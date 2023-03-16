@@ -24,3 +24,4 @@ Publications
    :maxdepth: 2
 
    started
+   cosmo
