@@ -45,26 +45,26 @@ which replaces the velocity variable.
 The Drift update is defined as
 
 .. math::
-    \mathbf{r}(t_n+\Delta t) 
+    \mathbf{r}(t_n+\Delta t)
     = \mathbf{r}(t_n) + \mathbf{p}(t_n) \int_{t_n}^{t_n + \Delta t} \frac{dt}{a^2}
 
 and the Kick update is defined as
 
 .. math::
-    \mathbf{p}(t_n+\Delta t) 
+    \mathbf{p}(t_n+\Delta t)
     = \mathbf{p}(t_n) + \mathbf{a}(t_n) \int_{t_n}^{t_n + \Delta t} \frac{dt}{a}
 
 
 Using the substitution :math:`1/y = a'` and :math:`-y^{-2}dy = da` the
-respective integrals can be rewritten as 
+respective integrals can be rewritten as
 
 .. math::
-   \int_{t_n}^{t_n + \Delta t} \frac{dt}{a^2} 
+   \int_{t_n}^{t_n + \Delta t} \frac{dt}{a^2}
    = \int_{1/a(t_n)}^{1/a(t_n + \Delta t)} \frac{da}{aH}\frac{1}{a^2}
    = \int_{1/a(t_n)}^{1/a(t_n + \Delta t)} \frac{-y}{H(1/y)}da
 
 .. math::
-   \int_{t_n}^{t_n + \Delta t} \frac{dt}{a} 
+   \int_{t_n}^{t_n + \Delta t} \frac{dt}{a}
    = \int_{1/a(t_n)}^{1/a(t_n + \Delta t)} \frac{da}{aH}\frac{1}{a}
    = \int_{1/a(t_n)}^{1/a(t_n + \Delta t)} \frac{-1}{H(1/y)}da
 
