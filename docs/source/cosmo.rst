@@ -27,8 +27,8 @@ define the spatial curvature density :math:`\Omega_k = 1 - \Omega_0`, where
 Let :math:`y^{2/3} = a'` then :math:`\frac23 y^{-1/3}dy = da'` and
 
 .. math::
-   t(a) = \int_0^a \frac23 y^{-1/3}dy\frac{1}{y^{2/3}H(y^{2/3})}
-        = \int_0^a \frac23 \frac{dy}{yH(y^{2/3})}
+   t(a) = \int_0^{a^{3/2}} \frac23 y^{-1/3}dy\frac{1}{y^{2/3}H(y^{2/3})}
+        = \int_0^{a^{3/2}} \frac23 \frac{dy}{yH(y^{2/3})}
 
 
 The inverse function :math:`a(t)` is determine using a root-finding method.
