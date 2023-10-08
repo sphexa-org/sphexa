@@ -89,7 +89,7 @@ public:
     DevVector<HydroType> divv, curlv;                        // Div(velocity), Curl(velocity)
     DevVector<HydroType> ugrav;                              // Gravitational potential
     DevVector<HydroType> ax, ay, az;                         // acceleration
-    DevVector<RealType>  du;                                 // energy rate of change (du/dt)
+    DevVector<T>         du;                                 // energy rate of change (du/dt)
     DevVector<XM1Type>   du_m1;                              // previous energy rate of change (du/dt)
     DevVector<HydroType> c11, c12, c13, c22, c23, c33;       // IAD components
     DevVector<HydroType> alpha;                              // AV coeficient
@@ -99,6 +99,7 @@ public:
     DevVector<KeyType>   keys;                               // Particle space-filling-curve keys
     DevVector<unsigned>  nc;                                 // number of neighbors of each particle
     DevVector<HydroType> dV11, dV12, dV13, dV22, dV23, dV33; // Velocity gradient components
+    DevVector<RealType> gamma;                               // Adiabatic index per particle
     DevVector<uint8_t>   rung;                               // rung per particle of previous timestep
     DevVector<uint64_t>  id;                                 // unique particle id
 
@@ -117,7 +118,7 @@ public:
         "x",        "y",   "z",    "x_m1", "y_m1",  "z_m1", "vx",   "vy",   "vz",   "rho",   "u",     "p",     "prho",
         "tdpdTrho", "h",   "m",    "c",    "ugrav", "ax",   "ay",   "az",   "du",   "du_m1", "c11",   "c12",   "c13",
         "c22",      "c23", "c33",  "mue",  "mui",   "temp", "cv",   "xm",   "kx",   "divv",  "curlv", "alpha", "gradh",
-        "keys",     "nc",  "dV11", "dV12", "dV13",  "dV22", "dV23", "dV33", "rung", "id"};
+        "keys",     "nc",  "dV11", "dV12", "dV13",  "dV22", "dV23", "dV33", "gamma", "rung", "id"};
 
     /*! @brief return a tuple of field references
      *
@@ -127,7 +128,7 @@ public:
     {
         auto ret = std::tie(x, y, z, x_m1, y_m1, z_m1, vx, vy, vz, rho, u, p, prho, tdpdTrho, h, m, c, ugrav, ax, ay,
                             az, du, du_m1, c11, c12, c13, c22, c23, c33, mue, mui, temp, cv, xm, kx, divv, curlv, alpha,
-                            gradh, keys, nc, dV11, dV12, dV13, dV22, dV23, dV33, rung, id);
+                            gradh, keys, nc, dV11, dV12, dV13, dV22, dV23, dV33, gamma, rung, id);
 
         static_assert(std::tuple_size_v<decltype(ret)> == fieldNames.size());
         return ret;

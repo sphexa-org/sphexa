@@ -5,7 +5,8 @@ set(VE_KERNELS
         ve_def_gradh_gpu.cu
         iad_divv_curlv_gpu.cu
         av_switches_gpu.cu
-        momentum_energy_gpu.cu)
+        momentum_energy_gpu.cu
+        additional_fields.cu)
 
 if(CMAKE_HIP_COMPILER)
     set_source_files_properties(${VE_KERNELS} PROPERTIES LANGUAGE HIP)
