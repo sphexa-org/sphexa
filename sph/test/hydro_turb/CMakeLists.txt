@@ -1,5 +1,7 @@
 set(UNIT_TESTS
+        create_modes.cpp
         rng.cpp
+        stirring.cpp
         test_main.cpp
         )
 
