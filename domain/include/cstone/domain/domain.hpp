@@ -274,7 +274,7 @@ public:
             }
         } while (fail);
 
-        // diagnostics(keyView.size(), peers);
+        diagnostics(keyView.size(), peers);
 
         updateLayout(sorter, keyView, particleKeys, std::tie(x, y, z, h, m), particleProperties, scratch);
         setupHalos(particleKeys, x, y, z, h, scratch);
@@ -570,7 +570,10 @@ private:
             }
         }
 
-        int numFlags = std::count(focusTree_.haloFlags().begin(), focusTree_.haloFlags().end(), 1);
+        int numFlags   = std::count(focusTree_.haloFlags().begin(), focusTree_.haloFlags().end(), 1);
+        auto truePeers = oneSidedPeers(std::span{global_.assignment().data(), size_t(numRanks_ + 1)}, numRanks_,
+                                       myRank_, globalTree, focusTree);
+
         for (int i = 0; i < numRanks_; ++i)
         {
             if (i == myRank_)
@@ -583,7 +586,14 @@ private:
                 {
                     for (auto r : peers)
                     {
-                        std::cout << r << " ";
+                        bool isOnesided = std::count(truePeers.begin(), truePeers.end(), r) == 1;
+                        if (isOnesided) { std::cout << r << " "; }
+                        else { std::cout << "*" << r << " "; }
+                    }
+                    for (auto r : truePeers)
+                    {
+                        bool isTwosided = std::count(peers.begin(), peers.end(), r) == 1;
+                        if (not isTwosided) { std::cout << "!" << r << " "; }
                     }
                 }
                 std::cout << std::endl;

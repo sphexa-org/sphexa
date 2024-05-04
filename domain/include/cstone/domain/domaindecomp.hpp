@@ -191,7 +191,7 @@ void translateAssignment(const SfcAssignment<KeyType>& assignment,
 
 //! @brief Return a list of ranks (peers) which contain nodes in @p focusTree that don't exist in @p globalTree
 template<class KeyType>
-std::vector<int> oneSidedPeers(std::span<KeyType> boundaries,
+std::vector<int> oneSidedPeers(std::span<const KeyType> boundaries,
                                int numRanks,
                                int myRank,
                                std::span<const KeyType> globalTree,
