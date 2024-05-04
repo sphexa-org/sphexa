@@ -412,4 +412,46 @@ private:
     std::vector<uint8_t> macs_;
 };
 
+//! @brief Return a list of ranks (peers) which contain nodes in @p focusTree that don't exist in @p globalTree
+template<class KeyType>
+std::vector<int> focusPeers(std::span<const KeyType> boundaries,
+                                   int numRanks,
+                                   int myRank,
+                                   std::span<const KeyType> globalTree,
+                                   std::span<const KeyType> focusTree)
+{
+    std::vector<int> peerFlags(numRanks, 0);
+#pragma omp parallel for
+    for (int rank = 0; rank < numRanks; ++rank)
+    {
+        if (rank == myRank) { continue; }
+        auto globStart = std::lower_bound(globalTree.begin(), globalTree.end(), boundaries[rank]);
+        auto globEnd   = std::lower_bound(globalTree.begin(), globalTree.end(), boundaries[rank + 1]);
+
+        auto focStart = std::lower_bound(focusTree.begin(), focusTree.end(), boundaries[rank]);
+        auto focEnd   = std::upper_bound(focusTree.begin(), focusTree.end(), boundaries[rank + 1]) - 1;
+        if (focEnd < focStart) { focEnd = focStart; }
+
+        if (focEnd - focStart > globEnd - globStart) { peerFlags[rank] = 1; }
+        else { peerFlags[rank] = not std::includes(globStart, globEnd, focStart, focEnd); }
+    }
+    return peerFlags;
+}
+
+template<class KeyType>
+std::vector<int> oneSidedPeers(std::span<const KeyType> boundaries,
+                               int numRanks,
+                               int myRank,
+                               std::span<const KeyType> globalTree,
+                               std::span<const KeyType> focusTree)
+{
+    auto peerFlags = focusPeers(boundaries, numRanks, myRank, globalTree, focusTree);
+    std::vector<int> ret;
+    for (int rank = 0; rank < numRanks; ++rank)
+    {
+        if (peerFlags[rank]) { ret.push_back(rank); }
+    }
+    return ret;
+}
+
 } // namespace cstone

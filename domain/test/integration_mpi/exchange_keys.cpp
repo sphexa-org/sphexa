@@ -82,7 +82,7 @@ void exchangeKeys(int myRank, int numRanks)
         reference[myRank + 1].addRange(4, 6);
     }
 
-    SendList probe = exchangeRequestKeys<KeyType>(treeLeaves, assignment, peers, layout);
+    SendList probe = exchangeRequestKeys<KeyType>(treeLeaves, assignment, peers, peers, layout);
 
     EXPECT_EQ(probe, reference);
 }
@@ -142,8 +142,10 @@ void unequalSurface(int myRank, int numRanks)
         reference[1].addRange(layout[3], layout[7]);
     }
 
-    SendList probe = exchangeRequestKeys<KeyType>(treeLeaves, assignment, peers, layout);
-    EXPECT_EQ(probe, reference);
+    SendList probe = exchangeRequestKeys<KeyType>(treeLeaves, assignment, peers, peers, layout);
+
+    if (myRank == 1) { EXPECT_EQ(probe, reference); }
+    if (myRank == 0) { EXPECT_EQ(probe[1].totalCount(), nNodes(treeLeaves) - 2); }
 }
 
 TEST(ExchangeKeys, unequalSurface)

@@ -151,7 +151,7 @@ TEST(DomainDecomposition, limitBoundaryShifts)
     }
 }
 
-TEST(DomainDecomposition, createSendRanges)
+TEST(DomainDecomposition, createSendList)
 {
     using KeyType = uint64_t;
 

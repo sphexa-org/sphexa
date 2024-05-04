@@ -45,39 +45,39 @@ namespace cstone
 
 /*! @brief exchange subtree structures with peers
  *
- * @tparam      KeyType          32- or 64-bit unsigned integer
- * @param[in]   peerRanks        List of peer rank IDs
- * @param[in]   focusAssignment  The assignment of @p localLeaves to peer ranks
+ * @tparam      KeyType     32- or 64-bit unsigned integer
+ * @param[in]   extPeers    List of peer rank IDs to send data to
+ * @param[in]   intPeers    List of peer rank IDs to receive data from
+ * @param[in]   assignment  The assignment of @p localLeaves to peer ranks
  * @param[in]   leaves      The tree of the executing rank. Covers the global domain, but is locally focused.
- * @param[out]  treelets        The tree structures of REMOTE peer ranks covering the LOCALLY assigned part of
- *                               the tree. Each treelet covers the same SFC key range (the assigned range of
- *                               the executing rank) but is adaptively (MAC) resolved from the perspective of the
- *                               peer rank.
+ * @param[out]  treelets    The tree structures of REMOTE peer ranks covering the LOCALLY assigned part of the tree.
+ *                          Each treelet covers the same SFC key range (the assigned range of the executing rank)
+ *                          but is adaptively (MAC) resolved from the perspective of the peer rank.
  *
  * Note: peerTrees stores the view of REMOTE ranks for the LOCAL domain. While focusAssignment and localLeaves
  * contain the LOCAL view of REMOTE peer domains.
  */
 template<class KeyType>
-void exchangeTreelets(std::span<const int> peerRanks,
-                      std::span<const IndexPair<TreeNodeIndex>> focusAssignment,
+void exchangeTreelets(std::span<const int> extPeers,
+                      std::span<const int> intPeers,
+                      std::span<const IndexPair<TreeNodeIndex>> assignment,
                       std::span<const KeyType> leaves,
                       std::vector<std::vector<KeyType>>& treelets)
 {
     constexpr int keyTag = static_cast<int>(P2pTags::focusTreelets);
-    size_t numPeers      = peerRanks.size();
 
     std::vector<MPI_Request> sendRequests;
-    sendRequests.reserve(numPeers);
-    for (auto peer : peerRanks)
+    sendRequests.reserve(extPeers.size());
+    for (auto peer : extPeers)
     {
         // +1 to include the upper key boundary for the last node
-        TreeNodeIndex sendCount = focusAssignment[peer].count() + 1;
-        mpiSendAsync(leaves.data() + focusAssignment[peer].start(), sendCount, peer, keyTag, sendRequests);
+        TreeNodeIndex sendCount = assignment[peer].count() + 1;
+        mpiSendAsync(leaves.data() + assignment[peer].start(), sendCount, peer, keyTag, sendRequests);
     }
 
     std::vector<MPI_Request> receiveRequests;
-    receiveRequests.reserve(numPeers);
-    int numMessages = numPeers;
+    receiveRequests.reserve(intPeers.size());
+    int numMessages = int(intPeers.size());
     while (numMessages--)
     {
         MPI_Status status;
@@ -90,8 +90,8 @@ void exchangeTreelets(std::span<const int> peerRanks,
         mpiRecvAsync(treelets[receiveRank].data(), receiveSize, receiveRank, keyTag, receiveRequests);
     }
 
-    MPI_Waitall(int(numPeers), sendRequests.data(), MPI_STATUS_IGNORE);
-    MPI_Waitall(int(numPeers), receiveRequests.data(), MPI_STATUS_IGNORE);
+    MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUS_IGNORE);
+    MPI_Waitall(int(receiveRequests.size()), receiveRequests.data(), MPI_STATUS_IGNORE);
 }
 
 //! @brief flag treelet keys that don't exist in @p leaves as invalid
@@ -116,12 +116,12 @@ void checkTreelets(std::span<const int> peerRanks,
 
 //! @brief remove treelet keys flagged as invalid
 template<class KeyType>
-void pruneTreelets(std::span<const int> peerRanks, std::vector<std::vector<KeyType>>& treelets)
+void pruneTreelets(std::span<const int> intPeers, std::vector<std::vector<KeyType>>& treelets)
 {
 #pragma omp parallel for
-    for (size_t r = 0; r < peerRanks.size(); ++r)
+    for (size_t r = 0; r < intPeers.size(); ++r)
     {
-        int rank = peerRanks[r];
+        int rank = intPeers[r];
         auto it  = std::remove_if(treelets[rank].begin(), treelets[rank].end(), isMasked<KeyType>);
         treelets[rank].erase(it, treelets[rank].end());
     }
@@ -130,7 +130,8 @@ void pruneTreelets(std::span<const int> peerRanks, std::vector<std::vector<KeyTy
 /*! @brief exchange subtree structures with peers
  *
  * @tparam      KeyType      32- or 64-bit unsigned integer
- * @param[in]   peerRanks    List of peer rank IDs
+ * @param[in]   intPeers     List of internal-side peer rank IDs
+ * @param[in]   extPeers     List of external-side peer rank IDs
  * @param[in]   leaves       leaves of the LET
  * @param[in]   treelets     The tree structures of REMOTE peer ranks covering the LOCALLY assigned part of
  *                           the tree. Each treelet covers the same SFC key range (the assigned range of
@@ -143,20 +144,20 @@ void pruneTreelets(std::span<const int> peerRanks, std::vector<std::vector<KeyTy
  * contain the LOCAL view of REMOTE peer domains.
  */
 template<class KeyType>
-void exchangeRejectedKeys(std::span<const int> peerRanks,
+void exchangeRejectedKeys(std::span<const int> intPeers,
+                          std::span<const int> extPeers,
                           std::span<const KeyType> leaves,
                           const std::vector<std::vector<KeyType>>& treelets,
                           std::span<TreeNodeIndex> nodeOps)
 
 {
     constexpr int keyTag = static_cast<int>(P2pTags::focusTreelets) + 1;
-    size_t numPeers      = peerRanks.size();
 
     std::vector<MPI_Request> sendRequests;
-    sendRequests.reserve(numPeers);
+    sendRequests.reserve(intPeers.size());
 
     std::vector<std::vector<KeyType, util::DefaultInitAdaptor<KeyType>>> rejectedKeyBuffers;
-    for (auto peer : peerRanks)
+    for (auto peer : intPeers)
     {
         auto& treelet          = treelets[peer];
         TreeNodeIndex numNodes = nNodes(treelet);
@@ -170,7 +171,7 @@ void exchangeRejectedKeys(std::span<const int> peerRanks,
         rejectedKeyBuffers.push_back(std::move(rejectedKeys));
     }
 
-    int numMessages = numPeers;
+    int numMessages = extPeers.size();
     while (numMessages--)
     {
         MPI_Status status;
@@ -189,22 +190,23 @@ void exchangeRejectedKeys(std::span<const int> peerRanks,
         }
     }
 
-    MPI_Waitall(int(numPeers), sendRequests.data(), MPI_STATUS_IGNORE);
+    MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUS_IGNORE);
 }
 
 template<class KeyType>
-void syncTreelets(std::span<const int> peers,
-                  std::span<const IndexPair<TreeNodeIndex>> focusAssignment,
+void syncTreelets(std::span<const int> extPeers,
+                  std::span<const int> intPeers,
+                  std::span<const IndexPair<TreeNodeIndex>> assignment,
                   OctreeData<KeyType, CpuTag>& octree,
                   std::vector<KeyType>& leaves,
                   std::vector<std::vector<KeyType>>& treelets)
 {
-    exchangeTreelets<KeyType>(peers, focusAssignment, leaves, treelets);
-    checkTreelets<KeyType>(peers, leaves, treelets);
+    exchangeTreelets<KeyType>(extPeers, intPeers, assignment, leaves, treelets);
+    checkTreelets<KeyType>(intPeers, leaves, treelets);
 
     std::vector<TreeNodeIndex> nodeOps(leaves.size(), 1);
-    exchangeRejectedKeys<KeyType>(peers, leaves, treelets, nodeOps);
-    pruneTreelets<KeyType>(peers, treelets);
+    exchangeRejectedKeys<KeyType>(intPeers, extPeers, leaves, treelets, nodeOps);
+    pruneTreelets<KeyType>(intPeers, treelets);
 
     if (std::count(nodeOps.begin(), nodeOps.end(), 1) != std::make_signed_t<size_t>(nodeOps.size()))
     {
@@ -216,20 +218,21 @@ void syncTreelets(std::span<const int> peers,
 }
 
 template<class KeyType, class Vector>
-void syncTreeletsGpu(std::span<const int> peers,
+void syncTreeletsGpu(std::span<const int> extPeers,
+                     std::span<const int> intPeers,
                      std::span<const IndexPair<TreeNodeIndex>> assignment,
-                     std::span<const KeyType> leaves,
+                     const std::vector<KeyType>& leaves,
                      OctreeData<KeyType, GpuTag>& octreeAcc,
                      DeviceVector<KeyType>& leavesAcc,
                      std::vector<std::vector<KeyType>>& treelets,
                      Vector& scratch)
 {
-    exchangeTreelets<KeyType>(peers, assignment, leaves, treelets);
-    checkTreelets<KeyType>(peers, leaves, treelets);
+    exchangeTreelets<KeyType>(extPeers, intPeers, assignment, leaves, treelets);
+    checkTreelets<KeyType>(intPeers, leaves, treelets);
 
     std::vector<TreeNodeIndex> nodeOps(leaves.size(), 1);
-    exchangeRejectedKeys<KeyType>(peers, leaves, treelets, nodeOps);
-    pruneTreelets<KeyType>(peers, treelets);
+    exchangeRejectedKeys<KeyType>(intPeers, extPeers, leaves, treelets, nodeOps);
+    pruneTreelets<KeyType>(intPeers, treelets);
 
     if (std::count(nodeOps.begin(), nodeOps.end(), 1) != nodeOps.size())
     {
@@ -297,7 +300,8 @@ void indexTreelets(std::span<const int> peerRanks,
 }
 
 template<class T, class DevVec>
-void exchangeTreeletGeneral(std::span<const int> peerRanks,
+void exchangeTreeletGeneral(std::span<const int> intPeers,
+                            std::span<const int> extPeers,
                             std::span<const std::span<const TreeNodeIndex>> treeletIdx,
                             std::span<const IndexPair<TreeNodeIndex>> focusAssignment,
                             std::span<const TreeNodeIndex> csToInternalMap,
@@ -308,30 +312,30 @@ void exchangeTreeletGeneral(std::span<const int> peerRanks,
     constexpr int alignmentBytes = 64;
     constexpr bool useGpu        = IsDeviceVector<DevVec>{};
 
-    std::vector<std::size_t> treeletSizes(2 * peerRanks.size());
-    for (size_t i = 0; i < peerRanks.size(); ++i)
-    {
-        treeletSizes[i]                    = treeletIdx[peerRanks[i]].size();       // send buffers
-        treeletSizes[i + peerRanks.size()] = focusAssignment[peerRanks[i]].count(); // recv buffers
-    }
+    std::vector<std::size_t> treeletSizes(intPeers.size() + extPeers.size());
+    for (size_t i = 0; i < intPeers.size(); ++i)
+        treeletSizes[i] = treeletIdx[intPeers[i]].size(); // send buffers
+    for (size_t i = 0; i < extPeers.size(); ++i)
+        treeletSizes[i + intPeers.size()] = focusAssignment[extPeers[i]].count(); // recv buffers
 
     size_t origSize    = scratch.size();
     auto packedBuffers = util::packAllocBuffer<T>(scratch, treeletSizes, alignmentBytes);
-    std::span<std::span<T>> sendBuffers{packedBuffers.data(), peerRanks.size()};
-    std::span<std::span<T>> recvBuffers{packedBuffers.data() + peerRanks.size(), peerRanks.size()};
+    std::span<std::span<T>> sendBuffers{packedBuffers.data(), intPeers.size()};
+    std::span<std::span<T>> recvBuffers{packedBuffers.data() + intPeers.size(), extPeers.size()};
 
     std::vector<std::vector<T, util::DefaultInitAdaptor<T>>> staging; // only used if GPU-direct is not active
     std::vector<MPI_Request> sendRequests;
-    sendRequests.reserve(peerRanks.size());
-    for (size_t i = 0; i < peerRanks.size(); ++i)
+    sendRequests.reserve(intPeers.size());
+    for (size_t i = 0; i < intPeers.size(); ++i)
     {
-        gatherAcc<useGpu, TreeNodeIndex>(treeletIdx[peerRanks[i]], quantities.data(), sendBuffers[i].data());
+        gatherAcc<useGpu, TreeNodeIndex>(treeletIdx[intPeers[i]], quantities.data(), sendBuffers[i].data());
         if constexpr (useGpu) { syncGpu(); }
-        mpiSendAsyncAcc<useGpu>(sendBuffers[i].data(), treeletIdx[peerRanks[i]].size(), peerRanks[i], commTag,
+        assert(sendBuffers[i].size() == treeletIdx[intPeers[i]].size());
+        mpiSendAsyncAcc<useGpu>(sendBuffers[i].data(), treeletIdx[intPeers[i]].size(), intPeers[i], commTag,
                                 sendRequests, staging);
     }
 
-    int numMessages = peerRanks.size();
+    int numMessages = extPeers.size();
     while (numMessages--)
     {
         MPI_Status status;
@@ -340,7 +344,7 @@ void exchangeTreeletGeneral(std::span<const int> peerRanks,
         TreeNodeIndex recvCount;
         mpiGetCount<T>(&status, &recvCount);
 
-        int peerIdx = std::find(peerRanks.begin(), peerRanks.end(), recvRank) - peerRanks.begin();
+        int peerIdx = std::find(extPeers.begin(), extPeers.end(), recvRank) - extPeers.begin();
         T* recvBuf  = recvBuffers[peerIdx].data();
         mpiRecvSyncAcc<useGpu>(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE);
 
