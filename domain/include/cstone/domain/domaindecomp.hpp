@@ -54,7 +54,7 @@ void uniformBins(const std::vector<IndexType>& counts, std::span<TreeNodeIndex> 
     binCounts.back() = countScan.back() - countScan[bins[numBins - 1]];
 }
 
-//! @brief Stores which parts of the SFC belong to which rank. Each rank as an identical copy
+//! @brief Stores which parts of the SFC belong to which rank. Each rank has an identical copy
 template<class KeyType>
 class SfcAssignment
 {
@@ -187,6 +187,36 @@ void translateAssignment(const SfcAssignment<KeyType>& assignment,
     TreeNodeIndex newStartIndex = findNodeAbove(focusTree.data(), focusTree.size(), assignment[myRank]);
     TreeNodeIndex newEndIndex   = findNodeBelow(focusTree.data(), focusTree.size(), assignment[myRank + 1]);
     focusAssignment[myRank]     = TreeIndexPair(newStartIndex, newEndIndex);
+}
+
+//! @brief Return a list of ranks (peers) which contain nodes in @p focusTree that don't exist in @p globalTree
+template<class KeyType>
+std::vector<int> oneSidedPeers(std::span<KeyType> boundaries,
+                               int numRanks,
+                               int myRank,
+                               std::span<const KeyType> globalTree,
+                               std::span<const KeyType> focusTree)
+{
+    std::vector<int> peerFlags(numRanks);
+#pragma omp parallel for
+    for (int rank = 0; rank < numRanks; ++rank)
+    {
+        auto globStart = std::lower_bound(globalTree.begin(), globalTree.end(), boundaries[rank]);
+        auto globEnd   = std::lower_bound(globalTree.begin(), globalTree.end(), boundaries[rank + 1]);
+
+        auto focStart = std::lower_bound(focusTree.begin(), focusTree.end(), boundaries[rank]);
+        auto focEnd   = std::upper_bound(focusTree.begin(), focusTree.end(), boundaries[rank + 1]) - 1;
+        if (focEnd < focStart) { focEnd = focStart; }
+
+        if (focEnd - focStart > globEnd - globStart) { peerFlags[rank] = 1; }
+        else { peerFlags[rank] = not std::includes(globStart, globEnd, focStart, focEnd); }
+    }
+    std::vector<int> ret;
+    for (int rank = 0; rank < numRanks; ++rank)
+    {
+        if (rank != myRank && peerFlags[rank]) { ret.push_back(rank); }
+    }
+    return ret;
 }
 
 /*! @brief Based on global assignment, create the list of local particle index ranges to send to each rank
