@@ -105,16 +105,9 @@ public:
             prevFocusEnd   = focusEnd;
         }
 
-        std::vector<KeyType> enforcedKeys;
-        enforcedKeys.reserve(peers_.size() * 2);
-
+        std::vector<KeyType> enforcedKeys{focusStart, focusEnd};
         focusTransfer<KeyType>(leaves_, leafCounts_, bucketSize_, myRank_, prevFocusStart, prevFocusEnd, focusStart,
                                focusEnd, enforcedKeys);
-        for (int peer : peers_)
-        {
-            enforcedKeys.push_back(assignment[peer]);
-            enforcedKeys.push_back(assignment[peer + 1]);
-        }
         auto uniqueEnd = std::unique(enforcedKeys.begin(), enforcedKeys.end());
         enforcedKeys.erase(uniqueEnd, enforcedKeys.end());
 
