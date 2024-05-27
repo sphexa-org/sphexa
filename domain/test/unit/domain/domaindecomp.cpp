@@ -136,22 +136,6 @@ TEST(DomainDecomposition, limitBoundaryShifts)
     }
 }
 
-TEST(DomainDecomposition, oneSidedPeers)
-{
-    using KeyType = uint64_t;
-
-    // clang-format off
-    //   rank                       0     1       2               3           4
-    std::vector<KeyType> globalTree{0,    10, 20, 30, 40, 50,     60, 70, 80, 90, 100,      200};
-    std::vector<KeyType> boundaries{0,    10,     30,                 70,         100,      200};
-    std::vector<KeyType> focusTree {0,                40, 50, 55, 60, 70, 75, 90,      150, 200};
-    // clang-format on
-
-    auto probe = oneSidedPeers<KeyType>(boundaries, boundaries.size() - 1, 3, globalTree, focusTree);
-    std::vector<int> ref{2, 4};
-    EXPECT_EQ(probe, ref);
-}
-
 TEST(DomainDecomposition, createSendList)
 {
     using KeyType = uint64_t;

@@ -167,29 +167,24 @@ void limitBoundaryShifts(const SfcAssignment<KeyType> oldAssignment,
 template<class KeyType>
 void translateAssignment(const SfcAssignment<KeyType>& assignment,
                          std::span<const KeyType> focusTree,
-                         std::span<const int> peerRanks,
-                         int myRank,
                          std::vector<TreeIndexPair>& focusAssignment)
 {
-    focusAssignment.resize(assignment.numRanks());
+    int numRanks = assignment.numRanks();
+    focusAssignment.resize(numRanks);
     std::fill(focusAssignment.begin(), focusAssignment.end(), TreeIndexPair(0, 0));
-    for (int peer : peerRanks)
+#pragma omp parallel for schedule(static)
+    for (int rank = 0; rank < numRanks; ++rank)
     {
         // Note: start-end range is narrowed down if no exact match is found.
-        // the discarded part will not participate in peer/halo exchanges
-        TreeNodeIndex startIndex = findNodeAbove(focusTree.data(), focusTree.size(), assignment[peer]);
-        TreeNodeIndex endIndex   = findNodeBelow(focusTree.data(), focusTree.size(), assignment[peer + 1]);
+        TreeNodeIndex startIndex = findNodeAbove(focusTree.data(), focusTree.size(), assignment[rank]);
+        TreeNodeIndex endIndex   = findNodeBelow(focusTree.data(), focusTree.size(), assignment[rank + 1]);
 
         if (endIndex < startIndex) { endIndex = startIndex; }
-        focusAssignment[peer] = TreeIndexPair(startIndex, endIndex);
+        focusAssignment[rank] = TreeIndexPair(startIndex, endIndex);
     }
-
-    TreeNodeIndex newStartIndex = findNodeAbove(focusTree.data(), focusTree.size(), assignment[myRank]);
-    TreeNodeIndex newEndIndex   = findNodeBelow(focusTree.data(), focusTree.size(), assignment[myRank + 1]);
-    focusAssignment[myRank]     = TreeIndexPair(newStartIndex, newEndIndex);
 }
 
-static void extractPeerRanges(std::span<const int> peers,
+inline void extractPeerRanges(std::span<const int> peers,
                               int myRank,
                               std::span<const TreeIndexPair> focusAssignment,
                               std::vector<TreeIndexPair>& peerRanges)
@@ -198,36 +193,6 @@ static void extractPeerRanges(std::span<const int> peers,
     gather<int>(peers, focusAssignment.data(), peerRanges.data());
     peerRanges.back() = focusAssignment[myRank];
     std::sort(peerRanges.begin(), peerRanges.end());
-}
-
-//! @brief Return a list of ranks (peers) which contain nodes in @p focusTree that don't exist in @p globalTree
-template<class KeyType>
-std::vector<int> oneSidedPeers(std::span<const KeyType> boundaries,
-                               int numRanks,
-                               int myRank,
-                               std::span<const KeyType> globalTree,
-                               std::span<const KeyType> focusTree)
-{
-    std::vector<int> peerFlags(numRanks);
-#pragma omp parallel for
-    for (int rank = 0; rank < numRanks; ++rank)
-    {
-        auto globStart = std::lower_bound(globalTree.begin(), globalTree.end(), boundaries[rank]);
-        auto globEnd   = std::lower_bound(globalTree.begin(), globalTree.end(), boundaries[rank + 1]);
-
-        auto focStart = std::lower_bound(focusTree.begin(), focusTree.end(), boundaries[rank]);
-        auto focEnd   = std::upper_bound(focusTree.begin(), focusTree.end(), boundaries[rank + 1]) - 1;
-        if (focEnd < focStart) { focEnd = focStart; }
-
-        if (focEnd - focStart > globEnd - globStart) { peerFlags[rank] = 1; }
-        else { peerFlags[rank] = not std::includes(globStart, globEnd, focStart, focEnd); }
-    }
-    std::vector<int> ret;
-    for (int rank = 0; rank < numRanks; ++rank)
-    {
-        if (rank != myRank && peerFlags[rank]) { ret.push_back(rank); }
-    }
-    return ret;
 }
 
 /*! @brief Based on global assignment, create the list of local particle index ranges to send to each rank

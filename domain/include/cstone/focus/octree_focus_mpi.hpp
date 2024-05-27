@@ -81,20 +81,21 @@ public:
 
     /*! @brief Update the tree structure according to previously calculated criteria (MAC and particle counts)
      *
-     * @param[in] peerRanks        list of ranks with nodes that fail the MAC in the SFC part assigned to @p myRank
      * @param[in] assignment       assignment of the global leaf tree to ranks
+     * @param[in] globalLeaves     SFC leaf keys of the global octree
+     * @param[in] box              global coordinate bounding box
      * @return                     true if the tree structure did not change
      *
      * The part of the SFC that is assigned to @p myRank is considered as the focus area.
      */
-    bool updateTree(std::span<const int> peerRanks, const SfcAssignment<KeyType>& assignment, const Box<RealType>& box)
+    bool updateTree(const SfcAssignment<KeyType>& assignment,
+                    std::span<const KeyType> globalLeaves,
+                    const Box<RealType>& box)
     {
         if (rebalanceStatus_ != valid)
         {
             throw std::runtime_error("update of criteria required before updating the tree structure\n");
         }
-        peers_.resize(peerRanks.size());
-        std::copy(peerRanks.begin(), peerRanks.end(), peers_.begin());
 
         KeyType focusStart = assignment[myRank_];
         KeyType focusEnd   = assignment[myRank_ + 1];
@@ -134,19 +135,20 @@ public:
                                  focusEnd, invThetaRefine, box))
                 ;
         }
-        translateAssignment<KeyType>(assignment, leaves_, peers_, myRank_, assignment_);
+        findPeers(assignment, globalLeaves);
+        translateAssignment<KeyType>(assignment, leaves_, assignment_);
 
         if constexpr (HaveGpu<Accelerator>{})
         {
-            syncTreeletsGpu<KeyType>(peers_, assignment_, leaves_, octreeAcc_, leavesAcc_, treelets_);
+            syncTreeletsGpu<KeyType>(recvPeers_, sendPeers_, assignment_, leaves_, octreeAcc_, leavesAcc_, treelets_);
             downloadOctree();
         }
-        else { syncTreelets(peers_, assignment_, treeData_, leaves_, treelets_); }
+        else { syncTreelets(recvPeers_, sendPeers_, assignment_, treeData_, leaves_, treelets_); }
 
-        indexTreelets<KeyType>(peerRanks, treeData_.prefixes, treeData_.levelRange, treelets_, treeletIdx_);
+        indexTreelets<KeyType>(sendPeers_, treeData_.prefixes, treeData_.levelRange, treelets_, treeletIdx_);
 
-        translateAssignment<KeyType>(assignment, leaves_, peers_, myRank_, assignment_);
-        extractPeerRanges(peers_, myRank_, assignment_, peerRanges_);
+        translateAssignment<KeyType>(assignment, leaves_, assignment_);
+        extractPeerRanges(recvPeers_, myRank_, assignment_, peerRanges_);
         std::copy_n(assignment.data(), numRanks_ + 1, globAssignment_.data());
         copy(treeletIdx_, treeletIdxAcc_);
 
@@ -196,7 +198,7 @@ public:
                                  std::numeric_limits<unsigned>::max(), false);
 
             // add counts from global tree
-            auto idxFromGlob       = enumerateRanges(invertRanges(0, assignment_, numLeafNodes));
+            auto idxFromGlob       = enumerateRanges(invertRanges(0, peerRanges_, numLeafNodes));
             std::size_t numIndices = idxFromGlob.size();
             auto* d_indices        = util::packAllocBuffer<TreeNodeIndex>(scratch, {&numIndices, 1}, 64)[0].data();
             memcpyH2D(idxFromGlob.data(), idxFromGlob.size(), d_indices);
@@ -228,7 +230,7 @@ public:
                                        std::numeric_limits<unsigned>::max(), true);
 
             // add counts from global tree
-            auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, nNodes(leaves_)));
+            auto idxFromGlob = enumerateRanges(invertRanges(0, peerRanges_, nNodes(leaves_)));
             rangeCount<KeyType>(globalTreeLeaves, globalCounts, leaves, idxFromGlob, leafCounts_);
 
             // 1st upsweep with local and global data
@@ -251,14 +253,15 @@ public:
     template<class T, class DevVec>
     void peerExchange(std::span<T> q, int commTag, DevVec& s) const
     {
-        exchangeTreeletGeneral<T>(peers_, treeletIdx_.view(), assignment_, leafToInternal(treeData_), q, commTag, s);
+        exchangeTreeletGeneral<T>(sendPeers_, recvPeers_, treeletIdx_.view(), assignment_, leafToInternal(treeData_), q,
+                                  commTag, s);
     }
 
     template<class T, class DevVec>
     void peerExchangeGpu(std::span<T> q, int commTag, DevVec& s) const
     {
-        exchangeTreeletGeneral<T>(peers_, treeletIdxAcc_.view(), assignment_, leafToInternal(octreeAcc_), q, commTag,
-                                  s);
+        exchangeTreeletGeneral<T>(sendPeers_, recvPeers_, treeletIdxAcc_.view(), assignment_,
+                                  leafToInternal(octreeAcc_), q, commTag, s);
     }
 
     /*! @brief transfer quantities of leaf cells inside the focus into a global array
@@ -590,7 +593,7 @@ public:
     template<class DeviceVector = std::vector<KeyType>>
     void converge(const Box<RealType>& box,
                   std::span<const KeyType> particleKeys,
-                  std::span<const int> peers,
+                  std::span<const int> /*peers*/,
                   const SfcAssignment<KeyType>& assignment,
                   std::span<const KeyType> globalTreeLeaves,
                   std::span<const unsigned> globalCounts,
@@ -601,7 +604,7 @@ public:
         while (converged != numRanks_)
         {
             updateMinMac(assignment, invThetaEff);
-            converged = updateTree(peers, assignment, box);
+            converged = updateTree(assignment, globalTreeLeaves, box);
             updateCounts(particleKeys, globalTreeLeaves, globalCounts, scratch);
             updateGeoCenters();
             MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
@@ -671,6 +674,30 @@ private:
         else { nodeFpCenters<KeyType>(treeData_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_); }
     }
 
+    void findPeers(const SfcAssignment<KeyType>& assignment, std::span<const KeyType> globalLeaves)
+    {
+        std::vector<KeyType> globalTreeBackingBuffer;
+        if constexpr (cstone::HaveGpu<Accelerator>{})
+        {
+            globalTreeBackingBuffer.resize(globalLeaves.size());
+            memcpyD2H(globalLeaves.data(), globalLeaves.size(), globalTreeBackingBuffer.data());
+            globalLeaves = std::span(globalTreeBackingBuffer);
+        }
+        auto extPeers = oneSidedPeerFlags<KeyType>({assignment.data(), size_t(numRanks_ + 1)}, numRanks_, myRank_,
+                                                   globalLeaves, leaves_);
+
+        std::vector<int> intPeers(numRanks_, 0);
+        MPI_Alltoall(extPeers.data(), 1, MPI_INT, intPeers.data(), 1, MPI_INT, MPI_COMM_WORLD);
+
+        sendPeers_.clear();
+        recvPeers_.clear();
+        for (int rank = 0; rank < numRanks_; ++rank)
+        {
+            if (extPeers[rank]) { recvPeers_.push_back(rank); }
+            if (intPeers[rank]) { sendPeers_.push_back(rank); }
+        }
+    }
+
     void uploadOctree()
     {
         if constexpr (HaveGpu<Accelerator>{})
@@ -736,7 +763,7 @@ private:
     Box<RealType> box_{0, 1};
 
     //! @brief list of peer ranks from last call to updateTree()
-    std::vector<int> peers_;
+    std::vector<int> sendPeers_, recvPeers_;
     //! @brief the tree structures that the peers have for the domain of the executing rank (myRank_)
     std::vector<std::vector<KeyType>> treelets_;
     ConcatVector<TreeNodeIndex> treeletIdx_;
