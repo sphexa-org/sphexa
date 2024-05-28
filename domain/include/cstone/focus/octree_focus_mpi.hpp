@@ -146,6 +146,7 @@ public:
         indexTreelets<KeyType>(peerRanks, treeData_.prefixes, treeData_.levelRange, treelets_, treeletIdx_);
 
         translateAssignment<KeyType>(assignment, leaves_, peers_, myRank_, assignment_);
+        extractPeerRanges(peers_, myRank_, assignment_, peerRanges_);
         std::copy_n(assignment.data(), numRanks_ + 1, globAssignment_.data());
         copy(treeletIdx_, treeletIdxAcc_);
 
@@ -307,7 +308,7 @@ public:
         const KeyType* prefixes         = rawPtr(treeData_.prefixes);
         const TreeNodeIndex* toInternal = leafToInternal(treeData_).data();
         //! list of leaf cell indices in the locally focused tree that need global information
-        auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, treeData_.numLeafNodes));
+        auto idxFromGlob = enumerateRanges(invertRanges(0, peerRanges_, treeData_.numLeafNodes));
         std::transform(idxFromGlob.begin(), idxFromGlob.end(), idxFromGlob.begin(),
                        [m = toInternal](auto i) { return m[i]; });
 
@@ -774,7 +775,7 @@ private:
     //! @brief we also need to hold on to the expansion centers of the global tree for the multipole upsweep
     std::vector<SourceCenterType<RealType>> globalCenters_;
     //! @brief the assignment of peer ranks to tree_.treeLeaves()
-    std::vector<TreeIndexPair> assignment_;
+    std::vector<TreeIndexPair> assignment_, peerRanges_;
     //! @brief global domain boundary SFC keys
     std::vector<KeyType> globAssignment_;
 

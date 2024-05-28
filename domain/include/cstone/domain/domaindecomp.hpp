@@ -189,6 +189,17 @@ void translateAssignment(const SfcAssignment<KeyType>& assignment,
     focusAssignment[myRank]     = TreeIndexPair(newStartIndex, newEndIndex);
 }
 
+static void extractPeerRanges(std::span<const int> peers,
+                              int myRank,
+                              std::span<const TreeIndexPair> focusAssignment,
+                              std::vector<TreeIndexPair>& peerRanges)
+{
+    peerRanges.resize(peers.size() + 1);
+    gather<int>(peers, focusAssignment.data(), peerRanges.data());
+    peerRanges.back() = focusAssignment[myRank];
+    std::sort(peerRanges.begin(), peerRanges.end());
+}
+
 //! @brief Return a list of ranks (peers) which contain nodes in @p focusTree that don't exist in @p globalTree
 template<class KeyType>
 std::vector<int> oneSidedPeers(std::span<const KeyType> boundaries,
