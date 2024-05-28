@@ -683,9 +683,9 @@ private:
             memcpyD2H(globalLeaves.data(), globalLeaves.size(), globalTreeBackingBuffer.data());
             globalLeaves = std::span(globalTreeBackingBuffer);
         }
-        auto extPeers = oneSidedPeerFlags<KeyType>({assignment.data(), size_t(numRanks_ + 1)}, numRanks_, myRank_,
-                                                   globalLeaves, leaves_);
 
+        auto extPeers =
+            focusPeers<KeyType>({assignment.data(), size_t(numRanks_ + 1)}, numRanks_, myRank_, globalLeaves, leaves_);
         std::vector<int> intPeers(numRanks_, 0);
         MPI_Alltoall(extPeers.data(), 1, MPI_INT, intPeers.data(), 1, MPI_INT, MPI_COMM_WORLD);
 
