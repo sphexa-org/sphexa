@@ -197,7 +197,7 @@ public:
         reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
         focusTree_.discoverHalos({rawPtr(layoutAcc_), layoutAcc_.size()}, rawPtr(h), haloSearchExt_, get<0>(scratch));
         focusTree_.computeLayout(layout_);
-        halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), peers, peers, layout_);
+        halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), layout_);
 
         updateLayout(sorter, keyView, particleKeys, std::tie(h), std::tuple_cat(std::tie(x, y, z), particleProperties),
                      scratch);
@@ -265,7 +265,7 @@ public:
             fail = focusTree_.computeLayout(layout_);
             MPI_Allreduce(MPI_IN_PLACE, &fail, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
-            halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), peers, peers, layout_);
+            halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), layout_);
 
             if (fail)
             {
@@ -570,9 +570,12 @@ private:
             }
         }
 
-        int numFlags   = std::count(focusTree_.haloFlags().begin(), focusTree_.haloFlags().end(), 1);
-        auto truePeers = oneSidedPeers(std::span{global_.assignment().data(), size_t(numRanks_ + 1)}, numRanks_,
-                                       myRank_, globalTree, focusTree);
+        int numFlags = std::count(focusTree_.haloFlags().begin(), focusTree_.haloFlags().end(), 1);
+        auto fPeers  = oneSidedPeers<KeyType>({global_.assignment().data(), size_t(numRanks_ + 1)}, numRanks_, myRank_,
+                                             globalTree, focusTree);
+        auto hPeerFlags = haloPeers(myRank_, layout_, focusTree_.assignment());
+        std::vector<int> hPeers;
+        detail::compactPeers(hPeerFlags, hPeers);
 
         for (int i = 0; i < numRanks_; ++i)
         {
@@ -586,11 +589,13 @@ private:
                 {
                     for (auto r : peers)
                     {
-                        bool isOnesided = std::count(truePeers.begin(), truePeers.end(), r) == 1;
-                        if (isOnesided) { std::cout << r << " "; }
+                        bool isFocus = std::count(fPeers.begin(), fPeers.end(), r) == 1;
+                        bool isHalo  = std::count(hPeers.begin(), hPeers.end(), r) == 1;
+                        if (isFocus and isHalo) { std::cout << r << " "; }
+                        else if (isHalo and not isFocus) { std::cout << "^" << r << " ";}
                         else { std::cout << "*" << r << " "; }
                     }
-                    for (auto r : truePeers)
+                    for (auto r : fPeers)
                     {
                         bool isTwosided = std::count(peers.begin(), peers.end(), r) == 1;
                         if (not isTwosided) { std::cout << "!" << r << " "; }

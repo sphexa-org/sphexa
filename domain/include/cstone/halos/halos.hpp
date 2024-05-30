@@ -20,8 +20,7 @@
 #include "cstone/domain/exchange_keys.hpp"
 #include "cstone/domain/index_ranges.hpp"
 #include "cstone/halos/exchange_halos.hpp"
-
-#include <sys/socket.h>
+#include "cstone/halos/halo_peers.hpp"
 #ifdef USE_CUDA
 #include "cstone/halos/exchange_halos_gpu.cuh"
 #endif
@@ -50,8 +49,6 @@ public:
      *
      * @param[in]  leaves      (focus) tree leaves
      * @param[in]  assignment  assignment of @p leaves to ranks
-     * @param[in]  sendPeers   list of interior peer ranks (remote ranks requiring halos from the local rank)
-     * @param[in]  recvPeers   list of exterior peer ranks (local rank requires halos from them)
      * @param[out] layout      Particle offsets for each node in @p leaves w.r.t to the final particle buffers,
      *                         including the halos, length = counts.size() + 1. The last element contains
      *                         the total number of locally present particles, i.e. assigned + halos.
@@ -62,15 +59,16 @@ public:
      */
     int exchangeRequests(std::span<const KeyType> leaves,
                          std::span<const TreeIndexPair> assignment,
-                         std::span<const int> sendPeers,
-                         std::span<const int> recvPeers,
                          std::span<const LocalIndex> layout)
     {
-        outgoingHaloIndices_ = exchangeRequestKeys<KeyType>(leaves, assignment, sendPeers, recvPeers, layout);
+        auto extPeerFlags = haloPeers(myRank_, layout, assignment);
+        exchangePeers(extPeerFlags, extPeers_, intPeers_);
+
+        outgoingHaloIndices_ = exchangeRequestKeys<KeyType>(leaves, assignment, extPeers_, intPeers_, layout);
 
         incomingHaloIndices_.resize(assignment.size());
         std::fill(incomingHaloIndices_.begin(), incomingHaloIndices_.end(), RecvList::value_type{0, 0});
-        for (int peer : recvPeers)
+        for (int peer : extPeers_)
         {
             incomingHaloIndices_[peer] = {layout[assignment[peer].start()], layout[assignment[peer].end()]};
         }
@@ -112,6 +110,8 @@ private:
 
     RecvList incomingHaloIndices_;
     SendList outgoingHaloIndices_;
+
+    std::vector<int> extPeers_, intPeers_;
 
     /*! @brief Counter for halo exchange calls
      * Multiple client calls to domain::exchangeHalos() during a time-step
