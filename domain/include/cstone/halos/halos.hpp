@@ -57,9 +57,9 @@ public:
      *                         and the corresponding layout range has length zero.
      * @return                 0 if all halo cells have been matched with a peer rank, 1 otherwise
      */
-    int exchangeRequests(std::span<const KeyType> leaves,
-                         std::span<const TreeIndexPair> assignment,
-                         std::span<const LocalIndex> layout)
+    void exchangeRequests(std::span<const KeyType> leaves,
+                          std::span<const TreeIndexPair> assignment,
+                          std::span<const LocalIndex> layout)
     {
         auto extPeerFlags = haloPeers(myRank_, layout, assignment);
         exchangePeers(extPeerFlags, extPeers_, intPeers_);
@@ -72,8 +72,6 @@ public:
         {
             incomingHaloIndices_[peer] = {layout[assignment[peer].start()], layout[assignment[peer].end()]};
         }
-
-        return 0;
     }
 
     /*! @brief repeat the halo exchange pattern from the previous sync operation for a different set of arrays

@@ -182,12 +182,10 @@ public:
         gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0, std::tie(h),
                      util::reverse(scratch));
 
-        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), 1.0 / theta_);
-        float invThetaEff      = invThetaMinMac(theta_);
-
+        float invThetaEff = invThetaMinMac(theta_);
         if (firstCall_)
         {
-            focusTree_.converge(box(), keyView, peers, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
+            focusTree_.converge(box(), keyView, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
                                 invThetaEff, std::get<0>(scratch));
         }
         focusTree_.updateMinMac(global_.assignment(), invThetaEff);
@@ -226,13 +224,10 @@ public:
         gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
                      std::tie(x, y, z, h, m), util::reverse(scratch));
 
-        float invThetaEff      = invThetaMinToVec(theta_);
-        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), invThetaEff);
-
         if (firstCall_)
         {
             // first rough convergence to avoid computing expansion centers of large nodes with a lot of particles
-            focusTree_.converge(box(), keyView, peers, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
+            focusTree_.converge(box(), keyView, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
                                 1.0, std::get<0>(scratch));
             focusTree_.updateMinMac(global_.assignment(), 1.0);
             int converged = 0, reps = 0;
@@ -274,7 +269,7 @@ public:
             }
         } while (fail);
 
-        diagnostics(keyView.size(), peers);
+        // diagnostics(keyView.size());
 
         updateLayout(sorter, keyView, particleKeys, std::tie(x, y, z, h, m), particleProperties, scratch);
         setupHalos(particleKeys, x, y, z, h, scratch);
@@ -536,7 +531,7 @@ private:
         bufDesc_     = newBufDesc;
     }
 
-    void diagnostics(size_t assignedSize, std::span<int> peers)
+    void diagnostics(size_t assignedSize)
     {
         auto focusAssignment = focusTree_.assignment();
         auto focusTree       = focusTree_.treeLeaves();
@@ -584,21 +579,20 @@ private:
                 std::cout << "rank " << i << " " << assignedSize << " " << layout_.back()
                           << " focus h/true/peers/loc/tot: " << numFlags << "/" << numFocusTruePeer << "/"
                           << numFocusPeers << "/" << focusAssignment[myRank_].count() << "/"
-                          << focusTree_.haloFlags().size() << " peers: [" << peers.size() << "] ";
-                if (numRanks_ <= 32)
+                          << focusTree_.haloFlags().size() << " peers: [" << std::max(hPeers.size(), fPeers.size())
+                          << "] ";
+                if (numRanks_ <= 64)
                 {
-                    for (auto r : peers)
-                    {
-                        bool isFocus = std::count(fPeers.begin(), fPeers.end(), r) == 1;
-                        bool isHalo  = std::count(hPeers.begin(), hPeers.end(), r) == 1;
-                        if (isFocus and isHalo) { std::cout << r << " "; }
-                        else if (isHalo and not isFocus) { std::cout << "^" << r << " ";}
-                        else { std::cout << "*" << r << " "; }
-                    }
                     for (auto r : fPeers)
                     {
-                        bool isTwosided = std::count(peers.begin(), peers.end(), r) == 1;
-                        if (not isTwosided) { std::cout << "!" << r << " "; }
+                        bool isHalo = std::count(hPeers.begin(), hPeers.end(), r) == 1;
+                        if (isHalo) { std::cout << r << " "; }
+                        else { std::cout << "*" << r << " "; }
+                    }
+                    for (auto r : hPeers)
+                    {
+                        bool isFocus = std::count(fPeers.begin(), fPeers.end(), r) == 1;
+                        if (not isFocus) { std::cout << "^" << r << " "; }
                     }
                 }
                 std::cout << std::endl;
