@@ -31,9 +31,9 @@
 
 #include "gtest/gtest.h"
 
-#include "cstone/domain/buffer_description.hpp"
+#include "cstone/util/pack_buffers.hpp"
 
-using namespace cstone;
+using namespace util;
 
 TEST(BufferDescription, computeByteOffsets1)
 {

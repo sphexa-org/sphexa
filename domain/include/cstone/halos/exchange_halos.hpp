@@ -54,7 +54,7 @@ void haloexchange(int epoch, const SendList& incomingHalos, const SendList& outg
         size_t sendCount = outgoingHalos[destinationRank].totalCount();
         if (sendCount == 0) continue;
 
-        std::vector<char> buffer(computeByteOffsets(sendCount, 1, arrays...).back());
+        std::vector<char> buffer(util::computeByteOffsets(sendCount, 1, arrays...).back());
 
         auto packSendBuffer = [outHalos = outgoingHalos[destinationRank]](auto arrayPair)
         {
@@ -65,7 +65,7 @@ void haloexchange(int epoch, const SendList& incomingHalos, const SendList& outg
             }
         };
 
-        auto packTuple = packBufferPtrs<1>(buffer.data(), sendCount, arrays...);
+        auto packTuple = util::packBufferPtrs<1>(buffer.data(), sendCount, arrays...);
         for_each_tuple(packSendBuffer, packTuple);
 
         mpiSendAsync(buffer.data(), buffer.size(), destinationRank, haloExchangeTag, sendRequests);
@@ -79,7 +79,7 @@ void haloexchange(int epoch, const SendList& incomingHalos, const SendList& outg
         numMessages += int(incomingHalo.totalCount() > 0);
         maxReceiveSize = std::max(maxReceiveSize, incomingHalo.totalCount());
     }
-    size_t maxReceiveBytes = computeByteOffsets(maxReceiveSize, 1, arrays...).back();
+    size_t maxReceiveBytes = util::computeByteOffsets(maxReceiveSize, 1, arrays...).back();
 
     std::vector<char> receiveBuffer(maxReceiveBytes);
 
@@ -99,7 +99,7 @@ void haloexchange(int epoch, const SendList& incomingHalos, const SendList& outg
             }
         };
 
-        auto packTuple = packBufferPtrs<1>(receiveBuffer.data(), receiveCount, arrays...);
+        auto packTuple = util::packBufferPtrs<1>(receiveBuffer.data(), receiveCount, arrays...);
         for_each_tuple(scatterRanges, packTuple);
 
         numMessages--;

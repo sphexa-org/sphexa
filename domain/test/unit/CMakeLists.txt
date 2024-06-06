@@ -1,6 +1,5 @@
 
 set(UNIT_TESTS
-        domain/buffer_description.cpp
         domain/domaindecomp.cpp
         domain/index_ranges.cpp
         domain/layout.cpp
@@ -29,6 +28,7 @@ set(UNIT_TESTS
         tree/octree.cpp
         tree/cs_util.cpp
         util/array.cpp
+        util/pack_buffers.cpp
         util/tuple_util.cpp
         util/type_list.cpp
         util/value_list.cpp

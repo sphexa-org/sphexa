@@ -329,14 +329,14 @@ void syncTreeletsGpu(gsl::span<const int> peers,
     {
         assert(octreeAcc.childOffsets.size() >= nodeOps.size());
         gsl::span<TreeNodeIndex> nops(rawPtr(octreeAcc.childOffsets), nodeOps.size());
-        memcpyH2D(nodeOps.data(), nodeOps.size(), nops.data());
+        memcpyH2D(rawPtr(nodeOps), nodeOps.size(), nops.data());
 
         exclusiveScanGpu(nops.data(), nops.data() + nops.size(), nops.data());
         TreeNodeIndex newNumLeafNodes;
         memcpyD2H(nops.data() + nops.size() - 1, 1, &newNumLeafNodes);
 
         auto& newLeaves = octreeAcc.prefixes;
-        reallocate(newLeaves, newNumLeafNodes + 1, 1.05);
+        reallocateDestructive(newLeaves, newNumLeafNodes + 1, 1.05);
         rebalanceTreeGpu(rawPtr(leavesAcc), nNodes(leavesAcc), newNumLeafNodes, nops.data(), rawPtr(newLeaves));
         swap(newLeaves, leavesAcc);
 

@@ -86,10 +86,10 @@ void haloExchangeGpu(int epoch,
         auto gatherArray = [d_range, d_rangeScan, numRanges = outHalos.nRanges(), sendCount](auto arrayPtr)
         { gatherRanges(d_rangeScan, d_range, numRanges, arrayPtr[0], arrayPtr[1], sendCount); };
 
-        for_each_tuple(gatherArray, packBufferPtrs<alignment>(sendPtr, sendCount, arrays...));
+        for_each_tuple(gatherArray, util::packBufferPtrs<alignment>(sendPtr, sendCount, arrays...));
         checkGpuErrors(cudaDeviceSynchronize());
 
-        size_t numBytesSend = computeByteOffsets(sendCount, alignment, arrays...).back();
+        size_t numBytesSend = util::computeByteOffsets(sendCount, alignment, arrays...).back();
         mpiSendGpuDirect(sendPtr, numBytesSend, int(destinationRank), haloExchangeTag, sendRequests, sendBuffers);
         sendPtr += numBytesSend;
     }
@@ -101,7 +101,7 @@ void haloExchangeGpu(int epoch,
         numMessages += int(incomingHalo.totalCount() > 0);
         maxReceiveSize = std::max(maxReceiveSize, incomingHalo.totalCount());
     }
-    size_t maxReceiveBytes = computeByteOffsets(maxReceiveSize, alignment, arrays...).back();
+    size_t maxReceiveBytes = util::computeByteOffsets(maxReceiveSize, alignment, arrays...).back();
 
     const size_t oldRecvSize = reallocateBytes(receiveScratchBuffer, maxReceiveBytes, allocGrowthRate);
     char* receiveBuffer      = reinterpret_cast<char*>(rawPtr(receiveScratchBuffer));
@@ -123,7 +123,7 @@ void haloExchangeGpu(int epoch,
         auto scatterArray = [d_range, d_rangeScan, numRanges = inHalos.nRanges(), receiveCount](auto arrayPtr)
         { scatterRanges(d_rangeScan, d_range, numRanges, arrayPtr[0], arrayPtr[1], receiveCount); };
 
-        for_each_tuple(scatterArray, packBufferPtrs<alignment>(receiveBuffer, receiveCount, arrays...));
+        for_each_tuple(scatterArray, util::packBufferPtrs<alignment>(receiveBuffer, receiveCount, arrays...));
         checkGpuErrors(cudaDeviceSynchronize());
 
         numMessages--;

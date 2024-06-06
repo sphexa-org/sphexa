@@ -113,7 +113,8 @@ void exchangeParticles(int epoch,
             size_t numFit        = numElementsFit<alignment>(INT_MAX * sizeof(TransferType) - headerBytes, arrays...);
             size_t nextSendCount = std::min(numFit, numRemaining);
 
-            std::vector<char> sendBuffer(headerBytes + computeByteOffsets(nextSendCount, alignment, arrays...).back());
+            std::vector<char> sendBuffer(headerBytes +
+                                         util::computeByteOffsets(nextSendCount, alignment, arrays...).back());
             encodeSendCountCpu(nextSendCount, sendBuffer.data());
             packArrays<alignment>(gatherCpu, ordering + sends[destinationRank] + numSent, nextSendCount,
                                   sendBuffer.data() + headerBytes, arrays + bufDesc.start...);
@@ -149,7 +150,7 @@ void exchangeParticles(int epoch,
         else { receiveLocation = receiveLog.lookup(receiveRank); }
 
         char* particleData = receiveBuffer.data() + headerBytes;
-        auto packTuple     = packBufferPtrs<alignment>(particleData, receiveCount, (arrays + receiveLocation)...);
+        auto packTuple     = util::packBufferPtrs<alignment>(particleData, receiveCount, (arrays + receiveLocation)...);
         auto scatterRanges = [receiveCount](auto arrayPair) { std::copy_n(arrayPair[1], receiveCount, arrayPair[0]); };
         util::for_each_tuple(scatterRanges, packTuple);
 
