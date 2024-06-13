@@ -6,6 +6,8 @@
 
 #pragma once
 
+#include "cstone/cuda/cuda_stubs.h"
+#include "cstone/cuda/device_vector.h"
 #include "cstone/primitives/gather.hpp"
 #include "cstone/primitives/math.hpp"
 #include "cstone/util/array.hpp"
@@ -95,6 +97,33 @@ auto packBufferPtrs(char* packedBufferBase, size_t arraySize, Arrays... arrays)
 
     util::for_each_tuple(packOneBuffer, indices);
 
+    return ret;
+}
+
+//! calculate needed space in bytes
+inline std::vector<size_t> computeByteOffsets(gsl::span<const size_t> numElements, int elementSize, int alignment)
+{
+    std::vector<size_t> ret(numElements.size() + 1, 0);
+    for (int i = 0; i < numElements.ssize(); ++i)
+    {
+        ret[i] = cstone::round_up(numElements[i] * elementSize, alignment);
+    }
+    std::exclusive_scan(ret.begin(), ret.end(), ret.begin(), size_t(0));
+    return ret;
+}
+
+template<class T, class ScratchVec>
+std::vector<T*> bufferOffsets(ScratchVec& scratch, gsl::span<const size_t> numElements, int alignment)
+{
+    auto sizeBytes = computeByteOffsets(numElements, sizeof(T), alignment);
+    reallocateBytes(scratch, sizeBytes.back(), 1.0);
+
+    std::vector<T*> ret(numElements.size());
+    auto* basePtr = reinterpret_cast<char*>(rawPtr(scratch));
+    for (int i = 0; i < numElements.ssize(); ++i)
+    {
+        ret[i] = reinterpret_cast<T*>(basePtr + sizeBytes[i]);
+    }
     return ret;
 }
 
