@@ -175,6 +175,25 @@ auto mpiRecvAsync(T* data, int count, int rank, int tag, std::vector<MPI_Request
     return mpiRecvAsync(ptr, count * N, rank, tag, requests);
 }
 
+//! @brief MPI_Get_count for standard types
+template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+auto mpiGetCount(MPI_Status* status, int* count)
+{
+    return MPI_Get_count(status, MpiType<T>{}, count);
+}
+
+//! @brief MPI_Get_count for arrays of standard types, T = std::array<ValueType, N>
+template<class T, std::enable_if_t<!std::is_arithmetic_v<T>, int> = 0>
+auto mpiGetCount(MPI_Status* status, int* count)
+{
+    using ValueType    = typename T::value_type;
+    constexpr size_t N = T{}.size();
+    static_assert(N && "array length must be nonzero");
+    auto ret = MPI_Get_count(status, MpiType<ValueType>{}, count);
+    *count /= N;
+    return ret;
+}
+
 template<class Ts, class Td, std::enable_if_t<std::is_arithmetic_v<Td>, int> = 0>
 auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op)
 {

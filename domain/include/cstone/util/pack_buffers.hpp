@@ -112,19 +112,54 @@ inline std::vector<size_t> computeByteOffsets(gsl::span<const size_t> numElement
     return ret;
 }
 
-template<class T, class ScratchVec>
-std::vector<T*> bufferOffsets(ScratchVec& scratch, gsl::span<const size_t> numElements, int alignment)
+/*! @brief allocate space for sum(numElements) elements and return pointers to each subrange
+ *
+ * @param[inout]  vec          vector-like container with linear memory
+ * @param[in]     numElements  sequence of subrange sizes
+ * @param[in]     alignment    subrange alignment requirement
+ * @return                     a vector with a pointer into @p vec for each subrange
+ */
+template<class T, class Vector>
+std::vector<T*> packAllocBuffer(Vector& vec, gsl::span<const size_t> numElements, int alignment)
 {
     auto sizeBytes = computeByteOffsets(numElements, sizeof(T), alignment);
-    reallocateBytes(scratch, sizeBytes.back(), 1.0);
+    reallocateBytes(vec, sizeBytes.back(), 1.0);
 
     std::vector<T*> ret(numElements.size());
-    auto* basePtr = reinterpret_cast<char*>(rawPtr(scratch));
+    auto* basePtr = reinterpret_cast<char*>(rawPtr(vec));
     for (int i = 0; i < numElements.ssize(); ++i)
     {
         ret[i] = reinterpret_cast<T*>(basePtr + sizeBytes[i]);
     }
     return ret;
 }
+
+//! multiple linear buffers concatenated into a single buffer
+template<class T>
+class ConcatVector
+{
+public:
+    ConcatVector() = default;
+    ConcatVector(int alignment)
+        : alignmentBytes_(alignment)
+    {
+    }
+
+    gsl::span<T> operator[](size_t i) { return {subsegments_[i], subsizes_[i]}; }
+    gsl::span<const T> operator[](size_t i) const { return {subsegments_[i], subsizes_[i]}; }
+    std::size_t size() { return buffer_.size(); }
+
+    void reindex(std::vector<std::size_t>&& segmentSizes)
+    {
+        subsizes_    = std::move(segmentSizes);
+        subsegments_ = packAllocBuffer<T>(buffer_, subsizes_, alignmentBytes_);
+    }
+
+private:
+    std::vector<T> buffer_;
+    std::vector<std::size_t> subsizes_;
+    std::vector<T*> subsegments_;
+    int alignmentBytes_{64};
+};
 
 } // namespace util

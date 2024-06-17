@@ -40,6 +40,9 @@
 
 namespace cstone
 {
+using util::packBufferPtrs;
+using util::computeByteOffsets;
+
 /*! @brief Layout description for particle buffers
  *
  * Common usage: storing the sub-range of locally owned/assigned particles within particle buffers

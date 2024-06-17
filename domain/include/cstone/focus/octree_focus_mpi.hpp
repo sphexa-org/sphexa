@@ -203,7 +203,7 @@ public:
     void updateCounts(gsl::span<const KeyType> particleKeys,
                       gsl::span<const KeyType> globalTreeLeaves,
                       gsl::span<const unsigned> globalCounts,
-                      DeviceVector&& /*scratch*/ = std::vector<KeyType>{})
+                      DeviceVector& scratch)
     {
         gsl::span<const KeyType> leaves(leaves_);
 
@@ -246,7 +246,8 @@ public:
 
         // counts from neighboring peers
         constexpr int countTag = static_cast<int>(P2pTags::focusPeerCounts);
-        peerExchange(gsl::span<unsigned>(counts_), countTag);
+        std::vector<int, util::DefaultInitAdaptor<int>> hScratch;
+        peerExchange(gsl::span<unsigned>(counts_), countTag, hScratch);
 
         // 2nd upsweep with peer and global data present
         upsweep(treeData_.levelRange, treeData_.childOffsets, counts_.data(), NodeCount<unsigned>{});
@@ -264,10 +265,10 @@ public:
         rebalanceStatus_ |= countsCriterion;
     }
 
-    template<class T>
-    void peerExchange(gsl::span<T> quantities, int commTag) const
+    template<class T, class DevVec>
+    void peerExchange(gsl::span<T> quantities, int commTag, DevVec& s) const
     {
-        exchangeTreeletGeneral<T>(peers_, treeletIdx_, assignment_, leafToInternal(treeData_), quantities, commTag);
+        exchangeTreeletGeneral<T>(peers_, treeletIdx_, assignment_, leafToInternal(treeData_), quantities, commTag, s);
     }
 
     /*! @brief transfer quantities of leaf cells inside the focus into a global array
@@ -398,7 +399,8 @@ public:
         }
 
         //! exchange information with peer close to focus
-        peerExchange<SourceCenterType<RealType>>(centers_, static_cast<int>(P2pTags::focusPeerCenters));
+        std::vector<int, util::DefaultInitAdaptor<int>> hScratch;
+        peerExchange<SourceCenterType<RealType>>(centers_, static_cast<int>(P2pTags::focusPeerCenters), hScratch);
         //! global exchange for the top nodes that are bigger than local domains
         std::vector<SourceCenterType<RealType>> globalLeafCenters(globalTree.numLeafNodes());
         populateGlobal<SourceCenterType<RealType>>(globalTree.treeLeaves(), centers_, globalLeafCenters);

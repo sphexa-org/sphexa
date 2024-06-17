@@ -122,7 +122,8 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
     upsweep({octree.levelRange, maxTreeLevel<KeyType>{} + 2}, {octree.childOffsets, size_t(octree.numNodes)},
             testCounts.data(), NodeCount<unsigned>{});
 
-    focusTree.template peerExchange<unsigned>(testCounts, static_cast<int>(P2pTags::focusPeerCounts) + 2);
+    std::vector<int> scratch;
+    focusTree.template peerExchange<unsigned>(testCounts, static_cast<int>(P2pTags::focusPeerCounts) + 2, scratch);
 
     auto upsweepFunction = [](auto levelRange, auto childOffsets, auto M)
     { upsweep(levelRange, childOffsets, M, NodeCount<unsigned>{}); };

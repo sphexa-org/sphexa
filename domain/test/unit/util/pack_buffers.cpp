@@ -136,11 +136,11 @@ TEST(PackBuffers, computeByteOffsetsDynamic)
     EXPECT_EQ(byteOffsets, ref);
 }
 
-TEST(PackBuffers, computeBufferOffsets)
+TEST(PackBuffers, packAllocBuffer)
 {
     std::vector<char> scratch;
     std::vector<size_t> numElements{3, 5, 2};
-    auto offsets = bufferOffsets<int>(scratch, numElements, 8);
+    auto offsets = packAllocBuffer<int>(scratch, numElements, 8);
     EXPECT_EQ(offsets.size(), 3);
 
     std::vector<int*> ref(4, (int*)scratch.data());

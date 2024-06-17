@@ -53,6 +53,7 @@
 #include "cstone/tree/csarray.hpp"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/gsl-lite.hpp"
+#include "cstone/util/pack_buffers.hpp"
 
 namespace cstone
 {
@@ -153,7 +154,7 @@ void exchangeTreelets(gsl::span<const int> peerRanks,
 template<class KeyType>
 void checkTreelets(gsl::span<const int> peerRanks,
                    gsl::span<const KeyType> leaves,
-                   std::vector<std::vector<KeyType>>& treelets,
+                   const std::vector<std::vector<KeyType>>& treelets,
                    std::vector<std::vector<TreeNodeIndex>>& treeletIdx)
 {
     for (auto rank : peerRanks)
@@ -197,12 +198,12 @@ template<class KeyType>
 void indexTreelets(gsl::span<const int> peerRanks,
                    gsl::span<const KeyType> nodeKeys,
                    gsl::span<const TreeNodeIndex> levelRange,
-                   std::vector<std::vector<KeyType>>& treelets,
+                   const std::vector<std::vector<KeyType>>& treelets,
                    std::vector<std::vector<TreeNodeIndex>>& treeletIdx)
 {
     for (int rank : peerRanks)
     {
-        auto& treelet          = treelets[rank];
+        const auto& treelet    = treelets[rank];
         auto& tlIdx            = treeletIdx[rank];
         TreeNodeIndex numNodes = nNodes(treelets[rank]);
         tlIdx.resize(numNodes);
@@ -345,41 +346,53 @@ void syncTreeletsGpu(gsl::span<const int> peers,
     }
 }
 
-template<class T>
+template<class T, class DevVec>
 void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
-                            const std::vector<std::vector<TreeNodeIndex>>& peerTrees,
+                            const std::vector<std::vector<TreeNodeIndex>>& treeletIdx,
                             gsl::span<const IndexPair<TreeNodeIndex>> focusAssignment,
                             gsl::span<const TreeNodeIndex> csToInternalMap,
                             gsl::span<T> quantities,
-                            int commTag)
+                            int commTag,
+                            DevVec& scratch)
 {
-    size_t numPeers = peerRanks.size();
-    std::vector<std::vector<T, util::DefaultInitAdaptor<T>>> sendBuffers;
-    sendBuffers.reserve(numPeers);
+    constexpr int alignmentBytes = 64;
+
+    std::vector<std::size_t> treeletSizes(2 * peerRanks.size());
+    for (int i = 0; i < peerRanks.size(); ++i)
+    {
+        treeletSizes[i]                    = treeletIdx[peerRanks[i]].size();
+        treeletSizes[i + peerRanks.size()] = focusAssignment[peerRanks[i]].count();
+    }
+
+    size_t origSize    = scratch.size();
+    auto bufferOffsets = util::packAllocBuffer<T>(scratch, treeletSizes, alignmentBytes);
 
     std::vector<MPI_Request> sendRequests;
-    sendRequests.reserve(numPeers);
-    for (auto peer : peerRanks)
+    sendRequests.reserve(peerRanks.size());
+    for (int i = 0; i < peerRanks.size(); ++i)
     {
-        std::vector<T, util::DefaultInitAdaptor<T>> buffer(peerTrees[peer].size());
-        gsl::span<const TreeNodeIndex> treelet(peerTrees[peer]);
-        gather<TreeNodeIndex>(treelet, quantities.data(), buffer.data());
-
-        mpiSendAsync(buffer.data(), buffer.size(), peer, commTag, sendRequests);
-        sendBuffers.push_back(std::move(buffer));
+        gather<TreeNodeIndex>(treeletIdx[peerRanks[i]], quantities.data(), bufferOffsets[i]);
+        mpiSendAsync(bufferOffsets[i], treeletIdx[peerRanks[i]].size(), peerRanks[i], commTag, sendRequests);
     }
 
-    std::vector<T, util::DefaultInitAdaptor<T>> buffer;
-    for (auto peer : peerRanks)
+    int numMessages = peerRanks.size();
+    while (numMessages--)
     {
-        TreeNodeIndex receiveCount = focusAssignment[peer].count();
-        buffer.resize(receiveCount);
-        mpiRecvSync(buffer.data(), receiveCount, peer, commTag, MPI_STATUS_IGNORE);
+        MPI_Status status;
+        MPI_Probe(MPI_ANY_SOURCE, commTag, MPI_COMM_WORLD, &status);
+        int recvRank = status.MPI_SOURCE;
+        TreeNodeIndex recvCount;
+        mpiGetCount<T>(&status, &recvCount);
 
-        auto mapToInternal = csToInternalMap.subspan(focusAssignment[peer].start(), receiveCount);
-        scatter(mapToInternal, buffer.data(), quantities.data());
+        int peerIdx = std::find(peerRanks.begin(), peerRanks.end(), recvRank) - peerRanks.begin();
+        T* recvBuf  = bufferOffsets[peerRanks.size() + peerIdx];
+        mpiRecvSync(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE);
+
+        auto mapToInternal = csToInternalMap.subspan(focusAssignment[recvRank].start(), recvCount);
+        scatter(mapToInternal, recvBuf, quantities.data());
     }
 
+    reallocate(scratch, origSize, 1.0);
     MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUS_IGNORE);
 }
 
