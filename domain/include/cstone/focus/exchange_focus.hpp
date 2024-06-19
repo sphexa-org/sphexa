@@ -183,30 +183,6 @@ void pruneTreelets(gsl::span<const int> peerRanks, std::vector<std::vector<KeyTy
     }
 }
 
-//! @brief assign treelet nodes their final indices w.r.t the final LET
-template<class KeyType>
-void indexTreelets(gsl::span<const int> peerRanks,
-                   gsl::span<const KeyType> nodeKeys,
-                   gsl::span<const TreeNodeIndex> levelRange,
-                   const std::vector<std::vector<KeyType>>& treelets,
-                   std::vector<std::vector<TreeNodeIndex>>& treeletIdx)
-{
-    for (int rank : peerRanks)
-    {
-        const auto& treelet    = treelets[rank];
-        auto& tlIdx            = treeletIdx[rank];
-        TreeNodeIndex numNodes = nNodes(treelets[rank]);
-        tlIdx.resize(numNodes);
-
-#pragma omp parallel for schedule(static)
-        for (int i = 0; i < numNodes; ++i)
-        {
-            tlIdx[i] = locateNode(treelet[i], treelet[i + 1], nodeKeys.data(), levelRange.data());
-            assert(tlIdx[i] < nodeKeys.size());
-        }
-    }
-}
-
 /*! @brief exchange subtree structures with peers
  *
  * @tparam      KeyType      32- or 64-bit unsigned integer
@@ -330,9 +306,43 @@ void syncTreeletsGpu(gsl::span<const int> peers,
     }
 }
 
+template<class VecOfVec>
+std::vector<std::size_t> extractNumNodes(const VecOfVec& vov)
+{
+    std::vector<std::size_t> ret(vov.size());
+    for (size_t i = 0; i < vov.size(); ++i)
+    {
+        ret[i] = vov[i].empty() ? 0 : nNodes(vov[i]);
+    }
+    return ret;
+}
+
+//! @brief assign treelet nodes their final indices w.r.t the final LET
+template<class KeyType>
+void indexTreelets(gsl::span<const int> peerRanks, gsl::span<const KeyType> nodeKeys,
+                   gsl::span<const TreeNodeIndex> levelRange,
+                   const std::vector<std::vector<KeyType>>& treelets,
+                   util::ConcatVector<TreeNodeIndex>& treeletIdx)
+{
+    treeletIdx.reindex(extractNumNodes(treelets));
+    for (int rank : peerRanks)
+    {
+        const auto& treelet    = treelets[rank];
+        auto tlIdx             = treeletIdx[rank];
+        TreeNodeIndex numNodes = nNodes(treelets[rank]);
+
+#pragma omp parallel for schedule(static)
+        for (int i = 0; i < numNodes; ++i)
+        {
+            tlIdx[i] = locateNode(treelet[i], treelet[i + 1], nodeKeys.data(), levelRange.data());
+            assert(tlIdx[i] < nodeKeys.size());
+        }
+    }
+}
+
 template<class T, class DevVec>
 void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
-                            const std::vector<std::vector<TreeNodeIndex>>& treeletIdx,
+                            const util::ConcatVector<TreeNodeIndex>& treeletIdx,
                             gsl::span<const IndexPair<TreeNodeIndex>> focusAssignment,
                             gsl::span<const TreeNodeIndex> csToInternalMap,
                             gsl::span<T> quantities,

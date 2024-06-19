@@ -661,7 +661,7 @@ private:
     std::vector<int> peers_;
     //! @brief the tree structures that the peers have for the domain of the executing rank (myRank_)
     std::vector<std::vector<KeyType>> treelets_;
-    std::vector<std::vector<TreeNodeIndex>> treeletIdx_;
+    util::ConcatVector<TreeNodeIndex> treeletIdx_;
 
     //! @brief octree data resident on GPU if active
     OctreeData<KeyType, Accelerator> octreeAcc_;

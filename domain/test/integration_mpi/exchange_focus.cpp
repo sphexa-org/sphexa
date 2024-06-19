@@ -109,7 +109,7 @@ void exchangeFocusIrregular(int myRank, int numRanks)
     }
 
     std::vector<std::vector<KeyType>> treelets(numRanks);
-    std::vector<std::vector<TreeNodeIndex>> treeletIdx(numRanks);
+    util::ConcatVector<TreeNodeIndex> treeletIdx(numRanks);
     syncTreelets(peers, peerFocusIndices, octree, treeLeaves, treelets);
     indexTreelets<KeyType>(peers, octree.prefixes, octree.levelRange, treelets, treeletIdx);
 
