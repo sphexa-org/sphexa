@@ -163,10 +163,10 @@ public:
 
         if constexpr (HaveGpu<Accelerator>{})
         {
-            syncTreeletsGpu(peers_, assignment_, leaves_, octreeAcc_, leavesAcc_, treelets_, treeletIdx_);
+            syncTreeletsGpu(peers_, assignment_, leaves_, octreeAcc_, leavesAcc_, treelets_);
             downloadOctree();
         }
-        else { syncTreelets(peers_, assignment_, treeData_, leaves_, treelets_, treeletIdx_); }
+        else { syncTreelets(peers_, assignment_, treeData_, leaves_, treelets_); }
 
         indexTreelets<KeyType>(peerRanks, treeData_.prefixes, treeData_.levelRange, treelets_, treeletIdx_);
 

@@ -154,41 +154,31 @@ void exchangeTreelets(gsl::span<const int> peerRanks,
 template<class KeyType>
 void checkTreelets(gsl::span<const int> peerRanks,
                    gsl::span<const KeyType> leaves,
-                   const std::vector<std::vector<KeyType>>& treelets,
-                   std::vector<std::vector<TreeNodeIndex>>& treeletIdx)
+                   std::vector<std::vector<KeyType>>& treelets)
 {
     for (auto rank : peerRanks)
     {
         auto& treelet          = treelets[rank];
-        auto& tlIdx            = treeletIdx[rank];
         TreeNodeIndex numNodes = nNodes(treelets[rank]);
-        tlIdx.resize(numNodes);
 
 #pragma omp parallel for schedule(static)
         for (int i = 0; i < numNodes; ++i)
         {
-            tlIdx[i] = (treelet[i] == leaves[findNodeAbove(leaves.data(), nNodes(leaves), treelet[i])]) ? 0 : 1;
+            auto k = treelet[i];
+            if (k != leaves[findNodeAbove(leaves.data(), nNodes(leaves), k)]) { treelet[i] = maskKey(k); }
         }
     }
 }
 
 //! @brief remove treelet keys flagged as invalid
 template<class KeyType>
-void pruneTreelets(gsl::span<const int> peerRanks,
-                   std::vector<std::vector<KeyType>>& treelets,
-                   const std::vector<std::vector<TreeNodeIndex>>& treeletIdx)
+void pruneTreelets(gsl::span<const int> peerRanks, std::vector<std::vector<KeyType>>& treelets)
 {
 #pragma omp parallel for
     for (int r = 0; r < peerRanks.size(); ++r)
     {
-        int rank                 = peerRanks[r];
-        const KeyType removeFlag = treelets[rank].front() ? 0 : nodeRange<KeyType>(0);
-        for (TreeNodeIndex i = 0; i < treeletIdx[rank].size(); ++i)
-        {
-            if (treeletIdx[rank][i]) { treelets[rank][i] = removeFlag; }
-        }
-
-        auto it = std::remove(treelets[rank].begin(), treelets[rank].end(), removeFlag);
+        int rank = peerRanks[r];
+        auto it  = std::remove_if(treelets[rank].begin(), treelets[rank].end(), isMasked<KeyType>);
         treelets[rank].erase(it, treelets[rank].end());
     }
 }
@@ -226,8 +216,6 @@ void indexTreelets(gsl::span<const int> peerRanks,
  *                           the tree. Each treelet covers the same SFC key range (the assigned range of
  *                           the executing rank) but is adaptively (MAC) resolved from the perspective of the
  *                           peer rank.
- * @param[in]   treeletIdx   validity of each treelet node. A value of 1 means invalid, which needs to be communicated
- *                           to the rank who had this node in the external part of its LET
  * @param[out]  nodeOps      node ops needed to remove exterior keys that don't exist on the owning rank from
  *                           @p leaves
  *
@@ -238,7 +226,6 @@ template<class KeyType>
 void exchangeRejectedKeys(gsl::span<const int> peerRanks,
                           gsl::span<const KeyType> leaves,
                           const std::vector<std::vector<KeyType>>& treelets,
-                          const std::vector<std::vector<TreeNodeIndex>>& treeletIdx,
                           gsl::span<TreeNodeIndex> nodeOps)
 
 {
@@ -253,12 +240,11 @@ void exchangeRejectedKeys(gsl::span<const int> peerRanks,
     {
         auto& treelet          = treelets[peer];
         TreeNodeIndex numNodes = nNodes(treelet);
-        auto& tlIdx            = treeletIdx[peer];
 
         std::vector<KeyType, util::DefaultInitAdaptor<KeyType>> rejectedKeys;
         for (int i = 0; i < numNodes; ++i)
         {
-            if (tlIdx[i]) { rejectedKeys.push_back(treelet[i]); }
+            if (isMasked(treelet[i])) { rejectedKeys.push_back(unmaskKey(treelet[i])); }
         }
         mpiSendAsync(rejectedKeys.data(), rejectedKeys.size(), peer, keyTag, sendRequests);
         rejectedKeyBuffers.push_back(std::move(rejectedKeys));
@@ -291,15 +277,14 @@ void syncTreelets(gsl::span<const int> peers,
                   gsl::span<const IndexPair<TreeNodeIndex>> focusAssignment,
                   OctreeData<KeyType, CpuTag>& octree,
                   std::vector<KeyType>& leaves,
-                  std::vector<std::vector<KeyType>>& treelets,
-                  std::vector<std::vector<TreeNodeIndex>>& treeletIdx)
+                  std::vector<std::vector<KeyType>>& treelets)
 {
     exchangeTreelets<KeyType>(peers, focusAssignment, leaves, treelets);
-    checkTreelets<KeyType>(peers, leaves, treelets, treeletIdx);
+    checkTreelets<KeyType>(peers, leaves, treelets);
 
     std::vector<TreeNodeIndex> nodeOps(leaves.size(), 1);
-    exchangeRejectedKeys<KeyType>(peers, leaves, treelets, treeletIdx, nodeOps);
-    pruneTreelets<KeyType>(peers, treelets, treeletIdx);
+    exchangeRejectedKeys<KeyType>(peers, leaves, treelets, nodeOps);
+    pruneTreelets<KeyType>(peers, treelets);
 
     if (std::count(nodeOps.begin(), nodeOps.end(), 1) != nodeOps.size())
     {
@@ -316,15 +301,14 @@ void syncTreeletsGpu(gsl::span<const int> peers,
                      const std::vector<KeyType>& leaves,
                      OctreeData<KeyType, GpuTag>& octreeAcc,
                      DeviceVector<KeyType>& leavesAcc,
-                     std::vector<std::vector<KeyType>>& treelets,
-                     std::vector<std::vector<TreeNodeIndex>>& treeletIdx)
+                     std::vector<std::vector<KeyType>>& treelets)
 {
     exchangeTreelets<KeyType>(peers, assignment, leaves, treelets);
-    checkTreelets<KeyType>(peers, leaves, treelets, treeletIdx);
+    checkTreelets<KeyType>(peers, leaves, treelets);
 
     std::vector<TreeNodeIndex> nodeOps(leaves.size(), 1);
-    exchangeRejectedKeys<KeyType>(peers, leaves, treelets, treeletIdx, nodeOps);
-    pruneTreelets<KeyType>(peers, treelets, treeletIdx);
+    exchangeRejectedKeys<KeyType>(peers, leaves, treelets, nodeOps);
+    pruneTreelets<KeyType>(peers, treelets);
 
     if (std::count(nodeOps.begin(), nodeOps.end(), 1) != nodeOps.size())
     {
