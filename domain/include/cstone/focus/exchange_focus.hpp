@@ -47,9 +47,8 @@
 #include <vector>
 
 #include "cstone/domain/index_ranges.hpp"
-#include "cstone/primitives/gather.hpp"
 #include "cstone/primitives/mpi_wrappers.hpp"
-#include "cstone/primitives/primitives_gpu.h"
+#include "cstone/primitives/gather_acc.hpp"
 #include "cstone/tree/csarray.hpp"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/gsl-lite.hpp"
@@ -350,6 +349,7 @@ void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
                             DevVec& scratch)
 {
     constexpr int alignmentBytes = 64;
+    constexpr bool useGpu = IsDeviceVector<DevVec>{};
 
     std::vector<std::size_t> treeletSizes(2 * peerRanks.size());
     for (int i = 0; i < peerRanks.size(); ++i)
@@ -365,7 +365,7 @@ void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
     sendRequests.reserve(peerRanks.size());
     for (int i = 0; i < peerRanks.size(); ++i)
     {
-        gather<TreeNodeIndex>(treeletIdx[peerRanks[i]], quantities.data(), bufferOffsets[i]);
+        gatherAcc<useGpu, TreeNodeIndex>(treeletIdx[peerRanks[i]], quantities.data(), bufferOffsets[i]);
         mpiSendAsync(bufferOffsets[i], treeletIdx[peerRanks[i]].size(), peerRanks[i], commTag, sendRequests);
     }
 
@@ -383,7 +383,7 @@ void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
         mpiRecvSync(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE);
 
         auto mapToInternal = csToInternalMap.subspan(focusAssignment[recvRank].start(), recvCount);
-        scatter(mapToInternal, recvBuf, quantities.data());
+        scatterAcc<useGpu>(mapToInternal, recvBuf, quantities.data());
     }
 
     reallocate(scratch, origSize, 1.0);
