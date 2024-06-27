@@ -47,6 +47,7 @@
 #include <vector>
 
 #include "cstone/domain/index_ranges.hpp"
+#include "cstone/primitives/concat_vector.hpp"
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/primitives/gather_acc.hpp"
 #include "cstone/tree/csarray.hpp"
@@ -321,7 +322,7 @@ template<class KeyType>
 void indexTreelets(gsl::span<const int> peerRanks, gsl::span<const KeyType> nodeKeys,
                    gsl::span<const TreeNodeIndex> levelRange,
                    const std::vector<std::vector<KeyType>>& treelets,
-                   util::ConcatVector<TreeNodeIndex>& treeletIdx)
+                   ConcatVector<TreeNodeIndex>& treeletIdx)
 {
     treeletIdx.reindex(extractNumNodes(treelets));
     for (int rank : peerRanks)

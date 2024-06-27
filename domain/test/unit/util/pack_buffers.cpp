@@ -149,21 +149,3 @@ TEST(PackBuffers, packAllocBuffer)
     EXPECT_EQ(base + 4, offsets[1].data());
     EXPECT_EQ(base + 10, offsets[2].data());
 }
-
-template<class T>
-auto testConstView(const ConcatVector<T>& v)
-{
-    return v.view();
-}
-
-TEST(PackBuffers, concatVector)
-{
-    ConcatVector<int> v;
-    v.reindex({1, 1, 2, 2});
-
-    auto modView  = v.view();
-    modView[0][0] = 42;
-
-    auto constView = testConstView(v);
-    EXPECT_EQ(constView[0][0], 42);
-}

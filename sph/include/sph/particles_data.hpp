@@ -37,7 +37,7 @@
 #include "cstone/cuda/cuda_utils.hpp"
 #include "cstone/fields/data_util.hpp"
 #include "cstone/fields/field_states.hpp"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/reallocate.hpp"

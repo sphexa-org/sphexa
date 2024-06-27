@@ -25,7 +25,7 @@
 
 #include <mpi.h>
 
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 
 #include "io/file_utils.hpp"
 #include "conserved_quantities.hpp"

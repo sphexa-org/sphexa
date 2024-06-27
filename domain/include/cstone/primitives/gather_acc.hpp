@@ -6,7 +6,7 @@
 
 #pragma once
 
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/primitives/gather.hpp"
 #include "cstone/primitives/primitives_gpu.h"
 

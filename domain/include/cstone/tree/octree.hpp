@@ -47,7 +47,7 @@
 #include "cstone/cuda/device_vector.h"
 #include "cstone/primitives/gather.hpp"
 #include "cstone/sfc/sfc.hpp"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/tree/csarray.hpp"
 #include "cstone/util/gsl-lite.hpp"
 

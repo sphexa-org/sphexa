@@ -32,7 +32,7 @@
 #pragma once
 
 #include "cstone/fields/data_util.hpp"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/util/constexpr_string.hpp"
 #include "cstone/util/value_list.hpp"
 

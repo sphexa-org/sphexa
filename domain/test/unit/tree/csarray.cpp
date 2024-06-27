@@ -395,3 +395,48 @@ TEST(CornerstoneOctree, computeSpanningTree)
     computeSpanningTree<unsigned>();
     computeSpanningTree<uint64_t>();
 }
+
+TEST(CornerstoneOctree, NodeDebug)
+{
+    using T = double;
+    using KeyType = uint64_t;
+    KeyType a = 0377400000000000000000lu;
+    KeyType b = 0500000000000000000000lu;
+    std::vector<KeyType> sdomain{a, b};
+
+    KeyType s0 = 0164640000000000000000lu;
+    KeyType s1 = 0164650000000000000000lu;
+    Box<T> box(0, 1, BoundaryType::periodic);
+    IBox source = sfcIBox(sfcKey(s0), sfcKey(s1));
+    auto [sourceCenter, sourceSize] = centerAndSize<KeyType>(source, box);
+    unsigned prefixLength = 3 * treeLevel(s1 - s0);
+    KeyType sourcePrefix = encodePlaceholderBit(s0, prefixLength);
+    auto expCenter = sourceCenter;
+
+    std::vector<KeyType> spanningTree(spanSfcRange(a, b) + 1);
+    spanSfcRange(a, b, spanningTree.data());
+    spanningTree.back() = b;
+
+    std::vector<T> distances;
+    T domainVol = 0;
+    for (size_t i = 0; i < nNodes(spanningTree); ++i)
+    {
+        IBox target = sfcIBox(sfcKey(spanningTree[i]), sfcKey(spanningTree[i+1]));
+        auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
+
+        auto distVec = minDistance(sourceCenter, sourceSize, targetCenter, targetSize, box);
+        T distNorm = std::sqrt(norm2(distVec));
+        distances.push_back(distNorm);
+        domainVol += 8 * targetSize[0] * targetSize[1] * targetSize[2];
+
+        //T macSq = computeVecMacR2(sourcePrefix, expCenter, 1.0 / 0.5, box);
+        T macSq = computeMinMacR2(sourcePrefix, invThetaMinMac(0.5), box)[3];
+
+        bool isClose = evaluateMacPbc(expCenter, macSq, targetCenter, targetSize, box);
+        std::cout << std::oct << spanningTree[i] << " - " << spanningTree[i + 1] << std::dec << ": " << distNorm
+                  << " MAC " << (isClose ? "Fail" : "Pass") << std::endl;
+    }
+    T minSTDist = *std::min_element(distances.begin(), distances.end());
+    std::cout << "Min source-target distance is " << minSTDist << std::endl;
+    std::cout << "Domain volume is " << domainVol << ", cubeLength " << std::cbrt(domainVol) << std::endl;
+}

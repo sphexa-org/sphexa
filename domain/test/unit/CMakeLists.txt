@@ -8,6 +8,7 @@ set(UNIT_TESTS
         focus/source_center.cpp
         neighbors/findneighbors.cpp
         primitives/clz.cpp
+        primitives/concat_vector.cpp
         primitives/gather.cpp
         primitives/math.cpp
         sfc/box.cpp

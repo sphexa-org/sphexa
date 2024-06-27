@@ -41,7 +41,7 @@
 #include "cstone/focus/source_center.hpp"
 #include "cstone/focus/source_center_gpu.h"
 #include "cstone/primitives/primitives_gpu.h"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/traversal/collisions_gpu.h"
 
 namespace cstone
@@ -662,7 +662,7 @@ private:
     std::vector<int> peers_;
     //! @brief the tree structures that the peers have for the domain of the executing rank (myRank_)
     std::vector<std::vector<KeyType>> treelets_;
-    util::ConcatVector<TreeNodeIndex> treeletIdx_;
+    ConcatVector<TreeNodeIndex> treeletIdx_;
 
     //! @brief octree data resident on GPU if active
     OctreeData<KeyType, Accelerator> octreeAcc_;
