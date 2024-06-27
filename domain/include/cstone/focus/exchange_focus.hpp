@@ -341,7 +341,7 @@ void indexTreelets(gsl::span<const int> peerRanks, gsl::span<const KeyType> node
 
 template<class T, class DevVec>
 void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
-                            const util::ConcatVector<TreeNodeIndex>& treeletIdx,
+                            gsl::span<const gsl::span<const TreeNodeIndex>> treeletIdx,
                             gsl::span<const IndexPair<TreeNodeIndex>> focusAssignment,
                             gsl::span<const TreeNodeIndex> csToInternalMap,
                             gsl::span<T> quantities,
@@ -349,7 +349,7 @@ void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
                             DevVec& scratch)
 {
     constexpr int alignmentBytes = 64;
-    constexpr bool useGpu = IsDeviceVector<DevVec>{};
+    constexpr bool useGpu        = IsDeviceVector<DevVec>{};
 
     std::vector<std::size_t> treeletSizes(2 * peerRanks.size());
     for (int i = 0; i < peerRanks.size(); ++i)
@@ -359,14 +359,16 @@ void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
     }
 
     size_t origSize    = scratch.size();
-    auto bufferOffsets = util::packAllocBuffer<T>(scratch, treeletSizes, alignmentBytes);
+    auto packedBuffers = util::packAllocBuffer<T>(scratch, treeletSizes, alignmentBytes);
+    gsl::span<gsl::span<T>> sendBuffers{packedBuffers.data(), peerRanks.size()};
+    gsl::span<gsl::span<T>> recvBuffers{packedBuffers.data() + peerRanks.size(), peerRanks.size()};
 
     std::vector<MPI_Request> sendRequests;
     sendRequests.reserve(peerRanks.size());
     for (int i = 0; i < peerRanks.size(); ++i)
     {
-        gatherAcc<useGpu, TreeNodeIndex>(treeletIdx[peerRanks[i]], quantities.data(), bufferOffsets[i]);
-        mpiSendAsync(bufferOffsets[i], treeletIdx[peerRanks[i]].size(), peerRanks[i], commTag, sendRequests);
+        gatherAcc<useGpu, TreeNodeIndex>(treeletIdx[peerRanks[i]], quantities.data(), sendBuffers[i].data());
+        mpiSendAsync(sendBuffers[i].data(), treeletIdx[peerRanks[i]].size(), peerRanks[i], commTag, sendRequests);
     }
 
     int numMessages = peerRanks.size();
@@ -379,7 +381,7 @@ void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
         mpiGetCount<T>(&status, &recvCount);
 
         int peerIdx = std::find(peerRanks.begin(), peerRanks.end(), recvRank) - peerRanks.begin();
-        T* recvBuf  = bufferOffsets[peerRanks.size() + peerIdx];
+        T* recvBuf  = recvBuffers[peerIdx].data();
         mpiRecvSync(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE);
 
         auto mapToInternal = csToInternalMap.subspan(focusAssignment[recvRank].start(), recvCount);

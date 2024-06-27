@@ -120,16 +120,16 @@ inline std::vector<size_t> computeByteOffsets(gsl::span<const size_t> numElement
  * @return                     a vector with a pointer into @p vec for each subrange
  */
 template<class T, class Vector>
-std::vector<T*> packAllocBuffer(Vector& vec, gsl::span<const size_t> numElements, int alignment)
+std::vector<gsl::span<T>> packAllocBuffer(Vector& vec, gsl::span<const size_t> numElements, int alignment)
 {
     auto sizeBytes = computeByteOffsets(numElements, sizeof(T), alignment);
     reallocateBytes(vec, sizeBytes.back(), 1.0);
 
-    std::vector<T*> ret(numElements.size());
+    std::vector<gsl::span<T>> ret(numElements.size());
     auto* basePtr = reinterpret_cast<char*>(rawPtr(vec));
     for (int i = 0; i < numElements.ssize(); ++i)
     {
-        ret[i] = reinterpret_cast<T*>(basePtr + sizeBytes[i]);
+        ret[i] = {reinterpret_cast<T*>(basePtr + sizeBytes[i]), numElements[i]};
     }
     return ret;
 }
@@ -145,20 +145,27 @@ public:
     {
     }
 
-    gsl::span<T> operator[](size_t i) { return {subsegments_[i], subsizes_[i]}; }
-    gsl::span<const T> operator[](size_t i) const { return {subsegments_[i], subsizes_[i]}; }
-    std::size_t size() { return buffer_.size(); }
+    //! @brief return number of segments
+    std::size_t size() { return segments_.size(); }
+
+    gsl::span<T> operator[](size_t i) { return segments_[i]; }
+    gsl::span<const T> operator[](size_t i) const { return segments_[i]; }
+
+    gsl::span<gsl::span<T>> view() { return segments_; }
+    gsl::span<const gsl::span<const T>> cview() { return csegments_; }
+    gsl::span<const gsl::span<const T>> view() const { return csegments_; }
 
     void reindex(std::vector<std::size_t>&& segmentSizes)
     {
-        subsizes_    = std::move(segmentSizes);
-        subsegments_ = packAllocBuffer<T>(buffer_, subsizes_, alignmentBytes_);
+        segments_  = packAllocBuffer<T>(buffer_, segmentSizes, alignmentBytes_);
+        csegments_ = packAllocBuffer<const T>(buffer_, segmentSizes, alignmentBytes_);
     }
 
 private:
     std::vector<T> buffer_;
-    std::vector<std::size_t> subsizes_;
-    std::vector<T*> subsegments_;
+    std::vector<gsl::span<T>> segments_;
+    // Can't cast span<T>* to span<const T>*, so need to stupidly duplicate the view in return for const-correctness
+    std::vector<gsl::span<const T>> csegments_;
     int alignmentBytes_{64};
 };
 

@@ -268,7 +268,8 @@ public:
     template<class T, class DevVec>
     void peerExchange(gsl::span<T> quantities, int commTag, DevVec& s) const
     {
-        exchangeTreeletGeneral<T>(peers_, treeletIdx_, assignment_, leafToInternal(treeData_), quantities, commTag, s);
+        gsl::span<const gsl::span<const TreeNodeIndex>> tlIdxView = treeletIdx_.view();
+        exchangeTreeletGeneral<T>(peers_, tlIdxView, assignment_, leafToInternal(treeData_), quantities, commTag, s);
     }
 
     /*! @brief transfer quantities of leaf cells inside the focus into a global array
