@@ -224,22 +224,20 @@ public:
                               particleKeys.data() + particleKeys.size(), std::numeric_limits<unsigned>::max(), true);
         }
 
-        // 1st upsweep with local data
+        // add counts from global tree
+        auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, nNodes(leaves_)));
+        countRequestParticles<KeyType>(globalTreeLeaves, globalCounts, leaves, idxFromGlob, leafCounts_);
+
+        // 1st upsweep with local and global data
         counts_.resize(treeData_.numNodes);
         scatter<TreeNodeIndex>(leafToInternal(treeData_), leafCounts_.data(), counts_.data());
         upsweep(treeData_.levelRange, treeData_.childOffsets, counts_.data(), NodeCount<unsigned>{});
 
-        // list of indices in leaves not part of the local or peer rank assignments
-        auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, nNodes(leaves_)));
-        countRequestParticles<KeyType>(globalTreeLeaves, globalCounts, leaves, idxFromGlob, treeData_.prefixes,
-                                       treeData_.levelRange, gsl::span<unsigned>(counts_));
-
-        // counts from neighboring peers
-        constexpr int countTag = static_cast<int>(P2pTags::focusPeerCounts);
+        // add counts from neighboring peers
         std::vector<int, util::DefaultInitAdaptor<int>> hScratch;
-        peerExchange(gsl::span<unsigned>(counts_), countTag, hScratch);
+        peerExchange(gsl::span<unsigned>(counts_), static_cast<int>(P2pTags::focusPeerCounts), hScratch);
 
-        // 2nd upsweep with peer and global data present
+        // 2nd upsweep with peer data present
         upsweep(treeData_.levelRange, treeData_.childOffsets, counts_.data(), NodeCount<unsigned>{});
         gather(leafToInternal(treeData_), counts_.data(), leafCounts_.data());
 

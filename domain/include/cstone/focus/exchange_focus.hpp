@@ -61,41 +61,32 @@ namespace cstone
 /*! @brief count particles inside specified ranges of a cornerstone leaf tree
  *
  * @tparam KeyType             32- or 64-bit unsigned integer
- * @param[in]  leaves          cornerstone SFC key sequence,
- * @param[in]  counts          particle counts of @p leaves, length = length(leaves) - 1
- * @param[in]  requestLeaves   query cornerstone SFC key sequence
- * @param[in]  prefixes        node keys that matches the layout of @p request counts
- * @param[in]  levelRange      octree-level boundary starts, used for efficiently locating nodes @p prefixes
- * @param[out] requestCounts   output counts for @p requestLeaves, length = same as @p prefixes
+ * @param[in]  leaves          global octree leaves, cornerstone SFC key sequence
+ * @param[in]  counts          global particle counts of @p leaves, length = length(leaves) - 1
+ * @param[in]  leavesFocus     focused octree leaves (LET), cornerstone SFC key sequence
+ * @param[in]  leavesFocusIdx  list of cell indices of @p leavesFocus to extract counts for
+ * @param[out] countsFocus     output counts for @p leavesFocus, length = length(leavesFocus) - 1
  */
 template<class KeyType>
 void countRequestParticles(gsl::span<const KeyType> leaves,
                            gsl::span<const unsigned> counts,
-                           gsl::span<const KeyType> focusLeaves,
-                           gsl::span<const TreeNodeIndex> requestIdx,
-                           gsl::span<const KeyType> prefixes,
-                           gsl::span<const TreeNodeIndex> levelRange,
-                           gsl::span<unsigned> requestCounts)
+                           gsl::span<const KeyType> leavesFocus,
+                           gsl::span<const TreeNodeIndex> leavesFocusIdx,
+                           gsl::span<unsigned> countsFocus)
 {
 #pragma omp parallel for
-    for (size_t i = 0; i < requestIdx.size(); ++i)
+    for (size_t i = 0; i < leavesFocusIdx.size(); ++i)
     {
-        KeyType startKey = focusLeaves[requestIdx[i]];
-        KeyType endKey   = focusLeaves[requestIdx[i] + 1];
+        TreeNodeIndex leafIdx = leavesFocusIdx[i];
+        KeyType startKey      = leavesFocus[leafIdx];
+        KeyType endKey        = leavesFocus[leafIdx + 1];
 
         size_t startIdx = findNodeBelow(leaves.data(), leaves.size(), startKey);
         size_t endIdx   = findNodeAbove(leaves.data(), leaves.size(), endKey);
+        assert(startKey == leaves[startIdx] && endKey == leaves[endIdx]);
 
-        // Nodes in @p leaves must match the request keys exactly, otherwise counts are wrong.
-        // If this assertion fails, it means that the local leaves/counts does not have the required
-        // resolution to answer the incoming count request of [startKey:endKey] precisely, which means that
-        // focusTransfer didn't work correctly
-        assert(startKey == leaves[startIdx]);
-        assert(endKey == leaves[endIdx]);
-
-        uint64_t internalCount     = std::accumulate(counts.begin() + startIdx, counts.begin() + endIdx, uint64_t(0));
-        TreeNodeIndex internalIdx  = locateNode(startKey, endKey, prefixes.data(), levelRange.data());
-        requestCounts[internalIdx] = std::min(uint64_t(std::numeric_limits<unsigned>::max()), internalCount);
+        uint64_t globCount   = std::accumulate(counts.begin() + startIdx, counts.begin() + endIdx, uint64_t(0));
+        countsFocus[leafIdx] = std::min(uint64_t(std::numeric_limits<unsigned>::max()), globCount);
     }
 }
 
