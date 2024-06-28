@@ -273,31 +273,19 @@ public:
     {
         assert(localQuantities.size() == treeData_.numNodes);
 
-        TreeNodeIndex firstGlobalIdx = findNodeAbove(globalLeaves.data(), globalLeaves.size(), prevFocusStart);
-        TreeNodeIndex lastGlobalIdx  = findNodeAbove(globalLeaves.data(), globalLeaves.size(), prevFocusEnd);
-        // make sure that the focus is resolved exactly in the global tree
-        assert(globalLeaves[firstGlobalIdx] == prevFocusStart);
-        assert(globalLeaves[lastGlobalIdx] == prevFocusEnd);
+        TreeNodeIndex firstGlobIdx = findNodeAbove(globalLeaves.data(), globalLeaves.size(), prevFocusStart);
+        TreeNodeIndex lastGlobIdx  = findNodeAbove(globalLeaves.data(), globalLeaves.size(), prevFocusEnd);
+        auto globLeavesFoc         = globalLeaves.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx + 1);
+        auto globQFoc              = globalQuantities.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx);
 
-        const KeyType* nodeKeys         = treeData_.prefixes.data();
-        const TreeNodeIndex* levelRange = treeData_.levelRange.data();
+        const KeyType* nodeKeys         = rawPtr(treeData_.prefixes);
+        const TreeNodeIndex* levelRange = rawPtr(treeData_.levelRange);
 
 #pragma omp parallel for schedule(static)
-        for (TreeNodeIndex globalIdx = firstGlobalIdx; globalIdx < lastGlobalIdx; ++globalIdx)
+        for (TreeNodeIndex i = 0; i < globLeavesFoc.size() - 1; ++i)
         {
-            TreeNodeIndex localIdx =
-                locateNode(globalLeaves[globalIdx], globalLeaves[globalIdx + 1], nodeKeys, levelRange);
-            if (localIdx == treeData_.numNodes)
-            {
-                // If the global tree is fully converged, but the locally focused tree is just being built up
-                // for the first time, it's possible that the global tree has a higher resolution than
-                // the focused tree.
-                continue;
-            }
-            assert(decodePlaceholderBit(nodeKeys[localIdx]) == globalLeaves[globalIdx]);
-            assert(decodePrefixLength(nodeKeys[localIdx]) ==
-                   3 * treeLevel(globalLeaves[globalIdx + 1] - globalLeaves[globalIdx]));
-            globalQuantities[globalIdx] = localQuantities[localIdx];
+            TreeNodeIndex localIdx = locateNode(globLeavesFoc[i], globLeavesFoc[i + 1], nodeKeys, levelRange);
+            globQFoc[i]            = localQuantities[localIdx];
         }
     }
 
