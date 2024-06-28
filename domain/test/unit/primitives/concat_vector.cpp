@@ -17,11 +17,20 @@ auto testConstView(const ConcatVector<T>& v)
 TEST(PackBuffers, concatVector)
 {
     ConcatVector<int> v;
-    v.reindex({1, 1, 2, 2});
+    v.reindex({1, 2, 3});
 
     auto modView  = v.view();
-    modView[0][0] = 42;
+    std::iota(modView[0].begin(), modView[0].end(), 10);
+    std::iota(modView[1].begin(), modView[1].end(), 20);
+    std::iota(modView[2].begin(), modView[2].end(), 30);
 
     auto constView = testConstView(v);
-    EXPECT_EQ(constView[0][0], 42);
+    EXPECT_EQ(constView[2][0], 30);
+
+    ConcatVector<int> v_cpy;
+    copy(v, v_cpy);
+    auto cpyView = v_cpy.view();
+    EXPECT_TRUE(std::equal(modView[0].begin(), modView[0].end(), cpyView[0].begin()));
+    EXPECT_TRUE(std::equal(modView[1].begin(), modView[1].end(), cpyView[1].begin()));
+    EXPECT_TRUE(std::equal(modView[2].begin(), modView[2].end(), cpyView[2].begin()));
 }

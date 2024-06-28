@@ -71,7 +71,6 @@ public:
         , numRanks_(numRanks)
         , bucketSize_(bucketSize)
         , treelets_(numRanks_)
-        , treeletIdx_(numRanks_)
         , counts_{bucketSize + 1}
         , macs_{1}
         , centers_(1)
@@ -163,7 +162,7 @@ public:
 
         if constexpr (HaveGpu<Accelerator>{})
         {
-            syncTreeletsGpu(peers_, assignment_, leaves_, octreeAcc_, leavesAcc_, treelets_);
+            syncTreeletsGpu<KeyType>(peers_, assignment_, leaves_, octreeAcc_, leavesAcc_, treelets_);
             downloadOctree();
         }
         else { syncTreelets(peers_, assignment_, treeData_, leaves_, treelets_); }
@@ -266,10 +265,9 @@ public:
     }
 
     template<class T, class DevVec>
-    void peerExchange(gsl::span<T> quantities, int commTag, DevVec& s) const
+    void peerExchange(gsl::span<T> q, int commTag, DevVec& s) const
     {
-        gsl::span<const gsl::span<const TreeNodeIndex>> tlIdxView = treeletIdx_.view();
-        exchangeTreeletGeneral<T>(peers_, tlIdxView, assignment_, leafToInternal(treeData_), quantities, commTag, s);
+        exchangeTreeletGeneral<T>(peers_, treeletIdx_.view(), assignment_, leafToInternal(treeData_), q, commTag, s);
     }
 
     /*! @brief transfer quantities of leaf cells inside the focus into a global array

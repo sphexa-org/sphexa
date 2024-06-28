@@ -274,7 +274,7 @@ void syncTreelets(gsl::span<const int> peers,
 template<class KeyType>
 void syncTreeletsGpu(gsl::span<const int> peers,
                      gsl::span<const IndexPair<TreeNodeIndex>> assignment,
-                     const std::vector<KeyType>& leaves,
+                     gsl::span<const KeyType> leaves,
                      OctreeData<KeyType, GpuTag>& octreeAcc,
                      DeviceVector<KeyType>& leavesAcc,
                      std::vector<std::vector<KeyType>>& treelets)
@@ -324,11 +324,11 @@ void indexTreelets(gsl::span<const int> peerRanks, gsl::span<const KeyType> node
                    const std::vector<std::vector<KeyType>>& treelets,
                    ConcatVector<TreeNodeIndex>& treeletIdx)
 {
-    treeletIdx.reindex(extractNumNodes(treelets));
+    auto tlView = treeletIdx.reindex(extractNumNodes(treelets));
     for (int rank : peerRanks)
     {
         const auto& treelet    = treelets[rank];
-        auto tlIdx             = treeletIdx[rank];
+        auto tlIdx             = tlView[rank];
         TreeNodeIndex numNodes = nNodes(treelets[rank]);
 
 #pragma omp parallel for schedule(static)

@@ -17,6 +17,7 @@
 
 #include <vector>
 
+#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/util/gsl-lite.hpp"
 #include "cstone/util/pack_buffers.hpp"
 
@@ -24,38 +25,47 @@ namespace cstone
 {
 
 //! multiple linear buffers concatenated into a single buffer
-template<class T>
+template<class T, template<class...> class AccVector = std::vector, int alignmentBytes = 64>
 class ConcatVector
 {
 public:
     ConcatVector() = default;
-    ConcatVector(int alignment)
-        : alignmentBytes_(alignment)
+
+    //! @brief return segment sizes
+    gsl::span<const std::size_t> sizes() const { return segmentSizes_; }
+    //! @brief return const span of underlying (linear) buffer
+    gsl::span<const T> data() const { return buffer_; }
+
+    auto view() { return util::packAllocBuffer<T>(buffer_, segmentSizes_, alignmentBytes); }
+    auto view() const { return util::packAllocBuffer<const T>(buffer_, segmentSizes_, alignmentBytes); }
+
+    auto reindex(std::vector<std::size_t>&& segmentSizes)
     {
-    }
-
-    //! @brief return number of segments
-    std::size_t size() { return segments_.size(); }
-
-    gsl::span<T> operator[](size_t i) { return segments_[i]; }
-    gsl::span<const T> operator[](size_t i) const { return segments_[i]; }
-
-    gsl::span<gsl::span<T>> view() { return segments_; }
-    gsl::span<const gsl::span<const T>> cview() { return csegments_; }
-    gsl::span<const gsl::span<const T>> view() const { return csegments_; }
-
-    void reindex(std::vector<std::size_t>&& segmentSizes)
-    {
-        segments_  = util::packAllocBuffer<T>(buffer_, segmentSizes, alignmentBytes_);
-        csegments_ = util::packAllocBuffer<const T>(buffer_, segmentSizes, alignmentBytes_);
+        segmentSizes_ = std::move(segmentSizes);
+        return view();
     }
 
 private:
-    std::vector<T> buffer_;
-    std::vector<gsl::span<T>> segments_;
-    // Can't cast span<T>* to span<const T>*, so need to stupidly duplicate the view in return for const-correctness
-    std::vector<gsl::span<const T>> csegments_;
-    int alignmentBytes_{64};
+    mutable AccVector<T> buffer_;
+    std::vector<std::size_t> segmentSizes_;
 };
+
+//! @brief copy src to dst
+template<class T, template<class...> class AccVec1, template<class...> class AccVec2, int A>
+void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst)
+{
+    std::vector<std::size_t> sizes(src.sizes().begin(), src.sizes().end());
+    auto dstView = dst.reindex(std::move(sizes));
+
+    if constexpr (!IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{})
+    {
+        memcpyH2D(src.data().data(), dstView.size(), dstView.data());
+    }
+    else if constexpr (IsDeviceVector<AccVec1<T>>{} && !IsDeviceVector<AccVec2<T>>{})
+    {
+        memcpyD2H(src.data().data(), dstView.size(), dstView.data());
+    }
+    else { dst = src; }
+}
 
 } // namespace cstone
