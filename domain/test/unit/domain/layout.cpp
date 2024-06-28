@@ -161,3 +161,11 @@ TEST(Layout, gatherArrays)
     EXPECT_TRUE(std::equal(&refA[outOffset], &refA[a.size()], &a[outOffset]));
     EXPECT_TRUE(std::equal(&refB[outOffset], &refB[b.size()], &b[outOffset]));
 }
+
+TEST(Layout, enumerateRanges)
+{
+    std::vector<IndexPair<TreeNodeIndex>> ranges{{10, 13}, {30, 32}};
+    auto probe = enumerateRanges(ranges);
+    std::vector<TreeNodeIndex> ref{10, 11, 12, 30, 31};
+    EXPECT_EQ(probe, ref);
+}

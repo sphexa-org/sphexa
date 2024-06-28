@@ -229,19 +229,10 @@ public:
         scatter<TreeNodeIndex>(leafToInternal(treeData_), leafCounts_.data(), counts_.data());
         upsweep(treeData_.levelRange, treeData_.childOffsets, counts_.data(), NodeCount<unsigned>{});
 
-        // global counts
-        auto globalCountIndices = invertRanges(0, assignment_, nNodes(leaves_));
-
-        // particle counts for leaf nodes in treeLeaves() / leafCounts():
-        //   Node indices [firstFocusNode:lastFocusNode] got assigned counts from local particles.
-        //   Node index ranges listed in requestIndices got assigned counts from peer ranks.
-        //   All remaining indices need to get their counts from the global tree.
-        //   They are stored in globalCountIndices.
-        for (auto ip : globalCountIndices)
-        {
-            countRequestParticles<KeyType>(globalTreeLeaves, globalCounts, leaves.subspan(ip.start(), ip.count() + 1),
-                                           treeData_.prefixes, treeData_.levelRange, gsl::span<unsigned>(counts_));
-        }
+        // list of indices in leaves not part of the local or peer rank assignments
+        auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, nNodes(leaves_)));
+        countRequestParticles<KeyType>(globalTreeLeaves, globalCounts, leaves, idxFromGlob, treeData_.prefixes,
+                                       treeData_.levelRange, gsl::span<unsigned>(counts_));
 
         // counts from neighboring peers
         constexpr int countTag = static_cast<int>(P2pTags::focusPeerCounts);

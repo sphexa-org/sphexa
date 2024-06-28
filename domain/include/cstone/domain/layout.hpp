@@ -89,6 +89,21 @@ invertRanges(TreeNodeIndex first, gsl::span<const IndexPair<TreeNodeIndex>> rang
     return invertedRanges;
 }
 
+//! @brief enumerate all input ranges with std::iota and pack them together in a single vector
+inline std::vector<TreeNodeIndex> enumerateRanges(gsl::span<const IndexPair<TreeNodeIndex>> ranges)
+{
+    std::vector<TreeNodeIndex> rangeCounts(ranges.size() + 1);
+    std::transform(ranges.begin(), ranges.end(), rangeCounts.begin(), [](auto pair) { return pair.count(); });
+    std::exclusive_scan(rangeCounts.begin(), rangeCounts.end(), rangeCounts.begin(), 0);
+
+    std::vector<TreeNodeIndex> ret(rangeCounts.back());
+    for (size_t i = 0; i < ranges.size(); ++i)
+    {
+        std::iota(ret.begin() + rangeCounts[i], ret.begin() + rangeCounts[i] + ranges[i].count(), ranges[i].start());
+    }
+    return ret;
+}
+
 /*! @brief extract ranges of marked indices from a source array
  *
  * @tparam IntegralType  an integer type

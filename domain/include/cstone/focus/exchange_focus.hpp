@@ -71,21 +71,20 @@ namespace cstone
 template<class KeyType>
 void countRequestParticles(gsl::span<const KeyType> leaves,
                            gsl::span<const unsigned> counts,
-                           gsl::span<const KeyType> requestLeaves,
+                           gsl::span<const KeyType> focusLeaves,
+                           gsl::span<const TreeNodeIndex> requestIdx,
                            gsl::span<const KeyType> prefixes,
                            gsl::span<const TreeNodeIndex> levelRange,
                            gsl::span<unsigned> requestCounts)
 {
 #pragma omp parallel for
-    for (size_t i = 0; i < nNodes(requestLeaves); ++i)
+    for (size_t i = 0; i < requestIdx.size(); ++i)
     {
-        KeyType startKey = requestLeaves[i];
-        KeyType endKey   = requestLeaves[i + 1];
+        KeyType startKey = focusLeaves[requestIdx[i]];
+        KeyType endKey   = focusLeaves[requestIdx[i] + 1];
 
         size_t startIdx = findNodeBelow(leaves.data(), leaves.size(), startKey);
         size_t endIdx   = findNodeAbove(leaves.data(), leaves.size(), endKey);
-
-        TreeNodeIndex internalIdx = locateNode(startKey, endKey, prefixes.data(), levelRange.data());
 
         // Nodes in @p leaves must match the request keys exactly, otherwise counts are wrong.
         // If this assertion fails, it means that the local leaves/counts does not have the required
@@ -95,6 +94,7 @@ void countRequestParticles(gsl::span<const KeyType> leaves,
         assert(endKey == leaves[endIdx]);
 
         uint64_t internalCount     = std::accumulate(counts.begin() + startIdx, counts.begin() + endIdx, uint64_t(0));
+        TreeNodeIndex internalIdx  = locateNode(startKey, endKey, prefixes.data(), levelRange.data());
         requestCounts[internalIdx] = std::min(uint64_t(std::numeric_limits<unsigned>::max()), internalCount);
     }
 }
