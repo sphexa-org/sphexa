@@ -302,21 +302,18 @@ public:
                        gsl::span<const T> globalQuantities,
                        gsl::span<T> localQuantities) const
     {
-        const KeyType* localLeaves      = leaves_.data();
+        const KeyType* prefixes         = rawPtr(treeData_.prefixes);
         const TreeNodeIndex* toInternal = leafToInternal(treeData_).data();
-        //! requestIndices: range of leaf cell indices in the locally focused tree that need global information
-        auto requestIndices = invertRanges(0, assignment_, treeData_.numLeafNodes);
-        for (auto range : requestIndices)
-        {
-            //! from global tree, pull in missing elements into locally focused tree
+        //! list of leaf cell indices in the locally focused tree that need global information
+        auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, treeData_.numLeafNodes));
+        for(auto& i : idxFromGlob) { i = toInternal[i]; }
+
 #pragma omp parallel for schedule(static)
-            for (TreeNodeIndex i = range.start(); i < range.end(); ++i)
-            {
-                TreeNodeIndex globalIndex =
-                    locateNode(localLeaves[i], localLeaves[i + 1], globalNodeKeys, globalLevelRange);
-                TreeNodeIndex internalIdx    = toInternal[i];
-                localQuantities[internalIdx] = globalQuantities[globalIndex];
-            }
+        for (TreeNodeIndex k = 0; k < idxFromGlob.size(); ++k)
+        {
+            TreeNodeIndex i       = idxFromGlob[k];
+            TreeNodeIndex globIdx = locateNode(prefixes[i], globalNodeKeys, globalLevelRange);
+            localQuantities[i]    = globalQuantities[globIdx];
         }
     }
 
