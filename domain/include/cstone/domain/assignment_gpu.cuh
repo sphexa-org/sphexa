@@ -199,11 +199,11 @@ public:
     }
 
     //! @brief read only visibility of the global octree leaves to the outside
-    gsl::span<const KeyType> treeLeaves() const { return tree_.treeLeaves(); }
+    gsl::span<const KeyType> treeLeaves() const { return {rawPtr(d_csTree_), d_csTree_.size()}; }
     //! @brief the octree, including the internal part
     const Octree<KeyType>& octree() const { return tree_; }
     //! @brief read only visibility of the global octree leaf counts to the outside
-    gsl::span<const unsigned> nodeCounts() const { return nodeCounts_; }
+    gsl::span<const unsigned> nodeCounts() const { return {rawPtr(d_nodeCounts_), d_nodeCounts_.size()}; }
     //! @brief the global coordinate bounding box
     const Box<T>& box() const { return box_; }
     //! @brief return the space filling curve rank assignment of the last call to @a assign()

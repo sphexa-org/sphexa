@@ -79,6 +79,7 @@ bool updateOctreeGlobalGpu(const KeyType* keyStart,
     {
         counts[i] = std::max(counts[i], counts_reduced[i]);
     }
+    memcpyH2D(counts.data(), counts.size(), rawPtr(d_counts));
 
     return converged;
 }

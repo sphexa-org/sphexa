@@ -76,4 +76,12 @@ extern ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
                                        const TreeNodeIndex* parents,
                                        TreeNodeIndex* nodeOps);
 
+//! @brief see CPU version
+template<class KeyType>
+extern void rangeCountGpu(gsl::span<const KeyType> leaves,
+                          gsl::span<const unsigned> counts,
+                          gsl::span<const KeyType> leavesFocus,
+                          gsl::span<const TreeNodeIndex> leavesFocusIdx,
+                          gsl::span<unsigned> countsFocus);
+
 } // namespace cstone

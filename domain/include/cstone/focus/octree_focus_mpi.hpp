@@ -204,6 +204,7 @@ public:
                       gsl::span<const unsigned> globalCounts,
                       DeviceVector& scratch)
     {
+        std::size_t origSize = scratch.size();
         gsl::span<const KeyType> leaves(leaves_);
 
         leafCounts_.resize(nNodes(leaves_));
@@ -214,6 +215,17 @@ public:
 
             computeNodeCountsGpu(rawPtr(leavesAcc_), rawPtr(leafCountsAcc_), numLeafNodes, particleKeys.begin(),
                                  particleKeys.end(), std::numeric_limits<unsigned>::max(), false);
+
+            // add counts from global tree
+            auto idxFromGlob       = enumerateRanges(invertRanges(0, assignment_, nNodes(leaves_)));
+            std::size_t numIndices = idxFromGlob.size();
+            auto* d_indices        = util::packAllocBuffer<TreeNodeIndex>(scratch, {&numIndices, 1}, 64)[0].data();
+            memcpyH2D(idxFromGlob.data(), idxFromGlob.size(), d_indices);
+
+            gsl::span<const KeyType> leavesAcc{rawPtr(leavesAcc_), leavesAcc_.size()};
+            rangeCountGpu<KeyType>(globalTreeLeaves, globalCounts, leavesAcc, {d_indices, idxFromGlob.size()},
+                                   {rawPtr(leafCountsAcc_), leafCountsAcc_.size()});
+
             memcpyD2H(rawPtr(leafCountsAcc_), numLeafNodes, leafCounts_.data());
         }
         else
@@ -222,11 +234,11 @@ public:
             assert(std::is_sorted(particleKeys.begin(), particleKeys.end()));
             computeNodeCounts(leaves_.data(), leafCounts_.data(), nNodes(leaves_), particleKeys.data(),
                               particleKeys.data() + particleKeys.size(), std::numeric_limits<unsigned>::max(), true);
-        }
 
-        // add counts from global tree
-        auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, nNodes(leaves_)));
-        countRequestParticles<KeyType>(globalTreeLeaves, globalCounts, leaves, idxFromGlob, leafCounts_);
+            // add counts from global tree
+            auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, nNodes(leaves_)));
+            rangeCount<KeyType>(globalTreeLeaves, globalCounts, leaves, idxFromGlob, leafCounts_);
+        }
 
         // 1st upsweep with local and global data
         counts_.resize(treeData_.numNodes);
@@ -249,6 +261,7 @@ public:
             reallocateDestructive(countsAcc_, counts_.size(), allocGrowthRate_);
             memcpyH2D(counts_.data(), counts_.size(), rawPtr(countsAcc_));
         }
+        reallocate(scratch, origSize, 1.0);
 
         rebalanceStatus_ |= countsCriterion;
     }
