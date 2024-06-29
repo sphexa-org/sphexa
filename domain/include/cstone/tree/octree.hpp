@@ -613,6 +613,7 @@ struct SumCombination
 template<class CountType>
 struct NodeCount
 {
+    HOST_DEVICE_FUN
     CountType operator()(TreeNodeIndex /*nodeIdx*/, TreeNodeIndex c, const CountType* Q)
     {
         uint64_t sum = Q[c];

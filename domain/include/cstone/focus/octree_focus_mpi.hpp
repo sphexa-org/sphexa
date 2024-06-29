@@ -211,13 +211,13 @@ public:
         if constexpr (HaveGpu<Accelerator>{})
         {
             reallocateDestructive(leafCountsAcc_, nNodes(leavesAcc_), allocGrowthRate_);
-            TreeNodeIndex numLeafNodes = treeData_.numLeafNodes;
+            TreeNodeIndex numLeafNodes = octreeAcc_.numLeafNodes;
 
             computeNodeCountsGpu(rawPtr(leavesAcc_), rawPtr(leafCountsAcc_), numLeafNodes, particleKeys.begin(),
                                  particleKeys.end(), std::numeric_limits<unsigned>::max(), false);
 
             // add counts from global tree
-            auto idxFromGlob       = enumerateRanges(invertRanges(0, assignment_, nNodes(leaves_)));
+            auto idxFromGlob       = enumerateRanges(invertRanges(0, assignment_, numLeafNodes));
             std::size_t numIndices = idxFromGlob.size();
             auto* d_indices        = util::packAllocBuffer<TreeNodeIndex>(scratch, {&numIndices, 1}, 64)[0].data();
             memcpyH2D(idxFromGlob.data(), idxFromGlob.size(), d_indices);
@@ -226,7 +226,14 @@ public:
             rangeCountGpu<KeyType>(globalTreeLeaves, globalCounts, leavesAcc, {d_indices, idxFromGlob.size()},
                                    {rawPtr(leafCountsAcc_), leafCountsAcc_.size()});
 
-            memcpyD2H(rawPtr(leafCountsAcc_), numLeafNodes, leafCounts_.data());
+            // 1st upsweep with local and global data
+            reallocateDestructive(countsAcc_, octreeAcc_.numNodes, allocGrowthRate_);
+            scatterGpu(leafToInternal(octreeAcc_).data(), numLeafNodes, rawPtr(leafCountsAcc_), rawPtr(countsAcc_));
+
+            upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(treeData_.levelRange), rawPtr(octreeAcc_.childOffsets),
+                          rawPtr(countsAcc_));
+            counts_.resize(octreeAcc_.numNodes);
+            memcpyD2H(rawPtr(countsAcc_), octreeAcc_.numNodes, rawPtr(counts_));
         }
         else
         {
@@ -238,12 +245,12 @@ public:
             // add counts from global tree
             auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, nNodes(leaves_)));
             rangeCount<KeyType>(globalTreeLeaves, globalCounts, leaves, idxFromGlob, leafCounts_);
-        }
 
-        // 1st upsweep with local and global data
-        counts_.resize(treeData_.numNodes);
-        scatter<TreeNodeIndex>(leafToInternal(treeData_), leafCounts_.data(), counts_.data());
-        upsweep(treeData_.levelRange, treeData_.childOffsets, counts_.data(), NodeCount<unsigned>{});
+            // 1st upsweep with local and global data
+            counts_.resize(treeData_.numNodes);
+            scatter<TreeNodeIndex>(leafToInternal(treeData_), leafCounts_.data(), counts_.data());
+            upsweep(treeData_.levelRange, treeData_.childOffsets, counts_.data(), NodeCount<unsigned>{});
+        }
 
         // add counts from neighboring peers
         std::vector<int, util::DefaultInitAdaptor<int>> hScratch;
@@ -258,7 +265,6 @@ public:
             memcpyH2D(leafCounts_.data(), assignment_[myRank_].start(), rawPtr(leafCountsAcc_));
             memcpyH2D(leafCounts_.data() + assignment_[myRank_].end(), leafCounts_.size() - assignment_[myRank_].end(),
                       rawPtr(leafCountsAcc_) + assignment_[myRank_].end());
-            reallocateDestructive(countsAcc_, counts_.size(), allocGrowthRate_);
             memcpyH2D(counts_.data(), counts_.size(), rawPtr(countsAcc_));
         }
         reallocate(scratch, origSize, 1.0);

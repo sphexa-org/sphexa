@@ -175,4 +175,36 @@ void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d)
 template void buildOctreeGpu(const uint32_t*, OctreeView<uint32_t>);
 template void buildOctreeGpu(const uint64_t*, OctreeView<uint64_t>);
 
+__global__ void upsweepSumKernel(TreeNodeIndex firstCell,
+                                 TreeNodeIndex lastCell,
+                                 const TreeNodeIndex* childOffsets,
+                                 LocalIndex* nodeCounts)
+{
+    const int cellIdx = blockIdx.x * blockDim.x + threadIdx.x + firstCell;
+    if (cellIdx >= lastCell) return;
+
+    TreeNodeIndex firstChild = childOffsets[cellIdx];
+
+    if (firstChild) { nodeCounts[cellIdx] = NodeCount<LocalIndex>{}(cellIdx, firstChild, nodeCounts); }
+}
+
+void upsweepSumGpu(int numLevels,
+                   const TreeNodeIndex* levelRange,
+                   const TreeNodeIndex* childOffsets,
+                   LocalIndex* nodeCounts)
+{
+    constexpr int numThreads = 128;
+
+    for (int level = numLevels - 1; level >= 0; level--)
+    {
+        int numCellsLevel = levelRange[level + 1] - levelRange[level];
+        int numBlocks     = (numCellsLevel - 1) / numThreads + 1;
+        if (numCellsLevel)
+        {
+            upsweepSumKernel<<<numBlocks, numThreads>>>(levelRange[level], levelRange[level + 1], childOffsets,
+                                                        nodeCounts);
+        }
+    }
+}
+
 } // namespace cstone

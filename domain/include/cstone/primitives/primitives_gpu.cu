@@ -136,6 +136,27 @@ template void gatherGpu(const unsigned*, size_t, const util::array<float, 2>*, u
 template void gatherGpu(const unsigned*, size_t, const util::array<float, 3>*, util::array<float, 3>*);
 template void gatherGpu(const unsigned*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
 
+template<class T, class IndexType>
+__global__ void scatterGpuKernel(const IndexType* map, size_t n, const T* source, T* destination)
+{
+    size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (tid < n) { destination[map[tid]] = source[tid]; }
+}
+
+template<class T, class IndexType>
+void scatterGpu(const IndexType* map, size_t n, const T* source, T* destination)
+{
+    int numThreads = 256;
+    int numBlocks  = iceil(n, numThreads);
+
+    scatterGpuKernel<<<numBlocks, numThreads>>>(map, n, source, destination);
+}
+
+template void scatterGpu(const int*, size_t, const int*, int*);
+template void scatterGpu(const int*, size_t, const uint32_t*, uint32_t*);
+template void scatterGpu(const int*, size_t, const uint64_t*, uint64_t*);
+
 template<class T>
 std::tuple<T, T> MinMaxGpu<T>::operator()(const T* first, const T* last)
 {

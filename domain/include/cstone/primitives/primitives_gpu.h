@@ -52,6 +52,9 @@ extern void gatherGpu(const IndexType* ordering, size_t numElements, const T* sr
 inline auto gatherGpuL = [](const auto* ordering, auto numElements, const auto* src, const auto dest)
 { gatherGpu(ordering, numElements, src, dest); };
 
+template<class T, class IndexType>
+extern void scatterGpu(const IndexType* ordering, size_t numElements, const T* src, T* buffer);
+
 template<class T>
 struct MinMaxGpu
 {
