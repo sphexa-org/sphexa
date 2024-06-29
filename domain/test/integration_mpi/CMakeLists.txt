@@ -51,6 +51,7 @@ function(addCstoneGpuMpiTest source exename testname ranks)
 endfunction()
 
 if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
+    addCstoneGpuMpiTest(exchange_general_gpu.cpp exchange_general_gpu ExchangeGeneralGpu 5)
     addCstoneGpuMpiTest(exchange_halos_gpu.cpp exchange_halos_gpu GlobalHaloExchangeGpu 2)
     addCstoneGpuMpiTest(exchange_domain_gpu.cpp exchange_domain_gpu GlobalDomainExchangeGpu 2)
     addCstoneGpuMpiTest(assignment_gpu.cpp assignment_gpu AssignmentGpu 2)

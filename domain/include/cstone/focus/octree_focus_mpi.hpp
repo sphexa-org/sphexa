@@ -515,8 +515,6 @@ public:
     }
     //! @brief Expansion (com) centers of each global cell
     gsl::span<const SourceCenterType<RealType>> globalExpansionCenters() const { return globalCenters_; }
-    //! brief particle counts per focus tree leaf cell
-    gsl::span<const unsigned> leafCounts() const { return leafCounts_; }
 
     //! @brief return a view to the octree on the active accelerator
     OctreeView<const KeyType> octreeViewAcc() const
@@ -532,12 +530,18 @@ public:
         else { return leaves_; }
     }
 
+    //! brief particle counts per focus tree leaf cell
+    gsl::span<const unsigned> leafCounts() const { return leafCounts_; }
+
     //! @brief the cornerstone leaf cell particle counts
     gsl::span<const unsigned> leafCountsAcc() const
     {
         if constexpr (HaveGpu<Accelerator>{}) { return {rawPtr(leafCountsAcc_), leafCountsAcc_.size()}; }
         else { return leafCounts_; }
     }
+
+    //! brief particle counts per focus tree leaf cell
+    gsl::span<const unsigned> countsAcc() const { return {rawPtr(countsAcc_), countsAcc_.size()}; }
 
     gsl::span<const Vec3<RealType>> geoCentersAcc() const { return {rawPtr(geoCentersAcc_), geoCentersAcc_.size()}; }
     gsl::span<const Vec3<RealType>> geoSizesAcc() const { return {rawPtr(geoSizesAcc_), geoSizesAcc_.size()}; }

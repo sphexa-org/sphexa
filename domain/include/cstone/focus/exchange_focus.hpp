@@ -51,6 +51,7 @@
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/primitives/gather_acc.hpp"
 #include "cstone/tree/csarray.hpp"
+#include "cstone/tree/csarray_gpu.h"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/gsl-lite.hpp"
 #include "cstone/util/pack_buffers.hpp"
