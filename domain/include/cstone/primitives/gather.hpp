@@ -129,6 +129,17 @@ void scatter(gsl::span<const IndexType> ordering, const ValueType* source, Value
     }
 }
 
+//! @brief gather from @p src and scatter into @p dst
+template<class IndexType, class VType>
+void gatherScatter(gsl::span<const IndexType> gmap, gsl::span<const IndexType> smap, const VType* src, VType* dst)
+{
+#pragma omp parallel for schedule(static)
+    for (size_t i = 0; i < gmap.size(); ++i)
+    {
+        dst[smap[i]] = src[gmap[i]];
+    }
+}
+
 template<class IndexType, class BufferType>
 class SfcSorter
 {

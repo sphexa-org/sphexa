@@ -281,12 +281,13 @@ public:
         const KeyType* nodeKeys         = rawPtr(treeData_.prefixes);
         const TreeNodeIndex* levelRange = rawPtr(treeData_.levelRange);
 
+        std::vector<TreeNodeIndex> gmap(lastGlobIdx - firstGlobIdx);
 #pragma omp parallel for schedule(static)
         for (TreeNodeIndex i = 0; i < globLeavesFoc.size() - 1; ++i)
         {
-            TreeNodeIndex localIdx = locateNode(globLeavesFoc[i], globLeavesFoc[i + 1], nodeKeys, levelRange);
-            globQFoc[i]            = localQuantities[localIdx];
+            gmap[i] = locateNode(globLeavesFoc[i], globLeavesFoc[i + 1], nodeKeys, levelRange);
         }
+        gather<TreeNodeIndex>(gmap, localQuantities.data(), globQFoc.data());
     }
 
     /*! @brief transfer missing cell quantities from global tree into localQuantities
@@ -306,15 +307,16 @@ public:
         const TreeNodeIndex* toInternal = leafToInternal(treeData_).data();
         //! list of leaf cell indices in the locally focused tree that need global information
         auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, treeData_.numLeafNodes));
-        for(auto& i : idxFromGlob) { i = toInternal[i]; }
+        std::transform(idxFromGlob.begin(), idxFromGlob.end(), idxFromGlob.begin(),
+                       [m = toInternal](auto i) { return m[i]; });
 
+        std::vector<TreeNodeIndex> gmap(idxFromGlob.size());
 #pragma omp parallel for schedule(static)
-        for (TreeNodeIndex k = 0; k < idxFromGlob.size(); ++k)
+        for (TreeNodeIndex i = 0; i < idxFromGlob.size(); ++i)
         {
-            TreeNodeIndex i       = idxFromGlob[k];
-            TreeNodeIndex globIdx = locateNode(prefixes[i], globalNodeKeys, globalLevelRange);
-            localQuantities[i]    = globalQuantities[globIdx];
+            gmap[i] = locateNode(prefixes[idxFromGlob[i]], globalNodeKeys, globalLevelRange);
         }
+        gatherScatter<TreeNodeIndex>(gmap, idxFromGlob, globalQuantities.data(), localQuantities.data());
     }
 
     template<class Tm, class DevVec1 = std::vector<LocalIndex>, class DevVec2 = std::vector<LocalIndex>>
