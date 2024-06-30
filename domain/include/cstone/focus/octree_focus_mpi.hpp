@@ -236,8 +236,11 @@ public:
             gsl::span<unsigned> countsAccView{rawPtr(countsAcc_), countsAcc_.size()};
             peerExchangeGpu(countsAccView, static_cast<int>(P2pTags::focusPeerCounts), scratch);
 
-            counts_.resize(octreeAcc_.numNodes);
-            memcpyD2H(rawPtr(countsAcc_), octreeAcc_.numNodes, rawPtr(counts_));
+            upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(treeData_.levelRange), rawPtr(octreeAcc_.childOffsets),
+                          rawPtr(countsAcc_));
+            gatherAcc<HaveGpu<Accelerator>{}>(leafToInternal(octreeAcc_), rawPtr(countsAcc_), rawPtr(leafCountsAcc_));
+
+            memcpyD2H(rawPtr(leafCountsAcc_), octreeAcc_.numLeafNodes, rawPtr(leafCounts_));
         }
         else
         {
@@ -256,20 +259,11 @@ public:
             upsweep(treeData_.levelRange, treeData_.childOffsets, counts_.data(), NodeCount<unsigned>{});
 
             // add counts from neighboring peers
-            std::vector<int, util::DefaultInitAdaptor<int>> hScratch;
-            peerExchange(gsl::span<unsigned>(counts_), static_cast<int>(P2pTags::focusPeerCounts), hScratch);
-        }
+            peerExchange(gsl::span<unsigned>(counts_), static_cast<int>(P2pTags::focusPeerCounts), scratch);
 
-        // 2nd upsweep with peer data present
-        upsweep(treeData_.levelRange, treeData_.childOffsets, counts_.data(), NodeCount<unsigned>{});
-        gather(leafToInternal(treeData_), counts_.data(), leafCounts_.data());
-
-        if constexpr (HaveGpu<Accelerator>{})
-        {
-            memcpyH2D(leafCounts_.data(), assignment_[myRank_].start(), rawPtr(leafCountsAcc_));
-            memcpyH2D(leafCounts_.data() + assignment_[myRank_].end(), leafCounts_.size() - assignment_[myRank_].end(),
-                      rawPtr(leafCountsAcc_) + assignment_[myRank_].end());
-            memcpyH2D(counts_.data(), counts_.size(), rawPtr(countsAcc_));
+            // 2nd upsweep with peer data present
+            upsweep(treeData_.levelRange, treeData_.childOffsets, counts_.data(), NodeCount<unsigned>{});
+            gather(leafToInternal(treeData_), counts_.data(), leafCounts_.data());
         }
         reallocate(scratch, origSize, 1.0);
 
