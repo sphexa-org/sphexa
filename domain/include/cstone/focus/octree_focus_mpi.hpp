@@ -170,6 +170,7 @@ public:
         indexTreelets<KeyType>(peerRanks, treeData_.prefixes, treeData_.levelRange, treelets_, treeletIdx_);
 
         translateAssignment<KeyType>(assignment, leaves_, peers_, myRank_, assignment_);
+        copy(treeletIdx_, treeletIdxAcc_);
 
         /*! Store box for use in all property updates (counts, centers, MACs, etc) until updateTree() is called again.
          *  We store it here in order to disallow calling updateMacs with a changed bounding box, because changing
@@ -232,6 +233,9 @@ public:
 
             upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(treeData_.levelRange), rawPtr(octreeAcc_.childOffsets),
                           rawPtr(countsAcc_));
+            gsl::span<unsigned> countsAccView{rawPtr(countsAcc_), countsAcc_.size()};
+            peerExchangeGpu(countsAccView, static_cast<int>(P2pTags::focusPeerCounts), scratch);
+
             counts_.resize(octreeAcc_.numNodes);
             memcpyD2H(rawPtr(countsAcc_), octreeAcc_.numNodes, rawPtr(counts_));
         }
@@ -250,11 +254,11 @@ public:
             counts_.resize(treeData_.numNodes);
             scatter<TreeNodeIndex>(leafToInternal(treeData_), leafCounts_.data(), counts_.data());
             upsweep(treeData_.levelRange, treeData_.childOffsets, counts_.data(), NodeCount<unsigned>{});
-        }
 
-        // add counts from neighboring peers
-        std::vector<int, util::DefaultInitAdaptor<int>> hScratch;
-        peerExchange(gsl::span<unsigned>(counts_), static_cast<int>(P2pTags::focusPeerCounts), hScratch);
+            // add counts from neighboring peers
+            std::vector<int, util::DefaultInitAdaptor<int>> hScratch;
+            peerExchange(gsl::span<unsigned>(counts_), static_cast<int>(P2pTags::focusPeerCounts), hScratch);
+        }
 
         // 2nd upsweep with peer data present
         upsweep(treeData_.levelRange, treeData_.childOffsets, counts_.data(), NodeCount<unsigned>{});
@@ -276,6 +280,13 @@ public:
     void peerExchange(gsl::span<T> q, int commTag, DevVec& s) const
     {
         exchangeTreeletGeneral<T>(peers_, treeletIdx_.view(), assignment_, leafToInternal(treeData_), q, commTag, s);
+    }
+
+    template<class T, class DevVec>
+    void peerExchangeGpu(gsl::span<T> q, int commTag, DevVec& s) const
+    {
+        exchangeTreeletGeneral<T>(peers_, treeletIdxAcc_.view(), assignment_, leafToInternal(octreeAcc_), q, commTag,
+                                  s);
     }
 
     /*! @brief transfer quantities of leaf cells inside the focus into a global array
@@ -660,6 +671,7 @@ private:
     //! @brief the tree structures that the peers have for the domain of the executing rank (myRank_)
     std::vector<std::vector<KeyType>> treelets_;
     ConcatVector<TreeNodeIndex> treeletIdx_;
+    ConcatVector<TreeNodeIndex, AccVector> treeletIdxAcc_;
 
     //! @brief octree data resident on GPU if active
     OctreeData<KeyType, Accelerator> octreeAcc_;

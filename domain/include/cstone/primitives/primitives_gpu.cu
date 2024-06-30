@@ -122,6 +122,8 @@ void gatherGpu(const IndexType* map, size_t n, const T* source, T* destination)
 }
 
 template void gatherGpu(const int*, size_t, const int*, int*);
+template void gatherGpu(const int*, size_t, const uint32_t*, uint32_t*);
+template void gatherGpu(const int*, size_t, const uint64_t*, uint64_t*);
 template void gatherGpu(const unsigned*, size_t, const uint8_t*, uint8_t*);
 template void gatherGpu(const unsigned*, size_t, const double*, double*);
 template void gatherGpu(const unsigned*, size_t, const float*, float*);

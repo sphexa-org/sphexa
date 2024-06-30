@@ -5,6 +5,7 @@ set(UNIT_TEST_SOURCES_GPU
         domain/domaindecomp_gpu.cu
         halos/gather_halos_gpu.cu
         primitives/clz.cu
+        primitives/concat_vector.cu
         primitives/gather.cu
         primitives/primitives_gpu.cu
         primitives/warpscan.cu

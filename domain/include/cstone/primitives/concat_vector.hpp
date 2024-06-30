@@ -34,7 +34,7 @@ public:
     //! @brief return segment sizes
     gsl::span<const std::size_t> sizes() const { return segmentSizes_; }
     //! @brief return const span of underlying (linear) buffer
-    gsl::span<const T> data() const { return buffer_; }
+    gsl::span<const T> data() const { return {rawPtr(buffer_), buffer_.size()}; }
 
     auto view() { return util::packAllocBuffer<T>(buffer_, segmentSizes_, alignmentBytes); }
     auto view() const { return util::packAllocBuffer<const T>(buffer_, segmentSizes_, alignmentBytes); }
@@ -46,6 +46,11 @@ public:
     }
 
 private:
+    friend bool operator==(const ConcatVector& lhs, const ConcatVector& rhs)
+    {
+        return lhs.buffer_ == rhs.buffer_ && lhs.segmentSizes_ == rhs.segmentSizes_;
+    }
+
     mutable AccVector<T> buffer_;
     std::vector<std::size_t> segmentSizes_;
 };
@@ -56,16 +61,24 @@ void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& d
 {
     std::vector<std::size_t> sizes(src.sizes().begin(), src.sizes().end());
     auto dstView = dst.reindex(std::move(sizes));
+    T* dstBuffer = dstView.front().data();
 
     if constexpr (!IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{})
     {
-        memcpyH2D(src.data().data(), dstView.size(), dstView.data());
+        memcpyH2D(src.data().data(), src.data().size(), dstBuffer);
     }
     else if constexpr (IsDeviceVector<AccVec1<T>>{} && !IsDeviceVector<AccVec2<T>>{})
     {
-        memcpyD2H(src.data().data(), dstView.size(), dstView.data());
+        memcpyD2H(src.data().data(), src.data().size(), dstBuffer);
     }
-    else { dst = src; }
+    else if constexpr (IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{})
+    {
+        memcpyD2D(src.data().data(), src.data().size(), dstBuffer);
+    }
+    else if constexpr (!IsDeviceVector<AccVec1<T>>{} && !IsDeviceVector<AccVec2<T>>{})
+    {
+        std::copy_n(src.data().data(), src.data().size(), dstBuffer);
+    }
 }
 
 } // namespace cstone

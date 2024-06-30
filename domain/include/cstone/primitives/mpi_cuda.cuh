@@ -35,7 +35,7 @@
 
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/util/noinit_alloc.hpp"
-#include "cstone/cuda/errorcheck.cuh"
+#include "cstone/cuda/cuda_stubs.h"
 
 #ifdef CSTONE_HAVE_GPU_AWARE_MPI
 constexpr inline bool useGpuDirect = true;
@@ -54,7 +54,7 @@ auto mpiSendGpuDirect(T* data,
     if constexpr (!useGpuDirect)
     {
         std::vector<T, util::DefaultInitAdaptor<T>> hostBuffer(count);
-        checkGpuErrors(cudaMemcpy(hostBuffer.data(), data, count * sizeof(T), cudaMemcpyDeviceToHost));
+        memcpyD2H(data, count, hostBuffer.data());
         auto errCode = mpiSendAsync(hostBuffer.data(), count, rank, tag, requests);
         buffers.push_back(std::move(hostBuffer));
 
@@ -82,7 +82,7 @@ auto mpiRecvGpuDirect(T* data, int count, int rank, int tag, MPI_Status* status)
     {
         std::vector<T, util::DefaultInitAdaptor<T>> hostBuffer(count);
         auto errCode = mpiRecvSync(hostBuffer.data(), count, rank, tag, status);
-        checkGpuErrors(cudaMemcpy(data, hostBuffer.data(), count * sizeof(T), cudaMemcpyHostToDevice));
+        memcpyH2D(hostBuffer.data(), count, data);
 
         return errCode;
     }

@@ -19,6 +19,54 @@
 
 using namespace cstone;
 
+TEST(GeneralFocusExchangeGpu, bareTreelet)
+{
+    int rank = 0, nRanks = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
+
+    if (rank > 1) { return; }
+
+    std::vector<unsigned> counts(10);
+    std::iota(counts.begin(), counts.begin() + 4, 100 * rank);
+
+    std::vector<int> peers{rank ? 0 : 1};
+
+    ConcatVector<TreeNodeIndex> gatherMaps;
+    gatherMaps.reindex({2, 2});
+    auto gmView              = gatherMaps.view();
+    gmView[peers.front()][0] = 1;
+    gmView[peers.front()][1] = 3;
+
+    std::vector<TreeNodeIndex> scatterMap{8, 9};
+    std::vector<IndexPair<TreeNodeIndex>> scatterSubRangePerRank{{0, 2}, {0, 2}};
+
+    ConcatVector<TreeNodeIndex, DeviceVector> d_gatherMaps;
+    copy(gatherMaps, d_gatherMaps);
+    DeviceVector<TreeNodeIndex> d_scatterMap = scatterMap;
+    DeviceVector<unsigned> d_counts = counts;
+    DeviceVector<char> scratch;
+
+    auto d_gatherMapsView = static_cast<const ConcatVector<TreeNodeIndex, DeviceVector>&>(d_gatherMaps).view();
+    exchangeTreeletGeneral<unsigned>(
+        peers, d_gatherMapsView, {rawPtr(scatterSubRangePerRank), scatterSubRangePerRank.size()},
+        {rawPtr(d_scatterMap), d_scatterMap.size()}, {rawPtr(d_counts), d_counts.size()}, 0, scratch);
+
+    std::vector<unsigned> h_counts = toHost(d_counts);
+
+    if (rank == 0)
+    {
+        EXPECT_EQ(h_counts[8], 101);
+        EXPECT_EQ(h_counts[9], 103);
+    }
+
+    if (rank == 1)
+    {
+        EXPECT_EQ(h_counts[8], 1);
+        EXPECT_EQ(h_counts[9], 3);
+    }
+}
+
 //! @brief see test description of CPU version
 template<class KeyType, class T>
 static void generalExchangeRandomGaussian(int thisRank, int numRanks)

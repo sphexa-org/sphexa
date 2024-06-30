@@ -621,7 +621,7 @@ struct NodeCount
         {
             sum += Q[c + octant];
         }
-        return stl::min(uint64_t(std::numeric_limits<CountType>::max()), sum);
+        return stl::min(uint64_t(0xFFFFFFFF), sum);
     }
 };
 

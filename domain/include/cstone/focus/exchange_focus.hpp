@@ -49,6 +49,7 @@
 #include "cstone/domain/index_ranges.hpp"
 #include "cstone/primitives/concat_vector.hpp"
 #include "cstone/primitives/mpi_wrappers.hpp"
+#include "cstone/primitives/mpi_cuda.cuh"
 #include "cstone/primitives/gather_acc.hpp"
 #include "cstone/tree/csarray.hpp"
 #include "cstone/tree/csarray_gpu.h"
@@ -315,8 +316,8 @@ void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
     std::vector<std::size_t> treeletSizes(2 * peerRanks.size());
     for (int i = 0; i < peerRanks.size(); ++i)
     {
-        treeletSizes[i]                    = treeletIdx[peerRanks[i]].size();
-        treeletSizes[i + peerRanks.size()] = focusAssignment[peerRanks[i]].count();
+        treeletSizes[i]                    = treeletIdx[peerRanks[i]].size();       // send buffers
+        treeletSizes[i + peerRanks.size()] = focusAssignment[peerRanks[i]].count(); // recv buffers
     }
 
     size_t origSize    = scratch.size();
@@ -324,12 +325,22 @@ void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
     gsl::span<gsl::span<T>> sendBuffers{packedBuffers.data(), peerRanks.size()};
     gsl::span<gsl::span<T>> recvBuffers{packedBuffers.data() + peerRanks.size(), peerRanks.size()};
 
+    std::vector<std::vector<T, util::DefaultInitAdaptor<T>>> staging; // only used if GPU-direct is not active
     std::vector<MPI_Request> sendRequests;
     sendRequests.reserve(peerRanks.size());
     for (int i = 0; i < peerRanks.size(); ++i)
     {
         gatherAcc<useGpu, TreeNodeIndex>(treeletIdx[peerRanks[i]], quantities.data(), sendBuffers[i].data());
-        mpiSendAsync(sendBuffers[i].data(), treeletIdx[peerRanks[i]].size(), peerRanks[i], commTag, sendRequests);
+        if constexpr (useGpu)
+        {
+            syncGpu();
+            mpiSendGpuDirect(sendBuffers[i].data(), treeletIdx[peerRanks[i]].size(), peerRanks[i], commTag,
+                             sendRequests, staging);
+        }
+        else
+        {
+            mpiSendAsync(sendBuffers[i].data(), treeletIdx[peerRanks[i]].size(), peerRanks[i], commTag, sendRequests);
+        }
     }
 
     int numMessages = peerRanks.size();
@@ -343,14 +354,16 @@ void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
 
         int peerIdx = std::find(peerRanks.begin(), peerRanks.end(), recvRank) - peerRanks.begin();
         T* recvBuf  = recvBuffers[peerIdx].data();
-        mpiRecvSync(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE);
+        if constexpr (useGpu) { mpiRecvGpuDirect(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE); }
+        else { mpiRecvSync(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE); }
 
         auto mapToInternal = csToInternalMap.subspan(focusAssignment[recvRank].start(), recvCount);
         scatterAcc<useGpu>(mapToInternal, recvBuf, quantities.data());
     }
+    if constexpr (useGpu) { syncGpu(); }
 
-    reallocate(scratch, origSize, 1.0);
     MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUS_IGNORE);
+    reallocate(scratch, origSize, 1.0);
 }
 
 /*! @brief Pass on focus tree parts from old owners to new owners
