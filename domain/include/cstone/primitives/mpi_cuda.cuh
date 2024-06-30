@@ -88,3 +88,24 @@ auto mpiRecvGpuDirect(T* data, int count, int rank, int tag, MPI_Status* status)
     }
     else { return mpiRecvSync(data, count, rank, tag, status); }
 }
+
+//! @brief this wrapper is needed to support sending from GPU buffers with staging through host (no GPU-direct MPI)
+template<bool useGpu, class T>
+auto mpiSendAsyncAcc(T* data,
+                     size_t count,
+                     int rank,
+                     int tag,
+                     std::vector<MPI_Request>& requests,
+                     [[maybe_unused]] std::vector<std::vector<T, util::DefaultInitAdaptor<T>>>& buffers)
+{
+    if constexpr (useGpu) { mpiSendGpuDirect(data, count, rank, tag, requests, buffers); }
+    else { mpiSendAsync(data, count, rank, tag, requests); }
+}
+
+//! @brief this wrapper is needed to support sending from GPU buffers with staging through host (no GPU-direct MPI)
+template<bool useGpu, class T>
+auto mpiRecvSyncAcc(T* data, int count, int rank, int tag, MPI_Status* status)
+{
+    if constexpr (useGpu) { mpiRecvGpuDirect(data, count, rank, tag, status); }
+    else { mpiRecvSync(data, count, rank, tag, status); }
+}

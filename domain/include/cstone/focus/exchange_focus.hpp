@@ -331,16 +331,9 @@ void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
     for (int i = 0; i < peerRanks.size(); ++i)
     {
         gatherAcc<useGpu, TreeNodeIndex>(treeletIdx[peerRanks[i]], quantities.data(), sendBuffers[i].data());
-        if constexpr (useGpu)
-        {
-            syncGpu();
-            mpiSendGpuDirect(sendBuffers[i].data(), treeletIdx[peerRanks[i]].size(), peerRanks[i], commTag,
-                             sendRequests, staging);
-        }
-        else
-        {
-            mpiSendAsync(sendBuffers[i].data(), treeletIdx[peerRanks[i]].size(), peerRanks[i], commTag, sendRequests);
-        }
+        if constexpr (useGpu) { syncGpu(); }
+        mpiSendAsyncAcc<useGpu>(sendBuffers[i].data(), treeletIdx[peerRanks[i]].size(), peerRanks[i], commTag,
+                                sendRequests, staging);
     }
 
     int numMessages = peerRanks.size();
@@ -354,8 +347,7 @@ void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
 
         int peerIdx = std::find(peerRanks.begin(), peerRanks.end(), recvRank) - peerRanks.begin();
         T* recvBuf  = recvBuffers[peerIdx].data();
-        if constexpr (useGpu) { mpiRecvGpuDirect(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE); }
-        else { mpiRecvSync(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE); }
+        mpiRecvSyncAcc<useGpu>(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE);
 
         auto mapToInternal = csToInternalMap.subspan(focusAssignment[recvRank].start(), recvCount);
         scatterAcc<useGpu>(mapToInternal, recvBuf, quantities.data());
