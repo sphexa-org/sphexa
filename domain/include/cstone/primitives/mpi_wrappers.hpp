@@ -32,6 +32,7 @@
 #pragma once
 
 #include <mpi.h>
+#include <algorithm>
 #include <cassert>
 #include <limits>
 #include <type_traits>
@@ -212,4 +213,30 @@ auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op)
     auto dest_ptr = reinterpret_cast<ValueType*>(dest);
 
     return mpiAllreduce(src_ptr, dest_ptr, count * N, op);
+}
+
+template<class Ts, class Td, std::enable_if_t<std::is_arithmetic_v<Td>, int> = 0>
+auto mpiAllgatherv(const Ts* src, int sendCount, Td* dest, int* counts, int* displ, MPI_Comm comm)
+{
+    return MPI_Allgatherv(src, sendCount, MpiType<Td>{}, dest, counts, displ, MpiType<Td>{}, comm);
+}
+
+//! @brief adaptor to wrap compile-time size arrays into flattened arrays of the underlying type
+template<class Ts, class Td, std::enable_if_t<!std::is_arithmetic_v<Td>, int> = 0>
+auto mpiAllgatherv(const Ts* src, int sendCount, Td* dest, const int* counts, const int* displ, MPI_Comm comm)
+{
+    using ValueType    = typename Td::value_type;
+    constexpr size_t N = Td{}.size();
+
+    using SrcType = std::conditional_t<std::is_same_v<void, Ts>, void, ValueType>;
+    auto src_ptr  = reinterpret_cast<const SrcType*>(src);
+    auto dest_ptr = reinterpret_cast<ValueType*>(dest);
+
+    int numRanks;
+    MPI_Comm_size(comm, &numRanks);
+
+    std::vector<int> countsN(numRanks), displN(numRanks);
+    std::transform(counts, counts + numRanks, countsN.data(), [N](auto x) { return x * N; });
+    std::transform(displ, displ + numRanks, displN.data(), [N](auto x) { return x * N; });
+    return mpiAllgatherv(src_ptr, sendCount * N, dest_ptr, countsN.data(), displN.data(), comm);
 }

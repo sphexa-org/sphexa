@@ -74,6 +74,7 @@ public:
         , counts_{bucketSize + 1}
         , macs_{1}
         , centers_(1)
+        , globAssignment_(numRanks + 1)
     {
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -170,6 +171,7 @@ public:
         indexTreelets<KeyType>(peerRanks, treeData_.prefixes, treeData_.levelRange, treelets_, treeletIdx_);
 
         translateAssignment<KeyType>(assignment, leaves_, peers_, myRank_, assignment_);
+        std::copy_n(assignment.data(), numRanks_ + 1, globAssignment_.data());
         copy(treeletIdx_, treeletIdxAcc_);
 
         /*! Store box for use in all property updates (counts, centers, MACs, etc) until updateTree() is called again.
@@ -343,6 +345,26 @@ public:
         gatherScatter<TreeNodeIndex>(gmap, idxFromGlob, globalQuantities.data(), localQuantities.data());
     }
 
+    //! @brief Distribute global leaf quantities with local part filled in
+    template<class T>
+    void gatherGlobalLeaves(gsl::span<const KeyType> globalLeaves, gsl::span<T> globalLeafQuantities) const
+    {
+        std::vector<TreeNodeIndex> numGlobNodesPerRank(numRanks_), globNodesDispl(numRanks_ + 1);
+
+        for (int rank = 0; rank < numRanks_; ++rank)
+        {
+            globNodesDispl[rank] = findNodeAbove(globalLeaves.data(), nNodes(globalLeaves), globAssignment_[rank]);
+        }
+        globNodesDispl.back() = nNodes(globalLeaves);
+        for (int rank = 0; rank < numRanks_; ++rank)
+        {
+            numGlobNodesPerRank[rank] = globNodesDispl[rank + 1] - globNodesDispl[rank];
+        }
+
+        mpiAllgatherv(MPI_IN_PLACE, 0, globalLeafQuantities.data(), numGlobNodesPerRank.data(), globNodesDispl.data(),
+                      MPI_COMM_WORLD);
+    }
+
     template<class Tm, class DevVec1 = std::vector<LocalIndex>, class DevVec2 = std::vector<LocalIndex>>
     void updateCenters(const RealType* x,
                        const RealType* y,
@@ -397,26 +419,32 @@ public:
             upsweep(treeData_.levelRange, treeData_.childOffsets, centers_.data(), CombineSourceCenter<RealType>{});
         }
 
-        //! exchange information with peer close to focus
-        std::vector<int, util::DefaultInitAdaptor<int>> hScratch;
-        peerExchange<SourceCenterType<RealType>>(centers_, static_cast<int>(P2pTags::focusPeerCenters), hScratch);
         //! global exchange for the top nodes that are bigger than local domains
         std::vector<SourceCenterType<RealType>> globalLeafCenters(globalTree.numLeafNodes());
         populateGlobal<SourceCenterType<RealType>>(globalTree.treeLeaves(), centers_, globalLeafCenters);
-        mpiAllreduce(MPI_IN_PLACE, globalLeafCenters.data(), globalLeafCenters.size(), MPI_SUM);
+        gatherGlobalLeaves<SourceCenterType<RealType>>(globalTree.treeLeaves(), globalLeafCenters);
         scatter(globalTree.internalOrder(), globalLeafCenters.data(), globalCenters_.data());
         upsweep(globalTree.levelRange(), globalTree.childOffsets(), globalCenters_.data(),
                 CombineSourceCenter<RealType>{});
         extractGlobal<SourceCenterType<RealType>>(globalTree.nodeKeys().data(), globalTree.levelRange().data(),
                                                   globalCenters_, centers_);
 
-        //! upsweep with all (leaf) data in place
-        upsweep(treeData_.levelRange, treeData_.childOffsets, centers_.data(), CombineSourceCenter<RealType>{});
-
         if constexpr (HaveGpu<Accelerator>{})
         {
             reallocate(centersAcc_, octreeAcc_.numNodes, allocGrowthRate_);
             memcpyH2D(centers_.data(), centers_.size(), rawPtr(centersAcc_));
+            peerExchangeGpu<SourceCenterType<RealType>>(centersAcc_, static_cast<int>(P2pTags::focusPeerCenters),
+                                                        scratch1);
+            upsweepCentersGpu(maxTreeLevel<KeyType>{}, treeData_.levelRange.data(), octree.childOffsets,
+                              rawPtr(centersAcc_));
+        }
+        else
+        {
+            //! exchange information with peer close to focus
+            std::vector<int, util::DefaultInitAdaptor<int>> hScratch;
+            peerExchange<SourceCenterType<RealType>>(centers_, static_cast<int>(P2pTags::focusPeerCenters), hScratch);
+            //! upsweep with all (leaf) data in place
+            upsweep(treeData_.levelRange, treeData_.childOffsets, centers_.data(), CombineSourceCenter<RealType>{});
         }
     }
 
@@ -698,6 +726,8 @@ private:
     std::vector<SourceCenterType<RealType>> globalCenters_;
     //! @brief the assignment of peer ranks to tree_.treeLeaves()
     std::vector<TreeIndexPair> assignment_;
+    //! @brief global domain boundary SFC keys
+    std::vector<KeyType> globAssignment_;
 
     //! @brief the status of the macs_ and counts_ rebalance criteria
     int rebalanceStatus_{valid};
@@ -741,7 +771,7 @@ void globalFocusExchange(const Octree<KeyType>& globalOctree,
     focusTree.template populateGlobal<Q>(globalOctree.treeLeaves(), quantities, globalLeafQuantities);
 
     //! exchange global leaves
-    mpiAllreduce(MPI_IN_PLACE, globalLeafQuantities.data(), numGlobalLeaves, MPI_SUM);
+    focusTree.template gatherGlobalLeaves<Q>(globalOctree.treeLeaves(), globalLeafQuantities);
 
     std::vector<Q> globalQuantities(globalOctree.numTreeNodes());
     scatter(globalOctree.internalOrder(), globalLeafQuantities.data(), globalQuantities.data());

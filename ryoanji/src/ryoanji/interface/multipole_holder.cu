@@ -108,11 +108,12 @@ public:
         gsl::span multipoleSpan{multipoles, size_t(octree_.numNodes)};
         cstone::globalFocusExchange(globalOctree, focusTree, multipoleSpan, ryUpsweep, globalCenters.data());
 
-        std::vector<int, util::DefaultInitAdaptor<int>> scratch;
-        focusTree.peerExchange(multipoleSpan, static_cast<int>(cstone::P2pTags::focusPeerCenters) + 1, scratch);
-
         // H2D multipoles
         memcpyH2D(multipoles, multipoles_.size(), rawPtr(multipoles_));
+
+        gsl::span d_multipoleSpan{rawPtr(multipoles_), size_t(octree_.numNodes)};
+        focusTree.peerExchangeGpu(d_multipoleSpan, static_cast<int>(cstone::P2pTags::focusPeerCenters) + 1,
+                                  traversalStack_);
 
         //! second upsweep with leaf data from peer and global ranks in place
         for (int level = numLevels - 1; level >= 0; level--)

@@ -43,7 +43,7 @@ constexpr inline bool useGpuDirect = true;
 constexpr inline bool useGpuDirect = false;
 #endif
 
-template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+template<class T>
 auto mpiSendGpuDirect(T* data,
                       size_t count,
                       int rank,
@@ -75,7 +75,7 @@ auto mpiSendGpuDirect(char* data,
     return mpiSendGpuDirect(reinterpret_cast<T*>(data), numBytes / sizeof(T), rank, tag, requests, buffers);
 }
 
-template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+template<class T>
 auto mpiRecvGpuDirect(T* data, int count, int rank, int tag, MPI_Status* status)
 {
     if constexpr (!useGpuDirect)

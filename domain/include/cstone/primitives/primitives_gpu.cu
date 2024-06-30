@@ -124,6 +124,13 @@ void gatherGpu(const IndexType* map, size_t n, const T* source, T* destination)
 template void gatherGpu(const int*, size_t, const int*, int*);
 template void gatherGpu(const int*, size_t, const uint32_t*, uint32_t*);
 template void gatherGpu(const int*, size_t, const uint64_t*, uint64_t*);
+template void gatherGpu(const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+template void gatherGpu(const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
+template void gatherGpu(const int*, size_t, const util::array<float, 20>*, util::array<float, 20>*);
+template void gatherGpu(const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
+template void gatherGpu(const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
+template void gatherGpu(const int*, size_t, const util::array<double, 20>*, util::array<double, 20>*);
+
 template void gatherGpu(const unsigned*, size_t, const uint8_t*, uint8_t*);
 template void gatherGpu(const unsigned*, size_t, const double*, double*);
 template void gatherGpu(const unsigned*, size_t, const float*, float*);
@@ -158,6 +165,12 @@ void scatterGpu(const IndexType* map, size_t n, const T* source, T* destination)
 template void scatterGpu(const int*, size_t, const int*, int*);
 template void scatterGpu(const int*, size_t, const uint32_t*, uint32_t*);
 template void scatterGpu(const int*, size_t, const uint64_t*, uint64_t*);
+template void scatterGpu(const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+template void scatterGpu(const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
+template void scatterGpu(const int*, size_t, const util::array<float, 20>*, util::array<float, 20>*);
+template void scatterGpu(const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
+template void scatterGpu(const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
+template void scatterGpu(const int*, size_t, const util::array<double, 20>*, util::array<double, 20>*);
 
 template<class T>
 std::tuple<T, T> MinMaxGpu<T>::operator()(const T* first, const T* last)
