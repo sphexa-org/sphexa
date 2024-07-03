@@ -74,7 +74,7 @@ __global__ void markRampGPU(unsigned ngmax, const cstone::Box<Tc> box, const Loc
 
         auto ncTrue = traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool);
 
-        if (i >= last) continue;
+        if (i >= bodyEnd) continue;
 
         unsigned ncCapped = stl::min(ncTrue[0], ngmax);
         markRampJLoop<TravConfig::targetSize>(i, neighborsWarp + laneIdx, ncCapped, Atmin, Atmax, ramp, kx, xm, m,
