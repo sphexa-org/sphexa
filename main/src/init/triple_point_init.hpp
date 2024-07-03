@@ -50,7 +50,7 @@ template<class T, class Dataset>
 void initTriplePointFields(Dataset& d, const std::map<std::string, double>& constants, T particleMass)
 {
 
-    using Th = Dataset::HydroType;
+    using Th = typename Dataset::HydroType;
 
     T  rho_I     = constants.at("rho_I");
     T  rho_II    = constants.at("rho_II");
@@ -133,7 +133,7 @@ public:
         settings_ = buildSettings(d, TriplePointConstants(), settingsFile, reader);
     }
 
-    using T = Dataset::RealType;
+    using T = typename Dataset::RealType;
 
     cstone::Box<T> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
                         IFileReader* reader) const override
