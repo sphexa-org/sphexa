@@ -48,13 +48,12 @@ using cstone::TravConfig;
 using cstone::TreeNodeIndex;
 
 template<class T, class Tm, class Tc, class KeyType>
-__global__ void markRampGPU(const cstone::Box<Tc> box, size_t first, size_t last, unsigned ngmax,
-                            const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* x, const Tc* y, const Tc* z,
+__global__ void markRampGPU(unsigned ngmax, const cstone::Box<Tc> box, const LocalIndex* grpStart,
+                            const LocalIndex* grpEnd, LocalIndex numGroups, const Tc* x, const Tc* y, const Tc* z,
                             const T* h, const T* kx, const T* xm, const Tm* m, T* markRamp, T Atmin, T Atmax, T ramp,
                             LocalIndex* nidx, TreeNodeIndex* globalPool)
 {
     unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
-    unsigned numTargets  = (last - first - 1) / TravConfig::targetSize + 1;
     unsigned targetIdx   = 0;
     unsigned warpIdxGrid = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
 
@@ -66,11 +65,10 @@ __global__ void markRampGPU(const cstone::Box<Tc> box, size_t first, size_t last
         if (laneIdx == 0) { targetIdx = atomicAdd(&cstone::targetCounterGlob, 1); }
         targetIdx = cstone::shflSync(targetIdx, 0);
 
-        if (targetIdx >= numTargets) return;
+        if (targetIdx >= numGroups) return;
 
-        cstone::LocalIndex bodyBegin = first + targetIdx * TravConfig::targetSize;
-        cstone::LocalIndex bodyEnd   = cstone::imin(bodyBegin + TravConfig::targetSize, last);
-        cstone::LocalIndex i         = bodyBegin + laneIdx;
+        cstone::LocalIndex bodyBegin = grpStart[targetIdx] cstone::LocalIndex bodyEnd =
+            grpEnd[targetIdx] cstone::LocalIndex                              i = bodyBegin + laneIdx;
 
         auto ncTrue = traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool);
 
@@ -83,22 +81,21 @@ __global__ void markRampGPU(const cstone::Box<Tc> box, size_t first, size_t last
 }
 
 template<class Dataset>
-void computeMarkRamp(size_t first, size_t last, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
+void computeMarkRamp(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    unsigned numBodies = first - last;
-    unsigned numBlocks = TravConfig::numBlocks(numBodies);
 
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, numBodies, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
-    markRampGPU<<<numBlocks, TravConfig::numThreads>>>(
-        box, first, last, d.ngmax, d.treeView.nsView(), rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
-        rawPtr(d.devData.h), rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.m),
+
+    markRampGPU<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
+        d.ngmax box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x), rawPtr(d.devData.y),
+        rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.m),
         rawPtr(d.devData.markRamp), d.Atmin, d.Atmax, d.ramp, nidxPool, traversalPool);
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeMarkRamp(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d, const cstone::Box<double>&);
-template void computeMarkRamp(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d, const cstone::Box<float>&);
+template void computeMarkRamp(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
+                              const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace cuda
 } // namespace sph

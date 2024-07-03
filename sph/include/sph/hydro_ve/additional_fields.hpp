@@ -59,14 +59,11 @@ void computeMarkRampImpl(size_t first, size_t last, Dataset d)
 }
 
 template<class T, class Dataset>
-void computeMarkRamp(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
+void computeMarkRamp(const GroupView& grp, Dataset& d, const cstone::Box<T>& box)
 {
 
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
-    {
-        cuda::computeMarkRamp(startIndex, endIndex, d, box);
-    }
-    else { computeMarkRampImpl(startIndex, endIndex, d); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeMarkRamp(grp, d, box); }
+    else { computeMarkRampImpl(grp.firstBody, grp.lastBody, d); }
 }
 
 }; // namespace sph
