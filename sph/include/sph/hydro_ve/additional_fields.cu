@@ -68,8 +68,9 @@ __global__ void markRampGPU(unsigned ngmax, const cstone::Box<Tc> box, const Loc
 
         if (targetIdx >= numGroups) return;
 
-        cstone::LocalIndex bodyBegin = grpStart[targetIdx] cstone::LocalIndex bodyEnd =
-            grpEnd[targetIdx] cstone::LocalIndex                              i = bodyBegin + laneIdx;
+        cstone::LocalIndex bodyBegin = grpStart[targetIdx];
+        cstone::LocalIndex bodyEnd   = grpEnd[targetIdx];
+        cstone::LocalIndex i         = bodyBegin + laneIdx;
 
         auto ncTrue = traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool);
 
