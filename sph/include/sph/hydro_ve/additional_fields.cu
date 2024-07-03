@@ -88,7 +88,7 @@ void computeMarkRamp(const GroupView& grp, Dataset& d, const cstone::Box<typenam
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     markRampGPU<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.ngmax box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x), rawPtr(d.devData.y),
+        d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x), rawPtr(d.devData.y),
         rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.m),
         rawPtr(d.devData.markRamp), d.Atmin, d.Atmax, d.ramp, nidxPool, traversalPool);
     checkGpuErrors(cudaDeviceSynchronize());
