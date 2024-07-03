@@ -49,7 +49,8 @@ using cstone::TreeNodeIndex;
 
 template<class T, class Tm, class Tc, class KeyType>
 __global__ void markRampGPU(unsigned ngmax, const cstone::Box<Tc> box, const LocalIndex* grpStart,
-                            const LocalIndex* grpEnd, LocalIndex numGroups, const Tc* x, const Tc* y, const Tc* z,
+                            const LocalIndex* grpEnd, LocalIndex numGroups,
+                            const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* x, const Tc* y, const Tc* z,
                             const T* h, const T* kx, const T* xm, const Tm* m, T* markRamp, T Atmin, T Atmax, T ramp,
                             LocalIndex* nidx, TreeNodeIndex* globalPool)
 {
