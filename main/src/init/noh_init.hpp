@@ -73,7 +73,7 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
     double hInit       = std::cbrt(3.0 / (4 * M_PI) * d.ng0 * totalVolume / d.numParticlesGlobal) * 0.5;
     double mPart       = constants.at("mTotal") / d.numParticlesGlobal;
 
-    auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
+    auto cv    = sph::idealGasCv(d.muiConst, d.gammaConst);
     auto temp0 = constants.at("u0") / cv;
 
     std::fill(d.m.begin(), d.m.end(), mPart);

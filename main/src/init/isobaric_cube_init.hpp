@@ -80,7 +80,7 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
     T uExt      = pIsobaric / (gamma - 1.) / rhoExt;
     T epsilon   = constants.at("epsilon");
 
-    auto cv = sph::idealGasCv(d.muiConst, d.gamma);
+    auto cv = sph::idealGasCv(d.muiConst, d.gammaConst);
 
     std::fill(d.m.begin(), d.m.end(), massPart);
     std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);

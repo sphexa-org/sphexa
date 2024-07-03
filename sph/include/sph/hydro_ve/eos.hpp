@@ -65,13 +65,16 @@ void computeIdealGasEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     bool storeRho = (d.rho.size() == d.m.size());
     bool storeP   = (d.p.size() == d.m.size());
 
+    bool isGammaConst = d.gamma.empty();
+
     if (d.u.empty())
     {
 #pragma omp parallel for schedule(static)
         for (size_t i = startIndex; i < endIndex; ++i)
         {
+            auto gamma_i = isGammaConst ? d.gammaConst : d.gamma[i];
             auto rho      = kx[i] * m[i] / xm[i];
-            auto [pi, ci] = idealGasEOS(temp[i], rho, d.muiConst, d.gamma);
+            auto [pi, ci] = idealGasEOS(temp[i], rho, d.muiConst, gamma_i);
             prho[i]       = pi / (kx[i] * m[i] * m[i] * gradh[i]);
             c[i]          = ci;
             if (storeRho) { d.rho[i] = rho; }
@@ -83,8 +86,9 @@ void computeIdealGasEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
 #pragma omp parallel for schedule(static)
         for (size_t i = startIndex; i < endIndex; ++i)
         {
+            auto gamma_i = isGammaConst ? d.gammaConst : d.gamma[i];
             auto rho      = kx[i] * m[i] / xm[i];
-            auto [pi, ci] = idealGasEOS_u(u[i], rho, d.gamma);
+            auto [pi, ci] = idealGasEOS_u(u[i], rho, gamma_i);
             prho[i]       = pi / (kx[i] * m[i] * m[i] * gradh[i]);
             c[i]          = ci;
             if (storeRho) { d.rho[i] = rho; }
@@ -155,10 +159,13 @@ void computeIdealGasEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        gpu::computeIdealGasEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.devData.temp), rawPtr(d.devData.u),
+        bool isGammaConst = d.devData.gamma.empty();
+        const auto* gamma = isGammaConst ? &d.gamma : rawPtr(d.devData.gamma);
+
+        gpu::computeIdealGasEOS(startIndex, endIndex, d.muiConst, gamma, rawPtr(d.devData.temp), rawPtr(d.devData.u),
                                 rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
                                 rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.c),
-                                rawPtr(d.devData.rho), rawPtr(d.devData.p));
+                                rawPtr(d.devData.rho), rawPtr(d.devData.p), isGammaConst);
     }
     else { computeIdealGasEOS_Impl(startIndex, endIndex, d); }
 }

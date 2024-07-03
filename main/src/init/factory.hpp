@@ -87,6 +87,12 @@ std::unique_ptr<ISimInitializer<Dataset>> initializerFactory(std::string testCas
         if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for Kelvin-Helmholtz test\n"); }
         else { return SimInitializers<Dataset>::makeKelvinHelmholtz(glassBlock, settingsFile, reader); }
     }
+    if (testNamedBase == "triple-point-shock")
+    {
+        if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for Triple-point Shock test\n"); }
+        else { return SimInitializers<Dataset>::makeTriplePointShock(glassBlock, settingsFile, reader); }
+    }
+
     if (testNamedBase == "evrard-cooling")
     {
         if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for evrard-cooling\n"); }

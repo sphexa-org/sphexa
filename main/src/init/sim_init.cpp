@@ -40,6 +40,7 @@
 #include "sedov_init.hpp"
 #include "turbulence_init.hpp"
 #include "wind_shock_init.hpp"
+#include "triple_point_init.hpp"
 #ifdef SPH_EXA_HAVE_GRACKLE
 #include "evrard_cooling_init.hpp"
 #endif
@@ -138,6 +139,13 @@ std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeWindShock(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
     return std::make_unique<WindShockGlass<Dataset>>(glassBlock, settingsFile, reader);
+}
+
+template<class Dataset>
+std::unique_ptr<ISimInitializer<Dataset>>
+SimInitializers<Dataset>::makeTriplePointShock(std::string glassBlock, std::string settingsFile, IFileReader* reader)
+{
+    return std::make_unique<TriplePointGlass<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 #ifdef USE_CUDA

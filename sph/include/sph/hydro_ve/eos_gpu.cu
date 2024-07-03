@@ -42,17 +42,18 @@ namespace gpu
 {
 
 template<class Tt, class Tm, class Thydro>
-__global__ void cudaComputeIdealGasEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, const Tt* temp,
+__global__ void cudaComputeIdealGasEOS(size_t firstParticle, size_t lastParticle, Tm mui, const Tt* gamma, const Tt* temp,
                                        const Tt* u, const Tm* m, const Thydro* kx, const Thydro* xm,
-                                       const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* rho, Thydro* p)
+                                       const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* rho, Thydro* p, bool isGammaConst)
 {
     unsigned i = firstParticle + blockDim.x * blockIdx.x + threadIdx.x;
     if (i >= lastParticle) return;
 
     Thydro p_i;
     Thydro rho_i = kx[i] * m[i] / xm[i];
+    Tt gamma_i = isGammaConst ? *gamma : gamma[i];
 
-    if (u == nullptr) { util::tie(p_i, c[i]) = idealGasEOS(temp[i], rho_i, mui, gamma); }
+    if (u == nullptr) { util::tie(p_i, c[i]) = idealGasEOS(temp[i], rho_i, mui, gamma_i); }
     else { util::tie(p_i, c[i]) = idealGasEOS_u(u[i], rho_i, gamma); }
 
     prho[i] = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
@@ -61,24 +62,24 @@ __global__ void cudaComputeIdealGasEOS(size_t firstParticle, size_t lastParticle
 }
 
 template<class Tt, class Tm, class Thydro>
-void computeIdealGasEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, const Tt* temp, const Tt* u,
+void computeIdealGasEOS(size_t firstParticle, size_t lastParticle, Tm mui, const Tt* gamma, const Tt* temp, const Tt* u,
                         const Tm* m, const Thydro* kx, const Thydro* xm, const Thydro* gradh, Thydro* prho, Thydro* c,
-                        Thydro* rho, Thydro* p)
+                        Thydro* rho, Thydro* p, bool isGammaConst)
 {
     if (firstParticle == lastParticle) { return; }
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(lastParticle - firstParticle, numThreads);
     cudaComputeIdealGasEOS<<<numBlocks, numThreads>>>(firstParticle, lastParticle, mui, gamma, temp, u, m, kx, xm,
-                                                      gradh, prho, c, rho, p);
+                                                      gradh, prho, c, rho, p, isGammaConst);
 
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
 #define COMPUTE_EOS(Ttemp, Tm, Thydro)                                                                                 \
-    template void computeIdealGasEOS(size_t firstParticle, size_t lastParticle, Tm mui, Ttemp gamma,                   \
+    template void computeIdealGasEOS(size_t firstParticle, size_t lastParticle, Tm mui, const Ttemp* gamma,                   \
                                      const Ttemp* temp, const Ttemp* u, const Tm* m, const Thydro* kx,                 \
                                      const Thydro* xm, const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* rho,      \
-                                     Thydro* p)
+                                     Thydro* p, bool isGammaConst)
 
 COMPUTE_EOS(double, double, double);
 COMPUTE_EOS(double, float, double);

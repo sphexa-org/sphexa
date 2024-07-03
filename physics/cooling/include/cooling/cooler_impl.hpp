@@ -90,7 +90,7 @@ private:
              d.dust_chemistry, d.metal_cooling, d.UVbackground,
              //!
              //! d.char *grackle_data_file,
-             d.cmb_temperature_floor, d.Gamma, d.h2_on_dust, d.use_dust_density_field, d.dust_recombination_cooling,
+             d.cmb_temperature_floor, d.gammaConst, d.h2_on_dust, d.use_dust_density_field, d.dust_recombination_cooling,
              d.photoelectric_heating, d.photoelectric_heating_rate, d.use_isrf_field, d.interstellar_radiation_field,
              d.use_volumetric_heating_rate, d.use_specific_heating_rate, d.three_body_rate, d.cie_cooling,
              d.h2_optical_depth_approximation, d.ih2co, d.ipiht, d.HydrogenFractionByMass, d.DeuteriumToHydrogenRatio,

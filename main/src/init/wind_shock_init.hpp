@@ -74,7 +74,7 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     T hInt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoInt);
     T hExt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoExt);
 
-    auto cv = sph::idealGasCv(d.muiConst, d.gamma);
+    auto cv = sph::idealGasCv(d.muiConst, d.gammaConst);
 
     std::fill(d.m.begin(), d.m.end(), massPart);
     std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
