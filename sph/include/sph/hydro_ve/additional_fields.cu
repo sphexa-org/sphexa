@@ -97,14 +97,8 @@ void computeMarkRamp(size_t first, size_t last, Dataset& d, const cstone::Box<ty
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeMarkRamp(size_t, size_t, sphexa::ParticlesData<double, unsigned, cstone::GpuTag>& d,
-                              const cstone::Box<double>&);
-template void computeMarkRamp(size_t, size_t, sphexa::ParticlesData<double, uint64_t, cstone::GpuTag>& d,
-                              const cstone::Box<double>&);
-template void computeMarkRamp(size_t, size_t, sphexa::ParticlesData<float, unsigned, cstone::GpuTag>& d,
-                              const cstone::Box<float>&);
-template void computeMarkRamp(size_t, size_t, sphexa::ParticlesData<float, uint64_t, cstone::GpuTag>& d,
-                              const cstone::Box<float>&);
+template void computeMarkRamp(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d, const cstone::Box<double>&);
+template void computeMarkRamp(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d, const cstone::Box<float>&);
 
 } // namespace cuda
 } // namespace sph
