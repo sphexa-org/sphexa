@@ -142,6 +142,7 @@ public:
         using T       = typename Dataset::RealType;
         auto& d       = simData.hydro;
         auto  pbc     = cstone::BoundaryType::periodic;
+        auto  fbc     = cstone::BoundaryType::fixed;
 
         std::vector<T> xBlock, yBlock, zBlock;
         readTemplateBlock(glassBlock, reader, xBlock, yBlock, zBlock);
@@ -153,8 +154,7 @@ public:
         cstone::Vec3<int> multiplicity_III = {36 * multi1D, 9 * multi1D, multi1D};
 
         T              zCoord = 1 / 6.;
-        auto           fbc    = cstone::BoundaryType::fixed;
-        cstone::Box<T> globalBox(0., 7., 0., 3., 0., zCoord, fbc, fbc, fbc);
+        cstone::Box<T> globalBox(0., 7., 0., 3., 0., zCoord, fbc, fbc, pbc);
 
         cstone::Box<T> section_I(0., 1., 0., 3., 0., zCoord, pbc, pbc, pbc);
         cstone::Box<T> section_II(1., 7., 1.5, 3., 0., zCoord, pbc, pbc, pbc);
