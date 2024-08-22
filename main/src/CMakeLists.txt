@@ -16,6 +16,7 @@ endfunction()
 add_subdirectory(init)
 add_subdirectory(io)
 add_subdirectory(observables)
+add_subdirectory(propagator)
 add_subdirectory(sphexa)
 
 if (BUILD_ANALYTICAL)
