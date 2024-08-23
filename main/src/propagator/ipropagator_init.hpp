@@ -30,6 +30,16 @@
  * @author ChristopherBignamini <christopher.bignamini@gmail.com>
  */
 
+#pragma once
+
+#include <memory>
+
+#include "cstone/domain/domain.hpp"
+#include "ipropagator.hpp"
+#include "init/settings.hpp"
+#include "sphexa/simulation_data.hpp"
+
+
 namespace sphexa
 {
 
@@ -46,21 +56,25 @@ public:
 };
  */
 
-template<class DomainType, class ParticleDataType, bool avClean = false >
+template<class DomainType, class ParticleDataType>
 struct PropInitializers
 {
 
-    using PropInitPtr = std::unique_ptr<Propagator<DomainType, ParticleDataType, avClean>>;
+    using PropInitPtr = std::unique_ptr<Propagator<DomainType, ParticleDataType>>;
 
-    static PropInitPtr makeHydroVeProp(std::ostream& output, size_t rank);
-    static PropInitPtr makeHydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings);
+    static PropInitPtr makeHydroVeProp(std::ostream& output, size_t rank, bool avClean);
+    static PropInitPtr makeHydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
     static PropInitPtr makeHydroProp(std::ostream& output, size_t rank);
 #ifdef SPH_EXA_HAVE_GRACKLE
     static PropInitPtr makeHydroGrackleProp(std::ostream& output, size_t rank, const InitSettings& settings);
 #endif
     static PropInitPtr makeNbodyProp(std::ostream& output, size_t rank);
-    static PropInitPtr makeTurbVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings);
-    static PropInitPtr makeTurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings);
+    static PropInitPtr makeTurbVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
+    static PropInitPtr makeTurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
 };
 
+extern template struct PropInitializers<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag> >;
+extern template struct PropInitializers<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag> >;
+
 }
+

@@ -44,6 +44,7 @@
 #include "io/factory.hpp"
 #include "observables/factory.hpp"
 #include "propagator/factory.hpp"
+#include "sph/types.hpp"
 #include "util/timer.hpp"
 #include "util/utils.hpp"
 
@@ -75,7 +76,7 @@ int main(int argc, char** argv)
     }
 
     using Dataset = SimulationData<AccType>;
-    using Domain  = cstone::Domain<SphTypes::KeyType, SphTypes::CoordinateType, AccType>;
+    using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, AccType>;
 
     const std::string        initCond     = parser.get("--init");
     const size_t             problemSize  = parser.get("-n", 50);

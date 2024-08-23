@@ -37,6 +37,7 @@
 
 #include "cstone/util/constexpr_string.hpp"
 #include "cstone/fields/field_get.hpp"
+#include "io/arg_parser.hpp"
 #include "sph/sph.hpp"
 #include "sph/hydro_turb/turbulence_data.hpp"
 

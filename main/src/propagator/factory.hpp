@@ -33,8 +33,6 @@
 
 #pragma once
 
-//#include <variant>
-
 #include "ipropagator.hpp"
 #include "ipropagator_init.hpp"
 
@@ -47,13 +45,43 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
 {
     if (choice == "ve")
     {
-        if (avClean) { return PropInitializers::makeHydroVeProp<true, DomainType, ParticleDataType>>(output, rank); }
-        else { return PropInitializers::makeHydroVeProp<false, DomainType, ParticleDataType>>(output, rank); }
+        return PropInitializers<DomainType, ParticleDataType>::makeHydroVeProp(output, rank, avClean);
     }
     if (choice == "ve-bdt")
     {
-        if (avClean) { return PropInitializers::makeHydroVeBdtProp<true, DomainType, ParticleDataType>(output, rank, s); }
-        else { return PropInitializers::makeHydroVeBdtProp<false, DomainType, ParticleDataType>(output, rank, s); }
+        return PropInitializers<DomainType, ParticleDataType>::makeHydroVeBdtProp(output, rank, s, avClean);
+    }
+    if (choice == "std") { return PropInitializers<DomainType, ParticleDataType>::makeHydroProp(output, rank); }
+#ifdef SPH_EXA_HAVE_GRACKLE
+    if (choice == "std-cooling")
+    {
+        return PropInitializers<DomainType, ParticleDataType>::makeHydroGrackleProp(output, rank, s);
+    }
+#endif
+    if (choice == "nbody") { return PropInitializers<DomainType, ParticleDataType>::makeNbodyProp(output, rank); }
+    if (choice == "turbulence")
+    {
+        return PropInitializers<DomainType, ParticleDataType>::makeTurbVeBdtProp(output, rank, s, avClean);
+    }
+    if (choice == "turbulence-ve")
+    {
+        return PropInitializers<DomainType, ParticleDataType>::makeTurbVeProp(output, rank, s, avClean);
+    }
+
+    throw std::runtime_error("Unknown propagator choice: " + choice);
+}
+
+/* propagatorFactory(const std::string& choice, bool avClean, std::ostream& output, size_t rank, const InitSettings& s)
+{
+    if (choice == "ve")
+    {
+        if (avClean) { return PropInitializers::makeHydroVeProp<DomainType, ParticleDataType>>(output, rank, avClean); }
+        else { return PropInitializers::makeHydroVeProp<DomainType, ParticleDataType>>(output, rank, avClean); }
+    }
+    if (choice == "ve-bdt")
+    {
+        if (avClean) { return PropInitializers::makeHydroVeBdtProp<DomainType, ParticleDataType>(output, rank, s, avClean); }
+        else { return PropInitializers::makeHydroVeBdtProp<DomainType, ParticleDataType>(output, rank, s, avClean); }
     }
     if (choice == "std") { return PropInitializers::makeHydroProp<DomainType, ParticleDataType>(output, rank); }
 #ifdef SPH_EXA_HAVE_GRACKLE
@@ -65,33 +93,17 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
     if (choice == "nbody") { return PropInitializers::makeNbodyProp<DomainType, ParticleDataType>(output, rank); }
     if (choice == "turbulence")
     {
-        if (avClean) { return PropInitializers::makeTurbVeBdtProp<true, DomainType, ParticleDataType>(output, rank, s); }
-        else { return PropInitializers::makeTurbVeBdtProp<false, DomainType, ParticleDataType>(output, rank, s); }
+        if (avClean) { return PropInitializers::makeTurbVeBdtProp<DomainType, ParticleDataType>(output, rank, s, avClean); }
+        else { return PropInitializers::makeTurbVeBdtProp<DomainType, ParticleDataType>(output, rank, s, avClean); }
     }
     if (choice == "turbulence-ve")
     {
-        if (avClean) { return PropInitializers::makeTurbVeProp<true, DomainType, ParticleDataType>(output, rank, s); }
-        else { return PropInitializers::makeTurbVeProp<false, DomainType, ParticleDataType>(output, rank, s); }
+        if (avClean) { return PropInitializers::makeTurbVeProp<DomainType, ParticleDataType>(output, rank, s, avClean); }
+        else { return PropInitializers::makeTurbVeProp<DomainType, ParticleDataType>(output, rank, s, avClean); }
     }
 
     throw std::runtime_error("Unknown propagator choice: " + choice);
 }
-
-template<class DomainType, class ParticleDataType>
-std::unique_ptr<Propagator<DomainType, ParticleDataType>>
-propagatorFactory(const std::string& choice, std::ostream& output, size_t rank, const InitSettings& s)
-{
-    if (choice == "std") { return PropInitializers::makeHydroProp<DomainType, ParticleDataType>(output, rank); }
-#ifdef SPH_EXA_HAVE_GRACKLE
-    if (choice == "std-cooling")
-    {
-        return PropInitializers::makeHydroGrackleProp<DomainType, ParticleDataType>(output, rank, s);
-    }
-#endif
-    if (choice == "nbody") { return PropInitializers::makeNbodyProp<DomainType, ParticleDataType>(output, rank); }
-
-    throw std::runtime_error("Unknown propagator choice: " + choice);
-}
-
+ */
 
 } // namespace sphexa

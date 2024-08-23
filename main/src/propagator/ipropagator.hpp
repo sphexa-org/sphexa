@@ -34,7 +34,10 @@
 
 #include <variant>
 
+#include "cstone/sfc/box.hpp"
+#include "cstone/tree/accel_switch.hpp"
 #include "io/ifile_io.hpp"
+#include "sph/particles_data.hpp" //TODO: why we didn't need it before? Should we use cpu or gpu version?
 #include "util/pm_reader.hpp"
 #include "util/timer.hpp"
 

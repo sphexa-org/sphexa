@@ -1,6 +1,6 @@
 add_library(propagator_init propagator_init.cpp)
-target_include_directories(propagator_init PRIVATE ${PROJECT_SOURCE_DIR}/main/src ${COOLING_DIR} ${CSTONE_DIR} ${SPH_DIR}
-        ${MPI_CXX_INCLUDE_PATH})
+target_include_directories(propagator_init PRIVATE ${PROJECT_SOURCE_DIR}/main/src ${COOLING_DIR} ${CSTONE_DIR} 
+        ${SPH_DIR} ${RYOANJI_DIR} ${MPI_CXX_INCLUDE_PATH})
 target_link_libraries(propagator_init PRIVATE ${MPI_CXX_LIBRARIES} OpenMP::OpenMP_CXX)
 enableGrackle(propagator_init)
 
@@ -8,7 +8,7 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     add_library(propagator_init_gpu propagator_init.cpp)
     target_compile_definitions(propagator_init_gpu PRIVATE USE_CUDA)
     target_include_directories(propagator_init_gpu PRIVATE ${PROJECT_SOURCE_DIR}/main/src ${COOLING_DIR} ${CSTONE_DIR}
-            ${SPH_DIR} ${MPI_CXX_INCLUDE_PATH})
+            ${SPH_DIR} ${RYOANJI_DIR} ${MPI_CXX_INCLUDE_PATH})
     target_link_libraries(propagator_init_gpu PRIVATE ${MPI_CXX_LIBRARIES} OpenMP::OpenMP_CXX)
     enableGrackle(propagator_init_gpu)
 endif ()

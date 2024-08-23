@@ -37,6 +37,7 @@
 
 #include "cstone/fields/field_get.hpp"
 #include "cstone/util/value_list.hpp"
+#include "io/arg_parser.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/sph.hpp"
 
