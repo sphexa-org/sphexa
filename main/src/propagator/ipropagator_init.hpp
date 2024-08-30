@@ -43,19 +43,6 @@
 namespace sphexa
 {
 
-/* template<class Dataset>
-class IPropInitializer
-{
-public:
-    virtual cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t, Dataset& d,
-                                                         IFileReader*) const = 0;
-
-    virtual const InitSettings& constants() const = 0;
-
-    virtual ~IPropInitializer() = default;
-};
- */
-
 template<class DomainType, class ParticleDataType>
 struct PropInitializers
 {
@@ -63,8 +50,8 @@ struct PropInitializers
     using PropInitPtr = std::unique_ptr<Propagator<DomainType, ParticleDataType>>;
 
     static PropInitPtr makeHydroVeProp(std::ostream& output, size_t rank, bool avClean);
-    static PropInitPtr makeHydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
     static PropInitPtr makeHydroProp(std::ostream& output, size_t rank);
+    static PropInitPtr makeHydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
 #ifdef SPH_EXA_HAVE_GRACKLE
     static PropInitPtr makeHydroGrackleProp(std::ostream& output, size_t rank, const InitSettings& settings);
 #endif
@@ -77,4 +64,3 @@ extern template struct PropInitializers<cstone::Domain<unsigned long, double, cs
 extern template struct PropInitializers<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag> >;
 
 }
-

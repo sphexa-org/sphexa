@@ -71,39 +71,4 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
     throw std::runtime_error("Unknown propagator choice: " + choice);
 }
 
-/* propagatorFactory(const std::string& choice, bool avClean, std::ostream& output, size_t rank, const InitSettings& s)
-{
-    if (choice == "ve")
-    {
-        if (avClean) { return PropInitializers::makeHydroVeProp<DomainType, ParticleDataType>>(output, rank, avClean); }
-        else { return PropInitializers::makeHydroVeProp<DomainType, ParticleDataType>>(output, rank, avClean); }
-    }
-    if (choice == "ve-bdt")
-    {
-        if (avClean) { return PropInitializers::makeHydroVeBdtProp<DomainType, ParticleDataType>(output, rank, s, avClean); }
-        else { return PropInitializers::makeHydroVeBdtProp<DomainType, ParticleDataType>(output, rank, s, avClean); }
-    }
-    if (choice == "std") { return PropInitializers::makeHydroProp<DomainType, ParticleDataType>(output, rank); }
-#ifdef SPH_EXA_HAVE_GRACKLE
-    if (choice == "std-cooling")
-    {
-        return PropInitializers::makeHydroGrackleProp<DomainType, ParticleDataType>(output, rank, s);
-    }
-#endif
-    if (choice == "nbody") { return PropInitializers::makeNbodyProp<DomainType, ParticleDataType>(output, rank); }
-    if (choice == "turbulence")
-    {
-        if (avClean) { return PropInitializers::makeTurbVeBdtProp<DomainType, ParticleDataType>(output, rank, s, avClean); }
-        else { return PropInitializers::makeTurbVeBdtProp<DomainType, ParticleDataType>(output, rank, s, avClean); }
-    }
-    if (choice == "turbulence-ve")
-    {
-        if (avClean) { return PropInitializers::makeTurbVeProp<DomainType, ParticleDataType>(output, rank, s, avClean); }
-        else { return PropInitializers::makeTurbVeProp<DomainType, ParticleDataType>(output, rank, s, avClean); }
-    }
-
-    throw std::runtime_error("Unknown propagator choice: " + choice);
-}
- */
-
 } // namespace sphexa
