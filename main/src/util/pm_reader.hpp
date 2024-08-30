@@ -8,7 +8,7 @@
 namespace sphexa
 {
 
-int readPmCounter(const char* fname, unsigned long long* joules, unsigned long long* ms)
+inline int readPmCounter(const char* fname, unsigned long long* joules, unsigned long long* ms)
 {
     auto file = fopen(fname, "r");
     if (file == nullptr) { return 1; }

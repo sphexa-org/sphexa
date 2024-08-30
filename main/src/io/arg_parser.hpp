@@ -11,7 +11,7 @@ namespace sphexa
 {
 
 //! @brief returns true if all characters of @p str together represent a valid integral number
-bool strIsIntegral(const std::string& str)
+inline bool strIsIntegral(const std::string& str)
 {
     char* ptr;
     std::strtol(str.c_str(), &ptr, 10);
@@ -77,7 +77,7 @@ private:
  * @return              true if @p step matches any integral numbers in @p extraOutput or
  *                      if any floating point number therein falls into the interval @p [t1, t2)
  */
-bool isExtraOutputStep(size_t step, double t1, double t2, const std::vector<std::string>& extraOutputs)
+inline bool isExtraOutputStep(size_t step, double t1, double t2, const std::vector<std::string>& extraOutputs)
 {
     auto matchStepOrTime = [step, t1, t2](const std::string& token)
     {
@@ -96,7 +96,7 @@ bool isExtraOutputStep(size_t step, double t1, double t2, const std::vector<std:
  * @param frequencyStr  frequency time to output the simulation as string
  * @return              true if the interval [t1, t2] contains a positive integer multiple of the output frequency
  */
-bool isOutputTime(double t1, double t2, const std::string& frequencyStr)
+inline bool isOutputTime(double t1, double t2, const std::string& frequencyStr)
 {
     double frequency = std::stod(frequencyStr);
     if (strIsIntegral(frequencyStr) || frequency == 0.0) { return false; }
@@ -111,20 +111,20 @@ bool isOutputTime(double t1, double t2, const std::string& frequencyStr)
  * @param frequencyStr  iteration frequency to output the simulation as string
  * @return              true if the step is an integral multiple of the output frequency
  */
-bool isOutputStep(size_t step, const std::string& frequencyStr)
+inline bool isOutputStep(size_t step, const std::string& frequencyStr)
 {
     int frequency = std::stoi(frequencyStr);
     return strIsIntegral(frequencyStr) && frequency != 0 && (step % frequency == 0);
 }
 
-std::string strBeforeSign(const std::string& str, const std::string& sign)
+inline std::string strBeforeSign(const std::string& str, const std::string& sign)
 {
     auto commaPos = str.find_first_of(sign);
     return str.substr(0, commaPos);
 }
 
 //! @brief If the input string ends with @p sign followed by an integer, return the integer, otherwise return -1
-std::string strAfterSign(const std::string& str, const std::string& sign)
+inline std::string strAfterSign(const std::string& str, const std::string& sign)
 {
     auto commaPos = str.find_first_of(sign);
     if (commaPos == std::string::npos) { return {}; }
@@ -133,12 +133,12 @@ std::string strAfterSign(const std::string& str, const std::string& sign)
 }
 
 //! @brief If the input string ends with @p sign followed by an integer, return the integer, otherwise return -1
-int numberAfterSign(const std::string& str, const std::string& sign)
+inline int numberAfterSign(const std::string& str, const std::string& sign)
 {
     std::string afterComma = strAfterSign(str, sign);
     return strIsIntegral(afterComma) ? std::stoi(afterComma) : -1;
 }
 
-std::string removeModifiers(const std::string& initCond) { return strBeforeSign(strBeforeSign(initCond, ":"), ","); }
+inline std::string removeModifiers(const std::string& initCond) { return strBeforeSign(strBeforeSign(initCond, ":"), ","); }
 
 } // namespace sphexa

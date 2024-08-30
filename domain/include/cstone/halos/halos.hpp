@@ -54,7 +54,7 @@ namespace detail
 {
 
 //! @brief check that only owned particles in [particleStart_:particleEnd_] are sent out as halos
-void checkIndices(const SendList& sendList,
+inline void checkIndices(const SendList& sendList,
                   [[maybe_unused]] LocalIndex start,
                   [[maybe_unused]] LocalIndex end,
                   [[maybe_unused]] LocalIndex bufferSize)
