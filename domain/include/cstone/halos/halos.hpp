@@ -33,6 +33,8 @@
 #include <numeric>
 #include <vector>
 
+#include "halos_utility.hpp"
+
 #include "cstone/cuda/cuda_utils.hpp"
 #include "cstone/domain/index_ranges.hpp"
 #include "cstone/domain/layout.hpp"
@@ -49,67 +51,6 @@
 
 namespace cstone
 {
-
-namespace detail
-{
-
-//! @brief check that only owned particles in [particleStart_:particleEnd_] are sent out as halos
-inline void checkIndices(const SendList& sendList,
-                  [[maybe_unused]] LocalIndex start,
-                  [[maybe_unused]] LocalIndex end,
-                  [[maybe_unused]] LocalIndex bufferSize)
-{
-    for (const auto& manifest : sendList)
-    {
-        for (size_t ri = 0; ri < manifest.nRanges(); ++ri)
-        {
-            assert(!overlapTwoRanges(LocalIndex{0}, start, manifest.rangeStart(ri), manifest.rangeEnd(ri)));
-            assert(!overlapTwoRanges(end, bufferSize, manifest.rangeStart(ri), manifest.rangeEnd(ri)));
-        }
-    }
-}
-
-//! @brief check halo discovery for sanity
-template<class KeyType>
-int checkHalos(int myRank,
-               gsl::span<const TreeIndexPair> focusAssignment,
-               gsl::span<const int> haloFlags,
-               gsl::span<const KeyType> ftree)
-{
-    TreeNodeIndex firstAssignedNode = focusAssignment[myRank].start();
-    TreeNodeIndex lastAssignedNode  = focusAssignment[myRank].end();
-
-    std::array<TreeNodeIndex, 2> checkRanges[2] = {{0, firstAssignedNode},
-                                                   {lastAssignedNode, TreeNodeIndex(haloFlags.size())}};
-
-    int ret = 0;
-    for (int range = 0; range < 2; ++range)
-    {
-#pragma omp parallel for
-        for (TreeNodeIndex i = checkRanges[range][0]; i < checkRanges[range][1]; ++i)
-        {
-            if (haloFlags[i])
-            {
-                bool peerFound = false;
-                for (auto peerRange : focusAssignment)
-                {
-                    if (peerRange.start() <= i && i < peerRange.end()) { peerFound = true; }
-                }
-                if (!peerFound)
-                {
-                    std::cout << "Assignment rank " << myRank << " " << std::oct << ftree[firstAssignedNode] << " - "
-                              << ftree[lastAssignedNode] << std::dec << std::endl;
-                    std::cout << "Failed node " << i << " " << std::oct << ftree[i] << " - " << ftree[i + 1] << std::dec
-                              << std::endl;
-                    ret = 1;
-                }
-            }
-        }
-    }
-    return ret;
-}
-
-} // namespace detail
 
 template<class DevVec1, class DevVec2, class... Arrays>
 void haloExchangeGpu(int epoch,
