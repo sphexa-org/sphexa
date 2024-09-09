@@ -34,6 +34,7 @@
 
 #include "cstone/domain/domain.hpp"
 #include "cstone/findneighbors.hpp"
+#include "cstone/halos/halos_utility.hpp"
 #include "coord_samples/random.hpp"
 
 #include "ryoanji/interface/global_multipole.hpp"
