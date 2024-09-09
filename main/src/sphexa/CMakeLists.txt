@@ -25,7 +25,7 @@ endfunction()
 set(exename sphexa)
 add_executable(${exename} sphexa.cpp)
 target_include_directories(${exename} PRIVATE ${SPH_EXA_INCLUDE_DIRS})
-target_link_libraries(${exename} PRIVATE io sim_init propagator_init observables OpenMP::OpenMP_CXX ${MPI_CXX_LIBRARIES})
+target_link_libraries(${exename} PRIVATE io sim_init propagator_init observables cstone_gpu OpenMP::OpenMP_CXX ${MPI_CXX_LIBRARIES})
 target_include_directories(${exename} PRIVATE ${PROJECT_SOURCE_DIR}/physics/cooling/include/)
 
 enableInSituViz(${exename})
