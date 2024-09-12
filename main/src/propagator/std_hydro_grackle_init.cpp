@@ -30,17 +30,15 @@
  * @author ChristopherBignamini <christopher.bignamini@gmail.com>
  */
 
+#ifdef SPH_EXA_HAVE_GRACKLE
 
 #include "ipropagator_init.hpp"
 #include "ipropagator.hpp"
-//#ifdef SPH_EXA_HAVE_GRACKLE
 #include "std_hydro_grackle.hpp"
-//#endif
 
 namespace sphexa
 {
 
-//#ifdef SPH_EXA_HAVE_GRACKLE
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
 PropInitializers<DomainType, ParticleDataType>::makeHydroGrackleProp(std::ostream& output, size_t rank, const InitSettings& settings)
@@ -57,4 +55,4 @@ template struct PropInitializers<cstone::Domain<unsigned long, double, cstone::C
 
 } // namespace sphexa
 
-
+#endif
