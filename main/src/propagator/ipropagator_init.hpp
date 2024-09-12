@@ -60,7 +60,4 @@ struct PropInitializers
     static PropInitPtr makeTurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
 };
 
-extern template struct PropInitializers<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag> >;
-extern template struct PropInitializers<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag> >;
-
 }
