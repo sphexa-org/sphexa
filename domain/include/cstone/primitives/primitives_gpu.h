@@ -98,8 +98,13 @@ extern void sequenceGpu(IndexType* input, size_t numElements, IndexType init);
 template<class KeyType>
 extern void sortGpu(KeyType* first, KeyType* last, KeyType* keyBuf);
 
+//! @brief Determine temporary device storage requirements for sortByKeyGpu
 template<class KeyType, class ValueType>
-extern void sortByKeyGpu(KeyType* first, KeyType* last, ValueType* values, KeyType* keyBuf, ValueType* valueBuf);
+extern uint64_t sortByKeyTempStorage(uint64_t numElements);
+
+template<class KeyType, class ValueType>
+extern void
+sortByKeyGpu(KeyType* first, KeyType* last, ValueType* values, KeyType* keyBuf, ValueType* valueBuf, void*, uint64_t);
 
 template<class KeyType, class ValueType>
 extern void sortByKeyGpu(KeyType* first, KeyType* last, ValueType* values);

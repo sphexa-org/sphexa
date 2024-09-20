@@ -36,7 +36,7 @@
 
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/primitives/primitives_gpu.h"
-#include "cstone/util/reallocate.hpp"
+#include "cstone/util/pack_buffers.hpp"
 
 namespace cstone
 {
@@ -77,13 +77,24 @@ public:
         sortByKeyGpu(first, last, ordering());
     }
 
-    template<class KeyType>
-    void setMapFromCodes(KeyType* first, KeyType* last, KeyType* keyBuf, IndexType* valueBuf)
+    template<class KeyType, class KeyBuf, class ValueBuf>
+    void updateMap(KeyType* first, KeyType* last, KeyBuf& keyBuf, ValueBuf& valueBuf)
     {
-        mapSize_ = std::size_t(last - first);
-        reallocateBytes(buffer_, mapSize_ * sizeof(IndexType), growthRate_);
-        sequenceGpu(ordering(), mapSize_, IndexType(0));
-        sortByKeyGpu(first, last, ordering(), keyBuf, valueBuf);
+        assert(last - first == mapSize_);
+        // temp storage for radix sort as multiples of IndexType
+        uint64_t tempStorageEle = iceil(sortByKeyTempStorage<KeyType, IndexType>(last - first), sizeof(IndexType));
+
+        auto s1 = reallocateBytes(keyBuf, mapSize_ * sizeof(KeyType), growthRate_);
+
+        // pack valueBuffer and temp storage into @p valueBuf
+        auto s2                 = valueBuf.size();
+        uint64_t numElements[2] = {uint64_t(mapSize_ * growthRate_), tempStorageEle};
+        auto tempBuffers        = util::packAllocBuffer<IndexType>(valueBuf, {numElements, 2}, 128);
+
+        sortByKeyGpu(first, last, ordering(), (KeyType*)rawPtr(keyBuf), tempBuffers[0].data(), tempBuffers[1].data(),
+                     tempStorageEle * sizeof(IndexType));
+        reallocate(keyBuf, s1, 1.0);
+        reallocate(valueBuf, s2, 1.0);
     }
 
     template<class KeyType, class KeyBuf, class ValueBuf>
@@ -93,24 +104,7 @@ public:
         reallocateBytes(buffer_, mapSize_ * sizeof(IndexType), growthRate_);
         sequenceGpu(ordering(), mapSize_, IndexType(0));
 
-        auto s1 = reallocateBytes(keyBuf, mapSize_ * sizeof(KeyType), growthRate_);
-        auto s2 = reallocateBytes(valueBuf, mapSize_ * sizeof(IndexType), growthRate_);
-
-        setMapFromCodes(first, last, (KeyType*)rawPtr(keyBuf), (IndexType*)rawPtr(valueBuf));
-
-        reallocate(keyBuf, s1, 1.0);
-        reallocate(valueBuf, s2, 1.0);
-    }
-
-    template<class KeyType, class KeyBuf, class ValueBuf>
-    void updateMap(KeyType* first, KeyType* last, KeyBuf& keyBuf, ValueBuf& valueBuf)
-    {
-        assert(last - first == mapSize_);
-        auto s1 = reallocateBytes(keyBuf, mapSize_ * sizeof(KeyType), growthRate_);
-        auto s2 = reallocateBytes(valueBuf, mapSize_ * sizeof(IndexType), growthRate_);
-        sortByKeyGpu(first, last, ordering(), (KeyType*)rawPtr(keyBuf), (IndexType*)rawPtr(valueBuf));
-        reallocate(keyBuf, s1, 1.0);
-        reallocate(valueBuf, s2, 1.0);
+        updateMap(first, last, keyBuf, valueBuf);
     }
 
     auto gatherFunc() const { return gatherGpuL; }

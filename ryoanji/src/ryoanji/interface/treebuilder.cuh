@@ -74,11 +74,14 @@ public:
         thrust::device_vector<int>     d_ordering(numBodies), d_values_tmp(numBodies);
         thrust::device_vector<T>       tmp(numBodies);
 
+        uint64_t                    tempStorageEle = cstone::sortByKeyTempStorage<KeyType, LocalIndex>(numBodies);
+        thrust::device_vector<char> cubTmpStorage(tempStorageEle);
+
         cstone::computeSfcKeysGpu(x, y, z, cstone::sfcKindPointer(rawPtr(d_keys)), numBodies, box);
 
         cstone::sequenceGpu(rawPtr(d_ordering), d_ordering.size(), 0);
         cstone::sortByKeyGpu(rawPtr(d_keys), rawPtr(d_keys) + d_keys.size(), rawPtr(d_ordering), rawPtr(d_keys_tmp),
-                             rawPtr(d_values_tmp));
+                             rawPtr(d_values_tmp), rawPtr(cubTmpStorage), tempStorageEle);
 
         thrust::gather(thrust::device, d_ordering.begin(), d_ordering.end(), x, tmp.begin());
         thrust::copy(tmp.begin(), tmp.end(), x);
