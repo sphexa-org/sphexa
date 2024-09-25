@@ -33,6 +33,7 @@
 
 #include "ipropagator_init.hpp"
 #include "ipropagator.hpp"
+#include "turb_ve_bdt.hpp"
 #include "ve_hydro_bdt.hpp"
 
 namespace sphexa
@@ -44,6 +45,14 @@ PropInitializers<DomainType, ParticleDataType>::makeHydroVeBdtProp(std::ostream&
 {
     if (avClean) { return std::make_unique<HydroVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
     else { return std::make_unique<HydroVeBdtProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
+}
+
+template<class DomainType, class ParticleDataType>
+std::unique_ptr<Propagator<DomainType, ParticleDataType>>
+PropInitializers<DomainType, ParticleDataType>::makeTurbVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean)
+{
+    if (avClean) { return std::make_unique<TurbVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
+    else { return std::make_unique<TurbVeBdtProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
 }
 
 #ifdef USE_CUDA
