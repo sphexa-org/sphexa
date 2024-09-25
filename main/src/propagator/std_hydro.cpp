@@ -1,8 +1,8 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
+ *               2024 University of Basel
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,40 +24,33 @@
  */
 
 /*! @file
- * @brief Propagator initialization
+ * @brief Translation unit for the std hydro propagator initializer
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  * @author ChristopherBignamini <christopher.bignamini@gmail.com>
  */
 
-#pragma once
 
-#include <memory>
-
-#include "cstone/domain/domain.hpp"
+#include "ipropagator_init.hpp"
 #include "ipropagator.hpp"
-#include "init/settings.hpp"
-#include "sphexa/simulation_data.hpp"
-
+#include "std_hydro.hpp"
 
 namespace sphexa
 {
 
 template<class DomainType, class ParticleDataType>
-struct PropInitializers
+std::unique_ptr<Propagator<DomainType, ParticleDataType>>
+PropInitializers<DomainType, ParticleDataType>::makeHydroProp(std::ostream& output, size_t rank)
 {
-
-    using PropPtr = std::unique_ptr<Propagator<DomainType, ParticleDataType>>;
-
-    static PropPtr makeHydroVeProp(std::ostream& output, size_t rank, bool avClean);
-    static PropPtr makeHydroProp(std::ostream& output, size_t rank);
-    static PropPtr makeHydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
-#ifdef SPH_EXA_HAVE_GRACKLE
-    static PropPtr makeHydroGrackleProp(std::ostream& output, size_t rank, const InitSettings& settings);
-#endif
-    static PropPtr makeNbodyProp(std::ostream& output, size_t rank);
-    static PropPtr makeTurbVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
-    static PropPtr makeTurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
-};
-
+    return std::make_unique<HydroProp<DomainType, ParticleDataType>>(output, rank);
 }
+
+#ifdef USE_CUDA
+template struct PropInitializers<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag> >;
+#else
+template struct PropInitializers<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag> >;
+#endif
+
+} // namespace sphexa
+
+
