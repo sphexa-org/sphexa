@@ -119,7 +119,7 @@ TEST(Layout, extractMarkedElements)
 TEST(Layout, computeHaloReceiveList)
 {
     std::vector<LocalIndex> layout{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-    std::vector<int> haloFlags{1, 0, 1, 1, 0, 0, 0, 1, 1, 0};
+    std::vector<int>     haloFlags{1, 0, 1, 1, 0, 0, 0, 1, 1, 0};
 
     std::vector<int> peers{0, 2};
 
@@ -130,14 +130,13 @@ TEST(Layout, computeHaloReceiveList)
     assignment[1] = TreeIndexPair(4, 6);
     assignment[2] = TreeIndexPair(6, 10);
 
-    SendList receiveList = computeHaloReceiveList(layout, haloFlags, assignment, peers);
+    auto recvList = computeHaloRecvList(layout, haloFlags, assignment, peers);
 
-    SendList reference(numRanks);
-    reference[0].addRange(0, 1);
-    reference[0].addRange(2, 4);
-    reference[2].addRange(7, 9);
+    std::vector<IndexPair<LocalIndex>> reference(numRanks);
+    reference[0] = {LocalIndex(0), LocalIndex(4)};
+    reference[2] = {LocalIndex(7), LocalIndex(9)};
 
-    EXPECT_EQ(receiveList, reference);
+    EXPECT_EQ(recvList, reference);
 }
 
 TEST(Layout, gatherArrays)
