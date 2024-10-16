@@ -2,11 +2,11 @@
 function(enableH5Part exename)
     if(SPH_EXA_WITH_H5PART)
         target_compile_definitions(${exename} PUBLIC SPH_EXA_HAVE_H5PART)
-        target_include_directories(${exename} PUBLIC ${PROJECT_SOURCE_DIR}/extern/h5part)
+        target_include_directories(${exename} PUBLIC ${H5Hut_INCLUDE_DIR})
 
-        # necessary because the HDF5_INLUCDE_DIRS is empty on CRAY and HIP-compilation is done without the cray-wrapper
+	# necessary because the HDF5_INCLUDE_DIRS is empty on CRAY and HIP-compilation is done without the cray-wrapper
         target_include_directories(${exename} PUBLIC $ENV{HDF5_DIR}/include)
-        target_link_libraries(${exename} PRIVATE H5Part ${HDF5_LIBRARIES})
+  target_link_libraries(${exename} PRIVATE ${H5Hut_LIBRARY} ${HDF5_LIBRARIES})
     endif()
 endfunction()
 

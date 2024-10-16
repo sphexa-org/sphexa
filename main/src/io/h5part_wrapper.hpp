@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include <cstdint>
+#include <functional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -37,81 +39,52 @@
 #include "cstone/util/type_list.hpp"
 #include "cstone/util/tuple_util.hpp"
 
-#include "H5Part.h"
+#include "H5hut.h"
 
-namespace sphexa
-{
-namespace fileutils
+namespace sphexa::fileutils
 {
 
+// ---------------------------------------------------------------------------
+// types used by sph-exa throughout
 using H5PartTypes = util::TypeList<double, float, char, int, int64_t, unsigned, uint64_t>;
 
-std::string H5PartTypeToString(h5part_int64_t type)
+// ---------------------------------------------------------------------------
+enum attribute_type
 {
-    if (type == H5PART_FLOAT64) { return "C++: double / python: np.float64"; }
-    if (type == H5PART_FLOAT32) { return "C++: float / python: np.float32"; }
-    if (type == H5PART_INT32) { return "C++: int / python: np.int32"; }
-    if (type == H5PART_INT64) { return "C++: int64_t / python: np.int64"; }
-    if (type == H5PART_CHAR) { return "C++: char / python: np.int8"; }
+    file,
+    step,
+};
 
-    return "H5PART_UNKNOWN";
-}
-
-template<class T>
-struct H5PartType
+// ---------------------------------------------------------------------------
+// helper to define traits that we can use for brevity
+template<typename H5_Type>
+struct h5_traits
 {
 };
 
-template<>
-struct H5PartType<double>
-{
-    operator h5part_int64_t() const noexcept { return H5PART_FLOAT64; } // NOLINT
-};
+#define make_h5_trait(T, NATIVE_TYPE, H5HUT_TYPE, STRING)                                                              \
+    template<>                                                                                                         \
+    struct h5_traits<T>                                                                                                \
+    {                                                                                                                  \
+                                    operator h5_int64_t() const noexcept { return NATIVE_TYPE; }                       \
+        static constexpr h5_types_t h5hut_type = H5HUT_TYPE;                                                           \
+        static const std::string    stringval() { return STRING; }                                                     \
+    }
 
-template<>
-struct H5PartType<float>
-{
-    operator h5part_int64_t() const noexcept { return H5PART_FLOAT32; } // NOLINT
-};
+make_h5_trait(double, /*        */ H5T_NATIVE_DOUBLE, /* */ H5_FLOAT64_T, /**/ "C++: double / python: np.float64");
+make_h5_trait(float, /*         */ H5T_NATIVE_FLOAT, /*  */ H5_FLOAT32_T, /**/ "C++: float / python: np.float32");
+make_h5_trait(std::int64_t, /*  */ H5T_NATIVE_LONG, /*   */ H5_INT64_T, /*  */ "C++:  int64 / python: np.int64");
+make_h5_trait(std::uint64_t, /* */ H5T_NATIVE_ULONG, /*  */ H5_UINT64_T, /* */ "C++: uint64 / python: np.uint64");
+make_h5_trait(int, /*           */ H5T_NATIVE_INT, /*    */ H5_INT32_T, /*  */ "C++:  int / python: np.int32");
+make_h5_trait(unsigned, /*      */ H5T_NATIVE_UINT, /*   */ H5_UINT32_T, /* */ "C++: uint / python: np.uint32");
+make_h5_trait(std::int16_t, /*  */ H5T_NATIVE_SHORT, /*  */ H5_INT16_T, /*  */ "C++:  int16 / python: np.int16");
+make_h5_trait(std::uint16_t, /* */ H5T_NATIVE_USHORT, /* */ H5_UINT16_T, /* */ "C++: uint16 / python: np.uint16");
+make_h5_trait(char, /*          */ H5T_NATIVE_CHAR, /*   */ H5_INT8_T, /*   */ "C++:  char / python: np.int8");
+make_h5_trait(unsigned char, /* */ H5T_NATIVE_UCHAR, /*  */ H5_UINT8_T, /*  */ "C++: uchar / python: np.uint8");
 
-template<>
-struct H5PartType<char>
-{
-    operator h5part_int64_t() const noexcept { return H5PART_CHAR; } // NOLINT
-};
-
-template<>
-struct H5PartType<unsigned char>
-{
-    operator h5part_int64_t() const noexcept { return H5PART_CHAR; } // NOLINT
-};
-
-template<>
-struct H5PartType<int>
-{
-    operator h5part_int64_t() const noexcept { return H5PART_INT32; } // NOLINT
-};
-
-template<>
-struct H5PartType<unsigned>
-{
-    operator h5part_int64_t() const noexcept { return H5PART_INT32; } // NOLINT
-};
-
-template<>
-struct H5PartType<int64_t>
-{
-    operator h5part_int64_t() const noexcept { return H5PART_INT64; } // NOLINT
-};
-
-template<>
-struct H5PartType<uint64_t>
-{
-    operator h5part_int64_t() const noexcept { return H5PART_INT64; } // NOLINT
-};
-
+// ---------------------------------------------------------------------------
 //! @brief return the names of all datasets in @p h5_file
-std::vector<std::string> datasetNames(H5PartFile* h5_file)
+std::vector<std::string> datasetNames(h5_file_t h5_file)
 {
     auto numSets = H5PartGetNumDatasets(h5_file);
 
@@ -128,18 +101,19 @@ std::vector<std::string> datasetNames(H5PartFile* h5_file)
 }
 
 //! @brief return the names of all file attributes in @p h5_file
-std::vector<std::string> fileAttributeNames(H5PartFile* h5_file)
+std::vector<std::string> fileAttributeNames(h5_file_t h5_file)
 {
-    auto numAttributes = H5PartGetNumFileAttribs(h5_file);
+    auto numAttributes = H5GetNumFileAttribs(h5_file);
 
     std::vector<std::string> setNames(numAttributes);
     for (int64_t fi = 0; fi < numAttributes; ++fi)
     {
-        int            maxlen = 256;
-        char           attrName[maxlen];
-        h5part_int64_t typeId, attrSize;
+        int        maxlen = 256;
+        char       attrName[maxlen];
+        h5_int64_t typeId;
+        h5_size_t  attrSize;
 
-        H5PartGetFileAttribInfo(h5_file, fi, attrName, maxlen, &typeId, &attrSize);
+        H5GetFileAttribInfo(h5_file, fi, attrName, maxlen, &typeId, &attrSize);
         setNames[fi] = std::string(attrName);
     }
 
@@ -147,46 +121,111 @@ std::vector<std::string> fileAttributeNames(H5PartFile* h5_file)
 }
 
 //! @brief return the names of all step attributes in @p h5_file
-std::vector<std::string> stepAttributeNames(H5PartFile* h5_file)
+std::vector<std::string> stepAttributeNames(h5_file_t h5_file)
 {
-    auto numAttributes = H5PartGetNumStepAttribs(h5_file);
+    auto numAttributes = H5GetNumStepAttribs(h5_file);
 
     std::vector<std::string> setNames(numAttributes);
     for (int64_t fi = 0; fi < numAttributes; ++fi)
     {
-        int            maxlen = 256;
-        char           attrName[maxlen];
-        h5part_int64_t typeId, attrSize;
+        int        maxlen = 256;
+        char       attrName[maxlen];
+        h5_int64_t typeId;
+        h5_size_t  attrSize;
 
-        H5PartGetStepAttribInfo(h5_file, fi, attrName, maxlen, &typeId, &attrSize);
+        H5GetStepAttribInfo(h5_file, fi, attrName, maxlen, &typeId, &attrSize);
         setNames[fi] = std::string(attrName);
     }
 
     return setNames;
 }
 
-template<class T>
-auto writeH5PartStepAttrib(H5PartFile* h5_file, const std::string& name, const T* value, size_t numElements)
+// ---------------------------------------------------------------------------
+// templated access to Step Attributes
+template<typename T>
+inline h5_err_t H5WriteStepAttribT(const h5_file_t f, const char* const attrib_name, const T* const buffer,
+                                   const h5_size_t nelems)
 {
-    return H5PartWriteStepAttrib(h5_file, name.c_str(), H5PartType<T>{}, value, numElements);
+    // copied from h5hut source, but templated to simplify calling
+    return h5_write_iteration_attrib(f, attrib_name, h5_traits<T>::h5hut_type, buffer, nelems);
 }
 
-template<class T>
-auto writeH5PartFileAttrib(H5PartFile* h5_file, const std::string& name, const T* value, size_t numElements)
+template<typename T>
+inline h5_err_t H5ReadStepAttribT(const h5_file_t f, const char* const attrib_name, void* const buffer)
 {
-    return H5PartWriteFileAttrib(h5_file, name.c_str(), H5PartType<T>{}, value, numElements);
+    // copied from h5hut source, but templated to simplify calling
+    return h5_read_iteration_attrib(f, attrib_name, h5_traits<T>::h5hut_type, (void*)buffer);
 }
 
+template<class ExtractType>
+auto readH5PartStepAttribute(ExtractType* attr, size_t size, int attrIndex, h5_file_t h5File)
+{
+    return readAttribute_typesafe(h5File, attribute_type::step, attr, int(size), attrIndex);
+}
+
+// ---------------------------------------------------------------------------
+// templated access to File Attributes
+template<typename T>
+static inline h5_err_t H5WriteFileAttribT(const h5_file_t f, const char* const attrib_name, const T* const buffers,
+                                          const h5_size_t nelems)
+{
+    // copied from h5hut source, but templated to simplify calling
+    return h5_write_file_attrib(f, attrib_name, h5_traits<T>::h5hut_type, buffers, nelems);
+}
+
+template<typename T>
+static inline h5_err_t H5ReadFileAttribT(const h5_file_t f, const char* const attrib_name, void* const buffer)
+{
+    // copied from h5hut source, but templated to simplify calling
+    return h5_read_file_attrib(f, attrib_name, h5_traits<T>::h5hut_type, (void*)buffer);
+}
+
+template<class ExtractType>
+auto readH5PartFileAttribute(ExtractType* attr, size_t size, int attrIndex, h5_file_t h5File)
+{
+    return readAttribute_typesafe(h5File, attribute_type::file, attr, int(size), attrIndex);
+}
+
+// ---------------------------------------------------------------------------
+// templated access to Fields
+template<typename T>
+static inline h5_err_t H5PartWriteDataT(const h5_file_t f, const char* name, const T* data)
+{
+    // copied from h5hut source, but templated to simplify calling
+    return h5u_write_dataset(f, name, (void*)data, h5_traits<T>::h5hut_type);
+}
+
+template<typename T>
+static inline h5_err_t H5PartReadDataT(const h5_file_t f, const char* name, T* data)
+{
+    // copied from h5hut source, but templated to simplify calling
+    return h5u_read_dataset(f, name, data, h5_traits<T>::h5hut_type);
+}
+
+// ---------------------------------------------------------------------------
 //! @brief Read an HDF5 attribute into the provided buffer, doing type-conversions when it is safe to do so
-template<class ExtractType, class Reader, class Info>
-void readAttribute(ExtractType* attr, int attrSizeBuf, int attrIndex, Reader&& readAttrib, Info&& readAttribInfo)
+template<class ExtractType>
+void readAttribute_typesafe(h5_file_t h5_file, attribute_type domain, ExtractType* attr, std::size_t attrSizeBuf,
+                            int attrIndex)
 {
     using IoTuple = util::Reduce<std::tuple, H5PartTypes>;
 
-    h5part_int64_t typeId, attrSizeFile;
-    char           attrName[256];
-    readAttribInfo(attrIndex, attrName, 256, &typeId, &attrSizeFile);
-    bool breakLoop = false;
+    h5_int64_t typeId;
+    h5_size_t  attrSizeFile;
+    char       attrName[256];
+    bool       breakLoop = false;
+
+    if (std::invoke(
+            [&]()
+            {
+                if (domain == attribute_type::step)
+                    return H5GetStepAttribInfo(h5_file, attrIndex, attrName, 256, &typeId, &attrSizeFile);
+                else
+                    return H5GetFileAttribInfo(h5_file, attrIndex, attrName, 256, &typeId, &attrSizeFile);
+            }) != H5_SUCCESS)
+    {
+        throw std::runtime_error("Could not read attribute info " + std::string(attrName) + "\n");
+    }
 
     if (attrSizeBuf != attrSizeFile)
     {
@@ -198,24 +237,31 @@ void readAttribute(ExtractType* attr, int attrSizeBuf, int attrIndex, Reader&& r
     auto readTypesafe = [&](auto dummyValue)
     {
         using TypeInFile = std::decay_t<decltype(dummyValue)>;
-        if (fileutils::H5PartType<TypeInFile>{} == typeId && not breakLoop)
+        if (h5_traits<TypeInFile>::h5hut_type == typeId && not breakLoop)
         {
-            std::vector<TypeInFile> attrBuf(attrSizeFile);
-            if (readAttrib(attrName, attrBuf.data()) != H5PART_SUCCESS)
-            {
-                throw std::runtime_error("Could not read attribute " + std::string(attrName) + "\n");
-            }
-
             bool bothFloating        = std::is_floating_point_v<TypeInFile> && std::is_floating_point_v<ExtractType>;
             bool extractToCommonType = std::is_same_v<std::common_type_t<TypeInFile, ExtractType>, ExtractType>;
-            if (bothFloating || extractToCommonType) { std::copy(attrBuf.begin(), attrBuf.end(), attr); }
+            if (bothFloating || extractToCommonType)
+            {
+                std::vector<TypeInFile> attrBuf(attrSizeFile);
+                if (std::invoke(
+                        [&]()
+                        {
+                            if (domain == attribute_type::step)
+                                return H5ReadStepAttribT<TypeInFile>(h5_file, attrName, attrBuf.data());
+                            else
+                                return H5ReadFileAttribT<TypeInFile>(h5_file, attrName, attrBuf.data());
+                        }) != H5_SUCCESS)
+                {
+                    throw std::runtime_error("Could not read attribute " + std::string(attrName) + "\n");
+                }
+                std::copy(attrBuf.begin(), attrBuf.end(), attr);
+            }
             else
             {
-                int64_t memTypeId = fileutils::H5PartType<ExtractType>{};
                 throw std::runtime_error("Reading attribute " + std::string(attrName) +
-                                         " failed: " + "type in file is " + fileutils::H5PartTypeToString(typeId) +
-                                         ", but supplied buffer type is " + fileutils::H5PartTypeToString(memTypeId) +
-                                         "\n");
+                                         " failed: " + "type in file is " + h5_traits<TypeInFile>::stringval() +
+                                         ", but supplied buffer type is " + h5_traits<ExtractType>::stringval() + "\n");
             }
             breakLoop = true;
         }
@@ -223,126 +269,18 @@ void readAttribute(ExtractType* attr, int attrSizeBuf, int attrIndex, Reader&& r
     util::for_each_tuple(readTypesafe, IoTuple{});
 }
 
-template<class ExtractType>
-auto readH5PartStepAttribute(ExtractType* attr, size_t size, int attrIndex, H5PartFile* h5File)
-{
-    auto read = [h5File](const char* key, void* attr) { return H5PartReadStepAttrib(h5File, key, attr); };
-
-    auto info = [h5File](int idx, char* buf, int sz, h5part_int64_t* typeId, h5part_int64_t* attrSize)
-    { return H5PartGetStepAttribInfo(h5File, idx, buf, sz, typeId, attrSize); };
-
-    return readAttribute(attr, int(size), attrIndex, read, info);
-}
-
-template<class ExtractType>
-auto readH5PartFileAttribute(ExtractType* attr, size_t size, int attrIndex, H5PartFile* h5File)
-{
-    auto read = [h5File](const char* key, void* attr) { return H5PartReadFileAttrib(h5File, key, attr); };
-
-    auto info = [h5File](int idx, char* buf, int sz, h5part_int64_t* typeId, h5part_int64_t* attrSize)
-    { return H5PartGetFileAttribInfo(h5File, idx, buf, sz, typeId, attrSize); };
-
-    return readAttribute(attr, int(size), attrIndex, read, info);
-}
-
-/* read fields */
-
-inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, double* field)
-{
-    static_assert(std::is_same_v<double, h5part_float64_t>);
-    return H5PartReadDataFloat64(h5_file, fieldName.c_str(), field);
-}
-
-inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, float* field)
-{
-    static_assert(std::is_same_v<float, h5part_float32_t>);
-    return H5PartReadDataFloat32(h5_file, fieldName.c_str(), field);
-}
-
-inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, uint8_t* field)
-{
-    return H5PartReadDataInt8(h5_file, fieldName.c_str(), field);
-}
-
-inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, char* field)
-{
-    return H5PartReadDataInt8(h5_file, fieldName.c_str(), (uint8_t*)field);
-}
-
-inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, int* field)
-{
-    static_assert(std::is_same_v<int, h5part_int32_t>);
-    return H5PartReadDataInt32(h5_file, fieldName.c_str(), field);
-}
-
-inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, int64_t* field)
-{
-    return H5PartReadDataInt64(h5_file, fieldName.c_str(), (h5part_int64_t*)field);
-}
-
-inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, unsigned* field)
-{
-    return H5PartReadDataInt32(h5_file, fieldName.c_str(), (h5part_int32_t*)field);
-}
-
-inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, uint64_t* field)
-{
-    return H5PartReadDataInt64(h5_file, fieldName.c_str(), (h5part_int64_t*)field);
-}
-
-/* write fields */
-
-inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const double* field)
-{
-    static_assert(std::is_same_v<double, h5part_float64_t>);
-    return H5PartWriteDataFloat64(h5_file, fieldName.c_str(), field);
-}
-
-inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const float* field)
-{
-    static_assert(std::is_same_v<float, h5part_float32_t>);
-    return H5PartWriteDataFloat32(h5_file, fieldName.c_str(), field);
-}
-
-inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const uint8_t* field)
-{
-    return H5PartWriteDataInt8(h5_file, fieldName.c_str(), field);
-}
-
-inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const char* field)
-{
-    return H5PartWriteDataInt8(h5_file, fieldName.c_str(), (const uint8_t*)field);
-}
-
-inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const int* field)
-{
-    static_assert(std::is_same_v<int, h5part_int32_t>);
-    return H5PartWriteDataInt32(h5_file, fieldName.c_str(), field);
-}
-
-inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const int64_t* field)
-{
-    return H5PartWriteDataInt64(h5_file, fieldName.c_str(), (const h5part_int64_t*)field);
-}
-
-inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const unsigned* field)
-{
-    return H5PartWriteDataInt32(h5_file, fieldName.c_str(), (const h5part_int32_t*)field);
-}
-
-inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const uint64_t* field)
-{
-    return H5PartWriteDataInt64(h5_file, fieldName.c_str(), (const h5part_int64_t*)field);
-}
-
+// ---------------------------------------------------------------------------
 //! @brief Open in parallel mode if supported, otherwise serial if numRanks == 1
-H5PartFile* openH5Part(const std::string& path, h5part_int64_t mode, MPI_Comm comm)
+h5_file_t openH5Part(const std::string& path, h5_int64_t mode, MPI_Comm comm)
 {
     const char* h5_fname = path.c_str();
-    H5PartFile* h5_file  = nullptr;
+    h5_file_t   h5_file;
 
-#ifdef H5PART_PARALLEL_IO
-    h5_file = H5PartOpenFileParallel(h5_fname, mode, comm);
+#ifdef H5_HAVE_PARALLEL
+    h5_prop_t prop = H5CreateFileProp();
+    H5SetPropFileMPIOCollective(prop, &comm);
+    h5_file = H5OpenFile(h5_fname, mode, prop);
+    H5CloseProp(prop);
 #else
     int numRanks;
     MPI_Comm_size(comm, &numRanks);
@@ -350,11 +288,10 @@ H5PartFile* openH5Part(const std::string& path, h5part_int64_t mode, MPI_Comm co
     {
         throw std::runtime_error("Cannot open HDF5 file on multiple ranks without parallel HDF5 support\n");
     }
-    h5_file = H5PartOpenFile(h5_fname, mode);
+    h5_file = H5OpenFile(h5_fname, mode, H5_PROP_DEFAULT);
 #endif
 
     return h5_file;
 }
 
-} // namespace fileutils
-} // namespace sphexa
+} // namespace sphexa::fileutils
