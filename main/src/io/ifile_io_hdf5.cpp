@@ -73,15 +73,14 @@ public:
         if (!h5File_ || path != pathStep_)
         {
             closeStep();
-            int64_t mode = (std::filesystem::exists(path) ? H5PART_APPEND : H5PART_WRITE) | H5PART_VFD_MPIIO_IND;
-            h5File_      = fileutils::openH5Part(path, mode, comm_);
+            h5File_ = fileutils::openH5Part(path, H5_O_RDWR, comm_);
         }
 
         if (lastIndex > firstIndex)
         {
             // create the next step
-            h5part_int64_t numSteps = H5PartGetNumSteps(h5File_);
-            H5PartSetStep(h5File_, numSteps);
+            h5_int64_t numSteps = H5GetNumSteps(h5File_);
+            H5SetStep(h5File_, numSteps);
 
             uint64_t numParticles = lastIndex - firstIndex;
             // set number of particles that each rank will write
@@ -92,27 +91,34 @@ public:
 
     void stepAttribute(const std::string& key, FieldType val, int64_t size) override
     {
-        std::visit([this, &key, size](auto arg) { fileutils::writeH5PartStepAttrib(h5File_, key.c_str(), arg, size); },
-                   val);
+        std::visit(
+            [this, &key, size](auto arg) { //
+                fileutils::H5WriteStepAttribT(h5File_, key.c_str(), arg, size);
+            },
+            val);
     }
 
     void fileAttribute(const std::string& key, FieldType val, int64_t size) override
     {
-        std::visit([this, &key, size](auto arg) { fileutils::writeH5PartFileAttrib(h5File_, key.c_str(), arg, size); },
-                   val);
+        std::visit(
+            [this, &key, size](auto arg) { //
+                fileutils::H5WriteFileAttribT(h5File_, key.c_str(), arg, size);
+            },
+            val);
     }
 
     void writeField(const std::string& key, FieldType field, int = 0) override
     {
-        std::visit([this, &key](auto arg) { fileutils::writeH5PartField(h5File_, key, arg + firstIndex_); }, field);
+        std::visit([this, &key](auto arg) { fileutils::H5PartWriteDataT(h5File_, key.c_str(), arg + firstIndex_); },
+                   field);
     }
 
     void closeStep() override
     {
         if (h5File_)
         {
-            H5PartCloseFile(h5File_);
-            h5File_ = nullptr;
+            H5CloseFile(h5File_);
+            h5File_ = 0;
         }
     }
 
@@ -123,7 +129,7 @@ private:
     size_t      firstIndex_{0};
     std::string pathStep_;
 
-    H5PartFile* h5File_{nullptr};
+    h5_file_t h5File_{0};
 };
 
 std::unique_ptr<IFileWriter> makeH5PartWriter(MPI_Comm comm) { return std::make_unique<H5PartWriter>(comm); }
@@ -154,7 +160,7 @@ public:
 
     explicit H5PartReader(MPI_Comm comm)
         : comm_(comm)
-        , h5File_{nullptr}
+        , h5File_{0}
     {
         MPI_Comm_rank(comm, &rank_);
     }
@@ -179,13 +185,13 @@ public:
     {
         closeStep();
         pathStep_ = path;
-        h5File_   = fileutils::openH5Part(path, H5PART_READ | H5PART_VFD_MPIIO_IND, comm_);
+        h5File_   = fileutils::openH5Part(path, H5_O_RDWR, comm_);
 
-        if (H5PartGetNumSteps(h5File_) == 0) { return; }
+        if (H5GetNumSteps(h5File_) == 0) { return; }
 
         // set step to last step in file if negative
-        if (step < 0) { step = H5PartGetNumSteps(h5File_) - 1; }
-        H5PartSetStep(h5File_, step);
+        if (step < 0) { step = H5GetNumSteps(h5File_) - 1; }
+        H5SetStep(h5File_, step);
 
         globalCount_ = H5PartGetNumParticles(h5File_);
         if (globalCount_ < 1) { return; }
@@ -217,19 +223,21 @@ public:
 
     int64_t fileAttributeSize(const std::string& key) override
     {
-        int64_t attrIndex = fileAttributeIndex(key);
-        int64_t typeId, attrSize;
-        char    dummy[256];
-        H5PartGetFileAttribInfo(h5File_, attrIndex, dummy, 256, &typeId, &attrSize);
+        int64_t   attrIndex = fileAttributeIndex(key);
+        h5_size_t attrSize;
+        int64_t   typeId;
+        char      dummy[256];
+        H5GetFileAttribInfo(h5File_, attrIndex, dummy, 256, &typeId, &attrSize);
         return attrSize;
     }
 
     int64_t stepAttributeSize(const std::string& key) override
     {
-        int64_t attrIndex = stepAttributeIndex(key);
-        int64_t typeId, attrSize;
-        char    dummy[256];
-        H5PartGetStepAttribInfo(h5File_, attrIndex, dummy, 256, &typeId, &attrSize);
+        int64_t   attrIndex = stepAttributeIndex(key);
+        h5_size_t attrSize;
+        int64_t   typeId;
+        char      dummy[256];
+        H5GetStepAttribInfo(h5File_, attrIndex, dummy, 256, &typeId, &attrSize);
         return attrSize;
     }
 
@@ -257,8 +265,9 @@ public:
 
     void readField(const std::string& key, FieldType field) override
     {
-        auto err = std::visit([this, &key](auto arg) { return fileutils::readH5PartField(h5File_, key, arg); }, field);
-        if (err != H5PART_SUCCESS) { throw std::runtime_error("Could not read field: " + key); }
+        auto err =
+            std::visit([this, &key](auto arg) { return fileutils::H5PartReadDataT(h5File_, key.c_str(), arg); }, field);
+        if (err != H5_SUCCESS) { throw std::runtime_error("Could not read field: " + key); }
     }
 
     uint64_t localNumParticles() override { return localCount_; }
@@ -269,8 +278,8 @@ public:
     {
         if (h5File_)
         {
-            H5PartCloseFile(h5File_);
-            h5File_ = nullptr;
+            H5CloseFile(h5File_);
+            h5File_ = 0;
         }
     }
 
@@ -294,12 +303,12 @@ private:
     int      rank_{0};
     MPI_Comm comm_;
 
-    uint64_t    firstIndex_, lastIndex_;
-    uint64_t    localCount_;
-    uint64_t    globalCount_;
+    int64_t     firstIndex_, lastIndex_;
+    int64_t     localCount_;
+    int64_t     globalCount_;
     std::string pathStep_;
 
-    H5PartFile* h5File_;
+    h5_file_t h5File_;
 };
 
 std::unique_ptr<IFileReader> makeH5PartReader(MPI_Comm comm) { return std::make_unique<H5PartReader>(comm); }
