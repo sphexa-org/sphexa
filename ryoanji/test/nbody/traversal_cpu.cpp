@@ -45,24 +45,29 @@ TEST(Gravity, TreeWalk)
 {
     using T             = double;
     using KeyType       = uint64_t;
-    using MultipoleType = ryoanji::CartesianQuadrupole<T>;
+    using MultipoleType = ryoanji::CartesianMDQpole<T>;
 
-    float          theta      = 0.5;
-    float          G          = 1.0;
-    unsigned       bucketSize = 64;
+    float          theta       = 0.2;
+    float          G           = 1.0;
+    unsigned       bucketSize  = 64;
     cstone::Box<T> box(-1, 1);
-    int            numShells    = 1;
-    LocalIndex     numParticles = 10000;
+    int            numShells    = 0;
+    LocalIndex     numParticles = 100000;
 
-    RandomCoordinates<T, SfcKind<KeyType>> coordinates(numParticles, box);
+    RandomGaussianCoordinates<T, SfcKind<KeyType>> coordinates(numParticles, box);
 
     const T* x = coordinates.x().data();
     const T* y = coordinates.y().data();
     const T* z = coordinates.z().data();
 
-    std::vector<T> h(numParticles, 0.01);
-    std::vector<T> masses(numParticles);
-    std::generate(begin(masses), end(masses), drand48);
+    std::vector<T> h(numParticles, 0.1);
+    adjustSmoothingLength<KeyType>(h.size(), 2, 5, coordinates.x(), coordinates.y(), coordinates.z(), h, box);
+
+    std::vector<T> masses(numParticles, T(1) / numParticles);
+    for (size_t i = 0; i < masses.size(); ++i)
+    {
+        if (i % 2) masses[i] *= -1.0;
+    }
 
     // the leaf cells and leaf particle counts
     auto [treeLeaves, counts] =
@@ -97,7 +102,7 @@ TEST(Gravity, TreeWalk)
     std::vector<T> az(numParticles, 0);
 
     auto   t0       = std::chrono::high_resolution_clock::now();
-    double egravTot = 0;
+    T egravTot = 0;
     computeGravity(octree.childOffsets.data(), octree.internalToLeaf.data(), centers.data(), multipoles.data(),
                    layout.data(), 0, octree.numLeafNodes, x, y, z, h.data(), masses.data(), box, G, (T*)nullptr,
                    ax.data(), ay.data(), az.data(), &egravTot, numShells);
@@ -134,18 +139,15 @@ TEST(Gravity, TreeWalk)
     std::vector<T> delta(numParticles);
     for (LocalIndex i = 0; i < numParticles; ++i)
     {
-        T dx = ax[i] - Ax[i];
-        T dy = ay[i] - Ay[i];
-        T dz = az[i] - Az[i];
-
-        delta[i] = std::sqrt((dx * dx + dy * dy + dz * dz) / (Ax[i] * Ax[i] + Ay[i] * Ay[i] + Az[i] * Az[i]));
+        ryoanji::Vec3<T> axi{ax[i], ay[i], az[i]}, Axi{Ax[i], Ay[i], Az[i]};
+        delta[i] = std::sqrt(norm2(axi - Axi) / norm2(Axi));
     }
 
     // sort errors in ascending order to infer the error distribution
     std::sort(begin(delta), end(delta));
 
     EXPECT_TRUE(delta[numParticles * 0.99] < 3e-3);
-    EXPECT_TRUE(delta[numParticles - 1] < 2e-2);
+    EXPECT_TRUE(delta[numParticles - 1] < 3e-2);
 
     std::cout.precision(10);
     std::cout << "min Error: " << delta[0] << std::endl;

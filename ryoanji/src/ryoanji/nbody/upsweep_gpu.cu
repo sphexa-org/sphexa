@@ -75,10 +75,6 @@ void computeLeafMultipoles(const Tc* x, const Tc* y, const Tc* z, const Tm* m, c
                                         const TreeNodeIndex* leafToInternal, TreeNodeIndex numLeaves,                  \
                                         const LocalIndex* layout, const Vec4<Tf>* centers, MType* multipoles)
 
-COMPUTE_LEAF_MULTIPOLES(double, double, double, CartesianQuadrupole<double>);
-COMPUTE_LEAF_MULTIPOLES(double, float, double, CartesianQuadrupole<float>);
-COMPUTE_LEAF_MULTIPOLES(float, float, float, CartesianQuadrupole<float>);
-
 template<class T, class MType>
 __global__ void upsweepMultipolesKernel(TreeNodeIndex firstCell, TreeNodeIndex lastCell,
                                         const TreeNodeIndex* childOffsets, const Vec4<T>* centers, MType* multipoles)
@@ -108,8 +104,15 @@ void upsweepMultipoles(TreeNodeIndex firstCell, TreeNodeIndex lastCell, const Tr
     template void upsweepMultipoles(TreeNodeIndex firstCell, TreeNodeIndex lastCell,                                   \
                                     const TreeNodeIndex* childOffsets, const Vec4<T>* centers, MType* multipoles)
 
-UPSWEEP_MULTIPOLES(double, CartesianQuadrupole<double>);
-UPSWEEP_MULTIPOLES(double, CartesianQuadrupole<float>);
-UPSWEEP_MULTIPOLES(float, CartesianQuadrupole<float>);
+#define INSTANTIATE_MULTIPOLE(MType)                                                                                   \
+    COMPUTE_LEAF_MULTIPOLES(double, double, double, MType<double>);                                                    \
+    COMPUTE_LEAF_MULTIPOLES(double, float, double, MType<float>);                                                      \
+    COMPUTE_LEAF_MULTIPOLES(float, float, float, MType<float>);                                                        \
+    UPSWEEP_MULTIPOLES(double, MType<double>);                                                                         \
+    UPSWEEP_MULTIPOLES(double, MType<float>);                                                                          \
+    UPSWEEP_MULTIPOLES(float, MType<float>);
+
+INSTANTIATE_MULTIPOLE(CartesianQuadrupole)
+INSTANTIATE_MULTIPOLE(CartesianMDQpole)
 
 } // namespace ryoanji

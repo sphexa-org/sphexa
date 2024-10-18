@@ -241,9 +241,15 @@ const MType* MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::deviceMultipol
     template class MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, CartesianQuadrupole<MVal>>
 
 MHOLDER_CART(double, double, double, double, double, uint64_t, double);
-MHOLDER_CART(double, double, float, double, double, uint64_t, float);
 MHOLDER_CART(double, float, float, float, double, uint64_t, float);
 MHOLDER_CART(float, float, float, float, float, uint64_t, float);
+
+#define MHOLDER_CART_DIPOLE(Tc, Th, Tm, Ta, Tf, KeyType, MVal)                                                         \
+    template class MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, CartesianMDQpole<MVal>>
+
+MHOLDER_CART_DIPOLE(double, double, double, double, double, uint64_t, double);
+MHOLDER_CART_DIPOLE(double, float, float, float, double, uint64_t, float);
+MHOLDER_CART_DIPOLE(float, float, float, float, float, uint64_t, float);
 
 #define DIRECT_SUM(T)                                                                                                  \
     template void directSum(size_t, size_t, size_t, Vec3<T>, int, const T*, const T*, const T*, const T*, const T*,    \
