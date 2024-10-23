@@ -44,7 +44,7 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     // declare a scene (s1) and pseudocolor plot (p1)
     conduit::Node& scenes          = add_scene["scenes"];
     scenes["s1/plots/p1/type"]     = "pseudocolor";
-    scenes["s1/plots/p1/pipeline"] = "pl1";
+    //scenes["s1/plots/p1/pipeline"] = "pl1";
     scenes["s1/plots/p1/field"]    = "Density";
     // scenes["s1/plots/p1/points/radius"] = .5;
     // scenes["s1/plots/p1/points/radius_delta"] = .01;
@@ -82,7 +82,8 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     savedata["e1/type"] = "relay";
     // savedata["e1/pipeline"] = "pl1";
     savedata["e1/params/path"]     = "out_export_particles";
-    savedata["e1/params/protocol"] = "blueprint/mesh/hdf5";
+    savedata["e1/params/protocol"] = "hdf5";
+    //actions.to_yaml();
 }
 
 /*! @brief Add a volume-independent vertex field to a mesh
@@ -111,13 +112,13 @@ void Execute(DataType& d, long startIndex, long endIndex)
     mesh["state/time"].set_external(&d.ttot);
 
     mesh["coordsets/coords/type"] = "explicit";
-    mesh["coordsets/coords/values/x"].set_external(&d.x[startIndex], endIndex - startIndex);
-    mesh["coordsets/coords/values/y"].set_external(&d.y[startIndex], endIndex - startIndex);
-    mesh["coordsets/coords/values/z"].set_external(&d.z[startIndex], endIndex - startIndex);
+    mesh["coordsets/coords/values/x"].set_external(d.x.data(), endIndex - startIndex);
+    mesh["coordsets/coords/values/y"].set_external(d.y.data(), endIndex - startIndex);
+    mesh["coordsets/coords/values/z"].set_external(d.z.data(), endIndex - startIndex);
 
-    mesh["topologies/mesh/type"]     = "unstructured";
+    mesh["topologies/mesh/type"] = "points";
     mesh["topologies/mesh/coordset"] = "coords";
-
+    
     addField(mesh, "x", d.x.data(), startIndex, endIndex);
     addField(mesh, "y", d.y.data(), startIndex, endIndex);
     addField(mesh, "z", d.z.data(), startIndex, endIndex);
@@ -134,10 +135,7 @@ void Execute(DataType& d, long startIndex, long endIndex)
     addField(mesh, "ay", d.ay.data(), startIndex, endIndex);
     addField(mesh, "az", d.az.data(), startIndex, endIndex);
 
-    std::vector<conduit_int64> conn(endIndex - startIndex);
-    std::iota(conn.begin(), conn.end(), 0);
-    mesh["topologies/mesh/elements/connectivity"].set_external(conn);
-    mesh["topologies/mesh/elements/shape"] = "point";
+
 
     conduit::Node verify_info;
     if (!conduit::blueprint::mesh::verify(mesh, verify_info))
