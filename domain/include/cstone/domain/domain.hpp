@@ -222,10 +222,9 @@ public:
             focusTree_.converge(box(), keyView, peers, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
                                 invThetaEff, std::get<0>(scratch));
         }
-        focusTree_.updateMinMac(box(), global_.assignment(), invThetaEff);
+        focusTree_.updateMinMac(global_.assignment(), invThetaEff);
         focusTree_.updateTree(peers, global_.assignment(), box());
         focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
-        focusTree_.updateGeoCenters(box());
 
         auto octreeView            = focusTree_.octreeViewAcc();
         const KeyType* focusLeaves = focusTree_.treeLeavesAcc().data();
@@ -272,15 +271,15 @@ public:
             // first rough convergence to avoid computing expansion centers of large nodes with a lot of particles
             focusTree_.converge(box(), keyView, peers, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
                                 1.0, std::get<0>(scratch));
-            focusTree_.updateMinMac(box(), global_.assignment(), 1.0);
+            focusTree_.updateMinMac(global_.assignment(), 1.0);
             int converged = 0, reps = 0;
             while (converged != numRanks_ || reps < 2)
             {
                 converged = focusTree_.updateTree(peers, global_.assignment(), box());
                 focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
-                focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(), box(),
+                focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(),
                                          std::get<0>(scratch), std::get<1>(scratch));
-                focusTree_.updateMacs(box(), global_.assignment(), 1.0 / theta_);
+                focusTree_.updateMacs(global_.assignment(), 1.0 / theta_);
                 MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
                 reps++;
             }
@@ -289,13 +288,12 @@ public:
         int fail = 0;
         do
         {
-            focusTree_.updateMacs(box(), global_.assignment(), centerDriftTol_ / theta_);
+            focusTree_.updateMacs(global_.assignment(), centerDriftTol_ / theta_);
             focusTree_.updateTree(peers, global_.assignment(), box());
             focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
-            focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(), box(),
-                                     std::get<0>(scratch), std::get<1>(scratch));
-            focusTree_.updateMacs(box(), global_.assignment(), 1.0 / theta_);
-            focusTree_.updateGeoCenters(box());
+            focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(), std::get<0>(scratch),
+                                     std::get<1>(scratch));
+            focusTree_.updateMacs(global_.assignment(), 1.0 / theta_);
 
             auto octreeView            = focusTree_.octreeViewAcc();
             const KeyType* focusLeaves = focusTree_.treeLeavesAcc().data();
@@ -419,9 +417,9 @@ public:
     void updateExpansionCenters(VectorX& x, VectorX& y, VectorX& z, VectorM& m, VectorS1& s1, VectorS2& s2)
     {
         auto si = startIndex();
-        focusTree_.updateCenters(rawPtr(x) + si, rawPtr(y) + si, rawPtr(z) + si, rawPtr(m) + si, global_.octree(),
-                                 box(), s1, s2);
-        focusTree_.setMacRadius(box(), 1.0 / theta_);
+        focusTree_.updateCenters(rawPtr(x) + si, rawPtr(y) + si, rawPtr(z) + si, rawPtr(m) + si, global_.octree(), s1,
+                                 s2);
+        focusTree_.setMacRadius(1.0 / theta_);
     };
 
     OctreeNsView<T, KeyType> octreeProperties() const

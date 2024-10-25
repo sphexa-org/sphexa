@@ -172,9 +172,15 @@ public:
 
         translateAssignment<KeyType>(assignment, leaves_, peers_, myRank_, assignment_);
 
+        /*! Store box for use in all property updates (counts, centers, MACs, etc) until updateTree() is called again.
+         *  We store it here in order to disallow calling updateMacs with a changed bounding box, because changing
+         *  the bounding box invalidates the expansion centers (centersAcc_)
+         */
+        box_             = box;
         prevFocusStart   = focusStart;
         prevFocusEnd     = focusEnd;
         rebalanceStatus_ = invalid;
+        updateGeoCenters();
         return converged;
     }
 
@@ -343,7 +349,6 @@ public:
                        const RealType* z,
                        const Tm* m,
                        const Octree<KeyType>& globalTree,
-                       const Box<RealType>& box,
                        DevVec1&& scratch1 = std::vector<LocalIndex>{},
                        DevVec2&& scratch2 = std::vector<LocalIndex>{})
     {
@@ -417,11 +422,10 @@ public:
     /*! @brief Update the MAC criteria based on a min distance MAC
      *
      * @tparam    T            float or double
-     * @param[in] box          global coordinate bounding box
      * @param[in] assignment   assignment of the global leaf tree to ranks
      * @param[in] invTheta     inverse effective opening angle, 1/theta + 0.5
      */
-    void updateMinMac(const Box<RealType>& box, const SfcAssignment<KeyType>& assignment, float invThetaEff)
+    void updateMinMac(const SfcAssignment<KeyType>& assignment, float invThetaEff)
     {
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -437,26 +441,25 @@ public:
             for (size_t i = 0; i < treeData_.numNodes; ++i)
             {
                 //! set centers to geometric centers for min dist Mac
-                centers_[i] = computeMinMacR2(nodeKeys[i], invThetaEff, box);
+                centers_[i] = computeMinMacR2(nodeKeys[i], invThetaEff, box_);
             }
         }
 
-        updateMacs(box, assignment, invThetaEff);
+        updateMacs(assignment, invThetaEff);
     }
 
     //! @brief Compute MAC acceptance radius of each cell based on @p invTheta and previously computed expansion centers
-    void setMacRadius(const Box<RealType>& box, float invTheta)
+    void setMacRadius(float invTheta)
     {
         if constexpr (HaveGpu<Accelerator>{})
         {
-            setMacGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box);
+            setMacGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box_);
         }
-        else { setMac<RealType, KeyType>(treeData_.prefixes, centers_, invTheta, box); }
+        else { setMac<RealType, KeyType>(treeData_.prefixes, centers_, invTheta, box_); }
     }
 
     /*! @brief Update the MAC criteria based on given expansion centers and effective inverse theta
      *
-     * @param[in] box          global coordinate bounding box
      * @param[in] assignment   assignment of the global leaf tree to ranks
      * @param[in] invTheta     inverse effective opening angle, 1/theta + x
      *
@@ -470,9 +473,9 @@ public:
      * centers_ = geo centers, invTheta = 1/theta + 0.5     -> Identical to MinMac along the axes through the center,
      *                                                         slightly less restrictive in the diagonal directions
      */
-    void updateMacs(const Box<RealType>& box, const SfcAssignment<KeyType>& assignment, float invTheta)
+    void updateMacs(const SfcAssignment<KeyType>& assignment, float invTheta)
     {
-        setMacRadius(box, invTheta);
+        setMacRadius(invTheta);
         macs_.resize(treeData_.numNodes);
 
         // need to find again assignment start and end indices in focus tree because assignment might have changed
@@ -483,7 +486,7 @@ public:
         {
             reallocate(macsAcc_, octreeAcc_.numNodes, allocGrowthRate_);
             fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), char(0));
-            markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(centersAcc_), box,
+            markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(centersAcc_), box_,
                         rawPtr(leavesAcc_) + fAssignStart, fAssignEnd - fAssignStart, false, rawPtr(macsAcc_));
 
             memcpyD2H(rawPtr(macsAcc_), macsAcc_.size(), macs_.data());
@@ -491,24 +494,11 @@ public:
         else
         {
             std::fill(rawPtr(macs_), rawPtr(macs_) + macs_.size(), char(0));
-            markMacs(rawPtr(treeData_.prefixes), rawPtr(treeData_.childOffsets), rawPtr(centers_), box,
+            markMacs(rawPtr(treeData_.prefixes), rawPtr(treeData_.childOffsets), rawPtr(centers_), box_,
                      rawPtr(leaves_) + fAssignStart, fAssignEnd - fAssignStart, false, rawPtr(macs_));
         }
 
         rebalanceStatus_ |= macCriterion;
-    }
-
-    void updateGeoCenters(const Box<RealType>& box)
-    {
-        reallocate(geoCentersAcc_, treeData_.numNodes, allocGrowthRate_);
-        reallocate(geoSizesAcc_, treeData_.numNodes, allocGrowthRate_);
-
-        if constexpr (HaveGpu<Accelerator>{})
-        {
-            computeGeoCentersGpu(rawPtr(octreeAcc_.prefixes), treeData_.numNodes, rawPtr(geoCentersAcc_),
-                                 rawPtr(geoSizesAcc_), box);
-        }
-        else { nodeFpCenters<KeyType>(treeData_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box); }
     }
 
     //! @brief update until converged with a simple min-distance MAC
@@ -525,10 +515,10 @@ public:
         int converged = 0;
         while (converged != numRanks_)
         {
-            updateMinMac(box, assignment, invThetaEff);
+            updateMinMac(assignment, invThetaEff);
             converged = updateTree(peers, assignment, box);
             updateCounts(particleKeys, globalTreeLeaves, globalCounts, scratch);
-            updateGeoCenters(box);
+            updateGeoCenters();
             MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
         }
     }
@@ -587,6 +577,20 @@ public:
     }
 
 private:
+    //! @brief compute geometrical center and size of each tree cell in terms of x,y,z coordinates
+    void updateGeoCenters()
+    {
+        reallocate(geoCentersAcc_, treeData_.numNodes, allocGrowthRate_);
+        reallocate(geoSizesAcc_, treeData_.numNodes, allocGrowthRate_);
+
+        if constexpr (HaveGpu<Accelerator>{})
+        {
+            computeGeoCentersGpu(rawPtr(octreeAcc_.prefixes), treeData_.numNodes, rawPtr(geoCentersAcc_),
+                                 rawPtr(geoSizesAcc_), box_);
+        }
+        else { nodeFpCenters<KeyType>(treeData_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_); }
+    }
+
     void uploadOctree()
     {
         if constexpr (HaveGpu<Accelerator>{})
@@ -648,6 +652,8 @@ private:
 
     //! @brief allocation growth rate for focus tree arrays with length ~ numFocusNodes
     float allocGrowthRate_{1.05};
+    //! @brief box from last call to updateTree()
+    Box<RealType> box_{0, 1};
 
     //! @brief list of peer ranks from last call to updateTree()
     std::vector<int> peers_;
