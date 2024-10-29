@@ -42,16 +42,17 @@ initStep["du_m1"] = du_m1
 initStep["temp"] = temp
 initStep["h"] = h
 initStep["alpha"] = alpha
+initStep["id"] = np.arange(0, numParticles, dtype=np.uint64)
 
 # attributes
-#  data types will not be converted and has to match what the C++ code uses. It will print an error message
-#  in case there is a type mismatch
 
 initStep.attrs["numParticlesGlobal"] = numParticles
 initStep.attrs["time"] = 0.0
 initStep.attrs["minDt"] = minDt
 initStep.attrs["minDt_m1"] = minDt
-initStep.attrs["iteration"] = 0
+initStep.attrs["iteration"] = 1
+initStep.attrs["ng0"] = np.array([100], dtype=np.int32)
+initStep.attrs["ngmax"] = np.array([150], dtype=np.int32)
 # gravity is turned on by a non-zero attribute value
 initStep.attrs["gravConstant"] = 1.0
 initStep.attrs["gamma"] = 5. / 3.
