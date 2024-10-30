@@ -37,14 +37,14 @@
 
 #include "ifile_io_impl.h"
 
-#ifdef SPH_EXA_HAVE_H5PART
+#ifdef SPH_EXA_HAVE_H5HUT
 #include "h5part_wrapper.hpp"
 #endif
 
 namespace sphexa
 {
 
-#ifdef SPH_EXA_HAVE_H5PART
+#ifdef SPH_EXA_HAVE_H5HUT
 
 class H5PartWriter final : public IFileWriter
 {
