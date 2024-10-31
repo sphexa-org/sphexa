@@ -8,7 +8,7 @@ function(addFrontendMpiTest source exename testname ranks)
     target_include_directories(${exename} PRIVATE ${CSTONE_DIR} ${SPH_DIR} ${PROJECT_SOURCE_DIR}/main/src)
 endfunction()
 
-if (SPH_EXA_WITH_H5PART)
+if (SPH_EXA_WITH_H5HUT)
     addFrontendMpiTest(hdf5.cpp hdf5io HDF5IO 2)
     target_link_libraries(hdf5io PRIVATE io)
 endif()
