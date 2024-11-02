@@ -244,15 +244,16 @@ __device__ uint2 traverseWarp(unsigned* nc_i,
         {
             sourceQueue = cellQueue[ringAddr(oldSources + sourceIdx)]; // Global source cell index in queue
         }
-        sourceQueue = spreadSeg8(sourceQueue);
-        sourceIdx   = shflSync(sourceIdx, laneIdx >> 3);
+        sourceQueue         = spreadSeg8(sourceQueue);
+        sourceIdx           = shflSync(sourceIdx, laneIdx >> 3);
+        const bool isSource = sourceIdx < numSources; // Source index is within bounds
+        if (!isSource) { sourceQueue = 0; }
 
         const Vec3<Tc> curSrcCenter = centers[sourceQueue];      // Current source cell center
         const Vec3<Tc> curSrcSize   = sizes[sourceQueue];        // Current source cell center
         const int childBegin        = childOffsets[sourceQueue]; // First child cell
         const bool isNode           = childBegin;
         const bool isClose          = cellOverlap<UsePbc>(curSrcCenter, curSrcSize, targetCenter, targetSize, box);
-        const bool isSource         = sourceIdx < numSources; // Source index is within bounds
         const bool isDirect         = isClose && !isNode && isSource;
         const int leafIdx           = (isDirect) ? internalToLeaf[sourceQueue] : 0; // the cstone leaf index
 
