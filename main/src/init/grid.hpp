@@ -206,9 +206,9 @@ void extractBlock(const cstone::FBox<T>& selectBox, const cstone::Box<T>& global
     {
         auto sX = scaleBlockToGlobal({xBlock[i], yBlock[i], zBlock[i]}, gridIdx, m, globalBox);
 
-        bool select = (selectBox.xmin() <= sX[0] && sX[0] < selectBox.xmax()) &&
-                      (selectBox.ymin() <= sX[1] && sX[1] < selectBox.ymax()) &&
-                      (selectBox.zmin() <= sX[2] && sX[2] < selectBox.zmax());
+        bool select = (selectBox.xmin() <= sX[0] && sX[0] <= selectBox.xmax()) &&
+                      (selectBox.ymin() <= sX[1] && sX[1] <= selectBox.ymax()) &&
+                      (selectBox.zmin() <= sX[2] && sX[2] <= selectBox.zmax());
         if (select)
         {
             x.push_back(sX[0]);
