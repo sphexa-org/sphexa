@@ -75,9 +75,9 @@ void Execute(DataType& d, long startIndex, long endIndex)
 
     // start with coordsets
     mesh["coordsets/coords/type"] = "explicit";
-    mesh["coordsets/coords/values/x"].set_external(d.x.data(), endIndex - startIndex);
-    mesh["coordsets/coords/values/y"].set_external(d.y.data(), endIndex - startIndex);
-    mesh["coordsets/coords/values/z"].set_external(d.z.data(), endIndex - startIndex);
+    mesh["coordsets/coords/values/x"].set_external(d.x.data() + startIndex, endIndex - startIndex);
+    mesh["coordsets/coords/values/y"].set_external(d.y.data() + startIndex, endIndex - startIndex);
+    mesh["coordsets/coords/values/z"].set_external(d.z.data() + startIndex, endIndex - startIndex);
 
     // Next, add topology with implicit connectivity
     mesh["topologies/mesh/type"] = "points";
