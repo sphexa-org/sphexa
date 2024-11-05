@@ -3,11 +3,15 @@ function(enableH5hut exename)
     if (SPH_EXA_WITH_H5HUT)
         target_compile_definitions(${exename} PUBLIC SPH_EXA_HAVE_H5HUT)
         target_include_directories(${exename} PUBLIC ${H5hut_INCLUDE_DIR})
-
+        if(SPH_EXA_HDF5_PARALLEL_MODE STREQUAL "independent")
+          target_compile_definitions(${exename} PRIVATE  SPH_EXA_HDF5_PARALLEL_MODE_INDEPENDENT)
+        elseif(SPH_EXA_HDF5_PARALLEL_MODE STREQUAL "collective")
+            target_compile_definitions(${exename} PRIVATE SPH_EXA_HDF5_PARALLEL_MODE_COLLECTIVE)
+        endif()
         # necessary because the HDF5_INCLUDE_DIRS is empty on CRAY and HIP-compilation is done without the cray-wrapper
         target_include_directories(${exename} PUBLIC $ENV{HDF5_DIR}/include)
         target_link_libraries(${exename} PRIVATE ${H5hut_LIBRARY} ${HDF5_LIBRARIES})
-    endif ()
+    endif()
 endfunction()
 
 add_library(io ifile_io_ascii.cpp ifile_io_hdf5.cpp arg_parser.cpp)
