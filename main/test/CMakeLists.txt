@@ -28,7 +28,7 @@ if (CMAKE_CUDA_COMPILER AND SPH_EXA_WITH_H5PART)
                                ${SPH_DIR}
                                ${CSTONE_DIR}
                                ${PROJECT_SOURCE_DIR}/main/src)
-    target_link_libraries(${testname} PUBLIC cstone_gpu sph_gpu io OpenMP::OpenMP_CXX CUDA::cudart GTest::gtest_main)
+    target_link_libraries(${testname} PUBLIC cstone_gpu sph_gpu OpenMP::OpenMP_CXX CUDA::cudart GTest::gtest_main)
     add_test(NAME FrontendUnitsCuda COMMAND ${exename})
     unset(testname)
 endif ()
