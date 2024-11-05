@@ -218,7 +218,7 @@ sph:test:cuda:sphexa:cpu:
   image: ${BUILD_CUDA}
   script:
     - echo "SLURMD_NODENAME=${SLURMD_NODENAME} SLURM_NODEID=${SLURM_NODEID} SLURM_PROCID=${SLURM_PROCID}"
-    - export LD_LIBRARY_PATH=/usr/local/HDF_Group/HDF5/1.13.2/lib:$LD_LIBRARY_PATH
+    - export LD_LIBRARY_PATH=/usr/local/HDF_Group/HDF5/1.13.2/lib:/usr/local/h5hut/lib:$LD_LIBRARY_PATH
     - wget --quiet -O glass.h5 https://zenodo.org/records/8369645/files/50c.h5
     - echo "sedov:cpu"
     - /usr/local/bin/sphexa --init sedov --prop std -s 1 -n 50
@@ -243,7 +243,7 @@ sph:test:cuda:sphexa:gpu:
   image: ${BUILD_CUDA}
   script:
     - echo "SLURMD_NODENAME=${SLURMD_NODENAME} SLURM_NODEID=${SLURM_NODEID} SLURM_PROCID=${SLURM_PROCID}"
-    - export LD_LIBRARY_PATH=/usr/local/HDF_Group/HDF5/1.13.2/lib:$LD_LIBRARY_PATH
+    - export LD_LIBRARY_PATH=/usr/local/HDF_Group/HDF5/1.13.2/lib:/usr/local/h5hut/lib:$LD_LIBRARY_PATH
     - ln -fs /usr/local/bin/sedov_solution .
     - wget --quiet -O glass.h5 https://zenodo.org/records/8369645/files/50c.h5
     - echo "# --- sedov:gpu"
