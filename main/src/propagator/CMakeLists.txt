@@ -20,7 +20,7 @@ if (CMAKE_CUDA_COMPILER)
 endif ()
 
 if (CMAKE_HIP_COMPILER)
-    target_link_libraries(propagator_gpu PRIVATE ryoanji sph_gpu util hip::host)
+    target_link_libraries(propagator_gpu PRIVATE hip::host)
     target_compile_definitions(propagator_gpu PRIVATE THRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)
     set_target_properties(propagator_gpu PROPERTIES LINKER_LANGUAGE CXX)
 endif ()
