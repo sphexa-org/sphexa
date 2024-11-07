@@ -35,7 +35,7 @@
 #include <memory>
 
 #include "cstone/domain/domain.hpp"
-#include "ipropagator.hpp"
+#include "propagator.hpp"
 #include "init/settings.hpp"
 #include "sphexa/simulation_data.hpp"
 
@@ -44,7 +44,7 @@ namespace sphexa
 {
 
 template<class DomainType, class ParticleDataType>
-struct PropInitializers
+struct PropLib
 {
 
     using PropPtr = std::unique_ptr<Propagator<DomainType, ParticleDataType>>;

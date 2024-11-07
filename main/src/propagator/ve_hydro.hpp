@@ -38,7 +38,7 @@
 #include "sph/particles_data.hpp"
 #include "sph/sph.hpp"
 
-#include "ipropagator.hpp"
+#include "propagator.hpp"
 #include "gravity_wrapper.hpp"
 
 namespace sphexa

@@ -32,7 +32,7 @@
 
 
 #include "ipropagator_init.hpp"
-#include "ipropagator.hpp"
+#include "propagator.hpp"
 #include "nbody.hpp"
 
 namespace sphexa
@@ -40,15 +40,15 @@ namespace sphexa
 
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
-PropInitializers<DomainType, ParticleDataType>::makeNbodyProp(std::ostream& output, size_t rank)
+PropLib<DomainType, ParticleDataType>::makeNbodyProp(std::ostream& output, size_t rank)
 {
     return std::make_unique<NbodyProp<DomainType, ParticleDataType>>(output, rank);
 }
 
 #ifdef USE_CUDA
-template struct PropInitializers<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag> >;
+template struct PropLib<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag> >;
 #else
-template struct PropInitializers<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag> >;
+template struct PropLib<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag> >;
 #endif
 
 } // namespace sphexa

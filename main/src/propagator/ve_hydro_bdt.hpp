@@ -41,7 +41,7 @@
 #include "sph/sph.hpp"
 #include "sph/ts_rungs.hpp"
 
-#include "ipropagator.hpp"
+#include "propagator.hpp"
 #include "gravity_wrapper.hpp"
 
 namespace sphexa

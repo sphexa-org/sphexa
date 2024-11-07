@@ -32,7 +32,7 @@
 
 
 #include "ipropagator_init.hpp"
-#include "ipropagator.hpp"
+#include "propagator.hpp"
 #include "turb_ve.hpp"
 #include "ve_hydro.hpp"
 
@@ -41,7 +41,7 @@ namespace sphexa
 
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
-PropInitializers<DomainType, ParticleDataType>::makeHydroVeProp(std::ostream& output, size_t rank, bool avClean)
+PropLib<DomainType, ParticleDataType>::makeHydroVeProp(std::ostream& output, size_t rank, bool avClean)
 {
     if (avClean) { return std::make_unique<HydroVeProp<true, DomainType, ParticleDataType>>(output, rank); }
     else { return std::make_unique<HydroVeProp<false, DomainType, ParticleDataType>>(output, rank); }
@@ -49,16 +49,16 @@ PropInitializers<DomainType, ParticleDataType>::makeHydroVeProp(std::ostream& ou
 
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
-PropInitializers<DomainType, ParticleDataType>::makeTurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean)
+PropLib<DomainType, ParticleDataType>::makeTurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean)
 {
     if (avClean) { return std::make_unique<TurbVeProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
     else { return std::make_unique<TurbVeProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
 }
 
 #ifdef USE_CUDA
-template struct PropInitializers<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag> >;
+template struct PropLib<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag> >;
 #else
-template struct PropInitializers<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag> >;
+template struct PropLib<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag> >;
 #endif
 
 } // namespace sphexa
