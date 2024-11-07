@@ -34,7 +34,6 @@
 
 #include <memory>
 
-#include "cstone/domain/domain.hpp"
 #include "propagator.hpp"
 #include "init/settings.hpp"
 #include "sphexa/simulation_data.hpp"
