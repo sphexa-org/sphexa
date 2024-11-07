@@ -11,7 +11,7 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     target_compile_definitions(propagator_gpu PRIVATE USE_CUDA)
     target_include_directories(propagator_gpu PRIVATE ${PROJECT_SOURCE_DIR}/main/src ${COOLING_DIR} ${CSTONE_DIR}
             ${SPH_DIR} ${RYOANJI_DIR} ${MPI_CXX_INCLUDE_PATH})
-    target_link_libraries(propagator_gpu PRIVATE ${MPI_CXX_LIBRARIES} ryoanji sph_gpu util OpenMP::OpenMP_CXX)
+    target_link_libraries(propagator_gpu PRIVATE ${MPI_CXX_LIBRARIES} cstone_gpu ryoanji sph_gpu util OpenMP::OpenMP_CXX)
     enableGrackle(propagator_gpu)
 endif ()
 
