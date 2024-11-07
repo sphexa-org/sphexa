@@ -18,7 +18,7 @@ add_subdirectory(io)
 add_subdirectory(observables)
 add_subdirectory(propagator)
 add_subdirectory(sphexa)
-add_subdirectory(util)
+#add_subdirectory(util)
 
 if (BUILD_ANALYTICAL)
     add_subdirectory(analytical_solutions)

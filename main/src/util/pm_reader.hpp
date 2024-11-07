@@ -8,7 +8,20 @@
 namespace sphexa
 {
 
-int readPmCounter(const char* fname, unsigned long long* joules, unsigned long long* ms);
+static int readPmCounter(const char* fname, unsigned long long* joules, unsigned long long* ms)
+{
+    auto file = fopen(fname, "r");
+    if (file == nullptr) { return 1; }
+
+    if (fscanf(file, "%llu %*s %llu %*s", joules, ms) != 2)
+    {
+        fprintf(stderr, "ERROR: unable to parse file %s\n", fname);
+        fclose(file);
+        return 1;
+    }
+
+    return fclose(file);
+}
 
 class PmReader
 {
