@@ -16,7 +16,7 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
 endif ()
 
 if (CMAKE_CUDA_COMPILER)
-    target_link_libraries(propagator_gpu PRIVATE ryoanji sph_gpu util CUDA::cudart)
+    target_link_libraries(propagator_gpu PRIVATE CUDA::cudart)
 endif ()
 
 if (CMAKE_HIP_COMPILER)
