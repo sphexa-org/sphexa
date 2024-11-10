@@ -108,6 +108,7 @@ RUN echo \
        -DCMAKE_CXX_COMPILER=mpicxx -DCMAKE_C_COMPILER=mpicc \
        -DBUILD_TESTING=OFF -DBUILD_ANALYTICAL=OFF -DGPU_DIRECT=OFF \
        -DCMAKE_BUILD_TYPE=Debug -DCMAKE_HIP_ARCHITECTURES=gfx90a \
+       -DSPH_EXA_WITH_H5HUT=OFF \
     && echo "## cmake --build + --install :" \
     && MPICH_CXX=/opt/rocm-5.2.3/llvm/bin/clang++ \
        MPICH_CC=/opt/rocm-5.2.3/llvm/bin/clang \

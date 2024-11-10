@@ -44,23 +44,23 @@ TEST(H5PartCpp, typesafeStepAttrRead)
     if (std::filesystem::exists(testfile)) { std::filesystem::remove(testfile); }
 
     {
-        H5PartFile* h5File = H5PartOpenFile(testfile.c_str(), H5PART_WRITE);
-        H5PartSetStep(h5File, 0);
+        h5_file_t h5File = H5OpenFile(testfile.c_str(), H5_O_RDWR, H5_PROP_DEFAULT);
+        H5SetStep(h5File, 0);
 
         double float64Attr = 0.5;
-        writeH5PartStepAttrib(h5File, "float64Attr", &float64Attr, 1);
+        H5WriteStepAttribT(h5File, "float64Attr", &float64Attr, 1);
         int64_t int64Attr = 42;
-        writeH5PartStepAttrib(h5File, "int64Attr", &int64Attr, 1);
+        H5WriteStepAttribT(h5File, "int64Attr", &int64Attr, 1);
         uint64_t uint64Attr = uint64_t(2) << 40;
-        writeH5PartStepAttrib(h5File, "uint64Attr", &uint64Attr, 1);
+        H5WriteStepAttribT(h5File, "uint64Attr", &uint64Attr, 1);
         char int8Attr = 1;
-        writeH5PartStepAttrib(h5File, "int8Attr", &int8Attr, 1);
+        H5WriteStepAttribT(h5File, "int8Attr", &int8Attr, 1);
 
-        H5PartCloseFile(h5File);
+        H5CloseFile(h5File);
     }
     {
-        H5PartFile* h5File = H5PartOpenFile(testfile.c_str(), H5PART_READ);
-        H5PartSetStep(h5File, 0);
+        h5_file_t h5File = H5OpenFile(testfile.c_str(), H5_O_RDWR, H5_PROP_DEFAULT);
+        H5SetStep(h5File, 0);
 
         {
             std::vector<double> a(1);
@@ -101,7 +101,7 @@ TEST(H5PartCpp, typesafeStepAttrRead)
             EXPECT_EQ(a[0], 1);
         }
 
-        H5PartCloseFile(h5File);
+        H5CloseFile(h5File);
     }
 }
 
@@ -111,21 +111,21 @@ TEST(H5PartCpp, typesafeFileAttrRead)
     if (std::filesystem::exists(testfile)) { std::filesystem::remove(testfile); }
 
     {
-        H5PartFile* h5File = H5PartOpenFile(testfile.c_str(), H5PART_WRITE);
+        h5_file_t h5File = H5OpenFile(testfile.c_str(), H5_O_WRONLY, H5_PROP_DEFAULT);
 
         double float64Attr = 0.5;
-        writeH5PartFileAttrib(h5File, "float64Attr", &float64Attr, 1);
+        H5WriteFileAttribT(h5File, "float64Attr", &float64Attr, 1);
         int64_t int64Attr = 42;
-        writeH5PartFileAttrib(h5File, "int64Attr", &int64Attr, 1);
+        H5WriteFileAttribT(h5File, "int64Attr", &int64Attr, 1);
         uint64_t uint64Attr = uint64_t(2) << 40;
-        writeH5PartFileAttrib(h5File, "uint64Attr", &uint64Attr, 1);
+        H5WriteFileAttribT(h5File, "uint64Attr", &uint64Attr, 1);
         char int8Attr = 1;
-        writeH5PartFileAttrib(h5File, "int8Attr", &int8Attr, 1);
+        H5WriteFileAttribT(h5File, "int8Attr", &int8Attr, 1);
 
-        H5PartCloseFile(h5File);
+        H5CloseFile(h5File);
     }
     {
-        H5PartFile* h5File = H5PartOpenFile(testfile.c_str(), H5PART_READ);
+        h5_file_t h5File = H5OpenFile(testfile.c_str(), H5_O_RDONLY, H5_PROP_DEFAULT);
 
         {
             std::vector<double> a(1);
@@ -166,6 +166,6 @@ TEST(H5PartCpp, typesafeFileAttrRead)
             EXPECT_EQ(a[0], 1);
         }
 
-        H5PartCloseFile(h5File);
+        H5CloseFile(h5File);
     }
 }
