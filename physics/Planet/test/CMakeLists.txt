@@ -1,0 +1,15 @@
+set(UNIT_TESTS planet_test.cpp accretion.cpp)
+set(testname planet_tests)
+add_executable(${testname} ${UNIT_TESTS})
+target_compile_options(${testname} PRIVATE -Wall -Wextra)
+target_compile_definitions(${testname} PUBLIC SPH_EXA_HAVE_H5PART)
+target_include_directories(${testname} PRIVATE ${MPI_CXX_INCLUDE_PATH})
+target_include_directories(${testname} PRIVATE ${PLANET_DIR} ${CSTONE_DIR} ${SPH_DIR} ${PROJECT_SOURCE_DIR}/include ${MAIN_APP_DIR})
+
+#target_link_libraries(${testname} PRIVATE grackle)
+#target_link_libraries(${testname} PRIVATE cooler)
+target_link_libraries(${testname} PRIVATE ${MPI_CXX_LIBRARIES} GTest::gtest_main)
+#target_compile_definitions(${testname} PRIVATE PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+add_test(NAME ${testname} COMMAND ${testname})
+
+install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/physics)

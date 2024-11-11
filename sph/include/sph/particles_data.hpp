@@ -110,7 +110,7 @@ public:
     //! @brief gravitational smoothing
     RealType eps{0.005};
     //! @brief acceleration based time-step control
-    RealType etaAcc{0.2};
+    RealType etaAcc{0.1};
 
     //! @brief adiabatic index
     RealType gamma{5.0 / 3.0};
@@ -218,6 +218,7 @@ public:
     FieldVector<HydroType> cv;                                 // Specific heat
     FieldVector<HydroType> mue, mui;                           // mean molecular weight (electrons, ions)
     FieldVector<HydroType> divv, curlv;                        // Div(velocity), Curl(velocity)
+    FieldVector<HydroType> potential;                          // Gravitational potential
     FieldVector<HydroType> ax, ay, az;                         // acceleration
     FieldVector<RealType>  du;                                 // energy rate of change (du/dt)
     FieldVector<XM1Type>   du_m1;                              // previous energy rate of change (du/dt)
@@ -245,10 +246,11 @@ public:
      * Name of each field as string for use e.g in HDF5 output. Order has to correspond to what's returned by data().
      */
     inline static constexpr std::array fieldNames{
-        "x",     "y",        "z",    "x_m1", "y_m1", "z_m1", "vx",   "vy",   "vz",   "rho",   "u",    "p",
-        "prho",  "tdpdTrho", "h",    "m",    "c",    "ax",   "ay",   "az",   "du",   "du_m1", "c11",  "c12",
-        "c13",   "c22",      "c23",  "c33",  "mue",  "mui",  "temp", "cv",   "xm",   "kx",    "divv", "curlv",
-        "alpha", "gradh",    "keys", "nc",   "dV11", "dV12", "dV13", "dV22", "dV23", "dV33",  "rung", "id"};
+        "x",   "y",    "z",     "x_m1",     "y_m1", "z_m1", "vx",    "vy",        "vz",    "rho",
+        "u",   "p",    "prho",  "tdpdTrho", "h",    "m",    "c",     "potential", "ax",    "ay",
+        "az",  "du",   "du_m1", "c11",      "c12",  "c13",  "c22",   "c23",       "c33",   "mue",
+        "mui", "temp", "cv",    "xm",       "kx",   "divv", "curlv", "alpha",     "gradh", "keys",
+        "nc",  "dV11", "dV12",  "dV13",     "dV22", "dV23", "dV33",  "rung",      "id"};
 
     //! @brief dataset prefix to be prepended to fieldNames for structured output
     static const inline std::string prefix{};
@@ -262,9 +264,10 @@ public:
      */
     auto dataTuple()
     {
-        auto ret = std::tie(x, y, z, x_m1, y_m1, z_m1, vx, vy, vz, rho, u, p, prho, tdpdTrho, h, m, c, ax, ay, az, du,
-                            du_m1, c11, c12, c13, c22, c23, c33, mue, mui, temp, cv, xm, kx, divv, curlv, alpha, gradh,
-                            keys, nc, dV11, dV12, dV13, dV22, dV23, dV33, rung, id);
+        auto ret = std::tie(x, y, z, x_m1, y_m1, z_m1, vx, vy, vz, rho, u, p, prho, tdpdTrho, h, m, c, potential, ax,
+                            ay, az, du, du_m1, c11, c12, c13, c22, c23, c33, mue, mui, temp, cv, xm, kx, divv, curlv,
+                            alpha, gradh, keys, nc, dV11, dV12, dV13, dV22, dV23, dV33, rung, id);
+
 #if defined(__clang__) || __GNUC__ > 11
         static_assert(std::tuple_size_v<decltype(ret)> == fieldNames.size());
 #endif

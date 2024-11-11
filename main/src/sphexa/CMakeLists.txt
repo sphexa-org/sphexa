@@ -39,6 +39,7 @@ if(CMAKE_CUDA_COMPILER)
     target_compile_definitions(${exename}-cuda PRIVATE USE_CUDA)
     target_link_libraries(${exename}-cuda PRIVATE cstone_gpu ryoanji sph_gpu io sim_init_gpu observables_gpu OpenMP::OpenMP_CXX
         ${MPI_CXX_LIBRARIES} CUDA::cudart)
+    target_link_libraries(${exename}-cuda PRIVATE planet_gpu)
     enableInSituViz(${exename}-cuda)
     enableGpuDirect(${exename}-cuda)
     enableGrackle(${exename}-cuda)
