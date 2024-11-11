@@ -33,21 +33,8 @@ struct StarData
     //! @brief Don't cool any particle above this density threshold
     float cooling_rho_limit{1.683e-3};
 
-    //! @brief Internal energy of particles will be limited to values above
-    //! e.g. prevent particles cooling below CMB temperature
-    double u_floor{9.3e-6}; // for G = 1, [L] = AU, [M] = M_sun: 9.3e-6 approx. 1 K; 2.73 K: u = 2.5e-5;
-
-    //! @brief Internal energy of particles will be limited to values below
-    //! for handling problems with initial conditions / hydro
-    double u_max{std::numeric_limits<double>::infinity()};
-
     //! @brief Limit the timestep depending on changes in the internal energy. delta_t = K_u * u / du
     double K_u{std::numeric_limits<double>::infinity()};
-
-    //! @brief Limit the absolute value of du
-    //! for handling problems with the initial conditions / hydro
-    double du_adjust{std::numeric_limits<double>::infinity()}; //  ~ 0.25 * u_typical / t_resolve; 0.25 * 5e-5
-                                                               // / 0.125 = 1e-4
 
     //! @brief Use a polytropic equation of state
     //! P = Kpoly * rho ^ exp_poly
@@ -90,10 +77,7 @@ struct StarData
         optionalIO("star::beta", &beta, 1);
         optionalIO("star::removal_limit_h", &removal_limit_h, 1);
         optionalIO("star::cooling_rho_limit", &cooling_rho_limit, 1);
-        optionalIO("star::u_floor", &u_floor, 1);
-        optionalIO("star::u_max", &u_max, 1);
         optionalIO("star::K_u", &K_u, 1);
-        optionalIO("star::du_adjust", &du_adjust, 1);
         optionalIO("star::use_polytropic_eos", &use_polytropic_eos, 1);
         optionalIO("star::Kpoly", &Kpoly, 1);
         optionalIO("star::exp_poly", &exp_poly, 1);

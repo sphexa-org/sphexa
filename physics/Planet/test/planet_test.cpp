@@ -32,6 +32,8 @@ TEST_F(PlanetTest, testStarPosition)
     star.position    = {0., 1., 0.};
     star.position_m1 = {0., 0., 0.};
     star.force_local = {1., 0., 0.};
+    star.m           = 1.0;
+    star.fixed_star  = 0;
 
     planet::computeAndExchangeStarPosition(star, 1., 1., rank);
     if (rank == 0)

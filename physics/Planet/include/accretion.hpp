@@ -20,7 +20,7 @@
 namespace planet
 {
 
-//! @brief Flag particles for removal. Overwrites keys.
+//! @brief Flag particles for removal. Overwrites keys for the removed particles.
 template<typename Dataset, typename StarData>
 void computeAccretionCondition(size_t first, size_t last, Dataset& d, StarData& star)
 {

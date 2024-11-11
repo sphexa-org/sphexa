@@ -42,13 +42,7 @@ HOST_DEVICE_FUN auto idealGasEOS_u(T1 u, T2 rho, T3 gamma)
 template<class T1, class T2, class T3>
 HOST_DEVICE_FUN auto idealGasEOSTemp(T1 temp, T2 rho, T3 mui, T1 gamma)
 {
-    using Tc = std::common_type_t<T1, T2, T3>;
     return idealGasEOS_u(idealGasCv(mui, gamma) * temp, rho, gamma);
-    /*Tc tmp = idealGasCv(mui, gamma) * temp * (gamma - Tc(1));
-    Tc p   = rho * tmp;
-    Tc c   = std::sqrt(tmp);
-
-    return util::tuple<Tc, Tc>{p, c};*/
 }
 
 /*! @brief Polytropic EOS for a 1.4 M_sun and 12.8 km neutron star

@@ -38,7 +38,6 @@
 #include "nbody.hpp"
 #include "std_hydro.hpp"
 #include "ve_hydro.hpp"
-
 #include "ve_hydro_bdt.hpp"
 #ifdef SPH_EXA_HAVE_GRACKLE
 #include "std_hydro_grackle.hpp"

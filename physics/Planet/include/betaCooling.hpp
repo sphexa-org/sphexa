@@ -18,7 +18,7 @@ void betaCoolingImpl(size_t first, size_t last, Dataset& d, const StarData& star
 #pragma omp parallel for
     for (size_t i = first; i < last; i++)
     {
-        if (d.rho[i] < star.cooling_rho_limit && d.u[i] > star.u_floor)
+        if (d.rho[i] < star.cooling_rho_limit)
         {
             const double dx    = d.x[i] - star.position[0];
             const double dy    = d.y[i] - star.position[1];
@@ -66,11 +66,9 @@ void betaCooling(size_t startIndex, size_t endIndex, Dataset& d, const StarData&
 template<typename Dataset, typename StarData>
 void duTimestep(size_t startIndex, size_t endIndex, Dataset& d, StarData& star)
 {
-    if (star.u_floor == 0. && star.u_max == std::numeric_limits<decltype(star.u_max)>::infinity() &&
-        star.du_adjust == std::numeric_limits<decltype(star.du_adjust)>::infinity() &&
-        star.K_u == std::numeric_limits<decltype(star.K_u)>::infinity())
+    if (star.K_u == std::numeric_limits<decltype(star.K_u)>::infinity())
     {
-        return;
+        star.t_du = std::numeric_limits<decltype(star.t_du)>::infinity();
     }
     else
     {

@@ -35,10 +35,11 @@ struct AccretionTest : public ::testing::Test
     using ConservedFields = util::FieldList<"vx", "vy", "vz", "m">;
     using DependentFields = util::FieldList<"keys", "u", "rho">;
 
-    inline constexpr static size_t n_elements  = 20;
-    inline constexpr static size_t n_elements3 = n_elements * n_elements * n_elements;
-    inline constexpr static double inner_limit = 0.2;
-    inline constexpr static double dt          = 1.;
+    inline constexpr static size_t n_elements        = 20;
+    inline constexpr static size_t n_elements3       = n_elements * n_elements * n_elements;
+    inline constexpr static double inner_limit       = 0.2;
+    inline constexpr static double initial_star_mass = 1.;
+    inline constexpr static double dt                = 1.;
 
     sphexa::ParticlesData<cstone::CpuTag>       data;
     std::unique_ptr<cstone::Domain<KeyType, T>> domain_ptr = nullptr;
@@ -66,6 +67,8 @@ struct AccretionTest : public ::testing::Test
 
         star.inner_size      = inner_limit;
         star.removal_limit_h = INFINITY;
+        star.fixed_star      = 0;
+        star.m               = initial_star_mass;
     }
 
     void initData()
@@ -159,7 +162,7 @@ struct AccretionTest : public ::testing::Test
     void testExchangeAndAccreteOnStar()
     {
         // Check if mass of star = mass of accreted particles
-        EXPECT_NEAR(star.m, 1. + mass_inside, 1e-9);
+        EXPECT_NEAR(star.m, initial_star_mass + mass_inside, 1e-9);
         // Check momentum of star
         EXPECT_NEAR(star.position_m1[0] / dt * star.m, momentum_inside_x, 1e-4);
         EXPECT_NEAR(star.position_m1[1] / dt * star.m, momentum_inside_y, 1e-4);
@@ -169,7 +172,7 @@ struct AccretionTest : public ::testing::Test
 
 TEST_F(AccretionTest, testAccretion)
 {
-    // if (numRanks != 2) throw std::runtime_error("Must be excuted with two ranks");
+    if (numRanks != 2) throw std::runtime_error("Must be excuted with two ranks");
 
     initData();
 
@@ -190,49 +193,4 @@ TEST_F(AccretionTest, testAccretion)
 
     EXPECT_TRUE(n_inside == 0);
     EXPECT_TRUE(n_inside_with_halos == 0);
-}
-
-TEST_F(AccretionTest, testAccretion2)
-{
-    initData();
-
-    sync();
-
-    /*const size_t first = domain_ptr->startIndex();
-    const size_t last  = domain_ptr->endIndex();
-
-
-   const double star_size2 = star.inner_size * star.inner_size;
-
-   double accr_mass{};
-   double accr_mom[3]{};
-   size_t n_accreted{};
-   size_t n_removed{};
-
-   for (size_t i = first; i < last; i++)
-   {
-       const double dx    = data.x[i] - star.position[0];
-       const double dy    = data.y[i] - star.position[1];
-       const double dz    = data.z[i] - star.position[2];
-       const double dist2 = dx * dx + dy * dy + dz * dz;
-       if (dist2 < 0.02) {
-           printf("i: %zu\n", i);
-           printf("dx, dy, dz: %lf\t%lf\t%lf\n", dx, dy, dz);
-           data.keys[i] = cstone::removeKey<KeyType>::value; }
-   }*/
-
-    // data.keys[1831] = cstone::removeKey<KeyType>::value;
-    // data.keys[3609] = cstone::removeKey<KeyType>::value;
-    // data.keys[7331] = cstone::removeKey<KeyType>::value;
-    //
-    // data.keys[2168] = cstone::removeKey<KeyType>::value;
-    // data.keys[4390] = cstone::removeKey<KeyType>::value;
-    // data.keys[5826] = cstone::removeKey<KeyType>::value;
-    // data.keys[5830] = cstone::removeKey<KeyType>::value;
-    // data.keys[5831] = cstone::removeKey<KeyType>::value;
-    // data.keys[5832] = cstone::removeKey<KeyType>::value;
-    // data.keys[6168] = cstone::removeKey<KeyType>::value;
-
-    sync();
-    printf("count: %zu\n", data.keys.size());
 }
