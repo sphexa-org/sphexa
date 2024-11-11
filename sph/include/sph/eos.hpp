@@ -28,15 +28,27 @@ HOST_DEVICE_FUN constexpr T1 idealGasCv(T1 mui, T2 gamma)
  * Returns pressure, speed of sound
  */
 template<class T1, class T2, class T3>
-HOST_DEVICE_FUN auto idealGasEOS(T1 temp, T2 rho, T3 mui, T1 gamma)
+HOST_DEVICE_FUN auto idealGasEOS_u(T1 u, T2 rho, T3 gamma)
 {
     using Tc = std::common_type_t<T1, T2, T3>;
 
-    Tc tmp = idealGasCv(mui, gamma) * temp * (gamma - Tc(1));
+    Tc tmp = u * (gamma - Tc(1));
+    Tc p   = rho * tmp;
+    Tc c   = std::sqrt(gamma * tmp);
+
+    return util::tuple<Tc, Tc>{p, c};
+}
+
+template<class T1, class T2, class T3>
+HOST_DEVICE_FUN auto idealGasEOSTemp(T1 temp, T2 rho, T3 mui, T1 gamma)
+{
+    using Tc = std::common_type_t<T1, T2, T3>;
+    return idealGasEOS_u(idealGasCv(mui, gamma) * temp, rho, gamma);
+    /*Tc tmp = idealGasCv(mui, gamma) * temp * (gamma - Tc(1));
     Tc p   = rho * tmp;
     Tc c   = std::sqrt(tmp);
 
-    return util::tuple<Tc, Tc>{p, c};
+    return util::tuple<Tc, Tc>{p, c};*/
 }
 
 /*! @brief Polytropic EOS for a 1.4 M_sun and 12.8 km neutron star
@@ -48,7 +60,7 @@ HOST_DEVICE_FUN auto idealGasEOS(T1 temp, T2 rho, T3 mui, T1 gamma)
  * Returns pressure, and speed of sound
  */
 template<class T>
-HOST_DEVICE_FUN auto polytropicEOS(T rho)
+HOST_DEVICE_FUN auto polytropicEOS_neutronstar(T rho)
 {
     constexpr T Kpol     = 2.246341237993810232e-10;
     constexpr T gammapol = 3.e0;
@@ -67,7 +79,7 @@ HOST_DEVICE_FUN auto polytropicEOS(T rho)
  * @param d           the dataset with the particle buffers
  */
 template<typename Dataset>
-void computeEOS_Polytropic(size_t startIndex, size_t endIndex, Dataset& d)
+void computeEOS_Polytropic_neutronstar(size_t startIndex, size_t endIndex, Dataset& d)
 {
     const auto* kx = d.kx.data();
     const auto* xm = d.xm.data();
@@ -80,7 +92,7 @@ void computeEOS_Polytropic(size_t startIndex, size_t endIndex, Dataset& d)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
         auto rho             = kx[i] * m[i] / xm[i];
-        std::tie(p[i], c[i]) = polytropicEOS(rho);
+        std::tie(p[i], c[i]) = polytropicEOS_neutronstar(rho);
     }
 }
 

@@ -38,11 +38,13 @@
 #include "nbody.hpp"
 #include "std_hydro.hpp"
 #include "ve_hydro.hpp"
+
 #include "ve_hydro_bdt.hpp"
 #ifdef SPH_EXA_HAVE_GRACKLE
 #include "std_hydro_grackle.hpp"
 #endif
 #include "turb_ve.hpp"
+#include "std_planet.hpp"
 
 namespace sphexa
 {
@@ -79,6 +81,7 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
         if (avClean) { return std::make_unique<TurbVeProp<true, DomainType, ParticleDataType>>(output, rank, s); }
         else { return std::make_unique<TurbVeProp<false, DomainType, ParticleDataType>>(output, rank, s); }
     }
+    if (choice == "std-planet") { return std::make_unique<PlanetProp<DomainType, ParticleDataType>>(output, rank, s); }
 
     throw std::runtime_error("Unknown propagator choice: " + choice);
 }

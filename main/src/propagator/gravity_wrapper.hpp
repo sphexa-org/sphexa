@@ -81,14 +81,14 @@ public:
         ryoanji::computeGravity(octree.childOffsets, octree.internalToLeaf, focusTree.expansionCentersAcc().data(),
                                 multipoles_.data(), domain.layout().data(), domain.startCell(), domain.endCell(),
                                 d.x.data(), d.y.data(), d.z.data(), d.h.data(), d.m.data(), domain.box(), d.g,
-                                (Tu*)nullptr, d.ax.data(), d.ay.data(), d.az.data(), &d.egrav, numShells);
+                                d.potential.data(), d.ax.data(), d.ay.data(), d.az.data(), &d.egrav, numShells);
 
         if (usePbc)
         {
             ryoanji::computeGravityEwald(makeVec3(focusTree.expansionCentersAcc()[0]), multipoles_.front(),
                                          domain.startIndex(), domain.endIndex(), d.x.data(), d.y.data(), d.z.data(),
-                                         d.m.data(), box, d.g, (Tu*)nullptr, d.ax.data(), d.ay.data(), d.az.data(),
-                                         &d.egrav, ewaldSettings_);
+                                         d.m.data(), box, d.g, d.potential.data(), d.ax.data(), d.ay.data(),
+                                         d.az.data(), &d.egrav, ewaldSettings_);
         }
     }
 
@@ -135,9 +135,10 @@ public:
         bool        usePbc    = box.boundaryX() == cstone::BoundaryType::periodic;
         int         numShells = usePbc ? ewaldSettings_.numReplicaShells : 0;
 
-        d.egrav = mHolder_.compute(grp, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
-                                   rawPtr(d.devData.m), rawPtr(d.devData.h), d.g, numShells, domain.box(),
-                                   rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az));
+        d.egrav =
+            mHolder_.compute(grp, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.m),
+                             rawPtr(d.devData.h), d.g, numShells, domain.box(), rawPtr(d.devData.potential),
+                             rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az));
 
         auto stats = mHolder_.readStats();
 
@@ -152,7 +153,7 @@ public:
             memcpyD2H(mHolder_.deviceMultipoles(), 1, &rootM);
 
             computeGravityEwaldGpu(makeVec3(rootCenter), rootM, grp, rawPtr(d.devData.x), rawPtr(d.devData.y),
-                                   rawPtr(d.devData.z), rawPtr(d.devData.m), box, d.g, (Ta*)nullptr,
+                                   rawPtr(d.devData.z), rawPtr(d.devData.m), box, d.g, rawPtr(d.devData.potential),
                                    rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az), &d.egrav,
                                    ewaldSettings_);
         }

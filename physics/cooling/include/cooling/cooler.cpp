@@ -40,6 +40,8 @@ void Cooler<T>::cool_particles(const T dt, const Trho* rho, const Tu* u, const G
 
 template void Cooler<double>::cool_particles(double, const float*, const double*, const GrackleFieldPtrs&, double*,
                                              const size_t, const size_t);
+template void Cooler<double>::cool_particles(double, const double*, const double*, const GrackleFieldPtrs&, double*,
+                                             const size_t, const size_t);
 
 template<typename T>
 template<typename Trho, typename Tu, typename Ttemp>
@@ -51,6 +53,9 @@ void Cooler<T>::computeTemperature(const Trho* rho, const Tu* u, const GrackleFi
 
 template void Cooler<double>::computeTemperature(const float*, const double*, const GrackleFieldPtrs&, double*,
                                                  const size_t, const size_t);
+template void Cooler<double>::computeTemperature(const double*, const double*, const GrackleFieldPtrs&, double*,
+                                                 const size_t, const size_t);
+
 
 template<typename T>
 template<typename Trho, typename Tu, typename Tp>
@@ -62,6 +67,9 @@ void Cooler<T>::computePressures(const Trho* rho, const Tu* u, const GrackleFiel
 
 template void Cooler<double>::computePressures(const float*, const double*, const GrackleFieldPtrs&, float*,
                                                const size_t, const size_t);
+template void Cooler<double>::computePressures(const double*, const double*, const GrackleFieldPtrs&, double*,
+                                               const size_t, const size_t);
+
 
 template<typename T>
 template<typename Trho, typename Tu, typename Tgamma>
@@ -73,6 +81,8 @@ void Cooler<T>::computeAdiabaticIndices(const Trho* rho, const Tu* u, const Grac
 
 template void Cooler<double>::computeAdiabaticIndices(const float*, const double*, const GrackleFieldPtrs&, float*,
                                                       const size_t, const size_t);
+template void Cooler<double>::computeAdiabaticIndices(const double*, const double*, const GrackleFieldPtrs&, double*,
+                                                      const size_t, const size_t);
 
 template<typename T>
 template<typename Trho, typename Tu>
@@ -83,6 +93,8 @@ double Cooler<T>::cooling_timestep(const Trho* rho, const Tu* u, const GrackleFi
 }
 
 template double Cooler<double>::cooling_timestep(const float*, const double*, const GrackleFieldPtrs&, const size_t,
+                                                 const size_t);
+template double Cooler<double>::cooling_timestep(const double*, const double*, const GrackleFieldPtrs&, const size_t,
                                                  const size_t);
 
 template<typename T>
