@@ -156,8 +156,11 @@ void markMacsGpu(const KeyType* prefixes,
     constexpr unsigned numThreads = 128;
     unsigned numBlocks            = iceil(numFocusNodes, numThreads);
 
-    markMacsGpuKernel<<<numBlocks, numThreads>>>(prefixes, childOffsets, centers, box, focusNodes, numFocusNodes,
-                                                 limitSource, markings);
+    if (numFocusNodes)
+    {
+        markMacsGpuKernel<<<numBlocks, numThreads>>>(prefixes, childOffsets, centers, box, focusNodes, numFocusNodes,
+                                                     limitSource, markings);
+    }
 }
 
 #define MARK_MACS_GPU(KeyType, T)                                                                                      \

@@ -351,6 +351,40 @@ template void exclusiveScanGpu(const int*, const int*, uint64_t*, uint64_t);
 template void exclusiveScanGpu(const unsigned*, const unsigned*, unsigned*, unsigned);
 template void exclusiveScanGpu(const unsigned*, const unsigned*, uint64_t*, uint64_t);
 
+template<class IndexType, class SumType>
+void inclusiveScanGpu(const IndexType* first, const IndexType* last, SumType* output)
+{
+    thrust::inclusive_scan(thrust::device, first, last, output);
+
+    /*! Accumulation in 64-bit from 32-bit inputs only works by explicitly setting the type of the initial
+     *  value, which is only supported in Thrust/CUB version shipped with CUDA 12.7 and later
+     */
+    // thrust::inclusive_scan(thrust::device, first, last, output, SumType(0), thrust::plus<>{});
+    /*
+    SumType init = 0;
+    size_t temp_storage_bytes{};
+    size_t num_elements = last - first;
+    cub::DeviceScan::InclusiveScanInit(nullptr, temp_storage_bytes, first, output, thrust::plus<>{}, init,
+                                       num_elements);
+
+    // Allocate temporary storage for inclusive scan
+    uint8_t* temp_storage;
+    checkGpuErrors(cudaMalloc(&temp_storage, temp_storage_bytes));
+
+    // Run inclusive prefix sum
+    cub::DeviceScan::InclusiveScanInit(temp_storage, temp_storage_bytes, first, output, thrust::plus<>{}, init,
+                                       num_elements);
+
+    checkGpuErrors(cudaFree(temp_storage));
+    */
+}
+
+template void inclusiveScanGpu(const int*, const int*, int*);
+template void inclusiveScanGpu(const int*, const int*, unsigned*);
+// template void inclusiveScanGpu(const int*, const int*, uint64_t*);
+template void inclusiveScanGpu(const unsigned*, const unsigned*, unsigned*);
+// template void inclusiveScanGpu(const unsigned*, const unsigned*, uint64_t*);
+
 template<class ValueType>
 size_t countGpu(const ValueType* first, const ValueType* last, ValueType v)
 {

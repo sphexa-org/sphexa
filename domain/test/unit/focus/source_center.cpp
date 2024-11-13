@@ -91,8 +91,8 @@ static void computeSourceCenter()
     std::generate(begin(masses), end(masses), [numParticles]() { return drand48() / numParticles; });
     std::vector<util::array<T, 4>> centers(octree.numNodes);
 
-    std::vector<LocalIndex> layout(octree.numLeafNodes + 1);
-    std::exclusive_scan(csCounts.begin(), csCounts.end() + 1, layout.begin(), LocalIndex(0));
+    std::vector<LocalIndex> layout(octree.numLeafNodes + 1, 0);
+    std::inclusive_scan(csCounts.begin(), csCounts.end(), layout.begin() + 1);
 
     auto toInternal = leafToInternal(octree);
     computeLeafMassCenter<T, T, T>(coords.x(), coords.y(), coords.z(), masses, toInternal, layout.data(),

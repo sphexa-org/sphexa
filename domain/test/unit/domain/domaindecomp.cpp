@@ -39,15 +39,16 @@ using namespace cstone;
 TEST(DomainDecomposition, uniformBins)
 {
     {
+        unsigned umax = std::numeric_limits<unsigned>::max();
         int numSplits = 2;
-        std::vector<unsigned> counts{5, 5, 5, 5, 5, 6};
+        std::vector<unsigned> counts{umax - 10, 5, 5, umax - 11, 5, 6};
 
         std::vector<TreeNodeIndex> bins(numSplits + 1);
         std::vector<unsigned> binCounts(numSplits);
         uniformBins(counts, bins, binCounts);
 
         std::vector<TreeNodeIndex> ref{0, 3, 6};
-        std::vector<unsigned> refCnt{15, 16};
+        std::vector<unsigned> refCnt{umax, umax};
         EXPECT_EQ(bins, ref);
         EXPECT_EQ(binCounts, refCnt);
     }

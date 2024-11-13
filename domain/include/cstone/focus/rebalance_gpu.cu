@@ -191,7 +191,10 @@ ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
                                 TreeNodeIndex* nodeOps)
 {
     resetEnforceKeyStatus<<<1, 1>>>();
-    enforceKeysKernel<<<numForcedKeys, 1>>>(forcedKeys, nodeKeys, childOffsets, parents, nodeOps);
+    if (numForcedKeys)
+    {
+        enforceKeysKernel<<<numForcedKeys, 1>>>(forcedKeys, nodeKeys, childOffsets, parents, nodeOps);
+    }
 
     int status;
     checkGpuErrors(cudaMemcpyFromSymbol(&status, enforceKeyStatus_device, sizeof(ResolutionStatus)));

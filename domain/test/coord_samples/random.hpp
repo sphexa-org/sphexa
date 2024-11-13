@@ -247,8 +247,8 @@ void adjustSmoothingLength(LocalIndex numParticles,
     octree.resize(nNodes(csTree));
     updateInternalTree<KeyType>(csTree, octree.data());
 
-    std::vector<LocalIndex> layout(nNodes(csTree) + 1);
-    std::exclusive_scan(counts.begin(), counts.end() + 1, layout.begin(), 0);
+    std::vector<LocalIndex> layout(nNodes(csTree) + 1, 0);
+    std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
 
     gsl::span<const KeyType> nodeKeys(octree.prefixes.data(), octree.numNodes);
     std::vector<Vec3<Tc>> centers(octree.numNodes), sizes(octree.numNodes);

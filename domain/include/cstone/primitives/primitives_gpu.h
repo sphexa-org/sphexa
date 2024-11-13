@@ -105,6 +105,9 @@ template<class IndexType, class SumType>
 extern void exclusiveScanGpu(const IndexType* first, const IndexType* last, SumType* output, SumType init);
 
 template<class IndexType, class SumType>
+extern void inclusiveScanGpu(const IndexType* first, const IndexType* last, SumType* output);
+
+template<class IndexType, class SumType>
 void exclusiveScanGpu(const IndexType* first, const IndexType* last, SumType* output)
 {
     exclusiveScanGpu(first, last, output, SumType(0));

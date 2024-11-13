@@ -165,8 +165,11 @@ void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d)
     getLevelRange<<<maxTreeLevel<KeyType>{} + 2, 1>>>(d.prefixes, numNodes, d.levelRange);
 
     thrust::fill(thrust::device, d.childOffsets, d.childOffsets + numNodes, 0);
-    linkTree<<<iceil(d.numInternalNodes, numThreads), numThreads>>>(d.prefixes, d.numInternalNodes, d.leafToInternal,
-                                                                    d.levelRange, d.childOffsets, d.parents);
+    if (d.numInternalNodes)
+    {
+        linkTree<<<iceil(d.numInternalNodes, numThreads), numThreads>>>(
+            d.prefixes, d.numInternalNodes, d.leafToInternal, d.levelRange, d.childOffsets, d.parents);
+    }
 }
 
 template void buildOctreeGpu(const uint32_t*, OctreeView<uint32_t>);

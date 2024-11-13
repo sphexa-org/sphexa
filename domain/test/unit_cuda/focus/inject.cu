@@ -42,12 +42,13 @@ TEST(FocusGpu, injectKeysGpu)
 {
     using KeyType = uint64_t;
 
-    OctreeData<KeyType, GpuTag> tree;
-
     DeviceVector<KeyType> leaves        = std::vector<KeyType>{0, 64};
     DeviceVector<KeyType> mandatoryKeys = std::vector<KeyType>{0, 32, 64};
 
-    injectKeysGpu(tree, leaves, mandatoryKeys);
+    DeviceVector<KeyType> keyScratch;
+    DeviceVector<TreeNodeIndex> s1, s2;
+
+    injectKeysGpu(leaves, {mandatoryKeys.data(), mandatoryKeys.size()}, keyScratch, s1, s2);
 
     DeviceVector<KeyType> ref = std::vector<KeyType>{0, 8, 16, 24, 32, 40, 48, 56, 64};
 

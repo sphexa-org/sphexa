@@ -74,8 +74,8 @@ TEST(Gravity, TreeWalk)
     updateInternalTree<KeyType>(treeLeaves, octree.data());
 
     // layout[i] is equal to the index in (x,y,z,m) of the first particle in leaf cell with index i
-    std::vector<LocalIndex> layout(octree.numLeafNodes + 1);
-    std::exclusive_scan(counts.begin(), counts.end() + 1, layout.begin(), LocalIndex(0));
+    std::vector<LocalIndex> layout(octree.numLeafNodes + 1, 0);
+    std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
 
     auto toInternal = leafToInternal(octree);
 

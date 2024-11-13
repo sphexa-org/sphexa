@@ -232,8 +232,8 @@ TEST(TargetGroups, groupVolumes)
     // nodeIdx                   0  1 |2  3  4  5  6   7  8  9 |10  11  12 13 14 15
     // fixed groups                |                 |                   |
     std::vector<unsigned> counts{4, 1, 8, 8, 8, 8, 31, 8, 8, 8, 16, 16, 16, 0, 0};
-    std::vector<LocalIndex> layout(counts.size() + 1);
-    std::exclusive_scan(counts.begin(), counts.end() + 1, layout.begin(), 0);
+    std::vector<LocalIndex> layout(counts.size() + 1, 0);
+    std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
 
     // these coordinates do not lie in the leaf cells specified by layout, but this is irrelevant for this test case
     thrust::device_vector<T> x(last), y(last), z(last), h(last);
