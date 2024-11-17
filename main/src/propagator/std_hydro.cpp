@@ -30,7 +30,7 @@
  * @author ChristopherBignamini <christopher.bignamini@gmail.com>
  */
 
-
+#include "sph/types.hpp"
 #include "propagator.h"
 #include "std_hydro.hpp"
 
@@ -45,11 +45,11 @@ PropLib<DomainType, ParticleDataType>::makeHydroProp(std::ostream& output, size_
 }
 
 #ifdef USE_CUDA
-template struct PropLib<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag> >;
+template struct PropLib<cstone::Domain<SphTypes::KeyType, SphTypes::CoordinateType, cstone::GpuTag>,
+                        SimulationData<cstone::GpuTag>>;
 #else
-template struct PropLib<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag> >;
+template struct PropLib<cstone::Domain<SphTypes::KeyType, SphTypes::CoordinateType, cstone::CpuTag>,
+                        SimulationData<cstone::CpuTag>>;
 #endif
 
 } // namespace sphexa
-
-
