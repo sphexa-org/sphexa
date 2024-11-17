@@ -30,9 +30,7 @@
  * @author ChristopherBignamini <christopher.bignamini@gmail.com>
  */
 
-
-#include "ipropagator_init.hpp"
-#include "propagator.hpp"
+#include "propagator.h"
 #include "nbody.hpp"
 
 namespace sphexa
@@ -46,11 +44,9 @@ PropLib<DomainType, ParticleDataType>::makeNbodyProp(std::ostream& output, size_
 }
 
 #ifdef USE_CUDA
-template struct PropLib<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag> >;
+template struct PropLib<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag>>;
 #else
-template struct PropLib<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag> >;
+template struct PropLib<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag>>;
 #endif
 
 } // namespace sphexa
-
-

@@ -39,7 +39,7 @@
 #include "sph/positions.hpp"
 #include "sph/ts_global.hpp"
 
-#include "propagator.hpp"
+#include "ipropagator.hpp"
 #include "gravity_wrapper.hpp"
 
 namespace sphexa

@@ -1,7 +1,34 @@
+#include <algorithm>
+
 #include "arg_parser.hpp"
 
 namespace sphexa
 {
+
+ArgParser::ArgParser(int argc, const char** argv)
+    : begin(argv)
+    , end(argv + argc)
+{
+}
+
+std::vector<std::string> ArgParser::getCommaList(const std::string& option) const
+{
+    std::string listWithCommas = get(option);
+
+    std::replace(listWithCommas.begin(), listWithCommas.end(), ',', ' ');
+
+    std::vector<std::string> list;
+    std::stringstream        ss(listWithCommas);
+    std::string              field;
+    while (ss >> field)
+    {
+        list.push_back(field);
+    }
+
+    return list;
+}
+
+bool ArgParser::exists(const std::string& option) const { return std::find(begin, end, option) != end; }
 
 bool strIsIntegral(const std::string& str)
 {

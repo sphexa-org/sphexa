@@ -33,8 +33,8 @@
 
 #pragma once
 
-#include "propagator.hpp"
-#include "ipropagator_init.hpp"
+#include "ipropagator.hpp"
+#include "propagator.h"
 
 namespace sphexa
 {
@@ -43,10 +43,7 @@ template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
 propagatorFactory(const std::string& choice, bool avClean, std::ostream& output, size_t rank, const InitSettings& s)
 {
-    if (choice == "ve")
-    {
-        return PropLib<DomainType, ParticleDataType>::makeHydroVeProp(output, rank, avClean);
-    }
+    if (choice == "ve") { return PropLib<DomainType, ParticleDataType>::makeHydroVeProp(output, rank, avClean); }
     if (choice == "ve-bdt")
     {
         return PropLib<DomainType, ParticleDataType>::makeHydroVeBdtProp(output, rank, s, avClean);

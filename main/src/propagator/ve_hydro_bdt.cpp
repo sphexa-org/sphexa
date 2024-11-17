@@ -30,9 +30,7 @@
  * @author ChristopherBignamini <christopher.bignamini@gmail.com>
  */
 
-
-#include "ipropagator_init.hpp"
-#include "propagator.hpp"
+#include "propagator.h"
 #include "turb_ve_bdt.hpp"
 #include "ve_hydro_bdt.hpp"
 
@@ -41,26 +39,29 @@ namespace sphexa
 
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
-PropLib<DomainType, ParticleDataType>::makeHydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean)
+PropLib<DomainType, ParticleDataType>::makeHydroVeBdtProp(std::ostream& output, size_t rank,
+                                                          const InitSettings& settings, bool avClean)
 {
-    if (avClean) { return std::make_unique<HydroVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
+    if (avClean)
+    {
+        return std::make_unique<HydroVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings);
+    }
     else { return std::make_unique<HydroVeBdtProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
 }
 
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
-PropLib<DomainType, ParticleDataType>::makeTurbVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean)
+PropLib<DomainType, ParticleDataType>::makeTurbVeBdtProp(std::ostream& output, size_t rank,
+                                                         const InitSettings& settings, bool avClean)
 {
     if (avClean) { return std::make_unique<TurbVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
     else { return std::make_unique<TurbVeBdtProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
 }
 
 #ifdef USE_CUDA
-template struct PropLib<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag> >;
+template struct PropLib<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag>>;
 #else
-template struct PropLib<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag> >;
+template struct PropLib<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag>>;
 #endif
 
 } // namespace sphexa
-
-

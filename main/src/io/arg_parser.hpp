@@ -4,8 +4,6 @@
 #include <string>
 #include <sstream>
 #include <vector>
-#include <cmath>
-#include <cassert>
 
 namespace sphexa
 {
@@ -16,11 +14,7 @@ bool strIsIntegral(const std::string& str);
 class ArgParser
 {
 public:
-    ArgParser(int argc, const char** argv)
-        : begin(argv)
-        , end(argv + argc)
-    {
-    }
+    ArgParser(int argc, const char** argv);
 
     //! @brief look for @p option in the supplied cmd-line arguments and convert to T if found
     template<class T = std::string>
@@ -39,24 +33,9 @@ public:
     }
 
     //! @brief parse a comma-separated list
-    std::vector<std::string> getCommaList(const std::string& option) const
-    {
-        std::string listWithCommas = get(option);
+    std::vector<std::string> getCommaList(const std::string& option) const;
 
-        std::replace(listWithCommas.begin(), listWithCommas.end(), ',', ' ');
-
-        std::vector<std::string> list;
-        std::stringstream        ss(listWithCommas);
-        std::string              field;
-        while (ss >> field)
-        {
-            list.push_back(field);
-        }
-
-        return list;
-    }
-
-    bool exists(const std::string& option) const { return std::find(begin, end, option) != end; }
+    bool exists(const std::string& option) const;
 
 private:
     const char** begin;
@@ -99,6 +78,6 @@ std::string strAfterSign(const std::string& str, const std::string& sign);
 //! @brief If the input string ends with @p sign followed by an integer, return the integer, otherwise return -1
 int numberAfterSign(const std::string& str, const std::string& sign);
 
-std::string removeModifiers(const std::string& initCond); /*{ return strBeforeSign(strBeforeSign(initCond, ":"), ","); }*/
+std::string removeModifiers(const std::string& initCond);
 
 } // namespace sphexa

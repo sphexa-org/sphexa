@@ -34,10 +34,9 @@
 
 #include <memory>
 
-#include "propagator.hpp"
+#include "ipropagator.hpp"
 #include "init/settings.hpp"
 #include "sphexa/simulation_data.hpp"
-
 
 namespace sphexa
 {
@@ -59,4 +58,4 @@ struct PropLib
     static PropPtr makeTurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
 };
 
-}
+} // namespace sphexa

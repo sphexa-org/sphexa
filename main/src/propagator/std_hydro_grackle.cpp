@@ -32,8 +32,7 @@
 
 #ifdef SPH_EXA_HAVE_GRACKLE
 
-#include "ipropagator_init.hpp"
-#include "propagator.hpp"
+#include "propagator.h"
 #include "std_hydro_grackle.hpp"
 
 namespace sphexa
@@ -45,7 +44,6 @@ PropLib<DomainType, ParticleDataType>::makeHydroGrackleProp(std::ostream& output
 {
     return std::make_unique<HydroGrackleProp<DomainType, ParticleDataType>>(output, rank, settings);
 }
-//#endif
 
 #ifdef USE_CUDA
 template struct PropLib<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag> >;

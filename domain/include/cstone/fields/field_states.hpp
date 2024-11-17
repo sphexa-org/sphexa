@@ -32,6 +32,7 @@
 #pragma once
 
 #include <array>
+#include <algorithm>
 #include <vector>
 #include <variant>
 

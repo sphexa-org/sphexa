@@ -31,8 +31,7 @@
  */
 
 
-#include "ipropagator_init.hpp"
-#include "propagator.hpp"
+#include "propagator.h"
 #include "std_hydro.hpp"
 
 namespace sphexa

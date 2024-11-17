@@ -31,8 +31,7 @@
  */
 
 
-#include "ipropagator_init.hpp"
-#include "propagator.hpp"
+#include "propagator.h"
 #include "turb_ve.hpp"
 #include "ve_hydro.hpp"
 
@@ -49,16 +48,17 @@ PropLib<DomainType, ParticleDataType>::makeHydroVeProp(std::ostream& output, siz
 
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
-PropLib<DomainType, ParticleDataType>::makeTurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean)
+PropLib<DomainType, ParticleDataType>::makeTurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings,
+                                                      bool avClean)
 {
     if (avClean) { return std::make_unique<TurbVeProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
     else { return std::make_unique<TurbVeProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
 }
 
 #ifdef USE_CUDA
-template struct PropLib<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag> >;
+template struct PropLib<cstone::Domain<unsigned long, double, cstone::GpuTag>, SimulationData<cstone::GpuTag>>;
 #else
-template struct PropLib<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag> >;
+template struct PropLib<cstone::Domain<unsigned long, double, cstone::CpuTag>, SimulationData<cstone::CpuTag>>;
 #endif
 
 } // namespace sphexa
