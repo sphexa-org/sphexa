@@ -156,9 +156,11 @@ TEST(EOSTests, helmholtzEOS_test)
 
     std::vector<double> p(input_size), c(input_size), cv(input_size), u(input_size);
 
+    helmholtz_constants::Helmholtz_EOS* helmEOS = new helmholtz_constants::Helmholtz_EOS();
+
     for (int i = 0; i < test_size; ++i)
     {
-        std::tie(c[i], p[i], cv[i], u[i]) = helmholtzEOS<double, double>(temp_in[i], rho_in[i], 1.0, 1.0);
+        std::tie(c[i], p[i], cv[i], u[i]) = helmholtzEOS<double, double>(helmEOS, temp_in[i], rho_in[i], 1.0, 1.0);
     }
 
     for (int i = 0; i < test_size; ++i)
@@ -171,4 +173,5 @@ TEST(EOSTests, helmholtzEOS_test)
         // EXPECT_NEAR(cv[i], cv_sol[i], 1.0e-6);
         // EXPECT_NEAR(u[i], u_sol[i], 1.0e-6);
     }
+    delete helmEOS;
 }

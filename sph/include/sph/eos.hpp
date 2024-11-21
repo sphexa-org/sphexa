@@ -68,10 +68,9 @@ HOST_DEVICE_FUN auto polytropicEOS(T rho)
  *
  */
 template<class T, class T2>
-HOST_DEVICE_FUN auto helmholtzEOS(const T temp, const T2 rho, T abar_, T zbar_)
+HOST_DEVICE_FUN auto helmholtzEOS(helmholtz_constants::Helmholtz_EOS* helmEOS, const T temp, const T2 rho, T abar_,
+                                  T zbar_)
 {
-    helmholtz_constants::Helmholtz_EOS* helmholtzEOS = new helmholtz_constants::Helmholtz_EOS();
-
     // coefficients
     T fi[36] = {0.0};
 
@@ -80,7 +79,7 @@ HOST_DEVICE_FUN auto helmholtzEOS(const T temp, const T2 rho, T abar_, T zbar_)
 
     // compute polynomial rates
     int iat, jat;
-    helmholtzEOS->getTableIndices(iat, jat, temp, rho, abar, zbar);
+    helmEOS->getTableIndices(iat, jat, temp, rho, abar, zbar);
 
     T ytot1 = 1 / abar;
     T ye    = std::max<T>((T)1e-16, zbar / abar);
@@ -149,218 +148,216 @@ HOST_DEVICE_FUN auto helmholtzEOS(const T temp, const T2 rho, T abar_, T zbar_)
     T xnem = xni * zbar;
 
     // move table values into coefficient table
-    fi[0]  = helmholtzEOS->f[iat + 0][jat + 0];
-    fi[1]  = helmholtzEOS->f[iat + 1][jat + 0];
-    fi[2]  = helmholtzEOS->f[iat + 0][jat + 1];
-    fi[3]  = helmholtzEOS->f[iat + 1][jat + 1];
-    fi[4]  = helmholtzEOS->ft[iat + 0][jat + 0];
-    fi[5]  = helmholtzEOS->ft[iat + 1][jat + 0];
-    fi[6]  = helmholtzEOS->ft[iat + 0][jat + 1];
-    fi[7]  = helmholtzEOS->ft[iat + 1][jat + 1];
-    fi[8]  = helmholtzEOS->ftt[iat + 0][jat + 0];
-    fi[9]  = helmholtzEOS->ftt[iat + 1][jat + 0];
-    fi[10] = helmholtzEOS->ftt[iat + 0][jat + 1];
-    fi[11] = helmholtzEOS->ftt[iat + 1][jat + 1];
-    fi[12] = helmholtzEOS->fd[iat + 0][jat + 0];
-    fi[13] = helmholtzEOS->fd[iat + 1][jat + 0];
-    fi[14] = helmholtzEOS->fd[iat + 0][jat + 1];
-    fi[15] = helmholtzEOS->fd[iat + 1][jat + 1];
-    fi[16] = helmholtzEOS->fdd[iat + 0][jat + 0];
-    fi[17] = helmholtzEOS->fdd[iat + 1][jat + 0];
-    fi[18] = helmholtzEOS->fdd[iat + 0][jat + 1];
-    fi[19] = helmholtzEOS->fdd[iat + 1][jat + 1];
-    fi[20] = helmholtzEOS->fdt[iat + 0][jat + 0];
-    fi[21] = helmholtzEOS->fdt[iat + 1][jat + 0];
-    fi[22] = helmholtzEOS->fdt[iat + 0][jat + 1];
-    fi[23] = helmholtzEOS->fdt[iat + 1][jat + 1];
-    fi[24] = helmholtzEOS->fddt[iat + 0][jat + 0];
-    fi[25] = helmholtzEOS->fddt[iat + 1][jat + 0];
-    fi[26] = helmholtzEOS->fddt[iat + 0][jat + 1];
-    fi[27] = helmholtzEOS->fddt[iat + 1][jat + 1];
-    fi[28] = helmholtzEOS->fdtt[iat + 0][jat + 0];
-    fi[29] = helmholtzEOS->fdtt[iat + 1][jat + 0];
-    fi[30] = helmholtzEOS->fdtt[iat + 0][jat + 1];
-    fi[31] = helmholtzEOS->fdtt[iat + 1][jat + 1];
-    fi[32] = helmholtzEOS->fddtt[iat + 0][jat + 0];
-    fi[33] = helmholtzEOS->fddtt[iat + 1][jat + 0];
-    fi[34] = helmholtzEOS->fddtt[iat + 0][jat + 1];
-    fi[35] = helmholtzEOS->fddtt[iat + 1][jat + 1];
+    fi[0]  = helmEOS->f[iat + 0][jat + 0];
+    fi[1]  = helmEOS->f[iat + 1][jat + 0];
+    fi[2]  = helmEOS->f[iat + 0][jat + 1];
+    fi[3]  = helmEOS->f[iat + 1][jat + 1];
+    fi[4]  = helmEOS->ft[iat + 0][jat + 0];
+    fi[5]  = helmEOS->ft[iat + 1][jat + 0];
+    fi[6]  = helmEOS->ft[iat + 0][jat + 1];
+    fi[7]  = helmEOS->ft[iat + 1][jat + 1];
+    fi[8]  = helmEOS->ftt[iat + 0][jat + 0];
+    fi[9]  = helmEOS->ftt[iat + 1][jat + 0];
+    fi[10] = helmEOS->ftt[iat + 0][jat + 1];
+    fi[11] = helmEOS->ftt[iat + 1][jat + 1];
+    fi[12] = helmEOS->fd[iat + 0][jat + 0];
+    fi[13] = helmEOS->fd[iat + 1][jat + 0];
+    fi[14] = helmEOS->fd[iat + 0][jat + 1];
+    fi[15] = helmEOS->fd[iat + 1][jat + 1];
+    fi[16] = helmEOS->fdd[iat + 0][jat + 0];
+    fi[17] = helmEOS->fdd[iat + 1][jat + 0];
+    fi[18] = helmEOS->fdd[iat + 0][jat + 1];
+    fi[19] = helmEOS->fdd[iat + 1][jat + 1];
+    fi[20] = helmEOS->fdt[iat + 0][jat + 0];
+    fi[21] = helmEOS->fdt[iat + 1][jat + 0];
+    fi[22] = helmEOS->fdt[iat + 0][jat + 1];
+    fi[23] = helmEOS->fdt[iat + 1][jat + 1];
+    fi[24] = helmEOS->fddt[iat + 0][jat + 0];
+    fi[25] = helmEOS->fddt[iat + 1][jat + 0];
+    fi[26] = helmEOS->fddt[iat + 0][jat + 1];
+    fi[27] = helmEOS->fddt[iat + 1][jat + 1];
+    fi[28] = helmEOS->fdtt[iat + 0][jat + 0];
+    fi[29] = helmEOS->fdtt[iat + 1][jat + 0];
+    fi[30] = helmEOS->fdtt[iat + 0][jat + 1];
+    fi[31] = helmEOS->fdtt[iat + 1][jat + 1];
+    fi[32] = helmEOS->fddtt[iat + 0][jat + 0];
+    fi[33] = helmEOS->fddtt[iat + 1][jat + 0];
+    fi[34] = helmEOS->fddtt[iat + 0][jat + 1];
+    fi[35] = helmEOS->fddtt[iat + 1][jat + 1];
 
     // various differences
-    T xt  = std::max<T>((temp - helmholtzEOS->t_[jat]) * helmholtzEOS->dti_sav[jat], 0.);
-    T xd  = std::max<T>((din - helmholtzEOS->d[iat]) * helmholtzEOS->ddi_sav[iat], 0.);
+    T xt  = std::max<T>((temp - helmEOS->t_[jat]) * helmEOS->dti_sav[jat], 0.);
+    T xd  = std::max<T>((din - helmEOS->d[iat]) * helmEOS->ddi_sav[iat], 0.);
     T mxt = 1. - xt;
     T mxd = 1. - xd;
 
     // the six density and six temperature basis functions;
-    T si0t = helmholtzEOS->psi0(xt);
-    T si1t = helmholtzEOS->psi1(xt) * helmholtzEOS->dt_sav[jat];
-    T si2t = helmholtzEOS->psi2(xt) * helmholtzEOS->dt2_sav[jat];
+    T si0t = helmEOS->psi0(xt);
+    T si1t = helmEOS->psi1(xt) * helmEOS->dt_sav[jat];
+    T si2t = helmEOS->psi2(xt) * helmEOS->dt2_sav[jat];
 
-    T si0mt = helmholtzEOS->psi0(mxt);
-    T si1mt = -helmholtzEOS->psi1(mxt) * helmholtzEOS->dt_sav[jat];
-    T si2mt = helmholtzEOS->psi2(mxt) * helmholtzEOS->dt2_sav[jat];
+    T si0mt = helmEOS->psi0(mxt);
+    T si1mt = -helmEOS->psi1(mxt) * helmEOS->dt_sav[jat];
+    T si2mt = helmEOS->psi2(mxt) * helmEOS->dt2_sav[jat];
 
-    T si0d = helmholtzEOS->psi0(xd);
-    T si1d = helmholtzEOS->psi1(xd) * helmholtzEOS->dd_sav[iat];
-    T si2d = helmholtzEOS->psi2(xd) * helmholtzEOS->dd2_sav[iat];
+    T si0d = helmEOS->psi0(xd);
+    T si1d = helmEOS->psi1(xd) * helmEOS->dd_sav[iat];
+    T si2d = helmEOS->psi2(xd) * helmEOS->dd2_sav[iat];
 
-    T si0md = helmholtzEOS->psi0(mxd);
-    T si1md = -helmholtzEOS->psi1(mxd) * helmholtzEOS->dd_sav[iat];
-    T si2md = helmholtzEOS->psi2(mxd) * helmholtzEOS->dd2_sav[iat];
+    T si0md = helmEOS->psi0(mxd);
+    T si1md = -helmEOS->psi1(mxd) * helmEOS->dd_sav[iat];
+    T si2md = helmEOS->psi2(mxd) * helmEOS->dd2_sav[iat];
 
     // derivatives of the weight functions
-    T dsi0t = helmholtzEOS->dpsi0(xt) * helmholtzEOS->dti_sav[jat];
-    T dsi1t = helmholtzEOS->dpsi1(xt);
-    T dsi2t = helmholtzEOS->dpsi2(xt) * helmholtzEOS->dt_sav[jat];
+    T dsi0t = helmEOS->dpsi0(xt) * helmEOS->dti_sav[jat];
+    T dsi1t = helmEOS->dpsi1(xt);
+    T dsi2t = helmEOS->dpsi2(xt) * helmEOS->dt_sav[jat];
 
-    T dsi0mt = -helmholtzEOS->dpsi0(mxt) * helmholtzEOS->dti_sav[jat];
-    T dsi1mt = helmholtzEOS->dpsi1(mxt);
-    T dsi2mt = -helmholtzEOS->dpsi2(mxt) * helmholtzEOS->dt_sav[jat];
+    T dsi0mt = -helmEOS->dpsi0(mxt) * helmEOS->dti_sav[jat];
+    T dsi1mt = helmEOS->dpsi1(mxt);
+    T dsi2mt = -helmEOS->dpsi2(mxt) * helmEOS->dt_sav[jat];
 
-    T dsi0d = helmholtzEOS->dpsi0(xd) * helmholtzEOS->ddi_sav[iat];
-    T dsi1d = helmholtzEOS->dpsi1(xd);
-    T dsi2d = helmholtzEOS->dpsi2(xd) * helmholtzEOS->dd_sav[iat];
+    T dsi0d = helmEOS->dpsi0(xd) * helmEOS->ddi_sav[iat];
+    T dsi1d = helmEOS->dpsi1(xd);
+    T dsi2d = helmEOS->dpsi2(xd) * helmEOS->dd_sav[iat];
 
-    T dsi0md = -helmholtzEOS->dpsi0(mxd) * helmholtzEOS->ddi_sav[iat];
-    T dsi1md = helmholtzEOS->dpsi1(mxd);
-    T dsi2md = -helmholtzEOS->dpsi2(mxd) * helmholtzEOS->dd_sav[iat];
+    T dsi0md = -helmEOS->dpsi0(mxd) * helmEOS->ddi_sav[iat];
+    T dsi1md = helmEOS->dpsi1(mxd);
+    T dsi2md = -helmEOS->dpsi2(mxd) * helmEOS->dd_sav[iat];
 
     // second derivatives of the weight functions
-    T ddsi0t = helmholtzEOS->ddpsi0(xt) * helmholtzEOS->dt2i_sav[jat];
-    T ddsi1t = helmholtzEOS->ddpsi1(xt) * helmholtzEOS->dti_sav[jat];
-    T ddsi2t = helmholtzEOS->ddpsi2(xt);
+    T ddsi0t = helmEOS->ddpsi0(xt) * helmEOS->dt2i_sav[jat];
+    T ddsi1t = helmEOS->ddpsi1(xt) * helmEOS->dti_sav[jat];
+    T ddsi2t = helmEOS->ddpsi2(xt);
 
-    T ddsi0mt = helmholtzEOS->ddpsi0(mxt) * helmholtzEOS->dt2i_sav[jat];
-    T ddsi1mt = -helmholtzEOS->ddpsi1(mxt) * helmholtzEOS->dti_sav[jat];
-    T ddsi2mt = helmholtzEOS->ddpsi2(mxt);
+    T ddsi0mt = helmEOS->ddpsi0(mxt) * helmEOS->dt2i_sav[jat];
+    T ddsi1mt = -helmEOS->ddpsi1(mxt) * helmEOS->dti_sav[jat];
+    T ddsi2mt = helmEOS->ddpsi2(mxt);
 
     // the free energy
-    T free = helmholtzEOS->h5(fi, si0t, si1t, si2t, si0mt, si1mt, si2mt, si0d, si1d, si2d, si0md, si1md, si2md);
+    T free = helmEOS->h5(fi, si0t, si1t, si2t, si0mt, si1mt, si2mt, si0d, si1d, si2d, si0md, si1md, si2md);
 
     // derivative with respect to density
-    T df_d = helmholtzEOS->h5(fi, si0t, si1t, si2t, si0mt, si1mt, si2mt, dsi0d, dsi1d, dsi2d, dsi0md, dsi1md, dsi2md);
+    T df_d = helmEOS->h5(fi, si0t, si1t, si2t, si0mt, si1mt, si2mt, dsi0d, dsi1d, dsi2d, dsi0md, dsi1md, dsi2md);
 
     // derivative with respect to temperature
-    T df_t = helmholtzEOS->h5(fi, dsi0t, dsi1t, dsi2t, dsi0mt, dsi1mt, dsi2mt, si0d, si1d, si2d, si0md, si1md, si2md);
+    T df_t = helmEOS->h5(fi, dsi0t, dsi1t, dsi2t, dsi0mt, dsi1mt, dsi2mt, si0d, si1d, si2d, si0md, si1md, si2md);
 
     // derivative with respect to temperature**2
-    T df_tt =
-        helmholtzEOS->h5(fi, ddsi0t, ddsi1t, ddsi2t, ddsi0mt, ddsi1mt, ddsi2mt, si0d, si1d, si2d, si0md, si1md, si2md);
+    T df_tt = helmEOS->h5(fi, ddsi0t, ddsi1t, ddsi2t, ddsi0mt, ddsi1mt, ddsi2mt, si0d, si1d, si2d, si0md, si1md, si2md);
 
     // derivative with respect to temperature and density
-    T df_dt =
-        helmholtzEOS->h5(fi, dsi0t, dsi1t, dsi2t, dsi0mt, dsi1mt, dsi2mt, dsi0d, dsi1d, dsi2d, dsi0md, dsi1md, dsi2md);
+    T df_dt = helmEOS->h5(fi, dsi0t, dsi1t, dsi2t, dsi0mt, dsi1mt, dsi2mt, dsi0d, dsi1d, dsi2d, dsi0md, dsi1md, dsi2md);
 
     // now get the pressure derivative with  density, chemical potential, and
     // electron positron number densities
     // get the interpolation weight functions
-    si0t = helmholtzEOS->xpsi0(xt);
-    si1t = helmholtzEOS->xpsi1(xt) * helmholtzEOS->dt_sav[jat];
+    si0t = helmEOS->xpsi0(xt);
+    si1t = helmEOS->xpsi1(xt) * helmEOS->dt_sav[jat];
 
-    si0mt = helmholtzEOS->xpsi0(mxt);
-    si1mt = -helmholtzEOS->xpsi1(mxt) * helmholtzEOS->dt_sav[jat];
+    si0mt = helmEOS->xpsi0(mxt);
+    si1mt = -helmEOS->xpsi1(mxt) * helmEOS->dt_sav[jat];
 
-    si0d = helmholtzEOS->xpsi0(xd);
-    si1d = helmholtzEOS->xpsi1(xd) * helmholtzEOS->dd_sav[iat];
+    si0d = helmEOS->xpsi0(xd);
+    si1d = helmEOS->xpsi1(xd) * helmEOS->dd_sav[iat];
 
-    si0md = helmholtzEOS->xpsi0(mxd);
-    si1md = -helmholtzEOS->xpsi1(mxd) * helmholtzEOS->dd_sav[iat];
+    si0md = helmEOS->xpsi0(mxd);
+    si1md = -helmEOS->xpsi1(mxd) * helmEOS->dd_sav[iat];
 
     // derivatives of weight functions
-    dsi0t = helmholtzEOS->xdpsi0(xt) * helmholtzEOS->dti_sav[jat];
-    dsi1t = helmholtzEOS->xdpsi1(xt);
+    dsi0t = helmEOS->xdpsi0(xt) * helmEOS->dti_sav[jat];
+    dsi1t = helmEOS->xdpsi1(xt);
 
-    dsi0mt = -helmholtzEOS->xdpsi0(mxt) * helmholtzEOS->dti_sav[jat];
-    dsi1mt = helmholtzEOS->xdpsi1(mxt);
+    dsi0mt = -helmEOS->xdpsi0(mxt) * helmEOS->dti_sav[jat];
+    dsi1mt = helmEOS->xdpsi1(mxt);
 
-    dsi0d = helmholtzEOS->xdpsi0(xd) * helmholtzEOS->ddi_sav[iat];
-    dsi1d = helmholtzEOS->xdpsi1(xd);
+    dsi0d = helmEOS->xdpsi0(xd) * helmEOS->ddi_sav[iat];
+    dsi1d = helmEOS->xdpsi1(xd);
 
-    dsi0md = -helmholtzEOS->xdpsi0(mxd) * helmholtzEOS->ddi_sav[iat];
-    dsi1md = helmholtzEOS->xdpsi1(mxd);
+    dsi0md = -helmEOS->xdpsi0(mxd) * helmEOS->ddi_sav[iat];
+    dsi1md = helmEOS->xdpsi1(mxd);
 
     // move table values into coefficient table
-    fi[0]  = helmholtzEOS->dpdf[iat + 0][jat + 0];
-    fi[1]  = helmholtzEOS->dpdf[iat + 1][jat + 0];
-    fi[2]  = helmholtzEOS->dpdf[iat + 0][jat + 1];
-    fi[3]  = helmholtzEOS->dpdf[iat + 1][jat + 1];
-    fi[4]  = helmholtzEOS->dpdft[iat + 0][jat + 0];
-    fi[5]  = helmholtzEOS->dpdft[iat + 1][jat + 0];
-    fi[6]  = helmholtzEOS->dpdft[iat + 0][jat + 1];
-    fi[7]  = helmholtzEOS->dpdft[iat + 1][jat + 1];
-    fi[8]  = helmholtzEOS->dpdfd[iat + 0][jat + 0];
-    fi[9]  = helmholtzEOS->dpdfd[iat + 1][jat + 0];
-    fi[10] = helmholtzEOS->dpdfd[iat + 0][jat + 1];
-    fi[11] = helmholtzEOS->dpdfd[iat + 1][jat + 1];
-    fi[12] = helmholtzEOS->dpdfdt[iat + 0][jat + 0];
-    fi[13] = helmholtzEOS->dpdfdt[iat + 1][jat + 0];
-    fi[14] = helmholtzEOS->dpdfdt[iat + 0][jat + 1];
-    fi[15] = helmholtzEOS->dpdfdt[iat + 1][jat + 1];
+    fi[0]  = helmEOS->dpdf[iat + 0][jat + 0];
+    fi[1]  = helmEOS->dpdf[iat + 1][jat + 0];
+    fi[2]  = helmEOS->dpdf[iat + 0][jat + 1];
+    fi[3]  = helmEOS->dpdf[iat + 1][jat + 1];
+    fi[4]  = helmEOS->dpdft[iat + 0][jat + 0];
+    fi[5]  = helmEOS->dpdft[iat + 1][jat + 0];
+    fi[6]  = helmEOS->dpdft[iat + 0][jat + 1];
+    fi[7]  = helmEOS->dpdft[iat + 1][jat + 1];
+    fi[8]  = helmEOS->dpdfd[iat + 0][jat + 0];
+    fi[9]  = helmEOS->dpdfd[iat + 1][jat + 0];
+    fi[10] = helmEOS->dpdfd[iat + 0][jat + 1];
+    fi[11] = helmEOS->dpdfd[iat + 1][jat + 1];
+    fi[12] = helmEOS->dpdfdt[iat + 0][jat + 0];
+    fi[13] = helmEOS->dpdfdt[iat + 1][jat + 0];
+    fi[14] = helmEOS->dpdfdt[iat + 0][jat + 1];
+    fi[15] = helmEOS->dpdfdt[iat + 1][jat + 1];
 
-    T dpepdd = helmholtzEOS->h3(fi, si0t, si1t, si0mt, si1mt, si0d, si1d, si0md, si1md);
+    T dpepdd = helmEOS->h3(fi, si0t, si1t, si0mt, si1mt, si0d, si1d, si0md, si1md);
     dpepdd   = std::max<T>(ye * dpepdd, (T)1.e-30);
 
     // move table values into coefficient table
-    fi[0]  = helmholtzEOS->ef[iat + 0][jat + 0];
-    fi[1]  = helmholtzEOS->ef[iat + 1][jat + 0];
-    fi[2]  = helmholtzEOS->ef[iat + 0][jat + 1];
-    fi[3]  = helmholtzEOS->ef[iat + 1][jat + 1];
-    fi[4]  = helmholtzEOS->eft[iat + 0][jat + 0];
-    fi[5]  = helmholtzEOS->eft[iat + 1][jat + 0];
-    fi[6]  = helmholtzEOS->eft[iat + 0][jat + 1];
-    fi[7]  = helmholtzEOS->eft[iat + 1][jat + 1];
-    fi[8]  = helmholtzEOS->efd[iat + 0][jat + 0];
-    fi[9]  = helmholtzEOS->efd[iat + 1][jat + 0];
-    fi[10] = helmholtzEOS->efd[iat + 0][jat + 1];
-    fi[11] = helmholtzEOS->efd[iat + 1][jat + 1];
-    fi[12] = helmholtzEOS->efdt[iat + 0][jat + 0];
-    fi[13] = helmholtzEOS->efdt[iat + 1][jat + 0];
-    fi[14] = helmholtzEOS->efdt[iat + 0][jat + 1];
-    fi[15] = helmholtzEOS->efdt[iat + 1][jat + 1];
+    fi[0]  = helmEOS->ef[iat + 0][jat + 0];
+    fi[1]  = helmEOS->ef[iat + 1][jat + 0];
+    fi[2]  = helmEOS->ef[iat + 0][jat + 1];
+    fi[3]  = helmEOS->ef[iat + 1][jat + 1];
+    fi[4]  = helmEOS->eft[iat + 0][jat + 0];
+    fi[5]  = helmEOS->eft[iat + 1][jat + 0];
+    fi[6]  = helmEOS->eft[iat + 0][jat + 1];
+    fi[7]  = helmEOS->eft[iat + 1][jat + 1];
+    fi[8]  = helmEOS->efd[iat + 0][jat + 0];
+    fi[9]  = helmEOS->efd[iat + 1][jat + 0];
+    fi[10] = helmEOS->efd[iat + 0][jat + 1];
+    fi[11] = helmEOS->efd[iat + 1][jat + 1];
+    fi[12] = helmEOS->efdt[iat + 0][jat + 0];
+    fi[13] = helmEOS->efdt[iat + 1][jat + 0];
+    fi[14] = helmEOS->efdt[iat + 0][jat + 1];
+    fi[15] = helmEOS->efdt[iat + 1][jat + 1];
 
     // electron chemical potential etaele
-    T etaele = helmholtzEOS->h3(fi, si0t, si1t, si0mt, si1mt, si0d, si1d, si0md, si1md);
+    T etaele = helmEOS->h3(fi, si0t, si1t, si0mt, si1mt, si0d, si1d, si0md, si1md);
 
     // derivative with respect to  density
-    x        = helmholtzEOS->h3(fi, si0t, si1t, si0mt, si1mt, dsi0d, dsi1d, dsi0md, dsi1md);
+    x        = helmEOS->h3(fi, si0t, si1t, si0mt, si1mt, dsi0d, dsi1d, dsi0md, dsi1md);
     T detadd = ye * x;
 
     // derivative with respect to temperature
-    T detadt = helmholtzEOS->h3(fi, dsi0t, dsi1t, dsi0mt, dsi1mt, si0d, si1d, si0md, si1md);
+    T detadt = helmEOS->h3(fi, dsi0t, dsi1t, dsi0mt, dsi1mt, si0d, si1d, si0md, si1md);
 
     // derivative with respect to abar and zbar
     T detada = -x * din * ytot1;
     T detadz = x * rho * ytot1;
 
     // move table values into coefficient table
-    fi[0]  = helmholtzEOS->xf[iat + 0][jat + 0];
-    fi[1]  = helmholtzEOS->xf[iat + 1][jat + 0];
-    fi[2]  = helmholtzEOS->xf[iat + 0][jat + 1];
-    fi[3]  = helmholtzEOS->xf[iat + 1][jat + 1];
-    fi[4]  = helmholtzEOS->xft[iat + 0][jat + 0];
-    fi[5]  = helmholtzEOS->xft[iat + 1][jat + 0];
-    fi[6]  = helmholtzEOS->xft[iat + 0][jat + 1];
-    fi[7]  = helmholtzEOS->xft[iat + 1][jat + 1];
-    fi[8]  = helmholtzEOS->xfd[iat + 0][jat + 0];
-    fi[9]  = helmholtzEOS->xfd[iat + 1][jat + 0];
-    fi[10] = helmholtzEOS->xfd[iat + 0][jat + 1];
-    fi[11] = helmholtzEOS->xfd[iat + 1][jat + 1];
-    fi[12] = helmholtzEOS->xfdt[iat + 0][jat + 0];
-    fi[13] = helmholtzEOS->xfdt[iat + 1][jat + 0];
-    fi[14] = helmholtzEOS->xfdt[iat + 0][jat + 1];
-    fi[15] = helmholtzEOS->xfdt[iat + 1][jat + 1];
+    fi[0]  = helmEOS->xf[iat + 0][jat + 0];
+    fi[1]  = helmEOS->xf[iat + 1][jat + 0];
+    fi[2]  = helmEOS->xf[iat + 0][jat + 1];
+    fi[3]  = helmEOS->xf[iat + 1][jat + 1];
+    fi[4]  = helmEOS->xft[iat + 0][jat + 0];
+    fi[5]  = helmEOS->xft[iat + 1][jat + 0];
+    fi[6]  = helmEOS->xft[iat + 0][jat + 1];
+    fi[7]  = helmEOS->xft[iat + 1][jat + 1];
+    fi[8]  = helmEOS->xfd[iat + 0][jat + 0];
+    fi[9]  = helmEOS->xfd[iat + 1][jat + 0];
+    fi[10] = helmEOS->xfd[iat + 0][jat + 1];
+    fi[11] = helmEOS->xfd[iat + 1][jat + 1];
+    fi[12] = helmEOS->xfdt[iat + 0][jat + 0];
+    fi[13] = helmEOS->xfdt[iat + 1][jat + 0];
+    fi[14] = helmEOS->xfdt[iat + 0][jat + 1];
+    fi[15] = helmEOS->xfdt[iat + 1][jat + 1];
 
     // electron + positron number densities
-    T xnefer = helmholtzEOS->h3(fi, si0t, si1t, si0mt, si1mt, si0d, si1d, si0md, si1md);
+    T xnefer = helmEOS->h3(fi, si0t, si1t, si0mt, si1mt, si0d, si1d, si0md, si1md);
 
     // derivative with respect to  density
-    x        = helmholtzEOS->h3(fi, si0t, si1t, si0mt, si1mt, dsi0d, dsi1d, dsi0md, dsi1md);
+    x        = helmEOS->h3(fi, si0t, si1t, si0mt, si1mt, dsi0d, dsi1d, dsi0md, dsi1md);
     x        = std::max<T>(x, (T)1e-30);
     T dxnedd = ye * x;
 
     // derivative with respect to temperature
-    T dxnedt = helmholtzEOS->h3(fi, dsi0t, dsi1t, dsi0mt, dsi1mt, si0d, si1d, si0md, si1md);
+    T dxnedt = helmEOS->h3(fi, dsi0t, dsi1t, dsi0mt, dsi1mt, si0d, si1d, si0md, si1md);
 
     // derivative with respect to abar and zbar
     T dxneda = -x * din * ytot1;
@@ -633,12 +630,15 @@ void computeEOS_Helmholtz(size_t startIndex, size_t endIndex, Dataset& d)
     auto* cv = d.p.data();
     auto* u  = d.u.data();
 
+    helmholtz_constants::Helmholtz_EOS* helmEOS = new helmholtz_constants::Helmholtz_EOS();
+
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
         auto rho                          = kx[i] * m[i] / xm[i];
-        std::tie(c[i], p[i], cv[i], u[i]) = helmholtzEOS(rho, d.temp[i], d.abar[i], d.zbar[i]);
+        std::tie(c[i], p[i], cv[i], u[i]) = helmholtzEOS(helmEOS, rho, d.temp[i], d.abar[i], d.zbar[i]);
     }
+    delete helmEOS;
 }
 
 /*! @brief Polytropic EOS interface for SPH where rho is computed on-the-fly
