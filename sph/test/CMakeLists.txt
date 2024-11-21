@@ -1,10 +1,11 @@
 add_subdirectory(hydro_turb)
 
 set(UNIT_TESTS
-        positions.cpp
-        std.cpp
-        table_creation.cpp
-        ve.cpp
+    positions.cpp
+    std.cpp
+    table_creation.cpp
+    ve.cpp
+    test_eos.cpp
 )
 
 set(testname sph_tests)
@@ -20,17 +21,16 @@ install(FILES ${PROJECT_SOURCE_DIR}/test/example_data.txt DESTINATION ${CMAKE_IN
 
 # create a symbolic link in the build directory to the example data file
 add_custom_command(TARGET ${testname} PRE_BUILD
-        COMMAND ${CMAKE_COMMAND} -E create_symlink
-        ${PROJECT_SOURCE_DIR}/test/example_data.txt $<TARGET_FILE_DIR:${testname}>/example_data.txt)
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+    ${PROJECT_SOURCE_DIR}/test/example_data.txt $<TARGET_FILE_DIR:${testname}>/example_data.txt)
 
 set(UNIT_TESTS_GPU timestep.cu)
 
-if (CMAKE_HIP_COMPILER)
+if(CMAKE_HIP_COMPILER)
     set_source_files_properties(${UNIT_TESTS_GPU} PROPERTIES LANGUAGE HIP)
-endif ()
+endif()
 
-if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
-
+if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     set(testname sph_gpu_tests)
     add_executable(${testname} ${UNIT_TESTS_GPU})
 
@@ -40,5 +40,4 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
 
     install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/hydro)
     install(FILES ${PROJECT_SOURCE_DIR}/test/example_data.txt DESTINATION ${CMAKE_INSTALL_SBINDIR}/hydro)
-
 endif()

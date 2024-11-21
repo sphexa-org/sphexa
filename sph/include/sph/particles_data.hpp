@@ -231,6 +231,8 @@ public:
     FieldVector<HydroType> dV11, dV12, dV13, dV22, dV23, dV33; // Velocity gradient components
     FieldVector<uint8_t>   rung;                               // rung per particle of previous timestep
     FieldVector<uint64_t>  id;                                 // unique particle id
+    FieldVector<RealType>  abar;                               // the average atomic mass
+    FieldVector<RealType>  zbar;                               // the average atomic number
 
     //! @brief Indices of neighbors for each particle, length is number of assigned particles * ngmax. CPU version only.
     std::vector<cstone::LocalIndex>         neighbors;
@@ -245,10 +247,10 @@ public:
      * Name of each field as string for use e.g in HDF5 output. Order has to correspond to what's returned by data().
      */
     inline static constexpr std::array fieldNames{
-        "x",     "y",        "z",    "x_m1", "y_m1", "z_m1", "vx",   "vy",   "vz",   "rho",   "u",    "p",
-        "prho",  "tdpdTrho", "h",    "m",    "c",    "ax",   "ay",   "az",   "du",   "du_m1", "c11",  "c12",
-        "c13",   "c22",      "c23",  "c33",  "mue",  "mui",  "temp", "cv",   "xm",   "kx",    "divv", "curlv",
-        "alpha", "gradh",    "keys", "nc",   "dV11", "dV12", "dV13", "dV22", "dV23", "dV33",  "rung", "id"};
+        "x",        "y",    "z",    "x_m1", "y_m1", "z_m1", "vx",   "vy",   "vz",    "rho",   "u",     "p",     "prho",
+        "tdpdTrho", "h",    "m",    "c",    "ax",   "ay",   "az",   "du",   "du_m1", "c11",   "c12",   "c13",   "c22",
+        "c23",      "c33",  "mue",  "mui",  "temp", "cv",   "xm",   "kx",   "divv",  "curlv", "alpha", "gradh", "keys",
+        "nc",       "dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "rung", "id",    "abar",  "zbar"};
 
     //! @brief dataset prefix to be prepended to fieldNames for structured output
     static const inline std::string prefix{};
@@ -264,7 +266,7 @@ public:
     {
         auto ret = std::tie(x, y, z, x_m1, y_m1, z_m1, vx, vy, vz, rho, u, p, prho, tdpdTrho, h, m, c, ax, ay, az, du,
                             du_m1, c11, c12, c13, c22, c23, c33, mue, mui, temp, cv, xm, kx, divv, curlv, alpha, gradh,
-                            keys, nc, dV11, dV12, dV13, dV22, dV23, dV33, rung, id);
+                            keys, nc, dV11, dV12, dV13, dV22, dV23, dV33, rung, id, abar, zbar);
 #if defined(__clang__) || __GNUC__ > 11
         static_assert(std::tuple_size_v<decltype(ret)> == fieldNames.size());
 #endif
