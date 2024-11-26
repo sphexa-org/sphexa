@@ -153,14 +153,14 @@ public:
                                                         G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()},
                                                         (Ta*)nullptr, ax, ay, az, (int*)rawPtr(traversalStack_));
         float totalPotential;
-        checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, totalPotentialGlob, sizeof(float)));
+        checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
         return 0.5f * Tc(G) * totalPotential;
     }
 
     util::array<uint64_t, 5> readStats() const
     {
         typename BhStats::type stats[BhStats::numStats];
-        checkGpuErrors(cudaMemcpyFromSymbol(stats, bhStats, BhStats::numStats * sizeof(BhStats::type)));
+        checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(bhStats), BhStats::numStats * sizeof(BhStats::type)));
 
         auto sumP2P   = stats[BhStats::sumP2P];
         auto maxP2P   = stats[BhStats::maxP2P];

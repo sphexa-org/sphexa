@@ -30,6 +30,7 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/primitives/math.hpp"
 #include "cstone/primitives/stl.hpp"
 #include "cstone/util/array.hpp"

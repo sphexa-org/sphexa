@@ -613,7 +613,7 @@ auto computeAcceleration(size_t firstBody, size_t lastBody, const Tc* x, const T
     double dt = std::chrono::duration<double>(t1 - t0).count();
 
     typename BhStats::type stats[BhStats::numStats];
-    checkGpuErrors(cudaMemcpyFromSymbol(stats, bhStats, BhStats::numStats * sizeof(BhStats::type)));
+    checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(bhStats), BhStats::numStats * sizeof(BhStats::type)));
 
     auto sumP2P = stats[BhStats::sumP2P];
     auto maxP2P = stats[BhStats::maxP2P];
@@ -621,7 +621,7 @@ auto computeAcceleration(size_t firstBody, size_t lastBody, const Tc* x, const T
     auto maxM2P = stats[BhStats::maxM2P];
 
     float totalPotential;
-    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, totalPotentialGlob, sizeof(float)));
+    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
 
     util::array<Tc, 5> interactions;
     interactions[0] = Tc(sumP2P) / Tc(numBodies);

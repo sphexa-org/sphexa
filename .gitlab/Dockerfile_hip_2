@@ -93,8 +93,6 @@ RUN echo \
     && unset GCC_X86_64 \
     && cd /usr/local/games/SPH-EXA.git \
     && ls -la . \
-    && parallel -j+0 hipify-perl -inplace ::: \
-       `find . -name '*.h' -o -name '*.cuh' -o -name '*.hpp' -o -name '*.cpp' -o -name '*.cu'` \
     && sed -i "s@GIT_REPOSITORY@SOURCE_DIR $GGTEST_VERSION/\n#@" ./domain/cmake/setup_GTest.cmake \
     && sed -i "s@GIT_REPOSITORY@SOURCE_DIR $GGTEST_VERSION/\n#@" ./cmake/setup_GTest.cmake \
     && sed -i "s@GIT_REPOSITORY@SOURCE_DIR $GGTEST_VERSION/\n#@" ./ryoanji/cmake/setup_GTest.cmake \

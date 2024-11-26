@@ -32,8 +32,7 @@
 #pragma once
 
 #include <cstdint>
-#include <cuda_runtime.h>
-
+#include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/cuda/errorcheck.cuh"
 
 namespace cstone

@@ -32,7 +32,6 @@
 #pragma once
 
 #include <vector>
-#include <cuda_runtime.h>
 
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/util/noinit_alloc.hpp"

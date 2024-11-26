@@ -29,8 +29,6 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#include <cub/cub.cuh>
-
 #include <thrust/binary_search.h>
 #include <thrust/count.h>
 #include <thrust/execution_policy.h>
@@ -39,6 +37,7 @@
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
 
+#include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/errorcheck.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/util/array.hpp"

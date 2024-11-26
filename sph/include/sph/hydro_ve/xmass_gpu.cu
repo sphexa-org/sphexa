@@ -113,10 +113,10 @@ void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<typename D
     checkGpuErrors(cudaDeviceSynchronize());
 
     NcStats::type stats[NcStats::numStats];
-    checkGpuErrors(cudaMemcpyFromSymbol(stats, cstone::ncStats, NcStats::numStats * sizeof(NcStats::type)));
+    checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(cstone::ncStats), NcStats::numStats * sizeof(NcStats::type)));
 
     bool convergenceFailure;
-    checkGpuErrors(cudaMemcpyFromSymbol(&convergenceFailure, nc_h_convergenceFailure, sizeof(bool)));
+    checkGpuErrors(cudaMemcpyFromSymbol(&convergenceFailure, GPU_SYMBOL(nc_h_convergenceFailure), sizeof(bool)));
 
     NcStats::type maxP2P   = stats[cstone::NcStats::maxP2P];
     NcStats::type maxStack = stats[cstone::NcStats::maxStack];

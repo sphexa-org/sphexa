@@ -8,6 +8,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/fill.h>
 
+#include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/util/noinit_thrust.cuh"
 
 #include "device_vector.h"

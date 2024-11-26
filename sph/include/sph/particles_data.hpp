@@ -50,7 +50,6 @@
 #include "sph_kernel_tables.hpp"
 
 #if defined(USE_CUDA)
-#include "sph/util/pinned_allocator.cuh"
 #include "particles_data_gpu.cuh"
 #endif
 

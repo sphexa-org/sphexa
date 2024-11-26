@@ -29,15 +29,13 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#include <cub/cub.cuh>
-
+#include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/findneighbors.hpp"
+#include "cstone/primitives/warpscan.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
 
 #include "sph/sph_gpu.hpp"
 #include "sph/particles_data.hpp"
-#include "sph/util/device_math.cuh"
 #include "sph/hydro_std/momentum_energy_kern.hpp"
 
 namespace sph
@@ -99,7 +97,7 @@ __global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, c
     T           blockMin = reduce.Reduce(dt_i, cub::Min());
     __syncthreads();
 
-    if (threadIdx.x == 0) { atomicMinFloat(&minDt_device, blockMin); }
+    if (threadIdx.x == 0) { cstone::atomicMinFloat(&minDt_device, blockMin); }
 }
 
 template<class Dataset>
@@ -109,7 +107,7 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     float huge = 1e10;
-    checkGpuErrors(cudaMemcpyToSymbol(minDt_device, &huge, sizeof(huge)));
+    checkGpuErrors(cudaMemcpyToSymbol(GPU_SYMBOL(minDt_device), &huge, sizeof(huge)));
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     cudaGradP<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
@@ -123,7 +121,7 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
     checkGpuErrors(cudaGetLastError());
 
     float minDt;
-    checkGpuErrors(cudaMemcpyFromSymbol(&minDt, minDt_device, sizeof(minDt)));
+    checkGpuErrors(cudaMemcpyFromSymbol(&minDt, GPU_SYMBOL(minDt_device), sizeof(minDt)));
     d.minDtCourant = minDt;
 }
 

@@ -28,8 +28,7 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#include <cub/cub.cuh>
-
+#include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/errorcheck.cuh"
 #include "cstone/focus/rebalance.hpp"
 #include "cstone/focus/rebalance_gpu.h"
@@ -159,7 +158,7 @@ bool protectAncestorsGpu(const KeyType* prefixes,
     protectAncestorsKernel<<<iceil(numNodes, numThreads), numThreads>>>(prefixes, parents, nodeOps, numNodes);
 
     int numNodesModify;
-    checkGpuErrors(cudaMemcpyFromSymbol(&numNodesModify, nodeOpSum, sizeof(int)));
+    checkGpuErrors(cudaMemcpyFromSymbol(&numNodesModify, GPU_SYMBOL(nodeOpSum), sizeof(int)));
 
     return numNodesModify == 0;
 }
@@ -197,7 +196,7 @@ ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
     }
 
     int status;
-    checkGpuErrors(cudaMemcpyFromSymbol(&status, enforceKeyStatus_device, sizeof(ResolutionStatus)));
+    checkGpuErrors(cudaMemcpyFromSymbol(&status, GPU_SYMBOL(enforceKeyStatus_device), sizeof(ResolutionStatus)));
     return static_cast<ResolutionStatus>(status);
 }
 

@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <cuda_runtime.h>
 #include <variant>
 
 #include "cstone/cuda/cuda_utils.cuh"
