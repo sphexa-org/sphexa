@@ -18,7 +18,7 @@ void betaCoolingImpl(size_t first, size_t last, Dataset& d, const StarData& star
 #pragma omp parallel for
     for (size_t i = first; i < last; i++)
     {
-        if (d.rho[i] < star.cooling_rho_limit)
+        if (d.rho[i] < star.cooling_rho_limit && d.u[i] > star.u_floor)
         {
             const double dx    = d.x[i] - star.position[0];
             const double dy    = d.y[i] - star.position[1];

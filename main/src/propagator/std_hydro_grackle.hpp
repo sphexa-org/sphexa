@@ -27,16 +27,14 @@
  * @brief A Propagator class for standard SPH including Grackle chemistry and cooling
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
- * @author Jose A. Escartin <ja.escartin@gmail.com>
  * @author Noah Kubli <noah.kubli@uzh.ch>
  */
 
 #pragma once
 
-#include <variant>
-
 #include "cstone/fields/field_get.hpp"
 #include "cstone/util/value_list.hpp"
+#include "io/arg_parser.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/sph.hpp"
 

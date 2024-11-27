@@ -369,8 +369,8 @@ public:
             auto* d_layout     = reinterpret_cast<LocalIndex*>(rawPtr(scratch1));
 
             fillGpu(d_layout, d_layout + octree.numLeafNodes + 1, LocalIndex(0));
-            exclusiveScanGpu(rawPtr(leafCountsAcc_) + firstIdx, rawPtr(leafCountsAcc_) + lastIdx + 1,
-                             d_layout + firstIdx);
+            inclusiveScanGpu(rawPtr(leafCountsAcc_) + firstIdx, rawPtr(leafCountsAcc_) + lastIdx,
+                             d_layout + firstIdx + 1);
             computeLeafSourceCenterGpu(x, y, z, m, octree.leafToInternal + octree.numInternalNodes, octree.numLeafNodes,
                                        d_layout, rawPtr(centersAcc_));
             //! upsweep with local data in place
@@ -384,8 +384,8 @@ public:
         {
             //! compute temporary pre-halo exchange particle layout for local particles only
             std::vector<LocalIndex> layout(leafCounts_.size() + 1, 0);
-            std::exclusive_scan(leafCounts_.begin() + firstIdx, leafCounts_.begin() + lastIdx + 1,
-                                layout.begin() + firstIdx, 0);
+            std::inclusive_scan(leafCounts_.begin() + firstIdx, leafCounts_.begin() + lastIdx,
+                                layout.begin() + firstIdx + 1, std::plus<>{}, LocalIndex(0));
 #pragma omp parallel for schedule(static)
             for (TreeNodeIndex leafIdx = 0; leafIdx < treeData_.numLeafNodes; ++leafIdx)
             {

@@ -190,9 +190,9 @@ cstone::Vec3<T> scaleBlockToGlobal(cstone::Vec3<T> uX, cstone::Vec3<int> gridIdx
  * @param[in]  globalBox    global coordinate bounding box
  * @param[in]  gridIdx      3D integer coordinate in [0,m-1]^3
  * @param[in]  m            multiplicity of the global grid
- * @param[in]  xBlock       x-coords of the template block in [0,1]
- * @param[in]  yBlock       y-coords of the template block in [0,1]
- * @param[in]  zBlock       z-coords of the template block in [0,1]
+ * @param[in]  xBlock       x-coords of the template block in [0,1)
+ * @param[in]  yBlock       y-coords of the template block in [0,1)
+ * @param[in]  zBlock       z-coords of the template block in [0,1)
  * @param[out] x            output x-coords that lie in @p selectBox
  * @param[out] y            output y-coords that lie in @p selectBox
  * @param[out] z            output z-coords that lie in @p selectBox
@@ -206,9 +206,9 @@ void extractBlock(const cstone::FBox<T>& selectBox, const cstone::Box<T>& global
     {
         auto sX = scaleBlockToGlobal({xBlock[i], yBlock[i], zBlock[i]}, gridIdx, m, globalBox);
 
-        bool select = (selectBox.xmin() <= sX[0] && sX[0] <= selectBox.xmax()) &&
-                      (selectBox.ymin() <= sX[1] && sX[1] <= selectBox.ymax()) &&
-                      (selectBox.zmin() <= sX[2] && sX[2] <= selectBox.zmax());
+        bool select = (selectBox.xmin() <= sX[0] && sX[0] < selectBox.xmax()) &&
+                      (selectBox.ymin() <= sX[1] && sX[1] < selectBox.ymax()) &&
+                      (selectBox.zmin() <= sX[2] && sX[2] < selectBox.zmax());
         if (select)
         {
             x.push_back(sX[0]);
@@ -227,9 +227,9 @@ void extractBlock(const cstone::FBox<T>& selectBox, const cstone::Box<T>& global
  * @param[in]  keyEnd       SFC key end
  * @param[in]  globalBox    global coordinate bounding box
  * @param[in]  multiplicity multiplicity of the global grid
- * @param[in]  xBlock       x-coords of the template block in [0,1]
- * @param[in]  yBlock       y-coords of the template block in [0,1]
- * @param[in]  zBlock       z-coords of the template block in [0,1]
+ * @param[in]  xBlock       x-coords of the template block in [0,1)
+ * @param[in]  yBlock       y-coords of the template block in [0,1)
+ * @param[in]  zBlock       z-coords of the template block in [0,1)
  * @param[out] x            output x-coords with SFC keys in @p [keyStart:keyEnd]
  * @param[out] y            output y-coords with SFC keys in @p [keyStart:keyEnd]
  * @param[out] z            output z-coords with SFC keys in @p [keyStart:keyEnd]
@@ -239,6 +239,15 @@ void assembleCuboid(KeyType keyStart, KeyType keyEnd, const cstone::Box<T>& glob
                     gsl::span<const T> xBlock, gsl::span<const T> yBlock, gsl::span<const T> zBlock, Vector& x,
                     Vector& y, Vector& z)
 {
+
+    auto outOfBounds = [](auto it1, auto it2)
+    { return *std::min_element(it1, it2) < 0.0 || *std::max_element(it1, it2) >= 1.0; };
+    if (outOfBounds(xBlock.begin(), xBlock.end()) || outOfBounds(yBlock.begin(), yBlock.end()) ||
+        outOfBounds(zBlock.begin(), zBlock.end()))
+    {
+        throw std::runtime_error("template glass block coordinates have to be in [0,1)^3\n");
+    }
+
     // span the assigned SFC range with valid octree cells
     int                  numCells = cstone::spanSfcRange(keyStart, keyEnd);
     std::vector<KeyType> cells(numCells + 1);

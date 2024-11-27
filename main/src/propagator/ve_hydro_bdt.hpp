@@ -36,6 +36,7 @@
 
 #include "cstone/cuda/device_vector.h"
 #include "cstone/fields/field_get.hpp"
+#include "io/arg_parser.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/sph.hpp"
 #include "sph/ts_rungs.hpp"

@@ -20,16 +20,17 @@
 
 namespace planet
 {
-template<size_t numThreads, typename Tpos, typename Ta, typename Tm, typename Ts>
+template<size_t numThreads, typename Tpos, typename Ta, typename Tm, typename Tsp, typename Tsm, typename Tg,
+         typename Tis, typename Tf, typename Tp>
 __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z,
-                                             Ta* ax, Ta* ay, Ta* az, const Tm* m, Ts star_pos_x, Ts star_pos_y,
-                                             Ts star_pos_z, Ts sm, Tpos g, Ts inner_size2, Ts* star_force_block_x,
-                                             Ts* star_force_block_y, Ts* star_force_block_z, Ts* star_potential_block)
+                                             Ta* ax, Ta* ay, Ta* az, const Tm* m, Tsp star_pos_x, Tsp star_pos_y,
+                                             Tsp star_pos_z, Tsm sm, Tg g, Tis inner_size2, Tf* star_force_block_x,
+                                             Tf* star_force_block_y, Tf* star_force_block_z, Tp* star_potential_block)
 {
-    __shared__ Ts star_force_thread_x[numThreads];
-    __shared__ Ts star_force_thread_y[numThreads];
-    __shared__ Ts star_force_thread_z[numThreads];
-    __shared__ Ts star_potential_thread[numThreads];
+    __shared__ Tf star_force_thread_x[numThreads];
+    __shared__ Tf star_force_thread_y[numThreads];
+    __shared__ Tf star_force_thread_z[numThreads];
+    __shared__ Tp star_potential_thread[numThreads];
 
     cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -107,7 +108,6 @@ void computeCentralForceGPU(size_t first, size_t last, Dataset& d, StarData& sta
     cudaMalloc(&star_force_block_z, sizeof(Tf) * numBlocks);
     Tp* star_pot_block;
     cudaMalloc(&star_pot_block, sizeof(Tp) * numBlocks);
-
     computeCentralForceGPUKernel<numThreads><<<numBlocks, numThreads>>>(
         first, last, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.ax),
         rawPtr(d.devData.ay), rawPtr(d.devData.az), rawPtr(d.devData.m), star.position[0], star.position[1],

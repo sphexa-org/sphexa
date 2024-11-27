@@ -36,6 +36,7 @@
 #include <vector>
 #include <mpi.h>
 
+#include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/primitives/primitives_gpu.h"
 #include "kernels.hpp"
 

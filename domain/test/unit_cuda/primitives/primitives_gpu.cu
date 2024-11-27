@@ -65,7 +65,7 @@ TEST(PrimitivesGpu, segmentMax)
     unsigned numSegments = 120;
     std::vector<unsigned> h_segments(numSegments + 1, numElements / numSegments);
     h_segments[numSegments - 1] += numElements % numSegments;
-    std::exclusive_scan(h_segments.begin(), h_segments.end() + 1, h_segments.begin(), 0);
+    std::exclusive_scan(h_segments.begin(), h_segments.end(), h_segments.begin(), 0);
 
     thrust::device_vector<unsigned> segments = h_segments;
     thrust::device_vector<double> output(numSegments);

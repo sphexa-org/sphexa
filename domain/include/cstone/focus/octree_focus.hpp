@@ -204,7 +204,8 @@ struct CombinedUpdate
         if (status == ResolutionStatus::failed)
         {
             converged = false;
-            injectKeysGpu(tree, leaves, d_mandatoryKeys);
+            injectKeysGpu(leaves, {d_mandatoryKeys.data(), d_mandatoryKeys.size()}, tree.prefixes, tree.childOffsets,
+                          tree.internalToLeaf);
         }
 
         tree.resize(nNodes(leaves));

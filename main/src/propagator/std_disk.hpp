@@ -10,16 +10,18 @@
 #include <variant>
 
 #include "cstone/fields/field_get.hpp"
+#include "gravity_wrapper.hpp"
+#include "io/arg_parser.hpp"
+#include "ipropagator.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/sph.hpp"
-#include "exchangeStarPosition.hpp"
-#include "computeCentralForce.hpp"
-#include "star_data.hpp"
+
 #include "accretion.hpp"
 #include "betaCooling.hpp"
+#include "computeCentralForce.hpp"
 #include "eos_polytropic.hpp"
-#include "ipropagator.hpp"
-#include "gravity_wrapper.hpp"
+#include "exchangeStarPosition.hpp"
+#include "star_data.hpp"
 
 namespace sphexa
 {
@@ -28,7 +30,7 @@ using namespace sph;
 using util::FieldList;
 
 template<class DomainType, class DataType>
-class PlanetProp : public Propagator<DomainType, DataType>
+class DiskProp : public Propagator<DomainType, DataType>
 {
 protected:
     using Base = Propagator<DomainType, DataType>;
@@ -59,7 +61,7 @@ protected:
         FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33", "nc">;
 
 public:
-    PlanetProp(std::ostream& output, size_t rank, const InitSettings& settings)
+    DiskProp(std::ostream& output, size_t rank, const InitSettings& settings)
         : Base(output, rank)
     {
     }

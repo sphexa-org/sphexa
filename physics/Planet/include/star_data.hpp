@@ -18,10 +18,10 @@ struct StarData
     //! @brief mass of the central star
     double m{1e6};
 
-    //! @brief inner size of the central star where particles are deleted
+    //! @brief inner size of the central star where particles are accreted
     double inner_size{0.};
 
-    //! @brief Fix the position of the central star
+    //! @brief Fix the position of the central star instead of integrating the position
     int fixed_star{1};
 
     //! @brief Constant for beta cooling in the disk
@@ -31,7 +31,10 @@ struct StarData
     double removal_limit_h{std::numeric_limits<double>::infinity()};
 
     //! @brief Don't cool any particle above this density threshold
-    float cooling_rho_limit{1.683e-3};
+    float cooling_rho_limit{std::numeric_limits<float>::infinity()};
+
+    //! @brief Don't cool any particle whose internal energy is below
+    double u_floor{0.};
 
     //! @brief Limit the timestep depending on changes in the internal energy. delta_t = K_u * u / du
     double K_u{std::numeric_limits<double>::infinity()};
@@ -39,9 +42,11 @@ struct StarData
     //! @brief Use a polytropic equation of state
     //! P = Kpoly * rho ^ exp_poly
     int use_polytropic_eos{1};
+
     //! @brief The next two parameters are used if the polytropic equation of state is activated.
     //! @brief polytropic constant
     double Kpoly{1.9998578841e-3};
+
     //! @brief polytropic exponent
     double exp_poly{5. / 3.};
 
@@ -77,6 +82,7 @@ struct StarData
         optionalIO("star::beta", &beta, 1);
         optionalIO("star::removal_limit_h", &removal_limit_h, 1);
         optionalIO("star::cooling_rho_limit", &cooling_rho_limit, 1);
+        optionalIO("star::u_floor", &u_floor, 1);
         optionalIO("star::K_u", &K_u, 1);
         optionalIO("star::use_polytropic_eos", &use_polytropic_eos, 1);
         optionalIO("star::Kpoly", &Kpoly, 1);

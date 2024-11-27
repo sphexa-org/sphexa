@@ -7,6 +7,7 @@
 #pragma once
 
 #include "cstone/sfc/box.hpp"
+#include "cstone/primitives/primitives_gpu.h"
 #include "sph/sph_gpu.hpp"
 
 namespace sph

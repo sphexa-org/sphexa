@@ -32,8 +32,6 @@
 
 #pragma once
 
-#include <variant>
-
 #include "cstone/fields/field_get.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/sph.hpp"

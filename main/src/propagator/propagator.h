@@ -24,49 +24,39 @@
  */
 
 /*! @file
- * @brief Evaluate choice of propagator
+ * @brief Propagator initialization
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
- * @author Jose A. Escartin <ja.escartin@gmail.com>
  * @author ChristopherBignamini <christopher.bignamini@gmail.com>
  */
 
 #pragma once
 
+#include <memory>
+
 #include "ipropagator.hpp"
-#include "propagator.h"
+#include "init/settings.hpp"
+#include "sphexa/simulation_data.hpp"
 
 namespace sphexa
 {
 
 template<class DomainType, class ParticleDataType>
-std::unique_ptr<Propagator<DomainType, ParticleDataType>>
-propagatorFactory(const std::string& choice, bool avClean, std::ostream& output, size_t rank, const InitSettings& s)
+struct PropLib
 {
-    if (choice == "ve") { return PropLib<DomainType, ParticleDataType>::makeHydroVeProp(output, rank, avClean); }
-    if (choice == "ve-bdt")
-    {
-        return PropLib<DomainType, ParticleDataType>::makeHydroVeBdtProp(output, rank, s, avClean);
-    }
-    if (choice == "std") { return PropLib<DomainType, ParticleDataType>::makeHydroProp(output, rank); }
-#ifdef SPH_EXA_HAVE_GRACKLE
-    if (choice == "std-cooling")
-    {
-        return PropLib<DomainType, ParticleDataType>::makeHydroGrackleProp(output, rank, s);
-    }
-#endif
-    if (choice == "nbody") { return PropLib<DomainType, ParticleDataType>::makeNbodyProp(output, rank); }
-    if (choice == "turbulence")
-    {
-        return PropLib<DomainType, ParticleDataType>::makeTurbVeBdtProp(output, rank, s, avClean);
-    }
-    if (choice == "turbulence-ve")
-    {
-        return PropLib<DomainType, ParticleDataType>::makeTurbVeProp(output, rank, s, avClean);
-    }
-    if (choice == "std-disk") { return PropLib<DomainType, ParticleDataType>::makeDiskProp(output, rank, s); }
 
-    throw std::runtime_error("Unknown propagator choice: " + choice);
-}
+    using PropPtr = std::unique_ptr<Propagator<DomainType, ParticleDataType>>;
+
+    static PropPtr makeHydroVeProp(std::ostream& output, size_t rank, bool avClean);
+    static PropPtr makeHydroProp(std::ostream& output, size_t rank);
+    static PropPtr makeHydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
+#ifdef SPH_EXA_HAVE_GRACKLE
+    static PropPtr makeHydroGrackleProp(std::ostream& output, size_t rank, const InitSettings& settings);
+#endif
+    static PropPtr makeNbodyProp(std::ostream& output, size_t rank);
+    static PropPtr makeTurbVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
+    static PropPtr makeTurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
+    static PropPtr makeDiskProp(std::ostream& output, size_t rank, const InitSettings& settings);
+};
 
 } // namespace sphexa

@@ -54,10 +54,10 @@ namespace detail
 {
 
 //! @brief check that only owned particles in [particleStart_:particleEnd_] are sent out as halos
-void checkIndices(const SendList& sendList,
-                  [[maybe_unused]] LocalIndex start,
-                  [[maybe_unused]] LocalIndex end,
-                  [[maybe_unused]] LocalIndex bufferSize)
+static void checkIndices(const SendList& sendList,
+                         [[maybe_unused]] LocalIndex start,
+                         [[maybe_unused]] LocalIndex end,
+                         [[maybe_unused]] LocalIndex bufferSize)
 {
     for (const auto& manifest : sendList)
     {
@@ -170,7 +170,8 @@ public:
             auto* d_flags = reinterpret_cast<int*>(rawPtr(scratch));
             auto* d_radii = reinterpret_cast<float*>(rawPtr(scratch)) + flagBytes / sizeof(float);
 
-            exclusiveScanGpu(counts.data() + firstNode, counts.data() + lastNode + 1, layout.data() + firstNode);
+            fillGpu(layout.data() + firstNode, layout.data() + firstNode + 1, LocalIndex(0));
+            inclusiveScanGpu(counts.data() + firstNode, counts.data() + lastNode, layout.data() + firstNode + 1);
             segmentMax(h, layout.data() + firstNode, numNodesSearch, d_radii + firstNode);
             // SPH convention: interaction radius = 2 * h
             scaleGpu(d_radii, d_radii + numLeafNodes, 2.0f * searchExtFact);
@@ -183,7 +184,9 @@ public:
         }
         else
         {
-            std::exclusive_scan(counts.begin() + firstNode, counts.begin() + lastNode + 1, layout.begin(), 0);
+            layout[0] = 0;
+            std::inclusive_scan(counts.begin() + firstNode, counts.begin() + lastNode, layout.begin() + 1,
+                                std::plus<>{}, LocalIndex(0));
             std::vector<float> haloRadii(counts.size(), 0.0f);
 #pragma omp parallel for schedule(static)
             for (TreeNodeIndex i = 0; i < numNodesSearch; ++i)
