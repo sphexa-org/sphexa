@@ -28,6 +28,12 @@ endif()
 
 option(CSTONE_WITH_CUDA "Enable building for NVIDIA GPUs" ON)
 option(CSTONE_WITH_HIP "Enable building for AMD GPUs" ON)
+option(CSTONE_WITH_GPU_AWARE_MPI "Enable CUDA-aware MPI communication" OFF)
+
+if(GPU_DIRECT)
+    message(WARNING "Option GPU_DIRECT is deprecated and will be removed. Use -DCSTONE_WITH_GPU_AWARE_MPI=ON instead.")
+    set(CSTONE_WITH_GPU_AWARE_MPI ON)
+endif()
 
 if(CSTONE_WITH_CUDA)
     check_language(CUDA)

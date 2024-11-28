@@ -24,7 +24,7 @@
  */
 
 /*! @file
- * @brief  Ryoanji multipole and related types
+ * @brief  helper types
  *
  * @author Rio Yokota <rioyokota@gsic.titech.ac.jp>
  */
@@ -46,44 +46,5 @@ using Vec4 = cstone::Vec4<T>;
 
 using TreeNodeIndex = cstone::TreeNodeIndex;
 using LocalIndex    = cstone::LocalIndex;
-
-template<size_t P>
-struct TermSize : public stl::integral_constant<size_t, P*(P + 1) * (P + 2) / 6>
-{
-};
-
-template<class T, size_t P>
-using SphericalMultipole = util::array<T, TermSize<P>{}>;
-
-template<class MType>
-struct IsSpherical
-    : public stl::integral_constant<size_t, MType{}.size() == TermSize<2>{} || MType{}.size() == TermSize<4>{}>
-{
-};
-
-template<int ArraySize, class = void>
-struct ExpansionOrder
-{
-};
-
-template<>
-struct ExpansionOrder<TermSize<1>{}> : stl::integral_constant<size_t, 1>
-{
-};
-
-template<>
-struct ExpansionOrder<TermSize<2>{}> : stl::integral_constant<size_t, 2>
-{
-};
-
-template<>
-struct ExpansionOrder<TermSize<3>{}> : stl::integral_constant<size_t, 3>
-{
-};
-
-template<>
-struct ExpansionOrder<TermSize<4>{}> : stl::integral_constant<size_t, 4>
-{
-};
 
 } // namespace ryoanji

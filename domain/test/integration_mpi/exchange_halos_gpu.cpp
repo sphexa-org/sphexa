@@ -66,7 +66,7 @@ void gpuDirect(int rank)
     MPI_Barrier(MPI_COMM_WORLD);
 }
 
-#ifdef USE_GPU_DIRECT
+#ifdef CSTONE_HAVE_GPU_AWARE_MPI
 TEST(HaloExchange, gpuDirect)
 #else
 TEST(HaloExchange, DISABLED_gpuDirect)

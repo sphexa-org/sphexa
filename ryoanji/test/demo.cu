@@ -1,8 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Basel, University of Zurich
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -23,12 +22,14 @@
  * SOFTWARE.
  */
 
-#include <chrono>
-#include <numeric>
+/*! @file
+ * @brief  Single-GPU demonstrator app for the Ryoanji N-body library
+ *
+ * @author Sebastian Keller <sebastian.f.keller@gmail.com>
+ * @author Rio Yokota <rioyokota@gsic.titech.ac.jp>
+ */
 
-#ifdef __HIPCC__
-#include <hip/hip_runtime.h>
-#endif
+#include <chrono>
 
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
@@ -36,21 +37,36 @@
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/cuda/thrust_util.cuh"
+#include "cstone/focus/source_center_gpu.h"
+#include "cstone/traversal/groups_gpu.h"
+#include "cstone/util/array.hpp"
 
 #include "nbody/dataset.hpp"
 #include "ryoanji/interface/treebuilder.cuh"
 #include "ryoanji/nbody/types.h"
 #include "ryoanji/nbody/traversal.cuh"
 #include "ryoanji/nbody/direct.cuh"
-#include "ryoanji/nbody/upwardpass.cuh"
+#include "ryoanji/nbody/upsweep_gpu.h"
 
 using namespace ryoanji;
 
+template<class Tc, class Th, class Tm, class Ta, class Tf, class MType>
+util::array<Tc, 5> computeAcceleration(size_t firstBody, size_t lastBody, const Tc* x, const Tc* y, const Tc* z,
+                                       const Tm* m, const Th* h, Tc G, int numShells, const cstone::Box<Tc>& box, Ta* p,
+                                       Ta* ax, Tc* ay, Tc* az, const TreeNodeIndex* childOffsets,
+                                       const TreeNodeIndex* internalToLeaf, const LocalIndex* layout,
+                                       const Vec4<Tf>* sourceCenter, const MType* Multipole);
+
+template<class KeyType, class T, class MType>
+void upsweep(int numSources, int numLeaves, int numLevels, float theta, const TreeNodeIndex* levelRange, const T* x,
+             const T* y, const T* z, const T* m, const cstone::Box<T>& box, const LocalIndex* layout,
+             const KeyType* prefixes, const TreeNodeIndex* childOffsets, const TreeNodeIndex* leafToInternal,
+             Vec4<T>* centers, MType* Multipole);
+
 int main(int argc, char** argv)
 {
-    constexpr int P     = 4;
     using T             = float;
-    using MultipoleType = SphericalMultipole<T, P>;
+    using MultipoleType = CartesianQuadrupole<T>;
 
     int power     = argc > 1 ? std::stoi(argv[1]) : 17;
     int directRef = argc > 2 ? std::stoi(argv[2]) : 1;
@@ -65,7 +81,6 @@ int main(int argc, char** argv)
 
     fprintf(stdout, "--- BH Parameters ---------------\n");
     fprintf(stdout, "numBodies            : %lu\n", numBodies);
-    fprintf(stdout, "P                    : %d\n", P);
     fprintf(stdout, "theta                : %f\n", theta);
     fprintf(stdout, "ncrit                : %d\n", ncrit);
 
@@ -77,17 +92,17 @@ int main(int argc, char** argv)
 
     cstone::Box<T> box(-boxSize, boxSize);
 
-    TreeBuilder<uint64_t> treeBuilder;
+    TreeBuilder<uint64_t> treeBuilder(ncrit);
     int                   numSources = treeBuilder.update(rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), numBodies, box);
 
-    std::vector<int2> levelRange(treeBuilder.maxTreeLevel() + 1);
-    int               highestLevel = treeBuilder.extract(levelRange.data());
+    const TreeNodeIndex* levelRange   = treeBuilder.levelRange();
+    int                  highestLevel = treeBuilder.maxTreeLevel();
 
     thrust::device_vector<Vec4<T>>       sourceCenter(numSources);
     thrust::device_vector<MultipoleType> Multipole(numSources);
 
-    upsweep(numSources, treeBuilder.numLeafNodes(), highestLevel, theta, levelRange.data(), rawPtr(d_x), rawPtr(d_y),
-            rawPtr(d_z), rawPtr(d_m), rawPtr(d_h), treeBuilder.layout(), treeBuilder.childOffsets(),
+    upsweep(numSources, treeBuilder.numLeafNodes(), highestLevel, theta, levelRange, rawPtr(d_x), rawPtr(d_y),
+            rawPtr(d_z), rawPtr(d_m), box, treeBuilder.layout(), treeBuilder.nodeKeys(), treeBuilder.childOffsets(),
             treeBuilder.leafToInternal(), rawPtr(sourceCenter), rawPtr(Multipole));
 
     thrust::device_vector<T> d_p(numBodies, 0), d_ax(numBodies, 0), d_ay(numBodies, 0), d_az(numBodies, 0);
@@ -103,7 +118,7 @@ int main(int argc, char** argv)
 
     auto   t1    = std::chrono::high_resolution_clock::now();
     double dt    = std::chrono::duration<double>(t1 - t0).count();
-    double flops = (interactions[0] * 20 + interactions[2] * 2 * pow(P, 3)) * numBodies / dt / 1e12;
+    double flops = (interactions[0] * 23 + interactions[2] * 65) * numBodies / dt / 1e12;
 
     fprintf(stdout, "--- Total runtime ----------------\n");
     fprintf(stdout, "Total BH            : %.7f s (%.7f TFlops)\n", dt, flops);
@@ -119,7 +134,7 @@ int main(int argc, char** argv)
     t1 = std::chrono::high_resolution_clock::now();
     dt = std::chrono::duration<double>(t1 - t0).count();
 
-    flops = std::pow((2 * numShells + 1), 3) * 24. * numBodies * numBodies / dt / 1e12;
+    flops = std::pow((2 * numShells + 1), 3) * 23. * numBodies * numBodies / dt / 1e12;
     fprintf(stdout, "Total Direct         : %.7f s (%.7f TFlops)\n", dt, flops);
 
     thrust::host_vector<T> h_p  = d_p;
@@ -164,4 +179,96 @@ int main(int argc, char** argv)
     fprintf(stdout, "M2P mean list length : %d (max %d)\n", int(interactions[2]), int(interactions[3]));
 
     return 0;
+}
+
+/*! @brief Compute approximate body accelerations with Barnes-Hut
+ *
+ * @param[in]    firstBody      index of first body in @p bodyPos to compute acceleration for
+ * @param[in]    lastBody       index (exclusive) of last body in @p bodyPos to compute acceleration for
+ * @param[in]    x,y,z,m,h      bodies, in SFC order and as referenced by sourceCells
+ * @param[in]    G              gravitational constant
+ * @param[in]    numShells      number of periodic shells in each dimension to include
+ * @param[in]    box            coordinate bounding box
+ * @param[inout] p              body potential to add to, on device
+ * @param[inout] ax,ay,az       body acceleration to add to
+ * @param[in]    childOffsets   location (index in [0:numTreeNodes]) of first child of each cell, 0 indicates a leaf
+ * @param[in]    internalToLeaf for each cell in [0:numTreeNodes], stores the leaf cell (cstone) index in [0:numLeaves]
+ *                              if the cell is not a leaf, the value is negative
+ * @param[in]    layout         for each leaf cell in [0:numLeaves], stores the index of the first body in the cell
+ * @param[in]    sourceCenter   x,y,z center and square MAC radius of each cell in [0:numTreeNodes]
+ * @param[in]    Multipole      cell multipoles, on device
+ * @return                      P2P and M2P interaction statistics
+ */
+template<class Tc, class Th, class Tm, class Ta, class Tf, class MType>
+util::array<Tc, 5> computeAcceleration(size_t firstBody, size_t lastBody, const Tc* x, const Tc* y, const Tc* z,
+                                       const Tm* m, const Th* h, Tc G, int numShells, const cstone::Box<Tc>& box, Ta* p,
+                                       Ta* ax, Tc* ay, Tc* az, const TreeNodeIndex* childOffsets,
+                                       const TreeNodeIndex* internalToLeaf, const LocalIndex* layout,
+                                       const Vec4<Tf>* sourceCenter, const MType* Multipole)
+{
+    constexpr int numWarpsPerBlock = TravConfig::numThreads / GpuConfig::warpSize;
+
+    cstone::GroupData<cstone::GpuTag> groups;
+    cstone::computeFixedGroups(firstBody, lastBody, TravConfig::targetSize, groups);
+
+    LocalIndex numBodies  = lastBody - firstBody;
+    int        numTargets = (numBodies - 1) / TravConfig::targetSize + 1;
+    int        numBlocks  = (numTargets - 1) / numWarpsPerBlock + 1;
+    numBlocks             = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
+
+    printf("launching %d blocks\n", numBlocks);
+
+    const int                  poolSize = TravConfig::memPerWarp * numWarpsPerBlock * numBlocks;
+    thrust::device_vector<int> globalPool(poolSize);
+
+    resetTraversalCounters<<<1, 1>>>();
+    traverse<<<numBlocks, TravConfig::numThreads>>>(
+        groups.view(), 1, x, y, z, m, h, childOffsets, internalToLeaf, layout, sourceCenter, Multipole, G, numShells,
+        {box.lx(), box.ly(), box.lz()}, p, ax, ay, az, thrust::raw_pointer_cast(globalPool.data()));
+    kernelSuccess("traverse");
+
+    typename BhStats::type stats[BhStats::numStats];
+    checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(bhStats), BhStats::numStats * sizeof(BhStats::type)));
+
+    auto sumP2P = stats[BhStats::sumP2P];
+    auto maxP2P = stats[BhStats::maxP2P];
+    auto sumM2P = stats[BhStats::sumM2P];
+    auto maxM2P = stats[BhStats::maxM2P];
+
+    float totalPotential;
+    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
+
+    util::array<Tc, 5> interactions;
+    interactions[0] = Tc(sumP2P) / Tc(numBodies);
+    interactions[1] = Tc(maxP2P);
+    interactions[2] = Tc(sumM2P) / Tc(numBodies);
+    interactions[3] = Tc(maxM2P);
+    interactions[4] = totalPotential;
+
+    return interactions;
+}
+
+template<class KeyType, class T, class MType>
+void upsweep(int numSources, int numLeaves, int numLevels, float theta, const TreeNodeIndex* levelRange, const T* x,
+             const T* y, const T* z, const T* m, const cstone::Box<T>& box, const LocalIndex* layout,
+             const KeyType* prefixes, const TreeNodeIndex* childOffsets, const TreeNodeIndex* leafToInternal,
+             Vec4<T>* centers, MType* Multipole)
+{
+    auto t0 = std::chrono::high_resolution_clock::now();
+
+    cstone::computeLeafSourceCenterGpu(x, y, z, m, leafToInternal, numLeaves, layout, centers);
+    cstone::upsweepCentersGpu(cstone::maxTreeLevel<KeyType>{}, levelRange, childOffsets, centers);
+
+    computeLeafMultipoles(x, y, z, m, leafToInternal, numLeaves, layout, centers, Multipole);
+    for (int level = numLevels - 1; level >= 1; level--)
+    {
+        upsweepMultipoles(levelRange[level], levelRange[level + 1], childOffsets, centers, Multipole);
+    }
+
+    cstone::setMacGpu(prefixes, numSources, centers, 1.f / theta, box);
+
+    auto   t1 = std::chrono::high_resolution_clock::now();
+    double dt = std::chrono::duration<double>(t1 - t0).count();
+
+    fprintf(stdout, "Upward pass          : %.7f s\n", dt);
 }

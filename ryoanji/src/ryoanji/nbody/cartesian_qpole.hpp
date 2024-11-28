@@ -50,11 +50,6 @@ struct IsCartesian : public stl::integral_constant<size_t, MType{}.size() == Car
 {
 };
 
-template<>
-struct ExpansionOrder<CartesianQuadrupole<float>{}.size()> : stl::integral_constant<size_t, 2>
-{
-};
-
 //! @brief CartesianQuadrupole index names
 struct Cqi
 {
@@ -254,22 +249,6 @@ HOST_DEVICE_FUN void M2M(int begin, int end, const Vec4<T>& Xout, const Vec4<T>*
         Vec3<T>      dX = makeVec3(Xout - Xi);
         addQuadrupole(Mout, dX, Mi);
     }
-}
-
-template<class MType, std::enable_if_t<IsCartesian<MType>{}, int> = 0>
-HOST_DEVICE_FUN MType normalize(const MType& multipole)
-{
-    return multipole;
-}
-
-template<class T>
-std::ostream& operator<<(std::ostream& os, const CartesianQuadrupole<T>& M)
-{
-    os << "m:  " << M[Cqi::mass] << " tr: " << M[Cqi::trace] << std::endl
-       << "xx: " << M[Cqi::qxx] << " xy: " << M[Cqi::qxy] << " xz: " << M[Cqi::qxz] << std::endl
-       << "yy: " << M[Cqi::qyy] << " yz: " << M[Cqi::qyz] << " zz: " << M[Cqi::qzz] << std::endl;
-
-    return os;
 }
 
 } // namespace ryoanji

@@ -296,7 +296,7 @@ void sortByKeyGpu(KeyType* first, KeyType* last, ValueType* values, KeyType* key
     // Determine temporary device storage requirements
     void* d_tempStorage     = nullptr;
     size_t tempStorageBytes = 0;
-    cub::DeviceRadixSort::SortPairs(d_tempStorage, tempStorageBytes, d_keys, d_values, numElements);
+    checkGpuErrors(cub::DeviceRadixSort::SortPairs(d_tempStorage, tempStorageBytes, d_keys, d_values, numElements));
 
     // Allocate temporary storage
     checkGpuErrors(cudaMalloc(&d_tempStorage, tempStorageBytes));

@@ -1,8 +1,8 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Basel, University of Zurich
+ *
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -34,10 +34,11 @@
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/primitives/math.hpp"
+#include "cstone/traversal/groups_gpu.h"
 #include "cstone/util/reallocate.hpp"
 #include "ryoanji/nbody/cartesian_qpole.hpp"
 #include "ryoanji/nbody/direct.cuh"
-#include "ryoanji/nbody/upwardpass.cuh"
+#include "ryoanji/nbody/upsweep_gpu.h"
 #include "ryoanji/nbody/upsweep_cpu.hpp"
 #include "ryoanji/nbody/traversal.cuh"
 #include "multipole_holder.cuh"
@@ -56,13 +57,11 @@ public:
                                    const Th* h, const cstone::FocusedOctree<KeyType, Tf, cstone::GpuTag>& focusTree,
                                    const cstone::LocalIndex* layout, const cstone::Box<Tc>& box)
     {
-        cstone::DeviceVector<util::array<GpuConfig::ThreadMask, TravConfig::nwt>> S;
-
         auto  d_leaves  = focusTree.treeLeavesAcc();
         float tolFactor = 2.0f;
-        cstone::computeGroupSplits<TravConfig::targetSize>(first, last, x, y, z, h, d_leaves.data(),
-                                                           d_leaves.size() - 1, layout, box, tolFactor, S,
-                                                           traversalStack_, groups_.data);
+        cstone::computeGroupSplits(first, last, x, y, z, h, d_leaves.data(), d_leaves.size() - 1, layout, box,
+                                   TravConfig::targetSize, tolFactor, traversalStack_, groups_.data);
+
         groups_.firstBody  = first;
         groups_.lastBody   = last;
         groups_.numGroups  = groups_.data.size() - 1;
@@ -75,9 +74,7 @@ public:
                  const cstone::FocusedOctree<KeyType, Tf, cstone::GpuTag>& focusTree, const cstone::LocalIndex* layout,
                  MType* multipoles)
     {
-        constexpr int numThreads = UpsweepConfig::numThreads;
-        octree_                  = focusTree.octreeViewAcc();
-
+        octree_ = focusTree.octreeViewAcc();
         resize(octree_.numLeafNodes);
 
         auto globalCenters = focusTree.globalExpansionCenters();
@@ -85,9 +82,8 @@ public:
         layout_  = layout;
         centers_ = focusTree.expansionCentersAcc().data();
 
-        computeLeafMultipoles<<<(octree_.numLeafNodes - 1) / numThreads + 1, numThreads>>>(
-            x, y, z, m, octree_.leafToInternal + octree_.numInternalNodes, octree_.numLeafNodes, layout_, centers_,
-            rawPtr(multipoles_));
+        computeLeafMultipoles(x, y, z, m, octree_.leafToInternal + octree_.numInternalNodes, octree_.numLeafNodes,
+                              layout_, centers_, rawPtr(multipoles_));
 
         std::vector<TreeNodeIndex> levelRange(cstone::maxTreeLevel<KeyType>{} + 2);
         memcpyD2H(octree_.levelRange, levelRange.size(), levelRange.data());
@@ -97,11 +93,10 @@ public:
         for (int level = numLevels - 1; level >= 0; level--)
         {
             int numCellsLevel = levelRange[level + 1] - levelRange[level];
-            int numBlocks     = (numCellsLevel - 1) / numThreads + 1;
             if (numCellsLevel)
             {
-                upsweepMultipoles<<<numBlocks, numThreads>>>(levelRange[level], levelRange[level + 1],
-                                                             octree_.childOffsets, centers_, rawPtr(multipoles_));
+                upsweepMultipoles(levelRange[level], levelRange[level + 1], octree_.childOffsets, centers_,
+                                  rawPtr(multipoles_));
             }
         }
 
@@ -122,18 +117,11 @@ public:
         for (int level = numLevels - 1; level >= 0; level--)
         {
             int numCellsLevel = levelRange[level + 1] - levelRange[level];
-            int numBlocks     = (numCellsLevel - 1) / numThreads + 1;
             if (numCellsLevel)
             {
-                upsweepMultipoles<<<numBlocks, numThreads>>>(levelRange[level], levelRange[level + 1],
-                                                             octree_.childOffsets, centers_, rawPtr(multipoles_));
+                upsweepMultipoles(levelRange[level], levelRange[level + 1], octree_.childOffsets, centers_,
+                                  rawPtr(multipoles_));
             }
-        }
-
-        if (IsSpherical<MType>{})
-        {
-            normalize<<<cstone::iceil(octree_.numNodes, numThreads), numThreads>>>(octree_.numNodes,
-                                                                                   rawPtr(multipoles_));
         }
     }
 
@@ -246,14 +234,6 @@ const MType* MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::deviceMultipol
 {
     return impl_->deviceMultipoles();
 }
-
-#define MHOLDER_SPH(Tc, Th, Tm, Ta, Tf, KeyType, MVal)                                                                 \
-    template class MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, SphericalMultipole<MVal, 4>>
-
-MHOLDER_SPH(double, double, double, double, double, uint64_t, double);
-MHOLDER_SPH(double, double, float, double, double, uint64_t, float);
-MHOLDER_SPH(double, float, float, float, double, uint64_t, float);
-MHOLDER_SPH(float, float, float, float, float, uint64_t, float);
 
 #define MHOLDER_CART(Tc, Th, Tm, Ta, Tf, KeyType, MVal)                                                                \
     template class MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, CartesianQuadrupole<MVal>>

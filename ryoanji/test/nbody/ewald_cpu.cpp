@@ -47,6 +47,16 @@ const int TEST_RNG_SEED = 42;
 const int verbose = 0;
 #define V(level) if ((level) == verbose)
 
+template<class T>
+std::ostream& operator<<(std::ostream& os, const CartesianQuadrupole<T>& M)
+{
+    os << "m:  " << M[Cqi::mass] << " tr: " << M[Cqi::trace] << std::endl
+       << "xx: " << M[Cqi::qxx] << " xy: " << M[Cqi::qxy] << " xz: " << M[Cqi::qxz] << std::endl
+       << "yy: " << M[Cqi::qyy] << " yz: " << M[Cqi::qyz] << " zz: " << M[Cqi::qzz] << std::endl;
+
+    return os;
+}
+
 template<class T, class KeyType_>
 class GridCoordinates
 {
@@ -184,10 +194,6 @@ makeTestTree(Coords& coordinates, cstone::Box<T> box, float mass_scale, float th
     std::vector<MultipoleType> multipoles(octree.numNodes);
     computeLeafMultipoles(x, y, z, masses.data(), toInternal, layout.data(), centers.data(), multipoles.data());
     upsweepMultipoles(octree.levelRange, octree.childOffsets.data(), centers.data(), multipoles.data());
-    for (size_t i = 0; i < multipoles.size(); ++i)
-    {
-        multipoles[i] = ryoanji::normalize(multipoles[i]);
-    }
 
     T totalMass = std::accumulate(masses.begin(), masses.end(), 0.0);
     EXPECT_NEAR(totalMass, multipoles[0][ryoanji::Cqi::mass], 1e-6);

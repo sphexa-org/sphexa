@@ -16,7 +16,6 @@ option(BUILD_ANALYTICAL "build analytical solution" ON)
 
 option(SPH_EXA_WITH_CUDA "Enable building for NVIDIA GPUs" ON)
 option(SPH_EXA_WITH_HIP "Enable building for AMD GPUs" ON)
-option(GPU_DIRECT "Enable CUDA-aware MPI communication" OFF)
 
 set(CSTONE_DIR ${PROJECT_SOURCE_DIR}/domain/include)
 set(CSTONE_TEST_DIR ${PROJECT_SOURCE_DIR}/domain/test)
@@ -104,6 +103,7 @@ endif()
 
 add_subdirectory(domain)
 add_subdirectory(ryoanji)
+add_subdirectory(scripts)
 add_subdirectory(sph)
 add_subdirectory(physics)
 add_subdirectory(main)

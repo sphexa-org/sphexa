@@ -32,6 +32,7 @@
 #pragma once
 
 #include <chrono>
+#include "cstone/cuda/errorcheck.cuh"
 
 #ifdef __CUDACC__
 
@@ -66,21 +67,21 @@ template<class F>
 float timeGpu(F&& f)
 {
     hipEvent_t start, stop;
-    hipEventCreate(&start);
-    hipEventCreate(&stop);
+    checkGpuErrors(hipEventCreate(&start));
+    checkGpuErrors(hipEventCreate(&stop));
 
-    hipEventRecord(start, hipStreamDefault);
+    checkGpuErrors(hipEventRecord(start, hipStreamDefault));
 
     f();
 
-    hipEventRecord(stop, hipStreamDefault);
-    hipEventSynchronize(stop);
+    checkGpuErrors(hipEventRecord(stop, hipStreamDefault));
+    checkGpuErrors(hipEventSynchronize(stop));
 
     float t0;
-    hipEventElapsedTime(&t0, start, stop);
+    checkGpuErrors(hipEventElapsedTime(&t0, start, stop));
 
-    hipEventDestroy(start);
-    hipEventDestroy(stop);
+    checkGpuErrors(hipEventDestroy(start));
+    checkGpuErrors(hipEventDestroy(stop));
 
     return t0;
 }

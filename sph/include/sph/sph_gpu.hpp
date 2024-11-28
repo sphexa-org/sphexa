@@ -13,10 +13,6 @@ using cstone::GroupData;
 using cstone::GroupView;
 
 template<class Dataset>
-extern void computeSpatialGroups(size_t, size_t, Dataset& d, const cstone::Box<typename Dataset::RealType>&,
-                                 GroupData<cstone::GpuTag>&);
-
-template<class Dataset>
 extern void computeIADGpu(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
 
 template<class Dataset>
@@ -75,5 +71,8 @@ template<class T>
 extern void groupAccTimestepGpu(float etaAcc, const GroupView&, const T* ax, const T* ay, const T* az, float* groupDt);
 
 void storeRungGpu(const GroupView& grp, uint8_t rung, uint8_t* particleRungs);
+
+//! @brief max number of particles per group used in neighbor search for SPH
+unsigned nsGroupSize();
 
 } // namespace sph

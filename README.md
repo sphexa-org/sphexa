@@ -109,7 +109,7 @@ Module and CMake configuration on LUMI
 ```shell
 module load CrayEnv buildtools/22.12 craype-accel-amd-gfx90a rocm cray-hdf5-parallel
 cd <GIT_SOURCE_DIR>; hipify-perl -inplace `find -name *.cu -o -name *.cuh` && find -name *.prehip -delete
-cmake -DCMAKE_CXX_COMPILER=CC -DCMAKE_HIP_ARCHITECTURES=gfx90a -DCMAKE_HIP_COMPILER=CC -DCMAKE_HIP_COMPILER_FORCED=ON -DGPU_DIRECT=<ON/OFF> -S <GIT_SOURCE_DIR>
+cmake -DCMAKE_CXX_COMPILER=CC -DCMAKE_HIP_ARCHITECTURES=gfx90a -DCMAKE_HIP_COMPILER=CC -DCMAKE_HIP_COMPILER_FORCED=ON -DCSTONE_WITH_GPU_AWARE_MPI=ON -S <GIT_SOURCE_DIR>
 ```
 
 Build everything: ```make -j```

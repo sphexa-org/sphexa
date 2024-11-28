@@ -31,7 +31,6 @@
  */
 
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/findneighbors.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
 
 #include "sph/sph_gpu.hpp"

@@ -14,4 +14,8 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
                            $<TARGET_OBJECTS:traversal_obj>
                            $<TARGET_OBJECTS:source_center_gpu_obj>
                            $<TARGET_OBJECTS:gpu_utils_obj>)
+
+    if (CSTONE_WITH_GPU_AWARE_MPI)
+        target_compile_definitions(cstone_gpu INTERFACE CSTONE_HAVE_GPU_AWARE_MPI)
+    endif()
 endif ()

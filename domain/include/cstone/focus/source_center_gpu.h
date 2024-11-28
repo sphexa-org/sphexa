@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "cstone/focus/source_center.hpp"
 #include "cstone/tree/definitions.h"
 
 namespace cstone

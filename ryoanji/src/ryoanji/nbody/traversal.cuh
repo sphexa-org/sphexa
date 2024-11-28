@@ -35,7 +35,7 @@
 #include <algorithm>
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/primitives/warpscan.cuh"
-#include "cstone/traversal/groups.cuh"
+#include "cstone/traversal/groups.hpp"
 #include "cartesian_qpole.hpp"
 #include "kernel.hpp"
 
@@ -561,81 +561,6 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverse(
             }
         }
     }
-}
-
-/*! @brief Compute approximate body accelerations with Barnes-Hut
- *
- * @param[in]    firstBody      index of first body in @p bodyPos to compute acceleration for
- * @param[in]    lastBody       index (exclusive) of last body in @p bodyPos to compute acceleration for
- * @param[in]    x,y,z,m,h      bodies, in SFC order and as referenced by sourceCells
- * @param[in]    G              gravitational constant
- * @param[in]    numShells      number of periodic shells in each dimension to include
- * @param[in]    box            coordinate bounding box
- * @param[inout] p              body potential to add to, on device
- * @param[inout] ax,ay,az       body acceleration to add to
- * @param[in]    childOffsets   location (index in [0:numTreeNodes]) of first child of each cell, 0 indicates a leaf
- * @param[in]    internalToLeaf for each cell in [0:numTreeNodes], stores the leaf cell (cstone) index in [0:numLeaves]
- *                              if the cell is not a leaf, the value is negative
- * @param[in]    layout         for each leaf cell in [0:numLeaves], stores the index of the first body in the cell
- * @param[in]    sourceCenter   x,y,z center and square MAC radius of each cell in [0:numTreeNodes]
- * @param[in]    Multipole      cell multipoles, on device
- * @return                      P2P and M2P interaction statistics
- */
-template<class Tc, class Th, class Tm, class Ta, class Tf, class MType>
-auto computeAcceleration(size_t firstBody, size_t lastBody, const Tc* x, const Tc* y, const Tc* z, const Tm* m,
-                         const Th* h, Tc G, int numShells, const cstone::Box<Tc>& box, Ta* p, Ta* ax, Tc* ay, Tc* az,
-                         const TreeNodeIndex* childOffsets, const TreeNodeIndex* internalToLeaf,
-                         const LocalIndex* layout, const Vec4<Tf>* sourceCenter, const MType* Multipole)
-{
-    constexpr int numWarpsPerBlock = TravConfig::numThreads / GpuConfig::warpSize;
-
-    cstone::GroupData<cstone::GpuTag> groups;
-    cstone::computeFixedGroups(firstBody, lastBody, TravConfig::targetSize, groups);
-
-    LocalIndex numBodies  = lastBody - firstBody;
-    int        numTargets = (numBodies - 1) / TravConfig::targetSize + 1;
-    int        numBlocks  = (numTargets - 1) / numWarpsPerBlock + 1;
-    numBlocks             = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
-
-    printf("launching %d blocks\n", numBlocks);
-
-    const int                  poolSize = TravConfig::memPerWarp * numWarpsPerBlock * numBlocks;
-    thrust::device_vector<int> globalPool(poolSize);
-
-    resetTraversalCounters<<<1, 1>>>();
-    auto t0 = std::chrono::high_resolution_clock::now();
-    traverse<<<numBlocks, TravConfig::numThreads>>>(
-        groups.view(), 1, x, y, z, m, h, childOffsets, internalToLeaf, layout, sourceCenter, Multipole, G, numShells,
-        {box.lx(), box.ly(), box.lz()}, p, ax, ay, az, thrust::raw_pointer_cast(globalPool.data()));
-    kernelSuccess("traverse");
-
-    auto   t1 = std::chrono::high_resolution_clock::now();
-    double dt = std::chrono::duration<double>(t1 - t0).count();
-
-    typename BhStats::type stats[BhStats::numStats];
-    checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(bhStats), BhStats::numStats * sizeof(BhStats::type)));
-
-    auto sumP2P = stats[BhStats::sumP2P];
-    auto maxP2P = stats[BhStats::maxP2P];
-    auto sumM2P = stats[BhStats::sumM2P];
-    auto maxM2P = stats[BhStats::maxM2P];
-
-    float totalPotential;
-    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
-
-    util::array<Tc, 5> interactions;
-    interactions[0] = Tc(sumP2P) / Tc(numBodies);
-    interactions[1] = Tc(maxP2P);
-    interactions[2] = Tc(sumM2P) / Tc(numBodies);
-    interactions[3] = Tc(maxM2P);
-    interactions[4] = totalPotential;
-
-    Tc flops = (interactions[0] * 20.0 + interactions[2] * 2.0 * powf(ExpansionOrder<MType{}.size()>{}, 3)) *
-               Tc(numBodies) / dt / 1e12;
-
-    fprintf(stdout, "Traverse             : %.7f s (%.7f TFlops)\n", dt, flops);
-
-    return interactions;
 }
 
 } // namespace ryoanji

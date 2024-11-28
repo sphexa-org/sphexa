@@ -17,10 +17,6 @@ function(addRyoanjiGpuMpiTest source exename testname ranks)
         target_link_libraries(${exename} PRIVATE cstone_gpu ryoanji)
     endif()
 
-    if (GPU_DIRECT)
-        target_compile_definitions(${exename} PRIVATE USE_GPU_DIRECT)
-    endif ()
-
     if (CMAKE_HIP_COMPILER)
         target_link_libraries(${exename} PRIVATE hip::host)
         target_compile_definitions(${exename} PRIVATE THRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)

@@ -213,14 +213,6 @@ EwaldParameters<Tc, Tmm> ewaldInitParameters(const CartesianQuadrupole<Tmm>& Mro
     return params;
 }
 
-template<class Tc, class Tmm>
-EwaldParameters<Tc, Tmm> ewaldInitParameters(const SphericalMultipole<Tmm, 4>& /*Mroot*/,
-                                             const Vec3<Tc>& /*Mroot_center*/, int /*numReplicaShells*/, double /*L*/,
-                                             double /*lCut*/, double /*hCut*/, double /*alpha_scale*/)
-{
-    throw std::runtime_error("Ewald periodic gravity correction not implemented for spherical multipoles\n");
-}
-
 //! @brief real space Ewald contribution to the potential and acceleration of a single particle @p r
 template<class T1, class T2>
 HOST_DEVICE_FUN Vec4<T1> computeEwaldRealSpace(Vec3<T1> r, const EwaldParameters<T1, T2>& params)

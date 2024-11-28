@@ -88,10 +88,6 @@ TEST(Gravity, TreeWalk)
     std::vector<MultipoleType> multipoles(octree.numNodes);
     computeLeafMultipoles(x, y, z, masses.data(), toInternal, layout.data(), centers.data(), multipoles.data());
     upsweepMultipoles(octree.levelRange, octree.childOffsets.data(), centers.data(), multipoles.data());
-    for (size_t i = 0; i < multipoles.size(); ++i)
-    {
-        multipoles[i] = ryoanji::normalize(multipoles[i]);
-    }
 
     T totalMass = std::accumulate(masses.begin(), masses.end(), 0.0);
     EXPECT_TRUE(std::abs(totalMass - multipoles[0][ryoanji::Cqi::mass]) < 1e-6);

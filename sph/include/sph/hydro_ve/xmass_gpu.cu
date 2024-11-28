@@ -1,8 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Basel, University of Zurich
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -46,6 +45,8 @@ using cstone::LocalIndex;
 using cstone::NcStats;
 using cstone::TravConfig;
 using cstone::TreeNodeIndex;
+
+unsigned nsGroupSize() { return TravConfig::targetSize; }
 
 namespace cuda
 {

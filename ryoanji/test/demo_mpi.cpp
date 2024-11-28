@@ -47,8 +47,7 @@ using namespace ryoanji;
 template<class T, class KeyType>
 void ryoanjiTest(int thisRank, int numRanks, size_t numParticlesGlobal)
 {
-    constexpr int P                = 4;
-    using MultipoleType            = SphericalMultipole<T, P>;
+    using MultipoleType            = CartesianQuadrupole<T>;
     size_t   numParticles          = numParticlesGlobal / numRanks;
     unsigned bucketSizeFocus       = 64;
     unsigned numGlobalNodesPerRank = 100;
@@ -114,7 +113,7 @@ void ryoanjiTest(int thisRank, int numRanks, size_t numParticlesGlobal)
     mpiAllreduce(&totalPotential, &totalPotentialGlobal, 1, MPI_SUM);
 
     auto [numP2P, maxP2P, numM2P, maxM2P, maxStack] = multipoleHolder.readStats();
-    double flops                                    = (numP2P * 23 + numM2P * 2 * pow(P, 3)) / dt / 1e12;
+    double flops                                    = (numP2P * 23 + numM2P * 65) / dt / 1e12;
 
     for (int rank = 0; rank < numRanks; ++rank)
     {
