@@ -109,17 +109,23 @@ auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, const
 
     // Limit shrinking of the bounding box in a single time-step due to removing of single particles that are far from
     // the system.
-    // The limit is applied equally on both sides such that the box can still follow the center of mass.
-    constexpr T shrink_limit{0.9};
+    constexpr T shrink_limit{0.05};
     const cstone::Vec3<T> previousDiff{previousBox.xmax() - previousBox.xmin(), previousBox.ymax() - previousBox.ymin(),
                                        previousBox.zmax() - previousBox.zmin()};
-    const cstone::Vec3<T> tightFitDiff{extrema[1] - extrema[0], extrema[3] - extrema[2], extrema[5] - extrema[4]};
-    const auto diffLowerLimit = previousDiff * shrink_limit;
-    const auto diffAdd        = max((diffLowerLimit - tightFitDiff) * 0.5, cstone::Vec3<T>{0., 0., 0.});
+    const std::array<T, 6> extrema_limits{
+        previousBox.xmin() + shrink_limit * previousDiff[0], previousBox.xmax() - shrink_limit * previousDiff[0],
+        previousBox.ymin() + shrink_limit * previousDiff[1], previousBox.ymax() - shrink_limit * previousDiff[1],
+        previousBox.zmin() + shrink_limit * previousDiff[2], previousBox.zmax() - shrink_limit * previousDiff[2]};
 
-    return Box<T>{extrema[0] - diffAdd[0], extrema[1] + diffAdd[0], extrema[2] - diffAdd[1],
-                  extrema[3] + diffAdd[1], extrema[4] - diffAdd[2], extrema[5] + diffAdd[2],
-                  previousBox.boundaryX(), previousBox.boundaryY(), previousBox.boundaryZ()};
+    return Box<T>{std::min(extrema[0], extrema_limits[0]),
+                  std::max(extrema[1], extrema_limits[1]),
+                  std::min(extrema[2], extrema_limits[2]),
+                  std::max(extrema[3], extrema_limits[3]),
+                  std::min(extrema[4], extrema_limits[4]),
+                  std::max(extrema[5], extrema_limits[5]),
+                  previousBox.boundaryX(),
+                  previousBox.boundaryY(),
+                  previousBox.boundaryZ()};
 }
 
 } // namespace cstone
