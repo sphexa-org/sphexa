@@ -44,7 +44,8 @@
 #include "nbody/dataset.hpp"
 #include "ryoanji/interface/treebuilder.cuh"
 #include "ryoanji/nbody/types.h"
-#include "ryoanji/nbody/traversal.cuh"
+#include "ryoanji/nbody/cartesian_qpole.hpp"
+#include "ryoanji/nbody/traversal_gpu.h"
 #include "ryoanji/nbody/direct.cuh"
 #include "ryoanji/nbody/upsweep_gpu.h"
 
@@ -162,7 +163,7 @@ int main(int argc, char** argv)
 
     fprintf(stdout, "--- BH vs. direct ---------------\n");
 
-    std::cout << "potentials, body-sum: " << 0.5 * G * potentialSum << " atomic sum: " << 0.5 * G * interactions[4]
+    std::cout << "potentials, body-sum: " << 0.5 * G * potentialSum << " atomic sum: " << interactions[4]
               << " reference: " << referencePotential << std::endl;
     std::cout << "min Error: " << delta[0] << std::endl;
     std::cout << "50th percentile: " << delta[numBodies / 2] << std::endl;
@@ -206,37 +207,23 @@ util::array<Tc, 5> computeAcceleration(size_t firstBody, size_t lastBody, const 
                                        const TreeNodeIndex* internalToLeaf, const LocalIndex* layout,
                                        const Vec4<Tf>* sourceCenter, const MType* Multipole)
 {
-    constexpr int numWarpsPerBlock = TravConfig::numThreads / GpuConfig::warpSize;
-
+    auto                              numBodies = lastBody - firstBody;
     cstone::GroupData<cstone::GpuTag> groups;
-    cstone::computeFixedGroups(firstBody, lastBody, TravConfig::targetSize, groups);
+    cstone::computeFixedGroups(firstBody, lastBody, bhMaxTargetSize(), groups);
 
-    LocalIndex numBodies  = lastBody - firstBody;
-    int        numTargets = (numBodies - 1) / TravConfig::targetSize + 1;
-    int        numBlocks  = (numTargets - 1) / numWarpsPerBlock + 1;
-    numBlocks             = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
-
-    printf("launching %d blocks\n", numBlocks);
-
-    const int                  poolSize = TravConfig::memPerWarp * numWarpsPerBlock * numBlocks;
+    const int                  poolSize = stackSize(groups.numGroups);
     thrust::device_vector<int> globalPool(poolSize);
 
-    resetTraversalCounters<<<1, 1>>>();
-    traverse<<<numBlocks, TravConfig::numThreads>>>(
-        groups.view(), 1, x, y, z, m, h, childOffsets, internalToLeaf, layout, sourceCenter, Multipole, G, numShells,
-        {box.lx(), box.ly(), box.lz()}, p, ax, ay, az, thrust::raw_pointer_cast(globalPool.data()));
+    double totalPotential =
+        traverse(groups.view(), 1, x, y, z, m, h, childOffsets, internalToLeaf, layout, sourceCenter, Multipole, G,
+                 numShells, {box.lx(), box.ly(), box.lz()}, p, ax, ay, az, thrust::raw_pointer_cast(globalPool.data()));
     kernelSuccess("traverse");
 
-    typename BhStats::type stats[BhStats::numStats];
-    checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(bhStats), BhStats::numStats * sizeof(BhStats::type)));
-
-    auto sumP2P = stats[BhStats::sumP2P];
-    auto maxP2P = stats[BhStats::maxP2P];
-    auto sumM2P = stats[BhStats::sumM2P];
-    auto maxM2P = stats[BhStats::maxM2P];
-
-    float totalPotential;
-    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
+    auto stats  = readBhStats();
+    auto sumP2P = stats[0];
+    auto maxP2P = stats[1];
+    auto sumM2P = stats[2];
+    auto maxM2P = stats[3];
 
     util::array<Tc, 5> interactions;
     interactions[0] = Tc(sumP2P) / Tc(numBodies);

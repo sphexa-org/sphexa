@@ -179,8 +179,12 @@ template class DeviceVector<util::array<uint64_t, 1>>;
 template class DeviceVector<util::array<uint64_t, 2>>;
 template class DeviceVector<util::array<unsigned, 2>>;
 template class DeviceVector<util::array<float, 3>>;
-template class DeviceVector<util::array<double, 3>>;
 template class DeviceVector<util::array<float, 4>>;
+template class DeviceVector<util::array<float, 8>>;
+template class DeviceVector<util::array<float, 12>>;
+template class DeviceVector<util::array<double, 3>>;
 template class DeviceVector<util::array<double, 4>>;
+template class DeviceVector<util::array<double, 8>>;
+template class DeviceVector<util::array<double, 12>>;
 
 } // namespace cstone

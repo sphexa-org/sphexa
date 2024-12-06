@@ -63,9 +63,9 @@ struct Cqi
         qyz   = 5,
         qzz   = 6,
         trace = 7,
-        px = 8,
-        py = 9,
-        pz = 10,
+        px    = 8,
+        py    = 9,
+        pz    = 10,
     };
 };
 
@@ -249,8 +249,8 @@ HOST_DEVICE_FUN void M2M(int begin, int end, const Vec4<T>& Xout, const Vec4<T>*
     for (int i = begin; i < end; i++)
     {
         const CartesianQuadrupole<Tm>& Mi = Msrc[i];
-        Vec4<T>      Xi = Xsrc[i];
-        Vec3<T>      dX = makeVec3(Xout - Xi);
+        Vec4<T>                        Xi = Xsrc[i];
+        Vec3<T>                        dX = makeVec3(Xout - Xi);
         addQuadrupole(Mout, dX, Mi);
     }
 }

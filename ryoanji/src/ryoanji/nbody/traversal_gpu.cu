@@ -1,8 +1,9 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Ryoanji N-body solver
+ *
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,14 +31,12 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#pragma once
-
-#include <algorithm>
 #include "cstone/cuda/gpu_config.cuh"
+#include "cstone/primitives/math.hpp"
 #include "cstone/primitives/warpscan.cuh"
-#include "cstone/traversal/groups.hpp"
 #include "cartesian_qpole.hpp"
 #include "kernel.hpp"
+#include "traversal_gpu.h"
 
 namespace ryoanji
 {
@@ -409,7 +408,7 @@ __global__ void resetTraversalCounters()
  *                              so the total size is TravConfig::memPerWarp * numWarpsPerBlock * numBlocks
  */
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType>
-__global__ __launch_bounds__(TravConfig::numThreads) void traverse(
+__global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
     cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ x, const Tc* __restrict__ y,
     const Tc* __restrict__ z, const Tm* __restrict__ m, const Th* __restrict__ h,
     const TreeNodeIndex* __restrict__ childOffsets, const TreeNodeIndex* __restrict__ internalToLeaf,
@@ -561,6 +560,69 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverse(
             }
         }
     }
+}
+
+template<class Tc, class Th, class Tm, class Ta, class Tf, class MType>
+double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ x, const Tc* __restrict__ y,
+                const Tc* __restrict__ z, const Tm* __restrict__ m, const Th* __restrict__ h,
+                const TreeNodeIndex* __restrict__ childOffsets, const TreeNodeIndex* __restrict__ internalToLeaf,
+                const LocalIndex* __restrict__ layout, const Vec4<Tf>* __restrict__ sourceCenter,
+                const MType* __restrict__ multipoles, Tc G, int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az,
+                int* gmPool)
+{
+
+    int numWarpsPerBlock = TravConfig::numThreads / cstone::GpuConfig::warpSize;
+    int numBlocks        = cstone::iceil(grp.numGroups, numWarpsPerBlock);
+    numBlocks            = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
+
+    resetTraversalCounters<<<1, 1>>>();
+    traverseKernel<<<numBlocks, TravConfig::numThreads>>>(grp, initNodeIdx, x, y, z, m, h, childOffsets, internalToLeaf,
+                                                          layout, sourceCenter, multipoles, G, numShells, boxL, p, ax,
+                                                          ay, az, gmPool);
+    float totalPotential;
+    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
+    return 0.5 * Tc(G) * totalPotential;
+}
+
+#define TRAVERSE(Tc, Th, Tm, Ta, Tf, MType)                                                                            \
+    template double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ x,                   \
+                             const Tc* __restrict__ y, const Tc* __restrict__ z, const Tm* __restrict__ m,             \
+                             const Th* __restrict__ h, const TreeNodeIndex* __restrict__ childOffsets,                 \
+                             const TreeNodeIndex* __restrict__ internalToLeaf, const LocalIndex* __restrict__ layout,  \
+                             const Vec4<Tf>* __restrict__ sourceCenter, const MType* __restrict__ multipoles, Tc G,    \
+                             int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az, int* gmPool)
+
+#define TRAVERSE_MPOLE(MType)                                                                                          \
+    TRAVERSE(double, double, double, double, double, MType<double>);                                                   \
+    TRAVERSE(double, float, float, float, double, MType<float>);                                                       \
+    TRAVERSE(float, float, float, float, float, MType<float>);
+
+TRAVERSE_MPOLE(CartesianQuadrupole)
+TRAVERSE_MPOLE(CartesianMDQpole)
+
+int bhMaxTargetSize() { return TravConfig::targetSize; }
+
+LocalIndex stackSize(LocalIndex numGroups)
+{
+    int numWarpsPerBlock = TravConfig::numThreads / cstone::GpuConfig::warpSize;
+    int numBlocks        = cstone::iceil(numGroups, numWarpsPerBlock);
+    numBlocks            = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
+    LocalIndex poolSize  = TravConfig::memPerWarp * numWarpsPerBlock * numBlocks;
+    return poolSize;
+}
+
+util::array<uint64_t, 5> readBhStats()
+{
+    typename BhStats::type stats[BhStats::numStats];
+    checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(bhStats), BhStats::numStats * sizeof(BhStats::type)));
+
+    auto sumP2P   = stats[BhStats::sumP2P];
+    auto maxP2P   = stats[BhStats::maxP2P];
+    auto sumM2P   = stats[BhStats::sumM2P];
+    auto maxM2P   = stats[BhStats::maxM2P];
+    auto maxStack = stats[BhStats::maxStack];
+
+    return {sumP2P, maxP2P, sumM2P, maxM2P, maxStack};
 }
 
 } // namespace ryoanji

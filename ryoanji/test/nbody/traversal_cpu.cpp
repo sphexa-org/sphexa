@@ -47,9 +47,9 @@ TEST(Gravity, TreeWalk)
     using KeyType       = uint64_t;
     using MultipoleType = ryoanji::CartesianMDQpole<T>;
 
-    float          theta       = 0.2;
-    float          G           = 1.0;
-    unsigned       bucketSize  = 64;
+    float          theta      = 0.2;
+    float          G          = 1.0;
+    unsigned       bucketSize = 64;
     cstone::Box<T> box(-1, 1);
     int            numShells    = 0;
     LocalIndex     numParticles = 100000;
@@ -101,8 +101,8 @@ TEST(Gravity, TreeWalk)
     std::vector<T> ay(numParticles, 0);
     std::vector<T> az(numParticles, 0);
 
-    auto   t0       = std::chrono::high_resolution_clock::now();
-    T egravTot = 0;
+    auto t0       = std::chrono::high_resolution_clock::now();
+    T    egravTot = 0;
     computeGravity(octree.childOffsets.data(), octree.internalToLeaf.data(), centers.data(), multipoles.data(),
                    layout.data(), 0, octree.numLeafNodes, x, y, z, h.data(), masses.data(), box, G, (T*)nullptr,
                    ax.data(), ay.data(), az.data(), &egravTot, numShells);

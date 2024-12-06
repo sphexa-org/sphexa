@@ -29,18 +29,14 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#include <thrust/device_vector.h>
-
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/cuda/thrust_util.cuh"
-#include "cstone/primitives/math.hpp"
 #include "cstone/traversal/groups_gpu.h"
 #include "cstone/util/reallocate.hpp"
 #include "ryoanji/nbody/cartesian_qpole.hpp"
 #include "ryoanji/nbody/direct.cuh"
 #include "ryoanji/nbody/upsweep_gpu.h"
 #include "ryoanji/nbody/upsweep_cpu.hpp"
-#include "ryoanji/nbody/traversal.cuh"
+#include "ryoanji/nbody/traversal_gpu.h"
 #include "multipole_holder.cuh"
 
 namespace ryoanji
@@ -60,7 +56,7 @@ public:
         auto  d_leaves  = focusTree.treeLeavesAcc();
         float tolFactor = 2.0f;
         cstone::computeGroupSplits(first, last, x, y, z, h, d_leaves.data(), d_leaves.size() - 1, layout, box,
-                                   TravConfig::targetSize, tolFactor, traversalStack_, groups_.data);
+                                   bhMaxTargetSize(), tolFactor, traversalStack_, groups_.data);
 
         groups_.firstBody  = first;
         groups_.lastBody   = last;
@@ -130,35 +126,13 @@ public:
     float compute(GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m, const Th* h, Tc G, int numShells,
                   const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az)
     {
-        int numWarpsPerBlock = TravConfig::numThreads / cstone::GpuConfig::warpSize;
-        int numBlocks        = cstone::iceil(grp.numGroups, numWarpsPerBlock);
-        numBlocks            = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
-        LocalIndex poolSize  = TravConfig::memPerWarp * numWarpsPerBlock * numBlocks;
-
-        resetTraversalCounters<<<1, 1>>>();
-
-        reallocate(traversalStack_, poolSize, 1.01);
-        traverse<<<numBlocks, TravConfig::numThreads>>>(
-            grp, 1, x, y, z, m, h, octree_.childOffsets, octree_.internalToLeaf, layout_, centers_, rawPtr(multipoles_),
-            G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()}, ugrav, ax, ay, az, (int*)rawPtr(traversalStack_));
-        float totalPotential;
-        checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
-        return 0.5f * Tc(G) * totalPotential;
+        reallocate(traversalStack_, stackSize(grp.numGroups), 1.01);
+        return traverse(grp, 1, x, y, z, m, h, octree_.childOffsets, octree_.internalToLeaf, layout_, centers_,
+                        rawPtr(multipoles_), G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()}, (Ta*)nullptr, ax, ay,
+                        az, (int*)rawPtr(traversalStack_));
     }
 
-    util::array<uint64_t, 5> readStats() const
-    {
-        typename BhStats::type stats[BhStats::numStats];
-        checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(bhStats), BhStats::numStats * sizeof(BhStats::type)));
-
-        auto sumP2P   = stats[BhStats::sumP2P];
-        auto maxP2P   = stats[BhStats::maxP2P];
-        auto sumM2P   = stats[BhStats::sumM2P];
-        auto maxM2P   = stats[BhStats::maxM2P];
-        auto maxStack = stats[BhStats::maxStack];
-
-        return {sumP2P, maxP2P, sumM2P, maxM2P, maxStack};
-    }
+    util::array<uint64_t, 5> readStats() const { return readBhStats(); }
 
     const MType* deviceMultipoles() const { return rawPtr(multipoles_); }
 
@@ -168,20 +142,15 @@ private:
         double growthRate = 1.01;
         size_t numNodes   = numLeaves + (numLeaves - 1) / 7;
 
-        if (numLeaves > multipoles_.capacity())
-        {
-            multipoles_.clear();
-            multipoles_.shrink_to_fit();
-        }
-        reallocate(multipoles_, numNodes, growthRate);
+        reallocateDestructive(multipoles_, numNodes, growthRate);
     }
 
     cstone::OctreeView<const KeyType> octree_;
 
     //! @brief properties of focused octree nodes
-    const LocalIndex*            layout_;
-    const Vec4<Tf>*              centers_;
-    thrust::device_vector<MType> multipoles_;
+    const LocalIndex*           layout_;
+    const Vec4<Tf>*             centers_;
+    cstone::DeviceVector<MType> multipoles_;
 
     //! @brief target particle group data
     cstone::GroupData<cstone::GpuTag> groups_;
@@ -237,19 +206,16 @@ const MType* MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::deviceMultipol
     return impl_->deviceMultipoles();
 }
 
-#define MHOLDER_CART(Tc, Th, Tm, Ta, Tf, KeyType, MVal)                                                                \
-    template class MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, CartesianQuadrupole<MVal>>
+#define MHOLDER_MTYPE(Tc, Th, Tm, Ta, Tf, KeyType, MType)                                                              \
+    template class MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>
 
-MHOLDER_CART(double, double, double, double, double, uint64_t, double);
-MHOLDER_CART(double, float, float, float, double, uint64_t, float);
-MHOLDER_CART(float, float, float, float, float, uint64_t, float);
+#define MHOLDER(MType)                                                                                                 \
+    MHOLDER_MTYPE(double, double, double, double, double, uint64_t, MType<double>);                                    \
+    MHOLDER_MTYPE(double, float, float, float, double, uint64_t, MType<float>);                                        \
+    MHOLDER_MTYPE(float, float, float, float, float, uint64_t, MType<float>);
 
-#define MHOLDER_CART_DIPOLE(Tc, Th, Tm, Ta, Tf, KeyType, MVal)                                                         \
-    template class MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, CartesianMDQpole<MVal>>
-
-MHOLDER_CART_DIPOLE(double, double, double, double, double, uint64_t, double);
-MHOLDER_CART_DIPOLE(double, float, float, float, double, uint64_t, float);
-MHOLDER_CART_DIPOLE(float, float, float, float, float, uint64_t, float);
+MHOLDER(CartesianQuadrupole)
+MHOLDER(CartesianMDQpole)
 
 #define DIRECT_SUM(T)                                                                                                  \
     template void directSum(size_t, size_t, size_t, Vec3<T>, int, const T*, const T*, const T*, const T*, const T*,    \
