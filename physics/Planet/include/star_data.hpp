@@ -15,10 +15,10 @@ namespace disk
 struct StarData
 {
     //! @brief position of the central star
-    std::array<double, 3> position{};
+    cstone::Vec3<double> position{};
 
     //! @brief position of the central star in the last step
-    std::array<double, 3> position_m1{};
+    cstone::Vec3<double> position_m1{};
 
     //! @brief mass of the central star
     double m{1e6};

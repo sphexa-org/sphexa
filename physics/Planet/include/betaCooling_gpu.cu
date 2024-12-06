@@ -23,7 +23,7 @@ namespace disk
 
 template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho, typename Trho2>
 __global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, Tdu* du,
-                                     const Tu* u, Ts star_mass, Ts star_pos_x, Ts star_pos_y, Ts star_pos_z, Ts beta,
+                                     const Tu* u, Ts star_mass, cstone::Vec3<Ts> star_position, Ts beta,
                                      Tpos g, const Trho* rho, Ts u_floor, Trho2 cooling_rho_limit)
 
 {
@@ -31,9 +31,9 @@ __global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, c
     if (i >= last) { return; }
     if (rho[i] >= cooling_rho_limit || u[i] <= u_floor) return;
 
-    const double dx    = x[i] - star_pos_x;
-    const double dy    = y[i] - star_pos_y;
-    const double dz    = z[i] - star_pos_z;
+    const double dx    = x[i] - star_position[0];
+    const double dy    = y[i] - star_position[1];
+    const double dz    = z[i] - star_position[2];
     const double dist2 = dx * dx + dy * dy + dz * dz;
     const double dist  = sqrt(dist2);
     const double omega = sqrt(g * star_mass / (dist2 * dist));
@@ -49,7 +49,7 @@ void betaCoolingGPU(size_t first, size_t last, Dataset& d, StarData& star)
 
     betaCoolingGPUKernel<<<numBlocks, numThreads>>>(
         first, last, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.du),
-        rawPtr(d.devData.u), star.m, star.position[0], star.position[1], star.position[2], star.beta, d.g,
+        rawPtr(d.devData.u), star.m, star.position, star.beta, d.g,
         rawPtr(d.devData.rho), star.u_floor, star.cooling_rho_limit);
 
     checkGpuErrors(cudaDeviceSynchronize());

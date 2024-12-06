@@ -30,8 +30,8 @@ __device__ void atomicAddVec4(cstone::Vec4<T>* x, const cstone::Vec4<T>& y)
 template<size_t numThreads, typename Tpos, typename Ta, typename Tm, typename Tsp, typename Tsm, typename Tg,
          typename Tis, typename Tf>
 __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z,
-                                             Ta* ax, Ta* ay, Ta* az, const Tm* m, Tsp star_pos_x, Tsp star_pos_y,
-                                             Tsp star_pos_z, Tsm sm, Tg g, Tis inner_size2, Tf* force_device)
+                                             Ta* ax, Ta* ay, Ta* az, const Tm* m, const cstone::Vec3<Tsp> star_position,
+                                             Tsm sm, Tg g, Tis inner_size2, Tf* force_device)
 {
     cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
     Tf                 force{};
@@ -39,9 +39,9 @@ __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Tp
     if (i >= last) { force = {0., 0., 0., 0.}; }
     else
     {
-        const double dx    = x[i] - star_pos_x;
-        const double dy    = y[i] - star_pos_y;
-        const double dz    = z[i] - star_pos_z;
+        const double dx    = x[i] - star_position[0];
+        const double dy    = y[i] - star_position[1];
+        const double dz    = z[i] - star_position[2];
         const double dist2 = stl::max(inner_size2, dx * dx + dy * dy + dz * dz);
         const double dist  = sqrt(dist2);
         const double dist3 = dist2 * dist;
@@ -82,8 +82,8 @@ void computeCentralForceGPU(size_t first, size_t last, Dataset& d, StarData& sta
 
     computeCentralForceGPUKernel<numThreads><<<numBlocks, numThreads>>>(
         first, last, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.ax),
-        rawPtr(d.devData.ay), rawPtr(d.devData.az), rawPtr(d.devData.m), star.position[0], star.position[1],
-        star.position[2], star.m, d.g, star.inner_size * star.inner_size, force_device);
+        rawPtr(d.devData.ay), rawPtr(d.devData.az), rawPtr(d.devData.m), star.position, star.m, d.g,
+        star.inner_size * star.inner_size, force_device);
 
     checkGpuErrors(cudaDeviceSynchronize());
     checkGpuErrors(cudaGetLastError());

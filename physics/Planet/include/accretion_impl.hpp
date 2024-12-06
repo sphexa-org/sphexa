@@ -6,16 +6,17 @@
 
 #include <algorithm>
 #include <execution>
+#include <iostream>
 #include <numeric>
 #include <vector>
-#include <iostream>
 #include "cstone/tree/definitions.h"
 #include "removalStatistics.hpp"
+#include "star_data.hpp"
 
 namespace disk
 {
 
-template<typename Dataset, typename StarData>
+template<typename Dataset>
 void computeAccretionConditionImpl(size_t first, size_t last, Dataset& d, StarData& star)
 {
     const double star_size2 = star.inner_size * star.inner_size;
