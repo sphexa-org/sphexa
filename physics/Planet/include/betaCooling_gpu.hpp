@@ -4,7 +4,7 @@
 
 #pragma once
 
-namespace planet
+namespace disk
 {
 template<typename Dataset, typename StarData>
 void betaCoolingGPU(size_t first, size_t last, Dataset& d, StarData& star);

@@ -4,5 +4,10 @@
 
 #pragma once
 
-template<typename Dataset, typename StarData>
+#include "star_data.hpp"
+
+namespace disk
+{
+template<typename Dataset>
 void computeAccretionConditionGPU(size_t first, size_t last, Dataset& d, StarData& star);
+}

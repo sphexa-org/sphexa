@@ -48,7 +48,7 @@ protected:
     MHolder_t      mHolder_;
     GroupData<Acc> groups_;
 
-    StarData star;
+    disk::StarData star;
 
     /*! @brief the list of conserved particles fields with values preserved between iterations
      *
@@ -120,9 +120,9 @@ public:
         d.treeView = domain.octreeProperties();
     }
 
-    void eosSwitch(size_t first, size_t last, DataType& simData, const StarData& star)
+    void eosSwitch(size_t first, size_t last, DataType& simData, const disk::StarData& star)
     {
-        if (star.use_polytropic_eos) { planet::computePolytropicEOS_HydroStd(first, last, simData.hydro, star); }
+        if (star.use_polytropic_eos) { disk::computePolytropicEOS_HydroStd(first, last, simData.hydro, star); }
         else { computeEOS_HydroStd(first, last, simData.hydro); }
     }
 
@@ -171,12 +171,12 @@ public:
             timer.step("Gravity");
         }
 
-        planet::betaCooling(first, last, d, star);
+        disk::betaCooling(first, last, d, star);
         timer.step("betaCooling");
 
-        planet::duTimestep(first, last, d, star);
+        disk::duTimestep(first, last, d, star);
 
-        planet::computeCentralForce(first, last, d, star);
+        disk::computeCentralForce(first, last, d, star);
         timer.step("computeCentralForce");
     }
 
@@ -193,13 +193,13 @@ public:
         updateSmoothingLength(groups_.view(), d);
         timer.step("UpdateQuantities");
 
-        planet::computeAndExchangeStarPosition(star, d.minDt, d.minDt_m1, Base::rank_);
+        disk::computeAndExchangeStarPosition(star, d.minDt, d.minDt_m1, Base::rank_);
         timer.step("computeAndExchangeStarPosition");
 
-        planet::computeAccretionCondition(first, last, d, star);
+        disk::computeAccretionCondition(first, last, d, star);
         timer.step("computeAccretionCondition");
 
-        planet::exchangeAndAccreteOnStar(star, d.minDt_m1, Base::rank_);
+        disk::exchangeAndAccreteOnStar(star, d.minDt_m1, Base::rank_);
         timer.step("exchangeAndAccreteOnStar");
 
         if (Base::rank_ == 0)

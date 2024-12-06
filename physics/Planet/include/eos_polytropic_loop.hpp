@@ -4,7 +4,7 @@
 
 #include "cstone/util/tuple.hpp"
 
-namespace planet
+namespace disk
 {
 /*! @brief general polytropic equation of state. P = Kpoly * rho^exp_poly
  *

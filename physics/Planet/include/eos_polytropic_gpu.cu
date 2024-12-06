@@ -11,7 +11,7 @@
 #include "sph/particles_data.hpp"
 #include "star_data.hpp"
 
-namespace planet
+namespace disk
 {
 
 template<typename T1, typename T2, typename T3, typename Trho, typename Tp, typename Tc>

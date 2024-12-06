@@ -6,7 +6,7 @@
 #include "cstone/tree/definitions.h"
 #include "sph/timestep.h"
 
-namespace planet
+namespace disk
 {
 template<typename Dataset, typename StarData>
 extern void computePolytropicEOS_HydroStdGPU(size_t firstParticle, size_t lastParticle, Dataset& d,

@@ -9,7 +9,7 @@
 #include "betaCooling_gpu.hpp"
 #include "sph/particles_data.hpp"
 
-namespace planet
+namespace disk
 {
 
 template<typename Dataset, typename StarData>

@@ -17,7 +17,7 @@
 #include "accretion_impl.hpp"
 #include "accretion_gpu.hpp"
 
-namespace planet
+namespace disk
 {
 
 //! @brief Flag particles for removal. Overwrites keys for the removed particles.
@@ -41,11 +41,11 @@ void exchangeAndAccreteOnStar(StarData& star, double minDt_m1, int rank)
     double                m_removed_global{};
     std::array<double, 3> p_removed_global{};
 
-    MPI_Reduce(&star.m_accreted_local, &m_accreted_global, 1, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
-    MPI_Reduce(star.p_accreted_local.data(), p_accreted_global.data(), 3, MpiType<double>{}, MPI_SUM, 0,
+    MPI_Reduce(&star.accreted_local.mass, &m_accreted_global, 1, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(star.accreted_local.momentum.data(), p_accreted_global.data(), 3, MpiType<double>{}, MPI_SUM, 0,
                MPI_COMM_WORLD);
-    MPI_Reduce(&star.m_removed_local, &m_removed_global, 1, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
-    MPI_Reduce(star.p_removed_local.data(), p_removed_global.data(), 3, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&star.removed_local.mass, &m_removed_global, 1, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(star.removed_local.momentum.data(), p_removed_global.data(), 3, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
 
     if (rank == 0)
     {
@@ -70,7 +70,7 @@ void exchangeAndAccreteOnStar(StarData& star, double minDt_m1, int rank)
                p_accreted_global[2], p_star[2]);
     }
 
-    if (rank == 0) { printf("accreted mass local: %g\n", star.m_accreted_local); }
+    if (rank == 0) { printf("accreted mass local: %g\n", star.accreted_local.mass); }
 
     MPI_Bcast(star.position_m1.data(), 3, MpiType<double>{}, 0, MPI_COMM_WORLD);
     MPI_Bcast(&star.m, 1, MpiType<double>{}, 0, MPI_COMM_WORLD);

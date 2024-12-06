@@ -12,7 +12,7 @@
 #include "sph/particles_data_stubs.hpp"
 #include "sph/eos.hpp"
 
-namespace planet
+namespace disk
 {
 
 template<typename Dataset, typename StarData>

@@ -18,21 +18,18 @@
 #include "accretion_impl.hpp"
 #include "sph/particles_data.hpp"
 
-namespace planet
+namespace disk
 {
 
 template<typename Dataset, typename StarData>
 void computeCentralForceImpl(size_t first, size_t last, Dataset& d, StarData& star)
 {
-    using Tf    = typename decltype(star.force_local)::value_type;
-    Tf force[3] = {};
-
-    using Tp = std::decay_t<decltype(star.potential_local)>;
-    Tp potential{0.};
-
+    cstone::Vec4<double> force_local{};
     const double inner_size2 = star.inner_size * star.inner_size;
 
-#pragma omp parallel for reduction(+ : force[:3]) reduction(+ : potential)
+#pragma omp declare reduction(add_force : cstone::Vec4<double> : omp_out = omp_out + omp_in) initializer(omp_priv = {})
+
+#pragma omp parallel for reduction(add_force : force_local)
     for (size_t i = first; i < last; i++)
     {
         const double dx    = d.x[i] - star.position[0];
@@ -50,15 +47,13 @@ void computeCentralForceImpl(size_t first, size_t last, Dataset& d, StarData& st
         d.ay[i] += ay_i;
         d.az[i] += az_i;
 
-        force[0] -= ax_i * d.m[i];
-        force[1] -= ay_i * d.m[i];
-        force[2] -= az_i * d.m[i];
-        potential -= d.g * d.m[i] / dist;
+        force_local[0] -= d.g * d.m[i] / dist;
+        force_local[1] -= ax_i * d.m[i];
+        force_local[2] -= ay_i * d.m[i];
+        force_local[3] -= az_i * d.m[i];
     }
 
-    star.force_local[0] = force[0];
-    star.force_local[1] = force[1];
-    star.force_local[2] = force[2];
+    star.force_local = force_local;
 }
 
 template<typename Dataset, typename StarData>
@@ -71,4 +66,4 @@ void computeCentralForce(size_t startIndex, size_t endIndex, Dataset& d, StarDat
     else { computeCentralForceImpl(startIndex, endIndex, d, star); }
 }
 
-} // namespace planet
+} // namespace disk

@@ -7,7 +7,7 @@
 #include <mpi.h>
 #include "cstone/primitives/mpi_wrappers.hpp"
 
-namespace planet
+namespace disk
 {
 
 //! @brief Compute the new star position by exchanging the force between the nodes and integrating the acceleration
@@ -15,16 +15,17 @@ template<typename StarData>
 void computeAndExchangeStarPosition(StarData& star, double dt, double dt_m1, int rank)
 {
     if (star.fixed_star == 1) { return; }
-    std::array<double, 3> global_force{};
+    std::array<double, 4> global_force{};
 
-    MPI_Reduce(star.force_local.data(), global_force.data(), 3, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
-    MPI_Reduce(&star.potential_local, &star.potential, 1, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(star.force_local.data(), global_force.data(), 4, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
+//    MPI_Reduce(&star.potential_local, &star.potential, 1, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
+    star.potential = global_force[0];
 
     if (rank == 0)
     {
-        double a_starx = global_force[0] / star.m;
-        double a_stary = global_force[1] / star.m;
-        double a_starz = global_force[2] / star.m;
+        double a_starx = global_force[1] / star.m;
+        double a_stary = global_force[2] / star.m;
+        double a_starz = global_force[3] / star.m;
 
         auto integrate = [dt, dt_m1](double a, double x_m1)
         {
@@ -48,4 +49,4 @@ void computeAndExchangeStarPosition(StarData& star, double dt, double dt_m1, int
     MPI_Bcast(star.position.data(), 3, MpiType<double>{}, 0, MPI_COMM_WORLD);
     MPI_Bcast(star.position_m1.data(), 3, MpiType<double>{}, 0, MPI_COMM_WORLD);
 }
-} // namespace planet
+} // namespace disk

@@ -18,7 +18,7 @@
 
 #include <cmath>
 
-namespace planet
+namespace disk
 {
 
 template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho, typename Trho2>
@@ -83,7 +83,7 @@ double duTimestepGPU(size_t first, size_t last, const Dataset& d, const StarData
     double init = INFINITY;
 
     return star.K_u *
-           thrust::transform_reduce(thrust::device, begin, end, AbsDivide<Tu, Tdu>{}, init, thrust::maximum<double>{});
+           thrust::transform_reduce(thrust::device, begin, end, AbsDivide<Tu, Tdu>{}, init, thrust::minimum<double>{});
 }
 
 template double duTimestepGPU(size_t, size_t, const sphexa::ParticlesData<cstone::GpuTag>&, const StarData&);
