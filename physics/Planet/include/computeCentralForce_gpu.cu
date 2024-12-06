@@ -15,7 +15,6 @@
 #include "computeCentralForce_gpu.hpp"
 #include "star_data.hpp"
 
-
 namespace disk
 {
 

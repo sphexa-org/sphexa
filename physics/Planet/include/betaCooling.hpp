@@ -80,4 +80,4 @@ void duTimestep(size_t startIndex, size_t endIndex, Dataset& d, StarData& star)
     }
 }
 
-} // namespace planet
+} // namespace disk

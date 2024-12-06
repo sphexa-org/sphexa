@@ -46,4 +46,4 @@ void computeAccretionConditionImpl(size_t first, size_t last, Dataset& d, StarDa
     star.removed_local  = removed_local;
 }
 
-} // namespace planet
+} // namespace disk

@@ -24,4 +24,4 @@ HOST_DEVICE_FUN auto polytropicEOS(T1 Kpoly, T2 exp_poly, T3 gamma, T4 rho)
     return util::tuple<Tc, Tc>{p, c};
 }
 
-} // namespace planet
+} // namespace disk

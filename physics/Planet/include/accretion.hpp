@@ -45,7 +45,8 @@ void exchangeAndAccreteOnStar(StarData& star, double minDt_m1, int rank)
     MPI_Reduce(star.accreted_local.momentum.data(), p_accreted_global.data(), 3, MpiType<double>{}, MPI_SUM, 0,
                MPI_COMM_WORLD);
     MPI_Reduce(&star.removed_local.mass, &m_removed_global, 1, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
-    MPI_Reduce(star.removed_local.momentum.data(), p_removed_global.data(), 3, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(star.removed_local.momentum.data(), p_removed_global.data(), 3, MpiType<double>{}, MPI_SUM, 0,
+               MPI_COMM_WORLD);
 
     if (rank == 0)
     {
@@ -76,4 +77,4 @@ void exchangeAndAccreteOnStar(StarData& star, double minDt_m1, int rank)
     MPI_Bcast(&star.m, 1, MpiType<double>{}, 0, MPI_COMM_WORLD);
 }
 
-} // namespace planet
+} // namespace disk

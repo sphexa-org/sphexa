@@ -77,11 +77,13 @@ public:
         bool        usePbc    = box.boundaryX() == cstone::BoundaryType::periodic;
         int         numShells = usePbc ? ewaldSettings_.numReplicaShells : 0;
 
-        d.egrav = 0;
+        d.egrav         = 0;
+        auto* potential = d.potential.empty() ? nullptr : d.potential.data();
+
         ryoanji::computeGravity(octree.childOffsets, octree.internalToLeaf, focusTree.expansionCentersAcc().data(),
                                 multipoles_.data(), domain.layout().data(), domain.startCell(), domain.endCell(),
                                 d.x.data(), d.y.data(), d.z.data(), d.h.data(), d.m.data(), domain.box(), d.g,
-                                d.potential.data(), d.ax.data(), d.ay.data(), d.az.data(), &d.egrav, numShells);
+                                potential, d.ax.data(), d.ay.data(), d.az.data(), &d.egrav, numShells);
 
         if (usePbc)
         {

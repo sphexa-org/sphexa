@@ -13,6 +13,9 @@
 #include <memory>
 #include <mpi.h>
 
+#include <gtest/gtest.h>
+#include "gtest-mpi-listener.hpp"
+
 static void fill_grid(auto& x, auto& y, auto& z, double start, double end, size_t n_elements)
 {
     assert(x.size() == y.size());
@@ -44,13 +47,13 @@ struct AccretionTest : public ::testing::Test
     sphexa::ParticlesData<cstone::CpuTag>       data;
     std::unique_ptr<cstone::Domain<KeyType, T>> domain_ptr = nullptr;
 
-    StarData star;
-    double   momentum_inside_x = 0.;
-    double   momentum_inside_y = 0.;
-    double   momentum_inside_z = 0.;
-    double   mass_inside       = 0.;
-    size_t   n_inside          = 0;
-    int      rank = 0, numRanks = 0;
+    disk::StarData star;
+    double         momentum_inside_x = 0.;
+    double         momentum_inside_y = 0.;
+    double         momentum_inside_z = 0.;
+    double         mass_inside       = 0.;
+    size_t         n_inside          = 0;
+    int            rank = 0, numRanks = 0;
 
     AccretionTest()
     {
@@ -180,10 +183,10 @@ TEST_F(AccretionTest, testAccretion)
     const size_t first = domain_ptr->startIndex();
     const size_t last  = domain_ptr->endIndex();
 
-    planet::computeAccretionCondition(first, last, data, star);
+    disk::computeAccretionCondition(first, last, data, star);
     testComputeAccretionCondition();
 
-    planet::exchangeAndAccreteOnStar(star, dt, rank);
+    disk::exchangeAndAccreteOnStar(star, dt, rank);
     testExchangeAndAccreteOnStar();
 
     sync();

@@ -28,14 +28,14 @@ TEST_F(PlanetTest, testStarPosition)
 
     if (numRanks != 2) throw std::runtime_error("Must be excuted with two ranks");
 
-    StarData star;
+    disk::StarData star;
     star.position    = {0., 1., 0.};
     star.position_m1 = {0., 0., 0.};
-    star.force_local = {1., 0., 0.};
+    star.force_local = {0., 1., 0., 0.};
     star.m           = 1.0;
     star.fixed_star  = 0;
 
-    planet::computeAndExchangeStarPosition(star, 1., 1., rank);
+    disk::computeAndExchangeStarPosition(star, 1., 1., rank);
     if (rank == 0)
     {
         printf("rank: %d star pos: %lf\t%lf\t%lf\n", rank, star.position[0], star.position[1], star.position[2]);

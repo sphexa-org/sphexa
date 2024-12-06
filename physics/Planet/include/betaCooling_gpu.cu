@@ -88,4 +88,4 @@ double duTimestepGPU(size_t first, size_t last, const Dataset& d, const StarData
 
 template double duTimestepGPU(size_t, size_t, const sphexa::ParticlesData<cstone::GpuTag>&, const StarData&);
 
-} // namespace planet
+} // namespace disk

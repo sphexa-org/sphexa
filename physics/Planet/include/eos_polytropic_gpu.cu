@@ -38,4 +38,4 @@ void computePolytropicEOS_HydroStdGPU(size_t firstParticle, size_t lastParticle,
 }
 
 template void computePolytropicEOS_HydroStdGPU(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>&, const StarData&);
-} // namespace planet
+} // namespace disk

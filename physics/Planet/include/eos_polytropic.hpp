@@ -40,4 +40,4 @@ void computePolytropicEOS_HydroStd(size_t startIndex, size_t endIndex, Dataset& 
     else { computePolytropic_HydroStdImpl(startIndex, endIndex, d, star); }
 }
 
-} // namespace planet
+} // namespace disk
