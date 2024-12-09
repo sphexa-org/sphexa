@@ -59,12 +59,15 @@ TEST(GlobalBox, localMinMax)
 template<class T>
 void makeGlobalBox(int rank, int numRanks)
 {
+    constexpr T infinity      = std::numeric_limits<T>::infinity();
+    constexpr T shrink_factor = 0.1;
+
     T val = rank + 1;
     std::vector<T> x{-val, val};
     std::vector<T> y{val, 2 * val};
     std::vector<T> z{-val, -2 * val};
 
-    Box<T> box = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), Box<T>{0, 1});
+    Box<T> box = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), Box<T>{0, 1}, infinity);
 
     T rVal = numRanks;
     EXPECT_EQ(box.xmin(), -rVal);
@@ -77,30 +80,71 @@ void makeGlobalBox(int rank, int numRanks)
     auto open     = BoundaryType::open;
     auto periodic = BoundaryType::periodic;
 
+    auto getDoubleLengthBox = [](const auto& box)
+    {
+        const std::array<T, 3> box_centre{(box.xmax() + box.xmin()) / T{2.}, (box.ymax() + box.ymin()) / T{2.},
+                                          (box.zmax() + box.zmin()) / T{2.}};
+
+        const Box<T> doubleLengthBox(box_centre[0] - box.lx(), box_centre[0] + box.lx(), box_centre[1] - box.ly(),
+                                     box_centre[1] + box.ly(), box_centre[2] - box.lz(), box_centre[2] + box.lz(),
+                                     box.boundaryX(), box.boundaryY(), box.boundaryZ());
+        return doubleLengthBox;
+    };
+    auto contains = [](const auto& large_box, const auto& small_box)
+    {
+        return (large_box.xmin() <= small_box.xmin() && large_box.ymin() <= small_box.ymin() &&
+                large_box.zmin() <= small_box.zmin() && large_box.xmax() >= small_box.xmax() &&
+                large_box.ymax() >= small_box.ymax() && large_box.zmax() >= small_box.zmax());
+    };
     // PBC case
     {
         Box<T> pbcBox{0, 1, 0, 1, 0, 1, periodic, periodic, periodic};
-        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), pbcBox);
+        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), pbcBox, infinity);
         EXPECT_EQ(pbcBox, newPbcBox);
     }
     // partial PBC
     {
         Box<T> pbcBox{0, 1, 0, 1, 0, 1, open, periodic, periodic};
-        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), pbcBox);
+        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), pbcBox, infinity);
         Box<T> refBox{-rVal, rVal, 0, 1, 0, 1, open, periodic, periodic};
         EXPECT_EQ(refBox, newPbcBox);
+
+        const auto doubleBox = getDoubleLengthBox(newPbcBox);
+        Box<T> shrinkedBox   = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), doubleBox, shrink_factor);
+
+        EXPECT_NEAR(shrinkedBox.lx(), (1. - 2. * shrink_factor) * doubleBox.lx(), 1e-6);
+        EXPECT_EQ(shrinkedBox.ly(), doubleBox.ly()); //, 1e-6);
+        EXPECT_EQ(shrinkedBox.lz(), doubleBox.lz());
+
+        EXPECT_TRUE(contains(shrinkedBox, newPbcBox));
     }
     {
         Box<T> pbcBox{0, 1, 0, 1, 0, 1, periodic, open, periodic};
-        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), pbcBox);
+        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), pbcBox, infinity);
         Box<T> refBox{0, 1, T(1), 2 * rVal, 0, 1, periodic, open, periodic};
         EXPECT_EQ(refBox, newPbcBox);
+
+        const auto doubleBox = getDoubleLengthBox(newPbcBox);
+        Box<T> shrinkedBox   = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), doubleBox, shrink_factor);
+
+        EXPECT_EQ(shrinkedBox.lx(), doubleBox.lx());
+        EXPECT_NEAR(shrinkedBox.ly(), (1. - 2. * shrink_factor) * doubleBox.ly(), 1e-6);
+        EXPECT_EQ(shrinkedBox.lz(), doubleBox.lz());
+        EXPECT_TRUE(contains(shrinkedBox, newPbcBox));
     }
     {
         Box<T> pbcBox{0, 1, 0, 1, 0, 1, periodic, periodic, open};
-        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), pbcBox);
+        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), pbcBox, infinity);
         Box<T> refBox{0, 1, 0, 1, -2 * rVal, T(-1), periodic, periodic, open};
         EXPECT_EQ(refBox, newPbcBox);
+
+        const auto doubleBox = getDoubleLengthBox(newPbcBox);
+        Box<T> shrinkedBox   = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), doubleBox, shrink_factor);
+
+        EXPECT_EQ(shrinkedBox.lx(), doubleBox.lx());
+        EXPECT_EQ(shrinkedBox.ly(), doubleBox.ly());
+        EXPECT_NEAR(shrinkedBox.lz(), (1. - 2. * shrink_factor) * doubleBox.lz(), 1e-6);
+        EXPECT_TRUE(contains(shrinkedBox, newPbcBox));
     }
 }
 
