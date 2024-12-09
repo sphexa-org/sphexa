@@ -5,8 +5,10 @@
 #pragma once
 
 #include <array>
+#include <limits>
 #include <iostream>
 
+#include "cstone/tree/definitions.h"
 #include "removalStatistics.hpp"
 
 namespace disk

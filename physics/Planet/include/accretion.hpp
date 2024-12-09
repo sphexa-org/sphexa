@@ -4,18 +4,14 @@
 
 #pragma once
 
-#include <cassert>
+#include <array>
+#include <cstdio>
 #include <mpi.h>
-#include "cstone/primitives/mpi_wrappers.hpp"
-#include "cstone/fields/field_get.hpp"
-#include "cstone/tree/accel_switch.hpp"
-#include "cstone/cuda/cuda_stubs.h"
-#include "cstone/util/type_list.hpp"
-
-#include "sph/particles_data.hpp"
 
 #include "accretion_impl.hpp"
 #include "accretion_gpu.hpp"
+#include "cstone/primitives/mpi_wrappers.hpp"
+#include "cstone/tree/accel_switch.hpp"
 
 namespace disk
 {
@@ -62,16 +58,17 @@ void exchangeAndAccreteOnStar(StarData& star, double minDt_m1, int rank)
 
         star.m = m_star_new;
 
-        printf("removed mass: %g\taccreted mass: %g\tstar mass: %g\n", m_removed_global, m_accreted_global, star.m);
-        printf("removed momentum x: %g\taccreted momentum x: %g\tstar momentum x: %g\n", p_removed_global[0],
-               p_accreted_global[0], p_star[0]);
-        printf("removed momentum y: %g\taccreted momentum y: %g\tstar momentum y: %g\n", p_removed_global[1],
-               p_accreted_global[1], p_star[1]);
-        printf("removed momentum z: %g\taccreted momentum z: %g\tstar momentum z: %g\n", p_removed_global[2],
-               p_accreted_global[2], p_star[2]);
+        std::printf("removed mass: %g\taccreted mass: %g\tstar mass: %g\n", m_removed_global, m_accreted_global,
+                    star.m);
+        std::printf("removed momentum x: %g\taccreted momentum x: %g\tstar momentum x: %g\n", p_removed_global[0],
+                    p_accreted_global[0], p_star[0]);
+        std::printf("removed momentum y: %g\taccreted momentum y: %g\tstar momentum y: %g\n", p_removed_global[1],
+                    p_accreted_global[1], p_star[1]);
+        std::printf("removed momentum z: %g\taccreted momentum z: %g\tstar momentum z: %g\n", p_removed_global[2],
+                    p_accreted_global[2], p_star[2]);
     }
 
-    if (rank == 0) { printf("accreted mass local: %g\n", star.accreted_local.mass); }
+    if (rank == 0) { std::printf("accreted mass local: %g\n", star.accreted_local.mass); }
 
     MPI_Bcast(star.position_m1.data(), 3, MpiType<double>{}, 0, MPI_COMM_WORLD);
     MPI_Bcast(&star.m, 1, MpiType<double>{}, 0, MPI_COMM_WORLD);

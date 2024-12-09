@@ -4,11 +4,6 @@
 
 #pragma once
 
-#include <algorithm>
-#include <execution>
-#include <iostream>
-#include <numeric>
-#include <vector>
 #include "cstone/tree/definitions.h"
 #include "removalStatistics.hpp"
 #include "star_data.hpp"

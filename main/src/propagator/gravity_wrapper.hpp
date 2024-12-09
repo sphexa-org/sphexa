@@ -137,10 +137,10 @@ public:
         bool        usePbc    = box.boundaryX() == cstone::BoundaryType::periodic;
         int         numShells = usePbc ? ewaldSettings_.numReplicaShells : 0;
 
-        d.egrav =
-            mHolder_.compute(grp, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.m),
-                             rawPtr(d.devData.h), d.g, numShells, domain.box(), rawPtr(d.devData.potential),
-                             rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az));
+        auto* potential = d.devData.potential.empty() ? nullptr : rawPtr(d.devData.potential);
+        d.egrav         = mHolder_.compute(grp, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
+                                           rawPtr(d.devData.m), rawPtr(d.devData.h), d.g, numShells, domain.box(), potential,
+                                           rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az));
 
         auto stats = mHolder_.readStats();
 

@@ -28,9 +28,9 @@ __device__ void atomicAddRS(RemovalStatistics* x, const RemovalStatistics& y)
     atomicAdd(&(x->count), y.count);
 }
 
-template<typename Tkeys>
-__device__ void markForRemovalAndAdd(RemovalStatistics& statistics, size_t i, Tkeys* keys, const auto* m,
-                                     const auto* vx, const auto* vy, const auto* vz)
+template<typename Tkeys, typename Tm, typename Tv>
+__device__ void markForRemovalAndAdd(RemovalStatistics& statistics, size_t i, Tkeys* keys, const Tm* m, const Tv* vx,
+                                     const Tv* vy, const Tv* vz)
 {
     keys[i]                = cstone::removeKey<Tkeys>::value;
     statistics.mass        = m[i];
