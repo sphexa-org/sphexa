@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <array>
 #include <mpi.h>
 #include "cstone/primitives/mpi_wrappers.hpp"
 
@@ -18,7 +19,7 @@ void computeAndExchangeStarPosition(StarData& star, double dt, double dt_m1, int
     std::array<double, 4> global_force{};
 
     MPI_Reduce(star.force_local.data(), global_force.data(), 4, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
-    //    MPI_Reduce(&star.potential_local, &star.potential, 1, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
+
     star.potential = global_force[0];
 
     if (rank == 0)

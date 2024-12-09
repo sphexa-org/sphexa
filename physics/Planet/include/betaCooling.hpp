@@ -4,10 +4,13 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cmath>
-#include "cstone/tree/accel_switch.hpp"
+#include <limits>
+#include <type_traits>
+
 #include "betaCooling_gpu.hpp"
-#include "sph/particles_data.hpp"
+#include "cstone/tree/accel_switch.hpp"
 
 namespace disk
 {

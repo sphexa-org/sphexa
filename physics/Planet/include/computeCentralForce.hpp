@@ -4,19 +4,12 @@
 
 #pragma once
 
-#include <array>
-#include <cassert>
+#include <algorithm>
 #include <cmath>
-#include <mpi.h>
-#include "cstone/primitives/mpi_wrappers.hpp"
-#include "cstone/fields/field_get.hpp"
-#include "cstone/tree/accel_switch.hpp"
-#include "cstone/cuda/cuda_stubs.h"
 
+#include "cstone/tree/accel_switch.hpp"
+#include "cstone/tree/definitions.h"
 #include "computeCentralForce_gpu.hpp"
-#include "accretion_gpu.hpp"
-#include "accretion_impl.hpp"
-#include "sph/particles_data.hpp"
 
 namespace disk
 {

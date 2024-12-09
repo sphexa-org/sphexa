@@ -23,8 +23,8 @@ namespace disk
 
 template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho, typename Trho2>
 __global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, Tdu* du,
-                                     const Tu* u, Ts star_mass, cstone::Vec3<Ts> star_position, Ts beta,
-                                     Tpos g, const Trho* rho, Ts u_floor, Trho2 cooling_rho_limit)
+                                     const Tu* u, Ts star_mass, cstone::Vec3<Ts> star_position, Ts beta, Tpos g,
+                                     const Trho* rho, Ts u_floor, Trho2 cooling_rho_limit)
 
 {
     cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
@@ -47,10 +47,10 @@ void betaCoolingGPU(size_t first, size_t last, Dataset& d, StarData& star)
     unsigned           numThreads   = 256;
     unsigned           numBlocks    = (numParticles + numThreads - 1) / numThreads;
 
-    betaCoolingGPUKernel<<<numBlocks, numThreads>>>(
-        first, last, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.du),
-        rawPtr(d.devData.u), star.m, star.position, star.beta, d.g,
-        rawPtr(d.devData.rho), star.u_floor, star.cooling_rho_limit);
+    betaCoolingGPUKernel<<<numBlocks, numThreads>>>(first, last, rawPtr(d.devData.x), rawPtr(d.devData.y),
+                                                    rawPtr(d.devData.z), rawPtr(d.devData.du), rawPtr(d.devData.u),
+                                                    star.m, star.position, star.beta, d.g, rawPtr(d.devData.rho),
+                                                    star.u_floor, star.cooling_rho_limit);
 
     checkGpuErrors(cudaDeviceSynchronize());
 }

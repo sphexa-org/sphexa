@@ -1,11 +1,5 @@
 #pragma once
 
-#include "cstone/sfc/box.hpp"
-#include "cstone/traversal/groups.hpp"
-#include "cstone/tree/octree.hpp"
-#include "cstone/tree/definitions.h"
-#include "sph/timestep.h"
-
 namespace disk
 {
 template<typename Dataset, typename StarData>
