@@ -27,6 +27,7 @@
  * @brief compute global minima and maxima of array ranges
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
+ * @author Noah Kubli <noah.kubli@uzh.ch>
  *
  */
 
@@ -69,19 +70,25 @@ struct MinMax
 
 /*! @brief compute global bounding box for local x,y,z arrays
  *
- * @tparam     T             float or double
+ * @tparam     T            float or double
  * @param[in]  x            x coordinate array start
  * @param[in]  y            y coordinate array start
  * @param[in]  z            z coordinate array start
  * @param[in]  numElements  length of @a x,y,z arrays
  * @param[in]  previousBox  previous coordinate bounding box, default open-boundary box with limits ignored
+ * @param      shrink_limit maximum shrink factor per side compared to previousBox
  * @return                  the new bounding box
  *
  * For each periodic dimension, limits are fixed and will not be modified.
  * For non-periodic dimensions, limits are determined by global min/max.
  */
 template<class T, class Op = MinMax<T>>
-auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, const Box<T>& previousBox = Box<T>(0, 1))
+auto makeGlobalBox(const T* x,
+                   const T* y,
+                   const T* z,
+                   size_t numElements,
+                   const Box<T>& previousBox = Box<T>(0, 1),
+                   const T shrink_limit      = 0.05)
 {
     bool pbcX = (previousBox.boundaryX() == BoundaryType::periodic);
     bool pbcY = (previousBox.boundaryY() == BoundaryType::periodic);
@@ -106,12 +113,21 @@ auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, const
         extrema[5] = -extrema[5];
     }
 
-    return Box<T>{extrema[0],
-                  extrema[1],
-                  extrema[2],
-                  extrema[3],
-                  extrema[4],
-                  extrema[5],
+    // Limit shrinking of the bounding box in a single time-step due to removing of single particles that are far from
+    // the system.
+    const cstone::Vec3<T> previousDiff{previousBox.xmax() - previousBox.xmin(), previousBox.ymax() - previousBox.ymin(),
+                                       previousBox.zmax() - previousBox.zmin()};
+    const std::array<T, 6> extrema_limits{
+        previousBox.xmin() + shrink_limit * previousDiff[0], previousBox.xmax() - shrink_limit * previousDiff[0],
+        previousBox.ymin() + shrink_limit * previousDiff[1], previousBox.ymax() - shrink_limit * previousDiff[1],
+        previousBox.zmin() + shrink_limit * previousDiff[2], previousBox.zmax() - shrink_limit * previousDiff[2]};
+
+    return Box<T>{std::min(extrema[0], extrema_limits[0]),
+                  std::max(extrema[1], extrema_limits[1]),
+                  std::min(extrema[2], extrema_limits[2]),
+                  std::max(extrema[3], extrema_limits[3]),
+                  std::min(extrema[4], extrema_limits[4]),
+                  std::max(extrema[5], extrema_limits[5]),
                   previousBox.boundaryX(),
                   previousBox.boundaryY(),
                   previousBox.boundaryZ()};
