@@ -406,4 +406,28 @@ HOST_DEVICE_FUN IBox createIBox(const Vec3<T> center, const Vec3<T>& size, const
     return {ixMin, ixMax, iyMin, iyMax, izMin, izMax};
 }
 
+/*! @brief limit shrinking of the box due to removal of particles
+ * @param fittingBox tight box for the current system
+ * @param previousBox box used for the previous time-step
+ * @param shrinkLimit maximum shrink factor per side compared to previousBox
+ */
+template<typename T>
+Box<T> limitBoxShrinking(const Box<T>& fittingBox, const Box<T>& previousBox, const T shrinkLimit = 0.05)
+{
+    const std::array<T, 6> limits{
+        previousBox.xmin() + shrinkLimit * previousBox.lx(), previousBox.xmax() - shrinkLimit * previousBox.lx(),
+        previousBox.ymin() + shrinkLimit * previousBox.ly(), previousBox.ymax() - shrinkLimit * previousBox.ly(),
+        previousBox.zmin() + shrinkLimit * previousBox.lz(), previousBox.zmax() - shrinkLimit * previousBox.lz()};
+
+    return Box<T>{std::min(fittingBox.xmin(), limits[0]),
+                  std::max(fittingBox.xmax(), limits[1]),
+                  std::min(fittingBox.ymin(), limits[2]),
+                  std::max(fittingBox.ymax(), limits[3]),
+                  std::min(fittingBox.zmin(), limits[4]),
+                  std::max(fittingBox.zmax(), limits[5]),
+                  previousBox.boundaryX(),
+                  previousBox.boundaryY(),
+                  previousBox.boundaryZ()};
+}
+
 } // namespace cstone

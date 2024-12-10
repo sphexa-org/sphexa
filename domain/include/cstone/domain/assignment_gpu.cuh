@@ -89,7 +89,9 @@ public:
         LocalIndex numParticles = bufDesc.end - bufDesc.start;
         LocalIndex start        = bufDesc.start;
 
-        box_ = makeGlobalBox<T, MinMaxGpu<T>>(x + start, y + start, z + start, numParticles, box_);
+        const auto fittingBox = makeGlobalBox<T, MinMaxGpu<T>>(x + start, y + start, z + start, numParticles, box_);
+        box_                  = limitBoxShrinking(fittingBox, box_);
+
         gsl::span<KeyType> keyView(particleKeys + start, numParticles);
 
         // compute SFC particle keys only for particles participating in tree build

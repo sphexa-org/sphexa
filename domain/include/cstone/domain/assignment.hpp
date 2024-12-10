@@ -77,8 +77,9 @@ public:
         // number of locally assigned particles to consider for global tree building
         LocalIndex numParticles = bufDesc.end - bufDesc.start;
 
-        box_ = makeGlobalBox(x + bufDesc.start, y + bufDesc.start, z + bufDesc.start, numParticles, box_);
-
+        const auto fittingBox =
+            makeGlobalBox(x + bufDesc.start, y + bufDesc.start, z + bufDesc.start, numParticles, box_);
+        box_ = limitBoxShrinking(fittingBox, box_);
         gsl::span<KeyType> keyView(particleKeys + bufDesc.start, numParticles);
 
         // compute SFC particle keys only for particles participating in tree build

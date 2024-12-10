@@ -136,3 +136,70 @@ TEST(SfcBox, createIBox)
         EXPECT_EQ(ref, probe);
     }
 }
+
+template<typename T>
+static bool contains(const Box<T>& large_box, const Box<T>& small_box)
+{
+    return (large_box.xmin() <= small_box.xmin() && large_box.ymin() <= small_box.ymin() &&
+            large_box.zmin() <= small_box.zmin() && large_box.xmax() >= small_box.xmax() &&
+            large_box.ymax() >= small_box.ymax() && large_box.zmax() >= small_box.zmax());
+};
+
+//! @brief newer box bigger than old box, limitBoxShrink has no effect
+TEST(limitBox, expand)
+{
+    using T                  = double;
+    constexpr T shrinkFactor = 0.1;
+    auto pbc                 = BoundaryType::periodic;
+    auto open                = BoundaryType::open;
+    Box<T> previousBox(0, 1, 2, 3, 4, 5, open, pbc, open);
+    Box<T> currentBox(-1, 2, -2, 3, -4, 6, open, pbc, open);
+    Box<T> limitedBox = limitBoxShrinking(currentBox, previousBox, shrinkFactor);
+    EXPECT_EQ(limitedBox, currentBox);
+}
+
+//! @brief newer box bigger than shrink limit, limitBoxShrink has no effect
+TEST(limitBox, aboveShrinkLimit)
+{
+    using T                  = double;
+    constexpr T shrinkFactor = 0.1001;
+    auto pbc                 = BoundaryType::periodic;
+    auto open                = BoundaryType::open;
+    Box<T> previousBox(0, 1, 2, 3, 4, 5, open, pbc, open);
+    Box<T> currentBox(0.1, 0.9, 2.1, 2.9, 4.1, 4.9, open, pbc, open);
+    Box<T> limitedBox = limitBoxShrinking(currentBox, previousBox, shrinkFactor);
+    EXPECT_EQ(limitedBox, currentBox);
+}
+
+//! @brief newer box smaller than shrink limit, limitBoxShrink kicks in
+TEST(limitBox, belowShrinkLimit)
+{
+    using T                  = double;
+    constexpr T shrinkFactor = 0.05;
+    Box<T> previousBox(1, 2, 10, 20, 100, 200);
+    Box<T> currentBox(1.1, 1.9, 11, 19, 110, 190);
+    Box<T> limitedBox = limitBoxShrinking(currentBox, previousBox, shrinkFactor);
+    EXPECT_NEAR(limitedBox.xmin(), 1.05, 1e-6);
+    EXPECT_NEAR(limitedBox.xmax(), 1.95, 1e-6);
+    EXPECT_NEAR(limitedBox.ymin(), 10.5, 1e-6);
+    EXPECT_NEAR(limitedBox.ymax(), 19.5, 1e-6);
+    EXPECT_NEAR(limitedBox.zmin(), 105, 1e-6);
+    EXPECT_NEAR(limitedBox.zmax(), 195, 1e-6);
+
+    EXPECT_TRUE(contains(previousBox, limitedBox));
+}
+
+TEST(SfcBox, limitBoxShrinking)
+{
+    using T                   = double;
+    constexpr T shrink_factor = 0.1;
+    Box<T> previousBox(0., 2., -1., 1., -1., 5.);
+    Box<T> currentBox(0., 0.05, 0., 1., 1., 2.);
+    Box<T> limitedBox = limitBoxShrinking(currentBox, previousBox, shrink_factor);
+
+    EXPECT_NEAR(limitedBox.lx(), (1. - shrink_factor) * previousBox.lx(), 1e-6);
+    EXPECT_NEAR(limitedBox.ly(), (1. - shrink_factor) * previousBox.ly(), 1e-6);
+    EXPECT_NEAR(limitedBox.lz(), (1. - 2. * shrink_factor) * previousBox.lz(), 1e-6);
+
+    EXPECT_TRUE(contains(limitedBox, currentBox));
+}
