@@ -1,8 +1,8 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * SPH-EXA
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Basel, University of Zurich
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -76,9 +76,6 @@ public:
     //! @brief save particle data fields to file
     virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&){};
 
-    //! @brief save extra customizable stuff
-    virtual void saveExtra(IFileWriter*, ParticleDataType&){};
-
     //! @brief save internal state to file
     virtual void save(IFileWriter*){};
 
@@ -99,6 +96,9 @@ public:
     };
 
     virtual ~Propagator() = default;
+
+    //! @brief Returns time elapsed since the start of last call to computeForces()
+    float stepElapsed() const { return timer.sumOfSteps(); }
 
     void printIterationTimings(const DomainType& domain, const ParticleDataType& simData)
     {
