@@ -40,8 +40,8 @@
 
 namespace cstone
 {
-using util::packBufferPtrs;
 using util::computeByteOffsets;
+using util::packBufferPtrs;
 
 /*! @brief Layout description for particle buffers
  *

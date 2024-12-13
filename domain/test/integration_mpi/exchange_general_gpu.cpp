@@ -44,7 +44,7 @@ TEST(GeneralFocusExchangeGpu, bareTreelet)
     ConcatVector<TreeNodeIndex, DeviceVector> d_gatherMaps;
     copy(gatherMaps, d_gatherMaps);
     DeviceVector<TreeNodeIndex> d_scatterMap = scatterMap;
-    DeviceVector<unsigned> d_counts = counts;
+    DeviceVector<unsigned> d_counts          = counts;
     DeviceVector<char> scratch;
 
     auto d_gatherMapsView = static_cast<const ConcatVector<TreeNodeIndex, DeviceVector>&>(d_gatherMaps).view();

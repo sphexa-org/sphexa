@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Zurich, 2021 University of Basel
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -398,20 +382,20 @@ TEST(CornerstoneOctree, computeSpanningTree)
 
 TEST(CornerstoneOctree, NodeDebug)
 {
-    using T = double;
+    using T       = double;
     using KeyType = uint64_t;
-    KeyType a = 0377400000000000000000lu;
-    KeyType b = 0500000000000000000000lu;
+    KeyType a     = 0377400000000000000000lu;
+    KeyType b     = 0500000000000000000000lu;
     std::vector<KeyType> sdomain{a, b};
 
     KeyType s0 = 0164640000000000000000lu;
     KeyType s1 = 0164650000000000000000lu;
     Box<T> box(0, 1, BoundaryType::periodic);
-    IBox source = sfcIBox(sfcKey(s0), sfcKey(s1));
+    IBox source                     = sfcIBox(sfcKey(s0), sfcKey(s1));
     auto [sourceCenter, sourceSize] = centerAndSize<KeyType>(source, box);
-    unsigned prefixLength = 3 * treeLevel(s1 - s0);
-    KeyType sourcePrefix = encodePlaceholderBit(s0, prefixLength);
-    auto expCenter = sourceCenter;
+    unsigned prefixLength           = 3 * treeLevel(s1 - s0);
+    KeyType sourcePrefix            = encodePlaceholderBit(s0, prefixLength);
+    auto expCenter                  = sourceCenter;
 
     std::vector<KeyType> spanningTree(spanSfcRange(a, b) + 1);
     spanSfcRange(a, b, spanningTree.data());
@@ -421,15 +405,15 @@ TEST(CornerstoneOctree, NodeDebug)
     T domainVol = 0;
     for (size_t i = 0; i < nNodes(spanningTree); ++i)
     {
-        IBox target = sfcIBox(sfcKey(spanningTree[i]), sfcKey(spanningTree[i+1]));
+        IBox target                     = sfcIBox(sfcKey(spanningTree[i]), sfcKey(spanningTree[i + 1]));
         auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
 
         auto distVec = minDistance(sourceCenter, sourceSize, targetCenter, targetSize, box);
-        T distNorm = std::sqrt(norm2(distVec));
+        T distNorm   = std::sqrt(norm2(distVec));
         distances.push_back(distNorm);
         domainVol += 8 * targetSize[0] * targetSize[1] * targetSize[2];
 
-        //T macSq = computeVecMacR2(sourcePrefix, expCenter, 1.0 / 0.5, box);
+        // T macSq = computeVecMacR2(sourcePrefix, expCenter, 1.0 / 0.5, box);
         T macSq = computeMinMacR2(sourcePrefix, invThetaMinMac(0.5), box)[3];
 
         bool isClose = evaluateMacPbc(expCenter, macSq, targetCenter, targetSize, box);

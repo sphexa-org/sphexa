@@ -1,3 +1,12 @@
+/*
+ * Cornerstone octree
+ *
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Zurich, 2021 University of Basel
+ *
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
+ */
+
 /*! @file
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
@@ -18,7 +27,7 @@ TEST(PrimitivesGpu, concatVector)
     ConcatVector<int> v;
     v.reindex({1, 2, 3});
 
-    auto modView  = v.view();
+    auto modView = v.view();
     std::iota(modView[0].begin(), modView[0].end(), 10);
     std::iota(modView[1].begin(), modView[1].end(), 20);
     std::iota(modView[2].begin(), modView[2].end(), 30);
