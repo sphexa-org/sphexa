@@ -39,7 +39,7 @@ template<class KeyType, class T>
 class GlobalAssignment
 {
 public:
-    GlobalAssignment(int rank, int nRanks, unsigned bucketSize, const Box<T>& box = Box<T>{0, 1})
+    GlobalAssignment(int rank, int nRanks, unsigned bucketSize, const Box<T>& box)
         : myRank_(rank)
         , numRanks_(nRanks)
         , bucketSize_(bucketSize)
@@ -77,12 +77,12 @@ public:
         // number of locally assigned particles to consider for global tree building
         LocalIndex numParticles = bufDesc.end - bufDesc.start;
 
-        const auto fittingBox =
-            makeGlobalBox(x + bufDesc.start, y + bufDesc.start, z + bufDesc.start, numParticles, box_);
-        box_ = limitBoxShrinking(fittingBox, box_);
-        gsl::span<KeyType> keyView(particleKeys + bufDesc.start, numParticles);
+        auto fittingBox = makeGlobalBox(x + bufDesc.start, y + bufDesc.start, z + bufDesc.start, numParticles, box_);
+        if (firstCall_) { box_ = fittingBox; }
+        else { box_ = limitBoxShrinking(fittingBox, box_); }
 
         // compute SFC particle keys only for particles participating in tree build
+        gsl::span<KeyType> keyView(particleKeys + bufDesc.start, numParticles);
         computeSfcKeys(x + bufDesc.start, y + bufDesc.start, z + bufDesc.start, sfcKindPointer(keyView.data()),
                        numParticles, box_);
 

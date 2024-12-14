@@ -45,7 +45,7 @@ template<class KeyType, class T>
 class GlobalAssignmentGpu
 {
 public:
-    GlobalAssignmentGpu(int rank, int nRanks, unsigned bucketSize, const Box<T>& box = Box<T>{0, 1})
+    GlobalAssignmentGpu(int rank, int nRanks, unsigned bucketSize, const Box<T>& box)
         : myRank_(rank)
         , numRanks_(nRanks)
         , bucketSize_(bucketSize)
@@ -89,12 +89,12 @@ public:
         LocalIndex numParticles = bufDesc.end - bufDesc.start;
         LocalIndex start        = bufDesc.start;
 
-        const auto fittingBox = makeGlobalBox<T, MinMaxGpu<T>>(x + start, y + start, z + start, numParticles, box_);
-        box_                  = limitBoxShrinking(fittingBox, box_);
-
-        gsl::span<KeyType> keyView(particleKeys + start, numParticles);
+        auto fittingBox = makeGlobalBox<T, MinMaxGpu<T>>(x + start, y + start, z + start, numParticles, box_);
+        if (firstCall_) { box_ = fittingBox; }
+        else { box_ = limitBoxShrinking(fittingBox, box_); }
 
         // compute SFC particle keys only for particles participating in tree build
+        gsl::span<KeyType> keyView(particleKeys + start, numParticles);
         computeSfcKeysGpu(x + start, y + start, z + start, sfcKindPointer(keyView.data()), numParticles, box_);
 
         // sort keys and keep track of ordering for later use

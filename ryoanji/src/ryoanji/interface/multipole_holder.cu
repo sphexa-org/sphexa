@@ -128,7 +128,7 @@ public:
     }
 
     float compute(GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m, const Th* h, Tc G, int numShells,
-                  const cstone::Box<Tc>& box, Ta* potential, Ta* ax, Ta* ay, Ta* az)
+                  const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az)
     {
         int numWarpsPerBlock = TravConfig::numThreads / cstone::GpuConfig::warpSize;
         int numBlocks        = cstone::iceil(grp.numGroups, numWarpsPerBlock);
@@ -140,7 +140,7 @@ public:
         reallocate(traversalStack_, poolSize, 1.01);
         traverse<<<numBlocks, TravConfig::numThreads>>>(
             grp, 1, x, y, z, m, h, octree_.childOffsets, octree_.internalToLeaf, layout_, centers_, rawPtr(multipoles_),
-            G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()}, potential, ax, ay, az, (int*)rawPtr(traversalStack_));
+            G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()}, ugrav, ax, ay, az, (int*)rawPtr(traversalStack_));
         float totalPotential;
         checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
         return 0.5f * Tc(G) * totalPotential;
@@ -219,10 +219,10 @@ void MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::upsweep(
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
 float MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::compute(GroupView grp, const Tc* x, const Tc* y, const Tc* z,
                                                                    const Tm* m, const Th* h, Tc G, int numShells,
-                                                                   const cstone::Box<Tc>& box, Ta* potential, Ta* ax,
+                                                                   const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax,
                                                                    Ta* ay, Ta* az)
 {
-    return impl_->compute(grp, x, y, z, m, h, G, numShells, box, potential, ax, ay, az);
+    return impl_->compute(grp, x, y, z, m, h, G, numShells, box, ugrav, ax, ay, az);
 }
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>

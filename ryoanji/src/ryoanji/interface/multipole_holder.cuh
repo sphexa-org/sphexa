@@ -58,7 +58,7 @@ public:
                  MType* multipoles);
 
     float compute(cstone::GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m, const Th* h, Tc G,
-                  int numShells, const cstone::Box<Tc>& box, Ta* potential, Ta* ax, Ta* ay, Ta* az);
+                  int numShells, const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az);
 
     util::array<uint64_t, 5> readStats() const;
 
