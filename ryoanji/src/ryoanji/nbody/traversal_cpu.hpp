@@ -176,7 +176,7 @@ template<class MType, class T1, class T2, class Tm>
 void computeGravity(const TreeNodeIndex* childOffsets, const TreeNodeIndex* internalToLeaf,
                     const cstone::SourceCenterType<T1>* macSpheres, const MType* multipoles, const LocalIndex* layout,
                     TreeNodeIndex firstLeafIndex, TreeNodeIndex lastLeafIndex, const T1* x, const T1* y, const T1* z,
-                    const T2* h, const Tm* m, const cstone::Box<T1>& box, float G, T1* ugrav, T2* ax, T2* ay, T2* az,
+                    const T2* h, const Tm* m, const cstone::Box<T1>& box, float G, T2* ugrav, T2* ax, T2* ay, T2* az,
                     T1* ugravTot, int numShells = 0)
 {
     constexpr LocalIndex groupSize   = 16;

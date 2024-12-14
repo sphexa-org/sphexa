@@ -372,7 +372,7 @@ HOST_DEVICE_FUN Vec4<T1> computeEwaldKSpace(Vec3<T1> r, const EwaldParameters<T1
 template<class MType, class Tc, class Ta, class Tm, class Tu>
 void computeGravityEwald(const cstone::Vec3<Tc>& rootCenter, const MType& Mroot, LocalIndex firstTarget,
                          LocalIndex lastTarget, const Tc* x, const Tc* y, const Tc* z, const Tm* m,
-                         const cstone::Box<Tc>& box, float G, Tu* ugrav, Ta* ax, Ta* ay, Ta* az, Tu* ugravTot,
+                         const cstone::Box<Tc>& box, float G, Ta* ugrav, Ta* ax, Ta* ay, Ta* az, Tu* ugravTot,
                          EwaldSettings settings)
 {
     if (box.minExtent() != box.maxExtent()) { throw std::runtime_error("Ewald gravity requires cubic bounding boxes"); }

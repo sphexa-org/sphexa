@@ -64,6 +64,7 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
     {
         return PropLib<DomainType, ParticleDataType>::makeTurbVeProp(output, rank, s, avClean);
     }
+    if (choice == "std-disk") { return PropLib<DomainType, ParticleDataType>::makeDiskProp(output, rank, s); }
 
     throw std::runtime_error("Unknown propagator choice: " + choice);
 }

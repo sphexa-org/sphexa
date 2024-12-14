@@ -1,8 +1,9 @@
 
 set(SPH_EXA_INCLUDE_DIRS ${CSTONE_DIR} ${COOLING_DIR} ${RYOANJI_DIR} ${SPH_DIR}
-    ${PROJECT_SOURCE_DIR}/main/src
-    ${CMAKE_BINARY_DIR}/main/src
-    ${MPI_CXX_INCLUDE_PATH})
+        ${PROJECT_SOURCE_DIR}/main/src
+        ${CMAKE_BINARY_DIR}/main/src
+        ${MPI_CXX_INCLUDE_PATH}
+        ${PLANET_DIR})
 
 function(enableGrackle exename)
     if(SPH_EXA_WITH_GRACKLE)
