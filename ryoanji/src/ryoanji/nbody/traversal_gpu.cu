@@ -391,13 +391,14 @@ __global__ void resetTraversalCounters()
  *
  * @param[in]    grp            groups of target particles to compute accelerations for
  * @param[in]    initNodeIdx    traversal will be started with all children of the parent of @p initNodeIdx
- * @param[in]    x,y,z,m,h      bodies, in SFC order and as referenced by sourceCells
+ * @param[in]    xt,yt,zt,mt,ht target bodies, as referenced and grouped by @p grp
+ * @param[in]    xs,ys,zs,ms,hs source bodies, in SFC order as used for tree-build and as referenced by layout
  * @param[in]    childOffsets   location (index in [0:numTreeNodes]) of first child of each cell, 0 indicates a leaf
  * @param[in]    internalToLeaf for each cell in [0:numTreeNodes], stores the leaf cell (cstone) index in [0:numLeaves]
  *                              if the cell is not a leaf, the value is negative
- * @param[in]    layout         for each leaf cell in [0:numLeaves], stores the index of the first body in the cell
+ * @param[in]    layout         for each leaf cell in [0:numLeaves], stores the index of the first source body in cell
  * @param[in]    sourceCenter   x,y,z center and square MAC radius of each cell in [0:numTreeNodes]
- * @param[in]    Multipole      cell multipoles, on device
+ * @param[in]    Multipoles     cell multipoles, on device
  * @param[in]    G              gravitational constant
  * @param[in]    numShells      number of periodic replicas in each dimension to include
  * @param[in]    boxL           length of coordinate bounding box in each dimension
@@ -409,8 +410,9 @@ __global__ void resetTraversalCounters()
  */
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType>
 __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
-    cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ x, const Tc* __restrict__ y,
-    const Tc* __restrict__ z, const Tm* __restrict__ m, const Th* __restrict__ h,
+    cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ xt, const Tc* __restrict__ yt,
+    const Tc* __restrict__ zt, const Tm* __restrict__ mt, const Th* __restrict__ ht, const Tc* __restrict__ xs,
+    const Tc* __restrict__ ys, const Tc* __restrict__ zs, const Tm* __restrict__ ms, const Th* __restrict__ hs,
     const TreeNodeIndex* __restrict__ childOffsets, const TreeNodeIndex* __restrict__ internalToLeaf,
     const LocalIndex* __restrict__ layout, const Vec4<Tf>* __restrict__ sourceCenter,
     const MType* __restrict__ Multipoles, Tc G, int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az,
@@ -458,7 +460,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
         for (int i = 0; i < TravConfig::nwt; i++)
         {
             int bodyIdx = imin(bodyBegin + i * GpuConfig::warpSize + laneIdx, bodyEnd - 1);
-            pos_i[i]    = {x[bodyIdx], y[bodyIdx], z[bodyIdx], h[bodyIdx]};
+            pos_i[i]    = {xt[bodyIdx], yt[bodyIdx], zt[bodyIdx], ht[bodyIdx]};
         }
 
         Vec3<Tc> Xmin = makeVec3(pos_i[0]);
@@ -500,8 +502,8 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
                     }
 
                     auto [numM2P_, numP2P_, maxStack_] = traverseWarp(
-                        acc_i, pos_i, targetCenter, targetSize, x, y, z, m, h, childOffsets, internalToLeaf, layout,
-                        sourceCenter, Multipoles, initNodeIdx, tempQueue, cellQueue);
+                        acc_i, pos_i, targetCenter, targetSize, xs, ys, zs, ms, hs, childOffsets, internalToLeaf,
+                        layout, sourceCenter, Multipoles, initNodeIdx, tempQueue, cellQueue);
 
                     {
                         Vec3<Tf> pbcShift{ix * boxL[0], iy * boxL[1], iz * boxL[2]};
@@ -528,7 +530,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
         for (int i = 0; i < TravConfig::nwt; i++)
         {
             const int bodyIdx = bodyIdxLane + i * GpuConfig::warpSize;
-            if (bodyIdx < bodyEnd) { warpPotential += m[bodyIdx] * acc_i[i][0]; }
+            if (bodyIdx < bodyEnd) { warpPotential += mt[bodyIdx] * acc_i[i][0]; }
         }
 
 #pragma unroll
@@ -553,7 +555,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
             const int bodyIdx = bodyIdxLane + i * GpuConfig::warpSize;
             if (bodyIdx < bodyEnd)
             {
-                if (p) { p[bodyIdx] += G * m[bodyIdx] * acc_i[i][0]; }
+                if (p) { p[bodyIdx] += G * mt[bodyIdx] * acc_i[i][0]; }
                 ax[bodyIdx] += G * acc_i[i][1];
                 ay[bodyIdx] += G * acc_i[i][2];
                 az[bodyIdx] += G * acc_i[i][3];
@@ -563,31 +565,34 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
 }
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType>
-double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ x, const Tc* __restrict__ y,
-                const Tc* __restrict__ z, const Tm* __restrict__ m, const Th* __restrict__ h,
-                const TreeNodeIndex* __restrict__ childOffsets, const TreeNodeIndex* __restrict__ internalToLeaf,
-                const LocalIndex* __restrict__ layout, const Vec4<Tf>* __restrict__ sourceCenter,
-                const MType* __restrict__ multipoles, Tc G, int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az,
-                int* gmPool)
+double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ xt, const Tc* __restrict__ yt,
+                const Tc* __restrict__ zt, const Tm* __restrict__ mt, const Th* __restrict__ ht,
+                const Tc* __restrict__ xs, const Tc* __restrict__ ys, const Tc* __restrict__ zs,
+                const Tm* __restrict__ ms, const Th* __restrict__ hs, const TreeNodeIndex* __restrict__ childOffsets,
+                const TreeNodeIndex* __restrict__ internalToLeaf, const LocalIndex* __restrict__ layout,
+                const Vec4<Tf>* __restrict__ sourceCenter, const MType* __restrict__ multipoles, Tc G, int numShells,
+                Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az, int* gmPool)
 {
 
-    int numWarpsPerBlock = TravConfig::numThreads / cstone::GpuConfig::warpSize;
+    int numWarpsPerBlock = TravConfig::numThreads / GpuConfig::warpSize;
     int numBlocks        = cstone::iceil(grp.numGroups, numWarpsPerBlock);
     numBlocks            = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
 
     resetTraversalCounters<<<1, 1>>>();
-    traverseKernel<<<numBlocks, TravConfig::numThreads>>>(grp, initNodeIdx, x, y, z, m, h, childOffsets, internalToLeaf,
-                                                          layout, sourceCenter, multipoles, G, numShells, boxL, p, ax,
-                                                          ay, az, gmPool);
+    traverseKernel<<<numBlocks, TravConfig::numThreads>>>(grp, initNodeIdx, xt, yt, zt, mt, ht, xs, ys, zs, ms, hs,
+                                                          childOffsets, internalToLeaf, layout, sourceCenter,
+                                                          multipoles, G, numShells, boxL, p, ax, ay, az, gmPool);
     float totalPotential;
     checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
     return 0.5 * Tc(G) * totalPotential;
 }
 
 #define TRAVERSE(Tc, Th, Tm, Ta, Tf, MType)                                                                            \
-    template double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ x,                   \
-                             const Tc* __restrict__ y, const Tc* __restrict__ z, const Tm* __restrict__ m,             \
-                             const Th* __restrict__ h, const TreeNodeIndex* __restrict__ childOffsets,                 \
+    template double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ xt,                  \
+                             const Tc* __restrict__ yt, const Tc* __restrict__ zt, const Tm* __restrict__ mt,          \
+                             const Th* __restrict__ ht, const Tc* __restrict__ xs, const Tc* __restrict__ ys,          \
+                             const Tc* __restrict__ zs, const Tm* __restrict__ ms, const Th* __restrict__ hs,          \
+                             const TreeNodeIndex* __restrict__ childOffsets,                                           \
                              const TreeNodeIndex* __restrict__ internalToLeaf, const LocalIndex* __restrict__ layout,  \
                              const Vec4<Tf>* __restrict__ sourceCenter, const MType* __restrict__ multipoles, Tc G,    \
                              int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az, int* gmPool)
@@ -613,7 +618,7 @@ LocalIndex stackSize(LocalIndex numGroups)
 
 util::array<uint64_t, 5> readBhStats()
 {
-    typename BhStats::type stats[BhStats::numStats];
+    BhStats::type stats[BhStats::numStats];
     checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(bhStats), BhStats::numStats * sizeof(BhStats::type)));
 
     auto sumP2P   = stats[BhStats::sumP2P];

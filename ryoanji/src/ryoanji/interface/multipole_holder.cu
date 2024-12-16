@@ -127,9 +127,19 @@ public:
                   const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az)
     {
         reallocate(traversalStack_, stackSize(grp.numGroups), 1.01);
-        return traverse(grp, 1, x, y, z, m, h, octree_.childOffsets, octree_.internalToLeaf, layout_, centers_,
-                        rawPtr(multipoles_), G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()}, (Ta*)nullptr, ax, ay,
-                        az, (int*)rawPtr(traversalStack_));
+        return traverse(grp, 1, x, y, z, m, h, x, y, z, m, h, octree_.childOffsets, octree_.internalToLeaf, layout_,
+                        centers_, rawPtr(multipoles_), G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()}, ugrav, ax,
+                        ay, az, (int*)rawPtr(traversalStack_));
+    }
+
+    float compute(GroupView grp, const Tc* xt, const Tc* yt, const Tc* zt, const Tm* mt, const Th* ht, const Tc* xs,
+                  const Tc* ys, const Tc* zs, const Tm* ms, const Th* hs, Tc G, int numShells,
+                  const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az)
+    {
+        reallocate(traversalStack_, stackSize(grp.numGroups), 1.01);
+        return traverse(grp, 1, xt, yt, zt, mt, ht, xs, ys, zs, ms, hs, octree_.childOffsets, octree_.internalToLeaf,
+                        layout_, centers_, rawPtr(multipoles_), G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()},
+                        ugrav, ax, ay, az, (int*)rawPtr(traversalStack_));
     }
 
     util::array<uint64_t, 5> readStats() const { return readBhStats(); }
@@ -192,6 +202,17 @@ float MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::compute(GroupView grp
                                                                    Ta* ay, Ta* az)
 {
     return impl_->compute(grp, x, y, z, m, h, G, numShells, box, ugrav, ax, ay, az);
+}
+
+template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
+float MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::compute(GroupView grp, const Tc* xt, const Tc* yt,
+                                                                   const Tc* zt, const Tm* mt, const Th* ht,
+                                                                   const Tc* xs, const Tc* ys, const Tc* zs,
+                                                                   const Tm* ms, const Th* hs, Tc G, int numShells,
+                                                                   const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax,
+                                                                   Ta* ay, Ta* az)
+{
+    return impl_->compute(grp, xt, yt, zt, mt, ht, xs, ys, zs, ms, hs, G, numShells, box, ugrav, ax, ay, az);
 }
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
