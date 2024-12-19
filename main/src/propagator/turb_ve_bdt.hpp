@@ -32,7 +32,6 @@
 #pragma once
 
 #include <filesystem>
-#include <sstream>
 #include <variant>
 
 #include "cstone/util/constexpr_string.hpp"
@@ -40,6 +39,7 @@
 #include "io/arg_parser.hpp"
 #include "sph/sph.hpp"
 #include "sph/hydro_turb/turbulence_data.hpp"
+#include "sph/ts_rungs.hpp"
 
 #include "gravity_wrapper.hpp"
 
@@ -91,7 +91,7 @@ protected:
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "du", "c11", "c12", "c13", "c22", "c23", "c33", "xm",
-                                       "kx", "nc", "divv", "gradh", "u">;
+                                       "kx", "nc", "divv", "gradh">;
 
     //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
