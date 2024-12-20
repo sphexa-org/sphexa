@@ -64,6 +64,10 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
     {
         return PropLib<DomainType, ParticleDataType>::makeTurbVeProp(output, rank, s, avClean);
     }
+    if (choice == "turbulence-std")
+    {
+        return PropLib<DomainType, ParticleDataType>::makeTurbStdBdtProp(output, rank, s);
+    }
 
     throw std::runtime_error("Unknown propagator choice: " + choice);
 }

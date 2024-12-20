@@ -20,7 +20,8 @@ template<class Dataset>
 extern void computeIADGpu(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
 
 template<class Dataset>
-extern void computeMomentumEnergyStdGpu(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
+extern void computeMomentumEnergyStdGpu(const GroupView&, float*, Dataset& d,
+                                        const cstone::Box<typename Dataset::RealType>&);
 
 namespace cuda
 {
@@ -52,6 +53,9 @@ extern void computeEOS(size_t, size_t, Tm mui, Tu gamma, const Tu*, const Tm*, c
 
 template<typename Dataset>
 extern void computeIsothermalEOS(size_t, size_t, Dataset& d);
+
+template<typename Dataset>
+extern void computeIsothermalEosStd(size_t, size_t, Dataset& d);
 
 } // namespace cuda
 

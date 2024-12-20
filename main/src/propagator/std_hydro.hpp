@@ -157,7 +157,7 @@ public:
         domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33">(d), get<"ax">(d), get<"ay">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeMomentumEnergySTD(groups_.view(), d, domain.box());
+        computeMomentumEnergySTD(groups_.view(), nullptr, d, domain.box());
         timer.step("MomentumEnergyIAD");
 
         if (d.g != 0.0)

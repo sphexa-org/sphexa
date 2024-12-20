@@ -101,7 +101,6 @@ __global__ void cudaComputeIsothermalEOS(size_t first, size_t last, Trho* rho, c
 template<typename Dataset>
 void computeIsothermalEOS(size_t first, size_t last, Dataset& d)
 {
-
     if (first == last) { return; }
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(last - first, numThreads);
@@ -113,6 +112,28 @@ void computeIsothermalEOS(size_t first, size_t last, Dataset& d)
 }
 
 template void computeIsothermalEOS(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d);
+
+template<typename T>
+__global__ void cudaComputeIsothermalEosStd(size_t first, size_t last, const T* rho, const T* c, T* p)
+{
+    unsigned i = first + blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= last) return;
+
+    p[i] = isothermalEOS(c[i], rho[i]);
+}
+
+template<typename Dataset>
+void computeIsothermalEosStd(size_t first, size_t last, Dataset& d)
+{
+    if (first == last) { return; }
+    unsigned numThreads = 256;
+    unsigned numBlocks  = cstone::iceil(last - first, numThreads);
+    cudaComputeIsothermalEosStd<<<numBlocks, numThreads>>>(first, last, rawPtr(d.devData.rho), rawPtr(d.devData.c),
+                                                           rawPtr(d.devData.p));
+    checkGpuErrors(cudaDeviceSynchronize());
+}
+
+template void computeIsothermalEosStd(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d);
 
 } // namespace cuda
 } // namespace sph

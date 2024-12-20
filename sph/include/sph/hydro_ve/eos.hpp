@@ -76,6 +76,18 @@ void computeEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     }
 }
 
+template<class Dataset>
+void computeEOS(size_t startIndex, size_t endIndex, Dataset& d)
+{
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    {
+        cuda::computeEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.devData.temp), rawPtr(d.devData.m),
+                         rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.gradh), rawPtr(d.devData.prho),
+                         rawPtr(d.devData.c), rawPtr(d.devData.rho), rawPtr(d.devData.p));
+    }
+    else { computeEOS_Impl(startIndex, endIndex, d); }
+}
+
 template<typename Dataset>
 void computeIsothermalEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
 {
@@ -115,15 +127,13 @@ void computeIsothermalEOS(size_t startIndex, size_t endIndex, Dataset& d)
 }
 
 template<class Dataset>
-void computeEOS(size_t startIndex, size_t endIndex, Dataset& d)
+void computeIsothermalEosStd(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        cuda::computeEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.devData.temp), rawPtr(d.devData.m),
-                         rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.gradh), rawPtr(d.devData.prho),
-                         rawPtr(d.devData.c), rawPtr(d.devData.rho), rawPtr(d.devData.p));
+        cuda::computeIsothermalEosStd(startIndex, endIndex, d);
     }
-    else { computeEOS_Impl(startIndex, endIndex, d); }
+    else { throw std::runtime_error("computeIosthermalEosStd not implemented on CPU\n"); }
 }
 
 } // namespace sph
