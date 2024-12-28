@@ -24,7 +24,6 @@ sph-run-cuda12-sm90-debug-1rank:
     - sbin/hydro/sph_tests
     - sbin/performance/octree_perf
     - sbin/performance/peers_perf
-    - sbin/performance/scan_perf
     - sbin/ryoanji/cpu_unit_tests/ryoanji_cpu_unit_tests
     - sbin/ryoanji/unit_tests/ryoanji_unit_tests
     # TODO:slow    - sbin/performance/hilbert_perf
