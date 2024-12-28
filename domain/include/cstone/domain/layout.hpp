@@ -160,7 +160,7 @@ inline void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
         layout[i]          = -int(haveParticles) & focusLeafCounts[i];
     }
 
-    exclusiveScan(layout.data(), layout.size());
+    std::exclusive_scan(layout.begin(), layout.end(), layout.begin(), LocalIndex{0});
 }
 
 /*! @brief computes a list which local array ranges are going to be filled with halo particles
