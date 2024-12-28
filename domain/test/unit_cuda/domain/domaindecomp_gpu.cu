@@ -1,25 +1,16 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2022 CSCS, ETH Zurich
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
+ */
+
+/*! @file
+ * @brief  Tests for GPU domain decomposition functions
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
 #include <thrust/device_vector.h>
@@ -54,7 +45,7 @@ static void sendListMinimalGpu()
     thrust::device_vector<KeyType> d_searchKeys(numRanks + 1);
     thrust::device_vector<LocalIndex> d_indices(numRanks + 1);
 
-    gsl::span<const KeyType> d_keyView{rp(d_keys), d_keys.size()};
+    std::span<const KeyType> d_keyView{rp(d_keys), d_keys.size()};
 
     // note: key input needs to be sorted
     auto sendList = createSendRangesGpu(assignment, d_keyView, rp(d_searchKeys), rp(d_indices));

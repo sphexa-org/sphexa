@@ -1,25 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2022 CSCS, ETH Zurich
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -32,7 +17,6 @@
 
 #include <cassert>
 #include <cstdint>
-#include <memory>
 #include <span>
 
 #include "cstone/cuda/cuda_utils.cuh"
@@ -76,26 +60,20 @@ public:
     const IndexType* getMap() const { return ordering(); }
 
     template<class KeyType, class KeyBuf, class ValueBuf>
-    void updateMap(KeyType* first, KeyType* last, KeyBuf& keyBuf, ValueBuf& valueBuf)
+    void updateMap(std::span<KeyType> keys, KeyBuf& keyBuf, ValueBuf& valueBuf)
     {
-        sortByKeyGpu<KeyType, IndexType>({first, last}, {ordering(), size_t(last - first)}, keyBuf, valueBuf,
-                                         growthRate_);
+        sortByKeyGpu<KeyType, IndexType>(keys, {ordering(), keys.size()}, keyBuf, valueBuf, growthRate_);
     }
 
     /*! @brief sort given Morton codes on the device and determine reorder map based on sort order
-     *
-     * @param[inout] first       pointer to first SFC code
-     * @param[inout] last        pointer to last SFC code
-     * @param[in]    valueOffset
      */
     template<class KeyType, class KeyBuf, class ValueBuf>
-    void setMapFromCodes(KeyType* first, KeyType* last, KeyBuf& keyBuf, ValueBuf& valueBuf)
+    void setMapFromCodes(std::span<KeyType> keys, IndexType /*offset*/, KeyBuf& keyBuf, ValueBuf& valueBuf)
     {
-        mapSize_ = std::size_t(last - first);
-        reallocateBytes(buffer_, mapSize_ * sizeof(IndexType), growthRate_);
-        sequenceGpu(ordering(), mapSize_, IndexType(0));
-
-        updateMap(first, last, keyBuf, valueBuf);
+        mapSize_ = keys.size();
+        reallocateBytes(buffer_, keys.size() * sizeof(IndexType), growthRate_);
+        sequenceGpu(ordering(), keys.size(), IndexType(0));
+        sortByKeyGpu(keys, std::span<IndexType>(ordering(), keys.size()), keyBuf, valueBuf, growthRate_);
     }
 
     auto gatherFunc() const { return gatherGpuL; }
@@ -138,8 +116,8 @@ public:
     }
 
 private:
-    IndexType* ordering() { return reinterpret_cast<IndexType*>(rawPtr(buffer_)); }
-    const IndexType* ordering() const { return reinterpret_cast<const IndexType*>(rawPtr(buffer_)); }
+    IndexType* ordering() { return reinterpret_cast<IndexType*>(buffer_.data()); }
+    const IndexType* ordering() const { return reinterpret_cast<const IndexType*>(buffer_.data()); }
 
     //! @brief reference to (non-owning) buffer for ordering
     BufferType& buffer_;

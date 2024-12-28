@@ -1,7 +1,7 @@
 /*
  * Cornerstone octree
  *
- * Copyright (c) 2024 CSCS, ETH Zurich, University of Zurich, 2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
  * Please, refer to the LICENSE file in the root directory.
  * SPDX-License-Identifier: MIT License
@@ -94,19 +94,17 @@ public:
         else { box_ = limitBoxShrinking(fittingBox, box_); }
 
         // compute SFC particle keys only for particles participating in tree build
-        gsl::span<KeyType> keyView(particleKeys + start, numParticles);
+        std::span<KeyType> keyView(particleKeys + start, numParticles);
         computeSfcKeysGpu(x + start, y + start, z + start, sfcKindPointer(keyView.data()), numParticles, box_);
 
         // sort keys and keep track of ordering for later use
-        sfcSorter.setMapFromCodes(keyView.begin(), keyView.end(), s0, s1);
+        sfcSorter.setMapFromCodes(keyView, start, s0, s1);
 
-        updateOctreeGlobalGpu(keyView.begin(), keyView.end(), bucketSize_, tree_, d_csTree_, nodeCounts_,
-                              d_nodeCounts_);
+        updateOctreeGlobalGpu<KeyType>(keyView, bucketSize_, tree_, d_csTree_, nodeCounts_, d_nodeCounts_);
         if (firstCall_)
         {
             firstCall_ = false;
-            while (!updateOctreeGlobalGpu(keyView.begin(), keyView.end(), bucketSize_, tree_, d_csTree_, nodeCounts_,
-                                          d_nodeCounts_))
+            while (!updateOctreeGlobalGpu<KeyType>(keyView, bucketSize_, tree_, d_csTree_, nodeCounts_, d_nodeCounts_))
                 ;
         }
 
@@ -156,9 +154,9 @@ public:
         exchangeParticlesGpu(0, recvLog_, exchanges_, myRank_, bufDesc, numAssigned(), sendScratch, receiveScratch,
                              sfcSorter.getMap(), x, y, z, particleProperties...);
 
-        auto [newStart, newEnd]    = domain_exchange::assignedEnvelope(bufDesc, numPresent(), numAssigned());
-        LocalIndex envelopeSize    = newEnd - newStart;
-        gsl::span<KeyType> keyView = gsl::span<KeyType>(keys + newStart, envelopeSize);
+        auto [newStart, newEnd] = domain_exchange::assignedEnvelope(bufDesc, numPresent(), numAssigned());
+        LocalIndex envelopeSize = newEnd - newStart;
+        std::span<KeyType> keyView(keys + newStart, envelopeSize);
 
         auto recvStart = domain_exchange::receiveStart(bufDesc, numPresent(), numAssigned());
         auto numRecv   = numAssigned() - numPresent();
@@ -169,7 +167,7 @@ public:
         sfcSorter.extendMap(shifts, sendScratch);
 
         // sort keys and keep track of the ordering
-        sfcSorter.updateMap(keyView.begin(), keyView.end(), sendScratch, receiveScratch);
+        sfcSorter.updateMap(keyView, sendScratch, receiveScratch);
 
         return std::make_tuple(newStart, keyView.subspan(numSendDown(), numAssigned()));
     }

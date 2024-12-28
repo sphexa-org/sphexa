@@ -1,7 +1,7 @@
 /*
  * Cornerstone octree
  *
- * Copyright (c) 2024 CSCS, ETH Zurich, University of Zurich, 2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
  * Please, refer to the LICENSE file in the root directory.
  * SPDX-License-Identifier: MIT License
@@ -15,7 +15,6 @@
 
 #pragma once
 
-#include <numeric>
 #include <vector>
 
 #include "cstone/primitives/mpi_wrappers.hpp"
@@ -27,7 +26,6 @@ namespace cstone
 template<class... Arrays>
 void haloexchange(int epoch, const RecvList& incomingHalos, const SendList& outgoingHalos, Arrays... arrays)
 {
-    using IndexType     = SendManifest::IndexType;
     int haloExchangeTag = static_cast<int>(P2pTags::haloExchange) + epoch;
 
     std::vector<std::vector<char>> sendBuffers;

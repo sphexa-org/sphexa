@@ -7,7 +7,6 @@
 
 #include <array>
 #include <cstdio>
-#include <cstdlib>
 #include <cmath>
 #include <vector>
 #include <fstream>

@@ -1,25 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2022 CSCS, ETH Zurich
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -30,12 +15,9 @@
 
 #pragma once
 
-#include <vector>
-
 #include "cstone/traversal/boxoverlap.hpp"
 #include "cstone/tree/csarray.hpp"
 #include "cstone/tree/octree.hpp"
-#include "cstone/util/gsl-lite.hpp"
 
 namespace cstone
 {
@@ -47,15 +29,15 @@ namespace cstone
  *      - 8 if node to be split
  */
 template<class KeyType>
-inline HOST_DEVICE_FUN int mergeCountAndMacOp(TreeNodeIndex nodeIdx,
-                                              const KeyType* nodeKeys,
-                                              const TreeNodeIndex* childOffsets,
-                                              const TreeNodeIndex* parents,
-                                              const unsigned* counts,
-                                              const char* macs,
-                                              KeyType focusStart,
-                                              KeyType focusEnd,
-                                              unsigned bucketSize)
+HOST_DEVICE_FUN int mergeCountAndMacOp(TreeNodeIndex nodeIdx,
+                                       const KeyType* nodeKeys,
+                                       const TreeNodeIndex* childOffsets,
+                                       const TreeNodeIndex* parents,
+                                       const unsigned* counts,
+                                       const char* macs,
+                                       KeyType focusStart,
+                                       KeyType focusEnd,
+                                       unsigned bucketSize)
 {
     TreeNodeIndex siblingGroup = (nodeIdx - 1) / 8;
     TreeNodeIndex parent       = nodeIdx ? parents[siblingGroup] : 0;
@@ -150,7 +132,7 @@ nzAncestorOp(TreeNodeIndex nodeIdx, const KeyType* prefixes, const TreeNodeIndex
  *  - 8 if to be split.
  */
 template<class KeyType>
-void rebalanceDecisionEssential(gsl::span<const KeyType> nodeKeys,
+void rebalanceDecisionEssential(std::span<const KeyType> nodeKeys,
                                 const TreeNodeIndex* childOffsets,
                                 const TreeNodeIndex* parents,
                                 const unsigned* counts,
@@ -161,7 +143,7 @@ void rebalanceDecisionEssential(gsl::span<const KeyType> nodeKeys,
                                 TreeNodeIndex* nodeOps)
 {
 #pragma omp parallel for
-    for (TreeNodeIndex i = 0; i < nodeKeys.ssize(); ++i)
+    for (std::size_t i = 0; i < nodeKeys.size(); ++i)
     {
         nodeOps[i] = mergeCountAndMacOp(i, nodeKeys.data(), childOffsets, parents, counts, macs, focusStart, focusEnd,
                                         bucketSize);
@@ -169,11 +151,11 @@ void rebalanceDecisionEssential(gsl::span<const KeyType> nodeKeys,
 }
 
 template<class KeyType>
-bool protectAncestors(gsl::span<const KeyType> nodeKeys, const TreeNodeIndex* parents, TreeNodeIndex* nodeOps)
+bool protectAncestors(std::span<const KeyType> nodeKeys, const TreeNodeIndex* parents, TreeNodeIndex* nodeOps)
 {
     int numChanges = 0;
 #pragma omp parallel for reduction(+ : numChanges)
-    for (TreeNodeIndex i = 0; i < nodeKeys.ssize(); ++i)
+    for (std::size_t i = 0; i < nodeKeys.size(); ++i)
     {
         int opDecision = nzAncestorOp(i, nodeKeys.data(), parents, nodeOps);
 
@@ -251,7 +233,7 @@ HOST_DEVICE_FUN ResolutionStatus enforceKeySingle(KeyType key,
 }
 
 template<class KeyType>
-ResolutionStatus enforceKeys(gsl::span<const KeyType> mandatoryKeys,
+ResolutionStatus enforceKeys(std::span<const KeyType> mandatoryKeys,
                              const KeyType* nodeKeys,
                              const TreeNodeIndex* childOffsets,
                              const TreeNodeIndex* parents,
@@ -276,11 +258,11 @@ ResolutionStatus enforceKeys(gsl::span<const KeyType> mandatoryKeys,
  * @param[out] countsFocus     output counts for @p leavesFocus, length = length(leavesFocus) - 1
  */
 template<class KeyType>
-void rangeCount(gsl::span<const KeyType> leaves,
-                gsl::span<const unsigned> counts,
-                gsl::span<const KeyType> leavesFocus,
-                gsl::span<const TreeNodeIndex> leavesFocusIdx,
-                gsl::span<unsigned> countsFocus)
+void rangeCount(std::span<const KeyType> leaves,
+                std::span<const unsigned> counts,
+                std::span<const KeyType> leavesFocus,
+                std::span<const TreeNodeIndex> leavesFocusIdx,
+                std::span<unsigned> countsFocus)
 {
 #pragma omp parallel for
     for (size_t i = 0; i < leavesFocusIdx.size(); ++i)

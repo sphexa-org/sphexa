@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -60,8 +44,8 @@ __global__ void findNeighborsKernel(const T* x,
                                     LocalIndex* neighbors,
                                     unsigned* neighborsCount)
 {
-    cstone::LocalIndex tid = blockDim.x * blockIdx.x + threadIdx.x;
-    cstone::LocalIndex id  = firstId + tid;
+    LocalIndex tid = blockDim.x * blockIdx.x + threadIdx.x;
+    LocalIndex id  = firstId + tid;
     if (id >= lastId) { return; }
 
     neighborsCount[id] = findNeighbors(id, x, y, z, h, treeView, box, ngmax, neighbors + tid * ngmax);
@@ -69,26 +53,19 @@ __global__ void findNeighborsKernel(const T* x,
 
 /*! @brief Neighbor search for bodies within the specified range
  *
- * @param[in]    firstBody           index of first body in @p bodyPos to compute acceleration for
- * @param[in]    lastBody            index (exclusive) of last body in @p bodyPos to compute acceleration for
- * @param[in]    rootRange           (start,end) index pair of cell indices to start traversal from
- * @param[in]    x,y,z,h             bodies, in SFC order and as referenced by @p layout
- * @param[in]    tree.childOffsets   location (index in [0:numTreeNodes]) of first child of each cell, 0 indicates a
- *                                   leaf
- * @param[in]    tree.internalToLeaf for each cell in [0:numTreeNodes], stores the leaf cell (cstone) index in
- *                                   [0:numLeaves] if the cell is not a leaf, the value is negative
- * @param[in]    tree.layout         for each leaf cell in [0:numLeaves], stores the index of the first body in the cell
- * @param[in]    tree.centers        x,y,z geometric center of each cell in [0:numTreeNodes]
- * @param[in]    tree.sizes          x,y,z geometric size of each cell in [0:numTreeNodes]
- * @param[in]    box                 global coordinate bounding box
- * @param[out]   nc                  neighbor counts of bodies with indices in [firstBody, lastBody]
- * @param[-]     globalPool          temporary storage for the cell traversal stack, uninitialized
- *                                   each active warp needs space for TravConfig::memPerWarp int32,
- *                                   so the total size is TravConfig::memPerWarp * numWarpsPerBlock * numBlocks
+ * @param[in]    firstBody    index of first body in @p bodyPos to compute acceleration for
+ * @param[in]    lastBody     index (exclusive) of last body in @p bodyPos to compute acceleration for
+ * @param[in]    x,y,z,h      bodies, in SFC order and as referenced by @p layout
+ * @param[in]    tree         octree data for traversal
+ * @param[in]    box          global coordinate bounding box
+ * @param[out]   nc           neighbor counts of bodies with indices in [firstBody, lastBody]
+ * @param[-]     globalPool   temporary storage for the cell traversal stack, uninitialized
+ *                            each active warp needs space for TravConfig::memPerWarp int32,
+ *                            so the total size is TravConfig::memPerWarp * numWarpsPerBlock * numBlocks
  */
 template<class Tc, class Th, class KeyType>
-__global__ __launch_bounds__(TravConfig::numThreads) void traverseBT(cstone::LocalIndex firstBody,
-                                                                     cstone::LocalIndex lastBody,
+__global__ __launch_bounds__(TravConfig::numThreads) void traverseBT(LocalIndex firstBody,
+                                                                     LocalIndex lastBody,
                                                                      const Tc* __restrict__ x,
                                                                      const Tc* __restrict__ y,
                                                                      const Tc* __restrict__ z,
@@ -112,16 +89,16 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseBT(cstone::Loc
 
         if (targetIdx >= numTargets) return;
 
-        const cstone::LocalIndex bodyBegin = firstBody + targetIdx * TravConfig::targetSize;
-        const cstone::LocalIndex bodyEnd   = imin(bodyBegin + TravConfig::targetSize, lastBody);
-        unsigned* warpNidx                 = nidx + targetIdx * TravConfig::targetSize * ngmax;
+        const LocalIndex bodyBegin = firstBody + targetIdx * TravConfig::targetSize;
+        const LocalIndex bodyEnd   = imin(bodyBegin + TravConfig::targetSize, lastBody);
+        unsigned* warpNidx         = nidx + targetIdx * TravConfig::targetSize * ngmax;
 
         auto nc_i = traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, warpNidx, ngmax, globalPool);
 
-        const cstone::LocalIndex bodyIdxLane = bodyBegin + laneIdx;
+        const LocalIndex bodyIdxLane = bodyBegin + laneIdx;
         for (int i = 0; i < TravConfig::nwt; i++)
         {
-            const cstone::LocalIndex bodyIdx = bodyIdxLane + i * GpuConfig::warpSize;
+            const LocalIndex bodyIdx = bodyIdxLane + i * GpuConfig::warpSize;
             if (bodyIdx < bodyEnd) { nc[bodyIdx] = nc_i[i]; }
         }
     }
@@ -191,18 +168,15 @@ void benchmarkGpu()
     std::vector<LocalIndex> neighborsCPU(ngmax * n);
     std::vector<unsigned> neighborsCountCPU(n);
 
-    const T* x        = coords.x().data();
-    const T* y        = coords.y().data();
-    const T* z        = coords.z().data();
-    const auto* codes = (KeyType*)(coords.particleKeys().data());
+    const T* x = coords.x().data();
+    const T* y = coords.y().data();
+    const T* z = coords.z().data();
 
     unsigned bucketSize   = 64;
-    auto [csTree, counts] = computeOctree(codes, codes + n, bucketSize);
+    auto [csTree, counts] = computeOctree(std::span(coords.particleKeys()), bucketSize);
     OctreeData<KeyType, CpuTag> octree;
     octree.resize(nNodes(csTree));
     updateInternalTree<KeyType>(csTree, octree.data());
-    const TreeNodeIndex* childOffsets = octree.childOffsets.data();
-    const TreeNodeIndex* toLeafOrder  = octree.internalToLeaf.data();
 
     std::vector<LocalIndex> layout(nNodes(csTree) + 1, 0);
     std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
@@ -237,7 +211,7 @@ void benchmarkGpu()
     std::copy(neighborsCountCPU.data(), neighborsCountCPU.data() + 64, std::ostream_iterator<int>(std::cout, " "));
     std::cout << std::endl;
 
-    std::vector<cstone::LocalIndex> neighborsGPU(ngmax * n);
+    std::vector<LocalIndex> neighborsGPU(ngmax * n);
     std::vector<unsigned> neighborsCountGPU(n);
 
     thrust::device_vector<T> d_x(coords.x().begin(), coords.x().end());
