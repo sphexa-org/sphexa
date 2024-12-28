@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -34,6 +18,7 @@
 #include <algorithm>
 #include <cassert>
 #include <numeric>
+#include <span>
 #include <tuple>
 #include <vector>
 
@@ -104,7 +89,7 @@ void omp_copy(InputIterator first, InputIterator last, OutputIterator out)
 
 //! @brief gather reorder
 template<class IndexType, class ValueType>
-void gather(gsl::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
+void gather(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
 {
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < ordering.size(); ++i)
@@ -114,13 +99,12 @@ void gather(gsl::span<const IndexType> ordering, const ValueType* source, ValueT
 }
 
 //! @brief Lambda to avoid templated functors that would become template-template parameters when passed to functions.
-inline auto gatherCpu = [](const auto* ordering, auto numElements, const auto* src, const auto dest) {
-    gather<LocalIndex>({ordering, numElements}, src, dest);
-};
+inline auto gatherCpu = [](std::span<const LocalIndex> ordering, const auto* src, auto* dest)
+{ gather<LocalIndex>(ordering, src, dest); };
 
 //! @brief scatter reorder
 template<class IndexType, class ValueType>
-void scatter(gsl::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
+void scatter(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
 {
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < ordering.size(); ++i)
@@ -131,7 +115,7 @@ void scatter(gsl::span<const IndexType> ordering, const ValueType* source, Value
 
 //! @brief gather from @p src and scatter into @p dst
 template<class IndexType, class VType>
-void gatherScatter(gsl::span<const IndexType> gmap, gsl::span<const IndexType> smap, const VType* src, VType* dst)
+void gatherScatter(std::span<const IndexType> gmap, std::span<const IndexType> smap, const VType* src, VType* dst)
 {
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < gmap.size(); ++i)
@@ -155,19 +139,19 @@ public:
     std::size_t size() const { return mapSize_; }
 
     template<class KeyType>
-    void setMapFromCodes(KeyType* first, KeyType* last)
+    void setMapFromCodes(std::span<KeyType> keys)
     {
-        mapSize_ = std::size_t(last - first);
+        mapSize_ = keys.size();
         reallocateBytes(buffer_, mapSize_ * sizeof(IndexType), 1.0);
         std::iota(ordering(), ordering() + mapSize_, 0);
-        sort_by_key(first, last, ordering());
+        sort_by_key(keys.begin(), keys.end(), ordering());
     }
 
     template<class KeyType>
-    void updateMap(KeyType* first, KeyType* last)
+    void updateMap(std::span<KeyType> keys)
     {
         assert(last - first == mapSize_);
-        sort_by_key(first, last, ordering());
+        sort_by_key(keys.begin(), keys.end(), ordering());
     }
 
     auto gatherFunc() const { return gatherCpu; }

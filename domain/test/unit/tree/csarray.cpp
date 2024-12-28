@@ -1,7 +1,7 @@
 /*
  * Cornerstone octree
  *
- * Copyright (c) 2024 CSCS, ETH Zurich, University of Zurich, 2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
  * Please, refer to the LICENSE file in the root directory.
  * SPDX-License-Identifier: MIT License
@@ -54,14 +54,14 @@ TEST(CornerstoneOctree, searchBounds12) { testBounds(12, 16, {0, 12}); }
 TEST(CornerstoneOctree, searchBounds13) { testBounds(8, nodeRange<uint64_t>(0), {10, 13}); }
 
 //! @brief test that computeNodeCounts correctly counts the number of codes for each node
-template<class CodeType>
+template<class KeyType>
 static void checkCountTreeNodes()
 {
-    std::vector<CodeType> tree = OctreeMaker<CodeType>{}.divide().divide(0).makeTree();
+    std::vector<KeyType> tree = OctreeMaker<KeyType>{}.divide().divide(0).makeTree();
 
-    std::vector<CodeType> codes{tree[1],         tree[1],       tree[1] + 10, tree[1] + 100, tree[2] - 1,
-                                tree[2] + 1,     tree[11],      tree[11] + 2, tree[12],      tree[12] + 1000,
-                                tree[12] + 2000, tree[13] - 10, tree[13],     tree[13] + 1};
+    std::vector<KeyType> keys{tree[1],         tree[1],       tree[1] + 10, tree[1] + 100, tree[2] - 1,
+                              tree[2] + 1,     tree[11],      tree[11] + 2, tree[12],      tree[12] + 1000,
+                              tree[12] + 2000, tree[13] - 10, tree[13],     tree[13] + 1};
 
     //  nodeIdx                     0  1  2  3  4  5  6  7  8  9 10 11 12 13 14
     std::vector<unsigned> reference{0, 5, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 2, 0};
@@ -70,8 +70,7 @@ static void checkCountTreeNodes()
     // Ntot: 14, nNonZeroNodes: 13 (first and last node are empty), avgNodeCount: 14/13 = 1
 
     std::vector<unsigned> counts(nNodes(tree));
-    computeNodeCounts(tree.data(), counts.data(), nNodes(tree), codes.data(), codes.data() + codes.size(),
-                      std::numeric_limits<unsigned>::max());
+    computeNodeCounts<KeyType>(tree.data(), counts.data(), nNodes(tree), keys, std::numeric_limits<unsigned>::max());
 
     EXPECT_EQ(counts, reference);
 }
@@ -89,14 +88,14 @@ static void computeNodeCountsSTree()
     /// 2 particles in the first and last node
 
     /// 2 particles in the first and last node
-    std::vector<KeyType> particleCodes{0, 0, nodeRange<KeyType>(0) - 1, nodeRange<KeyType>(0) - 1};
+    std::vector<KeyType> keys{0, 0, nodeRange<KeyType>(0) - 1, nodeRange<KeyType>(0) - 1};
 
     std::vector<unsigned> countsReference(nNodes(tree), 0);
     countsReference.front() = countsReference.back() = 2;
 
     std::vector<unsigned> countsProbe(nNodes(tree));
-    computeNodeCounts(tree.data(), countsProbe.data(), nNodes(tree), particleCodes.data(),
-                      particleCodes.data() + particleCodes.size(), std::numeric_limits<unsigned>::max());
+    computeNodeCounts<KeyType>(tree.data(), countsProbe.data(), nNodes(tree), keys,
+                               std::numeric_limits<unsigned>::max());
     EXPECT_EQ(countsReference, countsProbe);
 }
 
@@ -309,15 +308,15 @@ public:
     {
         int nParticles = 100000;
 
-        std::vector<KeyType> codes = makeRandomGaussianKeys<KeyType>(nParticles);
+        std::vector<KeyType> keys = makeRandomGaussianKeys<KeyType>(nParticles);
 
-        auto [tree, counts] = computeOctree(codes.data(), codes.data() + nParticles, bucketSize);
+        auto [tree, counts] = computeOctree<KeyType>(keys, bucketSize);
 
-        checkOctreeWithCounts(tree, counts, bucketSize, codes, false);
+        checkOctreeWithCounts(tree, counts, bucketSize, keys, false);
 
         // update with unchanged particle codes
-        updateOctree(codes.data(), codes.data() + nParticles, bucketSize, tree, counts);
-        checkOctreeWithCounts(tree, counts, bucketSize, codes, false);
+        updateOctree<KeyType>(keys, bucketSize, tree, counts);
+        checkOctreeWithCounts(tree, counts, bucketSize, keys, false);
 
         // range of smallest treeNode
         KeyType minRange = std::numeric_limits<KeyType>::max();
@@ -328,15 +327,15 @@ public:
         std::mt19937 gen(42);
         std::uniform_int_distribution<std::make_signed_t<KeyType>> displace(-minRange, minRange);
 
-        for (auto& code : codes)
-            code = std::max(std::make_signed_t<KeyType>(0),
-                            std::min(std::make_signed_t<KeyType>(code) + displace(gen),
+        for (auto& key : keys)
+            key = std::max(std::make_signed_t<KeyType>(0),
+                            std::min(std::make_signed_t<KeyType>(key) + displace(gen),
                                      std::make_signed_t<KeyType>(nodeRange<KeyType>(0) - 1)));
 
-        std::sort(begin(codes), end(codes));
-        updateOctree(codes.data(), codes.data() + nParticles, bucketSize, tree, counts);
+        std::sort(begin(keys), end(keys));
+        updateOctree<KeyType>(keys, bucketSize, tree, counts);
         // count < bucketSize may not be true anymore, but node counts still have to be correct
-        checkOctreeWithCounts(tree, counts, bucketSize, codes, true);
+        checkOctreeWithCounts(tree, counts, bucketSize, keys, true);
     }
 };
 
