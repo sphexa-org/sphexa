@@ -1,7 +1,7 @@
 /*
  * Cornerstone octree
  *
- * Copyright (c) 2024 CSCS, ETH Zurich, University of Zurich, 2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
  * Please, refer to the LICENSE file in the root directory.
  * SPDX-License-Identifier: MIT License
@@ -29,7 +29,6 @@
 #include "cstone/traversal/collisions.hpp"
 #include "cstone/traversal/collisions_gpu.h"
 #include "cstone/primitives/accel_switch.hpp"
-#include "cstone/util/gsl-lite.hpp"
 #include "cstone/util/reallocate.hpp"
 
 namespace cstone
@@ -57,9 +56,9 @@ static void checkIndices(const SendList& sendList,
 //! @brief check halo discovery for sanity
 template<class KeyType>
 int checkHalos(int myRank,
-               gsl::span<const TreeIndexPair> focusAssignment,
-               gsl::span<const int> haloFlags,
-               gsl::span<const KeyType> ftree)
+               std::span<const TreeIndexPair> focusAssignment,
+               std::span<const int> haloFlags,
+               std::span<const KeyType> ftree)
 {
     TreeNodeIndex firstAssignedNode = focusAssignment[myRank].start();
     TreeNodeIndex lastAssignedNode  = focusAssignment[myRank].end();
@@ -115,23 +114,26 @@ public:
 
     /*! @brief Discover which cells outside myRank's assignment are halos
      *
-     * @param[in] focusedTree      Fully linked octree, focused on the assignment of the executing rank
+     * @param[in] prefixes         LET node prefixes
+     * @param[in] childOffsets     LET connectivity
+     * @param[in] internalToLeaf   LET translate full tree cell index to cornerstone index (i.e. into leaves)
+     * @param[in] leaves           LET cornerstone leaf cell array
      * @param[in] counts           (focus) tree counts
      * @param[in] focusAssignment  Assignment of leaf tree cells to ranks
      * @param[-]  layout           temporary storage for node count scan
      * @param[in] box              Global coordinate bounding box
      * @param[in] h                smoothing lengths of locally owned particles
      * @param[in] searchExtFact    increases halo search radius to extend the depth of the ghost layer
-     * @param[-]  scratchBuffer    host or device buffer for temporary use
+     * @param[-]  scratch          host or device buffer for temporary use
      */
     template<class T, class Th, class Vector>
     void discover(const KeyType* prefixes,
                   const TreeNodeIndex* childOffsets,
                   const TreeNodeIndex* internalToLeaf,
                   const KeyType* leaves,
-                  gsl::span<const unsigned> counts,
-                  gsl::span<const TreeIndexPair> focusAssignment,
-                  gsl::span<LocalIndex> layout,
+                  std::span<const unsigned> counts,
+                  std::span<const TreeIndexPair> focusAssignment,
+                  std::span<LocalIndex> layout,
                   const Box<T>& box,
                   const Th* h,
                   float searchExtFact,
@@ -202,11 +204,11 @@ public:
      *                         and the corresponding layout range has length zero.
      * @return                 0 if all halo cells have been matched with a peer rank, 1 otherwise
      */
-    int computeLayout(gsl::span<const KeyType> leaves,
-                      gsl::span<const unsigned> counts,
-                      gsl::span<const TreeIndexPair> assignment,
-                      gsl::span<const int> peers,
-                      gsl::span<LocalIndex> layout)
+    int computeLayout(std::span<const KeyType> leaves,
+                      std::span<const unsigned> counts,
+                      std::span<const TreeIndexPair> assignment,
+                      std::span<const int> peers,
+                      std::span<LocalIndex> layout)
     {
         computeNodeLayout(counts, haloFlags_, assignment[myRank_].start(), assignment[myRank_].end(), layout);
         auto newParticleStart = layout[assignment[myRank_].start()];
@@ -250,7 +252,7 @@ public:
         }
     }
 
-    gsl::span<int> haloFlags() { return haloFlags_; }
+    std::span<int> haloFlags() { return haloFlags_; }
 
 private:
     int myRank_;

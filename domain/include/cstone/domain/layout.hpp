@@ -1,7 +1,7 @@
 /*
  * Cornerstone octree
  *
- * Copyright (c) 2024 CSCS, ETH Zurich, University of Zurich, 2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
  * Please, refer to the LICENSE file in the root directory.
  * SPDX-License-Identifier: MIT License
@@ -215,7 +215,7 @@ void gatherArrays(Gather&& gatherFunc,
         {
             auto& swapSpace = util::pickType<decltype(array)>(scratchBuffers);
             assert(swapSpace.size() == array.size());
-            gatherFunc(ordering, numElements, rawPtr(array) + inputOffset, rawPtr(swapSpace) + outputOffset);
+            gatherFunc({ordering, numElements}, rawPtr(array) + inputOffset, rawPtr(swapSpace) + outputOffset);
             swap(swapSpace, array);
         }
         else
@@ -226,7 +226,7 @@ void gatherArrays(Gather&& gatherFunc,
 
             auto* scratchSpace =
                 reinterpret_cast<typename std::decay_t<VectorRef>::value_type*>(rawPtr(std::get<i>(scratchBuffers)));
-            gatherFunc(ordering, numElements, rawPtr(array) + inputOffset, scratchSpace);
+            gatherFunc({ordering, numElements}, rawPtr(array) + inputOffset, scratchSpace);
             if constexpr (IsDeviceVector<std::decay_t<VectorRef>>{})
             {
                 memcpyD2D(scratchSpace, numElements, rawPtr(array) + outputOffset);

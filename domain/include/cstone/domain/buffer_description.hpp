@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -33,7 +17,6 @@
 
 #include "cstone/domain/index_ranges.hpp"
 #include "cstone/primitives/gather.hpp"
-#include "cstone/primitives/math.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/util/pack_buffers.hpp"
 #include "cstone/util/tuple_util.hpp"
@@ -100,7 +83,7 @@ template<int alignment, class F, class... Arrays>
 std::size_t packArrays(F&& gather, const LocalIndex* ordering, LocalIndex numElements, char* buffer, Arrays... arrays)
 {
     auto gatherArray = [&gather, numElements, ordering](auto arrayPair)
-    { gather(ordering, numElements, arrayPair[0], arrayPair[1]); };
+    { gather({ordering, numElements}, arrayPair[0], arrayPair[1]); };
 
     auto packTuple = util::packBufferPtrs<alignment>(buffer, numElements, arrays...);
     util::for_each_tuple(gatherArray, packTuple);
@@ -159,7 +142,7 @@ void extractLocallyOwnedImpl(BufferDescription bufDesc,
     Vector temp(numAssigned);
 
     // extract what we already had before the exchange
-    gatherCpu(ordering, numPresent, buffer.data() + bufDesc.start, temp.data());
+    gatherCpu({ordering, numPresent}, buffer.data() + bufDesc.start, temp.data());
 
     // extract what we received during the exchange
     LocalIndex rStart = receiveStart(bufDesc, numPresent, numAssigned);
