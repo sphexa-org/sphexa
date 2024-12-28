@@ -42,7 +42,8 @@ computeSfcKeysKernel(KeyType* keys, const T* x, const T* y, const T* z, size_t n
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < numKeys)
     {
-        if (keys[tid] != removeKey<KeyType>::value) { keys[tid] = sfc3D<KeyType>(x[tid], y[tid], z[tid], box); }
+        KeyType rmKey = removeKey<KeyType>{};
+        if (keys[tid] != rmKey) { keys[tid] = sfc3D<KeyType>(x[tid], y[tid], z[tid], box); }
     }
 }
 
