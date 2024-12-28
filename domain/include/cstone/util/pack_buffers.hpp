@@ -1,3 +1,12 @@
+/*
+ * Cornerstone octree
+ *
+ * Copyright (c) 2024 CSCS, ETH Zurich
+ *
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
+ */
+
 /*! @file
  * @brief Buffer description and management for domain decomposition particle exchanges
  *
@@ -6,11 +15,12 @@
 
 #pragma once
 
-#include "cstone/cuda/cuda_stubs.h"
-#include "cstone/cuda/device_vector.h"
-#include "cstone/primitives/gather.hpp"
+#include <numeric>
+#include <span>
+
 #include "cstone/primitives/math.hpp"
 #include "cstone/util/array.hpp"
+#include "cstone/util/reallocate.hpp"
 #include "cstone/util/tuple_util.hpp"
 #include "cstone/util/type_list.hpp"
 
@@ -73,22 +83,21 @@ auto packBufferPtrs(char* packedBufferBase, size_t arraySize, Arrays... arrays)
 {
     static_assert((... && std::is_pointer_v<Arrays>)&&"all arrays must be pointers");
     constexpr int numArrays = sizeof...(Arrays);
-    constexpr util::array<size_t, numArrays> elementSizes{sizeof(std::decay_t<decltype(*arrays)>)...};
     constexpr auto indices = util::makeIntegralTuple(std::make_index_sequence<numArrays>{});
 
     const std::array<char*, numArrays> data{reinterpret_cast<char*>(arrays)...};
 
     auto arrayByteOffsets = computeByteOffsets(arraySize, alignment, arrays...);
 
-    using Types     = util::TypeList<aux_traits::PackType<std::decay_t<decltype(*arrays)>>...>;
-    using PtrTypes  = util::Map<aux_traits::MakeL2ArrayPtrs, Types>;
-    using TupleType = util::Reduce<std::tuple, PtrTypes>;
+    using Types     = TypeList<aux_traits::PackType<std::decay_t<decltype(*arrays)>>...>;
+    using PtrTypes  = Map<aux_traits::MakeL2ArrayPtrs, Types>;
+    using TupleType = Reduce<std::tuple, PtrTypes>;
 
     TupleType ret;
 
-    auto packOneBuffer = [packedBufferBase, &data, &elementSizes, &arrayByteOffsets, &ret](auto index)
+    auto packOneBuffer = [packedBufferBase, &data, &arrayByteOffsets, &ret](auto index)
     {
-        using ElementType = util::TypeListElement_t<index, Types>;
+        using ElementType = TypeListElement_t<index, Types>;
         auto* srcPtr      = reinterpret_cast<ElementType*>(data[index]);
         auto* packedPtr   = reinterpret_cast<ElementType*>(packedBufferBase + arrayByteOffsets[index]);
 
@@ -101,10 +110,10 @@ auto packBufferPtrs(char* packedBufferBase, size_t arraySize, Arrays... arrays)
 }
 
 //! calculate needed space in bytes
-inline std::vector<size_t> computeByteOffsets(gsl::span<const size_t> numElements, int elementSize, int alignment)
+inline std::vector<size_t> computeByteOffsets(std::span<const size_t> numElements, int elementSize, int alignment)
 {
     std::vector<size_t> ret(numElements.size() + 1, 0);
-    for (int i = 0; i < numElements.ssize(); ++i)
+    for (std::size_t i = 0; i < numElements.size(); ++i)
     {
         ret[i] = cstone::round_up(numElements[i] * elementSize, alignment);
     }
@@ -120,14 +129,14 @@ inline std::vector<size_t> computeByteOffsets(gsl::span<const size_t> numElement
  * @return                     a vector with a pointer into @p vec for each subrange
  */
 template<class T, class Vector>
-std::vector<gsl::span<T>> packAllocBuffer(Vector& vec, gsl::span<const size_t> numElements, int alignment)
+std::vector<std::span<T>> packAllocBuffer(Vector& vec, std::span<const size_t> numElements, int alignment)
 {
     auto sizeBytes = computeByteOffsets(numElements, sizeof(T), alignment);
     reallocateBytes(vec, sizeBytes.back(), 1.0);
 
-    std::vector<gsl::span<T>> ret(numElements.size());
-    auto* basePtr = reinterpret_cast<char*>(rawPtr(vec));
-    for (int i = 0; i < numElements.ssize(); ++i)
+    std::vector<std::span<T>> ret(numElements.size());
+    auto* basePtr = reinterpret_cast<char*>(vec.data());
+    for (std::size_t i = 0; i < numElements.size(); ++i)
     {
         ret[i] = {reinterpret_cast<T*>(basePtr + sizeBytes[i]), numElements[i]};
     }

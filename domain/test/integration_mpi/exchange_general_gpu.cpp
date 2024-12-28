@@ -1,3 +1,12 @@
+/*
+ * Cornerstone octree
+ *
+ * Copyright (c) 2024 CSCS, ETH Zurich
+ *
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
+ */
+
 /*! @file
  * @brief Test global octree build together with domain particle exchange
  *
@@ -11,11 +20,9 @@
 
 #include "cstone/cuda/device_vector.h"
 #include "cstone/focus/octree_focus_mpi.hpp"
-#include "cstone/focus/source_center.hpp"
 #include "cstone/traversal/peers.hpp"
 
 #include "coord_samples/random.hpp"
-#include "cstone/util/reallocate.hpp"
 
 using namespace cstone;
 
@@ -85,8 +92,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
     // common pool of coordinates, identical on all ranks
     RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numRanks * numParticles, box);
 
-    auto [tree, counts] = computeOctree(coords.particleKeys().data(),
-                                        coords.particleKeys().data() + coords.particleKeys().size(), bucketSize);
+    auto [tree, counts] = computeOctree<KeyType>(coords.particleKeys(), bucketSize);
 
     Octree<KeyType> domainTree;
     domainTree.update(tree.data(), nNodes(tree));

@@ -1,7 +1,7 @@
 /*
  * Cornerstone octree
  *
- * Copyright (c) 2024 CSCS, ETH Zurich, University of Zurich, 2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
  * Please, refer to the LICENSE file in the root directory.
  * SPDX-License-Identifier: MIT License
@@ -38,7 +38,6 @@
 #include "cstone/tree/csarray.hpp"
 #include "cstone/tree/csarray_gpu.h"
 #include "cstone/tree/octree.hpp"
-#include "cstone/util/gsl-lite.hpp"
 #include "cstone/util/pack_buffers.hpp"
 
 namespace cstone
@@ -59,9 +58,9 @@ namespace cstone
  * contain the LOCAL view of REMOTE peer domains.
  */
 template<class KeyType>
-void exchangeTreelets(gsl::span<const int> peerRanks,
-                      gsl::span<const IndexPair<TreeNodeIndex>> focusAssignment,
-                      gsl::span<const KeyType> leaves,
+void exchangeTreelets(std::span<const int> peerRanks,
+                      std::span<const IndexPair<TreeNodeIndex>> focusAssignment,
+                      std::span<const KeyType> leaves,
                       std::vector<std::vector<KeyType>>& treelets)
 {
     constexpr int keyTag = static_cast<int>(P2pTags::focusTreelets);
@@ -97,8 +96,8 @@ void exchangeTreelets(gsl::span<const int> peerRanks,
 
 //! @brief flag treelet keys that don't exist in @p leaves as invalid
 template<class KeyType>
-void checkTreelets(gsl::span<const int> peerRanks,
-                   gsl::span<const KeyType> leaves,
+void checkTreelets(std::span<const int> peerRanks,
+                   std::span<const KeyType> leaves,
                    std::vector<std::vector<KeyType>>& treelets)
 {
     for (auto rank : peerRanks)
@@ -117,7 +116,7 @@ void checkTreelets(gsl::span<const int> peerRanks,
 
 //! @brief remove treelet keys flagged as invalid
 template<class KeyType>
-void pruneTreelets(gsl::span<const int> peerRanks, std::vector<std::vector<KeyType>>& treelets)
+void pruneTreelets(std::span<const int> peerRanks, std::vector<std::vector<KeyType>>& treelets)
 {
 #pragma omp parallel for
     for (int r = 0; r < peerRanks.size(); ++r)
@@ -144,10 +143,10 @@ void pruneTreelets(gsl::span<const int> peerRanks, std::vector<std::vector<KeyTy
  * contain the LOCAL view of REMOTE peer domains.
  */
 template<class KeyType>
-void exchangeRejectedKeys(gsl::span<const int> peerRanks,
-                          gsl::span<const KeyType> leaves,
+void exchangeRejectedKeys(std::span<const int> peerRanks,
+                          std::span<const KeyType> leaves,
                           const std::vector<std::vector<KeyType>>& treelets,
-                          gsl::span<TreeNodeIndex> nodeOps)
+                          std::span<TreeNodeIndex> nodeOps)
 
 {
     constexpr int keyTag = static_cast<int>(P2pTags::focusTreelets) + 1;
@@ -194,8 +193,8 @@ void exchangeRejectedKeys(gsl::span<const int> peerRanks,
 }
 
 template<class KeyType>
-void syncTreelets(gsl::span<const int> peers,
-                  gsl::span<const IndexPair<TreeNodeIndex>> focusAssignment,
+void syncTreelets(std::span<const int> peers,
+                  std::span<const IndexPair<TreeNodeIndex>> focusAssignment,
                   OctreeData<KeyType, CpuTag>& octree,
                   std::vector<KeyType>& leaves,
                   std::vector<std::vector<KeyType>>& treelets)
@@ -217,9 +216,9 @@ void syncTreelets(gsl::span<const int> peers,
 }
 
 template<class KeyType>
-void syncTreeletsGpu(gsl::span<const int> peers,
-                     gsl::span<const IndexPair<TreeNodeIndex>> assignment,
-                     gsl::span<const KeyType> leaves,
+void syncTreeletsGpu(std::span<const int> peers,
+                     std::span<const IndexPair<TreeNodeIndex>> assignment,
+                     std::span<const KeyType> leaves,
                      OctreeData<KeyType, GpuTag>& octreeAcc,
                      DeviceVector<KeyType>& leavesAcc,
                      std::vector<std::vector<KeyType>>& treelets)
@@ -234,7 +233,7 @@ void syncTreeletsGpu(gsl::span<const int> peers,
     if (std::count(nodeOps.begin(), nodeOps.end(), 1) != nodeOps.size())
     {
         assert(octreeAcc.childOffsets.size() >= nodeOps.size());
-        gsl::span<TreeNodeIndex> nops(rawPtr(octreeAcc.childOffsets), nodeOps.size());
+        std::span<TreeNodeIndex> nops(rawPtr(octreeAcc.childOffsets), nodeOps.size());
         memcpyH2D(rawPtr(nodeOps), nodeOps.size(), nops.data());
 
         exclusiveScanGpu(nops.data(), nops.data() + nops.size(), nops.data());
@@ -264,9 +263,9 @@ std::vector<std::size_t> extractNumNodes(const VecOfVec& vov)
 
 //! @brief assign treelet nodes their final indices w.r.t the final LET
 template<class KeyType>
-void indexTreelets(gsl::span<const int> peerRanks,
-                   gsl::span<const KeyType> nodeKeys,
-                   gsl::span<const TreeNodeIndex> levelRange,
+void indexTreelets(std::span<const int> peerRanks,
+                   std::span<const KeyType> nodeKeys,
+                   std::span<const TreeNodeIndex> levelRange,
                    const std::vector<std::vector<KeyType>>& treelets,
                    ConcatVector<TreeNodeIndex>& treeletIdx)
 {
@@ -287,11 +286,11 @@ void indexTreelets(gsl::span<const int> peerRanks,
 }
 
 template<class T, class DevVec>
-void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
-                            gsl::span<const gsl::span<const TreeNodeIndex>> treeletIdx,
-                            gsl::span<const IndexPair<TreeNodeIndex>> focusAssignment,
-                            gsl::span<const TreeNodeIndex> csToInternalMap,
-                            gsl::span<T> quantities,
+void exchangeTreeletGeneral(std::span<const int> peerRanks,
+                            std::span<const std::span<const TreeNodeIndex>> treeletIdx,
+                            std::span<const IndexPair<TreeNodeIndex>> focusAssignment,
+                            std::span<const TreeNodeIndex> csToInternalMap,
+                            std::span<T> quantities,
                             int commTag,
                             DevVec& scratch)
 {
@@ -307,8 +306,8 @@ void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
 
     size_t origSize    = scratch.size();
     auto packedBuffers = util::packAllocBuffer<T>(scratch, treeletSizes, alignmentBytes);
-    gsl::span<gsl::span<T>> sendBuffers{packedBuffers.data(), peerRanks.size()};
-    gsl::span<gsl::span<T>> recvBuffers{packedBuffers.data() + peerRanks.size(), peerRanks.size()};
+    std::span<std::span<T>> sendBuffers{packedBuffers.data(), peerRanks.size()};
+    std::span<std::span<T>> recvBuffers{packedBuffers.data() + peerRanks.size(), peerRanks.size()};
 
     std::vector<std::vector<T, util::DefaultInitAdaptor<T>>> staging; // only used if GPU-direct is not active
     std::vector<MPI_Request> sendRequests;
@@ -362,8 +361,8 @@ void exchangeTreeletGeneral(gsl::span<const int> peerRanks,
  * tree cells in F that don't exist in rank a's focus tree.
  */
 template<class KeyType>
-void focusTransfer(gsl::span<const KeyType> cstree,
-                   gsl::span<const unsigned> counts,
+void focusTransfer(std::span<const KeyType> cstree,
+                   std::span<const unsigned> counts,
                    unsigned bucketSize,
                    int myRank,
                    KeyType oldFocusStart,
@@ -384,8 +383,8 @@ void focusTransfer(gsl::span<const KeyType> cstree,
         TreeNodeIndex end   = findNodeAbove(cstree.data(), cstree.size(), newFocusStart);
 
         size_t numNodes = end - start;
-        auto treelet    = updateTreelet(gsl::span<const KeyType>(cstree.data() + start, numNodes + 1),
-                                        gsl::span<const unsigned>(counts.data() + start, numNodes), bucketSize);
+        auto treelet    = updateTreelet(std::span<const KeyType>(cstree.data() + start, numNodes + 1),
+                                        std::span<const unsigned>(counts.data() + start, numNodes), bucketSize);
 
         mpiSendAsync(treelet.data(), int(treelet.size() - 1), myRank - 1, ownerTag, sendRequests);
         sendBuffers.push_back(std::move(treelet));
@@ -398,8 +397,8 @@ void focusTransfer(gsl::span<const KeyType> cstree,
         TreeNodeIndex end   = findNodeAbove(cstree.data(), cstree.size(), oldFocusEnd);
 
         size_t numNodes = end - start;
-        auto treelet    = updateTreelet(gsl::span<const KeyType>(cstree.data() + start, numNodes + 1),
-                                        gsl::span<const unsigned>(counts.data() + start, numNodes), bucketSize);
+        auto treelet    = updateTreelet(std::span<const KeyType>(cstree.data() + start, numNodes + 1),
+                                        std::span<const unsigned>(counts.data() + start, numNodes), bucketSize);
 
         mpiSendAsync(treelet.data(), int(treelet.size() - 1), myRank + 1, ownerTag, sendRequests);
         sendBuffers.push_back(std::move(treelet));
