@@ -33,6 +33,7 @@
 #include <cassert>
 #include <cstdint>
 #include <memory>
+#include <span>
 
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/primitives/primitives_gpu.h"
@@ -40,6 +41,26 @@
 
 namespace cstone
 {
+
+//! @brief sortByKey with temp buffer management
+template<class KeyType, class ValueType, class KeyBuf, class ValueBuf>
+void sortByKeyGpu(
+    std::span<KeyType> keys, std::span<ValueType> values, KeyBuf& keyBuf, ValueBuf& valueBuf, float growthRate)
+{
+    // temp storage for radix sort as multiples of IndexType
+    uint64_t tempStorageEle = iceil(sortByKeyTempStorage<KeyType, ValueType>(keys.size()), sizeof(ValueType));
+    auto s1                 = reallocateBytes(keyBuf, keys.size() * sizeof(KeyType), growthRate);
+
+    // pack valueBuffer and temp storage into @p valueBuf
+    auto s2                 = valueBuf.size();
+    uint64_t numElements[2] = {uint64_t(keys.size() * growthRate), tempStorageEle};
+    auto tempBuffers        = util::packAllocBuffer<ValueType>(valueBuf, {numElements, 2}, 128);
+
+    sortByKeyGpu(keys.data(), keys.data() + keys.size(), values.data(), (KeyType*)rawPtr(keyBuf), tempBuffers[0].data(),
+                 tempBuffers[1].data(), tempStorageEle * sizeof(ValueType));
+    reallocate(keyBuf, s1, 1.0);
+    reallocate(valueBuf, s2, 1.0);
+}
 
 template<class IndexType, class BufferType>
 class GpuSfcSorter
@@ -54,49 +75,19 @@ public:
 
     const IndexType* getMap() const { return ordering(); }
 
-    /*! @brief sort given Morton codes on the device and determine reorder map based on sort order
-     *
-     * @param[inout] first   pointer to first SFC code
-     * @param[inout] last    pointer to last SFC code
-     *
-     * Precondition:
-     *   - [first:last] is a continuous sequence of accessible elements
-     *
-     * Postcondition
-     *   - [first:last] is sorted
-     *   - subsequent calls to operator() apply a gather operation to the input sequence
-     *     with the map obtained from sort_by_key with [first:last] as the keys
-     *     and the identity permutation as the values
-     */
-    template<class KeyType>
-    void setMapFromCodes(KeyType* first, KeyType* last)
-    {
-        mapSize_ = std::size_t(last - first);
-        reallocateBytes(buffer_, mapSize_ * sizeof(IndexType), growthRate_);
-        sequenceGpu(ordering(), mapSize_, IndexType(0));
-        sortByKeyGpu(first, last, ordering());
-    }
-
     template<class KeyType, class KeyBuf, class ValueBuf>
     void updateMap(KeyType* first, KeyType* last, KeyBuf& keyBuf, ValueBuf& valueBuf)
     {
-        assert(last - first == mapSize_);
-        // temp storage for radix sort as multiples of IndexType
-        uint64_t tempStorageEle = iceil(sortByKeyTempStorage<KeyType, IndexType>(last - first), sizeof(IndexType));
-
-        auto s1 = reallocateBytes(keyBuf, mapSize_ * sizeof(KeyType), growthRate_);
-
-        // pack valueBuffer and temp storage into @p valueBuf
-        auto s2                 = valueBuf.size();
-        uint64_t numElements[2] = {uint64_t(mapSize_ * growthRate_), tempStorageEle};
-        auto tempBuffers        = util::packAllocBuffer<IndexType>(valueBuf, {numElements, 2}, 128);
-
-        sortByKeyGpu(first, last, ordering(), (KeyType*)rawPtr(keyBuf), tempBuffers[0].data(), tempBuffers[1].data(),
-                     tempStorageEle * sizeof(IndexType));
-        reallocate(keyBuf, s1, 1.0);
-        reallocate(valueBuf, s2, 1.0);
+        sortByKeyGpu<KeyType, IndexType>({first, last}, {ordering(), size_t(last - first)}, keyBuf, valueBuf,
+                                         growthRate_);
     }
 
+    /*! @brief sort given Morton codes on the device and determine reorder map based on sort order
+     *
+     * @param[inout] first       pointer to first SFC code
+     * @param[inout] last        pointer to last SFC code
+     * @param[in]    valueOffset
+     */
     template<class KeyType, class KeyBuf, class ValueBuf>
     void setMapFromCodes(KeyType* first, KeyType* last, KeyBuf& keyBuf, ValueBuf& valueBuf)
     {
