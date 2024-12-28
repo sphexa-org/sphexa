@@ -44,11 +44,11 @@ namespace cstone
  *      the assignment of r2.
  */
 template<class KeyType>
-SendList exchangeRequestKeys(gsl::span<const KeyType> treeLeaves,
-                             gsl::span<const int> haloFlags,
-                             gsl::span<const TreeIndexPair> assignment,
-                             gsl::span<const int> peerRanks,
-                             gsl::span<const LocalIndex> layout)
+SendList exchangeRequestKeys(std::span<const KeyType> treeLeaves,
+                             std::span<const int> haloFlags,
+                             std::span<const TreeIndexPair> assignment,
+                             std::span<const int> peerRanks,
+                             std::span<const LocalIndex> layout)
 {
     std::vector<std::vector<KeyType>> sendBuffers;
     sendBuffers.reserve(peerRanks.size());

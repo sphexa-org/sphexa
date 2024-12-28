@@ -40,7 +40,7 @@ namespace ryoanji
  */
 template<class T1, class T2, class MType>
 void computeLeafMultipoles(const T1* x, const T1* y, const T1* z, const T2* m,
-                           gsl::span<const cstone::TreeNodeIndex> leafToInternal, const LocalIndex* layout,
+                           std::span<const cstone::TreeNodeIndex> leafToInternal, const LocalIndex* layout,
                            const cstone::SourceCenterType<T1>* centers, MType* multipoles)
 {
 #pragma omp parallel for schedule(static)
@@ -52,7 +52,7 @@ void computeLeafMultipoles(const T1* x, const T1* y, const T1* z, const T2* m,
 }
 
 template<class T, class MType>
-void upsweepMultipoles(gsl::span<const cstone::TreeNodeIndex> levelOffset, const cstone::TreeNodeIndex* childOffsets,
+void upsweepMultipoles(std::span<const cstone::TreeNodeIndex> levelOffset, const cstone::TreeNodeIndex* childOffsets,
                        const cstone::SourceCenterType<T>* centers, MType* multipoles)
 {
     int currentLevel = levelOffset.size() - 2;

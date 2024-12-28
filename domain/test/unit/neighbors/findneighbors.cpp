@@ -67,7 +67,7 @@ void neighborCheck(const Coordinates& coords, T radius, const Box<T>& box)
     std::vector<LocalIndex> layout(nNodes(csTree) + 1, 0);
     std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
 
-    gsl::span<const KeyType> nodeKeys(octree.prefixes.data(), octree.numNodes);
+    std::span<const KeyType> nodeKeys(octree.prefixes.data(), octree.numNodes);
     std::vector<Vec3<T>> centers(octree.numNodes), sizes(octree.numNodes);
     nodeFpCenters<KeyType>(nodeKeys, centers.data(), sizes.data(), box);
 

@@ -95,7 +95,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     const cstone::FocusedOctree<KeyType, T, cstone::GpuTag>& focusTree = domain.focusTree();
     //! the focused octree, structure only
     auto                                         octree  = focusTree.octreeViewAcc();
-    gsl::span<const cstone::SourceCenterType<T>> centers = focusTree.expansionCentersAcc();
+    std::span<const cstone::SourceCenterType<T>> centers = focusTree.expansionCentersAcc();
 
     std::vector<MultipoleType> multipoles(octree.numNodes);
     multipoleHolder.upsweep(rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), domain.globalTree(), domain.focusTree(),

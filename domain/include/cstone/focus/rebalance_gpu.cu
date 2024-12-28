@@ -218,11 +218,11 @@ __global__ void rangeCountKernel(const KeyType* leaves,
 }
 
 template<class KeyType>
-void rangeCountGpu(gsl::span<const KeyType> leaves,
-                   gsl::span<const unsigned> counts,
-                   gsl::span<const KeyType> leavesFocus,
-                   gsl::span<const TreeNodeIndex> leavesFocusIdx,
-                   gsl::span<unsigned> countsFocus)
+void rangeCountGpu(std::span<const KeyType> leaves,
+                   std::span<const unsigned> counts,
+                   std::span<const KeyType> leavesFocus,
+                   std::span<const TreeNodeIndex> leavesFocusIdx,
+                   std::span<unsigned> countsFocus)
 {
     constexpr unsigned numThreads = 64;
     unsigned numBlocks            = iceil(leavesFocusIdx.size(), numThreads);
@@ -232,9 +232,9 @@ void rangeCountGpu(gsl::span<const KeyType> leaves,
 }
 
 #define RANGE_COUNT_GPU(KeyType)                                                                                       \
-    template void rangeCountGpu(gsl::span<const KeyType> leaves, gsl::span<const unsigned> counts,                     \
-                                gsl::span<const KeyType> leavesFocus, gsl::span<const TreeNodeIndex> leavesFocusIdx,   \
-                                gsl::span<unsigned> countsFocus)
+    template void rangeCountGpu(std::span<const KeyType> leaves, std::span<const unsigned> counts,                     \
+                                std::span<const KeyType> leavesFocus, std::span<const TreeNodeIndex> leavesFocusIdx,   \
+                                std::span<unsigned> countsFocus)
 RANGE_COUNT_GPU(uint32_t);
 RANGE_COUNT_GPU(uint64_t);
 
