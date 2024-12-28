@@ -221,7 +221,7 @@ static void updateTreelet()
     TreeNodeIndex treeletEnd   = 9;
 
     {
-        gsl::span<const KeyType> treelet(tree.data() + treeletStart, tree.data() + treeletEnd + 1);
+        std::span<const KeyType> treelet(tree.data() + treeletStart, tree.data() + treeletEnd + 1);
         std::vector<unsigned> treeletCounts{bucketSize + 1, bucketSize - 1};
 
         auto newTreelet = updateTreelet<KeyType>(treelet, treeletCounts, bucketSize);
@@ -234,7 +234,7 @@ static void updateTreelet()
         EXPECT_EQ(newTreelet, reference);
     }
     {
-        gsl::span<const KeyType> treelet(tree.data() + treeletStart, tree.data() + treeletEnd + 1);
+        std::span<const KeyType> treelet(tree.data() + treeletStart, tree.data() + treeletEnd + 1);
         std::vector<unsigned> treeletCounts{bucketSize - 1, bucketSize + 1};
 
         auto newTreelet = updateTreelet<KeyType>(treelet, treeletCounts, bucketSize);
@@ -249,7 +249,7 @@ static void updateTreelet()
     treeletStart = 0;
     treeletEnd   = 8;
     {
-        gsl::span<const KeyType> treelet(tree.data() + treeletStart, tree.data() + treeletEnd + 1);
+        std::span<const KeyType> treelet(tree.data() + treeletStart, tree.data() + treeletEnd + 1);
         std::vector<unsigned> treeletCounts{1, 2, 3, 4, 5, 6, 7, 8};
 
         auto newTreelet = updateTreelet<KeyType>(treelet, treeletCounts, bucketSize);

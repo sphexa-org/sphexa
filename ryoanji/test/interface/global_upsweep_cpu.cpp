@@ -65,7 +65,7 @@ static int multipoleExchangeTest(int thisRank, int numRanks)
     const cstone::FocusedOctree<KeyType, T>& focusTree = domain.focusTree();
     //! the focused octree, structure only
     auto                                         octree  = focusTree.octreeViewAcc();
-    gsl::span<const cstone::SourceCenterType<T>> centers = focusTree.expansionCentersAcc();
+    std::span<const cstone::SourceCenterType<T>> centers = focusTree.expansionCentersAcc();
 
     std::vector<MultipoleType> multipoles(octree.numNodes);
     ryoanji::computeGlobalMultipoles(x.data(), y.data(), z.data(), m.data(), x.size(), domain.globalTree(), focusTree,

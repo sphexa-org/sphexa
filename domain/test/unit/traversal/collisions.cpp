@@ -32,7 +32,7 @@ static IBox makeLevelBox(unsigned ix, unsigned iy, unsigned iz, unsigned level)
 
 template<class KeyType>
 static std::vector<TreeNodeIndex>
-findCollidingIndices(IBox target, gsl::span<const KeyType> leaves, KeyType exclStart, KeyType exclEnd)
+findCollidingIndices(IBox target, std::span<const KeyType> leaves, KeyType exclStart, KeyType exclEnd)
 {
     Octree<KeyType> octree;
     octree.update(leaves.data(), nNodes(leaves));
@@ -49,7 +49,7 @@ findCollidingIndices(IBox target, gsl::span<const KeyType> leaves, KeyType exclS
 
 template<class KeyType>
 static std::vector<IBox>
-findCollidingBoxes(IBox target, gsl::span<const KeyType> leaves, KeyType exclStart, KeyType exclEnd)
+findCollidingBoxes(IBox target, std::span<const KeyType> leaves, KeyType exclStart, KeyType exclEnd)
 {
     std::vector<TreeNodeIndex> collisions = findCollidingIndices(target, leaves, exclStart, exclEnd);
 
