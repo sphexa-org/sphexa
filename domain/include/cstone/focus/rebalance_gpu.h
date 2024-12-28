@@ -15,6 +15,8 @@
 
 #pragma once
 
+#include <span>
+
 #include "cstone/tree/definitions.h"
 #include "cstone/domain/index_ranges.hpp"
 
@@ -63,10 +65,10 @@ extern ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
 
 //! @brief see CPU version
 template<class KeyType>
-extern void rangeCountGpu(gsl::span<const KeyType> leaves,
-                          gsl::span<const unsigned> counts,
-                          gsl::span<const KeyType> leavesFocus,
-                          gsl::span<const TreeNodeIndex> leavesFocusIdx,
-                          gsl::span<unsigned> countsFocus);
+extern void rangeCountGpu(std::span<const KeyType> leaves,
+                          std::span<const unsigned> counts,
+                          std::span<const KeyType> leavesFocus,
+                          std::span<const TreeNodeIndex> leavesFocusIdx,
+                          std::span<unsigned> countsFocus);
 
 } // namespace cstone

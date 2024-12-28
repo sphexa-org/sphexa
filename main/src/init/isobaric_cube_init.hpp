@@ -128,7 +128,7 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
 }
 
 template<class T>
-void compressCenterCube(gsl::span<T> x, gsl::span<T> y, gsl::span<T> z, T rInt, T s, T rExt, T epsilon)
+void compressCenterCube(std::span<T> x, std::span<T> y, std::span<T> z, T rInt, T s, T rExt, T epsilon)
 {
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < x.size(); i++)
