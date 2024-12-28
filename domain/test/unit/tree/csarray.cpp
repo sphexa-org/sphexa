@@ -329,8 +329,8 @@ public:
 
         for (auto& key : keys)
             key = std::max(std::make_signed_t<KeyType>(0),
-                            std::min(std::make_signed_t<KeyType>(key) + displace(gen),
-                                     std::make_signed_t<KeyType>(nodeRange<KeyType>(0) - 1)));
+                           std::min(std::make_signed_t<KeyType>(key) + displace(gen),
+                                    std::make_signed_t<KeyType>(nodeRange<KeyType>(0) - 1)));
 
         std::sort(begin(keys), end(keys));
         updateOctree<KeyType>(keys, bucketSize, tree, counts);

@@ -413,8 +413,8 @@ public:
         {
             reallocate(centersAcc_, octreeAcc_.numNodes, allocGrowthRate_);
             memcpyH2D(centers_.data(), centers_.size(), rawPtr(centersAcc_));
-            peerExchangeGpu<SourceCenterType<RealType>>({centersAcc_.data(), centersAcc_.size()},
-                                                        static_cast<int>(P2pTags::focusPeerCenters), scratch1);
+            peerExchangeGpu(std::span{centersAcc_.data(), centersAcc_.size()},
+                            static_cast<int>(P2pTags::focusPeerCenters), scratch1);
             upsweepCentersGpu(maxTreeLevel<KeyType>{}, treeData_.levelRange.data(), octree.childOffsets,
                               rawPtr(centersAcc_));
         }
@@ -422,8 +422,8 @@ public:
         {
             //! exchange information with peer close to focus
             std::vector<int, util::DefaultInitAdaptor<int>> hScratch;
-            peerExchange<SourceCenterType<RealType>>({centers_.data(), centers_.size()},
-                                                     static_cast<int>(P2pTags::focusPeerCenters), hScratch);
+            peerExchange(std::span{centers_.data(), centers_.size()}, static_cast<int>(P2pTags::focusPeerCenters),
+                         hScratch);
             //! upsweep with all (leaf) data in place
             upsweep(treeData_.levelRange, treeData_.childOffsets, centers_.data(), CombineSourceCenter<RealType>{});
         }
