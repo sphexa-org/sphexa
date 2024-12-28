@@ -19,7 +19,7 @@
  *          use the same bucket size for the locally focused tree. Usually, rank1 requests the full resolution
  *          along the surface with rank2 and a lower resolution far a way from the surface.
  *
- *      2.  rank2 receives the the node structure, counts particles for each received node and sends back
+ *      2.  rank2 receives the node structure, counts particles for each received node and sends back
  *          an answer with the particle counts per node.
  *
  *      3. rank1 receives the counts for the requested SFC keys from rank2
@@ -397,8 +397,8 @@ void focusTransfer(std::span<const KeyType> cstree,
         TreeNodeIndex end   = findNodeAbove(cstree.data(), cstree.size(), oldFocusEnd);
 
         size_t numNodes = end - start;
-        auto treelet    = updateTreelet(std::span<const KeyType>(cstree.data() + start, numNodes + 1),
-                                        std::span<const unsigned>(counts.data() + start, numNodes), bucketSize);
+        auto treelet    = updateTreelet(std::span{cstree.data() + start, numNodes + 1},
+                                        std::span{counts.data() + start, numNodes}, bucketSize);
 
         mpiSendAsync(treelet.data(), int(treelet.size() - 1), myRank + 1, ownerTag, sendRequests);
         sendBuffers.push_back(std::move(treelet));

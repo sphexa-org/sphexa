@@ -149,7 +149,6 @@ public:
     template<class KeyType>
     void updateMap(std::span<KeyType> keys)
     {
-        assert(last - first == mapSize_);
         sort_by_key(keys.begin(), keys.end(), ordering());
     }
 

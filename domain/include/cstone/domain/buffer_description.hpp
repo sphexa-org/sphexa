@@ -82,8 +82,9 @@ size_t computeTotalSendBytes(const SendRanges& sends, int thisRank, size_t numBy
 template<int alignment, class F, class... Arrays>
 std::size_t packArrays(F&& gather, const LocalIndex* ordering, LocalIndex numElements, char* buffer, Arrays... arrays)
 {
-    auto gatherArray = [&gather, numElements, ordering](auto arrayPair)
-    { gather({ordering, numElements}, arrayPair[0], arrayPair[1]); };
+    auto gatherArray = [&gather, numElements, ordering](auto arrayPair) {
+        gather({ordering, numElements}, arrayPair[0], arrayPair[1]);
+    };
 
     auto packTuple = util::packBufferPtrs<alignment>(buffer, numElements, arrays...);
     util::for_each_tuple(gatherArray, packTuple);
