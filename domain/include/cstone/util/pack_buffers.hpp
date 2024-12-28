@@ -83,7 +83,7 @@ auto packBufferPtrs(char* packedBufferBase, size_t arraySize, Arrays... arrays)
 {
     static_assert((... && std::is_pointer_v<Arrays>)&&"all arrays must be pointers");
     constexpr int numArrays = sizeof...(Arrays);
-    constexpr auto indices = util::makeIntegralTuple(std::make_index_sequence<numArrays>{});
+    constexpr auto indices  = util::makeIntegralTuple(std::make_index_sequence<numArrays>{});
 
     const std::array<char*, numArrays> data{reinterpret_cast<char*>(arrays)...};
 
