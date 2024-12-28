@@ -37,12 +37,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 #include <span>
 #include <vector>
 #include <tuple>
 
 #include "cstone/sfc/common.hpp"
-#include "cstone/primitives/scan.hpp"
 #include "cstone/util/tuple.hpp"
 
 #include "definitions.h"
@@ -213,7 +213,7 @@ void computeNodeCounts(const KeyType* tree,
 
     if (useCountsAsGuess)
     {
-        exclusiveScan(counts + firstNode, nNonZeroNodes);
+        std::exclusive_scan(counts + firstNode, counts + firstNode + nNonZeroNodes, counts + firstNode, LocalIndex{0});
 #pragma omp parallel for schedule(static)
         for (TreeNodeIndex i = 0; i < nNonZeroNodes; ++i)
         {
@@ -367,7 +367,6 @@ processNode(TreeNodeIndex nodeIndex, const KeyType* oldTree, const TreeNodeIndex
 
 /*! @brief split or fuse octree nodes based on node counts relative to bucketSize
  *
- * @tparam       KeyType      32- or 64-bit unsigned integer type
  * @param[in]    tree         cornerstone octree
  * @param[out]   newTree      rebalanced cornerstone octree
  * @param[in]    nodeOps      rebalance decision for each node, length @p numNodes(tree) + 1
@@ -378,7 +377,7 @@ void rebalanceTree(const InputVector& tree, OutputVector& newTree, TreeNodeIndex
 {
     TreeNodeIndex numNodes = nNodes(tree);
 
-    exclusiveScan(nodeOps, numNodes + 1);
+    std::exclusive_scan(nodeOps, nodeOps + numNodes + 1, nodeOps, TreeNodeIndex{0});
     newTree.resize(nodeOps[numNodes] + 1);
 
 #pragma omp parallel for schedule(static)
@@ -465,7 +464,7 @@ updateTreelet(std::span<const KeyType> treelet, std::span<const unsigned> counts
 
 /*! @brief create a cornerstone octree around a series of given SFC codes
  *
- * @tparam InputIterator  iterator to 32- or 64-bit unsigned integer
+ * @tparam KeyType        iterator to 32- or 64-bit unsigned integer
  * @param  spanningKeys   input SFC key sequence
  * @return                the cornerstone octree containing all values in the given code sequence
  *                        plus any additional intermediate SFC codes between them required to fulfill
@@ -494,7 +493,7 @@ std::vector<KeyType> computeSpanningTree(std::span<const KeyType> spanningKeys)
         offsets[i] = spanSfcRange(spanningKeys[i], spanningKeys[i + 1]);
     }
 
-    exclusiveScanSerialInplace(offsets.data(), offsets.size(), 0);
+    std::exclusive_scan(offsets.begin(), offsets.end(), offsets.begin(), TreeNodeIndex{0});
 
     std::vector<KeyType> spanningTree(offsets.back() + 1);
     for (TreeNodeIndex i = 0; i < numIntervals; ++i)
