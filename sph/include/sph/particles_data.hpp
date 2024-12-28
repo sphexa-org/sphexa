@@ -31,6 +31,7 @@
 #pragma once
 
 #include <array>
+#include <iostream>
 #include <vector>
 #include <variant>
 
@@ -42,7 +43,6 @@
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/reallocate.hpp"
 
-#include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"
 #include "sph/types.hpp"
 
