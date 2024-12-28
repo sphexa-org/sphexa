@@ -32,7 +32,7 @@ namespace cstone
  * and testing purposes
  */
 template<class KeyType>
-void findCollisions2All(gsl::span<const KeyType> tree,
+void findCollisions2All(std::span<const KeyType> tree,
                         std::vector<TreeNodeIndex>& collisionList,
                         const IBox& collisionBox)
 {
@@ -46,7 +46,7 @@ void findCollisions2All(gsl::span<const KeyType> tree,
 //! @brief all-to-all implementation of findAllCollisions
 template<class KeyType, class T>
 std::vector<std::vector<TreeNodeIndex>>
-findCollisionsAll2all(gsl::span<const KeyType> tree, const std::vector<T>& haloRadii, const Box<T>& globalBox)
+findCollisionsAll2all(std::span<const KeyType> tree, const std::vector<T>& haloRadii, const Box<T>& globalBox)
 {
     std::vector<std::vector<TreeNodeIndex>> collisions(tree.size() - 1);
 

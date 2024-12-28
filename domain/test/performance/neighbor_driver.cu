@@ -182,7 +182,7 @@ void benchmarkGpu()
     std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
 
     std::vector<Vec3<T>> centers(octree.numNodes), sizes(octree.numNodes);
-    gsl::span<const KeyType> nodeKeys(octree.prefixes.data(), octree.numNodes);
+    std::span<const KeyType> nodeKeys(octree.prefixes.data(), octree.numNodes);
     nodeFpCenters<KeyType>(nodeKeys, centers.data(), sizes.data(), box);
 
     OctreeNsView<T, KeyType> nsView{octree.numLeafNodes,

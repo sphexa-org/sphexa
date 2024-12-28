@@ -34,7 +34,7 @@ namespace cstone
  * This means that each subdividing a node, all 8 children always have to be added.
  */
 template<class KeyType, class Alloc>
-void injectKeys(std::vector<KeyType, Alloc>& tree, gsl::span<const KeyType> keys)
+void injectKeys(std::vector<KeyType, Alloc>& tree, std::span<const KeyType> keys)
 {
     std::vector<KeyType> spanningKeys(keys.begin(), keys.end());
     spanningKeys.push_back(0);
@@ -70,7 +70,7 @@ void injectKeys(std::vector<KeyType, Alloc>& tree, gsl::span<const KeyType> keys
  */
 template<class KeyType>
 void injectKeysGpu(DeviceVector<KeyType>& leaves,
-                   gsl::span<const KeyType> keys,
+                   std::span<const KeyType> keys,
                    DeviceVector<KeyType>& keyScratch,
                    DeviceVector<TreeNodeIndex>& spanOps,
                    DeviceVector<TreeNodeIndex>& spanOpsScan)

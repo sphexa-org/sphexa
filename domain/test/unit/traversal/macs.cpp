@@ -90,7 +90,7 @@ TEST(Macs, minVecMacMutual)
 
 template<class KeyType, class T>
 static std::vector<char> markVecMacAll2All(const KeyType* leaves,
-                                           gsl::span<const KeyType> prefixes,
+                                           std::span<const KeyType> prefixes,
                                            const Vec4<T>* centers,
                                            TreeNodeIndex firstLeaf,
                                            TreeNodeIndex lastLeaf,

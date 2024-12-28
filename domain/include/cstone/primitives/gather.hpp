@@ -23,7 +23,6 @@
 #include <vector>
 
 #include "cstone/tree/definitions.h"
-#include "cstone/util/gsl-lite.hpp"
 #include "cstone/util/noinit_alloc.hpp"
 #include "cstone/util/reallocate.hpp"
 

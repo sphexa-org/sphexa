@@ -23,7 +23,7 @@
 using namespace cstone;
 
 template<class KeyType, class T>
-std::vector<int> findHalosAll2All(gsl::span<const KeyType> tree,
+std::vector<int> findHalosAll2All(std::span<const KeyType> tree,
                                   const std::vector<T>& haloRadii,
                                   const Box<T>& box,
                                   TreeNodeIndex firstNode,
