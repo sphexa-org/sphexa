@@ -196,8 +196,8 @@ public:
         auto [exchangeStart, keyView] =
             distribute(sorter, particleKeys, x, y, z, std::tuple_cat(std::tie(h), particleProperties), scratch);
         // h is already reordered here for use in halo discovery
-        gatherArrays(sorter.gatherFunc(), sorter.getMap() + global_.numSendDown(), global_.numAssigned(), exchangeStart,
-                     0, std::tie(h), util::reverse(scratch));
+        gatherArrays(sorter.gatherFunc(), {sorter.getMap() + global_.o3start(bufDesc_), global_.numAssigned()}, 0,
+                     std::tie(h), util::reverse(scratch));
 
         std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), 1.0 / theta_);
         float invThetaEff      = invThetaMinMac(theta_);
@@ -251,8 +251,8 @@ public:
 
         auto [exchangeStart, keyView] =
             distribute(sorter, particleKeys, x, y, z, std::tuple_cat(std::tie(h, m), particleProperties), scratch);
-        gatherArrays(sorter.gatherFunc(), sorter.getMap() + global_.numSendDown(), global_.numAssigned(), exchangeStart,
-                     0, std::tie(x, y, z, h, m), util::reverse(scratch));
+        gatherArrays(sorter.gatherFunc(), {sorter.getMap() + global_.o3start(bufDesc_), global_.numAssigned()}, 0,
+                     std::tie(x, y, z, h, m), util::reverse(scratch));
 
         float invThetaEff      = invThetaMinToVec(theta_);
         std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), invThetaEff);
@@ -329,23 +329,21 @@ public:
                      OVec& ordering) const
     {
         static_assert((... && !IsDeviceVector<Vectors>{}), "reapplySync only support for arrays on CPUs");
-        std::apply([this](auto&... arrays) { this->template checkSizesEqual(this->prevBufDesc_.size, arrays...); },
-                   arrays);
+        std::apply([this](auto&... arrays) { this->checkSizesEqual(this->prevBufDesc_.size, arrays...); }, arrays);
 
         LocalIndex exSize =
             domain_exchange::exchangeBufferSize(prevBufDesc_, global_.numPresent(), global_.numAssigned());
         lowMemReallocate(exSize, allocGrowthRate_, arrays, {});
 
         BufferDescription exDesc{prevBufDesc_.start, prevBufDesc_.end, exSize};
-        auto envelope    = domain_exchange::assignedEnvelope(exDesc, global_.numPresent(), global_.numAssigned());
-        LocalIndex shift = prevBufDesc_.start - envelope[0];
+        auto envelope = domain_exchange::assignedEnvelope(exDesc, global_.numAssigned() - global_.numPresent());
 
         // the intermediate, reconstructed ordering needed for the MPI particle exchange
         std::vector<LocalIndex> prevOrd(prevBufDesc_.end - prevBufDesc_.start);
         // the post-exchange ordering that was obtained by sorting after receiving the particles from domain exchange
         std::vector<LocalIndex> orderingCpu;
 
-        auto* ord = (LocalIndex*)rawPtr(ordering);
+        auto* ord = (LocalIndex*)rawPtr(ordering) + envelope[0];
         if constexpr (HaveGpu<Accelerator>{})
         {
             static_assert(IsDeviceVector<OVec>{}, "Need ordering on GPU for GPU-accelerated domain");
@@ -354,17 +352,16 @@ public:
             ord = orderingCpu.data();
         }
 
-        std::transform(ord, ord + global_.numSendDown(), prevOrd.data(), [shift](auto i) { return i - shift; });
-        std::transform(ord + global_.numSendDown() + global_.numAssigned(), ord + envelope[1] - envelope[0],
-                       prevOrd.data() + global_.numSendDown() + global_.numPresent(),
-                       [shift](auto i) { return i - shift; });
+        std::copy(ord, ord + global_.numSendDown(), prevOrd.data());
+        std::copy(ord + global_.numSendDown() + global_.numAssigned(), ord + envelope[1] - envelope[0],
+                  prevOrd.data() + global_.numSendDown() + global_.numPresent());
 
         std::apply([exDesc, o = prevOrd.data(), &sendBuffer, &receiveBuffer, this](auto&... a)
                    { global_.redoExchange(exDesc, o, sendBuffer, receiveBuffer, rawPtr(a)...); },
                    arrays);
 
         lowMemReallocate(bufDesc_.size, allocGrowthRate_, arrays, std::tie(sendBuffer, receiveBuffer));
-        gatherArrays(gatherCpu, ord + global_.numSendDown(), global_.numAssigned(), envelope[0], bufDesc_.start, arrays,
+        gatherArrays(gatherCpu, {ord + global_.numSendDown(), global_.numAssigned()}, bufDesc_.start, arrays,
                      std::tie(sendBuffer, receiveBuffer));
     }
 
@@ -372,7 +369,7 @@ public:
     template<class... Vectors, class SendBuffer, class ReceiveBuffer>
     void exchangeHalos(std::tuple<Vectors&...> arrays, SendBuffer& sendBuffer, ReceiveBuffer& receiveBuffer) const
     {
-        std::apply([this](auto&... arrays) { this->template checkSizesEqual(this->bufDesc_.size, arrays...); }, arrays);
+        std::apply([this](auto&... arrays) { this->checkSizesEqual(this->bufDesc_.size, arrays...); }, arrays);
         this->halos_.exchangeHalos(arrays, sendBuffer, receiveBuffer);
     }
 
@@ -586,7 +583,7 @@ private:
         util::for_each_tuple(relocate, orderedBuffers);
 
         // reorder the unordered buffers
-        gatherArrays(sorter.gatherFunc(), sorter.getMap() + global_.numSendDown(), global_.numAssigned(), exchangeStart,
+        gatherArrays(sorter.gatherFunc(), {sorter.getMap() + global_.o3start(bufDesc_), global_.numAssigned()},
                      newBufDesc.start, unorderedBuffers, util::reverse(scratchBuffers));
 
         // newBufDesc is now the valid buffer description

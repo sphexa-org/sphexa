@@ -71,7 +71,6 @@ void exchangeParticlesGpu(int epoch,
                           int thisRank,
                           LocalIndex receiveStart,
                           LocalIndex receiveEnd,
-                          LocalIndex o1start,
                           DeviceVector& sendScratchBuffer,
                           DeviceVector& recvScratchBuffer,
                           const LocalIndex* ordering,
@@ -102,7 +101,7 @@ void exchangeParticlesGpu(int epoch,
 
         encodeSendCount(sendCount, sendPtr);
         size_t numBytes = headerBytes + packArrays<alignment>(gatherGpuL, ordering + sendStart, sendCount,
-                                                              sendPtr + headerBytes, arrays + o1start...);
+                                                              sendPtr + headerBytes, arrays...);
         checkGpuErrors(cudaDeviceSynchronize());
         mpiSendGpuDirect(sendPtr, numBytes, destinationRank, domExTag, sendRequests, sendBuffers);
         sendPtr += numBytes;
