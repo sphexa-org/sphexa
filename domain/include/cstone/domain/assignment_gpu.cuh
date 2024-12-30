@@ -129,7 +129,7 @@ public:
      * @param[inout] x                  particle x-coordinates
      * @param[inout] y                  particle y-coordinates
      * @param[inout] z                  particle z-coordinates
-     * @param[inout] particleProperties remaining particle properties, h, m, etc.
+     * @param[inout] properties remaining particle properties, h, m, etc.
      * @return                          index denoting the index range start of particles post-exchange
      *                                  plus a span with a view of the assigned particle keys
      *
@@ -148,42 +148,34 @@ public:
                     T* x,
                     T* y,
                     T* z,
-                    Arrays... particleProperties) const
+                    Arrays... properties) const
     {
         recvLog_.clear();
 
         auto numRecv   = numAssigned() - numPresent();
         auto recvStart = domain_exchange::receiveStart(o1e, numRecv);
-        exchangeParticlesGpu(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, o1e.start, sendScratch,
-                             receiveScratch, sfcSorter.getMap(), x, y, z, particleProperties...);
+        exchangeParticlesGpu(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, sendScratch,
+                             receiveScratch, sfcSorter.getMap(), x, y, z, properties...);
 
-        auto [newStart, newEnd] = domain_exchange::assignedEnvelope(o1e, numPresent(), numAssigned());
+        auto [newStart, newEnd] = domain_exchange::assignedEnvelope(o1e, numAssigned() - numPresent());
         LocalIndex envelopeSize = newEnd - newStart;
         std::span<KeyType> keyView(keys + newStart, envelopeSize);
 
         computeSfcKeysGpu(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv, box_);
-        std::make_signed_t<LocalIndex> shifts = -numRecv;
-        if (newEnd > o1e.end) { shifts = numRecv; }
-        sfcSorter.extendMap(shifts, sendScratch);
-
-        // sort keys and keep track of the ordering
-        sfcSorter.updateMap(keyView, sendScratch, receiveScratch);
+        sfcSorter.extendMap(recvStart, numRecv);
+        sfcSorter.updateMap(keyView, newStart, sendScratch, receiveScratch);
 
         return std::make_tuple(newStart, keyView.subspan(numSendDown(), numAssigned()));
     }
 
     //! @brief repeat exchange from last call to assign() for arrays on the CPU
     template<class SVec, class... Arrays>
-    auto redoExchange(BufferDescription o1e,
-                      const LocalIndex* ordering,
-                      SVec& /*s1*/,
-                      SVec& /*s2*/,
-                      Arrays... particleProperties) const
+    auto redoExchange(
+        BufferDescription o1e, const LocalIndex* ordering, SVec& /*s1*/, SVec& /*s2*/, Arrays... properties) const
     {
         auto numRecv   = numAssigned() - numPresent();
         auto recvStart = domain_exchange::receiveStart(o1e, numRecv);
-        exchangeParticles(1, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, o1e.start, ordering,
-                          particleProperties...);
+        exchangeParticles(1, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, ordering, properties...);
     }
 
     //! @brief read only visibility of the global octree leaves to the outside
@@ -197,6 +189,10 @@ public:
     //! @brief return the space filling curve rank assignment of the last call to @a assign()
     const SfcAssignment<KeyType>& assignment() const { return assignment_; }
 
+    LocalIndex o3start(BufferDescription o1) const
+    {
+        return domain_exchange::assignedEnvelope(o1, numAssigned() - numPresent())[0] + numSendDown();
+    }
     //! @brief number of local particles to be sent to lower ranks
     LocalIndex numSendDown() const { return exchanges_[myRank_]; }
     LocalIndex numPresent() const { return exchanges_.count(myRank_); }
