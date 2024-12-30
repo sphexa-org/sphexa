@@ -45,19 +45,19 @@ uint64_t decodeSendCountCpu(T* recvPtr)
 
 /*! @brief exchange array elements with other ranks according to the specified ranges
  *
- * @tparam Arrays                   pointers to particles buffers
- * @param[in] epoch                 MPI tag offset to avoid mix-ups of message from consecutive function calls
- * @param[in] receiveLog            List of received messages in previous calls to replicate resulting buffer layout
- * @param[in] sendList              List of index ranges to be sent to each rank, indices
- *                                  are valid w.r.t to arrays present on @p thisRank relative to @p particleStart.
- * @param[in] thisRank              Rank of the executing process
- * @param[in] bufDesc               data layout of local @p arrays with start, end of assigned particles and total size
- * @param[in] numParticlesAssigned  New number of assigned particles for each array on @p thisRank.
- * @param[in] ordering              Ordering through which to access arrays, valid w.r.t to [particleStart:particleEnd]
- * @param[inout] arrays             Pointers of different types but identical number of elements. The index range based
- *                                  exchange operations performed are identical for each input array. Upon completion,
- *                                  arrays will contain elements from the specified ranges and ranks.
- *                                  The order in which the incoming ranges are grouped is random.
+ * @tparam Arrays             pointers to particles buffers
+ * @param[in] epoch           MPI tag offset to avoid mix-ups of message from consecutive function calls
+ * @param[in] receiveLog      List of received messages in previous calls to replicate resulting buffer layout
+ * @param[in] sendList        List of index ranges to be sent to each rank, indices
+ *                            are valid w.r.t to arrays present on @p thisRank relative to @p particleStart.
+ * @param[in] thisRank        Rank of the executing process
+ * @param[in] receiveStart    start of receive index range where incoming particles in @p arrays will be placed
+ * @param[in] receiveEnd      end of receive range
+ * @param[in] ordering        Ordering through which to access arrays, valid w.r.t to [particleStart:particleEnd]
+ * @param[inout] arrays       Pointers of different types but identical number of elements. The index range based
+ *                            exchange operations performed are identical for each input array. Upon completion,
+ *                            arrays will contain elements from the specified ranges and ranks.
+ *                            The order in which the incoming ranges are grouped is random.
  *
  *  Example: If sendList[ri] contains the range [upper, lower), all elements (arrays+inputOffset)[ordering[upper:lower]]
  *           will be sent to rank ri. At the destination ri, the incoming elements
@@ -71,8 +71,9 @@ void exchangeParticles(int epoch,
                        ExchangeLog& receiveLog,
                        const SendRanges& sends,
                        int thisRank,
-                       BufferDescription bufDesc,
-                       LocalIndex numParticlesAssigned,
+                       LocalIndex receiveStart,
+                       LocalIndex receiveEnd,
+                       LocalIndex o1start,
                        const LocalIndex* ordering,
                        Arrays... arrays)
 {
@@ -101,7 +102,7 @@ void exchangeParticles(int epoch,
                                          util::computeByteOffsets(nextSendCount, alignment, arrays...).back());
             encodeSendCountCpu(nextSendCount, sendBuffer.data());
             packArrays<alignment>(gatherCpu, ordering + sends[destinationRank] + numSent, nextSendCount,
-                                  sendBuffer.data() + headerBytes, arrays + bufDesc.start...);
+                                  sendBuffer.data() + headerBytes, arrays + o1start...);
 
             mpiSendAsyncAs<TransferType>(sendBuffer.data(), sendBuffer.size(), destinationRank, domExTag, sendRequests);
             numSent += nextSendCount;
@@ -109,10 +110,6 @@ void exchangeParticles(int epoch,
         }
         assert(numSent == sendCount);
     }
-
-    LocalIndex numParticlesPresent = sends.count(thisRank);
-    LocalIndex receiveStart        = domain_exchange::receiveStart(bufDesc, numParticlesPresent, numParticlesAssigned);
-    LocalIndex receiveEnd          = receiveStart + numParticlesAssigned - numParticlesPresent;
 
     std::vector<char> receiveBuffer;
     while (receiveStart != receiveEnd)
