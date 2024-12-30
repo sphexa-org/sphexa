@@ -64,11 +64,7 @@ void exchangeAllToAll(int thisRank, int numRanks)
     sends.back() = gridSize;
     for (int rank = 0; rank < numRanks; ++rank)
     {
-        int lower = rank * segmentSize;
-        int upper = lower + segmentSize;
-
-        if (rank == numRanks - 1) upper += gridSize % numRanks;
-
+        int lower   = rank * segmentSize;
         sends[rank] = lower;
     }
 
@@ -79,7 +75,9 @@ void exchangeAllToAll(int thisRank, int numRanks)
     reallocate(bufDesc.size, 1.01, x, y);
 
     ExchangeLog log;
-    exchangeParticles(0, log, sends, thisRank, bufDesc, numPartAssigned, ordering.data(), x.data(), y.data());
+    auto recvStart = domain_exchange::receiveStart(bufDesc, numPartAssigned - numPartPresent);
+    auto recvEnd   = recvStart + numPartAssigned - numPartPresent;
+    exchangeParticles(0, log, sends, thisRank, recvStart, recvEnd, bufDesc.start, ordering.data(), x.data(), y.data());
 
     ex::extractLocallyOwned(bufDesc, numPartPresent, numPartAssigned, ordering.data() + sends[thisRank], x, y);
 
@@ -154,7 +152,9 @@ void exchangeCyclicNeighbors(int thisRank, int numRanks)
     reallocate(bufDesc.size, 1.01, x, y, testArray, uint8Array);
 
     ExchangeLog log;
-    exchangeParticles(0, log, sends, thisRank, bufDesc, gridSize, ordering.data(), x.data(), y.data(),
+    auto recvStart = domain_exchange::receiveStart(bufDesc, numPartAssigned - numPartPresent);
+    auto recvEnd   = recvStart + numPartAssigned - numPartPresent;
+    exchangeParticles(0, log, sends, thisRank, recvStart, recvEnd, bufDesc.start, ordering.data(), x.data(), y.data(),
                       uint8Array.data(), testArray.data());
 
     ex::extractLocallyOwned(bufDesc, numPartPresent, numPartAssigned, ordering.data() + sends[thisRank], x, y,

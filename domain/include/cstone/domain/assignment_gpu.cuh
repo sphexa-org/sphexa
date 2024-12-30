@@ -63,7 +63,7 @@ public:
 
     /*! @brief Update the global tree
      *
-     * @param[in]  bufDesc         Buffer description of @a keys, @a x, @a y, @a z with range of assigned particles
+     * @param[in]  o1         Buffer description of @a keys, @a x, @a y, @a z with range of assigned particles
      * @param[in]  sfcSorter       records the SFC order of the owned input coordinates
      * @param[out] particleKeys    will contain sorted particle SFC keys, length = bufDesc.size, on DEVICE
      * @param[-]   s0              device scratch vector
@@ -76,7 +76,7 @@ public:
      * This function does not modify / communicate any particle data.
      */
     template<class Sorter, class DevVector>
-    LocalIndex assign(BufferDescription bufDesc,
+    LocalIndex assign(BufferDescription o1,
                       Sorter& sfcSorter,
                       DevVector& s0,
                       DevVector& s1,
@@ -86,8 +86,8 @@ public:
                       const T* z)
     {
         // number of locally assigned particles to consider for global tree building
-        LocalIndex numParticles = bufDesc.end - bufDesc.start;
-        LocalIndex start        = bufDesc.start;
+        LocalIndex numParticles = o1.end - o1.start;
+        LocalIndex start        = o1.start;
 
         auto fittingBox = makeGlobalBox<T, MinMaxGpu<T>>(x + start, y + start, z + start, numParticles, box_);
         if (firstCall_) { box_ = fittingBox; }
@@ -112,15 +112,15 @@ public:
         limitBoundaryShifts<KeyType>(assignment_, newAssignment, tree_.treeLeaves(), nodeCounts_);
         assignment_ = std::move(newAssignment);
 
-        exchanges_ = createSendRangesGpu<KeyType>(assignment_, {particleKeys + bufDesc.start, numParticles},
-                                                  rawPtr(d_boundaryKeys_), rawPtr(d_boundaryIndices_));
+        exchanges_ =
+            createSendRangesGpu<KeyType>(assignment_, keyView, rawPtr(d_boundaryKeys_), rawPtr(d_boundaryIndices_));
 
-        return domain_exchange::exchangeBufferSize(bufDesc, numPresent(), numAssigned());
+        return domain_exchange::exchangeBufferSize(o1, numPresent(), numAssigned());
     }
 
     /*! @brief Distribute particles to their assigned ranks based on previous assignment
      *
-     * @param[in]    bufDesc            Buffer description with range of assigned particles and total buffer size
+     * @param[in]    o1e                Buffer description with range of assigned particles and total buffer size
      * @param[inout] sfcSorter          contains the ordering that accesses the range [bufDesc.start:bufDesc.end]
      *                                  in SFC order
      * @param[-]     sendScratch        scratch space for send buffers
@@ -140,7 +140,7 @@ public:
      * location. This saves us from having to move around data inside the buffers for a second time.
      */
     template<class Sorter, class DevVector, class... Arrays>
-    auto distribute(BufferDescription bufDesc,
+    auto distribute(BufferDescription o1e,
                     Sorter& sfcSorter,
                     DevVector& sendScratch,
                     DevVector& receiveScratch,
@@ -151,19 +151,19 @@ public:
                     Arrays... particleProperties) const
     {
         recvLog_.clear();
-        exchangeParticlesGpu(0, recvLog_, exchanges_, myRank_, bufDesc, numAssigned(), sendScratch, receiveScratch,
-                             sfcSorter.getMap(), x, y, z, particleProperties...);
 
-        auto [newStart, newEnd] = domain_exchange::assignedEnvelope(bufDesc, numPresent(), numAssigned());
+        auto numRecv   = numAssigned() - numPresent();
+        auto recvStart = domain_exchange::receiveStart(o1e, numRecv);
+        exchangeParticlesGpu(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, o1e.start, sendScratch,
+                             receiveScratch, sfcSorter.getMap(), x, y, z, particleProperties...);
+
+        auto [newStart, newEnd] = domain_exchange::assignedEnvelope(o1e, numPresent(), numAssigned());
         LocalIndex envelopeSize = newEnd - newStart;
         std::span<KeyType> keyView(keys + newStart, envelopeSize);
 
-        auto recvStart = domain_exchange::receiveStart(bufDesc, numPresent(), numAssigned());
-        auto numRecv   = numAssigned() - numPresent();
-
         computeSfcKeysGpu(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv, box_);
         std::make_signed_t<LocalIndex> shifts = -numRecv;
-        if (newEnd > bufDesc.end) { shifts = numRecv; }
+        if (newEnd > o1e.end) { shifts = numRecv; }
         sfcSorter.extendMap(shifts, sendScratch);
 
         // sort keys and keep track of the ordering
@@ -174,13 +174,16 @@ public:
 
     //! @brief repeat exchange from last call to assign() for arrays on the CPU
     template<class SVec, class... Arrays>
-    auto redoExchange(BufferDescription bufDesc,
+    auto redoExchange(BufferDescription o1e,
                       const LocalIndex* ordering,
                       SVec& /*s1*/,
                       SVec& /*s2*/,
                       Arrays... particleProperties) const
     {
-        exchangeParticles(1, recvLog_, exchanges_, myRank_, bufDesc, numAssigned(), ordering, particleProperties...);
+        auto numRecv   = numAssigned() - numPresent();
+        auto recvStart = domain_exchange::receiveStart(o1e, numRecv);
+        exchangeParticles(1, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, o1e.start, ordering,
+                          particleProperties...);
     }
 
     //! @brief read only visibility of the global octree leaves to the outside
