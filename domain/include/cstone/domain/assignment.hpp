@@ -21,7 +21,6 @@
 #include "cstone/tree/update_mpi.hpp"
 #include "cstone/sfc/box_mpi.hpp"
 #include "cstone/sfc/sfc.hpp"
-#include "cstone/util/reallocate.hpp"
 
 namespace cstone
 {
@@ -100,7 +99,7 @@ public:
         limitBoundaryShifts<KeyType>(assignment_, newAssignment, tree_.treeLeaves(), nodeCounts_);
         assignment_ = std::move(newAssignment);
 
-        exchanges_ = createSendRanges<KeyType>(assignment_, {particleKeys + o1.start, numParticles});
+        exchanges_ = createSendRanges<KeyType>(assignment_, keyView);
 
         return domain_exchange::exchangeBufferSize(o1, numPresent(), numAssigned());
     }
@@ -158,9 +157,10 @@ public:
     auto redoExchange(
         BufferDescription o1e, const LocalIndex* ordering, SVec& /*s1*/, SVec& /*s2*/, Arrays... properties) const
     {
-        auto numRecv   = numAssigned() - numPresent();
-        auto recvStart = domain_exchange::receiveStart(o1e, numRecv);
-        exchangeParticles(1, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, ordering, properties...);
+        auto numRecv    = numAssigned() - numPresent();
+        auto recvStart  = domain_exchange::receiveStart(o1e, numRecv);
+        auto exchangeO2 = shiftSendRanges(exchanges_, myRank_, numRecv);
+        exchangeParticles(1, recvLog_, exchangeO2, myRank_, recvStart, recvStart + numRecv, ordering, properties...);
     }
 
     //! @brief read only visibility of the global octree leaves to the outside
