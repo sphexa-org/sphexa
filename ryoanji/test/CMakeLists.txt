@@ -51,7 +51,6 @@ add_executable(${testname}
 target_compile_options(${testname} PRIVATE -Wall -Wextra -Wno-unknown-pragmas)
 target_include_directories(${testname} PRIVATE ${RYOANJI_TEST_INCLUDE_DIRS})
 target_link_libraries(${testname} PRIVATE GTest::gtest_main OpenMP::OpenMP_CXX)
-target_link_libraries(${testname} PRIVATE GTest::gmock_main OpenMP::OpenMP_CXX)
 add_test(NAME ${testname} COMMAND ryoanji_cpu_unit_tests)
 install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji/cpu_unit_tests)
 
