@@ -201,21 +201,19 @@ struct SmallerElementSize
 //! @brief reorder with state-less function object
 template<class Gather, class... Arrays1, class... Arrays2>
 void gatherArrays(Gather&& gatherFunc,
-                  const LocalIndex* ordering,
-                  LocalIndex numElements,
-                  LocalIndex inputOffset,
+                  std::span<const LocalIndex> ordering,
                   LocalIndex outputOffset,
                   std::tuple<Arrays1&...> arrays,
                   std::tuple<Arrays2&...> scratchBuffers)
 {
-    auto reorderArray = [ordering, numElements, inputOffset, outputOffset, &gatherFunc, &scratchBuffers](auto& array)
+    auto reorderArray = [ordering, outputOffset, &gatherFunc, &scratchBuffers](auto& array)
     {
         using VectorRef = decltype(array);
         if constexpr (util::Contains<VectorRef, std::tuple<Arrays2&...>>{})
         {
             auto& swapSpace = util::pickType<decltype(array)>(scratchBuffers);
             assert(swapSpace.size() == array.size());
-            gatherFunc({ordering, numElements}, rawPtr(array) + inputOffset, rawPtr(swapSpace) + outputOffset);
+            gatherFunc(ordering, rawPtr(array), rawPtr(swapSpace) + outputOffset);
             swap(swapSpace, array);
         }
         else
@@ -226,12 +224,12 @@ void gatherArrays(Gather&& gatherFunc,
 
             auto* scratchSpace =
                 reinterpret_cast<typename std::decay_t<VectorRef>::value_type*>(rawPtr(std::get<i>(scratchBuffers)));
-            gatherFunc({ordering, numElements}, rawPtr(array) + inputOffset, scratchSpace);
+            gatherFunc(ordering, rawPtr(array), scratchSpace);
             if constexpr (IsDeviceVector<std::decay_t<VectorRef>>{})
             {
-                memcpyD2D(scratchSpace, numElements, rawPtr(array) + outputOffset);
+                memcpyD2D(scratchSpace, ordering.size(), rawPtr(array) + outputOffset);
             }
-            else { omp_copy(scratchSpace, scratchSpace + numElements, rawPtr(array) + outputOffset); }
+            else { omp_copy(scratchSpace, scratchSpace + ordering.size(), rawPtr(array) + outputOffset); }
         }
     };
 

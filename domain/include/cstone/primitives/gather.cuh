@@ -60,60 +60,24 @@ public:
     const IndexType* getMap() const { return ordering(); }
 
     template<class KeyType, class KeyBuf, class ValueBuf>
-    void updateMap(std::span<KeyType> keys, KeyBuf& keyBuf, ValueBuf& valueBuf)
+    void updateMap(std::span<KeyType> keys, IndexType offset, KeyBuf& keyBuf, ValueBuf& valueBuf)
     {
-        sortByKeyGpu<KeyType, IndexType>(keys, {ordering(), keys.size()}, keyBuf, valueBuf, growthRate_);
+        sortByKeyGpu<KeyType, IndexType>(keys, {ordering() + offset, keys.size()}, keyBuf, valueBuf, growthRate_);
     }
 
-    /*! @brief sort given Morton codes on the device and determine reorder map based on sort order
-     */
+    //! @brief sort given SFC keys on the device and determine reorder map based on sort order
     template<class KeyType, class KeyBuf, class ValueBuf>
-    void setMapFromCodes(std::span<KeyType> keys, IndexType /*offset*/, KeyBuf& keyBuf, ValueBuf& valueBuf)
+    void setMapFromCodes(std::span<KeyType> keys, IndexType offset, KeyBuf& keyBuf, ValueBuf& valueBuf)
     {
-        mapSize_ = keys.size();
-        reallocateBytes(buffer_, keys.size() * sizeof(IndexType), growthRate_);
-        sequenceGpu(ordering(), keys.size(), IndexType(0));
-        sortByKeyGpu(keys, std::span<IndexType>(ordering(), keys.size()), keyBuf, valueBuf, growthRate_);
+        reallocateBytes(buffer_, (keys.size() + offset) * sizeof(IndexType), growthRate_);
+        sequenceGpu(ordering() + offset, keys.size(), offset);
+        sortByKeyGpu(keys, std::span<IndexType>(ordering() + offset, keys.size()), keyBuf, valueBuf, growthRate_);
     }
 
     auto gatherFunc() const { return gatherGpuL; }
 
-    /*! @brief extend ordering map to the left or right
-     *
-     * @param[in] shifts    number of shifts
-     * @param[-]  scratch   scratch space for temporary usage
-     *
-     * Negative shift values extends the ordering map to the left, positive value to the right
-     * Examples: map = [1, 0, 3, 2] -> extendMap(-1) -> map = [0, 2, 1, 4, 3]
-     *           map = [1, 0, 3, 2] -> extendMap(1) -> map = [1, 0, 3, 2, 4]
-     *
-     * This is used to extend the key-buffer passed to setMapFromCodes with additional keys, without
-     * having to restore the original unsorted key-sequence.
-     */
-    template<class Vector>
-    void extendMap(std::make_signed_t<IndexType> shifts, Vector& scratch)
-    {
-        if (shifts == 0) { return; }
-
-        auto newMapSize = mapSize_ + std::abs(shifts);
-        auto s1         = reallocateBytes(scratch, newMapSize * sizeof(IndexType), 1.0);
-        auto* tempMap   = reinterpret_cast<IndexType*>(rawPtr(scratch));
-
-        if (shifts < 0)
-        {
-            sequenceGpu(tempMap, IndexType(-shifts), IndexType(0));
-            incrementGpu(ordering(), ordering() + mapSize_, tempMap - shifts, IndexType(-shifts));
-        }
-        else if (shifts > 0)
-        {
-            memcpyD2D(ordering(), mapSize_, tempMap);
-            sequenceGpu(tempMap + mapSize_, IndexType(shifts), mapSize_);
-        }
-        reallocateBytes(buffer_, newMapSize * sizeof(IndexType), 1.0);
-        memcpyD2D(tempMap, newMapSize, ordering());
-        mapSize_ = newMapSize;
-        reallocate(scratch, s1, 1.0);
-    }
+    //! @brief extend the ordering buffer to an additional range
+    void extendMap(IndexType first, IndexType n) { sequenceGpu(ordering() + first, n, first); }
 
 private:
     IndexType* ordering() { return reinterpret_cast<IndexType*>(buffer_.data()); }
@@ -121,7 +85,6 @@ private:
 
     //! @brief reference to (non-owning) buffer for ordering
     BufferType& buffer_;
-    IndexType mapSize_{0};
     float growthRate_ = 1.05;
 };
 

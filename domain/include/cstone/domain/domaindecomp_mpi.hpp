@@ -48,7 +48,7 @@ uint64_t decodeSendCountCpu(T* recvPtr)
  * @tparam Arrays             pointers to particles buffers
  * @param[in] epoch           MPI tag offset to avoid mix-ups of message from consecutive function calls
  * @param[in] receiveLog      List of received messages in previous calls to replicate resulting buffer layout
- * @param[in] sendList        List of index ranges to be sent to each rank, indices
+ * @param[in] sends           List of index ranges to be sent to each rank, indices
  *                            are valid w.r.t to arrays present on @p thisRank relative to @p particleStart.
  * @param[in] thisRank        Rank of the executing process
  * @param[in] receiveStart    start of receive index range where incoming particles in @p arrays will be placed
@@ -73,7 +73,6 @@ void exchangeParticles(int epoch,
                        int thisRank,
                        LocalIndex receiveStart,
                        LocalIndex receiveEnd,
-                       LocalIndex o1start,
                        const LocalIndex* ordering,
                        Arrays... arrays)
 {
@@ -102,7 +101,7 @@ void exchangeParticles(int epoch,
                                          util::computeByteOffsets(nextSendCount, alignment, arrays...).back());
             encodeSendCountCpu(nextSendCount, sendBuffer.data());
             packArrays<alignment>(gatherCpu, ordering + sends[destinationRank] + numSent, nextSendCount,
-                                  sendBuffer.data() + headerBytes, arrays + o1start...);
+                                  sendBuffer.data() + headerBytes, arrays...);
 
             mpiSendAsyncAs<TransferType>(sendBuffer.data(), sendBuffer.size(), destinationRank, domExTag, sendRequests);
             numSent += nextSendCount;

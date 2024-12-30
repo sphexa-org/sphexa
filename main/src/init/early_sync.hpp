@@ -59,7 +59,7 @@ void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector&
                 const cstone::Box<T>& globalBox)
 {
     size_t                    bucketSize = std::max(64lu, numParticlesGlobal / (100 * numRanks));
-    cstone::BufferDescription bufDesc{0, cstone::LocalIndex(x.size()), cstone::LocalIndex(x.size())};
+    cstone::BufferDescription o1{0, cstone::LocalIndex(x.size()), cstone::LocalIndex(x.size())};
 
     cstone::GlobalAssignment<KeyType, T> distributor(rank, numRanks, bucketSize, globalBox);
 
@@ -69,15 +69,15 @@ void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector&
     std::vector<T>       scratch1, scratch2;
     std::vector<KeyType> particleKeys(x.size());
     cstone::LocalIndex   newNParticlesAssigned =
-        distributor.assign(bufDesc, sorter, scratch1, scratch2, particleKeys.data(), x.data(), y.data(), z.data());
+        distributor.assign(o1, sorter, scratch1, scratch2, particleKeys.data(), x.data(), y.data(), z.data());
     auto exchangeSize = std::max(cstone::LocalIndex(x.size()), newNParticlesAssigned);
     reallocate(exchangeSize, 1.01, particleKeys, x, y, z);
-    auto [exchangeStart, keyView] = distributor.distribute({bufDesc.start, bufDesc.end, exchangeSize}, sorter, scratch1,
-                                                           scratch2, particleKeys.data(), x.data(), y.data(), z.data());
+    auto [exchangeStart, keyView] = distributor.distribute({o1.start, o1.end, exchangeSize}, sorter, scratch1, scratch2,
+                                                           particleKeys.data(), x.data(), y.data(), z.data());
 
     scratch1.resize(x.size());
-    cstone::gatherArrays(sorter.gatherFunc(), sorter.getMap() + distributor.numSendDown(), distributor.numAssigned(),
-                         exchangeStart, 0, std::tie(x, y, z), std::tie(scratch1));
+    cstone::gatherArrays(sorter.gatherFunc(), {sorter.getMap() + distributor.o3start(o1), distributor.numAssigned()}, 0,
+                         std::tie(x, y, z), std::tie(scratch1));
     x.resize(keyView.size());
     y.resize(keyView.size());
     z.resize(keyView.size());
