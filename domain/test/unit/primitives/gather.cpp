@@ -42,7 +42,7 @@ void CpuGatherTest()
 
     std::vector<unsigned> scratch;
     SfcSorter<IndexType, std::vector<unsigned>> sorter(scratch);
-    sorter.setMapFromCodes(std::span(keys));
+    sorter.setMapFromCodes(std::span(keys), 0);
 
     {
         std::vector<KeyType> refCodes{0, 10, 20, 30, 40, 50, 60, 70, 80, 90};
@@ -63,42 +63,4 @@ TEST(GatherCpu, CpuGather)
     CpuGatherTest<float, uint64_t, unsigned>();
     CpuGatherTest<double, unsigned, unsigned>();
     CpuGatherTest<double, uint64_t, unsigned>();
-}
-
-TEST(GatherCpu, shiftMapLeft)
-{
-    using KeyType = unsigned;
-
-    std::vector<KeyType> keys{2, 1, 5, 4};
-
-    std::vector<unsigned> scratch, scratch2;
-    SfcSorter<LocalIndex, std::vector<unsigned>> sorter(scratch);
-
-    sorter.setMapFromCodes<KeyType>(keys);
-    // map is [1 0 3 2]
-
-    sorter.extendMap(-1, scratch2);
-    std::vector<LocalIndex> probeMap(sorter.getMap(), sorter.getMap() + sorter.size());
-
-    std::vector<LocalIndex> ref{0, 2, 1, 4, 3};
-    EXPECT_EQ(probeMap, ref);
-}
-
-TEST(GatherCpu, shiftMapRight)
-{
-    using KeyType = unsigned;
-
-    std::vector<KeyType> keys{2, 1, 5, 4};
-
-    std::vector<unsigned> scratch, scratch2;
-    SfcSorter<LocalIndex, std::vector<unsigned>> sorter(scratch);
-
-    sorter.setMapFromCodes<KeyType>(keys);
-    // map is [1 0 3 2]
-
-    sorter.extendMap(1, scratch2);
-    std::vector<LocalIndex> probeMap(sorter.getMap(), sorter.getMap() + sorter.size());
-
-    std::vector<LocalIndex> ref{1, 0, 3, 2, 4};
-    EXPECT_EQ(probeMap, ref);
 }

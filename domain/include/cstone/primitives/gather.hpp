@@ -135,60 +135,27 @@ public:
     SfcSorter(const SfcSorter&) = delete;
 
     const IndexType* getMap() const { return ordering(); }
-    std::size_t size() const { return mapSize_; }
 
     template<class KeyType>
-    void setMapFromCodes(std::span<KeyType> keys)
+    void setMapFromCodes(std::span<KeyType> keys, IndexType offset)
     {
-        mapSize_ = keys.size();
-        reallocateBytes(buffer_, mapSize_ * sizeof(IndexType), 1.0);
-        std::iota(ordering(), ordering() + mapSize_, 0);
-        sort_by_key(keys.begin(), keys.end(), ordering());
+        reallocateBytes(buffer_, (keys.size() + offset) * sizeof(IndexType), 1.0);
+        std::iota(ordering() + offset, ordering() + offset + keys.size(), offset);
+        sort_by_key(keys.begin(), keys.end(), ordering() + offset);
     }
 
     template<class KeyType>
-    void updateMap(std::span<KeyType> keys)
+    void updateMap(std::span<KeyType> keys, IndexType offset)
     {
-        sort_by_key(keys.begin(), keys.end(), ordering());
+        sort_by_key(keys.begin(), keys.end(), ordering() + offset);
     }
 
     auto gatherFunc() const { return gatherCpu; }
 
-    /*! @brief extend ordering map to the left or right
-     *
-     * @param[in] shifts    number of shifts
-     * @param[-]  scratch   scratch space for temporary usage
-     *
-     * Negative shift values extends the ordering map to the left, positive value to the right
-     * Examples: map = [1, 0, 3, 2] -> extendMap(-1) -> map = [0, 2, 1, 4, 3]
-     *           map = [1, 0, 3, 2] -> extendMap(1) -> map = [1, 0, 3, 2, 4]
-     *
-     * This is used to extend the key-buffer passed to setMapFromCodes with additional keys, without
-     * having to restore the original unsorted key-sequence.
-     */
-    template<class Vector>
-    void extendMap(std::make_signed_t<IndexType> shifts, Vector& scratch)
+    //! @brief extend the ordering buffer to an additional range
+    void extendMap(IndexType first, IndexType n)
     {
-        if (shifts == 0) { return; }
-
-        auto newMapSize = mapSize_ + std::abs(shifts);
-        reallocateBytes(scratch, newMapSize * sizeof(IndexType), 1.0);
-        auto* tempMap = reinterpret_cast<IndexType*>(scratch.data());
-
-        if (shifts < 0)
-        {
-            std::iota(tempMap, tempMap - shifts, IndexType(0));
-            std::transform(ordering(), ordering() + mapSize_, tempMap - shifts,
-                           [shifts](auto x) { return x - shifts; });
-        }
-        else if (shifts > 0)
-        {
-            omp_copy(ordering(), ordering() + mapSize_, tempMap);
-            std::iota(tempMap + mapSize_, tempMap + newMapSize, mapSize_);
-        }
-        reallocateBytes(buffer_, newMapSize * sizeof(IndexType), 1.0);
-        omp_copy(tempMap, tempMap + newMapSize, ordering());
-        mapSize_ = newMapSize;
+        std::iota(ordering() + first, ordering() + first + n, IndexType(first));
     }
 
 private:
@@ -197,7 +164,6 @@ private:
 
     //! @brief reference to (non-owning) buffer for ordering
     BufferType& buffer_;
-    std::size_t mapSize_{0};
 };
 
 } // namespace cstone
