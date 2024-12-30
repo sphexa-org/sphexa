@@ -338,26 +338,18 @@ public:
         BufferDescription exDesc{prevBufDesc_.start, prevBufDesc_.end, exSize};
         auto envelope = domain_exchange::assignedEnvelope(exDesc, global_.numAssigned() - global_.numPresent());
 
-        // the intermediate, reconstructed ordering needed for the MPI particle exchange
-        std::vector<LocalIndex> prevOrd(prevBufDesc_.end - prevBufDesc_.start);
-        // the post-exchange ordering that was obtained by sorting after receiving the particles from domain exchange
-        std::vector<LocalIndex> orderingCpu;
-
         auto* ord = (LocalIndex*)rawPtr(ordering) + envelope[0];
+        std::vector<LocalIndex> orderingCpu;
         if constexpr (HaveGpu<Accelerator>{})
         {
             static_assert(IsDeviceVector<OVec>{}, "Need ordering on GPU for GPU-accelerated domain");
             orderingCpu.resize(envelope[1] - envelope[0]);
-            memcpyD2H((LocalIndex*)rawPtr(ordering), orderingCpu.size(), orderingCpu.data());
+            memcpyD2H(ord, orderingCpu.size(), orderingCpu.data());
             ord = orderingCpu.data();
         }
 
-        std::copy(ord, ord + global_.numSendDown(), prevOrd.data());
-        std::copy(ord + global_.numSendDown() + global_.numAssigned(), ord + envelope[1] - envelope[0],
-                  prevOrd.data() + global_.numSendDown() + global_.numPresent());
-
-        std::apply([exDesc, o = prevOrd.data(), &sendBuffer, &receiveBuffer, this](auto&... a)
-                   { global_.redoExchange(exDesc, o, sendBuffer, receiveBuffer, rawPtr(a)...); },
+        std::apply([exDesc, ord, &sendBuffer, &receiveBuffer, this](auto&... a)
+                   { global_.redoExchange(exDesc, ord, sendBuffer, receiveBuffer, rawPtr(a)...); },
                    arrays);
 
         lowMemReallocate(bufDesc_.size, allocGrowthRate_, arrays, std::tie(sendBuffer, receiveBuffer));
