@@ -213,6 +213,16 @@ SendRanges createSendRanges(const SfcAssignment<KeyType>& assignment, std::span<
     return ret;
 }
 
+//! @brief translate send ranges indexed in o1 ordering to o2 ordering
+inline SendRanges shiftSendRanges(SendRanges ranges, int thisRank, LocalIndex numIncoming)
+{
+    for (int rank = thisRank + 1; rank <= ranges.numRanks(); ++rank)
+    {
+        ranges[rank] += numIncoming;
+    }
+    return ranges;
+}
+
 /*! @brief return @p numRanks equal length SFC segments for initial domain decomposition
  *
  * @tparam KeyType

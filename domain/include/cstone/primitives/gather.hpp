@@ -155,6 +155,7 @@ public:
     //! @brief extend the ordering buffer to an additional range
     void extendMap(IndexType first, IndexType n)
     {
+        reallocateBytes(buffer_, sizeof(IndexType) * (first + n), 1.0);
         std::iota(ordering() + first, ordering() + first + n, IndexType(first));
     }
 
