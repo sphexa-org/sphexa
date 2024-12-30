@@ -55,19 +55,16 @@ void reallocate(std::size_t size, double growthRate, Arrays&... arrays)
  * @param[in]    numBytes  minimum buffer size in bytes of @a vec
  * @return                 number of elements (vec.size(), not bytes) of supplied argument vector
  *
- * Note: previous content is destroyed
+ * Note: does not decrease the size of @p vec
  */
 template<class Vector>
-size_t reallocateBytes(Vector& vec, size_t numBytes, float growthRate)
+size_t reallocateBytes(Vector& vec, size_t numBytes, double growthRate)
 {
     constexpr size_t elementSize = sizeof(typename Vector::value_type);
     size_t originalSize          = vec.size();
 
     size_t currentSizeBytes = originalSize * elementSize;
-    if (currentSizeBytes < numBytes)
-    {
-        reallocateDestructive(vec, (numBytes + elementSize - 1) / elementSize, growthRate);
-    }
+    if (currentSizeBytes < numBytes) { reallocate(vec, (numBytes + elementSize - 1) / elementSize, growthRate); }
 
     return originalSize;
 }

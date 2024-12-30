@@ -155,7 +155,7 @@ public:
         auto numRecv   = numAssigned() - numPresent();
         auto recvStart = domain_exchange::receiveStart(o1e, numRecv);
         exchangeParticlesGpu(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, sendScratch,
-                             receiveScratch, sfcSorter.getMap(), x, y, z, properties...);
+                             receiveScratch, sfcSorter.getMap() + o1e.start, x, y, z, properties...);
 
         auto [newStart, newEnd] = domain_exchange::assignedEnvelope(o1e, numAssigned() - numPresent());
         LocalIndex envelopeSize = newEnd - newStart;
@@ -173,9 +173,10 @@ public:
     auto redoExchange(
         BufferDescription o1e, const LocalIndex* ordering, SVec& /*s1*/, SVec& /*s2*/, Arrays... properties) const
     {
-        auto numRecv   = numAssigned() - numPresent();
-        auto recvStart = domain_exchange::receiveStart(o1e, numRecv);
-        exchangeParticles(1, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, ordering, properties...);
+        auto numRecv    = numAssigned() - numPresent();
+        auto recvStart  = domain_exchange::receiveStart(o1e, numRecv);
+        auto exchangeO2 = shiftSendRanges(exchanges_, myRank_, numRecv);
+        exchangeParticles(1, recvLog_, exchangeO2, myRank_, recvStart, recvStart + numRecv, ordering, properties...);
     }
 
     //! @brief read only visibility of the global octree leaves to the outside

@@ -118,12 +118,9 @@ exchangeBufferSize(BufferDescription bufDesc, LocalIndex numPresent, LocalIndex 
 }
 
 //! @brief The index range that contains the locally assigned particles. Can contain left-over particles too.
-[[maybe_unused]] static util::array<LocalIndex, 2>
-assignedEnvelope(BufferDescription bufDesc, LocalIndex numIncoming)
+[[maybe_unused]] static util::array<LocalIndex, 2> assignedEnvelope(BufferDescription bufDesc, LocalIndex numIncoming)
 {
     bool fitHead = bufDesc.start >= numIncoming;
-    assert(fitHead || /*fitTail*/ bufDesc.size - bufDesc.end >= numIncoming);
-
     if (fitHead) { return {bufDesc.start - numIncoming, bufDesc.end}; }
     else { return {bufDesc.start, bufDesc.end + numIncoming}; }
 }
