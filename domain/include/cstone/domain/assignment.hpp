@@ -137,15 +137,15 @@ public:
                     Arrays... particleProperties) const
     {
         recvLog_.clear();
-        exchangeParticles(0, recvLog_, exchanges_, myRank_, bufDesc, numAssigned(), reorderFunctor.getMap(), x, y, z,
-                          particleProperties...);
+
+        auto numRecv   = numAssigned() - numPresent();
+        auto recvStart = domain_exchange::receiveStart(bufDesc, numRecv);
+        exchangeParticles(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, bufDesc.start,
+                          reorderFunctor.getMap(), x, y, z, particleProperties...);
 
         auto [newStart, newEnd] = domain_exchange::assignedEnvelope(bufDesc, numPresent(), numAssigned());
         LocalIndex envelopeSize = newEnd - newStart;
         std::span<KeyType> keyView(keys + newStart, envelopeSize);
-
-        auto recvStart = domain_exchange::receiveStart(bufDesc, numPresent(), numAssigned());
-        auto numRecv   = numAssigned() - numPresent();
 
         computeSfcKeys(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv, box_);
         std::make_signed_t<LocalIndex> shifts = -numRecv;
@@ -160,13 +160,16 @@ public:
 
     //! @brief repeat exchange from last call to assign()
     template<class SVec, class... Arrays>
-    auto redoExchange(BufferDescription bufDesc,
+    auto redoExchange(BufferDescription o1e,
                       const LocalIndex* ordering,
                       SVec& /*sendScratch*/,
                       SVec& /*receiveScratch*/,
                       Arrays... particleProperties) const
     {
-        exchangeParticles(1, recvLog_, exchanges_, myRank_, bufDesc, numAssigned(), ordering, particleProperties...);
+        auto numRecv   = numAssigned() - numPresent();
+        auto recvStart = domain_exchange::receiveStart(o1e, numRecv);
+        exchangeParticles(1, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, o1e.start, ordering,
+                          particleProperties...);
     }
 
     //! @brief read only visibility of the global octree leaves to the outside

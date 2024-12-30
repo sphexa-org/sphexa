@@ -108,11 +108,8 @@ exchangeBufferSize(BufferDescription bufDesc, LocalIndex numPresent, LocalIndex 
 }
 
 //! @brief return the index where particles from remote ranks will be received
-[[maybe_unused]] static LocalIndex
-receiveStart(BufferDescription bufDesc, LocalIndex numPresent, LocalIndex numAssigned)
+[[maybe_unused]] static LocalIndex receiveStart(BufferDescription bufDesc, LocalIndex numIncoming)
 {
-    LocalIndex numIncoming = numAssigned - numPresent;
-
     bool fitHead = bufDesc.start >= numIncoming;
     assert(fitHead || /*fitTail*/ bufDesc.size - bufDesc.end >= numIncoming);
 
@@ -146,7 +143,7 @@ void extractLocallyOwnedImpl(BufferDescription bufDesc,
     gatherCpu({ordering, numPresent}, buffer.data() + bufDesc.start, temp.data());
 
     // extract what we received during the exchange
-    LocalIndex rStart = receiveStart(bufDesc, numPresent, numAssigned);
+    LocalIndex rStart = receiveStart(bufDesc, numAssigned - numPresent);
     std::copy_n(buffer.data() + rStart, numAssigned - numPresent, temp.data() + numPresent);
     swap(temp, buffer);
 }

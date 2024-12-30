@@ -41,23 +41,21 @@ inline char* decodeSendCount(char* recvPtr, size_t* count, size_t alignment)
 
 /*! @brief exchange array elements with other ranks according to the specified ranges
  *
- * @tparam Arrays                  pointers to particles buffers
- * @param[in] epoch                MPI tag offset to avoid mix-ups of message from consecutive function calls
- * @param[in] receiveLog           List of received messages in previous calls to replicate resulting buffer layout
- * @param[in] sendList             List of index ranges to be sent to each rank, indices
- *                                 are valid w.r.t to arrays present on @p thisRank relative to @p particleStart.
- * @param[in] thisRank             Rank of the executing process
- * @param[in] particleStart        start index of locally owned particles prior to exchange
- * @param[in] particleEnd          end index of locally owned particles prior to exchange
- * @param[in] arraySize            size of @p arrays
- * @param[in] numParticlesAssigned New number of assigned particles for each array on @p thisRank.
- * @param[-]  sendScratchBuffer    resizable device vector for temporary usage
- * @param[-]  sendReceiveBuffer    resizable device vector for temporary usage
- * @param[in] ordering             Ordering to access arrays, valid w.r.t to [particleStart:particleEnd], ON DEVICE.
- * @param[inout] arrays            Pointers of different types but identical sizes. The index range based exchange
- *                                 operations performed are identical for each input array. Upon completion, arrays will
- *                                 contain elements from the specified ranges and ranks.
- *                                 The order in which the incoming ranges are grouped is random. ON DEVICE.
+ * @tparam Arrays                 pointers to particles buffers
+ * @param[in] epoch               MPI tag offset to avoid mix-ups of message from consecutive function calls
+ * @param[in] receiveLog          List of received messages in previous calls to replicate resulting buffer layout
+ * @param[in] sends               List of index ranges to be sent to each rank, indices
+ *                                are valid w.r.t to arrays present on @p thisRank relative to @p particleStart.
+ * @param[in] thisRank            Rank of the executing process
+ * @param[in] receiveStart        start of receive index range where incoming particles in @p arrays will be placed
+ * @param[in] receiveEnd          end of receive range
+ * @param[-]  sendScratchBuffer   resizable device vector for temporary usage
+ * @param[-]  recvScratchBuffer   resizable device vector for temporary usage
+ * @param[in] ordering            Ordering to access arrays, valid w.r.t to [particleStart:particleEnd], ON DEVICE.
+ * @param[inout] arrays           Pointers of different types but identical sizes. The index range based exchange
+ *                                operations performed are identical for each input array. Upon completion, arrays will
+ *                                contain elements from the specified ranges and ranks.
+ *                                The order in which the incoming ranges are grouped is random. ON DEVICE.
  *
  *  Example: If sendList[ri] contains the range [upper, lower), all elements (arrays+inputOffset)[ordering[upper:lower]]
  *           will be sent to rank ri. At the destination ri, the incoming elements
@@ -71,10 +69,11 @@ void exchangeParticlesGpu(int epoch,
                           ExchangeLog& receiveLog,
                           const SendRanges& sends,
                           int thisRank,
-                          BufferDescription bufDesc,
-                          LocalIndex numParticlesAssigned,
+                          LocalIndex receiveStart,
+                          LocalIndex receiveEnd,
+                          LocalIndex o1start,
                           DeviceVector& sendScratchBuffer,
-                          DeviceVector& receiveScratchBuffer,
+                          DeviceVector& recvScratchBuffer,
                           const LocalIndex* ordering,
                           Arrays... arrays)
 {
@@ -103,17 +102,13 @@ void exchangeParticlesGpu(int epoch,
 
         encodeSendCount(sendCount, sendPtr);
         size_t numBytes = headerBytes + packArrays<alignment>(gatherGpuL, ordering + sendStart, sendCount,
-                                                              sendPtr + headerBytes, arrays + bufDesc.start...);
+                                                              sendPtr + headerBytes, arrays + o1start...);
         checkGpuErrors(cudaDeviceSynchronize());
         mpiSendGpuDirect(sendPtr, numBytes, destinationRank, domExTag, sendRequests, sendBuffers);
         sendPtr += numBytes;
     }
 
-    LocalIndex numParticlesPresent = sends.count(thisRank);
-    LocalIndex receiveStart        = domain_exchange::receiveStart(bufDesc, numParticlesPresent, numParticlesAssigned);
-    LocalIndex receiveEnd          = receiveStart + numParticlesAssigned - numParticlesPresent;
-
-    const size_t oldRecvSize = receiveScratchBuffer.size();
+    const size_t oldRecvSize = recvScratchBuffer.size();
     while (receiveStart != receiveEnd)
     {
         MPI_Status status;
@@ -123,8 +118,8 @@ void exchangeParticlesGpu(int epoch,
         MPI_Get_count(&status, MpiType<TransferType>{}, &receiveCountTransfer);
 
         size_t receiveCountBytes = receiveCountTransfer * sizeof(TransferType);
-        reallocateBytes(receiveScratchBuffer, receiveCountBytes, allocGrowthRate);
-        char* receiveBuffer = reinterpret_cast<char*>(rawPtr(receiveScratchBuffer));
+        reallocateBytes(recvScratchBuffer, receiveCountBytes, allocGrowthRate);
+        char* receiveBuffer = reinterpret_cast<char*>(rawPtr(recvScratchBuffer));
         mpiRecvGpuDirect(reinterpret_cast<TransferType*>(receiveBuffer), receiveCountTransfer, receiveRank, domExTag,
                          &status);
 
@@ -156,7 +151,7 @@ void exchangeParticlesGpu(int epoch,
     }
 
     reallocate(sendScratchBuffer, oldSendSize, 1.01);
-    reallocate(receiveScratchBuffer, oldRecvSize, 1.01);
+    reallocate(recvScratchBuffer, oldRecvSize, 1.01);
 
     // If this process is going to send messages with rank/tag combinations
     // already sent in this function, this can lead to messages being mixed up
