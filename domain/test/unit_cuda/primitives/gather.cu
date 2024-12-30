@@ -33,38 +33,12 @@ TEST(SfcSorterGpu, shiftMapLeft)
     DeviceVector<IndexType> obuf, keyBuf, valBuf;
     GpuSfcSorter<IndexType, DeviceVector<unsigned>> sorter(obuf);
 
-    sorter.setMapFromCodes<KeyType>({keys.data(), keys.size()}, 0, keyBuf, valBuf);
-    // map is [1 0 3 2]
+    sorter.setMapFromCodes<KeyType>({keys.data(), keys.size()}, 1, keyBuf, valBuf);
+    // map is [. 2 1 4 3]
 
-    {
-        DeviceVector ref = std::vector<IndexType>{1, 0, 3, 2};
-        EXPECT_EQ(obuf, ref);
-    }
-
-    sorter.extendMap(-1, keyBuf);
-
+    sorter.extendMap(0, 1);
     {
         DeviceVector ref = std::vector<IndexType>{0, 2, 1, 4, 3};
-        EXPECT_EQ(obuf, ref);
-    }
-}
-
-TEST(SfcSorterGpu, shiftMapRight)
-{
-    using KeyType   = unsigned;
-    using IndexType = unsigned;
-
-    DeviceVector<KeyType> keys = std::vector<KeyType>{2, 1, 5, 4};
-
-    DeviceVector<IndexType> obuf, keyBuf, valBuf;
-    GpuSfcSorter<IndexType, DeviceVector<unsigned>> sorter(obuf);
-
-    sorter.setMapFromCodes<KeyType>({keys.data(), keys.size()}, 0, keyBuf, valBuf);
-    // map is [1 0 3 2]
-
-    sorter.extendMap(1, keyBuf);
-    {
-        DeviceVector ref = std::vector<IndexType>{1, 0, 3, 2, 4};
         EXPECT_EQ(obuf, ref);
     }
 }
