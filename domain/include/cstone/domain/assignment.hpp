@@ -54,7 +54,7 @@ public:
 
     /*! @brief Update the global tree
      *
-     * @param[in]  bufDesc         Buffer description with range of assigned particles
+     * @param[in]  o1         Buffer description with range of assigned particles
      * @param[in]  reorderFunctor  records the SFC order of the owned input coordinates
      * @param[out] particleKeys    will contain sorted particle SFC keys in the range [bufDesc.start:bufDesc.end]
      * @param[in]  x               x coordinates
@@ -65,7 +65,7 @@ public:
      * This function does not modify / communicate any particle data.
      */
     template<class Reorderer, class Vector>
-    LocalIndex assign(BufferDescription bufDesc,
+    LocalIndex assign(BufferDescription o1,
                       Reorderer& reorderFunctor,
                       Vector& /*sratch0*/,
                       Vector& /*scratch1*/,
@@ -75,19 +75,18 @@ public:
                       const T* z)
     {
         // number of locally assigned particles to consider for global tree building
-        LocalIndex numParticles = bufDesc.end - bufDesc.start;
+        LocalIndex numParticles = o1.end - o1.start;
 
-        auto fittingBox = makeGlobalBox(x + bufDesc.start, y + bufDesc.start, z + bufDesc.start, numParticles, box_);
+        auto fittingBox = makeGlobalBox(x + o1.start, y + o1.start, z + o1.start, numParticles, box_);
         if (firstCall_) { box_ = fittingBox; }
         else { box_ = limitBoxShrinking(fittingBox, box_); }
 
         // compute SFC particle keys only for particles participating in tree build
-        std::span<KeyType> keyView(particleKeys + bufDesc.start, numParticles);
-        computeSfcKeys(x + bufDesc.start, y + bufDesc.start, z + bufDesc.start, sfcKindPointer(keyView.data()),
-                       numParticles, box_);
+        std::span<KeyType> keyView(particleKeys + o1.start, numParticles);
+        computeSfcKeys(x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numParticles, box_);
 
         // sort keys and keep track of ordering for later use
-        reorderFunctor.setMapFromCodes(keyView);
+        reorderFunctor.setMapFromCodes(keyView, o1.start);
 
         updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, nodeCounts_);
         if (firstCall_)
@@ -101,14 +100,14 @@ public:
         limitBoundaryShifts<KeyType>(assignment_, newAssignment, tree_.treeLeaves(), nodeCounts_);
         assignment_ = std::move(newAssignment);
 
-        exchanges_ = createSendRanges<KeyType>(assignment_, {particleKeys + bufDesc.start, numParticles});
+        exchanges_ = createSendRanges<KeyType>(assignment_, {particleKeys + o1.start, numParticles});
 
-        return domain_exchange::exchangeBufferSize(bufDesc, numPresent(), numAssigned());
+        return domain_exchange::exchangeBufferSize(o1, numPresent(), numAssigned());
     }
 
     /*! @brief Distribute particles to their assigned ranks based on previous assignment
      *
-     * @param[in]    bufDesc            Buffer description with range of assigned particles and total buffer size
+     * @param[in]    o1e            Buffer description with range of assigned particles and total buffer size
      * @param[inout] reorderFunctor     contains the ordering that accesses the range [particleStart:particleEnd]
      *                                  in SFC order
      * @param[in]    keys               particle SFC keys, sorted in [bufDesc.start:bufDesc.end]
@@ -126,7 +125,7 @@ public:
      * location. This saves us from having to move around data inside the buffers for a second time.
      */
     template<class Reorderer, class Vector, class... Arrays>
-    auto distribute(BufferDescription bufDesc,
+    auto distribute(BufferDescription o1e,
                     Reorderer& reorderFunctor,
                     Vector& s1,
                     Vector& /*scratch2*/,
@@ -139,37 +138,29 @@ public:
         recvLog_.clear();
 
         auto numRecv   = numAssigned() - numPresent();
-        auto recvStart = domain_exchange::receiveStart(bufDesc, numRecv);
-        exchangeParticles(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, bufDesc.start,
-                          reorderFunctor.getMap(), x, y, z, particleProperties...);
+        auto recvStart = domain_exchange::receiveStart(o1e, numRecv);
+        exchangeParticles(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv,
+                          reorderFunctor.getMap() + o1e.start, x, y, z, particleProperties...);
 
-        auto [newStart, newEnd] = domain_exchange::assignedEnvelope(bufDesc, numPresent(), numAssigned());
+        auto [newStart, newEnd] = domain_exchange::assignedEnvelope(o1e, numAssigned() - numPresent());
         LocalIndex envelopeSize = newEnd - newStart;
         std::span<KeyType> keyView(keys + newStart, envelopeSize);
 
         computeSfcKeys(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv, box_);
-        std::make_signed_t<LocalIndex> shifts = -numRecv;
-        if (newEnd > bufDesc.end) { shifts = numRecv; }
-        reorderFunctor.extendMap(shifts, s1);
-
-        // sort keys and keep track of the ordering
-        reorderFunctor.updateMap(keyView);
+        reorderFunctor.extendMap(recvStart, numRecv);
+        reorderFunctor.updateMap(keyView, newStart);
 
         return std::make_tuple(newStart, keyView.subspan(numSendDown(), numAssigned()));
     }
 
     //! @brief repeat exchange from last call to assign()
     template<class SVec, class... Arrays>
-    auto redoExchange(BufferDescription o1e,
-                      const LocalIndex* ordering,
-                      SVec& /*sendScratch*/,
-                      SVec& /*receiveScratch*/,
-                      Arrays... particleProperties) const
+    auto redoExchange(
+        BufferDescription o1e, const LocalIndex* ordering, SVec& /*s1*/, SVec& /*s2*/, Arrays... properties) const
     {
         auto numRecv   = numAssigned() - numPresent();
         auto recvStart = domain_exchange::receiveStart(o1e, numRecv);
-        exchangeParticles(1, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, o1e.start, ordering,
-                          particleProperties...);
+        exchangeParticles(1, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, ordering, properties...);
     }
 
     //! @brief read only visibility of the global octree leaves to the outside
@@ -183,6 +174,10 @@ public:
     //! @brief return the space filling curve rank assignment of the last call to @a assign()
     const SfcAssignment<KeyType>& assignment() const { return assignment_; }
 
+    LocalIndex o3start(BufferDescription o1) const
+    {
+        return domain_exchange::assignedEnvelope(o1, numAssigned() - numPresent())[0] + numSendDown();
+    }
     //! @brief number of local particles to be sent to lower ranks
     LocalIndex numSendDown() const { return exchanges_[myRank_]; }
     LocalIndex numPresent() const { return exchanges_.count(myRank_); }

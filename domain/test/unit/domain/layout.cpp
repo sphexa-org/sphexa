@@ -125,15 +125,14 @@ TEST(Layout, computeHaloReceiveList)
 
 TEST(Layout, gatherArrays)
 {
-    std::vector<LocalIndex> ordering{1, 0, 2, 3};
+    std::vector<LocalIndex> ordering{2, 1, 3, 4};
     std::vector<float> a{0., 1., 2., 3., 4.};
     std::vector<unsigned char> b{0, 1, 2, 3, 4};
 
     std::vector<float> scratch(a.size());
 
-    LocalIndex inOffset  = 1;
     LocalIndex outOffset = 1;
-    gatherArrays(gatherCpu, ordering.data(), ordering.size(), inOffset, outOffset, std::tie(a, b), std::tie(scratch));
+    gatherArrays(gatherCpu, {ordering.data(), ordering.size()}, outOffset, std::tie(a, b), std::tie(scratch));
 
     static_assert(not SmallerElementSize<0, std::vector<int>, std::tuple<std::vector<char>, std::vector<int>>>{});
     static_assert(SmallerElementSize<1, std::vector<int>, std::tuple<std::vector<char>, std::vector<int>>>{});
