@@ -77,7 +77,11 @@ public:
     auto gatherFunc() const { return gatherGpuL; }
 
     //! @brief extend the ordering buffer to an additional range
-    void extendMap(IndexType first, IndexType n) { sequenceGpu(ordering() + first, n, first); }
+    void extendMap(IndexType first, IndexType n)
+    {
+        reallocateBytes(buffer_, sizeof(IndexType) * (first + n), 1.0);
+        sequenceGpu(ordering() + first, n, first);
+    }
 
 private:
     IndexType* ordering() { return reinterpret_cast<IndexType*>(buffer_.data()); }
