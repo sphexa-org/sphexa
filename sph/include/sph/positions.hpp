@@ -35,7 +35,7 @@
 #include "cstone/sfc/box.hpp"
 #include "cstone/util/array.hpp"
 #include "cstone/util/tuple.hpp"
-#include "cstone/primitives/accel_switch.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 
 #include "sph/sph_gpu.hpp"
 #include "sph/eos.hpp"

@@ -62,10 +62,11 @@ protected:
     using MultipoleType = ryoanji::CartesianQuadrupole<Tmass>;
 
     using Acc       = typename DataType::AcceleratorType;
-    using MHolder_t = typename cstone::AccelSwitchType<Acc, MultipoleHolderCpu, MultipoleHolderGpu>::template type<
-        MultipoleType, DomainType, typename DataType::HydroData>;
+    using MHolder_t = std::conditional_t<cstone::HaveGpu<Acc>{},
+                                         MultipoleHolderGpu<MultipoleType, DomainType, typename DataType::HydroData>,
+                                         MultipoleHolderCpu<MultipoleType, DomainType, typename DataType::HydroData>>;
     template<class VType>
-    using AccVector = typename cstone::AccelSwitchType<Acc, std::vector, cstone::DeviceVector>::template type<VType>;
+    using AccVector = std::conditional_t<cstone::HaveGpu<Acc>{}, cstone::DeviceVector<VType>, std::vector<VType>>;
 
     MHolder_t mHolder_;
 
