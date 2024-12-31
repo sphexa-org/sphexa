@@ -32,6 +32,7 @@
 #pragma once
 
 #include "cstone/domain/assignment.hpp"
+#include "cstone/domain/layout.hpp"
 
 namespace sphexa
 {

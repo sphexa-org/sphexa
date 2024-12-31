@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "cstone/cuda/cuda_utils.hpp"
+#include "cstone/domain/exchange_keys.hpp"
 #include "cstone/domain/index_ranges.hpp"
 #include "cstone/domain/layout.hpp"
 #include "cstone/halos/exchange_halos.hpp"

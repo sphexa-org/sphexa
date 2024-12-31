@@ -20,17 +20,11 @@
 
 #include "cstone/cuda/cuda_utils.hpp"
 #include "cstone/domain/assignment.hpp"
-#ifdef USE_CUDA
-#include "cstone/domain/assignment_gpu.cuh"
-#include "cstone/primitives/gather.cuh"
-#endif
-#include "cstone/domain/exchange_keys.hpp"
 #include "cstone/domain/layout.hpp"
 #include "cstone/focus/octree_focus_mpi.hpp"
 #include "cstone/halos/halos.hpp"
 #include "cstone/primitives/gather.hpp"
 #include "cstone/primitives/primitives_acc.hpp"
-#include "cstone/traversal/collisions.hpp"
 #include "cstone/traversal/peers.hpp"
 #include "cstone/primitives/accel_switch.hpp"
 #include "cstone/sfc/box_mpi.hpp"
@@ -667,9 +661,7 @@ private:
     AccVector<LocalIndex> layoutAcc_;
     std::vector<LocalIndex> layout_;
 
-    using Distributor_t =
-        typename AccelSwitchType<Accelerator, GlobalAssignment, GlobalAssignmentGpu>::template type<KeyType, T>;
-    Distributor_t global_;
+    GlobalAssignment<KeyType, T, Accelerator> global_;
 
     Halos<KeyType, Accelerator> halos_{myRank_};
 
