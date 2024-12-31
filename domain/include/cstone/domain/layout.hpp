@@ -36,6 +36,7 @@
 
 #include "cstone/cuda/cuda_utils.hpp"
 #include "cstone/domain/domaindecomp.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/util/tuple_util.hpp"
 #include "cstone/util/type_list.hpp"
 
@@ -199,21 +200,21 @@ struct SmallerElementSize
 };
 
 //! @brief reorder with state-less function object
-template<class Gather, class... Arrays1, class... Arrays2>
-void gatherArrays(Gather&& gatherFunc,
-                  std::span<const LocalIndex> ordering,
+template<class... Arrays1, class... Arrays2>
+void gatherArrays(std::span<const LocalIndex> ordering,
                   LocalIndex outputOffset,
                   std::tuple<Arrays1&...> arrays,
                   std::tuple<Arrays2&...> scratchBuffers)
 {
-    auto reorderArray = [ordering, outputOffset, &gatherFunc, &scratchBuffers](auto& array)
+    auto reorderArray = [ordering, outputOffset, &scratchBuffers](auto& array)
     {
-        using VectorRef = decltype(array);
+        using VectorRef  = decltype(array);
+        using VectorType = std::decay_t<VectorRef>;
         if constexpr (util::Contains<VectorRef, std::tuple<Arrays2&...>>{})
         {
             auto& swapSpace = util::pickType<decltype(array)>(scratchBuffers);
             assert(swapSpace.size() == array.size());
-            gatherFunc(ordering, rawPtr(array), rawPtr(swapSpace) + outputOffset);
+            gatherAcc<IsDeviceVector<VectorType>{}>(ordering, rawPtr(array), rawPtr(swapSpace) + outputOffset);
             swap(swapSpace, array);
         }
         else
@@ -222,14 +223,9 @@ void gatherArrays(Gather&& gatherFunc,
             static_assert(i < sizeof...(Arrays2));
             assert(std::get<i>(scratchBuffers).size() == array.size());
 
-            auto* scratchSpace =
-                reinterpret_cast<typename std::decay_t<VectorRef>::value_type*>(rawPtr(std::get<i>(scratchBuffers)));
-            gatherFunc(ordering, rawPtr(array), scratchSpace);
-            if constexpr (IsDeviceVector<std::decay_t<VectorRef>>{})
-            {
-                memcpyD2D(scratchSpace, ordering.size(), rawPtr(array) + outputOffset);
-            }
-            else { omp_copy(scratchSpace, scratchSpace + ordering.size(), rawPtr(array) + outputOffset); }
+            auto* scratch = reinterpret_cast<typename VectorType::value_type*>(rawPtr(std::get<i>(scratchBuffers)));
+            gatherAcc<IsDeviceVector<VectorType>{}>(ordering, rawPtr(array), scratch);
+            copy_n<IsDeviceVector<VectorType>{}>(scratch, ordering.size(), rawPtr(array) + outputOffset);
         }
     };
 
