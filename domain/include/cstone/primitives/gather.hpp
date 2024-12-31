@@ -123,7 +123,7 @@ void gatherScatter(std::span<const IndexType> gmap, std::span<const IndexType> s
     }
 }
 
-template<class IndexType, class BufferType>
+template<class BufferType>
 class SfcSorter
 {
 public:
@@ -134,18 +134,18 @@ public:
 
     SfcSorter(const SfcSorter&) = delete;
 
-    const IndexType* getMap() const { return ordering(); }
+    const LocalIndex* getMap() const { return ordering(); }
 
     template<class KeyType, class KeyBuf, class ValueBuf>
-    void setMapFromCodes(std::span<KeyType> keys, IndexType offset, KeyBuf&, ValueBuf&)
+    void setMapFromCodes(std::span<KeyType> keys, LocalIndex offset, KeyBuf&, ValueBuf&)
     {
-        reallocateBytes(buffer_, (keys.size() + offset) * sizeof(IndexType), 1.0);
+        reallocateBytes(buffer_, (keys.size() + offset) * sizeof(LocalIndex), 1.0);
         std::iota(ordering() + offset, ordering() + offset + keys.size(), offset);
         sort_by_key(keys.begin(), keys.end(), ordering() + offset);
     }
 
     template<class KeyType, class KeyBuf, class ValueBuf>
-    void updateMap(std::span<KeyType> keys, IndexType offset, KeyBuf&, ValueBuf&)
+    void updateMap(std::span<KeyType> keys, LocalIndex offset, KeyBuf&, ValueBuf&)
     {
         sort_by_key(keys.begin(), keys.end(), ordering() + offset);
     }
@@ -153,15 +153,15 @@ public:
     auto gatherFunc() const { return gatherCpu; }
 
     //! @brief extend the ordering buffer to an additional range
-    void extendMap(IndexType first, IndexType n)
+    void extendMap(LocalIndex first, LocalIndex n)
     {
-        reallocateBytes(buffer_, sizeof(IndexType) * (first + n), 1.0);
-        std::iota(ordering() + first, ordering() + first + n, IndexType(first));
+        reallocateBytes(buffer_, sizeof(LocalIndex) * (first + n), 1.0);
+        std::iota(ordering() + first, ordering() + first + n, LocalIndex(first));
     }
 
 private:
-    IndexType* ordering() { return reinterpret_cast<IndexType*>(buffer_.data()); }
-    const IndexType* ordering() const { return reinterpret_cast<const IndexType*>(buffer_.data()); }
+    LocalIndex* ordering() { return reinterpret_cast<LocalIndex*>(buffer_.data()); }
+    const LocalIndex* ordering() const { return reinterpret_cast<const LocalIndex*>(buffer_.data()); }
 
     //! @brief reference to (non-owning) buffer for ordering
     BufferType& buffer_;

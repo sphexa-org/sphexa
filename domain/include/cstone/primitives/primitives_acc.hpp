@@ -16,11 +16,24 @@
 #pragma once
 
 #include <algorithm>
+#include <type_traits>
 
 #include "cstone/primitives/primitives_gpu.h"
 
 namespace cstone
 {
+
+struct CpuTag
+{
+};
+struct GpuTag
+{
+};
+
+template<class AccType>
+struct HaveGpu : public std::integral_constant<int, std::is_same_v<AccType, GpuTag>>
+{
+};
 
 template<bool useGpu, class T>
 void fill(T* first, T* last, T value)

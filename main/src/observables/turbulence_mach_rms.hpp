@@ -25,8 +25,6 @@
 
 #include <mpi.h>
 
-#include "cstone/primitives/accel_switch.hpp"
-
 #include "io/file_utils.hpp"
 #include "conserved_quantities.hpp"
 #include "gpu_reductions.h"
