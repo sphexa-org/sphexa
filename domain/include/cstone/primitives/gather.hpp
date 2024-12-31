@@ -134,22 +134,8 @@ public:
 
     SfcSorter(const SfcSorter&) = delete;
 
-    const LocalIndex* getMap() const { return ordering(); }
-
-    template<class KeyType, class KeyBuf, class ValueBuf>
-    void sortByKey(std::span<KeyType> keys, LocalIndex offset, KeyBuf&, ValueBuf&)
-    {
-        sort_by_key(keys.begin(), keys.end(), ordering() + offset);
-    }
-
-    //! @brief extend the ordering buffer to an additional range
-    void sequence(LocalIndex first, LocalIndex n)
-    {
-        reallocateBytes(buffer_, sizeof(LocalIndex) * (first + n), 1.0);
-        std::iota(ordering() + first, ordering() + first + n, LocalIndex(first));
-    }
-
-    auto gatherFunc() const { return gatherCpu; }
+    LocalIndex* getMap() { return ordering(); }
+    BufferType& getBuf() { return buffer_; }
 
 private:
     LocalIndex* ordering() { return reinterpret_cast<LocalIndex*>(buffer_.data()); }
