@@ -28,7 +28,6 @@
 #ifdef USE_CUDA
 #include "cstone/domain/domaindecomp_gpu.cuh"
 #include "cstone/domain/domaindecomp_mpi_gpu.cuh"
-#include "cstone/primitives/gather.cuh"
 #endif
 
 namespace cstone
@@ -102,8 +101,8 @@ public:
         // compute SFC particle keys only for particles participating in tree build
         std::span<KeyType> keyView(particleKeys + o1.start, numPart);
         computeSfcKeys<gpu>(x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numPart, box_);
-        reorderFunctor.sequence(o1.start, numPart);
-        reorderFunctor.sortByKey(keyView, o1.start, s0, s1);
+        sequence<gpu>(o1.start, numPart, reorderFunctor.getBuf(), growthRate_);
+        sortByKey<gpu>(keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_);
 
         updateOctreeGlobal<gpu, KeyType>(keyView, bucketSize_, tree_, d_csTree_, nodeCounts_, d_nodeCounts_);
         if (firstCall_)
@@ -133,8 +132,8 @@ public:
      * @param[in]    o1e                Buffer description with range of assigned particles and total buffer size
      * @param[inout] reorderFunctor     contains the ordering that accesses the range [particleStart:particleEnd]
      *                                  in SFC order
-     * @param[-]     sendScratch        scratch space for send buffers
-     * @param[-]     receiveScratch     scratch space for receive buffers
+     * @param[-]     s0        scratch space for send buffers
+     * @param[-]     s1     scratch space for receive buffers
      * @param[in]    keys               particle SFC keys, sorted in [bufDesc.start:bufDesc.end]
      * @param[inout] x                  particle x-coordinates
      * @param[inout] y                  particle y-coordinates
@@ -152,8 +151,8 @@ public:
     template<class Reorderer, class Vector, class... Arrays>
     auto distribute(BufferDescription o1e,
                     Reorderer& reorderFunctor,
-                    Vector& sendScratch,
-                    Vector& receiveScratch,
+                    Vector& s0,
+                    Vector& s1,
                     KeyType* keys,
                     T* x,
                     T* y,
@@ -166,8 +165,8 @@ public:
         auto recvStart = domain_exchange::receiveStart(o1e, numRecv);
         if constexpr (gpu)
         {
-            exchangeParticlesGpu(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, sendScratch,
-                                 receiveScratch, reorderFunctor.getMap() + o1e.start, x, y, z, properties...);
+            exchangeParticlesGpu(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, s0, s1,
+                                 reorderFunctor.getMap() + o1e.start, x, y, z, properties...);
         }
         else
         {
@@ -181,8 +180,8 @@ public:
 
         computeSfcKeys<gpu>(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv,
                             box_);
-        reorderFunctor.sequence(recvStart, numRecv);
-        reorderFunctor.sortByKey(keyView, newStart, sendScratch, receiveScratch);
+        sequence<gpu>(recvStart, numRecv, reorderFunctor.getBuf(), growthRate_);
+        sortByKey<gpu>(keyView, std::span{reorderFunctor.getMap() + newStart, keyView.size()}, s0, s1, growthRate_);
 
         return std::make_tuple(newStart, keyView.subspan(numSendDown(), numAssigned()));
     }
@@ -252,6 +251,7 @@ private:
     AccVector<KeyType> d_csTree_;
 
     bool firstCall_{true};
+    double growthRate_{1.05};
 };
 
 } // namespace cstone
