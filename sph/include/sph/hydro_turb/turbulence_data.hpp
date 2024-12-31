@@ -37,7 +37,7 @@
 
 #include "cstone/cuda/device_vector.h"
 #include "cstone/cuda/cuda_utils.hpp"
-#include "cstone/primitives/accel_switch.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 
 #include "sph/hydro_turb/create_modes.hpp"
 
@@ -47,9 +47,7 @@ namespace sph
 template<class T, class Accelerator>
 class TurbulenceData
 {
-    // resulting type is a thrust::device_vector if the Accelerator is a GPU, otherwise a std::vector
-    using DeviceVector =
-        typename cstone::AccelSwitchType<Accelerator, std::vector, cstone::DeviceVector>::template type<T>;
+    using AccVector = std::conditional_t<cstone::HaveGpu<Accelerator>{}, cstone::DeviceVector<T>, std::vector<T>>;
 
 public:
     using RealType = T;
@@ -81,10 +79,10 @@ public:
     std::vector<T> phasesReal;
     std::vector<T> phasesImag;
 
-    DeviceVector d_modes;
-    DeviceVector d_amplitudes;
-    DeviceVector d_phasesReal;
-    DeviceVector d_phasesImag;
+    AccVector d_modes;
+    AccVector d_amplitudes;
+    AccVector d_phasesReal;
+    AccVector d_phasesImag;
 
     //! @brief load or store all stateful turbulence data with file-based IO
     template<class Archive>

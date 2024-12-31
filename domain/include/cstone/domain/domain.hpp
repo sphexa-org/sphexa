@@ -26,7 +26,6 @@
 #include "cstone/primitives/gather.hpp"
 #include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/traversal/peers.hpp"
-#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/sfc/box_mpi.hpp"
 #include "cstone/sfc/sfc.hpp"
 #include "cstone/sfc/sfc_gpu.h"
@@ -36,10 +35,7 @@
 namespace cstone
 {
 
-template<class KeyType, class T>
-class GlobalAssignmentGpu;
-
-template<class IndexType, class BufferType>
+template<class BufferType>
 class GpuSfcSorter;
 
 template<class KeyType, class T, class Accelerator = CpuTag>
@@ -49,11 +45,11 @@ class Domain
 
     //! @brief A vector template that resides on the hardware specified as Accelerator
     template<class ValueType>
-    using AccVector = typename AccelSwitchType<Accelerator, std::vector, DeviceVector>::template type<ValueType>;
+    using AccVector = std::conditional_t<HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
 
     template<class BufferType>
     using ReorderFunctor_t =
-        typename AccelSwitchType<Accelerator, SfcSorter, GpuSfcSorter>::template type<LocalIndex, BufferType>;
+        std::conditional_t<HaveGpu<Accelerator>{}, GpuSfcSorter<BufferType>, SfcSorter<BufferType>>;
 
 public:
     //! @brief floating point type used for the coordinate bounding box and geometric/mass centers of tree nodes
