@@ -18,7 +18,7 @@
 #include <utility>
 
 #include "cstone/cuda/device_vector.h"
-#include "cstone/primitives/accel_switch.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/tree/definitions.h"
 
 namespace cstone
@@ -38,7 +38,7 @@ template<class Accelerator>
 class GroupData
 {
     template<class T>
-    using AccVector = typename AccelSwitchType<Accelerator, std::vector, DeviceVector>::template type<T>;
+    using AccVector = std::conditional_t<HaveGpu<Accelerator>{}, DeviceVector<T>, std::vector<T>>;
 
 public:
     GroupData()                 = default;

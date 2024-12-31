@@ -30,7 +30,6 @@
 #include "cstone/primitives/primitives_gpu.h"
 #include "cstone/traversal/collisions.hpp"
 #include "cstone/traversal/collisions_gpu.h"
-#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/util/reallocate.hpp"
 
 namespace cstone
