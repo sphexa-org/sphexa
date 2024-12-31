@@ -34,7 +34,7 @@
 #include "cstone/primitives/concat_vector.hpp"
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/primitives/mpi_cuda.cuh"
-#include "cstone/primitives/gather_acc.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/tree/csarray.hpp"
 #include "cstone/tree/csarray_gpu.h"
 #include "cstone/tree/octree.hpp"
