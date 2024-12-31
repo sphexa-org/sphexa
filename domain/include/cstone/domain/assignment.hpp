@@ -15,12 +15,22 @@
 
 #pragma once
 
+#include "cstone/cuda/device_vector.h"
+#include "cstone/domain/domaindecomp.hpp"
 #include "cstone/domain/domaindecomp_mpi.hpp"
-#include "cstone/domain/layout.hpp"
+#include "cstone/primitives/accel_switch.hpp"
+#include "cstone/primitives/primitives_gpu.h"
 #include "cstone/tree/octree.hpp"
 #include "cstone/tree/update_mpi.hpp"
+#include "cstone/tree/update_mpi_gpu.cuh"
 #include "cstone/sfc/box_mpi.hpp"
 #include "cstone/sfc/sfc.hpp"
+#include "cstone/sfc/sfc_gpu.h"
+#ifdef USE_CUDA
+#include "cstone/domain/domaindecomp_gpu.cuh"
+#include "cstone/domain/domaindecomp_mpi_gpu.cuh"
+#include "cstone/primitives/gather.cuh"
+#endif
 
 namespace cstone
 {
@@ -34,9 +44,14 @@ namespace cstone
  * the assignment of that tree to the ranks and performs the necessary point-2-point data exchanges
  * to send all particles to their owning ranks.
  */
-template<class KeyType, class T>
+template<class KeyType, class T, class Accelerator = CpuTag>
 class GlobalAssignment
 {
+    template<class ValueType>
+    using AccVector = typename AccelSwitchType<Accelerator, std::vector, DeviceVector>::template type<ValueType>;
+
+    constexpr static bool gpu = HaveGpu<Accelerator>{};
+
 public:
     GlobalAssignment(int rank, int nRanks, unsigned bucketSize, const Box<T>& box)
         : myRank_(rank)
@@ -49,13 +64,17 @@ public:
         std::vector<KeyType> init = computeSpanningTree<KeyType>(initialBoundaries);
         tree_.update(init.data(), nNodes(init));
         nodeCounts_ = std::vector<unsigned>(nNodes(init), bucketSize_ - 1);
+
+        if constexpr (gpu) { reallocate(numRanks_ + 1, 1.0, d_boundaryKeys_, d_boundaryIndices_); }
     }
 
     /*! @brief Update the global tree
      *
-     * @param[in]  o1         Buffer description with range of assigned particles
+     * @param[in]  o1              buffer description with range of assigned particles
      * @param[in]  reorderFunctor  records the SFC order of the owned input coordinates
      * @param[out] particleKeys    will contain sorted particle SFC keys in the range [bufDesc.start:bufDesc.end]
+     * @param[-]   s0              device scratch vector
+     * @param[-]   s1              device scratch vector
      * @param[in]  x               x coordinates
      * @param[in]  y               y coordinates
      * @param[in]  z               z coordinates
@@ -66,32 +85,34 @@ public:
     template<class Reorderer, class Vector>
     LocalIndex assign(BufferDescription o1,
                       Reorderer& reorderFunctor,
-                      Vector& /*sratch0*/,
-                      Vector& /*scratch1*/,
+                      Vector& s0,
+                      Vector& s1,
                       KeyType* particleKeys,
                       const T* x,
                       const T* y,
                       const T* z)
     {
         // number of locally assigned particles to consider for global tree building
-        LocalIndex numParticles = o1.end - o1.start;
+        LocalIndex numPart = o1.end - o1.start;
 
-        auto fittingBox = makeGlobalBox(x + o1.start, y + o1.start, z + o1.start, numParticles, box_);
+        using Op        = std::conditional_t<HaveGpu<Accelerator>{}, MinMaxGpu<T>, MinMax<T>>;
+        auto fittingBox = makeGlobalBox<T, Op>(x + o1.start, y + o1.start, z + o1.start, numPart, box_);
         if (firstCall_) { box_ = fittingBox; }
         else { box_ = limitBoxShrinking(fittingBox, box_); }
 
         // compute SFC particle keys only for particles participating in tree build
-        std::span<KeyType> keyView(particleKeys + o1.start, numParticles);
-        computeSfcKeys(x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numParticles, box_);
+        std::span<KeyType> keyView(particleKeys + o1.start, numPart);
+        computeSfcKeys<gpu>(x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numPart, box_);
 
         // sort keys and keep track of ordering for later use
-        reorderFunctor.setMapFromCodes(keyView, o1.start);
+        reorderFunctor.setMapFromCodes(keyView, o1.start, s0, s1);
 
-        updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, nodeCounts_);
+        updateOctreeGlobal<gpu, KeyType>(keyView, bucketSize_, tree_, d_csTree_, nodeCounts_, d_nodeCounts_);
         if (firstCall_)
         {
             firstCall_ = false;
-            while (!updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, nodeCounts_))
+            while (
+                !updateOctreeGlobal<gpu, KeyType>(keyView, bucketSize_, tree_, d_csTree_, nodeCounts_, d_nodeCounts_))
                 ;
         }
 
@@ -99,21 +120,28 @@ public:
         limitBoundaryShifts<KeyType>(assignment_, newAssignment, tree_.treeLeaves(), nodeCounts_);
         assignment_ = std::move(newAssignment);
 
-        exchanges_ = createSendRanges<KeyType>(assignment_, keyView);
+        if constexpr (gpu)
+        {
+            exchanges_ =
+                createSendRangesGpu<KeyType>(assignment_, keyView, rawPtr(d_boundaryKeys_), rawPtr(d_boundaryIndices_));
+        }
+        else { exchanges_ = createSendRanges<KeyType>(assignment_, keyView); }
 
         return domain_exchange::exchangeBufferSize(o1, numPresent(), numAssigned());
     }
 
     /*! @brief Distribute particles to their assigned ranks based on previous assignment
      *
-     * @param[in]    o1e            Buffer description with range of assigned particles and total buffer size
+     * @param[in]    o1e                Buffer description with range of assigned particles and total buffer size
      * @param[inout] reorderFunctor     contains the ordering that accesses the range [particleStart:particleEnd]
      *                                  in SFC order
+     * @param[-]     sendScratch        scratch space for send buffers
+     * @param[-]     receiveScratch     scratch space for receive buffers
      * @param[in]    keys               particle SFC keys, sorted in [bufDesc.start:bufDesc.end]
      * @param[inout] x                  particle x-coordinates
      * @param[inout] y                  particle y-coordinates
      * @param[inout] z                  particle z-coordinates
-     * @param[inout] particleProperties remaining particle properties, h, m, etc.
+     * @param[inout] properties remaining particle properties, h, m, etc.
      * @return                          index denoting the index range start of particles post-exchange
      *                                  plus a span with a view of the assigned particle keys
      *
@@ -126,28 +154,37 @@ public:
     template<class Reorderer, class Vector, class... Arrays>
     auto distribute(BufferDescription o1e,
                     Reorderer& reorderFunctor,
-                    Vector& s1,
-                    Vector& /*scratch2*/,
+                    Vector& sendScratch,
+                    Vector& receiveScratch,
                     KeyType* keys,
                     T* x,
                     T* y,
                     T* z,
-                    Arrays... particleProperties) const
+                    Arrays... properties) const
     {
         recvLog_.clear();
 
         auto numRecv   = numAssigned() - numPresent();
         auto recvStart = domain_exchange::receiveStart(o1e, numRecv);
-        exchangeParticles(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv,
-                          reorderFunctor.getMap() + o1e.start, x, y, z, particleProperties...);
+        if constexpr (gpu)
+        {
+            exchangeParticlesGpu(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, sendScratch,
+                                 receiveScratch, reorderFunctor.getMap() + o1e.start, x, y, z, properties...);
+        }
+        else
+        {
+            exchangeParticles(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv,
+                              reorderFunctor.getMap() + o1e.start, x, y, z, properties...);
+        }
 
         auto [newStart, newEnd] = domain_exchange::assignedEnvelope(o1e, numAssigned() - numPresent());
         LocalIndex envelopeSize = newEnd - newStart;
         std::span<KeyType> keyView(keys + newStart, envelopeSize);
 
-        computeSfcKeys(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv, box_);
+        computeSfcKeys<gpu>(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv,
+                            box_);
         reorderFunctor.extendMap(recvStart, numRecv);
-        reorderFunctor.updateMap(keyView, newStart);
+        reorderFunctor.updateMap(keyView, newStart, sendScratch, receiveScratch);
 
         return std::make_tuple(newStart, keyView.subspan(numSendDown(), numAssigned()));
     }
@@ -164,11 +201,21 @@ public:
     }
 
     //! @brief read only visibility of the global octree leaves to the outside
-    std::span<const KeyType> treeLeaves() const { return tree_.treeLeaves(); }
+    std::span<const KeyType> treeLeaves() const
+    {
+        if (gpu) { return {rawPtr(d_csTree_), d_csTree_.size()}; }
+        else { return tree_.treeLeaves(); }
+    }
+
+    //! @brief read only visibility of the global octree leaf counts to the outside
+    std::span<const unsigned> nodeCounts() const
+    {
+        if (gpu) { return {rawPtr(d_nodeCounts_), d_nodeCounts_.size()}; }
+        else { return nodeCounts_; }
+    }
+
     //! @brief the octree, including the internal part
     const Octree<KeyType>& octree() const { return tree_; }
-    //! @brief read only visibility of the global octree leaf counts to the outside
-    std::span<const unsigned> nodeCounts() const { return nodeCounts_; }
     //! @brief the global coordinate bounding box
     const Box<T>& box() const { return box_; }
     //! @brief return the space filling curve rank assignment of the last call to @a assign()
@@ -195,10 +242,16 @@ private:
     SendRanges exchanges_;
     mutable ExchangeLog recvLog_;
 
+    AccVector<KeyType> d_boundaryKeys_;
+    AccVector<LocalIndex> d_boundaryIndices_;
+
     //! @brief leaf particle counts
     std::vector<unsigned> nodeCounts_;
+    AccVector<unsigned> d_nodeCounts_;
+
     //! @brief the fully linked octree
     Octree<KeyType> tree_;
+    AccVector<KeyType> d_csTree_;
 
     bool firstCall_{true};
 };
