@@ -136,16 +136,16 @@ public:
 
     const IndexType* getMap() const { return ordering(); }
 
-    template<class KeyType>
-    void setMapFromCodes(std::span<KeyType> keys, IndexType offset)
+    template<class KeyType, class KeyBuf, class ValueBuf>
+    void setMapFromCodes(std::span<KeyType> keys, IndexType offset, KeyBuf&, ValueBuf&)
     {
         reallocateBytes(buffer_, (keys.size() + offset) * sizeof(IndexType), 1.0);
         std::iota(ordering() + offset, ordering() + offset + keys.size(), offset);
         sort_by_key(keys.begin(), keys.end(), ordering() + offset);
     }
 
-    template<class KeyType>
-    void updateMap(std::span<KeyType> keys, IndexType offset)
+    template<class KeyType, class KeyBuf, class ValueBuf>
+    void updateMap(std::span<KeyType> keys, IndexType offset, KeyBuf&, ValueBuf&)
     {
         sort_by_key(keys.begin(), keys.end(), ordering() + offset);
     }
