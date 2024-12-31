@@ -21,6 +21,7 @@
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/tree/csarray_gpu.h"
 #include "cstone/tree/octree.hpp"
+#include "cstone/tree/update_mpi.hpp"
 
 namespace cstone
 {
@@ -65,6 +66,18 @@ bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
     memcpyH2D(counts.data(), counts.size(), rawPtr(d_counts));
 
     return converged;
+}
+
+template<bool useGpu, class KeyType, class DevKeyVec, class DevCountVec>
+bool updateOctreeGlobal(std::span<const KeyType> keys,
+                        unsigned bucketSize,
+                        Octree<KeyType>& tree,
+                        DevKeyVec& d_csTree,
+                        std::vector<unsigned>& counts,
+                        DevCountVec& d_counts)
+{
+    if constexpr (useGpu) { return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, counts, d_counts); }
+    else { return updateOctreeGlobal(keys, bucketSize, tree, counts); }
 }
 
 } // namespace cstone
