@@ -17,6 +17,7 @@
 
 #include <numeric>
 #include <span>
+#include <vector>
 
 #include "cstone/primitives/math.hpp"
 #include "cstone/util/array.hpp"
