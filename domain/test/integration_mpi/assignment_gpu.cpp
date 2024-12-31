@@ -26,11 +26,9 @@
 
 #include "gtest/gtest.h"
 
+#define USE_CUDA
 #include "coord_samples/random.hpp"
-#include "cstone/domain/assignment_gpu.cuh"
 #include "cstone/domain/assignment.hpp"
-
-#include "cstone/util/reallocate.hpp"
 
 using namespace cstone;
 
@@ -93,7 +91,7 @@ void randomGaussianAssignment(int rank, int numRanks)
     DeviceVector<T> d_y = y;
     DeviceVector<T> d_z = z;
 
-    GlobalAssignmentGpu<KeyType, T> assignmentGpu(rank, numRanks, bucketSize, box);
+    GlobalAssignment<KeyType, T, GpuTag> assignmentGpu(rank, numRanks, bucketSize, box);
     DeviceVector<unsigned> sfcScratch;
     GpuSfcSorter<LocalIndex, DeviceVector<unsigned>> deviceSort(sfcScratch);
 
