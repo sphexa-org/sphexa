@@ -137,27 +137,19 @@ public:
     const LocalIndex* getMap() const { return ordering(); }
 
     template<class KeyType, class KeyBuf, class ValueBuf>
-    void setMapFromCodes(std::span<KeyType> keys, LocalIndex offset, KeyBuf&, ValueBuf&)
-    {
-        reallocateBytes(buffer_, (keys.size() + offset) * sizeof(LocalIndex), 1.0);
-        std::iota(ordering() + offset, ordering() + offset + keys.size(), offset);
-        sort_by_key(keys.begin(), keys.end(), ordering() + offset);
-    }
-
-    template<class KeyType, class KeyBuf, class ValueBuf>
-    void updateMap(std::span<KeyType> keys, LocalIndex offset, KeyBuf&, ValueBuf&)
+    void sortByKey(std::span<KeyType> keys, LocalIndex offset, KeyBuf&, ValueBuf&)
     {
         sort_by_key(keys.begin(), keys.end(), ordering() + offset);
     }
-
-    auto gatherFunc() const { return gatherCpu; }
 
     //! @brief extend the ordering buffer to an additional range
-    void extendMap(LocalIndex first, LocalIndex n)
+    void sequence(LocalIndex first, LocalIndex n)
     {
         reallocateBytes(buffer_, sizeof(LocalIndex) * (first + n), 1.0);
         std::iota(ordering() + first, ordering() + first + n, LocalIndex(first));
     }
+
+    auto gatherFunc() const { return gatherCpu; }
 
 private:
     LocalIndex* ordering() { return reinterpret_cast<LocalIndex*>(buffer_.data()); }

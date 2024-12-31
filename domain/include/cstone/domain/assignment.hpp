@@ -102,9 +102,8 @@ public:
         // compute SFC particle keys only for particles participating in tree build
         std::span<KeyType> keyView(particleKeys + o1.start, numPart);
         computeSfcKeys<gpu>(x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numPart, box_);
-
-        // sort keys and keep track of ordering for later use
-        reorderFunctor.setMapFromCodes(keyView, o1.start, s0, s1);
+        reorderFunctor.sequence(o1.start, numPart);
+        reorderFunctor.sortByKey(keyView, o1.start, s0, s1);
 
         updateOctreeGlobal<gpu, KeyType>(keyView, bucketSize_, tree_, d_csTree_, nodeCounts_, d_nodeCounts_);
         if (firstCall_)
@@ -182,8 +181,8 @@ public:
 
         computeSfcKeys<gpu>(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv,
                             box_);
-        reorderFunctor.extendMap(recvStart, numRecv);
-        reorderFunctor.updateMap(keyView, newStart, sendScratch, receiveScratch);
+        reorderFunctor.sequence(recvStart, numRecv);
+        reorderFunctor.sortByKey(keyView, newStart, sendScratch, receiveScratch);
 
         return std::make_tuple(newStart, keyView.subspan(numSendDown(), numAssigned()));
     }

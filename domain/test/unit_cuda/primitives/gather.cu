@@ -33,10 +33,11 @@ TEST(SfcSorterGpu, shiftMapLeft)
     DeviceVector<IndexType> obuf, keyBuf, valBuf;
     GpuSfcSorter<DeviceVector<unsigned>> sorter(obuf);
 
-    sorter.setMapFromCodes<KeyType>({keys.data(), keys.size()}, 1, keyBuf, valBuf);
+    sorter.sequence(1, keys.size());
+    sorter.sortByKey<KeyType>({keys.data(), keys.size()}, 1, keyBuf, valBuf);
     // map is [. 2 1 4 3]
 
-    sorter.extendMap(0, 1);
+    sorter.sequence(0, 1);
     {
         DeviceVector ref = std::vector<IndexType>{0, 2, 1, 4, 3};
         EXPECT_EQ(obuf, ref);
