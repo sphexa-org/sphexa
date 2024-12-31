@@ -42,7 +42,8 @@ void CpuGatherTest()
 
     std::vector<unsigned> scratch, s0, s1;
     SfcSorter<std::vector<unsigned>> sorter(scratch);
-    sorter.setMapFromCodes(std::span(keys), 0, s0, s1);
+    sorter.sequence(0, keys.size());
+    sorter.sortByKey(std::span(keys), 0, s0, s1);
 
     {
         std::vector<KeyType> refCodes{0, 10, 20, 30, 40, 50, 60, 70, 80, 90};
