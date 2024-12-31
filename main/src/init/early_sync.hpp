@@ -77,8 +77,8 @@ void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector&
                                                            particleKeys.data(), x.data(), y.data(), z.data());
 
     scratch1.resize(x.size());
-    cstone::gatherArrays(sorter.gatherFunc(), {sorter.getMap() + distributor.o3start(o1), distributor.numAssigned()}, 0,
-                         std::tie(x, y, z), std::tie(scratch1));
+    cstone::gatherArrays({sorter.getMap() + distributor.o3start(o1), distributor.numAssigned()}, 0, std::tie(x, y, z),
+                         std::tie(scratch1));
     x.resize(keyView.size());
     y.resize(keyView.size());
     z.resize(keyView.size());

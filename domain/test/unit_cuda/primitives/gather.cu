@@ -19,25 +19,26 @@
 #include "gtest/gtest.h"
 
 #include <cstone/cuda/device_vector.h>
-#include "cstone/primitives/gather.cuh"
+#include "cstone/primitives/primitives_acc.hpp"
 
 using namespace cstone;
 
-TEST(SfcSorterGpu, shiftMapLeft)
+TEST(SortByKey, minimal)
 {
     using KeyType   = unsigned;
     using IndexType = unsigned;
 
     DeviceVector<KeyType> keys = std::vector<KeyType>{2, 1, 5, 4};
-
     DeviceVector<IndexType> obuf, keyBuf, valBuf;
-    GpuSfcSorter<DeviceVector<unsigned>> sorter(obuf);
 
-    sorter.sequence(1, keys.size());
-    sorter.sortByKey<KeyType>({keys.data(), keys.size()}, 1, keyBuf, valBuf);
+    constexpr bool gpu = true;
+
+    LocalIndex off = 1;
+    sequence<gpu>(off, keys.size(), obuf, 1.0);
+    sortByKey<gpu>(std::span{keys.data(), keys.size()}, std::span{obuf.data() + off, keys.size()}, keyBuf, valBuf, 1.0);
     // map is [. 2 1 4 3]
 
-    sorter.sequence(0, 1);
+    sequence<gpu>(0, off, obuf, 1.0);
     {
         DeviceVector ref = std::vector<IndexType>{0, 2, 1, 4, 3};
         EXPECT_EQ(obuf, ref);
