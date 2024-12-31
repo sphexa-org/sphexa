@@ -29,8 +29,6 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#include "cstone/primitives/accel_switch.hpp"
-
 #include "isim_init.hpp"
 
 #include "evrard_init.hpp"

@@ -18,7 +18,6 @@
 #include "cstone/cuda/device_vector.h"
 #include "cstone/domain/domaindecomp.hpp"
 #include "cstone/domain/domaindecomp_mpi.hpp"
-#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/primitives/primitives_gpu.h"
 #include "cstone/tree/octree.hpp"
 #include "cstone/tree/update_mpi.hpp"
@@ -48,7 +47,7 @@ template<class KeyType, class T, class Accelerator = CpuTag>
 class GlobalAssignment
 {
     template<class ValueType>
-    using AccVector = typename AccelSwitchType<Accelerator, std::vector, DeviceVector>::template type<ValueType>;
+    using AccVector = std::conditional_t<HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
 
     constexpr static bool gpu = HaveGpu<Accelerator>{};
 
