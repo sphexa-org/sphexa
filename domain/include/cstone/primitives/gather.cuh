@@ -46,7 +46,7 @@ void sortByKeyGpu(
     reallocate(valueBuf, s2, 1.0);
 }
 
-template<class IndexType, class BufferType>
+template<class BufferType>
 class GpuSfcSorter
 {
 public:
@@ -57,35 +57,35 @@ public:
 
     GpuSfcSorter(const GpuSfcSorter&) = delete;
 
-    const IndexType* getMap() const { return ordering(); }
+    const LocalIndex* getMap() const { return ordering(); }
 
     template<class KeyType, class KeyBuf, class ValueBuf>
-    void updateMap(std::span<KeyType> keys, IndexType offset, KeyBuf& keyBuf, ValueBuf& valueBuf)
+    void updateMap(std::span<KeyType> keys, LocalIndex offset, KeyBuf& keyBuf, ValueBuf& valueBuf)
     {
-        sortByKeyGpu<KeyType, IndexType>(keys, {ordering() + offset, keys.size()}, keyBuf, valueBuf, growthRate_);
+        sortByKeyGpu<KeyType, LocalIndex>(keys, {ordering() + offset, keys.size()}, keyBuf, valueBuf, growthRate_);
     }
 
     //! @brief sort given SFC keys on the device and determine reorder map based on sort order
     template<class KeyType, class KeyBuf, class ValueBuf>
-    void setMapFromCodes(std::span<KeyType> keys, IndexType offset, KeyBuf& keyBuf, ValueBuf& valueBuf)
+    void setMapFromCodes(std::span<KeyType> keys, LocalIndex offset, KeyBuf& keyBuf, ValueBuf& valueBuf)
     {
-        reallocateBytes(buffer_, (keys.size() + offset) * sizeof(IndexType), growthRate_);
+        reallocateBytes(buffer_, (keys.size() + offset) * sizeof(LocalIndex), growthRate_);
         sequenceGpu(ordering() + offset, keys.size(), offset);
-        sortByKeyGpu(keys, std::span<IndexType>(ordering() + offset, keys.size()), keyBuf, valueBuf, growthRate_);
+        sortByKeyGpu(keys, std::span<LocalIndex>(ordering() + offset, keys.size()), keyBuf, valueBuf, growthRate_);
     }
 
     auto gatherFunc() const { return gatherGpuL; }
 
     //! @brief extend the ordering buffer to an additional range
-    void extendMap(IndexType first, IndexType n)
+    void extendMap(LocalIndex first, LocalIndex n)
     {
-        reallocateBytes(buffer_, sizeof(IndexType) * (first + n), 1.0);
+        reallocateBytes(buffer_, sizeof(LocalIndex) * (first + n), 1.0);
         sequenceGpu(ordering() + first, n, first);
     }
 
 private:
-    IndexType* ordering() { return reinterpret_cast<IndexType*>(buffer_.data()); }
-    const IndexType* ordering() const { return reinterpret_cast<const IndexType*>(buffer_.data()); }
+    LocalIndex* ordering() { return reinterpret_cast<LocalIndex*>(buffer_.data()); }
+    const LocalIndex* ordering() const { return reinterpret_cast<const LocalIndex*>(buffer_.data()); }
 
     //! @brief reference to (non-owning) buffer for ordering
     BufferType& buffer_;

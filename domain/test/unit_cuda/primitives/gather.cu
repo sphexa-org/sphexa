@@ -31,7 +31,7 @@ TEST(SfcSorterGpu, shiftMapLeft)
     DeviceVector<KeyType> keys = std::vector<KeyType>{2, 1, 5, 4};
 
     DeviceVector<IndexType> obuf, keyBuf, valBuf;
-    GpuSfcSorter<IndexType, DeviceVector<unsigned>> sorter(obuf);
+    GpuSfcSorter<DeviceVector<unsigned>> sorter(obuf);
 
     sorter.setMapFromCodes<KeyType>({keys.data(), keys.size()}, 1, keyBuf, valBuf);
     // map is [. 2 1 4 3]

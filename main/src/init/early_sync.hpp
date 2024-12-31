@@ -64,8 +64,8 @@ void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector&
 
     cstone::GlobalAssignment<KeyType, T> distributor(rank, numRanks, bucketSize, globalBox);
 
-    std::vector<unsigned>                                        orderScratch;
-    cstone::SfcSorter<cstone::LocalIndex, std::vector<unsigned>> sorter(orderScratch);
+    std::vector<unsigned>                    orderScratch;
+    cstone::SfcSorter<std::vector<unsigned>> sorter(orderScratch);
 
     std::vector<T>       scratch1, scratch2;
     std::vector<KeyType> particleKeys(x.size());

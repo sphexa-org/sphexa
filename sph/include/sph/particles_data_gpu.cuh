@@ -35,8 +35,7 @@
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/device_vector.h"
 #include "cstone/fields/field_states.hpp"
-#include "cstone/primitives/primitives_gpu.h"
-#include "cstone/primitives/accel_switch.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/util/reallocate.hpp"
 
@@ -66,7 +65,7 @@ public:
         cudaStream_t stream;
     };
 
-    struct neighbors_stream d_stream[NST];
+    neighbors_stream d_stream[NST];
 
     /*! @brief Particle fields
      *

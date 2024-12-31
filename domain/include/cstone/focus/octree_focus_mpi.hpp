@@ -25,7 +25,6 @@
 #include "cstone/focus/source_center.hpp"
 #include "cstone/focus/source_center_gpu.h"
 #include "cstone/primitives/primitives_gpu.h"
-#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/traversal/collisions_gpu.h"
 
 namespace cstone
@@ -37,7 +36,7 @@ class FocusedOctree
 {
     //! @brief A vector template that resides on the hardware specified as Accelerator
     template<class ValueType>
-    using AccVector = typename AccelSwitchType<Accelerator, std::vector, DeviceVector>::template type<ValueType>;
+    using AccVector = std::conditional_t<HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
 
 public:
     /*! @brief constructor
