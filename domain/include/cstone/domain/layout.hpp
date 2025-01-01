@@ -146,7 +146,7 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
  * @param[in]  firstAssignedIdx  first focus leaf idx to treat as part of the assigned nodes on the executing rank
  * @param[in]  lastAssignedIdx   last focus leaf idx to treat as part of the assigned nodes on the executing rank
  * @param[out] layout            length N+1. The first element is zero, the last element is
- *                               equal to the sum of all all present (assigned+halo) node counts.
+ *                               equal to the sum of all present (assigned+halo) node counts.
  */
 inline void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
                               std::span<const int> haloFlags,
