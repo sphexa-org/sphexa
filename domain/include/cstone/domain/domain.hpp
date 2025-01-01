@@ -197,8 +197,7 @@ public:
         auto octreeView            = focusTree_.octreeViewAcc();
         const KeyType* focusLeaves = focusTree_.treeLeavesAcc().data();
 
-        reallocateDestructive(layout_, octreeView.numLeafNodes + 1, allocGrowthRate_);
-        reallocateDestructive(layoutAcc_, octreeView.numLeafNodes + 1, allocGrowthRate_);
+        reallocate(octreeView.numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
         halos_.discover(octreeView.prefixes, octreeView.childOffsets, octreeView.internalToLeaf, focusLeaves,
                         focusTree_.leafCountsAcc(), focusTree_.assignment(), {rawPtr(layoutAcc_), layoutAcc_.size()},
                         box(), rawPtr(h), haloSearchExt_, std::get<0>(scratch));
@@ -272,8 +271,7 @@ public:
             auto octreeView            = focusTree_.octreeViewAcc();
             const KeyType* focusLeaves = focusTree_.treeLeavesAcc().data();
 
-            reallocateDestructive(layout_, octreeView.numLeafNodes + 1, allocGrowthRate_);
-            reallocateDestructive(layoutAcc_, octreeView.numLeafNodes + 1, allocGrowthRate_);
+            reallocate(octreeView.numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
             halos_.discover(octreeView.prefixes, octreeView.childOffsets, octreeView.internalToLeaf, focusLeaves,
                             focusTree_.leafCountsAcc(), focusTree_.assignment(),
                             {rawPtr(layoutAcc_), layoutAcc_.size()}, box(), rawPtr(h), haloSearchExt_,
@@ -515,36 +513,26 @@ private:
         lowMemReallocate(newBufDesc.size, allocGrowthRate_, std::tuple_cat(orderedBuffers, unorderedBuffers),
                          scratchBuffers);
 
+        // copy or H2D upload
+        layoutAcc_ = layout_;
+
         // re-locate particle SFC keys
-        if constexpr (IsDeviceVector<KeyVec>{})
-        {
-            memcpyH2D(layout_.data(), layout_.size(), rawPtr(layoutAcc_));
-            auto& swapSpace = std::get<0>(scratchBuffers);
-            size_t origSize = reallocateBytes(swapSpace, keyView.size() * sizeof(KeyType), allocGrowthRate_);
-
-            auto* swapPtr = reinterpret_cast<KeyType*>(rawPtr(swapSpace));
-            memcpyD2D(keyView.data(), keyView.size(), swapPtr);
-            reallocate(keys, newBufDesc.size, allocGrowthRate_);
-            fill<true>(rawPtr(keys) + bufDesc_.size, rawPtr(keys) + newBufDesc.size, KeyType(0));
-            memcpyD2D(swapPtr, keyView.size(), rawPtr(keys) + newBufDesc.start);
-
-            reallocate(swapSpace, origSize, 1.0);
-        }
-        else
-        {
-            omp_copy(layout_.begin(), layout_.end(), layoutAcc_.begin());
-            reallocate(swapKeys_, newBufDesc.size, allocGrowthRate_);
-            fill<false>(rawPtr(swapKeys_) + bufDesc_.size, rawPtr(swapKeys_) + newBufDesc.size, KeyType(0));
-            omp_copy(keyView.begin(), keyView.end(), swapKeys_.begin() + newBufDesc.start);
-            swap(keys, swapKeys_);
-        }
+        constexpr int i = util::FindIndex<KeyVec&, std::tuple<Arrays3&...>, SmallerElementSize>{};
+        constexpr int j = (i >= sizeof...(Arrays3)) ? 0 : i;
+        auto& swapSpace = std::get<j>(scratchBuffers);
+        size_t origSize = reallocateBytes(swapSpace, keyView.size() * sizeof(KeyType), allocGrowthRate_);
+        auto* swapPtr   = reinterpret_cast<KeyType*>(swapSpace.data());
+        copy_n<HaveGpu<Accelerator>{}>(keyView.data(), keyView.size(), swapPtr);
+        reallocate(keys, newBufDesc.size, allocGrowthRate_);
+        fill<HaveGpu<Accelerator>{}>(rawPtr(keys) + bufDesc_.size, rawPtr(keys) + newBufDesc.size, KeyType(0));
+        copy_n<HaveGpu<Accelerator>{}>(swapPtr, keyView.size(), rawPtr(keys) + newBufDesc.start);
+        reallocate(swapSpace, origSize, 1.0);
 
         // relocate ordered buffer contents from offset 0 to offset newBufDesc.start
         auto relocate =
             [size = keyView.size(), dest = newBufDesc.start, scratch = util::reverse(scratchBuffers)](auto& array)
         {
-            static_assert(util::FindIndex<decltype(array), std::tuple<Arrays3&...>>{} < sizeof...(Arrays3),
-                          "No suitable scratch buffer available");
+            static_assert(util::Contains<decltype(array), std::tuple<Arrays3&...>>{}, "No suitable scratch buffer");
             auto& swapSpace = util::pickType<decltype(array)>(scratch);
             copy_n<IsDeviceVector<std::decay_t<decltype(array)>>{}>(rawPtr(array), size, rawPtr(swapSpace) + dest);
             swap(array, swapSpace);
@@ -649,8 +637,6 @@ private:
     Halos<KeyType, Accelerator> halos_{myRank_};
 
     bool firstCall_{true};
-
-    std::vector<KeyType> swapKeys_;
 };
 
 } // namespace cstone
