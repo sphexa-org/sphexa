@@ -143,52 +143,36 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
  *
  * @param[in]  focusLeafCounts   node counts of the focus leaves, size N
  * @param[in]  haloFlags         flag for each node, with a non-zero value if present as halo node, size N
- * @param[in]  firstAssignedIdx  first focus leaf idx to treat as part of the assigned nodes on the executing rank
- * @param[in]  lastAssignedIdx   last focus leaf idx to treat as part of the assigned nodes on the executing rank
+ * @param[in]  firstIdx  first focus leaf idx to treat as part of the assigned nodes on the executing rank
+ * @param[in]  lastIdx   last focus leaf idx to treat as part of the assigned nodes on the executing rank
  * @param[out] layout            length N+1. The first element is zero, the last element is
  *                               equal to the sum of all present (assigned+halo) node counts.
  */
-inline void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
-                              std::span<const int> haloFlags,
-                              TreeNodeIndex firstAssignedIdx,
-                              TreeNodeIndex lastAssignedIdx,
-                              std::span<LocalIndex> layout)
+template<bool useGpu>
+void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
+                       std::span<const int> haloFlags,
+                       TreeNodeIndex firstIdx,
+                       TreeNodeIndex lastIdx,
+                       std::span<LocalIndex> layout)
 {
+    if constexpr (useGpu)
+    {
+        memcpyD2D(focusLeafCounts.data() + firstIdx, lastIdx - firstIdx, layout.data() + firstIdx);
+        selectCopyGpu(focusLeafCounts.data(), firstIdx, haloFlags.data(), layout.data());
+        selectCopyGpu(focusLeafCounts.data() + lastIdx, focusLeafCounts.size() - lastIdx, haloFlags.data() + lastIdx,
+                      layout.data() + lastIdx);
+        exclusiveScanGpu(layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0});
+    }
+    else
+    {
 #pragma omp parallel for
-    for (TreeNodeIndex i = 0; i < TreeNodeIndex(focusLeafCounts.size()); ++i)
-    {
-        bool haveParticles = (firstAssignedIdx <= i && i < lastAssignedIdx) || haloFlags[i];
-        layout[i]          = -int(haveParticles) & focusLeafCounts[i];
+        for (TreeNodeIndex i = 0; i < TreeNodeIndex(focusLeafCounts.size()); ++i)
+        {
+            bool haveParticles = (firstIdx <= i && i < lastIdx) || haloFlags[i];
+            layout[i]          = -int(haveParticles) & focusLeafCounts[i];
+        }
+        std::exclusive_scan(layout.begin(), layout.end(), layout.begin(), LocalIndex{0});
     }
-
-    std::exclusive_scan(layout.begin(), layout.end(), layout.begin(), LocalIndex{0});
-}
-
-/*! @brief computes a list which local array ranges are going to be filled with halo particles
- *
- * @param layout       prefix sum of leaf counts of locally present nodes (see computeNodeLayout)
- *                     length N+1
- * @param haloFlags    0 or 1 for each leaf, length N
- * @param assignment   assignment of leaf nodes to peer ranks
- * @param peerRanks    list of peer ranks
- * @return             list of array index ranges for the receiving part in exchangeHalos
- */
-inline auto computeHaloRecvList(std::span<const LocalIndex> layout,
-                                std::span<const int> haloFlags,
-                                std::span<const TreeIndexPair> assignment,
-                                std::span<const int> peerRanks)
-{
-    RecvList ret(assignment.size());
-
-    for (int peer : peerRanks)
-    {
-        auto pFlags           = haloFlags.subspan(assignment[peer].start(), assignment[peer].count());
-        TreeNodeIndex firstNz = std::distance(haloFlags.begin(), std::find(pFlags.begin(), pFlags.end(), 1));
-        TreeNodeIndex lastNz  = std::distance(haloFlags.begin(), std::find(pFlags.rbegin(), pFlags.rend(), 1).base());
-        ret[peer]             = {layout[firstNz], layout[lastNz]};
-    }
-
-    return ret;
 }
 
 //! @brief Compare value_type size of container T to the value_type size of the N-th container in Tuple
