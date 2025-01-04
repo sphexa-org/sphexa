@@ -72,7 +72,7 @@ void exchangeKeys(int myRank, int numRanks)
     }
 
     assignment[myRank] = TreeIndexPair(2, 6);
-    computeNodeLayout(counts, haloFlags, assignment[myRank].start(), assignment[myRank].end(), layout);
+    computeNodeLayout<false>(counts, haloFlags, assignment[myRank].start(), assignment[myRank].end(), layout);
 
     if (myRank < numRanks - 1)
     {
@@ -124,7 +124,7 @@ void unequalSurface(int myRank, int numRanks)
         haloFlags  = std::vector<int>{1, 1, 0, 1, 1, 1, 1, 1};
         peers.push_back(0);
         reference[0].addRange(offset, offset + 1);
-        computeNodeLayout(counts, haloFlags, 2, 3, layout);
+        computeNodeLayout<false>(counts, haloFlags, 2, 3, layout);
     }
 
     if (myRank == 0)
@@ -132,7 +132,7 @@ void unequalSurface(int myRank, int numRanks)
         haloFlags = std::vector<int>{0, 0, 0, 0, 0, 0, 0, 1};
         peers.push_back(1);
         reference[1].addRange(0, nNodes(treeLeaves) - 1);
-        computeNodeLayout(counts, haloFlags, 0, 7, layout);
+        computeNodeLayout<false>(counts, haloFlags, 0, 7, layout);
     }
 
     SendList probe = exchangeRequestKeys<KeyType>(treeLeaves, haloFlags, assignment, peers, layout);

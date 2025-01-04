@@ -107,6 +107,9 @@ void haloExchangeGpu(int epoch,
 template<class KeyType, class Accelerator>
 class Halos
 {
+    template<class ValueType>
+    using AccVector = std::conditional_t<HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
+
 public:
     Halos(int myRank)
         : myRank_(myRank)
@@ -211,7 +214,7 @@ public:
                       std::span<const int> peers,
                       std::span<LocalIndex> layout)
     {
-        computeNodeLayout(counts, haloFlags_, assignment[myRank_].start(), assignment[myRank_].end(), layout);
+        computeNodeLayout<false>(counts, haloFlags_, assignment[myRank_].start(), assignment[myRank_].end(), layout);
         auto newParticleStart = layout[assignment[myRank_].start()];
         auto newParticleEnd   = layout[assignment[myRank_].end()];
 
@@ -220,7 +223,13 @@ public:
         if (detail::checkHalos(myRank_, assignment, haloFlags_, leaves)) { return 1; }
         detail::checkIndices(outgoingHaloIndices_, newParticleStart, newParticleEnd, layout.back());
 
-        incomingHaloIndices_ = computeHaloRecvList(layout, haloFlags_, assignment, peers);
+        incomingHaloIndices_.resize(assignment.size());
+        std::fill(incomingHaloIndices_.begin(), incomingHaloIndices_.end(), RecvList::value_type{0, 0});
+        for (int peer : peers)
+        {
+            incomingHaloIndices_[peer] = {layout[assignment[peer].start()], layout[assignment[peer].end()]};
+        }
+
         return 0;
     }
 
@@ -262,6 +271,7 @@ private:
     SendList outgoingHaloIndices_;
 
     std::vector<int> haloFlags_;
+    AccVector<int> haloFlagsAcc_;
 
     /*! @brief Counter for halo exchange calls
      * Multiple client calls to domain::exchangeHalos() during a time-step
