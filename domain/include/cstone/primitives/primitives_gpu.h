@@ -110,4 +110,7 @@ void exclusiveScanGpu(const IndexType* first, const IndexType* last, SumType* ou
 template<class ValueType>
 extern size_t countGpu(const ValueType* first, const ValueType* last, ValueType v);
 
+template<class T>
+extern void selectCopyGpu(const T* src, LocalIndex n, const int* selectFlags, T* dest);
+
 } // namespace cstone
