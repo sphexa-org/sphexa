@@ -25,8 +25,6 @@ namespace cstone
  *
  * @tparam KeyType      32- or 64-bit unsigned integer
  * @param treeLeaves    cornerstone octree leaves, length N+1
- * @param haloFlags     0 or 1 for each node in @p leaves, length N
- *                      nodes marked with 1 are halos of the executing rank
  * @param assignment    assignment of @p treeLeaves to ranks, only ranks listed in @p peerRanks
  *                      are accessed
  * @param peerRanks     list of peer rank IDs
@@ -45,7 +43,6 @@ namespace cstone
  */
 template<class KeyType>
 SendList exchangeRequestKeys(std::span<const KeyType> treeLeaves,
-                             std::span<const uint8_t> haloFlags,
                              std::span<const TreeIndexPair> assignment,
                              std::span<const int> peerRanks,
                              std::span<const LocalIndex> layout)
@@ -59,8 +56,7 @@ SendList exchangeRequestKeys(std::span<const KeyType> treeLeaves,
 
     for (int peer : peerRanks)
     {
-        auto requestKeys =
-            extractMarkedElements(treeLeaves, haloFlags, assignment[peer].start(), assignment[peer].end());
+        auto requestKeys = extractMarkedElements(treeLeaves, layout, assignment[peer].start(), assignment[peer].end());
         mpiSendAsync(requestKeys.data(), int(requestKeys.size()), peer, haloRequestKeyTag, sendRequests);
         sendBuffers.push_back(std::move(requestKeys));
     }
