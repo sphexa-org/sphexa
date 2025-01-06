@@ -69,7 +69,7 @@ void findHalos(const KeyType* prefixes,
                const Box<CoordinateType>& box,
                TreeNodeIndex firstNode,
                TreeNodeIndex lastNode,
-               int* collisionFlags)
+               uint8_t* collisionFlags)
 {
     KeyType lowestCode  = leaves[firstNode];
     KeyType highestCode = leaves[lastNode];

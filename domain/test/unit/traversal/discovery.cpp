@@ -23,13 +23,13 @@
 using namespace cstone;
 
 template<class KeyType, class T>
-std::vector<int> findHalosAll2All(std::span<const KeyType> tree,
+std::vector<uint8_t> findHalosAll2All(std::span<const KeyType> tree,
                                   const std::vector<T>& haloRadii,
                                   const Box<T>& box,
                                   TreeNodeIndex firstNode,
                                   TreeNodeIndex lastNode)
 {
-    std::vector<int> flags(nNodes(tree));
+    std::vector<uint8_t> flags(nNodes(tree));
     auto collisions = findCollisionsAll2all(tree, haloRadii, box);
 
     for (TreeNodeIndex i = firstNode; i < lastNode; ++i)
@@ -57,22 +57,22 @@ void findHalosFlags()
     octree.update(tree.data(), nNodes(tree));
 
     {
-        std::vector<int> collisionFlags(nNodes(tree), 0);
+        std::vector<uint8_t> collisionFlags(nNodes(tree), 0);
         findHalos(octree.nodeKeys().data(), octree.childOffsets().data(), octree.toLeafOrder().data(), tree.data(),
                   interactionRadii.data(), box, 0, 32, collisionFlags.data());
 
-        std::vector<int> reference = findHalosAll2All<KeyType>(tree, interactionRadii, box, 0, 32);
+        std::vector<uint8_t> reference = findHalosAll2All<KeyType>(tree, interactionRadii, box, 0, 32);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes
         EXPECT_EQ(16, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
         EXPECT_EQ(collisionFlags, reference);
     }
     {
-        std::vector<int> collisionFlags(nNodes(tree), 0);
+        std::vector<uint8_t> collisionFlags(nNodes(tree), 0);
         findHalos(octree.nodeKeys().data(), octree.childOffsets().data(), octree.toLeafOrder().data(), tree.data(),
                   interactionRadii.data(), box, 32, 64, collisionFlags.data());
 
-        std::vector<int> reference = findHalosAll2All<KeyType>(tree, interactionRadii, box, 32, 64);
+        std::vector<uint8_t> reference = findHalosAll2All<KeyType>(tree, interactionRadii, box, 32, 64);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes
         EXPECT_EQ(16, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));

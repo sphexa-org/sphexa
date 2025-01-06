@@ -45,7 +45,7 @@ namespace cstone
  */
 template<class KeyType>
 SendList exchangeRequestKeys(std::span<const KeyType> treeLeaves,
-                             std::span<const int> haloFlags,
+                             std::span<const uint8_t> haloFlags,
                              std::span<const TreeIndexPair> assignment,
                              std::span<const int> peerRanks,
                              std::span<const LocalIndex> layout)
