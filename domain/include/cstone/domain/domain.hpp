@@ -194,20 +194,10 @@ public:
         focusTree_.updateTree(peers, global_.assignment(), box());
         focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
 
-        auto octreeView            = focusTree_.octreeViewAcc();
-        const KeyType* focusLeaves = focusTree_.treeLeavesAcc().data();
-
-        reallocate(octreeView.numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
-        halos_.discover(octreeView.prefixes, octreeView.childOffsets, octreeView.internalToLeaf, focusLeaves,
-                        focusTree_.leafCountsAcc(), focusTree_.assignment(), {rawPtr(layoutAcc_), layoutAcc_.size()},
-                        box(), rawPtr(h), haloSearchExt_, std::get<0>(scratch));
-        auto fail = halos_.computeLayout(focusTree_.treeLeaves(), focusTree_.leafCounts(), focusTree_.assignment(),
-                                         peers, layout_);
-        if (fail)
-        {
-            std::cout << "found halo outside peer area on rank " << myRank_ << std::endl;
-            MPI_Abort(MPI_COMM_WORLD, 67);
-        }
+        reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
+        focusTree_.discoverHalos({rawPtr(layoutAcc_), layoutAcc_.size()}, rawPtr(h), haloSearchExt_, get<0>(scratch));
+        focusTree_.computeLayout(layout_);
+        halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), peers, layout_);
 
         updateLayout(sorter, keyView, particleKeys, std::tie(h),
                      std::tuple_cat(std::tie(x, y, z), particleProperties), scratch);
@@ -268,18 +258,14 @@ public:
                                      std::get<1>(scratch));
             focusTree_.updateMacs(global_.assignment(), 1.0 / theta_);
 
-            auto octreeView            = focusTree_.octreeViewAcc();
-            const KeyType* focusLeaves = focusTree_.treeLeavesAcc().data();
-
-            reallocate(octreeView.numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
-            halos_.discover(octreeView.prefixes, octreeView.childOffsets, octreeView.internalToLeaf, focusLeaves,
-                            focusTree_.leafCountsAcc(), focusTree_.assignment(),
-                            {rawPtr(layoutAcc_), layoutAcc_.size()}, box(), rawPtr(h), haloSearchExt_,
-                            std::get<0>(scratch));
-            focusTree_.addMacs(halos_.haloFlags());
-            fail = halos_.computeLayout(focusTree_.treeLeaves(), focusTree_.leafCounts(), focusTree_.assignment(),
-                                        peers, layout_);
+            reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
+            focusTree_.discoverHalos({rawPtr(layoutAcc_), layoutAcc_.size()}, rawPtr(h), haloSearchExt_,
+                                     get<0>(scratch));
+            focusTree_.addMacs();
+            fail = focusTree_.computeLayout(layout_);
             MPI_Allreduce(MPI_IN_PLACE, &fail, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+            halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), peers, layout_);
 
             if (fail)
             {
