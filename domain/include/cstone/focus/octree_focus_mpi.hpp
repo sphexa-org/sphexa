@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <iostream>
 #include <numeric>
 
 #include "cstone/cuda/cuda_utils.hpp"
@@ -26,6 +27,8 @@
 #include "cstone/focus/source_center_gpu.h"
 #include "cstone/primitives/primitives_gpu.h"
 #include "cstone/traversal/collisions_gpu.h"
+
+#include <ranges>
 
 namespace cstone
 {
@@ -510,6 +513,86 @@ public:
         rebalanceStatus_ |= macCriterion;
     }
 
+    /*! @brief Discover which cells outside myRank's assignment are halos
+     *
+     * @param[-]  layout           temporary storage for node count scan
+     * @param[in] h                smoothing lengths of locally owned particles
+     * @param[in] searchExtFact    increases halo search radius to extend the depth of the ghost layer
+     * @param[-]  scratch          host or device buffer for temporary use
+     */
+    template<class Th, class Vector>
+    void discoverHalos(std::span<LocalIndex> layout,
+                       const Th* h,
+                       float searchExtFact,
+                       Vector& scratch)
+    {
+        TreeNodeIndex firstNode      = assignment_[myRank_].start();
+        TreeNodeIndex lastNode       = assignment_[myRank_].end();
+        auto let                     = octreeViewAcc();
+        TreeNodeIndex numNodesSearch = lastNode - firstNode;
+        TreeNodeIndex numLeafNodes   = let.numLeafNodes;
+
+        reallocate(numLeafNodes, allocGrowthRate_, haloFlags_, haloFlagsAcc_);
+
+        if constexpr (HaveGpu<Accelerator>{})
+        {
+            size_t radiiBytes = numLeafNodes * sizeof(float);
+            size_t origSize   = reallocateBytes(scratch, radiiBytes, allocGrowthRate_);
+            auto* d_radii     = reinterpret_cast<float*>(rawPtr(scratch));
+
+            fillGpu(layout.data() + firstNode, layout.data() + firstNode + 1, LocalIndex{0});
+            inclusiveScanGpu(leafCountsAcc_.data() + firstNode, leafCountsAcc_.data() + lastNode,
+                             layout.data() + firstNode + 1);
+            segmentMax(h, layout.data() + firstNode, numNodesSearch, d_radii + firstNode);
+            // SPH convention: interaction radius = 2 * h
+            scaleGpu(d_radii, d_radii + numLeafNodes, 2.0f * searchExtFact);
+
+            fillGpu(haloFlagsAcc_.data(), haloFlagsAcc_.data() + numLeafNodes, uint8_t{0});
+            auto let = octreeViewAcc();
+            findHalosGpu(let.prefixes, let.childOffsets, let.internalToLeaf, leavesAcc_.data(), d_radii, box_,
+                         firstNode, lastNode, haloFlagsAcc_.data());
+            memcpyD2H(haloFlagsAcc_.data(), numLeafNodes, haloFlags_.data());
+
+            reallocate(scratch, origSize, 1.0);
+        }
+        else
+        {
+            layout[0] = 0;
+            std::inclusive_scan(leafCounts_.begin() + firstNode, leafCounts_.begin() + lastNode, layout.begin() + 1,
+                                std::plus{}, LocalIndex{0});
+            std::vector<float> haloRadii(leafCounts_.size(), 0.0f);
+#pragma omp parallel for schedule(static)
+            for (TreeNodeIndex i = 0; i < numNodesSearch; ++i)
+            {
+                if (layout[i + 1] > layout[i])
+                {
+                    // Note factor 2 due to SPH convention: interaction radius = 2 * h
+                    haloRadii[i + firstNode] = *std::max_element(h + layout[i], h + layout[i + 1]) * 2 * searchExtFact;
+                }
+            }
+            std::fill(begin(haloFlags_), end(haloFlags_), 0);
+            findHalos(let.prefixes, let.childOffsets, let.internalToLeaf, leaves_.data(), haloRadii.data(), box_,
+                      firstNode, lastNode, haloFlags_.data());
+        }
+    }
+
+    void addMacs()
+    {
+        const TreeNodeIndex* toInternal = leafToInternal(treeData_).data();
+#pragma omp parallel for schedule(static)
+        for (std::size_t i = 0; i < haloFlags_.size(); ++i)
+        {
+            size_t iIdx = toInternal[i];
+            if (macs_[iIdx] && !haloFlags_[i]) { haloFlags_[i] = 1; }
+        }
+    }
+
+    int computeLayout(std::span<LocalIndex> layout) const
+    {
+        computeNodeLayout<false>(leafCounts_, haloFlags_, assignment_[myRank_], layout);
+        return checkLayout(myRank_, assignment_, layout, treeLeaves());
+    }
+
     //! @brief update until converged with a simple min-distance MAC
     template<class DeviceVector = std::vector<KeyType>>
     void converge(const Box<RealType>& box,
@@ -578,16 +661,7 @@ public:
     std::span<const Vec3<RealType>> geoCentersAcc() const { return {rawPtr(geoCentersAcc_), geoCentersAcc_.size()}; }
     std::span<const Vec3<RealType>> geoSizesAcc() const { return {rawPtr(geoSizesAcc_), geoSizesAcc_.size()}; }
 
-    void addMacs(std::span<uint8_t> haloFlags) const
-    {
-        const TreeNodeIndex* toInternal = leafToInternal(treeData_).data();
-#pragma omp parallel for schedule(static)
-        for (std::size_t i = 0; i < haloFlags.size(); ++i)
-        {
-            size_t iIdx = toInternal[i];
-            if (macs_[iIdx] && !haloFlags[i]) { haloFlags[i] = 1; }
-        }
-    }
+    std::span<const uint8_t> haloFlags() const { return haloFlags_; }
 
 private:
     //! @brief compute geometrical center and size of each tree cell in terms of x,y,z coordinates
@@ -675,19 +749,12 @@ private:
     ConcatVector<TreeNodeIndex> treeletIdx_;
     ConcatVector<TreeNodeIndex, AccVector> treeletIdxAcc_;
 
-    //! @brief octree data resident on GPU if active
-    OctreeData<KeyType, Accelerator> octreeAcc_;
-    AccVector<KeyType> leavesAcc_;
-    AccVector<unsigned> leafCountsAcc_;
-    AccVector<SourceCenterType<RealType>> centersAcc_;
-    AccVector<Vec3<RealType>> geoCentersAcc_;
-    AccVector<Vec3<RealType>> geoSizesAcc_;
-    AccVector<unsigned> countsAcc_;
-    AccVector<uint8_t> macsAcc_;
-
     OctreeData<KeyType, CpuTag> treeData_;
+    OctreeData<KeyType, Accelerator> octreeAcc_;
+
     //! @brief leaves in cstone format for tree_
     std::vector<KeyType> leaves_;
+    AccVector<KeyType> leavesAcc_;
 
     //! @brief previous iteration focus start
     KeyType prevFocusStart = 0;
@@ -696,12 +763,22 @@ private:
 
     //! @brief particle counts of the focused tree leaves, tree_.treeLeaves()
     std::vector<unsigned> leafCounts_;
+    AccVector<unsigned> leafCountsAcc_;
     //! @brief particle counts of the full tree, tree_.octree()
     std::vector<unsigned> counts_;
+    AccVector<unsigned> countsAcc_;
     //! @brief mac evaluation result relative to focus area (pass or fail)
     std::vector<uint8_t> macs_;
+    AccVector<uint8_t> macsAcc_;
+    std::vector<uint8_t> haloFlags_;
+    AccVector<uint8_t> haloFlagsAcc_;
     //! @brief the expansion (com) centers of each cell of tree_.octree()
     std::vector<SourceCenterType<RealType>> centers_;
+    AccVector<SourceCenterType<RealType>> centersAcc_;
+    //! @brief geometric center and size per cell
+    AccVector<Vec3<RealType>> geoCentersAcc_;
+    AccVector<Vec3<RealType>> geoSizesAcc_;
+
     //! @brief we also need to hold on to the expansion centers of the global tree for the multipole upsweep
     std::vector<SourceCenterType<RealType>> globalCenters_;
     //! @brief the assignment of peer ranks to tree_.treeLeaves()
