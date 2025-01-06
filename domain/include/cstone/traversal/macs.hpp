@@ -156,7 +156,7 @@ HOST_DEVICE_FUN void markMacPerBox(const Vec3<T>& targetCenter,
                                    const Box<T>& box,
                                    KeyType focusStart,
                                    KeyType focusEnd,
-                                   char* markings)
+                                   uint8_t* markings)
 {
     auto checkAndMarkMac = [&](TreeNodeIndex idx)
     {
@@ -200,7 +200,7 @@ void markMacs(const KeyType* prefixes,
               const KeyType* focusNodes,
               TreeNodeIndex numFocusNodes,
               bool limitSource,
-              char* markings)
+              uint8_t* markings)
 {
     KeyType focusStart = focusNodes[0];
     KeyType focusEnd   = focusNodes[numFocusNodes];

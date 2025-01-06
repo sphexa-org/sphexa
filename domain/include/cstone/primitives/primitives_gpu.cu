@@ -41,6 +41,7 @@ void fillGpu(T* first, T* last, T value)
 template void fillGpu(double*, double*, double);
 template void fillGpu(float*, float*, float);
 template void fillGpu(int*, int*, int);
+template void fillGpu(uint8_t*, uint8_t*, uint8_t);
 template void fillGpu(char*, char*, char);
 template void fillGpu(unsigned*, unsigned*, unsigned);
 template void fillGpu(uint64_t*, uint64_t*, uint64_t);

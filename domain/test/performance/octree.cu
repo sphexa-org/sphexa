@@ -38,7 +38,7 @@ auto benchmarkMacsCpu(const OctreeView<KeyType>& octree,
                       TreeNodeIndex firstFocusNode,
                       TreeNodeIndex lastFocusNode)
 {
-    std::vector<char> macs(octree.numNodes, 0);
+    std::vector<uint8_t> macs(octree.numNodes, 0);
     auto findMacsLambda = [&octree, &centers, &box, &leaves, &macs, firstFocusNode, lastFocusNode]()
     {
         markMacs(octree.prefixes, octree.childOffsets, centers, box, leaves.data() + firstFocusNode,
@@ -146,7 +146,7 @@ int main()
     TreeNodeIndex firstFocusNode = 10000 + 0;
     TreeNodeIndex lastFocusNode  = 10000 + octree.numLeafNodes / 2;
 
-    thrust::device_vector<char> macs(octree.numNodes);
+    thrust::device_vector<uint8_t> macs(octree.numNodes);
     thrust::device_vector<SourceCenterType<T>> centers(octree.numNodes);
 
     float invTheta = 1.0 / 0.5;
@@ -180,6 +180,6 @@ int main()
 
     auto macsCpu = benchmarkMacsCpu(h_octree, h_centers.data(), box, h_tree, firstFocusNode, lastFocusNode);
 
-    thrust::host_vector<char> macsGpuDl = macs;
+    thrust::host_vector<uint8_t> macsGpuDl = macs;
     std::cout << "GPU matches CPU " << std::equal(macsCpu.begin(), macsCpu.end(), macsGpuDl.begin());
 }

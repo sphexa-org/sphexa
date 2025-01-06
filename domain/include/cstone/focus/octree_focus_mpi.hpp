@@ -494,7 +494,7 @@ public:
         if constexpr (HaveGpu<Accelerator>{})
         {
             reallocate(macsAcc_, octreeAcc_.numNodes, allocGrowthRate_);
-            fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), char(0));
+            fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0));
             markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(centersAcc_), box_,
                         rawPtr(leavesAcc_) + fAssignStart, fAssignEnd - fAssignStart, false, rawPtr(macsAcc_));
 
@@ -502,7 +502,7 @@ public:
         }
         else
         {
-            std::fill(rawPtr(macs_), rawPtr(macs_) + macs_.size(), char(0));
+            std::fill(rawPtr(macs_), rawPtr(macs_) + macs_.size(), uint8_t(0));
             markMacs(rawPtr(treeData_.prefixes), rawPtr(treeData_.childOffsets), rawPtr(centers_), box_,
                      rawPtr(leaves_) + fAssignStart, fAssignEnd - fAssignStart, false, rawPtr(macs_));
         }
@@ -683,7 +683,7 @@ private:
     AccVector<Vec3<RealType>> geoCentersAcc_;
     AccVector<Vec3<RealType>> geoSizesAcc_;
     AccVector<unsigned> countsAcc_;
-    AccVector<char> macsAcc_;
+    AccVector<uint8_t> macsAcc_;
 
     OctreeData<KeyType, CpuTag> treeData_;
     //! @brief leaves in cstone format for tree_
@@ -699,7 +699,7 @@ private:
     //! @brief particle counts of the full tree, tree_.octree()
     std::vector<unsigned> counts_;
     //! @brief mac evaluation result relative to focus area (pass or fail)
-    std::vector<char> macs_;
+    std::vector<uint8_t> macs_;
     //! @brief the expansion (com) centers of each cell of tree_.octree()
     std::vector<SourceCenterType<RealType>> centers_;
     //! @brief we also need to hold on to the expansion centers of the global tree for the multipole upsweep
