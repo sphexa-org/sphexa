@@ -73,7 +73,7 @@ void halo_discovery(Box<double> box, const std::vector<KeyType>& tree, const std
         auto u3 = std::chrono::high_resolution_clock::now();
         std::cout << "second octree update: " << std::chrono::duration<double>(u3 - u2).count() << std::endl;
 
-        std::vector<int> collisionFlags(nNodes(tree), 0);
+        std::vector<uint8_t> collisionFlags(nNodes(tree), 0);
 
         OctreeView<KeyType> o = octree.data();
         auto tp0              = std::chrono::high_resolution_clock::now();

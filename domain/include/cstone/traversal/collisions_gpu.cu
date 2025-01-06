@@ -29,7 +29,7 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
                                 const Box<T> box,
                                 TreeNodeIndex firstNode,
                                 TreeNodeIndex lastNode,
-                                int* collisionFlags)
+                                uint8_t* collisionFlags)
 {
     unsigned leafIdx = blockIdx.x * blockDim.x + threadIdx.x + firstNode;
 
@@ -78,7 +78,7 @@ void findHalosGpu(const KeyType* prefixes,
                   const Box<T>& box,
                   TreeNodeIndex firstNode,
                   TreeNodeIndex lastNode,
-                  int* collisionFlags)
+                  uint8_t* collisionFlags)
 {
     constexpr unsigned numThreads = 128;
     unsigned numBlocks            = iceil(lastNode - firstNode, numThreads);
@@ -91,7 +91,7 @@ void findHalosGpu(const KeyType* prefixes,
     template void findHalosGpu(const KeyType* prefixes, const TreeNodeIndex* childOffsets,                             \
                                const TreeNodeIndex* internalToLeaf, const KeyType* leaves,                             \
                                const RadiusType* interactionRadii, const Box<T>& box, TreeNodeIndex firstNode,         \
-                               TreeNodeIndex lastNode, int* collisionFlags)
+                               TreeNodeIndex lastNode, uint8_t* collisionFlags)
 
 FIND_HALOS_GPU(uint32_t, float, float);
 FIND_HALOS_GPU(uint32_t, float, double);

@@ -432,15 +432,15 @@ template size_t countGpu(const int* first, const int* last, int v);
 template size_t countGpu(const unsigned* first, const unsigned* last, unsigned v);
 template size_t countGpu(const uint64_t* first, const uint64_t* last, uint64_t v);
 
-template<class T>
-__global__ void selectCopyKernel(const T* src, LocalIndex n, const int* selectFlags, T* dest)
+template<class T, class S>
+__global__ void selectCopyKernel(const T* src, LocalIndex n, const S* selectFlags, T* dest)
 {
     LocalIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < n && selectFlags[tid]) { dest[tid] = src[tid]; }
 }
 
-template<class T>
-void selectCopy(const T* src, LocalIndex n, const int* selectFlags, T* dest)
+template<class T, class S>
+void selectCopy(const T* src, LocalIndex n, const S* selectFlags, T* dest)
 {
     int numThreads = 256;
     int numBlocks  = iceil(n, numThreads);
@@ -448,6 +448,6 @@ void selectCopy(const T* src, LocalIndex n, const int* selectFlags, T* dest)
     selectCopyKernel<<<numBlocks, numThreads>>>(src, n, selectFlags, dest);
 }
 
-template void selectCopy(const unsigned*, LocalIndex, const int*, unsigned*);
+template void selectCopy(const unsigned*, LocalIndex, const uint8_t*, unsigned*);
 
 } // namespace cstone

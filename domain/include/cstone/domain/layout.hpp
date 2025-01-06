@@ -109,7 +109,7 @@ inline std::vector<TreeNodeIndex> enumerateRanges(std::span<const IndexPair<Tree
  */
 template<class IntegralType>
 std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> source,
-                                                std::span<const int> flags,
+                                                std::span<const uint8_t> flags,
                                                 TreeNodeIndex firstReqIdx,
                                                 TreeNodeIndex secondReqIdx)
 {
@@ -150,7 +150,7 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
  */
 template<bool useGpu>
 void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
-                       std::span<const int> haloFlags,
+                       std::span<const uint8_t> haloFlags,
                        TreeNodeIndex firstIdx,
                        TreeNodeIndex lastIdx,
                        std::span<LocalIndex> layout)
