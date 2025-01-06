@@ -30,7 +30,7 @@ __global__ void rebalanceDecisionEssentialKernel(const KeyType* prefixes,
                                                  const TreeNodeIndex* childOffsets,
                                                  const TreeNodeIndex* parents,
                                                  const unsigned* counts,
-                                                 const char* macs,
+                                                 const uint8_t* macs,
                                                  KeyType focusStart,
                                                  KeyType focusEnd,
                                                  unsigned bucketSize,
@@ -50,7 +50,7 @@ void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
                                    const TreeNodeIndex* childOffsets,
                                    const TreeNodeIndex* parents,
                                    const unsigned* counts,
-                                   const char* macs,
+                                   const uint8_t* macs,
                                    KeyType focusStart,
                                    KeyType focusEnd,
                                    unsigned bucketSize,
@@ -65,14 +65,14 @@ void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
 #define REBA_DEC_ESS_GPU(KeyType)                                                                                      \
     template void rebalanceDecisionEssentialGpu(const KeyType* prefixes, const TreeNodeIndex* childOffsets,            \
                                                 const TreeNodeIndex* parents, const unsigned* counts,                  \
-                                                const char* macs, KeyType focusStart, KeyType focusEnd,                \
+                                                const uint8_t* macs, KeyType focusStart, KeyType focusEnd,             \
                                                 unsigned bucketSize, TreeNodeIndex* nodeOps, TreeNodeIndex numNodes)
 REBA_DEC_ESS_GPU(uint32_t);
 REBA_DEC_ESS_GPU(uint64_t);
 
 template<class KeyType>
 __global__ void macRefineDecisionKernel(const KeyType* prefixes,
-                                        const char* macs,
+                                        const uint8_t* macs,
                                         const TreeNodeIndex* l2i,
                                         TreeNodeIndex numLeafNodes,
                                         int2 focus,
@@ -87,7 +87,7 @@ __global__ void macRefineDecisionKernel(const KeyType* prefixes,
 
 template<class KeyType>
 void macRefineDecisionGpu(const KeyType* prefixes,
-                          const char* macs,
+                          const uint8_t* macs,
                           const TreeNodeIndex* l2i,
                           TreeNodeIndex numLeafNodes,
                           TreeIndexPair focus,
@@ -99,7 +99,7 @@ void macRefineDecisionGpu(const KeyType* prefixes,
 }
 
 #define MAC_REF_DEC_GPU(KeyType)                                                                                       \
-    template void macRefineDecisionGpu(const KeyType* prefixes, const char* macs, const TreeNodeIndex* l2i,            \
+    template void macRefineDecisionGpu(const KeyType* prefixes, const uint8_t* macs, const TreeNodeIndex* l2i,         \
                                        TreeNodeIndex numLeafNodes, TreeIndexPair focus, TreeNodeIndex* nodeOps)
 MAC_REF_DEC_GPU(uint32_t);
 MAC_REF_DEC_GPU(uint64_t);

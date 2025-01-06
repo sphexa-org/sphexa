@@ -34,7 +34,7 @@ HOST_DEVICE_FUN int mergeCountAndMacOp(TreeNodeIndex nodeIdx,
                                        const TreeNodeIndex* childOffsets,
                                        const TreeNodeIndex* parents,
                                        const unsigned* counts,
-                                       const char* macs,
+                                       const uint8_t* macs,
                                        KeyType focusStart,
                                        KeyType focusEnd,
                                        unsigned bucketSize)
@@ -71,7 +71,7 @@ HOST_DEVICE_FUN int mergeCountAndMacOp(TreeNodeIndex nodeIdx,
 
 //! @brief refine nodes based on Mac only
 template<class KeyType>
-inline HOST_DEVICE_FUN int macRefineOp(KeyType nodeKey, char mac)
+HOST_DEVICE_FUN int macRefineOp(KeyType nodeKey, char mac)
 {
     unsigned level = decodePrefixLength(nodeKey) / 3;
     if (level < maxTreeLevel<KeyType>{} && mac) { return 8; }
@@ -91,7 +91,7 @@ inline HOST_DEVICE_FUN int macRefineOp(KeyType nodeKey, char mac)
  * the nodeOps value of the ancestor, 0 otherwise
  */
 template<class KeyType>
-inline HOST_DEVICE_FUN TreeNodeIndex
+HOST_DEVICE_FUN TreeNodeIndex
 nzAncestorOp(TreeNodeIndex nodeIdx, const KeyType* prefixes, const TreeNodeIndex* parents, const TreeNodeIndex* nodeOps)
 {
     if (nodeIdx == 0) { return nodeOps[0]; }
@@ -136,7 +136,7 @@ void rebalanceDecisionEssential(std::span<const KeyType> nodeKeys,
                                 const TreeNodeIndex* childOffsets,
                                 const TreeNodeIndex* parents,
                                 const unsigned* counts,
-                                const char* macs,
+                                const uint8_t* macs,
                                 KeyType focusStart,
                                 KeyType focusEnd,
                                 unsigned bucketSize,
