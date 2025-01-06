@@ -58,6 +58,6 @@ extern void markMacsGpu(const KeyType* prefixes,
                         const KeyType* focusNodes,
                         TreeNodeIndex numFocusNodes,
                         bool limitSource,
-                        char* markings);
+                        uint8_t* markings);
 
 } // namespace cstone
