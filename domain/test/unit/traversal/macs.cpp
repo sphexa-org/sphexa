@@ -98,14 +98,14 @@ TEST(Macs, minMacMutualInt)
 }
 
 template<class KeyType, class T>
-static std::vector<char> markVecMacAll2All(const KeyType* leaves,
-                                           std::span<const KeyType> prefixes,
-                                           const Vec4<T>* centers,
-                                           TreeNodeIndex firstLeaf,
-                                           TreeNodeIndex lastLeaf,
-                                           const Box<T>& box)
+static std::vector<uint8_t> markVecMacAll2All(const KeyType* leaves,
+                                              std::span<const KeyType> prefixes,
+                                              const Vec4<T>* centers,
+                                              TreeNodeIndex firstLeaf,
+                                              TreeNodeIndex lastLeaf,
+                                              const Box<T>& box)
 {
-    std::vector<char> markings(prefixes.size(), 0);
+    std::vector<uint8_t> markings(prefixes.size(), 0);
 
     // loop over target cells
     for (TreeNodeIndex i = firstLeaf; i < lastLeaf; ++i)
@@ -158,7 +158,7 @@ static void markMacVector()
     upsweep(octree.levelRange, octree.childOffsets, centers.data(), CombineSourceCenter<T>{});
     setMac<T, KeyType>(octree.prefixes, centers, 1.0 / theta, box);
 
-    std::vector<char> markings(octree.numNodes, 0);
+    std::vector<uint8_t> markings(octree.numNodes, 0);
 
     TreeNodeIndex focusIdxStart = 4;
     TreeNodeIndex focusIdxEnd   = 22;
@@ -166,7 +166,7 @@ static void markMacVector()
     markMacs(octree.prefixes.data(), octree.childOffsets.data(), centers.data(), box, leaves.data() + focusIdxStart,
              focusIdxEnd - focusIdxStart, false, markings.data());
 
-    std::vector<char> reference =
+    std::vector<uint8_t> reference =
         markVecMacAll2All<KeyType>(leaves.data(), octree.prefixes, centers.data(), focusIdxStart, focusIdxEnd, box);
 
     EXPECT_EQ(markings, reference);
@@ -195,10 +195,10 @@ TEST(Macs, limitSource4x4)
     std::vector<SourceCenterType<T>> centers(ov.numNodes);
     geoMacSpheres<KeyType>({ov.prefixes, size_t(ov.numNodes)}, centers.data(), invTheta, box);
 
-    std::vector<char> macs(ov.numNodes, 0);
+    std::vector<uint8_t> macs(ov.numNodes, 0);
     markMacs(ov.prefixes, ov.childOffsets, centers.data(), box, leaves.data() + 0, 32, true, macs.data());
 
-    std::vector<char> macRef{1, 0, 0, 0, 0, 1, 1, 1, 1};
+    std::vector<uint8_t> macRef{1, 0, 0, 0, 0, 1, 1, 1, 1};
     macRef.resize(ov.numNodes);
     EXPECT_EQ(macRef, macs);
 

@@ -69,7 +69,7 @@ struct CombinedUpdate
                             KeyType focusEnd,
                             std::span<const KeyType> mandatoryKeys,
                             std::span<const unsigned> counts,
-                            std::span<const char> macs)
+                            std::span<const uint8_t> macs)
     {
         [[maybe_unused]] TreeNodeIndex numNodes = tree.numLeafNodes + tree.numInternalNodes;
         assert(TreeNodeIndex(counts.size()) == numNodes);
@@ -140,7 +140,7 @@ struct CombinedUpdate
                                KeyType focusEnd,
                                std::span<const KeyType> mandatoryKeys,
                                std::span<const unsigned> counts,
-                               std::span<const char> macs)
+                               std::span<const uint8_t> macs)
     {
         TreeNodeIndex numNodes = tree.numLeafNodes + tree.numInternalNodes;
         assert(TreeNodeIndex(counts.size()) == numNodes);
@@ -200,7 +200,7 @@ struct CombinedUpdate
 template<class KeyType>
 bool updateMacRefine(OctreeData<KeyType, CpuTag>& tree,
                      std::vector<KeyType>& leaves,
-                     std::span<const char> macs,
+                     std::span<const uint8_t> macs,
                      TreeIndexPair focus)
 {
     assert(tree.childOffsets.size() >= size_t(tree.numLeafNodes + 1));
@@ -229,7 +229,7 @@ template<class T, class KeyType>
 bool macRefine(OctreeData<KeyType, CpuTag>& tree,
                std::vector<KeyType>& leaves,
                std::vector<SourceCenterType<T>>& centers,
-               std::vector<char>& macs,
+               std::vector<uint8_t>& macs,
                KeyType oldFocusStart,
                KeyType oldFocusEnd,
                KeyType focusStart,
@@ -263,7 +263,7 @@ bool macRefine(OctreeData<KeyType, CpuTag>& tree,
 template<class KeyType>
 bool updateMacRefineGpu(OctreeData<KeyType, GpuTag>& tree,
                         DeviceVector<KeyType>& leaves,
-                        const char* macs,
+                        const uint8_t* macs,
                         TreeIndexPair focus)
 {
     assert(tree.childOffsets.size() >= size_t(tree.numLeafNodes + 1));
@@ -292,7 +292,7 @@ template<class T, class KeyType>
 bool macRefineGpu(OctreeData<KeyType, GpuTag>& tree,
                   DeviceVector<KeyType>& leaves,
                   DeviceVector<SourceCenterType<T>>& centers,
-                  DeviceVector<char>& macs,
+                  DeviceVector<uint8_t>& macs,
                   KeyType oldFocusStart,
                   KeyType oldFocusEnd,
                   KeyType focusStart,
@@ -305,7 +305,7 @@ bool macRefineGpu(OctreeData<KeyType, GpuTag>& tree,
     geoMacSpheresGpu(rawPtr(tree.prefixes), tree.numNodes, rawPtr(centers), invTheta, box);
 
     reallocate(macs, tree.numNodes, 1.05);
-    fillGpu(macs.data(), macs.data() + macs.size(), char(0));
+    fillGpu(macs.data(), macs.data() + macs.size(), uint8_t(0));
 
     KeyType growthLower = focusStart < oldFocusStart ? oldFocusStart : focusStart;
     KeyType growthUpper = oldFocusEnd < focusEnd ? oldFocusEnd : focusEnd;
@@ -398,7 +398,7 @@ private:
     std::vector<unsigned> leafCounts_;
     std::vector<unsigned> counts_;
     //! @brief mac evaluation result relative to focus area (pass or fail)
-    std::vector<char> macs_;
+    std::vector<uint8_t> macs_;
 };
 
 } // namespace cstone
