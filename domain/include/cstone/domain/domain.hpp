@@ -179,7 +179,7 @@ public:
         auto [exchangeStart, keyView] =
             distribute(sorter, particleKeys, x, y, z, std::tuple_cat(std::tie(h), particleProperties), scratch);
         // h is already reordered here for use in halo discovery
-        gatherArrays({sorter.getMap() + global_.o3start(bufDesc_), global_.numAssigned()}, 0, std::tie(h),
+        gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0, std::tie(h),
                      util::reverse(scratch));
 
         std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), 1.0 / theta_);
@@ -194,20 +194,10 @@ public:
         focusTree_.updateTree(peers, global_.assignment(), box());
         focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
 
-        auto octreeView            = focusTree_.octreeViewAcc();
-        const KeyType* focusLeaves = focusTree_.treeLeavesAcc().data();
-
-        reallocate(octreeView.numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
-        halos_.discover(octreeView.prefixes, octreeView.childOffsets, octreeView.internalToLeaf, focusLeaves,
-                        focusTree_.leafCountsAcc(), focusTree_.assignment(), {rawPtr(layoutAcc_), layoutAcc_.size()},
-                        box(), rawPtr(h), haloSearchExt_, std::get<0>(scratch));
-        auto fail = halos_.computeLayout(focusTree_.treeLeaves(), focusTree_.leafCounts(), focusTree_.assignment(),
-                                         peers, layout_);
-        if (fail)
-        {
-            std::cout << "found halo outside peer area on rank " << myRank_ << std::endl;
-            MPI_Abort(MPI_COMM_WORLD, 67);
-        }
+        reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
+        focusTree_.discoverHalos({rawPtr(layoutAcc_), layoutAcc_.size()}, rawPtr(h), haloSearchExt_, get<0>(scratch));
+        focusTree_.computeLayout(layout_);
+        halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), peers, layout_);
 
         updateLayout(sorter, keyView, particleKeys, std::tie(h),
                      std::tuple_cat(std::tie(x, y, z), particleProperties), scratch);
@@ -233,8 +223,8 @@ public:
 
         auto [exchangeStart, keyView] =
             distribute(sorter, particleKeys, x, y, z, std::tuple_cat(std::tie(h, m), particleProperties), scratch);
-        gatherArrays({sorter.getMap() + global_.o3start(bufDesc_), global_.numAssigned()}, 0, std::tie(x, y, z, h, m),
-                     util::reverse(scratch));
+        gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
+                     std::tie(x, y, z, h, m), util::reverse(scratch));
 
         float invThetaEff      = invThetaMinToVec(theta_);
         std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), invThetaEff);
@@ -268,18 +258,14 @@ public:
                                      std::get<1>(scratch));
             focusTree_.updateMacs(global_.assignment(), 1.0 / theta_);
 
-            auto octreeView            = focusTree_.octreeViewAcc();
-            const KeyType* focusLeaves = focusTree_.treeLeavesAcc().data();
-
-            reallocate(octreeView.numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
-            halos_.discover(octreeView.prefixes, octreeView.childOffsets, octreeView.internalToLeaf, focusLeaves,
-                            focusTree_.leafCountsAcc(), focusTree_.assignment(),
-                            {rawPtr(layoutAcc_), layoutAcc_.size()}, box(), rawPtr(h), haloSearchExt_,
-                            std::get<0>(scratch));
-            focusTree_.addMacs(halos_.haloFlags());
-            fail = halos_.computeLayout(focusTree_.treeLeaves(), focusTree_.leafCounts(), focusTree_.assignment(),
-                                        peers, layout_);
+            reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
+            focusTree_.discoverHalos({rawPtr(layoutAcc_), layoutAcc_.size()}, rawPtr(h), haloSearchExt_,
+                                     get<0>(scratch));
+            focusTree_.addMacs();
+            fail = focusTree_.computeLayout(layout_);
             MPI_Allreduce(MPI_IN_PLACE, &fail, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+            halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), peers, layout_);
 
             if (fail)
             {
@@ -540,7 +526,7 @@ private:
         util::for_each_tuple(relocate, orderedBuffers);
 
         // reorder the unordered buffers
-        gatherArrays({sorter.getMap() + global_.o3start(bufDesc_), global_.numAssigned()}, newBufDesc.start,
+        gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, newBufDesc.start,
                      unorderedBuffers, util::reverse(scratchBuffers));
 
         // newBufDesc is now the valid buffer description

@@ -61,7 +61,8 @@ TEST(DomainDecomposition, invertRanges)
 TEST(Layout, extractMarkedElements)
 {
     std::vector<unsigned> leaves{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-    std::vector<uint8_t> haloFlags{0, 0, 0, 1, 1, 1, 0, 1, 0, 1};
+    // std::vector<LocalIndex> haloFlags{0, 0, 0, 1, 1, 1, 0, 1, 0, 1};
+    std::vector<LocalIndex> haloFlags{0, 0, 0, 0, 1, 2, 3, 3, 4, 4, 5};
 
     {
         std::vector<unsigned> reqKeys = extractMarkedElements<unsigned>(leaves, haloFlags, 0, 0);

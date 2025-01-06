@@ -242,11 +242,11 @@ auto vecMacMatrix(const std::vector<KeyType>& leaves,
     {
         TreeNodeIndex iStart = findNodeAbove(leaves.data(), nNodes(leaves), assignment[i]);
         TreeNodeIndex iEnd   = findNodeAbove(leaves.data(), nNodes(leaves), assignment[i + 1]);
-        std::vector<char> macs_internal(numNodes, 0);
+        std::vector<uint8_t> macs_internal(numNodes, 0);
         markMacs(octree.nodeKeys().data(), octree.childOffsets().data(), c4.data(), box, leaves.data() + iStart,
                  iEnd - iStart, false, macs_internal.data());
 
-        std::vector<char> macs(octree.numLeafNodes(), 0);
+        std::vector<uint8_t> macs(octree.numLeafNodes(), 0);
         gather(octree.internalOrder(), macs_internal.data(), macs.data());
 
         for (int j = 0; j < numRanks; ++j)

@@ -218,13 +218,18 @@ public:
     //! @brief return the space filling curve rank assignment of the last call to @a assign()
     const SfcAssignment<KeyType>& assignment() const { return assignment_; }
 
-    LocalIndex o3start(BufferDescription o1) const
+    /*! @brief  index of first local key (and gather ordering element) after receiving particles from domain exchange
+     * @param o1  pre-exchange buffer descrption
+     */
+    LocalIndex postExchangeStart(BufferDescription o1) const
     {
         return domain_exchange::assignedEnvelope(o1, numAssigned() - numPresent())[0] + numSendDown();
     }
     //! @brief number of local particles to be sent to lower ranks
     LocalIndex numSendDown() const { return exchanges_[myRank_]; }
+    //! @brief number of particles present before communication <= numAssigned()
     LocalIndex numPresent() const { return exchanges_.count(myRank_); }
+    //! @brief number of particles assigned to local subdomain
     LocalIndex numAssigned() const { return assignment_.totalCount(myRank_); }
 
 private:
