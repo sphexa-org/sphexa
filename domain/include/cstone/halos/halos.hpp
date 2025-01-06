@@ -58,7 +58,7 @@ static void checkIndices(const SendList& sendList,
 template<class KeyType>
 int checkHalos(int myRank,
                std::span<const TreeIndexPair> focusAssignment,
-               std::span<const int> haloFlags,
+               std::span<const uint8_t> haloFlags,
                std::span<const KeyType> ftree)
 {
     TreeNodeIndex firstAssignedNode = focusAssignment[myRank].start();
@@ -154,11 +154,11 @@ public:
         if constexpr (HaveGpu<Accelerator>{})
         {
             // round up to multiple of 128 such that the radii pointer will be aligned
-            size_t flagBytes  = round_up((numLeafNodes + 1) * sizeof(int), 128);
+            size_t flagBytes  = round_up((numLeafNodes + 1) * sizeof(uint8_t), 128);
             size_t radiiBytes = numLeafNodes * sizeof(float);
             size_t origSize   = reallocateBytes(scratch, flagBytes + radiiBytes, growthRate);
 
-            auto* d_flags = reinterpret_cast<int*>(rawPtr(scratch));
+            auto* d_flags = reinterpret_cast<uint8_t*>(rawPtr(scratch));
             auto* d_radii = reinterpret_cast<float*>(rawPtr(scratch)) + flagBytes / sizeof(float);
 
             fillGpu(layout.data() + firstNode, layout.data() + firstNode + 1, LocalIndex(0));
@@ -167,7 +167,7 @@ public:
             // SPH convention: interaction radius = 2 * h
             scaleGpu(d_radii, d_radii + numLeafNodes, 2.0f * searchExtFact);
 
-            fillGpu(d_flags, d_flags + numLeafNodes, 0);
+            fillGpu(d_flags, d_flags + numLeafNodes, uint8_t{0});
             findHalosGpu(prefixes, childOffsets, internalToLeaf, leaves, d_radii, box, firstNode, lastNode, d_flags);
             memcpyD2H(d_flags, numLeafNodes, haloFlags_.data());
 
@@ -177,7 +177,7 @@ public:
         {
             layout[0] = 0;
             std::inclusive_scan(counts.begin() + firstNode, counts.begin() + lastNode, layout.begin() + 1,
-                                std::plus<>{}, LocalIndex(0));
+                                std::plus<>{}, LocalIndex{0});
             std::vector<float> haloRadii(counts.size(), 0.0f);
 #pragma omp parallel for schedule(static)
             for (TreeNodeIndex i = 0; i < numNodesSearch; ++i)
@@ -262,7 +262,7 @@ public:
         }
     }
 
-    std::span<int> haloFlags() { return haloFlags_; }
+    std::span<uint8_t> haloFlags() { return haloFlags_; }
 
 private:
     int myRank_;
@@ -270,8 +270,7 @@ private:
     RecvList incomingHaloIndices_;
     SendList outgoingHaloIndices_;
 
-    std::vector<int> haloFlags_;
-    AccVector<int> haloFlagsAcc_;
+    std::vector<uint8_t> haloFlags_;
 
     /*! @brief Counter for halo exchange calls
      * Multiple client calls to domain::exchangeHalos() during a time-step

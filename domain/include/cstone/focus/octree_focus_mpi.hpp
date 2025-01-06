@@ -578,7 +578,7 @@ public:
     std::span<const Vec3<RealType>> geoCentersAcc() const { return {rawPtr(geoCentersAcc_), geoCentersAcc_.size()}; }
     std::span<const Vec3<RealType>> geoSizesAcc() const { return {rawPtr(geoSizesAcc_), geoSizesAcc_.size()}; }
 
-    void addMacs(std::span<int> haloFlags) const
+    void addMacs(std::span<uint8_t> haloFlags) const
     {
         const TreeNodeIndex* toInternal = leafToInternal(treeData_).data();
 #pragma omp parallel for schedule(static)
