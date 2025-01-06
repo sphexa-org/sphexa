@@ -44,13 +44,13 @@ TEST(Macs, limitSource4x4_matchCPU)
     std::vector<KeyType> h_prefixes = toHost(fullTree.prefixes);
     std::vector<SourceCenterType<T>> h_centers(ov.numNodes);
     geoMacSpheres<KeyType>(h_prefixes, h_centers.data(), invTheta, box);
-    thrust::device_vector<char> macs(ov.numNodes, 0);
+    thrust::device_vector<uint8_t> macs(ov.numNodes, 0);
     thrust::device_vector<SourceCenterType<T>> centers = h_centers;
 
     markMacsGpu(ov.prefixes, ov.childOffsets, rawPtr(centers), box, rawPtr(leaves) + 0, 32, true, rawPtr(macs));
-    thrust::host_vector<char> h_macs = macs;
+    thrust::host_vector<uint8_t> h_macs = macs;
 
-    thrust::host_vector<char> macRef = std::vector<char>{1, 0, 0, 0, 0, 1, 1, 1, 1};
+    thrust::host_vector<uint8_t> macRef = std::vector<uint8_t>{1, 0, 0, 0, 0, 1, 1, 1, 1};
     macRef.resize(ov.numNodes);
     EXPECT_EQ(macRef, h_macs);
 
