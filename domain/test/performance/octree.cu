@@ -108,7 +108,7 @@ int main()
     // halo discovery benchmark
 
     thrust::device_vector<float> haloRadii(nNodes(tree), 0.01);
-    thrust::device_vector<int> flags(nNodes(tree), 0);
+    thrust::device_vector<uint8_t> flags(nNodes(tree), 0);
 
     auto octreeView      = octree.data();
     auto findHalosLambda = [octree = octreeView, &box, &tree, &haloRadii, &flags]()
@@ -127,7 +127,7 @@ int main()
     OctreeView<KeyType> h_octree = h_octreeHarness.data();
     {
         thrust::host_vector<float> radii = haloRadii;
-        std::vector<int> h_flags(nNodes(tree), 0);
+        std::vector<uint8_t> h_flags(nNodes(tree), 0);
 
         auto findHalosCpuLambda = [&]()
         {

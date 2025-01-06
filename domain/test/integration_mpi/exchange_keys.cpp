@@ -53,7 +53,7 @@ template<class KeyType>
 void exchangeKeys(int myRank, int numRanks)
 {
     std::vector<unsigned> counts{2, 2, 1, 1, 1, 1, 2, 2};
-    std::vector<int> haloFlags{0, 1, 0, 0, 0, 0, 1, 0};
+    std::vector<uint8_t> haloFlags{0, 1, 0, 0, 0, 0, 1, 0};
 
     std::vector<unsigned> layout(counts.size() + 1);
 
@@ -107,7 +107,7 @@ void unequalSurface(int myRank, int numRanks)
     std::vector<KeyType> treeLeaves = OctreeMaker<KeyType>().divide().makeTree();
     std::vector<unsigned> counts(nNodes(treeLeaves), 1);
 
-    std::vector<int> haloFlags(nNodes(treeLeaves));
+    std::vector<uint8_t> haloFlags(nNodes(treeLeaves));
     std::vector<int> peers;
 
     std::vector<TreeIndexPair> assignment(numRanks);
@@ -121,7 +121,7 @@ void unequalSurface(int myRank, int numRanks)
     if (myRank == 1)
     {
         int offset = nNodes(treeLeaves) - 1;
-        haloFlags  = std::vector<int>{1, 1, 0, 1, 1, 1, 1, 1};
+        haloFlags  = std::vector<uint8_t>{1, 1, 0, 1, 1, 1, 1, 1};
         peers.push_back(0);
         reference[0].addRange(offset, offset + 1);
         computeNodeLayout<false>(counts, haloFlags, 2, 3, layout);
@@ -129,7 +129,7 @@ void unequalSurface(int myRank, int numRanks)
 
     if (myRank == 0)
     {
-        haloFlags = std::vector<int>{0, 0, 0, 0, 0, 0, 0, 1};
+        haloFlags = std::vector<uint8_t>{0, 0, 0, 0, 0, 0, 0, 1};
         peers.push_back(1);
         reference[1].addRange(0, nNodes(treeLeaves) - 1);
         computeNodeLayout<false>(counts, haloFlags, 0, 7, layout);
