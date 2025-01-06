@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include <iostream>
 #include <vector>
 
 #include "cstone/cuda/cuda_utils.hpp"
@@ -93,7 +94,7 @@ inline std::vector<TreeNodeIndex> enumerateRanges(std::span<const IndexPair<Tree
  *
  * @tparam IntegralType  an integer type
  * @param source         array with quantities to extract, length N+1
- * @param flags          0 or 1 flags for index, length N
+ * @param flags          select flags, length N+1
  * @param firstReqIdx    first index, permissible range: [0:N]
  * @param secondReqIdx   second index, permissible range: [0:N+1]
  * @return               vector (of pairs) of elements of @p source that span all
@@ -109,7 +110,7 @@ inline std::vector<TreeNodeIndex> enumerateRanges(std::span<const IndexPair<Tree
  */
 template<class IntegralType>
 std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> source,
-                                                std::span<const uint8_t> flags,
+                                                std::span<const LocalIndex> flags,
                                                 TreeNodeIndex firstReqIdx,
                                                 TreeNodeIndex secondReqIdx)
 {
@@ -118,7 +119,7 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
     while (firstReqIdx != secondReqIdx)
     {
         // advance to first halo (or to secondReqIdx)
-        while (firstReqIdx < secondReqIdx && flags[firstReqIdx] == 0)
+        while (firstReqIdx < secondReqIdx && flags[firstReqIdx + 1] == flags[firstReqIdx])
         {
             firstReqIdx++;
         }
@@ -128,7 +129,7 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
         {
             requestKeys.push_back(source[firstReqIdx]);
             // advance until not a halo or end of range
-            while (firstReqIdx < secondReqIdx && flags[firstReqIdx] == 1)
+            while (firstReqIdx < secondReqIdx && flags[firstReqIdx + 1] > flags[firstReqIdx])
             {
                 firstReqIdx++;
             }
@@ -143,24 +144,22 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
  *
  * @param[in]  focusLeafCounts   node counts of the focus leaves, size N
  * @param[in]  haloFlags         flag for each node, with a non-zero value if present as halo node, size N
- * @param[in]  firstIdx  first focus leaf idx to treat as part of the assigned nodes on the executing rank
- * @param[in]  lastIdx   last focus leaf idx to treat as part of the assigned nodes on the executing rank
+ * @param[in]  idx               first and last focus leaf idx of the assigned nodes on the executing rank
  * @param[out] layout            length N+1. The first element is zero, the last element is
  *                               equal to the sum of all present (assigned+halo) node counts.
  */
 template<bool useGpu>
 void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
                        std::span<const uint8_t> haloFlags,
-                       TreeNodeIndex firstIdx,
-                       TreeNodeIndex lastIdx,
+                       TreeIndexPair idx,
                        std::span<LocalIndex> layout)
 {
     if constexpr (useGpu)
     {
-        memcpyD2D(focusLeafCounts.data() + firstIdx, lastIdx - firstIdx, layout.data() + firstIdx);
-        selectCopyGpu(focusLeafCounts.data(), firstIdx, haloFlags.data(), layout.data());
-        selectCopyGpu(focusLeafCounts.data() + lastIdx, focusLeafCounts.size() - lastIdx, haloFlags.data() + lastIdx,
-                      layout.data() + lastIdx);
+        memcpyD2D(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start());
+        selectCopyGpu(focusLeafCounts.data(), idx.start(), haloFlags.data(), layout.data());
+        selectCopyGpu(focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(),
+                      haloFlags.data() + idx.end(), layout.data() + idx.end());
         exclusiveScanGpu(layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0});
     }
     else
@@ -168,11 +167,50 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
 #pragma omp parallel for
         for (TreeNodeIndex i = 0; i < TreeNodeIndex(focusLeafCounts.size()); ++i)
         {
-            bool haveParticles = (firstIdx <= i && i < lastIdx) || haloFlags[i];
+            bool haveParticles = (idx.start() <= i && i < idx.end()) || haloFlags[i];
             layout[i]          = -int(haveParticles) & focusLeafCounts[i];
         }
         std::exclusive_scan(layout.begin(), layout.end(), layout.begin(), LocalIndex{0});
     }
+}
+
+//! @brief check halo discovery for sanity
+template<class KeyType>
+int checkLayout(int myRank,
+               std::span<const TreeIndexPair> focusAssignment,
+               std::span<const LocalIndex> layout,
+               std::span<const KeyType> ftree)
+{
+    TreeNodeIndex firstNode = focusAssignment[myRank].start();
+    TreeNodeIndex lastNode  = focusAssignment[myRank].end();
+
+    std::array<TreeNodeIndex, 2> checkRanges[2] = {{0, firstNode}, {lastNode, TreeNodeIndex(nNodes(ftree))}};
+
+    int ret = 0;
+    for (int range = 0; range < 2; ++range)
+    {
+#pragma omp parallel for
+        for (TreeNodeIndex i = checkRanges[range][0]; i < checkRanges[range][1]; ++i)
+        {
+            if (layout[i + 1] > layout[i])
+            {
+                bool peerFound = false;
+                for (auto peerRange : focusAssignment)
+                {
+                    if (peerRange.start() <= i && i < peerRange.end()) { peerFound = true; }
+                }
+                if (!peerFound)
+                {
+                    std::cout << "Assignment rank " << myRank << " " << std::oct << ftree[firstNode] << " - "
+                              << ftree[lastNode] << std::dec << std::endl;
+                    std::cout << "Failed node " << i << " " << std::oct << ftree[i] << " - " << ftree[i + 1] << std::dec
+                              << std::endl;
+                    ret = 1;
+                }
+            }
+        }
+    }
+    return ret;
 }
 
 //! @brief Compare value_type size of container T to the value_type size of the N-th container in Tuple
