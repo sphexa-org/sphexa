@@ -183,7 +183,7 @@ __global__ void groupSplitsKernel(LocalIndex first,
     LocalIndex warpIdx = tid / GpuConfig::warpSize;
     LocalIndex laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
 
-    if (warpIdx * groupSize >= last) { return; }
+    if (warpIdx * groupSize >= last - first) { return; }
 
     LocalIndex bodyIdx[nwt];
     for (int k = 0; k < nwt; ++k)

@@ -41,6 +41,7 @@ void groupDivvTimestepGpu(float Krho, const GroupView& grp, const T* divv, float
     int numThreads = 256;
     int numBlocks  = cstone::iceil(grp.numGroups, numThreads);
 
+    if (numBlocks == 0) { return; }
     groupDivvKernel<<<numBlocks, numThreads>>>(Krho, grp.groupStart, grp.groupEnd, grp.numGroups, divv, groupDt);
 }
 
@@ -75,6 +76,7 @@ void groupAccTimestepGpu(float etaAcc, const GroupView& grp, const T* ax, const 
     int numThreads = 256;
     int numBlocks  = cstone::iceil(grp.numGroups, numThreads);
 
+    if (numBlocks == 0) { return; }
     groupAccKernel<<<numBlocks, numThreads>>>(etaAcc, grp.groupStart, grp.groupEnd, grp.numGroups, ax, ay, az, groupDt);
 }
 
