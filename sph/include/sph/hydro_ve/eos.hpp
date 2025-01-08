@@ -76,6 +76,41 @@ void computeEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     }
 }
 
+template<typename Dataset>
+void computeIsothermalEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
+{
+    const auto* m     = d.m.data();
+    const auto* kx    = d.kx.data();
+    const auto* xm    = d.xm.data();
+    const auto* gradh = d.gradh.data();
+
+    auto* prho = d.prho.data();
+    auto* c    = d.c.data();
+
+    bool storeRho = (d.rho.size() == d.m.size());
+    bool storeP   = (d.p.size() == d.m.size());
+
+#pragma omp parallel for schedule(static)
+    for (size_t i = startIndex; i < endIndex; ++i)
+    {
+        auto rho = kx[i] * m[i] / xm[i];
+        auto pi  = isothermalEOS(c[i], rho);
+        prho[i]  = pi / (kx[i] * m[i] * m[i] * gradh[i]);
+        if (storeRho) { d.rho[i] = rho; }
+        if (storeP) { d.p[i] = pi; }
+    }
+}
+
+template<class Dataset>
+void computeIsothermalEOS(size_t startIndex, size_t endIndex, Dataset& d)
+{
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    {
+        cuda::computeIsothermalEOS(startIndex, endIndex, d);
+    }
+    else { computeIsothermalEOS_Impl(startIndex, endIndex, d); }
+}
+
 template<class Dataset>
 void computeEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
