@@ -86,11 +86,9 @@ void computeIsothermalEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
 
     auto* prho = d.prho.data();
     auto* c    = d.c.data();
-    auto* u    = d.u.data();
 
     bool storeRho = (d.rho.size() == d.m.size());
     bool storeP   = (d.p.size() == d.m.size());
-    bool storeU   = (d.u.size() == d.m.size());
 
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; ++i)
@@ -100,7 +98,6 @@ void computeIsothermalEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
         prho[i]  = pi / (kx[i] * m[i] * m[i] * gradh[i]);
         if (storeRho) { d.rho[i] = rho; }
         if (storeP) { d.p[i] = pi; }
-        if (storeU) { u[i] = c[i] * c[i] / (d.gamma * (d.gamma - 1.)); }
     }
 }
 

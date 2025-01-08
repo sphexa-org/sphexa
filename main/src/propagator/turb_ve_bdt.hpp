@@ -32,15 +32,15 @@
 #pragma once
 
 #include <filesystem>
-#include <variant>
 
-#include "cstone/util/constexpr_string.hpp"
 #include "cstone/fields/field_get.hpp"
 #include "io/arg_parser.hpp"
-#include "sph/sph.hpp"
 #include "sph/hydro_turb/turbulence_data.hpp"
+#include "sph/particles_data.hpp"
+#include "sph/sph.hpp"
 #include "sph/ts_rungs.hpp"
 
+#include "ipropagator.hpp"
 #include "gravity_wrapper.hpp"
 
 namespace sphexa
@@ -85,9 +85,16 @@ protected:
     //! number of initial steps to disable block time-steps
     int safetySteps{0};
 
-    AccVector<LocalIndex>                                                                haloRecvScratch;
-    sph::TurbulenceData<typename DataType::RealType, typename DataType::AcceleratorType> turbulenceData;
-    using ConservedFields = FieldList<"c", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "rung", "id">;
+    //! @brief no dependent fields can be temporarily reused as scratch space for halo exchanges
+    AccVector<LocalIndex> haloRecvScratch;
+
+    TurbulenceData<T, Acc> turbulenceData;
+
+    /*! @brief the list of conserved particles fields with values preserved between iterations
+     *
+     * x, y, z, h and m are automatically considered conserved and must not be specified in this list
+     */
+    using ConservedFields = FieldList<"c", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "alpha", "rung", "id">;
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "du", "c11", "c12", "c13", "c22", "c23", "c33", "xm",
@@ -282,7 +289,7 @@ public:
         if (d.g != 0.0)
         {
             bool      isNewHierarchy = activeRung(timestep_.substep, timestep_.numRungs) == 0;
-            GroupView gravGroup = isNewHierarchy ? mHolder_.computeSpatialGroups(simData.hydro, domain) : activeRungs_;
+            GroupView gravGroup      = isNewHierarchy ? mHolder_.computeSpatialGroups(d, domain) : activeRungs_;
 
             mHolder_.upsweep(d, domain);
             timer.step("Upsweep");
@@ -467,11 +474,11 @@ private:
             }
 
             // clang-format off
-                std::cout << "R0: " << numRungs[0] << " (" << (100. * numRungs[0] / groups_.numGroups) << "%) "
-                          << "R1: " << numRungs[1] << " (" << (100. * numRungs[1] / groups_.numGroups) << "%) "
-                          << "R2: " << numRungs[2] << " (" << (100. * numRungs[2] / groups_.numGroups) << "%) "
-                          << "R3: " << numRungs[3] << " (" << (100. * numRungs[3] / groups_.numGroups) << "%) "
-                          << "All: " << groups_.numGroups << " (100%)" << std::endl;
+            std::cout << "R0: " << numRungs[0] << " (" << (100. * numRungs[0] / groups_.numGroups) << "%) "
+                      << "R1: " << numRungs[1] << " (" << (100. * numRungs[1] / groups_.numGroups) << "%) "
+                      << "R2: " << numRungs[2] << " (" << (100. * numRungs[2] / groups_.numGroups) << "%) "
+                      << "R3: " << numRungs[3] << " (" << (100. * numRungs[3] / groups_.numGroups) << "%) "
+                      << "All: " << groups_.numGroups << " (100%)" << std::endl;
             // clang-format on
         }
     }
