@@ -36,7 +36,7 @@ sph-build-cuda12-sm90-debug:
     - 'uenv_dir=`echo $UENV_VIEW |cut -d: -f1`'
     - 'uenv_view=`echo $UENV_VIEW |cut -d: -f3`'
     - echo "UENV_VIEW=$UENV_VIEW uenv_dir=$uenv_dir uenv_view=$uenv_view"
-    - 'export CPATH=$uenv_dir/env/$uenv_view:$CPATH'
+    - 'export CPATH=$uenv_dir/env/$uenv_view/include:$CPATH'
     - echo "CPATH=$CPATH"
     - cmake --build build 
       -j `grep -c processor /proc/cpuinfo |awk '{print $0/3}'`
