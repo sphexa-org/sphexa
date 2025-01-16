@@ -4,6 +4,7 @@ include:
 sph:build:cuda12:sm90:debug:
   stage: SPH_build
   # needs: ['sph:base:cuda12']
+  image: prgenv-gnu/24.11:v1
   extends: .uenv-runner-daint-gh200
   variables:
     # JG: 'YES'
