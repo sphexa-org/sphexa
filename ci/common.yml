@@ -5,5 +5,6 @@ stages:
   - sphexa_build
   - sphexa_unittests
 
-variables:
-  SPH_INSTALLDIR_DAINT: $SCRATCH/daint/ci
+# variables:
+#   SPH_INSTALLDIR_DAINT: $SCRATCH
+#   # CI_COMMIT_SHORT_SHA = /daint/ci/f148a2a4
