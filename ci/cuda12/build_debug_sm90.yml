@@ -35,7 +35,7 @@ sph-build-cuda12-sm90-debug:
     # cmake --build
     - uenv_dir=`echo $UENV_VIEW |cut -d\: -f1`
     - uenv_view=`echo $UENV_VIEW |cut -d\: -f3`
-    - export CPATH=$uenv_dir/env/$uenv_view:$CPATH
+    - export CPATH="$uenv_dir/env/$uenv_view:$CPATH"
     - cmake --build build -j `grep -c processor /proc/cpuinfo |awk '{print $0/3}'`
     # cmake --install
     - mkdir -p ${SPH_INSTALLDIR}
