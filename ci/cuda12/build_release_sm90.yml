@@ -9,7 +9,7 @@ sph-build-cuda12-sm90-release:
   variables:
     PERSIST_IMAGE_NAME: ${CSCS_REGISTRY_PATH}/sphexa_cuda12_release:${CI_COMMIT_SHORT_SHA}
     WITH_UENV_VIEW: 'default'
-    SLURM_PARTITION: 'debug'
+    # SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
   before_script:
     - pwd

@@ -8,7 +8,7 @@ sph-run-cuda12-sm90-release-1rank:
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
-    SLURM_PARTITION: 'debug'
+    # SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 1
   before_script:
@@ -45,7 +45,7 @@ sph-run-cuda12-sm90-release-2ranks:
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
-    SLURM_PARTITION: 'debug'
+    # SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 2
   before_script:
@@ -81,7 +81,7 @@ sph-run-cuda12-sm90-release-4ranks:
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
-    SLURM_PARTITION: 'debug'
+    # SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 4
   before_script:
@@ -103,7 +103,7 @@ sph-run-cuda12-sm90-release-12ranks:
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
-    SLURM_PARTITION: 'debug'
+    # SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 12
   before_script:
@@ -127,7 +127,7 @@ sph-run-cuda12-sm90-release-sphexa-cuda:
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
-    SLURM_PARTITION: 'debug'
+    # SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 4
     SLURM_CPUS_PER_TASK: 71
@@ -150,7 +150,7 @@ sph-run-cuda12-sm90-release-sphexa-cpu:
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
-    SLURM_PARTITION: 'debug'
+    # SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 4
     SLURM_CPUS_PER_TASK: 71
