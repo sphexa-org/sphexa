@@ -1,9 +1,9 @@
 include:
   - local: 'ci/common.yml'
 
-sph-run-cuda12-sm90-debug-1rank:
+sph-run-cuda12-sm90-release-1rank:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-debug']
+  needs: ['sph-build-cuda12-sm90-release']
   image: prgenv-gnu/24.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
@@ -38,9 +38,9 @@ sph-run-cuda12-sm90-debug-1rank:
     - sbin/unit_cuda/component_units_cuda
     - date
 
-sph-run-cuda12-sm90-debug-2ranks:
+sph-run-cuda12-sm90-release-2ranks:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-debug']
+  needs: ['sph-build-cuda12-sm90-release']
   image: prgenv-gnu/24.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
@@ -74,9 +74,9 @@ sph-run-cuda12-sm90-debug-2ranks:
     - sbin/integration_mpi/exchange_halos_gpu
     - date
 
-sph-run-cuda12-sm90-debug-4ranks:
+sph-run-cuda12-sm90-release-4ranks:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-debug']
+  needs: ['sph-build-cuda12-sm90-release']
   image: prgenv-gnu/24.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
@@ -96,9 +96,9 @@ sph-run-cuda12-sm90-debug-4ranks:
     - sbin/ryoanji/global_upsweep_gpu
     - date
  
-sph-run-cuda12-sm90-debug-12ranks:
+sph-run-cuda12-sm90-release-12ranks:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-debug']
+  needs: ['sph-build-cuda12-sm90-release']
   image: prgenv-gnu/24.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
@@ -120,9 +120,9 @@ sph-run-cuda12-sm90-debug-12ranks:
     - sbin/integration_mpi/domain_nranks
     - date
 
-sph-run-cuda12-sm90-debug-sphexa-cuda:
+sph-run-cuda12-sm90-release-sphexa-cuda:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-debug']
+  needs: ['sph-build-cuda12-sm90-release']
   image: prgenv-gnu/24.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
@@ -143,9 +143,9 @@ sph-run-cuda12-sm90-debug-sphexa-cuda:
     - bin/sphexa-cuda --glass ./50c.h5 --init sedov --G 1.0 -n 100 -s 10
     - date
 
-sph-run-cuda12-sm90-debug-sphexa-cpu:
+sph-run-cuda12-sm90-release-sphexa-cpu:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-debug']
+  needs: ['sph-build-cuda12-sm90-release']
   image: prgenv-gnu/24.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
@@ -165,3 +165,5 @@ sph-run-cuda12-sm90-debug-sphexa-cpu:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
     - bin/sphexa --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 4
     - date
+
+
