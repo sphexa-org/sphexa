@@ -16,7 +16,7 @@ sph-run-cuda12-sm90-debug-1:
     - pwd
     # - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
-    - echo "Debug with: cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
+    - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     #
   script:
     - echo "$MYTEST"
