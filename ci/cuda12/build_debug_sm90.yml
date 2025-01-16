@@ -2,7 +2,7 @@ include:
   - local: 'ci/common.yml'
 
 sph-build-cuda12-sm90-debug:
-  stage: build
+  stage: sphexa_build
   # needs: ['sph:base:cuda12']
   image: prgenv-gnu/24.11:v1
   extends: [.uenv-runner-daint-gh200]
@@ -19,7 +19,7 @@ sph-build-cuda12-sm90-debug:
     - mpicxx --version
     - nvcc --version
   script:
-    - echo "OUT: PERSIST_IMAGE_NAME = ${PERSIST_IMAGE_NAME}"
+    - echo "OUT / PERSIST_IMAGE_NAME = ${PERSIST_IMAGE_NAME}"
     - pwd
     - ls -la
     - echo ${SCRATCH}
