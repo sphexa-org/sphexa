@@ -21,11 +21,16 @@ sph-build-cuda12-sm90-debug:
     - mpicxx --version
     - nvcc --version
     - echo "OUT / PERSIST_IMAGE_NAME = ${PERSIST_IMAGE_NAME}"
-    - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR} - ${CI_COMMIT_SHORT_SHA}"
+    - echo "SCRATCH = ${SCRATCH}"
+    - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
+    - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
     # do not use : !
   script:
     # jfrog.svc.cscs.ch/docker-ci-ext/44692846847247/sphexa_cuda12_debug:b75f47f5
     # /capstor/scratch/cscs/piccinal/gitlab-runner/builds/hY7owqPdK/0/4264416954089684
+    - echo "SCRATCH = ${SCRATCH}"
+    - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
+    - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
     - mkdir -p ${SPH_INSTALLDIR}
     - touch ${SPH_INSTALLDIR}/xx
 #     - CC=mpicc CXX=mpicxx cmake -S . -B build
