@@ -33,7 +33,7 @@ sph-build-cuda12-sm90-debug:
       -DCMAKE_CUDA_ARCHITECTURES=90
       -DCMAKE_BUILD_TYPE=Debug
     # cmake --build
-    - uenv_dir=`echo $UENV_VIEW |cut -d\: -f1`
+    - 'uenv_dir=`echo $UENV_VIEW |cut -d\: -f1`'
     #- uenv_view=`echo $UENV_VIEW |cut -d\: -f3`
     #- export CPATH="$uenv_dir/env/$uenv_view:$CPATH"
     - cmake --build build 
