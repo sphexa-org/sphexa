@@ -7,16 +7,25 @@ sph:build:cuda12:sm90:debug:
   image: prgenv-gnu/24.11:v1
   extends: .uenv-runner-daint-gh200
   variables:
-    # JG: 'YES'
-    # DOCKERFILE: 'ci/cuda12/Dockerfile_2'
     PERSIST_IMAGE_NAME: $CSCS_REGISTRY_PATH/sphexa-cuda12-debug:$CI_COMMIT_SHORT_SHA
+    # JG: 'YES'
     # PERSIST_IMAGE_NAME: "${BUILD_CUDA12_SM90_DEBUG}"
   before_script:
-    - echo "OUT=PERSIST_IMAGE_NAME=$PERSIST_IMAGE_NAME"
-  script:
     - cmake --version
     - mpicxx --version
     - nvcc --version
+  script:
+    - echo "OUT: PERSIST_IMAGE_NAME = ${PERSIST_IMAGE_NAME}"
+    - pwd
+    - ls -la
+    - echo $SCRATCH
+    - ls -la $SCRATCH
+    - touch $SCRATCH/x
+#     - CC=mpicc CXX=mpicxx cmake -S . -B build
+#       -DCMAKE_CUDA_ARCHITECTURES=90
+#       -DCMAKE_BUILD_TYPE=Debug
+#     - cmake --build build -j `grep -c processor /proc/cpuinfo |awk '{print $0/3}'`
+#     - cmake --install build --prefix=
   variables:
     WITH_UENV_VIEW: 'default'
     SLURM_JOB_NUM_NODES: 1
