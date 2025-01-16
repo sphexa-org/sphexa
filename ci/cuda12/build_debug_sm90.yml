@@ -38,7 +38,9 @@ sph-build-cuda12-sm90-debug:
       -DCMAKE_CUDA_ARCHITECTURES=90
       -DCMAKE_BUILD_TYPE=Debug
     # cmake --build
-    - time -p cmake --build build 
+    - date
+    - cmake --build build 
       -j `grep -c processor /proc/cpuinfo |awk '{print $0/3}'`
+    - date
     # cmake --install
     - cmake --install build --prefix=${SPH_INSTALLDIR}
