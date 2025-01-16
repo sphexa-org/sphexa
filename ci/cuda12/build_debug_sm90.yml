@@ -14,9 +14,10 @@ sph:build:cuda12:sm90:debug:
     - echo "OUT=PERSIST_IMAGE_NAME=$PERSIST_IMAGE_NAME"
   script:
     - cmake --version
-    - nvcc --version
     - mpicxx --version
+    - nvcc --version
   variables:
     WITH_UENV_VIEW: 'default'
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 1
+    SLURM_PARTITION: 'debug'
