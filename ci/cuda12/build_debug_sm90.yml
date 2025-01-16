@@ -20,6 +20,7 @@ sph-build-cuda12-sm90-debug:
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
     - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
     - mkdir -p ${SPH_INSTALLDIR}
+    - chmod a+rx ${SPH_INSTALLDIR}
     # NOTE: error 'script config should be a string or a nested array of strings up to 10 levels deep' -> do not use ":", use '' instead
     - 'uenv_dir=`echo $UENV_VIEW |cut -d: -f1`'
     - 'uenv_view=`echo $UENV_VIEW |cut -d: -f3`'
