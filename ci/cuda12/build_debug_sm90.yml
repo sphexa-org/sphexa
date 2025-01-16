@@ -1,0 +1,21 @@
+# include:
+#   - local: 'ci/common.yml'
+
+sph:build:cuda12:sm90:debug:
+  stage: SPH_build
+  # needs: ['sph:base:cuda12']
+  extends: .uenv-runner-daint-gh200
+  variables:
+    # JG: 'YES'
+    # DOCKERFILE: 'ci/cuda12/Dockerfile_2'
+    PERSIST_IMAGE_NAME: $CSCS_REGISTRY_PATH/sphexa-cuda12-debug:$CI_COMMIT_SHORT_SHA
+    # PERSIST_IMAGE_NAME: "${BUILD_CUDA12_SM90_DEBUG}"
+  before_script:
+    - echo "OUT=PERSIST_IMAGE_NAME=$PERSIST_IMAGE_NAME"
+  script:
+    - cmake --version
+    - nvcc --version
+  variables:
+    WITH_UENV_VIEW: 'default'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 1
