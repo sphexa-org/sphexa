@@ -1,7 +1,7 @@
 include:
   - local: 'ci/common.yml'
 
-sph:build:cuda12:sm90:debug:
+sph_build_cuda12_sm90_debug:
   stage: SPH_build
   # needs: ['sph:base:cuda12']
   image: prgenv-gnu/24.11:v1
