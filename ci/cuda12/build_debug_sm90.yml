@@ -15,6 +15,7 @@ sph:build:cuda12:sm90:debug:
   script:
     - cmake --version
     - nvcc --version
+    - mpicxx --version
   variables:
     WITH_UENV_VIEW: 'default'
     SLURM_JOB_NUM_NODES: 1
