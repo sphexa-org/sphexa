@@ -3,4 +3,4 @@ include:
 
 stages:
   - sphexa_build
-  - sphexa_unittests
+  - sphexa_run

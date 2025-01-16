@@ -24,7 +24,12 @@ sph-build-cuda12-sm90-debug:
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
     - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
     - mkdir -p ${SPH_INSTALLDIR}
-    # NOTE: error 'script config should be a string or a nested array of strings up to 10 levels deep' -> do not use ":"
+    # NOTE: error 'script config should be a string or a nested array of strings up to 10 levels deep' -> do not use ":", use '' instead
+    - 'uenv_dir=`echo $UENV_VIEW |cut -d: -f1`'
+    - 'uenv_view=`echo $UENV_VIEW |cut -d: -f3`'
+    - echo "UENV_VIEW=$UENV_VIEW uenv_dir=$uenv_dir uenv_view=$uenv_view"
+    - 'export CPATH=$uenv_dir/env/$uenv_view/include:$CPATH'
+    - echo "CPATH=$CPATH"
   script:
     # jfrog.svc.cscs.ch/docker-ci-ext/44692846847247/sphexa_cuda12_debug:b75f47f5
     # /capstor/scratch/cscs/piccinal/gitlab-runner/builds/hY7owqPdK/0/4264416954089684
@@ -33,13 +38,7 @@ sph-build-cuda12-sm90-debug:
       -DCMAKE_CUDA_ARCHITECTURES=90
       -DCMAKE_BUILD_TYPE=Debug
     # cmake --build
-    - 'uenv_dir=`echo $UENV_VIEW |cut -d: -f1`'
-    - 'uenv_view=`echo $UENV_VIEW |cut -d: -f3`'
-    - echo "UENV_VIEW=$UENV_VIEW uenv_dir=$uenv_dir uenv_view=$uenv_view"
-    - 'export CPATH=$uenv_dir/env/$uenv_view/include:$CPATH'
-    - echo "CPATH=$CPATH"
     - cmake --build build 
       -j `grep -c processor /proc/cpuinfo |awk '{print $0/3}'`
     # cmake --install
-    - mkdir -p ${SPH_INSTALLDIR}
     - cmake --install build --prefix=${SPH_INSTALLDIR}

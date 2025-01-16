@@ -1,22 +1,26 @@
 include:
   - local: 'ci/common.yml'
 
-sph-run_unittests_cuda12-sm90-debug-cpu-1rank:
-  stage: sphexa_unittests
+# sph-run_unittests_cuda12-sm90-debug-cpu-1rank:
+sph-run-cuda12-sm90-debug-1:
+  stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-debug']
-  # needs: ['sph:base:cuda12']
   image: prgenv-gnu/24.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
-    # PERSIST_IMAGE_NAME: ${CSCS_REGISTRY_PATH}/sphexa_cuda12_debug:${CI_COMMIT_SHORT_SHA}
     WITH_UENV_VIEW: 'default'
     SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
-    # SLURM_NTASKS: 1
+    SLURM_NTASKS: 1
   before_script:
     - pwd
     # - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
-    - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
+    - echo "Debug with: cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
+    #
   script:
-    - $SPH_INSTALLDIR/bin/sphexa --help
+    - echo "$MYTEST"
+    - $SPH_INSTALLDIR/$MYTEST
+  parallel:
+    matrix:
+      - MYTEST: ["sbin/coord_samples/coordinate_test", "sbin/hydro/turbulence_tests", "sbin/hydro/sph_tests", "sbin/performance/octree_perf", "sbin/performance/peers_perf", "sbin/performance/scan_perf", "sbin/ryoanji/cpu_unit_tests/ryoanji_cpu_unit_tests", "sbin/ryoanji/unit_tests/ryoanji_unit_tests", "sbin/unit/component_units_omp", "sbin/unit/component_units"]
