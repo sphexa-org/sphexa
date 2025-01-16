@@ -17,7 +17,7 @@ sph-build-cuda12-sm90-release:
     - mpicxx --version
     - nvcc --version
     - echo "OUT / PERSIST_IMAGE_NAME = ${PERSIST_IMAGE_NAME}"
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
+    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/release/${CI_COMMIT_SHORT_SHA}
     - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
     - mkdir -p ${SPH_INSTALLDIR}
     # NOTE: error 'script config should be a string or a nested array of strings up to 10 levels deep' -> do not use ":", use '' instead

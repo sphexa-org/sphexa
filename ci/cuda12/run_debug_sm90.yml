@@ -13,14 +13,14 @@ sph-run-cuda12-sm90-debug-1rank:
     SLURM_NTASKS: 1
   before_script:
     - pwd
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
+    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - date
   script:
     - cd $SPH_INSTALLDIR
     - sbin/coord_samples/coordinate_test
     - sbin/hydro/turbulence_tests
-    - ln -s sbin/hydro/example_data.txt .
+    - ln -fs sbin/hydro/example_data.txt .
     - sbin/hydro/sph_tests
     - sbin/performance/octree_perf
     - sbin/performance/peers_perf
@@ -50,7 +50,7 @@ sph-run-cuda12-sm90-debug-2ranks:
     SLURM_NTASKS: 2
   before_script:
     - pwd
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
+    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - date
   script:
@@ -86,7 +86,7 @@ sph-run-cuda12-sm90-debug-4ranks:
     SLURM_NTASKS: 4
   before_script:
     - pwd
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
+    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - date
   script:
@@ -108,7 +108,7 @@ sph-run-cuda12-sm90-debug-12ranks:
     SLURM_NTASKS: 12
   before_script:
     - pwd
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
+    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - date
   script:
@@ -133,7 +133,7 @@ sph-run-cuda12-sm90-debug-sphexa-cuda:
     SLURM_CPUS_PER_TASK: 71
   before_script:
     - pwd
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
+    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - export OMP_NUM_THREADS=64
     - date
@@ -156,7 +156,7 @@ sph-run-cuda12-sm90-debug-sphexa-cpu:
     SLURM_CPUS_PER_TASK: 71
   before_script:
     - pwd
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
+    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - export OMP_NUM_THREADS=64
     - date
