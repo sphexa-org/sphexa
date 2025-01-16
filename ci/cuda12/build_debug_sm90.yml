@@ -1,11 +1,11 @@
 include:
   - local: 'ci/common.yml'
 
-sph_build_cuda12_sm90_debug:
-  stage: sph_build
+sph-build-cuda12-sm90-debug:
+  stage: build
   # needs: ['sph:base:cuda12']
   image: prgenv-gnu/24.11:v1
-  extends: .uenv-runner-daint-gh200
+  extends: [.uenv-runner-daint-gh200]
   variables:
     PERSIST_IMAGE_NAME: ${CSCS_REGISTRY_PATH}/sphexa_cuda12_debug:${CI_COMMIT_SHORT_SHA}
     WITH_UENV_VIEW: 'default'
