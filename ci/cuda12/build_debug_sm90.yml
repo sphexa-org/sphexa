@@ -1,13 +1,17 @@
 include:
   - local: 'ci/common.yml'
 
-sph_build_cuda12_sm90_debug:
+sph:build:cuda12:sm90:debug:
   stage: SPH_build
   # needs: ['sph:base:cuda12']
   image: prgenv-gnu/24.11:v1
   extends: .uenv-runner-daint-gh200
   variables:
     PERSIST_IMAGE_NAME: $CSCS_REGISTRY_PATH/sphexa-cuda12-debug:$CI_COMMIT_SHORT_SHA
+    WITH_UENV_VIEW: 'default'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 1
+    SLURM_PARTITION: 'debug'
     # JG: 'YES'
     # PERSIST_IMAGE_NAME: "${BUILD_CUDA12_SM90_DEBUG}"
   before_script:
@@ -26,8 +30,3 @@ sph_build_cuda12_sm90_debug:
 #       -DCMAKE_BUILD_TYPE=Debug
 #     - cmake --build build -j `grep -c processor /proc/cpuinfo |awk '{print $0/3}'`
 #     - cmake --install build --prefix=
-  variables:
-    WITH_UENV_VIEW: 'default'
-    SLURM_JOB_NUM_NODES: 1
-    SLURM_NTASKS: 1
-    SLURM_PARTITION: 'debug'
