@@ -12,11 +12,12 @@ sph-run_unittests_cuda12-sm90-debug:
     WITH_UENV_VIEW: 'default'
     SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
-    SPH_INSTALLDIR: ${SPH_INSTALLDIR_DAINT}
     # SLURM_NTASKS: 1
   before_script:
     - pwd
     - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
+    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
+    - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
   script:
     - echo "ok"
 

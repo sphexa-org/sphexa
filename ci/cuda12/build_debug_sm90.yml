@@ -11,7 +11,7 @@ sph-build-cuda12-sm90-debug:
     WITH_UENV_VIEW: 'default'
     SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
-    SPH_INSTALLDIR: ${SCRATCH}/${CI_COMMIT_SHORT_SHA}
+    # SPH_INSTALLDIR: ${SCRATCH}/${CI_COMMIT_SHORT_SHA}
     # SLURM_NTASKS: 1
     # JG: 'YES'
     # PERSIST_IMAGE_NAME: "${BUILD_CUDA12_SM90_DEBUG}"
@@ -21,15 +21,12 @@ sph-build-cuda12-sm90-debug:
     - mpicxx --version
     - nvcc --version
     - echo "OUT / PERSIST_IMAGE_NAME = ${PERSIST_IMAGE_NAME}"
-    - echo "SCRATCH = ${SCRATCH}"
-    - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
+    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
     - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
     # do not use : !
   script:
     # jfrog.svc.cscs.ch/docker-ci-ext/44692846847247/sphexa_cuda12_debug:b75f47f5
     # /capstor/scratch/cscs/piccinal/gitlab-runner/builds/hY7owqPdK/0/4264416954089684
-    - echo "SCRATCH = ${SCRATCH}"
-    - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
     - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
     - mkdir -p ${SPH_INSTALLDIR}
     - touch ${SPH_INSTALLDIR}/xx
