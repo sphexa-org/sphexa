@@ -20,4 +20,3 @@ sph-run_unittests_cuda12-sm90-debug-cpu-1rank:
     - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
   script:
     - $SPH_INSTALLDIR/bin/sphexa --help
-
