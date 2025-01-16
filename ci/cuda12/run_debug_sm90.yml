@@ -19,8 +19,22 @@ sph-run-cuda12-sm90-debug-1:
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     #
   script:
-    - echo "$MYTEST"
-    - $SPH_INSTALLDIR/$MYTEST
-  parallel:
-    matrix:
-      - MYTEST: ["sbin/coord_samples/coordinate_test", "sbin/hydro/turbulence_tests", "sbin/hydro/sph_tests", "sbin/performance/octree_perf", "sbin/performance/peers_perf", "sbin/performance/scan_perf", "sbin/ryoanji/cpu_unit_tests/ryoanji_cpu_unit_tests", "sbin/ryoanji/unit_tests/ryoanji_unit_tests", "sbin/unit/component_units_omp", "sbin/unit/component_units"]
+    - $SPH_INSTALLDIR/sbin/coord_samples/coordinate_test
+    - $SPH_INSTALLDIR/sbin/hydro/turbulence_tests
+    - $SPH_INSTALLDIR/sbin/hydro/sph_tests
+    - $SPH_INSTALLDIR/sbin/performance/octree_perf
+    - $SPH_INSTALLDIR/sbin/performance/peers_perf
+    - $SPH_INSTALLDIR/sbin/performance/scan_perf
+    - $SPH_INSTALLDIR/sbin/ryoanji/cpu_unit_tests/ryoanji_cpu_unit_tests
+    - $SPH_INSTALLDIR/sbin/ryoanji/unit_tests/ryoanji_unit_tests
+    - $SPH_INSTALLDIR/sbin/unit/component_units_omp
+    - $SPH_INSTALLDIR/sbin/unit/component_units
+
+#no   script:
+#no     - echo "$MYTEST"
+#no     - $SPH_INSTALLDIR/$MYTEST
+#no   parallel:
+#no     matrix:
+#no       - MYTEST: ["sbin/coord_samples/coordinate_test", "sbin/hydro/turbulence_tests", "sbin/hydro/sph_tests", "sbin/performance/octree_perf", "sbin/performance/peers_perf", "sbin/performance/scan_perf", "sbin/ryoanji/cpu_unit_tests/ryoanji_cpu_unit_tests", "sbin/ryoanji/unit_tests/ryoanji_unit_tests", "sbin/unit/component_units_omp", "sbin/unit/component_units"]
+
+
