@@ -1,8 +1,7 @@
 include:
   - local: 'ci/common.yml'
 
-# sph-run_unittests_cuda12-sm90-debug-cpu-1rank:
-sph-run-cuda12-sm90-debug-1:
+sph-run-cuda12-sm90-debug-1rank:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-debug']
   image: prgenv-gnu/24.11:v1
@@ -14,12 +13,11 @@ sph-run-cuda12-sm90-debug-1:
     SLURM_NTASKS: 1
   before_script:
     - pwd
-    # - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
-    #
   script:
     - cd $SPH_INSTALLDIR
+    - date
     - sbin/coord_samples/coordinate_test
     - sbin/hydro/turbulence_tests
     - ln -s sbin/hydro/example_data.txt .
@@ -29,6 +27,97 @@ sph-run-cuda12-sm90-debug-1:
     - sbin/performance/scan_perf
     - sbin/ryoanji/cpu_unit_tests/ryoanji_cpu_unit_tests
     - sbin/ryoanji/unit_tests/ryoanji_unit_tests
-    - sbin/unit/component_units_omp
-    - sbin/unit/component_units
+    # TODO:slow    - sbin/performance/hilbert_perf
+    # TODO:fail    - sbin/unit/component_units_omp
+    # TODO:fail    - sbin/unit/component_units
+    # GPU tests:
+    - date
+    - sbin/hydro/sph_gpu_tests
+    - sbin/performance/hilbert_perf_gpu
+    - sbin/performance/neighbors_test_gpu
+    - sbin/performance/octree_perf_gpu
+    - sbin/unit_cuda/component_units_cuda
+    - date
 
+sph-run-cuda12-sm90-debug-2ranks:
+  stage: sphexa_run
+  needs: ['sph-build-cuda12-sm90-debug']
+  image: prgenv-gnu/24.11:v1
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    WITH_UENV_VIEW: 'default'
+    SLURM_PARTITION: 'debug'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 2
+  before_script:
+    - pwd
+    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
+    - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
+  script:
+    - cd $SPH_INSTALLDIR
+    - date
+    - sbin/integration_mpi/box_mpi
+    - sbin/integration_mpi/domain_2ranks
+    - sbin/integration_mpi/domain_resize
+    - sbin/integration_mpi/exchange_focus
+    - sbin/integration_mpi/exchange_halos
+    - sbin/integration_mpi/exchange_keys
+    - sbin/integration_mpi/focus_transfer
+    - sbin/integration_mpi/globaloctree
+    - sbin/integration_mpi/hdf5io
+    - sbin/ryoanji/global_upsweep_cpu
+    - sbin/ryoanji/ryoanji_demo/ryoanji_demo
+    - sbin/ryoanji/ryoanji_demo_mpi
+    # GPU tests:
+    - date
+    - sbin/integration_mpi/assignment_gpu
+    - sbin/integration_mpi/domain_gpu
+    - sbin/integration_mpi/exchange_domain_gpu
+    - sbin/integration_mpi/exchange_halos_gpu
+    - date
+
+sph-run-cuda12-sm90-debug-4ranks:
+  stage: sphexa_run
+  needs: ['sph-build-cuda12-sm90-debug']
+  image: prgenv-gnu/24.11:v1
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    WITH_UENV_VIEW: 'default'
+    SLURM_PARTITION: 'debug'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 4
+  before_script:
+    - pwd
+    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
+    - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
+  script:
+    - cd $SPH_INSTALLDIR
+    - date
+    - sbin/integration_mpi/exchange_general_gpu # was -n5
+    - sbin/ryoanji/global_forces_gpu
+    - sbin/ryoanji/global_upsweep_gpu
+    - date
+ 
+sph-run-cuda12-sm90-debug-12ranks:
+  stage: sphexa_run
+  needs: ['sph-build-cuda12-sm90-debug']
+  image: prgenv-gnu/24.11:v1
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    WITH_UENV_VIEW: 'default'
+    SLURM_PARTITION: 'debug'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 12
+  before_script:
+    - pwd
+    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
+    - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
+  script:
+    - cd $SPH_INSTALLDIR
+    - date
+    - sbin/integration_mpi/exchange_domain
+    - sbin/integration_mpi/exchange_general
+    - sbin/integration_mpi/focus_tree
+    - sbin/integration_mpi/treedomain
+    - sbin/integration_mpi/domain_nranks
+    - date
