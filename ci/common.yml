@@ -3,5 +3,7 @@ include:
 
 stages:
   - sphexa_build
-  # - SPH_unit_tests
+  - sphexa_unittests
 
+variables:
+  SPH_INSTALLDIR_DAINT: $SCRATCH/daint/ci

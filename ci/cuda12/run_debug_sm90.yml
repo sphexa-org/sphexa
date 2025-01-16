@@ -1,0 +1,22 @@
+include:
+  - local: 'ci/common.yml'
+
+sph-run_unittests_cuda12-sm90-debug:
+  stage: sphexa_unittests
+  needs: ['sph-build-cuda12-sm90-debug']
+  # needs: ['sph:base:cuda12']
+  image: prgenv-gnu/24.11:v1
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    # PERSIST_IMAGE_NAME: ${CSCS_REGISTRY_PATH}/sphexa_cuda12_debug:${CI_COMMIT_SHORT_SHA}
+    WITH_UENV_VIEW: 'default'
+    SLURM_PARTITION: 'debug'
+    SLURM_JOB_NUM_NODES: 1
+    SPH_INSTALLDIR: ${SPH_INSTALLDIR_DAINT}
+    # SLURM_NTASKS: 1
+  before_script:
+    - pwd
+    - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
+  script:
+    - echo "ok"
+
