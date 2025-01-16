@@ -1,7 +1,7 @@
 include:
   - local: 'ci/common.yml'
 
-sph-run_unittests_cuda12-sm90-debug:
+sph-run_unittests_cuda12-sm90-debug-cpu-1rank:
   stage: sphexa_unittests
   needs: ['sph-build-cuda12-sm90-debug']
   # needs: ['sph:base:cuda12']
@@ -15,9 +15,9 @@ sph-run_unittests_cuda12-sm90-debug:
     # SLURM_NTASKS: 1
   before_script:
     - pwd
-    - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
+    # - echo "CI_COMMIT_SHORT_SHA = ${CI_COMMIT_SHORT_SHA}"
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
     - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
   script:
-    - echo "ok"
+    - $SPH_INSTALLDIR/bin/sphexa --help
 

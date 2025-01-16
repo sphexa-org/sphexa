@@ -23,16 +23,14 @@ sph-build-cuda12-sm90-debug:
     - echo "OUT / PERSIST_IMAGE_NAME = ${PERSIST_IMAGE_NAME}"
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/${CI_COMMIT_SHORT_SHA}
     - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
+    - mkdir -p ${SPH_INSTALLDIR}
     # do not use : !
   script:
     # jfrog.svc.cscs.ch/docker-ci-ext/44692846847247/sphexa_cuda12_debug:b75f47f5
     # /capstor/scratch/cscs/piccinal/gitlab-runner/builds/hY7owqPdK/0/4264416954089684
-    - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
+    - CC=mpicc CXX=mpicxx cmake -S . -B build
+      -DCMAKE_CUDA_ARCHITECTURES=90
+      -DCMAKE_BUILD_TYPE=Debug
+    - cmake --build build -j `grep -c processor /proc/cpuinfo |awk '{print $0/3}'`
     - mkdir -p ${SPH_INSTALLDIR}
-    - touch ${SPH_INSTALLDIR}/xx
-#     - CC=mpicc CXX=mpicxx cmake -S . -B build
-#       -DCMAKE_CUDA_ARCHITECTURES=90
-#       -DCMAKE_BUILD_TYPE=Debug
-#     - cmake --build build -j `grep -c processor /proc/cpuinfo |awk '{print $0/3}'`
-#     - mkdir -p ${SPH_INSTALLDIR}
-#     - cmake --install build --prefix=${SPH_INSTALLDIR}
+    - cmake --install build --prefix=${SPH_INSTALLDIR}
