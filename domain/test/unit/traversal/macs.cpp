@@ -88,6 +88,47 @@ TEST(Macs, minMacMutual)
     EXPECT_FALSE(minMacMutual(cA, sA, cB, sB, Box<T>(0, 4, BoundaryType::periodic), 1.0));
 }
 
+TEST(Macs, minMacMutualInt)
+{
+    using KeyType = uint32_t;
+    using T       = double;
+
+    int maxCoord = 1u << maxTreeLevel<KeyType>{};
+
+    IBox b(100, 110, 100, 110, 100, 105);
+    float invTheta = 1.5;
+    {
+        Box<T> box(0, 1);
+        auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invTheta;
+
+        EXPECT_TRUE(minMacMutualInt({83, 84, 100, 101, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_FALSE(minMacMutualInt({84, 85, 100, 101, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_TRUE(minMacMutualInt({100, 101, 83, 84, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_FALSE(minMacMutualInt({100, 101, 84, 85, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_TRUE(minMacMutualInt({100, 101, 100, 101, 121, 122}, b, ellipse, {0, 0, 0}));
+        EXPECT_FALSE(minMacMutualInt({100, 101, 100, 101, 120, 121}, b, ellipse, {0, 0, 0}));
+
+        EXPECT_TRUE(minMacMutualInt({90, 91}, b, ellipse, {0, 0, 0}));
+        EXPECT_FALSE(minMacMutualInt({91, 92}, b, ellipse, {0, 0, 0}));
+    }
+    {
+        Box<T> box(0, 2, 0, 1, 0, 2);
+        auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invTheta;
+        EXPECT_TRUE(minMacMutualInt({83, 84, 100, 101, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_FALSE(minMacMutualInt({84, 85, 100, 101, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_TRUE(minMacMutualInt({100, 101, 68, 69, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_FALSE(minMacMutualInt({100, 101, 69, 70, 100, 101}, b, ellipse, {0, 0, 0}));
+    }
+    {
+        auto pbc_t = BoundaryType::periodic;
+        Box<T> box(0, 1, pbc_t);
+        auto pbc = Vec3<int>{box.boundaryX() == pbc_t, box.boundaryY() == pbc_t, box.boundaryZ() == pbc_t} * maxCoord;
+        auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invTheta;
+        EXPECT_TRUE(minMacMutualInt({1023 - 67, 1023, 100, 101, 100, 101}, b, ellipse, pbc));
+        EXPECT_FALSE(minMacMutualInt({1023 - 68, 1023, 100, 101, 100, 101}, b, ellipse, pbc));
+    }
+}
+
 TEST(Macs, minVecMacMutual)
 {
     using T = double;
