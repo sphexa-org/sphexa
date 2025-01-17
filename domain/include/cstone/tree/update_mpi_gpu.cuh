@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -32,6 +16,7 @@
 #pragma once
 
 #include <mpi.h>
+#include <span>
 
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/tree/csarray_gpu.h"
@@ -43,8 +28,7 @@ namespace cstone
 /*! @brief global update step of an octree, including regeneration of the internal node structure
  *
  * @tparam        KeyType     unsigned 32- or 64-bit integer
- * @param[in]     keyStart    first particle key, on device
- * @param[in]     keyEnd      last particle key, on device
+ * @param[in]     keys    first particle key, on device
  * @param[in]     bucketSize  max number of particles per leaf
  * @param[inout]  tree        a fully linked octree
  * @param[inout]  counts      leaf node particle counts
@@ -52,8 +36,7 @@ namespace cstone
  * @return                    true if tree was not changed
  */
 template<class KeyType, class DevKeyVec, class DevCountVec>
-bool updateOctreeGlobalGpu(const KeyType* keyStart,
-                           const KeyType* keyEnd,
+bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
                            unsigned bucketSize,
                            Octree<KeyType>& tree,
                            DevKeyVec& d_csTree,
@@ -68,7 +51,7 @@ bool updateOctreeGlobalGpu(const KeyType* keyStart,
     reallocate(d_counts, tree.numLeafNodes(), 1.01);
 
     memcpyH2D(tree.treeLeaves().data(), d_csTree.size(), d_csTree.data());
-    computeNodeCountsGpu(rawPtr(d_csTree), rawPtr(d_counts), tree.numLeafNodes(), keyStart, keyEnd, maxCount, true);
+    computeNodeCountsGpu(rawPtr(d_csTree), rawPtr(d_counts), tree.numLeafNodes(), keys, maxCount, true);
     memcpyD2H(d_counts.data(), d_counts.size(), counts.data());
 
     std::vector<unsigned> counts_reduced(counts.size());

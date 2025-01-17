@@ -1,7 +1,7 @@
 /*
  * Cornerstone octree
  *
- * Copyright (c) 2024 CSCS, ETH Zurich, University of Zurich, 2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
  * Please, refer to the LICENSE file in the root directory.
  * SPDX-License-Identifier: MIT License
@@ -55,7 +55,7 @@ namespace cstone
  *         that the input ranges did not cover
  */
 inline std::vector<IndexPair<TreeNodeIndex>>
-invertRanges(TreeNodeIndex first, gsl::span<const IndexPair<TreeNodeIndex>> ranges, TreeNodeIndex last)
+invertRanges(TreeNodeIndex first, std::span<const IndexPair<TreeNodeIndex>> ranges, TreeNodeIndex last)
 {
     std::vector<IndexPair<TreeNodeIndex>> invertedRanges;
 
@@ -74,7 +74,7 @@ invertRanges(TreeNodeIndex first, gsl::span<const IndexPair<TreeNodeIndex>> rang
 }
 
 //! @brief enumerate all input ranges with std::iota and pack them together in a single vector
-inline std::vector<TreeNodeIndex> enumerateRanges(gsl::span<const IndexPair<TreeNodeIndex>> ranges)
+inline std::vector<TreeNodeIndex> enumerateRanges(std::span<const IndexPair<TreeNodeIndex>> ranges)
 {
     std::vector<TreeNodeIndex> rangeCounts(ranges.size() + 1);
     std::transform(ranges.begin(), ranges.end(), rangeCounts.begin(), [](auto pair) { return pair.count(); });
@@ -107,8 +107,8 @@ inline std::vector<TreeNodeIndex> enumerateRanges(gsl::span<const IndexPair<Tree
  *  - Particle offsets from buffer layouts
  */
 template<class IntegralType>
-std::vector<IntegralType> extractMarkedElements(gsl::span<const IntegralType> source,
-                                                gsl::span<const int> flags,
+std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> source,
+                                                std::span<const int> flags,
                                                 TreeNodeIndex firstReqIdx,
                                                 TreeNodeIndex secondReqIdx)
 {
@@ -147,11 +147,11 @@ std::vector<IntegralType> extractMarkedElements(gsl::span<const IntegralType> so
  * @param[out] layout            length N+1. The first element is zero, the last element is
  *                               equal to the sum of all all present (assigned+halo) node counts.
  */
-inline void computeNodeLayout(gsl::span<const unsigned> focusLeafCounts,
-                              gsl::span<const int> haloFlags,
+inline void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
+                              std::span<const int> haloFlags,
                               TreeNodeIndex firstAssignedIdx,
                               TreeNodeIndex lastAssignedIdx,
-                              gsl::span<LocalIndex> layout)
+                              std::span<LocalIndex> layout)
 {
 #pragma omp parallel for
     for (TreeNodeIndex i = 0; i < TreeNodeIndex(focusLeafCounts.size()); ++i)
@@ -160,7 +160,7 @@ inline void computeNodeLayout(gsl::span<const unsigned> focusLeafCounts,
         layout[i]          = -int(haveParticles) & focusLeafCounts[i];
     }
 
-    exclusiveScan(layout.data(), layout.size());
+    std::exclusive_scan(layout.begin(), layout.end(), layout.begin(), LocalIndex{0});
 }
 
 /*! @brief computes a list which local array ranges are going to be filled with halo particles
@@ -172,10 +172,10 @@ inline void computeNodeLayout(gsl::span<const unsigned> focusLeafCounts,
  * @param peerRanks    list of peer ranks
  * @return             list of array index ranges for the receiving part in exchangeHalos
  */
-inline auto computeHaloRecvList(gsl::span<const LocalIndex> layout,
-                                gsl::span<const int> haloFlags,
-                                gsl::span<const TreeIndexPair> assignment,
-                                gsl::span<const int> peerRanks)
+inline auto computeHaloRecvList(std::span<const LocalIndex> layout,
+                                std::span<const int> haloFlags,
+                                std::span<const TreeIndexPair> assignment,
+                                std::span<const int> peerRanks)
 {
     RecvList ret(assignment.size());
 
@@ -215,7 +215,7 @@ void gatherArrays(Gather&& gatherFunc,
         {
             auto& swapSpace = util::pickType<decltype(array)>(scratchBuffers);
             assert(swapSpace.size() == array.size());
-            gatherFunc(ordering, numElements, rawPtr(array) + inputOffset, rawPtr(swapSpace) + outputOffset);
+            gatherFunc({ordering, numElements}, rawPtr(array) + inputOffset, rawPtr(swapSpace) + outputOffset);
             swap(swapSpace, array);
         }
         else
@@ -226,7 +226,7 @@ void gatherArrays(Gather&& gatherFunc,
 
             auto* scratchSpace =
                 reinterpret_cast<typename std::decay_t<VectorRef>::value_type*>(rawPtr(std::get<i>(scratchBuffers)));
-            gatherFunc(ordering, numElements, rawPtr(array) + inputOffset, scratchSpace);
+            gatherFunc({ordering, numElements}, rawPtr(array) + inputOffset, scratchSpace);
             if constexpr (IsDeviceVector<std::decay_t<VectorRef>>{})
             {
                 memcpyD2D(scratchSpace, numElements, rawPtr(array) + outputOffset);
