@@ -32,9 +32,8 @@
 
 #pragma once
 
-#include <vector>
-
 #include "boxoverlap.hpp"
+#include "cstone/primitives/math.hpp"
 #include "cstone/traversal/traversal.hpp"
 #include "cstone/tree/octree.hpp"
 
@@ -157,6 +156,28 @@ HOST_DEVICE_FUN bool minMacMutual(const Vec3<T>& centerA,
     T mac = sizeAB * invTheta;
 
     return distSq > (mac * mac);
+}
+
+/*! @brief integer based mutual min-mac
+ * @tparam T float or double
+ * @param a         first integer cell box
+ * @param b         second integer cell box
+ * @param ellipse   grid anisotropy (max grid-step in any dim / grid-step in dim_i) divided by theta
+ *                  is equal to (L_max / L_x,y,z) * 1/theta if the number of grid points is equal in all dimensions
+ * @param pbc       pbc yes/no per dimension
+ * @return          true if MAC passed, i.e. true if cells are far
+ */
+template<class T>
+HOST_DEVICE_FUN bool minMacMutualInt(IBox a, IBox b, Vec3<T> ellipse, Vec3<int> pbc)
+{
+    T l_max = std::max({a.xmax() - a.xmin(), a.ymax() - a.ymin(), a.zmax() - a.zmin(), b.xmax() - b.xmin(),
+                        b.ymax() - b.ymin(), b.zmax() - b.zmin()});
+
+    // computing a-b separation in integers is key to avoid a-b/b-a asymmetry due to round-off errors
+    Vec3<int> a_b = boxSeparation(a, b, pbc);
+
+    Vec3<T> E{a_b[0] / ellipse[0], a_b[1] / ellipse[1], a_b[2] / ellipse[2]};
+    return norm2(E) > l_max * l_max;
 }
 
 /*! @brief commutative combination of min-distance and vector map
