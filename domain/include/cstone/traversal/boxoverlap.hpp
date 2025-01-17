@@ -74,7 +74,7 @@ HOST_DEVICE_FUN inline int rangeSep(int a, int b, int c, int d, int R)
     if (overlapTwoRanges(a, b, c, d)) { return 0; }
     int d1 = pbcDistance(d - a, R);
     int d2 = pbcDistance(c - b, R);
-    return std::min(std::abs(d1), std::abs(d2));
+    return stl::min(std::abs(d1), std::abs(d2));
 }
 
 //! @brief check whether two boxes overlap. takes PBC into account, boxes can wrap around

@@ -215,7 +215,7 @@ public:
                      0, std::tie(h), util::reverse(scratch));
 
         float invThetaEff      = invThetaMinMac(theta_);
-        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), invThetaEff);
+        std::vector<int> peers = findPeersMacInt(myRank_, global_.assignment(), global_.octree(), box(), 1.0 / theta_);
 
         if (firstCall_)
         {
@@ -234,7 +234,13 @@ public:
         halos_.discover(octreeView.prefixes, octreeView.childOffsets, octreeView.internalToLeaf, focusLeaves,
                         focusTree_.leafCountsAcc(), focusTree_.assignment(), {rawPtr(layoutAcc_), layoutAcc_.size()},
                         box(), rawPtr(h), haloSearchExt_, std::get<0>(scratch));
-        halos_.computeLayout(focusTree_.treeLeaves(), focusTree_.leafCounts(), focusTree_.assignment(), peers, layout_);
+        auto fail = halos_.computeLayout(focusTree_.treeLeaves(), focusTree_.leafCounts(), focusTree_.assignment(),
+                                         peers, layout_);
+        if (fail)
+        {
+            std::cout << "found halo outside peer area on rank " << myRank_ << std::endl;
+            MPI_Abort(MPI_COMM_WORLD, 67);
+        }
 
         updateLayout(sorter, exchangeStart, keyView, particleKeys, std::tie(h),
                      std::tuple_cat(std::tie(x, y, z), particleProperties), scratch);
