@@ -13,10 +13,6 @@ using cstone::GroupData;
 using cstone::GroupView;
 
 template<class Dataset>
-extern void computeSpatialGroups(size_t, size_t, Dataset& d, const cstone::Box<typename Dataset::RealType>&,
-                                 GroupData<cstone::GpuTag>&);
-
-template<class Dataset>
 extern void computeIADGpu(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
 
 template<class Dataset>
@@ -50,6 +46,9 @@ template<class Tu, class Tm, class Thydro>
 extern void computeEOS(size_t, size_t, Tm mui, Tu gamma, const Tu*, const Tu*, const Tm*, const Thydro*, const Thydro*,
                        const Thydro*, Thydro*, Thydro*, Thydro*, Thydro*);
 
+template<typename Dataset>
+extern void computeIsothermalEOS(size_t, size_t, Dataset& d);
+
 } // namespace cuda
 
 template<class Tc, class Thydro, class Tm1, class Tdu>
@@ -75,5 +74,8 @@ template<class T>
 extern void groupAccTimestepGpu(float etaAcc, const GroupView&, const T* ax, const T* ay, const T* az, float* groupDt);
 
 void storeRungGpu(const GroupView& grp, uint8_t rung, uint8_t* particleRungs);
+
+//! @brief max number of particles per group used in neighbor search for SPH
+unsigned nsGroupSize();
 
 } // namespace sph

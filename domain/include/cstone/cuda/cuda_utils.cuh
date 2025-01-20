@@ -7,7 +7,8 @@
 #pragma once
 
 #include <type_traits>
-#include <cuda_runtime.h>
+#include <vector>
+#include "cuda_runtime.hpp"
 
 #include "device_vector.h"
 #include "cuda_stubs.h"

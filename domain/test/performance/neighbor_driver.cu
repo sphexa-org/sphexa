@@ -38,7 +38,6 @@
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/findneighbors.hpp"
-#include "cstone/primitives/math.hpp"
 
 #include "cstone/traversal/find_neighbors.cuh"
 

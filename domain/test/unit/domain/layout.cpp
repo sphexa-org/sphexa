@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Zurich, 2021 University of Basel
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -130,14 +114,13 @@ TEST(Layout, computeHaloReceiveList)
     assignment[1] = TreeIndexPair(4, 6);
     assignment[2] = TreeIndexPair(6, 10);
 
-    SendList receiveList = computeHaloReceiveList(layout, haloFlags, assignment, peers);
+    auto recvList = computeHaloRecvList(layout, haloFlags, assignment, peers);
 
-    SendList reference(numRanks);
-    reference[0].addRange(0, 1);
-    reference[0].addRange(2, 4);
-    reference[2].addRange(7, 9);
+    std::vector<IndexPair<LocalIndex>> reference(numRanks);
+    reference[0] = {LocalIndex(0), LocalIndex(4)};
+    reference[2] = {LocalIndex(7), LocalIndex(9)};
 
-    EXPECT_EQ(receiveList, reference);
+    EXPECT_EQ(recvList, reference);
 }
 
 TEST(Layout, gatherArrays)
@@ -148,7 +131,7 @@ TEST(Layout, gatherArrays)
 
     std::vector<float> scratch(a.size());
 
-    LocalIndex inOffset = 1;
+    LocalIndex inOffset  = 1;
     LocalIndex outOffset = 1;
     gatherArrays(gatherCpu, ordering.data(), ordering.size(), inOffset, outOffset, std::tie(a, b), std::tie(scratch));
 
@@ -160,4 +143,12 @@ TEST(Layout, gatherArrays)
 
     EXPECT_TRUE(std::equal(&refA[outOffset], &refA[a.size()], &a[outOffset]));
     EXPECT_TRUE(std::equal(&refB[outOffset], &refB[b.size()], &b[outOffset]));
+}
+
+TEST(Layout, enumerateRanges)
+{
+    std::vector<IndexPair<TreeNodeIndex>> ranges{{10, 13}, {30, 32}};
+    auto probe = enumerateRanges(ranges);
+    std::vector<TreeNodeIndex> ref{10, 11, 12, 30, 31};
+    EXPECT_EQ(probe, ref);
 }

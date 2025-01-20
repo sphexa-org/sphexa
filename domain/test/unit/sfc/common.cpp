@@ -196,6 +196,22 @@ TEST(SfcCode, decodePlaceholderbit64)
     EXPECT_EQ(0635000000000000000000ul, decodePlaceholderBit(01635ul));
 }
 
+TEST(SfcCode, maskKey)
+{
+    EXPECT_EQ(maskKey(0lu), 0lu);
+    EXPECT_EQ(maskKey(nodeRange<uint64_t>(0)), nodeRange<uint64_t>(0));
+    EXPECT_EQ(maskKey(1lu), nodeRange<uint64_t>(0) + 1);
+    EXPECT_EQ(maskKey(nodeRange<uint64_t>(0) - 1), nodeRange<uint64_t>(0) - 1 + nodeRange<uint64_t>(0));
+}
+
+TEST(SfcCode, unmaskKey)
+{
+    EXPECT_EQ(unmaskKey(0lu), 0lu);
+    EXPECT_EQ(unmaskKey(nodeRange<uint64_t>(0)), nodeRange<uint64_t>(0));
+    EXPECT_EQ(1lu, unmaskKey(nodeRange<uint64_t>(0) + 1));
+    EXPECT_EQ(nodeRange<uint64_t>(0) - 1, unmaskKey(nodeRange<uint64_t>(0) - 1 + nodeRange<uint64_t>(0)));
+}
+
 TEST(SfcCode, octalDigit32)
 {
     EXPECT_EQ(1, octalDigit(010000000000u, 0));

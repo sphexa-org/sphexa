@@ -1,3 +1,33 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Basel, University of Zurich
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+/*! @file
+ * @brief Cray power measurement counter reading
+ *
+ * @author Sebastian Keller <sebastian.f.keller@gmail.com
+ */
+
 #pragma once
 
 #include <cstdio>
@@ -33,25 +63,26 @@ public:
     {
     }
 
-    void addCounters(const std::string& pmRoot, int numRanksPerNode_)
+    void addCounters(const std::string& pmRoot, int numRanksPerNode)
     {
-        numRanksPerNode   = numRanksPerNode_;
-        using CounterDesc = std::tuple<std::string, std::string, std::function<bool(int, int)>>;
-        std::vector<CounterDesc> countersToAdd{
-            {"node", pmRoot + "/energy", [](int r, int numRanksPerNode) { return r % numRanksPerNode == 0; }},
-            {"acc", pmRoot + "/accel" + std::to_string(rank_ % numRanksPerNode) + "_energy",
-             [](int, int) { return true; }}};
-
-        for (auto& c : countersToAdd)
+        numRanksPerNode_ = numRanksPerNode;
+        // energy per compute node, only the first rank per node reads the node energy counter
         {
-            bool enable = std::filesystem::exists(get<1>(c)) && get<2>(c)(rank_, numRanksPerNode);
-            pmCounters.emplace_back(get<0>(c), get<1>(c), std::vector<PmType>{}, std::vector<PmType>{}, enable);
+            std::string path   = pmRoot + "/energy";
+            bool        enable = (rank_ % numRanksPerNode == 0) && std::filesystem::exists(path);
+            pmCounters.emplace_back("node", path, std::vector<PmType>{}, std::vector<PmType>{}, enable);
+        }
+        // energy per accelerator
+        {
+            std::string path   = pmRoot + "/accel" + std::to_string(rank_ % numRanksPerNode) + "_energy";
+            bool        enable = std::filesystem::exists(path);
+            pmCounters.emplace_back("acc", path, std::vector<PmType>{}, std::vector<PmType>{}, enable);
         }
     }
 
     void start()
     {
-        numStartCalled++;
+        numStartCalled_++;
         readPm();
     }
 
@@ -83,15 +114,15 @@ public:
 
             ar->addStep(0, pmValues.size(), outFile + ar->suffix());
             ar->stepAttribute("numRanks", &numRanks, 1);
-            ar->stepAttribute("numRanksPerNode", &numRanks, 1);
-            ar->stepAttribute("numIterations", &numStartCalled, 1);
+            ar->stepAttribute("numRanksPerNode", &numRanksPerNode_, 1);
+            ar->stepAttribute("numIterations", &numStartCalled_, 1);
             ar->writeField(pmName, pmValuesRebased.data(), pmValuesRebased.size());
             ar->writeField(pmName + "_timeStamps", pmTimeStampsRebased.data(), pmTimeStampsRebased.size());
             ar->closeStep();
             pmValues.clear();
             pmTimeStamps.clear();
         }
-        numStartCalled = 0;
+        numStartCalled_ = 0;
     }
 
 private:
@@ -107,7 +138,7 @@ private:
         }
     }
 
-    int rank_, numRanksPerNode{0}, numStartCalled{0};
+    int rank_, numRanksPerNode_{0}, numStartCalled_{0};
 
     //                     name         filepath      counter reading      time-stamp reading  enabled
     std::vector<std::tuple<std::string, std::string, std::vector<PmType>, std::vector<PmType>, bool>> pmCounters;

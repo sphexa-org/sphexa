@@ -39,7 +39,7 @@ CUDA version: 11.6 or later, HIP version 5.2 or later.
 
 Example CMake invocation:
 ```shell
-CC=mpicc CXX=mpicxx cmake -DCMAKE_CUDA_ARCHITECTURES=60,80,90 -DGPU_DIRECT=<ON/OFF> -DCMAKE_CUDA_FLAGS=-ccbin=mpicxx <GIT_SOURCE_DIR>
+CC=mpicc CXX=mpicxx cmake -DCMAKE_CUDA_ARCHITECTURES=60;80;90 -DCSTONE_WITH_GPU_AWARE_MPI=<ON/OFF> -DCMAKE_CUDA_FLAGS=-ccbin=mpicxx <GIT_SOURCE_DIR>
 ```
 
 GPU-direct (RDMA) MPI communication can be turned on or off by supplying `-D GPU_DIRECT=ON`. Default is `OFF`.

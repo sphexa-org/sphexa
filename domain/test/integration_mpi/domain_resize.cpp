@@ -54,7 +54,7 @@ TEST(GlobalDomainResize, resize)
     // Add two new particles on each rank
     int n_new = 2;
     // If halos are large enough, no resizing required
-    int add_size = n_new - int(domain.endIndex()) + int(x.size());
+    int add_size = n_new - (int(x.size()) - domain.endIndex());
     // Resize
     if (add_size > 0)
     {

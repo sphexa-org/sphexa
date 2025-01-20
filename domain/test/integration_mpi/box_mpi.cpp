@@ -149,13 +149,3 @@ void makeGlobalBox(int rank, int numRanks)
         EXPECT_TRUE(contains(shrinkedBox, newPbcBox));
     }
 }
-
-TEST(GlobalBox, makeGlobalBox)
-{
-    int rank = 0, numRanks = 0;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
-
-    makeGlobalBox<float>(rank, numRanks);
-    makeGlobalBox<double>(rank, numRanks);
-}

@@ -8,6 +8,8 @@
 #include <thrust/device_vector.h>
 #include <thrust/fill.h>
 
+#include "cstone/cuda/cuda_runtime.hpp"
+#include "cstone/cuda/errorcheck.cuh"
 #include "cstone/util/noinit_thrust.cuh"
 
 #include "device_vector.h"
@@ -83,7 +85,7 @@ DeviceVector<T>::DeviceVector(const T* first, const T* last)
 {
     auto size = last - first;
     impl_->resize(size);
-    cudaMemcpy(impl_->data(), first, size * sizeof(T), cudaMemcpyHostToDevice);
+    checkGpuErrors(cudaMemcpy(impl_->data(), first, size * sizeof(T), cudaMemcpyHostToDevice));
 }
 
 template<class T>
@@ -174,10 +176,15 @@ template class DeviceVector<util::array<int, 2>>;
 template class DeviceVector<util::array<int, 3>>;
 template class DeviceVector<util::array<unsigned, 1>>;
 template class DeviceVector<util::array<uint64_t, 1>>;
+template class DeviceVector<util::array<uint64_t, 2>>;
 template class DeviceVector<util::array<unsigned, 2>>;
 template class DeviceVector<util::array<float, 3>>;
-template class DeviceVector<util::array<double, 3>>;
 template class DeviceVector<util::array<float, 4>>;
+template class DeviceVector<util::array<float, 8>>;
+template class DeviceVector<util::array<float, 12>>;
+template class DeviceVector<util::array<double, 3>>;
 template class DeviceVector<util::array<double, 4>>;
+template class DeviceVector<util::array<double, 8>>;
+template class DeviceVector<util::array<double, 12>>;
 
 } // namespace cstone

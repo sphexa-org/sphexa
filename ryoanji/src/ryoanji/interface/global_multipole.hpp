@@ -64,7 +64,8 @@ void computeGlobalMultipoles(const Tc* x, const Tc* y, const Tc* z, const Tm* m,
     { ryoanji::upsweepMultipoles(levelRange, childOffsets.data(), centers, M); };
     cstone::globalFocusExchange(globalOctree, focusTree, multipoleSpan, ryUpsweep, globalCenters.data());
 
-    focusTree.peerExchange(multipoleSpan, static_cast<int>(cstone::P2pTags::focusPeerCenters) + 1);
+    std::vector<int, util::DefaultInitAdaptor<int>> scratch;
+    focusTree.peerExchange(multipoleSpan, static_cast<int>(cstone::P2pTags::focusPeerCenters) + 1, scratch);
 
     //! second upsweep with leaf data from peer and global ranks in place
     ryoanji::upsweepMultipoles({octree.levelRange, cstone::maxTreeLevel<KeyType>{} + 2}, octree.childOffsets,

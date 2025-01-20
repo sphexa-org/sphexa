@@ -12,7 +12,7 @@
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/focus/source_center.hpp"
-#include "cstone/traversal/groups.cuh"
+#include "cstone/traversal/groups_gpu.cu"
 
 #include "dataset.hpp"
 #include "ryoanji/nbody/cartesian_qpole.hpp"

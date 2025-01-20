@@ -1,8 +1,9 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Ryoanji N-body solver
+ *
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -30,14 +31,12 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#pragma once
-
-#include <algorithm>
 #include "cstone/cuda/gpu_config.cuh"
+#include "cstone/primitives/math.hpp"
 #include "cstone/primitives/warpscan.cuh"
-#include "cstone/traversal/groups.cuh"
 #include "cartesian_qpole.hpp"
 #include "kernel.hpp"
+#include "traversal_gpu.h"
 
 namespace ryoanji
 {
@@ -392,13 +391,14 @@ __global__ void resetTraversalCounters()
  *
  * @param[in]    grp            groups of target particles to compute accelerations for
  * @param[in]    initNodeIdx    traversal will be started with all children of the parent of @p initNodeIdx
- * @param[in]    x,y,z,m,h      bodies, in SFC order and as referenced by sourceCells
+ * @param[in]    xt,yt,zt,mt,ht target bodies, as referenced and grouped by @p grp
+ * @param[in]    xs,ys,zs,ms,hs source bodies, in SFC order as used for tree-build and as referenced by layout
  * @param[in]    childOffsets   location (index in [0:numTreeNodes]) of first child of each cell, 0 indicates a leaf
  * @param[in]    internalToLeaf for each cell in [0:numTreeNodes], stores the leaf cell (cstone) index in [0:numLeaves]
  *                              if the cell is not a leaf, the value is negative
- * @param[in]    layout         for each leaf cell in [0:numLeaves], stores the index of the first body in the cell
+ * @param[in]    layout         for each leaf cell in [0:numLeaves], stores the index of the first source body in cell
  * @param[in]    sourceCenter   x,y,z center and square MAC radius of each cell in [0:numTreeNodes]
- * @param[in]    Multipole      cell multipoles, on device
+ * @param[in]    Multipoles     cell multipoles, on device
  * @param[in]    G              gravitational constant
  * @param[in]    numShells      number of periodic replicas in each dimension to include
  * @param[in]    boxL           length of coordinate bounding box in each dimension
@@ -409,9 +409,10 @@ __global__ void resetTraversalCounters()
  *                              so the total size is TravConfig::memPerWarp * numWarpsPerBlock * numBlocks
  */
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType>
-__global__ __launch_bounds__(TravConfig::numThreads) void traverse(
-    cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ x, const Tc* __restrict__ y,
-    const Tc* __restrict__ z, const Tm* __restrict__ m, const Th* __restrict__ h,
+__global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
+    cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ xt, const Tc* __restrict__ yt,
+    const Tc* __restrict__ zt, const Tm* __restrict__ mt, const Th* __restrict__ ht, const Tc* __restrict__ xs,
+    const Tc* __restrict__ ys, const Tc* __restrict__ zs, const Tm* __restrict__ ms, const Th* __restrict__ hs,
     const TreeNodeIndex* __restrict__ childOffsets, const TreeNodeIndex* __restrict__ internalToLeaf,
     const LocalIndex* __restrict__ layout, const Vec4<Tf>* __restrict__ sourceCenter,
     const MType* __restrict__ Multipoles, Tc G, int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az,
@@ -459,7 +460,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverse(
         for (int i = 0; i < TravConfig::nwt; i++)
         {
             int bodyIdx = imin(bodyBegin + i * GpuConfig::warpSize + laneIdx, bodyEnd - 1);
-            pos_i[i]    = {x[bodyIdx], y[bodyIdx], z[bodyIdx], h[bodyIdx]};
+            pos_i[i]    = {xt[bodyIdx], yt[bodyIdx], zt[bodyIdx], ht[bodyIdx]};
         }
 
         Vec3<Tc> Xmin = makeVec3(pos_i[0]);
@@ -501,8 +502,8 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverse(
                     }
 
                     auto [numM2P_, numP2P_, maxStack_] = traverseWarp(
-                        acc_i, pos_i, targetCenter, targetSize, x, y, z, m, h, childOffsets, internalToLeaf, layout,
-                        sourceCenter, Multipoles, initNodeIdx, tempQueue, cellQueue);
+                        acc_i, pos_i, targetCenter, targetSize, xs, ys, zs, ms, hs, childOffsets, internalToLeaf,
+                        layout, sourceCenter, Multipoles, initNodeIdx, tempQueue, cellQueue);
 
                     {
                         Vec3<Tf> pbcShift{ix * boxL[0], iy * boxL[1], iz * boxL[2]};
@@ -529,7 +530,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverse(
         for (int i = 0; i < TravConfig::nwt; i++)
         {
             const int bodyIdx = bodyIdxLane + i * GpuConfig::warpSize;
-            if (bodyIdx < bodyEnd) { warpPotential += m[bodyIdx] * acc_i[i][0]; }
+            if (bodyIdx < bodyEnd) { warpPotential += mt[bodyIdx] * acc_i[i][0]; }
         }
 
 #pragma unroll
@@ -554,7 +555,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverse(
             const int bodyIdx = bodyIdxLane + i * GpuConfig::warpSize;
             if (bodyIdx < bodyEnd)
             {
-                if (p) { p[bodyIdx] += G * m[bodyIdx] * acc_i[i][0]; }
+                if (p) { p[bodyIdx] += G * mt[bodyIdx] * acc_i[i][0]; }
                 ax[bodyIdx] += G * acc_i[i][1];
                 ay[bodyIdx] += G * acc_i[i][2];
                 az[bodyIdx] += G * acc_i[i][3];
@@ -563,79 +564,70 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverse(
     }
 }
 
-/*! @brief Compute approximate body accelerations with Barnes-Hut
- *
- * @param[in]    firstBody      index of first body in @p bodyPos to compute acceleration for
- * @param[in]    lastBody       index (exclusive) of last body in @p bodyPos to compute acceleration for
- * @param[in]    x,y,z,m,h      bodies, in SFC order and as referenced by sourceCells
- * @param[in]    G              gravitational constant
- * @param[in]    numShells      number of periodic shells in each dimension to include
- * @param[in]    box            coordinate bounding box
- * @param[inout] p              body potential to add to, on device
- * @param[inout] ax,ay,az       body acceleration to add to
- * @param[in]    childOffsets   location (index in [0:numTreeNodes]) of first child of each cell, 0 indicates a leaf
- * @param[in]    internalToLeaf for each cell in [0:numTreeNodes], stores the leaf cell (cstone) index in [0:numLeaves]
- *                              if the cell is not a leaf, the value is negative
- * @param[in]    layout         for each leaf cell in [0:numLeaves], stores the index of the first body in the cell
- * @param[in]    sourceCenter   x,y,z center and square MAC radius of each cell in [0:numTreeNodes]
- * @param[in]    Multipole      cell multipoles, on device
- * @return                      P2P and M2P interaction statistics
- */
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType>
-auto computeAcceleration(size_t firstBody, size_t lastBody, const Tc* x, const Tc* y, const Tc* z, const Tm* m,
-                         const Th* h, Tc G, int numShells, const cstone::Box<Tc>& box, Ta* p, Ta* ax, Tc* ay, Tc* az,
-                         const TreeNodeIndex* childOffsets, const TreeNodeIndex* internalToLeaf,
-                         const LocalIndex* layout, const Vec4<Tf>* sourceCenter, const MType* Multipole)
+double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ xt, const Tc* __restrict__ yt,
+                const Tc* __restrict__ zt, const Tm* __restrict__ mt, const Th* __restrict__ ht,
+                const Tc* __restrict__ xs, const Tc* __restrict__ ys, const Tc* __restrict__ zs,
+                const Tm* __restrict__ ms, const Th* __restrict__ hs, const TreeNodeIndex* __restrict__ childOffsets,
+                const TreeNodeIndex* __restrict__ internalToLeaf, const LocalIndex* __restrict__ layout,
+                const Vec4<Tf>* __restrict__ sourceCenter, const MType* __restrict__ multipoles, Tc G, int numShells,
+                Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az, int* gmPool)
 {
-    constexpr int numWarpsPerBlock = TravConfig::numThreads / GpuConfig::warpSize;
 
-    cstone::GroupData<cstone::GpuTag> groups;
-    cstone::computeFixedGroups(firstBody, lastBody, TravConfig::targetSize, groups);
-
-    LocalIndex numBodies  = lastBody - firstBody;
-    int        numTargets = (numBodies - 1) / TravConfig::targetSize + 1;
-    int        numBlocks  = (numTargets - 1) / numWarpsPerBlock + 1;
-    numBlocks             = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
-
-    printf("launching %d blocks\n", numBlocks);
-
-    const int                  poolSize = TravConfig::memPerWarp * numWarpsPerBlock * numBlocks;
-    thrust::device_vector<int> globalPool(poolSize);
+    int numWarpsPerBlock = TravConfig::numThreads / GpuConfig::warpSize;
+    int numBlocks        = cstone::iceil(grp.numGroups, numWarpsPerBlock);
+    numBlocks            = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
 
     resetTraversalCounters<<<1, 1>>>();
-    auto t0 = std::chrono::high_resolution_clock::now();
-    traverse<<<numBlocks, TravConfig::numThreads>>>(
-        groups.view(), 1, x, y, z, m, h, childOffsets, internalToLeaf, layout, sourceCenter, Multipole, G, numShells,
-        {box.lx(), box.ly(), box.lz()}, p, ax, ay, az, thrust::raw_pointer_cast(globalPool.data()));
-    kernelSuccess("traverse");
-
-    auto   t1 = std::chrono::high_resolution_clock::now();
-    double dt = std::chrono::duration<double>(t1 - t0).count();
-
-    typename BhStats::type stats[BhStats::numStats];
-    checkGpuErrors(cudaMemcpyFromSymbol(stats, bhStats, BhStats::numStats * sizeof(BhStats::type)));
-
-    auto sumP2P = stats[BhStats::sumP2P];
-    auto maxP2P = stats[BhStats::maxP2P];
-    auto sumM2P = stats[BhStats::sumM2P];
-    auto maxM2P = stats[BhStats::maxM2P];
-
+    traverseKernel<<<numBlocks, TravConfig::numThreads>>>(grp, initNodeIdx, xt, yt, zt, mt, ht, xs, ys, zs, ms, hs,
+                                                          childOffsets, internalToLeaf, layout, sourceCenter,
+                                                          multipoles, G, numShells, boxL, p, ax, ay, az, gmPool);
     float totalPotential;
-    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, totalPotentialGlob, sizeof(float)));
+    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
+    return 0.5 * Tc(G) * totalPotential;
+}
 
-    util::array<Tc, 5> interactions;
-    interactions[0] = Tc(sumP2P) / Tc(numBodies);
-    interactions[1] = Tc(maxP2P);
-    interactions[2] = Tc(sumM2P) / Tc(numBodies);
-    interactions[3] = Tc(maxM2P);
-    interactions[4] = totalPotential;
+#define TRAVERSE(Tc, Th, Tm, Ta, Tf, MType)                                                                            \
+    template double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ xt,                  \
+                             const Tc* __restrict__ yt, const Tc* __restrict__ zt, const Tm* __restrict__ mt,          \
+                             const Th* __restrict__ ht, const Tc* __restrict__ xs, const Tc* __restrict__ ys,          \
+                             const Tc* __restrict__ zs, const Tm* __restrict__ ms, const Th* __restrict__ hs,          \
+                             const TreeNodeIndex* __restrict__ childOffsets,                                           \
+                             const TreeNodeIndex* __restrict__ internalToLeaf, const LocalIndex* __restrict__ layout,  \
+                             const Vec4<Tf>* __restrict__ sourceCenter, const MType* __restrict__ multipoles, Tc G,    \
+                             int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az, int* gmPool)
 
-    Tc flops = (interactions[0] * 20.0 + interactions[2] * 2.0 * powf(ExpansionOrder<MType{}.size()>{}, 3)) *
-               Tc(numBodies) / dt / 1e12;
+#define TRAVERSE_MPOLE(MType)                                                                                          \
+    TRAVERSE(double, double, double, double, double, MType<double>);                                                   \
+    TRAVERSE(double, float, float, float, double, MType<float>);                                                       \
+    TRAVERSE(float, float, float, float, float, MType<float>);
 
-    fprintf(stdout, "Traverse             : %.7f s (%.7f TFlops)\n", dt, flops);
+TRAVERSE_MPOLE(CartesianQuadrupole)
+TRAVERSE_MPOLE(CartesianMDQpole)
 
-    return interactions;
+int bhMaxTargetSize() { return TravConfig::targetSize; }
+
+LocalIndex stackSize(LocalIndex numGroups)
+{
+    int numWarpsPerBlock = TravConfig::numThreads / cstone::GpuConfig::warpSize;
+    int numBlocks        = cstone::iceil(numGroups, numWarpsPerBlock);
+    numBlocks            = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
+    LocalIndex poolSize  = TravConfig::memPerWarp * numWarpsPerBlock * numBlocks;
+    return poolSize;
+}
+
+util::array<uint64_t, 5> readBhStats()
+{
+    BhStats::type stats[BhStats::numStats];
+    checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(bhStats), BhStats::numStats * sizeof(BhStats::type)));
+
+    auto sumP2P   = stats[BhStats::sumP2P];
+    auto maxP2P   = stats[BhStats::maxP2P];
+    auto sumM2P   = stats[BhStats::sumM2P];
+    auto maxM2P   = stats[BhStats::maxM2P];
+    auto maxStack = stats[BhStats::maxStack];
+
+    return {sumP2P, maxP2P, sumM2P, maxM2P, maxStack};
 }
 
 } // namespace ryoanji

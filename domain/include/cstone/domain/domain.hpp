@@ -47,7 +47,7 @@
 #include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/traversal/collisions.hpp"
 #include "cstone/traversal/peers.hpp"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/sfc/box_mpi.hpp"
 #include "cstone/sfc/sfc.hpp"
 #include "cstone/sfc/sfc_gpu.h"

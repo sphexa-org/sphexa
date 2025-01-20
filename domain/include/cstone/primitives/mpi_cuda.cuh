@@ -32,19 +32,18 @@
 #pragma once
 
 #include <vector>
-#include <cuda_runtime.h>
 
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/util/noinit_alloc.hpp"
-#include "cstone/cuda/errorcheck.cuh"
+#include "cstone/cuda/cuda_stubs.h"
 
-#ifdef USE_GPU_DIRECT
+#ifdef CSTONE_HAVE_GPU_AWARE_MPI
 constexpr inline bool useGpuDirect = true;
 #else
 constexpr inline bool useGpuDirect = false;
 #endif
 
-template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+template<class T>
 auto mpiSendGpuDirect(T* data,
                       size_t count,
                       int rank,
@@ -55,7 +54,7 @@ auto mpiSendGpuDirect(T* data,
     if constexpr (!useGpuDirect)
     {
         std::vector<T, util::DefaultInitAdaptor<T>> hostBuffer(count);
-        checkGpuErrors(cudaMemcpy(hostBuffer.data(), data, count * sizeof(T), cudaMemcpyDeviceToHost));
+        memcpyD2H(data, count, hostBuffer.data());
         auto errCode = mpiSendAsync(hostBuffer.data(), count, rank, tag, requests);
         buffers.push_back(std::move(hostBuffer));
 
@@ -76,16 +75,37 @@ auto mpiSendGpuDirect(char* data,
     return mpiSendGpuDirect(reinterpret_cast<T*>(data), numBytes / sizeof(T), rank, tag, requests, buffers);
 }
 
-template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
+template<class T>
 auto mpiRecvGpuDirect(T* data, int count, int rank, int tag, MPI_Status* status)
 {
     if constexpr (!useGpuDirect)
     {
         std::vector<T, util::DefaultInitAdaptor<T>> hostBuffer(count);
         auto errCode = mpiRecvSync(hostBuffer.data(), count, rank, tag, status);
-        checkGpuErrors(cudaMemcpy(data, hostBuffer.data(), count * sizeof(T), cudaMemcpyHostToDevice));
+        memcpyH2D(hostBuffer.data(), count, data);
 
         return errCode;
     }
     else { return mpiRecvSync(data, count, rank, tag, status); }
+}
+
+//! @brief this wrapper is needed to support sending from GPU buffers with staging through host (no GPU-direct MPI)
+template<bool useGpu, class T>
+auto mpiSendAsyncAcc(T* data,
+                     size_t count,
+                     int rank,
+                     int tag,
+                     std::vector<MPI_Request>& requests,
+                     [[maybe_unused]] std::vector<std::vector<T, util::DefaultInitAdaptor<T>>>& buffers)
+{
+    if constexpr (useGpu) { mpiSendGpuDirect(data, count, rank, tag, requests, buffers); }
+    else { mpiSendAsync(data, count, rank, tag, requests); }
+}
+
+//! @brief this wrapper is needed to support sending from GPU buffers with staging through host (no GPU-direct MPI)
+template<bool useGpu, class T>
+auto mpiRecvSyncAcc(T* data, int count, int rank, int tag, MPI_Status* status)
+{
+    if constexpr (useGpu) { mpiRecvGpuDirect(data, count, rank, tag, status); }
+    else { mpiRecvSync(data, count, rank, tag, status); }
 }

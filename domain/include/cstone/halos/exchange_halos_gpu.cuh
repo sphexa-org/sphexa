@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Zurich, 2021 University of Basel
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -49,7 +33,7 @@ namespace cstone
 
 template<class DevVec1, class DevVec2, class... Arrays>
 void haloExchangeGpu(int epoch,
-                     const SendList& incomingHalos,
+                     const RecvList& incomingHalos,
                      const SendList& outgoingHalos,
                      DevVec1& sendScratchBuffer,
                      DevVec2& receiveScratchBuffer,
@@ -66,7 +50,7 @@ void haloExchangeGpu(int epoch,
     const size_t oldSendSize = reallocateBytes(
         sendScratchBuffer, computeTotalSendBytes<alignment>(outgoingHalos, -1, 0, arrays...), allocGrowthRate);
 
-    size_t numRanges = std::max(maxNumRanges(outgoingHalos), maxNumRanges(incomingHalos));
+    size_t numRanges = maxNumRanges(outgoingHalos);
     IndexType* d_range;
     checkGpuErrors(cudaMalloc((void**)&d_range, 2 * numRanges * sizeof(IndexType)));
     IndexType* d_rangeScan = d_range + numRanges;
@@ -86,47 +70,39 @@ void haloExchangeGpu(int epoch,
         auto gatherArray = [d_range, d_rangeScan, numRanges = outHalos.nRanges(), sendCount](auto arrayPtr)
         { gatherRanges(d_rangeScan, d_range, numRanges, arrayPtr[0], arrayPtr[1], sendCount); };
 
-        for_each_tuple(gatherArray, packBufferPtrs<alignment>(sendPtr, sendCount, arrays...));
+        for_each_tuple(gatherArray, util::packBufferPtrs<alignment>(sendPtr, sendCount, arrays...));
         checkGpuErrors(cudaDeviceSynchronize());
 
-        size_t numBytesSend = computeByteOffsets(sendCount, alignment, arrays...).back();
+        size_t numBytesSend = util::computeByteOffsets(sendCount, alignment, arrays...).back();
         mpiSendGpuDirect(sendPtr, numBytesSend, int(destinationRank), haloExchangeTag, sendRequests, sendBuffers);
         sendPtr += numBytesSend;
     }
 
-    int numMessages       = 0;
-    size_t maxReceiveSize = 0;
+    int numMessages           = 0;
+    LocalIndex maxReceiveSize = 0;
     for (const auto& incomingHalo : incomingHalos)
     {
-        numMessages += int(incomingHalo.totalCount() > 0);
-        maxReceiveSize = std::max(maxReceiveSize, incomingHalo.totalCount());
+        numMessages += int(incomingHalo.count() > 0);
+        maxReceiveSize = std::max(maxReceiveSize, incomingHalo.count());
     }
-    size_t maxReceiveBytes = computeByteOffsets(maxReceiveSize, alignment, arrays...).back();
+    size_t maxReceiveBytes = util::computeByteOffsets(maxReceiveSize, alignment, arrays...).back();
 
     const size_t oldRecvSize = reallocateBytes(receiveScratchBuffer, maxReceiveBytes, allocGrowthRate);
     char* receiveBuffer      = reinterpret_cast<char*>(rawPtr(receiveScratchBuffer));
 
-    while (numMessages > 0)
+    while (numMessages--)
     {
         MPI_Status status;
         mpiRecvGpuDirect(receiveBuffer, maxReceiveBytes, MPI_ANY_SOURCE, haloExchangeTag, &status);
-        int receiveRank     = status.MPI_SOURCE;
-        const auto& inHalos = incomingHalos[receiveRank];
-        size_t receiveCount = inHalos.totalCount();
+        int receiveRank         = status.MPI_SOURCE;
+        const auto& inHalos     = incomingHalos[receiveRank];
+        LocalIndex receiveCount = inHalos.count();
 
-        // compute indices to extract and upload to GPU
-        checkGpuErrors(
-            cudaMemcpy(d_range, inHalos.offsets(), inHalos.nRanges() * sizeof(IndexType), cudaMemcpyHostToDevice));
-        checkGpuErrors(
-            cudaMemcpy(d_rangeScan, inHalos.scan(), inHalos.nRanges() * sizeof(IndexType), cudaMemcpyHostToDevice));
+        auto unpack = [start = inHalos.start(), receiveCount](auto arrayPair)
+        { memcpyD2H(arrayPair[1], receiveCount, arrayPair[0] + start); };
 
-        auto scatterArray = [d_range, d_rangeScan, numRanges = inHalos.nRanges(), receiveCount](auto arrayPtr)
-        { scatterRanges(d_rangeScan, d_range, numRanges, arrayPtr[0], arrayPtr[1], receiveCount); };
-
-        for_each_tuple(scatterArray, packBufferPtrs<alignment>(receiveBuffer, receiveCount, arrays...));
+        for_each_tuple(unpack, util::packBufferPtrs<alignment>(receiveBuffer, receiveCount, arrays...));
         checkGpuErrors(cudaDeviceSynchronize());
-
-        numMessages--;
     }
 
     if (not sendRequests.empty())

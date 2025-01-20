@@ -1,3 +1,11 @@
+/*
+ * Cornerstone octree
+ *
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Zurich, 2021 University of Basel
+ *
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
+ */
 
 /*! @file
  * @brief math tests
@@ -25,7 +33,10 @@ TEST(Math, round_up)
 TEST(Math, butterfly)
 {
     std::array<uint32_t, 9> W1;
-    for (uint32_t i = 0; i < W1.size(); ++i) { W1[i] = butterfly(i); }
+    for (uint32_t i = 0; i < W1.size(); ++i)
+    {
+        W1[i] = butterfly(i);
+    }
 
     std::array<uint32_t, 9> ref{0, 1, 2, 1, 3, 1, 2, 1, 4};
     EXPECT_EQ(W1, ref);

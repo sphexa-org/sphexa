@@ -229,6 +229,28 @@ HOST_DEVICE_FUN constexpr KeyType decodePlaceholderBit(KeyType code)
     return ret << (3 * maxTreeLevel<KeyType>{} - prefixLength);
 }
 
+//! @brief Mask key to set special status. Does not support WS-prefix keys.
+template<class KeyType>
+KeyType maskKey(KeyType key)
+{
+    if (key == 0 || key == nodeRange<KeyType>(0)) { return key; }
+    return key | nodeRange<KeyType>(0);
+}
+
+//! @brief Inverse of maskKey
+template<class KeyType>
+KeyType unmaskKey(KeyType key)
+{
+    if (key == nodeRange<KeyType>(0)) { return key; }
+    return key & (nodeRange<KeyType>(0) - 1);
+}
+
+template<class KeyType>
+bool isMasked(KeyType key)
+{
+    return key > nodeRange<KeyType>(0);
+}
+
 /*! @brief extract the n-th octal digit from an SFC key, starting from the most significant
  *
  * @tparam KeyType   32- or 64-bit unsigned integer type

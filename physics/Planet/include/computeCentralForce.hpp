@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <cmath>
 
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/tree/definitions.h"
 #include "computeCentralForce_gpu.hpp"
 

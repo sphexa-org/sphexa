@@ -1,8 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Basel, University of Zurich
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -38,9 +37,10 @@
 #include <thrust/host_vector.h>
 #include <thrust/sequence.h>
 
-#include "cstone/cuda/device_vector.h"
 #include "cstone/cuda/thrust_util.cuh"
-#include "cstone/traversal/groups.cuh"
+#include "cstone/primitives/math.hpp"
+#include "cstone/traversal/groups_gpu.cuh"
+#include "cstone/traversal/groups_gpu.h"
 #include "cstone/tree/cs_util.hpp"
 
 using namespace cstone;
@@ -51,15 +51,13 @@ using SplitType             = util::array<GpuConfig::ThreadMask, nwt>;
 
 TEST(TargetGroups, t0)
 {
-    using T              = double;
-    LocalIndex numGroups = 4, groupSize = 8, first = 4, last = 34;
+    LocalIndex groupSize = 8, first = 4, last = 34;
 
-    thrust::device_vector<LocalIndex> groups(numGroups + 1);
-    fixedGroupsKernel<<<iceil(last - first, 64), 64>>>(first, last, groupSize, rawPtr(groups),
-                                                       iceil(last - first, groupSize));
+    GroupData<GpuTag> groups;
+    computeFixedGroups(first, last, groupSize, groups);
 
-    thrust::host_vector<LocalIndex> hgroups = groups;
-    thrust::host_vector<LocalIndex> ref     = std::vector<LocalIndex>{4, 12, 20, 28, 34};
+    std::vector<LocalIndex> hgroups = toHost(groups.data);
+    std::vector<LocalIndex> ref{4, 12, 20, 28, 34};
     EXPECT_EQ(hgroups, ref);
 }
 
@@ -276,12 +274,11 @@ TEST(TargetGroups, groupVolumes)
     }
 
     {
-        DeviceVector<SplitType> S;
         DeviceVector<LocalIndex> temp, groups;
 
         float tolFactor = std::sqrt(3.0) / distCrit * 1.01;
-        computeGroupSplits<groupSize>(first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves),
-                                      nNodes(leaves), rawPtr(d_layout), box, tolFactor, S, temp, groups);
+        computeGroupSplits(first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves), nNodes(leaves),
+                           rawPtr(d_layout), box, groupSize, tolFactor, temp, groups);
 
         std::vector<LocalIndex> h_groups = toHost(groups);
         EXPECT_EQ(h_groups.size(), 4);

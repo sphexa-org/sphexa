@@ -46,7 +46,7 @@ using namespace ryoanji;
 template<class T, class KeyType>
 static int multipoleHolderTest(int thisRank, int numRanks)
 {
-    using MultipoleType              = SphericalMultipole<T, 4>;
+    using MultipoleType              = CartesianQuadrupole<T>;
     const LocalIndex numParticles    = 1000 * numRanks;
     unsigned         bucketSize      = 64;
     unsigned         bucketSizeLocal = 16;

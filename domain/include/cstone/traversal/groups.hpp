@@ -9,7 +9,7 @@
 #include <utility>
 
 #include "cstone/cuda/device_vector.h"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/tree/definitions.h"
 
 namespace cstone

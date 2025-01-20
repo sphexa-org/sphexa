@@ -109,18 +109,19 @@ void exchangeFocusIrregular(int myRank, int numRanks)
     }
 
     std::vector<std::vector<KeyType>> treelets(numRanks);
-    std::vector<std::vector<TreeNodeIndex>> treeletIdx(numRanks);
-    syncTreelets(peers, peerFocusIndices, octree, treeLeaves, treelets, treeletIdx);
+    ConcatVector<TreeNodeIndex> treeletIdx;
+    syncTreelets(peers, peerFocusIndices, octree, treeLeaves, treelets);
     indexTreelets<KeyType>(peers, octree.prefixes, octree.levelRange, treelets, treeletIdx);
 
+    auto treeletView = treeletIdx.view();
     if (myRank == 0)
     {
         KeyType boundary = decodePlaceholderBit(KeyType(014));
-        EXPECT_EQ(treeletIdx[1].size(), findNodeAbove(treeLeavesRef[1].data(), nNodes(treeLeavesRef[1]), boundary));
+        EXPECT_EQ(treeletView[1].size(), findNodeAbove(treeLeavesRef[1].data(), nNodes(treeLeavesRef[1]), boundary));
         // check that rank 0's interior tree matches the exterior tree of rank 1
-        for (size_t i = 0; i < treeletIdx[1].size(); ++i)
+        for (size_t i = 0; i < treeletView[1].size(); ++i)
         {
-            KeyType tlKey = octree.prefixes[treeletIdx[1][i]];
+            KeyType tlKey = octree.prefixes[treeletView[1][i]];
             EXPECT_EQ(tlKey, encodePlaceholderBit2K(treeLeavesRef[1][i], treeLeavesRef[1][i + 1]));
         }
     }
@@ -132,12 +133,12 @@ void exchangeFocusIrregular(int myRank, int numRanks)
 
         TreeNodeIndex numNodesExtTreeRank0 = nNodes(treeLeavesRef[0]) - peerStartIdx;
         // size of rank 0's exterior tree should match interior treelet size on rank 1
-        EXPECT_EQ(numNodesExtTreeRank0, treeletIdx[0].size());
+        EXPECT_EQ(numNodesExtTreeRank0, treeletView[0].size());
 
-        for (size_t i = 0; i < treeletIdx[0].size(); ++i)
+        for (size_t i = 0; i < treeletView[0].size(); ++i)
         {
             const KeyType* refTree = &treeLeavesRef[0][peerStartIdx];
-            KeyType tlKey          = octree.prefixes[treeletIdx[0][i]];
+            KeyType tlKey          = octree.prefixes[treeletView[0][i]];
             EXPECT_EQ(tlKey, encodePlaceholderBit2K(refTree[i], refTree[i + 1]));
         }
     }

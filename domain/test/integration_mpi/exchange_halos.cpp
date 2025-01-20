@@ -53,20 +53,18 @@ void simpleTest(int thisRank)
         localOffset = 3;
     }
 
-    SendList incomingHalos(nRanks);
+    RecvList incomingHalos(nRanks);
     SendList outgoingHalos(nRanks);
 
     if (thisRank == 0)
     {
-        incomingHalos[1].addRange(3, 6);
-        incomingHalos[1].addRange(6, 10);
+        incomingHalos[1] = {3, 10};
         outgoingHalos[1].addRange(0, 1);
         outgoingHalos[1].addRange(1, 3);
     }
     if (thisRank == 1)
     {
-        incomingHalos[0].addRange(0, 1);
-        incomingHalos[0].addRange(1, 3);
+        incomingHalos[0] = {0, 3};
         outgoingHalos[0].addRange(3, 6);
         outgoingHalos[0].addRange(6, 10);
     }

@@ -3,7 +3,7 @@ add_subdirectory(hydro_turb)
 add_subdirectory(hydro_ve)
 
 set(TIMESTEP_GPU_KERNELS
-        groups.cu positions_gpu.cu ts_groups.cu update_h_gpu.cu
+        positions_gpu.cu ts_groups.cu update_h_gpu.cu
 )
 
 if (CMAKE_HIP_COMPILER)

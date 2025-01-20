@@ -45,7 +45,7 @@ using SourceCenterType = util::array<T, 4>;
 template<class T>
 HOST_DEVICE_FUN void addBody(SourceCenterType<T>& center, const SourceCenterType<T>& source)
 {
-    T weight = source[3];
+    T weight = std::abs(source[3]);
 
     center[0] += weight * source[0];
     center[1] += weight * source[1];
@@ -53,11 +53,11 @@ HOST_DEVICE_FUN void addBody(SourceCenterType<T>& center, const SourceCenterType
     center[3] += weight;
 }
 
-//! @brief finish mass center computation by diving coordinates by total mass
+//! @brief finish mass center computation by dividing coordinates by total absolute mass
 template<class T>
 HOST_DEVICE_FUN SourceCenterType<T> normalizeMass(SourceCenterType<T> center)
 {
-    T invM = (center[3] != T(0.0)) ? T(1.0) / center[3] : T(0.0);
+    T invM = (center[3] != T(0.0)) ? T(1.0) / center[3] : T(1.0);
     center[0] *= invM;
     center[1] *= invM;
     center[2] *= invM;

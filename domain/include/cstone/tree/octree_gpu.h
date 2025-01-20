@@ -49,4 +49,7 @@ namespace cstone
 template<class KeyType>
 extern void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d);
 
+//! @brief Upsweep by summing up child nodes, e.g. to compute particle node counts
+void upsweepSumGpu(int numLvl, const TreeNodeIndex* lvlRange, const TreeNodeIndex* childOffsets, LocalIndex* counts);
+
 } // namespace cstone

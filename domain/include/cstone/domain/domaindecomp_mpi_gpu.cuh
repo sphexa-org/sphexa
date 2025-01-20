@@ -152,7 +152,7 @@ void exchangeParticlesGpu(int epoch,
         if (record) { receiveLog.addExchange(receiveRank, receiveStart); }
         else { receiveLocation = receiveLog.lookup(receiveRank); }
 
-        auto packTuple     = packBufferPtrs<alignment>(receiveBuffer, receiveCount, (arrays + receiveLocation)...);
+        auto packTuple = util::packBufferPtrs<alignment>(receiveBuffer, receiveCount, (arrays + receiveLocation)...);
         auto scatterRanges = [receiveCount](auto arrayPair)
         {
             checkGpuErrors(cudaMemcpy(arrayPair[0], arrayPair[1],

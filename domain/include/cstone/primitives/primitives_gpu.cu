@@ -29,7 +29,7 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#include <cub/cub.cuh>
+#include <stdexcept>
 
 #include <thrust/binary_search.h>
 #include <thrust/count.h>
@@ -39,6 +39,7 @@
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
 
+#include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/errorcheck.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/util/array.hpp"
@@ -123,6 +124,15 @@ void gatherGpu(const IndexType* map, size_t n, const T* source, T* destination)
 }
 
 template void gatherGpu(const int*, size_t, const int*, int*);
+template void gatherGpu(const int*, size_t, const uint32_t*, uint32_t*);
+template void gatherGpu(const int*, size_t, const uint64_t*, uint64_t*);
+template void gatherGpu(const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+template void gatherGpu(const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
+template void gatherGpu(const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*);
+template void gatherGpu(const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
+template void gatherGpu(const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
+template void gatherGpu(const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
+
 template void gatherGpu(const unsigned*, size_t, const uint8_t*, uint8_t*);
 template void gatherGpu(const unsigned*, size_t, const double*, double*);
 template void gatherGpu(const unsigned*, size_t, const float*, float*);
@@ -136,6 +146,33 @@ template void gatherGpu(const unsigned*, size_t, const util::array<float, 1>*, u
 template void gatherGpu(const unsigned*, size_t, const util::array<float, 2>*, util::array<float, 2>*);
 template void gatherGpu(const unsigned*, size_t, const util::array<float, 3>*, util::array<float, 3>*);
 template void gatherGpu(const unsigned*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+
+template<class T, class IndexType>
+__global__ void scatterGpuKernel(const IndexType* map, size_t n, const T* source, T* destination)
+{
+    size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (tid < n) { destination[map[tid]] = source[tid]; }
+}
+
+template<class T, class IndexType>
+void scatterGpu(const IndexType* map, size_t n, const T* source, T* destination)
+{
+    int numThreads = 256;
+    int numBlocks  = iceil(n, numThreads);
+
+    scatterGpuKernel<<<numBlocks, numThreads>>>(map, n, source, destination);
+}
+
+template void scatterGpu(const int*, size_t, const int*, int*);
+template void scatterGpu(const int*, size_t, const uint32_t*, uint32_t*);
+template void scatterGpu(const int*, size_t, const uint64_t*, uint64_t*);
+template void scatterGpu(const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+template void scatterGpu(const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
+template void scatterGpu(const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*);
+template void scatterGpu(const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
+template void scatterGpu(const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
+template void scatterGpu(const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
 
 template<class T>
 std::tuple<T, T> MinMaxGpu<T>::operator()(const T* first, const T* last)
@@ -286,21 +323,34 @@ template void sortGpu(uint32_t*, uint32_t*, uint32_t*);
 template void sortGpu(uint64_t*, uint64_t*, uint64_t*);
 template void sortGpu(float*, float*, float*);
 
+// Determine temporary device storage requirements
 template<class KeyType, class ValueType>
-void sortByKeyGpu(KeyType* first, KeyType* last, ValueType* values, KeyType* keyBuf, ValueType* valueBuf)
+uint64_t sortByKeyTempStorage(uint64_t numElements)
+{
+    cub::DoubleBuffer<KeyType> d_keys(nullptr, nullptr);
+    cub::DoubleBuffer<ValueType> d_values(nullptr, nullptr);
+
+    uint64_t tempStorageBytes = 0;
+    cub::DeviceRadixSort::SortPairs(nullptr, tempStorageBytes, d_keys, d_values, numElements);
+    return tempStorageBytes;
+}
+
+template<class KeyType, class ValueType>
+void sortByKeyGpu(KeyType* first,
+                  KeyType* last,
+                  ValueType* values,
+                  KeyType* keyBuf,
+                  ValueType* valueBuf,
+                  void* d_tempStorage,
+                  uint64_t tempStorageBytes)
 {
     size_t numElements = last - first;
 
     cub::DoubleBuffer<KeyType> d_keys(first, keyBuf);
     cub::DoubleBuffer<ValueType> d_values(values, valueBuf);
 
-    // Determine temporary device storage requirements
-    void* d_tempStorage     = nullptr;
-    size_t tempStorageBytes = 0;
-    cub::DeviceRadixSort::SortPairs(d_tempStorage, tempStorageBytes, d_keys, d_values, numElements);
-
-    // Allocate temporary storage
-    checkGpuErrors(cudaMalloc(&d_tempStorage, tempStorageBytes));
+    auto tempBytesCheck = sortByKeyTempStorage<KeyType, ValueType>(numElements);
+    if (tempStorageBytes < tempBytesCheck) { throw std::runtime_error("temp storage too small\n"); };
 
     // Run sorting operation
     checkGpuErrors(cub::DeviceRadixSort::SortPairs(d_tempStorage, tempStorageBytes, d_keys, d_values, numElements));
@@ -316,16 +366,18 @@ void sortByKeyGpu(KeyType* first, KeyType* last, ValueType* values, KeyType* key
     {
         checkGpuErrors(cudaMemcpy(values, curValues, numElements * sizeof(ValueType), cudaMemcpyDeviceToDevice));
     }
-
-    checkGpuErrors(cudaFree(d_tempStorage));
 }
 
-template void sortByKeyGpu(unsigned*, unsigned*, unsigned*, unsigned*, unsigned*);
-template void sortByKeyGpu(unsigned*, unsigned*, int*, unsigned*, int*);
-template void sortByKeyGpu(uint64_t*, uint64_t*, unsigned*, uint64_t*, unsigned*);
-template void sortByKeyGpu(uint64_t*, uint64_t*, int*, uint64_t*, int*);
-template void sortByKeyGpu(uint64_t*, uint64_t*, uint64_t*, uint64_t*, uint64_t*);
-template void sortByKeyGpu(float*, float*, unsigned*, float*, unsigned*);
+#define SORT_BY_KEY_GPU_DB(KeyType, ValueType)                                                                         \
+    template void sortByKeyGpu(KeyType*, KeyType*, ValueType*, KeyType*, ValueType*, void*, uint64_t);                 \
+    template uint64_t sortByKeyTempStorage<KeyType, ValueType>(uint64_t)
+
+SORT_BY_KEY_GPU_DB(unsigned, unsigned);
+SORT_BY_KEY_GPU_DB(unsigned, int);
+SORT_BY_KEY_GPU_DB(uint64_t, unsigned);
+SORT_BY_KEY_GPU_DB(uint64_t, int);
+SORT_BY_KEY_GPU_DB(uint64_t, uint64_t);
+SORT_BY_KEY_GPU_DB(float, unsigned);
 
 template<class KeyType, class ValueType>
 void sortByKeyGpu(KeyType* first, KeyType* last, ValueType* values)

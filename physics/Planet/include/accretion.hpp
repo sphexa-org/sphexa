@@ -11,7 +11,7 @@
 #include "accretion_impl.hpp"
 #include "accretion_gpu.hpp"
 #include "cstone/primitives/mpi_wrappers.hpp"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 
 namespace disk
 {

@@ -31,7 +31,17 @@
 
 #pragma once
 
-#include <memory>
+#include <thrust/execution_policy.h>
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
+#include <thrust/gather.h>
+
+#include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/cuda/thrust_util.cuh"
+#include "cstone/primitives/primitives_gpu.h"
+#include "cstone/sfc/sfc_gpu.h"
+#include "cstone/tree/octree_gpu.h"
+#include "cstone/tree/update_gpu.cuh"
 
 #include "ryoanji/nbody/types.h"
 
@@ -42,12 +52,8 @@ template<class KeyType>
 class TreeBuilder
 {
 public:
-    TreeBuilder();
-
-    ~TreeBuilder();
-
     //! @brief initialize with the desired maximum particles per leaf cell
-    TreeBuilder(unsigned ncrit);
+    TreeBuilder(unsigned ncrit) : bucketSize_(ncrit) {}
 
     /*! @brief construct an octree from body coordinates
      *
@@ -62,29 +68,77 @@ public:
      * Note: x,y,z arrays will be sorted in SFC order to match be consistent with the cell body offsets of the tree
      */
     template<class T>
-    int update(T* x, T* y, T* z, size_t numBodies, const cstone::Box<T>& box);
+    int update(T* x, T* y, T* z, size_t numBodies, const cstone::Box<T>& box)
+    {
+        thrust::device_vector<KeyType> d_keys(numBodies), d_keys_tmp(numBodies);
+        thrust::device_vector<int>     d_ordering(numBodies), d_values_tmp(numBodies);
+        thrust::device_vector<T>       tmp(numBodies);
 
-    /*! @brief extract the octree level range from the previous update call
-     *
-     * @param[out] h_levelRange  indices of the first node at each subdivison level
-     * @return     the maximum subdivision level in the output tree
-     */
-    int extract(int2* h_levelRange);
+        uint64_t                    tempStorageEle = cstone::sortByKeyTempStorage<KeyType, LocalIndex>(numBodies);
+        thrust::device_vector<char> cubTmpStorage(tempStorageEle);
 
-    const LocalIndex*    layout() const;
-    const TreeNodeIndex* childOffsets() const;
-    const TreeNodeIndex* leafToInternal() const;
-    const TreeNodeIndex* internalToLeaf() const;
+        cstone::computeSfcKeysGpu(x, y, z, cstone::sfcKindPointer(rawPtr(d_keys)), numBodies, box);
 
-    TreeNodeIndex numLeafNodes() const;
-    unsigned      maxTreeLevel() const;
+        cstone::sequenceGpu(rawPtr(d_ordering), d_ordering.size(), 0);
+        cstone::sortByKeyGpu(rawPtr(d_keys), rawPtr(d_keys) + d_keys.size(), rawPtr(d_ordering), rawPtr(d_keys_tmp),
+                             rawPtr(d_values_tmp), rawPtr(cubTmpStorage), tempStorageEle);
+
+        thrust::gather(thrust::device, d_ordering.begin(), d_ordering.end(), x, tmp.begin());
+        thrust::copy(tmp.begin(), tmp.end(), x);
+        thrust::gather(thrust::device, d_ordering.begin(), d_ordering.end(), y, tmp.begin());
+        thrust::copy(tmp.begin(), tmp.end(), y);
+        thrust::gather(thrust::device, d_ordering.begin(), d_ordering.end(), z, tmp.begin());
+        thrust::copy(tmp.begin(), tmp.end(), z);
+
+        if (d_tree_.size() == 0)
+        {
+            // initial guess on first call. use previous tree as guess on subsequent calls
+            d_tree_   = std::vector<KeyType>{0, cstone::nodeRange<KeyType>(0)};
+            d_counts_ = std::vector<unsigned>{unsigned(numBodies)};
+        }
+
+        while (!cstone::updateOctreeGpu(rawPtr(d_keys), rawPtr(d_keys) + d_keys.size(), bucketSize_, d_tree_, d_counts_,
+                                        tmpTree_, workArray_))
+            ;
+
+        octreeGpuData_.resize(cstone::nNodes(d_tree_));
+        cstone::buildOctreeGpu(rawPtr(d_tree_), octreeGpuData_.data());
+
+        d_layout_.resize(d_counts_.size() + 1);
+        cstone::fillGpu(rawPtr(d_layout_), rawPtr(d_layout_) + 1, LocalIndex(0));
+        cstone::inclusiveScanGpu(rawPtr(d_counts_), rawPtr(d_counts_) + d_counts_.size(), rawPtr(d_layout_) + 1);
+
+        levelRange_host_ = toHost(octreeGpuData_.levelRange);
+        return octreeGpuData_.numInternalNodes + octreeGpuData_.numLeafNodes;
+    }
+
+    const LocalIndex*    layout() const { return rawPtr(d_layout_); }
+    const KeyType*       nodeKeys() const { return rawPtr(octreeGpuData_.prefixes); }
+    const TreeNodeIndex* childOffsets() const { return rawPtr(octreeGpuData_.childOffsets); }
+    const TreeNodeIndex* leafToInternal() const
+    {
+        return cstone::leafToInternal(octreeGpuData_).data();
+    }
+    const TreeNodeIndex* internalToLeaf() const { return rawPtr(octreeGpuData_.internalToLeaf); }
+    //! @brief return host-resident octree level cell ranges
+    const TreeNodeIndex* levelRange() const { return levelRange_host_.data(); }
+
+    TreeNodeIndex numLeafNodes() const { return octreeGpuData_.numLeafNodes; }
+    unsigned      maxTreeLevel() const { return cstone::maxTreeLevel<KeyType>{}; }
 
 private:
-    class Impl;
-    std::unique_ptr<Impl> impl_;
-};
+    unsigned bucketSize_;
 
-extern template class TreeBuilder<uint32_t>;
-extern template class TreeBuilder<uint64_t>;
+    thrust::device_vector<KeyType>  d_tree_;
+    thrust::device_vector<unsigned> d_counts_;
+
+    thrust::device_vector<KeyType>               tmpTree_;
+    thrust::device_vector<cstone::TreeNodeIndex> workArray_;
+
+    cstone::OctreeData<KeyType, cstone::GpuTag> octreeGpuData_;
+    thrust::device_vector<cstone::LocalIndex>   d_layout_;
+
+    std::vector<TreeNodeIndex> levelRange_host_;
+};
 
 } // namespace ryoanji

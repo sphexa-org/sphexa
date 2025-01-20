@@ -36,6 +36,7 @@
 #include <thrust/device_ptr.h>
 #include <thrust/scan.h>
 
+#include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/cuda/errorcheck.cuh"
 #include "cstone/primitives/math.hpp"
 #include "csarray.hpp"

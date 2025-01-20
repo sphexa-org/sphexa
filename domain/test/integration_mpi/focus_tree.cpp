@@ -123,12 +123,13 @@ void globalRandomGaussian(int thisRank, int numRanks)
     computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box);
 
     FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal);
+    std::vector<int, util::DefaultInitAdaptor<int>> scratch;
 
     int converged = 0;
     while (converged != numRanks)
     {
         converged = focusTree.updateTree(peers, assignment, box);
-        focusTree.updateCounts(particleKeys, tree, counts);
+        focusTree.updateCounts(particleKeys, tree, counts, scratch);
         focusTree.updateMinMac(assignment, invThetaEff);
         MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 

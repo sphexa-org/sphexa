@@ -206,6 +206,53 @@ static int multipoleHolderTest(int thisRank, int numRanks)
         bool passPot    = std::abs((bhPotentialGlob - potentialSumRefGlob) / potentialSumRefGlob) < ptol;
 
         pass = passAcc1pc && passAccMax && passPot;
+
+        // Test separate targets and sources
+        {
+            auto extract = [](cstone::DeviceVector<T>& dv, LocalIndex a, LocalIndex b)
+            {
+                cstone::DeviceVector<T> ret(b - a);
+                memcpyD2D(dv.data() + a, ret.size(), ret.data());
+                return ret;
+            };
+
+            /* Compute accelerations for some target particles. We pick the first numTarget sources because
+             * we already have the reference values. But the target particles can be distinct from the sources.
+             * The only concern is performance: this only runs efficiently if the targets are SFC sorted and grouped
+             * by MultipoleHolder::computeSpatialGroups to ensure that target groups have compact bounding boxes.
+             */
+            LocalIndex              numTargets = 100;
+            cstone::DeviceVector<T> d_xt       = extract(d_x, domain.startIndex(), domain.startIndex() + numTargets);
+            cstone::DeviceVector<T> d_yt       = extract(d_y, domain.startIndex(), domain.startIndex() + numTargets);
+            cstone::DeviceVector<T> d_zt       = extract(d_z, domain.startIndex(), domain.startIndex() + numTargets);
+            cstone::DeviceVector<T> d_mt       = extract(d_m, domain.startIndex(), domain.startIndex() + numTargets);
+            cstone::DeviceVector<T> d_ht       = extract(d_h, domain.startIndex(), domain.startIndex() + numTargets);
+
+            auto targetGroups =
+                multipoleHolder.computeSpatialGroups(0, numTargets, d_xt.data(), d_yt.data(), d_zt.data(), d_ht.data(),
+                                                     focusTree, domain.layout().data(), box);
+
+            cstone::DeviceVector<T> d_axt(numTargets, 0), d_ayt(numTargets, 0), d_azt(numTargets, 0);
+
+            multipoleHolder.compute(targetGroups, d_xt.data(), d_yt.data(), d_zt.data(), d_mt.data(), d_ht.data(),
+                                    d_x.data(), d_y.data(), d_z.data(), d_m.data(), d_h.data(), G, 0, box, nullptr,
+                                    rawPtr(d_axt), rawPtr(d_ayt), rawPtr(d_azt));
+
+            std::vector<T> axt = toHost(d_axt);
+            std::vector<T> ayt = toHost(d_ayt);
+            std::vector<T> azt = toHost(d_azt);
+
+            bool passTargets = true;
+            for (int i = 0; i < numTargets; i++)
+            {
+                Vec3<T> ref   = {axRef[i], ayRef[i], azRef[i]};
+                Vec3<T> probe = {axt[i], ayt[i], azt[i]};
+                T       error = std::sqrt(norm2(ref - probe) / norm2(ref));
+                if (error > atolmax) { passTargets = false; }
+            }
+            if (not passTargets) { std::cout << "Separate targets were not correct" << std::endl; }
+            pass = pass && passTargets;
+        }
     }
 
     if (thisRank == 0)

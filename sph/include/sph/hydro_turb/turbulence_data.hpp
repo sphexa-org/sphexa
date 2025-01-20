@@ -37,7 +37,7 @@
 
 #include "cstone/cuda/device_vector.h"
 #include "cstone/cuda/cuda_utils.hpp"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 
 #include "sph/hydro_turb/create_modes.hpp"
 
