@@ -12,6 +12,7 @@
 #include "betaCooling_gpu.hpp"
 #include "cstone/primitives/accel_switch.hpp"
 
+
 namespace disk
 {
 
