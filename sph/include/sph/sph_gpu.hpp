@@ -39,12 +39,14 @@ extern void computeAVswitches(const GroupView&, Dataset& d, const cstone::Box<ty
 template<bool avClean, class Dataset>
 extern void computeMomentumEnergy(const GroupView&, float*, Dataset&, const cstone::Box<typename Dataset::RealType>&);
 
-template<class Tu, class Trho, class Tp, class Tc>
-extern void computeEOS_HydroStd(size_t, size_t, Trho, Tu, const Tu*, const Trho* m, Trho*, Tp*, Tc*);
+template<class Tt, class Tmass, class Trho, class Tp, class Tc>
+extern void computeEOS_HydroStd(size_t firstParticle, size_t lastParticle, Tmass mui, Tt gamma, const Tt* temp,
+                                const Tt* u, const Tmass* m, Trho* rho, Tp* p, Tc* c);
 
-template<class Tu, class Tm, class Thydro>
-extern void computeEOS(size_t, size_t, Tm mui, Tu gamma, const Tu*, const Tm*, const Thydro*, const Thydro*,
-                       const Thydro*, Thydro*, Thydro*, Thydro*, Thydro*);
+template<class Tt, class Tm, class Thydro>
+extern void computeEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, const Tt* temp, const Tt* u,
+                       const Tm* m, const Thydro* kx, const Thydro* xm, const Thydro* gradh, Thydro* prho, Thydro* c,
+                       Thydro* rho, Thydro* p);
 
 template<class Th, class Tu>
 extern void computeIsothermalEOS(size_t first, size_t last, Th cConst, Th* c, Th* rho, Th* p, const Th* m, const Th* kx,

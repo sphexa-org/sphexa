@@ -52,7 +52,7 @@ namespace sph
 template<typename Dataset>
 void computeEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
 {
-    const auto* temp  = d.temp.data();
+    const auto* u     = d.u.data();
     const auto* m     = d.m.data();
     const auto* kx    = d.kx.data();
     const auto* xm    = d.xm.data();
@@ -68,7 +68,7 @@ void computeEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
         auto rho      = kx[i] * m[i] / xm[i];
-        auto [pi, ci] = idealGasEOS(temp[i], rho, d.muiConst, d.gamma);
+        auto [pi, ci] = idealGasEOS_u(u[i], rho, d.gamma);
         prho[i]       = pi / (kx[i] * m[i] * m[i] * gradh[i]);
         c[i]          = ci;
         if (storeRho) { d.rho[i] = rho; }
@@ -122,9 +122,9 @@ void computeIdealGasEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        cuda::computeEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.devData.temp), rawPtr(d.devData.m),
-                         rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.gradh), rawPtr(d.devData.prho),
-                         rawPtr(d.devData.c), rawPtr(d.devData.rho), rawPtr(d.devData.p));
+        cuda::computeEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.devData.temp), rawPtr(d.devData.u),
+                         rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.gradh),
+                         rawPtr(d.devData.prho), rawPtr(d.devData.c), rawPtr(d.devData.rho), rawPtr(d.devData.p));
     }
     else { computeEOS_Impl(startIndex, endIndex, d); }
 }
