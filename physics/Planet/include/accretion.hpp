@@ -13,7 +13,6 @@
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/primitives/accel_switch.hpp"
 
-
 namespace disk
 {
 

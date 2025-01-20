@@ -10,7 +10,6 @@
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
 #include "sph/particles_data.hpp"
-#include "sph/util/device_math.cuh"
 
 #include "computeCentralForce_gpu.hpp"
 #include "star_data.hpp"
