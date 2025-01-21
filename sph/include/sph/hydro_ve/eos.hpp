@@ -53,6 +53,7 @@ template<typename Dataset>
 void computeEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
 {
     const auto* u     = d.u.data();
+    const auto* temp  = d.temp.data();
     const auto* m     = d.m.data();
     const auto* kx    = d.kx.data();
     const auto* xm    = d.xm.data();
@@ -64,15 +65,31 @@ void computeEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     bool storeRho = (d.rho.size() == d.m.size());
     bool storeP   = (d.p.size() == d.m.size());
 
-#pragma omp parallel for schedule(static)
-    for (size_t i = startIndex; i < endIndex; ++i)
+    if (d.u.size() == 0)
     {
-        auto rho      = kx[i] * m[i] / xm[i];
-        auto [pi, ci] = idealGasEOS_u(u[i], rho, d.gamma);
-        prho[i]       = pi / (kx[i] * m[i] * m[i] * gradh[i]);
-        c[i]          = ci;
-        if (storeRho) { d.rho[i] = rho; }
-        if (storeP) { d.p[i] = pi; }
+#pragma omp parallel for schedule(static)
+        for (size_t i = startIndex; i < endIndex; ++i)
+        {
+            auto rho      = kx[i] * m[i] / xm[i];
+            auto [pi, ci] = idealGasEOS(temp[i], rho, d.muiConst, d.gamma);
+            prho[i]       = pi / (kx[i] * m[i] * m[i] * gradh[i]);
+            c[i]          = ci;
+            if (storeRho) { d.rho[i] = rho; }
+            if (storeP) { d.p[i] = pi; }
+        }
+    }
+    else
+    {
+#pragma omp parallel for schedule(static)
+        for (size_t i = startIndex; i < endIndex; ++i)
+        {
+            auto rho      = kx[i] * m[i] / xm[i];
+            auto [pi, ci] = idealGasEOS_u(u[i], rho, d.gamma);
+            prho[i]       = pi / (kx[i] * m[i] * m[i] * gradh[i]);
+            c[i]          = ci;
+            if (storeRho) { d.rho[i] = rho; }
+            if (storeP) { d.p[i] = pi; }
+        }
     }
 }
 

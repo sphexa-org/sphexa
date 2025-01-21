@@ -66,7 +66,7 @@ void computeEOS_HydroStdImpl(size_t startIndex, size_t endIndex, Dataset& d)
 #pragma omp parallel for schedule(static)
         for (size_t i = startIndex; i < endIndex; ++i)
         {
-            std::tie(p[i], c[i]) = idealGasEOSTemp(temp[i], rho[i], d.muiConst, d.gamma);
+            std::tie(p[i], c[i]) = idealGasEOS(temp[i], rho[i], d.muiConst, d.gamma);
         }
     }
     else

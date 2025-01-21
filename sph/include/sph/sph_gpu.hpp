@@ -39,9 +39,9 @@ extern void computeAVswitches(const GroupView&, Dataset& d, const cstone::Box<ty
 template<bool avClean, class Dataset>
 extern void computeMomentumEnergy(const GroupView&, float*, Dataset&, const cstone::Box<typename Dataset::RealType>&);
 
-template<class Tt, class Tmass, class Trho, class Tp, class Tc>
-extern void computeEOS_HydroStd(size_t firstParticle, size_t lastParticle, Tmass mui, Tt gamma, const Tt* temp,
-                                const Tt* u, const Tmass* m, Trho* rho, Tp* p, Tc* c);
+template<class Tt, class Tm, class Thydro>
+extern void computeEOS_HydroStd(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, const Tt* temp,
+                                const Tt* u, const Tm* m, Thydro* rho, Thydro* p, Thydro* c);
 
 template<class Tt, class Tm, class Thydro>
 extern void computeEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, const Tt* temp, const Tt* u,
