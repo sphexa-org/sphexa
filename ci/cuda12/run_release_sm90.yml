@@ -28,8 +28,8 @@ sph-run-cuda12-sm90-release-1rank:
     - sbin/ryoanji/cpu_unit_tests/ryoanji_cpu_unit_tests
     - sbin/ryoanji/unit_tests/ryoanji_unit_tests
     # TODO:slow    - sbin/performance/hilbert_perf
-    # TODO:fail    - sbin/unit/component_units_omp
-    # TODO:fail    - sbin/unit/component_units
+    - sbin/unit/component_units_omp
+    - sbin/unit/component_units
     # GPU tests:
     - sbin/hydro/sph_gpu_tests
     - sbin/performance/hilbert_perf_gpu
