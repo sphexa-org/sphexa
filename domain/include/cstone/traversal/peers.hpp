@@ -69,67 +69,11 @@ std::vector<int> findPeersMac(int myRank,
     KeyType domainStart = assignment[myRank];
     KeyType domainEnd   = assignment[myRank + 1];
 
-    auto crossFocusPairs =
-        [domainStart, domainEnd, invThetaEff, &tree = domainTree, &box](TreeNodeIndex a, TreeNodeIndex b)
-    {
-        bool aFocusOverlap = overlapTwoRanges(domainStart, domainEnd, tree.codeStart(a), tree.codeEnd(a));
-        bool bInFocus      = containedIn(tree.codeStart(b), tree.codeEnd(b), domainStart, domainEnd);
-        // node a has to overlap/be contained in the focus, while b must not be inside it
-        if (!aFocusOverlap || bInFocus) { return false; }
-
-        IBox aBox             = sfcIBox(sfcKey(tree.codeStart(a)), tree.level(a));
-        IBox bBox             = sfcIBox(sfcKey(tree.codeStart(b)), tree.level(b));
-        auto [aCenter, aSize] = centerAndSize<KeyType>(aBox, box);
-        auto [bCenter, bSize] = centerAndSize<KeyType>(bBox, box);
-        return !minVecMacMutual(aCenter, aSize, bCenter, bSize, box, invThetaEff);
-    };
-
-    auto m2l = [](TreeNodeIndex, TreeNodeIndex) {};
-
-    std::vector<int> peerRanks(assignment.numRanks(), 0);
-    auto p2p = [&domainTree, &assignment, &peerRanks](TreeNodeIndex /*a*/, TreeNodeIndex b)
-    {
-        int peerRank = assignment.findRank(domainTree.codeStart(b));
-        if (peerRanks[peerRank] == 0) { peerRanks[peerRank] = 1; }
-    };
-
-    std::vector<KeyType> spanningNodeKeys(spanSfcRange(domainStart, domainEnd) + 1);
-    spanSfcRange(domainStart, domainEnd, spanningNodeKeys.data());
-    spanningNodeKeys.back() = domainEnd;
-
-    const KeyType* nodeKeys         = domainTree.nodeKeys().data();
-    const TreeNodeIndex* levelRange = domainTree.levelRange().data();
-
-#pragma omp parallel for schedule(dynamic)
-    for (std::size_t i = 0; i < spanningNodeKeys.size() - 1; ++i)
-    {
-        TreeNodeIndex nodeIdx = locateNode(spanningNodeKeys[i], spanningNodeKeys[i + 1], nodeKeys, levelRange);
-        dualTraversal(domainTree, nodeIdx, 0, crossFocusPairs, m2l, p2p);
-    }
-
-    std::vector<int> ret;
-    for (int i = 0; i < int(peerRanks.size()); ++i)
-    {
-        if (peerRanks[i]) { ret.push_back(i); }
-    }
-
-    return ret;
-}
-
-template<class T, template<class> class TreeType, class KeyType>
-std::vector<int> findPeersMacInt(int myRank,
-                                 const SfcAssignment<KeyType>& assignment,
-                                 const TreeType<KeyType>& domainTree,
-                                 const Box<T>& box,
-                                 float invThetaEff)
-{
-    KeyType domainStart = assignment[myRank];
-    KeyType domainEnd   = assignment[myRank + 1];
-
-    int maxCoord = 1u << maxTreeLevel<KeyType>{};
-    auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invThetaEff;
-    auto pbc_t   = BoundaryType::periodic;
-    auto pbc     = Vec3<int>{box.boundaryX() == pbc_t, box.boundaryY() == pbc_t, box.boundaryZ() == pbc_t} * maxCoord;
+    int maxCoord   = 1u << maxTreeLevel<KeyType>{};
+    float roundOff = 1 + 1e-6; // ensure that peers are picked up in case of a numerical tie
+    auto ellipse   = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invThetaEff * roundOff;
+    auto pbc_t     = BoundaryType::periodic;
+    auto pbc       = Vec3<int>{box.boundaryX() == pbc_t, box.boundaryY() == pbc_t, box.boundaryZ() == pbc_t} * maxCoord;
 
     auto crossFocusPairs = [domainStart, domainEnd, ellipse, pbc, &tree = domainTree](TreeNodeIndex a, TreeNodeIndex b)
     {
@@ -189,26 +133,27 @@ std::vector<int> findPeersMacStt(int myRank,
     TreeNodeIndex firstLeaf = findNodeAbove(leaves, octree.numLeafNodes(), domainStart);
     TreeNodeIndex lastLeaf  = findNodeAbove(leaves, octree.numLeafNodes(), domainEnd);
 
+    int maxCoord = 1u << maxTreeLevel<KeyType>{};
+    auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invThetaEff;
+    auto pbc_t   = BoundaryType::periodic;
+    auto pbc     = Vec3<int>{box.boundaryX() == pbc_t, box.boundaryY() == pbc_t, box.boundaryZ() == pbc_t} * maxCoord;
+
     std::vector<int> peers(assignment.numRanks());
 
 #pragma omp parallel for
     for (TreeNodeIndex i = firstLeaf; i < lastLeaf; ++i)
     {
         IBox target = sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]));
-        Vec3<T> targetCenter, targetSize;
-        std::tie(targetCenter, targetSize) = centerAndSize<KeyType>(target, box);
 
-        auto violatesMac =
-            [&targetCenter, &targetSize, &octree, &box, invThetaEff, domainStart, domainEnd](TreeNodeIndex idx)
+        auto violatesMac = [target, ellipse, pbc, &octree, domainStart, domainEnd](TreeNodeIndex idx)
         {
             KeyType nodeStart = octree.codeStart(idx);
             KeyType nodeEnd   = octree.codeEnd(idx);
             // if the tree node with index idx is fully contained in the focus, we stop traversal
             if (containedIn(nodeStart, nodeEnd, domainStart, domainEnd)) { return false; }
 
-            IBox sourceBox                  = sfcIBox(sfcKey(nodeStart), octree.level(idx));
-            auto [sourceCenter, sourceSize] = centerAndSize<KeyType>(sourceBox, box);
-            return !minVecMacMutual(targetCenter, targetSize, sourceCenter, sourceSize, box, invThetaEff);
+            IBox source = sfcIBox(sfcKey(nodeStart), octree.level(idx));
+            return !minMacMutualInt(target, source, ellipse, pbc);
         };
 
         auto markLeafIdx = [&octree, &peers, &assignment](TreeNodeIndex idx)

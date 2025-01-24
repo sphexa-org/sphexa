@@ -72,22 +72,6 @@ TEST(Macs, evaluateMAC)
     }
 }
 
-TEST(Macs, minMacMutual)
-{
-    using T = double;
-
-    Vec3<T> cA{0.5, 0.5, 0.5};
-    Vec3<T> sA{0.5, 0.5, 0.5};
-
-    Vec3<T> cB{3.5, 3.5, 3.5};
-    Vec3<T> sB{0.5, 0.5, 0.5};
-
-    EXPECT_TRUE(minMacMutual(cA, sA, cB, sB, Box<T>(0, 4, BoundaryType::open), 1.0 / 0.29));
-    EXPECT_FALSE(minMacMutual(cA, sA, cB, sB, Box<T>(0, 4, BoundaryType::open), 1.0 / 0.28));
-
-    EXPECT_FALSE(minMacMutual(cA, sA, cB, sB, Box<T>(0, 4, BoundaryType::periodic), 1.0));
-}
-
 TEST(Macs, minMacMutualInt)
 {
     using KeyType = uint32_t;
@@ -127,22 +111,6 @@ TEST(Macs, minMacMutualInt)
         EXPECT_TRUE(minMacMutualInt({1023 - 67, 1023, 100, 101, 100, 101}, b, ellipse, pbc));
         EXPECT_FALSE(minMacMutualInt({1023 - 68, 1023, 100, 101, 100, 101}, b, ellipse, pbc));
     }
-}
-
-TEST(Macs, minVecMacMutual)
-{
-    using T = double;
-
-    Vec3<T> cA{0.5, 0.5, 0.5};
-    Vec3<T> sA{0.5, 0.5, 0.5};
-
-    Vec3<T> cB{3.5, 3.5, 3.5};
-    Vec3<T> sB{0.5, 0.5, 0.5};
-
-    EXPECT_TRUE(minVecMacMutual(cA, sA, cB, sB, Box<T>(0, 4, BoundaryType::open), invThetaVecMac(0.39)));
-    EXPECT_FALSE(minVecMacMutual(cA, sA, cB, sB, Box<T>(0, 4, BoundaryType::open), invThetaVecMac(0.38)));
-
-    EXPECT_FALSE(minVecMacMutual(cA, sA, cB, sB, Box<T>(0, 4, BoundaryType::periodic), invThetaVecMac(1.0)));
 }
 
 template<class KeyType, class T>

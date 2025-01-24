@@ -81,8 +81,8 @@ TEST(BoxOverlap, boxSeparation)
     }
     {
         Vec3<int> pbc{0, 100, 200};
-        Vec3<int> ref{2, 10, 7};
-        EXPECT_EQ(boxSeparation({0, 1, 10, 100, 2, 4}, {3, 5, 110, 120, 180, 195}, pbc), ref);
+        Vec3<int> ref{2, 4, 7};
+        EXPECT_EQ(boxSeparation({0, 1, 10, 100, 2, 4}, {3, 5, 4, 5, 180, 195}, pbc), ref);
     }
     {
         Vec3<int> pbc{1024, 1024, 1024};

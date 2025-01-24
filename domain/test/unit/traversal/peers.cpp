@@ -51,21 +51,21 @@ static std::vector<int> findPeersAll2All(int myRank,
     TreeNodeIndex firstIdx = findNodeAbove(tree.data(), nNodes(tree), assignment[myRank]);
     TreeNodeIndex lastIdx  = findNodeAbove(tree.data(), nNodes(tree), assignment[myRank + 1]);
 
-    std::vector<Vec3<T>> boxCenter(nNodes(tree));
-    std::vector<Vec3<T>> boxSize(nNodes(tree));
+    int maxCoord = 1u << maxTreeLevel<KeyType>{};
+    auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invThetaEff;
+    auto pbc_t   = BoundaryType::periodic;
+    auto pbc     = Vec3<int>{box.boundaryX() == pbc_t, box.boundaryY() == pbc_t, box.boundaryZ() == pbc_t} * maxCoord;
+
+    std::vector<IBox> boxes(nNodes(tree));
     for (TreeNodeIndex i = 0; i < TreeNodeIndex(nNodes(tree)); ++i)
     {
-        IBox ibox                          = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]));
-        std::tie(boxCenter[i], boxSize[i]) = centerAndSize<KeyType>(ibox, box);
+        boxes[i] = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]));
     }
 
     std::vector<int> peers(assignment.numRanks());
     for (TreeNodeIndex i = firstIdx; i < lastIdx; ++i)
         for (TreeNodeIndex j = 0; j < TreeNodeIndex(nNodes(tree)); ++j)
-            if (!minVecMacMutual(boxCenter[i], boxSize[i], boxCenter[j], boxSize[j], box, invThetaEff))
-            {
-                peers[assignment.findRank(tree[j])] = 1;
-            }
+            if (!minMacMutualInt(boxes[i], boxes[j], ellipse, pbc)) { peers[assignment.findRank(tree[j])] = 1; }
 
     std::vector<int> ret;
     for (int i = 0; i < int(peers.size()); ++i)
@@ -88,8 +88,8 @@ static void findMacPeers64grid(int rank, float theta, BoundaryType pbc, int /*re
         assignment.set(i, leaves[i], 1);
     }
 
-    std::vector<int> peers     = findPeersMac(rank, assignment, octree, box, invThetaVecMac(theta));
-    std::vector<int> reference = findPeersAll2All(rank, assignment, octree.treeLeaves(), box, invThetaVecMac(theta));
+    std::vector<int> peers     = findPeersMac(rank, assignment, octree, box, invThetaMinToVec(theta));
+    std::vector<int> reference = findPeersAll2All(rank, assignment, octree.treeLeaves(), box, invThetaMinToVec(theta));
 
     EXPECT_EQ(peers, reference);
 }
@@ -121,7 +121,7 @@ static void findPeers()
     int nParticles    = 100000;
     int bucketSize    = 64;
     int numRanks      = 50;
-    float invThetaEff = invThetaVecMac(0.5f);
+    float invThetaEff = invThetaMinToVec(0.5f);
 
     auto particleKeys   = makeRandomGaussianKeys<KeyType>(nParticles);
     auto [tree, counts] = computeOctree(particleKeys.data(), particleKeys.data() + nParticles, bucketSize);
@@ -193,8 +193,7 @@ template<class KeyType, class T>
 auto peerMatrix(const std::vector<KeyType>& leaves,
                 const std::vector<KeyType>& assignmentKeys,
                 Box<T> box,
-                float invThetaEff,
-                bool useInt)
+                float invThetaEff)
 {
     Octree<KeyType> octree;
     octree.update(leaves.data(), nNodes(leaves));
@@ -210,11 +209,7 @@ auto peerMatrix(const std::vector<KeyType>& leaves,
 
     for (int i = 0; i < numRanks; ++i)
     {
-        std::vector<int> peers;
-        if (useInt)
-            peers = findPeersMacInt(i, assignment, octree, box, invThetaEff);
-        else
-            peers = findPeersMac(i, assignment, octree, box, invThetaEff);
+        auto peers = findPeersMac(i, assignment, octree, box, invThetaEff);
         for (auto j : peers)
         {
             matrix[i][j] = 1;
@@ -247,7 +242,7 @@ auto vecMacMatrix(const std::vector<KeyType>& leaves,
 
     std::vector<Vec4<T>> c4(numNodes);
 
-    T margin = 0.99;
+    T margin        = 0.99;
     auto randCorner = [margin] { return drand48() > 0.5 ? margin : -margin; };
     for (size_t i = 0; i < c4.size(); ++i)
     {
@@ -288,7 +283,7 @@ std::vector<KeyType> makeAssignment(int numRanks)
 
     auto randInt = [] { return int(6 * (drand48() - 0.5)); };
 
-    for (int i = 1; i < ret.size() - 1; ++i)
+    for (size_t i = 1; i < ret.size() - 1; ++i)
     {
         ret[i] += randInt() * delta;
     }
@@ -312,13 +307,11 @@ TEST(Peers, pairs_nograv)
 
     Box<double> box(-0.028, 0.028, BoundaryType::periodic);
 
-    float theta        = 1.0;
-    auto mat_fp_sphere = peerMatrix(leaves, ak, box, invThetaMinMac(theta), false);
-    auto mat_int_min   = peerMatrix(leaves, ak, box, 1.0 / theta, true);
+    float theta      = 1.0;
+    auto mat_int_min = peerMatrix(leaves, ak, box, 1.0 / theta);
 
-    EXPECT_FALSE(isSymmetric(mat_fp_sphere));
+    // fp-based peers would not be symmetric
     EXPECT_TRUE(isSymmetric(mat_int_min));
-    EXPECT_EQ(compareMatrices(mat_fp_sphere, mat_int_min), 0);
 }
 
 TEST(Peers, pairs_grav)
@@ -338,13 +331,11 @@ TEST(Peers, pairs_grav)
     Box<double> box(-0.028, 0.028, -0.04, 0.04, -0.1, 0.1, BoundaryType::periodic, BoundaryType::periodic /*Z open */);
 
     float theta          = 0.5;
-    float invThetaIntMin = 1.0 / theta + std::sqrt(3.) / 2;
-    auto mat_fp_sphere   = peerMatrix(leaves, ak, box, invThetaVecMac(theta), false);
-    auto mat_int_min     = peerMatrix(leaves, ak, box, invThetaIntMin, true);
+    float invThetaIntMin = invThetaMinToVec(theta);
+    auto mat_int_min     = peerMatrix(leaves, ak, box, invThetaIntMin);
 
     auto mat_vecmac = vecMacMatrix(leaves, ak, box, 1.0f / theta);
 
     EXPECT_TRUE(isSymmetric(mat_int_min));
-    EXPECT_EQ(compareMatrices(mat_vecmac, mat_fp_sphere), 0);
     EXPECT_EQ(compareMatrices(mat_vecmac, mat_int_min), 0);
 }

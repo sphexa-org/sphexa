@@ -43,8 +43,8 @@ namespace cstone
 //! @brief compute 1/theta + s for the minimum distance MAC
 HOST_DEVICE_FUN inline float invThetaMinMac(float theta) { return 1.0f / theta + 0.5f; }
 
-//! @brief compute 1/theta + sqrt(3) for the worst-case vector MAC
-HOST_DEVICE_FUN inline float invThetaVecMac(float theta) { return 1.0f / theta + std::sqrt(3.0f); }
+//! @brief cover worst-case vector mac with a min-Mac
+HOST_DEVICE_FUN inline float invThetaMinToVec(float theta) { return 1.0f / theta + std::sqrt(3.0f) / 2; }
 
 /*! @brief Compute square of the acceptance radius for the minimum distance MAC
  *
@@ -139,25 +139,6 @@ evaluateMacPbc(Vec3<T> sourceCenter, T macSq, Vec3<T> targetCenter, Vec3<T> targ
     return R2 < std::abs(macSq);
 }
 
-//! @brief commutative version of the min-distance mac, based on floating point math
-template<class T>
-HOST_DEVICE_FUN bool minMacMutual(const Vec3<T>& centerA,
-                                  const Vec3<T>& sizeA,
-                                  const Vec3<T>& centerB,
-                                  const Vec3<T>& sizeB,
-                                  const Box<T>& box,
-                                  float invTheta)
-{
-    Vec3<T> dX = minDistance(centerA, sizeA, centerB, sizeB, box);
-
-    T distSq = norm2(dX);
-    T sizeAB = 2 * stl::max(max(sizeA), max(sizeB));
-
-    T mac = sizeAB * invTheta;
-
-    return distSq > (mac * mac);
-}
-
 /*! @brief integer based mutual min-mac
  * @tparam T float or double
  * @param a         first integer cell box
@@ -173,44 +154,11 @@ HOST_DEVICE_FUN bool minMacMutualInt(IBox a, IBox b, Vec3<T> ellipse, Vec3<int> 
     T l_max = std::max({a.xmax() - a.xmin(), a.ymax() - a.ymin(), a.zmax() - a.zmin(), b.xmax() - b.xmin(),
                         b.ymax() - b.ymin(), b.zmax() - b.zmin()});
 
-    // computing a-b separation in integers is key to avoid a-b/b-a asymmetry due to round-off errors
+    // computing a-b separation in integers is key to avoiding a-b/b-a asymmetry due to round-off errors
     Vec3<int> a_b = boxSeparation(a, b, pbc);
 
     Vec3<T> E{a_b[0] / ellipse[0], a_b[1] / ellipse[1], a_b[2] / ellipse[2]};
     return norm2(E) > l_max * l_max;
-}
-
-/*! @brief commutative combination of min-distance and vector map
- *
- * @param invThetaEff  1/theta + s, effective inverse opening parameter
- *
- * This MAC doesn't pass any A-B pairs that would fail either the min-distance
- * or vector MAC. Can be used instead of the vector mac when the mass center locations
- * are not known.
- */
-template<class T>
-HOST_DEVICE_FUN bool minVecMacMutual(const Vec3<T>& centerA,
-                                     const Vec3<T>& sizeA,
-                                     const Vec3<T>& centerB,
-                                     const Vec3<T>& sizeB,
-                                     const Box<T>& box,
-                                     float invThetaEff)
-{
-    bool passA;
-    {
-        // A = target, B = source
-        Vec3<T> dX = minDistance(centerB, centerA, sizeA, box);
-        T mac      = max(sizeB) * 2 * invThetaEff;
-        passA      = norm2(dX) > (mac * mac);
-    }
-    bool passB;
-    {
-        // B = target, A = source
-        Vec3<T> dX = minDistance(centerA, centerB, sizeB, box);
-        T mac      = max(sizeA) * 2 * invThetaEff;
-        passB      = norm2(dX) > (mac * mac);
-    }
-    return passA && passB;
 }
 
 //! @brief mark all nodes of @p octree (leaves and internal) that fail the evaluateMac w.r.t to @p target
