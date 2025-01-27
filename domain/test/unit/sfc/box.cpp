@@ -48,15 +48,16 @@ TEST(SfcBox, pbcAdjust)
 
 TEST(SfcBox, pbcDistance)
 {
-    EXPECT_EQ(pbcDistance<1024>(-1024), 0);
-    EXPECT_EQ(pbcDistance<1024>(-513), 511);
-    EXPECT_EQ(pbcDistance<1024>(-512), 512);
-    EXPECT_EQ(pbcDistance<1024>(-1), -1);
-    EXPECT_EQ(pbcDistance<1024>(0), 0);
-    EXPECT_EQ(pbcDistance<1024>(1), 1);
-    EXPECT_EQ(pbcDistance<1024>(512), 512);
-    EXPECT_EQ(pbcDistance<1024>(513), -511);
-    EXPECT_EQ(pbcDistance<1024>(1024), 0);
+    int R = 1024;
+    EXPECT_EQ(pbcDistance(-1024, R), 0);
+    EXPECT_EQ(pbcDistance(-513, R), 511);
+    EXPECT_EQ(pbcDistance(-512, R), 512);
+    EXPECT_EQ(pbcDistance(-1, R), -1);
+    EXPECT_EQ(pbcDistance(0, R), 0);
+    EXPECT_EQ(pbcDistance(1, R), 1);
+    EXPECT_EQ(pbcDistance(512, R), 512);
+    EXPECT_EQ(pbcDistance(513, R), -511);
+    EXPECT_EQ(pbcDistance(1024, R), 0);
 }
 
 TEST(SfcBox, applyPbc)
