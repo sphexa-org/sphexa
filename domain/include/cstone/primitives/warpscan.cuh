@@ -18,6 +18,7 @@
 #include <type_traits>
 
 #include "cstone/cuda/gpu_config.cuh"
+#include "cstone/primitives/clz.hpp"
 
 namespace cstone
 {
@@ -25,10 +26,6 @@ namespace cstone
 //! @brief there's no int overload for min in AMD ROCM
 __device__ __forceinline__ int imin(int a, int b) { return a < b ? a : b; }
 __device__ __forceinline__ unsigned imin(unsigned a, unsigned b) { return a < b ? a : b; }
-
-__device__ __forceinline__ int countLeadingZeros(uint32_t x) { return __clz(x); }
-
-__device__ __forceinline__ int countLeadingZeros(uint64_t x) { return __clzll(x); }
 
 __device__ __forceinline__ uint32_t reverseBits(uint32_t x) { return __brev(x); }
 
