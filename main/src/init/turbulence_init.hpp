@@ -49,9 +49,9 @@ InitSettings TurbulenceConstants()
 {
     return {{"solWeight", 0.5},
             {"stMaxModes", 100000},
-            {"Lbox", 0.056},
-            {"stEnergyPrefac", 7.8e-3},
-            {"stMachVelocity", 4.0e0},
+            {"Lbox", 1.0},
+            {"stEnergyPrefac", 5.0e-3},
+            {"stMachVelocity", 0.3e0},
             {"minDt", 1e-4},
             {"minDt_m1", 1e-4},
             {"epsilon", 1e-15},
@@ -60,9 +60,10 @@ InitSettings TurbulenceConstants()
             {"mTotal", 1.0},
             {"powerLawExp", 5. / 3},
             {"anglesExp", 2.0},
-            {"gamma", 1.0},
+            {"gamma", 1.001},
             {"mui", 0.62},
             {"soundSpeed", 1.0},
+            {"u0", 1000.},
             {"Kcour", 0.4},
             {"gravConstant", 0.0},
             {"ng0", 100},
@@ -78,11 +79,16 @@ void initTurbulenceHydroFields(Dataset& d, const std::map<std::string, double>& 
     double Lbox  = constants.at("Lbox");
     double hInit = std::cbrt(3.0 / (4. * M_PI) * d.ng0 * std::pow(Lbox, 3) / d.numParticlesGlobal) * 0.5;
 
+    auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
+    auto temp0 = constants.at("u0") / cv;
+
     std::fill(d.m.begin(), d.m.end(), mPart);
     std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
     std::fill(d.h.begin(), d.h.end(), hInit);
     std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
     std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
+    std::fill(d.temp.begin(), d.temp.end(), temp0);
+    std::fill(d.c.begin(), d.c.end(), constants.at("soundSpeed"));
 
     std::fill(d.vx.begin(), d.vx.end(), 0.);
     std::fill(d.vy.begin(), d.vy.end(), 0.);
@@ -90,8 +96,6 @@ void initTurbulenceHydroFields(Dataset& d, const std::map<std::string, double>& 
     std::fill(d.x_m1.begin(), d.x_m1.end(), 0.);
     std::fill(d.y_m1.begin(), d.y_m1.end(), 0.);
     std::fill(d.z_m1.begin(), d.z_m1.end(), 0.);
-
-    std::fill(d.c.begin(), d.c.end(), constants.at("soundSpeed"));
 
     generateParticleIDs(d.id);
 }
