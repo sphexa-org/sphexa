@@ -84,8 +84,9 @@ void computeIsothermalEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     const auto* xm    = d.xm.data();
     const auto* gradh = d.gradh.data();
 
-    auto* prho = d.prho.data();
-    auto* c    = d.c.data();
+    auto* prho   = d.prho.data();
+    auto* temp   = d.temp.data();
+    auto  cConst = d.soundSpeedConst;
 
     bool storeRho = (d.rho.size() == d.m.size());
     bool storeP   = (d.p.size() == d.m.size());
@@ -94,10 +95,11 @@ void computeIsothermalEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
         auto rho = kx[i] * m[i] / xm[i];
-        auto pi  = isothermalEOS(c[i], rho);
+        auto pi  = isothermalEOS(cConst, rho);
         prho[i]  = pi / (kx[i] * m[i] * m[i] * gradh[i]);
         if (storeRho) { d.rho[i] = rho; }
         if (storeP) { d.p[i] = pi; }
+        if (temp) { temp[i] = 0; }
     }
 }
 
@@ -112,7 +114,7 @@ void computeIsothermalEOS(size_t startIndex, size_t endIndex, Dataset& d)
 }
 
 template<class Dataset>
-void computeEOS(size_t startIndex, size_t endIndex, Dataset& d)
+void computeIdealGasEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
@@ -121,6 +123,13 @@ void computeEOS(size_t startIndex, size_t endIndex, Dataset& d)
                          rawPtr(d.devData.c), rawPtr(d.devData.rho), rawPtr(d.devData.p));
     }
     else { computeEOS_Impl(startIndex, endIndex, d); }
+}
+
+template<class Dataset>
+void computeEOS(size_t startIndex, size_t endIndex, Dataset& d)
+{
+    if (d.eosChoice == 0) { computeIdealGasEOS(startIndex, endIndex, d); }
+    else if (d.eosChoice == 1) { computeIsothermalEOS(startIndex, endIndex, d); }
 }
 
 } // namespace sph

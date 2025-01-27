@@ -111,11 +111,14 @@ public:
     //! @brief acceleration based time-step control
     RealType etaAcc{0.2};
 
+    //! @brief EOS parameters
+    int eosChoice{0};
     //! @brief adiabatic index
     RealType gamma{5.0 / 3.0};
-
     //! @brief mean molecular weight of ions for models that use one value for all particles
     Tmass muiConst{10.0};
+    //! @brief constant sound speed for isothermal EOS
+    HydroType soundSpeedConst{1.0};
 
     // AV switches floor and ceiling
     HydroType alphamin{0.05};
@@ -176,10 +179,14 @@ public:
         optionalIO("Kcour", &Kcour, 1);
         optionalIO("Krho", &Krho, 1);
         ar->stepAttribute("gravConstant", &g, 1);
-        optionalIO("gamma", &gamma, 1);
         optionalIO("eps", &eps, 1);
         optionalIO("etaAcc", &etaAcc, 1);
+
+        // EOS parameters
+        optionalIO("gamma", &gamma, 1);
+        optionalIO("eosChoice", &eosChoice, 1);
         optionalIO("muiConst", &muiConst, 1);
+        optionalIO("soundSpeedConst", &soundSpeedConst, 1);
 
         optionalIO("alphamin", &alphamin, 1);
         optionalIO("alphamax", &alphamax, 1);
