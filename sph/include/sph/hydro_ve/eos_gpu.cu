@@ -42,33 +42,20 @@ namespace cuda
 {
 
 template<class Tt, class Tm, class Thydro>
-__global__ void cudaEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, const Tt* temp, const Tm* m,
-                        const Thydro* kx, const Thydro* xm, const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* rho,
-                        Thydro* p)
+__global__ void cudaEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, const Tt* temp, const Tt* u,
+                        const Tm* m, const Thydro* kx, const Thydro* xm, const Thydro* gradh, Thydro* prho, Thydro* c,
+                        Thydro* rho, Thydro* p)
 {
     unsigned i = firstParticle + blockDim.x * blockIdx.x + threadIdx.x;
     if (i >= lastParticle) return;
 
     Thydro p_i;
-    Thydro rho_i         = kx[i] * m[i] / xm[i];
-    util::tie(p_i, c[i]) = idealGasEOS(temp[i], rho_i, mui, gamma);
-    prho[i]              = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
-    if (rho) { rho[i] = rho_i; }
-    if (p) { p[i] = p_i; }
-}
+    Thydro rho_i = kx[i] * m[i] / xm[i];
 
-template<class Tt, class Tm, class Thydro>
-__global__ void cudaEOS_u(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, const Tt* u, const Tm* m,
-                          const Thydro* kx, const Thydro* xm, const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* rho,
-                          Thydro* p)
-{
-    unsigned i = firstParticle + blockDim.x * blockIdx.x + threadIdx.x;
-    if (i >= lastParticle) return;
+    if (u == nullptr) { util::tie(p_i, c[i]) = idealGasEOS(temp[i], rho_i, mui, gamma); }
+    else { util::tie(p_i, c[i]) = idealGasEOS_u(u[i], rho_i, gamma); }
 
-    Thydro p_i;
-    Thydro rho_i         = kx[i] * m[i] / xm[i];
-    util::tie(p_i, c[i]) = idealGasEOS_u(u[i], rho_i, gamma);
-    prho[i]              = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
+    prho[i] = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
     if (rho) { rho[i] = rho_i; }
     if (p) { p[i] = p_i; }
 }
@@ -81,16 +68,9 @@ void computeEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, con
     if (firstParticle == lastParticle) { return; }
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(lastParticle - firstParticle, numThreads);
-    if (u == nullptr)
-    {
-        cudaEOS_u<<<numBlocks, numThreads>>>(firstParticle, lastParticle, mui, gamma, u, m, kx, xm, gradh, prho, c, rho,
-                                             p);
-    }
-    else
-    {
-        cudaEOS<<<numBlocks, numThreads>>>(firstParticle, lastParticle, mui, gamma, temp, m, kx, xm, gradh, prho, c,
-                                           rho, p);
-    }
+    cudaEOS<<<numBlocks, numThreads>>>(firstParticle, lastParticle, mui, gamma, temp, u, m, kx, xm, gradh, prho, c, rho,
+                                       p);
+
     checkGpuErrors(cudaDeviceSynchronize());
 }
 

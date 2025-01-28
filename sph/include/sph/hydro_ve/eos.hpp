@@ -65,7 +65,7 @@ void computeEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     bool storeRho = (d.rho.size() == d.m.size());
     bool storeP   = (d.p.size() == d.m.size());
 
-    if (d.u.size() == 0)
+    if (d.u.empty())
     {
 #pragma omp parallel for schedule(static)
         for (size_t i = startIndex; i < endIndex; ++i)
