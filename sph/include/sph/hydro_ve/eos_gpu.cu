@@ -81,34 +81,31 @@ COMPUTE_EOS(double, float, double);
 COMPUTE_EOS(double, float, float);
 COMPUTE_EOS(float, float, float);
 
-template<typename Trho, typename Tc, typename Tp, typename Tgamma, typename Tm, typename Tkx, typename Txm,
-         typename Tgradh, typename Tprho, typename Tu>
-__global__ void cudaComputeIsothermalEOS(size_t first, size_t last, Trho* rho, const Tc* c, Tp* p, const Tm* m,
-                                         const Tkx* kx, const Txm* xm, const Tgradh* gradh, Tprho* prho,
-                                         const Tgamma gamma, Tu* u)
+template<typename Th, typename Tu>
+__global__ void cudaComputeIsothermalEOS(size_t first, size_t last, Th cConst, Th* rho, Th* p, const Th* m,
+                                         const Th* kx, const Th* xm, const Th* gradh, Th* prho, Tu* temp)
 {
     unsigned i = first + blockDim.x * blockIdx.x + threadIdx.x;
     if (i >= last) return;
 
-    Trho rho_i = kx[i] * m[i] / xm[i];
-    Tp   p_i   = isothermalEOS(c[i], rho_i);
-    prho[i]    = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
+    Th rho_i = kx[i] * m[i] / xm[i];
+    Th p_i   = isothermalEOS(cConst, rho_i);
+    prho[i]  = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
     if (rho) { rho[i] = rho_i; }
     if (p) { p[i] = p_i; }
-    if (u) { u[i] = c[i] * c[i] / (gamma * (gamma - 1.)); }
+    if (temp) { temp[i] = 0; }
 }
 
 template<typename Dataset>
 void computeIsothermalEOS(size_t first, size_t last, Dataset& d)
 {
-
     if (first == last) { return; }
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(last - first, numThreads);
-    cudaComputeIsothermalEOS<<<numBlocks, numThreads>>>(first, last, rawPtr(d.devData.rho), rawPtr(d.devData.c),
+    cudaComputeIsothermalEOS<<<numBlocks, numThreads>>>(first, last, d.soundSpeedConst, rawPtr(d.devData.rho),
                                                         rawPtr(d.devData.p), rawPtr(d.devData.m), rawPtr(d.devData.kx),
                                                         rawPtr(d.devData.xm), rawPtr(d.devData.gradh),
-                                                        rawPtr(d.devData.prho), d.gamma, rawPtr(d.devData.u));
+                                                        rawPtr(d.devData.prho), rawPtr(d.devData.temp));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 

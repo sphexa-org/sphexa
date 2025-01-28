@@ -34,9 +34,6 @@
 
 #include <string>
 
-#include "cstone/sfc/box.hpp"
-#include "io/ifile_io.hpp"
-
 #include "iobservables.hpp"
 
 namespace sphexa
@@ -62,7 +59,15 @@ std::unique_ptr<IObservables<Dataset>> observablesFactory(const InitSettings& se
         double bubbleMass   = bubbleVolume * rhoInt;
         return Observables<Dataset>::makeWindBubbleObs(constantsFile, rhoInt, uExt, bubbleMass);
     }
-    if (settings.count("turbulence")) { return Observables<Dataset>::makeTurbMachObs(constantsFile); }
+    if (settings.count("turbulence"))
+    {
+        if (settings.contains("eosChoice") && settings.at("eosChoice") == 1)
+        {
+            // isothermal EOS has constant sound speed, mach number is sqrt(2*E_kin)
+            return Observables<Dataset>::makeTimeEnergyObs(constantsFile);
+        }
+        return Observables<Dataset>::makeTurbMachObs(constantsFile);
+    }
     if (settings.count("kelvin-helmholtz")) { return Observables<Dataset>::makeTimeEnergyGrowthObs(constantsFile); }
 
     return Observables<Dataset>::makeTimeEnergyObs(constantsFile);
