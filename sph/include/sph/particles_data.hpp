@@ -42,6 +42,7 @@
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/reallocate.hpp"
 
+#include "sph/eos.hpp"
 #include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"
 #include "sph/types.hpp"
@@ -112,9 +113,13 @@ public:
     RealType etaAcc{0.2};
 
     //! @brief EOS parameters
-    int eosChoice{0};
+    sph::EosType eosChoice{sph::EosType::idealGas};
     //! @brief adiabatic index
     RealType gamma{5.0 / 3.0};
+    //! @brief polytropic index
+    RealType polytropic_index{5. / 3.};
+    //! @brief polytropic constant
+    RealType polytropic_const{1.};
     //! @brief mean molecular weight of ions for models that use one value for all particles
     Tmass muiConst{10.0};
     //! @brief constant sound speed for isothermal EOS
@@ -187,6 +192,8 @@ public:
         optionalIO("eosChoice", &eosChoice, 1);
         optionalIO("muiConst", &muiConst, 1);
         optionalIO("soundSpeedConst", &soundSpeedConst, 1);
+        optionalIO("polytropic_index", &polytropic_index, 1);
+        optionalIO("polytropic_const", &polytropic_const, 1);
 
         optionalIO("alphamin", &alphamin, 1);
         optionalIO("alphamax", &alphamax, 1);

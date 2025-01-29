@@ -42,9 +42,9 @@ namespace cuda
 {
 
 template<class Tt, class Tm, class Thydro>
-__global__ void cudaEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, const Tt* temp, const Tt* u,
-                        const Tm* m, const Thydro* kx, const Thydro* xm, const Thydro* gradh, Thydro* prho, Thydro* c,
-                        Thydro* rho, Thydro* p)
+__global__ void cudaComputeIdealGasEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, const Tt* temp,
+                                       const Tt* u, const Tm* m, const Thydro* kx, const Thydro* xm,
+                                       const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* rho, Thydro* p)
 {
     unsigned i = firstParticle + blockDim.x * blockIdx.x + threadIdx.x;
     if (i >= lastParticle) return;
@@ -61,23 +61,24 @@ __global__ void cudaEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt ga
 }
 
 template<class Tt, class Tm, class Thydro>
-void computeEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, const Tt* temp, const Tt* u, const Tm* m,
-                const Thydro* kx, const Thydro* xm, const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* rho,
-                Thydro* p)
+void computeIdealGasEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, const Tt* temp, const Tt* u,
+                        const Tm* m, const Thydro* kx, const Thydro* xm, const Thydro* gradh, Thydro* prho, Thydro* c,
+                        Thydro* rho, Thydro* p)
 {
     if (firstParticle == lastParticle) { return; }
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(lastParticle - firstParticle, numThreads);
-    cudaEOS<<<numBlocks, numThreads>>>(firstParticle, lastParticle, mui, gamma, temp, u, m, kx, xm, gradh, prho, c, rho,
-                                       p);
+    cudaComputeIdealGasEOS<<<numBlocks, numThreads>>>(firstParticle, lastParticle, mui, gamma, temp, u, m, kx, xm,
+                                                      gradh, prho, c, rho, p);
 
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
 #define COMPUTE_EOS(Ttemp, Tm, Thydro)                                                                                 \
-    template void computeEOS(size_t firstParticle, size_t lastParticle, Tm mui, Ttemp gamma, const Ttemp* temp,        \
-                             const Ttemp* u, const Tm* m, const Thydro* kx, const Thydro* xm, const Thydro* gradh,     \
-                             Thydro* prho, Thydro* c, Thydro* rho, Thydro* p)
+    template void computeIdealGasEOS(size_t firstParticle, size_t lastParticle, Tm mui, Ttemp gamma,                   \
+                                     const Ttemp* temp, const Ttemp* u, const Tm* m, const Thydro* kx,                 \
+                                     const Thydro* xm, const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* rho,      \
+                                     Thydro* p)
 
 COMPUTE_EOS(double, double, double);
 COMPUTE_EOS(double, float, double);
@@ -118,6 +119,44 @@ void computeIsothermalEOS(size_t first, size_t last, Th cConst, Th* c, Th* rho, 
 COMPUTE_ISOTHERM_EOS(double, double);
 COMPUTE_ISOTHERM_EOS(float, double);
 COMPUTE_ISOTHERM_EOS(float, float);
+
+template<typename Th, typename Tt>
+__global__ void cudaComputePolytropicEOS(size_t first, size_t last, Tt polytropic_const, Tt polytropic_index, Th* rho,
+                                         Th* p, const Th* m, const Th* kx, const Th* xm, const Th* gradh, Th* prho,
+                                         Tt* temp, Th* c)
+{
+    unsigned i = first + blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= last) return;
+
+    Th rho_i        = kx[i] * m[i] / xm[i];
+    auto [p_i, c_i] = polytropicEOS(polytropic_const, polytropic_index, rho_i);
+    prho[i]         = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
+    c[i]            = c[i];
+    if (rho) { rho[i] = rho_i; }
+    if (p) { p[i] = p_i; }
+    if (temp) { temp[i] = 0; }
+}
+
+template<typename Th, typename Tt>
+void computePolytropicEOS(size_t first, size_t last, Tt polytropic_const, Tt polytropic_index, Th* rho, Th* p,
+                          const Th* m, const Th* kx, const Th* xm, const Th* gradh, Th* prho, Tt* temp, Th* c)
+{
+    if (first == last) { return; }
+    unsigned numThreads = 256;
+    unsigned numBlocks  = cstone::iceil(last - first, numThreads);
+    cudaComputePolytropicEOS<<<numBlocks, numThreads>>>(first, last, polytropic_const, polytropic_index, rho, p, m, kx,
+                                                        xm, gradh, prho, temp, c);
+    checkGpuErrors(cudaDeviceSynchronize());
+}
+
+#define COMPUTE_POLYTROPIC_EOS(Th, Tt)                                                                                 \
+    template void computePolytropicEOS(size_t first, size_t last, Tt polytropic_const, Tt polytropic_index, Th* rho,   \
+                                       Th* p, const Th* m, const Th* kx, const Th* xm, const Th* gradh, Th* prho,      \
+                                       Tt* temp, Th* c)
+
+COMPUTE_POLYTROPIC_EOS(double, double);
+COMPUTE_POLYTROPIC_EOS(float, double);
+COMPUTE_POLYTROPIC_EOS(float, float);
 
 } // namespace cuda
 } // namespace sph

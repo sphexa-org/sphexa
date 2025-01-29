@@ -60,7 +60,7 @@ InitSettings TurbulenceConstants()
             {"mTotal", 1.0},
             {"powerLawExp", 5. / 3},
             {"anglesExp", 2.0},
-            {"eosChoice", 0},
+            {"eosChoice", sph::EosType::idealGas},
             {"gamma", 1.001},
             {"muiConst", 0.62},
             {"soundSpeedConst", 1.0},
