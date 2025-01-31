@@ -46,8 +46,9 @@ template<class Tu, class Tm, class Thydro>
 extern void computeEOS(size_t, size_t, Tm mui, Tu gamma, const Tu*, const Tm*, const Thydro*, const Thydro*,
                        const Thydro*, Thydro*, Thydro*, Thydro*, Thydro*);
 
-template<typename Dataset>
-extern void computeIsothermalEOS(size_t, size_t, Dataset& d);
+template<class Th, class Tu>
+extern void computeIsothermalEOS(size_t first, size_t last, Th cConst, Th* c, Th* rho, Th* p, const Th* m, const Th* kx,
+                                 const Th* xm, const Th* gradh, Th* prho, Tu* temp);
 
 } // namespace cuda
 
