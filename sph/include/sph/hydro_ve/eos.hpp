@@ -84,9 +84,10 @@ void computeIsothermalEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     const auto* xm    = d.xm.data();
     const auto* gradh = d.gradh.data();
 
+    auto  cConst = d.soundSpeedConst;
+    auto* c      = d.c.data();
     auto* prho   = d.prho.data();
     auto* temp   = d.temp.data();
-    auto  cConst = d.soundSpeedConst;
 
     bool storeRho = (d.rho.size() == d.m.size());
     bool storeP   = (d.p.size() == d.m.size());
@@ -97,6 +98,7 @@ void computeIsothermalEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
         auto rho = kx[i] * m[i] / xm[i];
         auto pi  = isothermalEOS(cConst, rho);
         prho[i]  = pi / (kx[i] * m[i] * m[i] * gradh[i]);
+        c[i]     = cConst; // c is used in AV-switches and momentum energy, need to set correct constant value
         if (storeRho) { d.rho[i] = rho; }
         if (storeP) { d.p[i] = pi; }
         if (temp) { temp[i] = 0; }
@@ -108,7 +110,9 @@ void computeIsothermalEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        cuda::computeIsothermalEOS(startIndex, endIndex, d);
+        cuda::computeIsothermalEOS(startIndex, endIndex, d.soundSpeedConst, rawPtr(d.devData.c), rawPtr(d.devData.rho),
+                                   rawPtr(d.devData.p), rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
+                                   rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.temp));
     }
     else { computeIsothermalEOS_Impl(startIndex, endIndex, d); }
 }

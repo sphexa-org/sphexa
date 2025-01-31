@@ -35,7 +35,6 @@
 
 #include "sph/sph_gpu.hpp"
 #include "sph/eos.hpp"
-#include "sph/particles_data.hpp"
 
 namespace sph
 {
@@ -82,7 +81,7 @@ COMPUTE_EOS(double, float, float);
 COMPUTE_EOS(float, float, float);
 
 template<typename Th, typename Tu>
-__global__ void cudaComputeIsothermalEOS(size_t first, size_t last, Th cConst, Th* rho, Th* p, const Th* m,
+__global__ void cudaComputeIsothermalEOS(size_t first, size_t last, Th cConst, Th* c, Th* rho, Th* p, const Th* m,
                                          const Th* kx, const Th* xm, const Th* gradh, Th* prho, Tu* temp)
 {
     unsigned i = first + blockDim.x * blockIdx.x + threadIdx.x;
@@ -91,25 +90,30 @@ __global__ void cudaComputeIsothermalEOS(size_t first, size_t last, Th cConst, T
     Th rho_i = kx[i] * m[i] / xm[i];
     Th p_i   = isothermalEOS(cConst, rho_i);
     prho[i]  = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
+    c[i]     = cConst; // c is used in AV-switches and momentum energy, need to set correct constant value
     if (rho) { rho[i] = rho_i; }
     if (p) { p[i] = p_i; }
     if (temp) { temp[i] = 0; }
 }
 
-template<typename Dataset>
-void computeIsothermalEOS(size_t first, size_t last, Dataset& d)
+template<typename Th, typename Tu>
+void computeIsothermalEOS(size_t first, size_t last, Th cConst, Th* c, Th* rho, Th* p, const Th* m, const Th* kx,
+                          const Th* xm, const Th* gradh, Th* prho, Tu* temp)
 {
     if (first == last) { return; }
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(last - first, numThreads);
-    cudaComputeIsothermalEOS<<<numBlocks, numThreads>>>(first, last, d.soundSpeedConst, rawPtr(d.devData.rho),
-                                                        rawPtr(d.devData.p), rawPtr(d.devData.m), rawPtr(d.devData.kx),
-                                                        rawPtr(d.devData.xm), rawPtr(d.devData.gradh),
-                                                        rawPtr(d.devData.prho), rawPtr(d.devData.temp));
+    cudaComputeIsothermalEOS<<<numBlocks, numThreads>>>(first, last, cConst, c, rho, p, m, kx, xm, gradh, prho, temp);
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeIsothermalEOS(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d);
+#define COMPUTE_ISOTHERM_EOS(Th, Tu)                                                                                   \
+    template void computeIsothermalEOS(size_t first, size_t last, Th cConst, Th* c, Th* rho, Th* p, const Th* m,       \
+                                       const Th* kx, const Th* xm, const Th* gradh, Th* prho, Tu* temp)
+
+COMPUTE_ISOTHERM_EOS(double, double);
+COMPUTE_ISOTHERM_EOS(float, double);
+COMPUTE_ISOTHERM_EOS(float, float);
 
 } // namespace cuda
 } // namespace sph
