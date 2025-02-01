@@ -676,7 +676,7 @@ _set_num_particles (
     register int i;
 #endif
 
-    if ( nparticles <= 0 )
+    if ( nparticles < 0 )
         return HANDLE_H5PART_INVALID_ERR ( "nparticles", nparticles );
 
     /* prevent invalid stride value */
