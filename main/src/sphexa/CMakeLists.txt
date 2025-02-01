@@ -26,12 +26,19 @@ enableInSituViz(${exename})
 enableGrackle(${exename})
 install(TARGETS ${exename} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
+    add_library(particle_selection_gpu OBJECT particle_selection.cu)
+    target_include_directories(particle_selection_gpu PRIVATE ${SPH_EXA_INCLUDE_DIRS})
+    target_link_libraries(particle_selection_gpu PRIVATE CUDA::cudart)
+endif()
+
 if(CMAKE_CUDA_COMPILER)
+
     add_executable(${exename}-cuda sphexa.cpp)
     target_include_directories(${exename}-cuda PRIVATE ${SPH_EXA_INCLUDE_DIRS})
     target_include_directories(${exename}-cuda PUBLIC ${CMAKE_BINARY_DIR}/main/src)
     target_compile_definitions(${exename}-cuda PRIVATE USE_CUDA)
-    target_link_libraries(${exename}-cuda PRIVATE ryoanji sph_gpu io sim_init_gpu propagator_gpu observables_gpu OpenMP::OpenMP_CXX
+    target_link_libraries(${exename}-cuda PRIVATE ryoanji sph_gpu io sim_init_gpu particle_selection_gpu propagator_gpu observables_gpu OpenMP::OpenMP_CXX
         ${MPI_CXX_LIBRARIES} CUDA::cudart)
     enableInSituViz(${exename}-cuda)
     enableGrackle(${exename}-cuda)
@@ -41,7 +48,7 @@ elseif(CMAKE_HIP_COMPILER)
     add_executable(${exename}-hip sphexa.cpp)
     target_include_directories(${exename}-hip PRIVATE ${SPH_EXA_INCLUDE_DIRS})
     target_compile_definitions(${exename}-hip PRIVATE USE_CUDA THRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)
-    target_link_libraries(${exename}-hip PRIVATE ryoanji sph_gpu io sim_init_gpu propagator_gpu observables_gpu OpenMP::OpenMP_CXX
+    target_link_libraries(${exename}-hip PRIVATE ryoanji sph_gpu io sim_init_gpu particle_selection_gpu propagator_gpu observables_gpu OpenMP::OpenMP_CXX
         ${MPI_CXX_LIBRARIES} hip::host)
     set_target_properties(${exename}-hip PROPERTIES LINKER_LANGUAGE CXX)
     enableInSituViz(${exename}-hip)
