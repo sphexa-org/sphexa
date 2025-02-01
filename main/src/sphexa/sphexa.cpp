@@ -79,7 +79,8 @@ int main(int argc, char** argv)
 
     using Dataset = SimulationData<AccType>;
     using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, AccType>;
-    using ParticleIndexVectorType = Propagator<Domain, Dataset>::ParticleIndexVectorType;
+    // TODO: duplicated in ipropagator
+    using ParticleIndexVectorType = decltype(Dataset::HydroData::id);
 
     const std::string        initCond     = parser.get("--init");
     const size_t             problemSize  = parser.get("-n", 50);
