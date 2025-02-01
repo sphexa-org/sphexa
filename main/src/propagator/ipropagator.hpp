@@ -50,6 +50,9 @@ class Propagator
     using T = typename ParticleDataType::RealType;
 
 public:
+
+    using ParticleIndexVectorType = decltype(ParticleDataType::HydroData::id);
+
     Propagator(std::ostream& output, int rank)
         : out(output)
         , timer(output)
@@ -75,6 +78,14 @@ public:
 
     //! @brief save particle data fields to file
     virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&){};
+
+    //! @brief save selected particle data fields to file                                                   // TODO: const ParticleDataType::HydroData&
+    void saveSelParticlesFields(IFileWriter* writer, size_t first, size_t last, const ParticleIndexVectorType& selectedParticlesPositions, ParticleDataType::HydroData& hydroSimData)
+    {
+        // TODO: outputSelParticlesAllocatedFields not needed, keeping it as separate function for refactoring reasons
+        outputSelParticlesAllocatedFields(writer, first, last, selectedParticlesPositions, hydroSimData);
+        timer.step("SelectedParticlesFileOutput");
+    }
 
     //! @brief save internal state to file
     virtual void save(IFileWriter*){};
@@ -168,6 +179,58 @@ protected:
 
         output(first, last, simData.hydro, writer);
         output(first, last, simData.chem, writer);
+    }
+
+    // TODO: last parameter should be const& but at some point we use the data() method which is non-const
+    static void outputSelParticlesAllocatedFields(IFileWriter* writer, size_t first, size_t last, const ParticleIndexVectorType& selectedParticlesPositions,
+        ParticleDataType::HydroData& hydroSimData)
+    {
+        auto fieldPointers = hydroSimData.data();
+        auto indicesDone   = hydroSimData.outputFieldIndices;
+        auto namesDone     = hydroSimData.outputFieldNames;
+
+        // // Locally untag the selected particles to print the right ID
+        // // TODO: it can be probably done with templates
+        // constexpr uint64_t msbMask = static_cast<uint64_t>(1) << (sizeof(uint64_t)*8 - 1);
+        // std::vector<uint64_t> localSelectedParticlesIds = {};
+        // std::for_each(selectedParticlesPositions.begin(), selectedParticlesPositions.end(), [&hydroSimData, &localSelectedParticlesIds](auto particlePosition){
+        //     localSelectedParticlesIds.push_back(hydroSimData.id[particlePosition] & ~msbMask);
+        // });
+
+        // TODO: check existence of code duplication with outputAllocatedFields
+        for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
+        {
+            int fidx = indicesDone[i];
+            if (hydroSimData.isAllocated(fidx))
+            {
+                int column = std::find(hydroSimData.outputFieldIndices.begin(), hydroSimData.outputFieldIndices.end(), fidx) -
+                                       hydroSimData.outputFieldIndices.begin();
+
+                // TODO: the call frequency of this and of the outputAllocatedFields method will be different,
+                // we can save transfer time with a status flag but it will be the current method the one that
+                // will be called more frequently and which will be responsible for the data transfer.
+                // TODO: should we just transfer a minimal subset of particles including the selected ones?
+                transferToHost(hydroSimData, first, last, {hydroSimData.fieldNames[fidx]});
+
+
+                // Copy current field data to a new vector only for the selected particles
+                std::visit([writer, c = column, key = namesDone[i], &selectedParticlesPositions](auto field){
+                    std::remove_pointer_t<decltype(field)> selectedParticleFieldValues;
+                    // TODO: use copy_if
+                    // std::copy_if(field->begin(), field->end(), std::back_inserter(selectedParticleFieldPointers),
+                    //     [](){return true;});
+                    std::for_each(selectedParticlesPositions.begin(), selectedParticlesPositions.end(),
+                        [&selectedParticleFieldValues, &field](auto particlePosition){
+                            selectedParticleFieldValues.push_back(field->at(particlePosition));
+                        });
+                    writer->writeField(key, selectedParticleFieldValues.data(), c);
+                },
+                fieldPointers[fidx]);
+
+                indicesDone.erase(indicesDone.begin() + i);
+                namesDone.erase(namesDone.begin() + i);
+            }
+        }
     }
 
     std::ostream& out;
