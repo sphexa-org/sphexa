@@ -98,7 +98,7 @@ int main(int argc, char** argv)
     const std::string        profFreqStr  = parser.get("--profile", maxStepStr);
     const bool               profEnabled  = parser.exists("--profile");
     const std::string        pmroot       = parser.get("--pmroot", std::string("/sys/cray/pm_counters"));
-    const std::string        idSel        = parser.get("--idSel");
+    const bool               partSel      = parser.exists("--partSel");
     std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
 
 
@@ -119,19 +119,22 @@ int main(int argc, char** argv)
     ParticleIndexVectorType selParticlesIds;
     ParticleIndexVectorType localSelectedParticlesIndexes;
     bool tagSelectedParticles = false;
-    bool isSelectedParticleOutputTriggered = true;
+    bool isSelectedParticleOutputTriggered = false;
     std::string selParticlesOutFile;
-    bool saveSelParticles = !idSel.empty();
-    saveSelParticles = true;
-    selParticlesIds.push_back(3);
-    selParticlesIds.push_back(23);
-    selParticlesIds.push_back(15000);
-    selParticlesIds.push_back(38500);
-    selParticlesIds.push_back(46000);
-    if(saveSelParticles) {
+    if(partSel) {
+
+        // TODO: debug
+        selParticlesIds.push_back(3);
+        selParticlesIds.push_back(23);
+        selParticlesIds.push_back(15000);
+        selParticlesIds.push_back(38500);
+        selParticlesIds.push_back(46000);
 
         // Activate particle selected tagging
         tagSelectedParticles = true;
+
+        // Activate selected particles output
+        isSelectedParticleOutputTriggered = true;
 
         // Set file name for selected particles output
         selParticlesOutFile = "selected_particles_" + outFile;
