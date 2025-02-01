@@ -118,7 +118,6 @@ int main(int argc, char** argv)
 //    auto particleSelectionId = particleSelection(idSel, fileReader.get());
     ParticleIndexVectorType selParticlesIds;
     ParticleIndexVectorType localSelectedParticlesIndexes;
-    ParticleIndexVectorType localSelectedParticlesIndexes_thrust;
     bool tagSelectedParticles = false;
     bool isSelectedParticleOutputTriggered = true;
     std::string selParticlesOutFile;
@@ -192,8 +191,9 @@ int main(int argc, char** argv)
             // in a simulation starting from scratch we need to tag the selected particles if saveSelParticles is true and only in first iteration.
             // In a simulation starting from a checkpoint file we need to tag the selected particles only if they are not already tagged? 
             // Implementation of a check for tag existence in a checkpoint file is currently missing.
+
             // Find the selected particles in local id list and tag them by setting the MSB of the id field
-            // TODO: move to GPU/sync with GPU
+            // TODO: move to GPU
             std::for_each(selParticlesIds.begin(), selParticlesIds.end(), [&idList = d.id](auto selParticleId){
                 const auto selParticleIndex = std::find(idList.begin(), idList.end(), selParticleId) - idList.begin();
                 if (selParticleIndex < idList.size()) {
@@ -231,29 +231,18 @@ int main(int argc, char** argv)
             // TODO: what about MPI task sync at this point? I'm assuming everything is synced...
             // Reset the list of indexes of subdomain selected particles: this is needed since a specific particle can move to another rank
             localSelectedParticlesIndexes.clear();
-            localSelectedParticlesIndexes_thrust.clear();
 
-            // Find the selected particles in local id list and save their indexes
-            unsigned int particleIndex = 0;
-            // TODO: use d.devData to access device data for a GPU implementation!
-            std::for_each(d.id.begin(), d.id.end(), [&localSelectedParticlesIndexes, &particleIndex](auto& particleId){
-                if((particleId & msbMask) != 0) {// check MSB
-                    localSelectedParticlesIndexes.push_back(particleIndex); // TODO: inefficient due to resizing, avoid push_back usage
-                }
-                particleIndex++;
-            });
-
-            findSelectedParticlesIndexes(d, domain.startIndex(), domain.endIndex(), localSelectedParticlesIndexes_thrust);
+            // Find the selected particles positions in dataset
+            findSelectedParticlesIndexes(d, domain.startIndex(), domain.endIndex(), localSelectedParticlesIndexes);
 
             // TODO: debug
             MPI_Barrier(MPI_COMM_WORLD);
             for (auto rankId = 0; rankId < numRanks; ++rankId) {
                 if (rank == rankId) {
-                    std::cout<<"Rank "<<rankId<<std::endl;
-                    std::cout<<"Selected particle positions: "<<localSelectedParticlesIndexes_thrust.size()<<" "
-                        <<localSelectedParticlesIndexes.size()<<std::endl;
-                    for(auto i = 0; i < localSelectedParticlesIndexes_thrust.size(); ++i) {
-                        std::cout<<localSelectedParticlesIndexes_thrust[i]<<" ";
+                    std::cout<<"Rank "<<rankId<<" number of selected particles: "<<localSelectedParticlesIndexes.size()<<std::endl;
+                    std::cout<<"Selected particle positions: "<<std::endl;
+                    for(auto particleIndex : localSelectedParticlesIndexes) {
+                        std::cout<<particleIndex<<" ";
                     }
                     std::cout<<std::endl;
                 }
