@@ -11,6 +11,7 @@
 
 namespace sphexa
 {
+
 using ParticleIdType = uint64_t; // TODO: retrieve type from ParticlesData
 constexpr ParticleIdType msbMask = static_cast<ParticleIdType>(1) << (sizeof(ParticleIdType)*8 - 1);
 
