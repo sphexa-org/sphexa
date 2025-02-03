@@ -25,6 +25,7 @@
 
 #include "ryoanji/interface/global_multipole.hpp"
 #include "ryoanji/interface/multipole_holder.cuh"
+#include "ryoanji/nbody/traversal_cpu.hpp"
 
 using namespace ryoanji;
 
@@ -101,6 +102,36 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     multipoleHolder.upsweep(rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), domain.globalTree(), domain.focusTree(),
                             domain.layout().data(), multipoles.data());
 
+    std::vector<T> ax_cpu(d_x.size(), 0), ay_cpu(d_x.size(), 0), az_cpu(d_x.size(), 0);
+    {
+        auto cpToHost = []<class X>(const X* ptr, int n)
+        {
+            std::vector<X> ret(n);
+            memcpyD2H(ptr, n, ret.data());
+            return ret;
+        };
+
+        auto child          = cpToHost(octree.childOffsets, octree.numNodes);
+        auto intToLeaf      = cpToHost(octree.internalToLeaf, octree.numNodes);
+        auto centers_cpu    = cpToHost(centers.data(), centers.size());
+        auto multipoles_cpu = cpToHost(multipoleHolder.deviceMultipoles(), octree.numNodes);
+        auto layout         = cpToHost(domain.layout().data(), domain.layout().size());
+
+        auto x = toHost(d_x);
+        auto y = toHost(d_y);
+        auto z = toHost(d_z);
+        auto h = toHost(d_h);
+        auto m = toHost(d_m);
+
+        T egravTot_cpu = 0;
+        computeGravity(child.data(), intToLeaf.data(), centers_cpu.data(), multipoles_cpu.data(), layout.data(), 0,
+                       octree.numLeafNodes, x.data(), y.data(), z.data(), h.data(), m.data(), box, G, (T*)nullptr,
+                       ax_cpu.data(), ay_cpu.data(), az_cpu.data(), &egravTot_cpu, numShells);
+        ax_cpu.erase(ax_cpu.begin(), ax_cpu.begin() + domain.startIndex());
+        ay_cpu.erase(ay_cpu.begin(), ay_cpu.begin() + domain.startIndex());
+        az_cpu.erase(az_cpu.begin(), az_cpu.begin() + domain.startIndex());
+    }
+
     // Check Barnes-Hut accelerations from distributed particle set
     // against the direct-sum reference computed with the (single node) common pool
     bool                pass;
@@ -150,22 +181,30 @@ static int multipoleHolderTest(int thisRank, int numRanks)
         std::vector<T> azRef = dl(d_azref.data() + firstGlobalIdx, d_azref.data() + lastGlobalIdx);
 
         double         potentialSumRef = 0;
-        std::vector<T> errors(ax.size());
+        std::vector<T> errors(ax.size()), errors_cpu(ax.size());
         for (int i = 0; i < ax.size(); i++)
         {
             potentialSumRef += pRef[i];
-            Vec3<T> ref   = {axRef[i], ayRef[i], azRef[i]};
-            Vec3<T> probe = {ax[i], ay[i], az[i]};
-            errors[i]     = std::sqrt(norm2(ref - probe) / norm2(ref));
+            Vec3<T> ref       = {axRef[i], ayRef[i], azRef[i]};
+            Vec3<T> probe     = {ax[i], ay[i], az[i]};
+            Vec3<T> probe_cpu = {ax_cpu[i], ay_cpu[i], az_cpu[i]};
+            errors[i]         = std::sqrt(norm2(ref - probe) / norm2(ref));
+            errors_cpu[i]     = std::sqrt(norm2(ref - probe_cpu) / norm2(ref));
         }
         potentialSumRef *= 0.5 * G;
         std::sort(begin(errors), end(errors));
+        std::sort(begin(errors_cpu), end(errors_cpu));
 
         double err1pc = errors[errors.size() * 0.99];
         double errmax = errors.back();
-
         MPI_Allgather(&err1pc, 1, MPI_DOUBLE, firstPercentiles.data(), 1, MPI_DOUBLE, MPI_COMM_WORLD);
         MPI_Allgather(&errmax, 1, MPI_DOUBLE, maxErrors.data(), 1, MPI_DOUBLE, MPI_COMM_WORLD);
+
+        std::vector<double> firstPercentiles_cpu(numRanks), maxErrors_cpu(numRanks);
+        double              err1pc_cpu = errors_cpu[errors.size() * 0.99];
+        double              errmax_cpu = errors_cpu.back();
+        MPI_Allgather(&err1pc_cpu, 1, MPI_DOUBLE, firstPercentiles_cpu.data(), 1, MPI_DOUBLE, MPI_COMM_WORLD);
+        MPI_Allgather(&errmax_cpu, 1, MPI_DOUBLE, maxErrors_cpu.data(), 1, MPI_DOUBLE, MPI_COMM_WORLD);
 
         double bhPotentialGlob, potentialSumRefGlob;
         MPI_Allreduce(&bhPotential, &bhPotentialGlob, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -178,8 +217,12 @@ static int multipoleHolderTest(int thisRank, int numRanks)
         if (thisRank == 0)
         {
             for (int i = 0; i < numRanks; ++i)
+            {
                 std::cout << "rank " << i << " 1st-percentile acc error " << firstPercentiles[i] << ", max acc error "
                           << maxErrors[i] << std::endl;
+                std::cout << "rank " << i << " 1st-pct (CPU)  acc error " << firstPercentiles_cpu[i]
+                          << ", max acc error " << maxErrors_cpu[i] << std::endl;
+            }
 
             std::cout << "global reference potential " << potentialSumRefGlob << ", BH global potential "
                       << bhPotentialGlob << std::endl;
