@@ -9,11 +9,11 @@
 #include "sph/particles_data.hpp"
 #include "cstone/fields/field_get.hpp"
 
-struct PlanetTest : public ::testing::Test
+struct DiskTest : public ::testing::Test
 {
     int rank = 0, numRanks = 0;
 
-    PlanetTest()
+    DiskTest()
     {
         int initialized = 0;
         MPI_Initialized(&initialized);
@@ -23,7 +23,7 @@ struct PlanetTest : public ::testing::Test
     }
 };
 
-TEST_F(PlanetTest, testStarPosition)
+TEST_F(DiskTest, testStarPosition)
 {
 
     if (numRanks != 2) throw std::runtime_error("Must be excuted with two ranks");

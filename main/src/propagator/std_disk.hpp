@@ -19,7 +19,6 @@
 #include "accretion.hpp"
 #include "betaCooling.hpp"
 #include "computeCentralForce.hpp"
-#include "eos_polytropic.hpp"
 #include "exchangeStarPosition.hpp"
 #include "star_data.hpp"
 

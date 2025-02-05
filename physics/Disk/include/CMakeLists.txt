@@ -1,0 +1,17 @@
+
+if (CMAKE_HIP_COMPILER)
+    set_source_files_properties(computeCentralForce_gpu.cu accretion_gpu.cu betaCooling_gpu.cu PROPERTIES LANGUAGE HIP)
+endif ()
+
+if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
+    add_library(disk_gpu OBJECT computeCentralForce_gpu.cu accretion_gpu.cu betaCooling_gpu.cu)
+    target_include_directories(disk_gpu PRIVATE ${CSTONE_DIR} ${SPH_DIR})
+    target_compile_definitions(disk_gpu PRIVATE USE_CUDA)
+    if (CMAKE_CUDA_COMPILER)
+        target_link_libraries(disk_gpu PRIVATE CUDA::cudart)
+    else ()
+        target_link_libraries(disk_gpu PRIVATE hip::host)
+        target_compile_definitions(disk_gpu PRIVATE THRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)
+        set_target_properties(${exename} PROPERTIES LINKER_LANGUAGE CXX)
+    endif ()
+endif ()

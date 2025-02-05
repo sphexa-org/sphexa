@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(CSTONE_DIR ${CMAKE_SOURCE_DIR}/domain/include)
 set(MAIN_APP_DIR ${CMAKE_SOURCE_DIR}/main/src)
-set(PLANET_DIR ${CMAKE_SOURCE_DIR}/physics/Planet/include)
+set(DISK_DIR ${CMAKE_SOURCE_DIR}/physics/Disk/include)
 set(SPH_DIR ${PROJECT_SOURCE_DIR}/sph/include)
 
 add_subdirectory(include)

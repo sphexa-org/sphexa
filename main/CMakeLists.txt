@@ -3,7 +3,7 @@ set(CSTONE_DIR ${PROJECT_SOURCE_DIR}/domain/include)
 set(COOLING_DIR ${PROJECT_SOURCE_DIR}/physics/cooling/include)
 set(RYOANJI_DIR ${PROJECT_SOURCE_DIR}/ryoanji/src)
 set(SPH_DIR ${PROJECT_SOURCE_DIR}/sph/include)
-set(PLANET_DIR ${PROJECT_SOURCE_DIR}/physics/Planet/include)
+set(DISK_DIR ${PROJECT_SOURCE_DIR}/physics/Disk/include)
 
 add_subdirectory(src)
 if (BUILD_TESTING)
