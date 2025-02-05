@@ -82,14 +82,13 @@ HOST_DEVICE_FUN constexpr int pbcAdjust(int x)
 }
 
 //! @brief maps x into the range [-R/2+1: R/2+1] (-511 to 512 with R = 1024)
-template<int R>
-HOST_DEVICE_FUN constexpr int pbcDistance(int x)
+HOST_DEVICE_FUN constexpr int pbcDistance(int x, int R)
 {
     // this version handles x outside -R, R
     // int roundAwayFromZero = (x > 0) ? x + R/2 : x - R/2;
     // return x -= R * (roundAwayFromZero / R);
-    assert(x >= -R);
-    assert(x <= R);
+    assert(R == 0 || x >= -R);
+    assert(R == 0 || x <= R);
     int ret = (x <= -R / 2) ? x + R : x;
     return (ret > R / 2) ? ret - R : ret;
 }

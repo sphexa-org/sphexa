@@ -39,15 +39,32 @@ extern void computeAVswitches(const GroupView&, Dataset& d, const cstone::Box<ty
 template<bool avClean, class Dataset>
 extern void computeMomentumEnergy(const GroupView&, float*, Dataset&, const cstone::Box<typename Dataset::RealType>&);
 
-template<class Tu, class Trho, class Tp, class Tc>
-extern void computeEOS_HydroStd(size_t, size_t, Trho, Tu, const Tu*, const Tu*, const Trho* m, Trho*, Tp*, Tc*);
+template<class Tt, class Tm, class Th>
+extern void computeIdealGasEOS(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma, const Tt* temp, const Tt* u,
+                               const Tm* m, const Th* kx, const Th* xm, const Th* gradh, Th* prho, Th* c, Th* rho,
+                               Th* p);
 
-template<class Tu, class Tm, class Thydro>
-extern void computeEOS(size_t, size_t, Tm mui, Tu gamma, const Tu*, const Tu*, const Tm*, const Thydro*, const Thydro*,
-                       const Thydro*, Thydro*, Thydro*, Thydro*, Thydro*);
+template<class Th, class Tu>
+extern void computeIsothermalEOS(size_t first, size_t last, Th cConst, Th* c, Th* rho, Th* p, const Th* m, const Th* kx,
+                                 const Th* xm, const Th* gradh, Th* prho, Tu* temp);
+
+template<class Th, class Tu>
+extern void computeIsothermalEOS(size_t firstParticle, size_t lastParticle, Th cConst, Th* c, Th* rho, Th* p,
+                                 const Th* m, const Th* kx, const Th* xm, const Th* gradh, Th* prho, Tu* temp);
+
+template<class Th, class Tt>
+extern void computePolytropicEOS(size_t firstParticle, size_t lastParticle, Tt polytropic_const, Tt polytropic_index,
+                                 Th* rho, Th* p, const Th* m, const Th* kx, const Th* xm, const Th* gradh, Th* prho,
+                                 Tt* temp, Th* c);
+
+template<class Dataset>
+extern void computeIdealGasEOS_HydroStd(size_t firstParticle, size_t lastParticle, Dataset& d);
 
 template<typename Dataset>
-extern void computeIsothermalEOS(size_t, size_t, Dataset& d);
+extern void computeIsothermalEOS_HydroStd(size_t firstParticle, size_t lastParticle, Dataset& d);
+
+template<typename Dataset>
+extern void computePolytropicEOS_HydroStd(size_t firstParticle, size_t lastParticle, Dataset& d);
 
 } // namespace cuda
 

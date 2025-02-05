@@ -46,17 +46,6 @@ struct StarData
     //! @brief Limit the timestep depending on changes in the internal energy. delta_t = K_u * u / du
     double K_u{std::numeric_limits<double>::infinity()};
 
-    //! @brief Use a polytropic equation of state
-    //! P = Kpoly * rho ^ exp_poly
-    int use_polytropic_eos{1};
-
-    //! @brief The next two parameters are used if the polytropic equation of state is activated.
-    //! @brief polytropic constant
-    double Kpoly{1.9998578841e-3};
-
-    //! @brief polytropic exponent
-    double exp_poly{5. / 3.};
-
     template<typename Archive>
     void loadOrStoreAttributes(Archive* ar)
     {
@@ -91,9 +80,6 @@ struct StarData
         optionalIO("star::cooling_rho_limit", &cooling_rho_limit, 1);
         optionalIO("star::u_floor", &u_floor, 1);
         optionalIO("star::K_u", &K_u, 1);
-        optionalIO("star::use_polytropic_eos", &use_polytropic_eos, 1);
-        optionalIO("star::Kpoly", &Kpoly, 1);
-        optionalIO("star::exp_poly", &exp_poly, 1);
     };
 
     //! @brief Potential from interaction between star and particles

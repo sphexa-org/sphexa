@@ -52,7 +52,7 @@ namespace sph
  * we could potentially avoid halo exchange of p and c in return for exchanging halos of u.
  */
 template<typename Dataset>
-void computeEOS_HydroStdImpl(size_t startIndex, size_t endIndex, Dataset& d)
+void computeIdealGasEOS_HydroStd_Impl(size_t startIndex, size_t endIndex, Dataset& d)
 {
     const auto* u    = d.u.data();
     const auto* temp = d.temp.data();
@@ -66,7 +66,7 @@ void computeEOS_HydroStdImpl(size_t startIndex, size_t endIndex, Dataset& d)
 #pragma omp parallel for schedule(static)
         for (size_t i = startIndex; i < endIndex; ++i)
         {
-            std::tie(p[i], c[i]) = idealGasEOSTemp(temp[i], rho[i], d.muiConst, d.gamma);
+            std::tie(p[i], c[i]) = idealGasEOS(temp[i], rho[i], d.muiConst, d.gamma);
         }
     }
     else
@@ -79,16 +79,76 @@ void computeEOS_HydroStdImpl(size_t startIndex, size_t endIndex, Dataset& d)
     }
 }
 
+template<typename Dataset>
+void computeIsothermalEOS_HydroStd_Impl(size_t startIndex, size_t endIndex, Dataset& d)
+{
+    const auto* rho = d.rho.data();
+
+    auto* p      = d.p.data();
+    auto* temp   = d.temp.data();
+    auto  cConst = d.soundSpeedConst;
+
+#pragma omp parallel for schedule(static)
+    for (size_t i = startIndex; i < endIndex; ++i)
+    {
+        p[i] = isothermalEOS(cConst, rho[i]);
+        if (temp) { temp[i] = 0; }
+    }
+}
+
+template<typename Dataset>
+void computePolytropicEOS_HydroStd_Impl(size_t startIndex, size_t endIndex, Dataset& d)
+{
+    const auto* rho = d.rho.data();
+
+    auto* p    = d.p.data();
+    auto* temp = d.temp.data();
+    auto* c    = d.c.data();
+
+#pragma omp parallel for schedule(static)
+    for (size_t i = startIndex; i < endIndex; ++i)
+    {
+        std::tie(p[i], c[i]) = polytropicEOS(d.polytropic_const, d.polytropic_index, rho[i]);
+        if (temp) { temp[i] = 0; }
+    }
+}
+
 template<class Dataset>
-void computeEOS_HydroStd(size_t startIndex, size_t endIndex, Dataset& d)
+void computeIdealGasEOS_HydroStd(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        cuda::computeEOS_HydroStd(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.devData.temp),
-                                  rawPtr(d.devData.u), rawPtr(d.devData.m), rawPtr(d.devData.rho), rawPtr(d.devData.p),
-                                  rawPtr(d.devData.c));
+        cuda::computeIdealGasEOS_HydroStd(startIndex, endIndex, d);
     }
-    else { computeEOS_HydroStdImpl(startIndex, endIndex, d); }
+    else { computeIdealGasEOS_HydroStd_Impl(startIndex, endIndex, d); }
+}
+
+template<class Dataset>
+void computeIsothermalEOS_HydroStd(size_t startIndex, size_t endIndex, Dataset& d)
+{
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    {
+        cuda::computeIsothermalEOS_HydroStd(startIndex, endIndex, d);
+    }
+    else { computeIsothermalEOS_HydroStd_Impl(startIndex, endIndex, d); }
+}
+
+template<class Dataset>
+void computePolytropicEOS_HydroStd(size_t startIndex, size_t endIndex, Dataset& d)
+{
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    {
+        cuda::computePolytropicEOS_HydroStd(startIndex, endIndex, d);
+    }
+    else { computePolytropicEOS_HydroStd_Impl(startIndex, endIndex, d); }
+}
+
+template<class Dataset>
+void computeEOS_HydroStd(size_t startIndex, size_t endIndex, Dataset& d)
+{
+    if (d.eosChoice == EosType::idealGas) { computeIdealGasEOS_HydroStd(startIndex, endIndex, d); }
+    else if (d.eosChoice == EosType::isothermal) { computeIsothermalEOS_HydroStd(startIndex, endIndex, d); }
+    else if (d.eosChoice == EosType::polytropic) { computePolytropicEOS_HydroStd(startIndex, endIndex, d); }
 }
 
 } // namespace sph

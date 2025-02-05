@@ -1,13 +1,18 @@
 #pragma once
 
-#include <vector>
-
 #include "cstone/util/tuple.hpp"
 
 #include "kernels.hpp"
 
 namespace sph
 {
+
+enum EosType : int
+{
+    idealGas   = 0,
+    isothermal = 1,
+    polytropic = 2
+};
 
 //! @brief returns the heat capacity for given mean molecular weight
 template<class T1, class T2>
@@ -21,7 +26,6 @@ HOST_DEVICE_FUN constexpr T1 idealGasCv(T1 mui, T2 gamma)
  *
  * @param u     internal energy
  * @param rho   baryonic density
- * @param mui   mean molecular weight
  * @param gamma adiabatic index
  *
  * This EOS is used for simple cases where we don't need the temperature.
@@ -40,7 +44,7 @@ HOST_DEVICE_FUN auto idealGasEOS_u(T1 u, T2 rho, T3 gamma)
 }
 
 template<class T1, class T2, class T3>
-HOST_DEVICE_FUN auto idealGasEOSTemp(T1 temp, T2 rho, T3 mui, T1 gamma)
+HOST_DEVICE_FUN auto idealGasEOS(T1 temp, T2 rho, T3 mui, T1 gamma)
 {
     return idealGasEOS_u(idealGasCv(mui, gamma) * temp, rho, gamma);
 }
@@ -59,49 +63,26 @@ HOST_DEVICE_FUN auto isothermalEOS(T1 c, T2 rho)
     return p;
 }
 
-/*! @brief Polytropic EOS for a 1.4 M_sun and 12.8 km neutron star
+/*! @brief General polytropic equation of state.
+ * @param K_poly       polytropic constant
+ * @param gamma_poly   polytropic exponent
+ * @param rho          SPH density
  *
- * @param rho  baryonic density
+ * Returns pressure and sound speed
  *
- * Kpol is hardcoded for these NS characteristics and is not valid for
- * other NS masses and radius
- * Returns pressure, and speed of sound
+ * For a 1.4 M_sun and 12.8 km neutron star the values are
+ * K_poly = 2.246341237993810232e-10
+ * gammapol = 3.e0
  */
-template<class T>
-HOST_DEVICE_FUN auto polytropicEOS_neutronstar(T rho)
+template<typename T1, typename T2, typename T3>
+HOST_DEVICE_FUN auto polytropicEOS(T1 K_poly, T2 gamma_poly, T3 rho)
 {
-    constexpr T Kpol     = 2.246341237993810232e-10;
-    constexpr T gammapol = 3.e0;
+    using Tc = std::common_type_t<T1, T2, T3>;
 
-    T p = Kpol * std::pow(rho, gammapol);
-    T c = std::sqrt(gammapol * p / rho);
+    Tc p = K_poly * std::pow(rho, gamma_poly);
+    Tc c = std::sqrt(gamma_poly * p / rho);
 
-    return util::tuple<T, T>{p, c};
-}
-
-/*! @brief Polytropic EOS interface for SPH where rho is computed on-the-fly
- *
- * @tparam Dataset
- * @param startIndex  index of first locally owned particle
- * @param endIndex    index of last locally owned particle
- * @param d           the dataset with the particle buffers
- */
-template<typename Dataset>
-void computeEOS_Polytropic_neutronstar(size_t startIndex, size_t endIndex, Dataset& d)
-{
-    const auto* kx = d.kx.data();
-    const auto* xm = d.xm.data();
-    const auto* m  = d.m.data();
-
-    auto* p = d.p.data();
-    auto* c = d.c.data();
-
-#pragma omp parallel for schedule(static)
-    for (size_t i = startIndex; i < endIndex; ++i)
-    {
-        auto rho             = kx[i] * m[i] / xm[i];
-        std::tie(p[i], c[i]) = polytropicEOS_neutronstar(rho);
-    }
+    return util::tuple<Tc, Tc>{p, c};
 }
 
 } // namespace sph

@@ -2,6 +2,5 @@ include:
   - remote: 'https://gitlab.com/cscs-ci/recipes/-/raw/master/templates/v2/.ci-ext.yml'
 
 stages:
-  - SPH_build
-  # - SPH_unit_tests
-
+  - sphexa_build
+  - sphexa_run

@@ -35,52 +35,94 @@
 
 #include "sph/sph_gpu.hpp"
 #include "sph/eos.hpp"
+#include "sph/particles_data.hpp"
 
 namespace sph
 {
 namespace cuda
 {
 
-template<class Tt, class Trho, class Tp, class Tc>
-__global__ void cudaEOS_HydroStdTemp(size_t firstParticle, size_t lastParticle, Trho mui, Tt gamma, const Tt* temp,
-                                     const Trho* m, Trho* rho, Tp* p, Tc* c)
+template<class Tt, class Tm, class Thydro>
+__global__ void cudaComputeIdealGasEOS_HydroStd(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma,
+                                                const Tt* temp, const Tt* u, const Tm* m, Thydro* rho, Thydro* p,
+                                                Thydro* c)
 {
     unsigned i = firstParticle + blockDim.x * blockIdx.x + threadIdx.x;
     if (i >= lastParticle) return;
 
-    util::tie(p[i], c[i]) = idealGasEOSTemp(temp[i], rho[i], mui, gamma);
+    if (u == nullptr) { util::tie(p[i], c[i]) = idealGasEOS(temp[i], rho[i], mui, gamma); }
+    else { util::tie(p[i], c[i]) = idealGasEOS_u(u[i], rho[i], gamma); }
 }
 
-template<class Tt, class Trho, class Tp, class Tc>
-__global__ void cudaEOS_HydroStd_u(size_t firstParticle, size_t lastParticle, Trho mui, Tt gamma, const Tt* u,
-                                   const Trho* m, Trho* rho, Tp* p, Tc* c)
-{
-    unsigned i = firstParticle + blockDim.x * blockIdx.x + threadIdx.x;
-    if (i >= lastParticle) return;
-
-    util::tie(p[i], c[i]) = idealGasEOS_u(u[i], rho[i], gamma);
-}
-
-template<class Tt, class Trho, class Tp, class Tc>
-void computeEOS_HydroStd(size_t firstParticle, size_t lastParticle, Trho mui, Tt gamma, const Tt* temp, const Tt* u,
-                         const Trho* m, Trho* rho, Tp* p, Tc* c)
+template<class Dataset>
+void computeIdealGasEOS_HydroStd(size_t firstParticle, size_t lastParticle, Dataset& d)
 {
     if (firstParticle == lastParticle) { return; }
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(lastParticle - firstParticle, numThreads);
-    if (u == nullptr)
-    {
-        cudaEOS_HydroStdTemp<<<numBlocks, numThreads>>>(firstParticle, lastParticle, mui, gamma, temp, m, rho, p, c);
-    }
-    else { cudaEOS_HydroStd_u<<<numBlocks, numThreads>>>(firstParticle, lastParticle, mui, gamma, u, m, rho, p, c); }
+
+    cudaComputeIdealGasEOS_HydroStd<<<numBlocks, numThreads>>>(
+        firstParticle, lastParticle, d.muiConst, d.gamma, rawPtr(d.devData.temp), rawPtr(d.devData.u),
+        rawPtr(d.devData.m), rawPtr(d.devData.rho), rawPtr(d.devData.p), rawPtr(d.devData.c));
+
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeEOS_HydroStd(size_t, size_t, double, double, const double*, const double*, const double*, double*,
-                                  double*, double*);
-template void computeEOS_HydroStd(size_t, size_t, float, double, const double*, const double*, const float*, float*,
-                                  float*, float*);
-template void computeEOS_HydroStd(size_t, size_t, float, float, const float*, const float*, const float*, float*,
-                                  float*, float*);
+template void computeIdealGasEOS_HydroStd(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>&);
+
+template<typename Th, typename Tu>
+__global__ void cudaComputeIsothermalEOS_HydroStd(size_t first, size_t last, Th cConst, Th* c, Th* rho, Th* p, Tu* temp)
+{
+    unsigned i = first + blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= last) return;
+
+    p[i] = isothermalEOS(cConst, rho[i]);
+    c[i] = cConst;
+    if (temp) { temp[i] = 0; }
+}
+
+template<typename Dataset>
+void computeIsothermalEOS_HydroStd(size_t first, size_t last, Dataset& d)
+{
+    if (first == last) { return; }
+    unsigned numThreads = 256;
+    unsigned numBlocks  = cstone::iceil(last - first, numThreads);
+
+    cudaComputeIsothermalEOS_HydroStd<<<numBlocks, numThreads>>>(first, last, d.soundSpeedConst, rawPtr(d.devData.c),
+                                                                 rawPtr(d.devData.rho), rawPtr(d.devData.p),
+                                                                 rawPtr(d.devData.temp));
+
+    checkGpuErrors(cudaDeviceSynchronize());
+}
+
+template void computeIsothermalEOS_HydroStd(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d);
+
+template<typename Th, typename Tt>
+__global__ void cudaComputePolytropicEOS_HydroStd(size_t first, size_t last, Tt polytropic_const, Tt polytropic_index,
+                                                  Th* rho, Th* p, Tt* temp, Th* c)
+{
+    unsigned i = first + blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= last) return;
+
+    util::tie(p[i], c[i]) = polytropicEOS(polytropic_const, polytropic_index, rho[i]);
+    if (temp) { temp[i] = 0; }
+}
+
+template<typename Dataset>
+void computePolytropicEOS_HydroStd(size_t first, size_t last, Dataset& d)
+{
+    if (first == last) { return; }
+    unsigned numThreads = 256;
+    unsigned numBlocks  = cstone::iceil(last - first, numThreads);
+
+    cudaComputePolytropicEOS_HydroStd<<<numBlocks, numThreads>>>(first, last, d.polytropic_const, d.polytropic_index,
+                                                                 rawPtr(d.devData.rho), rawPtr(d.devData.p),
+                                                                 rawPtr(d.devData.temp), rawPtr(d.devData.c));
+
+    checkGpuErrors(cudaDeviceSynchronize());
+}
+
+template void computePolytropicEOS_HydroStd(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>&);
+
 } // namespace cuda
 } // namespace sph

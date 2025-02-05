@@ -120,12 +120,6 @@ public:
         d.treeView = domain.octreeProperties();
     }
 
-    void eosSwitch(size_t first, size_t last, DataType& simData, const disk::StarData& star)
-    {
-        if (star.use_polytropic_eos) { disk::computePolytropicEOS_HydroStd(first, last, simData.hydro, star); }
-        else { computeEOS_HydroStd(first, last, simData.hydro); }
-    }
-
     void computeForces(DomainType& domain, DataType& simData) override
     {
         timer.start();
@@ -147,7 +141,7 @@ public:
 
         computeDensity(groups_.view(), d, domain.box());
         timer.step("Density");
-        eosSwitch(first, last, simData, star);
+        computeEOS_HydroStd(first, last, d);
         timer.step("EquationOfState");
 
         domain.exchangeHalos(get<"vx", "vy", "vz", "rho", "p", "c">(d), get<"ax">(d), get<"ay">(d));
