@@ -112,13 +112,35 @@ void Execute(DataType& d, long startIndex, long endIndex)
     mesh["state/time"].set_external(&d.ttot);
 
     mesh["coordsets/coords/type"] = "explicit";
+#if defined(USE_CUDA)
+    mesh["coordsets/coords/values/x"].set_external(d.devData.x.data() + startIndex, endIndex - startIndex);
+    mesh["coordsets/coords/values/y"].set_external(d.devData.y.data() + startIndex, endIndex - startIndex);
+    mesh["coordsets/coords/values/z"].set_external(d.devData.z.data() + startIndex, endIndex - startIndex);
+#else
     mesh["coordsets/coords/values/x"].set_external(d.x.data() + startIndex, endIndex - startIndex);
     mesh["coordsets/coords/values/y"].set_external(d.y.data() + startIndex, endIndex - startIndex);
     mesh["coordsets/coords/values/z"].set_external(d.z.data() + startIndex, endIndex - startIndex);
-
+#endif
     mesh["topologies/mesh/type"] = "points";
     mesh["topologies/mesh/coordset"] = "coords";
-    
+
+#if defined(USE_CUDA)
+    addField(mesh, "x", d.devData.x.data(), startIndex, endIndex);
+    addField(mesh, "y", d.devData.y.data(), startIndex, endIndex);
+    addField(mesh, "z", d.devData.z.data(), startIndex, endIndex);
+    addField(mesh, "vx", d.devData.vx.data(), startIndex, endIndex);
+    addField(mesh, "vy", d.devData.vy.data(), startIndex, endIndex);
+    addField(mesh, "vz", d.devData.vz.data(), startIndex, endIndex);
+    addField(mesh, "Mass", d.devData.m.data(), startIndex, endIndex);
+    addField(mesh, "Smoothing Length", d.devData.h.data(), startIndex, endIndex);
+    addField(mesh, "Density", d.devData.rho.data(), startIndex, endIndex);
+    addField(mesh, "Internal Energy", d.devData.u.data(), startIndex, endIndex);
+    addField(mesh, "Pressure", d.devData.p.data(), startIndex, endIndex);
+    addField(mesh, "Speed of Sound", d.devData.c.data(), startIndex, endIndex);
+    addField(mesh, "ax", d.devData.ax.data(), startIndex, endIndex);
+    addField(mesh, "ay", d.devData.ay.data(), startIndex, endIndex);
+    addField(mesh, "az", d.devData.az.data(), startIndex, endIndex);
+#else
     addField(mesh, "x", d.x.data(), startIndex, endIndex);
     addField(mesh, "y", d.y.data(), startIndex, endIndex);
     addField(mesh, "z", d.z.data(), startIndex, endIndex);
@@ -134,9 +156,8 @@ void Execute(DataType& d, long startIndex, long endIndex)
     addField(mesh, "ax", d.ax.data(), startIndex, endIndex);
     addField(mesh, "ay", d.ay.data(), startIndex, endIndex);
     addField(mesh, "az", d.az.data(), startIndex, endIndex);
-
-
-
+#endif
+    
     conduit::Node verify_info;
     if (!conduit::blueprint::mesh::verify(mesh, verify_info))
     {
