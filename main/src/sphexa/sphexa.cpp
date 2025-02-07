@@ -98,7 +98,8 @@ int main(int argc, char** argv)
     const std::string        profFreqStr  = parser.get("--profile", maxStepStr);
     const bool               profEnabled  = parser.exists("--profile");
     const std::string        pmroot       = parser.get("--pmroot", std::string("/sys/cray/pm_counters"));
-    const bool               partSel      = parser.exists("--partSel");
+    const std::vector<std::string> idSel  = parser.getCommaList("--idSel");
+    const std::vector<std::string> sphSel = parser.getCommaList("--sphSel");
     std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
 
 
@@ -118,17 +119,28 @@ int main(int argc, char** argv)
 //    auto particleSelectionId = particleSelection(idSel, fileReader.get());
     ParticleIndexVectorType selParticlesIds;
     ParticleIndexVectorType localSelectedParticlesIndexes;
+    ParticleSelectionSphere selSphereData;
+    bool partSel = false;
     bool tagSelectedParticles = false;
     bool isSelectedParticleOutputTriggered = false;
     std::string selParticlesOutFile;
-    if(partSel) {
+    if(!idSel.empty()) {
+        // TODO: add check, input must be a list of unsigned int
+        for(auto& id : idSel) {
+            selParticlesIds.push_back(std::stoul(id));
+        }
 
-        // TODO: debug
-        selParticlesIds.push_back(3);
-        selParticlesIds.push_back(23);
-        selParticlesIds.push_back(15000);
-        selParticlesIds.push_back(38500);
-        selParticlesIds.push_back(46000);
+        partSel = true;
+    }
+    if(!sphSel.empty()) {
+        // TODO: add check, input must be a unitary sphere center and radius
+        selSphereData.radius = std::stod(sphSel[0]);
+        selSphereData.center[0] = std::stod(sphSel[1]);
+        selSphereData.center[1] = std::stod(sphSel[2]);
+        selSphereData.center[2] = std::stod(sphSel[3]);
+        partSel = true;
+    }
+    if(partSel){
 
         // Activate particle selected tagging
         tagSelectedParticles = true;
@@ -137,7 +149,7 @@ int main(int argc, char** argv)
         isSelectedParticleOutputTriggered = true;
 
         // Set file name for selected particles output
-        selParticlesOutFile = "selected_particles_" + outFile;
+        selParticlesOutFile = "selected_particles_" + outFile + selParticlesFileWriter->suffix();
     }
 
     Dataset simData;
@@ -195,14 +207,15 @@ int main(int argc, char** argv)
             // In a simulation starting from a checkpoint file we need to tag the selected particles only if they are not already tagged? 
             // Implementation of a check for tag existence in a checkpoint file is currently missing.
 
-            // Find the selected particles in local id list and tag them by setting the MSB of the id field
-            // TODO: move to GPU
-            std::for_each(selParticlesIds.begin(), selParticlesIds.end(), [&idList = d.id](auto selParticleId){
-                const auto selParticleIndex = std::find(idList.begin(), idList.end(), selParticleId) - idList.begin();
-                if (selParticleIndex < idList.size()) {
-                   idList[selParticleIndex] = idList[selParticleIndex] | msbMask;
-                }
-            });
+            // If a selection sphere has been provided run spatial identification
+            if(!sphSel.empty()) {
+                // Find the selected particles in dataset
+                findParticlesInSphere(d, domain.startIndex(), domain.endIndex(), selSphereData);
+            }
+            else {
+                // Find the selected particles in user provided id list and tag them by setting the MSB of the id field
+                findParticlesInIdList(d, domain.startIndex(), domain.endIndex(), selParticlesIds);
+            }
 
             // Update id on device
             // TODO: check transfer index range
@@ -228,7 +241,6 @@ int main(int argc, char** argv)
             isOutputTriggered = false;
         }
 
-
         if (isSelectedParticleOutputTriggered) // && propatagor->isSynced
         {
             // TODO: what about MPI task sync at this point? I'm assuming everything is synced...
@@ -236,22 +248,7 @@ int main(int argc, char** argv)
             localSelectedParticlesIndexes.clear();
 
             // Find the selected particles positions in dataset
-            findSelectedParticlesIndexes(d, domain.startIndex(), domain.endIndex(), localSelectedParticlesIndexes);
-
-            // TODO: debug
-            MPI_Barrier(MPI_COMM_WORLD);
-            for (auto rankId = 0; rankId < numRanks; ++rankId) {
-                if (rank == rankId) {
-                    std::cout<<"Rank "<<rankId<<" number of selected particles: "<<localSelectedParticlesIndexes.size()<<std::endl;
-                    std::cout<<"Selected particle positions: "<<std::endl;
-                    for(auto particleIndex : localSelectedParticlesIndexes) {
-                        std::cout<<particleIndex<<" ";
-                    }
-                    std::cout<<std::endl;
-                }
-                MPI_Barrier(MPI_COMM_WORLD);
-            }
-
+            findSelectedParticlesIndexes(d, localSelectedParticlesIndexes);
 
             selParticlesFileWriter->addStep(0, localSelectedParticlesIndexes.size(), selParticlesOutFile);
             simData.hydro.loadOrStoreAttributes(selParticlesFileWriter.get());
