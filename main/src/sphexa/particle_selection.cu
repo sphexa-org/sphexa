@@ -22,6 +22,7 @@
 namespace sphexa
 {
 
+
 // TODO: retrieve particle id type from ParticlesData
 struct MaskFunctor
 {
@@ -53,6 +54,16 @@ struct SearchFunctor
     }
 };
 
+
+void findParticlesInSphere_gpu(ParticlesData<cstone::GpuTag>& d, size_t firstIndex, size_t lastIndex, const ParticleSelectionSphere& selSphereData) {
+
+}
+
+void findParticlesInIdList_gpu(ParticlesData<cstone::GpuTag>& d, size_t firstIndex, size_t lastIndex, const std::vector<ParticleIdType>& selParticlesIds) {
+
+}
+
+
 // TODO: remove, debug only
 //#include <inttypes.h>
 // struct printf_functor
@@ -67,8 +78,7 @@ struct SearchFunctor
 //   }
 // };
 
-void findSelectedParticlesIndexes_gpu(const ParticlesData<cstone::GpuTag>& d, unsigned long first, unsigned long last, 
-                                     std::vector<uint64_t>& localSelectedParticlesIndexes){
+void findSelectedParticlesIndexes_gpu(const ParticlesData<cstone::GpuTag>& d, std::vector<uint64_t>& localSelectedParticlesIndexes){
 
     auto devRawId = d.devData.id.data();
     const auto devIdSize = d.devData.id.size();
