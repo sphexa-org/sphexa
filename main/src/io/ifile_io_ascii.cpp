@@ -59,8 +59,8 @@ public:
     [[nodiscard]] int numRanks() const override { return numRanks_; }
 
     std::string suffix() const override { return ""; }
-
-    void addStep(size_t firstIndex, size_t lastIndex, std::string path) override
+    // TODO: better implementation needed, can we remove settingsWriting flag?
+    void addStep(size_t firstIndex, size_t lastIndex, std::string path, bool settingsWriting = false) override
     {
         firstIndexStep_ = firstIndex;
         lastIndexStep_  = lastIndex;

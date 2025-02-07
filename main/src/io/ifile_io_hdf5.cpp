@@ -66,7 +66,7 @@ public:
 
     std::string suffix() const override { return ".h5"; }
 
-    void addStep(size_t firstIndex, size_t lastIndex, std::string path) override
+    void addStep(size_t firstIndex, size_t lastIndex, std::string path, bool settingsWriting = false) override
     {
         firstIndex_ = firstIndex;
 
@@ -77,7 +77,7 @@ public:
             h5File_      = fileutils::openH5Part(path, mode, comm_);
         }
 
-        if (lastIndex > firstIndex)
+        if (lastIndex >= firstIndex && !settingsWriting)
         {
             // create the next step
             h5part_int64_t numSteps = H5PartGetNumSteps(h5File_);
