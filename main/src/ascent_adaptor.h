@@ -112,52 +112,30 @@ void Execute(DataType& d, long startIndex, long endIndex)
     mesh["state/time"].set_external(&d.ttot);
 
     mesh["coordsets/coords/type"] = "explicit";
-#if defined(USE_CUDA)
-    mesh["coordsets/coords/values/x"].set_external(d.devData.x.data() + startIndex, endIndex - startIndex);
-    mesh["coordsets/coords/values/y"].set_external(d.devData.y.data() + startIndex, endIndex - startIndex);
-    mesh["coordsets/coords/values/z"].set_external(d.devData.z.data() + startIndex, endIndex - startIndex);
-#else
-    mesh["coordsets/coords/values/x"].set_external(d.x.data() + startIndex, endIndex - startIndex);
-    mesh["coordsets/coords/values/y"].set_external(d.y.data() + startIndex, endIndex - startIndex);
-    mesh["coordsets/coords/values/z"].set_external(d.z.data() + startIndex, endIndex - startIndex);
-#endif
-    mesh["topologies/mesh/type"] = "points";
+    mesh["coordsets/coords/values/x"].set_external(get<"x">(d).data() + startIndex, endIndex - startIndex);
+    mesh["coordsets/coords/values/y"].set_external(get<"y">(d).data() + startIndex, endIndex - startIndex);
+    mesh["coordsets/coords/values/z"].set_external(get<"z">(d).data() + startIndex, endIndex - startIndex);
+    mesh["topologies/mesh/type"]     = "points";
     mesh["topologies/mesh/coordset"] = "coords";
 
-#if defined(USE_CUDA)
-    addField(mesh, "x", d.devData.x.data(), startIndex, endIndex);
-    addField(mesh, "y", d.devData.y.data(), startIndex, endIndex);
-    addField(mesh, "z", d.devData.z.data(), startIndex, endIndex);
-    addField(mesh, "vx", d.devData.vx.data(), startIndex, endIndex);
-    addField(mesh, "vy", d.devData.vy.data(), startIndex, endIndex);
-    addField(mesh, "vz", d.devData.vz.data(), startIndex, endIndex);
-    addField(mesh, "Mass", d.devData.m.data(), startIndex, endIndex);
-    addField(mesh, "Smoothing Length", d.devData.h.data(), startIndex, endIndex);
-    addField(mesh, "Density", d.devData.rho.data(), startIndex, endIndex);
-    addField(mesh, "Internal Energy", d.devData.u.data(), startIndex, endIndex);
-    addField(mesh, "Pressure", d.devData.p.data(), startIndex, endIndex);
-    addField(mesh, "Speed of Sound", d.devData.c.data(), startIndex, endIndex);
-    addField(mesh, "ax", d.devData.ax.data(), startIndex, endIndex);
-    addField(mesh, "ay", d.devData.ay.data(), startIndex, endIndex);
-    addField(mesh, "az", d.devData.az.data(), startIndex, endIndex);
-#else
-    addField(mesh, "x", d.x.data(), startIndex, endIndex);
-    addField(mesh, "y", d.y.data(), startIndex, endIndex);
-    addField(mesh, "z", d.z.data(), startIndex, endIndex);
-    addField(mesh, "vx", d.vx.data(), startIndex, endIndex);
-    addField(mesh, "vy", d.vy.data(), startIndex, endIndex);
-    addField(mesh, "vz", d.vz.data(), startIndex, endIndex);
-    addField(mesh, "Mass", d.m.data(), startIndex, endIndex);
-    addField(mesh, "Smoothing Length", d.h.data(), startIndex, endIndex);
-    addField(mesh, "Density", d.rho.data(), startIndex, endIndex);
-    addField(mesh, "Internal Energy", d.u.data(), startIndex, endIndex);
-    addField(mesh, "Pressure", d.p.data(), startIndex, endIndex);
-    addField(mesh, "Speed of Sound", d.c.data(), startIndex, endIndex);
-    addField(mesh, "ax", d.ax.data(), startIndex, endIndex);
-    addField(mesh, "ay", d.ay.data(), startIndex, endIndex);
-    addField(mesh, "az", d.az.data(), startIndex, endIndex);
-#endif
-    
+    addField(mesh, "x", get<"x">(d).data(), startIndex, endIndex);
+    addField(mesh, "y", get<"y">(d).data(), startIndex, endIndex);
+    addField(mesh, "z", get<"z">(d).data(), startIndex, endIndex);
+    addField(mesh, "vx", get<"vx">(d).data(), startIndex, endIndex);
+    addField(mesh, "vy", get<"vy">(d).data(), startIndex, endIndex);
+    addField(mesh, "vz", get<"vz">(d).data(), startIndex, endIndex);
+    addField(mesh, "kx", get<"kx">(d).data(), startIndex, endIndex);
+    addField(mesh, "xm", get<"xm">(d).data(), startIndex, endIndex);
+    addField(mesh, "Mass", get<"m">(d).data(), startIndex, endIndex);
+    addField(mesh, "Smoothing Length", get<"h">(d).data(), startIndex, endIndex);
+    addField(mesh, "Density", get<"rho">(d).data(), startIndex, endIndex);
+    addField(mesh, "Internal Energy", get<"u">(d).data(), startIndex, endIndex);
+    addField(mesh, "Pressure", get<"p">(d).data(), startIndex, endIndex);
+    addField(mesh, "Speed of Sound", get<"c">(d).data(), startIndex, endIndex);
+    addField(mesh, "ax", get<"ax">(d).data(), startIndex, endIndex);
+    addField(mesh, "ay", get<"ay">(d).data(), startIndex, endIndex);
+    addField(mesh, "az", get<"az">(d).data(), startIndex, endIndex);
+
     conduit::Node verify_info;
     if (!conduit::blueprint::mesh::verify(mesh, verify_info))
     {
