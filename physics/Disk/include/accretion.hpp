@@ -6,11 +6,10 @@
 
 #include <array>
 #include <cstdio>
-#include <mpi.h>
 
 #include "accretion_impl.hpp"
 #include "accretion_gpu.hpp"
-#include "cstone/primitives/mpi_wrappers.hpp"
+#include "buffer_reduce.hpp"
 #include "cstone/primitives/accel_switch.hpp"
 
 namespace disk
@@ -31,47 +30,32 @@ void computeAccretionCondition(size_t first, size_t last, Dataset& d, StarData& 
 template<typename StarData>
 void exchangeAndAccreteOnStar(StarData& star, double minDt_m1, int rank)
 {
-    double                m_accreted_global{};
-    std::array<double, 3> p_accreted_global{};
+    const auto [m_accreted, p_accreted, m_removed, p_removed] =
+        buffered_reduce(rank, star.accreted_local.mass, star.accreted_local.momentum, star.removed_local.mass,
+                        star.removed_local.momentum);
 
-    double                m_removed_global{};
-    std::array<double, 3> p_removed_global{};
+    const double m_star_new = m_accreted + star.m;
 
-    MPI_Reduce(&star.accreted_local.mass, &m_accreted_global, 1, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
-    MPI_Reduce(star.accreted_local.momentum.data(), p_accreted_global.data(), 3, MpiType<double>{}, MPI_SUM, 0,
-               MPI_COMM_WORLD);
-    MPI_Reduce(&star.removed_local.mass, &m_removed_global, 1, MpiType<double>{}, MPI_SUM, 0, MPI_COMM_WORLD);
-    MPI_Reduce(star.removed_local.momentum.data(), p_removed_global.data(), 3, MpiType<double>{}, MPI_SUM, 0,
-               MPI_COMM_WORLD);
-
-    if (rank == 0)
+    std::array<double, 3> p_star;
+    for (size_t i = 0; i < 3; i++)
     {
-        double m_star_new = m_accreted_global + star.m;
-
-        std::array<double, 3> p_star;
-        for (size_t i = 0; i < 3; i++)
-        {
-            p_star[i] = (star.position_m1[i] / minDt_m1) * star.m;
-            p_star[i] += p_accreted_global[i];
-            star.position_m1[i] = p_star[i] / m_star_new * minDt_m1;
-        }
-
-        star.m = m_star_new;
-
-        std::printf("removed mass: %g\taccreted mass: %g\tstar mass: %g\n", m_removed_global, m_accreted_global,
-                    star.m);
-        std::printf("removed momentum x: %g\taccreted momentum x: %g\tstar momentum x: %g\n", p_removed_global[0],
-                    p_accreted_global[0], p_star[0]);
-        std::printf("removed momentum y: %g\taccreted momentum y: %g\tstar momentum y: %g\n", p_removed_global[1],
-                    p_accreted_global[1], p_star[1]);
-        std::printf("removed momentum z: %g\taccreted momentum z: %g\tstar momentum z: %g\n", p_removed_global[2],
-                    p_accreted_global[2], p_star[2]);
+        p_star[i] = (star.position_m1[i] / minDt_m1) * star.m;
+        p_star[i] += p_accreted[i];
+        star.position_m1[i] = p_star[i] / m_star_new * minDt_m1;
     }
 
-    if (rank == 0) { std::printf("accreted mass local: %g\n", star.accreted_local.mass); }
-
-    MPI_Bcast(star.position_m1.data(), 3, MpiType<double>{}, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&star.m, 1, MpiType<double>{}, 0, MPI_COMM_WORLD);
+    star.m = m_star_new;
+    if (rank == 0)
+    {
+        std::printf("removed mass: %g\taccreted mass: %g\tstar mass: %g\n", m_removed, m_accreted, star.m);
+        std::printf("removed momentum x: %g\taccreted momentum x: %g\tstar momentum x: %g\n", p_removed[0],
+                    p_accreted[0], p_star[0]);
+        std::printf("removed momentum y: %g\taccreted momentum y: %g\tstar momentum y: %g\n", p_removed[1],
+                    p_accreted[1], p_star[1]);
+        std::printf("removed momentum z: %g\taccreted momentum z: %g\tstar momentum z: %g\n", p_removed[2],
+                    p_accreted[2], p_star[2]);
+        std::printf("accreted mass local: %g\n", star.accreted_local.mass);
+    }
 }
 
 } // namespace disk
