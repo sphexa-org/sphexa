@@ -367,3 +367,86 @@ TEST(FocusDomain, reapplySync)
         EXPECT_EQ(numCommon, domain.nParticles());
     }
 }
+
+template<class KeyType, class T>
+void randomGaussianGrav(int thisRank, int numRanks)
+{
+    const LocalIndex numParticles    = (100000 / numRanks) * numRanks;
+    unsigned         bucketSize      = numParticles / (100 * numRanks);
+    unsigned         bucketSizeLocal = std::min(64u, bucketSize);
+    float            theta           = 0.5;
+
+    Box<T> box{-1, 1};
+
+    // common pool of coordinates, identical on all ranks
+    RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box);
+
+    std::vector<T> globalH(numParticles, 0.1);
+    adjustSmoothingLength<KeyType>(globalH.size(), 5, 10, coords.x(), coords.y(), coords.z(), globalH, box);
+
+    std::vector<T> globalMasses(numParticles, 1.0 / numParticles);
+
+    LocalIndex firstIndex = (numParticles * thisRank) / numRanks;
+    LocalIndex lastIndex  = (numParticles * (thisRank + 1)) / numRanks;
+
+    // extract a slice of the common pool, each rank takes a different slice, but all slices together
+    // are equal to the common pool
+    std::vector<T>       x(coords.x().begin() + firstIndex, coords.x().begin() + lastIndex);
+    std::vector<T>       y(coords.y().begin() + firstIndex, coords.y().begin() + lastIndex);
+    std::vector<T>       z(coords.z().begin() + firstIndex, coords.z().begin() + lastIndex);
+    std::vector<T>       h(globalH.begin() + firstIndex, globalH.begin() + lastIndex);
+    std::vector<T>       m(globalMasses.begin() + firstIndex, globalMasses.begin() + lastIndex);
+    std::vector<KeyType> keys(x.size());
+
+    Domain<KeyType, T, CpuTag> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta, box);
+
+    std::vector<T> s1, s2, s3;
+    domain.syncGrav(keys, x, y, z, h, m, std::tuple{}, std::tie(s1, s2, s3));
+    domain.exchangeHalos(std::tie(m), s1, s2);
+
+    std::span<const KeyType> gkeys(coords.particleKeys());
+    int firstGlobalIdx = std::lower_bound(gkeys.begin(), gkeys.end(), keys[domain.startIndex()]) - gkeys.begin();
+    int lastGlobalIdx  = std::upper_bound(gkeys.begin(), gkeys.end(), keys[domain.endIndex() - 1]) - gkeys.begin();
+
+    //! the focused octree, structure only
+    auto LET         = domain.focusTree();
+    auto let_full    = LET.octreeViewAcc();
+    auto let_leaves  = LET.treeLeavesAcc();
+    auto let_lcounts = LET.leafCountsAcc();
+    auto let_layout  = domain.layout();
+
+    //std::span<const SourceCenterType<T>> centers = domain.focusTree().expansionCentersAcc();
+
+    //! global ref tree at focus resolution
+    // auto [gtree, gcounts] = computeOctree<KeyType>(coords.particleKeys(), bucketSizeLocal);
+
+    ASSERT_EQ(let_leaves.size(), let_layout.size());
+    for (int i = 0; i < let_leaves.size() - 1; ++i)
+    {
+        if (let_layout[i + 1] > let_layout[i])
+        {
+            EXPECT_EQ(let_layout[i + 1] - let_layout[i], let_lcounts[i]);
+            auto pk1 = keys[let_layout[i]];
+            auto pk2 = keys[let_layout[i + 1] - 1];
+
+            int gi1 = std::lower_bound(gkeys.begin(), gkeys.end(), pk1) - gkeys.begin();
+            int gi2 = std::lower_bound(gkeys.begin(), gkeys.end(), pk2) - gkeys.begin();
+            EXPECT_EQ(gi2 - gi1 + 1, let_lcounts[i]);
+
+            for (int d = 0; d < let_lcounts[i]; ++d)
+            {
+                EXPECT_EQ(keys[let_layout[i] + d], gkeys[gi1 + d]);
+            }
+        }
+    }
+}
+
+TEST(FocusDomain, randomGaussianGrav)
+{
+    int rank = 0, nRanks = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
+    {
+        randomGaussianGrav<uint64_t, double>(rank, nRanks);
+    }
+}
