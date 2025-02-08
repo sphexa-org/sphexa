@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -109,11 +93,11 @@ struct CombineSourceCenter
  * @param sourceCenter      array of length numNodes of the full octree
  */
 template<class T1, class T2, class T3>
-void computeLeafMassCenter(gsl::span<const T1> x,
-                           gsl::span<const T1> y,
-                           gsl::span<const T1> z,
-                           gsl::span<const T2> m,
-                           gsl::span<const TreeNodeIndex> leafToInternal,
+void computeLeafMassCenter(std::span<const T1> x,
+                           std::span<const T1> y,
+                           std::span<const T1> z,
+                           std::span<const T2> m,
+                           std::span<const TreeNodeIndex> leafToInternal,
                            const LocalIndex* layout,
                            SourceCenterType<T3>* sourceCenter)
 {
@@ -127,8 +111,8 @@ void computeLeafMassCenter(gsl::span<const T1> x,
 
 //! @brief replace the last center element (mass) with the squared mac radius
 template<class T, class KeyType>
-void setMac(gsl::span<const KeyType> nodeKeys,
-            gsl::span<SourceCenterType<T>> centers,
+void setMac(std::span<const KeyType> nodeKeys,
+            std::span<SourceCenterType<T>> centers,
             float invTheta,
             const Box<T>& box)
 {
@@ -143,7 +127,7 @@ void setMac(gsl::span<const KeyType> nodeKeys,
 
 //! @brief compute geometric node centers based on node SFC keys and the global bounding box
 template<class KeyType, class T>
-void nodeFpCenters(gsl::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box)
+void nodeFpCenters(std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box)
 {
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < prefixes.size(); ++i)
@@ -158,10 +142,10 @@ void nodeFpCenters(gsl::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>*
 
 //! @brief set @p centers to geometric node centers with Mac radius l * invTheta
 template<class KeyType, class T>
-void geoMacSpheres(gsl::span<const KeyType> prefixes, SourceCenterType<T>* centers, float invTheta, const Box<T>& box)
+void geoMacSpheres(std::span<const KeyType> prefixes, SourceCenterType<T>* centers, float invTheta, const Box<T>& box)
 {
 #pragma omp parallel for schedule(static)
-    for (TreeNodeIndex i = 0; i < prefixes.ssize(); ++i)
+    for (std::size_t i = 0; i < prefixes.size(); ++i)
     {
         centers[i] = computeMinMacR2(prefixes[i], invTheta, box);
     }

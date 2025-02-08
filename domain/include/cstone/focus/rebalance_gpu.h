@@ -1,25 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2022 CSCS, ETH Zurich
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -29,6 +14,8 @@
  */
 
 #pragma once
+
+#include <span>
 
 #include "cstone/tree/definitions.h"
 #include "cstone/domain/index_ranges.hpp"
@@ -78,10 +65,10 @@ extern ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
 
 //! @brief see CPU version
 template<class KeyType>
-extern void rangeCountGpu(gsl::span<const KeyType> leaves,
-                          gsl::span<const unsigned> counts,
-                          gsl::span<const KeyType> leavesFocus,
-                          gsl::span<const TreeNodeIndex> leavesFocusIdx,
-                          gsl::span<unsigned> countsFocus);
+extern void rangeCountGpu(std::span<const KeyType> leaves,
+                          std::span<const unsigned> counts,
+                          std::span<const KeyType> leavesFocus,
+                          std::span<const TreeNodeIndex> leavesFocusIdx,
+                          std::span<unsigned> countsFocus);
 
 } // namespace cstone

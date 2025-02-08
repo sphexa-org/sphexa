@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -43,14 +27,13 @@
 using namespace cstone;
 
 template<class KeyType>
-std::tuple<std::vector<KeyType>, std::vector<unsigned>>
-build_tree(const KeyType* firstCode, const KeyType* lastCode, unsigned bucketSize)
+std::tuple<std::vector<KeyType>, std::vector<unsigned>> build_tree(std::span<const KeyType> keys, unsigned bucketSize)
 {
     std::vector<KeyType> tree;
     std::vector<unsigned> counts;
 
     auto tp0               = std::chrono::high_resolution_clock::now();
-    std::tie(tree, counts) = computeOctree(firstCode, lastCode, bucketSize);
+    std::tie(tree, counts) = computeOctree<KeyType>(keys, bucketSize);
     auto tp1               = std::chrono::high_resolution_clock::now();
 
     double t0 = std::chrono::duration<double>(tp1 - tp0).count();
@@ -58,7 +41,7 @@ build_tree(const KeyType* firstCode, const KeyType* lastCode, unsigned bucketSiz
               << " count: " << std::accumulate(begin(counts), end(counts), 0lu) << std::endl;
 
     tp0 = std::chrono::high_resolution_clock::now();
-    updateOctree(firstCode, lastCode, bucketSize, tree, counts, std::numeric_limits<unsigned>::max());
+    updateOctree<KeyType>(keys, bucketSize, tree, counts, std::numeric_limits<unsigned>::max());
     tp1 = std::chrono::high_resolution_clock::now();
 
     double t1 = std::chrono::duration<double>(tp1 - tp0).count();
@@ -115,8 +98,7 @@ int main()
     RandomGaussianCoordinates<double, HilbertKey<KeyType>> randomBox(numParticles, box);
 
     // tree build from random gaussian coordinates
-    auto [tree, counts] =
-        build_tree(randomBox.particleKeys().data(), randomBox.particleKeys().data() + numParticles, bucketSize);
+    auto [tree, counts] = build_tree<KeyType>(randomBox.particleKeys(), bucketSize);
     // halo discovery with tree
     halo_discovery(box, tree, counts);
 
@@ -132,5 +114,5 @@ int main()
     computeSfcKeys(px[0].data(), px[1].data(), px[2].data(), sfcKindPointer(pxCodes.data()), numParticles, pBox);
     std::sort(begin(pxCodes), end(pxCodes));
 
-    std::tie(tree, counts) = build_tree(pxCodes.data(), pxCodes.data() + numParticles, bucketSize);
+    std::tie(tree, counts) = build_tree<KeyType>(pxCodes, bucketSize);
 }

@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Ryoanji N-body solver
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -96,14 +80,23 @@ void computeGravityGroup(const util::array<Vec4<T1>, N>& target, const TreeNodeI
      * the traversal routine to keep going. If the MAC passed, the multipole moments are applied
      * to the particles in the target box and traversal is stopped.
      */
-    auto descendOrM2P = [centers, multipoles, &target, &targetCenter, &targetSize, acc](TreeNodeIndex idx)
+    auto descendOrM2P =
+        [internalToLeaf, layout, centers, multipoles, &target, &targetCenter, &targetSize, acc](TreeNodeIndex idx)
     {
         const auto& com = centers[idx];
         const auto& mp  = multipoles[idx];
 
         bool violatesMac = cstone::evaluateMac(makeVec3(com), com[3], targetCenter, targetSize);
 
-        if (!violatesMac)
+        auto lidx = internalToLeaf[idx];
+        // A leaf cell with non-zero multipole mass, but no particles must be remote.
+        // Domain.syncGrav guarantees that such a cell never fails MAC. We may still see a MAC failure here
+        // because target group particle bounding boxes may protrude outside the assigned SFC domain.
+        // In this case we may nevertheless apply M2P because the protruding part that caused the mac to fail
+        // must have contained no particles, because particles can only be inside the SFC domain.
+        bool isRemoteUntaggedLeaf = lidx >= 0 && layout[lidx] == layout[lidx + 1] && mp[Cqi::mass] > 0;
+
+        if (!violatesMac || isRemoteUntaggedLeaf)
         {
 // apply multipole to all particles in group
 #if defined(__llvm__) || defined(__clang__)
