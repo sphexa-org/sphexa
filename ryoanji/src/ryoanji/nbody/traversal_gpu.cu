@@ -257,7 +257,8 @@ __device__ util::tuple<unsigned, unsigned, unsigned>
         if (stackUsed > TravConfig::memPerWarp) { return {0xFFFFFFFF, 0xFFFFFFFF, maxStack}; }
 
         // Multipole approximation
-        const bool isApprox    = !isClose && isSource; // Source cell can be used for M2P
+        const bool isRemote    = layout[leafIdx + 1] == layout[leafIdx] && Multipoles[sourceQueue][Cqi::mass] > 0;
+        const bool isApprox    = (!isClose || (!isNode && isRemote)) && isSource; // Source cell can be used for M2P
         int        numKeepWarp = streamCompact(&sourceQueue, isApprox, tempQueue);
         // push valid approx source cell indices into approxQueue
         const int apxTopUp = shflUpSync(sourceQueue, apxFillLevel);
