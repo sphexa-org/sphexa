@@ -18,6 +18,8 @@
 namespace disk
 {
 
+static __device__ cstone::Vec4<double> force_device;
+
 template<typename T>
 __device__ void atomicAddVec4(cstone::Vec4<T>* x, const cstone::Vec4<T>& y)
 {
@@ -27,14 +29,13 @@ __device__ void atomicAddVec4(cstone::Vec4<T>* x, const cstone::Vec4<T>& y)
     atomicAdd(&(*x)[3], y[3]);
 }
 
-template<size_t numThreads, typename Treal, typename Tmass, typename Ta, typename Tstar, typename Tforce>
+template<size_t numThreads, typename Treal, typename Tmass, typename Ta, typename Tstar>
 __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Treal* x, const Treal* y, const Treal* z,
-                                             Ta* ax, Ta* ay, Ta* az, const Tmass* m,
-                                             const cstone::Vec3<Tstar> star_position, Tstar m_star, Treal g, Tstar inner_size2,
-                                             Tforce* force_device)
+                                             Ta* ax, Ta* ay, Ta* az, const Tmass* m, Treal g,
+                                             cstone::Vec3<Tstar> star_position, Tstar m_star, Tstar inner_size2)
 {
-    cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
-    Tforce force{};
+    cstone::LocalIndex   i = first + blockDim.x * blockIdx.x + threadIdx.x;
+    cstone::Vec4<double> force{};
 
     if (i >= last) { force = {0., 0., 0., 0.}; }
     else
@@ -60,40 +61,38 @@ __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Tr
         force[3] = -az_i * m[i];
     }
 
-    typedef cub::BlockReduce<Tforce, numThreads>     BlockReduce;
+    typedef cub::BlockReduce<cstone::Vec4<double>, numThreads> BlockReduce;
     __shared__ typename BlockReduce::TempStorage temp_storage;
 
-    Tforce force_block = BlockReduce(temp_storage).Sum(force);
+    cstone::Vec4<double> force_block = BlockReduce(temp_storage).Sum(force);
     __syncthreads();
-    if (threadIdx.x == 0) { atomicAddVec4(force_device, force_block); }
+    if (threadIdx.x == 0) { atomicAddVec4(&force_device, force_block); }
 }
 
 template<typename Treal, typename Thydro, typename Tmass>
 void computeCentralForceGPU(size_t first, size_t last, const Treal* x, const Treal* y, const Treal* z, Thydro* ax,
-                            Thydro* ay, Thydro* az, const Tmass* m, const Treal g, StarData& star)
+                            Thydro* ay, Thydro* az, const Tmass* m, Treal g, StarData& star)
 {
     cstone::LocalIndex numParticles = last - first;
     constexpr unsigned numThreads   = 256;
     unsigned           numBlocks    = (numParticles + numThreads - 1) / numThreads;
 
-    star.force_local = {};
-    cstone::Vec4<double>* force_device;
-    checkGpuErrors(cudaMalloc(reinterpret_cast<void**>(&force_device), sizeof *force_device));
-    checkGpuErrors(cudaMemcpy(force_device, &star.force_local, sizeof star.force_local, cudaMemcpyHostToDevice));
+    cstone::Vec4<double> force_local{0., 0., 0., 0.};
+    checkGpuErrors(cudaMemcpyToSymbol(GPU_SYMBOL(force_device), &force_local, sizeof(force_local)));
 
     computeCentralForceGPUKernel<numThreads><<<numBlocks, numThreads>>>(
-        first, last, x, y, z, ax, ay, az, m, star.position, star.m, g, star.inner_size * star.inner_size, force_device);
+        first, last, x, y, z, ax, ay, az, m, g, star.position, star.m, star.inner_size * star.inner_size);
 
     checkGpuErrors(cudaDeviceSynchronize());
     checkGpuErrors(cudaGetLastError());
 
-    checkGpuErrors(cudaMemcpy(&star.force_local, force_device, sizeof star.force_local, cudaMemcpyDeviceToHost));
-    checkGpuErrors(cudaFree(force_device));
+    checkGpuErrors(cudaMemcpyFromSymbol(&force_local, GPU_SYMBOL(force_device), sizeof(force_local)));
+    star.force_local = force_local;
 }
 
-#define COMPUTE_CENTRAL_FORCE_GPU(Treal, Thydro, Tmass)                                                                        \
-    template void computeCentralForceGPU(size_t, size_t, const Treal* x, const Treal* y, const Treal* z, Thydro* ax,    \
-                                         Thydro* ay, Thydro* az, const Tmass* m, const Treal g, StarData&);
+#define COMPUTE_CENTRAL_FORCE_GPU(Treal, Thydro, Tmass)                                                                \
+    template void computeCentralForceGPU(size_t, size_t, const Treal* x, const Treal* y, const Treal* z, Thydro* ax,   \
+                                         Thydro* ay, Thydro* az, const Tmass* m, Treal g, StarData&);
 
 COMPUTE_CENTRAL_FORCE_GPU(double, double, double);
 COMPUTE_CENTRAL_FORCE_GPU(double, float, double);
