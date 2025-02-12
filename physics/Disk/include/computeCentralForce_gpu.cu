@@ -62,7 +62,7 @@ __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Tr
     }
 
     typedef cub::BlockReduce<cstone::Vec4<double>, numThreads> BlockReduce;
-    __shared__ typename BlockReduce::TempStorage temp_storage;
+    __shared__ typename BlockReduce::TempStorage               temp_storage;
 
     cstone::Vec4<double> force_block = BlockReduce(temp_storage).Sum(force);
     __syncthreads();

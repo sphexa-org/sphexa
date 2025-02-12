@@ -4,6 +4,10 @@
 
 #pragma once
 
+#include "cstone/cuda/device_vector.h"
+#include "cstone/fields/field_get.hpp"
+#include "cstone/util/constexpr_string.hpp"
+
 namespace disk
 {
 template<util::StructuralString field, typename Dataset>

@@ -186,7 +186,7 @@ public:
         updateSmoothingLength(groups_.view(), d);
         timer.step("UpdateQuantities");
 
-        disk::computeAndExchangeStarPosition(star, d.minDt, d.minDt_m1, Base::rank_);
+        disk::computeAndExchangeStarPosition(star, d.minDt, d.minDt_m1);
         timer.step("computeAndExchangeStarPosition");
 
         disk::computeAccretionCondition(first, last, d, star);

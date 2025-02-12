@@ -35,7 +35,7 @@ TEST_F(DiskTest, testStarPosition)
     star.m           = 1.0;
     star.fixed_star  = 0;
 
-    disk::computeAndExchangeStarPosition(star, 1., 1., rank);
+    disk::computeAndExchangeStarPosition(star, 1., 1.);
     if (rank == 0)
     {
         printf("rank: %d star pos: %lf\t%lf\t%lf\n", rank, star.position[0], star.position[1], star.position[2]);

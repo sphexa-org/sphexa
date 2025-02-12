@@ -57,6 +57,8 @@ requires same_value_types<T...> auto buffered_mpi_allreduce_sum(const T&... args
 
     std::tuple<std::remove_reference_t<T>...> result;
     for_each_buffer([](const auto& buf_element, auto& res) { res = buf_element; }, buffer, result);
-    return result;
+
+    if constexpr (sizeof...(T) == 1) { return std::get<0>(result); }
+    else { return result; }
 }
 } // namespace disk
