@@ -48,6 +48,7 @@
 #include "util/timer.hpp"
 #include "util/utils.hpp"
 
+#include "particle_selection.hpp"
 #include "simulation_data.hpp"
 #include "insitu_viz.h"
 
@@ -78,6 +79,8 @@ int main(int argc, char** argv)
 
     using Dataset = SimulationData<AccType>;
     using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, AccType>;
+    // TODO: duplicated in ipropagator
+    using ParticleIndexVectorType = decltype(Dataset::HydroData::id);
 
     const std::string        initCond     = parser.get("--init");
     const size_t             problemSize  = parser.get("-n", 50);
@@ -95,7 +98,10 @@ int main(int argc, char** argv)
     const std::string        profFreqStr  = parser.get("--profile", maxStepStr);
     const bool               profEnabled  = parser.exists("--profile");
     const std::string        pmroot       = parser.get("--pmroot", std::string("/sys/cray/pm_counters"));
+    const std::vector<std::string> idSel  = parser.getCommaList("--idSel");
+    const std::vector<std::string> sphSel = parser.getCommaList("--sphSel");
     std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
+
 
     std::ofstream nullOutput("/dev/null");
     std::ostream& output = (quiet || rank) ? nullOutput : std::cout;
@@ -103,10 +109,48 @@ int main(int argc, char** argv)
 
     //! @brief evaluate user choice for different kind of actions
     auto fileWriter  = fileWriterFactory(ascii, MPI_COMM_WORLD);
+    auto selParticlesFileWriter  = fileWriterFactory(ascii, MPI_COMM_WORLD);
     auto fileReader  = fileReaderFactory(ascii, MPI_COMM_WORLD);
     auto simInit     = initializerFactory<Dataset>(initCond, glassBlock, fileReader.get());
     auto propagator  = propagatorFactory<Domain, Dataset>(propChoice, avClean, output, rank, simInit->constants());
     auto observables = observablesFactory<Dataset>(simInit->constants(), constantsFile);
+
+    // Particle selection for output
+//    auto particleSelectionId = particleSelection(idSel, fileReader.get());
+    ParticleIndexVectorType selParticlesIds;
+    ParticleIndexVectorType localSelectedParticlesIndexes;
+    ParticleSelectionSphere selSphereData;
+    bool partSel = false;
+    bool tagSelectedParticles = false;
+    bool isSelectedParticleOutputTriggered = false;
+    std::string selParticlesOutFile;
+    if(!idSel.empty()) {
+        // TODO: add check, input must be a list of unsigned int
+        for(auto& id : idSel) {
+            selParticlesIds.push_back(std::stoul(id));
+        }
+
+        partSel = true;
+    }
+    if(!sphSel.empty()) {
+        // TODO: add check, input must be a unitary sphere center and radius
+        selSphereData.radius = std::stod(sphSel[0]);
+        selSphereData.center[0] = std::stod(sphSel[1]);
+        selSphereData.center[1] = std::stod(sphSel[2]);
+        selSphereData.center[2] = std::stod(sphSel[3]);
+        partSel = true;
+    }
+    if(partSel){
+
+        // Activate particle selected tagging
+        tagSelectedParticles = true;
+
+        // Activate selected particles output
+        isSelectedParticleOutputTriggered = true;
+
+        // Set file name for selected particles output
+        selParticlesOutFile = "selected_particles_" + outFile + selParticlesFileWriter->suffix();
+    }
 
     Dataset simData;
     simData.comm = MPI_COMM_WORLD;
@@ -119,7 +163,6 @@ int main(int argc, char** argv)
     propagator->activateFields(simData);
     propagator->load(initCond, fileReader.get());
     auto box = simInit->init(rank, numRanks, problemSize, simData, fileReader.get());
-
     auto& d = simData.hydro;
     transferAllocatedToDevice(d, 0, d.x.size(), propagator->conservedFields());
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
@@ -139,7 +182,6 @@ int main(int argc, char** argv)
     domain.setGrowthAllocRate(simData.hydro.getAllocGrowthRate());
 
     propagator->sync(domain, simData);
-    if (rank == 0) std::cout << "Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
 
     viz::init_catalyst(argc, argv);
     viz::init_ascent(d, domain.startIndex());
@@ -155,6 +197,30 @@ int main(int argc, char** argv)
         if (propagator->isSynced())
         {
             observables->computeAndWrite(simData, domain.startIndex(), domain.endIndex(), box);
+        }
+
+        if (tagSelectedParticles) {
+
+            if (rank == 0) { std::cout << "Execution of selected particle identification\n"; }
+            // TODO: Check if selected particle tagging is needed:
+            // in a simulation starting from scratch we need to tag the selected particles if saveSelParticles is true and only in first iteration.
+            // In a simulation starting from a checkpoint file we need to tag the selected particles only if they are not already tagged? 
+            // Implementation of a check for tag existence in a checkpoint file is currently missing.
+
+            // If a selection sphere has been provided run spatial identification
+            if(!sphSel.empty()) {
+                // Find the selected particles in dataset
+                findParticlesInSphere(d, domain.startIndex(), domain.endIndex(), selSphereData);
+            }
+            else {
+                // Find the selected particles in user provided id list and tag them by setting the MSB of the id field
+                findParticlesInIdList(d, domain.startIndex(), domain.endIndex(), selParticlesIds);
+            }
+
+            // Update id on device
+            // TODO: check transfer index range
+            transferToDevice(d, 0, d.id.size(), {"id"});
+            tagSelectedParticles = false;
         }
 
         bool isWallClockReached = syncedWallClockElapsed(totalTimer.elapsed(), simDuration, propagator->stepElapsed());
@@ -174,11 +240,31 @@ int main(int argc, char** argv)
             fileWriter->closeStep();
             isOutputTriggered = false;
         }
+
+        if (isSelectedParticleOutputTriggered) // && propatagor->isSynced
+        {
+            // TODO: what about MPI task sync at this point? I'm assuming everything is synced...
+            // Reset the list of indexes of subdomain selected particles: this is needed since a specific particle can move to another rank
+            localSelectedParticlesIndexes.clear();
+
+            // Find the selected particles positions in dataset
+            findSelectedParticlesIndexes(d, localSelectedParticlesIndexes);
+
+            selParticlesFileWriter->addStep(0, localSelectedParticlesIndexes.size(), selParticlesOutFile);
+            simData.hydro.loadOrStoreAttributes(selParticlesFileWriter.get());
+            box.loadOrStore(selParticlesFileWriter.get());
+            propagator->saveSelParticlesFields(selParticlesFileWriter.get(), domain.startIndex(), domain.endIndex(), localSelectedParticlesIndexes, simData.hydro);
+            selParticlesFileWriter->closeStep();
+//            isSelectedParticleOutputTriggered = false;
+
+        }
+
         if (isOutputStep(d.iteration, profFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, profFreqStr) ||
             isWallClockReached)
         {
             if (profEnabled) { propagator->writeMetrics(fileWriter.get(), "profile"); }
         }
+
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
 
