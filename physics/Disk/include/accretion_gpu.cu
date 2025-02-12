@@ -1,8 +1,9 @@
 //
 // Created by Noah Kubli on 12.03.2024.
 //
-#include <cub/cub.cuh>
-#include "cuda_runtime.h"
+
+#include "cstone/cuda/cub.hpp"
+#include "cstone/cuda/cuda_runtime.hpp
 
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/findneighbors.hpp"
@@ -14,7 +15,7 @@
 
 #include "accretion_gpu.hpp"
 #include "star_data.hpp"
-#include "removalStatistics.hpp"
+#include "removal_statistics.hpp"
 
 namespace disk
 {

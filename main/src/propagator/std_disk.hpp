@@ -17,9 +17,9 @@
 #include "sph/sph.hpp"
 
 #include "accretion.hpp"
-#include "betaCooling.hpp"
-#include "computeCentralForce.hpp"
-#include "exchangeStarPosition.hpp"
+#include "beta_cooling.hpp"
+#include "central_force.hpp"
+#include "exchange_star_position.hpp"
 #include "star_data.hpp"
 
 namespace sphexa

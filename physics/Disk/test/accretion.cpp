@@ -16,7 +16,7 @@
 #include <gtest/gtest.h>
 #include "gtest-mpi-listener.hpp"
 
-static void fill_grid(auto& x, auto& y, auto& z, double start, double end, size_t n_elements)
+static void fillGrid(auto& x, auto& y, auto& z, double start, double end, size_t n_elements)
 {
     assert(x.size() == y.size());
     assert(y.size() == z.size());
@@ -83,8 +83,8 @@ struct AccretionTest : public ::testing::Test
         data.resize(n_elements3);
         std::cout << "size: " << data.x.size() << std::endl;
 
-        fill_grid(data.x, data.y, data.z, -1., 1., n_elements);
-        fill_grid(data.vx, data.vy, data.vz, 0., 1., n_elements);
+        fillGrid(data.x, data.y, data.z, -1., 1., n_elements);
+        fillGrid(data.vx, data.vy, data.vz, 0., 1., n_elements);
 
         std::fill(data.h.begin(), data.h.end(), 0.05);
         std::fill(data.m.begin(), data.m.end(), 1.);

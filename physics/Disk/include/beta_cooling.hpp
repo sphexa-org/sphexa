@@ -9,7 +9,7 @@
 #include <limits>
 #include <type_traits>
 
-#include "betaCooling_gpu.hpp"
+#include "beta_cooling_gpu.hpp"
 #include "cstone/primitives/accel_switch.hpp"
 #include "get_ptr.hpp"
 

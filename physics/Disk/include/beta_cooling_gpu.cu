@@ -2,7 +2,7 @@
 // Created by Noah Kubli on 17.04.2024.
 //
 
-#include "betaCooling_gpu.hpp"
+#include "beta_cooling_gpu.hpp"
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/findneighbors.hpp"
 #include "cstone/traversal/find_neighbors.cuh"

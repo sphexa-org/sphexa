@@ -1,10 +1,10 @@
 
 if (CMAKE_HIP_COMPILER)
-    set_source_files_properties(computeCentralForce_gpu.cu accretion_gpu.cu betaCooling_gpu.cu PROPERTIES LANGUAGE HIP)
+    set_source_files_properties(central_force_gpu.cu accretion_gpu.cu beta_cooling_gpu.cu PROPERTIES LANGUAGE HIP)
 endif ()
 
 if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
-    add_library(disk_gpu OBJECT computeCentralForce_gpu.cu accretion_gpu.cu betaCooling_gpu.cu)
+    add_library(disk_gpu OBJECT central_force_gpu.cu accretion_gpu.cu beta_cooling_gpu.cu)
     target_include_directories(disk_gpu PRIVATE ${CSTONE_DIR} ${SPH_DIR})
     target_compile_definitions(disk_gpu PRIVATE USE_CUDA)
     if (CMAKE_CUDA_COMPILER)

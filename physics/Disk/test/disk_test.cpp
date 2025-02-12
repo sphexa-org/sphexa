@@ -3,8 +3,8 @@
 //
 #include "gtest/gtest.h"
 #include <mpi.h>
-#include "computeCentralForce.hpp"
-#include "exchangeStarPosition.hpp"
+#include "central_force.hpp"
+#include "exchange_star_position.hpp"
 #include "star_data.hpp"
 #include "sph/particles_data.hpp"
 #include "cstone/fields/field_get.hpp"

@@ -9,7 +9,7 @@
 #include <iostream>
 
 #include "cstone/tree/definitions.h"
-#include "removalStatistics.hpp"
+#include "removal_statistics.hpp"
 
 namespace disk
 {

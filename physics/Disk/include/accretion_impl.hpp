@@ -5,7 +5,7 @@
 #pragma once
 
 #include "cstone/tree/definitions.h"
-#include "removalStatistics.hpp"
+#include "removal_statistics.hpp"
 #include "star_data.hpp"
 
 namespace disk
