@@ -126,6 +126,7 @@ void Execute(DataType& d, long startIndex, long endIndex)
     addField(mesh, "vz", get<"vz">(d).data(), startIndex, endIndex);
     addField(mesh, "kx", get<"kx">(d).data(), startIndex, endIndex);
     addField(mesh, "xm", get<"xm">(d).data(), startIndex, endIndex);
+    addField(mesh, "Temperature", get<"temp">(d).data(), startIndex, endIndex);
     addField(mesh, "Mass", get<"m">(d).data(), startIndex, endIndex);
     addField(mesh, "Smoothing Length", get<"h">(d).data(), startIndex, endIndex);
     addField(mesh, "Density", get<"rho">(d).data(), startIndex, endIndex);
