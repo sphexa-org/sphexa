@@ -96,14 +96,23 @@ void computeGravityGroup(const util::array<Vec4<T1>, N>& target, const TreeNodeI
      * the traversal routine to keep going. If the MAC passed, the multipole moments are applied
      * to the particles in the target box and traversal is stopped.
      */
-    auto descendOrM2P = [centers, multipoles, &target, &targetCenter, &targetSize, acc](TreeNodeIndex idx)
+    auto descendOrM2P =
+        [internalToLeaf, layout, centers, multipoles, &target, &targetCenter, &targetSize, acc](TreeNodeIndex idx)
     {
         const auto& com = centers[idx];
         const auto& mp  = multipoles[idx];
 
         bool violatesMac = cstone::evaluateMac(makeVec3(com), com[3], targetCenter, targetSize);
 
-        if (!violatesMac)
+        auto leafIdx = internalToLeaf[idx];
+        // A leaf cell with non-zero multipole mass, but no particles must be remote.
+        // Domain.syncGrav guarantees that such a cell never fails MAC. We may still see a MAC failure here
+        // because target group particle bounding boxes may protrude outside the assigned SFC domain.
+        // In this case we may nevertheless apply M2P because the protruding part that caused the mac to fail
+        // must have contained no particles, because particles can only be inside the SFC domain.
+        bool isRemote = leafIdx >= 0 && layout[leafIdx] == layout[leafIdx + 1] && mp[Cqi::mass] > 0;
+
+        if (!violatesMac || isRemote)
         {
 // apply multipole to all particles in group
 #if defined(__llvm__) || defined(__clang__)
