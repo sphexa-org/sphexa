@@ -10,6 +10,7 @@
 #include "cstone/primitives/accel_switch.hpp"
 #include "cstone/tree/definitions.h"
 #include "computeCentralForce_gpu.hpp"
+#include "get_ptr.hpp"
 
 namespace disk
 {
@@ -20,7 +21,7 @@ void computeCentralForceImpl(size_t first, size_t last, Dataset& d, StarData& st
     cstone::Vec4<double> force_local{};
     const double         inner_size2 = star.inner_size * star.inner_size;
 
-#pragma omp declare reduction(add_force : cstone::Vec4 <double> : omp_out = omp_out + omp_in) initializer(omp_priv = {})
+#pragma omp declare reduction(add_force : cstone::Vec4<double> : omp_out = omp_out + omp_in) initializer(omp_priv = {})
 
 #pragma omp parallel for reduction(add_force : force_local)
     for (size_t i = first; i < last; i++)
@@ -54,7 +55,8 @@ void computeCentralForce(size_t startIndex, size_t endIndex, Dataset& d, StarDat
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        computeCentralForceGPU(startIndex, endIndex, d, star);
+        computeCentralForceGPU(startIndex, endIndex, getPtr<"x">(d), getPtr<"y">(d), getPtr<"z">(d), getPtr<"ax">(d),
+                               getPtr<"ay">(d), getPtr<"az">(d), getPtr<"m">(d), d.g, star);
     }
     else { computeCentralForceImpl(startIndex, endIndex, d, star); }
 }

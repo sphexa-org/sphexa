@@ -41,7 +41,7 @@ namespace sph
 {
 
 template<class Tc, class T>
-HOST_DEVICE_FUN T avRvCorrection(util::array<Tc, 3> R, Tc eta_ab, T eta_crit, const util::array<T, 6>& gradV_i,
+HOST_DEVICE_FUN T  avRvCorrection(util::array<Tc, 3> R, Tc eta_ab, T eta_crit, const util::array<T, 6>& gradV_i,
                                  const util::array<const T, 6>& gradV_j)
 {
     T dmy1 = dot(R, symv(gradV_i, R));

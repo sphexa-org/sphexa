@@ -11,6 +11,7 @@
 #include "accretion_gpu.hpp"
 #include "buffer_reduce.hpp"
 #include "cstone/primitives/accel_switch.hpp"
+#include "get_ptr.hpp"
 
 namespace disk
 {
@@ -21,7 +22,9 @@ void computeAccretionCondition(size_t first, size_t last, Dataset& d, StarData& 
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        computeAccretionConditionGPU(first, last, d, star);
+        computeAccretionConditionGPU(first, last, getPtr<"x">(d), getPtr<"y">(d), getPtr<"z">(d), getPtr<"h">(d),
+                                     getPtr<"keys">(d), getPtr<"m">(d), getPtr<"vx">(d), getPtr<"vy">(d),
+                                     getPtr<"vz">(d), star);
     }
     else { computeAccretionConditionImpl(first, last, d, star); }
 }

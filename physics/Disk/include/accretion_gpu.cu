@@ -78,8 +78,10 @@ __global__ void computeAccretionConditionKernel(size_t first, size_t last, const
     if (threadIdx.x == 0) { atomicAddRS(device_removed, block_removed); }
 }
 
-template<typename Dataset>
-void computeAccretionConditionGPU(size_t first, size_t last, Dataset& d, StarData& star)
+template<typename Treal, typename Thydro, typename Tkeys, typename Tmass>
+void computeAccretionConditionGPU(size_t first, size_t last, const Treal* x, const Treal* y, const Treal* z,
+                                  const Thydro* h, Tkeys* keys, const Tmass* m, const Thydro* vx, const Thydro* vy,
+                                  const Thydro* vz, StarData& star)
 {
     cstone::LocalIndex numParticles = last - first;
     constexpr unsigned numThreads   = 256;
@@ -96,9 +98,8 @@ void computeAccretionConditionGPU(size_t first, size_t last, Dataset& d, StarDat
     checkGpuErrors(cudaMemcpy(removed_device, &star.removed_local, sizeof star.removed_local, cudaMemcpyHostToDevice));
 
     computeAccretionConditionKernel<numThreads><<<numBlocks, numThreads>>>(
-        first, last, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h),
-        rawPtr(d.devData.keys), rawPtr(d.devData.m), rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
-        star.position, star.inner_size * star.inner_size, star.removal_limit_h, accreted_device, removed_device);
+        first, last, x, y, z, h, keys, m, vx, vy, vz, star.position, star.inner_size * star.inner_size,
+        star.removal_limit_h, accreted_device, removed_device);
 
     checkGpuErrors(cudaDeviceSynchronize());
     checkGpuErrors(cudaGetLastError());
@@ -110,5 +111,13 @@ void computeAccretionConditionGPU(size_t first, size_t last, Dataset& d, StarDat
     checkGpuErrors(cudaFree(removed_device));
 }
 
-template void computeAccretionConditionGPU(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>&, StarData&);
+#define COMPUTE_ACCRETION_CONDITION_GPU(Treal, Thydro, Tkeys, Tmass)                                                   \
+    template void computeAccretionConditionGPU(size_t first, size_t last, const Treal* x, const Treal* y,              \
+                                               const Treal* z, const Thydro* h, Tkeys* keys, const Tmass* m,           \
+                                               const Thydro* vx, const Thydro* vy, const Thydro* vz, StarData& star);
+
+COMPUTE_ACCRETION_CONDITION_GPU(double, double, size_t, double);
+COMPUTE_ACCRETION_CONDITION_GPU(double, float, size_t, double);
+COMPUTE_ACCRETION_CONDITION_GPU(double, float, size_t, float);
+
 } // namespace disk

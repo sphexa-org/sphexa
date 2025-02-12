@@ -2,6 +2,7 @@
 // Created by Noah Kubli on 11.03.2024.
 //
 #include <cub/cub.cuh>
+#include <type_traits>
 #include "cuda_runtime.h"
 
 #include "cstone/cuda/cuda_utils.cuh"
@@ -26,14 +27,14 @@ __device__ void atomicAddVec4(cstone::Vec4<T>* x, const cstone::Vec4<T>& y)
     atomicAdd(&(*x)[3], y[3]);
 }
 
-template<size_t numThreads, typename Tpos, typename Ta, typename Tm, typename Tsp, typename Tsm, typename Tg,
-         typename Tis, typename Tf>
-__global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z,
-                                             Ta* ax, Ta* ay, Ta* az, const Tm* m, const cstone::Vec3<Tsp> star_position,
-                                             Tsm sm, Tg g, Tis inner_size2, Tf* force_device)
+template<size_t numThreads, typename Treal, typename Tmass, typename Ta, typename Tstar, typename Tforce>
+__global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Treal* x, const Treal* y, const Treal* z,
+                                             Ta* ax, Ta* ay, Ta* az, const Tmass* m,
+                                             const cstone::Vec3<Tstar> star_position, Tstar m_star, Treal g, Tstar inner_size2,
+                                             Tforce* force_device)
 {
     cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
-    Tf                 force{};
+    Tforce force{};
 
     if (i >= last) { force = {0., 0., 0., 0.}; }
     else
@@ -45,7 +46,7 @@ __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Tp
         const double dist  = sqrt(dist2);
         const double dist3 = dist2 * dist;
 
-        const double a_strength = 1. / dist3 * sm * g;
+        const double a_strength = 1. / dist3 * m_star * g;
         const double ax_i       = -dx * a_strength;
         const double ay_i       = -dy * a_strength;
         const double az_i       = -dz * a_strength;
@@ -59,16 +60,17 @@ __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Tp
         force[3] = -az_i * m[i];
     }
 
-    typedef cub::BlockReduce<Tf, numThreads>     BlockReduce;
+    typedef cub::BlockReduce<Tforce, numThreads>     BlockReduce;
     __shared__ typename BlockReduce::TempStorage temp_storage;
 
-    Tf force_block = BlockReduce(temp_storage).Sum(force);
+    Tforce force_block = BlockReduce(temp_storage).Sum(force);
     __syncthreads();
     if (threadIdx.x == 0) { atomicAddVec4(force_device, force_block); }
 }
 
-template<typename Dataset, typename StarData>
-void computeCentralForceGPU(size_t first, size_t last, Dataset& d, StarData& star)
+template<typename Treal, typename Thydro, typename Tmass>
+void computeCentralForceGPU(size_t first, size_t last, const Treal* x, const Treal* y, const Treal* z, Thydro* ax,
+                            Thydro* ay, Thydro* az, const Tmass* m, const Treal g, StarData& star)
 {
     cstone::LocalIndex numParticles = last - first;
     constexpr unsigned numThreads   = 256;
@@ -80,9 +82,7 @@ void computeCentralForceGPU(size_t first, size_t last, Dataset& d, StarData& sta
     checkGpuErrors(cudaMemcpy(force_device, &star.force_local, sizeof star.force_local, cudaMemcpyHostToDevice));
 
     computeCentralForceGPUKernel<numThreads><<<numBlocks, numThreads>>>(
-        first, last, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.ax),
-        rawPtr(d.devData.ay), rawPtr(d.devData.az), rawPtr(d.devData.m), star.position, star.m, d.g,
-        star.inner_size * star.inner_size, force_device);
+        first, last, x, y, z, ax, ay, az, m, star.position, star.m, g, star.inner_size * star.inner_size, force_device);
 
     checkGpuErrors(cudaDeviceSynchronize());
     checkGpuErrors(cudaGetLastError());
@@ -91,5 +91,12 @@ void computeCentralForceGPU(size_t first, size_t last, Dataset& d, StarData& sta
     checkGpuErrors(cudaFree(force_device));
 }
 
-template void computeCentralForceGPU(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>&, StarData&);
+#define COMPUTE_CENTRAL_FORCE_GPU(Treal, Thydro, Tmass)                                                                        \
+    template void computeCentralForceGPU(size_t, size_t, const Treal* x, const Treal* y, const Treal* z, Thydro* ax,    \
+                                         Thydro* ay, Thydro* az, const Tmass* m, const Treal g, StarData&);
+
+COMPUTE_CENTRAL_FORCE_GPU(double, double, double);
+COMPUTE_CENTRAL_FORCE_GPU(double, float, double);
+COMPUTE_CENTRAL_FORCE_GPU(double, float, float);
+
 } // namespace disk

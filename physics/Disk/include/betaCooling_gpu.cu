@@ -21,10 +21,10 @@
 namespace disk
 {
 
-template<typename Tpos, typename Tu, typename Ts, typename Tdu, typename Trho, typename Trho2>
-__global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, const Tpos* y, const Tpos* z, Tdu* du,
-                                     const Tu* u, Ts star_mass, cstone::Vec3<Ts> star_position, Ts beta, Tpos g,
-                                     const Trho* rho, Ts u_floor, Trho2 cooling_rho_limit)
+template<typename Treal, typename Thydro, typename Ts>
+__global__ void betaCoolingGPUKernel(size_t first, size_t last, const Treal* x, const Treal* y, const Treal* z,
+                                     const Treal* u, const Thydro* rho, Treal* du, Treal g, Ts star_mass,
+                                     cstone::Vec3<Ts> star_position, Ts beta, Ts u_floor, Ts cooling_rho_limit)
 
 {
     cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
@@ -40,22 +40,26 @@ __global__ void betaCoolingGPUKernel(size_t first, size_t last, const Tpos* x, c
     du[i] += -u[i] * omega / beta;
 }
 
-template<typename Dataset, typename StarData>
-void betaCoolingGPU(size_t first, size_t last, Dataset& d, StarData& star)
+template<typename Treal, typename Thydro>
+void betaCoolingGPU(size_t first, size_t last, const Treal* x, const Treal* y, const Treal* z, const Treal* u,
+                    const Thydro* rho, Treal* du, const Treal g, const StarData& star)
 {
     cstone::LocalIndex numParticles = last - first;
     unsigned           numThreads   = 256;
     unsigned           numBlocks    = (numParticles + numThreads - 1) / numThreads;
 
-    betaCoolingGPUKernel<<<numBlocks, numThreads>>>(first, last, rawPtr(d.devData.x), rawPtr(d.devData.y),
-                                                    rawPtr(d.devData.z), rawPtr(d.devData.du), rawPtr(d.devData.u),
-                                                    star.m, star.position, star.beta, d.g, rawPtr(d.devData.rho),
-                                                    star.u_floor, star.cooling_rho_limit);
+    betaCoolingGPUKernel<<<numBlocks, numThreads>>>(first, last, x, y, z, u, rho, du, g, star.m, star.position,
+                                                    star.beta, star.u_floor, star.cooling_rho_limit);
 
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void betaCoolingGPU(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>&, const StarData&);
+#define BETA_COOLING_GPU(Treal, Thydro)                                                                                \
+    template void betaCoolingGPU(size_t first, size_t last, const Treal* x, const Treal* y, const Treal* z,            \
+                                 const Treal* u, const Thydro* rho, Treal* du, const Treal g, const StarData& star);
+
+BETA_COOLING_GPU(double, double);
+BETA_COOLING_GPU(double, float);
 
 template<typename Tu, typename Tdu>
 struct AbsDivide
@@ -66,13 +70,10 @@ struct AbsDivide
     }
 };
 
-template<typename Dataset, typename StarData>
-double duTimestepGPU(size_t first, size_t last, const Dataset& d, const StarData& star)
+template<typename Treal>
+double duTimestepGPU(size_t first, size_t last, const Treal* u, const Treal* du)
 {
     cstone::LocalIndex numParticles = last - first;
-
-    const auto* u  = rawPtr(d.devData.u);
-    const auto* du = rawPtr(d.devData.du);
 
     using Tu  = std::decay_t<decltype(*u)>;
     using Tdu = std::decay_t<decltype(*du)>;
@@ -82,10 +83,12 @@ double duTimestepGPU(size_t first, size_t last, const Dataset& d, const StarData
 
     double init = INFINITY;
 
-    return star.K_u *
-           thrust::transform_reduce(thrust::device, begin, end, AbsDivide<Tu, Tdu>{}, init, thrust::minimum<double>{});
+    return thrust::transform_reduce(thrust::device, begin, end, AbsDivide<Tu, Tdu>{}, init, thrust::minimum<double>{});
 }
 
-template double duTimestepGPU(size_t, size_t, const sphexa::ParticlesData<cstone::GpuTag>&, const StarData&);
+#define DU_TIMESTEP_GPU(Treal)                                                                                         \
+    template double duTimestepGPU(size_t first, size_t last, const Treal* u, const Treal* du);
+
+DU_TIMESTEP_GPU(double);
 
 } // namespace disk

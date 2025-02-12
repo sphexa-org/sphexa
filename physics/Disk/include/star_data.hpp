@@ -38,7 +38,7 @@ struct StarData
     double removal_limit_h{std::numeric_limits<double>::infinity()};
 
     //! @brief Don't cool any particle above this density threshold
-    float cooling_rho_limit{std::numeric_limits<float>::infinity()};
+    double cooling_rho_limit{std::numeric_limits<float>::infinity()};
 
     //! @brief Don't cool any particle whose internal energy is below
     double u_floor{0.};

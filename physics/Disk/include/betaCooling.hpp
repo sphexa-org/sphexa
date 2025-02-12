@@ -11,6 +11,7 @@
 
 #include "betaCooling_gpu.hpp"
 #include "cstone/primitives/accel_switch.hpp"
+#include "get_ptr.hpp"
 
 namespace disk
 {
@@ -34,8 +35,8 @@ void betaCoolingImpl(size_t first, size_t last, Dataset& d, const StarData& star
     }
 }
 
-template<typename Dataset, typename StarData>
-auto duTimestepImpl(size_t first, size_t last, const Dataset& d, const StarData& star)
+template<typename Dataset>
+auto duTimestepImpl(size_t first, size_t last, const Dataset& d)
 {
 
     using Tu         = std::decay_t<decltype(d.u[0])>;
@@ -46,12 +47,13 @@ auto duTimestepImpl(size_t first, size_t last, const Dataset& d, const StarData&
 #pragma omp parallel for reduction(min : duTimestepMin)
     for (size_t i = first; i < last; i++)
     {
-        Tt duTimestep = star.K_u * std::abs(d.u[i] / d.du[i]);
+        Tt duTimestep = std::abs(d.u[i] / d.du[i]);
         duTimestepMin = std::min(duTimestepMin, duTimestep);
     }
     return duTimestepMin;
 }
 
+//! @brief Cool the disk with a cooling time proportional to the Keplerian orbital time (around the star)
 template<typename Dataset, typename StarData>
 void betaCooling(size_t startIndex, size_t endIndex, Dataset& d, const StarData& star)
 {
@@ -60,12 +62,15 @@ void betaCooling(size_t startIndex, size_t endIndex, Dataset& d, const StarData&
     {
         if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
         {
-            betaCoolingGPU(startIndex, endIndex, d, star);
+            betaCoolingGPU(startIndex, endIndex, getPtr<"x">(d), getPtr<"y">(d), getPtr<"z">(d), getPtr<"u">(d),
+                           getPtr<"rho">(d), getPtr<"du">(d), d.g, star);
         }
         else { betaCoolingImpl(startIndex, endIndex, d, star); }
     }
 }
 
+//! @brief Compute a maximal time step depending on how fast the internal energy changes
+//! (e.g. due to cooling).
 template<typename Dataset, typename StarData>
 void duTimestep(size_t startIndex, size_t endIndex, Dataset& d, StarData& star)
 {
@@ -77,9 +82,9 @@ void duTimestep(size_t startIndex, size_t endIndex, Dataset& d, StarData& star)
     {
         if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
         {
-            star.t_du = duTimestepGPU(startIndex, endIndex, d, star);
+            star.t_du = star.K_u * duTimestepGPU(startIndex, endIndex, getPtr<"u">(d), getPtr<"du">(d));
         }
-        else { star.t_du = duTimestepImpl(startIndex, endIndex, d, star); }
+        else { star.t_du = star.K_u * duTimestepImpl(startIndex, endIndex, d); }
     }
 }
 
