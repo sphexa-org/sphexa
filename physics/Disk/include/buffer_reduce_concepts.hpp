@@ -13,14 +13,15 @@
 
 namespace disk
 {
-
+namespace buffer
+{
 template<typename T>
 concept array_type = requires(T t, std::size_t i)
 {
     t[i];
     t.size();
     std::tuple_size_v<T>;
-    typename T::value_type;
+    typename std::remove_reference_t<T>::value_type;
 };
 
 template<typename T>
@@ -59,6 +60,9 @@ template<typename... T>
 concept same_value_types = is_same_value_types<std::decay_t<T>...>::value;
 
 template<typename... T>
+concept bufferable_types = arithmetic_or_arrays<T...>&& same_value_types<T...>;
+
+template<typename... T>
 struct flattened_size : std::integral_constant<std::size_t, 0>
 {
 };
@@ -82,4 +86,5 @@ struct flattened_size<std::tuple<T...>> : std::integral_constant<std::size_t, fl
 template<typename T>
 inline constexpr std::size_t flattened_size_v = flattened_size<std::decay_t<T>>::value;
 
+} // namespace buffer
 } // namespace disk

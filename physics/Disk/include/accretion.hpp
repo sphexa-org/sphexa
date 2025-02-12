@@ -33,7 +33,7 @@ void computeAccretionCondition(size_t first, size_t last, Dataset& d, StarData& 
 template<typename StarData>
 void exchangeAndAccreteOnStar(StarData& star, double minDt_m1, int rank)
 {
-    const auto [m_accreted, p_accreted, m_removed, p_removed] = buffered_mpi_allreduce_sum(
+    const auto [m_accreted, p_accreted, m_removed, p_removed] = buffer::mpiAllreduceSum(
         star.accreted_local.mass, star.accreted_local.momentum, star.removed_local.mass, star.removed_local.momentum);
 
     const double m_star_new = m_accreted + star.m;

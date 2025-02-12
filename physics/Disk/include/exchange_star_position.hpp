@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <array>
-#include <mpi.h>
 #include "buffer_reduce.hpp"
 #include "cstone/primitives/mpi_wrappers.hpp"
 
@@ -18,7 +16,7 @@ void computeAndExchangeStarPosition(StarData& star, double dt, double dt_m1)
 {
     if (star.fixed_star == 1) { return; }
 
-    const auto global_force = buffered_mpi_allreduce_sum(star.force_local);
+    const auto global_force = buffer::mpiAllreduceSum(star.force_local);
 
     star.potential = global_force[0];
 

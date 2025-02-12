@@ -3,7 +3,7 @@
 //
 
 #include "cstone/cuda/cub.hpp"
-#include "cstone/cuda/cuda_runtime.hpp
+#include "cstone/cuda/cuda_runtime.hpp"
 
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/findneighbors.hpp"
