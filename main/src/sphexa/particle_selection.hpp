@@ -40,13 +40,9 @@ void findParticlesInSphere(ParticlesData<AccType>& d, size_t firstIndex, size_t 
             auto x = d.x[particleIndex];
             auto y = d.y[particleIndex];
             auto z = d.z[particleIndex];
-            // std::cout<<particleIndex<<" "<<x<<" "<<y<<" "<<z<<" "<<(x - selSphereData.center[0])*(x - selSphereData.center[0]) +
-            //    (y - selSphereData.center[1])*(y - selSphereData.center[1]) +
-            //    (z - selSphereData.center[2])*(z - selSphereData.center[2])<<" "<<squareRadius<<std::endl;
             if((x - selSphereData.center[0])*(x - selSphereData.center[0]) +
                (y - selSphereData.center[1])*(y - selSphereData.center[1]) +
                (z - selSphereData.center[2])*(z - selSphereData.center[2]) <= squareRadius) {
-                // std::cout<<" Tag particle "<<std::endl;
                 d.id[particleIndex] = d.id[particleIndex] | msbMask;
             }
         }
@@ -70,10 +66,9 @@ void findParticlesInIdList(ParticlesData<AccType>& d, size_t firstIndex, size_t 
         const auto idListBeginIt = d.id.begin()+firstIndex;
         const auto idListEndIt = d.id.begin()+lastIndex;
         std::for_each(selParticlesIds.begin(), selParticlesIds.end(), [idListBeginIt, idListEndIt](auto selParticleId){
-            // Find the selected particles in user provided id list and tag them by setting the MSB of the id field
-            auto selParticleIt = std::find(idListBeginIt, idListEndIt, selParticleId);
-            if (selParticleIt != idListEndIt) {
-                *selParticleIt = *selParticleIt | msbMask;
+            auto lower = std::lower_bound(idListBeginIt, idListEndIt, selParticleId);
+            if(lower != idListEndIt && *lower == selParticleId) {
+                *lower = *lower | msbMask;
             }
         });
     }
