@@ -56,7 +56,9 @@ struct PropLib
     static PropPtr makeNbodyProp(std::ostream& output, size_t rank);
     static PropPtr makeTurbVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
     static PropPtr makeTurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
+#ifdef SPH_EXA_DISK_PHYSICS
     static PropPtr makeDiskProp(std::ostream& output, size_t rank, const InitSettings& settings);
+#endif
 };
 
 } // namespace sphexa
