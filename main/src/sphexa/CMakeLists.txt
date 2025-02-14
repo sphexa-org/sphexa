@@ -24,9 +24,6 @@ target_include_directories(${exename} PRIVATE ${PROJECT_SOURCE_DIR}/physics/cool
 
 enableInSituViz(${exename})
 enableGrackle(${exename})
-if (SPH_EXA_DISK_PHYSICS)
-    target_compile_definitions(${exename} PUBLIC SPH_EXA_DISK_PHYSICS)
-endif ()
 
 install(TARGETS ${exename} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 

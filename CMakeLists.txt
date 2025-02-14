@@ -101,7 +101,7 @@ if (SPH_EXA_WITH_GRACKLE)
     add_subdirectory(extern/grackle)
 endif()
 
-option(SPH_EXA_DISK_PHYSICS "Enable disk physics and propagator" OFF)
+option(SPH_EXA_WITH_DISKS "Enable disk physics and propagator" OFF)
 
 add_subdirectory(domain)
 add_subdirectory(ryoanji)

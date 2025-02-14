@@ -64,7 +64,7 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
     {
         return PropLib<DomainType, ParticleDataType>::makeTurbVeProp(output, rank, s, avClean);
     }
-#ifdef SPH_EXA_DISK_PHYSICS
+#ifdef SPH_EXA_HAVE_DISKS
     if (choice == "std-disk") { return PropLib<DomainType, ParticleDataType>::makeDiskProp(output, rank, s); }
 #endif
 

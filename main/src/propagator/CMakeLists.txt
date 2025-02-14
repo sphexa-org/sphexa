@@ -1,8 +1,20 @@
+
+function(enableDiskPhysics exename link_gpu)
+    if (SPH_EXA_WITH_DISKS)
+        target_sources(${exename} PRIVATE std_disk.cpp)
+        target_include_directories(${exename} PRIVATE ${DISK_DIR})
+        target_compile_definitions(${exename} PUBLIC SPH_EXA_HAVE_DISKS)
+        if (${link_gpu})
+            target_link_libraries(${exename} PRIVATE disk_gpu)
+        endif ()
+    endif ()
+endfunction()
+
 set(PROP_SOURCES nbody.cpp std_hydro_grackle.cpp std_hydro.cpp ve_hydro.cpp ve_hydro_bdt.cpp)
 
 add_library(propagator ${PROP_SOURCES})
 target_include_directories(propagator PRIVATE ${PROJECT_SOURCE_DIR}/main/src ${COOLING_DIR} ${CSTONE_DIR}
-        ${SPH_DIR} ${RYOANJI_DIR} ${MPI_CXX_INCLUDE_PATH} ${DISK_DIR})
+        ${SPH_DIR} ${RYOANJI_DIR} ${MPI_CXX_INCLUDE_PATH})
 
 target_link_libraries(propagator PRIVATE ${MPI_CXX_LIBRARIES} util OpenMP::OpenMP_CXX)
 enableDiskPhysics(propagator FALSE)
