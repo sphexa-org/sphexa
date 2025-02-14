@@ -38,7 +38,6 @@ void betaCoolingImpl(size_t first, size_t last, Dataset& d, const StarData& star
 template<typename Dataset>
 auto duTimestepImpl(size_t first, size_t last, const Dataset& d)
 {
-
     using Tu         = std::decay_t<decltype(d.u[0])>;
     using Tdu        = std::decay_t<decltype(d.du[0])>;
     using Tt         = std::common_type_t<Tu, Tdu>;

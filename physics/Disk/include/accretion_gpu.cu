@@ -3,15 +3,8 @@
 //
 
 #include "cstone/cuda/cub.hpp"
-#include "cstone/cuda/cuda_runtime.hpp"
-
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/findneighbors.hpp"
-#include "cstone/sfc/box.hpp"
-#include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/tree/definitions.h"
-
-#include "sph/particles_data.hpp"
 
 #include "accretion_gpu.hpp"
 #include "star_data.hpp"

@@ -2,14 +2,8 @@
 // Created by Noah Kubli on 11.03.2024.
 //
 #include "cstone/cuda/cub.hpp"
-#include "cstone/cuda/cuda_runtime.hpp"
-
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/findneighbors.hpp"
 #include "cstone/primitives/math.hpp"
-#include "cstone/sfc/box.hpp"
-#include "cstone/traversal/find_neighbors.cuh"
-#include "sph/particles_data.hpp"
 
 #include "central_force_gpu.hpp"
 #include "star_data.hpp"

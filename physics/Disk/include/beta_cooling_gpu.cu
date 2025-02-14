@@ -4,15 +4,9 @@
 
 #include "beta_cooling_gpu.hpp"
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/findneighbors.hpp"
-#include "cstone/traversal/find_neighbors.cuh"
-#include "cstone/sfc/box.hpp"
-
-#include "sph/particles_data.hpp"
 #include "star_data.hpp"
 
 #include <thrust/execution_policy.h>
-#include <thrust/reduce.h>
 #include <thrust/transform_reduce.h>
 #include <thrust/tuple.h>
 
