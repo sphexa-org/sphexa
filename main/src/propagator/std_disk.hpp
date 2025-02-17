@@ -29,10 +29,10 @@ using namespace sph;
 using util::FieldList;
 
 template<class DomainType, class DataType>
-class DiskProp : public HydroProp<DomainType, DataType, "u">
+class DiskProp : public HydroProp<DomainType, DataType>
 {
 protected:
-    using Base = HydroProp<DomainType, DataType, "u">;
+    using Base = HydroProp<DomainType, DataType>;
     using Base::timer;
 
     using T = typename DataType::RealType;
