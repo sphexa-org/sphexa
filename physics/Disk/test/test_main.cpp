@@ -24,41 +24,36 @@
  */
 
 /*! @file
- * @brief Propagator initialization
+ * @brief GTest MPI driver
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
- * @author ChristopherBignamini <christopher.bignamini@gmail.com>
  */
 
-#pragma once
+#include <mpi.h>
 
-#include <memory>
+#include <gtest/gtest.h>
+#include "gtest-mpi-listener.hpp"
 
-#include "ipropagator.hpp"
-#include "init/settings.hpp"
-#include "sphexa/simulation_data.hpp"
-
-namespace sphexa
+int main(int argc, char** argv)
 {
+    ::testing::InitGoogleTest(&argc, argv);
 
-template<class DomainType, class ParticleDataType>
-struct PropLib
-{
+    MPI_Init(NULL, NULL);
 
-    using PropPtr = std::unique_ptr<Propagator<DomainType, ParticleDataType>>;
+    // Add object that will finalize MPI on exit; Google Test owns this pointer
+    ::testing::AddGlobalTestEnvironment(new GTestMPIListener::MPIEnvironment);
 
-    static PropPtr makeHydroVeProp(std::ostream& output, size_t rank, bool avClean);
-    static PropPtr makeHydroProp(std::ostream& output, size_t rank);
-    static PropPtr makeHydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
-#ifdef SPH_EXA_HAVE_GRACKLE
-    static PropPtr makeHydroGrackleProp(std::ostream& output, size_t rank, const InitSettings& settings);
-#endif
-    static PropPtr makeNbodyProp(std::ostream& output, size_t rank);
-    static PropPtr makeTurbVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
-    static PropPtr makeTurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
-#ifdef SPH_EXA_HAVE_DISKS
-    static PropPtr makeDiskProp(std::ostream& output, size_t rank, const InitSettings& settings);
-#endif
-};
+    // Get the event listener list.
+    ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
 
-} // namespace sphexa
+    // Remove default listener: the default printer and the default XML printer
+    ::testing::TestEventListener* l = listeners.Release(listeners.default_result_printer());
+    // if (rank != 0) { delete l; }
+
+    // Adds MPI listener; Google Test owns this pointer
+    listeners.Append(new GTestMPIListener::MPIWrapperPrinter(l, MPI_COMM_WORLD));
+
+    auto ret = RUN_ALL_TESTS();
+
+    return ret;
+}
