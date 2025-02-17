@@ -49,7 +49,7 @@ inline void writeSettings(const InitSettings& settings, const std::string& path,
         throw std::runtime_error("Cannot write settings: file " + path + " already exists\n");
     }
 
-    writer->addStep(0, 0, path);
+    writer->addStep(0, 0, path, true);
     for (auto it = settings.cbegin(); it != settings.cend(); ++it)
     {
         writer->fileAttribute(it->first, &(it->second), 1);
