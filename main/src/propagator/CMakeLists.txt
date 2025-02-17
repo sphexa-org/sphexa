@@ -1,7 +1,6 @@
 
 function(enableDiskPhysics exename link_gpu)
     if (SPH_EXA_WITH_DISKS)
-        target_sources(${exename} PRIVATE std_disk.cpp)
         target_include_directories(${exename} PRIVATE ${DISK_DIR})
         target_compile_definitions(${exename} PUBLIC SPH_EXA_HAVE_DISKS)
         if (${link_gpu})
