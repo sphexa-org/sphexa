@@ -52,7 +52,7 @@ void findParticlesInSphere(ParticlesData<AccType>& d, size_t firstIndex, size_t 
 
 // Find particles in user provided id list and tag them
 // TODO: only pass d.id
-extern void findParticlesInIdList_gpu(ParticlesData<cstone::GpuTag>& d, const std::vector<ParticleIdType>& selParticlesIds);
+extern void findParticlesInIdList_gpu(ParticlesData<cstone::GpuTag>& d, size_t firstIndex, size_t lastIndex, const std::vector<ParticleIdType>& selParticlesIds);
 
 template<class AccType>
 void findParticlesInIdList(ParticlesData<AccType>& d, size_t firstIndex, size_t lastIndex, const std::vector<ParticleIdType>& selParticlesIds) {
