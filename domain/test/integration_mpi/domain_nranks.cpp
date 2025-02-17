@@ -405,20 +405,52 @@ void randomGaussianGrav(int thisRank, int numRanks)
     domain.exchangeHalos(std::tie(m), s1, s2);
 
     std::span<const KeyType> gkeys(coords.particleKeys());
-    int firstGlobalIdx = std::lower_bound(gkeys.begin(), gkeys.end(), keys[domain.startIndex()]) - gkeys.begin();
-    int lastGlobalIdx  = std::upper_bound(gkeys.begin(), gkeys.end(), keys[domain.endIndex() - 1]) - gkeys.begin();
+    LocalIndex firstGlobalIdx = std::lower_bound(gkeys.begin(), gkeys.end(), keys[domain.startIndex()]) - gkeys.begin();
+    LocalIndex lastGlobalIdx =
+        std::upper_bound(gkeys.begin(), gkeys.end(), keys[domain.endIndex() - 1]) - gkeys.begin();
 
     //! the focused octree, structure only
-    auto LET         = domain.focusTree();
-    auto let_full    = LET.octreeViewAcc();
-    auto let_leaves  = LET.treeLeavesAcc();
-    auto let_lcounts = LET.leafCountsAcc();
+    auto ftree       = domain.focusTree();
+    auto let_full    = ftree.octreeViewAcc();
+    auto let_leaves  = ftree.treeLeavesAcc();
+    auto let_lcounts = ftree.leafCountsAcc();
     auto let_layout  = domain.layout();
 
-    //std::span<const SourceCenterType<T>> centers = domain.focusTree().expansionCentersAcc();
+    {
+        KeyType focusStart = let_leaves[ftree.assignment()[thisRank].start()];
+        KeyType focusEnd   = let_leaves[ftree.assignment()[thisRank].end()];
 
-    //! global ref tree at focus resolution
-    // auto [gtree, gcounts] = computeOctree<KeyType>(coords.particleKeys(), bucketSizeLocal);
+        std::vector<KeyType> spanningKeys(spanSfcRange(focusStart, focusEnd) + 1);
+        spanSfcRange(focusStart, focusEnd, spanningKeys.data());
+        spanningKeys.back() = focusEnd;
+
+        std::span<const SourceCenterType<T>> centers = ftree.expansionCentersAcc();
+        std::vector<uint8_t> marks(let_full.numNodes, 0);
+        for (TreeNodeIndex i = 0; i < nNodes(spanningKeys); ++i)
+        {
+            IBox target                     = sfcIBox(sfcKey(spanningKeys[i]), sfcKey(spanningKeys[i + 1]));
+            auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
+            unsigned maxLevel               = maxTreeLevel<KeyType>{};
+
+            markMacPerBox(targetCenter, targetSize, maxLevel, let_full.prefixes, let_full.childOffsets, centers.data(),
+                          box, focusStart, focusEnd, marks.data());
+        }
+        for (TreeNodeIndex j = 0; j < let_full.numNodes; ++j)
+        {
+            TreeNodeIndex leafIdx = let_full.internalToLeaf[j];
+            bool isLeaf           = leafIdx >= 0;
+            bool isRemote =
+                ftree.assignment()[thisRank].start() <= leafIdx && leafIdx < ftree.assignment()[thisRank].end();
+            if (isLeaf && isRemote && marks[j])
+            {
+                LocalIndex gi1 = std::lower_bound(gkeys.begin(), gkeys.end(), let_leaves[leafIdx]) - gkeys.begin();
+                LocalIndex gi2 = std::lower_bound(gkeys.begin(), gkeys.end(), let_leaves[leafIdx + 1]) - gkeys.begin();
+                EXPECT_EQ(gi2 - gi1 + 1, let_layout[leafIdx + 1] - let_layout[leafIdx]);
+            }
+        }
+    }
+
+    // Any leaf in the tree with particles: does it contain the same particles as in the reference set of particles?
 
     ASSERT_EQ(let_leaves.size(), let_layout.size());
     for (int i = 0; i < let_leaves.size() - 1; ++i)
@@ -439,6 +471,8 @@ void randomGaussianGrav(int thisRank, int numRanks)
             }
         }
     }
+
+    // Do we have all halos to compute correct neighbor counts?
 
     int ngmax = 1; // don't store neighbors, only counts
     std::vector<LocalIndex> neighbors(domain.nParticles() * ngmax);
