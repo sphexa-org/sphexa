@@ -118,7 +118,7 @@ int main(int argc, char** argv)
     // Particle selection for output
 //    auto particleSelectionId = particleSelection(idSel, fileReader.get());
     ParticleIndexVectorType selParticlesIds;
-    ParticleIndexVectorType localSelectedParticlesIndexes;
+//    ParticleIndexVectorType localSelectedParticlesIndexes;
     ParticleSelectionSphere selSphereData;
     bool partSel = false;
     bool tagSelectedParticles = false;
@@ -243,20 +243,8 @@ int main(int argc, char** argv)
 
         if (isSelectedParticleOutputTriggered) // && propatagor->isSynced
         {
-            // TODO: what about MPI task sync at this point? I'm assuming everything is synced...
-            // Reset the list of indexes of subdomain selected particles: this is needed since a specific particle can move to another rank
-            localSelectedParticlesIndexes.clear();
-
-            // Find the selected particles positions in dataset
-            findSelectedParticlesIndexes(d, localSelectedParticlesIndexes);
-
-            selParticlesFileWriter->addStep(0, localSelectedParticlesIndexes.size(), selParticlesOutFile);
-            simData.hydro.loadOrStoreAttributes(selParticlesFileWriter.get());
-            box.loadOrStore(selParticlesFileWriter.get());
-            propagator->saveSelParticlesFields(selParticlesFileWriter.get(), domain.startIndex(), domain.endIndex(), localSelectedParticlesIndexes, simData.hydro);
-            selParticlesFileWriter->closeStep();
+            propagator->saveSelParticlesFields(fileWriter.get(), selParticlesOutFile, domain.startIndex(), domain.endIndex(), simData.hydro);
 //            isSelectedParticleOutputTriggered = false;
-
         }
 
         if (isOutputStep(d.iteration, profFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, profFreqStr) ||
