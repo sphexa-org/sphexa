@@ -103,10 +103,12 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
             vi = 0.0;
         }
 
-        d.temp[i] = pi / ((d.gamma - 1.) * rho) / cv;
-        d.vx[i]   = -1.0 * vi * std::sin(theta);
-        d.vy[i]   = vi * std::cos(theta);
-        d.vz[i]   = 0.0;
+        auto ui = pi / ((d.gamma - 1.) * rho);
+        if (d.u.empty()) { d.temp[i] = ui / cv; }
+        else { d.u[i] = ui; }
+        d.vx[i] = -1.0 * vi * std::sin(theta);
+        d.vy[i] = vi * std::cos(theta);
+        d.vz[i] = 0.0;
 
         d.x_m1[i] = d.vx[i] * firstTimeStep;
         d.y_m1[i] = d.vy[i] * firstTimeStep;
