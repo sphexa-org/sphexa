@@ -89,6 +89,7 @@ void initTurbulenceHydroFields(Dataset& d, const std::map<std::string, double>& 
     std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
     std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
     std::fill(d.temp.begin(), d.temp.end(), temp0);
+    std::fill(d.u.begin(), d.u.end(), constants.at("u0"));
 
     std::fill(d.vx.begin(), d.vx.end(), 0.);
     std::fill(d.vy.begin(), d.vy.end(), 0.);

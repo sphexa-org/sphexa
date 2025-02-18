@@ -81,6 +81,7 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
     std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
     std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
     std::fill(d.temp.begin(), d.temp.end(), temp0);
+    std::fill(d.u.begin(), d.u.end(), constants.at("u0"));
     std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
 
     generateParticleIDs(d.id);
