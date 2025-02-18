@@ -28,7 +28,8 @@
  *
  */
 
-#include <array>
+#pragma once
+
 #include <mpi.h>
 
 #include "conserved_quantities.hpp"
@@ -40,20 +41,20 @@ namespace sphexa
 {
 //!@brief counts the number of particles that still belong to the cloud on each rank
 template<class Tt, class T, class Tm>
-size_t localSurvivors(size_t first, size_t last, const Tt* temp, const T* kx, const T* xmass, const Tm* m,
-                      double rhoBubble, double tempWind)
+double survivingMass(size_t first, size_t last, const Tt* temp, const T* kx, const T* xmass, const Tm* m,
+                     double rhoBubble, double tempWind)
 {
-    size_t survivors = 0;
+    double survivingMass = 0;
 
-#pragma omp parallel for reduction(+ : survivors)
+#pragma omp parallel for reduction(+ : survivingMass)
     for (size_t i = first; i < last; i++)
     {
         T rhoi = kx[i] / xmass[i] * m[i];
 
-        if (rhoi >= 0.64 * rhoBubble && temp[i] <= 0.9 * tempWind) { survivors++; }
+        if (rhoi >= 0.64 * rhoBubble && temp[i] <= 0.9 * tempWind) { survivingMass += m[i]; }
     }
 
-    return survivors;
+    return survivingMass;
 }
 
 /*!
@@ -68,32 +69,29 @@ size_t localSurvivors(size_t first, size_t last, const Tt* temp, const T* kx, co
  * @param[in] m           particles masses
  * @param[in] rhoBubble   initial density inside the cloud
  * @param[in] uWind       initial internal energy of the supersonic wind
- * @param[in] initialMass initial total mass of the cloud
- * @return                fraction of particles surviving in the bubble
+ * @return                mass of particles surviving in the bubble
  *
  */
 template<class Dataset>
-double calculateSurvivingFraction(size_t first, size_t last, double rhoBubble, double uWind, double initialMass,
-                                  Dataset& d)
+double calculateSurvivingMass(size_t first, size_t last, double rhoBubble, double uWind, Dataset& d)
 {
-    size_t localSurvived;
+    double bubbleMass;
 
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        localSurvived = survivorsGpu(rawPtr(d.devData.temp), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
-                                     rawPtr(d.devData.m), rhoBubble, uWind, first, last);
+        bubbleMass = survivingMassGpu(rawPtr(d.devData.temp), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
+                                      rawPtr(d.devData.m), rhoBubble, uWind, first, last);
     }
     else
     {
-        localSurvived =
-            localSurvivors(first, last, d.temp.data(), d.kx.data(), d.xm.data(), d.m.data(), rhoBubble, uWind);
+        bubbleMass = survivingMass(first, last, d.temp.data(), d.kx.data(), d.xm.data(), d.m.data(), rhoBubble, uWind);
     }
 
     int    rootRank = 0;
-    size_t globalSurvivors;
-    MPI_Reduce(&localSurvived, &globalSurvivors, 1, MpiType<size_t>{}, MPI_SUM, rootRank, MPI_COMM_WORLD);
+    double globalBubbleMass;
+    MPI_Reduce(&bubbleMass, &globalBubbleMass, 1, MpiType<double>{}, MPI_SUM, rootRank, MPI_COMM_WORLD);
 
-    return globalSurvivors * d.m[0] / initialMass;
+    return globalBubbleMass;
 }
 
 //! @brief Observables that includes times, energies and bubble surviving fraction
@@ -117,7 +115,7 @@ public:
 
     using T = typename Dataset::RealType;
 
-    void computeAndWrite(Dataset& simData, size_t firstIndex, size_t lastIndex, cstone::Box<T>& box)
+    void computeAndWrite(Dataset& simData, size_t firstIndex, size_t lastIndex, const cstone::Box<T>& box) override
     {
         auto& d = simData.hydro;
         computeConservedQuantities(firstIndex, lastIndex, d, simData.comm);
@@ -128,8 +126,8 @@ public:
                 "kx was empty. Wind Shock surviving fraction is only supported with volume elements (--prop ve)\n");
         }
 
-        T    tempWind       = uWind * sph::idealGasCv(d.muiConst, d.gamma);
-        auto bubbleFraction = calculateSurvivingFraction(firstIndex, lastIndex, rhoBubble, tempWind, initialMass, d);
+        T    tempWind   = uWind * sph::idealGasCv(d.muiConst, d.gamma);
+        auto bubbleMass = calculateSurvivingMass(firstIndex, lastIndex, rhoBubble, tempWind, d);
         int  rank;
         MPI_Comm_rank(simData.comm, &rank);
 
@@ -139,7 +137,7 @@ public:
             T normalizedTime = d.ttot / tkh;
 
             fileutils::writeColumns(constantsFile, ' ', d.iteration, d.ttot, d.minDt, d.etot, d.ecin, d.eint, d.egrav,
-                                    d.linmom, d.angmom, bubbleFraction, normalizedTime);
+                                    d.linmom, d.angmom, bubbleMass / initialMass, normalizedTime);
         }
     }
 };
