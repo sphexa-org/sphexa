@@ -28,8 +28,6 @@
  * @author Lukas Schmidt
  */
 
-#include <fstream>
-
 #include "conserved_quantities.hpp"
 #include "iobservables.hpp"
 #include "io/file_utils.hpp"

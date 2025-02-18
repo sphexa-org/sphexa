@@ -135,15 +135,13 @@ struct Survivors
     HOST_DEVICE_FUN
     double operator()(const thrust::tuple<Tt, T, T, Tm>& p)
     {
-        size_t isCloud;
-        auto   temp = get<0>(p);
-        auto   kx   = get<1>(p);
-        auto   xm   = get<2>(p);
-        auto   m    = get<3>(p);
-        auto   rhoi = kx / xm * m;
-        if (rhoi >= 0.64 * rhoBubble && temp <= 0.9 * tempWind) { isCloud = 1; }
-        else { isCloud = 0; }
-        return isCloud;
+        auto temp = get<0>(p);
+        auto kx   = get<1>(p);
+        auto xm   = get<2>(p);
+        auto m    = get<3>(p);
+        auto rhoi = kx / xm * m;
+        if (rhoi >= 0.64 * rhoBubble && temp <= 0.9 * tempWind) { return m; }
+        else { return 0; }
     }
 
     double rhoBubble;
@@ -151,25 +149,19 @@ struct Survivors
 };
 
 template<class T, class Tt, class Tm>
-size_t survivorsGpu(const Tt* temp, const T* kx, const T* xmass, const Tm* m, double rhoBubble, double tempWind,
-                    size_t first, size_t last)
+double survivingMassGpu(const Tt* temp, const T* kx, const T* xmass, const Tm* m, double rhoBubble, double tempWind,
+                        size_t first, size_t last)
 {
     auto it1 = thrust::make_zip_iterator(thrust::make_tuple(temp + first, kx + first, xmass + first, m + first));
     auto it2 = thrust::make_zip_iterator(thrust::make_tuple(temp + last, kx + last, xmass + last, m + last));
 
-    auto plus = thrust::plus<size_t>{};
-
-    size_t localSurvivors = 0;
-
-    localSurvivors = thrust::transform_reduce(thrust::device, it1, it2, Survivors<T, Tt, Tm>{rhoBubble, tempWind},
-                                              localSurvivors, plus);
-
-    return localSurvivors;
+    return thrust::transform_reduce(thrust::device, it1, it2, Survivors<T, Tt, Tm>{rhoBubble, tempWind}, 0.0,
+                                    thrust::plus{});
 }
 
 #define SURVIVORS(T, Tt, Tm)                                                                                           \
-    template size_t survivorsGpu(const Tt* temp, const T* kx, const T* xmass, const Tm* m, double, double, size_t,     \
-                                 size_t)
+    template double survivingMassGpu(const Tt* temp, const T* kx, const T* xmass, const Tm* m, double, double, size_t, \
+                                     size_t)
 
 SURVIVORS(double, double, double);
 SURVIVORS(float, float, float);

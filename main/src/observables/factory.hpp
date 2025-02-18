@@ -53,11 +53,8 @@ std::unique_ptr<IObservables<Dataset>> observablesFactory(const InitSettings& se
     }
     if (settings.count("wind-shock"))
     {
-        double rhoInt       = settings.at("rhoInt");
-        double uExt         = settings.at("uExt");
-        double bubbleVolume = std::pow(settings.at("rSphere"), 3) * 4.0 / 3.0 * M_PI;
-        double bubbleMass   = bubbleVolume * rhoInt;
-        return Observables<Dataset>::makeWindBubbleObs(constantsFile, rhoInt, uExt, bubbleMass);
+        return Observables<Dataset>::makeWindBubbleObs(constantsFile, settings.at("rhoInt"), settings.at("uExt"),
+                                                       settings.at("rSphere"));
     }
     if (settings.count("turbulence"))
     {
