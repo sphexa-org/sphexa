@@ -7,7 +7,7 @@ target_link_libraries(propagator PRIVATE ${MPI_CXX_LIBRARIES} util OpenMP::OpenM
 enableGrackle(propagator)
 
 if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
-    add_library(propagator_gpu ${PROP_SOURCES})
+    add_library(propagator_gpu ${PROP_SOURCES} ipropagator.cu)
     target_compile_definitions(propagator_gpu PRIVATE USE_CUDA)
     target_include_directories(propagator_gpu PRIVATE ${PROJECT_SOURCE_DIR}/main/src ${COOLING_DIR} ${CSTONE_DIR}
             ${SPH_DIR} ${RYOANJI_DIR} ${MPI_CXX_INCLUDE_PATH})
