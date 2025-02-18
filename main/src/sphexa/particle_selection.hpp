@@ -1,4 +1,29 @@
-/*! @file
+/*
+ * MIT License
+ *
+ * SPH-EXA
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Basel, University of Zurich
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+ /*! @file
  * @brief  CPU/GPU Particle subset positions identification functions
  *
  * @author Christopher Bignamini <christopher.bignamini@gmail.com>
@@ -11,9 +36,6 @@
 
 namespace sphexa
 {
-
-using ParticleIdType = uint64_t; // TODO: retrieve type from ParticlesData
-constexpr ParticleIdType msbMask = static_cast<ParticleIdType>(1) << (sizeof(ParticleIdType)*8 - 1);
 
 struct ParticleSelectionSphere
 {
@@ -70,31 +92,6 @@ void findParticlesInIdList(ParticlesData<AccType>& d, size_t firstIndex, size_t 
             if(lower != idListEndIt && *lower == selParticleId) {
                 *lower = *lower | msbMask;
             }
-        });
-    }
-}
-
-// Identify tagged particles and save their indexes
-extern void findSelectedParticlesIndexes_gpu(const ParticlesData<cstone::GpuTag>& d, std::vector<uint64_t>& localSelectedParticlesIndexes);
-
-// TODO: search in size_t firstIndex, size_t lastIndex
-template<class AccType>
-void findSelectedParticlesIndexes(const ParticlesData<AccType>& d, std::vector<uint64_t>& localSelectedParticlesIndexes)
-{
-    if constexpr (cstone::HaveGpu<AccType>{})
-    {
-        findSelectedParticlesIndexes_gpu(d, localSelectedParticlesIndexes);
-    }
-    else
-    {
-        // Find the selected particles in local id list and save their indexes
-        // TODO: switch to GPU-like implementation?
-        uint64_t particleIndex = 0;
-        std::for_each(d.id.begin(), d.id.end(), [&localSelectedParticlesIndexes, &particleIndex](auto& particleId){
-            if((particleId & msbMask) != 0) {// check MSB
-                localSelectedParticlesIndexes.push_back(particleIndex); // TODO: inefficient due to resizing, avoid push_back usage
-            }
-            particleIndex++;
         });
     }
 }
