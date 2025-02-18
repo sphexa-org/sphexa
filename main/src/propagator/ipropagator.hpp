@@ -28,6 +28,7 @@
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  * @author Jose A. Escartin <ja.escartin@gmail.com>
+ * @author Christopher Bignamini <christopher.bignamini@gmail.com>
  */
 
 #pragma once
@@ -80,10 +81,10 @@ public:
     virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&){};
 
     //! @brief save selected particle data fields to file                                                   // TODO: const ParticleDataType::HydroData&
-    void saveSelParticlesFields(IFileWriter* writer, size_t first, size_t last, const ParticleIndexVectorType& selectedParticlesPositions, ParticleDataType::HydroData& hydroSimData)
+    void saveSelParticlesFields(IFileWriter* writer, std::string selParticlesOutFile, size_t first, size_t last, ParticleDataType::HydroData& hydroSimData)
     {
         // TODO: outputSelParticlesAllocatedFields not needed, keeping it as separate function for refactoring reasons
-        outputSelParticlesAllocatedFields(writer, first, last, selectedParticlesPositions, hydroSimData);
+        outputSelParticlesAllocatedFields(writer, selParticlesOutFile, first, last, hydroSimData);
         timer.step("SelectedParticlesFileOutput");
     }
 
@@ -182,9 +183,32 @@ protected:
     }
 
     // TODO: last parameter should be const& but at some point we use the data() method which is non-const
-    static void outputSelParticlesAllocatedFields(IFileWriter* writer, size_t first, size_t last, const ParticleIndexVectorType& selectedParticlesPositions,
-        ParticleDataType::HydroData& hydroSimData)
+    static void outputSelParticlesAllocatedFields(IFileWriter* writer, std::string selParticlesOutFile, size_t first, size_t last, ParticleDataType::HydroData& hydroSimData)
     {
+        // TODO: what about MPI task sync at this point? I'm assuming everything is synced...
+        ParticleIndexVectorType selectedParticlesIndexes;
+
+        // Find the selected particles positions in dataset
+        findSelectedParticlesIndexes(hydroSimData, first, last, selectedParticlesIndexes);
+
+
+        // TODO: debug only
+        for(auto mpiRank=0; mpiRank<writer->numRanks(); mpiRank++){
+            if(mpiRank == writer->rank()){
+                std::cout << "Rank " << mpiRank << " selected particles: ";
+                for(auto& particleIndex : selectedParticlesIndexes){
+                    std::cout << particleIndex << " "<<(hydroSimData.id[particleIndex] & ~msbMask)<< " ";
+                }
+                std::cout << std::endl;
+            }
+            MPI_Barrier(writer->comm());
+        }
+
+
+        writer->addStep(0, selectedParticlesIndexes.size(), selParticlesOutFile);
+        hydroSimData.loadOrStoreAttributes(writer);
+        // box.loadOrStore(selParticlesFileWriter.get()); // TODO: do we need to load/store the boundary data/coordinates?
+
         auto fieldPointers = hydroSimData.data();
         auto indicesDone   = hydroSimData.outputFieldIndices;
         auto namesDone     = hydroSimData.outputFieldNames;
@@ -214,12 +238,12 @@ protected:
 
 
                 // Copy current field data to a new vector only for the selected particles
-                std::visit([writer, c = column, key = namesDone[i], &selectedParticlesPositions](auto field){
+                std::visit([writer, c = column, key = namesDone[i], &selectedParticlesIndexes](auto field){
                     std::remove_pointer_t<decltype(field)> selectedParticleFieldValues;
                     // TODO: use copy_if
                     // std::copy_if(field->begin(), field->end(), std::back_inserter(selectedParticleFieldPointers),
                     //     [](){return true;});
-                    std::for_each(selectedParticlesPositions.begin(), selectedParticlesPositions.end(),
+                    std::for_each(selectedParticlesIndexes.begin(), selectedParticlesIndexes.end(),
                         [&selectedParticleFieldValues, &field](auto particlePosition){
                             selectedParticleFieldValues.push_back(field->at(particlePosition));
                         });
@@ -230,6 +254,30 @@ protected:
                 indicesDone.erase(indicesDone.begin() + i);
                 namesDone.erase(namesDone.begin() + i);
             }
+        }
+
+        writer->closeStep();
+
+    }
+
+    template<class AccType>
+    static void findSelectedParticlesIndexes(const ParticlesData<AccType>& d, size_t first, size_t last, std::vector<uint64_t>& selectedParticlesIndexes)
+    {
+        if constexpr (cstone::HaveGpu<AccType>{})
+        {
+            findSelectedParticlesIndexes_gpu(d, first, last, selectedParticlesIndexes);
+        }
+        else
+        {
+            // Find the selected particles in local id list and save their indexes
+            // TODO: switch to GPU-like implementation?
+            uint64_t particleIndex = first;
+            std::for_each(d.id.begin()+first, d.id.begin()+last, [&selectedParticlesIndexes, &particleIndex](auto& particleId){
+                if((particleId & msbMask) != 0) {// check MSB
+                    selectedParticlesIndexes.push_back(particleIndex); // TODO: inefficient due to resizing, avoid push_back usage
+                }
+                particleIndex++;
+            });
         }
     }
 
