@@ -342,7 +342,7 @@ void randomGaussianGrav(int thisRank, int numRanks)
     RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box);
 
     std::vector<T> globalH(numParticles, 0.1);
-    adjustSmoothingLength<KeyType>(globalH.size(), 100, 150, coords.x(), coords.y(), coords.z(), globalH, box);
+    adjustSmoothingLength<KeyType>(globalH.size(), 200, 250, coords.x(), coords.y(), coords.z(), globalH, box);
 
     std::vector<T> globalMasses(numParticles, 1.0 / numParticles);
 
@@ -441,8 +441,6 @@ void randomGaussianGrav(int thisRank, int numRanks)
                   domain.octreeProperties(), ngmax, neighbors.data(), neighborsCount.data());
 
     uint64_t neighborSum = std::accumulate(begin(neighborsCount), end(neighborsCount), 0);
-    MPI_Allreduce(MPI_IN_PLACE, &neighborSum, 1, MpiType<uint64_t>{}, MPI_SUM, MPI_COMM_WORLD);
-
     {
         std::vector<LocalIndex> neighborsRef(numParticles * ngmax);
         std::vector<unsigned> neighborsCountRef(numParticles);
@@ -469,8 +467,6 @@ void randomGaussianGrav(int thisRank, int numRanks)
 
 
         uint64_t neighborSumRef = std::accumulate(begin(neighborsCountRef), end(neighborsCountRef), uint64_t(0));
-        MPI_Allreduce(MPI_IN_PLACE, &neighborSumRef, 1, MpiType<uint64_t>{}, MPI_SUM, MPI_COMM_WORLD);
-        if (thisRank == 0) { std::cout << "neighbor sum " << neighborSum << std::endl; }
         EXPECT_EQ(neighborSum, neighborSumRef);
     }
 }
