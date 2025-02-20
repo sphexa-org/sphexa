@@ -78,12 +78,26 @@ FROM $BASE_IMAGE
 
 ENV TZ Europe/Zurich
 ENV PATH="${PATH}:/usr/local/cuda/bin"
-ENV CMAKE_PREFIX_PATH="/usr/local/HDF_Group/HDF5/1.13.2/share/cmake:${CMAKE_PREFIX_PATH}"
+ENV CMAKE_PREFIX_PATH="/usr/local/HDF_Group/HDF5/1.13.2/share/cmake:/usr/local/h5hut:${CMAKE_PREFIX_PATH}"
 # --mount type=bind,source=$PWD/SPH-EXA.git,target=/usr/local/games/SPH-EXA.git
 # not needed in gitlab:
 # COPY SPH-EXA.git /usr/local/games/SPH-EXA.git
 # + TODO: ln -fs /sources/ SPH-EXA.git
 COPY . /usr/local/games/SPH-EXA.git
+ENV LIBS="-lmpi"
+
+#{{{ h5part
+RUN echo \
+    && apt-get update \
+    && apt-get -y install libtool m4 automake \
+    && echo "## install h5hut" \
+    && git clone https://gitlab.psi.ch/H5hut/src.git h5hut \
+    && cd h5hut \
+    && ./autogen.sh \
+    && ./configure --prefix=/usr/local/h5hut --enable-parallel --with-hdf5=/usr/local/HDF_Group/HDF5/1.13.2 --with-mpi\
+    && make -j `grep processor /proc/cpuinfo | wc -l` \
+    && make install
+#}}}
 
 #{{{ build
 RUN echo \
@@ -107,7 +121,8 @@ RUN echo \
     -DCMAKE_C_COMPILER=mpicc \
     -DBUILD_TESTING=ON \
     -DBUILD_ANALYTICAL=ON \
-    -DSPH_EXA_WITH_H5PART=ON \
+    -DSPH_EXA_WITH_H5HUT=ON \
+    -DSPH_EXA_HDF5_PARALLEL_MODE=independent \
     -DGPU_DIRECT=OFF \
     -DCMAKE_CUDA_FLAGS='-arch=sm_60' \
     -DCMAKE_BUILD_TYPE=Debug \
