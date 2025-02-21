@@ -63,11 +63,11 @@ SPH-EXA
 ```
 #### Toolchain requirements
 
-The C++ (.cpp) part of the code requires a **C++20 compiler**, at least GCC 11, clang 12 or cray-clang 14.
-For CUDA (.cu), the minimum supported CUDA version is **CUDA 11.2** with a C++17 host compiler, e.g. GCC 9.3.0.
-
-For ease of use, the recommended minimum version of CUDA is 11.4.1 which supports GCC 11, providing both the required
-C++20 support and bug-free CUDA host compilation. [**NOTE:** CUDA/11.3.1 seems to have solved the compatibility issues with GCC 10.3.0]
+The code requires a **C++20 compiler** for both the CPU and GPU parts.
+* GCC 12 and later
+* Clang 16 and later
+* CUDA 12 and later
+* ROCm 6 and later. ROCm 5 compiles, but has bugs preventing the reliable use of GPU-aware-MPI
 
 #### Compilation
 
@@ -87,24 +87,18 @@ mkdir build
 cd build
 cmake <GIT_SOURCE_DIR>
 ```
-CMake configuration on Piz Daint for clang:
-**Cray-clang 14** for CPU code (.cpp), **CUDA 11.6 + GCC 11.2.0** for GPU code (.cu):
+CMake configuration on Daint on Alps:
+**CUDA 12.6 + GCC 13.3**:
 ```shell
-module load daint-gpu
-module load CMake/3.22.1
-module load PrgEnv-cray
-module load cdt/22.05           # will load cce/14.0.0
-module load nvhpc-nompi/22.2    # will load nvcc/11.6
-module load gcc/11.2.0
-module load cray-hdf5-parallel
+uenv image pull prgenv-gnu/24.11:v1
+uenv start prgenv-gnu/24.11:v1 --view=default
 
 mkdir build
 cd build
 
-# C-compiler is needed for hdf5 detection
-CC=cc CXX=CC cmake -DCMAKE_CUDA_ARCHITECTURES=60 -S <GIT_SOURCE_DIR>
-
+CC=mpicc CXX=mpicxx cmake -DCMAKE_CUDA_ARCHITECTURES=90 -DCSTONE_WITH_GPU_AWARE_MPI=ON -S <GIT_SOURCE_DIR
 ```
+
 Module and CMake configuration on LUMI (ROCm 6.2.2)
 ```shell
 module swap PrgEnv-cray PrgEnv-gnu
