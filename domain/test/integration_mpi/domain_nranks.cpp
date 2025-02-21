@@ -409,10 +409,9 @@ void randomGaussianGrav(int thisRank, int numRanks)
         KeyType k2 = k1 + (1ul << (3 * maxTreeLevel<KeyType>{} - decodePrefixLength(let_full.prefixes[i])));
         int gi1    = std::lower_bound(gkeys.begin(), gkeys.end(), k1) - gkeys.begin();
         int gi2    = std::lower_bound(gkeys.begin(), gkeys.end(), k2) - gkeys.begin();
-        // leafCenter based on global
-        auto leafCenter =
+        auto globCenter =
             massCenter<T>(coords.x().data(), coords.y().data(), coords.z().data(), globalMasses.data(), gi1, gi2);
-        EXPECT_NEAR(sqrt(norm2(makeVec3(leafCenter) - makeVec3(centers[i]))), 0.0, 1e-5);
+        EXPECT_NEAR(sqrt(norm2(makeVec3(globCenter) - makeVec3(centers[i]))), 0.0, 1e-5);
     }
 
     // Are the MAC flags set correctly? Do nodes marked by MAC have correct particle counts?
