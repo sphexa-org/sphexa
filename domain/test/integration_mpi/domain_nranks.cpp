@@ -376,6 +376,47 @@ void randomGaussianGrav(int thisRank, int numRanks)
     auto let_lcounts = ftree.leafCountsAcc();
     auto let_layout  = domain.layout();
 
+    std::span<const SourceCenterType<T>> centers = ftree.expansionCentersAcc();
+
+    // Any leaf in the tree with particles: does it contain the same particles as in the reference set of particles?
+
+    ASSERT_EQ(let_leaves.size(), let_layout.size());
+    for (int i = 0; i < let_leaves.size() - 1; ++i)
+    {
+        if (let_layout[i + 1] > let_layout[i])
+        {
+            EXPECT_EQ(let_layout[i + 1] - let_layout[i], let_lcounts[i]);
+            auto pk1 = keys[let_layout[i]];
+            auto pk2 = keys[let_layout[i + 1] - 1];
+
+            int gi1 = std::lower_bound(gkeys.begin(), gkeys.end(), pk1) - gkeys.begin();
+            int gi2 = std::lower_bound(gkeys.begin(), gkeys.end(), pk2) - gkeys.begin();
+            EXPECT_EQ(gi2 - gi1 + 1, let_lcounts[i]);
+
+            for (int d = 0; d < let_lcounts[i]; ++d)
+            {
+                EXPECT_EQ(keys[let_layout[i] + d], gkeys[gi1 + d]);
+            }
+
+        }
+    }
+
+    // Are all local and remote mass centers correct ?
+
+    for (int i = 0; i < let_full.numNodes; ++i)
+    {
+        KeyType k1 = decodePlaceholderBit(let_full.prefixes[i]);
+        KeyType k2 = k1 + (1ul << (3 * maxTreeLevel<KeyType>{} - decodePrefixLength(let_full.prefixes[i])));
+        int gi1    = std::lower_bound(gkeys.begin(), gkeys.end(), k1) - gkeys.begin();
+        int gi2    = std::lower_bound(gkeys.begin(), gkeys.end(), k2) - gkeys.begin();
+        // leafCenter based on global
+        auto leafCenter =
+            massCenter<T>(coords.x().data(), coords.y().data(), coords.z().data(), globalMasses.data(), gi1, gi2);
+        EXPECT_NEAR(sqrt(norm2(makeVec3(leafCenter) - makeVec3(centers[i]))), 0.0, 1e-5);
+    }
+
+    // Are the MAC flags set correctly? Do nodes marked by MAC have correct particle counts?
+
     {
         KeyType focusStart = let_leaves[ftree.assignment()[thisRank].start()];
         KeyType focusEnd   = let_leaves[ftree.assignment()[thisRank].end()];
@@ -384,7 +425,6 @@ void randomGaussianGrav(int thisRank, int numRanks)
         spanSfcRange(focusStart, focusEnd, spanningKeys.data());
         spanningKeys.back() = focusEnd;
 
-        std::span<const SourceCenterType<T>> centers = ftree.expansionCentersAcc();
         std::vector<uint8_t> marks(let_full.numNodes, 0);
         for (TreeNodeIndex i = 0; i < nNodes(spanningKeys); ++i)
         {
@@ -406,28 +446,6 @@ void randomGaussianGrav(int thisRank, int numRanks)
                 LocalIndex gi1 = std::lower_bound(gkeys.begin(), gkeys.end(), let_leaves[leafIdx]) - gkeys.begin();
                 LocalIndex gi2 = std::lower_bound(gkeys.begin(), gkeys.end(), let_leaves[leafIdx + 1]) - gkeys.begin();
                 EXPECT_EQ(gi2 - gi1 + 1, let_layout[leafIdx + 1] - let_layout[leafIdx]);
-            }
-        }
-    }
-
-    // Any leaf in the tree with particles: does it contain the same particles as in the reference set of particles?
-
-    ASSERT_EQ(let_leaves.size(), let_layout.size());
-    for (int i = 0; i < let_leaves.size() - 1; ++i)
-    {
-        if (let_layout[i + 1] > let_layout[i])
-        {
-            EXPECT_EQ(let_layout[i + 1] - let_layout[i], let_lcounts[i]);
-            auto pk1 = keys[let_layout[i]];
-            auto pk2 = keys[let_layout[i + 1] - 1];
-
-            int gi1 = std::lower_bound(gkeys.begin(), gkeys.end(), pk1) - gkeys.begin();
-            int gi2 = std::lower_bound(gkeys.begin(), gkeys.end(), pk2) - gkeys.begin();
-            EXPECT_EQ(gi2 - gi1 + 1, let_lcounts[i]);
-
-            for (int d = 0; d < let_lcounts[i]; ++d)
-            {
-                EXPECT_EQ(keys[let_layout[i] + d], gkeys[gi1 + d]);
             }
         }
     }
