@@ -38,6 +38,7 @@
 #include "cstone/sfc/box.hpp"
 #include "cstone/primitives/accel_switch.hpp"
 #include "io/ifile_io.hpp"
+#include "io/id_tag_utils.hpp"
 #include "sph/particles_data.hpp"
 #include "util/pm_reader.hpp"
 #include "util/timer.hpp"
@@ -183,14 +184,14 @@ protected:
     }
 
     // TODO: last parameter should be const& but at some point we use the data() method which is non-const
-    static void outputSelParticlesAllocatedFields(IFileWriter* writer, std::string selParticlesOutFile, size_t first, size_t last, ParticleDataType::HydroData& hydroSimData)
+    void outputSelParticlesAllocatedFields(IFileWriter* writer, std::string selParticlesOutFile, size_t first, size_t last, ParticleDataType::HydroData& hydroSimData)
     {
         // TODO: what about MPI task sync at this point? I'm assuming everything is synced...
         ParticleIndexVectorType selectedParticlesIndexes;
 
         // Find the selected particles positions in dataset
-        findSelectedParticlesIndexes(hydroSimData, first, last, selectedParticlesIndexes);
-
+        // findSelectedParticlesIndexes(hydroSimData, first, last, selectedParticlesIndexes);
+        findTaggedIds(hydroSimData.id, first, last, selectedParticlesIndexes);
 
         // TODO: debug only
         for(auto mpiRank=0; mpiRank<writer->numRanks(); mpiRank++){
@@ -260,26 +261,26 @@ protected:
 
     }
 
-    template<class AccType>
-    static void findSelectedParticlesIndexes(const ParticlesData<AccType>& d, size_t first, size_t last, std::vector<uint64_t>& selectedParticlesIndexes)
-    {
-        if constexpr (cstone::HaveGpu<AccType>{})
-        {
-            findSelectedParticlesIndexes_gpu(d, first, last, selectedParticlesIndexes);
-        }
-        else
-        {
-            // Find the selected particles in local id list and save their indexes
-            // TODO: switch to GPU-like implementation?
-            uint64_t particleIndex = first;
-            std::for_each(d.id.begin()+first, d.id.begin()+last, [&selectedParticlesIndexes, &particleIndex](auto& particleId){
-                if((particleId & msbMask) != 0) {// check MSB
-                    selectedParticlesIndexes.push_back(particleIndex); // TODO: inefficient due to resizing, avoid push_back usage
-                }
-                particleIndex++;
-            });
-        }
-    }
+    // template<class AccType>
+    // static void findSelectedParticlesIndexes(const ParticlesData<AccType>& d, size_t first, size_t last, std::vector<uint64_t>& selectedParticlesIndexes)
+    // {
+    //     if constexpr (cstone::HaveGpu<AccType>{})
+    //     {
+    //         findSelectedParticlesIndexes_gpu(d, first, last, selectedParticlesIndexes);
+    //     }
+    //     else
+    //     {
+    //         // Find the selected particles in local id list and save their indexes
+    //         // TODO: switch to GPU-like implementation?
+    //         uint64_t particleIndex = first;
+    //         std::for_each(d.id.begin()+first, d.id.begin()+last, [&selectedParticlesIndexes, &particleIndex](auto& particleId){
+    //             if((particleId & msbMask) != 0) {// check MSB
+    //                 selectedParticlesIndexes.push_back(particleIndex); // TODO: inefficient due to resizing, avoid push_back usage
+    //             }
+    //             particleIndex++;
+    //         });
+    //     }
+    // }
 
     std::ostream& out;
     Timer         timer;

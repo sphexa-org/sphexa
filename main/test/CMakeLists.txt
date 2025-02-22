@@ -3,6 +3,7 @@ set(UNIT_TESTS
         init/grid.cpp
         io/arg_parser.cpp
         io/h5part_wrapper.cpp
+        io/id_tag_utils.cpp
         observables/gravitational_waves.cpp
         sphexa/particles_data.cpp
         test_main.cpp)
@@ -22,6 +23,7 @@ if (CMAKE_CUDA_COMPILER AND SPH_EXA_WITH_H5PART)
     set(testname frontend_units_cuda)
     add_executable(${testname}
             cuda/gpu_particles_data.cpp
+            io/id_tag_utils.cpp
             test_main.cpp)
     target_include_directories(${testname} PRIVATE
                                ${COOLING_DIR}
