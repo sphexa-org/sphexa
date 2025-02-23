@@ -46,6 +46,40 @@
 namespace sphexa
 {
 
+// TODO: retrieve particle id type from ParticlesData
+/*! @brief Tagged id identification condition functor  
+ */
+struct MaskFunctor
+{
+    __device__
+    uint64_t operator()(uint64_t id) const
+    {
+        return (id & msbMask) != 0;
+    }
+};
+
+// TODO: retrieve particle id type from ParticlesData
+/*! @brief Linear search functor  
+ */
+struct SearchFunctor
+{
+    const uint64_t* m_devRawScanResult;
+    const uint64_t m_first;
+    const uint64_t m_scanResultSize;
+
+    __device__
+    void operator()(uint64_t& i) const
+    {
+        for(auto j = i; j<m_scanResultSize; j++){ // TODO: check performance penalty due to break
+            if(m_devRawScanResult[j] == i+1){
+                i = j+m_first;
+                break;
+            }
+        }
+    }
+};
+
+
 /*! @brief Tagged id identification function  
  *
  * @param[in]  ids          ordered id list
@@ -76,7 +110,7 @@ void findTaggedIds(const cstone::DeviceVector<uint64_t>& ids, size_t first, size
     // TODO: can I use a zip iterator here instead of raw pointer?
     auto* devRawScanResult = thrust::raw_pointer_cast(devScanResult.data());
     const auto scanResultSize = devScanResult.size();
-    SearchFunctor searchFunctor{devRawScanResult, scanResultSize};
+    SearchFunctor searchFunctor{devRawScanResult, first, scanResultSize};
     thrust::for_each(thrust::device, devSubsetPos.begin(), devSubsetPos.end(), searchFunctor);
 
     // Copy result to host
