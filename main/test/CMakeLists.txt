@@ -7,7 +7,7 @@ set(UNIT_TESTS
         observables/gravitational_waves.cpp
         sphexa/particles_data.cpp
         test_main.cpp)
-
+#TODO: why only if SPH_EXA_WITH_H5PART is on?
 if (SPH_EXA_WITH_H5PART)
     set(exename frontend_units)
     add_executable(${exename} ${UNIT_TESTS})
@@ -23,14 +23,14 @@ if (CMAKE_CUDA_COMPILER AND SPH_EXA_WITH_H5PART)
     set(testname frontend_units_cuda)
     add_executable(${testname}
             cuda/gpu_particles_data.cpp
-            io/id_tag_utils.cpp
+            io/id_tag_utils_gpu.cpp
             test_main.cpp)
     target_include_directories(${testname} PRIVATE
                                ${COOLING_DIR}
                                ${SPH_DIR}
                                ${CSTONE_DIR}
                                ${PROJECT_SOURCE_DIR}/main/src)
-    target_link_libraries(${testname} PUBLIC cstone_gpu sph_gpu OpenMP::OpenMP_CXX CUDA::cudart GTest::gtest_main)
+    target_link_libraries(${testname} PUBLIC cstone_gpu io_gpu sph_gpu OpenMP::OpenMP_CXX CUDA::cudart GTest::gtest_main)
     add_test(NAME FrontendUnitsCuda COMMAND ${exename})
     unset(testname)
 endif ()
