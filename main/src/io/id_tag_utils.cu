@@ -32,7 +32,6 @@
 
 
 //TODO: check headers
-//#include <thrust/binary_search.h>
 #include <thrust/device_vector.h>
 #include <thrust/execution_policy.h>
 #include <thrust/sequence.h>
@@ -58,6 +57,37 @@ struct MaskFunctor
     }
 };
 
+
+/*! @brief Id tagging (in first:last range) from list
+ *
+ * @param[out] ids          ordered id list
+ * @param[in]  first        first id index // TODO number of elements and pass iterator?
+ * @param[in]  last         last (excluded) id index
+ * @param[in]  selectedIds  vindexes to be tagged
+ */
+void tagIdsInList(cstone::DeviceVector<uint64_t>& ids, size_t first, size_t last, const std::vector<uint64_t>& selectedIds) 
+{
+    throw std::runtime_error("Not implemented yet");
+}
+
+
+/*! @brief Id tagging (in first:last range) in spherical volume, GPU version
+ *
+ * @param[out] ids           ordered id list
+ * @param[in]  x             x coordinates
+ * @param[in]  y             y coordinates
+ * @param[in]  z             z coordinates
+ * @param[in]  first         first id index // TODO number of elements and pass iterator?
+ * @param[in]  last          last (excluded) id index
+ * @param[in]  selSphereData spherical volume definition
+ */
+void tagIdsInSphere(cstone::DeviceVector<uint64_t>& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y, 
+    const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData)
+{
+    throw std::runtime_error("Not implemented yet");
+}
+
+
 // TODO: retrieve particle id type from ParticlesData
 /*! @brief Linear search functor  
  */
@@ -80,12 +110,12 @@ struct SearchFunctor
 };
 
 
-/*! @brief Tagged id identification function  
+/*! @brief Tagged id identification
  *
- * @param[in]  ids          ordered id list
- * @param[in]  first        first id index // TODO number of elements and pass iterator?
- * @param[in]  last         last (excluded) id index
- * @param[out] taggedIdsIndexes  vector of indexes (positions wrt of selected particles
+ * @param[in]  ids              ordered id list
+ * @param[in]  first            first id index // TODO number of elements and pass iterator?
+ * @param[in]  last             last (excluded) id index
+ * @param[out] taggedIdsIndexes vector of indexes (positions wrt of selected particles)
  */
 void findTaggedIds(const cstone::DeviceVector<uint64_t>& ids, size_t first, size_t last, std::vector<uint64_t>& taggedIdsIndexes)
 {

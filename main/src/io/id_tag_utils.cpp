@@ -24,7 +24,7 @@
  */
 
  /*! @file
- * @brief  CPU/GPU Particle ID tag utilities, CPU implementation
+ * @brief  CPU/GPU Particle ID tag utilities, CPU implementations
  *
  * @author Christopher Bignamini <christopher.bignamini@gmail.com>
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
@@ -34,6 +34,57 @@
 
 namespace sphexa
 {
+
+/*! @brief Id tagging (in first:last range) from list, CPU version
+ *
+ * @param[out] ids          ordered id list
+ * @param[in]  first        first id index // TODO number of elements and pass iterator?
+ * @param[in]  last         last (excluded) id index
+ * @param[in]  selectedIds  indexes to be tagged
+ */
+void tagIdsInList(std::vector<uint64_t>& ids, size_t first, size_t last, const std::vector<uint64_t>& selectedIds)
+{
+    const auto idListBeginIt = ids.begin()+first;
+    const auto idListEndIt = ids.begin()+last;
+    auto lastFound = 0;
+    std::for_each(selectedIds.begin(), selectedIds.end(), [idListBeginIt, idListEndIt, &lastFound](auto selectedIds){
+        auto lower = std::lower_bound(idListBeginIt+lastFound, idListEndIt, selectedIds);
+        if(lower != idListEndIt && *lower == selectedIds) {
+            lastFound = lower - idListBeginIt + 1;
+            *lower = *lower | msbMask;
+        }
+    });
+}
+
+/*! @brief Id tagging (in first:last range) in spherical volume, CPU version
+ *
+ * @param[out] ids           ordered id list
+ * @param[in]  x             x coordinates
+ * @param[in]  y             y coordinates
+ * @param[in]  z             z coordinates
+ * @param[in]  first         first id index // TODO number of elements and pass iterator?
+ * @param[in]  last          last (excluded) id index
+ * @param[in]  selSphereData spherical volume definition
+ */
+void tagIdsInSphere(std::vector<uint64_t>& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
+    const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData)
+{
+    // TODO: can we use C++23 zip iterators? Is there anything already implemented in SPH-EXA?
+    const auto squareRadius = selSphereData.radius*selSphereData.radius;
+//#pragma omp parallel for
+    for(auto particleIndex = firstIndex; particleIndex < lastIndex; particleIndex++){
+        auto current_x = x[particleIndex];
+        auto current_y = y[particleIndex];
+        auto current_z = z[particleIndex];
+        if((current_x - selSphereData.center[0])*(current_x - selSphereData.center[0]) +
+            (current_y - selSphereData.center[1])*(current_y - selSphereData.center[1]) +
+            (current_z - selSphereData.center[2])*(current_z - selSphereData.center[2]) <= squareRadius) {
+            ids[particleIndex] = ids[particleIndex] | msbMask;
+        }
+    }
+}
+
+
 /*! @brief Tagged id identification function  
  *
  * @param[in]  ids          ordered id list
