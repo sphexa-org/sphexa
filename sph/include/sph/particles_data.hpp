@@ -59,9 +59,6 @@ namespace sphexa
 
 namespace lt = ::sph::lt;
 
-using ParticleIdType = uint64_t; // TODO: retrieve type from ParticlesData
-constexpr ParticleIdType msbMask = static_cast<ParticleIdType>(1) << (sizeof(ParticleIdType)*8 - 1);
-
 template<class AccType>
 class ParticlesData : public cstone::FieldStates<ParticlesData<AccType>>
 {
