@@ -403,8 +403,11 @@ struct GromacsLikeNeighborhoodImpl
     const Th* h;
 
     template<class... In, class... Out, class Interaction, Symmetry Sym>
-    void
-    ijLoop(std::tuple<In*...> const& input, std::tuple<Out*...> const& output, Interaction&& interaction, Sym) const
+    void ijLoop(std::tuple<In*...> const& input,
+                std::tuple<Out*...> const& output,
+                Interaction&& interaction,
+                detail::EmptyPostamble,
+                Sym) const
     {
         const auto constInput = makeConstRestrict(input);
 

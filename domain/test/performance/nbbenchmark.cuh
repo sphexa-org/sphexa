@@ -114,7 +114,7 @@ void benchmarkNeighborhood(const Coords& coords,
     ijloop::CpuDirectNeighborhood{ngmax}
         .build(nsView, box, n, groupView, x, y, z, h.data())
         .ijLoop(util::tupleMap([](auto const& v) { return v.data(); }, inputs),
-                util::tupleMap([](auto& v) { return v.data(); }, outputs), interaction, Sym{});
+                util::tupleMap([](auto& v) { return v.data(); }, outputs), interaction, ijloop::empty_postamble, Sym{});
 
     const thrust::universal_vector<Tc> dX(coords.x().begin(), coords.x().end()),
         dY(coords.y().begin(), coords.y().end()), dZ(coords.z().begin(), coords.z().end());
@@ -179,7 +179,8 @@ void benchmarkNeighborhood(const Coords& coords,
     for (std::size_t i = 1; i < events.size(); ++i)
     {
         neighborhoodGPU.ijLoop(util::tupleMap([](auto const& v) { return rawPtr(v); }, dInputs),
-                               util::tupleMap([](auto& v) { return rawPtr(v); }, dOutputs), interaction, Sym());
+                               util::tupleMap([](auto& v) { return rawPtr(v); }, dOutputs), interaction,
+                               ijloop::empty_postamble, Sym());
         cudaEventRecord(events[i]);
     }
     cudaEventSynchronize(events.back());

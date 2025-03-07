@@ -53,7 +53,7 @@
 namespace cstone::ijloop
 {
 
-namespace detail
+namespace gpu_cluster_nb_list_neighborhood_detail
 {
 
 constexpr __forceinline__ bool includeNbSymmetric(unsigned i, unsigned j, unsigned first, unsigned last)
@@ -547,15 +547,20 @@ __device__ inline constexpr T0 dynamicTupleGet(std::tuple<T0, T...> const& tuple
     return res;
 }
 
-template<class Config, class T0, class... T>
-__device__ __forceinline__ void
-storeTupleISum(std::tuple<T0, T...> tuple, std::tuple<T0*, T*...> const& ptrs, const unsigned index, const bool store)
+template<class Config, class T0, class... T, class Postamble, class IData>
+__device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
+                                               std::tuple<T0*, T*...> const& ptrs,
+                                               const unsigned index,
+                                               const bool store,
+                                               Postamble const& postamble,
+                                               IData const& iData)
 {
     const auto block = cooperative_groups::this_thread_block();
     assert(block.dim_threads().x == Config::iSize);
     const auto warp = cooperative_groups::tiled_partition<GpuConfig::warpSize>(block);
 
-    if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < GpuConfig::warpSize / Config::iSize)
+    if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < GpuConfig::warpSize / Config::iSize &&
+                  std::is_same<Postamble, detail::EmptyPostamble>())
     {
         const T0 res = reduceTuple<GpuConfig::warpSize / Config::iSize, true>(tuple, std::plus<T0>());
         if ((block.thread_index().y <= sizeof...(T)) & store)
@@ -574,13 +579,14 @@ storeTupleISum(std::tuple<T0, T...> tuple, std::tuple<T0*, T*...> const& ptrs, c
             util::for_each_tuple([&](auto& t) { t += warp.shfl_down(t, offset); }, tuple);
 
         if ((block.thread_index().y == 0) & store)
-            util::for_each_tuple(
-                [index](auto* ptr, auto const& t)
-                {
-                    if constexpr (Config::symmetric) { atomicAddScalarOrVec(&ptr[index], t); }
-                    else { ptr[index] = t; }
-                },
-                ptrs, tuple);
+        {
+            if constexpr (Config::symmetric)
+            {
+                util::for_each_tuple([index](auto* ptr, auto const& t) { atomicAddScalarOrVec(&ptr[index], t); }, ptrs,
+                                     tuple);
+            }
+            else { storeParticleData(ptrs, index, postamble(iData, tuple)); }
+        }
     }
 }
 
@@ -621,7 +627,8 @@ template<class Config,
          class Th,
          class In,
          class Out,
-         class Interaction>
+         class Interaction,
+         class Postamble>
 __global__ __launch_bounds__(GpuConfig::warpSize* NumWarpsPerBlock) void gpuClusterNbListNeighborhoodKernel(
     const Box<Tc> __grid_constant__ box,
     const LocalIndex totalBodies,
@@ -634,6 +641,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumWarpsPerBlock) void gpuClus
     const In __grid_constant__ input,
     const Out __grid_constant__ output,
     const Interaction interaction,
+    const Postamble postamble,
     const LocalIndex* __restrict__ clusterNeighbors,
     const unsigned* __restrict__ clusterNeighborsCount)
 {
@@ -677,7 +685,12 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumWarpsPerBlock) void gpuClus
     const auto iData =
         i < totalBodies ? loadParticleData(x, y, z, h, input, i) : dummyParticleData(x, y, z, h, input, i);
 
-    using result_t                       = decltype(interaction(iData, iData, Vec3<Tc>(), Tc(0)));
+    using result_t = std::decay_t<decltype(interaction(iData, iData, Vec3<Tc>(), Tc(0)))>;
+
+    static_assert(!Config::symmetric ||
+                      std::is_same<std::decay_t<decltype(postamble(iData, std::declval<result_t>()))>, result_t>(),
+                  "postamble that changes the result type is not supported in combination with symmetric neighborhood");
+
     result_t result                      = {};
     const auto computeClusterInteraction = [&](const unsigned jCluster, const bool self)
     {
@@ -725,7 +738,26 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumWarpsPerBlock) void gpuClus
         computeClusterInteraction(jCluster, false);
     }
 
-    storeTupleISum<Config>(result, output, i, i >= firstBody & i < lastBody);
+    storeTupleISum<Config>(result, output, i, i >= firstBody & i < lastBody, postamble, iData);
+}
+
+template<class Tc, class Th, class In, class Out, class Postamble>
+__global__ void applyPostamble(const LocalIndex totalBodies,
+                               const Tc* __restrict__ x,
+                               const Tc* __restrict__ y,
+                               const Tc* __restrict__ z,
+                               const Th* __restrict__ h,
+                               const In __grid_constant__ input,
+                               const Out __grid_constant__ output,
+                               const Postamble postamble)
+{
+    const auto grid    = cooperative_groups::this_grid();
+    const LocalIndex i = grid.thread_rank();
+    if (i > totalBodies) return;
+
+    const auto iData  = loadParticleData(x, y, z, h, input, i);
+    const auto result = util::tupleMap([&](auto* ptr) { return ptr[i]; }, output);
+    storeParticleData(output, i, postamble(iData, result));
 }
 
 template<class Config, class Tc, class Th>
@@ -738,9 +770,12 @@ struct GpuClusterNbListNeighborhoodImpl
     thrust::device_vector<LocalIndex> clusterNeighbors;
     thrust::device_vector<unsigned> clusterNeighborsCount;
 
-    template<class... In, class... Out, class Interaction, Symmetry Sym>
-    void
-    ijLoop(std::tuple<In*...> const& input, std::tuple<Out*...> const& output, Interaction&& interaction, Sym) const
+    template<class... In, class... Out, class Interaction, class Postamble, Symmetry Sym>
+    void ijLoop(std::tuple<In*...> const& input,
+                std::tuple<Out*...> const& output,
+                Interaction&& interaction,
+                Postamble&& postamble,
+                Sym) const
     {
         const LocalIndex numBodies = lastBody - firstBody;
         if (Config::symmetric)
@@ -760,8 +795,17 @@ struct GpuClusterNbListNeighborhoodImpl
         const unsigned numBlocks            = iceil(numIClusters, numWarpsPerBlock);
         gpuClusterNbListNeighborhoodKernel<Config, numWarpsPerBlock, true, Sym><<<numBlocks, blockSize>>>(
             box, totalBodies, firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
-            std::forward<Interaction>(interaction), rawPtr(clusterNeighbors), rawPtr(clusterNeighborsCount));
+            std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), rawPtr(clusterNeighbors),
+            rawPtr(clusterNeighborsCount));
         checkGpuErrors(cudaGetLastError());
+
+        if constexpr (Config::symmetric && !std::is_same<std::decay_t<Postamble>, detail::EmptyPostamble>())
+        {
+            constexpr unsigned threads = 128;
+            const unsigned numBlocks   = iceil(totalBodies, threads);
+            applyPostamble<<<numBlocks, threads>>>(totalBodies, x, y, z, h, makeConstRestrict(input), output,
+                                                   std::forward<Postamble>(postamble));
+        }
     }
 
     Statistics stats() const
@@ -802,9 +846,9 @@ struct GpuClusterNbListNeighborhoodConfig
     using withoutSymmetry    = GpuClusterNbListNeighborhoodConfig<NcMax, ISize, JSize, ExpectedCompressionRate, false>;
 };
 
-} // namespace detail
+} // namespace gpu_cluster_nb_list_neighborhood_detail
 
-template<class Config = detail::GpuClusterNbListNeighborhoodConfig<>>
+template<class Config = gpu_cluster_nb_list_neighborhood_detail::GpuClusterNbListNeighborhoodConfig<>>
 struct GpuClusterNbListNeighborhood
 {
     template<unsigned NcMax>
@@ -818,15 +862,18 @@ struct GpuClusterNbListNeighborhood
     using withoutSymmetry    = GpuClusterNbListNeighborhood<typename Config::withoutSymmetry>;
 
     template<class Tc, class KeyType, class Th>
-    detail::GpuClusterNbListNeighborhoodImpl<Config, Tc, Th> build(const OctreeNsView<Tc, KeyType>& tree,
-                                                                   const Box<Tc>& box,
-                                                                   const LocalIndex totalBodies,
-                                                                   const GroupView& groups,
-                                                                   const Tc* x,
-                                                                   const Tc* y,
-                                                                   const Tc* z,
-                                                                   const Th* h) const
+    gpu_cluster_nb_list_neighborhood_detail::GpuClusterNbListNeighborhoodImpl<Config, Tc, Th>
+    build(const OctreeNsView<Tc, KeyType>& tree,
+          const Box<Tc>& box,
+          const LocalIndex totalBodies,
+          const GroupView& groups,
+          const Tc* x,
+          const Tc* y,
+          const Tc* z,
+          const Th* h) const
     {
+        using namespace gpu_cluster_nb_list_neighborhood_detail;
+
         const LocalIndex firstICluster = groups.firstBody / Config::iSize;
         const LocalIndex lastICluster  = iceil(groups.lastBody, Config::iSize);
         const LocalIndex numIClusters  = lastICluster - firstICluster;
@@ -834,7 +881,7 @@ struct GpuClusterNbListNeighborhood
 
         thrust::device_vector<util::tuple<Vec3<Tc>, Vec3<Tc>>> jClusterBboxes(numJClusters);
 
-        detail::GpuClusterNbListNeighborhoodImpl<Config, Tc, Th> nbList{
+        GpuClusterNbListNeighborhoodImpl<Config, Tc, Th> nbList{
             box,
             totalBodies,
             groups.firstBody,
@@ -843,13 +890,13 @@ struct GpuClusterNbListNeighborhood
             y,
             z,
             h,
-            thrust::device_vector<LocalIndex>(detail::nbStoragePerICluster<Config>::value * numIClusters),
+            thrust::device_vector<LocalIndex>(nbStoragePerICluster<Config>::value * numIClusters),
             thrust::device_vector<unsigned>(Config::compress ? 0 : numIClusters)};
 
         {
             constexpr unsigned numThreads = 128;
             unsigned numBlocks            = iceil(totalBodies, numThreads);
-            detail::gpuClusterNbListComputeBboxes<Config>
+            gpuClusterNbListComputeBboxes<Config>
                 <<<numBlocks, numThreads>>>(totalBodies, x, y, z, rawPtr(jClusterBboxes));
             checkGpuErrors(cudaGetLastError());
         }
@@ -864,7 +911,7 @@ struct GpuClusterNbListNeighborhood
                 maxH = thrust::reduce(thrust::device, h, h + totalBodies, Th(0), thrust::maximum<Th>());
 
             resetTraversalCounters<<<1, 1>>>();
-            detail::gpuClusterNbListBuild<Config, numWarpsPerBlock, true><<<numBlocks, blockSize>>>(
+            gpuClusterNbListBuild<Config, numWarpsPerBlock, true><<<numBlocks, blockSize>>>(
                 tree, box, totalBodies, groups.firstBody, groups.lastBody, x, y, z, h, rawPtr(jClusterBboxes),
                 rawPtr(nbList.clusterNeighbors), rawPtr(nbList.clusterNeighborsCount), rawPtr(pool), maxH);
             checkGpuErrors(cudaGetLastError());

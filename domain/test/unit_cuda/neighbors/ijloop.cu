@@ -61,7 +61,17 @@ struct NeighborFun
     {
         const auto [i, iPos, hi, vi] = iData;
         const auto [j, jPos, hj, vj] = jData;
-        return std::make_tuple(i, j, iPos, jPos, ijPosDiff, distSq, hi, hj, vi, vj, 1u);
+        return std::make_tuple(i, j, iPos, jPos, ijPosDiff, distSq, hi, hj, vi, vj, 1u, hi);
+    }
+};
+
+struct PostambleFun
+{
+    template<class ParticleData, class Result>
+    constexpr auto operator()(ParticleData const& /* iData */, Result jResult) const
+    {
+        std::get<11>(jResult) /= std::get<10>(jResult);
+        return jResult;
     }
 };
 
@@ -75,7 +85,8 @@ using Result                      = std::tuple<thrust::universal_vector<LocalInd
                                                thrust::universal_vector<double>,       // hjSum
                                                thrust::universal_vector<double>,       // viSum
                                                thrust::universal_vector<double>,       // vjSum
-                                               thrust::universal_vector<unsigned>      // neighborsCount
+                                               thrust::universal_vector<unsigned>,     // neighborsCount
+                                               thrust::universal_vector<double>        // hiSumNormalized
                                                >;
 constexpr static auto resultNames = std::make_tuple("iSum",
                                                     "jSum",
@@ -87,7 +98,8 @@ constexpr static auto resultNames = std::make_tuple("iSum",
                                                     "hjSum",
                                                     "viSum",
                                                     "vjSum",
-                                                    "neighborsCount");
+                                                    "neighborsCount",
+                                                    "hiSumNormalized");
 
 Result reference(const Box<double>& box,
                  const double* const x,
@@ -102,7 +114,7 @@ Result reference(const Box<double>& box,
     thrust::universal_vector<LocalIndex> iSum(numBodies), jSum(numBodies);
     thrust::universal_vector<Vec3<double>> iPosSum(numBodies), jPosSum(numBodies), ijPosDiffSum(numBodies);
     thrust::universal_vector<double> d2Sum(numBodies), hiSum(numBodies), hjSum(numBodies), viSum(numBodies),
-        vjSum(numBodies);
+        vjSum(numBodies), hiSumNormalized(numBodies);
     thrust::universal_vector<unsigned> neighborsCount(numBodies);
 
     for (unsigned i = firstBody; i < lastBody; ++i)
@@ -159,11 +171,12 @@ Result reference(const Box<double>& box,
                 neighborsCount[i] += 1;
             }
         }
+        hiSumNormalized[i] = hiSum[i] / neighborsCount[i];
     }
 
     return Result(std::move(iSum), std::move(jSum), std::move(iPosSum), std::move(jPosSum), std::move(ijPosDiffSum),
                   std::move(d2Sum), std::move(hiSum), std::move(hjSum), std::move(viSum), std::move(vjSum),
-                  std::move(neighborsCount));
+                  std::move(neighborsCount), std::move(hiSumNormalized));
 }
 
 void validate(const Result& expected, const Result& actual)
@@ -284,7 +297,7 @@ auto run(Neighborhood const& nb)
                          return rawPtr(vec);
                      },
                      actual),
-                 NeighborFun{}, ijloop::symmetry::asymmetric);
+                 NeighborFun{}, PostambleFun{}, ijloop::symmetry::asymmetric);
     checkGpuErrors(cudaDeviceSynchronize());
 
     validate(ref, actual);

@@ -44,7 +44,7 @@ namespace cstone::ijloop
 namespace detail
 {
 
-template<bool UsePbc, class Tc, class Th, class KeyType, class In, class Out, class Interaction>
+template<bool UsePbc, class Tc, class Th, class KeyType, class In, class Out, class Interaction, class Postamble>
 __global__ __launch_bounds__(TravConfig::numThreads) void gpuAlwaysTraverseNeighborhoodKernel(
     const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
     const Box<Tc> __grid_constant__ box,
@@ -56,6 +56,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void gpuAlwaysTraverseNeigh
     const In __grid_constant__ input,
     const Out __grid_constant__ output,
     const Interaction interaction,
+    const Postamble postamble,
     const unsigned ngmax,
     LocalIndex* __restrict__ neighbors,
     int* __restrict__ globalPool)
@@ -98,7 +99,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void gpuAlwaysTraverseNeigh
                     updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
                 }
 
-                storeParticleData(output, i, result);
+                storeParticleData(output, i, postamble(iData, result));
             }
         }
     }
@@ -116,9 +117,12 @@ struct GpuAlwaysTraverseNeighborhoodImpl
     mutable thrust::device_vector<LocalIndex> neighbors;
     mutable thrust::device_vector<int> globalPool;
 
-    template<class... In, class... Out, class Interaction, Symmetry Sym>
-    void
-    ijLoop(std::tuple<In*...> const& input, std::tuple<Out*...> const& output, Interaction&& interaction, Sym) const
+    template<class... In, class... Out, class Interaction, class Postamble, Symmetry Sym>
+    void ijLoop(std::tuple<In*...> const& input,
+                std::tuple<Out*...> const& output,
+                Interaction&& interaction,
+                Postamble&& postamble,
+                Sym) const
     {
         resetTraversalCounters<<<1, 1>>>();
         if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
@@ -126,13 +130,13 @@ struct GpuAlwaysTraverseNeighborhoodImpl
         {
             gpuAlwaysTraverseNeighborhoodKernel<true><<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
                 tree, box, groups, x, y, z, h, makeConstRestrict(input), output, std::forward<Interaction>(interaction),
-                ngmax, rawPtr(neighbors), rawPtr(globalPool));
+                std::forward<Postamble>(postamble), ngmax, rawPtr(neighbors), rawPtr(globalPool));
         }
         else
         {
             gpuAlwaysTraverseNeighborhoodKernel<false><<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
                 tree, box, groups, x, y, z, h, makeConstRestrict(input), output, std::forward<Interaction>(interaction),
-                ngmax, rawPtr(neighbors), rawPtr(globalPool));
+                std::forward<Postamble>(postamble), ngmax, rawPtr(neighbors), rawPtr(globalPool));
         }
         checkGpuErrors(cudaGetLastError());
     }

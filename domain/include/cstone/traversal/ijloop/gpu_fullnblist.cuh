@@ -67,7 +67,7 @@ __global__ __launch_bounds__(MaxThreads) void gpuFullNbListNeighborhoodBuild(
     neighborsCount[threadId] = findNeighbors(i, x, y, z, h, tree, box, ngmax, neighbors + threadId, neighborsStride);
 }
 
-template<int MaxThreads, class Tc, class Th, class In, class Out, class Interaction>
+template<int MaxThreads, class Tc, class Th, class In, class Out, class Interaction, class Postamble>
 __global__
 __launch_bounds__(MaxThreads) void gpuFullNbListNeighborhoodKernel(const Box<Tc> __grid_constant__ box,
                                                                    const LocalIndex firstBody,
@@ -79,6 +79,7 @@ __launch_bounds__(MaxThreads) void gpuFullNbListNeighborhoodKernel(const Box<Tc>
                                                                    const In __grid_constant__ input,
                                                                    const Out __grid_constant__ output,
                                                                    const Interaction interaction,
+                                                                   const Postamble postamble,
                                                                    const unsigned ngmax,
                                                                    const LocalIndex* __restrict__ neighbors,
                                                                    const unsigned* __restrict__ neighborsCount)
@@ -104,7 +105,7 @@ __launch_bounds__(MaxThreads) void gpuFullNbListNeighborhoodKernel(const Box<Tc>
         updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
     }
 
-    storeParticleData(output, i, result);
+    storeParticleData(output, i, postamble(iData, result));
 }
 
 template<class Tc, class Th>
@@ -118,15 +119,19 @@ struct GpuFullNbListNeighborhoodImpl
     thrust::device_vector<LocalIndex> neighbors;
     thrust::device_vector<unsigned> neighborsCount;
 
-    template<class... In, class... Out, class Interaction, Symmetry Sym>
-    void
-    ijLoop(std::tuple<In*...> const& input, std::tuple<Out*...> const& output, Interaction&& interaction, Sym) const
+    template<class... In, class... Out, class Interaction, class Postamble, Symmetry Sym>
+    void ijLoop(std::tuple<In*...> const& input,
+                std::tuple<Out*...> const& output,
+                Interaction&& interaction,
+                Postamble&& postamble,
+                Sym) const
     {
         const LocalIndex numBodies = lastBody - firstBody;
         constexpr int numThreads   = 128;
         detail::gpuFullNbListNeighborhoodKernel<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
             box, firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
-            std::forward<Interaction>(interaction), ngmax, rawPtr(neighbors), rawPtr(neighborsCount));
+            std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), ngmax, rawPtr(neighbors),
+            rawPtr(neighborsCount));
         checkGpuErrors(cudaGetLastError());
     }
 

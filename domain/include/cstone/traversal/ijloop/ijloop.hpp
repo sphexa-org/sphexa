@@ -136,6 +136,22 @@ storeParticleData(std::tuple<Ts*...> const& output, LocalIndex index, std::tuple
 namespace detail
 {
 
+struct EmptyPostamble
+{
+    template<class ParticleData, class Result>
+    constexpr Result operator()(ParticleData const&, Result const& result) const
+    {
+        return result;
+    }
+};
+
+} // namespace detail
+
+constexpr detail::EmptyPostamble empty_postamble;
+
+namespace detail
+{
+
 struct ConceptTestInteraction
 {
     constexpr std::tuple<int>
@@ -173,7 +189,8 @@ concept Neighborhood = requires(T nb,
     } -> std::same_as<Statistics>;
     {
         nb.build(tree, box, totalBodies, groups, x, y, z, h)
-            .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, symmetry::asymmetric)
+            .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble,
+                    symmetry::asymmetric)
     } -> std::same_as<void>;
 };
 
