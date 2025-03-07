@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -39,21 +23,56 @@ TEST(BoxOverlap, overlapRange)
 {
     constexpr int R = 1024;
 
-    EXPECT_TRUE(overlapRange<R>(0, 2, 1, 3));
-    EXPECT_FALSE(overlapRange<R>(0, 1, 1, 2));
-    EXPECT_FALSE(overlapRange<R>(0, 1, 2, 3));
-    EXPECT_TRUE(overlapRange<R>(0, 1023, 1, 3));
-    EXPECT_TRUE(overlapRange<R>(0, 1024, 1, 3));
-    EXPECT_TRUE(overlapRange<R>(0, 2048, 1, 3));
+    EXPECT_TRUE(overlapRange(0, 2, 1, 3, R));
+    EXPECT_FALSE(overlapRange(0, 1, 1, 2, R));
+    EXPECT_FALSE(overlapRange(0, 1, 2, 3, R));
+    EXPECT_TRUE(overlapRange(0, 1023, 1, 3, R));
+    EXPECT_TRUE(overlapRange(0, 1024, 1, 3, R));
+    EXPECT_TRUE(overlapRange(0, 2048, 1, 3, R));
 
-    EXPECT_TRUE(overlapRange<R>(1022, 1024, 1023, 1024));
-    EXPECT_TRUE(overlapRange<R>(1023, 1025, 0, 1));
-    EXPECT_FALSE(overlapRange<R>(0, 1, 1023, 1024));
-    EXPECT_TRUE(overlapRange<R>(-1, 1, 1023, 1024));
-    EXPECT_FALSE(overlapRange<R>(-1, 1, 1022, 1023));
+    EXPECT_TRUE(overlapRange(1022, 1024, 1023, 1024, R));
+    EXPECT_TRUE(overlapRange(1023, 1025, 0, 1, R));
+    EXPECT_FALSE(overlapRange(0, 1, 1023, 1024, R));
+    EXPECT_TRUE(overlapRange(-1, 1, 1023, 1024, R));
+    EXPECT_FALSE(overlapRange(-1, 1, 1022, 1023, R));
 
-    EXPECT_TRUE(overlapRange<R>(1023, 2048, 0, 1));
-    EXPECT_TRUE(overlapRange<R>(512, 1024, 332, 820));
+    EXPECT_TRUE(overlapRange(1023, 2048, 0, 1, R));
+    EXPECT_TRUE(overlapRange(512, 1024, 332, 820, R));
+}
+
+TEST(BoxOverlap, rangeSep)
+{
+    EXPECT_EQ(rangeSep(0, 1, 3, 4, 10), 2);
+    EXPECT_EQ(rangeSep(0, 1, 3, 4, 5), 1);
+    EXPECT_EQ(rangeSep(0, 1, 3, 4, 0), 2);
+
+    EXPECT_EQ(rangeSep(3, 4, 0, 1, 10), 2);
+    EXPECT_EQ(rangeSep(3, 4, 0, 1, 5), 1);
+    EXPECT_EQ(rangeSep(3, 4, 0, 1, 0), 2);
+}
+
+TEST(BoxOverlap, boxSeparation)
+{
+    {
+        Vec3<int> pbc{1024, 1024, 1024};
+        Vec3<int> ref{2, 2, 2};
+        EXPECT_EQ(boxSeparation({0, 1}, {3, 6}, pbc), ref);
+    }
+    {
+        Vec3<int> pbc{0, 1024, 1024};
+        Vec3<int> ref{2, 1, 1};
+        EXPECT_EQ(boxSeparation({0, 1}, {3, 1023}, pbc), ref);
+    }
+    {
+        Vec3<int> pbc{0, 100, 200};
+        Vec3<int> ref{2, 4, 7};
+        EXPECT_EQ(boxSeparation({0, 1, 10, 100, 2, 4}, {3, 5, 4, 5, 180, 195}, pbc), ref);
+    }
+    {
+        Vec3<int> pbc{1024, 1024, 1024};
+        Vec3<int> ref{0, 0, 0};
+        EXPECT_EQ(boxSeparation({0, 2, 2, 4, 6, 8}, {1, 3, 3, 5, 7, 9}, pbc), ref);
+    }
 }
 
 /*! @brief Test overlap between octree nodes and coordinate ranges

@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -32,9 +16,8 @@
 
 #pragma once
 
-#include <vector>
-
 #include "boxoverlap.hpp"
+#include "cstone/primitives/math.hpp"
 #include "cstone/traversal/traversal.hpp"
 #include "cstone/tree/octree.hpp"
 
@@ -44,8 +27,8 @@ namespace cstone
 //! @brief compute 1/theta + s for the minimum distance MAC
 HOST_DEVICE_FUN inline float invThetaMinMac(float theta) { return 1.0f / theta + 0.5f; }
 
-//! @brief compute 1/theta + sqrt(3) for the worst-case vector MAC
-HOST_DEVICE_FUN inline float invThetaVecMac(float theta) { return 1.0f / theta + std::sqrt(3.0f); }
+//! @brief cover worst-case vector mac with a min-Mac
+HOST_DEVICE_FUN inline float invThetaMinToVec(float theta) { return 1.0f / theta + std::sqrt(3.0f) / 2; }
 
 /*! @brief Compute square of the acceptance radius for the minimum distance MAC
  *
@@ -140,56 +123,26 @@ evaluateMacPbc(Vec3<T> sourceCenter, T macSq, Vec3<T> targetCenter, Vec3<T> targ
     return R2 < std::abs(macSq);
 }
 
-//! @brief commutative version of the min-distance mac, based on floating point math
-template<class T>
-HOST_DEVICE_FUN bool minMacMutual(const Vec3<T>& centerA,
-                                  const Vec3<T>& sizeA,
-                                  const Vec3<T>& centerB,
-                                  const Vec3<T>& sizeB,
-                                  const Box<T>& box,
-                                  float invTheta)
-{
-    Vec3<T> dX = minDistance(centerA, sizeA, centerB, sizeB, box);
-
-    T distSq = norm2(dX);
-    T sizeAB = 2 * stl::max(max(sizeA), max(sizeB));
-
-    T mac = sizeAB * invTheta;
-
-    return distSq > (mac * mac);
-}
-
-/*! @brief commutative combination of min-distance and vector map
- *
- * @param invThetaEff  1/theta + s, effective inverse opening parameter
- *
- * This MAC doesn't pass any A-B pairs that would fail either the min-distance
- * or vector MAC. Can be used instead of the vector mac when the mass center locations
- * are not known.
+/*! @brief integer based mutual min-mac
+ * @tparam T float or double
+ * @param a         first integer cell box
+ * @param b         second integer cell box
+ * @param ellipse   grid anisotropy (max grid-step in any dim / grid-step in dim_i) divided by theta
+ *                  is equal to (L_max / L_x,y,z) * 1/theta if the number of grid points is equal in all dimensions
+ * @param pbc       pbc yes/no per dimension
+ * @return          true if MAC passed, i.e. true if cells are far
  */
 template<class T>
-HOST_DEVICE_FUN bool minVecMacMutual(const Vec3<T>& centerA,
-                                     const Vec3<T>& sizeA,
-                                     const Vec3<T>& centerB,
-                                     const Vec3<T>& sizeB,
-                                     const Box<T>& box,
-                                     float invThetaEff)
+HOST_DEVICE_FUN bool minMacMutualInt(IBox a, IBox b, Vec3<T> ellipse, Vec3<int> pbc)
 {
-    bool passA;
-    {
-        // A = target, B = source
-        Vec3<T> dX = minDistance(centerB, centerA, sizeA, box);
-        T mac      = max(sizeB) * 2 * invThetaEff;
-        passA      = norm2(dX) > (mac * mac);
-    }
-    bool passB;
-    {
-        // B = target, A = source
-        Vec3<T> dX = minDistance(centerA, centerB, sizeB, box);
-        T mac      = max(sizeA) * 2 * invThetaEff;
-        passB      = norm2(dX) > (mac * mac);
-    }
-    return passA && passB;
+    T l_max = std::max({a.xmax() - a.xmin(), a.ymax() - a.ymin(), a.zmax() - a.zmin(), b.xmax() - b.xmin(),
+                        b.ymax() - b.ymin(), b.zmax() - b.zmin()});
+
+    // computing a-b separation in integers is key to avoiding a-b/b-a asymmetry due to round-off errors
+    Vec3<int> a_b = boxSeparation(a, b, pbc);
+
+    Vec3<T> E{a_b[0] / ellipse[0], a_b[1] / ellipse[1], a_b[2] / ellipse[2]};
+    return norm2(E) > l_max * l_max;
 }
 
 //! @brief mark all nodes of @p octree (leaves and internal) that fail the evaluateMac w.r.t to @p target

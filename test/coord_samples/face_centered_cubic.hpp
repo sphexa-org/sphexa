@@ -35,11 +35,9 @@
 #include <random>
 #include <vector>
 
-#include "cstone/findneighbors.hpp"
 #include "cstone/primitives/gather.hpp"
 #include "cstone/sfc/sfc.hpp"
 #include "cstone/tree/definitions.h"
-#include "cstone/util/gsl-lite.hpp"
 
 namespace cstone
 {
@@ -127,18 +125,18 @@ public:
                 for (unsigned k = 0; k < nz; ++k)
                 {
                     const unsigned idx = i * ny * nz * 4 + j * nz * 4 + k * 4;
-                    x_[idx + 0]   = i * dx;
-                    y_[idx + 0]   = j * dy;
-                    z_[idx + 0]   = k * dz;
-                    x_[idx + 1]   = i * dx;
-                    y_[idx + 1]   = (j + 0.5) * dy;
-                    z_[idx + 1]   = (k + 0.5) * dz;
-                    x_[idx + 2]   = (i + 0.5) * dx;
-                    y_[idx + 2]   = j * dy;
-                    z_[idx + 2]   = (k + 0.5) * dz;
-                    x_[idx + 3]   = (i + 0.5) * dx;
-                    y_[idx + 3]   = (j + 0.5) * dy;
-                    z_[idx + 3]   = k * dz;
+                    x_[idx + 0]        = i * dx;
+                    y_[idx + 0]        = j * dy;
+                    z_[idx + 0]        = k * dz;
+                    x_[idx + 1]        = i * dx;
+                    y_[idx + 1]        = (j + 0.5) * dy;
+                    z_[idx + 1]        = (k + 0.5) * dz;
+                    x_[idx + 2]        = (i + 0.5) * dx;
+                    y_[idx + 2]        = j * dy;
+                    z_[idx + 2]        = (k + 0.5) * dz;
+                    x_[idx + 3]        = (i + 0.5) * dx;
+                    y_[idx + 3]        = (j + 0.5) * dy;
+                    z_[idx + 3]        = k * dz;
                 }
             }
         }

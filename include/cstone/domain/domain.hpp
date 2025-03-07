@@ -1,25 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2022 CSCS, ETH Zurich
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -214,8 +199,8 @@ public:
         gatherArrays(sorter.gatherFunc(), sorter.getMap() + global_.numSendDown(), global_.numAssigned(), exchangeStart,
                      0, std::tie(h), util::reverse(scratch));
 
+        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), 1.0 / theta_);
         float invThetaEff      = invThetaMinMac(theta_);
-        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), invThetaEff);
 
         if (firstCall_)
         {
@@ -234,7 +219,13 @@ public:
         halos_.discover(octreeView.prefixes, octreeView.childOffsets, octreeView.internalToLeaf, focusLeaves,
                         focusTree_.leafCountsAcc(), focusTree_.assignment(), {rawPtr(layoutAcc_), layoutAcc_.size()},
                         box(), rawPtr(h), haloSearchExt_, std::get<0>(scratch));
-        halos_.computeLayout(focusTree_.treeLeaves(), focusTree_.leafCounts(), focusTree_.assignment(), peers, layout_);
+        auto fail = halos_.computeLayout(focusTree_.treeLeaves(), focusTree_.leafCounts(), focusTree_.assignment(),
+                                         peers, layout_);
+        if (fail)
+        {
+            std::cout << "found halo outside peer area on rank " << myRank_ << std::endl;
+            MPI_Abort(MPI_COMM_WORLD, 67);
+        }
 
         updateLayout(sorter, exchangeStart, keyView, particleKeys, std::tie(h),
                      std::tuple_cat(std::tie(x, y, z), particleProperties), scratch);
@@ -263,7 +254,7 @@ public:
         gatherArrays(sorter.gatherFunc(), sorter.getMap() + global_.numSendDown(), global_.numAssigned(), exchangeStart,
                      0, std::tie(x, y, z, h, m), util::reverse(scratch));
 
-        float invThetaEff      = invThetaVecMac(theta_);
+        float invThetaEff      = invThetaMinToVec(theta_);
         std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), invThetaEff);
 
         if (firstCall_)
@@ -404,7 +395,7 @@ public:
     //! @brief the index of the last locally assigned cell in focusTree()
     TreeNodeIndex endCell() const { return focusTree_.assignment()[myRank_].end(); }
     //! @brief particle offsets of each focus tree leaf cell
-    gsl::span<const LocalIndex> layout() const { return {rawPtr(layoutAcc_), layoutAcc_.size()}; }
+    std::span<const LocalIndex> layout() const { return {rawPtr(layoutAcc_), layoutAcc_.size()}; }
     //! @brief return the coordinate bounding box from the previous sync call
     const Box<T>& box() const { return global_.box(); }
 
@@ -542,7 +533,7 @@ private:
     template<class Sorter, class KeyVec, class... Arrays1, class... Arrays2, class... Arrays3>
     void updateLayout(Sorter& sorter,
                       LocalIndex exchangeStart,
-                      gsl::span<const KeyType> keyView,
+                      std::span<const KeyType> keyView,
                       KeyVec& keys,
                       std::tuple<Arrays1&...> orderedBuffers,
                       std::tuple<Arrays2&...> unorderedBuffers,
@@ -603,7 +594,7 @@ private:
         bufDesc_     = newBufDesc;
     }
 
-    void diagnostics(size_t assignedSize, gsl::span<int> peers)
+    void diagnostics(size_t assignedSize, std::span<int> peers)
     {
         auto focusAssignment = focusTree_.assignment();
         auto focusTree       = focusTree_.treeLeaves();

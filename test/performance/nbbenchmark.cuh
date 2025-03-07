@@ -76,24 +76,24 @@ void benchmarkNeighborhood(const Coords& coords,
     printf("Number of particles: %u\n", n);
     printf("Expected average number of neighbors: %.0f\n", expected_neighbors);
 
-    const Tc* x          = coords.x().data();
-    const Tc* y          = coords.y().data();
-    const Tc* z          = coords.z().data();
-    const KeyType* codes = coords.particleKeys().data();
+    const Tc* x         = coords.x().data();
+    const Tc* y         = coords.y().data();
+    const Tc* z         = coords.z().data();
+    const KeyType* keys = coords.particleKeys().data();
 
     constexpr unsigned bucketSize = 64;
-    const auto [csTree, counts]   = computeOctree(codes, codes + n, bucketSize);
+    const auto [csTree, counts]   = computeOctree(std::span(coords.particleKeys()), bucketSize);
     OctreeData<KeyType, CpuTag> octree;
     octree.resize(nNodes(csTree));
     updateInternalTree<KeyType>(csTree, octree.data());
     const TreeNodeIndex* childOffsets = octree.childOffsets.data();
     const TreeNodeIndex* toLeafOrder  = octree.internalToLeaf.data();
 
-    std::vector<LocalIndex> layout(nNodes(csTree) + 1);
-    std::exclusive_scan(counts.begin(), counts.end() + 1, layout.begin(), 0);
+    std::vector<LocalIndex> layout(nNodes(csTree) + 1, 0);
+    std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
 
     std::vector<Vec3<Tc>> centers(octree.numNodes), sizes(octree.numNodes);
-    gsl::span<const KeyType> nodeKeys(octree.prefixes.data(), octree.numNodes);
+    std::span<const KeyType> nodeKeys(octree.prefixes.data(), octree.numNodes);
     nodeFpCenters<KeyType>(nodeKeys, centers.data(), sizes.data(), box);
 
     const OctreeNsView<Tc, KeyType> nsView{octree.numLeafNodes,
@@ -101,7 +101,7 @@ void benchmarkNeighborhood(const Coords& coords,
                                            octree.childOffsets.data(),
                                            octree.internalToLeaf.data(),
                                            octree.levelRange.data(),
-                                           codes,
+                                           keys,
                                            layout.data(),
                                            centers.data(),
                                            sizes.data()};

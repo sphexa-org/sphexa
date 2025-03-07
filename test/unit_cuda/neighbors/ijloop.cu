@@ -214,26 +214,26 @@ auto initialData()
     Box<double> box{0, 1, BoundaryType::periodic};
     RandomCoordinates<double, StrongKeyT> coords(totalBodies, box);
 
-    thrust::universal_vector<double> x   = coords.x();
-    thrust::universal_vector<double> y   = coords.y();
-    thrust::universal_vector<double> z   = coords.z();
-    thrust::universal_vector<KeyT> codes = coords.particleKeys();
+    thrust::universal_vector<double> x  = coords.x();
+    thrust::universal_vector<double> y  = coords.y();
+    thrust::universal_vector<double> z  = coords.z();
+    thrust::universal_vector<KeyT> keys = coords.particleKeys();
 
     thrust::universal_vector<double> h(totalBodies), v(totalBodies);
     std::mt19937 gen(42);
     std::generate(h.begin(), h.end(), std::bind(std::uniform_real_distribution<double>(0.03, 0.15), std::ref(gen)));
     std::generate(v.begin(), v.end(), std::bind(std::uniform_real_distribution<double>(-100, 100), std::ref(gen)));
 
-    auto [csTree, counts] = computeOctree(rawPtr(codes), rawPtr(codes) + totalBodies, 8);
+    auto [csTree, counts] = computeOctree(std::span<const KeyT>(rawPtr(keys), keys.size()), 8);
     OctreeData<KeyT, CpuTag> octree;
     octree.resize(nNodes(csTree));
     updateInternalTree<KeyT>(csTree, octree.data());
 
-    thrust::universal_vector<LocalIndex> layout(nNodes(csTree) + 1);
-    std::exclusive_scan(counts.begin(), counts.end() + 1, layout.begin(), 0);
+    thrust::universal_vector<LocalIndex> layout(nNodes(csTree) + 1, 0);
+    std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
 
     thrust::universal_vector<Vec3<double>> centers(octree.numNodes), sizes(octree.numNodes);
-    gsl::span<const KeyT> nodeKeys(rawPtr(octree.prefixes), octree.numNodes);
+    std::span<const KeyT> nodeKeys(rawPtr(octree.prefixes), octree.numNodes);
     nodeFpCenters(nodeKeys, rawPtr(centers), rawPtr(sizes), box);
 
     Result ref =
@@ -244,7 +244,7 @@ auto initialData()
                                     rawPtr(octree.childOffsets),
                                     rawPtr(octree.internalToLeaf),
                                     rawPtr(octree.levelRange),
-                                    rawPtr(codes),
+                                    rawPtr(keys),
                                     rawPtr(layout),
                                     rawPtr(centers),
                                     rawPtr(sizes)};
@@ -261,8 +261,8 @@ auto initialData()
                               .groupStart = rawPtr(groups),
                               .groupEnd   = rawPtr(groups) + 1};
 
-    auto treeData = std::make_tuple(std::move(codes), std::move(octree), std::move(codes), std::move(layout),
-                                    std::move(centers), std::move(sizes), std::move(groups));
+    auto treeData = std::make_tuple(std::move(keys), std::move(octree), std::move(layout), std::move(centers),
+                                    std::move(sizes), std::move(groups));
 
     return std::make_tuple(box, totalBodies, groupView, std::move(x), std::move(y), std::move(z), std::move(h),
                            std::move(v), std::move(treeData), std::move(view), std::move(ref));
