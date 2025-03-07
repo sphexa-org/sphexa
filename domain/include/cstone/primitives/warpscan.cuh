@@ -23,6 +23,22 @@
 namespace cstone
 {
 
+namespace detail
+{
+
+__device__ __forceinline__ unsigned laneIndex()
+{
+#ifdef __CUDACC__
+    unsigned laneIdx;
+    asm volatile("mov.u32 %0, %laneid;" : "=r"(laneIdx));
+    return laneIdx;
+#else
+    return (threadIdx.z * blockDim.y * blockDim.x + threadIdx.y * blockDim.x + threadIdx.x) & (GpuConfig::warpSize - 1);
+#endif
+}
+
+} // namespace detail
+
 //! @brief there's no int overload for min in AMD ROCM
 __device__ __forceinline__ int imin(int a, int b) { return a < b ? a : b; }
 __device__ __forceinline__ unsigned imin(unsigned a, unsigned b) { return a < b ? a : b; }
@@ -133,7 +149,7 @@ __device__ __forceinline__ T warpMax(T laneVal)
 //! @brief standard inclusive warp-scan
 __device__ __forceinline__ int inclusiveScanInt(int value)
 {
-    unsigned lane = threadIdx.x & (GpuConfig::warpSize - 1);
+    unsigned lane = detail::laneIndex();
 #pragma unroll
     for (int i = 1; i < GpuConfig::warpSize; i *= 2)
     {
@@ -146,7 +162,7 @@ __device__ __forceinline__ int inclusiveScanInt(int value)
 //! @brief returns a mask with bits set for each warp lane before the calling lane
 __device__ __forceinline__ GpuConfig::ThreadMask lanemask_lt()
 {
-    GpuConfig::ThreadMask lane = threadIdx.x & (GpuConfig::warpSize - 1);
+    GpuConfig::ThreadMask lane = detail::laneIndex();
     return (GpuConfig::ThreadMask(1) << lane) - 1;
 }
 
@@ -169,7 +185,7 @@ __device__ __forceinline__ int reduceBool(const bool p)
 //! @brief returns a mask with bits set for each warp lane before and including the calling lane
 __device__ __forceinline__ GpuConfig::ThreadMask lanemask_le()
 {
-    GpuConfig::ThreadMask lane = threadIdx.x & (GpuConfig::warpSize - 1);
+    GpuConfig::ThreadMask lane = detail::laneIndex();
     return (GpuConfig::ThreadMask(2) << lane) - 1;
 }
 
@@ -207,7 +223,7 @@ __device__ __forceinline__ int inclusiveSegscan(int value, int distance)
  */
 __device__ __forceinline__ int inclusiveSegscanInt(const int packedValue, const int carryValue)
 {
-    int laneIdx = int(threadIdx.x) & (GpuConfig::warpSize - 1);
+    int laneIdx = detail::laneIndex();
 
     int isNegative = packedValue < 0;
     int mask       = -isNegative;
@@ -258,7 +274,7 @@ __device__ __forceinline__ int streamCompact(T* value, bool keep, volatile T* sm
     if (keep) { sm_exchange[laneCompacted] = *value; }
     syncWarp();
 
-    int laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
+    int laneIdx = detail::laneIndex();
     *value      = sm_exchange[laneIdx];
 
     int numKeep = popCount(SignedMask(keepBallot));
@@ -273,7 +289,7 @@ __device__ __forceinline__ int streamCompact(T* value, bool keep, volatile T* sm
  */
 __device__ __forceinline__ int spreadSeg8(int val)
 {
-    int laneIdx = int(threadIdx.x) & (GpuConfig::warpSize - 1);
+    int laneIdx = detail::laneIndex();
     return shflSync(val, laneIdx >> 3) + (laneIdx & 7);
 }
 

@@ -16,11 +16,14 @@ if(CMAKE_CUDA_COMPILER) # disabled for HIP
 endif ()
 
 if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
-    cstone_add_cuda_performance_test(neighbor_driver.cu neighbors_test_gpu)
+    cstone_add_cuda_performance_test(sph_density_driver.cu sph_density_test_gpu)
+    cstone_add_cuda_performance_test(lennard_jones_driver.cu lennard_jones_test_gpu)
     cstone_add_cuda_performance_test(octree.cu octree_perf_gpu)
     cstone_add_cuda_performance_test(hilbert.cu hilbert_perf_gpu)
 
     if (CMAKE_CUDA_COMPILER)
         set_source_files_properties(octree.cu PROPERTIES COMPILE_OPTIONS --expt-relaxed-constexpr)
+        set_source_files_properties(sph_density_driver.cu PROPERTIES COMPILE_OPTIONS "--extended-lambda;--expt-relaxed-constexpr")
+        set_source_files_properties(lennard_jones_driver.cu PROPERTIES COMPILE_OPTIONS "--extended-lambda;--expt-relaxed-constexpr")
     endif()
 endif()
