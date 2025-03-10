@@ -84,7 +84,9 @@ public:
 
     //! @brief particle fields selected for file output
     std::vector<int>         outputFieldIndices;
+    std::vector<int>         subsetOutputFieldIndices;
     std::vector<std::string> outputFieldNames;
+    std::vector<std::string> subsetOutputFieldNames;
 
     void setOutputFields(std::vector<std::string>& outFields)
     {
@@ -96,6 +98,20 @@ public:
         std::for_each(outputFieldNames.begin(), outputFieldNames.end(), [](auto& f) { f = prefix + f; });
 
         outFields.erase(std::remove_if(outFields.begin(), outFields.end(), hasField), outFields.end());
+    }
+
+    // TODO: to be tested
+    // TODO: as for the hydro data case, avoid code duplication between setOutputFields and setSubsetOutputFields
+    void setSubsetOutputFields(std::vector<std::string>& outputFieldsSubset)
+    {
+        auto hasField = [](const std::string& field)
+        { return cstone::getFieldIndex(field, fieldNames) < fieldNames.size(); };
+
+        std::copy_if(outputFieldsSubset.begin(), outputFieldsSubset.end(), std::back_inserter(subsetOutputFieldNames), hasField);
+        subsetOutputFieldIndices = cstone::fieldStringsToInt(subsetOutputFieldNames, fieldNames);
+        std::for_each(subsetOutputFieldNames.begin(), subsetOutputFieldNames.end(), [](auto& f) { f = prefix + f; });
+
+        outputFieldsSubset.erase(std::remove_if(outputFieldsSubset.begin(), outputFieldsSubset.end(), hasField), outputFieldsSubset.end());
     }
 
     template<class Archive>
