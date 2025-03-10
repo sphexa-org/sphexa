@@ -136,8 +136,9 @@ public:
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
 
         resizeNeighbors(d, domain.nParticles() * d.ngmax);
-        findNeighborsSfc(first, last, d, domain.box());
         computeGroups(first, last, d, domain.box(), groups_);
+        updateSmoothingLengthIterative(groups_.view(), d, domain.box());
+        findNeighborsSfc(first, last, d, domain.box());
         timer.step("FindNeighbors");
 
         computeDensity(groups_.view(), d, domain.box());

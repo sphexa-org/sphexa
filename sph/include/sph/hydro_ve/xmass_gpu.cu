@@ -51,13 +51,11 @@ unsigned nsGroupSize() { return TravConfig::targetSize; }
 namespace cuda
 {
 
-__device__ bool nc_h_convergenceFailure = false;
-
 template<class Tc, class Tm, class T, class KeyType>
-__global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box, const LocalIndex* grpStart,
+__global__ void xmassGpu(Tc K, unsigned ngmax, const cstone::Box<Tc> box, const LocalIndex* grpStart,
                          const LocalIndex* grpEnd, LocalIndex numGroups, const cstone::OctreeNsView<Tc, KeyType> tree,
-                         unsigned* nc, const Tc* x, const Tc* y, const Tc* z, T* h, const Tm* m, const T* wh,
-                         const T* whd, T* xm, LocalIndex* nidx, TreeNodeIndex* globalPool)
+                         const Tc* x, const Tc* y, const Tc* z, T* h, const Tm* m, const T* wh, const T* whd, T* xm,
+                         LocalIndex* nidx, TreeNodeIndex* globalPool)
 {
     unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned targetIdx   = 0;
@@ -77,27 +75,14 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
         LocalIndex bodyEnd   = grpEnd[targetIdx];
         LocalIndex i         = bodyBegin + laneIdx;
 
-        unsigned ncSph =
-            1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
-
-        constexpr int ncMaxIteration = 9;
-        for (int ncIt = 0; ncIt <= ncMaxIteration; ++ncIt)
-        {
-            bool repeat = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
-            if (!cstone::ballotSync(repeat)) { break; }
-            if (repeat) { h[i] = updateH(ng0, ncSph, h[i]); }
-            ncSph =
-                1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
-
-            if (ncIt == ncMaxIteration) { nc_h_convergenceFailure = true; }
-        }
+        unsigned ncTrue =
+            traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
 
         if (i >= bodyEnd) continue;
 
-        unsigned ncCapped = stl::min(ncSph - 1, ngmax);
+        unsigned ncCapped = stl::min(ncTrue, ngmax);
         xm[i] = sph::xmassJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, h, m, wh,
                                                         whd);
-        nc[i] = ncSph;
     }
 }
 
@@ -108,16 +93,13 @@ void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<typename D
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     xmassGpu<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.K, d.ng0, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.nc),
-        rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.m),
-        rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.xm), nidxPool, traversalPool);
+        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x),
+        rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.m), rawPtr(d.devData.wh),
+        rawPtr(d.devData.whd), rawPtr(d.devData.xm), nidxPool, traversalPool);
     checkGpuErrors(cudaDeviceSynchronize());
 
     NcStats::type stats[NcStats::numStats];
     checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(cstone::ncStats), NcStats::numStats * sizeof(NcStats::type)));
-
-    bool convergenceFailure;
-    checkGpuErrors(cudaMemcpyFromSymbol(&convergenceFailure, GPU_SYMBOL(nc_h_convergenceFailure), sizeof(bool)));
 
     NcStats::type maxP2P   = stats[cstone::NcStats::maxP2P];
     NcStats::type maxStack = stats[cstone::NcStats::maxStack];
@@ -125,7 +107,6 @@ void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<typename D
     d.devData.stackUsedNc = maxStack;
 
     if (maxP2P == 0xFFFFFFFF) { throw std::runtime_error("GPU traversal stack exhausted in neighbor search\n"); }
-    if (convergenceFailure) { throw std::runtime_error("coupled nc/h-updated failed to converge"); }
 }
 
 template void computeXMass(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,

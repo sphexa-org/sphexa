@@ -136,7 +136,6 @@ public:
 
         auto& d = simData.hydro;
         d.resizeAcc(domain.nParticlesWithHalos());
-        resizeNeighbors(d, domain.nParticles() * d.ngmax);
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
@@ -144,8 +143,10 @@ public:
         fill(get<"m">(d), 0, first, d.m[first]);
         fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
 
-        findNeighborsSfc(first, last, d, domain.box());
+        resizeNeighbors(d, domain.nParticles() * d.ngmax);
         computeGroups(first, last, d, domain.box(), groups_);
+        updateSmoothingLengthIterative(groups_.view(), d, domain.box());
+        findNeighborsSfc(first, last, d, domain.box());
         timer.step("FindNeighbors");
         pmReader.step();
 
@@ -236,8 +237,7 @@ public:
                                  d.outputFieldIndices.begin();
                     transferToHost(d, first, last, {d.fieldNames[fidx]});
                     std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writer->writeField(key, field->data(), c); },
-                               fieldPointers[fidx]);
+                               { writer->writeField(key, field->data(), c); }, fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
