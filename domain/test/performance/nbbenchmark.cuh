@@ -111,7 +111,7 @@ void benchmarkNeighborhood(const Coords& coords,
     const auto allocVec = [n]<class Tv>(Tv initialValue) { return std::vector<Tv>(n, initialValue); };
     const std::tuple<std::vector<InputTs>...> inputs = util::tupleMap(allocVec, inputValues);
     std::tuple<std::vector<OutputTs>...> outputs     = util::tupleMap(allocVec, initialOutputValues);
-    ijloop::CpuDirectNeighborhood{ngmax}
+    ijloop::CpuAlwaysTraverseNeighborhood{ngmax}
         .build(nsView, box, n, groupView, x, y, z, h.data())
         .ijLoop(util::tupleMap([](auto const& v) { return v.data(); }, inputs),
                 util::tupleMap([](auto& v) { return v.data(); }, outputs), interaction, ijloop::empty_postamble, Sym{});

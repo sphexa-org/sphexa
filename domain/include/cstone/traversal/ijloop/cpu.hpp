@@ -43,10 +43,10 @@
 namespace cstone::ijloop
 {
 
-namespace detail
+namespace cpu_nb_list_detail
 {
 template<class Tc, class KeyType, class Th>
-struct CpuDirectNeighborhoodImpl
+struct CpuAlwaysTraverseNeighborhoodImpl
 {
     OctreeNsView<Tc, KeyType> tree;
     Box<Tc> box;
@@ -92,23 +92,114 @@ struct CpuDirectNeighborhoodImpl
 
     Statistics stats() const { return {.numBodies = lastBody - firstBody, .numBytes = 0}; }
 };
-} // namespace detail
 
-struct CpuDirectNeighborhood
+template<class Tc, class KeyType, class Th>
+struct CpuFullNbListNeighborhoodImpl
+{
+    OctreeNsView<Tc, KeyType> tree;
+    Box<Tc> box;
+    LocalIndex firstBody, lastBody;
+    std::vector<LocalIndex> neighborsCount, neighbors;
+    const Tc *x, *y, *z;
+    const Th* h;
+    unsigned ngmax;
+
+    template<class... In, class... Out, class Interaction, class Postamble, Symmetry Sym>
+    void ijLoop(std::tuple<In*...> const& input,
+                std::tuple<Out*...> const& output,
+                Interaction&& interaction,
+                Postamble&& postamble,
+                Sym) const
+    {
+        const auto constInput = makeConstRestrict(input);
+#pragma omp parallel for
+        for (LocalIndex i = firstBody; i < lastBody; ++i)
+        {
+            const auto iData  = loadParticleData(x, y, z, h, constInput, i);
+            const bool usePbc = requiresPbcHandling(box, iData);
+
+            const unsigned nbs = neighborsCount[i - firstBody];
+            auto result        = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
+#pragma omp simd
+            for (unsigned nb = 0; nb < nbs; ++nb)
+            {
+                const LocalIndex j = neighbors[(i - firstBody) * ngmax + nb];
+                const auto jData   = loadParticleData(x, y, z, h, constInput, j);
+
+                const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
+
+                updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
+            }
+
+            storeParticleData(output, i, postamble(iData, result));
+        }
+    }
+
+    Statistics stats() const
+    {
+        return {.numBodies = lastBody - firstBody,
+                .numBytes  = neighborsCount.size() * sizeof(typename decltype(neighborsCount)::value_type) +
+                            neighbors.size() * sizeof(typename decltype(neighbors)::value_type)};
+    }
+};
+} // namespace cpu_nb_list_detail
+
+struct CpuAlwaysTraverseNeighborhood
 {
     unsigned ngmax;
 
     template<class Tc, class KeyType, class Th>
-    detail::CpuDirectNeighborhoodImpl<Tc, KeyType, Th> build(const OctreeNsView<Tc, KeyType>& tree,
-                                                             const Box<Tc>& box,
-                                                             const LocalIndex /* totalBodies */,
-                                                             const GroupView& groups,
-                                                             const Tc* const x,
-                                                             const Tc* const y,
-                                                             const Tc* const z,
-                                                             const Th* const h) const
+    cpu_nb_list_detail::CpuAlwaysTraverseNeighborhoodImpl<Tc, KeyType, Th> build(const OctreeNsView<Tc, KeyType>& tree,
+                                                                                 const Box<Tc>& box,
+                                                                                 const LocalIndex /* totalBodies */,
+                                                                                 const GroupView& groups,
+                                                                                 const Tc* const x,
+                                                                                 const Tc* const y,
+                                                                                 const Tc* const z,
+                                                                                 const Th* const h) const
     {
         return {tree, box, groups.firstBody, groups.lastBody, x, y, z, h, ngmax};
+    }
+};
+
+struct CpuFullNbListNeighborhood
+{
+    unsigned ngmax;
+
+    template<class Tc, class KeyType, class Th>
+    cpu_nb_list_detail::CpuFullNbListNeighborhoodImpl<Tc, KeyType, Th> build(const OctreeNsView<Tc, KeyType>& tree,
+                                                                             const Box<Tc>& box,
+                                                                             const LocalIndex /* totalBodies */,
+                                                                             const GroupView& groups,
+                                                                             const Tc* const x,
+                                                                             const Tc* const y,
+                                                                             const Tc* const z,
+                                                                             const Th* const h) const
+    {
+        using namespace cpu_nb_list_detail;
+
+        const LocalIndex numBodies = groups.lastBody - groups.firstBody;
+
+        CpuFullNbListNeighborhoodImpl<Tc, KeyType, Th> nbList{tree,
+                                                              box,
+                                                              groups.firstBody,
+                                                              groups.lastBody,
+                                                              std::vector<LocalIndex>(numBodies),
+                                                              std::vector<LocalIndex>(numBodies * ngmax),
+                                                              x,
+                                                              y,
+                                                              z,
+                                                              h,
+                                                              ngmax};
+
+#pragma omp parallel for
+        for (LocalIndex i = 0; i < numBodies; ++i)
+        {
+            nbList.neighborsCount[i] = std::min(
+                findNeighbors(i + groups.firstBody, x, y, z, h, tree, box, ngmax, &nbList.neighbors[i * ngmax]), ngmax);
+        }
+
+        return nbList;
     }
 };
 

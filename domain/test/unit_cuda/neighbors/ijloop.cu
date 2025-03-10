@@ -308,7 +308,8 @@ auto run(Neighborhood const& nb)
     validate(ref, actual);
 }
 
-TEST(IjLoop, Cpu) { run(ijloop::CpuDirectNeighborhood{ngmax}); }
+TEST(IjLoop, CpuAlwaysTraverse) { run(ijloop::CpuAlwaysTraverseNeighborhood{ngmax}); }
+TEST(IjLoop, CpuFullNbList) { run(ijloop::CpuFullNbListNeighborhood{ngmax}); }
 TEST(IjLoop, GpuAlwaysTraverse) { run(ijloop::GpuAlwaysTraverseNeighborhood{ngmax}); }
 TEST(IjLoop, GpuFullNbList) { run(ijloop::GpuFullNbListNeighborhood{ngmax}); }
 TEST(IjLoop, GpuClusterNbList4x4WithoutSymmetryWithoutCompression)
