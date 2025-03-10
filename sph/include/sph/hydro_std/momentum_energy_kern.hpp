@@ -17,7 +17,7 @@ struct MomentumAndEnergyInteraction
     const T* wh;
 
     template<class ParticleData, class Tc>
-    auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& posDiff, T r2) const
+    auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij, T r2) const
     {
         constexpr T gradh_i = 1.0;
         constexpr T gradh_j = 1.0;
@@ -40,19 +40,19 @@ struct MomentumAndEnergyInteraction
         T v1 = dist * hiInv;
         T v2 = dist * hjInv;
 
-        T rv = posDiff[0] * vx_ij + posDiff[1] * vy_ij + posDiff[2] * vz_ij;
+        T rv = r_ij[0] * vx_ij + r_ij[1] * vy_ij + r_ij[2] * vz_ij;
 
         T hjInv3 = hjInv * hjInv * hjInv;
         T Wi     = hiInv3 * lt::lookup(wh, v1);
         T Wj     = hjInv3 * lt::lookup(wh, v2);
 
-        T termA1_i = c11i * posDiff[0] + c12i * posDiff[1] + c13i * posDiff[2];
-        T termA2_i = c12i * posDiff[0] + c22i * posDiff[1] + c23i * posDiff[2];
-        T termA3_i = c13i * posDiff[0] + c23i * posDiff[1] + c33i * posDiff[2];
+        T termA1_i = c11i * r_ij[0] + c12i * r_ij[1] + c13i * r_ij[2];
+        T termA2_i = c12i * r_ij[0] + c22i * r_ij[1] + c23i * r_ij[2];
+        T termA3_i = c13i * r_ij[0] + c23i * r_ij[1] + c33i * r_ij[2];
 
-        T termA1_j = c11j * posDiff[0] + c12j * posDiff[1] + c13j * posDiff[2];
-        T termA2_j = c12j * posDiff[0] + c22j * posDiff[1] + c23j * posDiff[2];
-        T termA3_j = c13j * posDiff[0] + c23j * posDiff[1] + c33j * posDiff[2];
+        T termA1_j = c11j * r_ij[0] + c12j * r_ij[1] + c13j * r_ij[2];
+        T termA2_j = c12j * r_ij[0] + c22j * r_ij[1] + c23j * r_ij[2];
+        T termA3_j = c13j * r_ij[0] + c23j * r_ij[1] + c33j * r_ij[2];
 
         T           wij          = rv / dist;
         constexpr T av_alpha     = T(1);
@@ -92,7 +92,7 @@ struct MomentumAndEnergyPostamble
     Tc K;
 
     template<class ParticleData, class Result>
-    constexpr auto operator()(const ParticleData&, const Result& result)
+    constexpr auto operator()(const ParticleData&, const Result& result) const
     {
         const auto [energy, momentum_x, momentum_y, momentum_z, vijsignal] = result;
         // with the choice of calculating coordinate (r) and velocity (v_ij) differences as i - j,
@@ -112,7 +112,8 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
     MomentumAndEnergyInteraction interaction{wh};
     MomentumAndEnergyPostamble   postamble{K};
 
-    const auto input = std::make_tuple(m, rho, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33);
+    const auto input  = std::make_tuple(m, rho, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33);
+    const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, maxvsignal - i);
 
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
     const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
@@ -125,14 +126,14 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
 
         const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
 
-        const auto [ijPosDiff, distSq] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
+        const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
 
-        cstone::ijloop::updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
+        cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
     }
 
     result = postamble(iData, result);
 
-    cstone::ijloop::storeParticleData(std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, maxvsignal - i), i, result);
+    cstone::ijloop::storeParticleData(output, i, result);
 }
 
 } // namespace sph
