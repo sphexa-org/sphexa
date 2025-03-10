@@ -250,7 +250,7 @@ public:
 
     //! @brief Indices of neighbors for each particle, length is number of assigned particles * ngmax. CPU version only.
     std::vector<cstone::LocalIndex>         neighbors;
-    std::any neighborhood;
+    std::any                                neighborhood;
     cstone::OctreeNsView<RealType, KeyType> treeView;
 
     DeviceData_t<AccType> devData;

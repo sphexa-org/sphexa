@@ -360,8 +360,7 @@ public:
                        [shift](auto i) { return i - shift; });
 
         std::apply([exDesc, o = prevOrd.data(), &sendBuffer, &receiveBuffer, this](auto&... a)
-                   { global_.redoExchange(exDesc, o, sendBuffer, receiveBuffer, rawPtr(a)...); },
-                   arrays);
+                   { global_.redoExchange(exDesc, o, sendBuffer, receiveBuffer, rawPtr(a)...); }, arrays);
 
         lowMemReallocate(bufDesc_.size, allocGrowthRate_, arrays, std::tie(sendBuffer, receiveBuffer));
         gatherArrays(gatherCpu, ord + global_.numSendDown(), global_.numAssigned(), envelope[0], bufDesc_.start, arrays,
