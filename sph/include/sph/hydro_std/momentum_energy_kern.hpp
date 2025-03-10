@@ -17,7 +17,8 @@ struct MomentumAndEnergyInteraction
     const T* wh;
 
     template<class ParticleData, class Tc>
-    auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij, T r2) const
+    constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
+                              T r2) const
     {
         constexpr T gradh_i = 1.0;
         constexpr T gradh_j = 1.0;
