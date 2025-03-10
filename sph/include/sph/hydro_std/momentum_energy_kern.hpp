@@ -2,6 +2,7 @@
 
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/sfc/box.hpp"
+#include "cstone/util/tuple_util.hpp"
 
 #include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"

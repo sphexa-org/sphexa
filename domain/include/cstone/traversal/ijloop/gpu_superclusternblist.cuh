@@ -106,17 +106,29 @@ constexpr __forceinline__ unsigned clusterOffset(unsigned firstBody)
 }
 
 template<class T>
-constexpr __forceinline__ void atomicAddScalarOrVec(T* ptr, T value)
+constexpr __forceinline__ void atomicUpdatePtr(T* ptr, T value)
 {
     atomicAdd(ptr, value);
 }
 
+template<class T>
+constexpr __forceinline__ void atomicUpdatePtr(T* ptr, reduction::min<T> value)
+{
+    atomicMin(ptr, value.value);
+}
+
+template<class T>
+constexpr __forceinline__ void atomicUpdatePtr(T* ptr, reduction::max<T> value)
+{
+    atomicMax(ptr, value.value);
+}
+
 template<class T, std::size_t N>
-constexpr __forceinline__ void atomicAddScalarOrVec(util::array<T, N>* ptr, util::array<T, N> const& value)
+constexpr __forceinline__ void atomicUpdatePtr(util::array<T, N>* ptr, util::array<T, N> const& value)
 {
 #pragma unroll
     for (std::size_t i = 0; i < N; ++i)
-        atomicAddScalarOrVec(&((*ptr)[i]), value[i]);
+        atomicUpdatePtr(&((*ptr)[i]), value[i]);
 }
 
 __global__ void initSuperclusterInfo(const LocalIndex firstISupercluster,
@@ -726,9 +738,9 @@ __device__ inline constexpr T0 dynamicTupleGet(std::tuple<T0, T...> const& tuple
     return res;
 }
 
-template<class Config, class T0, class... T, class Postamble, class IData>
+template<class Config, class T0, class... T, class... Ps, class Postamble, class IData>
 __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
-                                               std::tuple<T0*, T*...> const& ptrs,
+                                               std::tuple<Ps*...> const& ptrs,
                                                const unsigned index,
                                                const bool store,
                                                Postamble const& postamble,
@@ -746,7 +758,7 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
         {
             T0* ptr = dynamicTupleGet(ptrs, block.thread_index().y % (GpuConfig::warpSize / Config::iThreads));
             if constexpr (Config::symmetric | (Config::numWarpsPerInteraction > 1))
-                atomicAddScalarOrVec(&ptr[index], res);
+                atomicUpdatePtr(&ptr[index], res);
             else
                 ptr[index] = res;
         }
@@ -755,13 +767,13 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
     {
 #pragma unroll
         for (unsigned offset = GpuConfig::warpSize / 2; offset >= Config::iThreads; offset /= 2)
-            util::for_each_tuple([&](auto& t) { t += warp.shfl_down(t, offset); }, tuple);
+            util::for_each_tuple([&](auto& t) { detail::updateReduction(t, warp.shfl_down(t, offset)); }, tuple);
 
         if ((block.thread_index().y % (GpuConfig::warpSize / Config::iThreads) == 0) & store)
         {
             if constexpr (Config::symmetric | Config::numWarpsPerInteraction > 1)
             {
-                util::for_each_tuple([index](auto* ptr, auto const& t) { atomicAddScalarOrVec(&ptr[index], t); }, ptrs,
+                util::for_each_tuple([index](auto* ptr, auto const& t) { atomicUpdatePtr(&ptr[index], t); }, ptrs,
                                      tuple);
             }
             else { storeParticleData(ptrs, index, postamble(iData, tuple)); }
@@ -769,9 +781,9 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
     }
 }
 
-template<class Config, class T0, class... T>
+template<class Config, class T0, class... T, class... Ps>
 constexpr __device__ void
-storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<T0*, T*...> const& ptrs, const unsigned index, const bool store)
+storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const unsigned index, const bool store)
 {
     const auto block = cooperative_groups::this_thread_block();
     assert(block.dim_threads().x == Config::iThreads);
@@ -783,18 +795,17 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<T0*, T*...> const& ptrs, c
         if ((block.thread_index().x <= sizeof...(T)) & store)
         {
             T0* ptr = dynamicTupleGet(ptrs, block.thread_index().x);
-            atomicAddScalarOrVec(&ptr[index], res);
+            atomicUpdatePtr(&ptr[index], res);
         }
     }
     else
     {
 #pragma unroll
         for (unsigned offset = Config::iThreads / 2; offset >= 1; offset /= 2)
-            util::for_each_tuple([&](auto& t) { t += warp.shfl_down(t, offset); }, tuple);
+            util::for_each_tuple([&](auto& t) { detail::updateReduction(t, warp.shfl_down(t, offset)); }, tuple);
 
         if ((block.thread_index().x == 0) & store)
-            util::for_each_tuple([index](auto* ptr, auto const& t) { atomicAddScalarOrVec(&ptr[index], t); }, ptrs,
-                                 tuple);
+            util::for_each_tuple([index](auto* ptr, auto const& t) { atomicUpdatePtr(&ptr[index], t); }, ptrs, tuple);
     }
 }
 
@@ -968,6 +979,26 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     }
 }
 
+template<class Tc, class Th, class In, class Out, class Interaction>
+__global__ void initResult(const LocalIndex firstBody,
+                           const LocalIndex lastBody,
+                           const Tc* __restrict__ x,
+                           const Tc* __restrict__ y,
+                           const Tc* __restrict__ z,
+                           const Th* __restrict__ h,
+                           const In __grid_constant__ input,
+                           const Out __grid_constant__ output,
+                           Interaction interaction)
+{
+    const auto grid    = cooperative_groups::this_grid();
+    const LocalIndex i = grid.thread_rank() + firstBody;
+    if (i >= lastBody) return;
+
+    using IData  = decltype(loadParticleData(x, y, z, h, input, 0));
+    using Result = decltype(interaction(IData{}, IData{}, Vec3<Tc>{0, 0, 0}, Tc(0)));
+    storeParticleData(output, i, Result{});
+}
+
 template<class Tc, class Th, class In, class Out, class Postamble>
 __global__ void applyPostamble(const LocalIndex totalBodies,
                                const Tc* __restrict__ x,
@@ -1012,9 +1043,11 @@ struct GpuSuperclusterNbListNeighborhoodImpl
 
         if (Config::symmetric | (Config::numWarpsPerInteraction > 1))
         {
-            util::for_each_tuple(
-                [&](auto* ptr)
-                { checkGpuErrors(cudaMemsetAsync(ptr + firstBody, 0, sizeof(decltype(*ptr)) * numBodies)); }, output);
+            constexpr unsigned threads = 128;
+            const unsigned numBlocks   = iceil(numBodies, threads);
+            initResult<<<numBlocks, threads>>>(firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
+                                               std::forward<Interaction>(interaction));
+            checkGpuErrors(cudaGetLastError());
         }
 
         assert(firstBody < lastBody);

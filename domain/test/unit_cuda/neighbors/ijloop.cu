@@ -61,7 +61,7 @@ struct NeighborFun
     {
         const auto [i, iPos, hi, vi] = iData;
         const auto [j, jPos, hj, vj] = jData;
-        return std::make_tuple(i, j, iPos, jPos, ijPosDiff, distSq, hi, hj, vi, vj, 1u, hi);
+        return std::make_tuple(i, j, iPos, jPos, ijPosDiff, distSq, hi, hj, vi, vj, 1u, hi, ijloop::reduction::min(j));
     }
 };
 
@@ -86,7 +86,8 @@ using Result                      = std::tuple<thrust::universal_vector<LocalInd
                                                thrust::universal_vector<double>,       // viSum
                                                thrust::universal_vector<double>,       // vjSum
                                                thrust::universal_vector<unsigned>,     // neighborsCount
-                                               thrust::universal_vector<double>        // hiSumNormalized
+                                               thrust::universal_vector<double>,       // hiSumNormalized
+                                               thrust::universal_vector<LocalIndex>    // jMin
                                                >;
 constexpr static auto resultNames = std::make_tuple("iSum",
                                                     "jSum",
@@ -99,7 +100,8 @@ constexpr static auto resultNames = std::make_tuple("iSum",
                                                     "viSum",
                                                     "vjSum",
                                                     "neighborsCount",
-                                                    "hiSumNormalized");
+                                                    "hiSumNormalized",
+                                                    "jMin");
 
 Result reference(const Box<double>& box,
                  const double* const x,
@@ -111,14 +113,16 @@ Result reference(const Box<double>& box,
                  const LocalIndex firstBody,
                  const LocalIndex lastBody)
 {
-    thrust::universal_vector<LocalIndex> iSum(numBodies), jSum(numBodies);
+    thrust::universal_vector<LocalIndex> iSum(numBodies), jSum(numBodies), jMin(numBodies);
     thrust::universal_vector<Vec3<double>> iPosSum(numBodies), jPosSum(numBodies), ijPosDiffSum(numBodies);
-    thrust::universal_vector<double> d2Sum(numBodies), hiSum(numBodies), hjSum(numBodies), viSum(numBodies),
+    thrust::universal_vector<double> distSqSum(numBodies), hiSum(numBodies), hjSum(numBodies), viSum(numBodies),
         vjSum(numBodies), hiSumNormalized(numBodies);
     thrust::universal_vector<unsigned> neighborsCount(numBodies);
 
     for (unsigned i = firstBody; i < lastBody; ++i)
     {
+        jMin[i] = std::numeric_limits<LocalIndex>::max();
+
         for (unsigned j = 0; j < numBodies; ++j)
         {
             const double xi = x[i];
@@ -163,20 +167,21 @@ Result reference(const Box<double>& box,
                 iPosSum[i] += Vec3<double>{xi, yi, zi};
                 jPosSum[i] += Vec3<double>{xj, yj, zj};
                 ijPosDiffSum[i] += Vec3<double>{xij, yij, zij};
-                d2Sum[i] += d2;
+                distSqSum[i] += d2;
                 hiSum[i] += h[i];
                 hjSum[i] += h[j];
                 viSum[i] += v[i];
                 vjSum[i] += v[j];
                 neighborsCount[i] += 1;
+                jMin[i] = std::min(jMin[i], LocalIndex(j));
             }
         }
         hiSumNormalized[i] = hiSum[i] / neighborsCount[i];
     }
 
     return Result(std::move(iSum), std::move(jSum), std::move(iPosSum), std::move(jPosSum), std::move(ijPosDiffSum),
-                  std::move(d2Sum), std::move(hiSum), std::move(hjSum), std::move(viSum), std::move(vjSum),
-                  std::move(neighborsCount), std::move(hiSumNormalized));
+                  std::move(distSqSum), std::move(hiSum), std::move(hjSum), std::move(viSum), std::move(vjSum),
+                  std::move(neighborsCount), std::move(hiSumNormalized), std::move(jMin));
 }
 
 void validate(const Result& expected, const Result& actual)

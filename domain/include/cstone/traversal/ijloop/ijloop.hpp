@@ -60,6 +60,23 @@ inline constexpr Even even             = {};
 inline constexpr Odd odd               = {};
 } // namespace symmetry
 
+namespace reduction
+{
+
+template<class T>
+struct min
+{
+    T value = std::numeric_limits<T>::max();
+};
+
+template<class T>
+struct max
+{
+    T value = std::numeric_limits<T>::lowest();
+};
+
+} // namespace reduction
+
 template<class... Ts>
 inline constexpr std::tuple<const Ts*...> makeConstRestrict(std::tuple<Ts*...> input)
 {
@@ -120,17 +137,57 @@ inline constexpr Th radiusSq(std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...> const& 
     return Th(4) * std::get<2>(data) * std::get<2>(data);
 }
 
+namespace detail
+{
+
+template<class T>
+inline constexpr void updateReduction(T& result, T const& value)
+{
+    result += value;
+}
+
+template<class T>
+inline constexpr void updateReduction(reduction::min<T>& result, reduction::min<T> const& value)
+{
+    result.value = std::min(result.value, value.value);
+}
+
+template<class T>
+inline constexpr void updateReduction(reduction::min<T>& result, reduction::max<T> const& value)
+{
+    result.value = std::max(result.value, value.value);
+}
+
+} // namespace detail
+
 template<class... Ts>
 inline constexpr void updateResult(std::tuple<Ts...>& result, std::tuple<Ts...> const& value)
 {
-    util::for_each_tuple([](auto& r, auto const& v) { r += v; }, result, value);
+    util::for_each_tuple([](auto& r, auto const& v) { detail::updateReduction(r, v); }, result, value);
 }
 
-template<class... Ts>
-inline constexpr void
-storeParticleData(std::tuple<Ts*...> const& output, LocalIndex index, std::tuple<Ts...> const& value)
+namespace detail
 {
-    util::for_each_tuple([index](auto* ptr, auto const& v) { ptr[index] = v; }, output, value);
+
+template<class T>
+inline constexpr T const& reductionResult(T const& result)
+{
+    return result;
+}
+
+template<class T>
+inline constexpr T const& reductionResult(reduction::min<T> const& result)
+{
+    return result.value;
+}
+
+} // namespace detail
+
+template<class... Ts, class... Rs>
+inline constexpr void
+storeParticleData(std::tuple<Ts*...> const& output, LocalIndex index, std::tuple<Rs...> const& value)
+{
+    util::for_each_tuple([index](auto* ptr, auto const& v) { ptr[index] = detail::reductionResult(v); }, output, value);
 }
 
 namespace detail
