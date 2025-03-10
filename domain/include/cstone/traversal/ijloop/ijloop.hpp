@@ -154,7 +154,7 @@ inline constexpr void updateReduction(reduction::min<T>& result, reduction::min<
 }
 
 template<class T>
-inline constexpr void updateReduction(reduction::min<T>& result, reduction::max<T> const& value)
+inline constexpr void updateReduction(reduction::max<T>& result, reduction::max<T> const& value)
 {
     result.value = std::max(result.value, value.value);
 }
@@ -178,6 +178,12 @@ inline constexpr T const& reductionResult(T const& result)
 
 template<class T>
 inline constexpr T const& reductionResult(reduction::min<T> const& result)
+{
+    return result.value;
+}
+
+template<class T>
+inline constexpr T const& reductionResult(reduction::max<T> const& result)
 {
     return result.value;
 }
