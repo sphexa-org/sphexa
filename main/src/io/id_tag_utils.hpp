@@ -35,35 +35,38 @@
 #include <vector>
 
 #include "cstone/cuda/device_vector.h"
+#include "sph/particles_data.hpp"
 #include "sph/types.hpp"
+#include "io/ifile_io.hpp"
 
 namespace sphexa
 {
 
-using ParticleIdType = uint64_t; // TODO: retrieve type from ParticlesData?
-using CoordinateType  = sph::SphTypes::CoordinateType;
+using IdType = uint64_t;//decltype(std::declval<ParticlesData<cstone::CpuTag>>().id)::value_type;// TODO: retrieve type from ParticlesData?
+using IdVectorType = std::vector<IdType>;//decltype(std::declval<ParticlesData<cstone::CpuTag>>().id);
+using CoordinateType = sph::SphTypes::CoordinateType;
 
-/*! @brief Tagging mask definition (most significant bit switch)
+/*! @brief Tagging mask definition (most significant bit flip)
  */
-constexpr ParticleIdType msbMask = static_cast<ParticleIdType>(1) << (sizeof(ParticleIdType)*8 - 1);
+constexpr IdType msbMask = static_cast<IdType>(1) << (sizeof(IdType)*8 - 1);
 
 /*! @brief Tagged id (in first:last range) identification, CPU version
  *
  * @param[in]  ids          ordered id list
  * @param[in]  first        first id index // TODO number of elements and pass iterator?
  * @param[in]  last         last (excluded) id index
- * @param[out] taggedIdsIndexes  vector of indexes (positions wrt of selected particles)
+ * @param[out] taggedIdsIndexes  vector of indexes of tagged ids
  */
-void findTaggedIds(const std::vector<uint64_t>& ids, size_t first, size_t last, std::vector<uint64_t>& taggedIdsIndexes);
+void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes);
 
 /*! @brief Tagged id (in first:last range) identification, GPU version
  *
  * @param[in]  ids          ordered id list
  * @param[in]  first        first id index // TODO number of elements and pass iterator?
  * @param[in]  last         last (excluded) id index
- * @param[out] taggedIdsIndexes  vector of indexes (positions wrt of selected particles)
+ * @param[out] taggedIdsIndexes  vector of indexes of tagged ids
  */
-void findTaggedIds(const cstone::DeviceVector<uint64_t>& ids, size_t first, size_t last, std::vector<uint64_t>& taggedIdsIndexes);
+void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes);
 
 /*! @brief Id tagging (in first:last range) from list, CPU version
  *
@@ -72,7 +75,7 @@ void findTaggedIds(const cstone::DeviceVector<uint64_t>& ids, size_t first, size
  * @param[in]  last         last (excluded) id index
  * @param[in]  selectedIds  indexes to be tagged
  */
-void tagIdsInList(std::vector<uint64_t>& ids, size_t first, size_t last, const std::vector<uint64_t>& selectedIds);
+void tagIdsInList(IdVectorType& ids, size_t first, size_t last, const IdVectorType& selectedIds);
 
 /*! @brief Id tagging (in first:last range) from list, GPU version
  *
@@ -81,41 +84,71 @@ void tagIdsInList(std::vector<uint64_t>& ids, size_t first, size_t last, const s
  * @param[in]  last         last (excluded) id index
  * @param[in]  selectedIds  indexes to be tagged
  */
-void tagIdsInList(cstone::DeviceVector<uint64_t>& ids, size_t first, size_t last, const std::vector<uint64_t>& selectedIds);
+void tagIdsInList(cstone::DeviceVector<IdType>& ids, size_t first, size_t last, const IdVectorType& selectedIds);
 
 /*! @brief Id tagging spherical volume definition
  */
 struct IdSelectionSphere
 {
-    std::array<double, 3> center;
-    double radius;
+    std::array<CoordinateType, 3> center;
+    CoordinateType radius;
 };
 
 /*! @brief Id tagging (in first:last range) in spherical volume, CPU version
  *
- * @param[out] ids           ordered id list
- * @param[in]  x             x coordinates
- * @param[in]  y             y coordinates
- * @param[in]  z             z coordinates
- * @param[in]  first         first id index // TODO number of elements and pass iterator?
- * @param[in]  last          last (excluded) id index
- * @param[in]  selSphereData spherical volume definition
+ * @param[out] ids               ordered id list
+ * @param[out] originalTaggedIds original values of tagged ids
+ * @param[in]  x                 x coordinates
+ * @param[in]  y                 y coordinates
+ * @param[in]  z                 z coordinates
+ * @param[in]  first             first id index // TODO number of elements and pass iterator?
+ * @param[in]  last              last (excluded) id index
+ * @param[in]  selSphereData     spherical volume definition
  */
-void tagIdsInSphere(std::vector<uint64_t>& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
+void tagIdsInSphere(IdVectorType& ids, IdVectorType& originalTaggedIds, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
     const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
 
 /*! @brief Id tagging (in first:last range) in spherical volume, GPU version
  *
- * @param[out] ids           ordered id list
- * @param[in]  x             x coordinates
- * @param[in]  y             y coordinates
- * @param[in]  z             z coordinates
- * @param[in]  first         first id index // TODO number of elements and pass iterator?
- * @param[in]  last          last (excluded) id index
- * @param[in]  selSphereData spherical volume definition
+ * @param[out] ids               ordered id list
+ * @param[out] originalTaggedIds original values of tagged ids
+ * @param[in]  x                 x coordinates
+ * @param[in]  y                 y coordinates
+ * @param[in]  z                 z coordinates
+ * @param[in]  first             first id index // TODO number of elements and pass iterator?
+ * @param[in]  last              last (excluded) id index
+ * @param[in]  selSphereData     spherical volume definition
  */
-void tagIdsInSphere(cstone::DeviceVector<uint64_t>& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
+void tagIdsInSphere(cstone::DeviceVector<IdType>& ids, IdVectorType& originalTaggedIds, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
     const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
+
+/*! @brief Tagged ids field output
+ *
+ * @param[in] taggedIdsIndexes  vector of indexes of tagged ids
+ * @param[in] writer            file writer
+ * @param[in] field             field to be written (ParticlesData::FieldVector* type)
+ * @param[in] name              field name
+ * @param[in] column            field column
+ */
+void outputTaggedIdsField(const IdVectorType& taggedIdsIndexes, IFileWriter* writer, const auto field, const std::string name, int column)
+{
+    std::remove_pointer_t<decltype(field)> taggedIdsFieldValues;
+    taggedIdsFieldValues.reserve(taggedIdsIndexes.size());
+    std::for_each(taggedIdsIndexes.begin(), taggedIdsIndexes.end(),
+        [&taggedIdsFieldValues, &field](auto index){
+            taggedIdsFieldValues.push_back(field->at(index));
+        });
+    writer->writeField(name, taggedIdsFieldValues.data(), column);
+}
+
+// /*! @brief Tagged ids allocated fields output
+//  *
+//  * @param[in] taggedIdsIndexes  vector of indexes of tagged ids
+//  * @param[in] writer            file writer
+//  * @param[in] fieldPointers     pointer collection to allocated fields
+//  * @param[in] fieldNames        field names
+//  */
+// void outputTaggedIdsAllocatedFields(const std::vector<uint64_t>& taggedIdsIndexes, const IFileWriter* writer, const auto& fieldPointers, const std::vector<std::String>& names);
 
 
 }
