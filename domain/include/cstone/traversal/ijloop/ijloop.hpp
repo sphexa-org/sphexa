@@ -35,6 +35,7 @@
 #include <type_traits>
 
 #include "cstone/sfc/box.hpp"
+#include "cstone/traversal/boxoverlap.hpp"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/tree/octree.hpp"
@@ -105,8 +106,8 @@ dummyParticleData(const Tc*, const Tc*, const Tc*, const Th*, std::tuple<const T
 template<class Tc, class Th, class... Ts>
 inline constexpr bool requiresPbcHandling(Box<Tc> const& box, std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...> const& iData)
 {
-    if (box.boundaryX() != BoundaryType::periodic & box.boundaryY() != BoundaryType::periodic &
-        box.boundaryZ() != BoundaryType::periodic)
+    if ((box.boundaryX() != BoundaryType::periodic) & (box.boundaryY() != BoundaryType::periodic) &
+        (box.boundaryZ() != BoundaryType::periodic))
         return false;
     const Vec3<Tc>& iPos = std::get<1>(iData);
     const Tc twoHi       = Tc(2) * std::get<2>(iData);
