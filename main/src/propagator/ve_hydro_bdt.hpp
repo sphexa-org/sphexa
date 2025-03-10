@@ -237,7 +237,7 @@ public:
         fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
 
         updateSmoothingLengthIterative(activeRungs_, d, domain.box());
-        findNeighborsSfc(first, last, d, domain.box());
+        findNeighborsSfc(activeRungs_, d, domain.box());
         timer.step("FindNeighbors");
         pmReader.step();
 
@@ -400,8 +400,7 @@ public:
                                  d.outputFieldIndices.begin();
                     transferToHost(d, first, last, {d.fieldNames[fidx]});
                     std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writer->writeField(key, field->data(), c); },
-                               fieldPointers[fidx]);
+                               { writer->writeField(key, field->data(), c); }, fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
