@@ -42,7 +42,7 @@ namespace sphexa
  * @param[in]  last         last (excluded) id index
  * @param[in]  selectedIds  indexes to be tagged
  */
-void tagIdsInList(std::vector<uint64_t>& ids, size_t first, size_t last, const std::vector<uint64_t>& selectedIds)
+void tagIdsInList(IdVectorType& ids, size_t first, size_t last, const IdVectorType& selectedIds)
 {
     const auto idListBeginIt = ids.begin()+first;
     const auto idListEndIt = ids.begin()+last;
@@ -58,17 +58,21 @@ void tagIdsInList(std::vector<uint64_t>& ids, size_t first, size_t last, const s
 
 /*! @brief Id tagging (in first:last range) in spherical volume, CPU version
  *
- * @param[out] ids           ordered id list
- * @param[in]  x             x coordinates
- * @param[in]  y             y coordinates
- * @param[in]  z             z coordinates
- * @param[in]  first         first id index // TODO number of elements and pass iterator?
- * @param[in]  last          last (excluded) id index
- * @param[in]  selSphereData spherical volume definition
+ * @param[out] ids                ordered id list
+ * @param[out] originalTaggedIds  original values of tagged ids
+ * @param[in]  x                  x coordinates
+ * @param[in]  y                  y coordinates
+ * @param[in]  z                  z coordinates
+ * @param[in]  first              first id index // TODO number of elements and pass iterator?
+ * @param[in]  last               last (excluded) id index
+ * @param[in]  selSphereData      spherical volume definition
  */
-void tagIdsInSphere(std::vector<uint64_t>& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
+void tagIdsInSphere(IdVectorType& ids, IdVectorType& originalTaggedIds, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
     const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData)
 {
+    originalTaggedIds.reserve(lastIndex-firstIndex);
+    auto numTaggedIds = 0;
+
     // TODO: can we use C++23 zip iterators? Is there anything already implemented in SPH-EXA?
     const auto squareRadius = selSphereData.radius*selSphereData.radius;
 //#pragma omp parallel for
@@ -79,9 +83,13 @@ void tagIdsInSphere(std::vector<uint64_t>& ids, const std::vector<CoordinateType
         if((current_x - selSphereData.center[0])*(current_x - selSphereData.center[0]) +
             (current_y - selSphereData.center[1])*(current_y - selSphereData.center[1]) +
             (current_z - selSphereData.center[2])*(current_z - selSphereData.center[2]) <= squareRadius) {
-            ids[particleIndex] = ids[particleIndex] | msbMask;
+                originalTaggedIds.push_back(ids[particleIndex]);
+                ids[particleIndex] = ids[particleIndex] | msbMask;
+                numTaggedIds++;
         }
     }
+
+    originalTaggedIds.resize(numTaggedIds);
 }
 
 
@@ -92,11 +100,11 @@ void tagIdsInSphere(std::vector<uint64_t>& ids, const std::vector<CoordinateType
  * @param[in]  last         last (excluded) id index
  * @param[out] taggedIdsIndexes  vector of indexes (positions wrt of selected particles
  */
-void findTaggedIds(const std::vector<uint64_t>& ids, size_t first, size_t last, std::vector<uint64_t>& taggedIdsIndexes)
+void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes)
 {
     // Find the selected particles in local id list and save their indexes
     // TODO: switch to GPU-like implementation?
-    uint64_t idIndex = first;
+    IdType idIndex = first;
     std::for_each(ids.begin()+first, ids.begin()+last, [&taggedIdsIndexes, &idIndex](auto& id){
         if((id & sphexa::msbMask) != 0) {
             taggedIdsIndexes.push_back(idIndex); // TODO: inefficient due to resizing, avoid push_back usage
@@ -104,5 +112,24 @@ void findTaggedIds(const std::vector<uint64_t>& ids, size_t first, size_t last, 
         idIndex++;
     });
 }
+
+// /*! @brief Tagged ids allocated fields output
+//  *
+//  * @param[in] taggedIdsIndexes  vector of indexes of tagged ids
+//  * @param[in] writer            file writer
+//  * @param[in] fieldPointers     pointer collection to allocated fields
+//  * @param[in] fieldNames        field names
+//  */
+// void outputTaggedIdsAllocatedFields(const std::vector<uint64_t>& taggedIdsIndexes, const IFileWriter* writer, const auto& fieldPointers, const std::vector<std::String>& names)
+// {
+//     for (int i = int(fieldPointers.size()) - 1; i >= 0; --i)
+//     {
+//         if (fieldPointers[i])
+//         {
+//             outputTaggedIdsField(taggedIdsIndexes, writer, fieldPointers[i], names[i], i);
+//         }
+//     }
+
+// }
 
 }
