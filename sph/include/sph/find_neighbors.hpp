@@ -3,6 +3,8 @@
 #include "cstone/findneighbors.hpp"
 #include "cstone/traversal/groups.hpp"
 
+#include "sph/find_neighbors_gpu.hpp"
+
 namespace sph
 {
 
@@ -27,12 +29,14 @@ void findNeighborsSph(const Tc* x, const Tc* y, const Tc* z, T* h, LocalIndex fi
 template<class T, class Dataset>
 void findNeighborsSfc(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { return; }
-
     if (d.ng0 > d.ngmax) { throw std::runtime_error("ng0 should be smaller than ngmax\n"); }
 
-    findNeighborsSph(d.x.data(), d.y.data(), d.z.data(), d.h.data(), groups.firstBody, groups.lastBody, box, d.treeView,
-                     d.ngmax, d.neighbors.data());
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { findNeighborsSfcGpu(groups, d, box); }
+    else
+    {
+        findNeighborsSph(d.x.data(), d.y.data(), d.z.data(), d.h.data(), groups.firstBody, groups.lastBody, box,
+                         d.treeView, d.ngmax, d.neighbors.data());
+    }
 }
 
 } // namespace sph
