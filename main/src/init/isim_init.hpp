@@ -52,7 +52,14 @@ public:
 
     virtual const InitSettings& constants() const = 0;
 
+    // // TODO: do we have to keep this class as pure virtual?
+    const IdSubsets& idSubsets() const  { return idSelectionDatasets_; }
+
     virtual ~ISimInitializer() = default;
+
+protected:
+    mutable IdSubsets idSelectionDatasets_;
+
 };
 
 template<class Dataset>
