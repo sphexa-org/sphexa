@@ -135,8 +135,15 @@ std::tuple<KeyType, KeyType> estimateEvrardSfcPartition(size_t cbrtNumPart, cons
 template<class Dataset>
 class EvrardGlassSphere : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     std::string          glassBlock;
     mutable InitSettings settings_;
+
+protected:
+    // TODO: to be discussed with Sebastian, do we override base classes InitSettings because of slicing?
+    using Base::idSelectionDatasets_;
+
 
 public:
     explicit EvrardGlassSphere(std::string initBlock, std::string settingsFile, IFileReader* reader)
