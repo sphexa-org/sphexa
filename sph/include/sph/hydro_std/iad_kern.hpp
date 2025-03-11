@@ -16,10 +16,14 @@ struct IADInteractionSTD
     const T* wh;
 
     template<class ParticleData, class Tc>
-    auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij, T r2) const
+    constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij, T r2) const
     {
         const auto [i, iPos, hi, mi, roi] = iData;
         const auto [j, jPos, hj, mj, roj] = jData;
+
+        T rx = r_ij[0];
+        T ry = r_ij[1];
+        T rz = r_ij[2];
 
         T hiInv = T(1) / hi;
 
@@ -30,13 +34,13 @@ struct IADInteractionSTD
 
         T mj_roj_w = mj / roj * w;
 
-        return std::make_tuple(           //
-            r_ij[0] * r_ij[0] * mj_roj_w, //
-            r_ij[0] * r_ij[1] * mj_roj_w, //
-            r_ij[0] * r_ij[2] * mj_roj_w, //
-            r_ij[1] * r_ij[1] * mj_roj_w, //
-            r_ij[1] * r_ij[2] * mj_roj_w, //
-            r_ij[2] * r_ij[2] * mj_roj_w);
+        return std::make_tuple( //
+            rx * rx * mj_roj_w, //
+            rx * ry * mj_roj_w, //
+            rx * rz * mj_roj_w, //
+            ry * ry * mj_roj_w, //
+            ry * rz * mj_roj_w, //
+            rz * rz * mj_roj_w);
     }
 };
 
@@ -95,8 +99,7 @@ HOST_DEVICE_FUN inline void IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
     const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
 
-    decltype(interaction(iData, iData, cstone::Vec3<Tc>{}, T{})) result = {};
-
+    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
     for (unsigned pj = 0; pj < neighborsCount; ++pj)
     {
         cstone::LocalIndex j = neighbors[stride * pj];

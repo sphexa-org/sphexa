@@ -26,6 +26,10 @@ struct MomentumAndEnergyInteraction
         const auto [i, iPos, hi, mi, roi, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
         const auto [j, jPos, hj, mj, roj, vxj, vyj, vzj, prj, cj, c11j, c12j, c13j, c22j, c23j, c33j] = jData;
 
+        T rx = r_ij[0];
+        T ry = r_ij[1];
+        T rz = r_ij[2];
+
         T    hiInv  = T(1) / hi;
         T    hiInv3 = hiInv * hiInv * hiInv;
         auto mi_roi = mi / roi;
@@ -41,21 +45,21 @@ struct MomentumAndEnergyInteraction
         T v1 = dist * hiInv;
         T v2 = dist * hjInv;
 
-        T rv = r_ij[0] * vx_ij + r_ij[1] * vy_ij + r_ij[2] * vz_ij;
+        T rv = r_ij[0] * vx_ij + ry * vy_ij + rz * vz_ij;
 
         T hjInv3 = hjInv * hjInv * hjInv;
         T Wi     = hiInv3 * lt::lookup(wh, v1);
         T Wj     = hjInv3 * lt::lookup(wh, v2);
 
-        T termA1_i = c11i * r_ij[0] + c12i * r_ij[1] + c13i * r_ij[2];
-        T termA2_i = c12i * r_ij[0] + c22i * r_ij[1] + c23i * r_ij[2];
-        T termA3_i = c13i * r_ij[0] + c23i * r_ij[1] + c33i * r_ij[2];
+        T termA1_i = c11i * r_ij[0] + c12i * ry + c13i * rz;
+        T termA2_i = c12i * r_ij[0] + c22i * ry + c23i * rz;
+        T termA3_i = c13i * r_ij[0] + c23i * ry + c33i * rz;
 
-        T termA1_j = c11j * r_ij[0] + c12j * r_ij[1] + c13j * r_ij[2];
-        T termA2_j = c12j * r_ij[0] + c22j * r_ij[1] + c23j * r_ij[2];
-        T termA3_j = c13j * r_ij[0] + c23j * r_ij[1] + c33j * r_ij[2];
+        T termA1_j = c11j * r_ij[0] + c12j * ry + c13j * rz;
+        T termA2_j = c12j * r_ij[0] + c22j * ry + c23j * rz;
+        T termA3_j = c13j * r_ij[0] + c23j * ry + c33j * rz;
 
-        T           wij          = rv / dist;
+        T           wij          = i == j ? 0 : rv / dist;
         constexpr T av_alpha     = T(1);
         T           viscosity_ij = T(0.5) * artificial_viscosity(av_alpha, av_alpha, ci, cj, wij);
 
@@ -119,8 +123,7 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
     const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
 
-    decltype(interaction(iData, iData, cstone::Vec3<Tc>{}, T{})) result = {};
-
+    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
     for (unsigned pj = 0; pj < neighborsCount; ++pj)
     {
         cstone::LocalIndex j = neighbors[stride * pj];
