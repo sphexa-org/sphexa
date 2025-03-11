@@ -36,6 +36,7 @@
 #include <algorithm>
 
 #include "cstone/sfc/box.hpp"
+#include "io/id_tag_utils.hpp"
 #include "sph/eos.hpp"
 
 #include "isim_init.hpp"
@@ -103,8 +104,14 @@ void initTurbulenceHydroFields(Dataset& d, const std::map<std::string, double>& 
 template<class Dataset>
 class TurbulenceGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
+
+protected:
+    // TODO: to be discussed with Sebastian, do we override base classes InitSettings because of slicing?
+    using Base::idSelectionDatasets_;
+
 
 public:
     explicit TurbulenceGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
@@ -142,6 +149,26 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initTurbulenceHydroFields(d, settings_);
+
+        // TODO: can we move the tagging to the ISimInitializer init function in order to avoid code duplication?
+        auto idSelectionSphereRadius = settings_.find("id_selection_sphere_radius");
+        if(idSelectionSphereRadius != settings_.end()) {
+
+            if (rank == 0) { std::cout << "Execution of selected particle identification\n"; }
+
+            IdSelectionSphere idSelectionSphere{settings_.at("id_selection_sphere_center_x"), settings_.at("id_selection_sphere_center_y"),
+                                                settings_.at("id_selection_sphere_center_z"), idSelectionSphereRadius->second};
+
+            IdVectorType originalTaggedIds;
+            tagIdsInSphere(simData.hydro.id, originalTaggedIds, simData.hydro.x, simData.hydro.y, simData.hydro.z, 0,
+                simData.hydro.id.size(),idSelectionSphere);
+
+            idSelectionDatasets_["id_selection_sphere_0"] = IdSelectionDataset{IdSelectionSettings{idSelectionSphere, 0}, originalTaggedIds};
+
+        }
+        // TODO: add selection from idList case
+        // tagIdsInList(d.id, domain.startIndex(), domain.endIndex(), selParticlesIds);
+
 
         return globalBox;
     }
