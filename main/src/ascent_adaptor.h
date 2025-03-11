@@ -118,15 +118,43 @@ void Execute(DataType& d, long startIndex, long endIndex)
     mesh["topologies/mesh/type"]     = "points";
     mesh["topologies/mesh/coordset"] = "coords";
 
+    /* i/o checkpoint: x,y,z, vx,vy,vz, alpha, du_m1, h, m, temp, x_m1, y_m1, z_m1
+    DATASET "x" {     H5T_IEEE_F64LE
+    DATASET "y" {     H5T_IEEE_F64LE
+    DATASET "z" {     H5T_IEEE_F64LE
+    DATASET "temp" {  H5T_IEEE_F64LE
+    #
+    DATASET "alpha" { H5T_IEEE_F32LE
+    DATASET "du_m1" { H5T_IEEE_F32LE
+    DATASET "h" {     H5T_IEEE_F32LE
+    DATASET "m" {     H5T_IEEE_F32LE
+    DATASET "vx" {    H5T_IEEE_F32LE
+    DATASET "vy" {    H5T_IEEE_F32LE
+    DATASET "vz" {    H5T_IEEE_F32LE
+    DATASET "x_m1" {  H5T_IEEE_F32LE
+    DATASET "y_m1" {  H5T_IEEE_F32LE
+    DATASET "z_m1" {  H5T_IEEE_F32LE
+    */
     addField(mesh, "x", get<"x">(d).data(), startIndex, endIndex);
     addField(mesh, "y", get<"y">(d).data(), startIndex, endIndex);
     addField(mesh, "z", get<"z">(d).data(), startIndex, endIndex);
+    addField(mesh, "Temperature", get<"temp">(d).data(), startIndex, endIndex);
+
+    /*
+    addField(mesh, "alpha", get<"alpha">(d).data(), startIndex, endIndex);
+    addField(mesh, "du_m1", get<"du_m1">(d).data(), startIndex, endIndex);
+    addField(mesh, "h", get<"h">(d).data(), startIndex, endIndex);
+    addField(mesh, "m", get<"m">(d).data(), startIndex, endIndex);
+    addField(mesh, "x_m1", get<"x_m1">(d).data(), startIndex, endIndex);
+    addField(mesh, "y_m1", get<"y_m1">(d).data(), startIndex, endIndex);
+    addField(mesh, "z_m1", get<"z_m1">(d).data(), startIndex, endIndex);
+    */
     addField(mesh, "vx", get<"vx">(d).data(), startIndex, endIndex);
     addField(mesh, "vy", get<"vy">(d).data(), startIndex, endIndex);
     addField(mesh, "vz", get<"vz">(d).data(), startIndex, endIndex);
+    /*
     addField(mesh, "kx", get<"kx">(d).data(), startIndex, endIndex);
     addField(mesh, "xm", get<"xm">(d).data(), startIndex, endIndex);
-    addField(mesh, "Temperature", get<"temp">(d).data(), startIndex, endIndex);
     addField(mesh, "Mass", get<"m">(d).data(), startIndex, endIndex);
     addField(mesh, "Smoothing Length", get<"h">(d).data(), startIndex, endIndex);
     addField(mesh, "Density", get<"rho">(d).data(), startIndex, endIndex);
@@ -136,7 +164,7 @@ void Execute(DataType& d, long startIndex, long endIndex)
     addField(mesh, "ax", get<"ax">(d).data(), startIndex, endIndex);
     addField(mesh, "ay", get<"ay">(d).data(), startIndex, endIndex);
     addField(mesh, "az", get<"az">(d).data(), startIndex, endIndex);
-
+    */
     conduit::Node verify_info;
     if (!conduit::blueprint::mesh::verify(mesh, verify_info))
     {
