@@ -127,6 +127,7 @@ struct GpuFullNbListNeighborhoodImpl
                 Sym) const
     {
         const LocalIndex numBodies = lastBody - firstBody;
+        if (numBodies == 0) return;
         constexpr int numThreads   = 128;
         detail::gpuFullNbListNeighborhoodKernel<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
             box, firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
@@ -170,6 +171,8 @@ struct GpuFullNbListNeighborhood
             ngmax,
             thrust::device_vector<LocalIndex>(ngmax * std::size_t(numBodies)),
             thrust::device_vector<int>(numBodies)};
+        if (numBodies == 0) return nbList;
+
         constexpr int numThreads = 128;
         detail::gpuFullNbListNeighborhoodBuild<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
             tree, box, groups.firstBody, groups.lastBody, x, y, z, h, ngmax, rawPtr(nbList.neighbors),
