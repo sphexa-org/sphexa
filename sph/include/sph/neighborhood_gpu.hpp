@@ -10,8 +10,9 @@ template<class Dataset>
 inline auto buildNeighborhoodGpu(const cstone::GroupView& groups, Dataset& d,
                                  const cstone::Box<typename Dataset::RealType>& box)
 {
-    return cstone::ijloop::GpuAlwaysTraverseNeighborhood{d.ngmax}.build(d.treeView, box, d.size(), groups, d.x.data(),
-                                                                        d.y.data(), d.z.data(), d.h.data());
+    return cstone::ijloop::GpuAlwaysTraverseNeighborhood{d.ngmax}.build(d.treeView, box, d.size(), groups,
+                                                                        rawPtr(d.devData.x), rawPtr(d.devData.y),
+                                                                        rawPtr(d.devData.z), rawPtr(d.devData.h));
 }
 
 template<class Dataset>
