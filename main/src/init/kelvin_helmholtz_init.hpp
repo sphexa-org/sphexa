@@ -79,7 +79,8 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
 
     generateParticleIDs(d.id);
 
-    auto cv = sph::idealGasCv(d.muiConst, gamma);
+    auto  cv     = sph::idealGasCv(d.muiConst, gamma);
+    auto* u_or_t = d.u.empty() ? d.temp.data() : d.u.data();
 
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
@@ -89,7 +90,7 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
         if (d.y[i] < 0.75 && d.y[i] > 0.25)
         {
             d.h[i]    = hInt;
-            d.temp[i] = uInt / cv;
+            u_or_t[i] = uInt;
             if (d.y[i] > 0.5) { d.vx[i] = vxInt + vDif * std::exp((d.y[i] - 0.75) / ls); }
             else { d.vx[i] = vxInt + vDif * std::exp((0.25 - d.y[i]) / ls); }
         }
@@ -107,7 +108,7 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
                 d.h[i] = hInt * (1 - dist / (2 * hExt)) + hExt * dist / (2 * hExt);
             }
 
-            d.temp[i] = uExt / cv;
+            u_or_t[i] = uExt;
             if (d.y[i] < 0.25) { d.vx[i] = vxExt - vDif * std::exp((d.y[i] - 0.25) / ls); }
             else { d.vx[i] = vxExt - vDif * std::exp((0.75 - d.y[i]) / ls); }
         }
@@ -115,6 +116,10 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
         d.x_m1[i] = d.vx[i] * d.minDt;
         d.y_m1[i] = d.vy[i] * d.minDt;
         d.z_m1[i] = d.vz[i] * d.minDt;
+    }
+    if (d.u.empty())
+    {
+        std::for_each(d.temp.begin(), d.temp.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
     }
 }
 

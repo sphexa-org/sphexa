@@ -92,6 +92,8 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
 
     generateParticleIDs(d.id);
 
+    auto* u_or_t = d.temp.empty() ? d.u.data() : d.temp.data();
+
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
@@ -113,22 +115,27 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
                 d.h[i] = hInt * (1 - dist / (2 * hExt)) + hExt * dist / (2 * hExt);
             }
 
-            d.temp[i] = uExt / cv;
+            u_or_t[i] = uExt;
         }
         else
         {
             d.h[i]    = hInt;
-            d.temp[i] = uInt / cv;
+            u_or_t[i] = uInt;
         }
 
         d.x_m1[i] = d.vx[i] * constants.at("minDt");
         d.y_m1[i] = d.vy[i] * constants.at("minDt");
         d.z_m1[i] = d.vz[i] * constants.at("minDt");
     }
+
+    if (d.u.empty())
+    {
+        std::for_each(d.temp.begin(), d.temp.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
+    }
 }
 
 template<class T>
-void compressCenterCube(gsl::span<T> x, gsl::span<T> y, gsl::span<T> z, T rInt, T s, T rExt, T epsilon)
+void compressCenterCube(std::span<T> x, std::span<T> y, std::span<T> z, T rInt, T s, T rExt, T epsilon)
 {
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < x.size(); i++)

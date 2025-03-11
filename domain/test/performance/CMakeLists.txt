@@ -2,10 +2,6 @@ include(cstone_add_performance_test)
 
 cstone_add_performance_test(octree.cpp octree_perf)
 cstone_add_performance_test(peers.cpp peers_perf)
-cstone_add_performance_test(scan.cpp scan_perf)
-
-# only scan.cpp provides some coverage beyond the unit tests
-cstone_add_test(scan_perf EXECUTABLE scan_perf RANKS 1)
 
 #if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
 if(CMAKE_CUDA_COMPILER) # disabled for HIP

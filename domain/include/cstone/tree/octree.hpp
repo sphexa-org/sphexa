@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -39,7 +23,7 @@
 
 #pragma once
 
-#include <iterator>
+#include <span>
 #include <vector>
 
 #include "cstone/cuda/annotation.hpp"
@@ -49,7 +33,6 @@
 #include "cstone/sfc/sfc.hpp"
 #include "cstone/primitives/accel_switch.hpp"
 #include "cstone/tree/csarray.hpp"
-#include "cstone/util/gsl-lite.hpp"
 
 namespace cstone
 {
@@ -375,7 +358,7 @@ public:
 };
 
 template<class KeyType>
-void updateInternalTree(gsl::span<const KeyType> leaves, OctreeView<KeyType> o)
+void updateInternalTree(std::span<const KeyType> leaves, OctreeView<KeyType> o)
 {
     assert(size_t(o.numLeafNodes) == nNodes(leaves));
     buildOctreeCpu(leaves.data(), o.numLeafNodes, o.numInternalNodes, o.prefixes, o.childOffsets, o.parents,
@@ -383,7 +366,7 @@ void updateInternalTree(gsl::span<const KeyType> leaves, OctreeView<KeyType> o)
 }
 
 template<class KeyType, class Accelerator>
-gsl::span<const TreeNodeIndex> leafToInternal(const OctreeData<KeyType, Accelerator>& octree)
+std::span<const TreeNodeIndex> leafToInternal(const OctreeData<KeyType, Accelerator>& octree)
 {
     return {rawPtr(octree.leafToInternal) + octree.numInternalNodes, size_t(octree.numLeafNodes)};
 }
@@ -412,7 +395,7 @@ public:
     }
 
     //! @brief rebalance based on leaf counts only, optimized version that avoids unnecessary allocations
-    bool rebalance(unsigned bucketSize, gsl::span<const unsigned> counts)
+    bool rebalance(unsigned bucketSize, std::span<const unsigned> counts)
     {
         assert(childOffsets_.size() >= cstoneTree_.size());
 
@@ -440,23 +423,23 @@ public:
     }
 
     //! @brief return a const view of the cstone leaf array
-    gsl::span<const KeyType> treeLeaves() const { return cstoneTree_; }
+    std::span<const KeyType> treeLeaves() const { return cstoneTree_; }
     //! @brief return const pointer to node(cell) SFC keys
-    gsl::span<const KeyType> nodeKeys() const { return prefixes_; }
+    std::span<const KeyType> nodeKeys() const { return prefixes_; }
     //! @brief return const pointer to child offsets array
-    gsl::span<const TreeNodeIndex> childOffsets() const { return childOffsets_; }
+    std::span<const TreeNodeIndex> childOffsets() const { return childOffsets_; }
     //! @brief return const pointer to the cell parents array
-    gsl::span<const TreeNodeIndex> parents() const { return parents_; }
+    std::span<const TreeNodeIndex> parents() const { return parents_; }
 
     //! @brief stores the first internal node index of each tree subdivision level
-    gsl::span<const TreeNodeIndex> levelRange() const { return levelRange_; }
+    std::span<const TreeNodeIndex> levelRange() const { return levelRange_; }
     //! @brief converts a cornerstone index into an internal index
-    gsl::span<const TreeNodeIndex> internalOrder() const
+    std::span<const TreeNodeIndex> internalOrder() const
     {
         return {leafToInternal_.data() + numInternalNodes_, size_t(numLeafNodes_)};
     }
     //! @brief converts  an internal index into a cornerstone index
-    gsl::span<const TreeNodeIndex> toLeafOrder() const { return {internalToLeaf_.data(), size_t(numTreeNodes())}; }
+    std::span<const TreeNodeIndex> toLeafOrder() const { return {internalToLeaf_.data(), size_t(numTreeNodes())}; }
 
     //! @brief total number of nodes in the tree
     inline TreeNodeIndex numTreeNodes() const { return levelRange_.back(); }
@@ -581,8 +564,8 @@ private:
 };
 
 template<class T, class CombinationFunction>
-void upsweep(gsl::span<const TreeNodeIndex> levelOffset,
-             gsl::span<const TreeNodeIndex> childOffsets,
+void upsweep(std::span<const TreeNodeIndex> levelOffset,
+             std::span<const TreeNodeIndex> childOffsets,
              T* quantities,
              CombinationFunction&& combinationFunction)
 {
@@ -595,7 +578,7 @@ void upsweep(gsl::span<const TreeNodeIndex> levelOffset,
 #pragma omp parallel for schedule(static)
         for (TreeNodeIndex i = start; i < end; ++i)
         {
-            cstone::TreeNodeIndex firstChild = childOffsets[i];
+            TreeNodeIndex firstChild = childOffsets[i];
             if (firstChild) { quantities[i] = combinationFunction(i, firstChild, quantities); }
         }
     }

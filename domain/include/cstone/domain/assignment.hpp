@@ -1,7 +1,7 @@
 /*
  * Cornerstone octree
  *
- * Copyright (c) 2024 CSCS, ETH Zurich, University of Zurich, 2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
  * Please, refer to the LICENSE file in the root directory.
  * SPDX-License-Identifier: MIT License
@@ -82,18 +82,18 @@ public:
         else { box_ = limitBoxShrinking(fittingBox, box_); }
 
         // compute SFC particle keys only for particles participating in tree build
-        gsl::span<KeyType> keyView(particleKeys + bufDesc.start, numParticles);
+        std::span<KeyType> keyView(particleKeys + bufDesc.start, numParticles);
         computeSfcKeys(x + bufDesc.start, y + bufDesc.start, z + bufDesc.start, sfcKindPointer(keyView.data()),
                        numParticles, box_);
 
         // sort keys and keep track of ordering for later use
-        reorderFunctor.setMapFromCodes(keyView.begin(), keyView.end());
+        reorderFunctor.setMapFromCodes(keyView);
 
-        updateOctreeGlobal(keyView.begin(), keyView.end(), bucketSize_, tree_, nodeCounts_);
+        updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, nodeCounts_);
         if (firstCall_)
         {
             firstCall_ = false;
-            while (!updateOctreeGlobal(keyView.begin(), keyView.end(), bucketSize_, tree_, nodeCounts_))
+            while (!updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, nodeCounts_))
                 ;
         }
 
@@ -142,7 +142,7 @@ public:
 
         auto [newStart, newEnd] = domain_exchange::assignedEnvelope(bufDesc, numPresent(), numAssigned());
         LocalIndex envelopeSize = newEnd - newStart;
-        gsl::span<KeyType> keyView(keys + newStart, envelopeSize);
+        std::span<KeyType> keyView(keys + newStart, envelopeSize);
 
         auto recvStart = domain_exchange::receiveStart(bufDesc, numPresent(), numAssigned());
         auto numRecv   = numAssigned() - numPresent();
@@ -153,7 +153,7 @@ public:
         reorderFunctor.extendMap(shifts, s1);
 
         // sort keys and keep track of the ordering
-        reorderFunctor.updateMap(keyView.begin(), keyView.end());
+        reorderFunctor.updateMap(keyView);
 
         return std::make_tuple(newStart, keyView.subspan(numSendDown(), numAssigned()));
     }
@@ -170,11 +170,11 @@ public:
     }
 
     //! @brief read only visibility of the global octree leaves to the outside
-    gsl::span<const KeyType> treeLeaves() const { return tree_.treeLeaves(); }
+    std::span<const KeyType> treeLeaves() const { return tree_.treeLeaves(); }
     //! @brief the octree, including the internal part
     const Octree<KeyType>& octree() const { return tree_; }
     //! @brief read only visibility of the global octree leaf counts to the outside
-    gsl::span<const unsigned> nodeCounts() const { return nodeCounts_; }
+    std::span<const unsigned> nodeCounts() const { return nodeCounts_; }
     //! @brief the global coordinate bounding box
     const Box<T>& box() const { return box_; }
     //! @brief return the space filling curve rank assignment of the last call to @a assign()

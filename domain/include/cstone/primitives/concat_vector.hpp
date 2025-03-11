@@ -15,10 +15,10 @@
 
 #pragma once
 
+#include <span>
 #include <vector>
 
-#include "cstone/primitives/accel_switch.hpp"
-#include "cstone/util/gsl-lite.hpp"
+#include "cstone/cuda/cuda_stubs.h"
 #include "cstone/util/pack_buffers.hpp"
 
 namespace cstone
@@ -32,9 +32,9 @@ public:
     ConcatVector() = default;
 
     //! @brief return segment sizes
-    gsl::span<const std::size_t> sizes() const { return segmentSizes_; }
+    std::span<const std::size_t> sizes() const { return segmentSizes_; }
     //! @brief return const span of underlying (linear) buffer
-    gsl::span<const T> data() const { return {rawPtr(buffer_), buffer_.size()}; }
+    std::span<const T> data() const { return {rawPtr(buffer_), buffer_.size()}; }
 
     auto view() { return util::packAllocBuffer<T>(buffer_, segmentSizes_, alignmentBytes); }
     auto view() const { return util::packAllocBuffer<const T>(buffer_, segmentSizes_, alignmentBytes); }

@@ -88,6 +88,7 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     T k = d.ngmax / r;
 
     util::array<T, 3> blobCenter{r, r, r};
+    auto*             u_or_t = d.u.empty() ? d.temp.data() : d.u.data();
 
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
@@ -109,7 +110,7 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
                 d.h[i] = hInt + 0.5 * (hExt - hInt) * (1. + std::tanh(k * (rPos - rSphere - hExt)));
             }
 
-            d.temp[i] = uExt / cv;
+            u_or_t[i] = uExt;
             d.vx[i]   = vxExt;
             d.vy[i]   = vyExt;
             d.vz[i]   = vzExt;
@@ -117,7 +118,7 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
         else
         {
             d.h[i]    = hInt;
-            d.temp[i] = uInt / cv;
+            u_or_t[i] = uInt;
             d.vx[i]   = 0.;
             d.vy[i]   = 0.;
             d.vz[i]   = 0.;
@@ -126,6 +127,10 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
         d.x_m1[i] = d.vx[i] * d.minDt;
         d.y_m1[i] = d.vy[i] * d.minDt;
         d.z_m1[i] = d.vz[i] * d.minDt;
+    }
+    if (d.u.empty())
+    {
+        std::for_each(d.temp.begin(), d.temp.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
     }
 }
 
