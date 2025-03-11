@@ -84,7 +84,6 @@ struct XmassPostamble
 
         T hInv  = 1.0 / hi;
         T h3Inv = hInv * hInv * hInv;
-        rho0i += mi;
 
         return std::make_tuple(veDefinition(mi, rho0i * K * h3Inv));
     }
@@ -105,8 +104,7 @@ HOST_DEVICE_FUN inline T xmassJLoop(cstone::LocalIndex i, Tc K, const cstone::Bo
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
     const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
 
-    decltype(interaction(iData, iData, cstone::Vec3<Tc>{}, T{})) result = {};
-
+    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
     for (unsigned pj = 0; pj < neighborsCount; ++pj)
     {
         cstone::LocalIndex j = neighbors[stride * pj];
@@ -123,6 +121,13 @@ HOST_DEVICE_FUN inline T xmassJLoop(cstone::LocalIndex i, Tc K, const cstone::Bo
     cstone::ijloop::storeParticleData(output, i, result);
 
     return xmassi;
+}
+
+template<class Neighborhood, class Tc, class T, class Tm>
+void xmassIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* wh, T* xmass)
+{
+    neighborhood.ijLoop(std::make_tuple(m), std::make_tuple(xmass), XmassInteraction<T>{wh}, XmassPostamble<T, Tc>{K},
+                        cstone::ijloop::symmetry::even);
 }
 
 } // namespace sph

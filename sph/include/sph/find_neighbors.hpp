@@ -5,6 +5,7 @@
 #include "cstone/traversal/ijloop/cpu.hpp"
 
 #include "sph/find_neighbors_gpu.hpp"
+#include "sph/neighborhood.hpp"
 
 namespace sph
 {
@@ -37,8 +38,7 @@ void findNeighborsSfc(const cstone::GroupView& groups, Dataset& d, const cstone:
     {
         findNeighborsSph(d.x.data(), d.y.data(), d.z.data(), d.h.data(), groups.firstBody, groups.lastBody, box,
                          d.treeView, d.ngmax, d.neighbors.data());
-        d.neighborhood = cstone::ijloop::CpuFullNbListNeighborhood{d.ngmax}.build(
-            d.treeView, box, d.size(), groups, d.x.data(), d.y.data(), d.z.data(), d.h.data());
+        d.neighborhood = buildNeighborhood(groups, d, box);
     }
 }
 

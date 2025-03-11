@@ -33,6 +33,7 @@
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
 
+#include "sph/neighborhood_gpu.hpp"
 #include "sph/sph_gpu.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/hydro_ve/xmass_kern.hpp"
@@ -89,24 +90,9 @@ __global__ void xmassGpu(Tc K, unsigned ngmax, const cstone::Box<Tc> box, const 
 template<class Dataset>
 void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
-    cstone::resetTraversalCounters<<<1, 1>>>();
+    auto& neighborhood = std::any_cast<const NeighborhoodTypeGpu<Dataset>&>(d.neighborhood);
 
-    xmassGpu<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x),
-        rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.m), rawPtr(d.devData.wh),
-        rawPtr(d.devData.whd), rawPtr(d.devData.xm), nidxPool, traversalPool);
-    checkGpuErrors(cudaDeviceSynchronize());
-
-    NcStats::type stats[NcStats::numStats];
-    checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(cstone::ncStats), NcStats::numStats * sizeof(NcStats::type)));
-
-    NcStats::type maxP2P   = stats[cstone::NcStats::maxP2P];
-    NcStats::type maxStack = stats[cstone::NcStats::maxStack];
-
-    d.devData.stackUsedNc = maxStack;
-
-    if (maxP2P == 0xFFFFFFFF) { throw std::runtime_error("GPU traversal stack exhausted in neighbor search\n"); }
+    xmassIjLoop(neighborhood, d.K, rawPtr(d.devData.m), rawPtr(d.devData.wh), rawPtr(d.devData.xm));
 }
 
 template void computeXMass(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,

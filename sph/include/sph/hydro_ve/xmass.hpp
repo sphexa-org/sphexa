@@ -31,46 +31,25 @@
 
 #pragma once
 
+#include <any>
+
+#include "sph/neighborhood.hpp"
 #include "sph/sph_gpu.hpp"
 #include "xmass_kern.hpp"
 
 namespace sph
 {
-template<typename Tc, class Dataset>
-void computeXMassImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box)
-{
-    const cstone::LocalIndex* neighbors      = d.neighbors.data();
-    const unsigned*           neighborsCount = d.nc.data();
-
-    const auto* h = d.h.data();
-    const auto* m = d.m.data();
-    const auto* x = d.x.data();
-    const auto* y = d.y.data();
-    const auto* z = d.z.data();
-
-    const auto* wh  = d.wh.data();
-    const auto* whd = d.whd.data();
-
-    auto* xm = d.xm.data();
-
-#pragma omp parallel for
-    for (size_t i = startIndex; i < endIndex; i++)
-    {
-        size_t   ni       = i - startIndex;
-        unsigned ncCapped = std::min(neighborsCount[i] - 1, d.ngmax);
-        xm[i]             = xmassJLoop(i, d.K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, h, m, wh, whd);
-#ifndef NDEBUG
-        if (std::isnan(xm[i]))
-            printf("ERROR::Rho0(%zu) rho0 %f, position: (%f %f %f), h: %f\n", i, xm[i], x[i], y[i], z[i], h[i]);
-#endif
-    }
-}
 
 template<typename Tc, class Dataset>
 void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeXMass(grp, d, box); }
-    else { computeXMassImpl(grp.firstBody, grp.lastBody, d, box); }
+    else
+    {
+        auto& neighborhood = std::any_cast<const NeighborhoodType<Dataset>&>(d.neighborhood);
+
+        xmassIjLoop(neighborhood, d.K, d.m.data(), d.wh.data(), d.xm.data());
+    }
 }
 
 } // namespace sph
