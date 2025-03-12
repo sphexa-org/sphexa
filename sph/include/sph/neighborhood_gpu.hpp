@@ -1,5 +1,7 @@
 #pragma once
 
+#include <any>
+
 #include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
 
@@ -18,5 +20,11 @@ inline auto buildNeighborhoodGpu(const cstone::GroupView& groups, Dataset& d,
 template<class Dataset>
 using NeighborhoodTypeGpu = decltype(buildNeighborhoodGpu(std::declval<cstone::GroupView>(), std::declval<Dataset&>(),
                                                           std::declval<cstone::Box<typename Dataset::RealType>>()));
+
+template<class Dataset>
+inline const NeighborhoodTypeGpu<Dataset>& getNeighborhoodGpu(const Dataset& d)
+{
+    return std::any_cast<const NeighborhoodTypeGpu<Dataset>&>(d.neighborhood);
+}
 
 } // namespace sph

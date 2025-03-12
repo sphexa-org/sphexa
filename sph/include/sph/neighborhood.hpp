@@ -1,5 +1,7 @@
 #pragma once
 
+#include <any>
+
 #include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/ijloop/cpu.hpp"
 
@@ -17,5 +19,11 @@ inline auto buildNeighborhood(const cstone::GroupView& groups, Dataset& d,
 template<class Dataset>
 using NeighborhoodType = decltype(buildNeighborhood(std::declval<cstone::GroupView>(), std::declval<Dataset&>(),
                                                     std::declval<cstone::Box<typename Dataset::RealType>>()));
+
+template<class Dataset>
+inline const NeighborhoodType<Dataset>& getNeighborhood(const Dataset& d)
+{
+    return std::any_cast<const NeighborhoodType<Dataset>&>(d.neighborhood);
+}
 
 } // namespace sph

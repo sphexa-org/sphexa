@@ -31,8 +31,6 @@
 
 #pragma once
 
-#include <any>
-
 #include "sph/neighborhood.hpp"
 #include "sph/sph_gpu.hpp"
 #include "xmass_kern.hpp"
@@ -44,12 +42,7 @@ template<typename Tc, class Dataset>
 void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeXMass(grp, d, box); }
-    else
-    {
-        auto& neighborhood = std::any_cast<const NeighborhoodType<Dataset>&>(d.neighborhood);
-
-        xmassIjLoop(neighborhood, d.K, d.m.data(), d.wh.data(), d.xm.data());
-    }
+    else { xmassIjLoop(getNeighborhood(d), d.K, d.m.data(), d.wh.data(), d.xm.data()); }
 }
 
 } // namespace sph

@@ -52,47 +52,10 @@ unsigned nsGroupSize() { return TravConfig::targetSize; }
 namespace cuda
 {
 
-template<class Tc, class Tm, class T, class KeyType>
-__global__ void xmassGpu(Tc K, unsigned ngmax, const cstone::Box<Tc> box, const LocalIndex* grpStart,
-                         const LocalIndex* grpEnd, LocalIndex numGroups, const cstone::OctreeNsView<Tc, KeyType> tree,
-                         const Tc* x, const Tc* y, const Tc* z, T* h, const Tm* m, const T* wh, const T* whd, T* xm,
-                         LocalIndex* nidx, TreeNodeIndex* globalPool)
-{
-    unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
-    unsigned targetIdx   = 0;
-    unsigned warpIdxGrid = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
-
-    LocalIndex* neighborsWarp = nidx + ngmax * TravConfig::targetSize * warpIdxGrid;
-
-    while (true)
-    {
-        // first thread in warp grabs next target
-        if (laneIdx == 0) { targetIdx = atomicAdd(&cstone::targetCounterGlob, 1); }
-        targetIdx = cstone::shflSync(targetIdx, 0);
-
-        if (targetIdx >= numGroups) return;
-
-        LocalIndex bodyBegin = grpStart[targetIdx];
-        LocalIndex bodyEnd   = grpEnd[targetIdx];
-        LocalIndex i         = bodyBegin + laneIdx;
-
-        unsigned ncTrue =
-            traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
-
-        if (i >= bodyEnd) continue;
-
-        unsigned ncCapped = stl::min(ncTrue, ngmax);
-        xm[i] = sph::xmassJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, h, m, wh,
-                                                        whd);
-    }
-}
-
 template<class Dataset>
 void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    auto& neighborhood = std::any_cast<const NeighborhoodTypeGpu<Dataset>&>(d.neighborhood);
-
-    xmassIjLoop(neighborhood, d.K, rawPtr(d.devData.m), rawPtr(d.devData.wh), rawPtr(d.devData.xm));
+    xmassIjLoop(getNeighborhoodGpu(d), d.K, rawPtr(d.devData.m), rawPtr(d.devData.wh), rawPtr(d.devData.xm));
 }
 
 template void computeXMass(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
@@ -101,9 +64,7 @@ template void computeXMass(const GroupView& grp, sphexa::ParticlesData<cstone::G
 template<class Dataset>
 void computeDensity(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    auto& neighborhood = std::any_cast<const NeighborhoodTypeGpu<Dataset>&>(d.neighborhood);
-
-    densityIjLoop(neighborhood, d.K, rawPtr(d.devData.m), rawPtr(d.devData.wh), rawPtr(d.devData.rho));
+    densityIjLoop(getNeighborhoodGpu(d), d.K, rawPtr(d.devData.m), rawPtr(d.devData.wh), rawPtr(d.devData.rho));
 }
 
 template void computeDensity(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,

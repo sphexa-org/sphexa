@@ -32,8 +32,6 @@
 
 #pragma once
 
-#include <any>
-
 #include "sph/neighborhood.hpp"
 #include "sph/hydro_ve/xmass_kern.hpp"
 #include "sph/sph_gpu.hpp"
@@ -45,12 +43,7 @@ template<class T, class Dataset>
 void computeDensity(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeDensity(groups, d, box); }
-    else
-    {
-        auto& neighborhood = std::any_cast<const NeighborhoodType<Dataset>&>(d.neighborhood);
-
-        densityIjLoop(neighborhood, d.K, d.m.data(), d.wh.data(), d.rho.data());
-    }
+    else { densityIjLoop(getNeighborhood(d), d.K, d.m.data(), d.wh.data(), d.rho.data()); }
 }
 
 } // namespace sph
