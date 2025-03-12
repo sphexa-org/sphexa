@@ -38,61 +38,6 @@
 namespace sph
 {
 
-template<class Tc, class Dataset>
-void computeMomentumEnergyStdImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box)
-{
-    using T = typename Dataset::HydroType;
-
-    const cstone::LocalIndex* neighbors      = d.neighbors.data();
-    const unsigned*           neighborsCount = d.nc.data();
-
-    const auto* h   = d.h.data();
-    const auto* m   = d.m.data();
-    const auto* x   = d.x.data();
-    const auto* y   = d.y.data();
-    const auto* z   = d.z.data();
-    const auto* vx  = d.vx.data();
-    const auto* vy  = d.vy.data();
-    const auto* vz  = d.vz.data();
-    const auto* rho = d.rho.data();
-    const auto* c   = d.c.data();
-    const auto* p   = d.p.data();
-
-    const auto* c11 = d.c11.data();
-    const auto* c12 = d.c12.data();
-    const auto* c13 = d.c13.data();
-    const auto* c22 = d.c22.data();
-    const auto* c23 = d.c23.data();
-    const auto* c33 = d.c33.data();
-
-    auto* du       = d.du.data();
-    auto* grad_P_x = d.ax.data();
-    auto* grad_P_y = d.ay.data();
-    auto* grad_P_z = d.az.data();
-
-    const auto* wh  = d.wh.data();
-    const auto* whd = d.whd.data();
-
-    T minDt = INFINITY;
-
-#pragma omp parallel for schedule(static) reduction(min : minDt)
-    for (size_t i = startIndex; i < endIndex; ++i)
-    {
-        size_t ni = i - startIndex;
-
-        T maxvsignal = 0;
-
-        unsigned ncCapped = std::min(neighborsCount[i] - 1, d.ngmax);
-        momentumAndEnergyJLoop(i, d.K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, vx, vy, vz, h, m, rho, p, c,
-                               c11, c12, c13, c22, c23, c33, wh, whd, grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal);
-
-        T dt_i = tsKCourant(maxvsignal, h[i], c[i], d.Kcour);
-        minDt  = std::min(minDt, dt_i);
-    }
-
-    d.minDtCourant = minDt;
-}
-
 template<class T, class Dataset>
 void computeMomentumEnergySTD(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
 {
@@ -103,12 +48,12 @@ void computeMomentumEnergySTD(const GroupView& groups, Dataset& d, const cstone:
                                 d.vz.data(), d.p.data(), d.c.data(), d.c11.data(), d.c12.data(), d.c13.data(),
                                 d.c22.data(), d.c23.data(), d.c33.data(), d.wh.data(), d.du.data(), d.ax.data(),
                                 d.ay.data(), d.az.data(), d.dtCourant.data());
+
         auto minDt = std::numeric_limits<typename Dataset::HydroType>::infinity();
 #pragma omp parallel for reduction(min : minDt)
         for (auto i = groups.firstBody; i < groups.lastBody; ++i)
             minDt = std::min(minDt, d.dtCourant[i]);
         d.minDtCourant = minDt;
-        // computeMomentumEnergyStdImpl(groups.firstBody, groups.lastBody, d, box);
     }
 }
 
