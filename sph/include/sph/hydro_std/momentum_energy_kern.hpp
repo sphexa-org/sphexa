@@ -45,19 +45,19 @@ struct MomentumAndEnergyInteraction
         T v1 = dist * hiInv;
         T v2 = dist * hjInv;
 
-        T rv = r_ij[0] * vx_ij + ry * vy_ij + rz * vz_ij;
+        T rv = rx * vx_ij + ry * vy_ij + rz * vz_ij;
 
         T hjInv3 = hjInv * hjInv * hjInv;
         T Wi     = hiInv3 * lt::lookup(wh, v1);
         T Wj     = hjInv3 * lt::lookup(wh, v2);
 
-        T termA1_i = c11i * r_ij[0] + c12i * ry + c13i * rz;
-        T termA2_i = c12i * r_ij[0] + c22i * ry + c23i * rz;
-        T termA3_i = c13i * r_ij[0] + c23i * ry + c33i * rz;
+        T termA1_i = c11i * rx + c12i * ry + c13i * rz;
+        T termA2_i = c12i * rx + c22i * ry + c23i * rz;
+        T termA3_i = c13i * rx + c23i * ry + c33i * rz;
 
-        T termA1_j = c11j * r_ij[0] + c12j * ry + c13j * rz;
-        T termA2_j = c12j * r_ij[0] + c22j * ry + c23j * rz;
-        T termA3_j = c13j * r_ij[0] + c23j * ry + c33j * rz;
+        T termA1_j = c11j * rx + c12j * ry + c13j * rz;
+        T termA2_j = c12j * rx + c22j * ry + c23j * rz;
+        T termA3_j = c13j * rx + c23j * ry + c33j * rz;
 
         T           wij          = i == j ? 0 : rv / dist;
         constexpr T av_alpha     = T(1);
