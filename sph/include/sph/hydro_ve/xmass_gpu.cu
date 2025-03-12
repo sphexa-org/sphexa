@@ -98,37 +98,12 @@ void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<typename D
 template void computeXMass(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
                            const cstone::Box<SphTypes::CoordinateType>&);
 
-template<class Tm, class Trho>
-__global__ void convertXmassToRho(const LocalIndex* grpStart, const LocalIndex* grpEnd, LocalIndex numGroups,
-                                  const Tm* m, Trho* rho)
-{
-    LocalIndex tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (tid >= numGroups) { return; }
-
-    LocalIndex bodyBegin = grpStart[tid];
-    LocalIndex bodyEnd   = grpEnd[tid];
-
-    for (auto i = bodyBegin; i < bodyEnd; ++i)
-    {
-        rho[i] = m[i] / rho[i];
-    }
-}
-
 template<class Dataset>
 void computeDensity(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    swap(d.devData.xm, d.devData.rho);
-    computeXMass(grp, d, box);
-    swap(d.devData.xm, d.devData.rho);
+    auto& neighborhood = std::any_cast<const NeighborhoodTypeGpu<Dataset>&>(d.neighborhood);
 
-    unsigned numThreads = 256;
-    unsigned numBlocks  = (grp.numGroups + numThreads - 1) / numThreads;
-    if (numBlocks == 0) { return; }
-
-    // rho[i] = m[i] / rho[i];
-    convertXmassToRho<<<numBlocks, numThreads>>>(grp.groupStart, grp.groupEnd, grp.numGroups, rawPtr(d.devData.m),
-                                                 rawPtr(d.devData.rho));
+    densityIjLoop(neighborhood, d.K, rawPtr(d.devData.m), rawPtr(d.devData.wh), rawPtr(d.devData.rho));
 }
 
 template void computeDensity(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,
