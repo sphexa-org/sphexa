@@ -147,4 +147,13 @@ HOST_DEVICE_FUN inline void IADJLoop(cstone::LocalIndex i, Tc K, const cstone::B
     cstone::ijloop::storeParticleData(output, i, result);
 }
 
+template<class Neighborhood, class Tc, class T>
+void IADIjLoop(Neighborhood const& neighborhood, Tc K, const T* xm, const T* kx, const T* wh, T* c11, T* c12, T* c13,
+               T* c22, T* c23, T* c33)
+{
+    neighborhood.ijLoop(std::make_tuple(xm, kx), std::make_tuple(c11, c12, c13, c22, c23, c33), IADInteraction<T>{wh},
+                        IADPostamble<T, Tc>{K},
+                        cstone::ijloop::symmetry::asymmetric); // TODO: check symmetry
+}
+
 } // namespace sph

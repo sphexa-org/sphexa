@@ -53,7 +53,7 @@ struct DivVCurlVInteraction
         auto const [i, iPos, hi, vxi, vyi, vzi, xmi, kxi, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
         auto const [j, jPos, hj, vxj, vyj, vzj, xmj, kxj, c11j, c12j, c13j, c22j, c23j, c33j] = jData;
 
-        T hiInv  = T(1) / hi;
+        T hiInv = T(1) / hi;
 
         T rx   = r_ij[0];
         T ry   = r_ij[1];
@@ -141,14 +141,14 @@ divV_curlVJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cs
         cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
     }
 
-    if (divv && doGradV)
+    if (curlv && doGradV)
     {
         DivVCurlVPostamble<true, true, T, Tc> postamble{K};
         const auto                            presult = postamble(iData, result);
         const auto                            output = std::make_tuple(divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33);
         cstone::ijloop::storeParticleData(output, i, presult);
     }
-    else if (divv)
+    else if (curlv)
     {
         DivVCurlVPostamble<true, false, T, Tc> postamble{K};
         const auto                             presult = postamble(iData, result);
@@ -168,6 +168,39 @@ divV_curlVJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cs
         const auto                              presult = postamble(iData, result);
         const auto                              output  = std::make_tuple(divv);
         cstone::ijloop::storeParticleData(output, i, presult);
+    }
+}
+
+template<class Neighborhood, class Tc, class T>
+void divVCurlVIjLoop(const Neighborhood& neighborhood, Tc K, const T* vx, const T* vy, const T* vz, const T* xm,
+                     const T* kx, const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
+                     const T* wh, T* divv, T* curlv, T* dV11, T* dV12, T* dV13, T* dV22, T* dV23, T* dV33, bool doGradV)
+{
+    const auto input = std::make_tuple(vx, vy, vz, xm, kx, c11, c12, c13, c22, c23, c33);
+    // TODO: check symmetry
+    if (curlv && doGradV)
+    {
+        const auto output = std::make_tuple(divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33);
+        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<true, true, T, Tc>{K},
+                            cstone::ijloop::symmetry::asymmetric);
+    }
+    else if (curlv)
+    {
+        const auto output = std::make_tuple(divv, curlv);
+        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<true, false, T, Tc>{K},
+                            cstone::ijloop::symmetry::asymmetric);
+    }
+    else if (doGradV)
+    {
+        const auto output = std::make_tuple(divv, dV11, dV12, dV13, dV22, dV23, dV33);
+        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<false, true, T, Tc>{K},
+                            cstone::ijloop::symmetry::asymmetric);
+    }
+    else
+    {
+        const auto output = std::make_tuple(divv);
+        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<false, false, T, Tc>{K},
+                            cstone::ijloop::symmetry::asymmetric);
     }
 }
 
