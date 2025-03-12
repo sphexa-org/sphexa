@@ -112,7 +112,7 @@ struct CpuFullNbListNeighborhoodImpl
                 Sym) const
     {
         const auto constInput = makeConstRestrict(input);
-#pragma omp parallel for
+#pragma omp parallel for simd
         for (LocalIndex i = firstBody; i < lastBody; ++i)
         {
             const auto iData  = loadParticleData(x, y, z, h, constInput, i);
@@ -120,7 +120,6 @@ struct CpuFullNbListNeighborhoodImpl
 
             const unsigned nbs = neighborsCount[i - firstBody];
             auto result        = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
-#pragma omp simd
             for (unsigned nb = 0; nb < nbs; ++nb)
             {
                 const LocalIndex j = neighbors[(i - firstBody) * ngmax + nb];
