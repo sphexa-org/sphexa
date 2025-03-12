@@ -12,7 +12,7 @@ namespace sph
 {
 
 template<class T>
-struct MomentumAndEnergyInteraction
+struct MomentumAndEnergyInteractionStd
 {
     const T* wh;
 
@@ -92,7 +92,7 @@ struct MomentumAndEnergyInteraction
 };
 
 template<class Tc>
-struct MomentumAndEnergyPostamble
+struct MomentumAndEnergyPostambleStd
 {
     Tc K;
 
@@ -107,17 +107,21 @@ struct MomentumAndEnergyPostamble
 };
 
 template<class Tc>
-struct MomentumAndEnergyPostambleWithDt : MomentumAndEnergyPostamble<Tc>
+struct MomentumAndEnergyPostambleStdWithDt : MomentumAndEnergyPostambleStd<Tc>
 {
     Tc Kcour;
 
-    MomentumAndEnergyPostambleWithDt(Tc K, Tc Kcour) : MomentumAndEnergyPostamble<Tc>(K), Kcour(Kcour) {}
+    MomentumAndEnergyPostambleStdWithDt(Tc K, Tc Kcour)
+        : MomentumAndEnergyPostambleStd<Tc>(K)
+        , Kcour(Kcour)
+    {
+    }
 
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
         const auto [du, grad_P_x, grad_P_y, grad_P_z, maxvsignal] =
-            MomentumAndEnergyPostamble<Tc>::operator()(iData, result);
+            MomentumAndEnergyPostambleStd<Tc>::operator()(iData, result);
         const auto [i, iPos, hi, mi, roi, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
 
         auto dt = tsKCourant(maxvsignal.value, hi, ci, Kcour);
@@ -133,8 +137,8 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
                        const T* c12, const T* c13, const T* c22, const T* c23, const T* c33, const T* wh,
                        const T* /*whd*/, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, T* maxvsignal)
 {
-    MomentumAndEnergyInteraction interaction{wh};
-    MomentumAndEnergyPostamble   postamble{K};
+    MomentumAndEnergyInteractionStd interaction{wh};
+    MomentumAndEnergyPostambleStd   postamble{K};
 
     const auto input  = std::make_tuple(m, rho, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33);
     const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, maxvsignal - i);
@@ -166,8 +170,8 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, c
                              T* grad_P_z, T* dt)
 {
     neighborhood.ijLoop(std::make_tuple(m, rho, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
-                        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt), MomentumAndEnergyInteraction{wh},
-                        MomentumAndEnergyPostambleWithDt{K, Kcour},
+                        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt), MomentumAndEnergyInteractionStd{wh},
+                        MomentumAndEnergyPostambleStdWithDt{K, Kcour},
                         cstone::ijloop::symmetry::asymmetric); // TODO: different symmetries per output
 }
 
