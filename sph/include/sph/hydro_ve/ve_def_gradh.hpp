@@ -36,52 +36,16 @@
 
 namespace sph
 {
-template<class Tc, class Dataset>
-void computeVeDefGradhImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box)
-{
-    const cstone::LocalIndex* neighbors      = d.neighbors.data();
-    const unsigned*           neighborsCount = d.nc.data();
-
-    const auto* x = d.x.data();
-    const auto* y = d.y.data();
-    const auto* z = d.z.data();
-    const auto* h = d.h.data();
-    const auto* m = d.m.data();
-
-    const auto* wh  = d.wh.data();
-    const auto* whd = d.whd.data();
-
-    const auto* xm = d.xm.data();
-
-    auto* kx    = d.kx.data();
-    auto* gradh = d.gradh.data();
-
-    const Tc K         = d.K;
-    const Tc sincIndex = d.sincIndex;
-
-#pragma omp parallel for
-    for (size_t i = startIndex; i < endIndex; i++)
-    {
-        size_t   ni        = i - startIndex;
-        unsigned ncCapped  = std::min(neighborsCount[i] - 1, d.ngmax);
-        auto [kxi, gradhi] = veDefGradhJLoop(i, K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, h, m, wh, whd, xm);
-
-        kx[i]    = kxi;
-        gradh[i] = gradhi;
-
-#ifndef NDEBUG
-        auto rhoi = kxi * m[i] / xm[i];
-        if (std::isnan(rhoi))
-            printf("ERROR::Density(%zu) density %f, position: (%f %f %f), h: %f\n", i, rhoi, x[i], y[i], z[i], h[i]);
-#endif
-    }
-}
 
 template<typename Tc, class Dataset>
 void computeVeDefGradh(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeVeDefGradh(grp, d, box); }
-    else { computeVeDefGradhImpl(grp.firstBody, grp.lastBody, d, box); }
+    else
+    {
+        veDefGradhIjLoop(getNeighborhood(d), d.K, d.m.data(), d.xm.data(), d.wh.data(), d.whd.data(), d.kx.data(),
+                         d.gradh.data());
+    }
 }
 
 } // namespace sph
