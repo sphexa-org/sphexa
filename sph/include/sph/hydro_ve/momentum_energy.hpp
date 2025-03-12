@@ -37,81 +37,28 @@
 namespace sph
 {
 
-template<bool avClean, class Tc, class Dataset>
-void computeMomentumEnergyImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box)
-{
-    using T = typename Dataset::HydroType;
-
-    const cstone::LocalIndex* neighbors      = d.neighbors.data();
-    const unsigned*           neighborsCount = d.nc.data();
-
-    const auto* h        = d.h.data();
-    const auto* m        = d.m.data();
-    const auto* x        = d.x.data();
-    const auto* y        = d.y.data();
-    const auto* z        = d.z.data();
-    const auto* vx       = d.vx.data();
-    const auto* vy       = d.vy.data();
-    const auto* vz       = d.vz.data();
-    const auto* c        = d.c.data();
-    const auto* prho     = d.prho.data();
-    const auto* tdpdTrho = d.tdpdTrho.data();
-    const auto* alpha    = d.alpha.data();
-
-    const auto* c11 = d.c11.data();
-    const auto* c12 = d.c12.data();
-    const auto* c13 = d.c13.data();
-    const auto* c22 = d.c22.data();
-    const auto* c23 = d.c23.data();
-    const auto* c33 = d.c33.data();
-
-    const auto* dV11 = d.dV11.data();
-    const auto* dV12 = d.dV12.data();
-    const auto* dV13 = d.dV13.data();
-    const auto* dV22 = d.dV22.data();
-    const auto* dV23 = d.dV23.data();
-    const auto* dV33 = d.dV33.data();
-
-    auto* du       = d.du.data();
-    auto* grad_P_x = d.ax.data();
-    auto* grad_P_y = d.ay.data();
-    auto* grad_P_z = d.az.data();
-
-    const auto* wh  = d.wh.data();
-    const auto* whd = d.whd.data();
-    const auto* kx  = d.kx.data();
-    const auto* xm  = d.xm.data();
-
-    T minDt = INFINITY;
-
-#pragma omp parallel for schedule(static) reduction(min : minDt)
-    for (size_t i = startIndex; i < endIndex; ++i)
-    {
-        size_t   ni       = i - startIndex;
-        unsigned ncCapped = stl::min(neighborsCount[i] - 1, d.ngmax);
-
-        T maxvsignal = 0;
-
-        momentumAndEnergyJLoop<avClean>(i, d.K, box, neighbors + d.ngmax * ni, ncCapped, neighborsCount, x, y, z, vx,
-                                        vy, vz, h, m, prho, tdpdTrho, c, c11, c12, c13, c22, c23, c33, d.Atmin, d.Atmax,
-                                        d.ramp, wh, kx, xm, alpha, dV11, dV12, dV13, dV22, dV23, dV33, grad_P_x,
-                                        grad_P_y, grad_P_z, du, &maxvsignal);
-
-        T dt_i = tsKCourant(maxvsignal, h[i], c[i], d.Kcour);
-        minDt  = std::min(minDt, dt_i);
-    }
-
-    d.minDtCourant = minDt;
-}
-
 template<bool avClean, class T, class Dataset>
-void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d, const cstone::Box<T>& box)
+void computeMomentumEnergy(const GroupView& groups, float* groupDt, Dataset& d, const cstone::Box<T>& box)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        cuda::computeMomentumEnergy<avClean>(grp, groupDt, d, box);
+        cuda::computeMomentumEnergy<avClean>(groups, groupDt, d, box);
     }
-    else { computeMomentumEnergyImpl<avClean>(grp.firstBody, grp.lastBody, d, box); }
+    else
+    {
+        momentumAndEnergyIjLoop<avClean>(
+            getNeighborhood(d), d.K, d.Kcour, d.Atmin, d.Atmax, d.ramp, d.vx.data(), d.vy.data(), d.vz.data(),
+            d.m.data(), d.c.data(), d.kx.data(), d.alpha.data(), d.xm.data(), d.prho.data(), d.c11.data(), d.c12.data(),
+            d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data(), d.nc.data(), d.dV11.data(), d.dV12.data(),
+            d.dV13.data(), d.dV22.data(), d.dV23.data(), d.dV33.data(), d.tdpdTrho.data(), d.wh.data(), d.du.data(),
+            d.ax.data(), d.ay.data(), d.az.data(), d.dtCourant.data());
+
+        auto minDt = std::numeric_limits<typename Dataset::HydroType>::infinity();
+#pragma omp parallel for reduction(min : minDt)
+        for (auto i = groups.firstBody; i < groups.lastBody; ++i)
+            minDt = std::min(minDt, d.dtCourant[i]);
+        d.minDtCourant = minDt;
+    }
 }
 
 } // namespace sph

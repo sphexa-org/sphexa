@@ -186,6 +186,30 @@ struct MomentumAndEnergyPostamble
     };
 };
 
+template<bool UseTdpdTrho, class T, class Tc>
+struct MomentumAndEnergyPostambleWithDt : MomentumAndEnergyPostamble<UseTdpdTrho, T, Tc>
+{
+    Tc Kcour;
+
+    MomentumAndEnergyPostambleWithDt(Tc K, Tc Kcour)
+        : MomentumAndEnergyPostamble<UseTdpdTrho, T, Tc>(K)
+        , Kcour(Kcour)
+    {
+    }
+
+    template<class ParticleData, class Result>
+    constexpr auto operator()(const ParticleData& iData, const Result& result) const
+    {
+        const auto [du, grad_P_x, grad_P_y, grad_P_z, maxvsignal] =
+            MomentumAndEnergyPostamble<UseTdpdTrho, T, Tc>::operator()(iData, result);
+        const auto [i, iPos, hi, vxi, vyi, vzi, mi, ci, kxi, alpha_i, xmassi, prhoi, c11i, c12i, c13i, c22i, c23i, c33i,
+                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi] = iData;
+
+        auto dt = tsKCourant(maxvsignal.value, hi, ci, Kcour);
+        return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
+    };
+};
+
 template<bool avClean, size_t stride = 1, class Tc, class Tm, class T, class Tm1>
 HOST_DEVICE_FUN inline void
 momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
@@ -230,6 +254,33 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
         MomentumAndEnergyPostamble<false, T, Tc> postamble{K};
         auto                                     presult = postamble(iData, result);
         cstone::ijloop::storeParticleData(output, i, presult);
+    }
+}
+
+template<bool AvClean, class Neighborhood, class Tc, class T, class Tm, class Tm1>
+void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T Atmin, T Atmax, T ramp, const T* vx,
+                             const T* vy, const T* vz, const Tm* m, const T* c, const T* kx, const T* alpha,
+                             const T* xm, const T* prho, const T* c11, const T* c12, const T* c13, const T* c22,
+                             const T* c23, const T* c33, const unsigned* nc, const T* dV11, const T* dV12,
+                             const T* dV13, const T* dV22, const T* dV23, const T* dV33, const T* tdpdTrho, const T* wh,
+                             Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z, T* dt)
+{
+    if constexpr (!AvClean) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
+    const auto input =
+        std::make_tuple(vx, vy, vz, m, c, kx, alpha, xm, prho, c11, c12, c13, c22, c23, c33, nc, dV11, dV12, dV13, dV22,
+                        dV23, dV33, tdpdTrho ? tdpdTrho : vx /* pass random derefable array if tdpdTrho is null */);
+    const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
+    if (tdpdTrho)
+    {
+        neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<AvClean, T>{wh, Atmin, Atmax, ramp},
+                            MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour},
+                            cstone::ijloop::symmetry::asymmetric);
+    }
+    else
+    {
+        neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<AvClean, T>{wh, Atmin, Atmax, ramp},
+                            MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour},
+                            cstone::ijloop::symmetry::asymmetric);
     }
 }
 
