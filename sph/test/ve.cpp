@@ -114,7 +114,7 @@ TEST_F(SphKernelTests, AVSwitches)
     T newAlpha = AVswitchesJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), vx.data(),
                                  vy.data(), vz.data(), h.data(), c.data(), c11.data(), c12.data(), c13.data(),
                                  c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), kx.data(), xm.data(),
-                                 divv.data(), dt, alphamin, alphamax, decay_constant, alpha[0]);
+                                 divv.data(), alpha.data(), dt, alphamin, alphamax, decay_constant);
 
     EXPECT_NEAR(newAlpha, 0.93941905320351171, 2e-9);
 }

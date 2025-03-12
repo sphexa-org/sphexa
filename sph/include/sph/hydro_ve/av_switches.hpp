@@ -38,51 +38,19 @@ namespace sph
 {
 
 template<class T, class Dataset>
-void computeAVswitchesImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
-{
-    const cstone::LocalIndex* neighbors      = d.neighbors.data();
-    const unsigned*           neighborsCount = d.nc.data();
-
-    const auto* x  = d.x.data();
-    const auto* y  = d.y.data();
-    const auto* z  = d.z.data();
-    const auto* h  = d.h.data();
-    const auto* vx = d.vx.data();
-    const auto* vy = d.vy.data();
-    const auto* vz = d.vz.data();
-    const auto* c  = d.c.data();
-
-    const auto* c11 = d.c11.data();
-    const auto* c12 = d.c12.data();
-    const auto* c13 = d.c13.data();
-    const auto* c22 = d.c22.data();
-    const auto* c23 = d.c23.data();
-    const auto* c33 = d.c33.data();
-
-    const auto* divv = d.divv.data();
-    const auto* wh   = d.wh.data();
-    const auto* whd  = d.whd.data();
-    const auto* kx   = d.kx.data();
-    const auto* xm   = d.xm.data();
-
-    auto* alpha = d.alpha.data();
-
-#pragma omp parallel for
-    for (size_t i = startIndex; i < endIndex; ++i)
-    {
-        size_t   ni       = i - startIndex;
-        unsigned ncCapped = std::min(neighborsCount[i] - 1, d.ngmax);
-        alpha[i] = AVswitchesJLoop(i, d.K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, vx, vy, vz, h, c, c11, c12,
-                                   c13, c22, c23, c33, wh, whd, kx, xm, divv, d.minDt, d.alphamin, d.alphamax,
-                                   d.decay_constant, alpha[i]);
-    }
-}
-
-template<class T, class Dataset>
 void computeAVswitches(const GroupView& grp, Dataset& d, const cstone::Box<T>& box)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeAVswitches(grp, d, box); }
-    else { computeAVswitchesImpl(grp.firstBody, grp.lastBody, d, box); }
+    else
+    {
+        // write alpha output to dtCourant, then swap pointers
+        AVswitchesIjLoop(getNeighborhood(d), d.K, d.minDt, d.alphamin, d.alphamax, d.decay_constant, d.xm.data(),
+                         d.kx.data(), d.divv.data(), d.alpha.data(), d.vx.data(), d.vy.data(), d.vz.data(), d.c.data(),
+                         d.c11.data(), d.c12.data(), d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data(),
+                         d.wh.data(), d.dtCourant.data());
+        d.alpha.swap(d.dtCourant);
+        // computeAVswitchesImpl(grp.firstBody, grp.lastBody, d, box);
+    }
 }
 
 } // namespace sph
