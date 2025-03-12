@@ -176,11 +176,12 @@ TEST_F(SphKernelTests, MomentumEnergy)
                         dvzdx.data(), dvzdy.data(), dvzdz.data()},
                        {dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(), dV33.data()}, npart);
 
+    std::vector<unsigned> nc(x.size(), neighborsCount + 1);
     { // test with AV cleaning
         auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
-        momentumAndEnergyJLoop<true>(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(),
-                                     vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
+        momentumAndEnergyJLoop<true>(0, K, box(), neighbors.data(), neighborsCount, nc.data(), x.data(), y.data(),
+                                     z.data(), vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
                                      (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
                                      c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
                                      alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
@@ -195,8 +196,8 @@ TEST_F(SphKernelTests, MomentumEnergy)
     { // test without AV cleaning
         auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
-        momentumAndEnergyJLoop<false>(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(),
-                                      vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
+        momentumAndEnergyJLoop<false>(0, K, box(), neighbors.data(), neighborsCount, nc.data(), x.data(), y.data(),
+                                      z.data(), vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
                                       (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
                                       c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
                                       alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),

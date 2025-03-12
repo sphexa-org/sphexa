@@ -33,6 +33,7 @@
 
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/sfc/box.hpp"
+#include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"
@@ -62,75 +63,38 @@ HOST_DEVICE_FUN T avRvCorrection(util::array<Tc, 3> R, Tc eta_ab, T eta_crit, co
     return rv_AV;
 }
 
-template<bool avClean, size_t stride = 1, class Tc, class Tm, class T, class Tm1>
-HOST_DEVICE_FUN inline void
-momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
-                       unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy,
-                       const T* vz, const T* h, const Tm* m, const T* prho, const T* tdpdTrho, const T* c, const T* c11,
-                       const T* c12, const T* c13, const T* c22, const T* c23, const T* c33, const T Atmin,
-                       const T Atmax, const T ramp, const T* wh, const T* kx, const T* xm, const T* alpha,
-                       const T* dV11, const T* dV12, const T* dV13, const T* dV22, const T* dV23, const T* dV33,
-                       T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, T* maxvsignal)
+template<bool AvClean, class T>
+struct MomentumAndEnergyInteraction
 {
-    auto xi  = x[i];
-    auto yi  = y[i];
-    auto zi  = z[i];
-    auto vxi = vx[i];
-    auto vyi = vy[i];
-    auto vzi = vz[i];
+    const T* wh;
+    T        Atmin, Atmax, ramp;
 
-    auto hi  = h[i];
-    auto mi  = m[i];
-    auto ci  = c[i];
-    auto kxi = kx[i];
-
-    auto alpha_i = alpha[i];
-
-    auto xmassi = xm[i];
-    auto rhoi   = kxi * mi / xmassi;
-    auto prhoi  = prho[i];
-
-    T hiInv  = T(1) / hi;
-    T hiInv3 = hiInv * hiInv * hiInv;
-
-    T maxvsignali = 0.0;
-    T momentum_x = 0.0, momentum_y = 0.0, momentum_z = 0.0, energy = 0.0;
-    T a_visc_energy = 0.0;
-
-    auto c11i = c11[i];
-    auto c12i = c12[i];
-    auto c13i = c13[i];
-    auto c22i = c22[i];
-    auto c23i = c23[i];
-    auto c33i = c33[i];
-
-    [[maybe_unused]] util::array<T, 6> gradV_i;
-    if constexpr (avClean) { gradV_i = {dV11[i], dV12[i], dV13[i], dV22[i], dV23[i], dV33[i]}; }
-
-    // +1 is because we need to add selfparticle to neighborsCount
-    T eta_crit = std::cbrt(T(32) * M_PI / T(3) / T(neighborsCount + 1));
-
-    for (unsigned pj = 0; pj < neighborsCount; ++pj)
+    template<class ParticleData, class Tc>
+    constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
+                              T r2) const
     {
-        cstone::LocalIndex j = neighbors[stride * pj];
+        const auto [i, iPos, hi, vxi, vyi, vzi, mi, ci, kxi, alpha_i, xmassi, prhoi, c11i, c12i, c13i, c22i, c23i, c33i,
+                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi] = iData;
+        const auto [j, jPos, hj, vxj, vyj, vzj, mj, cj, kxj, alpha_j, xmassj, prhoj, c11j, c12j, c13j, c22j, c23j, c33j,
+                    ncj, dV11j, dV12j, dV13j, dV22j, dV23j, dV33j, tdpdTrhoj] = jData;
 
-        T    rx  = xi - x[j];
-        T    ry  = yi - y[j];
-        T    rz  = zi - z[j];
-        auto vxj = vx[j];
-        auto vyj = vy[j];
-        auto vzj = vz[j];
+        auto rhoi = kxi * mi / xmassi;
 
-        applyPBC(box, T(2) * hi, rx, ry, rz);
+        T hiInv  = T(1) / hi;
+        T hiInv3 = hiInv * hiInv * hiInv;
 
-        T r2   = rx * rx + ry * ry + rz * rz;
+        T eta_crit = std::cbrt(T(32) * M_PI / T(3) / T(nci));
+
+        T rx = r_ij[0];
+        T ry = r_ij[1];
+        T rz = r_ij[2];
+
         T dist = std::sqrt(r2);
 
         T vx_ij = vxi - vxj;
         T vy_ij = vyi - vyj;
         T vz_ij = vzi - vzj;
 
-        T hj    = h[j];
         T hjInv = T(1) / hj;
 
         T v1 = dist * hiInv;
@@ -144,36 +108,24 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
         T termA2_i = -(c12i * rx + c22i * ry + c23i * rz) * Wi;
         T termA3_i = -(c13i * rx + c23i * ry + c33i * rz) * Wi;
 
-        auto c11j = c11[j];
-        auto c12j = c12[j];
-        auto c13j = c13[j];
-        auto c22j = c22[j];
-        auto c23j = c23[j];
-        auto c33j = c33[j];
-
         T termA1_j = -(c11j * rx + c12j * ry + c13j * rz) * Wj;
         T termA2_j = -(c12j * rx + c22j * ry + c23j * rz) * Wj;
         T termA3_j = -(c13j * rx + c23j * ry + c33j * rz) * Wj;
 
-        auto mj     = m[j];
-        auto cj     = c[j];
-        auto kxj    = kx[j];
-        auto xmassj = xm[j];
-        auto rhoj   = kxj * mj / xmassj;
+        auto rhoj = kxj * mj / xmassj;
 
         T rv = rx * vx_ij + ry * vy_ij + rz * vz_ij;
-        if constexpr (avClean)
+        if constexpr (AvClean)
         {
-            rv += avRvCorrection({rx, ry, rz}, stl::min(v1, v2), eta_crit, gradV_i,
-                                 {dV11[j], dV12[j], dV13[j], dV22[j], dV23[j], dV33[j]});
+            rv += avRvCorrection({rx, ry, rz}, stl::min(v1, v2), eta_crit, {dV11i, dV12i, dV13i, dV22i, dV23i, dV33i},
+                                 {dV11j, dV12j, dV13j, dV22j, dV23j, dV33j});
         }
 
-        T wij          = rv / dist;
-        T viscosity_ij = artificial_viscosity(alpha_i, alpha[j], ci, cj, wij);
+        T wij          = i == j ? 0 : rv / dist;
+        T viscosity_ij = artificial_viscosity(alpha_i, alpha_j, ci, cj, wij);
 
         // For time-step calculations
         T vijsignal = T(0.5) * (ci + cj) - T(2) * wij;
-        maxvsignali = (vijsignal > maxvsignali) ? vijsignal : maxvsignali;
 
         T a_mom, b_mom;
         T Atwood = (std::abs(rhoi - rhoj)) / (rhoi + rhoj);
@@ -194,31 +146,91 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
             b_mom      = pow(xmassj, T(2) - sigma_ij) * pow(xmassi, sigma_ij);
         }
 
-        auto a_visc   = mj / rhoi * viscosity_ij;
-        auto b_visc   = mj / rhoj * viscosity_ij;
-        T    a_visc_x = T(0.5) * (a_visc * termA1_i + b_visc * termA1_j);
-        T    a_visc_y = T(0.5) * (a_visc * termA2_i + b_visc * termA2_j);
-        T    a_visc_z = T(0.5) * (a_visc * termA3_i + b_visc * termA3_j);
-        a_visc_energy += a_visc_x * vx_ij + a_visc_y * vy_ij + a_visc_z * vz_ij;
+        auto a_visc        = mj / rhoi * viscosity_ij;
+        auto b_visc        = mj / rhoj * viscosity_ij;
+        T    a_visc_x      = T(0.5) * (a_visc * termA1_i + b_visc * termA1_j);
+        T    a_visc_y      = T(0.5) * (a_visc * termA2_i + b_visc * termA2_j);
+        T    a_visc_z      = T(0.5) * (a_visc * termA3_i + b_visc * termA3_j);
+        T    a_visc_energy = a_visc_x * vx_ij + a_visc_y * vy_ij + a_visc_z * vz_ij;
 
-        energy += mj * a_mom * (vx_ij * termA1_i + vy_ij * termA2_i + vz_ij * termA3_i);
+        T energy = mj * a_mom * (vx_ij * termA1_i + vy_ij * termA2_i + vz_ij * termA3_i);
 
         auto momentum_i = mj * prhoi * a_mom;
-        auto momentum_j = mj * prho[j] * b_mom;
-        momentum_x += momentum_i * termA1_i + momentum_j * termA1_j + a_visc_x;
-        momentum_y += momentum_i * termA2_i + momentum_j * termA2_j + a_visc_y;
-        momentum_z += momentum_i * termA3_i + momentum_j * termA3_j + a_visc_z;
+        auto momentum_j = mj * prhoj * b_mom;
+        T    momentum_x = momentum_i * termA1_i + momentum_j * termA1_j + a_visc_x;
+        T    momentum_y = momentum_i * termA2_i + momentum_j * termA2_j + a_visc_y;
+        T    momentum_z = momentum_i * termA3_i + momentum_j * termA3_j + a_visc_z;
+
+        return std::make_tuple(a_visc_energy, energy, momentum_x, momentum_y, momentum_z,
+                               cstone::ijloop::reduction::max(vijsignal));
+    }
+};
+
+template<bool UseTdpdTrho, class T, class Tc>
+struct MomentumAndEnergyPostamble
+{
+    Tc K;
+
+    template<class ParticleData, class Result>
+    constexpr auto operator()(const ParticleData& iData, const Result& result) const
+    {
+        const auto [i, iPos, hi, vxi, vyi, vzi, mi, ci, kxi, alpha_i, xmassi, prhoi, c11i, c12i, c13i, c22i, c23i, c33i,
+                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi]        = iData;
+        auto [a_visc_energy, energy, momentum_x, momentum_y, momentum_z, maxvsignal] = result;
+        a_visc_energy                                                                = stl::max(T(0), a_visc_energy);
+        T eCoeff                                                                     = UseTdpdTrho ? tdpdTrhoi : prhoi;
+        T dui = K * (eCoeff * energy + T(0.5) * a_visc_energy); // factor of 2 already removed from 2P/rho
+
+        // grad_P_xyz is stored as the acceleration,s accel = -grad_P / rho
+        return std::make_tuple(dui, -K * momentum_x, -K * momentum_y, -K * momentum_z, maxvsignal);
+    };
+};
+
+template<bool avClean, size_t stride = 1, class Tc, class Tm, class T, class Tm1>
+HOST_DEVICE_FUN inline void
+momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
+                       unsigned neighborsCount, const unsigned* nc, const Tc* x, const Tc* y, const Tc* z, const T* vx,
+                       const T* vy, const T* vz, const T* h, const Tm* m, const T* prho, const T* tdpdTrho, const T* c,
+                       const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
+                       const T Atmin, const T Atmax, const T ramp, const T* wh, const T* kx, const T* xm,
+                       const T* alpha, const T* dV11, const T* dV12, const T* dV13, const T* dV22, const T* dV23,
+                       const T* dV33, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, T* maxvsignal)
+{
+    MomentumAndEnergyInteraction<avClean, T> interaction{wh, Atmin, Atmax, ramp};
+
+    if constexpr (!avClean) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
+    const auto input =
+        std::make_tuple(vx, vy, vz, m, c, kx, alpha, xm, prho, c11, c12, c13, c22, c23, c33, nc, dV11, dV12, dV13, dV22,
+                        dV23, dV33, tdpdTrho ? tdpdTrho : vx /* pass random derefable array if tdpdTrho is null */);
+    const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, maxvsignal - i);
+
+    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
+    const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
+
+    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
+    for (unsigned pj = 0; pj < neighborsCount; ++pj)
+    {
+        cstone::LocalIndex j = neighbors[stride * pj];
+
+        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
+
+        const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
+
+        cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
     }
 
-    a_visc_energy = stl::max(T(0), a_visc_energy);
-    T eCoeff      = (tdpdTrho == nullptr) ? prhoi : tdpdTrho[i];
-    du[i]         = K * (eCoeff * energy + T(0.5) * a_visc_energy); // factor of 2 already removed from 2P/rho
-
-    // grad_P_xyz is stored as the acceleration,s accel = -grad_P / rho
-    grad_P_x[i] = -K * momentum_x;
-    grad_P_y[i] = -K * momentum_y;
-    grad_P_z[i] = -K * momentum_z;
-    *maxvsignal = maxvsignali;
+    if (tdpdTrho)
+    {
+        MomentumAndEnergyPostamble<true, T, Tc> postamble{K};
+        auto                                    presult = postamble(iData, result);
+        cstone::ijloop::storeParticleData(output, i, presult);
+    }
+    else
+    {
+        MomentumAndEnergyPostamble<false, T, Tc> postamble{K};
+        auto                                     presult = postamble(iData, result);
+        cstone::ijloop::storeParticleData(output, i, presult);
+    }
 }
 
 } // namespace sph
