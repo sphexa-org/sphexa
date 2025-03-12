@@ -85,7 +85,15 @@ struct XmassPostamble
         T hInv  = 1.0 / hi;
         T h3Inv = hInv * hInv * hInv;
 
-        return std::make_tuple(veDefinition(mi, rho0i * K * h3Inv));
+        T xmassi = veDefinition(mi, rho0i * K * h3Inv);
+#ifdef NDBEBUG
+        if (std::isnan(xmassi))
+        {
+            printf("ERROR::Rho0(%zu) rho0 %f, position: (%f %f %f), h: %f\n", size_t(i), xmassi, iPos[0], iPos[1],
+                   iPos[2], hi);
+        }
+#endif
+        return std::make_tuple(xmassi);
     }
 };
 
