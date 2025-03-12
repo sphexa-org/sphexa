@@ -16,7 +16,8 @@ struct IADInteractionSTD
     const T* wh;
 
     template<class ParticleData, class Tc>
-    constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij, T r2) const
+    constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
+                              T r2) const
     {
         const auto [i, iPos, hi, mi, roi] = iData;
         const auto [j, jPos, hj, mj, roj] = jData;
@@ -114,6 +115,15 @@ HOST_DEVICE_FUN inline void IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone
     result = postamble(iData, result);
 
     cstone::ijloop::storeParticleData(output, i, result);
+}
+
+template<class Neighborhood, class Tc, class Tm, class T>
+void IADIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* rho, const T* wh, T* c11, T* c12, T* c13,
+               T* c22, T* c23, T* c33)
+{
+    neighborhood.ijLoop(std::make_tuple(m, rho), std::make_tuple(c11, c12, c13, c22, c23, c33),
+                        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K},
+                        cstone::ijloop::symmetry::asymmetric); // TODO: check symmetry
 }
 
 } // namespace sph
