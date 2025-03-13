@@ -189,11 +189,12 @@ int main(int argc, char** argv)
         isSubsetOutputTriggered = isOutputStep(d.iteration, writeFreqStrSubset) ||
                                   isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStrSubset) ||
                                   isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtraSubset) ||
-                                  (isWallClockReached && writeEnabledSubset) || isOutputTriggered;
+                                  (isWallClockReached && writeEnabledSubset) || isSubsetOutputTriggered;
 
         if (isSubsetOutputTriggered) // && propatagor->isSynced
         {
             propagator->saveSelParticlesFields(fileWriter.get(), outFileSubset, domain.startIndex(), domain.endIndex(), simData.hydro);
+            isSubsetOutputTriggered = false;
         }
 
         if (isOutputStep(d.iteration, profFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, profFreqStr) ||
