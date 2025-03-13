@@ -124,7 +124,7 @@ struct GpuAlwaysTraverseNeighborhoodImpl
                 Postamble&& postamble,
                 Sym) const
     {
-        if (groups.lastBody - groups.firstBody == 0) return;
+        if (groups.numGroups == 0) return;
         resetTraversalCounters<<<1, 1>>>();
         if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
             box.boundaryZ() == BoundaryType::periodic)

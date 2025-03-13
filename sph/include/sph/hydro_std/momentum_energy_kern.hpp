@@ -112,7 +112,7 @@ struct MomentumAndEnergyPostambleStdWithDt : MomentumAndEnergyPostambleStd<Tc>
     Tc Kcour;
 
     MomentumAndEnergyPostambleStdWithDt(Tc K, Tc Kcour)
-        : MomentumAndEnergyPostambleStd<Tc>(K)
+        : MomentumAndEnergyPostambleStd<Tc>{K}
         , Kcour(Kcour)
     {
     }
