@@ -65,7 +65,7 @@ InitSettings TurbulenceConstants()
             {"muiConst", 0.62},
             {"soundSpeedConst", 1.0},
             {"u0", 1000.},
-            {"Kcour", 0.4},
+            {"Kcour", 0.2},
             {"gravConstant", 0.0},
             {"ng0", 100},
             {"ngmax", 150},
