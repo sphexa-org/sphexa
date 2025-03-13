@@ -53,13 +53,13 @@ static __device__ float minDt_ve_device;
 template<bool avClean, class Tc, class Tm, class T, class Tm1, class KeyType>
 __global__ void momentumEnergyGpu(Tc K, Tc Kcour, T Atmin, T Atmax, T ramp, unsigned ngmax, const cstone::Box<Tc> box,
                                   const LocalIndex* grpStart, const LocalIndex* grpEnd, LocalIndex numGroups,
-                                  const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* x, const Tc* y, const Tc* z,
-                                  const T* vx, const T* vy, const T* vz, const T* h, const Tm* m, const T* prho,
-                                  const T* tdpdTrho, const T* c, const T* c11, const T* c12, const T* c13, const T* c22,
-                                  const T* c23, const T* c33, const T* wh, const T* kx, const T* xm, const T* alpha,
-                                  const T* dV11, const T* dV12, const T* dV13, const T* dV22, const T* dV23,
-                                  const T* dV33, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, LocalIndex* nidx,
-                                  TreeNodeIndex* globalPool, float* groupDt)
+                                  const cstone::OctreeNsView<Tc, KeyType> tree, const unsigned* nc, const Tc* x,
+                                  const Tc* y, const Tc* z, const T* vx, const T* vy, const T* vz, const T* h,
+                                  const Tm* m, const T* prho, const T* tdpdTrho, const T* c, const T* c11, const T* c12,
+                                  const T* c13, const T* c22, const T* c23, const T* c33, const T* wh, const T* kx,
+                                  const T* xm, const T* alpha, const T* dV11, const T* dV12, const T* dV13,
+                                  const T* dV22, const T* dV23, const T* dV33, T* grad_P_x, T* grad_P_y, T* grad_P_z,
+                                  Tm1* du, LocalIndex* nidx, TreeNodeIndex* globalPool, float* groupDt)
 {
     unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned targetIdx   = 0;
@@ -88,9 +88,9 @@ __global__ void momentumEnergyGpu(Tc K, Tc Kcour, T Atmin, T Atmax, T ramp, unsi
         if (i < bodyEnd)
         {
             momentumAndEnergyJLoop<avClean, TravConfig::targetSize>(
-                i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, vx, vy, vz, h, m, prho, tdpdTrho, c, c11, c12,
-                c13, c22, c23, c33, Atmin, Atmax, ramp, wh, kx, xm, alpha, dV11, dV12, dV13, dV22, dV23, dV33, grad_P_x,
-                grad_P_y, grad_P_z, du, &maxvsignal);
+                i, K, box, neighborsWarp + laneIdx, ncCapped, nc, x, y, z, vx, vy, vz, h, m, prho, tdpdTrho, c, c11,
+                c12, c13, c22, c23, c33, Atmin, Atmax, ramp, wh, kx, xm, alpha, dV11, dV12, dV13, dV22, dV23, dV33,
+                grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal);
         }
 
         auto dt_lane = (i < bodyEnd) ? tsKCourant(maxvsignal, h[i], c[i], Kcour) : INFINITY;
@@ -128,8 +128,8 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
 
     momentumEnergyGpu<avClean><<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
         d.K, d.Kcour, d.Atmin, d.Atmax, d.ramp, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView,
-        rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.vx), rawPtr(d.devData.vy),
-        rawPtr(d.devData.vz), rawPtr(d.devData.h), rawPtr(d.devData.m), rawPtr(d.devData.prho),
+        rawPtr(d.devData.nc), rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.vx),
+        rawPtr(d.devData.vy), rawPtr(d.devData.vz), rawPtr(d.devData.h), rawPtr(d.devData.m), rawPtr(d.devData.prho),
         rawPtr(d.devData.tdpdTrho), rawPtr(d.devData.c), rawPtr(d.devData.c11), rawPtr(d.devData.c12),
         rawPtr(d.devData.c13), rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33),
         rawPtr(d.devData.wh), rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.alpha),
