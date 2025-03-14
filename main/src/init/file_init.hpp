@@ -74,9 +74,15 @@ auto restoreData(IFileReader* reader, SimulationData& simData)
 template<class Dataset>
 class FileInit : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     InitSettings settings_;
     std::string  h5_fname;
     int          initStep = -1;
+
+protected:
+    // TODO: to be discussed with Sebastian, do we override base classes InitSettings because of slicing?
+    using Base::idSelectionDatasets_;
+
 
 public:
     explicit FileInit(const std::string& fname, int initStep_, IFileReader* reader)
@@ -92,6 +98,27 @@ public:
     {
         reader->setStep(h5_fname, initStep, FileMode::collective);
         auto box = restoreData(reader, simData);
+
+        // TODO: can we move the tagging to the ISimInitializer init function in order to avoid code duplication?
+        auto idSelectionSphereRadius = settings_.find("id_selection_sphere_radius");
+        if(idSelectionSphereRadius != settings_.end()) {
+
+            std::cout << "Execution of selected particle identification\n";
+
+            IdSelectionSphere idSelectionSphere{settings_.at("id_selection_sphere_center_x"), settings_.at("id_selection_sphere_center_y"),
+                                                settings_.at("id_selection_sphere_center_z"), idSelectionSphereRadius->second};
+
+            IdVectorType originalTaggedIds;
+            tagIdsInSphere(simData.hydro.id, originalTaggedIds, simData.hydro.x, simData.hydro.y, simData.hydro.z, 0,
+                simData.hydro.id.size(),idSelectionSphere);
+
+            idSelectionDatasets_["id_selection_sphere_0"] = IdSelectionDataset{IdSelectionSettings{idSelectionSphere, 0}, originalTaggedIds};
+
+        }
+        // TODO: add selection from idList case
+        // tagIdsInList(d.id, domain.startIndex(), domain.endIndex(), selParticlesIds);
+
+
         reader->closeStep();
         return box;
     }
