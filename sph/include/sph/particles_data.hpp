@@ -249,7 +249,7 @@ public:
     FieldVector<uint64_t>  id;                                 // unique particle id
     FieldVector<HydroType> dtCourant;                          // per-particle timestep restriction
 
-    std::any                                neighborhood;
+    std::any                                neighborhood, neighborhoodInfo;
     cstone::OctreeNsView<RealType, KeyType> treeView;
 
     DeviceData_t<AccType> devData;

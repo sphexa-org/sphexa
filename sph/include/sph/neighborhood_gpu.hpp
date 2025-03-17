@@ -16,8 +16,12 @@ inline auto buildNeighborhoodGpu(const cstone::GroupView& groups, Dataset& d,
     using Neighborhood = ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<
         TravConfig::targetSize>::withNcMax<1024>::withoutSymmetry;
 
-    return Neighborhood{}.build(d.treeView, box, d.size(), groups, rawPtr(d.devData.x), rawPtr(d.devData.y),
-                                rawPtr(d.devData.z), rawPtr(d.devData.h));
+    if (!d.neighborhoodInfo.has_value()) d.neighborhoodInfo = Neighborhood{};
+
+    const auto& nbInfo = std::any_cast<const Neighborhood&>(d.neighborhoodInfo);
+
+    return nbInfo.build(d.treeView, box, d.size(), groups, rawPtr(d.devData.x), rawPtr(d.devData.y),
+                        rawPtr(d.devData.z), rawPtr(d.devData.h));
 }
 
 template<class Dataset>
