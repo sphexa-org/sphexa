@@ -14,6 +14,7 @@ sph-run-cuda12-sm90-release-1rank:
   before_script:
     - pwd
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/release/${CI_COMMIT_SHORT_SHA}
+    - export LD_LIBRARY_PATH=${SPH_INSTALLDIR}/lib:${LD_LIBRARY_PATH}
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - date
   script:
@@ -50,6 +51,7 @@ sph-run-cuda12-sm90-release-2ranks:
   before_script:
     - pwd
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/release/${CI_COMMIT_SHORT_SHA}
+    - export LD_LIBRARY_PATH=${SPH_INSTALLDIR}/lib:${LD_LIBRARY_PATH}
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - date
   script:
@@ -86,6 +88,7 @@ sph-run-cuda12-sm90-release-4ranks:
   before_script:
     - pwd
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/release/${CI_COMMIT_SHORT_SHA}
+    - export LD_LIBRARY_PATH=${SPH_INSTALLDIR}/lib:${LD_LIBRARY_PATH}
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - date
   script:
@@ -108,6 +111,7 @@ sph-run-cuda12-sm90-release-12ranks:
   before_script:
     - pwd
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/release/${CI_COMMIT_SHORT_SHA}
+    - export LD_LIBRARY_PATH=${SPH_INSTALLDIR}/lib:${LD_LIBRARY_PATH}
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - date
   script:
@@ -133,6 +137,7 @@ sph-run-cuda12-sm90-release-sphexa-cuda:
   before_script:
     - pwd
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/release/${CI_COMMIT_SHORT_SHA}
+    - export LD_LIBRARY_PATH=${SPH_INSTALLDIR}/lib:${LD_LIBRARY_PATH}
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - export OMP_NUM_THREADS=64
     - date
@@ -156,6 +161,7 @@ sph-run-cuda12-sm90-release-sphexa-cpu:
   before_script:
     - pwd
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/release/${CI_COMMIT_SHORT_SHA}
+    - export LD_LIBRARY_PATH=${SPH_INSTALLDIR}/lib:${LD_LIBRARY_PATH}
     - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - export OMP_NUM_THREADS=64
     - date
@@ -164,5 +170,3 @@ sph-run-cuda12-sm90-release-sphexa-cpu:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
     - bin/sphexa --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 4
     - date
-
-

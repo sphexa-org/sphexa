@@ -20,21 +20,40 @@ sph-build-cuda12-sm90-debug:
     - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
     - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
     - mkdir -p ${SPH_INSTALLDIR}
-    # NOTE: error 'script config should be a string or a nested array of strings up to 10 levels deep' -> do not use ":", use '' instead
+    # NOTE: error 'script config should be a string or a nested array of
+    # strings up to 10 levels deep' -> do not use ":", use '' instead
     - 'uenv_dir=`echo $UENV_VIEW |cut -d: -f1`'
     - 'uenv_view=`echo $UENV_VIEW |cut -d: -f3`'
     - echo "UENV_VIEW=$UENV_VIEW uenv_dir=$uenv_dir uenv_view=$uenv_view"
     - 'export CPATH=$uenv_dir/env/$uenv_view/include:$CPATH'
     - echo "CPATH=$CPATH"
   script:
+    # build h5hut
+    # TODO: use spack
+    # - git clone --depth=1 https://gitlab.psi.ch/H5hut/src.git h5hut.git
+    - git clone --depth=1 https://github.com/eth-cscs/h5hut h5hut.git
+    - cd h5hut.git
+    - git log -n1
+    - ./autogen.sh > h5_1.log 2>&1
+    - ./configure --with-hdf5=/user-environment/env/default/
+      --enable-large-indices
+      --enable-parallel --with-mpi
+      --prefix=${SPH_INSTALLDIR} > h5_2.log 2>&1
+    - make -j 96 > h5_3.log 2>&1
+    - make install > h5_4.log 2>&1
+    - cd ..
     # cmake -S
     - CC=mpicc CXX=mpicxx cmake -S . -B build
       -DCMAKE_CUDA_ARCHITECTURES=90
       -DCMAKE_BUILD_TYPE=Debug
+      -DCMAKE_CUDA_FLAGS=-ccbin=mpicxx
+      -DSPH_EXA_WITH_H5HUT=ON
+      -DSPH_EXA_HDF5_PARALLEL_MODE=independent
+      -DH5hut_INCLUDE_DIR=${SPH_INSTALLDIR}/include
+      -DH5hut_LIBRARY=${SPH_INSTALLDIR}/lib/libH5hut.so
     # cmake --build
     - date
-    - cmake --build build 
-      -j `grep -c processor /proc/cpuinfo |awk '{print $0/3}'`
+    - cmake --build build -j 96
     - date
     # cmake --install
     - cmake --install build --prefix=${SPH_INSTALLDIR}
