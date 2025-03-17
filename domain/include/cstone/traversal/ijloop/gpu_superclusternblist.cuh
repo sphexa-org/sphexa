@@ -50,6 +50,7 @@
 #include "cstone/primitives/math.hpp"
 #include "cstone/reducearray.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
+#include "cstone/traversal/ijloop/atomic_update_ptr.cuh"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 #include "cstone/tree/octree.hpp"
 
@@ -103,44 +104,6 @@ constexpr __forceinline__ unsigned clusterOffset(unsigned firstBody)
         (firstBody + Config::superclusterSize - 1) / Config::superclusterSize * Config::superclusterSize - firstBody;
     assert(offset < Config::superclusterSize);
     return offset;
-}
-
-template<class T>
-constexpr __forceinline__ void atomicUpdatePtr(T* ptr, T value)
-{
-    atomicAdd(ptr, value);
-}
-
-template<class T>
-constexpr __forceinline__ void atomicUpdatePtr(T* ptr, reduction::min<T> value)
-{
-    atomicMin(ptr, value.value);
-}
-
-template<class T>
-constexpr __forceinline__ void atomicUpdatePtr(T* ptr, reduction::max<T> value)
-{
-    atomicMax(ptr, value.value);
-}
-
-template<class T>
-constexpr __forceinline__ void atomicUpdatePtr(reduction::min<T>* ptr, reduction::min<T> value)
-{
-    atomicMin(&ptr->value, value.value);
-}
-
-template<class T>
-constexpr __forceinline__ void atomicUpdatePtr(reduction::max<T>* ptr, reduction::max<T> value)
-{
-    atomicMax(&ptr->value, value.value);
-}
-
-template<class T, std::size_t N>
-constexpr __forceinline__ void atomicUpdatePtr(util::array<T, N>* ptr, util::array<T, N> const& value)
-{
-#pragma unroll
-    for (std::size_t i = 0; i < N; ++i)
-        atomicUpdatePtr(&((*ptr)[i]), value[i]);
 }
 
 __global__ void initSuperclusterInfo(const LocalIndex firstISupercluster,

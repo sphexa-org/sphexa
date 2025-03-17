@@ -47,6 +47,7 @@
 #include "cstone/primitives/math.hpp"
 #include "cstone/reducearray.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
+#include "cstone/traversal/ijloop/atomic_update_ptr.cuh"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 #include "cstone/tree/octree.hpp"
 
@@ -61,32 +62,6 @@ constexpr __forceinline__ bool includeNbSymmetric(unsigned i, unsigned j, unsign
     constexpr unsigned blockSize = 8;
     const bool s                 = (i / blockSize) % 2 == (j / blockSize) % 2;
     return (j < first) | (j >= last) | (i < j ? s : !s);
-}
-
-template<class T>
-constexpr __forceinline__ void atomicUpdatePtr(T* ptr, T value)
-{
-    atomicAdd(ptr, value);
-}
-
-template<class T>
-constexpr __forceinline__ void atomicUpdatePtr(T* ptr, reduction::min<T> value)
-{
-    atomicMin(ptr, value.value);
-}
-
-template<class T>
-constexpr __forceinline__ void atomicUpdatePtr(T* ptr, reduction::max<T> value)
-{
-    atomicMax(ptr, value.value);
-}
-
-template<class T, std::size_t N>
-constexpr __forceinline__ void atomicUpdatePtr(util::array<T, N>* ptr, util::array<T, N> const& value)
-{
-#pragma unroll
-    for (std::size_t i = 0; i < N; ++i)
-        atomicUpdatePtr(&((*ptr)[i]), value[i]);
 }
 
 template<class Config>
