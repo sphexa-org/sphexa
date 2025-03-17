@@ -184,7 +184,6 @@ public:
         d.treeView = domain.octreeProperties();
 
         d.resizeAcc(domain.nParticlesWithHalos());
-        resizeNeighbors(d, domain.nParticles() * d.ngmax);
 
         computeGroups(domain.startIndex(), domain.endIndex(), d, domain.box(), groups_);
         activeRungs_ = groups_.view();

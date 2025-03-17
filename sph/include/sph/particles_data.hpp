@@ -249,8 +249,6 @@ public:
     FieldVector<uint64_t>  id;                                 // unique particle id
     FieldVector<HydroType> dtCourant;                          // per-particle timestep restriction
 
-    //! @brief Indices of neighbors for each particle, length is number of assigned particles * ngmax. CPU version only.
-    std::vector<cstone::LocalIndex>         neighbors;
     std::any                                neighborhood;
     cstone::OctreeNsView<RealType, KeyType> treeView;
 
@@ -393,15 +391,6 @@ private:
     //! @brief buffer growth factor when reallocating
     float allocGrowthRate_{1.05};
 };
-
-//! @brief resizes the neighbors list, only used in the CPU version
-template<class Dataset>
-void resizeNeighbors(Dataset& d, size_t size)
-{
-    auto growthRate = d.getAllocGrowthRate();
-    //! If we have a GPU, neighbors are calculated on-the-fly, so we don't need space to store them
-    reallocate(d.neighbors, cstone::HaveGpu<typename Dataset::AcceleratorType>{} ? 0 : size, growthRate);
-}
 
 template<class Dataset, class... Fs>
 void release(Dataset& d, const Fs&... fs)

@@ -143,7 +143,6 @@ public:
         fill(get<"m">(d), 0, first, d.m[first]);
         fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
 
-        resizeNeighbors(d, domain.nParticles() * d.ngmax);
         computeGroups(first, last, d, domain.box(), groups_);
         updateSmoothingLengthIterative(groups_.view(), d, domain.box());
         findNeighborsSfc(groups_.view(), d, domain.box());

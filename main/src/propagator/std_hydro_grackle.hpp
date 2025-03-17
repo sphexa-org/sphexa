@@ -163,7 +163,6 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        resizeNeighbors(d, domain.nParticles() * d.ngmax);
         computeGroups(first, last, d, domain.box(), groups_);
         updateSmoothingLengthIterative(groups_.view(), d, domain.box());
         findNeighborsSfc(groups_.view(), d, domain.box());
