@@ -1206,7 +1206,7 @@ struct GpuSuperclusterNbListNeighborhood
             y,
             z,
             h,
-            thrust::device_vector<std::uint32_t>(),
+            thrust::device_vector<std::uint32_t>(previousSize),
             thrust::device_vector<SuperclusterInfo>(numISuperclusters)};
 
         if (numISuperclusters == 0) return nbList;
@@ -1282,12 +1282,16 @@ struct GpuSuperclusterNbListNeighborhood
             nbList.neighborData.resize(requiredSize);
             runBuildKernel();
             checkGpuErrors(cudaDeviceSynchronize());
+            previousSize = requiredSize * 1.1;
         }
 
         thrust::stable_sort(thrust::device, nbList.superclusterInfo.begin(), nbList.superclusterInfo.end());
 
         return nbList;
     }
+
+private:
+    mutable std::size_t previousSize = 0;
 };
 
 } // namespace cstone::ijloop
