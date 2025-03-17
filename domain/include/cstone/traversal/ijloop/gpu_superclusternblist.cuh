@@ -1213,14 +1213,14 @@ struct GpuSuperclusterNbListNeighborhood
 
         thrust::device_vector<typename Config::SuperclusterSplitMask> superclusterSplitMasks(numISuperclusters);
         {
-            constexpr unsigned numThreads = 128;
+            constexpr unsigned numThreads = 256;
             const unsigned numBlocks      = iceil(numISuperclusters, numThreads);
             initSuperclusterInfo<<<numBlocks, numThreads>>>(firstISupercluster, lastISupercluster,
                                                             rawPtr(nbList.superclusterInfo));
             checkGpuErrors(cudaGetLastError());
         }
         {
-            constexpr unsigned numThreads = 128;
+            constexpr unsigned numThreads = 256;
             const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
             computeSuperclusterSplitMasks<Config><<<numBlocks, numThreads>>>(
                 firstISupercluster, lastISupercluster, firstValidBody, groups, rawPtr(superclusterSplitMasks));
@@ -1230,7 +1230,7 @@ struct GpuSuperclusterNbListNeighborhood
         thrust::device_vector<Vec3<Tc>> jClusterBboxCenters(numJClusters), jClusterBboxSizes(numJClusters);
 
         {
-            constexpr unsigned numThreads = 128;
+            constexpr unsigned numThreads = 256;
             unsigned numBlocks            = iceil(numJClusters * Config::jSize, numThreads);
             computeJClusterBboxes<Config><<<numBlocks, numThreads>>>(
                 firstValidBody, totalBodies, x, y, z, rawPtr(jClusterBboxCenters), rawPtr(jClusterBboxSizes));
