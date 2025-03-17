@@ -3,7 +3,7 @@
 #include <any>
 
 #include "cstone/traversal/groups.hpp"
-#include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
+#include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
 
 namespace sph
 {
@@ -12,9 +12,12 @@ template<class Dataset>
 inline auto buildNeighborhoodGpu(const cstone::GroupView& groups, Dataset& d,
                                  const cstone::Box<typename Dataset::RealType>& box)
 {
-    return cstone::ijloop::GpuAlwaysTraverseNeighborhood{d.ngmax}.build(d.treeView, box, d.size(), groups,
-                                                                        rawPtr(d.devData.x), rawPtr(d.devData.y),
-                                                                        rawPtr(d.devData.z), rawPtr(d.devData.h));
+    using namespace cstone;
+    using Neighborhood = ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<
+        TravConfig::targetSize>::withNcMax<1024>::withoutSymmetry;
+
+    return Neighborhood{}.build(d.treeView, box, d.size(), groups, rawPtr(d.devData.x), rawPtr(d.devData.y),
+                                rawPtr(d.devData.z), rawPtr(d.devData.h));
 }
 
 template<class Dataset>
