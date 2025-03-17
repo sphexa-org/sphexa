@@ -106,9 +106,9 @@ constexpr __forceinline__ unsigned clusterOffset(unsigned firstBody)
     return offset;
 }
 
-__global__ void initSuperclusterInfo(const LocalIndex firstISupercluster,
-                                     const LocalIndex lastISupercluster,
-                                     SuperclusterInfo* superclusterInfo)
+__global__ static void initSuperclusterInfo(const LocalIndex firstISupercluster,
+                                            const LocalIndex lastISupercluster,
+                                            SuperclusterInfo* superclusterInfo)
 {
     const auto grid      = cooperative_groups::this_grid();
     const unsigned index = grid.thread_rank();
