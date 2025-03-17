@@ -123,6 +123,18 @@ constexpr __forceinline__ void atomicUpdatePtr(T* ptr, reduction::max<T> value)
     atomicMax(ptr, value.value);
 }
 
+template<class T>
+constexpr __forceinline__ void atomicUpdatePtr(reduction::min<T>* ptr, reduction::min<T> value)
+{
+    atomicMin(&ptr->value, value.value);
+}
+
+template<class T>
+constexpr __forceinline__ void atomicUpdatePtr(reduction::max<T>* ptr, reduction::max<T> value)
+{
+    atomicMax(&ptr->value, value.value);
+}
+
 template<class T, std::size_t N>
 constexpr __forceinline__ void atomicUpdatePtr(util::array<T, N>* ptr, util::array<T, N> const& value)
 {
@@ -809,6 +821,12 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
     }
 }
 
+template<std::size_t Size, class... Ts>
+constexpr std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...> const&)
+{
+    return {};
+}
+
 template<class Config,
          unsigned NumSuperclustersPerBlock,
          bool UsePbc,
@@ -863,7 +881,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     {
         const unsigned base = iSupercluster * Config::superclusterSize;
         for (unsigned offset = block.thread_index().y * Config::iThreads + block.thread_index().x;
-             offset < Config::iClustersPerSupercluster * Config::iSize; offset += Config::iThreads * Config::jSize)
+             offset < Config::superclusterSize; offset += Config::iThreads * Config::jSize)
         {
             const unsigned i = base + offset;
             auto iData       = (i >= firstValidBody & i < totalBodies) ? loadParticleData(x, y, z, h, input, i)
@@ -969,13 +987,44 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
         }
     }
 
-    for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
+    if constexpr (!Config::symmetric && Config::numWarpsPerInteraction > 1)
     {
-        const unsigned ci = c + iClusterOffset;
-        const auto i =
-            iSupercluster * Config::superclusterSize + ci * Config::iSize + block.thread_index().x % Config::iSize;
-        storeTupleISum<Config>(iResults[c / iClustersPerWarp], output, i, i >= firstBody & i < lastBody, postamble,
-                               iSuperclusterData[ci * Config::iSize + block.thread_index().x % Config::iSize]);
+        __shared__ decltype(buffersForResults<Config::superclusterSize>(
+            result_t{})) outputBuffers[NumSuperclustersPerBlock];
+        auto& outputBuffer = outputBuffers[block.thread_index().z];
+        for (unsigned offset = block.thread_index().y * Config::iThreads + block.thread_index().x;
+             offset < Config::superclusterSize; offset += Config::iThreads * Config::jSize)
+            util::for_each_tuple([&](auto& array) { array[offset] = {}; }, outputBuffer);
+        block.sync();
+        for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
+        {
+            storeTupleISum<Config>(iResults[c / iClustersPerWarp],
+                                   util::tupleMap([](auto& array) { return array.data(); }, outputBuffer),
+                                   c * Config::iSize + block.thread_index().x, true, detail::EmptyPostamble{},
+                                   iSuperclusterData[c * Config::iSize + block.thread_index().x]);
+        }
+        block.sync();
+        const unsigned base = iSupercluster * Config::superclusterSize;
+        for (unsigned offset = block.thread_index().y * Config::iThreads + block.thread_index().x;
+             offset < Config::superclusterSize; offset += Config::iThreads * Config::jSize)
+        {
+            const unsigned i = base + offset;
+            if (i >= firstBody & i < lastBody)
+            {
+                const auto iData   = iSuperclusterData[offset];
+                const auto iResult = util::tupleMap([&](auto const& array) { return array[offset]; }, outputBuffer);
+                storeParticleData(output, i, postamble(iData, iResult));
+            }
+        }
+    }
+    else
+    {
+        for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
+        {
+            const auto i = iSupercluster * Config::superclusterSize + c * Config::iSize + block.thread_index().x;
+            storeTupleISum<Config>(iResults[c / iClustersPerWarp], output, i, i >= firstBody & i < lastBody, postamble,
+                                   iSuperclusterData[c * Config::iSize + block.thread_index().x]);
+        }
     }
 }
 
@@ -1041,7 +1090,7 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, input);
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, output);
 
-        if (Config::symmetric | (Config::numWarpsPerInteraction > 1))
+        if (Config::symmetric)
         {
             constexpr unsigned threads = 128;
             const unsigned numBlocks   = iceil(numBodies, threads);
@@ -1072,8 +1121,7 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         else
             runKernel(std::false_type());
 
-        if ((Config::symmetric | (Config::numWarpsPerInteraction > 1)) &&
-            !std::is_same<std::decay_t<Postamble>, detail::EmptyPostamble>())
+        if (Config::symmetric && !std::is_same<std::decay_t<Postamble>, detail::EmptyPostamble>())
         {
             util::for_each_tuple([&](auto& ptr) { ptr += firstValidBody; }, input);
             util::for_each_tuple([&](auto& ptr) { ptr += firstValidBody; }, output);
