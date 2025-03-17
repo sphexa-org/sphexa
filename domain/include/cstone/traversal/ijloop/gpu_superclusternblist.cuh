@@ -889,7 +889,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 
     using result_t = std::decay_t<decltype(interaction(particleData_t(), particleData_t(), Vec3<Tc>(), Tc(0)))>;
     static_assert(
-        (!Config::symmetric && Config::numWarpsPerInteraction == 1) ||
+        !Config::symmetric ||
             std::is_same<std::decay_t<decltype(postamble(std::declval<particleData_t>(), std::declval<result_t>()))>,
                          result_t>(),
         "postamble that changes the result type is not supported in combination with symmetric neighborhood or more "
@@ -1054,7 +1054,7 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, input);
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, output);
 
-        if (Config::symmetric)
+        if constexpr (Config::symmetric)
         {
             constexpr unsigned threads = 128;
             const unsigned numBlocks   = iceil(numBodies, threads);
@@ -1085,7 +1085,7 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         else
             runKernel(std::false_type());
 
-        if (Config::symmetric && !std::is_same<std::decay_t<Postamble>, detail::EmptyPostamble>())
+        if constexpr (Config::symmetric && !std::is_same<std::decay_t<Postamble>, detail::EmptyPostamble>())
         {
             util::for_each_tuple([&](auto& ptr) { ptr += firstValidBody; }, input);
             util::for_each_tuple([&](auto& ptr) { ptr += firstValidBody; }, output);
