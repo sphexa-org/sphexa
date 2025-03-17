@@ -859,7 +859,8 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     static_assert(Config::iThreads * Config::jSize >= GpuConfig::warpSize);
     static_assert(Config::iThreads * Config::jSize % GpuConfig::warpSize == 0);
 
-    const auto block = cooperative_groups::this_thread_block();
+    const auto block    = cooperative_groups::this_thread_block();
+    const auto subblock = cooperative_groups::tiled_partition<Config::iThreads * Config::jSize>(block);
     assert(block.dim_threads().x == Config::iThreads);
     assert(block.dim_threads().y == Config::jSize);
     assert(block.dim_threads().z == NumSuperclustersPerBlock);
@@ -921,7 +922,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
             nbData[n] = neighborData[iSuperclusterDataIndex + n];
     }
 
-    block.sync();
+    subblock.sync();
 
     using result_t = std::decay_t<decltype(interaction(particleData_t(), particleData_t(), Vec3<Tc>(), Tc(0)))>;
     static_assert(
@@ -995,7 +996,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
         for (unsigned offset = block.thread_index().y * Config::iThreads + block.thread_index().x;
              offset < Config::superclusterSize; offset += Config::iThreads * Config::jSize)
             util::for_each_tuple([&](auto& array) { array[offset] = {}; }, outputBuffer);
-        block.sync();
+        subblock.sync();
         for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
         {
             storeTupleISum<Config>(iResults[c / iClustersPerWarp],
@@ -1003,7 +1004,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                                    c * Config::iSize + block.thread_index().x, true, detail::EmptyPostamble{},
                                    iSuperclusterData[c * Config::iSize + block.thread_index().x]);
         }
-        block.sync();
+        subblock.sync();
         const unsigned base = iSupercluster * Config::superclusterSize;
         for (unsigned offset = block.thread_index().y * Config::iThreads + block.thread_index().x;
              offset < Config::superclusterSize; offset += Config::iThreads * Config::jSize)
