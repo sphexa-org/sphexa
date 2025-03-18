@@ -17,7 +17,7 @@ void findNeighborsSfc(const cstone::GroupView& groups, Dataset& d, const cstone:
     if (d.ng0 > d.ngmax) { throw std::runtime_error("ng0 should be smaller than ngmax\n"); }
 
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { findNeighborsSfcGpu(groups, d, box); }
-    else { d.neighborhood = buildNeighborhood(groups, d, box); }
+    else { buildNeighborhood(groups, d, box); }
 }
 
 } // namespace sph

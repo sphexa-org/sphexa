@@ -1034,7 +1034,7 @@ __global__ void applyPostamble(const LocalIndex totalBodies,
 template<class Config, class Tc, class Th>
 struct GpuSuperclusterNbListNeighborhoodImpl
 {
-    Box<Tc> box;
+    Box<Tc> box = {0, 0};
     LocalIndex firstValidBody, totalBodies, firstBody, lastBody;
     const Tc *x, *y, *z;
     const Th* h;
