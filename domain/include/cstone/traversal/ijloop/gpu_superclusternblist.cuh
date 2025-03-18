@@ -1189,6 +1189,13 @@ struct GpuSuperclusterNbListNeighborhood
     using withSymmetry       = GpuSuperclusterNbListNeighborhood<typename Config::withSymmetry>;
     using withoutSymmetry    = GpuSuperclusterNbListNeighborhood<typename Config::withoutSymmetry>;
 
+    static constexpr unsigned ncMax            = Config::ncMax;
+    static constexpr unsigned iSize            = Config::iSize;
+    static constexpr unsigned jSize            = Config::jSize;
+    static constexpr unsigned superclusterSize = Config::superclusterSize;
+    static constexpr bool compress             = Config::compress;
+    static constexpr bool symmetric            = Config::symmetric;
+
     template<class Tc, class KeyType, class Th>
     gpu_supercluster_nb_list_neighborhood_detail::GpuSuperclusterNbListNeighborhoodImpl<Config, Tc, Th>
     build(const OctreeNsView<Tc, KeyType>& tree,
