@@ -46,7 +46,7 @@ InitSettings KelvinHelmholtzConstants()
 {
     return {{"rhoInt", 2.},        {"rhoExt", 1.},           {"vxExt", 0.5},
             {"vxInt", -0.5},       {"gamma", 5. / 3.},       {"p", 2.5},
-            {"omega0", 0.01},      {"Kcour", 0.4},           {"ng0", 100},
+            {"omega0", 0.01},      {"Kcour", 0.2},           {"ng0", 100},
             {"ngmax", 150},        {"minDt", 1e-7},          {"minDt_m1", 1e-7},
             {"gravConstant", 0.0}, {"kelvin-helmholtz", 1.0}};
 }
