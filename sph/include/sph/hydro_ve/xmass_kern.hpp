@@ -136,9 +136,9 @@ HOST_DEVICE_FUN inline T xmassJLoop(cstone::LocalIndex i, Tc K, const cstone::Bo
         cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
     }
 
-    result = postamble(iData, result);
+    auto presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
 
-    cstone::ijloop::storeParticleData(output, i, result);
+    cstone::ijloop::storeParticleData(output, i, presult);
 
     return xmassi;
 }
@@ -146,15 +146,14 @@ HOST_DEVICE_FUN inline T xmassJLoop(cstone::LocalIndex i, Tc K, const cstone::Bo
 template<class Neighborhood, class Tc, class T, class Tm>
 void xmassIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* wh, T* xmass)
 {
-    neighborhood.ijLoop(std::make_tuple(m), std::make_tuple(xmass), XmassInteraction<T>{wh}, XmassPostamble<T, Tc>{K},
-                        cstone::ijloop::symmetry::even);
+    neighborhood.ijLoop(std::make_tuple(m), std::make_tuple(xmass), XmassInteraction<T>{wh}, XmassPostamble<T, Tc>{K});
 }
 
 template<class Neighborhood, class Tc, class T, class Tm>
 void densityIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* wh, T* xmass)
 {
     neighborhood.ijLoop(std::make_tuple(m), std::make_tuple(xmass), XmassInteraction<T>{wh},
-                        XmassToDensityPostamble<T, Tc>{K}, cstone::ijloop::symmetry::even);
+                        XmassToDensityPostamble<T, Tc>{K});
 }
 
 } // namespace sph

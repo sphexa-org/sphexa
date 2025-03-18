@@ -35,6 +35,8 @@
 
 #include <thrust/universal_vector.h>
 
+#include "cstone/cuda/thrust_util.cuh"
+#include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/groups_gpu.cuh"
 #include "cstone/traversal/ijloop/cpu.hpp"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
@@ -61,7 +63,8 @@ struct NeighborFun
     {
         const auto [i, iPos, hi, vi] = iData;
         const auto [j, jPos, hj, vj] = jData;
-        return std::make_tuple(i, j, iPos, jPos, ijPosDiff, distSq, hi, hj, vi, vj, 1u, hi, ijloop::reduction::min(j));
+        return std::make_tuple(i, j, iPos, jPos, ijloop::symmetric::odd(ijPosDiff), ijloop::symmetric::even(distSq), hi,
+                               hj, vi, vj, ijloop::symmetric::even(1u), hi, ijloop::reduction::min(j));
     }
 };
 
@@ -302,7 +305,7 @@ auto run(Neighborhood const& nb)
                          return rawPtr(vec);
                      },
                      actual),
-                 NeighborFun{}, PostambleFun{}, ijloop::symmetry::asymmetric);
+                 NeighborFun{}, PostambleFun{});
     checkGpuErrors(cudaDeviceSynchronize());
 
     validate(ref, actual);

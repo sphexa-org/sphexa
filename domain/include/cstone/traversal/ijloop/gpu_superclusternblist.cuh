@@ -728,21 +728,27 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
     if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < GpuConfig::warpSize / Config::iThreads &&
                   std::is_same<Postamble, detail::EmptyPostamble>())
     {
-        const T0 res = reduceTuple<GpuConfig::warpSize / Config::iThreads, true>(tuple, std::plus<T0>());
+        const T0 res =
+            reduceTuple<GpuConfig::warpSize / Config::iThreads, true>(tuple,
+                                                                      [](auto result, auto const& value)
+                                                                      {
+                                                                          detail::updateResultImpl(result, value);
+                                                                          return result;
+                                                                      });
         if ((block.thread_index().y % (GpuConfig::warpSize / Config::iThreads) <= sizeof...(T)) & store)
         {
-            T0* ptr = dynamicTupleGet(ptrs, block.thread_index().y % (GpuConfig::warpSize / Config::iThreads));
+            auto* ptr = dynamicTupleGet(ptrs, block.thread_index().y % (GpuConfig::warpSize / Config::iThreads));
             if constexpr (Config::symmetric | (Config::numWarpsPerInteraction > 1))
                 atomicUpdatePtr(&ptr[index], res);
             else
-                ptr[index] = res;
+                ptr[index] = detail::unwrapModifiersImpl(res);
         }
     }
     else
     {
 #pragma unroll
         for (unsigned offset = GpuConfig::warpSize / 2; offset >= Config::iThreads; offset /= 2)
-            util::for_each_tuple([&](auto& t) { detail::updateReduction(t, warp.shfl_down(t, offset)); }, tuple);
+            util::for_each_tuple([&](auto& t) { detail::updateResultImpl(t, warp.shfl_down(t, offset)); }, tuple);
 
         if ((block.thread_index().y % (GpuConfig::warpSize / Config::iThreads) == 0) & store)
         {
@@ -751,7 +757,7 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
                 util::for_each_tuple([index](auto* ptr, auto const& t) { atomicUpdatePtr(&ptr[index], t); }, ptrs,
                                      tuple);
             }
-            else { storeParticleData(ptrs, index, postamble(iData, tuple)); }
+            else { storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple))); }
         }
     }
 }
@@ -766,10 +772,15 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
 
     if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < Config::iThreads)
     {
-        const T0 res = reduceTuple<Config::iThreads, false>(tuple, std::plus<T0>());
+        const T0 res = reduceTuple<Config::iThreads, false>(tuple,
+                                                            [](auto result, auto const& value)
+                                                            {
+                                                                detail::updateResultImpl(result, value);
+                                                                return result;
+                                                            });
         if ((block.thread_index().x <= sizeof...(T)) & store)
         {
-            T0* ptr = dynamicTupleGet(ptrs, block.thread_index().x);
+            auto* ptr = dynamicTupleGet(ptrs, block.thread_index().x);
             atomicUpdatePtr(&ptr[index], res);
         }
     }
@@ -777,7 +788,7 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
     {
 #pragma unroll
         for (unsigned offset = Config::iThreads / 2; offset >= 1; offset /= 2)
-            util::for_each_tuple([&](auto& t) { detail::updateReduction(t, warp.shfl_down(t, offset)); }, tuple);
+            util::for_each_tuple([&](auto& t) { detail::updateResultImpl(t, warp.shfl_down(t, offset)); }, tuple);
 
         if ((block.thread_index().x == 0) & store)
             util::for_each_tuple([index](auto* ptr, auto const& t) { atomicUpdatePtr(&ptr[index], t); }, ptrs, tuple);
@@ -790,10 +801,18 @@ constexpr std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...
     return {};
 }
 
+template<class Config, unsigned NumSuperclustersPerBlock>
+__device__ __forceinline__ decltype(auto) independentSubblock(cooperative_groups::thread_block const& block)
+{
+    if constexpr (NumSuperclustersPerBlock > 1 || Config::iThreads * Config::jSize == GpuConfig::warpSize)
+        return cooperative_groups::tiled_partition<Config::iThreads * Config::jSize>(block);
+    else
+        return block;
+}
+
 template<class Config,
          unsigned NumSuperclustersPerBlock,
          bool UsePbc,
-         Symmetry Sym,
          class Tc,
          class Th,
          class In,
@@ -822,8 +841,8 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     static_assert(Config::iThreads * Config::jSize >= GpuConfig::warpSize);
     static_assert(Config::iThreads * Config::jSize % GpuConfig::warpSize == 0);
 
-    const auto block    = cooperative_groups::this_thread_block();
-    const auto subblock = cooperative_groups::tiled_partition<Config::iThreads * Config::jSize>(block);
+    const auto block        = cooperative_groups::this_thread_block();
+    decltype(auto) subblock = independentSubblock<Config, NumSuperclustersPerBlock>(block);
     assert(block.dim_threads().x == Config::iThreads);
     assert(block.dim_threads().y == Config::jSize);
     assert(block.dim_threads().z == NumSuperclustersPerBlock);
@@ -889,9 +908,9 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 
     using result_t = std::decay_t<decltype(interaction(particleData_t(), particleData_t(), Vec3<Tc>(), Tc(0)))>;
     static_assert(
-        !Config::symmetric ||
-            std::is_same<std::decay_t<decltype(postamble(std::declval<particleData_t>(), std::declval<result_t>()))>,
-                         result_t>(),
+        !Config::symmetric || std::is_same<std::decay_t<decltype(postamble(std::declval<particleData_t>(),
+                                                                           unwrapModifiers(std::declval<result_t>())))>,
+                                           decltype(unwrapModifiers(std::declval<result_t>()))>(),
         "postamble that changes the result type is not supported in combination with symmetric neighborhood or more "
         "than one warp per cluster-cluster interaction");
 
@@ -931,7 +950,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                     {
                         if ((distSq < radiusSq(jData)) & ((i != j) | (i < firstBody) | (i >= lastBody)))
                         {
-                            if constexpr (std::is_same_v<Sym, symmetry::Asymmetric>)
+                            if constexpr (!IsFullySymmetric<result_t>::value)
                                 ijInteraction = interaction(jData, iData, -ijPosDiff, distSq);
                             updateResult(jResult, ijInteraction);
                         }
@@ -943,9 +962,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 
             if constexpr (Config::symmetric)
             {
-                if constexpr (std::is_same_v<Sym, symmetry::Odd>)
-                    util::for_each_tuple([](auto& v) { v = -v; }, jResult);
-
+                applySymmetry(jResult);
                 storeTupleJSum<Config>(jResult, output, j, j >= firstBody & j < lastBody);
             }
         }
@@ -954,20 +971,27 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     if constexpr (!Config::symmetric && Config::numWarpsPerInteraction > 1)
     {
         __shared__ decltype(buffersForResults<Config::superclusterSize>(
-            result_t{})) outputBuffers[NumSuperclustersPerBlock];
-        auto& outputBuffer = outputBuffers[block.thread_index().z];
+            unwrapModifiers(std::declval<result_t>()))) outputBuffers[NumSuperclustersPerBlock];
+        auto outputBufferPtrs =
+            util::tupleMap([](auto& array) { return array.data(); }, outputBuffers[block.thread_index().z]);
+        auto init = unwrapModifiers(result_t{});
         for (unsigned offset = block.thread_index().y * Config::iThreads + block.thread_index().x;
              offset < Config::superclusterSize; offset += Config::iThreads * Config::jSize)
-            util::for_each_tuple([&](auto& array) { array[offset] = {}; }, outputBuffer);
-        subblock.sync();
+            storeParticleData(outputBufferPtrs, offset, init);
+
+        // Should be subblock.sync(), but that gives duplicated barriers and terrible performance in some cases
+        __syncthreads();
+
         for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
         {
-            storeTupleISum<Config>(iResults[c / iClustersPerWarp],
-                                   util::tupleMap([](auto& array) { return array.data(); }, outputBuffer),
+            storeTupleISum<Config>(iResults[c / iClustersPerWarp], outputBufferPtrs,
                                    c * Config::iSize + block.thread_index().x, true, detail::EmptyPostamble{},
                                    iSuperclusterData[c * Config::iSize + block.thread_index().x]);
         }
-        subblock.sync();
+
+        // Should be subblock.sync(), but that gives duplicated barriers and terrible performance in some cases
+        __syncthreads();
+
         const unsigned base = iSupercluster * Config::superclusterSize;
         for (unsigned offset = block.thread_index().y * Config::iThreads + block.thread_index().x;
              offset < Config::superclusterSize; offset += Config::iThreads * Config::jSize)
@@ -976,8 +1000,8 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
             if (i >= firstBody & i < lastBody)
             {
                 const auto iData   = iSuperclusterData[offset];
-                const auto iResult = util::tupleMap([&](auto const& array) { return array[offset]; }, outputBuffer);
-                storeParticleData(output, i, postamble(iData, iResult));
+                const auto iResult = util::tupleMap([&](auto const* ptr) { return ptr[offset]; }, outputBufferPtrs);
+                storeParticleData(output, i, postamble(iData, unwrapModifiers(iResult)));
             }
         }
     }
@@ -1009,7 +1033,7 @@ __global__ void initResult(const LocalIndex firstBody,
 
     using IData  = decltype(loadParticleData(x, y, z, h, input, 0));
     using Result = decltype(interaction(IData{}, IData{}, Vec3<Tc>{0, 0, 0}, Tc(0)));
-    storeParticleData(output, i, Result{});
+    storeParticleData(output, i, unwrapModifiers(Result{}));
 }
 
 template<class Tc, class Th, class In, class Out, class Postamble>
@@ -1041,12 +1065,9 @@ struct GpuSuperclusterNbListNeighborhoodImpl
     thrust::device_vector<std::uint32_t> neighborData;
     thrust::device_vector<SuperclusterInfo> superclusterInfo;
 
-    template<class... In, class... Out, class Interaction, class Postamble, Symmetry Sym>
-    void ijLoop(std::tuple<In*...> input,
-                std::tuple<Out*...> output,
-                Interaction&& interaction,
-                Postamble&& postamble,
-                Sym) const
+    template<class... In, class... Out, class Interaction, class Postamble>
+    void
+    ijLoop(std::tuple<In*...> input, std::tuple<Out*...> output, Interaction&& interaction, Postamble&& postamble) const
     {
         const LocalIndex numBodies = lastBody - firstBody;
         if (numBodies == 0) return;
@@ -1056,7 +1077,7 @@ struct GpuSuperclusterNbListNeighborhoodImpl
 
         if constexpr (Config::symmetric)
         {
-            constexpr unsigned threads = 128;
+            constexpr unsigned threads = 256;
             const unsigned numBlocks   = iceil(numBodies, threads);
             initResult<<<numBlocks, threads>>>(firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
                                                std::forward<Interaction>(interaction));
@@ -1073,7 +1094,7 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         const unsigned numBlocks                    = iceil(numISuperclusters, numSuperclustersPerBlock);
         const auto runKernel                        = [&](auto usePbc)
         {
-            runIjLoop<Config, numSuperclustersPerBlock, decltype(usePbc)::value, Sym><<<numBlocks, blockSize>>>(
+            runIjLoop<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize>>>(
                 box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
                 std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), rawPtr(neighborData),
                 rawPtr(superclusterInfo));
@@ -1089,7 +1110,7 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         {
             util::for_each_tuple([&](auto& ptr) { ptr += firstValidBody; }, input);
             util::for_each_tuple([&](auto& ptr) { ptr += firstValidBody; }, output);
-            constexpr unsigned threads = 128;
+            constexpr unsigned threads = 256;
             const unsigned numBlocks   = iceil(totalBodies, threads);
             applyPostamble<<<numBlocks, threads>>>(totalBodies - firstValidBody, x + firstValidBody, y + firstValidBody,
                                                    z + firstValidBody, h + firstValidBody, makeConstRestrict(input),

@@ -549,21 +549,27 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
     if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < GpuConfig::warpSize / Config::iSize &&
                   std::is_same<Postamble, detail::EmptyPostamble>())
     {
-        const T0 res = reduceTuple<GpuConfig::warpSize / Config::iSize, true>(tuple, std::plus<T0>());
+        const T0 res =
+            reduceTuple<GpuConfig::warpSize / Config::iSize, true>(tuple,
+                                                                   [](auto result, auto const& value)
+                                                                   {
+                                                                       detail::updateResultImpl(result, value);
+                                                                       return result;
+                                                                   });
         if ((block.thread_index().y <= sizeof...(T)) & store)
         {
-            T0* ptr = dynamicTupleGet(ptrs, block.thread_index().y);
+            auto* ptr = dynamicTupleGet(ptrs, block.thread_index().y);
             if constexpr (Config::symmetric)
                 atomicUpdatePtr(&ptr[index], res);
             else
-                ptr[index] = res;
+                ptr[index] = detail::unwrapModifiersImpl(res);
         }
     }
     else
     {
 #pragma unroll
         for (unsigned offset = GpuConfig::warpSize / 2; offset >= Config::iSize; offset /= 2)
-            util::for_each_tuple([&](auto& t) { detail::updateReduction(t, warp.shfl_down(t, offset)); }, tuple);
+            util::for_each_tuple([&](auto& t) { detail::updateResultImpl(t, warp.shfl_down(t, offset)); }, tuple);
 
         if ((block.thread_index().y == 0) & store)
         {
@@ -572,7 +578,7 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
                 util::for_each_tuple([index](auto* ptr, auto const& t) { atomicUpdatePtr(&ptr[index], t); }, ptrs,
                                      tuple);
             }
-            else { storeParticleData(ptrs, index, postamble(iData, tuple)); }
+            else { storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple))); }
         }
     }
 }
@@ -587,10 +593,15 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
 
     if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < Config::iSize)
     {
-        const T0 res = reduceTuple<Config::iSize, false>(tuple, std::plus<T0>());
+        const T0 res = reduceTuple<Config::iSize, false>(tuple,
+                                                         [](auto result, auto const& value)
+                                                         {
+                                                             detail::updateResultImpl(result, value);
+                                                             return result;
+                                                         });
         if ((block.thread_index().x <= sizeof...(T)) & store)
         {
-            T0* ptr = dynamicTupleGet(ptrs, block.thread_index().x);
+            auto* ptr = dynamicTupleGet(ptrs, block.thread_index().x);
             atomicUpdatePtr(&ptr[index], res);
         }
     }
@@ -598,7 +609,7 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
     {
 #pragma unroll
         for (unsigned offset = Config::iSize / 2; offset >= 1; offset /= 2)
-            util::for_each_tuple([&](auto& t) { detail::updateReduction(t, warp.shfl_down(t, offset)); }, tuple);
+            util::for_each_tuple([&](auto& t) { detail::updateResultImpl(t, warp.shfl_down(t, offset)); }, tuple);
 
         if ((block.thread_index().x == 0) & store)
             util::for_each_tuple([index](auto* ptr, auto const& t) { atomicUpdatePtr(&ptr[index], t); }, ptrs, tuple);
@@ -608,7 +619,6 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
 template<class Config,
          unsigned NumWarpsPerBlock,
          bool UsePbc,
-         Symmetry Sym,
          class Tc,
          class Th,
          class In,
@@ -674,7 +684,8 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumWarpsPerBlock) void gpuClus
     using result_t = std::decay_t<decltype(interaction(iData, iData, Vec3<Tc>(), Tc(0)))>;
 
     static_assert(!Config::symmetric ||
-                      std::is_same<std::decay_t<decltype(postamble(iData, std::declval<result_t>()))>, result_t>(),
+                      std::is_same<std::decay_t<decltype(postamble(iData, unwrapModifiers(std::declval<result_t>())))>,
+                                   decltype(unwrapModifiers(std::declval<result_t>()))>(),
                   "postamble that changes the result type is not supported in combination with symmetric neighborhood");
 
     result_t result                      = {};
@@ -695,7 +706,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumWarpsPerBlock) void gpuClus
             {
                 if (distSq < jRadiusSq & (!self | (i != j)))
                 {
-                    if constexpr (std::is_same_v<Sym, symmetry::Asymmetric>)
+                    if constexpr (!IsFullySymmetric<result_t>::value)
                         ijInteraction = interaction(jData, iData, -ijPosDiff, distSq);
                     updateResult(jResult, ijInteraction);
                 }
@@ -703,7 +714,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumWarpsPerBlock) void gpuClus
         }
         if constexpr (Config::symmetric)
         {
-            if constexpr (std::is_same_v<Sym, symmetry::Odd>) util::for_each_tuple([](auto& r) { r = -r; }, jResult);
+            applySymmetry(jResult);
             storeTupleJSum<Config>(jResult, output, j, j >= firstBody & j < lastBody);
         }
     };
@@ -744,7 +755,7 @@ __global__ void initResult(const LocalIndex firstBody,
 
     using IData  = decltype(loadParticleData(x, y, z, h, input, 0));
     using Result = decltype(interaction(IData{}, IData{}, Vec3<Tc>{0, 0, 0}, Tc(0)));
-    storeParticleData(output, i, Result{});
+    storeParticleData(output, i, unwrapModifiers(Result{}));
 }
 
 template<class Tc, class Th, class In, class Out, class Postamble>
@@ -776,12 +787,11 @@ struct GpuClusterNbListNeighborhoodImpl
     thrust::device_vector<LocalIndex> clusterNeighbors;
     thrust::device_vector<unsigned> clusterNeighborsCount;
 
-    template<class... In, class... Out, class Interaction, class Postamble, Symmetry Sym>
+    template<class... In, class... Out, class Interaction, class Postamble>
     void ijLoop(std::tuple<In*...> const& input,
                 std::tuple<Out*...> const& output,
                 Interaction&& interaction,
-                Postamble&& postamble,
-                Sym) const
+                Postamble&& postamble) const
     {
         const LocalIndex numBodies = lastBody - firstBody;
         if (Config::symmetric)
@@ -801,7 +811,7 @@ struct GpuClusterNbListNeighborhoodImpl
         constexpr unsigned numWarpsPerBlock = threads / GpuConfig::warpSize;
         const dim3 blockSize                = {Config::iSize, GpuConfig::warpSize / Config::iSize, numWarpsPerBlock};
         const unsigned numBlocks            = iceil(numIClusters, numWarpsPerBlock);
-        gpuClusterNbListNeighborhoodKernel<Config, numWarpsPerBlock, true, Sym><<<numBlocks, blockSize>>>(
+        gpuClusterNbListNeighborhoodKernel<Config, numWarpsPerBlock, true><<<numBlocks, blockSize>>>(
             box, totalBodies, firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
             std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), rawPtr(clusterNeighbors),
             rawPtr(clusterNeighborsCount));

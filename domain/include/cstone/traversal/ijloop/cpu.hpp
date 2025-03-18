@@ -55,12 +55,11 @@ struct CpuAlwaysTraverseNeighborhoodImpl
     const Th* h;
     unsigned ngmax;
 
-    template<class... In, class... Out, class Interaction, class Postamble, Symmetry Sym>
+    template<class... In, class... Out, class Interaction, class Postamble>
     void ijLoop(std::tuple<In*...> const& input,
                 std::tuple<Out*...> const& output,
                 Interaction&& interaction,
-                Postamble&& postamble,
-                Sym) const
+                Postamble&& postamble) const
     {
         const auto constInput = makeConstRestrict(input);
 #pragma omp parallel
@@ -85,7 +84,7 @@ struct CpuAlwaysTraverseNeighborhoodImpl
                     updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
                 }
 
-                storeParticleData(output, i, postamble(iData, result));
+                storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
             }
         }
     }
@@ -104,12 +103,11 @@ struct CpuFullNbListNeighborhoodImpl
     const Th* h;
     unsigned ngmax;
 
-    template<class... In, class... Out, class Interaction, class Postamble, Symmetry Sym>
+    template<class... In, class... Out, class Interaction, class Postamble>
     void ijLoop(std::tuple<In*...> const& input,
                 std::tuple<Out*...> const& output,
                 Interaction&& interaction,
-                Postamble&& postamble,
-                Sym) const
+                Postamble&& postamble) const
     {
         const auto constInput = makeConstRestrict(input);
 #pragma omp parallel for simd
@@ -130,7 +128,7 @@ struct CpuFullNbListNeighborhoodImpl
                 updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
             }
 
-            storeParticleData(output, i, postamble(iData, result));
+            storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
         }
     }
 

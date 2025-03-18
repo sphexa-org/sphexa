@@ -105,7 +105,7 @@ __launch_bounds__(MaxThreads) void gpuFullNbListNeighborhoodKernel(const Box<Tc>
         updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
     }
 
-    storeParticleData(output, i, postamble(iData, result));
+    storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
 }
 
 template<class Tc, class Th>
@@ -119,16 +119,15 @@ struct GpuFullNbListNeighborhoodImpl
     thrust::device_vector<LocalIndex> neighbors;
     thrust::device_vector<unsigned> neighborsCount;
 
-    template<class... In, class... Out, class Interaction, class Postamble, Symmetry Sym>
+    template<class... In, class... Out, class Interaction, class Postamble>
     void ijLoop(std::tuple<In*...> const& input,
                 std::tuple<Out*...> const& output,
                 Interaction&& interaction,
-                Postamble&& postamble,
-                Sym) const
+                Postamble&& postamble) const
     {
         const LocalIndex numBodies = lastBody - firstBody;
         if (numBodies == 0) return;
-        constexpr int numThreads   = 128;
+        constexpr int numThreads = 128;
         detail::gpuFullNbListNeighborhoodKernel<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
             box, firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
             std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), ngmax, rawPtr(neighbors),

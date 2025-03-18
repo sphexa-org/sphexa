@@ -44,22 +44,22 @@
 namespace cstone::ijloop
 {
 
-namespace symmetry
+namespace symmetric
 {
-struct Asymmetric
+
+template<class T>
+struct even
 {
-};
-struct Even
-{
-};
-struct Odd
-{
+    T value = {};
 };
 
-inline constexpr Asymmetric asymmetric = {};
-inline constexpr Even even             = {};
-inline constexpr Odd odd               = {};
-} // namespace symmetry
+template<class T>
+struct odd
+{
+    T value = {};
+};
+
+} // namespace symmetric
 
 namespace reduction
 {
@@ -142,19 +142,31 @@ namespace detail
 {
 
 template<class T>
-inline constexpr void updateReduction(T& result, T const& value)
+inline constexpr void updateResultImpl(T& result, T const& value)
 {
     result += value;
 }
 
 template<class T>
-inline constexpr void updateReduction(reduction::min<T>& result, reduction::min<T> const& value)
+inline constexpr void updateResultImpl(symmetric::even<T>& result, symmetric::even<T> const& value)
+{
+    updateResultImpl(result.value, value.value);
+}
+
+template<class T>
+inline constexpr void updateResultImpl(symmetric::odd<T>& result, symmetric::odd<T> const& value)
+{
+    updateResultImpl(result.value, value.value);
+}
+
+template<class T>
+inline constexpr void updateResultImpl(reduction::min<T>& result, reduction::min<T> const& value)
 {
     result.value = std::min(result.value, value.value);
 }
 
 template<class T>
-inline constexpr void updateReduction(reduction::max<T>& result, reduction::max<T> const& value)
+inline constexpr void updateResultImpl(reduction::max<T>& result, reduction::max<T> const& value)
 {
     result.value = std::max(result.value, value.value);
 }
@@ -164,37 +176,101 @@ inline constexpr void updateReduction(reduction::max<T>& result, reduction::max<
 template<class... Ts>
 inline constexpr void updateResult(std::tuple<Ts...>& result, std::tuple<Ts...> const& value)
 {
-    util::for_each_tuple([](auto& r, auto const& v) { detail::updateReduction(r, v); }, result, value);
+    util::for_each_tuple([](auto& r, auto const& v) { detail::updateResultImpl(r, v); }, result, value);
 }
 
 namespace detail
 {
 
 template<class T>
-inline constexpr T const& reductionResult(T const& result)
+struct IsSymmetric : std::false_type
+{
+};
+
+template<class T>
+struct IsSymmetric<symmetric::even<T>> : std::true_type
+{
+};
+
+template<class T>
+struct IsSymmetric<symmetric::odd<T>> : std::true_type
+{
+};
+
+template<class T>
+inline constexpr void applySymmetryImpl(T const&)
+{
+}
+
+template<class T>
+inline constexpr void applySymmetryImpl(symmetric::odd<T>& value)
+{
+    value.value = -value.value;
+}
+
+} // namespace detail
+
+template<class T>
+struct IsFullySymmetric;
+
+template<class... Ts>
+struct IsFullySymmetric<std::tuple<Ts...>> : std::conjunction<detail::IsSymmetric<std::remove_cvref_t<Ts>>...>
+{
+};
+
+template<class... Ts>
+inline constexpr void applySymmetry(std::tuple<Ts...>& value)
+{
+    if constexpr (IsFullySymmetric<std::tuple<Ts...>>::value)
+        util::for_each_tuple([](auto& v) { detail::applySymmetryImpl(v); }, value);
+}
+
+namespace detail
+{
+
+template<class T>
+inline constexpr T unwrapModifiersImpl(T const& result)
 {
     return result;
 }
 
 template<class T>
-inline constexpr T const& reductionResult(reduction::min<T> const& result)
+inline constexpr auto unwrapModifiersImpl(symmetric::even<T> const& result)
 {
-    return result.value;
+    return unwrapModifiersImpl(result.value);
 }
 
 template<class T>
-inline constexpr T const& reductionResult(reduction::max<T> const& result)
+inline constexpr auto unwrapModifiersImpl(symmetric::odd<T> const& result)
 {
-    return result.value;
+    return unwrapModifiersImpl(result.value);
+}
+
+template<class T>
+inline constexpr auto unwrapModifiersImpl(reduction::min<T> const& result)
+{
+    return unwrapModifiersImpl(result.value);
+}
+
+template<class T>
+inline constexpr auto unwrapModifiersImpl(reduction::max<T> const& result)
+{
+    return unwrapModifiersImpl(result.value);
 }
 
 } // namespace detail
 
-template<class... Ts, class... Rs>
-inline constexpr void
-storeParticleData(std::tuple<Ts*...> const& output, LocalIndex index, std::tuple<Rs...> const& value)
+template<class... Ts>
+inline constexpr auto unwrapModifiers(std::tuple<Ts...> const& value)
 {
-    util::for_each_tuple([index](auto* ptr, auto const& v) { ptr[index] = detail::reductionResult(v); }, output, value);
+    return util::tupleMap([](auto const& v) { return detail::unwrapModifiersImpl(v); }, value);
+}
+
+template<class... Ts>
+inline constexpr void
+storeParticleData(std::tuple<Ts*...> const& output, LocalIndex index, std::tuple<Ts...> const& value)
+{
+    util::for_each_tuple([index](auto* ptr, auto const& v) { ptr[index] = v; }, output, value);
 }
 
 namespace detail
@@ -233,10 +309,6 @@ struct Statistics
 };
 
 template<class T>
-concept Symmetry =
-    std::is_same_v<T, symmetry::Asymmetric> || std::is_same_v<T, symmetry::Even> || std::is_same_v<T, symmetry::Odd>;
-
-template<class T>
 concept Neighborhood = requires(T nb,
                                 OctreeNsView<double, unsigned> tree,
                                 Box<double> box,
@@ -253,8 +325,7 @@ concept Neighborhood = requires(T nb,
     } -> std::same_as<Statistics>;
     {
         nb.build(tree, box, totalBodies, groups, x, y, z, h)
-            .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble,
-                    symmetry::asymmetric)
+            .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble)
     } -> std::same_as<void>;
 };
 

@@ -53,7 +53,6 @@ template<class Tc,
          class Coords,
          cstone::ijloop::Neighborhood Neighborhood,
          class Interaction,
-         cstone::ijloop::Symmetry Sym,
          class... InputTs,
          class... OutputTs>
 void benchmarkNeighborhood(const Coords& coords,
@@ -61,7 +60,6 @@ void benchmarkNeighborhood(const Coords& coords,
                            const T hVal,
                            unsigned ngmax,
                            const Interaction& interaction,
-                           Sym,
                            const std::tuple<InputTs...>& inputValues,
                            const std::tuple<OutputTs...>& initialOutputValues)
 {
@@ -114,7 +112,7 @@ void benchmarkNeighborhood(const Coords& coords,
     ijloop::CpuAlwaysTraverseNeighborhood{ngmax}
         .build(nsView, box, n, groupView, x, y, z, h.data())
         .ijLoop(util::tupleMap([](auto const& v) { return v.data(); }, inputs),
-                util::tupleMap([](auto& v) { return v.data(); }, outputs), interaction, ijloop::empty_postamble, Sym{});
+                util::tupleMap([](auto& v) { return v.data(); }, outputs), interaction, ijloop::empty_postamble);
 
     const thrust::universal_vector<Tc> dX(coords.x().begin(), coords.x().end()),
         dY(coords.y().begin(), coords.y().end()), dZ(coords.z().begin(), coords.z().end());
@@ -180,7 +178,7 @@ void benchmarkNeighborhood(const Coords& coords,
     {
         neighborhoodGPU.ijLoop(util::tupleMap([](auto const& v) { return rawPtr(v); }, dInputs),
                                util::tupleMap([](auto& v) { return rawPtr(v); }, dOutputs), interaction,
-                               ijloop::empty_postamble, Sym());
+                               ijloop::empty_postamble);
         cudaEventRecord(events[i]);
     }
     cudaEventSynchronize(events.back());

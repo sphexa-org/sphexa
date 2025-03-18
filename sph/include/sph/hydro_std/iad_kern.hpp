@@ -122,8 +122,7 @@ void IADIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* rho
                T* c22, T* c23, T* c33)
 {
     neighborhood.ijLoop(std::make_tuple(m, rho), std::make_tuple(c11, c12, c13, c22, c23, c33),
-                        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K},
-                        cstone::ijloop::symmetry::asymmetric); // TODO: check symmetry
+                        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K});
 }
 
 } // namespace sph

@@ -144,28 +144,28 @@ divV_curlVJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cs
     if (curlv && doGradV)
     {
         DivVCurlVPostamble<true, true, T, Tc> postamble{K};
-        const auto                            presult = postamble(iData, result);
+        const auto                            presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
         const auto                            output = std::make_tuple(divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33);
         cstone::ijloop::storeParticleData(output, i, presult);
     }
     else if (curlv)
     {
         DivVCurlVPostamble<true, false, T, Tc> postamble{K};
-        const auto                             presult = postamble(iData, result);
+        const auto                             presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
         const auto                             output  = std::make_tuple(divv, curlv);
         cstone::ijloop::storeParticleData(output, i, presult);
     }
     else if (doGradV)
     {
         DivVCurlVPostamble<false, true, T, Tc> postamble{K};
-        const auto                             presult = postamble(iData, result);
+        const auto                             presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
         const auto                             output  = std::make_tuple(divv, dV11, dV12, dV13, dV22, dV23, dV33);
         cstone::ijloop::storeParticleData(output, i, presult);
     }
     else
     {
         DivVCurlVPostamble<false, false, T, Tc> postamble{K};
-        const auto                              presult = postamble(iData, result);
+        const auto                              presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
         const auto                              output  = std::make_tuple(divv);
         cstone::ijloop::storeParticleData(output, i, presult);
     }
@@ -181,26 +181,22 @@ void divVCurlVIjLoop(const Neighborhood& neighborhood, Tc K, const T* vx, const 
     if (curlv && doGradV)
     {
         const auto output = std::make_tuple(divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33);
-        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<true, true, T, Tc>{K},
-                            cstone::ijloop::symmetry::asymmetric);
+        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<true, true, T, Tc>{K});
     }
     else if (curlv)
     {
         const auto output = std::make_tuple(divv, curlv);
-        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<true, false, T, Tc>{K},
-                            cstone::ijloop::symmetry::asymmetric);
+        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<true, false, T, Tc>{K});
     }
     else if (doGradV)
     {
         const auto output = std::make_tuple(divv, dV11, dV12, dV13, dV22, dV23, dV33);
-        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<false, true, T, Tc>{K},
-                            cstone::ijloop::symmetry::asymmetric);
+        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<false, true, T, Tc>{K});
     }
     else
     {
         const auto output = std::make_tuple(divv);
-        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<false, false, T, Tc>{K},
-                            cstone::ijloop::symmetry::asymmetric);
+        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<false, false, T, Tc>{K});
     }
 }
 

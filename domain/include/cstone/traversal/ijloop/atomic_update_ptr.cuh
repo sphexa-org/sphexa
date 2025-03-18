@@ -38,52 +38,85 @@
 namespace cstone::ijloop
 {
 
+namespace detail
+{
+
 template<class T>
-__device__ __forceinline__ void atomicUpdatePtr(T* ptr, T value)
+__device__ __forceinline__ void atomicAddPtr(T* ptr, T value)
 {
     atomicAdd(ptr, value);
 }
 
-template<class T>
-__device__ __forceinline__ void atomicUpdatePtr(T* ptr, reduction::min<T> value)
-{
-    atomicMin(ptr, value.value);
-}
-
-__device__ __forceinline__ void atomicUpdatePtr(float* ptr, reduction::min<float> value)
-{
-    atomicMinFloat(ptr, value.value);
-}
-
-template<class T>
-__device__ __forceinline__ void atomicUpdatePtr(reduction::min<T>* ptr, reduction::min<T> value)
-{
-    atomicUpdatePtr(&ptr->value, value);
-}
-
-template<class T>
-__device__ __forceinline__ void atomicUpdatePtr(T* ptr, reduction::max<T> value)
-{
-    atomicMax(ptr, value.value);
-}
-
-__device__ __forceinline__ void atomicUpdatePtr(float* ptr, reduction::max<float> value)
-{
-    atomicMaxFloat(ptr, value.value);
-}
-
-template<class T>
-__device__ __forceinline__ void atomicUpdatePtr(reduction::max<T>* ptr, reduction::max<T> value)
-{
-    atomicUpdatePtr(&ptr->value, value);
-}
-
 template<class T, std::size_t N>
-__device__ __forceinline__ void atomicUpdatePtr(util::array<T, N>* ptr, util::array<T, N> const& value)
+__device__ __forceinline__ void atomicAddPtr(util::array<T, N>* ptr, util::array<T, N> const& value)
 {
 #pragma unroll
     for (std::size_t i = 0; i < N; ++i)
-        atomicUpdatePtr(&((*ptr)[i]), value[i]);
+        atomicAddPtr(&((*ptr)[i]), value[i]);
+}
+
+template<class T>
+__device__ __forceinline__ void atomicMinPtr(T* ptr, T value)
+{
+    atomicMin(ptr, value);
+}
+
+__device__ __forceinline__ void atomicMinPtr(float* ptr, float value) { atomicMinFloat(ptr, value); }
+
+template<class T, std::size_t N>
+__device__ __forceinline__ void atomicMinPtr(util::array<T, N>* ptr, util::array<T, N> const& value)
+{
+#pragma unroll
+    for (std::size_t i = 0; i < N; ++i)
+        atomicMinPtr(&((*ptr)[i]), value[i]);
+}
+
+template<class T>
+__device__ __forceinline__ void atomicMaxPtr(T* ptr, T value)
+{
+    atomicMax(ptr, value);
+}
+
+__device__ __forceinline__ void atomicMaxPtr(float* ptr, float value) { atomicMinFloat(ptr, value); }
+
+template<class T, std::size_t N>
+__device__ __forceinline__ void atomicMaxPtr(util::array<T, N>* ptr, util::array<T, N> const& value)
+{
+#pragma unroll
+    for (std::size_t i = 0; i < N; ++i)
+        atomicMaxPtr(&((*ptr)[i]), value[i]);
+}
+
+} // namespace detail
+
+template<class T>
+__device__ __forceinline__ void atomicUpdatePtr(T* ptr, T const& value)
+{
+    detail::atomicAddPtr(ptr, value);
+}
+
+template<class T, class S>
+__device__ __forceinline__ void atomicUpdatePtr(T* ptr, symmetric::even<S> const& value)
+{
+    atomicUpdatePtr(ptr, value.value);
+}
+
+template<class T, class S>
+__device__ __forceinline__ void atomicUpdatePtr(T* ptr, symmetric::odd<S> const& value)
+{
+    atomicUpdatePtr(ptr, value.value);
+}
+
+template<class T>
+__device__ __forceinline__ void atomicUpdatePtr(T* ptr, reduction::min<T> const& value)
+{
+    detail::atomicMinPtr(ptr, value.value);
+}
+
+template<class T>
+__device__ __forceinline__ void atomicUpdatePtr(T* ptr, reduction::max<T> const& value)
+{
+    detail::atomicMaxPtr(ptr, value.value);
 }
 
 } // namespace cstone::ijloop

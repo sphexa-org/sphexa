@@ -182,7 +182,7 @@ struct MomentumAndEnergyPostamble
         T dui = K * (eCoeff * energy + T(0.5) * a_visc_energy); // factor of 2 already removed from 2P/rho
 
         // grad_P_xyz is stored as the acceleration,s accel = -grad_P / rho
-        return std::make_tuple(dui, -K * momentum_x, -K * momentum_y, -K * momentum_z, maxvsignal);
+        return std::make_tuple(Tc(dui), T(-K * momentum_x), T(-K * momentum_y), T(-K * momentum_z), maxvsignal);
     };
 };
 
@@ -205,7 +205,7 @@ struct MomentumAndEnergyPostambleWithDt : MomentumAndEnergyPostamble<UseTdpdTrho
         const auto [i, iPos, hi, vxi, vyi, vzi, mi, ci, kxi, alpha_i, xmassi, prhoi, c11i, c12i, c13i, c22i, c23i, c33i,
                     nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi] = iData;
 
-        auto dt = tsKCourant(maxvsignal.value, hi, ci, Kcour);
+        auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
         return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
     };
 };
@@ -246,13 +246,13 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
     if (tdpdTrho)
     {
         MomentumAndEnergyPostamble<true, T, Tc> postamble{K};
-        auto                                    presult = postamble(iData, result);
+        auto                                    presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
         cstone::ijloop::storeParticleData(output, i, presult);
     }
     else
     {
         MomentumAndEnergyPostamble<false, T, Tc> postamble{K};
-        auto                                     presult = postamble(iData, result);
+        auto                                     presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
         cstone::ijloop::storeParticleData(output, i, presult);
     }
 }
@@ -273,14 +273,12 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T
     if (tdpdTrho)
     {
         neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<AvClean, T>{wh, Atmin, Atmax, ramp},
-                            MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour},
-                            cstone::ijloop::symmetry::asymmetric);
+                            MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour});
     }
     else
     {
         neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<AvClean, T>{wh, Atmin, Atmax, ramp},
-                            MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour},
-                            cstone::ijloop::symmetry::asymmetric);
+                            MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour});
     }
 }
 

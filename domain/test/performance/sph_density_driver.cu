@@ -118,7 +118,7 @@ struct DensityKernelFun
         const T dist                 = std::sqrt(distSq);
         const T vloc                 = dist * (T(1) / hi);
         const T w                    = i == j ? T(1) : table_lookup<UseKernelTable>(wh, vloc);
-        return std::make_tuple(w * mj);
+        return std::make_tuple(cstone::ijloop::symmetric::even(w * mj));
     }
 };
 
@@ -143,8 +143,8 @@ void benchmarkMain()
     const auto runBenchmark = [&](const char* name, auto const& neighborhood)
     {
         printf("--- %s ---\n", name);
-        benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, ngmax, kernelFun, ijloop::symmetry::even,
-                                                    inputValues, initialOutputValues);
+        benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, ngmax, kernelFun, inputValues,
+                                                    initialOutputValues);
         printf("\n");
     };
 

@@ -52,13 +52,15 @@ struct LjKernelFun
     constexpr __host__ __device__ auto
     operator()(ParticleData const& iData, ParticleData const& jData, cstone::Vec3<Tc> ijPosDiff, T distSq) const
     {
+        using namespace cstone::ijloop;
         const auto [i, iPos, hi] = iData;
         const auto [j, jPos, hj] = jData;
         const T r2inv            = T(1) / distSq;
         const T r6inv            = r2inv * r2inv * r2inv;
         const T forcelj          = r6inv * (lj1 * r6inv - lj2);
         const T fpair            = i == j ? 0 : forcelj * r2inv;
-        return std::make_tuple(T(ijPosDiff[0]) * fpair, T(ijPosDiff[1]) * fpair, T(ijPosDiff[2]) * fpair);
+        return std::make_tuple(symmetric::odd(T(ijPosDiff[0]) * fpair), symmetric::odd(T(ijPosDiff[1]) * fpair),
+                               symmetric::odd(T(ijPosDiff[2]) * fpair));
     }
 };
 
@@ -82,8 +84,8 @@ void benchmarkMain()
     const auto runBenchmark = [&](const char* name, auto const& neighborhood)
     {
         printf("--- %s ---\n", name);
-        benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, ngmax, kernelFun, ijloop::symmetry::odd,
-                                                    inputValues, initialOutputValues);
+        benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, ngmax, kernelFun, inputValues,
+                                                    initialOutputValues);
         printf("\n");
     };
 

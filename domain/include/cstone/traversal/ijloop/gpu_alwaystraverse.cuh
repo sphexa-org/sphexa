@@ -99,7 +99,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void gpuAlwaysTraverseNeigh
                     updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
                 }
 
-                storeParticleData(output, i, postamble(iData, result));
+                storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
             }
         }
     }
@@ -117,12 +117,11 @@ struct GpuAlwaysTraverseNeighborhoodImpl
     mutable thrust::device_vector<LocalIndex> neighbors;
     mutable thrust::device_vector<int> globalPool;
 
-    template<class... In, class... Out, class Interaction, class Postamble, Symmetry Sym>
+    template<class... In, class... Out, class Interaction, class Postamble>
     void ijLoop(std::tuple<In*...> const& input,
                 std::tuple<Out*...> const& output,
                 Interaction&& interaction,
-                Postamble&& postamble,
-                Sym) const
+                Postamble&& postamble) const
     {
         if (groups.numGroups == 0) return;
         resetTraversalCounters<<<1, 1>>>();

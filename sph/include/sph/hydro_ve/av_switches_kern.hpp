@@ -102,7 +102,7 @@ struct AVswitchesPostamble
     {
         auto [i, iPos, hi, xmi, kxi, divv_i, alpha_i, vxi, vyi, vzi, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
         auto [graddivv_x, graddivv_y, graddivv_z, vijsignalr_i]                                              = result;
-        T vijsignal_i = std::max(vijsignalr_i.value, T(1e-40));
+        T vijsignal_i = std::max(vijsignalr_i, T(1e-40));
 
         T graddivv = std::sqrt(graddivv_x * graddivv_x + graddivv_y * graddivv_y + graddivv_z * graddivv_z);
 
@@ -157,7 +157,7 @@ AVswitchesJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cs
         cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
     }
 
-    auto presult = postamble(iData, result);
+    auto presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
 
     cstone::ijloop::storeParticleData(output, i, presult);
 
@@ -172,8 +172,7 @@ void AVswitchesIjLoop(Neighborhood const& neighborhood, Tc K, Tc dt, T alphamin,
 {
     neighborhood.ijLoop(std::make_tuple(xm, kx, divv, alpha, vx, vy, vz, c, c11, c12, c13, c22, c23, c33),
                         std::make_tuple(alpha_out), AVswitchesInteraction<T, Tc>{wh, K},
-                        AVswitchesPostamble<T, Tc>{alphamin, alphamax, decay_constant, dt},
-                        cstone::ijloop::symmetry::asymmetric); // TODO: check symmetry
+                        AVswitchesPostamble<T, Tc>{alphamin, alphamax, decay_constant, dt});
 }
 
 } // namespace sph

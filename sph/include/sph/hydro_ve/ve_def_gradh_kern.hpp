@@ -142,7 +142,7 @@ void veDefGradhIjLoop(const Neighbordhood& neighborhood, Tc K, const Tm* m, cons
                       T* kx, T* gradh)
 {
     neighborhood.ijLoop(std::make_tuple(m, xm), std::make_tuple(kx, gradh), VeDefGradHInteraction{wh, whd},
-                        VeDefGradHPostamble<T, Tc>{K}, cstone::ijloop::symmetry::asymmetric); // TODO: check symmetry
+                        VeDefGradHPostamble<T, Tc>{K});
 }
 
 } // namespace sph

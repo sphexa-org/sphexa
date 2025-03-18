@@ -102,7 +102,9 @@ struct MomentumAndEnergyPostambleStd
         const auto [energy, momentum_x, momentum_y, momentum_z, maxvsignal] = result;
         // with the choice of calculating coordinate (r) and velocity (v_ij) differences as i - j,
         // we add the negative sign only here at the end instead of to termA123_ij in each interaction
-        return std::make_tuple(-K * Tc(0.5) * energy, K * momentum_x, K * momentum_y, K * momentum_z, maxvsignal);
+        using T = std::remove_cvref_t<decltype(momentum_x)>;
+        return std::make_tuple(-K * Tc(0.5) * energy, T(K * momentum_x), T(K * momentum_y), T(K * momentum_z),
+                               maxvsignal);
     };
 };
 
@@ -124,7 +126,7 @@ struct MomentumAndEnergyPostambleStdWithDt : MomentumAndEnergyPostambleStd<Tc>
             MomentumAndEnergyPostambleStd<Tc>::operator()(iData, result);
         const auto [i, iPos, hi, mi, roi, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
 
-        auto dt = tsKCourant(maxvsignal.value, hi, ci, Kcour);
+        auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
         return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
     };
 };
@@ -158,9 +160,9 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
         cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
     }
 
-    result = postamble(iData, result);
+    auto presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
 
-    cstone::ijloop::storeParticleData(output, i, result);
+    cstone::ijloop::storeParticleData(output, i, presult);
 }
 
 template<class Neighborhood, class Tc, class T, class Tm, class Tm1>
@@ -171,8 +173,7 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, c
 {
     neighborhood.ijLoop(std::make_tuple(m, rho, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
                         std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt), MomentumAndEnergyInteractionStd{wh},
-                        MomentumAndEnergyPostambleStdWithDt{K, Kcour},
-                        cstone::ijloop::symmetry::asymmetric); // TODO: different symmetries per output
+                        MomentumAndEnergyPostambleStdWithDt{K, Kcour});
 }
 
 } // namespace sph
