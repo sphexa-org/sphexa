@@ -14,7 +14,7 @@ inline auto buildNeighborhoodGpu(const cstone::GroupView& groups, Dataset& d,
 {
     using namespace cstone;
     using Neighborhood = ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<
-        TravConfig::targetSize>::withNcMax<1024>::withoutSymmetry;
+        TravConfig::targetSize>::withNcMax<256>::withoutSymmetry::withCompression;
 
     if (!d.neighborhoodInfo.has_value()) d.neighborhoodInfo = Neighborhood{};
 
