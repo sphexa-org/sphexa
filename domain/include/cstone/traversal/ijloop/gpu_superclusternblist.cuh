@@ -1163,9 +1163,9 @@ struct GpuSuperclusterNbListNeighborhoodConfig
         GpuSuperclusterNbListNeighborhoodConfig<NcMax, ISize, JSize, SuperclusterSize, true, Symmetric>;
     using withoutCompression =
         GpuSuperclusterNbListNeighborhoodConfig<NcMax, ISize, JSize, SuperclusterSize, false, Symmetric>;
-    using withSymmetry = GpuSuperclusterNbListNeighborhoodConfig<NcMax, ISize, JSize, SuperclusterSize, Compress, true>;
-    using withoutSymmetry =
-        GpuSuperclusterNbListNeighborhoodConfig<NcMax, ISize, JSize, SuperclusterSize, Compress, false>;
+    template<bool NewSymmetric>
+    using setSymmetry =
+        GpuSuperclusterNbListNeighborhoodConfig<NcMax, ISize, JSize, SuperclusterSize, Compress, NewSymmetric>;
 
     using SuperclusterSplitMask = std::conditional_t<(superclusterSize > 32), unsigned long long, unsigned>;
     static_assert(superclusterSize <= 64, "superclusters with more than 64 particles are not supported");
@@ -1185,8 +1185,10 @@ struct GpuSuperclusterNbListNeighborhood
         GpuSuperclusterNbListNeighborhood<typename Config::template withSuperclusterSize<SuperclusterSize>>;
     using withCompression    = GpuSuperclusterNbListNeighborhood<typename Config::withCompression>;
     using withoutCompression = GpuSuperclusterNbListNeighborhood<typename Config::withoutCompression>;
-    using withSymmetry       = GpuSuperclusterNbListNeighborhood<typename Config::withSymmetry>;
-    using withoutSymmetry    = GpuSuperclusterNbListNeighborhood<typename Config::withoutSymmetry>;
+    template<bool Symmetric>
+    using setSymmetry     = GpuSuperclusterNbListNeighborhood<typename Config::template setSymmetry<Symmetric>>;
+    using withSymmetry    = setSymmetry<true>;
+    using withoutSymmetry = setSymmetry<false>;
 
     static constexpr unsigned ncMax            = Config::ncMax;
     static constexpr unsigned iSize            = Config::iSize;
