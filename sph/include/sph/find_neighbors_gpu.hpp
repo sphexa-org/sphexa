@@ -7,6 +7,6 @@ namespace sph
 {
 
 template<class T, class Dataset>
-extern void findNeighborsSfcGpu(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box);
+extern void findNeighborsSfcGpu(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool symmetric);
 
 }

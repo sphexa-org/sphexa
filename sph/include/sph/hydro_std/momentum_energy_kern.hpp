@@ -87,7 +87,8 @@ struct MomentumAndEnergyInteractionStd
             energy = vx_ij * (a * termA1_i + b * termA1_j) + vy_ij * (a * termA2_i + b * termA2_j) +
                      vz_ij * (a * termA3_i + b * termA3_j);
         }
-        return std::make_tuple(energy, momentum_x, momentum_y, momentum_z, cstone::ijloop::reduction::max(vijsignal));
+        return std::make_tuple(Tc(energy), momentum_x, momentum_y, momentum_z,
+                               cstone::ijloop::symmetric::even(cstone::ijloop::reduction::max(vijsignal)));
     }
 };
 

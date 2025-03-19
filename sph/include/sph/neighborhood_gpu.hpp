@@ -15,9 +15,10 @@ namespace sph
 namespace detail
 {
 
-template<unsigned NcMax>
-using NeighborhoodInfo = cstone::ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<
-    8, 8>::withSuperclusterSize<cstone::TravConfig::targetSize>::withNcMax<NcMax>::withoutSymmetry::withCompression;
+template<unsigned NcMax, bool Symmetric>
+using NeighborhoodInfo =
+    cstone::ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<
+        cstone::TravConfig::targetSize>::withNcMax<NcMax>::template setSymmetry<Symmetric>::withCompression;
 
 template<class Dataset, class NeighborhoodInfo>
 using NeighborhoodData = decltype(std::declval<NeighborhoodInfo>().build(
@@ -35,24 +36,25 @@ struct NeighborhoodDataVariant<Dataset, std::variant<NeighborhoodInfos...>>
     using type = std::variant<NeighborhoodData<Dataset, NeighborhoodInfos>...>;
 };
 
-template<unsigned NcMax, class Dataset, class... Variants>
+template<unsigned NcMax, bool Symmetric, class Dataset, class... Variants>
 void setInfo(Dataset const& d, std::variant<Variants...>& info)
 {
-    if (!std::holds_alternative<NeighborhoodInfo<NcMax>>(info) && NcMax == std::bit_ceil(d.ngmax) * 2)
-        info = NeighborhoodInfo<NcMax>{};
+    if (!std::holds_alternative<NeighborhoodInfo<NcMax, Symmetric>>(info) &&
+        NcMax == std::max(std::bit_ceil(d.ngmax) * 2, 128u))
+        info = NeighborhoodInfo<NcMax, Symmetric>{};
 }
 
 template<class Dataset, class... Variants>
 void setInfo(Dataset& d, std::variant<Variants...>& v)
 {
-    (..., setInfo<Variants::ncMax>(d, v));
+    (..., setInfo<Variants::ncMax, Variants::symmetric>(d, v));
 }
 
-template<class Dataset>
+template<class Dataset, bool Symmetric>
 struct NeighborhoodDataGpu
 {
-    using InfoVariant =
-        std::variant<NeighborhoodInfo<128>, NeighborhoodInfo<256>, NeighborhoodInfo<512>, NeighborhoodInfo<1024>>;
+    using InfoVariant = std::variant<NeighborhoodInfo<128, Symmetric>, NeighborhoodInfo<256, Symmetric>,
+                                     NeighborhoodInfo<512, Symmetric>, NeighborhoodInfo<1024, Symmetric>>;
     using DataVariant = typename NeighborhoodDataVariant<Dataset, InfoVariant>::type;
 
     InfoVariant info;
@@ -81,20 +83,20 @@ struct NeighborhoodDataGpu
 
 } // namespace detail
 
-template<class Dataset>
+template<bool Symmetric = false, class Dataset>
 inline void buildNeighborhoodGpu(const cstone::GroupView& groups, Dataset& d,
                                  const cstone::Box<typename Dataset::RealType>& box)
 {
-    if (!d.neighborhood.has_value()) d.neighborhood = detail::NeighborhoodDataGpu<Dataset>{};
+    if (!d.neighborhood.has_value()) d.neighborhood = detail::NeighborhoodDataGpu<Dataset, Symmetric>{};
 
-    auto& nb = std::any_cast<detail::NeighborhoodDataGpu<Dataset>&>(d.neighborhood);
+    auto& nb = std::any_cast<detail::NeighborhoodDataGpu<Dataset, Symmetric>&>(d.neighborhood);
     nb.build(groups, d, box);
 }
 
-template<class Dataset>
-inline const detail::NeighborhoodDataGpu<Dataset>& getNeighborhoodGpu(const Dataset& d)
+template<bool Symmetric = false, class Dataset>
+inline const detail::NeighborhoodDataGpu<Dataset, Symmetric>& getNeighborhoodGpu(const Dataset& d)
 {
-    return std::any_cast<const detail::NeighborhoodDataGpu<Dataset>&>(d.neighborhood);
+    return std::any_cast<const detail::NeighborhoodDataGpu<Dataset, Symmetric>&>(d.neighborhood);
 }
 
 } // namespace sph

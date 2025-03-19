@@ -65,7 +65,7 @@ template void computeXMass(const GroupView& grp, sphexa::ParticlesData<cstone::G
 template<class Dataset>
 void computeDensity(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    densityIjLoop(getNeighborhoodGpu(d), d.K, rawPtr(d.devData.m), rawPtr(d.devData.wh), rawPtr(d.devData.rho));
+    densityIjLoop(getNeighborhoodGpu<true>(d), d.K, rawPtr(d.devData.m), rawPtr(d.devData.wh), rawPtr(d.devData.rho));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 

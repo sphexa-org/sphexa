@@ -6,12 +6,15 @@ namespace sph
 {
 
 template<class T, class Dataset>
-void findNeighborsSfcGpu(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box)
+void findNeighborsSfcGpu(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool symmetric)
 {
-    buildNeighborhoodGpu(groups, d, box);
+    if (symmetric)
+        buildNeighborhoodGpu<true>(groups, d, box);
+    else
+        buildNeighborhoodGpu<false>(groups, d, box);
 }
 
 template void findNeighborsSfcGpu(const cstone::GroupView&, sphexa::ParticlesData<cstone::GpuTag>&,
-                                  const cstone::Box<SphTypes::CoordinateType>&);
+                                  const cstone::Box<SphTypes::CoordinateType>&, bool);
 
 } // namespace sph
