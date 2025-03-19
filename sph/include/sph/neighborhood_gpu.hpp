@@ -36,18 +36,17 @@ struct NeighborhoodDataVariant<Dataset, std::variant<NeighborhoodInfos...>>
     using type = std::variant<NeighborhoodData<Dataset, NeighborhoodInfos>...>;
 };
 
-template<unsigned NcMax, bool Symmetric, class Dataset, class... Variants>
+template<class Variant, class Dataset, class... Variants>
 void setInfo(Dataset const& d, std::variant<Variants...>& info)
 {
-    if (!std::holds_alternative<NeighborhoodInfo<NcMax, Symmetric>>(info) &&
-        NcMax == std::max(std::bit_ceil(d.ngmax) * 2, 128u))
-        info = NeighborhoodInfo<NcMax, Symmetric>{};
+    if (!std::holds_alternative<Variant>(info) && Variant::ncMax == std::max(std::bit_ceil(d.ngmax) * 2, 128u))
+        info = Variant{};
 }
 
 template<class Dataset, class... Variants>
 void setInfo(Dataset& d, std::variant<Variants...>& v)
 {
-    (..., setInfo<Variants::ncMax, Variants::symmetric>(d, v));
+    (..., setInfo<Variants>(d, v));
 }
 
 template<class Dataset, bool Symmetric>
