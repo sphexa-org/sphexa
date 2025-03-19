@@ -148,18 +148,6 @@ inline constexpr void updateResultImpl(T& result, T const& value)
 }
 
 template<class T>
-inline constexpr void updateResultImpl(symmetric::even<T>& result, symmetric::even<T> const& value)
-{
-    updateResultImpl(result.value, value.value);
-}
-
-template<class T>
-inline constexpr void updateResultImpl(symmetric::odd<T>& result, symmetric::odd<T> const& value)
-{
-    updateResultImpl(result.value, value.value);
-}
-
-template<class T>
 inline constexpr void updateResultImpl(reduction::min<T>& result, reduction::min<T> const& value)
 {
     result.value = std::min(result.value, value.value);
@@ -169,6 +157,18 @@ template<class T>
 inline constexpr void updateResultImpl(reduction::max<T>& result, reduction::max<T> const& value)
 {
     result.value = std::max(result.value, value.value);
+}
+
+template<class T>
+inline constexpr void updateResultImpl(symmetric::even<T>& result, symmetric::even<T> const& value)
+{
+    updateResultImpl(result.value, value.value);
+}
+
+template<class T>
+inline constexpr void updateResultImpl(symmetric::odd<T>& result, symmetric::odd<T> const& value)
+{
+    updateResultImpl(result.value, value.value);
 }
 
 } // namespace detail
@@ -235,18 +235,6 @@ inline constexpr T unwrapModifiersImpl(T const& result)
 }
 
 template<class T>
-inline constexpr auto unwrapModifiersImpl(symmetric::even<T> const& result)
-{
-    return unwrapModifiersImpl(result.value);
-}
-
-template<class T>
-inline constexpr auto unwrapModifiersImpl(symmetric::odd<T> const& result)
-{
-    return unwrapModifiersImpl(result.value);
-}
-
-template<class T>
 inline constexpr auto unwrapModifiersImpl(reduction::min<T> const& result)
 {
     return unwrapModifiersImpl(result.value);
@@ -254,6 +242,18 @@ inline constexpr auto unwrapModifiersImpl(reduction::min<T> const& result)
 
 template<class T>
 inline constexpr auto unwrapModifiersImpl(reduction::max<T> const& result)
+{
+    return unwrapModifiersImpl(result.value);
+}
+
+template<class T>
+inline constexpr auto unwrapModifiersImpl(symmetric::even<T> const& result)
+{
+    return unwrapModifiersImpl(result.value);
+}
+
+template<class T>
+inline constexpr auto unwrapModifiersImpl(symmetric::odd<T> const& result)
 {
     return unwrapModifiersImpl(result.value);
 }

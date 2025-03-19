@@ -95,18 +95,6 @@ __device__ __forceinline__ void atomicUpdatePtr(T* ptr, T const& value)
     detail::atomicAddPtr(ptr, value);
 }
 
-template<class T, class S>
-__device__ __forceinline__ void atomicUpdatePtr(T* ptr, symmetric::even<S> const& value)
-{
-    atomicUpdatePtr(ptr, value.value);
-}
-
-template<class T, class S>
-__device__ __forceinline__ void atomicUpdatePtr(T* ptr, symmetric::odd<S> const& value)
-{
-    atomicUpdatePtr(ptr, value.value);
-}
-
 template<class T>
 __device__ __forceinline__ void atomicUpdatePtr(T* ptr, reduction::min<T> const& value)
 {
@@ -117,6 +105,18 @@ template<class T>
 __device__ __forceinline__ void atomicUpdatePtr(T* ptr, reduction::max<T> const& value)
 {
     detail::atomicMaxPtr(ptr, value.value);
+}
+
+template<class T, class S>
+__device__ __forceinline__ void atomicUpdatePtr(T* ptr, symmetric::even<S> const& value)
+{
+    atomicUpdatePtr(ptr, value.value);
+}
+
+template<class T, class S>
+__device__ __forceinline__ void atomicUpdatePtr(T* ptr, symmetric::odd<S> const& value)
+{
+    atomicUpdatePtr(ptr, value.value);
 }
 
 } // namespace cstone::ijloop
