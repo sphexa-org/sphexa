@@ -7,6 +7,7 @@
 #include <variant>
 
 #include "cstone/traversal/groups.hpp"
+#include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
 
 namespace sph
@@ -37,33 +38,41 @@ struct NeighborhoodDataVariant<Dataset, std::variant<NeighborhoodInfos...>>
 };
 
 template<class Variant, class Dataset, class... Variants>
-void setInfo(Dataset const& d, std::variant<Variants...>& info)
+void setInfo(Dataset const& d, std::variant<Variants...>& info, bool alwaysTraverse)
 {
-    if (!std::holds_alternative<Variant>(info) && Variant::ncMax == std::max(std::bit_ceil(d.ngmax) * 2, 128u))
-        info = Variant{};
+    if constexpr (std::is_same_v<Variant, cstone::ijloop::GpuAlwaysTraverseNeighborhood>)
+    {
+        if (alwaysTraverse) info = Variant{d.ngmax};
+    }
+    else
+    {
+        if (!alwaysTraverse && !std::holds_alternative<Variant>(info) &&
+            Variant::ncMax == std::max(std::bit_ceil(d.ngmax) * 2, 128u))
+            info = Variant{};
+    }
 }
 
 template<class Dataset, class... Variants>
-void setInfo(Dataset& d, std::variant<Variants...>& v)
+void setInfo(Dataset& d, std::variant<Variants...>& v, bool alwaysTraverse)
 {
-    (..., setInfo<Variants>(d, v));
+    (..., setInfo<Variants>(d, v, alwaysTraverse));
 }
 
 template<class Dataset, bool Symmetric>
 struct NeighborhoodDataGpu
 {
-    using InfoVariant = std::variant<NeighborhoodInfo<128, Symmetric>, NeighborhoodInfo<256, Symmetric>,
-                                     NeighborhoodInfo<512, Symmetric>, NeighborhoodInfo<1024, Symmetric>>;
+    using InfoVariant = std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, NeighborhoodInfo<128, Symmetric>,
+                                     NeighborhoodInfo<256, Symmetric>, NeighborhoodInfo<512, Symmetric>,
+                                     NeighborhoodInfo<1024, Symmetric>>;
     using DataVariant = typename NeighborhoodDataVariant<Dataset, InfoVariant>::type;
 
+    bool        alwaysTraverse;
     InfoVariant info;
     DataVariant data;
 
-    NeighborhoodDataGpu() {}
-
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
     {
-        setInfo(d, info);
+        setInfo(d, info, alwaysTraverse);
         std::visit(
             [&](auto const& nb)
             {
@@ -84,11 +93,12 @@ struct NeighborhoodDataGpu
 
 template<bool Symmetric = false, class Dataset>
 inline void buildNeighborhoodGpu(const cstone::GroupView& groups, Dataset& d,
-                                 const cstone::Box<typename Dataset::RealType>& box)
+                                 const cstone::Box<typename Dataset::RealType>& box, bool clustered)
 {
     if (!d.neighborhood.has_value()) d.neighborhood = detail::NeighborhoodDataGpu<Dataset, Symmetric>{};
 
-    auto& nb = std::any_cast<detail::NeighborhoodDataGpu<Dataset, Symmetric>&>(d.neighborhood);
+    auto& nb          = std::any_cast<detail::NeighborhoodDataGpu<Dataset, Symmetric>&>(d.neighborhood);
+    nb.alwaysTraverse = !clustered;
     nb.build(groups, d, box);
 }
 

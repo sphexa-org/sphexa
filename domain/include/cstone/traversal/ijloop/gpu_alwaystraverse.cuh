@@ -109,7 +109,7 @@ template<class Tc, class KeyType, class Th>
 struct GpuAlwaysTraverseNeighborhoodImpl
 {
     OctreeNsView<Tc, KeyType> tree;
-    Box<Tc> box;
+    Box<Tc> box = {0, 0};
     GroupView groups;
     const Tc *x, *y, *z;
     const Th* h;
