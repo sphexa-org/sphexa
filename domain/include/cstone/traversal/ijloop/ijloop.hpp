@@ -198,14 +198,15 @@ struct IsSymmetric<symmetric::odd<T>> : std::true_type
 };
 
 template<class T>
-inline constexpr void applySymmetryImpl(T const&)
+inline constexpr T const& applySymmetryImpl(T const& value)
 {
+    return value;
 }
 
 template<class T>
-inline constexpr void applySymmetryImpl(symmetric::odd<T>& value)
+inline constexpr symmetric::odd<T> applySymmetryImpl(symmetric::odd<T>& value)
 {
-    value.value = -value.value;
+    return {-value.value};
 }
 
 } // namespace detail
@@ -219,10 +220,17 @@ struct IsFullySymmetric<std::tuple<Ts...>> : std::conjunction<detail::IsSymmetri
 };
 
 template<class... Ts>
-inline constexpr void applySymmetry(std::tuple<Ts...>& value)
+inline constexpr auto selectSymmetric(std::tuple<Ts...> const& symmetricValue, std::tuple<Ts...> const& asymmetricValue)
 {
-    if constexpr (IsFullySymmetric<std::tuple<Ts...>>::value)
-        util::for_each_tuple([](auto& v) { detail::applySymmetryImpl(v); }, value);
+    return util::tupleMap(
+        []<class T>(T const& s, T const& a)
+        {
+            if constexpr (detail::IsSymmetric<T>::value)
+                return detail::applySymmetryImpl(s);
+            else
+                return a;
+        },
+        symmetricValue, asymmetricValue);
 }
 
 namespace detail

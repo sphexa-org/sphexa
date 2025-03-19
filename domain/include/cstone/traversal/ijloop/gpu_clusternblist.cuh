@@ -700,23 +700,19 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumWarpsPerBlock) void gpuClus
             const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
             const Th iRadiusSq             = radiusSq(iData);
             const Th jRadiusSq             = radiusSq(jData);
-            auto ijInteraction             = interaction(iData, jData, ijPosDiff, distSq);
+            const auto ijInteraction       = interaction(iData, jData, ijPosDiff, distSq);
             if (distSq < iRadiusSq) updateResult(result, ijInteraction);
             if constexpr (Config::symmetric)
             {
                 if (distSq < jRadiusSq & (!self | (i != j)))
                 {
-                    if constexpr (!IsFullySymmetric<result_t>::value)
-                        ijInteraction = interaction(jData, iData, -ijPosDiff, distSq);
-                    updateResult(jResult, ijInteraction);
+                    const auto jiInteraction =
+                        selectSymmetric(ijInteraction, interaction(jData, iData, -ijPosDiff, distSq));
+                    updateResult(jResult, jiInteraction);
                 }
             }
         }
-        if constexpr (Config::symmetric)
-        {
-            applySymmetry(jResult);
-            storeTupleJSum<Config>(jResult, output, j, j >= firstBody & j < lastBody);
-        }
+        if constexpr (Config::symmetric) storeTupleJSum<Config>(jResult, output, j, j >= firstBody & j < lastBody);
     };
 
     constexpr unsigned jClustersPerWarp     = GpuConfig::warpSize / Config::iSize / Config::jSize;

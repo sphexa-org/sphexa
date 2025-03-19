@@ -944,15 +944,15 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                     const auto& iData = iSuperclusterData[c * Config::iSize + block.thread_index().x];
                     assert(std::get<0>(iData) == i - firstValidBody);
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
-                    auto ijInteraction             = interaction(iData, jData, ijPosDiff, distSq);
+                    const auto ijInteraction       = interaction(iData, jData, ijPosDiff, distSq);
                     if (distSq < radiusSq(iData)) updateResult(iResults[c / iClustersPerWarp], ijInteraction);
                     if constexpr (Config::symmetric)
                     {
                         if ((distSq < radiusSq(jData)) & ((i != j) | (i < firstBody) | (i >= lastBody)))
                         {
-                            if constexpr (!IsFullySymmetric<result_t>::value)
-                                ijInteraction = interaction(jData, iData, -ijPosDiff, distSq);
-                            updateResult(jResult, ijInteraction);
+                            const auto jiInteraction =
+                                selectSymmetric(ijInteraction, interaction(jData, iData, -ijPosDiff, distSq));
+                            updateResult(jResult, jiInteraction);
                         }
                     }
                 }
@@ -962,7 +962,6 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 
             if constexpr (Config::symmetric)
             {
-                applySymmetry(jResult);
                 storeTupleJSum<Config>(jResult, output, j, j >= firstBody & j < lastBody);
             }
         }

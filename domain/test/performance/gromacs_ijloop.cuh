@@ -364,18 +364,17 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
                                 const Tc intBit                = (wexcl & maskJi) ? Tc(1) : Tc(0);
                                 if ((distSq < iRadiusSq) * intBit)
                                 {
-                                    auto ijInteraction = interaction(iData, jData, ijPosDiff, distSq);
+                                    const auto ijInteraction = interaction(iData, jData, ijPosDiff, distSq);
                                     updateResult(iResultBuf[i], ijInteraction);
-                                    if constexpr (!IsFullySymmetric<result_t>())
-                                        ijInteraction = interaction(jData, iData, -ijPosDiff, distSq);
-                                    if (ai != aj) updateResult(jResultBuf, ijInteraction);
+                                    const auto jiInteraction =
+                                        selectSymmetric(ijInteraction, interaction(jData, iData, -ijPosDiff, distSq));
+                                    if (ai != aj) updateResult(jResultBuf, jiInteraction);
                                 }
                             }
                         }
                         maskJi += maskJi;
                     }
 
-                    applySymmetry(jResultBuf);
                     storeTupleJSum(unwrapModifiers(jResultBuf), output, aj, aj >= firstBody & aj < lastBody);
                 }
             }
