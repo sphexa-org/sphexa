@@ -41,7 +41,7 @@ namespace cuda
 {
 
 template<class Dataset>
-void computeIadDivvCurlv(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
+void computeIadDivvCurlv(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
     // TODO: the following two loops could theoretically be merged into one with two reductions!
     const auto& neighborhood = getNeighborhoodGpu(d);

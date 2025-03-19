@@ -41,7 +41,7 @@ namespace sph::cuda
 {
 
 template<class Dataset>
-void computeAVswitches(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
+void computeAVswitches(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
     // TODO: d.alpha is used as input and output, this fails on neighborhoods that exploit symmetry!
     AVswitchesIjLoop(getNeighborhoodGpu(d), d.K, d.minDt, d.alphamin, d.alphamax, d.decay_constant,

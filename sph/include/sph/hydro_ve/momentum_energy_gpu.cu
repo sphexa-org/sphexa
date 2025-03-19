@@ -76,7 +76,7 @@ __global__ void reduceDt(const LocalIndex* __restrict__ grpStart, const LocalInd
 
 template<bool avClean, class Dataset>
 void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
-                           const cstone::Box<typename Dataset::RealType>& box)
+                           const cstone::Box<typename Dataset::RealType>&)
 {
     momentumAndEnergyIjLoop<avClean>(
         getNeighborhoodGpu(d), d.K, d.Kcour, d.Atmin, d.Atmax, d.ramp, rawPtr(d.devData.vx), rawPtr(d.devData.vy),

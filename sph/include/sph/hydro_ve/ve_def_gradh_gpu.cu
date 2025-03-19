@@ -43,7 +43,7 @@ namespace cuda
 {
 
 template<class Dataset>
-void computeVeDefGradh(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
+void computeVeDefGradh(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
     veDefGradhIjLoop(getNeighborhoodGpu(d), d.K, rawPtr(d.devData.m), rawPtr(d.devData.xm), rawPtr(d.devData.wh),
                      rawPtr(d.devData.whd), rawPtr(d.devData.kx), rawPtr(d.devData.gradh));
