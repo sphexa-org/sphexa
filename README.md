@@ -103,8 +103,8 @@ Module and CMake configuration on LUMI (ROCm 6.2.2)
 ```shell
 module swap PrgEnv-cray PrgEnv-gnu
 module load CrayEnv buildtools craype-accel-amd-gfx90a rocm cray-hdf5-parallel
-cd <GIT_SOURCE_DIR>;
-cmake -DCMAKE_CXX_COMPILER=CC -DCMAKE_HIP_ARCHITECTURES=gfx90a -DCMAKE_HIP_COMPILER=CC -DCSTONE_WITH_GPU_AWARE_MPI=ON -S <GIT_SOURCE_DIR>
+export MPICH_GPU_SUPPORT_ENABLED=1
+cmake -DCMAKE_CXX_COMPILER=CC -DCMAKE_HIP_ARCHITECTURES=gfx90a -DCSTONE_WITH_GPU_AWARE_MPI=ON -S <GIT_SOURCE_DIR>
 ```
 
 Build everything: ```make -j```

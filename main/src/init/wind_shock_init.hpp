@@ -52,7 +52,7 @@ InitSettings WindShockConstants()
 {
     return {{"r", .125},           {"rSphere", .025},   {"rhoInt", 10.}, {"rhoExt", 1.},     {"uExt", 3. / 2.},
             {"vxExt", 2.7},        {"vyExt", .0},       {"vzExt", .0},   {"dim", 3},         {"gamma", 5. / 3.},
-            {"minDt", 1e-10},      {"minDt_m1", 1e-10}, {"Kcour", 0.4},  {"epsilon", 0.},    {"mui", 10.},
+            {"minDt", 1e-10},      {"minDt_m1", 1e-10}, {"Kcour", 0.2},  {"epsilon", 0.},    {"mui", 10.},
             {"gravConstant", 0.0}, {"ng0", 100},        {"ngmax", 150},  {"wind-shock", 1.0}};
 }
 
