@@ -77,7 +77,7 @@ __device__ __forceinline__ void atomicMaxPtr(T* ptr, T value)
     atomicMax(ptr, value);
 }
 
-__device__ __forceinline__ void atomicMaxPtr(float* ptr, float value) { atomicMinFloat(ptr, value); }
+__device__ __forceinline__ void atomicMaxPtr(float* ptr, float value) { atomicMaxFloat(ptr, value); }
 
 template<class T, std::size_t N>
 __device__ __forceinline__ void atomicMaxPtr(util::array<T, N>* ptr, util::array<T, N> const& value)
