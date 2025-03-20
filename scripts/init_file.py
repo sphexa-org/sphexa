@@ -57,7 +57,7 @@ initStep.attrs["ngmax"] = np.array([150], dtype=np.int32)
 initStep.attrs["gravConstant"] = 1.0
 initStep.attrs["gamma"] = 5. / 3.
 initStep.attrs["muiConst"] = 1.21 * 4.329e13
-initStep.attrs["Kcour"] = 0.4
+initStep.attrs["Kcour"] = 0.2
 
 # BoundaryType: 0 = open, 1 = periodic, 2 = fixed
 initStep.attrs["boundaryType"] = np.array([0, 0, 0], dtype=np.int8)
