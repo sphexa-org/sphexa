@@ -56,7 +56,7 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
     using DtCourantType = typename std::decay_t<decltype(d.devData.dtCourant)>::value_type;
     auto minDt          = thrust::reduce(thrust::device, rawPtr(d.devData.dtCourant) + grp.firstBody,
                                          rawPtr(d.devData.dtCourant) + grp.lastBody,
-                                         std::numeric_limits<DtCourantType>::infinity(), thrust::maximum<DtCourantType>());
+                                         std::numeric_limits<DtCourantType>::infinity(), thrust::minimum<DtCourantType>());
     d.minDtCourant      = minDt;
 }
 
