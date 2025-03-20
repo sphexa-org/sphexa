@@ -32,6 +32,7 @@
 #pragma once
 
 #include <numeric>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -121,7 +122,7 @@ void readFileAttributes(InitSettings& settings, const std::string& settingsFile,
 }
 
 //! @brief generate particle IDs at the beginning of the simulation initialization
-void generateParticleIDs(gsl::span<uint64_t> id)
+void generateParticleIDs(std::span<uint64_t> id)
 {
     int rank = 0, numRanks = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);

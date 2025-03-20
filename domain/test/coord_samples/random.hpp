@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -39,7 +23,6 @@
 #include "cstone/primitives/gather.hpp"
 #include "cstone/sfc/sfc.hpp"
 #include "cstone/tree/definitions.h"
-#include "cstone/util/gsl-lite.hpp"
 
 namespace cstone
 {
@@ -242,7 +225,7 @@ void adjustSmoothingLength(LocalIndex numParticles,
     std::vector<unsigned> neighborCounts(numParticles);
 
     unsigned bucketSize   = 64;
-    auto [csTree, counts] = computeOctree(sfcKeys.data(), sfcKeys.data() + numParticles, bucketSize);
+    auto [csTree, counts] = computeOctree<KeyType>(std::span(sfcKeys), bucketSize);
     OctreeData<KeyType, CpuTag> octree;
     octree.resize(nNodes(csTree));
     updateInternalTree<KeyType>(csTree, octree.data());
@@ -250,7 +233,7 @@ void adjustSmoothingLength(LocalIndex numParticles,
     std::vector<LocalIndex> layout(nNodes(csTree) + 1, 0);
     std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
 
-    gsl::span<const KeyType> nodeKeys(octree.prefixes.data(), octree.numNodes);
+    std::span<const KeyType> nodeKeys(octree.prefixes);
     std::vector<Vec3<Tc>> centers(octree.numNodes), sizes(octree.numNodes);
     nodeFpCenters<KeyType>(nodeKeys, centers.data(), sizes.data(), box);
 

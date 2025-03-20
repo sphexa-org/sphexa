@@ -1,3 +1,12 @@
+/*
+ * Ryoanji N-body solver
+ *
+ * Copyright (c) 2024 CSCS, ETH Zurich
+ *
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
+ */
+
 /*! @file
  * @brief Compare the Ewald GPU kernel against the CPU version
  *
