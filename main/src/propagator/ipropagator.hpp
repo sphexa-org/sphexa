@@ -193,17 +193,17 @@ protected:
         // findSelectedParticlesIndexes(hydroSimData, first, last, selectedParticlesIndexes);
         findTaggedIds(hydroSimData.id, first, last, selectedParticlesIndexes);
 
-        // TODO: debug only
-        for(auto mpiRank=0; mpiRank<writer->numRanks(); mpiRank++){
-            if(mpiRank == writer->rank()){
-                std::cout << "Rank " << mpiRank << " selected particles: ";
-                for(auto& particleIndex : selectedParticlesIndexes){
-                    std::cout << particleIndex << " "<<(hydroSimData.id[particleIndex] & ~msbMask)<< " ";
-                }
-                std::cout << std::endl;
-            }
-            MPI_Barrier(writer->comm());
-        }
+        // // TODO: debug only
+        // for(auto mpiRank=0; mpiRank<writer->numRanks(); mpiRank++){
+        //     if(mpiRank == writer->rank()){
+        //         std::cout << "Rank " << mpiRank << " selected particles: ";
+        //         for(auto& particleIndex : selectedParticlesIndexes){
+        //             std::cout << particleIndex << " "<<(hydroSimData.id[particleIndex] & ~msbMask)<< " ";
+        //         }
+        //         std::cout << std::endl;
+        //     }
+        //     MPI_Barrier(writer->comm());
+        // }
 
 
         writer->addStep(0, selectedParticlesIndexes.size(), selParticlesOutFile);
@@ -211,8 +211,8 @@ protected:
         // box.loadOrStore(selParticlesFileWriter.get()); // TODO: do we need to load/store the boundary data/coordinates?
 
         auto fieldPointers = hydroSimData.data();
-        auto indicesDone   = hydroSimData.outputFieldIndices;
-        auto namesDone     = hydroSimData.outputFieldNames;
+        auto indicesDone   = hydroSimData.subsetOutputFieldIndices;
+        auto namesDone     = hydroSimData.subsetOutputFieldNames;
 
         // // Locally untag the selected particles to print the right ID
         // // TODO: it can be probably done with templates
@@ -228,8 +228,8 @@ protected:
             int fidx = indicesDone[i];
             if (hydroSimData.isAllocated(fidx))
             {
-                int column = std::find(hydroSimData.outputFieldIndices.begin(), hydroSimData.outputFieldIndices.end(), fidx) -
-                                       hydroSimData.outputFieldIndices.begin();
+                int column = std::find(hydroSimData.subsetOutputFieldIndices.begin(), hydroSimData.subsetOutputFieldIndices.end(), fidx) -
+                                       hydroSimData.subsetOutputFieldIndices.begin();
 
                 // TODO: the call frequency of this and of the outputAllocatedFields method will be different,
                 // we can save transfer time with a status flag but it will be the current method the one that
@@ -237,20 +237,22 @@ protected:
                 // TODO: should we just transfer a minimal subset of particles including the selected ones?
                 transferToHost(hydroSimData, first, last, {hydroSimData.fieldNames[fidx]});
 
-
-                // Copy current field data to a new vector only for the selected particles
                 std::visit([writer, c = column, key = namesDone[i], &selectedParticlesIndexes](auto field){
-                    std::remove_pointer_t<decltype(field)> selectedParticleFieldValues;
-                    // TODO: use copy_if
-                    // std::copy_if(field->begin(), field->end(), std::back_inserter(selectedParticleFieldPointers),
-                    //     [](){return true;});
-                    std::for_each(selectedParticlesIndexes.begin(), selectedParticlesIndexes.end(),
-                        [&selectedParticleFieldValues, &field](auto particlePosition){
-                            selectedParticleFieldValues.push_back(field->at(particlePosition));
-                        });
-                    writer->writeField(key, selectedParticleFieldValues.data(), c);
-                },
-                fieldPointers[fidx]);
+                    outputTaggedIdsField(selectedParticlesIndexes, writer, field, key, c);},fieldPointers[fidx]);
+
+                // // Copy current field data to a new vector only for the selected particles
+                // std::visit([writer, c = column, key = namesDone[i], &selectedParticlesIndexes](auto field){
+                //     std::remove_pointer_t<decltype(field)> selectedParticleFieldValues;
+                //     // TODO: use copy_if
+                //     // std::copy_if(field->begin(), field->end(), std::back_inserter(selectedParticleFieldPointers),
+                //     //     [](){return true;});
+                //     std::for_each(selectedParticlesIndexes.begin(), selectedParticlesIndexes.end(),
+                //         [&selectedParticleFieldValues, &field](auto particlePosition){
+                //             selectedParticleFieldValues.push_back(field->at(particlePosition));
+                //         });
+                //     writer->writeField(key, selectedParticleFieldValues.data(), c);
+                // },
+                // fieldPointers[fidx]);
 
                 indicesDone.erase(indicesDone.begin() + i);
                 namesDone.erase(namesDone.begin() + i);
@@ -260,27 +262,6 @@ protected:
         writer->closeStep();
 
     }
-
-    // template<class AccType>
-    // static void findSelectedParticlesIndexes(const ParticlesData<AccType>& d, size_t first, size_t last, std::vector<uint64_t>& selectedParticlesIndexes)
-    // {
-    //     if constexpr (cstone::HaveGpu<AccType>{})
-    //     {
-    //         findSelectedParticlesIndexes_gpu(d, first, last, selectedParticlesIndexes);
-    //     }
-    //     else
-    //     {
-    //         // Find the selected particles in local id list and save their indexes
-    //         // TODO: switch to GPU-like implementation?
-    //         uint64_t particleIndex = first;
-    //         std::for_each(d.id.begin()+first, d.id.begin()+last, [&selectedParticlesIndexes, &particleIndex](auto& particleId){
-    //             if((particleId & msbMask) != 0) {// check MSB
-    //                 selectedParticlesIndexes.push_back(particleIndex); // TODO: inefficient due to resizing, avoid push_back usage
-    //             }
-    //             particleIndex++;
-    //         });
-    //     }
-    // }
 
     std::ostream& out;
     Timer         timer;

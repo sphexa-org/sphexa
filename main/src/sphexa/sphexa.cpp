@@ -41,6 +41,7 @@
 
 #include "init/factory.hpp"
 #include "io/arg_parser.hpp"
+#include "io/id_tag_utils.hpp"
 #include "io/factory.hpp"
 #include "observables/factory.hpp"
 #include "propagator/factory.hpp"
@@ -48,7 +49,6 @@
 #include "util/timer.hpp"
 #include "util/utils.hpp"
 
-#include "particle_selection.hpp"
 #include "simulation_data.hpp"
 #include "insitu_viz.h"
 
@@ -79,28 +79,31 @@ int main(int argc, char** argv)
 
     using Dataset = SimulationData<AccType>;
     using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, AccType>;
-    // TODO: duplicated in ipropagator
-    using ParticleIndexVectorType = decltype(Dataset::HydroData::id);
 
-    const std::string        initCond     = parser.get("--init");
-    const size_t             problemSize  = parser.get("-n", 50);
-    const std::string        glassBlock   = parser.get("--glass");
-    const std::string        propChoice   = parser.get("--prop", std::string("ve"));
-    const std::string        maxStepStr   = parser.get("-s", std::string("200"));
-    std::vector<std::string> writeExtra   = parser.getCommaList("--wextra");
-    std::vector<std::string> outputFields = parser.getCommaList("-f");
-    const bool               ascii        = parser.exists("--ascii");
-    const bool               quiet        = parser.exists("--quiet");
-    const bool               avClean      = parser.exists("--avclean");
-    const int                simDuration  = parser.get("--duration", std::numeric_limits<int>::max());
-    const std::string        writeFreqStr = parser.get("-w", std::string("0"));
-    const bool               writeEnabled = writeFreqStr != "0" || !writeExtra.empty();
-    const std::string        profFreqStr  = parser.get("--profile", maxStepStr);
-    const bool               profEnabled  = parser.exists("--profile");
-    const std::string        pmroot       = parser.get("--pmroot", std::string("/sys/cray/pm_counters"));
-    const std::vector<std::string> idSel  = parser.getCommaList("--idSel");
-    const std::vector<std::string> sphSel = parser.getCommaList("--sphSel");
-    std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
+    const std::string        initCond           = parser.get("--init");
+    const size_t             problemSize        = parser.get("-n", 50);
+    const std::string        glassBlock         = parser.get("--glass");
+    const std::string        propChoice         = parser.get("--prop", std::string("ve"));
+    const std::string        maxStepStr         = parser.get("-s", std::string("200"));
+    std::vector<std::string> writeExtra         = parser.getCommaList("--wextra");
+    std::vector<std::string> writeExtraSubset   = parser.getCommaList("--wextra-subset");
+    std::vector<std::string> outputFields       = parser.getCommaList("-f");
+    std::vector<std::string> outputFieldsSubset = parser.getCommaList("-f-subset");
+    const bool               ascii              = parser.exists("--ascii");
+    const bool               quiet              = parser.exists("--quiet");
+    const bool               avClean            = parser.exists("--avclean");
+    const int                simDuration        = parser.get("--duration", std::numeric_limits<int>::max());
+    const std::string        writeFreqStr       = parser.get("-w", std::string("0"));
+    const std::string        writeFreqStrSubset = parser.get("-w-subset", std::string("0"));
+    const bool               writeEnabled       = writeFreqStr != "0" || !writeExtra.empty();
+    const bool               writeEnabledSubset = writeFreqStrSubset != "0" || !writeExtraSubset.empty();
+    const std::string        profFreqStr        = parser.get("--profile", maxStepStr);
+    const bool               profEnabled        = parser.exists("--profile");
+    const std::string        pmroot             = parser.get("--pmroot", std::string("/sys/cray/pm_counters"));
+    const std::vector<std::string> idSel        = parser.getCommaList("--idSel");
+    const std::vector<std::string> sphSel       = parser.getCommaList("--sphSel");
+    std::string              outFile            = parser.get("-o", "dump_" + removeModifiers(initCond));
+    std::string              outFileSubset      = parser.get("-o-subset", "dump_subset_" + removeModifiers(initCond));
 
 
     std::ofstream nullOutput("/dev/null");
@@ -109,48 +112,10 @@ int main(int argc, char** argv)
 
     //! @brief evaluate user choice for different kind of actions
     auto fileWriter  = fileWriterFactory(ascii, MPI_COMM_WORLD);
-    auto selParticlesFileWriter  = fileWriterFactory(ascii, MPI_COMM_WORLD);
     auto fileReader  = fileReaderFactory(ascii, MPI_COMM_WORLD);
     auto simInit     = initializerFactory<Dataset>(initCond, glassBlock, fileReader.get());
     auto propagator  = propagatorFactory<Domain, Dataset>(propChoice, avClean, output, rank, simInit->constants());
     auto observables = observablesFactory<Dataset>(simInit->constants(), constantsFile);
-
-    // Particle selection for output
-//    auto particleSelectionId = particleSelection(idSel, fileReader.get());
-    ParticleIndexVectorType selParticlesIds;
-//    ParticleIndexVectorType localSelectedParticlesIndexes;
-    ParticleSelectionSphere selSphereData;
-    bool partSel = false;
-    bool tagSelectedParticles = false;
-    bool isSelectedParticleOutputTriggered = false;
-    std::string selParticlesOutFile;
-    if(!idSel.empty()) {
-        // TODO: add check, input must be a list of unsigned int
-        for(auto& id : idSel) {
-            selParticlesIds.push_back(std::stoul(id));
-        }
-
-        partSel = true;
-    }
-    if(!sphSel.empty()) {
-        // TODO: add check, input must be a unitary sphere center and radius
-        selSphereData.radius = std::stod(sphSel[0]);
-        selSphereData.center[0] = std::stod(sphSel[1]);
-        selSphereData.center[1] = std::stod(sphSel[2]);
-        selSphereData.center[2] = std::stod(sphSel[3]);
-        partSel = true;
-    }
-    if(partSel){
-
-        // Activate particle selected tagging
-        tagSelectedParticles = true;
-
-        // Activate selected particles output
-        isSelectedParticleOutputTriggered = true;
-
-        // Set file name for selected particles output
-        selParticlesOutFile = "selected_particles_" + outFile + selParticlesFileWriter->suffix();
-    }
 
     Dataset simData;
     simData.comm = MPI_COMM_WORLD;
@@ -166,6 +131,7 @@ int main(int argc, char** argv)
     auto& d = simData.hydro;
     transferAllocatedToDevice(d, 0, d.x.size(), propagator->conservedFields());
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
+    simData.setSubsetOutputFields(outputFieldsSubset.empty() ? propagator->conservedFields() : outputFieldsSubset);
 
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
     bool  haveGrav = (d.g != 0.0);
@@ -173,6 +139,8 @@ int main(int argc, char** argv)
 
     if (!parser.exists("-o")) { outFile += fileWriter->suffix(); }
     if (writeEnabled) { writeSettings(simInit->constants(), outFile, fileWriter.get()); }
+    if (!parser.exists("-o-subset")) { outFileSubset += fileWriter->suffix(); }
+    if (writeEnabledSubset) { writeSettings(simInit->idSubsets(), outFileSubset, fileWriter.get()); }
     if (rank == 0) { std::cout << "Data generated for " << d.numParticlesGlobal << " global particles\n"; }
 
     uint64_t bucketSizeFocus = 64;
@@ -188,6 +156,7 @@ int main(int argc, char** argv)
 
     size_t startIteration    = d.iteration;
     bool   isOutputTriggered = false;
+    bool   isSubsetOutputTriggered = false;
 
     for (bool keepRunning = true; keepRunning; d.iteration++)
     {
@@ -197,30 +166,6 @@ int main(int argc, char** argv)
         if (propagator->isSynced())
         {
             observables->computeAndWrite(simData, domain.startIndex(), domain.endIndex(), box);
-        }
-
-        if (tagSelectedParticles) {
-
-            if (rank == 0) { std::cout << "Execution of selected particle identification\n"; }
-            // TODO: Check if selected particle tagging is needed:
-            // in a simulation starting from scratch we need to tag the selected particles if saveSelParticles is true and only in first iteration.
-            // In a simulation starting from a checkpoint file we need to tag the selected particles only if they are not already tagged? 
-            // Implementation of a check for tag existence in a checkpoint file is currently missing.
-
-            // If a selection sphere has been provided run spatial identification
-            if(!sphSel.empty()) {
-                // Find the selected particles in dataset
-                findParticlesInSphere(d, domain.startIndex(), domain.endIndex(), selSphereData);
-            }
-            else {
-                // Find the selected particles in user provided id list and tag them by setting the MSB of the id field
-                findParticlesInIdList(d, domain.startIndex(), domain.endIndex(), selParticlesIds);
-            }
-
-            // Update id on device
-            // TODO: check transfer index range
-            transferToDevice(d, 0, d.id.size(), {"id"});
-            tagSelectedParticles = false;
         }
 
         bool isWallClockReached = syncedWallClockElapsed(totalTimer.elapsed(), simDuration, propagator->stepElapsed());
@@ -241,10 +186,15 @@ int main(int argc, char** argv)
             isOutputTriggered = false;
         }
 
-        if (isSelectedParticleOutputTriggered) // && propatagor->isSynced
+        isSubsetOutputTriggered = isOutputStep(d.iteration, writeFreqStrSubset) ||
+                                  isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStrSubset) ||
+                                  isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtraSubset) ||
+                                  (isWallClockReached && writeEnabledSubset) || isSubsetOutputTriggered;
+
+        if (isSubsetOutputTriggered) // && propatagor->isSynced
         {
-            propagator->saveSelParticlesFields(fileWriter.get(), selParticlesOutFile, domain.startIndex(), domain.endIndex(), simData.hydro);
-//            isSelectedParticleOutputTriggered = false;
+            propagator->saveSelParticlesFields(fileWriter.get(), outFileSubset, domain.startIndex(), domain.endIndex(), simData.hydro);
+            isSubsetOutputTriggered = false;
         }
 
         if (isOutputStep(d.iteration, profFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, profFreqStr) ||
@@ -304,6 +254,7 @@ void printHelp(char* name, int rank)
 {
     if (rank == 0)
     {
+        // TODO: add missing options
         printf("\nUsage:\n\n");
         printf("%s [OPTIONS]\n", name);
         printf("\nWhere possible options are:\n\n");
@@ -326,14 +277,27 @@ void printHelp(char* name, int rank)
                "\t\t\t at which to trigger file output\n"
                "\t\t\t e.g.: --wextra 1,10,0.77 (output at after iteration 1 and 10 and at simulation time 0.77s\n\n");
 
+        printf("\t--wextra-subset LIST \t Comma-separated list of steps (integers) or ~times (floating point)\n"
+                "\t\t\t at which to trigger particle subset file output\n"
+                "\t\t\t e.g.: --wextra 1,10,0.77 (output at after iteration 1 and 10 and at simulation time 0.77s\n\n");
+
         printf("\t-w NUM \t\t NUM<=0:    Disable file output [default],\n\
                 \t int(NUM):  Dump particle data every NUM iteration steps,\n\
                 \t real(NUM): Dump particle data every NUM seconds of simulation (not wall-clock) time \n\n");
+
+        printf("\t-w-subset NUM \t\t NUM<=0:    Disable particle subset file output [default],\n\
+                \t int(NUM):  Dump particle subset data every NUM iteration steps,\n\
+                \t real(NUM): Dump particle subset data every NUM seconds of simulation (not wall-clock) time \n\n");
 
         printf("\t-f LIST \t Comma-separated list of field names to write for each dump.\n"
                "\t\t\t e.g: -f x,y,z,h,rho\n"
                "\t\t\t If omitted, the list will be set to all conserved fields,\n"
                "\t\t\t resulting in a restartable output file\n\n");
+
+        printf("\t-f-subset LIST \t Comma-separated list of field names to write for each particle subset dump.\n"
+                "\t\t\t e.g: -f x,y,z,h,rho\n"
+                "\t\t\t If omitted, the list will be set to all conserved fields,\n"
+                "\t\t\t resulting in a restartable output file\n\n");
 
         printf("\t--ascii \t Dump file in ASCII format [binary HDF5 by default]\n\n");
 

@@ -317,6 +317,54 @@ public:
         outFields.erase(std::remove_if(outFields.begin(), outFields.end(), hasField), outFields.end());
     }
 
+
+    /*! @brief mark fields file output
+     *
+     * @param outFields  list of field names
+     *
+     * Selected fields that match existing names contained in @a fieldNames will be removed from the argument
+     * @p field names.
+     */
+    void setSubsetOutputFields(std::vector<std::string>& outputFieldsSubset)
+    {
+        auto hasField = [](const std::string& field)
+        { return cstone::getFieldIndex(field, fieldNames) < fieldNames.size(); };
+
+        std::copy_if(outputFieldsSubset.begin(), outputFieldsSubset.end(), std::back_inserter(subsetOutputFieldNames), hasField);
+        subsetOutputFieldIndices = cstone::fieldStringsToInt(subsetOutputFieldNames, fieldNames);
+        std::for_each(subsetOutputFieldNames.begin(), subsetOutputFieldNames.end(), [](auto& f) { f = prefix + f; });
+
+        outputFieldsSubset.erase(std::remove_if(outputFieldsSubset.begin(), outputFieldsSubset.end(), hasField), outputFieldsSubset.end());
+    }
+
+    // TODO: refactoring of setSubsetOutputFields and setOutputFields needed to avoid code duplication,
+    //       with something like the function which follows
+    // /*! @brief mark fields file output
+    //  *
+    //  * @param outFields  list of field names
+    //  *
+    //  * Selected fields that match existing names contained in @a fieldNames will be removed from the argument. Output field names and indices
+    //  * will be added to outFieldNames and outFieldIndices respectively
+    //  *
+    //  * @param[out]  outFields  list of field names
+    //  * @param[out]  outFieldNames  list of field names for output
+    //  * @param[out]  outFieldIndices  list of field indices for output
+    //  *
+    //  * @p field names. // TODO: check this syntax
+    //  */
+    // void setOutputFields(std::vector<std::string>& outFields, std::vector<std::string>& outFieldNames, std::vector<int>& outFieldIndices)
+    // {
+    //     auto hasField = [](const std::string& field)
+    //     { return cstone::getFieldIndex(field, fieldNames) < fieldNames.size(); };
+
+    //     std::copy_if(outFields.begin(), outFields.end(), std::back_inserter(outFieldNames), hasField);
+    //     outFieldIndices = cstone::fieldStringsToInt(outFieldNames, fieldNames);
+    //     std::for_each(outFieldNames.begin(), outFieldNames.end(), [](auto& f) { f = prefix + f; });
+
+    //     outFields.erase(std::remove_if(outFields.begin(), outFields.end(), hasField), outFields.end());
+    // }
+
+
     void resize(size_t size)
     {
         auto data_ = data();
@@ -372,7 +420,9 @@ public:
 
     //! @brief particle fields selected for file output
     std::vector<int>         outputFieldIndices;
+    std::vector<int>         subsetOutputFieldIndices;
     std::vector<std::string> outputFieldNames;
+    std::vector<std::string> subsetOutputFieldNames;
 
     float getAllocGrowthRate() const { return allocGrowthRate_; }
 

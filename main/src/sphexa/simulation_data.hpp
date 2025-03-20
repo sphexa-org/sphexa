@@ -77,6 +77,24 @@ public:
             throw std::runtime_error("The following fields for output were not found: " + msg);
         }
     }
+
+    //! @brief record user selection of output fields for particle subset
+    void setSubsetOutputFields(std::vector<std::string> outputFieldsSubset)
+    {
+        hydro.setSubsetOutputFields(outputFieldsSubset);
+        chem.setSubsetOutputFields(outputFieldsSubset);
+
+        if (!outputFieldsSubset.empty())
+        {
+            std::string msg;
+            for (auto& s : outputFieldsSubset)
+            {
+                msg += s + ", ";
+            }
+            throw std::runtime_error("The following fields for subset output were not found: " + msg);
+        }
+    }
+
 };
 
 } // namespace sphexa

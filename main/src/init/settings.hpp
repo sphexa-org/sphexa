@@ -35,11 +35,34 @@
 #include <string>
 
 #include "io/ifile_io.hpp"
+#include "io/id_tag_utils.hpp"
 
 namespace sphexa
 {
 
 using InitSettings = std::map<std::string, double>;
+
+// TODO: alternatively, I could generalize InitSettings
+struct IdSelectionSettings
+{
+    // TODO: the second variant case is not really useful
+    // TODO: does it make sense to have an id-range based selection?
+//    using IdSelectionTypeVariant = std::variant<IdSelectionSphere, std::vector<IdType>>;
+    using IdSelectionTypeVariant = IdSelectionSphere;
+
+    // TODO: this data is already stored in settings_,
+    IdSelectionTypeVariant selectionData;
+
+    unsigned int selectionTimeStep;
+};
+
+struct IdSelectionDataset
+{
+    IdSelectionSettings settings;
+    std::vector<IdType> ids;
+};
+
+using IdSubsets = std::map<std::string, IdSelectionDataset>;
 
 //! @brief write @p InitSettings as file attributes of a new file @p path
 inline void writeSettings(const InitSettings& settings, const std::string& path, IFileWriter* writer)
@@ -53,6 +76,28 @@ inline void writeSettings(const InitSettings& settings, const std::string& path,
     for (auto it = settings.cbegin(); it != settings.cend(); ++it)
     {
         writer->fileAttribute(it->first, &(it->second), 1);
+    }
+    writer->closeStep();
+}
+
+//! @brief write @p IdSubsets as file attributes of a new file @p path
+inline void writeSettings(const IdSubsets& idSubsets, const std::string& path, IFileWriter* writer)
+{
+    if (std::filesystem::exists(path))
+    {
+        throw std::runtime_error("Cannot write settings: file " + path + " already exists\n");
+    }
+
+    writer->addStep(0, 0, path, true);
+    for (auto it = idSubsets.cbegin(); it != idSubsets.cend(); ++it)
+    {
+        writer->fileAttribute(it->first + "_radius", &(it->second.settings.selectionData.radius), 1);
+        writer->fileAttribute(it->first + "_center_x", &(it->second.settings.selectionData.center[0]), 1);
+        writer->fileAttribute(it->first + "_center_y", &(it->second.settings.selectionData.center[1]), 1);
+        writer->fileAttribute(it->first + "_center_z", &(it->second.settings.selectionData.center[2]), 1);
+        writer->fileAttribute(it->first + "_time_step", &(it->second.settings.selectionTimeStep), 1);
+        // TODO: I would not write the ids as attrbutes but as fields
+        writer->fileAttribute(it->first + "_id_subset", it->second.ids.data(), (it->second.ids.size()<10 ? it->second.ids.size() : 10));
     }
     writer->closeStep();
 }

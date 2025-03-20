@@ -51,7 +51,7 @@ namespace sphexa
 struct MaskFunctor
 {
     __device__
-    uint64_t operator()(uint64_t id) const
+    IdType operator()(IdType id) const
     {
         return (id & msbMask) != 0;
     }
@@ -65,7 +65,7 @@ struct MaskFunctor
  * @param[in]  last         last (excluded) id index
  * @param[in]  selectedIds  vindexes to be tagged
  */
-void tagIdsInList(cstone::DeviceVector<uint64_t>& ids, size_t first, size_t last, const std::vector<uint64_t>& selectedIds) 
+void tagIdsInList(cstone::DeviceVector<IdType>& ids, size_t first, size_t last, const std::vector<IdType>& selectedIds) 
 {
     throw std::runtime_error("Not implemented yet");
 }
@@ -73,15 +73,16 @@ void tagIdsInList(cstone::DeviceVector<uint64_t>& ids, size_t first, size_t last
 
 /*! @brief Id tagging (in first:last range) in spherical volume, GPU version
  *
- * @param[out] ids           ordered id list
- * @param[in]  x             x coordinates
- * @param[in]  y             y coordinates
- * @param[in]  z             z coordinates
- * @param[in]  first         first id index // TODO number of elements and pass iterator?
- * @param[in]  last          last (excluded) id index
- * @param[in]  selSphereData spherical volume definition
+ * @param[out] ids               ordered id list
+ * @param[out] originalTaggedIds original values of tagged ids
+ * @param[in]  x                 x coordinates
+ * @param[in]  y                 y coordinates
+ * @param[in]  z                 z coordinates
+ * @param[in]  first             first id index // TODO number of elements and pass iterator?
+ * @param[in]  last              last (excluded) id index
+ * @param[in]  selSphereData     spherical volume definition
  */
-void tagIdsInSphere(cstone::DeviceVector<uint64_t>& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y, 
+void tagIdsInSphere(cstone::DeviceVector<IdType>& ids, IdVectorType& originalTaggedIds, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
     const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData)
 {
     throw std::runtime_error("Not implemented yet");
@@ -93,12 +94,12 @@ void tagIdsInSphere(cstone::DeviceVector<uint64_t>& ids, const std::vector<Coord
  */
 struct SearchFunctor
 {
-    const uint64_t* m_devRawScanResult;
-    const uint64_t m_first;
-    const uint64_t m_scanResultSize;
+    const IdType* m_devRawScanResult;
+    const IdType m_first;
+    const IdType m_scanResultSize;
 
     __device__
-    void operator()(uint64_t& i) const
+    void operator()(IdType& i) const
     {
         for(auto j = i; j<m_scanResultSize; j++){ // TODO: check performance penalty due to break
             if(m_devRawScanResult[j] == i+1){
@@ -117,14 +118,14 @@ struct SearchFunctor
  * @param[in]  last             last (excluded) id index
  * @param[out] taggedIdsIndexes vector of indexes (positions wrt of selected particles)
  */
-void findTaggedIds(const cstone::DeviceVector<uint64_t>& ids, size_t first, size_t last, std::vector<uint64_t>& taggedIdsIndexes)
+void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t last, std::vector<IdType>& taggedIdsIndexes)
 {
     auto devRawId = ids.data();
     const auto devIdSize = last - first;
 
     // Create device containers
-    thrust::device_vector<uint64_t> devMask(devIdSize, 0);
-    thrust::device_vector<uint64_t> devScanResult(devIdSize, 0);
+    thrust::device_vector<IdType> devMask(devIdSize, 0);
+    thrust::device_vector<IdType> devScanResult(devIdSize, 0);
 
     // Generate mask
     thrust::transform(devRawId + first, devRawId + last, devMask.begin(), MaskFunctor{});
@@ -133,7 +134,7 @@ void findTaggedIds(const cstone::DeviceVector<uint64_t>& ids, size_t first, size
     thrust::inclusive_scan(devMask.begin(), devMask.end(), devScanResult.begin());
 
     // Create particle subset position container on GPU and initialize it sequentially
-    thrust::device_vector<uint64_t> devSubsetPos(devScanResult.back());
+    thrust::device_vector<IdType> devSubsetPos(devScanResult.back());
     thrust::sequence(thrust::device, devSubsetPos.begin(), devSubsetPos.end());
  
     // Find the position of the particle in the subset
@@ -145,7 +146,7 @@ void findTaggedIds(const cstone::DeviceVector<uint64_t>& ids, size_t first, size
 
     // Copy result to host
     // TODO: find better solution
-    thrust::host_vector<uint64_t> hostSubsetPos(devSubsetPos);
+    thrust::host_vector<IdType> hostSubsetPos(devSubsetPos);
     taggedIdsIndexes.assign(thrust::raw_pointer_cast(hostSubsetPos.data()), thrust::raw_pointer_cast(hostSubsetPos.data()) + hostSubsetPos.size());
 
     return;
