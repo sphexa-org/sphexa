@@ -265,6 +265,8 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
     const Vec3<Tc> groupCenter = (bbMax + bbMin) * Tc(0.5);
     const Vec3<Tc> groupSize   = (bbMax - bbMin) * Tc(0.5) * tree.searchExtFactor;
 
+    const bool usePbc = UsePbc && !insideBox(groupCenter, groupSize, box);
+
     const unsigned firstISupercluster = superclusterIndex<Config>(firstBody);
     const unsigned lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
     const unsigned iSupercluster      = superclusterIndex<Config>(firstGroupParticle);
@@ -338,7 +340,8 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
         const Vec3<Tc> curSrcSize   = sizes[sourceQueue];        // Current source cell center
         const int childBegin        = childOffsets[sourceQueue]; // First child cell
         const bool isNode           = childBegin;
-        const bool isClose          = cellOverlap<UsePbc>(curSrcCenter, curSrcSize, groupCenter, groupSize, box);
+        const bool isClose          = usePbc ? cellOverlap<true>(curSrcCenter, curSrcSize, groupCenter, groupSize, box)
+                                             : cellOverlap<false>(curSrcCenter, curSrcSize, groupCenter, groupSize, box);
         const bool isSource         = sourceIdx < numSources; // Source index is within bounds
         const bool isDirect         = isClose && !isNode && isSource;
         const int leafIdx           = isDirect ? internalToLeaf[sourceQueue] : 0; // the cstone leaf index
