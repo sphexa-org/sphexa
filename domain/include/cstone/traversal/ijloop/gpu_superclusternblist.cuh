@@ -242,6 +242,7 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
     Vec3<Tc> bbMin = {std::numeric_limits<Tc>::max(), std::numeric_limits<Tc>::max(), std::numeric_limits<Tc>::max()};
     Vec3<Tc> bbMax = {std::numeric_limits<Tc>::lowest(), std::numeric_limits<Tc>::lowest(),
                       std::numeric_limits<Tc>::lowest()};
+    assert(lastGroupParticle - firstGroupParticle > 0);
 
     for (unsigned i = firstGroupParticle + warp.thread_rank(); i < lastGroupParticle; i += warp.num_threads())
     {
@@ -262,7 +263,7 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
     }
 
     const Vec3<Tc> groupCenter = (bbMax + bbMin) * Tc(0.5);
-    const Vec3<Tc> groupSize   = (bbMax - bbMin) * Tc(0.5);
+    const Vec3<Tc> groupSize   = (bbMax - bbMin) * Tc(0.5) * tree.searchExtFactor;
 
     const unsigned firstISupercluster = superclusterIndex<Config>(firstBody);
     const unsigned lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
