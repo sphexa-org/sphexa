@@ -309,7 +309,7 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
     int jClusterQueue; // warp queue for source jCluster indices
     volatile int* tempQueue = sharedPool + GpuConfig::warpSize * warp.meta_group_rank();
     int* cellQueue =
-        globalPool + TravConfig::memPerWarp * (grid.block_rank() * warp.meta_group_size() + warp.meta_group_rank());
+        globalPool + TravConfig::memPerWarp * (grid.block_rank() * NumSuperclustersPerBlock + warp.meta_group_rank());
     const TreeNodeIndex* __restrict__ childOffsets   = tree.childOffsets;
     const TreeNodeIndex* __restrict__ internalToLeaf = tree.internalToLeaf;
     const LocalIndex* __restrict__ layout            = tree.layout;
