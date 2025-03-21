@@ -362,8 +362,11 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
 
         // Direct
         const int firstJCluster = jClusterIndex<Config>(layout[leafIdx] + firstValidBody);
-        const int numJClusters = (jClusterIndex<Config>(layout[leafIdx + 1] + firstValidBody - 1) + 1 - firstJCluster) &
-                                 -int(isDirect); // Number of jClusters in cell
+        const int numJClusters =
+            (layout[leafIdx + 1] == layout[leafIdx]
+                 ? 0
+                 : jClusterIndex<Config>(layout[leafIdx + 1] + firstValidBody - 1) + 1 - firstJCluster) &
+            -int(isDirect); // Number of jClusters in cell
         bool directTodo            = numJClusters;
         const int numJClustersScan = inclusiveScanInt(numJClusters);  // Inclusive scan of numJClusters
         int numJClustersLane       = numJClustersScan - numJClusters; // Exclusive scan of numJClusters
