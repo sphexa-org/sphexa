@@ -333,8 +333,10 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
         int sourceQueue = 0;
         if (warp.thread_rank() < GpuConfig::warpSize / 8)
             sourceQueue = cellQueue[ringAddr(oldSources + sourceIdx)]; // Global source cell index in queue
-        sourceQueue = spreadSeg8(sourceQueue);
-        sourceIdx   = warp.shfl(sourceIdx, warp.thread_rank() / 8);
+        sourceQueue         = spreadSeg8(sourceQueue);
+        sourceIdx           = warp.shfl(sourceIdx, warp.thread_rank() / 8);
+        const bool isSource = sourceIdx < numSources; // Source index is within bounds
+        if (!isSource) sourceQueue = 0;
 
         const Vec3<Tc> curSrcCenter = centers[sourceQueue];      // Current source cell center
         const Vec3<Tc> curSrcSize   = sizes[sourceQueue];        // Current source cell center
@@ -342,7 +344,6 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
         const bool isNode           = childBegin;
         const bool isClose          = usePbc ? cellOverlap<true>(curSrcCenter, curSrcSize, groupCenter, groupSize, box)
                                              : cellOverlap<false>(curSrcCenter, curSrcSize, groupCenter, groupSize, box);
-        const bool isSource         = sourceIdx < numSources; // Source index is within bounds
         const bool isDirect         = isClose && !isNode && isSource;
         const int leafIdx           = isDirect ? internalToLeaf[sourceQueue] : 0; // the cstone leaf index
 
