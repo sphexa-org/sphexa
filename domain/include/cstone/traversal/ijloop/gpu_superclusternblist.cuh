@@ -1320,6 +1320,11 @@ struct GpuSuperclusterNbListNeighborhood
             runBuildKernel();
             checkGpuErrors(cudaDeviceSynchronize());
             previousSize = requiredSize * 1.1;
+#ifndef NDEBUG
+            checkGpuErrors(cudaMemcpy(&requiredSize, &rawPtr(globalBuildData)->neighborDataSize,
+                                      sizeof(unsigned long long), cudaMemcpyDeviceToHost));
+            assert(requiredSize <= nbList.neighborData.size());
+#endif
         }
 
         thrust::stable_sort(thrust::device, nbList.superclusterInfo.begin(), nbList.superclusterInfo.end());
