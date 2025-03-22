@@ -72,13 +72,17 @@ auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, const
     bool pbcY = (previousBox.boundaryY() == BoundaryType::periodic);
     bool pbcZ = (previousBox.boundaryZ() == BoundaryType::periodic);
 
-    std::array<T, 6> extrema;
-    std::tie(extrema[0], extrema[1]) =
-        pbcX ? std::make_tuple(previousBox.xmin(), previousBox.xmax()) : Op{}(x, x + numElements);
-    std::tie(extrema[2], extrema[3]) =
-        pbcY ? std::make_tuple(previousBox.ymin(), previousBox.ymax()) : Op{}(y, y + numElements);
-    std::tie(extrema[4], extrema[5]) =
-        pbcZ ? std::make_tuple(previousBox.zmin(), previousBox.zmax()) : Op{}(z, z + numElements);
+    std::array<T, 6> extrema{previousBox.xmin(), previousBox.xmax(), previousBox.ymin(),
+                             previousBox.ymax(), previousBox.zmin(), previousBox.zmax()};
+    if (numElements)
+    {
+        std::tie(extrema[0], extrema[1]) =
+            pbcX ? std::make_tuple(previousBox.xmin(), previousBox.xmax()) : Op{}(x, x + numElements);
+        std::tie(extrema[2], extrema[3]) =
+            pbcY ? std::make_tuple(previousBox.ymin(), previousBox.ymax()) : Op{}(y, y + numElements);
+        std::tie(extrema[4], extrema[5]) =
+            pbcZ ? std::make_tuple(previousBox.zmin(), previousBox.zmax()) : Op{}(z, z + numElements);
+    }
 
     if (!pbcX || !pbcY || !pbcZ)
     {

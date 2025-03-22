@@ -19,6 +19,7 @@
 #include <span>
 #include <type_traits>
 
+#include "cstone/cuda/device_vector.h"
 #include "cstone/util/pack_buffers.hpp"
 #include "cstone/primitives/primitives_gpu.h"
 #include "gather.hpp"
