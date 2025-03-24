@@ -215,6 +215,133 @@ __global__ void computeJClusterBboxes(const LocalIndex firstValidBody,
     }
 }
 
+template<class Config, unsigned NumSuperclustersPerBlock>
+__device__ inline void sortCandidates(std::uint32_t* candidates, unsigned numCandidates)
+{
+    const auto block = cooperative_groups::this_thread_block();
+    const auto warp  = cooperative_groups::tiled_partition<GpuConfig::warpSize>(block);
+
+    constexpr unsigned itemsPerWarp = Config::ncMax / GpuConfig::warpSize;
+    std::uint32_t items[itemsPerWarp];
+#pragma unroll
+    for (unsigned i = 0; i < itemsPerWarp; ++i)
+    {
+        const unsigned c = warp.thread_rank() * itemsPerWarp + i;
+        items[i]         = c < numCandidates ? candidates[c] : std::numeric_limits<std::uint32_t>::max();
+    }
+
+    using WarpSort = cub::WarpMergeSort<std::uint32_t, itemsPerWarp, GpuConfig::warpSize>;
+    __shared__ typename WarpSort::TempStorage sortTmp[NumSuperclustersPerBlock];
+    WarpSort(sortTmp[warp.meta_group_rank()]).Sort(items, std::less<unsigned>());
+
+#pragma unroll
+    for (unsigned i = 0; i < itemsPerWarp; ++i)
+    {
+        const unsigned c = warp.thread_rank() * itemsPerWarp + i;
+        if (c < numCandidates) candidates[c] = items[i];
+    }
+
+    warp.sync();
+}
+
+template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th>
+__device__ inline void pruneCandidates(const Box<Tc>& box,
+                                       const LocalIndex firstValidBody,
+                                       const LocalIndex totalBodies,
+                                       const Tc* const __restrict__ x,
+                                       const Tc* const __restrict__ y,
+                                       const Tc* const __restrict__ z,
+                                       const Th* const __restrict__ h,
+                                       const unsigned iSupercluster,
+                                       std::uint32_t* __restrict__ jClusters,
+                                       unsigned& numCandidates)
+{
+    const auto block = cooperative_groups::this_thread_block();
+    const auto warp  = cooperative_groups::tiled_partition<GpuConfig::warpSize>(block);
+
+    __shared__ Tc xisBuffer[NumSuperclustersPerBlock][Config::superclusterSize];
+    __shared__ Tc yisBuffer[NumSuperclustersPerBlock][Config::superclusterSize];
+    __shared__ Tc zisBuffer[NumSuperclustersPerBlock][Config::superclusterSize];
+    __shared__ Th hisBuffer[NumSuperclustersPerBlock][Config::superclusterSize];
+    Tc* xis = xisBuffer[warp.meta_group_rank()];
+    Tc* yis = yisBuffer[warp.meta_group_rank()];
+    Tc* zis = zisBuffer[warp.meta_group_rank()];
+    Th* his = hisBuffer[warp.meta_group_rank()];
+
+    for (unsigned n = warp.thread_rank(); n < Config::superclusterSize; n += warp.num_threads())
+    {
+        const unsigned i =
+            std::max(std::min(Config::superclusterSize * iSupercluster + n, totalBodies - 1), firstValidBody);
+        xis[n] = x[i];
+        yis[n] = y[i];
+        zis[n] = z[i];
+        his[n] = h[i];
+    }
+
+    warp.sync();
+
+    constexpr unsigned iClustersPerWarp = Config::iThreads / Config::iSize;
+    const unsigned iClusterOffset       = iClustersPerWarp == 1 ? 0 : block.thread_index().x / Config::iSize;
+
+    std::uint32_t previousJCluster = std::numeric_limits<std::uint32_t>::max();
+    unsigned numJClusters          = 0;
+    for (unsigned candidate = 0; candidate < numCandidates; ++candidate)
+    {
+        const std::uint32_t jCluster = jClusters[candidate];
+        if (jCluster == previousJCluster) continue;
+        previousJCluster = jCluster;
+
+        bool keep = false;
+        for (unsigned w = 0; w < Config::numWarpsPerInteraction; ++w)
+        {
+            const unsigned j = jCluster * Config::jSize + (Config::jSize / Config::numWarpsPerInteraction) * w +
+                               block.thread_index().y;
+            const unsigned jSupercluster = superclusterIndex<Config>(j);
+            const unsigned jClamped      = std::max(firstValidBody, std::min(j, totalBodies - 1));
+            const Tc xj                  = x[jClamped];
+            const Tc yj                  = y[jClamped];
+            const Tc zj                  = z[jClamped];
+            const Th hj                  = h[jClamped];
+
+            for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
+            {
+                const unsigned ci = c + iClusterOffset;
+                const unsigned i  = ci * Config::iSize + block.thread_index().x % Config::iSize;
+                if (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j))
+                {
+                    const unsigned si = ci * Config::iSize + block.thread_index().x % Config::iSize;
+                    const Tc xi       = xis[si];
+                    const Tc yi       = yis[si];
+                    const Tc zi       = zis[si];
+                    const Th hi       = his[si];
+                    Tc xij            = xi - xj;
+                    Tc yij            = yi - yj;
+                    Tc zij            = zi - zj;
+                    if constexpr (UsePbc)
+                    {
+                        xij -= (box.boundaryX() == BoundaryType::periodic) * box.lx() * std::rint(xij * box.ilx());
+                        yij -= (box.boundaryY() == BoundaryType::periodic) * box.ly() * std::rint(yij * box.ily());
+                        zij -= (box.boundaryZ() == BoundaryType::periodic) * box.lz() * std::rint(zij * box.ilz());
+                    }
+                    const Th distSq = xij * xij + yij * yij + zij * zij;
+                    const Th hMax   = Config::symmetric ? std::max(hi, hj) : hi;
+                    keep            = distSq < Th(4) * hMax * hMax;
+                }
+                keep = warp.any(keep);
+                if (keep) break;
+            }
+            if (keep) break;
+        }
+        if (keep)
+        {
+            if (warp.thread_rank() == 0) jClusters[numJClusters] = jCluster;
+            ++numJClusters;
+        }
+    }
+    numCandidates = numJClusters;
+    warp.sync();
+}
+
 template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th, class KeyType>
 __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc, KeyType>& tree,
                                                           const Box<Tc>& box,
@@ -297,11 +424,19 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
             }
         }
 
-        const unsigned nbIndex = exclusiveScanBool(isNeighbor);
+        const unsigned nbIndex    = exclusiveScanBool(isNeighbor);
+        unsigned newNumCandidates = warp.shfl(numCandidates + nbIndex + isNeighbor, GpuConfig::warpSize - 1);
+        if (newNumCandidates >= Config::ncMax)
+        {
+            sortCandidates<Config, NumSuperclustersPerBlock>(candidates, numCandidates);
+            pruneCandidates<Config, NumSuperclustersPerBlock, UsePbc>(box, firstValidBody, totalBodies, x, y, z, h,
+                                                                      iSupercluster, candidates, numCandidates);
+            newNumCandidates = warp.shfl(numCandidates + nbIndex + isNeighbor, GpuConfig::warpSize - 1);
+        }
         // TODO: proper error handling
-        assert(numCandidates + nbIndex < Config::ncMax);
+        assert(newNumCandidates < Config::ncMax);
         if (isNeighbor & (numCandidates + nbIndex < Config::ncMax)) candidates[numCandidates + nbIndex] = jCluster;
-        numCandidates = warp.shfl(numCandidates + nbIndex + isNeighbor, GpuConfig::warpSize - 1);
+        numCandidates = newNumCandidates;
     };
 
     volatile __shared__ int sharedPool[NumSuperclustersPerBlock * GpuConfig::warpSize];
@@ -421,59 +556,6 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
 
     if (jClusterFillLevel > 0) // If there are leftover direct bodies
         checkOverlap(jClusterQueue, jClusterFillLevel);
-}
-
-template<class Config, unsigned NumSuperclustersPerBlock>
-__device__ __forceinline__ void sortCandidates(std::uint32_t* candidates, unsigned numCandidates)
-{
-    const auto block = cooperative_groups::this_thread_block();
-    const auto warp  = cooperative_groups::tiled_partition<GpuConfig::warpSize>(block);
-
-    constexpr unsigned itemsPerWarp = Config::ncMax / GpuConfig::warpSize;
-    std::uint32_t items[itemsPerWarp];
-#pragma unroll
-    for (unsigned i = 0; i < itemsPerWarp; ++i)
-    {
-        const unsigned c = warp.thread_rank() * itemsPerWarp + i;
-        items[i]         = c < numCandidates ? candidates[c] : std::numeric_limits<std::uint32_t>::max();
-    }
-
-    using WarpSort = cub::WarpMergeSort<std::uint32_t, itemsPerWarp, GpuConfig::warpSize>;
-    __shared__ typename WarpSort::TempStorage sortTmp[NumSuperclustersPerBlock];
-    WarpSort(sortTmp[warp.meta_group_rank()]).Sort(items, std::less<unsigned>());
-
-#pragma unroll
-    for (unsigned i = 0; i < itemsPerWarp; ++i)
-    {
-        const unsigned c = warp.thread_rank() * itemsPerWarp + i;
-        if (c < numCandidates) candidates[c] = items[i];
-    }
-
-    warp.sync();
-}
-
-__device__ __forceinline__ void pruneCandidates(std::uint32_t* __restrict__ jClusters, unsigned& numCandidates)
-{
-    const auto block = cooperative_groups::this_thread_block();
-    const auto warp  = cooperative_groups::tiled_partition<GpuConfig::warpSize>(block);
-
-    unsigned prunedCandidates = 0;
-    std::uint32_t previous    = ~0u;
-
-    for (unsigned n = 0; n < numCandidates; n += warp.num_threads())
-    {
-        const std::uint32_t candidate   = jClusters[std::min(n + warp.thread_rank(), numCandidates - 1)];
-        std::uint32_t previousCandidate = warp.shfl_up(candidate, 1);
-        if (warp.thread_rank() == 0) previousCandidate = previous;
-
-        const bool keep      = candidate != previousCandidate;
-        const unsigned index = exclusiveScanBool(keep);
-        if (keep) jClusters[prunedCandidates + index] = candidate;
-        prunedCandidates = warp.shfl(prunedCandidates + index + keep, warp.num_threads() - 1);
-        previous         = warp.shfl(candidate, warp.num_threads() - 1);
-    }
-
-    numCandidates = prunedCandidates;
 }
 
 template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th>
@@ -688,14 +770,12 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
             collectJClusterCandidates<Config, NumSuperclustersPerBlock, UsePbc>(
                 tree, box, firstValidBody, totalBodies, firstBody, lastBody, firstGroupParticle, lastGroupParticle, x,
                 y, z, h, maxH, jClusterBboxCenters, jClusterBboxSizes, globalPool, jClusters, numCandidates);
-
-            sortCandidates<Config, NumSuperclustersPerBlock>(jClusters, numCandidates);
-            if (lastGroupParticle < finalGroupParticle) pruneCandidates(jClusters, numCandidates);
         }
 
         __shared__ std::uint32_t masksBuffer[NumSuperclustersPerBlock][masksSize<Config>(Config::ncMax)];
         std::uint32_t* masks = masksBuffer[warp.meta_group_rank()];
 
+        sortCandidates<Config, NumSuperclustersPerBlock>(jClusters, numCandidates);
         pruneCandidatesAndComputeMasks<Config, NumSuperclustersPerBlock, UsePbc>(box, firstValidBody, totalBodies, x, y,
                                                                                  z, h, info.index, jClusters, masks,
                                                                                  numCandidates, info.neighborsCount);
