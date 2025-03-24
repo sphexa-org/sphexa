@@ -204,7 +204,7 @@ inline constexpr T const& applySymmetryImpl(T const& value)
 }
 
 template<class T>
-inline constexpr symmetric::odd<T> applySymmetryImpl(symmetric::odd<T>& value)
+inline constexpr symmetric::odd<T> applySymmetryImpl(symmetric::odd<T> const& value)
 {
     return {-value.value};
 }
