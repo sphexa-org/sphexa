@@ -252,6 +252,7 @@ __device__ inline void pruneCandidates(const Box<Tc>& box,
                                        const Tc* const __restrict__ y,
                                        const Tc* const __restrict__ z,
                                        const Th* const __restrict__ h,
+                                       const Th searchExtFactor,
                                        const unsigned iSupercluster,
                                        std::uint32_t* __restrict__ jClusters,
                                        unsigned& numCandidates)
@@ -324,7 +325,7 @@ __device__ inline void pruneCandidates(const Box<Tc>& box,
                         zij -= (box.boundaryZ() == BoundaryType::periodic) * box.lz() * std::rint(zij * box.ilz());
                     }
                     const Th distSq = xij * xij + yij * yij + zij * zij;
-                    const Th hMax   = Config::symmetric ? std::max(hi, hj) : hi;
+                    const Th hMax   = (Config::symmetric ? std::max(hi, hj) : hi) * searchExtFactor;
                     keep            = distSq < Th(4) * hMax * hMax;
                 }
                 keep = warp.any(keep);
@@ -430,7 +431,8 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
         {
             sortCandidates<Config, NumSuperclustersPerBlock>(candidates, numCandidates);
             pruneCandidates<Config, NumSuperclustersPerBlock, UsePbc>(box, firstValidBody, totalBodies, x, y, z, h,
-                                                                      iSupercluster, candidates, numCandidates);
+                                                                      tree.searchExtFactor, iSupercluster, candidates,
+                                                                      numCandidates);
             newNumCandidates = warp.shfl(numCandidates + nbIndex + isNeighbor, GpuConfig::warpSize - 1);
         }
         // TODO: proper error handling
@@ -566,6 +568,7 @@ __device__ __forceinline__ void pruneCandidatesAndComputeMasks(const Box<Tc>& bo
                                                                const Tc* const __restrict__ y,
                                                                const Tc* const __restrict__ z,
                                                                const Th* const __restrict__ h,
+                                                               const Th searchExtFactor,
                                                                const unsigned iSupercluster,
                                                                std::uint32_t* __restrict__ jClusters,
                                                                std::uint32_t* __restrict__ masks,
@@ -645,7 +648,7 @@ __device__ __forceinline__ void pruneCandidatesAndComputeMasks(const Box<Tc>& bo
                             zij -= (box.boundaryZ() == BoundaryType::periodic) * box.lz() * std::rint(zij * box.ilz());
                         }
                         const Th distSq             = xij * xij + yij * yij + zij * zij;
-                        const Th hMax               = Config::symmetric ? std::max(hi, hj) : hi;
+                        const Th hMax               = (Config::symmetric ? std::max(hi, hj) : hi) * searchExtFactor;
                         const bool overlaps         = distSq < Th(4) * hMax * hMax;
                         const unsigned maskBitIndex = w * Config::iClustersPerSupercluster + ci;
                         assert(maskBitIndex < 32);
@@ -776,9 +779,9 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
         std::uint32_t* masks = masksBuffer[warp.meta_group_rank()];
 
         sortCandidates<Config, NumSuperclustersPerBlock>(jClusters, numCandidates);
-        pruneCandidatesAndComputeMasks<Config, NumSuperclustersPerBlock, UsePbc>(box, firstValidBody, totalBodies, x, y,
-                                                                                 z, h, info.index, jClusters, masks,
-                                                                                 numCandidates, info.neighborsCount);
+        pruneCandidatesAndComputeMasks<Config, NumSuperclustersPerBlock, UsePbc>(
+            box, firstValidBody, totalBodies, x, y, z, h, tree.searchExtFactor, info.index, jClusters, masks,
+            numCandidates, info.neighborsCount);
 
         storeNeighborData<Config, NumSuperclustersPerBlock>(jClusters, masks, neighborData, neighborDataSize, info,
                                                             globalBuildData);
