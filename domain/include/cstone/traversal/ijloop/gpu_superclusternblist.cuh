@@ -431,8 +431,8 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
         {
             sortCandidates<Config, NumSuperclustersPerBlock>(candidates, numCandidates);
             pruneCandidates<Config, NumSuperclustersPerBlock, UsePbc>(box, firstValidBody, totalBodies, x, y, z, h,
-                                                                      tree.searchExtFactor, iSupercluster, candidates,
-                                                                      numCandidates);
+                                                                      (Th)tree.searchExtFactor, iSupercluster,
+                                                                      candidates, numCandidates);
             newNumCandidates = warp.shfl(numCandidates + nbIndex + isNeighbor, GpuConfig::warpSize - 1);
         }
         // TODO: proper error handling
@@ -780,7 +780,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
 
         sortCandidates<Config, NumSuperclustersPerBlock>(jClusters, numCandidates);
         pruneCandidatesAndComputeMasks<Config, NumSuperclustersPerBlock, UsePbc>(
-            box, firstValidBody, totalBodies, x, y, z, h, tree.searchExtFactor, info.index, jClusters, masks,
+            box, firstValidBody, totalBodies, x, y, z, h, (Th)tree.searchExtFactor, info.index, jClusters, masks,
             numCandidates, info.neighborsCount);
 
         storeNeighborData<Config, NumSuperclustersPerBlock>(jClusters, masks, neighborData, neighborDataSize, info,
