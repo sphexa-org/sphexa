@@ -162,7 +162,13 @@ public:
 
         size_t numParticlesGlobal = d.x.size();
         MPI_Allreduce(MPI_IN_PLACE, &numParticlesGlobal, 1, MpiType<size_t>{}, MPI_SUM, simData.comm);
-        syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, d.x, d.y, d.z, globalBox);
+
+        auto t0 = std::chrono::high_resolution_clock::now();
+        transferToDevice(d, 0, d.x.size(), {"x", "y", "z"});
+        syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, get<"x">(d), get<"y">(d), get<"z">(d), globalBox);
+        transferToHost(d, 0, get<"x">(d).size(), {"x", "y", "z"});
+        auto t1 = std::chrono::high_resolution_clock::now();
+        if (rank == 0) std::cout << "earlySync " << std::chrono::duration<float>(t1 - t0).count() << std::endl;
 
         d.resize(d.x.size());
 
@@ -188,9 +194,13 @@ public:
         cstone::Box<T> globalBox(-r_total, r_total, cstone::BoundaryType::open);
 
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
-        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
 
+        auto t0 = std::chrono::high_resolution_clock::now();
+        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
         cutSphere(r_total, d.x, d.y, d.z);
+        auto t1 = std::chrono::high_resolution_clock::now();
+        if (rank == 0) std::cout << "assembly " << std::chrono::duration<float>(t1 - t0).count() << std::endl;
+
         return globalBox;
     }
 
