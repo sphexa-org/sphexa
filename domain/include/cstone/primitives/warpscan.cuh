@@ -171,6 +171,16 @@ __device__ __forceinline__ GpuConfig::ThreadMask ballotSync(bool flag)
 #endif
 }
 
+//! @brief Compatibility wrapper for AMD.
+__device__ __forceinline__ GpuConfig::ThreadMask anySync(bool flag)
+{
+#if defined(__CUDACC__) && !defined(__HIPCC__)
+    return __any_sync(0xFFFFFFFF, flag);
+#else
+    return __any(flag);
+#endif
+}
+
 //! @brief compute warp-wide min
 template<class T>
 __device__ __forceinline__ T warpMin(T laneVal)
