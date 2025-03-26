@@ -34,9 +34,6 @@
 #include <cassert>
 #include <cstdint>
 
-#include <cooperative_groups.h>
-#include <cooperative_groups/scan.h>
-
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/primitives/clz.hpp"
 #include "cstone/primitives/warpscan.cuh"
@@ -49,12 +46,11 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
 {
     // TODO: add a buffer size limit, currently we just overflow
 
-    namespace cg    = cooperative_groups;
-    const auto warp = cg::tiled_partition<GpuConfig::warpSize>(cg::this_thread_block());
+    const unsigned laneIdx = laneIndex();
 
     if (n == 0)
     {
-        if (warp.thread_rank() == 0) *((unsigned*)output) = 0;
+        if (laneIdx == 0) *((unsigned*)output) = 0;
         return;
     }
 
@@ -76,37 +72,37 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
     unsigned previous = 0;
     for (unsigned offset = 0; offset < n; offset += GpuConfig::warpSize)
     {
-        const unsigned nb           = offset + warp.thread_rank();
+        const unsigned nb           = offset + laneIdx;
         const unsigned neighbor     = nb < n ? neighbors[nb] : 0;
-        const unsigned leftNeighbor = warp.shfl_up(neighbor, 1);
-        const unsigned diff         = neighbor - (warp.thread_rank() > 0 ? leftNeighbor : previous);
-        previous                    = warp.shfl(neighbor, GpuConfig::warpSize - 1);
+        const unsigned leftNeighbor = shflUpSync(neighbor, 1);
+        const unsigned diff         = neighbor - (laneIdx > 0 ? leftNeighbor : previous);
+        previous                    = shflSync(neighbor, GpuConfig::warpSize - 1);
 
         const bool nonOne     = diff != 1 & nb < n;
-        const auto nonOneBits = warp.ballot(nonOne);
-        if (warp.thread_rank() == 0) nonOnes[offset / GpuConfig::warpSize] = nonOneBits;
-        const bool additionalStorage = (diff < 1 | diff >= 9) & nb < n;
+        const auto nonOneBits = ballotSync(nonOne);
+        if (laneIdx == 0) nonOnes[offset / GpuConfig::warpSize] = nonOneBits;
+        const bool additionalStorage = (diff < 1 | diff >= 9) & (nb < n);
         const unsigned nBits         = diff == 0 ? 1 : 32 - countLeadingZeros(diff);
         const unsigned nNibbles      = additionalStorage ? (nBits + 3) / 4 : 0;
         const unsigned nNibblesData  = additionalStorage ? nNibbles : diff + 7;
 
         const unsigned nNibblesIndex     = exclusiveScanBool(nonOne);
         const unsigned nNibblesDataIndex = dataSize + nNibblesIndex;
-        const unsigned nNibblesSize      = warp.shfl(nNibblesIndex + nonOne, GpuConfig::warpSize - 1);
+        const unsigned nNibblesSize      = shflSync(nNibblesIndex + nonOne, GpuConfig::warpSize - 1);
         dataSize += nNibblesSize;
 
         if (nonOne) writeDataNibble(nNibblesDataIndex, nNibblesData, false);
-        warp.sync();
+        __syncwarp();
         if (nonOne) writeDataNibble(nNibblesDataIndex, nNibblesData, true);
 
-        const unsigned nbValueIndex     = cg::exclusive_scan(warp, nNibbles, cg::plus<unsigned>());
-        const unsigned nbValueDataIndex = dataSize + nbValueIndex;
-        const unsigned nbValueSize      = warp.shfl(nbValueIndex + nNibbles, GpuConfig::warpSize - 1);
+        const unsigned nbValueScan      = inclusiveScanInt(nNibbles);
+        const unsigned nbValueDataIndex = dataSize + nbValueScan - nNibbles;
+        const unsigned nbValueSize      = shflSync(nbValueScan, GpuConfig::warpSize - 1);
         dataSize += nbValueSize;
 
         for (unsigned i = 0; i < nNibbles; ++i)
             writeDataNibble(nbValueDataIndex + i, (diff >> (4 * i)) & 0xf, false);
-        warp.sync();
+        __syncwarp();
         for (unsigned i = 0; i < nNibbles; ++i)
             writeDataNibble(nbValueDataIndex + i, (diff >> (4 * i)) & 0xf, true);
     }
@@ -114,7 +110,7 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
     const unsigned totalBytes =
         sizeof(GpuConfig::ThreadMask) * (1 + (n + GpuConfig::warpSize - 1) / GpuConfig::warpSize) + (dataSize + 1) / 2;
     assert(n < (1 << 16));
-    if (warp.thread_rank() == 0) *((unsigned*)output) = totalBytes | (n << 16);
+    if (laneIdx == 0) *((unsigned*)output) = totalBytes | (n << 16);
 }
 
 __device__ __forceinline__ unsigned compressedNeighborsSize(const char* const input)
@@ -125,8 +121,7 @@ __device__ __forceinline__ unsigned compressedNeighborsSize(const char* const in
 __device__ __forceinline__ void
 warpDecompressNeighbors(const char* const __restrict__ input, std::uint32_t* const __restrict__ neighbors, unsigned& n)
 {
-    namespace cg    = cooperative_groups;
-    const auto warp = cg::tiled_partition<GpuConfig::warpSize>(cg::this_thread_block());
+    const unsigned laneIdx = laneIndex();
 
     n = *((unsigned*)input) >> 16;
 
@@ -146,30 +141,30 @@ warpDecompressNeighbors(const char* const __restrict__ input, std::uint32_t* con
     for (unsigned offset = 0; offset < n; offset += GpuConfig::warpSize)
     {
         const auto nonOneBits = nonOnes[offset / GpuConfig::warpSize];
-        const unsigned nb     = offset + warp.thread_rank();
-        const bool nonOne     = (nonOneBits >> warp.thread_rank()) & 1;
+        const unsigned nb     = offset + laneIdx;
+        const bool nonOne     = (nonOneBits >> laneIdx) & 1;
 
         const unsigned nNibblesIndex     = exclusiveScanBool(nonOne);
         const unsigned nNibblesDataIndex = dataSize + nNibblesIndex;
-        const unsigned nNibblesSize      = warp.shfl(nNibblesIndex + nonOne, GpuConfig::warpSize - 1);
+        const unsigned nNibblesSize      = shflSync(nNibblesIndex + nonOne, GpuConfig::warpSize - 1);
         dataSize += nNibblesSize;
 
         const unsigned nNibblesData  = nonOne ? readDataNibble(nNibblesDataIndex) : 0;
         const bool additionalStorage = nonOne ? nNibblesData <= 8 : 0;
         const unsigned nNibbles      = additionalStorage ? nNibblesData : 0;
 
-        const unsigned nbValueIndex     = cg::exclusive_scan(warp, nNibbles, cg::plus<unsigned>());
-        const unsigned nbValueDataIndex = dataSize + nbValueIndex;
-        const unsigned nbValueSize      = warp.shfl(nbValueIndex + nNibbles, GpuConfig::warpSize - 1);
+        const unsigned nbValueScan      = inclusiveScanInt(nNibbles);
+        const unsigned nbValueDataIndex = dataSize + nbValueScan - nNibbles;
+        const unsigned nbValueSize      = shflSync(nbValueScan, GpuConfig::warpSize - 1);
         dataSize += nbValueSize;
 
-        previous = warp.shfl(previous, GpuConfig::warpSize - 1);
+        previous = shflSync(previous, GpuConfig::warpSize - 1);
 
         unsigned diff = nonOne ? (additionalStorage ? readDataNibble(nbValueDataIndex) : nNibblesData - 7) : 1;
         for (unsigned i = 1; i < nNibbles; ++i)
             diff |= readDataNibble(nbValueDataIndex + i) << (4 * i);
 
-        previous += cg::inclusive_scan(warp, diff, cg::plus<unsigned>());
+        previous += inclusiveScanInt(diff);
         if (nb < n) neighbors[nb] = previous;
     }
 }
