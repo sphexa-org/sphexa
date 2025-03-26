@@ -33,10 +33,9 @@
 
 #include <tuple>
 
-#include <cooperative_groups.h>
-
-#include "cstone/util/array.hpp"
 #include "cstone/cuda/gpu_config.cuh"
+#include "cstone/primitives/warpscan.cuh"
+#include "cstone/util/array.hpp"
 
 namespace cstone
 {
@@ -45,8 +44,7 @@ template<unsigned ReductionSize, bool Interleave, class T, std::size_t ArraySize
 constexpr __device__ __forceinline__ T reduceArray(util::array<T, ArraySize> in, Op const& op)
 {
     static_assert(ArraySize <= ReductionSize);
-    const auto block              = cooperative_groups::this_thread_block();
-    const auto warp               = cooperative_groups::tiled_partition<GpuConfig::warpSize>(block);
+    const unsigned laneIdx        = laneIndex();
     constexpr unsigned reductions = GpuConfig::warpSize / ReductionSize;
 
 #pragma unroll
@@ -55,13 +53,12 @@ constexpr __device__ __forceinline__ T reduceArray(util::array<T, ArraySize> in,
 #pragma unroll
         for (unsigned i = 0; i < ArraySize; i += 2 * offset)
         {
-            in[i] = op(in[i], warp.shfl_down(in[i], Interleave ? offset * reductions : offset));
+            in[i] = op(in[i], shflDownSync(in[i], Interleave ? offset * reductions : offset));
             if (i + offset < ArraySize)
             {
                 in[i + offset] =
-                    op(in[i + offset], warp.shfl_up(in[i + offset], Interleave ? offset * reductions : offset));
-                const unsigned index =
-                    Interleave ? warp.thread_rank() / reductions : warp.thread_rank() % ReductionSize;
+                    op(in[i + offset], shflUpSync(in[i + offset], Interleave ? offset * reductions : offset));
+                const unsigned index = Interleave ? laneIdx / reductions : laneIdx % ReductionSize;
                 if ((index / offset) % 2) in[i] = in[i + offset];
             }
         }
