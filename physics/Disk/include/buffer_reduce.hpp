@@ -40,7 +40,7 @@ requires(std::tuple_size_v<std::decay_t<buffer_type>> ==
             i_buffer++;
         }
     };
-    for_each_tuple([&](auto&& res) { access_buffer(std::forward<decltype(res)>(res)); }, args_tuple);
+    util::for_each_tuple([&](auto&& res) { access_buffer(std::forward<decltype(res)>(res)); }, args_tuple);
 }
 
 template<bufferable_types... T>
@@ -84,5 +84,28 @@ auto mpiAllreduceSum(const T&... args)
 
     return extractBuffer<T...>(buffer);
 }
+
+template<bufferable_types... T>
+auto mpiAllreduceMin(const T&... args)
+{
+    auto buffer = makeBuffer(args...);
+
+    MPI_Allreduce(MPI_IN_PLACE, buffer.data(), buffer.size(), MpiType<value_type_t<decltype(buffer)>>{}, MPI_MIN,
+                  MPI_COMM_WORLD);
+
+    return extractBuffer<T...>(buffer);
+}
+
+template<bufferable_types... T>
+auto mpiAllreduceMax(const T&... args)
+{
+    auto buffer = makeBuffer(args...);
+
+    MPI_Allreduce(MPI_IN_PLACE, buffer.data(), buffer.size(), MpiType<value_type_t<decltype(buffer)>>{}, MPI_MAX,
+                  MPI_COMM_WORLD);
+
+    return extractBuffer<T...>(buffer);
+}
+
 } // namespace buffer
 } // namespace disk

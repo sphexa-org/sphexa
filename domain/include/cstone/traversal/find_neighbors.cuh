@@ -29,7 +29,7 @@ namespace cstone
 struct TravConfig
 {
     //! @brief size of global workspace memory per warp, must be a power of 2
-    static constexpr unsigned memPerWarp = 256 * GpuConfig::warpSize;
+    static constexpr unsigned memPerWarp = 1024 * GpuConfig::warpSize;
     static_assert((memPerWarp & (memPerWarp - 1)) == 0);
 
     //! @brief number of threads per block for the traversal kernel

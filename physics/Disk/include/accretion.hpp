@@ -23,7 +23,7 @@ void computeAccretionCondition(size_t first, size_t last, Dataset& d, StarData& 
     {
         computeAccretionConditionGPU(first, last, getPtr<"x">(d), getPtr<"y">(d), getPtr<"z">(d), getPtr<"h">(d),
                                      getPtr<"keys">(d), getPtr<"m">(d), getPtr<"vx">(d), getPtr<"vy">(d),
-                                     getPtr<"vz">(d), star);
+                                     getPtr<"vz">(d), getPtr<"nc">(d), star, d.ng0, d.ngmax);
     }
     else { computeAccretionConditionImpl(first, last, d, star); }
 }

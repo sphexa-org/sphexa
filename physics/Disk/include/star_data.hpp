@@ -8,6 +8,7 @@
 #include <limits>
 #include <iostream>
 
+#include "central_force_loop.hpp"
 #include "cstone/tree/definitions.h"
 #include "removal_statistics.hpp"
 
@@ -16,6 +17,12 @@ namespace disk
 
 struct StarData
 {
+    //! @brief Activate read / write attributes
+    bool active{false};
+
+    //! @brief The type of the potential to use when computing the gravitational forces involving the central star
+    StarPotentialType potentialType{StarPotentialType::newtonian};
+
     //! @brief position of the central star
     cstone::Vec3<double> position{};
 
@@ -47,6 +54,12 @@ struct StarData
     double K_u{std::numeric_limits<double>::infinity()};
 
     template<typename Archive>
+    void loadOrStoreIfActive(Archive* ar)
+    {
+        if (active) { loadOrStoreAttributes(ar); }
+    }
+
+    template<typename Archive>
     void loadOrStoreAttributes(Archive* ar)
     {
         //! @brief load or store an attribute, skips non-existing attributes on load.
@@ -54,7 +67,16 @@ struct StarData
         {
             try
             {
-                ar->stepAttribute(attribute, location, attrSize);
+                if constexpr (std::is_enum_v<std::decay_t<decltype(*location)>>)
+                {
+                    // handle pointers to enum by casting to the underlying type
+                    using EType = std::decay_t<decltype(*location)>;
+                    using UType = std::underlying_type_t<EType>;
+                    auto tmp    = static_cast<UType>(*location);
+                    ar->stepAttribute(attribute, &tmp, attrSize);
+                    *location = static_cast<EType>(tmp);
+                }
+                else { ar->stepAttribute(attribute, location, attrSize); }
             }
             catch (std::out_of_range&)
             {
@@ -66,6 +88,7 @@ struct StarData
             }
         };
 
+        optionalIO("star::potentialType", &potentialType, 1);
         optionalIO("star::x", &position[0], 1);
         optionalIO("star::y", &position[1], 1);
         optionalIO("star::z", &position[2], 1);

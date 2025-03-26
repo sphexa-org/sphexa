@@ -10,6 +10,7 @@
 #include "cstone/tree/definitions.h"
 #include "central_force_gpu.hpp"
 #include "get_ptr.hpp"
+#include "central_force_loop.hpp"
 
 namespace disk
 {
@@ -17,33 +18,20 @@ namespace disk
 template<typename Dataset, typename StarData>
 void computeCentralForceImpl(size_t first, size_t last, Dataset& d, StarData& star)
 {
-    cstone::Vec4<double> force_local{};
-    const double         inner_size2 = star.inner_size * star.inner_size;
+    cstone::Vec4<double>   force_local{};
+    const double           inner_size2 = star.inner_size * star.inner_size;
+    const CentralForceData data{d.x.data(), d.y.data(), d.z.data(), d.m.data(), d.ax.data(), d.ay.data(), d.az.data(), d.g, star.m, inner_size2, 1.0, star.position};
 
-#pragma omp declare reduction(add_force : cstone::Vec4 <double> : omp_out = omp_out + omp_in) initializer(omp_priv = {})
+#pragma omp declare reduction(add_force : cstone::Vec4<double> : omp_out = omp_out + omp_in) initializer(omp_priv = {})
 
 #pragma omp parallel for reduction(add_force : force_local)
     for (size_t i = first; i < last; i++)
     {
-        const double dx    = d.x[i] - star.position[0];
-        const double dy    = d.y[i] - star.position[1];
-        const double dz    = d.z[i] - star.position[2];
-        const double dist2 = std::max(inner_size2, dx * dx + dy * dy + dz * dz);
-        const double dist  = std::sqrt(dist2);
-        const double dist3 = dist2 * dist;
-
-        const double a_strength = 1. / dist3 * star.m * d.g;
-        const double ax_i       = -dx * a_strength;
-        const double ay_i       = -dy * a_strength;
-        const double az_i       = -dz * a_strength;
-        d.ax[i] += ax_i;
-        d.ay[i] += ay_i;
-        d.az[i] += az_i;
-
-        force_local[0] -= d.g * d.m[i] / dist;
-        force_local[1] -= ax_i * d.m[i];
-        force_local[2] -= ay_i * d.m[i];
-        force_local[3] -= az_i * d.m[i];
+        if (star.potentialType == StarPotentialType::newtonian) { newtonianGravity(data, i, force_local); }
+        else if (star.potentialType == StarPotentialType::einstein_precession)
+        {
+            einsteinPrecession(data, i, force_local);
+        }
     }
 
     star.force_local = force_local;

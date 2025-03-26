@@ -38,7 +38,7 @@ public:
                                    const cstone::LocalIndex* layout, const cstone::Box<Tc>& box)
     {
         auto  d_leaves  = focusTree.treeLeavesAcc();
-        float tolFactor = 2.0f;
+        float tolFactor = 1.0f;
         cstone::computeGroupSplits(first, last, x, y, z, h, d_leaves.data(), d_leaves.size() - 1, layout, box,
                                    bhMaxTargetSize(), tolFactor, traversalStack_, groups_.data);
 
