@@ -34,7 +34,6 @@
 #include <mutex>
 #include <shared_mutex>
 
-#include <cooperative_groups.h>
 #include <thrust/execution_policy.h>
 #include <thrust/sort.h>
 #include <thrust/universal_vector.h>
@@ -233,17 +232,15 @@ template<class T0, class... T>
 __device__ __forceinline__ void
 storeTupleISum(std::tuple<T0, T...> tuple, std::tuple<T0*, T*...> const& ptrs, const unsigned index, const bool store)
 {
-    const auto block = cooperative_groups::this_thread_block();
-    assert(block.dim_threads().x == clusterSize);
-    const auto warp                     = cooperative_groups::tiled_partition<GpuConfig::warpSize>(block);
+    assert(blockDim.x == clusterSize);
     constexpr unsigned splitClusterSize = clusterSize / clusterPairSplit;
 
     if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < splitClusterSize)
     {
         const T0 res = reduceTuple<splitClusterSize, true>(tuple, std::plus<T0>());
-        if ((block.thread_index().y % splitClusterSize <= sizeof...(T)) & store)
+        if ((threadIdx.y % splitClusterSize <= sizeof...(T)) & store)
         {
-            T0* ptr = dynamicTupleGet(ptrs, block.thread_index().y % splitClusterSize);
+            T0* ptr = dynamicTupleGet(ptrs, threadIdx.y % splitClusterSize);
             atomicAdd(&ptr[index], res);
         }
     }
@@ -251,9 +248,9 @@ storeTupleISum(std::tuple<T0, T...> tuple, std::tuple<T0*, T*...> const& ptrs, c
     {
 #pragma unroll
         for (unsigned offset = GpuConfig::warpSize / 2; offset >= clusterSize; offset /= 2)
-            util::for_each_tuple([&](auto& t) { t += warp.shfl_down(t, offset); }, tuple);
+            util::for_each_tuple([&](auto& t) { t += shflDownSync(t, offset); }, tuple);
 
-        if ((block.thread_index().y % splitClusterSize == 0) & store)
+        if ((threadIdx.y % splitClusterSize == 0) & store)
             util::for_each_tuple([index](auto* ptr, auto const& t) { atomicAddScalarOrVec(&ptr[index], t); }, ptrs,
                                  tuple);
     }
@@ -263,16 +260,14 @@ template<class T0, class... T>
 constexpr __device__ void
 storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<T0*, T*...> const& ptrs, const unsigned index, bool store)
 {
-    const auto block = cooperative_groups::this_thread_block();
-    assert(block.dim_threads().x == clusterSize);
-    const auto warp = cooperative_groups::tiled_partition<GpuConfig::warpSize>(block);
+    assert(blockDim.x == clusterSize);
 
     if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < clusterSize)
     {
         const T0 res = reduceTuple<clusterSize, false>(tuple, std::plus<T0>());
-        if ((block.thread_index().x <= sizeof...(T)) & store)
+        if ((threadIdx.x <= sizeof...(T)) & store)
         {
-            T0* ptr = dynamicTupleGet(ptrs, block.thread_index().x);
+            T0* ptr = dynamicTupleGet(ptrs, threadIdx.x);
             atomicAddScalarOrVec(&ptr[index], res);
         }
     }
@@ -280,9 +275,9 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<T0*, T*...> const& ptrs, c
     {
 #pragma unroll
         for (unsigned offset = clusterSize / 2; offset >= 1; offset /= 2)
-            util::for_each_tuple([&](auto& t) { t += warp.shfl_down(t, offset); }, tuple);
+            util::for_each_tuple([&](auto& t) { t += shflDownSync(t, offset); }, tuple);
 
-        if ((block.thread_index().x == 0) & store)
+        if ((threadIdx.x == 0) & store)
             util::for_each_tuple([index](auto* ptr, auto const& t) { atomicAddScalarOrVec(&ptr[index], t); }, ptrs,
                                  tuple);
     }
@@ -306,10 +301,10 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
 {
     constexpr unsigned superClusterInteractionMask = (1u << numClusterPerSupercluster) - 1u;
 
-    const auto block = cooperative_groups::this_thread_block();
-    const auto warp  = cooperative_groups::tiled_partition<GpuConfig::warpSize>(block);
+    const unsigned laneIdx = laneIndex();
+    const unsigned warpIdx = threadIdx.y / (clusterSize / clusterPairSplit);
 
-    const Sci nbSci               = sciSorted[block.group_index().x];
+    const Sci nbSci               = sciSorted[blockIdx.x];
     const unsigned sci            = nbSci.sci;
     const unsigned cijPackedBegin = nbSci.cjPackedBegin;
     const unsigned cijPackedEnd   = nbSci.cjPackedEnd;
@@ -319,14 +314,13 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
     __shared__ particleData_t xqib[clusterSize * numClusterPerSupercluster];
 
     constexpr bool loadUsingAllXYThreads = clusterSize == numClusterPerSupercluster;
-    if (loadUsingAllXYThreads || block.thread_index().y < numClusterPerSupercluster)
+    if (loadUsingAllXYThreads || threadIdx.y < numClusterPerSupercluster)
     {
-        const unsigned ci = sci * numClusterPerSupercluster + block.thread_index().y;
-        const unsigned ai = ci * clusterSize + block.thread_index().x;
-        xqib[block.thread_index().y * clusterSize + block.thread_index().x] =
-            loadParticleData(x, y, z, h, input, std::min(ai, lastBody - 1));
+        const unsigned ci                             = sci * numClusterPerSupercluster + threadIdx.y;
+        const unsigned ai                             = ci * clusterSize + threadIdx.x;
+        xqib[threadIdx.y * clusterSize + threadIdx.x] = loadParticleData(x, y, z, h, input, std::min(ai, lastBody - 1));
     }
-    block.sync();
+    __syncthreads();
 
     using result_t = decltype(interaction(particleData_t{}, particleData_t{}, Vec3<Tc>(), Tc()));
 
@@ -334,9 +328,9 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
 
     for (unsigned jPacked = cijPackedBegin; jPacked < cijPackedEnd; ++jPacked)
     {
-        const unsigned wexclIdx = cjPacked[jPacked].imei[warp.meta_group_rank()].exclInd;
-        const unsigned imask    = cjPacked[jPacked].imei[warp.meta_group_rank()].imask;
-        const unsigned wexcl    = excl[wexclIdx].pair[warp.thread_rank()];
+        const unsigned wexclIdx = cjPacked[jPacked].imei[warpIdx].exclInd;
+        const unsigned imask    = cjPacked[jPacked].imei[warpIdx].imask;
+        const unsigned wexcl    = excl[wexclIdx].pair[laneIdx];
         if (imask)
         {
             for (unsigned jm = 0; jm < jGroupSize; ++jm)
@@ -345,7 +339,7 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
                 {
                     unsigned maskJi     = 1u << (jm * numClusterPerSupercluster);
                     const unsigned cj   = cjPacked[jPacked].cj[jm];
-                    const unsigned aj   = cj * clusterSize + block.thread_index().y;
+                    const unsigned aj   = cj * clusterSize + threadIdx.y;
                     const auto jData    = loadParticleData(x, y, z, h, input, std::min(aj, lastBody - 1));
                     result_t jResultBuf = {};
 
@@ -355,10 +349,10 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
                         if (imask & maskJi)
                         {
                             const unsigned ci = sci * numClusterPerSupercluster + i;
-                            const unsigned ai = ci * clusterSize + block.thread_index().x;
+                            const unsigned ai = ci * clusterSize + threadIdx.x;
                             if (ai < lastBody)
                             {
-                                const auto iData               = xqib[i * clusterSize + block.thread_index().x];
+                                const auto iData               = xqib[i * clusterSize + threadIdx.x];
                                 const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
                                 const Th iRadiusSq             = radiusSq(iData);
                                 const Tc intBit                = (wexcl & maskJi) ? Tc(1) : Tc(0);
@@ -383,7 +377,7 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
 
     for (unsigned i = 0; i < numClusterPerSupercluster; ++i)
     {
-        const unsigned ai = (sci * numClusterPerSupercluster + i) * clusterSize + block.thread_index().x;
+        const unsigned ai = (sci * numClusterPerSupercluster + i) * clusterSize + threadIdx.x;
         storeTupleISum(unwrapModifiers(iResultBuf[i]), output, ai, ai >= firstBody & ai < lastBody);
     }
 }
