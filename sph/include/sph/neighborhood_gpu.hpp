@@ -73,6 +73,7 @@ struct NeighborhoodDataGpu
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
     {
         setInfo(d, info, alwaysTraverse);
+        data.template emplace<0>();
         std::visit(
             [&](auto const& nb)
             {
