@@ -1013,7 +1013,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
             {
                 if ((warpMask & 1) && (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j)))
                 {
-                    const auto& iData = iSuperclusterData[c * Config::iSize + threadIdx.x];
+                    const auto iData = iSuperclusterData[c * Config::iSize + threadIdx.x];
                     assert(std::get<0>(iData) == i - firstValidBody);
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
                     const auto ijInteraction       = interaction(iData, jData, ijPosDiff, distSq);
