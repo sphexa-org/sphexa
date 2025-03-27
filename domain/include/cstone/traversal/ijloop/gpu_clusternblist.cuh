@@ -849,11 +849,11 @@ template<class Config = gpu_cluster_nb_list_neighborhood_detail::GpuClusterNbLis
 struct GpuClusterNbListNeighborhood
 {
     template<unsigned NcMax>
-    using withNcMax = GpuClusterNbListNeighborhood<typename Config::withNcMax<NcMax>>;
+    using withNcMax = GpuClusterNbListNeighborhood<typename Config::template withNcMax<NcMax>>;
     template<unsigned ISize, unsigned JSize>
-    using withClusterSize = GpuClusterNbListNeighborhood<typename Config::withClusterSize<ISize, JSize>>;
+    using withClusterSize = GpuClusterNbListNeighborhood<typename Config::template withClusterSize<ISize, JSize>>;
     template<unsigned ExpectedCompressionRate>
-    using withCompression    = GpuClusterNbListNeighborhood<typename Config::withCompression<ExpectedCompressionRate>>;
+    using withCompression    = GpuClusterNbListNeighborhood<typename Config::template withCompression<ExpectedCompressionRate>>;
     using withoutCompression = GpuClusterNbListNeighborhood<typename Config::withoutCompression>;
     using withSymmetry       = GpuClusterNbListNeighborhood<typename Config::withSymmetry>;
     using withoutSymmetry    = GpuClusterNbListNeighborhood<typename Config::withoutSymmetry>;

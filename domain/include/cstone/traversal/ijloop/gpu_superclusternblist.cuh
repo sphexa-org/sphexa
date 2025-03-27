@@ -136,7 +136,7 @@ computeSuperclusterSplitMasks(const LocalIndex firstISupercluster,
 
     do
     {
-        newSplitMask = oldSplitMask | (Config::SuperclusterSplitMask(1) << splitPosition);
+        newSplitMask = oldSplitMask | ((typename Config::SuperclusterSplitMask)(1) << splitPosition);
         oldSplitMask = atomicCAS(splitMaskPtr, oldSplitMask, newSplitMask);
     } while (oldSplitMask != newSplitMask);
 }
