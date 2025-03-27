@@ -444,7 +444,7 @@ struct GromacsLikeNeighborhood
     template<class Tc, class KeyType, class Th>
     gromacs_like_neighborhood_detail::GromacsLikeNeighborhoodImpl<Tc, Th> build(const OctreeNsView<Tc, KeyType>& tree,
                                                                                 const Box<Tc>& box,
-                                                                                const LocalIndex /* totalBodies */,
+                                                                                const LocalIndex totalBodies,
                                                                                 const GroupView& groups,
                                                                                 const Tc* x,
                                                                                 const Tc* y,
