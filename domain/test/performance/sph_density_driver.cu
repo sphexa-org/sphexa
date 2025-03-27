@@ -152,11 +152,11 @@ void benchmarkMain()
     runBenchmark("NAIVE TWO-STAGE", ijloop::GpuFullNbListNeighborhood{ngmax});
     runBenchmark("GROMACS CLUSTERED TWO-STAGE", ijloop::GromacsLikeNeighborhood{ngmax});
 
-    using BaseClusterNb = ijloop::GpuClusterNbListNeighborhood<>::withNcMax<160>::withClusterSize<4, 4>;
+    using BaseClusterNb = ijloop::GpuClusterNbListNeighborhood<>::withNcMax<192>::withClusterSize<4, 4>;
     runBenchmark("CLUSTERED TWO-STAGE", BaseClusterNb::withoutSymmetry::withoutCompression{});
     runBenchmark("COMPRESSED CLUSTERED TWO-STAGE", BaseClusterNb::withoutSymmetry::withCompression<9>{});
 
-    using SymmetricClusterNb = BaseClusterNb::withNcMax<96>::withSymmetry;
+    using SymmetricClusterNb = BaseClusterNb::withNcMax<128>::withSymmetry;
     runBenchmark("CLUSTERED TWO-STAGE SYMMETRIC", SymmetricClusterNb::withoutCompression{});
     runBenchmark("COMPRESSED CLUSTERED TWO-STAGE ", SymmetricClusterNb::withCompression<7>{});
 
