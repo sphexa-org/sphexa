@@ -669,8 +669,8 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumWarpsPerBlock) void gpuClus
     using result_t = std::decay_t<decltype(interaction(iData, iData, Vec3<Tc>(), Tc(0)))>;
 
     static_assert(!Config::symmetric ||
-                      std::is_same<std::decay_t<decltype(postamble(iData, unwrapModifiers(std::declval<result_t>())))>,
-                                   decltype(unwrapModifiers(std::declval<result_t>()))>(),
+                      std::is_same<std::decay_t<decltype(postamble(iData, unwrapModifiers(result_t())))>,
+                                   decltype(unwrapModifiers(result_t()))>(),
                   "postamble that changes the result type is not supported in combination with symmetric neighborhood");
 
     result_t result                      = {};

@@ -978,9 +978,9 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 
     using result_t = std::decay_t<decltype(interaction(particleData_t(), particleData_t(), Vec3<Tc>(), Tc(0)))>;
     static_assert(
-        !Config::symmetric || std::is_same<std::decay_t<decltype(postamble(std::declval<particleData_t>(),
-                                                                           unwrapModifiers(std::declval<result_t>())))>,
-                                           decltype(unwrapModifiers(std::declval<result_t>()))>(),
+        !Config::symmetric || std::is_same<std::decay_t<decltype(postamble(particleData_t(),
+                                                                           unwrapModifiers(result_t())))>,
+                                           decltype(unwrapModifiers(result_t()))>(),
         "postamble that changes the result type is not supported in combination with symmetric neighborhood or more "
         "than one warp per cluster-cluster interaction");
 
@@ -1040,7 +1040,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     if constexpr (!Config::symmetric && Config::numWarpsPerInteraction > 1)
     {
         __shared__ decltype(buffersForResults<Config::superclusterSize>(
-            unwrapModifiers(std::declval<result_t>()))) outputBuffers[NumSuperclustersPerBlock];
+            unwrapModifiers(result_t()))) outputBuffers[NumSuperclustersPerBlock];
         auto outputBufferPtrs = util::tupleMap([](auto& array) { return array.data(); }, outputBuffers[threadIdx.z]);
         auto init             = unwrapModifiers(result_t{});
         for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
