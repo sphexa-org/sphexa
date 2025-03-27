@@ -37,13 +37,13 @@
 #include <tuple>
 #include <type_traits>
 
-#include <cub/warp/warp_merge_sort.cuh>
 #include <thrust/execution_policy.h>
 #include <thrust/functional.h>
 #include <thrust/reduce.h>
 #include <thrust/sort.h>
 
 #include "cstone/compressneighbors.cuh"
+#include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/reducearray.cuh"
