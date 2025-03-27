@@ -344,7 +344,7 @@ __global__
 
         // populate initial cell queue
         if (laneIdx == 0) cellQueue[0] = 1;
-        __syncwarp();
+        syncWarp();
 
         // these variables are always identical on all warp lanes
         int numSources        = 1; // current stack size

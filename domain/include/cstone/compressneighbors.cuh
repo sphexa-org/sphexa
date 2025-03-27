@@ -92,7 +92,7 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
         dataSize += nNibblesSize;
 
         if (nonOne) writeDataNibble(nNibblesDataIndex, nNibblesData, false);
-        __syncwarp();
+        syncWarp();
         if (nonOne) writeDataNibble(nNibblesDataIndex, nNibblesData, true);
 
         const unsigned nbValueScan      = inclusiveScanInt(nNibbles);
@@ -102,7 +102,7 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
 
         for (unsigned i = 0; i < nNibbles; ++i)
             writeDataNibble(nbValueDataIndex + i, (diff >> (4 * i)) & 0xf, false);
-        __syncwarp();
+        syncWarp();
         for (unsigned i = 0; i < nNibbles; ++i)
             writeDataNibble(nbValueDataIndex + i, (diff >> (4 * i)) & 0xf, true);
     }

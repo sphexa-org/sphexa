@@ -237,7 +237,7 @@ __device__ inline void sortCandidates(std::uint32_t* candidates, unsigned numCan
         if (c < numCandidates) candidates[c] = items[i];
     }
 
-    __syncwarp();
+    syncWarp();
 }
 
 template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th>
@@ -276,7 +276,7 @@ __device__ inline void pruneCandidates(const Box<Tc>& box,
         his[n] = h[i];
     }
 
-    __syncwarp();
+    syncWarp();
 
     constexpr unsigned iClustersPerWarp = Config::iThreads / Config::iSize;
     const unsigned iClusterOffset       = iClustersPerWarp == 1 ? 0 : threadIdx.x / Config::iSize;
@@ -337,7 +337,7 @@ __device__ inline void pruneCandidates(const Box<Tc>& box,
         }
     }
     numCandidates = numJClusters;
-    __syncwarp();
+    syncWarp();
 }
 
 template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th, class KeyType>
@@ -450,7 +450,7 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
 
     // populate initial cell queue
     if (laneIdx == 0) cellQueue[0] = 1;
-    __syncwarp();
+    syncWarp();
 
     // these variables are always identical on all warp lanes
     int numSources        = 1; // current stack size
@@ -596,7 +596,7 @@ __device__ __forceinline__ void pruneCandidatesAndComputeMasks(const Box<Tc>& bo
     for (unsigned n = laneIdx; n < maxMasksSize; n += GpuConfig::warpSize)
         masks[n] = 0;
 
-    __syncwarp();
+    syncWarp();
 
     constexpr unsigned iClustersPerWarp = Config::iThreads / Config::iSize;
     const unsigned iClusterOffset       = iClustersPerWarp == 1 ? 0 : threadIdx.x / Config::iSize;
