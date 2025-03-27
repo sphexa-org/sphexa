@@ -257,14 +257,17 @@ auto initialData()
     std::span<const KeyT> nodeKeys(rawPtr(octree.prefixes), octree.numNodes);
     nodeFpCenters(nodeKeys, rawPtr(centers), rawPtr(sizes), box);
 
+    thrust::universal_vector<KeyT> octreePrefixes = octree.prefixes;
+    thrust::universal_vector<TreeNodeIndex> octreeChildOffsets = octree.childOffsets, octreeInternalToLeaf = octree.internalToLeaf, octreeLevelRange = octree.levelRange;
+
     Result ref =
         reference(box, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(v), totalBodies, firstBody, lastBody);
 
     OctreeNsView<double, KeyT> view{octree.numLeafNodes,
-                                    rawPtr(octree.prefixes),
-                                    rawPtr(octree.childOffsets),
-                                    rawPtr(octree.internalToLeaf),
-                                    rawPtr(octree.levelRange),
+                                    rawPtr(octreePrefixes),
+                                    rawPtr(octreeChildOffsets),
+                                    rawPtr(octreeInternalToLeaf),
+                                    rawPtr(octreeLevelRange),
                                     rawPtr(keys),
                                     rawPtr(layout),
                                     rawPtr(centers),
@@ -282,7 +285,7 @@ auto initialData()
                               .groupStart = rawPtr(groups),
                               .groupEnd   = rawPtr(groups) + 1};
 
-    auto treeData = std::make_tuple(std::move(keys), std::move(octree), std::move(layout), std::move(centers),
+    auto treeData = std::make_tuple(std::move(keys), std::move(octreePrefixes), std::move(octreeChildOffsets), std::move(octreeInternalToLeaf), std::move(octreeLevelRange), std::move(layout), std::move(centers),
                                     std::move(sizes), std::move(groups));
 
     return std::make_tuple(box, totalBodies, groupView, std::move(x), std::move(y), std::move(z), std::move(h),
