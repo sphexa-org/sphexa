@@ -442,14 +442,15 @@ struct GromacsLikeNeighborhood
     unsigned ngmax;
 
     template<class Tc, class KeyType, class Th>
-    gromacs_like_neighborhood_detail::GromacsLikeNeighborhoodImpl<Tc, Th> build(const OctreeNsView<Tc, KeyType>& tree,
-                                                                                const Box<Tc>& box,
-                                                                                const LocalIndex totalBodies,
-                                                                                const GroupView& groups,
-                                                                                const Tc* x,
-                                                                                const Tc* y,
-                                                                                const Tc* z,
-                                                                                const Th* h) const
+    gromacs_like_neighborhood_detail::GromacsLikeNeighborhoodImpl<Tc, Th>
+    build(const OctreeNsView<Tc, KeyType>& tree,
+          const Box<Tc>& box,
+          [[maybe_unused]] const LocalIndex totalBodies,
+          const GroupView& groups,
+          const Tc* x,
+          const Tc* y,
+          const Tc* z,
+          const Th* h) const
     {
         using namespace gromacs_like_neighborhood_detail;
 
