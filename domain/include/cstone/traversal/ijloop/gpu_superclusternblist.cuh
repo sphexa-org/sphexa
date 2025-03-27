@@ -50,6 +50,7 @@
 #include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/ijloop/atomic_update_ptr.cuh"
 #include "cstone/traversal/ijloop/ijloop.hpp"
+#include "cstone/util/uninitialized.hpp"
 #include "cstone/tree/octree.hpp"
 
 namespace cstone::ijloop
@@ -928,9 +929,8 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     using particleData_t = decltype(loadParticleData(x, y, z, h, input, 0));
 
     // TODO: bank-conflict friendly SoA layout?
-    __shared__ particleData_t
-        iSuperclusterDataBuffer[NumSuperclustersPerBlock][Config::iClustersPerSupercluster * Config::iSize];
-    particleData_t* iSuperclusterData = iSuperclusterDataBuffer[threadIdx.z];
+    __shared__ util::Uninitialized<particleData_t[NumSuperclustersPerBlock][Config::iClustersPerSupercluster * Config::iSize]> iSuperclusterDataBuffer;
+    particleData_t* iSuperclusterData = iSuperclusterDataBuffer.data()[threadIdx.z];
     {
         const unsigned base = iSupercluster * Config::superclusterSize;
         for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;

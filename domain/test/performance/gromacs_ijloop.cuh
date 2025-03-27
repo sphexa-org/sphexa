@@ -43,6 +43,7 @@
 #include "cstone/reducearray.cuh"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 #include "cstone/tree/octree.hpp"
+#include "cstone/util/uninitialized.hpp"
 
 namespace cstone::ijloop
 {
@@ -311,7 +312,8 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
 
     using particleData_t = decltype(loadParticleData(x, y, z, h, input, 0));
 
-    __shared__ particleData_t xqib[clusterSize * numClusterPerSupercluster];
+    __shared__ util::Uninitialized<particleData_t[clusterSize * numClusterPerSupercluster]> xqibBuffer;
+    particleData_t* const xqib = xqibBuffer.data();
 
     constexpr bool loadUsingAllXYThreads = clusterSize == numClusterPerSupercluster;
     if (loadUsingAllXYThreads || threadIdx.y < numClusterPerSupercluster)
