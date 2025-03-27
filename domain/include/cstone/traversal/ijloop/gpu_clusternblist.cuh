@@ -213,7 +213,7 @@ __device__ __forceinline__ void deduplicateAndStoreNeighbors(unsigned* iClusterN
 
 template<class Config, unsigned NumWarpsPerBlock, bool UsePbc, class Tc, class Th, class KeyType>
 __global__
-    __maxnreg__(72) void gpuClusterNbListBuild(const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
+    __launch_bounds__(GpuConfig::warpSize * NumWarpsPerBlock) void gpuClusterNbListBuild(const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
                                                const Box<Tc> __grid_constant__ box,
                                                const LocalIndex totalBodies,
                                                const LocalIndex firstBody,
