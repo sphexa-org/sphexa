@@ -8,7 +8,8 @@
  */
 
 /*! @file
- * @brief Helper to get uninitialized memory for any type. Useful for uninitialized __shared__ buffers of arbitrary types.
+ * @brief Helper to get uninitialized memory for any type. Useful for uninitialized __shared__ buffers of arbitrary
+ * types.
  *
  * @author Felix Thaler <thaler@cscs.ch>
  */
@@ -20,16 +21,16 @@
 namespace util
 {
 
-template <class T>
-class Uninitialized {
+template<class T>
+class Uninitialized
+{
     alignas(std::alignment_of_v<T>) unsigned char buffer[sizeof(T)];
 
 public:
-    constexpr std::remove_extent_t<T>* data() {
-        return reinterpret_cast<std::remove_extent_t<T>*>(buffer);
-    }
+    constexpr std::remove_extent_t<T>* data() { return reinterpret_cast<std::remove_extent_t<T>*>(buffer); }
 
-    constexpr std::remove_extent_t<T> const* data() const {
+    constexpr std::remove_extent_t<T> const* data() const
+    {
         return reinterpret_cast<std::remove_extent_t<T> const*>(buffer);
     }
 };

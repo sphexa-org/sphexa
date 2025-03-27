@@ -212,21 +212,21 @@ __device__ __forceinline__ void deduplicateAndStoreNeighbors(unsigned* iClusterN
 }
 
 template<class Config, unsigned NumWarpsPerBlock, bool UsePbc, class Tc, class Th, class KeyType>
-__global__
-    __launch_bounds__(GpuConfig::warpSize * NumWarpsPerBlock) void gpuClusterNbListBuild(const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
-                                               const Box<Tc> __grid_constant__ box,
-                                               const LocalIndex totalBodies,
-                                               const LocalIndex firstBody,
-                                               const LocalIndex lastBody,
-                                               const Tc* const __restrict__ x,
-                                               const Tc* const __restrict__ y,
-                                               const Tc* const __restrict__ z,
-                                               const Th* const __restrict__ h,
-                                               const util::tuple<Vec3<Tc>, Vec3<Tc>>* const __restrict__ jClusterBboxes,
-                                               unsigned* const __restrict__ clusterNeighbors,
-                                               unsigned* const __restrict__ clusterNeighborsCount,
-                                               int* const __restrict__ globalPool,
-                                               const Th maxH)
+__global__ __launch_bounds__(GpuConfig::warpSize* NumWarpsPerBlock) void gpuClusterNbListBuild(
+    const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
+    const Box<Tc> __grid_constant__ box,
+    const LocalIndex totalBodies,
+    const LocalIndex firstBody,
+    const LocalIndex lastBody,
+    const Tc* const __restrict__ x,
+    const Tc* const __restrict__ y,
+    const Tc* const __restrict__ z,
+    const Th* const __restrict__ h,
+    const util::tuple<Vec3<Tc>, Vec3<Tc>>* const __restrict__ jClusterBboxes,
+    unsigned* const __restrict__ clusterNeighbors,
+    unsigned* const __restrict__ clusterNeighborsCount,
+    int* const __restrict__ globalPool,
+    const Th maxH)
 {
     static_assert(Config::ncMax % GpuConfig::warpSize == 0);
     static_assert((Config::ncMax + Config::ncMaxExtra) % GpuConfig::warpSize == 0);
@@ -853,7 +853,8 @@ struct GpuClusterNbListNeighborhood
     template<unsigned ISize, unsigned JSize>
     using withClusterSize = GpuClusterNbListNeighborhood<typename Config::template withClusterSize<ISize, JSize>>;
     template<unsigned ExpectedCompressionRate>
-    using withCompression    = GpuClusterNbListNeighborhood<typename Config::template withCompression<ExpectedCompressionRate>>;
+    using withCompression =
+        GpuClusterNbListNeighborhood<typename Config::template withCompression<ExpectedCompressionRate>>;
     using withoutCompression = GpuClusterNbListNeighborhood<typename Config::withoutCompression>;
     using withSymmetry       = GpuClusterNbListNeighborhood<typename Config::withSymmetry>;
     using withoutSymmetry    = GpuClusterNbListNeighborhood<typename Config::withoutSymmetry>;

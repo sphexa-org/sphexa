@@ -929,7 +929,9 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     using particleData_t = decltype(loadParticleData(x, y, z, h, input, 0));
 
     // TODO: bank-conflict friendly SoA layout?
-    __shared__ util::Uninitialized<particleData_t[NumSuperclustersPerBlock][Config::iClustersPerSupercluster * Config::iSize]> iSuperclusterDataBuffer;
+    __shared__
+        util::Uninitialized<particleData_t[NumSuperclustersPerBlock][Config::iClustersPerSupercluster * Config::iSize]>
+            iSuperclusterDataBuffer;
     particleData_t* iSuperclusterData = iSuperclusterDataBuffer.data()[threadIdx.z];
     {
         const unsigned base = iSupercluster * Config::superclusterSize;
@@ -978,9 +980,9 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 
     using result_t = std::decay_t<decltype(interaction(particleData_t(), particleData_t(), Vec3<Tc>(), Tc(0)))>;
     static_assert(
-        !Config::symmetric || std::is_same<std::decay_t<decltype(postamble(particleData_t(),
-                                                                           unwrapModifiers(result_t())))>,
-                                           decltype(unwrapModifiers(result_t()))>(),
+        !Config::symmetric ||
+            std::is_same<std::decay_t<decltype(postamble(particleData_t(), unwrapModifiers(result_t())))>,
+                         decltype(unwrapModifiers(result_t()))>(),
         "postamble that changes the result type is not supported in combination with symmetric neighborhood or more "
         "than one warp per cluster-cluster interaction");
 
