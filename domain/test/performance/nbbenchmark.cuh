@@ -172,21 +172,21 @@ void benchmarkNeighborhood(const Coords& coords,
     std::array<float, 11> times;
     std::array<cudaEvent_t, times.size() + 1> events;
     for (auto& event : events)
-        cudaEventCreate(&event);
-    cudaEventRecord(events[0]);
+        checkGpuErrors(cudaEventCreate(&event));
+    checkGpuErrors(cudaEventRecord(events[0]));
     for (std::size_t i = 1; i < events.size(); ++i)
     {
         neighborhoodGPU.ijLoop(util::tupleMap([](auto const& v) { return rawPtr(v); }, dInputs),
                                util::tupleMap([](auto& v) { return rawPtr(v); }, dOutputs), interaction,
                                ijloop::empty_postamble);
-        cudaEventRecord(events[i]);
+        checkGpuErrors(cudaEventRecord(events[i]));
     }
-    cudaEventSynchronize(events.back());
+    checkGpuErrors(cudaEventSynchronize(events.back()));
 
     for (std::size_t i = 0; i < times.size(); ++i)
     {
-        cudaEventElapsedTime(&times[i], events[i], events[i + 1]);
-        cudaEventDestroy(events[i]);
+        checkGpuErrors(cudaEventElapsedTime(&times[i], events[i], events[i + 1]));
+        checkGpuErrors(cudaEventDestroy(events[i]));
     }
 
     printf("GPU times [s]: ");
