@@ -114,8 +114,8 @@ void benchmarkNeighborhood(const Coords& coords,
         .ijLoop(util::tupleMap([](auto const& v) { return v.data(); }, inputs),
                 util::tupleMap([](auto& v) { return v.data(); }, outputs), interaction, ijloop::empty_postamble);
 
-    const thrust::device_vector<Tc> dX(coords.x().begin(), coords.x().end()),
-        dY(coords.y().begin(), coords.y().end()), dZ(coords.z().begin(), coords.z().end());
+    const thrust::device_vector<Tc> dX(coords.x().begin(), coords.x().end()), dY(coords.y().begin(), coords.y().end()),
+        dZ(coords.z().begin(), coords.z().end());
     const auto allocGpuVec = [n]<class Tv>(Tv initialValue) { return thrust::device_vector<Tv>(n, initialValue); };
     const auto dH          = allocGpuVec(hVal);
     const std::tuple<thrust::device_vector<InputTs>...> dInputs = util::tupleMap(allocGpuVec, inputValues);
@@ -211,7 +211,8 @@ void benchmarkNeighborhood(const Coords& coords,
         {
             using ValueType = typename std::remove_cvref_t<decltype(out)>::value_type;
             std::vector<ValueType> dOut(ddOut.size());
-            checkGpuErrors(cudaMemcpy(dOut.data(), rawPtr(ddOut), sizeof(ValueType) * dOut.size(), cudaMemcpyDeviceToHost));
+            checkGpuErrors(
+                cudaMemcpy(dOut.data(), rawPtr(ddOut), sizeof(ValueType) * dOut.size(), cudaMemcpyDeviceToHost));
             assert(dOut.size() == n && out.size() == n);
 #pragma omp parallel for
             for (unsigned i = 0; i < n; ++i)
