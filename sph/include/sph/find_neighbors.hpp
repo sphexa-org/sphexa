@@ -10,7 +10,7 @@ using cstone::LocalIndex;
 template<class Tc, class T, class KeyType>
 void findNeighborsSph(const Tc* x, const Tc* y, const Tc* z, T* h, LocalIndex firstId, LocalIndex lastId,
                       const cstone::Box<Tc>& box, const cstone::OctreeNsView<Tc, KeyType>& treeView, unsigned ng0,
-                      unsigned ngmax, LocalIndex* neighbors, unsigned* nc, unsigned* nc_it_stat)
+                      unsigned ngmax, LocalIndex* neighbors, unsigned* nc)
 {
     LocalIndex numWork = lastId - firstId;
 
@@ -28,7 +28,6 @@ void findNeighborsSph(const Tc* x, const Tc* y, const Tc* z, T* h, LocalIndex fi
         int iteration = 0;
         while ((ngmin > ncSph || (ncSph - 1) > ngmax) && iteration++ < maxIteration)
         {
-            nc_it_stat[id]++;
             h[id] = updateH(ng0, ncSph, h[id]);
             ncSph = 1 + findNeighbors(id, x, y, z, h, treeView, box, ngmax, neighbors + i * ngmax);
         }
@@ -53,7 +52,7 @@ void findNeighborsSfc(size_t startIndex, size_t endIndex, Dataset& d, const csto
     if (d.ng0 > d.ngmax) { throw std::runtime_error("ng0 should be smaller than ngmax\n"); }
 
     findNeighborsSph(d.x.data(), d.y.data(), d.z.data(), d.h.data(), startIndex, endIndex, box, d.treeView, d.ng0,
-                     d.ngmax, d.neighbors.data(), d.nc.data() + startIndex, d.nb_it_stat.data());
+                     d.ngmax, d.neighbors.data(), d.nc.data() + startIndex);
 }
 
 } // namespace sph

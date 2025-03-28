@@ -57,7 +57,7 @@ template<class Tc, class Tm, class T, class KeyType>
 __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box, const LocalIndex* grpStart,
                          const LocalIndex* grpEnd, LocalIndex numGroups, const cstone::OctreeNsView<Tc, KeyType> tree,
                          unsigned* nc, const Tc* x, const Tc* y, const Tc* z, T* h, const Tm* m, const T* wh,
-                         const T* whd, T* xm, LocalIndex* nidx, TreeNodeIndex* globalPool, unsigned* nb_it_stat)
+                         const T* whd, T* xm, LocalIndex* nidx, TreeNodeIndex* globalPool)
 {
     unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned targetIdx   = 0;
@@ -85,17 +85,11 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
         {
             bool repeat = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
             if (!cstone::ballotSync(repeat)) { break; }
-            nb_it_stat[i]++;
-            if (repeat)
-            {
-                T h_new = updateH(ng0, ncSph, h[i]);
-                h[i]    = h_new;
-            }
-
+            if (repeat) { h[i] = updateH(ng0, ncSph, h[i]); }
             ncSph =
                 1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
 
-            //            if (ncIt == ncMaxIteration) { nc_h_convergenceFailure = true; }
+            //if (ncIt == ncMaxIteration) { nc_h_convergenceFailure = true; }
         }
 
         if (i >= bodyEnd) continue;
@@ -116,8 +110,7 @@ void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<typename D
     xmassGpu<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
         d.K, d.ng0, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.nc),
         rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.m),
-        rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.xm), nidxPool, traversalPool,
-        rawPtr(d.devData.nb_it_stat));
+        rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.xm), nidxPool, traversalPool);
     checkGpuErrors(cudaDeviceSynchronize());
 
     NcStats::type stats[NcStats::numStats];

@@ -62,31 +62,6 @@ public:
 
         disk::computeCentralForce(first, last, d, simData.star);
         timer.step("computeCentralForce");
-
-        //        printNbItStatistics(simData, first, last);
-    }
-
-    void printNbItStatistics(DataType& simData, const size_t first, const size_t last) const
-    {
-        auto& d = simData.hydro;
-        transferToHost(d, first, last, {"nb_it_stat"});
-        std::array<size_t, 9> histogram{};
-        for (size_t i = first; i < last; i++)
-        {
-            size_t bin = (d.nb_it_stat[i] >= histogram.size() ? histogram.size() - 1 : d.nb_it_stat[i]);
-            histogram[bin]++;
-        }
-
-        MPI_Allreduce(MPI_IN_PLACE, histogram.data(), histogram.size(), MpiType<size_t>{}, MPI_SUM, MPI_COMM_WORLD);
-
-        if (Base::rank_ == 0)
-        {
-            printf("Neighbour iterations");
-            for (size_t i = 0; i < histogram.size(); i++)
-            {
-                printf("ncIt: %zu, nPart: %zu\n", i, histogram[i]);
-            }
-        }
     }
 
     void integrate(DomainType& domain, DataType& simData) override
