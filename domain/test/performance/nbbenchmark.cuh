@@ -36,7 +36,7 @@
 #include <numeric>
 #include <vector>
 
-#include <thrust/universal_vector.h>
+#include <thrust/device_vector.h>
 
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/sfc/box.hpp"
@@ -114,34 +114,34 @@ void benchmarkNeighborhood(const Coords& coords,
         .ijLoop(util::tupleMap([](auto const& v) { return v.data(); }, inputs),
                 util::tupleMap([](auto& v) { return v.data(); }, outputs), interaction, ijloop::empty_postamble);
 
-    const thrust::universal_vector<Tc> dX(coords.x().begin(), coords.x().end()),
+    const thrust::device_vector<Tc> dX(coords.x().begin(), coords.x().end()),
         dY(coords.y().begin(), coords.y().end()), dZ(coords.z().begin(), coords.z().end());
-    const auto allocGpuVec = [n]<class Tv>(Tv initialValue) { return thrust::universal_vector<Tv>(n, initialValue); };
+    const auto allocGpuVec = [n]<class Tv>(Tv initialValue) { return thrust::device_vector<Tv>(n, initialValue); };
     const auto dH          = allocGpuVec(hVal);
-    const std::tuple<thrust::universal_vector<InputTs>...> dInputs = util::tupleMap(allocGpuVec, inputValues);
-    std::tuple<thrust::universal_vector<OutputTs>...> dOutputs     = util::tupleMap(allocGpuVec, initialOutputValues);
+    const std::tuple<thrust::device_vector<InputTs>...> dInputs = util::tupleMap(allocGpuVec, inputValues);
+    std::tuple<thrust::device_vector<OutputTs>...> dOutputs     = util::tupleMap(allocGpuVec, initialOutputValues);
 
     std::size_t particleMemoryUsage = (dX.size() + dY.size() + dZ.size()) * sizeof(Tc);
-    const auto addMemoryUsage       = [&]<class Tv>(thrust::universal_vector<Tv> const& v)
+    const auto addMemoryUsage       = [&]<class Tv>(thrust::device_vector<Tv> const& v)
     { particleMemoryUsage += v.size() * sizeof(Tv); };
     util::for_each_tuple(addMemoryUsage, dInputs);
     util::for_each_tuple(addMemoryUsage, dOutputs);
     printf("Memory usage of particle data: %.2f MB\n", particleMemoryUsage / 1.0e6);
 
-    const thrust::universal_vector<KeyType> dPrefixes             = octree.prefixes;
-    const thrust::universal_vector<TreeNodeIndex> dChildOffsets   = octree.childOffsets;
-    const thrust::universal_vector<TreeNodeIndex> dInternalToLeaf = octree.internalToLeaf;
-    const thrust::universal_vector<TreeNodeIndex> dLevelRange     = octree.levelRange;
-    const thrust::universal_vector<LocalIndex> dLayout            = layout;
-    const thrust::universal_vector<Vec3<Tc>> dCenters             = centers;
-    const thrust::universal_vector<Vec3<Tc>> dSizes               = sizes;
+    const thrust::device_vector<KeyType> dPrefixes             = octree.prefixes;
+    const thrust::device_vector<TreeNodeIndex> dChildOffsets   = octree.childOffsets;
+    const thrust::device_vector<TreeNodeIndex> dInternalToLeaf = octree.internalToLeaf;
+    const thrust::device_vector<TreeNodeIndex> dLevelRange     = octree.levelRange;
+    const thrust::device_vector<LocalIndex> dLayout            = layout;
+    const thrust::device_vector<Vec3<Tc>> dCenters             = centers;
+    const thrust::device_vector<Vec3<Tc>> dSizes               = sizes;
     printf("Memory usage of tree data: %.2f MB\n",
            (sizeof(KeyType) * dPrefixes.size() +
             sizeof(TreeNodeIndex) * (dChildOffsets.size() + dInternalToLeaf.size() + dLevelRange.size()) +
             sizeof(LocalIndex) * dLayout.size() + sizeof(Vec3<Tc>) * (dCenters.size() + dSizes.size())) /
                1.0e6);
 
-    const thrust::universal_vector<KeyType> dCodes(coords.particleKeys().begin(), coords.particleKeys().end());
+    const thrust::device_vector<KeyType> dCodes(coords.particleKeys().begin(), coords.particleKeys().end());
     const OctreeNsView<Tc, KeyType> dNsView{.numLeafNodes   = octree.numLeafNodes,
                                             .prefixes       = rawPtr(dPrefixes),
                                             .childOffsets   = rawPtr(dChildOffsets),
@@ -207,8 +207,11 @@ void benchmarkNeighborhood(const Coords& coords,
         return std::abs(a - b) <= atol + rtol * std::abs(b);
     };
     util::for_each_tuple(
-        [&](auto const& dOut, auto const& out)
+        [&](auto const& ddOut, auto const& out)
         {
+            using ValueType = typename std::remove_cvref_t<decltype(out)>::value_type;
+            std::vector<ValueType> dOut(ddOut.size());
+            checkGpuErrors(cudaMemcpy(dOut.data(), rawPtr(ddOut), sizeof(ValueType) * dOut.size(), cudaMemcpyDeviceToHost));
             assert(dOut.size() == n && out.size() == n);
 #pragma omp parallel for
             for (unsigned i = 0; i < n; ++i)
