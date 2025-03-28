@@ -74,6 +74,25 @@ void printMap(const auto& map)
     }
 }
 
+//! @brief Displace system by a position and velocity
+template<typename Dataset>
+void displaceSystem(Dataset& simData, const cstone::Vec3<double>& X, const cstone::Vec3<double>& V)
+{
+    auto& d = simData.hydro;
+#pragma omp parallel for
+    for (size_t i = 0; i < d.x.size(); i++)
+    {
+        d.x[i] += X[0];
+        d.y[i] += X[1];
+        d.z[i] += X[2];
+        d.vx[i] += V[0];
+        d.vy[i] += V[1];
+        d.vz[i] += V[2];
+        d.x_m1[i] = d.vx[i] * d.minDt;
+        d.y_m1[i] = d.vy[i] * d.minDt;
+        d.z_m1[i] = d.vz[i] * d.minDt;
+    }
+}
 template<typename Dataset>
 class TDEOrbitInit : public ISimInitializer<Dataset>
 {
@@ -147,25 +166,6 @@ public:
         std::printf("v: %lf, %lf, %lf\n", V[0], V[1], V[2]);
 
         return box;
-    }
-
-    //! @brief Displace system by a position and velocity
-    void displaceSystem(Dataset& simData, const cstone::Vec3<double>& X, const cstone::Vec3<double>& V) const
-    {
-        auto& d = simData.hydro;
-#pragma omp parallel for
-        for (size_t i = 0; i < d.x.size(); i++)
-        {
-            d.x[i] += X[0];
-            d.y[i] += X[1];
-            d.z[i] += X[2];
-            d.vx[i] += V[0];
-            d.vy[i] += V[1];
-            d.vz[i] += V[2];
-            d.x_m1[i] = d.vx[i] * d.minDt;
-            d.y_m1[i] = d.vy[i] * d.minDt;
-            d.z_m1[i] = d.vz[i] * d.minDt;
-        }
     }
 };
 } // namespace sphexa

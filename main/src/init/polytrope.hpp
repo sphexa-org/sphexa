@@ -17,6 +17,9 @@
 #include "polytrope/bisect.hpp"
 #include "polytrope/polytrope_profile.hpp"
 
+// For LUMI run without relaxation
+#include "tde_orbit_init.hpp"
+
 namespace sphexa
 {
 
@@ -36,7 +39,21 @@ std::map<std::string, double> polytropeConstants()
             {"ng0", 100},
             {"ngmax", 150},
             {"eosChoice", sph::EosType::polytropic},
-            {"relaxationTimescale", t_relax}};
+            // LUMI run without relaxation
+            {"relaxationTimescale", 0.},
+            //            {"relaxationTimescale", t_relax},
+            {"tde-orbit::beta_impact", 1.0},
+            {"tde-orbit::r0_per_periapsis", 5.0},
+            {"star::potentialType", disk::StarPotentialType::einstein_precession},
+            {"star::m", 1.0},
+            {"star::inner_size", 0.0},
+            {"star::fixed_star", 1},
+            {"star::x", 0.},
+            {"star::y", 0.},
+            {"star::z", 0.},
+            {"star::x_m1", 0.},
+            {"star::y_m1", 0.},
+            {"star::z_m1", 0.}};
 }
 
 template<class Dataset>
@@ -125,17 +142,18 @@ public:
         using T       = typename Dataset::RealType;
 
         const double polytropic_index = settings_.at("polytropic_index");
-        const double n_polytropic        = 1. / (settings_.at("polytropic_index") - 1.);
-        const double m_total             = settings_.at("polytrope::mTotal");
-        const double r_total             = settings_.at("polytrope::r");
-        const double G                   = settings_.at("gravConstant");
-        const size_t ng0                 = settings_.at("ng0");
+        const double n_polytropic     = 1. / (settings_.at("polytropic_index") - 1.);
+        const double m_total          = settings_.at("polytrope::mTotal");
+        const double r_total          = settings_.at("polytrope::r");
+        const double G                = settings_.at("gravConstant");
+        const size_t ng0              = settings_.at("ng0");
 
         auto [rho_r, M_r, polytropic_const] = polytrope::computePolytropeProfile(n_polytropic, m_total, r_total, G);
         settings_["polytropic_const"]       = polytropic_const;
 
         if (rank == 0)
         {
+            std::printf("Polytrope + orbit placement for LUMI run (no relaxation!)\n");
             std::printf("polytropic constant: %lf\tpolytropic exponent: %lf\n", polytropic_const, polytropic_index);
             std::printf("r_total: %lf\tachieved r: %lf\n", r_total, M_r.y_values.back());
         }
@@ -151,6 +169,22 @@ public:
         estimateSmoothingLengths(rho_r, d, m_part, ng0, r_total);
 
         initPolytropeFields(d, settings_, m_part);
+
+        //***for LUMI run without relaxation
+        const double               m_b   = settings_.at("star::m");
+        const cstone::Vec3<double> pos_b = {settings_.at("star::x"), settings_.at("star::y"), settings_.at("star::z")};
+
+        const double r_tidal          = r_total * std::pow(m_b / m_total, 1. / 3.);
+        const double r_periapsis      = r_tidal / settings_.at("tde-orbit::beta_impact");
+        const double r0_per_periapsis = settings_.at("tde-orbit::r0_per_periapsis");
+
+        const auto [X, V] = computeParabolicOrbit(m_b, pos_b, r_periapsis, r0_per_periapsis, simData.hydro.g);
+        displaceSystem(simData, X, V);
+        std::printf("Placed orbiter: \n");
+        std::printf("x: %lf, %lf, %lf\n", X[0], X[1], X[2]);
+        std::printf("v: %lf, %lf, %lf\n", V[0], V[1], V[2]);
+
+        //***
 
         return globalBox;
     }
@@ -175,6 +209,8 @@ public:
         settings_["numParticlesGlobal"] = double(numParticlesGlobal);
         BuiltinWriter attributeSetter(settings_);
         d.loadOrStoreAttributes(&attributeSetter);
+        // for LUMI run without relaxation
+        simData.star.loadOrStoreAttributes(&attributeSetter);
     }
 
     auto createUniformSphere(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData, IFileReader* reader,
