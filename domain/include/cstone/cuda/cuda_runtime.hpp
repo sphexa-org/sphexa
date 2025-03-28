@@ -50,6 +50,7 @@
 #define cudaMemcpyToSymbolAsync hipMemcpyToSymbol // hipMemcpyToSymbolAsync does not exist
 #define cudaMemoryTypeDevice hipMemoryTypeDevice
 #define cudaMemoryTypeManaged hipMemoryTypeManaged
+#define cudaMemPrefetchAsync hipMemPrefetchAsync
 #define cudaMemset hipMemset
 #define cudaMemsetAsync hipMemsetAsync
 #define cudaPointerAttributes hipPointerAttribute_t

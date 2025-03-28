@@ -38,6 +38,7 @@
 #include <thrust/universal_vector.h>
 
 #include "cstone/cuda/thrust_util.cuh"
+#include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
 #include "cstone/traversal/ijloop/gpu_clusternblist.cuh"
 #include "cstone/traversal/ijloop/gpu_fullnblist.cuh"
@@ -72,6 +73,11 @@ tabulateFunction(F&& func, const double lowerSupport, const double upperSupport,
         T normalizedVal = lowerSupport + i * dx;
         table[i]        = func(normalizedVal);
     }
+
+    // required on AMD for decent performance
+    int device;
+    checkGpuErrors(cudaGetDevice(&device));
+    checkGpuErrors(cudaMemPrefetchAsync(rawPtr(table), sizeof(T) * n, device, 0));
 
     return table;
 }
