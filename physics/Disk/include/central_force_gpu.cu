@@ -25,7 +25,7 @@ __device__ void atomicAddVec4(cstone::Vec4<T>* x, const cstone::Vec4<T>& y)
 
 // template<size_t numThreads, typename Treal, typename Tmass, typename Ta, typename Tstar>
 template<size_t numThreads, typename Data>
-__global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Data& d, /*const Treal* x, const Treal* y,
+__global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Data d, /*const Treal* x, const Treal* y,
                                               const Treal* z, Ta* ax, Ta* ay, Ta* az, const Tmass* m, Treal g,
                                               cstone::Vec3<Tstar> star_position, Tstar m_star, Tstar inner_size2,*/
                                              StarPotentialType potentialType)
