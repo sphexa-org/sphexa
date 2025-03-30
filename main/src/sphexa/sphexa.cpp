@@ -159,10 +159,11 @@ int main(int argc, char** argv)
 
         bool isWallClockReached = syncedWallClockElapsed(totalTimer.elapsed(), simDuration, propagator->stepElapsed());
 
-        isOutputTriggered = isOutputStep(d.iteration, writeFreqStr) ||
-                            isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStr) ||
-                            isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtra) ||
-                            (isWallClockReached && writeEnabled) || isOutputTriggered;
+        isOutputTriggered =
+            (isOutputStep(d.iteration, writeFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStr) ||
+             isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtra) ||
+             (isWallClockReached && writeEnabled) || isOutputTriggered) &&
+            d.iteration > startIteration;
 
         if (isOutputTriggered && propagator->isSynced())
         {
