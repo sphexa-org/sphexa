@@ -150,6 +150,33 @@ void computePolytropicEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     }
 }
 
+template<typename Dataset>
+void computeHelmholtzEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
+{
+    const auto* kx   = d.kx.data();
+    const auto* xm   = d.xm.data();
+    const auto* m    = d.m.data();
+    const auto* temp = d.temp.data();
+    const auto* abar = d.abar.data();
+    const auto* zbar = d.zbar.data();
+
+    auto* p  = d.p.data();
+    auto* c  = d.c.data();
+    auto* cv = d.cv.data();
+    auto* u  = d.u.data();
+
+    helmholtz_constants::Helmholtz_EOS* helmEOS = new helmholtz_constants::Helmholtz_EOS();
+
+#pragma omp parallel for schedule(static)
+    for (size_t i = startIndex; i < endIndex; ++i)
+    {
+        auto rho                          = kx[i] * m[i] / xm[i];
+        std::tie(c[i], p[i], cv[i], u[i]) = helmholtzEOS(helmEOS, rho, temp[i], abar[i], zbar[i]);
+    }
+
+    delete helmEOS;
+}
+
 template<class Dataset>
 void computeIdealGasEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
@@ -189,11 +216,22 @@ void computePolytropicEOS(size_t startIndex, size_t endIndex, Dataset& d)
 }
 
 template<class Dataset>
+void computeHelmholtzEOS(size_t startIndex, size_t endIndex, Dataset& d)
+{
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    {
+        // TBD!
+    }
+    else { computeHelmholtzEOS_Impl(startIndex, endIndex, d); }
+}
+
+template<class Dataset>
 void computeEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if (d.eosChoice == EosType::idealGas) { computeIdealGasEOS(startIndex, endIndex, d); }
     else if (d.eosChoice == EosType::isothermal) { computeIsothermalEOS(startIndex, endIndex, d); }
     else if (d.eosChoice == EosType::polytropic) { computePolytropicEOS(startIndex, endIndex, d); }
+    else if (d.eosChoice == EosType::helmholtz) { computeHelmholtzEOS(startIndex, endIndex, d); }
 }
 
 } // namespace sph
