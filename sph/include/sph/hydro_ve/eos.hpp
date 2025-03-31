@@ -171,7 +171,7 @@ void computeHelmholtzEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
         auto rho                          = kx[i] * m[i] / xm[i];
-        std::tie(c[i], p[i], cv[i], u[i]) = helmholtzEOS(helmEOS, rho, temp[i], abar[i], zbar[i]);
+        std::tie(c[i], p[i], cv[i], u[i]) = helmholtzEOS(helmEOS, temp[i], rho, abar[i], zbar[i]);
     }
 
     delete helmEOS;

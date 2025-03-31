@@ -205,12 +205,12 @@ public:
     }
 
     // get corresponding table indices
-    template<typename T>
-    HOST_DEVICE_FUN void inline getTableIndices(int& iat, int& jat, const T temp, const T rho, const T abar,
-                                                const T zbar)
+    template<typename T1, typename T2>
+    HOST_DEVICE_FUN void inline getTableIndices(int& iat, int& jat, const T1 temp, const T2 rho, const T1 abar,
+                                                const T1 zbar)
     {
-        const T ye  = std::max((T)1e-16, zbar / abar);
-        const T din = ye * rho;
+        const T1 ye  = std::max((T1)1e-16, zbar / abar);
+        const T1 din = ye * rho;
 
         jat = int((std::log10(temp) - tlo) * tstpi);
         jat = std::max<int>(1, std::min<int>(jat, JMAX - 2));
