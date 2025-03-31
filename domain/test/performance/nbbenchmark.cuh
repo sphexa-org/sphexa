@@ -169,6 +169,14 @@ void benchmarkNeighborhood(const Coords& coords,
     printf("Memory usage of neighborhood data: %.2f MB (%.1f B/particle)\n", stats.numBytes / 1.0e6,
            stats.numBytes / double(stats.numBodies));
 
+    int device;
+    checkGpuErrors(cudaGetDevice(&device));
+    auto const prefetchToDevice = [&]<class Tv>(const thrust::universal_vector<Tv>& v)
+    { checkGpuErrors(cudaMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), device, 0)); };
+    util::for_each_tuple(prefetchToDevice, std::tie(dX, dY, dZ, dH));
+    util::for_each_tuple(prefetchToDevice, dInputs);
+    util::for_each_tuple(prefetchToDevice, dOutputs);
+
     std::array<float, 11> times;
     std::array<cudaEvent_t, times.size() + 1> events;
     for (auto& event : events)
