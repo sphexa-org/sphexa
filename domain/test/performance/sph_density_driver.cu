@@ -52,18 +52,61 @@
 
 constexpr int kTableSize = 20000;
 
+template<class T>
+constexpr __forceinline__ T fastSin(T x)
+{
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+    if constexpr (std::is_same_v<T, float>)
+        x = __sinf(x);
+    else
+#endif
+        x = std::sin(x);
+    return x;
+}
+
+template<class T>
+constexpr __forceinline__ T fastInv(T x)
+{
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+    if constexpr (std::is_same_v<T, float>)
+#if defined(__CUDA_ARCH__)
+        asm("rcp.approx.ftz.f32 %0,%0;" : "+f"(x) :);
+#else
+        x = __frcp_rn(x);
+#endif
+    else if constexpr (std::is_same_v<T, double>)
+#if defined(__CUDA_ARCH__)
+        asm("rcp.approx.ftz.f64 %0,%0;" : "+d"(x) :);
+#else
+        x = __drcp_rn(x);
+#endif
+    else
+#endif
+        x = T(1) / x;
+    return x;
+}
+
+template<class T>
+constexpr __forceinline__ T fastSqrt(T x)
+{
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+    if constexpr (std::is_same_v<T, float>)
+        x = __fsqrt_rn(x);
+    else if constexpr (std::is_same_v<T, double>)
+        x = __dsqrt_rn(x);
+    else
+#endif
+        x = std::sqrt(x);
+    return x;
+}
+
 template<typename T>
 constexpr inline T wharmonic_std(T v)
 {
     if (v == 0) { return 1; }
 
     const T Pv = T(M_PI_2) * v;
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-    if constexpr (std::is_same_v<T, float>)
-        return __sinf(Pv) * (T(1) / Pv);
-    else
-#endif
-        return std::sin(Pv) * (T(1) / Pv);
+    return fastSin(Pv) * fastInv(Pv);
 }
 
 template<class T, class F>
@@ -126,15 +169,9 @@ struct DensityKernelFun
     {
         const auto [i, iPos, hi, mi] = iData;
         const auto [j, jPos, hj, mj] = jData;
-        T dist;
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-        if constexpr (std::is_same_v<T, float>)
-            dist = __fsqrt_rn(distSq);
-        else
-#endif
-            dist = std::sqrt(distSq);
-        const T vloc = dist * (T(1) / hi);
-        const T w    = i == j ? T(1) : table_lookup<UseKernelTable>(wh, vloc);
+        const T dist                 = fastSqrt(distSq);
+        const T vloc                 = dist * fastInv(hi);
+        const T w                    = i == j ? T(1) : table_lookup<UseKernelTable>(wh, vloc);
         return std::make_tuple(cstone::ijloop::symmetric::even(w * mj));
     }
 };
