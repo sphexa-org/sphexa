@@ -444,15 +444,14 @@ struct GromacsLikeNeighborhood
     unsigned ngmax;
 
     template<class Tc, class KeyType, class Th>
-    gromacs_like_neighborhood_detail::GromacsLikeNeighborhoodImpl<Tc, Th>
-    build(const OctreeNsView<Tc, KeyType>& tree,
-          const Box<Tc>& box,
-          [[maybe_unused]] const LocalIndex totalBodies,
-          const GroupView& groups,
-          const Tc* x,
-          const Tc* y,
-          const Tc* z,
-          const Th* h) const
+    gromacs_like_neighborhood_detail::GromacsLikeNeighborhoodImpl<Tc, Th> build(OctreeNsView<Tc, KeyType> tree,
+                                                                                const Box<Tc>& box,
+                                                                                const LocalIndex totalBodies,
+                                                                                const GroupView& groups,
+                                                                                const Tc* x,
+                                                                                const Tc* y,
+                                                                                const Tc* z,
+                                                                                const Th* h) const
     {
         using namespace gromacs_like_neighborhood_detail;
 
@@ -495,6 +494,13 @@ struct GromacsLikeNeighborhood
             }
         };
 
+        std::vector<Th> hExt(totalBodies);
+        // trick the default neighbor search to include all neighbors within searchExtFactor
+#pragma omp parallel for
+        for (unsigned i = 0; i < totalBodies; ++i)
+            hExt[i] = h[i] * tree.searchExtFactor;
+        tree.searchExtFactor = 1;
+
 #pragma omp parallel
         {
             std::vector<LocalIndex> neighbors(ngmax);
@@ -502,7 +508,7 @@ struct GromacsLikeNeighborhood
             for (unsigned sci = 0; sci < numSuperclusters; ++sci)
             {
                 const auto superClusterNeighbors = clusterNeighborsOfSuperCluster(
-                    tree, box, x, y, z, h, groups.lastBody, ngmax, neighbors.data(), sci);
+                    tree, box, x, y, z, hExt.data(), groups.lastBody, ngmax, neighbors.data(), sci);
 
                 const unsigned ncjPacked = iceil(superClusterNeighbors.size(), jGroupSize);
                 unsigned cjPackedBegin, cjPackedEnd;

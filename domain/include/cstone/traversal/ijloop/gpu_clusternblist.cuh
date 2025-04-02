@@ -268,7 +268,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumWarpsPerBlock) void gpuClus
         const Vec3<Tc> iPos = {x[i], y[i], z[i]};
         const Th hi         = h[i];
 
-        const Th hBound = Config::symmetric ? maxH : hi;
+        const Th hBound = (Config::symmetric ? maxH : hi) * tree.searchExtFactor;
         Vec3<Tc> bbMin  = {iPos[0] - 2 * hBound, iPos[1] - 2 * hBound, iPos[2] - 2 * hBound};
         Vec3<Tc> bbMax  = {iPos[0] + 2 * hBound, iPos[1] + 2 * hBound, iPos[2] + 2 * hBound};
         Vec3<Tc> iClusterCenter, iClusterSize;
@@ -489,8 +489,8 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumWarpsPerBlock) void gpuClus
                 const Th hj              = j < totalBodies ? h[j] : 0;
                 const Vec3<Tc> ijPosDiff = posDiff(jPos);
                 const Th d2              = norm2(ijPosDiff);
-                const Th iRadiusSq       = Th(4) * hi * hi;
-                const Th jRadiusSq       = Th(4) * hj * hj;
+                const Th iRadiusSq       = Th(4) * hi * hi * tree.searchExtFactor * tree.searchExtFactor;
+                const Th jRadiusSq       = Th(4) * hj * hj * tree.searchExtFactor * tree.searchExtFactor;
                 const bool keep       = ballotSync(d2 < iRadiusSq | (Config::symmetric & d2 < jRadiusSq)) & jBlockMask;
                 const unsigned offset = exclusiveScanBool(keep & (laneIdx % threadsPerInteraction == 0));
 

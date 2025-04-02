@@ -33,6 +33,9 @@
 
 #include <tuple>
 
+#include <thrust/device_vector.h>
+#include <thrust/execution_policy.h>
+
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
@@ -42,7 +45,7 @@
 namespace cstone::ijloop
 {
 
-namespace detail
+namespace gpu_full_nb_list_neighborhood_detail
 {
 
 template<int MaxThreads, class Tc, class Th, class KeyType>
@@ -108,6 +111,14 @@ __launch_bounds__(MaxThreads) void gpuFullNbListNeighborhoodKernel(const Box<Tc>
     storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
 }
 
+template<class T>
+struct ScaleFunctor
+{
+    T factor;
+
+    constexpr T operator()(T x) const { return x * factor; }
+};
+
 template<class Tc, class Th>
 struct GpuFullNbListNeighborhoodImpl
 {
@@ -128,7 +139,7 @@ struct GpuFullNbListNeighborhoodImpl
         const LocalIndex numBodies = lastBody - firstBody;
         if (numBodies == 0) return;
         constexpr int numThreads = 128;
-        detail::gpuFullNbListNeighborhoodKernel<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
+        gpuFullNbListNeighborhoodKernel<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
             box, firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
             std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), ngmax, rawPtr(neighbors),
             rawPtr(neighborsCount));
@@ -142,41 +153,53 @@ struct GpuFullNbListNeighborhoodImpl
                             neighborsCount.size() * sizeof(typename decltype(neighborsCount)::value_type)};
     }
 };
-} // namespace detail
+} // namespace gpu_full_nb_list_neighborhood_detail
 
 struct GpuFullNbListNeighborhood
 {
     unsigned ngmax;
 
     template<class Tc, class KeyType, class Th>
-    detail::GpuFullNbListNeighborhoodImpl<Tc, Th> build(const OctreeNsView<Tc, KeyType>& tree,
-                                                        const Box<Tc>& box,
-                                                        const LocalIndex /*totalBodies*/,
-                                                        const GroupView& groups,
-                                                        const Tc* x,
-                                                        const Tc* y,
-                                                        const Tc* z,
-                                                        const Th* h) const
+    gpu_full_nb_list_neighborhood_detail::GpuFullNbListNeighborhoodImpl<Tc, Th> build(OctreeNsView<Tc, KeyType> tree,
+                                                                                      const Box<Tc>& box,
+                                                                                      const LocalIndex totalBodies,
+                                                                                      const GroupView& groups,
+                                                                                      const Tc* x,
+                                                                                      const Tc* y,
+                                                                                      const Tc* z,
+                                                                                      const Th* h) const
     {
+        using namespace gpu_full_nb_list_neighborhood_detail;
         const LocalIndex numBodies = groups.lastBody - groups.firstBody;
-        detail::GpuFullNbListNeighborhoodImpl<Tc, Th> nbList{
-            box,
-            groups.firstBody,
-            groups.lastBody,
-            x,
-            y,
-            z,
-            h,
-            ngmax,
-            thrust::device_vector<LocalIndex>(ngmax * std::size_t(numBodies)),
-            thrust::device_vector<int>(numBodies)};
+        GpuFullNbListNeighborhoodImpl<Tc, Th> nbList{box,
+                                                     groups.firstBody,
+                                                     groups.lastBody,
+                                                     x,
+                                                     y,
+                                                     z,
+                                                     h,
+                                                     ngmax,
+                                                     thrust::device_vector<LocalIndex>(ngmax * std::size_t(numBodies)),
+                                                     thrust::device_vector<int>(numBodies)};
         if (numBodies == 0) return nbList;
 
+        Th const* hExt = h;
+        thrust::device_vector<Th> hExtData;
+        if (tree.searchExtFactor != 1)
+        {
+            // trick the default neighbor search to include all neighbors within searchExtFactor
+            hExtData.resize(totalBodies);
+            thrust::transform(thrust::device, h, h + totalBodies, hExtData.begin(), ScaleFunctor{tree.searchExtFactor});
+            tree.searchExtFactor = 1;
+            hExt                 = rawPtr(hExtData);
+        }
+
         constexpr int numThreads = 128;
-        detail::gpuFullNbListNeighborhoodBuild<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
-            tree, box, groups.firstBody, groups.lastBody, x, y, z, h, ngmax, rawPtr(nbList.neighbors),
+        gpuFullNbListNeighborhoodBuild<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
+            tree, box, groups.firstBody, groups.lastBody, x, y, z, hExt, ngmax, rawPtr(nbList.neighbors),
             rawPtr(nbList.neighborsCount));
         checkGpuErrors(cudaGetLastError());
+        checkGpuErrors(cudaDeviceSynchronize());
         return nbList;
     }
 };

@@ -164,9 +164,9 @@ struct CpuFullNbListNeighborhood
     unsigned ngmax;
 
     template<class Tc, class KeyType, class Th>
-    cpu_nb_list_detail::CpuFullNbListNeighborhoodImpl<Tc, KeyType, Th> build(const OctreeNsView<Tc, KeyType>& tree,
+    cpu_nb_list_detail::CpuFullNbListNeighborhoodImpl<Tc, KeyType, Th> build(OctreeNsView<Tc, KeyType> tree,
                                                                              const Box<Tc>& box,
-                                                                             const LocalIndex /* totalBodies */,
+                                                                             const LocalIndex totalBodies,
                                                                              const GroupView& groups,
                                                                              const Tc* const x,
                                                                              const Tc* const y,
@@ -189,11 +189,24 @@ struct CpuFullNbListNeighborhood
                                                               h,
                                                               ngmax};
 
+        Th const* hExt = h;
+        std::unique_ptr<Th[]> hExtData;
+        if (tree.searchExtFactor != 1)
+        {
+            hExtData = std::make_unique<Th[]>(totalBodies);
+#pragma omp parallel for
+            for (LocalIndex i = 0; i < numBodies; ++i)
+                hExtData[i] = h[i] * tree.searchExtFactor;
+            tree.searchExtFactor = 1;
+            hExt                 = hExtData.get();
+        }
+
 #pragma omp parallel for
         for (LocalIndex i = 0; i < numBodies; ++i)
         {
             nbList.neighborsCount[i] = std::min(
-                findNeighbors(i + groups.firstBody, x, y, z, h, tree, box, ngmax, &nbList.neighbors[i * ngmax]), ngmax);
+                findNeighbors(i + groups.firstBody, x, y, z, hExt, tree, box, ngmax, &nbList.neighbors[i * ngmax]),
+                ngmax);
         }
 
         return nbList;
