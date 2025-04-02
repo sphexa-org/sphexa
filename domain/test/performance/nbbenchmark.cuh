@@ -60,6 +60,7 @@ template<class Tc,
 std::vector<float> benchmarkNeighborhood(const Coords& coords,
                                          const Neighborhood& neighborhood,
                                          const T hVal,
+                                         const T hBuffer,
                                          unsigned ngmax,
                                          const Interaction& interaction,
                                          const std::tuple<InputTs...>& inputValues,
@@ -119,7 +120,7 @@ std::vector<float> benchmarkNeighborhood(const Coords& coords,
     const thrust::universal_vector<Tc> dX(coords.x().begin(), coords.x().end()),
         dY(coords.y().begin(), coords.y().end()), dZ(coords.z().begin(), coords.z().end());
     const auto allocGpuVec = [n]<class Tv>(Tv initialValue) { return thrust::universal_vector<Tv>(n, initialValue); };
-    const auto dH          = allocGpuVec(hVal);
+    auto dH          = allocGpuVec(hVal + hBuffer);
     const std::tuple<thrust::universal_vector<InputTs>...> dInputs = util::tupleMap(allocGpuVec, inputValues);
     std::tuple<thrust::universal_vector<OutputTs>...> dOutputs     = util::tupleMap(allocGpuVec, initialOutputValues);
 
@@ -170,6 +171,8 @@ std::vector<float> benchmarkNeighborhood(const Coords& coords,
     const ijloop::Statistics stats = neighborhoodGPU.stats();
     printf("Memory usage of neighborhood data: %.2f MB (%.1f B/particle)\n", stats.numBytes / 1.0e6,
            stats.numBytes / double(stats.numBodies));
+
+    thrust::fill(dH.begin(), dH.end(), hVal);
 
     int device;
     checkGpuErrors(cudaGetDevice(&device));

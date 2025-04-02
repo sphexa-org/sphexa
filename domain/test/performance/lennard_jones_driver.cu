@@ -74,8 +74,9 @@ void benchmarkMain()
 
     constexpr unsigned ngmax = 224;
 
-    constexpr unsigned nx = 200;
-    constexpr T h         = 1.9;
+    constexpr unsigned nx = 100;
+    constexpr T h         = 1.75;
+    constexpr T hBuffer   = 0.15;
 
     FaceCenteredCubicCoordinates<Tc, StrongKeyType> coords(nx, nx, nx, {0, 1.6795962 * nx, BoundaryType::periodic});
 
@@ -89,7 +90,7 @@ void benchmarkMain()
     const auto runBenchmark = [&](const char* name, auto const& neighborhood)
     {
         printf("--- %s ---\n", name);
-        times[name] = benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, ngmax, kernelFun,
+        times[name] = benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, hBuffer, ngmax, kernelFun,
                                                                   inputValues, initialOutputValues);
         printf("\n");
     };

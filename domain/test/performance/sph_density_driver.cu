@@ -202,7 +202,7 @@ void benchmarkMain()
     const auto runBenchmark = [&](const char* name, auto const& neighborhood)
     {
         printf("--- %s ---\n", name);
-        benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, ngmax, kernelFun, inputValues,
+        benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, 0, ngmax, kernelFun, inputValues,
                                                     initialOutputValues);
         printf("\n");
     };
