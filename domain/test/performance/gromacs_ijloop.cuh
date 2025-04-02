@@ -286,7 +286,7 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<T0*, T*...> const& ptrs, c
 
 template<bool UsePbc, class Tc, class Th, class In, class Out, class Interaction>
 __global__
-__launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(const Box<Tc> __grid_constant__ box,
+__launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(const Box<Tc> box,
                                                                                const LocalIndex firstBody,
                                                                                const LocalIndex lastBody,
                                                                                const Tc* __restrict__ x,
