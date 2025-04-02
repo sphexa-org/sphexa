@@ -263,10 +263,11 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
 template<class Path, class T>
 void saveCsv(const Path& filename, const std::map<std::string, std::vector<T>>& data)
 {
+    if (data.empty()) throw std::runtime_error("ERROR writing CSV: no data passed!");
     std::ofstream file(filename);
+    if (!file) throw std::runtime_error("ERROR writing CSV: could not open file for writing!");
 
-    using Iterator = std::vector<T>::const_iterator;
-    std::vector<std::tuple<Iterator, Iterator>> iterators;
+    std::size_t numRows = 0;
     {
         bool first = true;
         for (const auto& [name, vec] : data)
@@ -276,23 +277,21 @@ void saveCsv(const Path& filename, const std::map<std::string, std::vector<T>>& 
             else
                 file << ",";
             file << name;
-            iterators.emplace_back(vec.begin(), vec.end());
+            numRows = std::max(numRows, vec.size());
         }
     }
     file << "\n";
-    while (true)
+    for (std::size_t row = 0; row < numRows; ++row)
     {
         bool first = true;
-        for (auto& [current, end] : iterators)
+        for (const auto& [_, vec] : data)
         {
-            if (current == end) goto done;
             if (first)
                 first = false;
             else
                 file << ",";
-            file << *current++;
+            if (row < vec.size()) file << vec[row];
         }
         file << "\n";
     }
-done:;
 }
