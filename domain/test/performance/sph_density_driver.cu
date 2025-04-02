@@ -32,8 +32,11 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <format>
 #include <limits>
+#include <map>
 #include <tuple>
+#include <vector>
 
 #include <thrust/universal_vector.h>
 
@@ -194,6 +197,8 @@ void benchmarkMain()
     const auto inputValues         = std::tuple(T(1));
     const auto initialOutputValues = std::tuple(std::numeric_limits<T>::quiet_NaN());
 
+    std::map<std::string, std::vector<float>> times;
+
     const auto runBenchmark = [&](const char* name, auto const& neighborhood)
     {
         printf("--- %s ---\n", name);
@@ -222,6 +227,8 @@ void benchmarkMain()
     using SymmetricSuperclusterNb = BaseSuperclusterNb::withNcMax<512>::withSymmetry;
     runBenchmark("SUPERCLUSTERED TWO-STAGE SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{});
     runBenchmark("COMPRESSED SUPERCLUSTERED TWO-STAGE SYMMETRIC", SymmetricSuperclusterNb::withCompression{});
+
+    saveCsv(std::format("sph_density_results_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), times);
 }
 
 int main()

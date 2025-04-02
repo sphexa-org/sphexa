@@ -33,7 +33,9 @@
 
 #include <cmath>
 #include <cstdio>
+#include <map>
 #include <numeric>
+#include <fstream>
 #include <vector>
 
 #include <thrust/universal_vector.h>
@@ -55,13 +57,13 @@ template<class Tc,
          class Interaction,
          class... InputTs,
          class... OutputTs>
-void benchmarkNeighborhood(const Coords& coords,
-                           const Neighborhood& neighborhood,
-                           const T hVal,
-                           unsigned ngmax,
-                           const Interaction& interaction,
-                           const std::tuple<InputTs...>& inputValues,
-                           const std::tuple<OutputTs...>& initialOutputValues)
+std::vector<float> benchmarkNeighborhood(const Coords& coords,
+                                         const Neighborhood& neighborhood,
+                                         const T hVal,
+                                         unsigned ngmax,
+                                         const Interaction& interaction,
+                                         const std::tuple<InputTs...>& inputValues,
+                                         const std::tuple<OutputTs...>& initialOutputValues)
 {
     using namespace cstone;
     using KeyType = typename StrongKeyType::ValueType;
@@ -177,8 +179,8 @@ void benchmarkNeighborhood(const Coords& coords,
     util::for_each_tuple(prefetchToDevice, dInputs);
     util::for_each_tuple(prefetchToDevice, dOutputs);
 
-    std::array<float, 11> times;
-    std::array<cudaEvent_t, times.size() + 1> events;
+    std::vector<float> times(101);
+    std::vector<cudaEvent_t> events(times.size() + 1);
     for (auto& event : events)
         checkGpuErrors(cudaEventCreate(&event));
     checkGpuErrors(cudaEventRecord(events[0]));
@@ -236,4 +238,36 @@ void benchmarkNeighborhood(const Coords& coords,
         },
         dOutputs, outputs);
     if (numFails) printf("TOTAL FAILS: %lu\n", numFails);
+
+    return times;
+}
+
+template<class Path, class T>
+void saveCsv(const Path& filename, const std::map<std::string, std::vector<T>>& data)
+{
+    std::ofstream file(filename);
+
+    using Iterator = std::vector<float>::const_iterator;
+    std::vector<std::tuple<Iterator, Iterator>> iterators;
+    for (const auto& [name, vec] : data)
+    {
+        file << name << ",";
+        iterators.emplace_back(vec.begin(), vec.end());
+    }
+    file << "\n";
+    bool allDone = false;
+    while (!allDone)
+    {
+        allDone = true;
+        for (auto& [current, end] : iterators)
+        {
+            if (current != end)
+            {
+                allDone = false;
+                file << *current++;
+            }
+            file << ",";
+        }
+        file << "\n";
+    }
 }
