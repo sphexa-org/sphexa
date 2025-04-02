@@ -97,7 +97,7 @@ void benchmarkMain()
 
     runBenchmark("DIRECT TREE TRAVERSAL", ijloop::GpuAlwaysTraverseNeighborhood{ngmax});
     runBenchmark("FULL NB LIST", ijloop::GpuFullNbListNeighborhood{ngmax});
-    runBenchmark("GROMACS CLUSTERED", ijloop::GromacsLikeNeighborhood{ngmax});
+    runBenchmark("GROMACS SUPERCLUSTERED", ijloop::GromacsLikeNeighborhood{ngmax});
 
     using BaseClusterNb = ijloop::GpuClusterNbListNeighborhood<>::withNcMax<192>::withClusterSize<4, 4>;
     runBenchmark("CLUSTERED", BaseClusterNb::withoutSymmetry::withoutCompression{});
