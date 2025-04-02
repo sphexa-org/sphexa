@@ -197,7 +197,7 @@ void benchmarkMain()
     const auto inputValues         = std::tuple(T(1));
     const auto initialOutputValues = std::tuple(std::numeric_limits<T>::quiet_NaN());
 
-    std::map<std::string, std::vector<float>> times;
+    std::map<std::string, std::vector<double>> times;
 
     const auto runBenchmark = [&](const char* name, auto const& neighborhood)
     {

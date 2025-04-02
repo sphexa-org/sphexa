@@ -57,14 +57,14 @@ template<class Tc,
          class Interaction,
          class... InputTs,
          class... OutputTs>
-std::vector<float> benchmarkNeighborhood(const Coords& coords,
-                                         const Neighborhood& neighborhood,
-                                         const T hVal,
-                                         const float searchExtFactor,
-                                         unsigned ngmax,
-                                         const Interaction& interaction,
-                                         const std::tuple<InputTs...>& inputValues,
-                                         const std::tuple<OutputTs...>& initialOutputValues)
+std::vector<double> benchmarkNeighborhood(const Coords& coords,
+                                          const Neighborhood& neighborhood,
+                                          const T hVal,
+                                          const float searchExtFactor,
+                                          unsigned ngmax,
+                                          const Interaction& interaction,
+                                          const std::tuple<InputTs...>& inputValues,
+                                          const std::tuple<OutputTs...>& initialOutputValues)
 {
     using namespace cstone;
     using KeyType = typename StrongKeyType::ValueType;
@@ -182,7 +182,7 @@ std::vector<float> benchmarkNeighborhood(const Coords& coords,
     util::for_each_tuple(prefetchToDevice, dInputs);
     util::for_each_tuple(prefetchToDevice, dOutputs);
 
-    std::vector<float> times(101);
+    std::vector<double> times(101);
     std::vector<cudaEvent_t> events(times.size() + 1);
     for (auto& event : events)
         checkGpuErrors(cudaEventCreate(&event));
@@ -198,22 +198,33 @@ std::vector<float> benchmarkNeighborhood(const Coords& coords,
 
     for (std::size_t i = 0; i < times.size(); ++i)
     {
-        checkGpuErrors(cudaEventElapsedTime(&times[i], events[i], events[i + 1]));
+        float millisecs;
+        checkGpuErrors(cudaEventElapsedTime(&millisecs, events[i], events[i + 1]));
         checkGpuErrors(cudaEventDestroy(events[i]));
+        times[i] = millisecs / 1000.0;
     }
 
-    printf("GPU times [s]: ");
-    for (auto t : times)
-        printf("%7.6fs ", t / 1000);
-    printf("\n");
-    printf("Gatom-step/s:  ");
-    for (auto t : times)
-        printf("%7.6f  ", n / 1.0e6 / t);
-    printf("\n");
+    std::vector<double> gigaAtomSteps(times.size());
+    std::transform(times.begin(), times.end(), gigaAtomSteps.begin(), [&](auto t) { return n / 1.0e9 / t; });
+
+    const float meanTime = std::accumulate(times.begin(), times.end(), 0.0) / times.size();
+    const float meanGigaAtomSteps =
+        std::accumulate(gigaAtomSteps.begin(), gigaAtomSteps.end(), 0.0f) / gigaAtomSteps.size();
+
+    const float stdDevTime = std::sqrt(std::accumulate(times.begin(), times.end(), 0.0, [&](auto a, auto t)
+                                                       { return a + (t - meanTime) * (t - meanTime); }) /
+                                       (times.size() - 1));
+    const float stdDevGigaAtomSteps =
+        std::sqrt(std::accumulate(gigaAtomSteps.begin(), gigaAtomSteps.end(), 0.0, [&](auto a, auto s)
+                                  { return a + (s - meanGigaAtomSteps) * (s - meanGigaAtomSteps); }) /
+                  (gigaAtomSteps.size() - 1));
 
     std::sort(times.begin(), times.end());
-    printf("Median: %7.6fs - %7.6f Gatom-step/s\n", times[times.size() / 2] / 1000,
-           n / 1.0e6 / times[times.size() / 2]);
+    std::sort(gigaAtomSteps.begin(), gigaAtomSteps.end());
+
+    printf("GPU Time:    %7.6f +- %7.6f, median = %7.6f [s]\n", meanTime, stdDevTime, times[times.size() / 2]);
+    printf("Performance: %7.6f +- %7.6f, median = %7.6f [Giga Particle Updates / s]\n", meanGigaAtomSteps,
+           stdDevGigaAtomSteps, gigaAtomSteps[gigaAtomSteps.size() / 2]);
 
     unsigned long numFails = 0;
     const auto isClose     = [](T a, T b)
@@ -254,7 +265,7 @@ void saveCsv(const Path& filename, const std::map<std::string, std::vector<T>>& 
 {
     std::ofstream file(filename);
 
-    using Iterator = std::vector<float>::const_iterator;
+    using Iterator = std::vector<T>::const_iterator;
     std::vector<std::tuple<Iterator, Iterator>> iterators;
     for (const auto& [name, vec] : data)
     {
