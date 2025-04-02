@@ -40,7 +40,7 @@ struct NeighborhoodDataVariant<Dataset, std::variant<NeighborhoodInfos...>>
 template<class Variant, class Dataset, class... Variants>
 void setInfo(Dataset const& d, std::variant<Variants...>& info, bool alwaysTraverse)
 {
-    const unsigned ngmaxClustered = std::max(std::bit_ceil(d.ngmax), 128u);
+    const unsigned ngmaxClustered = std::max(std::bit_ceil(d.ngmax * 2), 128u);
     if constexpr (std::is_same_v<Variant, cstone::ijloop::GpuAlwaysTraverseNeighborhood>)
     {
         if (alwaysTraverse || ngmaxClustered > 1024) info = Variant{d.ngmax};
