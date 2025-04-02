@@ -125,7 +125,7 @@ struct CpuFullNbListNeighborhoodImpl
 
                 const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 
-                updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
+                if (distSq < radiusSq(iData)) updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
             }
 
             storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
