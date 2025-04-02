@@ -335,6 +335,7 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
         const unsigned wexcl    = excl[wexclIdx].pair[laneIdx];
         if (imask)
         {
+#pragma unroll
             for (unsigned jm = 0; jm < jGroupSize; ++jm)
             {
                 if (imask & (superClusterInteractionMask << (jm * numClusterPerSupercluster)))
@@ -377,6 +378,7 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
         }
     }
 
+#pragma unroll
     for (unsigned i = 0; i < numClusterPerSupercluster; ++i)
     {
         const unsigned ai = (sci * numClusterPerSupercluster + i) * clusterSize + threadIdx.x;
