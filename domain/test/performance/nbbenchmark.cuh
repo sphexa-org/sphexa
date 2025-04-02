@@ -206,10 +206,14 @@ std::vector<float> benchmarkNeighborhood(const Coords& coords,
     for (auto t : times)
         printf("%7.6fs ", t / 1000);
     printf("\n");
-    printf("Gatom-step/s: ");
+    printf("Gatom-step/s:  ");
     for (auto t : times)
-        printf("%7.6fs ", n / 1.0e6 / t);
+        printf("%7.6f  ", n / 1.0e6 / t);
     printf("\n");
+
+    std::sort(times.begin(), times.end());
+    printf("Median: %7.6fs - %7.6f Gatom-step/s\n", times[times.size() / 2] / 1000,
+           n / 1.0e6 / times[times.size() / 2]);
 
     unsigned long numFails = 0;
     const auto isClose     = [](T a, T b)
