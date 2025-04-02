@@ -105,7 +105,7 @@ void benchmarkMain()
 
     using SymmetricClusterNb = BaseClusterNb::withNcMax<128>::withSymmetry;
     runBenchmark("CLUSTERED SYMMETRIC", SymmetricClusterNb::withoutCompression{});
-    runBenchmark("COMPRESSED CLUSTERED ", SymmetricClusterNb::withCompression<7>{});
+    runBenchmark("COMPRESSED CLUSTERED", SymmetricClusterNb::withCompression<7>{});
 
     using BaseSuperclusterNb =
         ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<64>::withNcMax<1024>;
