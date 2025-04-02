@@ -165,16 +165,12 @@ void computeHelmholtzEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     auto* cv = d.cv.data();
     auto* u  = d.u.data();
 
-    helmholtz_constants::Helmholtz_EOS* helmEOS = new helmholtz_constants::Helmholtz_EOS();
-
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
         auto rho                          = kx[i] * m[i] / xm[i];
-        std::tie(c[i], p[i], cv[i], u[i]) = helmholtzEOS(helmEOS, temp[i], rho, abar[i], zbar[i]);
+        std::tie(c[i], p[i], cv[i], u[i]) = helmholtzEOS(d.helmEOS, temp[i], rho, abar[i], zbar[i]);
     }
-
-    delete helmEOS;
 }
 
 template<class Dataset>
@@ -220,7 +216,10 @@ void computeHelmholtzEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        // TBD!
+        cuda::computeHelmholtzEOS(startIndex, endIndex, d.devData.devHelmEOS, rawPtr(d.devData.temp), rawPtr(d.devData.abar),
+                                  rawPtr(d.devData.zbar), rawPtr(d.devData.m), rawPtr(d.devData.kx),
+                                  rawPtr(d.devData.xm), rawPtr(d.devData.c), rawPtr(d.devData.p), rawPtr(d.devData.cv),
+                                  rawPtr(d.devData.u));
     }
     else { computeHelmholtzEOS_Impl(startIndex, endIndex, d); }
 }

@@ -158,5 +158,42 @@ COMPUTE_POLYTROPIC_EOS(double, double);
 COMPUTE_POLYTROPIC_EOS(float, double);
 COMPUTE_POLYTROPIC_EOS(float, float);
 
+template<typename Th, typename Tt>
+__global__ void cudaComputeHelmholtzEOS(size_t first, size_t last, sph::helmholtz_constants::Helmholtz_EOS* helmEOS,
+                                        const Tt* temp, const Tt* abar, const Tt* zbar, const Th* m, const Th* kx,
+                                        const Th* xm, Th* c, Th* p, Th* cv, Tt* u)
+{
+    unsigned i = first + blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= last) return;
+
+    Th rho_i                   = kx[i] * m[i] / xm[i];
+    auto [c_i, p_i, cv_i, u_i] = helmholtzEOS(helmEOS, temp[i], rho_i, abar[i], zbar[i]);
+
+    c[i]    = c_i;
+    cv[i]   = cv_i;
+    u[i]    = u_i;
+    if (p) { p[i] = p_i; }
+}
+
+template<typename Th, typename Tt>
+void computeHelmholtzEOS(size_t first, size_t last, sph::helmholtz_constants::Helmholtz_EOS* helmEOS, const Tt* temp,
+                         const Tt* abar, const Tt* zbar, const Th* m, const Th* kx, const Th* xm, Th* c, Th* p, Th* cv, Tt* u)
+{
+    if (first == last) { return; }
+    unsigned numThreads = 256;
+    unsigned numBlocks  = cstone::iceil(last - first, numThreads);
+    cudaComputeHelmholtzEOS<<<numBlocks, numThreads>>>(first, last, helmEOS, temp, abar, zbar, m, kx, xm, c, p, cv, u);
+    checkGpuErrors(cudaDeviceSynchronize());
+}
+
+#define COMPUTE_HELMHOLTZ_EOS(Th, Tt)                                                                                   \
+    template void computeHelmholtzEOS(size_t first, size_t last, sph::helmholtz_constants::Helmholtz_EOS* helmEOS,\
+                                      const Tt* temp, const Tt* abar, const Tt* zbar, const Th* m, const Th* kx,        \
+                                      const Th* xm, Th* c, Th* p, Th* cv, Tt* u)
+
+COMPUTE_HELMHOLTZ_EOS(double, double);
+COMPUTE_HELMHOLTZ_EOS(float, double);
+COMPUTE_HELMHOLTZ_EOS(float, float);
+
 } // namespace cuda
 } // namespace sph
