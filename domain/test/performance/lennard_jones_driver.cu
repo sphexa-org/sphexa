@@ -78,7 +78,7 @@ void benchmarkMain()
     constexpr T h                   = 1.75;
     constexpr float searchExtFactor = 1.9 / h;
 
-    FaceCenteredCubicCoordinates<Tc, StrongKeyType> coords(nx, nx, nx, {0, 1.6795962 * nx, BoundaryType::periodic});
+    FaceCenteredCubicCoordinates<Tc, StrongKeyType> coords(nx, nx, nx, {0, 1.6795962 * nx, BoundaryType::open});
 
     constexpr LjKernelFun<T> kernelFun{T(48), T(24)};
     constexpr auto inputValues         = std::tuple();

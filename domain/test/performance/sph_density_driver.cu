@@ -190,7 +190,7 @@ void benchmarkMain()
     constexpr unsigned n     = 100000 * scale;
     const T h                = 0.75 / 20 / std::cbrt(scale);
 
-    RandomCoordinates<Tc, StrongKeyType> coords(n, {0, 1, BoundaryType::periodic});
+    RandomCoordinates<Tc, StrongKeyType> coords(n, {0, 1, BoundaryType::open});
 
     const auto wh = kernelTable<T>();
     const DensityKernelFun<UseKernelTable, T> kernelFun{rawPtr(wh)};
