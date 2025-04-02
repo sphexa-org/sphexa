@@ -95,26 +95,26 @@ void benchmarkMain()
         printf("\n");
     };
 
-    runBenchmark("BATCHED DIRECT", ijloop::GpuAlwaysTraverseNeighborhood{ngmax});
-    runBenchmark("NAIVE TWO-STAGE", ijloop::GpuFullNbListNeighborhood{ngmax});
-    runBenchmark("GROMACS CLUSTERED TWO-STAGE", ijloop::GromacsLikeNeighborhood{ngmax});
+    runBenchmark("DIRECT TREE TRAVERSAL", ijloop::GpuAlwaysTraverseNeighborhood{ngmax});
+    runBenchmark("FULL NB LIST", ijloop::GpuFullNbListNeighborhood{ngmax});
+    runBenchmark("GROMACS CLUSTERED", ijloop::GromacsLikeNeighborhood{ngmax});
 
     using BaseClusterNb = ijloop::GpuClusterNbListNeighborhood<>::withNcMax<192>::withClusterSize<4, 4>;
-    runBenchmark("CLUSTERED TWO-STAGE", BaseClusterNb::withoutSymmetry::withoutCompression{});
-    runBenchmark("COMPRESSED CLUSTERED TWO-STAGE", BaseClusterNb::withoutSymmetry::withCompression<8>{});
+    runBenchmark("CLUSTERED", BaseClusterNb::withoutSymmetry::withoutCompression{});
+    runBenchmark("COMPRESSED CLUSTERED", BaseClusterNb::withoutSymmetry::withCompression<8>{});
 
     using SymmetricClusterNb = BaseClusterNb::withNcMax<128>::withSymmetry;
-    runBenchmark("CLUSTERED TWO-STAGE SYMMETRIC", SymmetricClusterNb::withoutCompression{});
-    runBenchmark("COMPRESSED CLUSTERED TWO-STAGE ", SymmetricClusterNb::withCompression<7>{});
+    runBenchmark("CLUSTERED SYMMETRIC", SymmetricClusterNb::withoutCompression{});
+    runBenchmark("COMPRESSED CLUSTERED ", SymmetricClusterNb::withCompression<7>{});
 
     using BaseSuperclusterNb =
         ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<64>::withNcMax<1024>;
-    runBenchmark("SUPERCLUSTERED TWO-STAGE", BaseSuperclusterNb::withoutSymmetry::withoutCompression{});
-    runBenchmark("COMPRESSED SUPERCLUSTERED TWO-STAGE", BaseSuperclusterNb::withoutSymmetry::withCompression{});
+    runBenchmark("SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withoutCompression{});
+    runBenchmark("COMPRESSED SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withCompression{});
 
     using SymmetricSuperclusterNb = BaseSuperclusterNb::withNcMax<512>::withSymmetry;
-    runBenchmark("SUPERCLUSTERED TWO-STAGE SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{});
-    runBenchmark("COMPRESSED SUPERCLUSTERED TWO-STAGE SYMMETRIC", SymmetricSuperclusterNb::withCompression{});
+    runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{});
+    runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{});
 
     saveCsv(std::format("lennard_jones_results_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), times);
 }
