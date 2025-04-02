@@ -60,7 +60,7 @@ template<class Tc,
 std::vector<float> benchmarkNeighborhood(const Coords& coords,
                                          const Neighborhood& neighborhood,
                                          const T hVal,
-                                         const T hBuffer,
+                                         const float searchExtFactor,
                                          unsigned ngmax,
                                          const Interaction& interaction,
                                          const std::tuple<InputTs...>& inputValues,
@@ -97,15 +97,16 @@ std::vector<float> benchmarkNeighborhood(const Coords& coords,
     std::span<const KeyType> nodeKeys(octree.prefixes.data(), octree.numNodes);
     nodeFpCenters<KeyType>(nodeKeys, centers.data(), sizes.data(), box);
 
-    const OctreeNsView<Tc, KeyType> nsView{octree.numLeafNodes,
-                                           octree.prefixes.data(),
-                                           octree.childOffsets.data(),
-                                           octree.internalToLeaf.data(),
-                                           octree.levelRange.data(),
-                                           keys,
-                                           layout.data(),
-                                           centers.data(),
-                                           sizes.data()};
+    const OctreeNsView<Tc, KeyType> nsView{.numLeafNodes    = octree.numLeafNodes,
+                                           .prefixes        = octree.prefixes.data(),
+                                           .childOffsets    = octree.childOffsets.data(),
+                                           .internalToLeaf  = octree.internalToLeaf.data(),
+                                           .levelRange      = octree.levelRange.data(),
+                                           .leaves          = keys,
+                                           .layout          = layout.data(),
+                                           .centers         = centers.data(),
+                                           .sizes           = sizes.data(),
+                                           .searchExtFactor = searchExtFactor};
     LocalIndex zero = 0;
     const GroupView groupView{.firstBody = 0, .lastBody = n, .numGroups = 1, .groupStart = &zero, .groupEnd = &n};
 
@@ -120,7 +121,7 @@ std::vector<float> benchmarkNeighborhood(const Coords& coords,
     const thrust::universal_vector<Tc> dX(coords.x().begin(), coords.x().end()),
         dY(coords.y().begin(), coords.y().end()), dZ(coords.z().begin(), coords.z().end());
     const auto allocGpuVec = [n]<class Tv>(Tv initialValue) { return thrust::universal_vector<Tv>(n, initialValue); };
-    auto dH          = allocGpuVec(hVal + hBuffer);
+    const auto dH          = allocGpuVec(hVal);
     const std::tuple<thrust::universal_vector<InputTs>...> dInputs = util::tupleMap(allocGpuVec, inputValues);
     std::tuple<thrust::universal_vector<OutputTs>...> dOutputs     = util::tupleMap(allocGpuVec, initialOutputValues);
 
@@ -145,15 +146,16 @@ std::vector<float> benchmarkNeighborhood(const Coords& coords,
                1.0e6);
 
     const thrust::universal_vector<KeyType> dCodes(coords.particleKeys().begin(), coords.particleKeys().end());
-    const OctreeNsView<Tc, KeyType> dNsView{.numLeafNodes   = octree.numLeafNodes,
-                                            .prefixes       = rawPtr(dPrefixes),
-                                            .childOffsets   = rawPtr(dChildOffsets),
-                                            .internalToLeaf = rawPtr(dInternalToLeaf),
-                                            .levelRange     = rawPtr(dLevelRange),
-                                            .leaves         = rawPtr(dCodes),
-                                            .layout         = rawPtr(dLayout),
-                                            .centers        = rawPtr(dCenters),
-                                            .sizes          = rawPtr(dSizes)};
+    const OctreeNsView<Tc, KeyType> dNsView{.numLeafNodes    = octree.numLeafNodes,
+                                            .prefixes        = rawPtr(dPrefixes),
+                                            .childOffsets    = rawPtr(dChildOffsets),
+                                            .internalToLeaf  = rawPtr(dInternalToLeaf),
+                                            .levelRange      = rawPtr(dLevelRange),
+                                            .leaves          = rawPtr(dCodes),
+                                            .layout          = rawPtr(dLayout),
+                                            .centers         = rawPtr(dCenters),
+                                            .sizes           = rawPtr(dSizes),
+                                            .searchExtFactor = searchExtFactor};
 
     constexpr unsigned groupSize = TravConfig::targetSize;
     DeviceVector<LocalIndex> temp, groups;
@@ -171,8 +173,6 @@ std::vector<float> benchmarkNeighborhood(const Coords& coords,
     const ijloop::Statistics stats = neighborhoodGPU.stats();
     printf("Memory usage of neighborhood data: %.2f MB (%.1f B/particle)\n", stats.numBytes / 1.0e6,
            stats.numBytes / double(stats.numBodies));
-
-    thrust::fill(dH.begin(), dH.end(), hVal);
 
     int device;
     checkGpuErrors(cudaGetDevice(&device));
