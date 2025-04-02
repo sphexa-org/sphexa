@@ -16,10 +16,11 @@ namespace sph
 namespace detail
 {
 
+// TODO: re-enable symmetry once NB list build times are optimized for varying smoothing lengths
 template<unsigned NcMax, bool Symmetric>
 using NeighborhoodInfo =
     cstone::ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<
-        cstone::TravConfig::targetSize>::withNcMax<NcMax>::template setSymmetry<Symmetric>::withCompression;
+        cstone::TravConfig::targetSize>::withNcMax<NcMax>::template setSymmetry<false>::withCompression;
 
 template<class Dataset, class NeighborhoodInfo>
 using NeighborhoodData = decltype(std::declval<NeighborhoodInfo>().build(
