@@ -267,25 +267,32 @@ void saveCsv(const Path& filename, const std::map<std::string, std::vector<T>>& 
 
     using Iterator = std::vector<T>::const_iterator;
     std::vector<std::tuple<Iterator, Iterator>> iterators;
-    for (const auto& [name, vec] : data)
     {
-        file << name << ",";
-        iterators.emplace_back(vec.begin(), vec.end());
+        bool first = true;
+        for (const auto& [name, vec] : data)
+        {
+            if (first)
+                first = false;
+            else
+                file << ",";
+            file << name;
+            iterators.emplace_back(vec.begin(), vec.end());
+        }
     }
     file << "\n";
-    bool allDone = false;
-    while (!allDone)
+    while (true)
     {
-        allDone = true;
+        bool first = true;
         for (auto& [current, end] : iterators)
         {
-            if (current != end)
-            {
-                allDone = false;
-                file << *current++;
-            }
-            file << ",";
+            if (current == end) goto done;
+            if (first)
+                first = false;
+            else
+                file << ",";
+            file << *current++;
         }
         file << "\n";
     }
+done:;
 }
