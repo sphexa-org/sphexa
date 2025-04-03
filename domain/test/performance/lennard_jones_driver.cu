@@ -56,12 +56,15 @@ struct LjKernelFun
     operator()(ParticleData const& iData, ParticleData const& jData, cstone::Vec3<Tc> ijPosDiff, T distSq) const
     {
         using namespace cstone::ijloop;
-        const auto [i, iPos, hi] = iData;
-        const auto [j, jPos, hj] = jData;
-        const T r2inv            = T(1) / distSq;
-        const T r6inv            = r2inv * r2inv * r2inv;
-        const T forcelj          = r6inv * (lj1 * r6inv - lj2);
-        const T fpair            = i == j ? 0 : forcelj * r2inv;
+        const auto [i, iPos, hi, qi] = iData;
+        const auto [j, jPos, hj, qj] = jData;
+        const T r2                   = std::max(distSq, T(1));
+        const T rinv                 = rsqrt(r2);
+        const T r2inv                = rinv * rinv;
+        const T r6inv                = r2inv * r2inv * r2inv;
+        const T forcelj              = r6inv * (lj1 * r6inv - lj2) * r2inv;
+        const T forcecoul            = qi * qj * r2inv * rinv;
+        const T fpair                = i == j ? 0 : forcelj + forcecoul;
         return std::make_tuple(symmetric::odd(T(ijPosDiff[0]) * fpair), symmetric::odd(T(ijPosDiff[1]) * fpair),
                                symmetric::odd(T(ijPosDiff[2]) * fpair));
     }
@@ -81,7 +84,7 @@ void benchmarkMain()
     FaceCenteredCubicCoordinates<Tc, StrongKeyType> coords(nx, nx, nx, {0, 1.6795962 * nx, BoundaryType::open});
 
     constexpr LjKernelFun<T> kernelFun{T(48), T(24)};
-    constexpr auto inputValues         = std::tuple();
+    constexpr auto inputValues         = std::tuple(T(12));
     constexpr auto initialOutputValues = std::tuple(
         std::numeric_limits<T>::quiet_NaN(), std::numeric_limits<T>::quiet_NaN(), std::numeric_limits<T>::quiet_NaN());
 
