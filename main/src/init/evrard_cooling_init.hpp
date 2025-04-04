@@ -31,10 +31,9 @@
 #pragma once
 
 #include "evrard_init.hpp"
-#include "cooling/cooler.hpp"
 
+#include "cooling/cooler.hpp"
 #include "cooling/init_chemistry.h"
-#include "io/id_tag_utils.hpp"
 
 namespace sphexa
 {
@@ -59,14 +58,13 @@ InitSettings evrardCoolingConstants()
             {"cooling::UVbackground", 0},
             {"cooling::m_code_in_ms", 1e16},
             {"cooling::l_code_in_kpc", 46400.}};
+
 }
 
 template<class Dataset>
 class EvrardGlassSphereCooling : public EvrardGlassSphere<Dataset>
 {
     using Base = EvrardGlassSphere<Dataset>;
-    using Base::idSelectionDatasets_;
-    // TODO: why don't we use inheritance for the settings?
     mutable InitSettings settings_;
 
 public:
@@ -82,27 +80,8 @@ public:
                                                  IFileReader* reader) const override
     {
         auto box = Base::init(rank, numRanks, cbrtNumPart, simData, reader);
-        std::fill(simData.hydro.u.begin(), simData.hydro.u.end(), settings_.at("u0"));
+        std::fill(simData.hydro.u.begin(), simData.hydro.u.end(), std::get<ScalarValue>(settings_.at("u0").getValue()));
         cooling::initChemistryData(simData.chem, simData.hydro.x.size());
-
-        // TODO: can we move the tagging to the ISimInitializer init function in order to avoid code duplication?
-        auto idSelectionSphereRadius = settings_.find("id_selection_sphere_radius");
-        if(idSelectionSphereRadius != settings_.end()) {
-
-            if (rank == 0) { std::cout << "Execution of selected particle identification\n"; }
-
-            IdSelectionSphere idSelectionSphere{settings_.at("id_selection_sphere_center_x"), settings_.at("id_selection_sphere_center_y"),
-                                                settings_.at("id_selection_sphere_center_z"), idSelectionSphereRadius->second};
-
-            IdVectorType originalTaggedIds;
-            tagIdsInSphere(simData.hydro.id, originalTaggedIds, simData.hydro.x, simData.hydro.y, simData.hydro.z, 0,
-                simData.hydro.id.size(),idSelectionSphere);
-
-            idSelectionDatasets_["id_selection_sphere_0"] = IdSelectionDataset{IdSelectionSettings{idSelectionSphere, 0}, originalTaggedIds};
-
-        }
-        // TODO: add selection from idList case
-        // tagIdsInList(d.id, domain.startIndex(), domain.endIndex(), selParticlesIds);
 
         return box;
     }
