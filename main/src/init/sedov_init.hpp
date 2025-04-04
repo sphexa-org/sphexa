@@ -46,16 +46,16 @@ namespace sphexa
 {
 
 template<class Dataset>
-void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
+void initSedovFields(Dataset& d, const InitSettings& constants)
 {
     using T = typename Dataset::RealType;
 
-    double r           = constants.at("r1");
+    double r           = std::get<ScalarValue>(constants.at("r1").getValue());
     double totalVolume = std::pow(2 * r, 3);
     double hInit       = std::cbrt(3.0 / (4 * M_PI) * d.ng0 * totalVolume / d.numParticlesGlobal) * 0.5;
 
-    double mPart  = constants.at("mTotal") / d.numParticlesGlobal;
-    double width  = constants.at("width");
+    double mPart  = std::get<ScalarValue>(constants.at("mTotal").getValue()) / d.numParticlesGlobal;
+    double width  = std::get<ScalarValue>(constants.at("width").getValue());
     double width2 = width * width;
 
     std::fill(d.m.begin(), d.m.end(), mPart);
@@ -88,7 +88,7 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
         T zi = d.z[i];
         T r2 = xi * xi + yi * yi + zi * zi;
 
-        T ui = constants.at("ener0") * exp(-(r2 / width2)) + constants.at("u0");
+        T ui = std::get<ScalarValue>(constants.at("ener0").getValue()) * exp(-(r2 / width2)) + std::get<ScalarValue>(constants.at("u0").getValue());
         if (d.temp.empty()) { d.u[i] = ui; }
         else { d.temp[i] = ui / cv; }
     }
@@ -97,6 +97,7 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
 template<class Dataset>
 class SedovGrid : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     mutable InitSettings settings_;
 
 public:
@@ -117,7 +118,7 @@ public:
         auto [first, last] = partitionRange(numParticlesGlobal, rank, numRanks);
         d.resize(last - first);
 
-        T              r = settings_.at("r1");
+        T              r = std::get<ScalarValue>(settings_.at("r1").getValue());
         cstone::Box<T> globalBox(-r, r, cstone::BoundaryType::periodic);
         regularGrid(r, cubeSide, first, last, d.x, d.y, d.z);
         syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, d.x, d.y, d.z, globalBox);
@@ -129,6 +130,9 @@ public:
 
         initSedovFields(d, settings_);
 
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical 
+        Base::initSubsets(settings_, rank == 0, d);
+
         return globalBox;
     }
 
@@ -138,6 +142,7 @@ public:
 template<class Dataset>
 class SedovGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
 
@@ -172,7 +177,7 @@ public:
         cstone::Vec3<int> multiplicity       = {multi1D, multi1D, multi1D};
         size_t            numParticlesGlobal = multi1D * multi1D * multi1D * blockSize;
 
-        T              r = settings_.at("r1");
+        T              r = std::get<ScalarValue>(settings_.at("r1").getValue());
         cstone::Box<T> globalBox(-r, r, cstone::BoundaryType::periodic);
 
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
@@ -185,6 +190,9 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initSedovFields(d, settings_);
+
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical
+        Base::initSubsets(settings_, rank == 0, d);
 
         return globalBox;
     }
