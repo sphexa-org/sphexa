@@ -65,20 +65,20 @@ InitSettings IsobaricCubeConstants()
 }
 
 template<class Dataset>
-void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
+void initIsobaricCubeFields(Dataset& d, const InitSettings& constants, double massPart)
 {
     using T = typename Dataset::RealType;
 
-    T r         = constants.at("r");
-    T rhoInt    = constants.at("rhoInt");
-    T rhoExt    = constants.at("rhoExt");
+    T r         = std::get<ScalarValue>(constants.at("r").getValue());
+    T rhoInt    = std::get<ScalarValue>(constants.at("rhoInt").getValue());
+    T rhoExt    = std::get<ScalarValue>(constants.at("rhoExt").getValue());
     T hInt      = 0.5 * std::pow(3. * d.ng0 * massPart / 4. / M_PI / rhoInt, 1. / 3.);
     T hExt      = 0.5 * std::pow(3. * d.ng0 * massPart / 4. / M_PI / rhoExt, 1. / 3.);
-    T pIsobaric = constants.at("pIsobaric");
-    T gamma     = constants.at("gamma");
+    T pIsobaric = std::get<ScalarValue>(constants.at("pIsobaric").getValue());
+    T gamma     = std::get<ScalarValue>(constants.at("gamma").getValue());
     T uInt      = pIsobaric / (gamma - 1.) / rhoInt;
     T uExt      = pIsobaric / (gamma - 1.) / rhoExt;
-    T epsilon   = constants.at("epsilon");
+    T epsilon   = std::get<ScalarValue>(constants.at("epsilon").getValue());
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
 
@@ -123,9 +123,9 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
             u_or_t[i] = uInt;
         }
 
-        d.x_m1[i] = d.vx[i] * constants.at("minDt");
-        d.y_m1[i] = d.vy[i] * constants.at("minDt");
-        d.z_m1[i] = d.vz[i] * constants.at("minDt");
+        d.x_m1[i] = d.vx[i] * std::get<ScalarValue>(constants.at("minDt").getValue());
+        d.y_m1[i] = d.vy[i] * std::get<ScalarValue>(constants.at("minDt").getValue());
+        d.z_m1[i] = d.vz[i] * std::get<ScalarValue>(constants.at("minDt").getValue());
     }
 
     if (d.u.empty())
@@ -163,6 +163,7 @@ void compressCenterCube(std::span<T> x, std::span<T> y, std::span<T> z, T rInt, 
 template<class Dataset>
 class IsobaricCubeGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
 
@@ -181,10 +182,10 @@ public:
         using KeyType = typename Dataset::KeyType;
         using T       = typename Dataset::RealType;
 
-        T r       = settings_.at("r");
-        T rhoInt  = settings_.at("rhoInt");
-        T rhoExt  = settings_.at("rhoExt");
-        T epsilon = settings_.at("pairInstability");
+        T r       = std::get<ScalarValue>(settings_.at("r").getValue());
+        T rhoInt  = std::get<ScalarValue>(settings_.at("rhoInt").getValue());
+        T rhoExt  = std::get<ScalarValue>(settings_.at("rhoExt").getValue());
+        T epsilon = std::get<ScalarValue>(settings_.at("pairInstability").getValue());
 
         std::vector<T> xBlock, yBlock, zBlock;
         readTemplateBlock(glassBlock, reader, xBlock, yBlock, zBlock);
@@ -217,10 +218,13 @@ public:
 
         initIsobaricCubeFields(d, settings_, massPart);
 
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical
+        Base::initSubsets(settings_, rank == 0, d);
+
         return globalBox;
     }
 
-    const std::map<std::string, double>& constants() const override { return settings_; }
+    const InitSettings& constants() const override { return settings_; }
 };
 
 } // namespace sphexa
