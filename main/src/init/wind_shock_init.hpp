@@ -57,19 +57,19 @@ InitSettings WindShockConstants()
 }
 
 template<class Dataset>
-void initWindShockFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
+void initWindShockFields(Dataset& d, const InitSettings& constants, double massPart)
 {
     using T = typename Dataset::RealType;
 
-    T r       = constants.at("r");
-    T rSphere = constants.at("rSphere");
-    T rhoInt  = constants.at("rhoInt");
-    T rhoExt  = constants.at("rhoExt");
-    T uExt    = constants.at("uExt");
-    T vxExt   = constants.at("vxExt");
-    T vyExt   = constants.at("vyExt");
-    T vzExt   = constants.at("vzExt");
-    T epsilon = constants.at("epsilon");
+    T r       = std::get<ScalarValue>(constants.at("r").getValue());
+    T rSphere = std::get<ScalarValue>(constants.at("rSphere").getValue());
+    T rhoInt  = std::get<ScalarValue>(constants.at("rhoInt").getValue());
+    T rhoExt  = std::get<ScalarValue>(constants.at("rhoExt").getValue());
+    T uExt    = std::get<ScalarValue>(constants.at("uExt").getValue());
+    T vxExt   = std::get<ScalarValue>(constants.at("vxExt").getValue());
+    T vyExt   = std::get<ScalarValue>(constants.at("vyExt").getValue());
+    T vzExt   = std::get<ScalarValue>(constants.at("vzExt").getValue());
+    T epsilon = std::get<ScalarValue>(constants.at("epsilon").getValue());
 
     T hInt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoInt);
     T hExt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoExt);
@@ -137,6 +137,7 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
 template<class Dataset>
 class WindShockGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
 
@@ -155,10 +156,10 @@ public:
         using KeyType = typename Dataset::KeyType;
         using T       = typename Dataset::RealType;
 
-        T r       = settings_.at("r");
-        T rSphere = settings_.at("rSphere");
-        T rhoInt  = settings_.at("rhoInt");
-        T rhoExt  = settings_.at("rhoExt");
+        T r       = std::get<ScalarValue>(settings_.at("r").getValue());
+        T rSphere = std::get<ScalarValue>(settings_.at("rSphere").getValue());
+        T rhoInt  = std::get<ScalarValue>(settings_.at("rhoInt").getValue());
+        T rhoExt  = std::get<ScalarValue>(settings_.at("rhoExt").getValue());
 
         T densityRatio   = rhoInt / rhoExt;
         T cubeVolume     = std::pow(2 * r, 3);
@@ -226,6 +227,9 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initWindShockFields(d, settings_, massPart);
+
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical
+        Base::initSubsets(settings_, rank == 0, d);
 
         return globalBox;
     }
