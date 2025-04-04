@@ -16,7 +16,7 @@ InitSettings sedovConstants()
                      {"cs0", 0.},  {"minDt", 1e-6},    {"minDt_m1", 1e-6},  {"gravConstant", 0.0},
                      {"ng0", 100}, {"ngmax", 150},     {"mui", 10}};
 
-    ret["ener0"] = ret["energyTotal"] / std::pow(M_PI, 1.5) / 1. / std::pow(ret["width"], 3.0);
+    ret["ener0"] = std::get<ScalarValue>(ret["energyTotal"].getValue()) / std::pow(M_PI, 1.5) / 1. / std::pow(std::get<ScalarValue>(ret["width"].getValue()), 3.0);
     return ret;
 }
 
