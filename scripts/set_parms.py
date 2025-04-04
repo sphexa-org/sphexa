@@ -35,6 +35,18 @@ from argparse import ArgumentParser
 
 import h5py
 
+def parse_value(v):
+    if "," in v:
+        try:
+            return [int(x) for x in v.split(",")]
+        except ValueError:
+            return [float(x) for x in v.split(",")]
+    else:
+        try:
+            return int(v)
+        except ValueError:
+            return float(v)
+
 if __name__ == "__main__":
     parser = ArgumentParser(description="Create settings file")
     parser.add_argument("settingsFile", help="Simulation settings HDF5 file")
@@ -49,13 +61,16 @@ if __name__ == "__main__":
     settingsDict = dict(zip(settings[:-1:2], settings[1::2]))
     for k, v in settingsDict.items():
         key = k.strip("-")
-        try:
-            f.attrs[key] = int(v)
-        except ValueError:
-            f.attrs[key] = float(v)
+        v = parse_value(v)
+        f.attrs[key] = v
 
     print("{0} now contains the following settings:".format(args.settingsFile))
     for k, v in f.attrs.items():
-        print("  ", k, v)
+        if v.size > 1:
+            v = v.tolist()
+            formatted_value = "[" + ", ".join(map(str, v)) + "]"
+            print("  ", k, formatted_value)
+        else:
+            print("  ", k, v)
 
     f.close()
