@@ -39,6 +39,8 @@
 #include "cstone/cuda/cuda_utils.hpp"
 #include "cstone/primitives/accel_switch.hpp"
 
+#include "init/settings.hpp"
+
 #include "sph/hydro_turb/create_modes.hpp"
 
 namespace sph
@@ -54,9 +56,9 @@ class TurbulenceData
 public:
     using RealType = T;
 
-    TurbulenceData(const std::map<std::string, double>& constants, bool verbose)
-        : solWeight(constants.at("solWeight"))
-        , gen(size_t(constants.at("rngSeed")))
+    TurbulenceData(const sphexa::InitSettings& constants, bool verbose)
+        : solWeight(std::get<sphexa::ScalarValue>(constants.at("solWeight").getValue()))
+        , gen(size_t(std::get<sphexa::ScalarValue>(constants.at("rngSeed").getValue())))
     {
         initModes(constants, verbose);
     }
@@ -148,18 +150,18 @@ private:
      *
      * Also fills the phases with a random gaussian distribution, which  will be overwritten when loading from file.
      */
-    void initModes(const std::map<std::string, double>& constants, bool verbose)
+    void initModes(const sphexa::InitSettings& constants, bool verbose)
     {
-        double eps         = constants.at("epsilon");
-        size_t stMaxModes  = size_t(constants.at("stMaxModes"));
-        double Lbox        = constants.at("Lbox");
-        double velocity    = constants.at("stMachVelocity");
-        size_t stSpectForm = size_t(constants.at("stSpectForm"));
-        double powerLawExp = constants.at("powerLawExp");
-        double anglesExp   = constants.at("anglesExp");
+        double eps         = std::get<sphexa::ScalarValue>(constants.at("epsilon").getValue());
+        size_t stMaxModes  = size_t(std::get<sphexa::ScalarValue>(constants.at("stMaxModes").getValue()));
+        double Lbox        = std::get<sphexa::ScalarValue>(constants.at("Lbox").getValue());
+        double velocity    = std::get<sphexa::ScalarValue>(constants.at("stMachVelocity").getValue());
+        size_t stSpectForm = size_t(std::get<sphexa::ScalarValue>(constants.at("stSpectForm").getValue()));
+        double powerLawExp = std::get<sphexa::ScalarValue>(constants.at("powerLawExp").getValue());
+        double anglesExp   = std::get<sphexa::ScalarValue>(constants.at("anglesExp").getValue());
 
         double twopi   = 2.0 * M_PI;
-        double energy  = constants.at("stEnergyPrefac") * std::pow(velocity, 3) / Lbox;
+        double energy  = std::get<sphexa::ScalarValue>(constants.at("stEnergyPrefac").getValue()) * std::pow(velocity, 3) / Lbox;
         double stirMin = (1.0 - eps) * twopi / Lbox;
         double stirMax = (3.0 + eps) * twopi / Lbox;
 
