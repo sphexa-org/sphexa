@@ -41,7 +41,6 @@
 
 #include "init/factory.hpp"
 #include "io/arg_parser.hpp"
-#include "io/id_tag_utils.hpp"
 #include "io/factory.hpp"
 #include "observables/factory.hpp"
 #include "propagator/factory.hpp"
@@ -100,8 +99,6 @@ int main(int argc, char** argv)
     const std::string        profFreqStr        = parser.get("--profile", maxStepStr);
     const bool               profEnabled        = parser.exists("--profile");
     const std::string        pmroot             = parser.get("--pmroot", std::string("/sys/cray/pm_counters"));
-    const std::vector<std::string> idSel        = parser.getCommaList("--idSel");
-    const std::vector<std::string> sphSel       = parser.getCommaList("--sphSel");
     std::string              outFile            = parser.get("-o", "dump_" + removeModifiers(initCond));
     std::string              outFileSubset      = parser.get("-o-subset", "dump_subset_" + removeModifiers(initCond));
 
@@ -140,7 +137,7 @@ int main(int argc, char** argv)
     if (!parser.exists("-o")) { outFile += fileWriter->suffix(); }
     if (writeEnabled) { writeSettings(simInit->constants(), outFile, fileWriter.get()); }
     if (!parser.exists("-o-subset")) { outFileSubset += fileWriter->suffix(); }
-    if (writeEnabledSubset) { writeSettings(simInit->idSubsets(), outFileSubset, fileWriter.get()); }
+    if (writeEnabledSubset) { writeSettings(simInit->subsets(), outFileSubset, fileWriter.get()); }
     if (rank == 0) { std::cout << "Data generated for " << d.numParticlesGlobal << " global particles\n"; }
 
     uint64_t bucketSizeFocus = 64;
@@ -157,7 +154,6 @@ int main(int argc, char** argv)
     size_t startIteration    = d.iteration;
     bool   isOutputTriggered = false;
     bool   isSubsetOutputTriggered = false;
-
     for (bool keepRunning = true; keepRunning; d.iteration++)
     {
         propagator->computeForces(domain, simData);
@@ -191,9 +187,10 @@ int main(int argc, char** argv)
                                   isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtraSubset) ||
                                   (isWallClockReached && writeEnabledSubset) || isSubsetOutputTriggered;
 
-        if (isSubsetOutputTriggered) // && propatagor->isSynced
+        if (isSubsetOutputTriggered)
         {
-            propagator->saveSelParticlesFields(fileWriter.get(), outFileSubset, domain.startIndex(), domain.endIndex(), simData.hydro);
+            // TODO: check if we need addStep, saveFields, save, closeStep
+            propagator->saveSubsetFields(fileWriter.get(), outFileSubset, domain.startIndex(), domain.endIndex(), simData.hydro);
             isSubsetOutputTriggered = false;
         }
 
@@ -254,7 +251,7 @@ void printHelp(char* name, int rank)
 {
     if (rank == 0)
     {
-        // TODO: add missing options
+        // TODO: add missing options (avClean, duration, profile, pmroot)
         printf("\nUsage:\n\n");
         printf("%s [OPTIONS]\n", name);
         printf("\nWhere possible options are:\n\n");
