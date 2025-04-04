@@ -75,7 +75,14 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     const double r                  = 2 * hVal;
     const double expected_neighbors = 4.0 / 3.0 * M_PI * r * r * r * n / (box.lx() * box.ly() * box.lz());
     printf("Number of particles: %u\n", n);
-    printf("Expected average number of neighbors: %.0f\n", expected_neighbors);
+    printf("Expected average number of neighbors for computations: %.0f\n", expected_neighbors);
+    if (searchExtFactor != 1)
+    {
+        const double rExt = r * searchExtFactor;
+        const double expected_neighbors_in_list =
+            4.0 / 3.0 * M_PI * rExt * rExt * rExt * n / (box.lx() * box.ly() * box.lz());
+        printf("Expected average number of neighbors in NB lists: %.0f\n", expected_neighbors_in_list);
+    }
 
     const Tc* x         = coords.x().data();
     const Tc* y         = coords.y().data();
