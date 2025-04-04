@@ -27,6 +27,7 @@
  * @brief Test-case simulation data initialization
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
+ * @author Christopher Bignamini <christopher.bignamini@gmail.com>
  */
 
 #pragma once
