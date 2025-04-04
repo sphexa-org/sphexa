@@ -96,6 +96,7 @@ int main(int argc, char** argv)
     const bool               profEnabled  = parser.exists("--profile");
     const std::string        pmroot       = parser.get("--pmroot", std::string("/sys/cray/pm_counters"));
     std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
+    std::string              profFile     = parser.get("-op", std::string("profile"));
 
     std::ofstream nullOutput("/dev/null");
     std::ostream& output = (quiet || rank) ? nullOutput : std::cout;
@@ -178,7 +179,7 @@ int main(int argc, char** argv)
         if (isOutputStep(d.iteration, profFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, profFreqStr) ||
             isWallClockReached)
         {
-            if (profEnabled) { propagator->writeMetrics(fileWriter.get(), "profile"); }
+            if (profEnabled) { propagator->writeMetrics(fileWriter.get(), profFile); }
         }
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
