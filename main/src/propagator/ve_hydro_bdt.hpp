@@ -119,7 +119,7 @@ public:
         if (avClean && rank == 0) { std::cout << "AV cleaning is activated" << std::endl; }
         try
         {
-            timestep_.dt_m1[0] = settings.at("minDt");
+            timestep_.dt_m1[0] = std::get<ScalarValue>(settings.at("minDt").getValue());
         }
         catch (const std::out_of_range&)
         {
