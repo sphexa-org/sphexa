@@ -82,10 +82,10 @@ public:
     virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&){};
 
     //! @brief save selected particle data fields to file                                                   // TODO: const ParticleDataType::HydroData&
-    void saveSelParticlesFields(IFileWriter* writer, std::string selParticlesOutFile, size_t first, size_t last, ParticleDataType::HydroData& hydroSimData)
+    void saveSubsetFields(IFileWriter* writer, std::string selParticlesOutFile, size_t first, size_t last, ParticleDataType::HydroData& hydroSimData)
     {
         // TODO: outputSelParticlesAllocatedFields not needed, keeping it as separate function for refactoring reasons
-        outputSelParticlesAllocatedFields(writer, selParticlesOutFile, first, last, hydroSimData);
+        outputSubsetAllocatedFields(writer, selParticlesOutFile, first, last, hydroSimData);
         timer.step("SelectedParticlesFileOutput");
     }
 
@@ -184,7 +184,7 @@ protected:
     }
 
     // TODO: last parameter should be const& but at some point we use the data() method which is non-const
-    void outputSelParticlesAllocatedFields(IFileWriter* writer, std::string selParticlesOutFile, size_t first, size_t last, ParticleDataType::HydroData& hydroSimData)
+    void outputSubsetAllocatedFields(IFileWriter* writer, std::string selParticlesOutFile, size_t first, size_t last, ParticleDataType::HydroData& hydroSimData)
     {
         // TODO: what about MPI task sync at this point? I'm assuming everything is synced...
         ParticleIndexVectorType selectedParticlesIndexes;
