@@ -51,22 +51,22 @@ double twoDimRadius(T x, T y)
 }
 
 template<class Dataset, class T>
-void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& settings, T mPart)
+void initGreshoChanFields(Dataset& d, const InitSettings& settings, T mPart)
 {
-    double ng0 = settings.at("ng0");
-    double rho = settings.at("rho");
-    // double mPart         = settings.at("mTotal") / d.numParticlesGlobal;
+    double ng0 = std::get<ScalarValue>(settings.at("ng0").getValue());
+    double rho = std::get<ScalarValue>(settings.at("rho").getValue());
+    // double mPart         = std::get<ScalarValue>(settings.at("mTotal")) / d.numParticlesGlobal;
     double hInit         = 0.5 * std::cbrt(3. * ng0 * mPart / 4. / M_PI / rho);
-    double firstTimeStep = settings.at("minDt");
+    double firstTimeStep = std::get<ScalarValue>(settings.at("minDt").getValue());
 
-    d.gamma    = settings.at("gamma");
+    d.gamma    = std::get<ScalarValue>(settings.at("gamma").getValue());
     d.minDt    = firstTimeStep;
     d.minDt_m1 = firstTimeStep;
 
     auto   cv = sph::idealGasCv(d.muiConst, d.gamma);
-    double R1 = settings.at("R1");
-    double v0 = settings.at("v0");
-    double P0 = settings.at("P0");
+    double R1 = std::get<ScalarValue>(settings.at("R1").getValue());
+    double v0 = std::get<ScalarValue>(settings.at("v0").getValue());
+    double P0 = std::get<ScalarValue>(settings.at("P0").getValue());
 
     std::fill(d.m.begin(), d.m.end(), mPart);
     std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
@@ -118,6 +118,7 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
 template<class Dataset>
 class GreshoChan : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
 
@@ -158,8 +159,11 @@ public:
         BuiltinWriter attributeSetter(settings_);
         d.loadOrStoreAttributes(&attributeSetter);
 
-        T massPart = globalBox.lx() * globalBox.ly() * globalBox.lz() * settings_.at("rho") / d.numParticlesGlobal;
+        T massPart = globalBox.lx() * globalBox.ly() * globalBox.lz() * std::get<ScalarValue>(settings_.at("rho").getValue()) / d.numParticlesGlobal;
         initGreshoChanFields(d, settings_, massPart);
+
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical
+        Base::initSubsets(settings_, rank == 0, d);
 
         return globalBox;
     }
