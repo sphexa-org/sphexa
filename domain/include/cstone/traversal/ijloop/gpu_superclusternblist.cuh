@@ -893,7 +893,7 @@ template<class Config,
          class Interaction,
          class Postamble>
 __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPerBlock) void runIjLoop(
-    const Box<Tc> box,
+    const Box<Tc> __grid_constant__ box,
     const LocalIndex firstValidBody,
     const LocalIndex totalBodies,
     const LocalIndex firstBody,
@@ -932,10 +932,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     __shared__
         util::Uninitialized<particleData_t[NumSuperclustersPerBlock][Config::iClustersPerSupercluster * Config::iSize]>
             iSuperclusterDataBuffer;
-    __shared__ bool iSuperclusterUsePbcBuffer[NumSuperclustersPerBlock]
-                                             [Config::iClustersPerSupercluster * Config::iSize];
     particleData_t* iSuperclusterData = iSuperclusterDataBuffer.data()[threadIdx.z];
-    bool* iSuperclusterUsePbc         = iSuperclusterUsePbcBuffer[threadIdx.z];
     {
         const unsigned base = iSupercluster * Config::superclusterSize;
         for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
@@ -946,7 +943,6 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                                                                        : dummyParticleData(x, y, z, h, input, i);
             std::get<0>(iData) -= firstValidBody;
             iSuperclusterData[offset] = iData;
-            if constexpr (UsePbc) iSuperclusterUsePbc[offset] = requiresPbcHandling(box, iData);
         }
     }
 
@@ -1017,10 +1013,9 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
             {
                 if ((warpMask & 1) && (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j)))
                 {
-                    const auto iData  = iSuperclusterData[c * Config::iSize + threadIdx.x];
-                    const bool usePbc = UsePbc && iSuperclusterUsePbc[c * Config::iSize + threadIdx.x];
+                    const auto iData = iSuperclusterData[c * Config::iSize + threadIdx.x];
                     assert(std::get<0>(iData) == i - firstValidBody);
-                    const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
+                    const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
                     const auto ijInteraction       = interaction(iData, jData, ijPosDiff, distSq);
                     if (distSq < radiusSq(iData)) updateResult(iResults[c / iClustersPerWarp], ijInteraction);
                     if constexpr (Config::symmetric)
