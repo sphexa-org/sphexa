@@ -52,15 +52,15 @@ InitSettings KelvinHelmholtzConstants()
 }
 
 template<class T, class Dataset>
-void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& constants, T massPart)
+void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T massPart)
 {
-    T rhoInt = constants.at("rhoInt");
-    T rhoExt = constants.at("rhoExt");
-    T omega0 = constants.at("omega0");
-    T gamma  = constants.at("gamma");
-    T p      = constants.at("p");
-    T vxInt  = constants.at("vxInt");
-    T vxExt  = constants.at("vxExt");
+    T rhoInt = std::get<ScalarValue>(constants.at("rhoInt").getValue());
+    T rhoExt = std::get<ScalarValue>(constants.at("rhoExt").getValue());
+    T omega0 = std::get<ScalarValue>(constants.at("omega0").getValue());
+    T gamma  = std::get<ScalarValue>(constants.at("gamma").getValue());
+    T p      = std::get<ScalarValue>(constants.at("p").getValue());
+    T vxInt  = std::get<ScalarValue>(constants.at("vxInt").getValue());
+    T vxExt  = std::get<ScalarValue>(constants.at("vxExt").getValue());
 
     T uInt = p / ((gamma - 1.) * rhoInt);
     T uExt = p / ((gamma - 1.) * rhoExt);
@@ -126,6 +126,7 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
 template<class Dataset>
 class KelvinHelmholtzGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
 
@@ -163,7 +164,7 @@ public:
         std::vector<T> x, y, z;
         assembleCuboid<T>(keyStart, keyEnd, layer1, outerMulti, xBlock, yBlock, zBlock, x, y, z);
 
-        T stretch = std::cbrt(settings_.at("rhoInt") / settings_.at("rhoExt"));
+        T stretch = std::cbrt(std::get<ScalarValue>(settings_.at("rhoInt").getValue()) / std::get<ScalarValue>(settings_.at("rhoExt").getValue()));
         T topEdge = layer3.ymax();
 
         auto inLayer1 = [b = layer1](T u, T v, T w)
@@ -196,7 +197,7 @@ public:
 
         size_t npartInner   = innerMulti[0] * innerMulti[1] * innerMulti[2] * xBlock.size();
         T      volumeHD     = 0.5 * globalBox.lx() * globalBox.ly() * globalBox.lz();
-        T      particleMass = volumeHD * settings_.at("rhoInt") / npartInner;
+        T      particleMass = volumeHD * std::get<ScalarValue>(settings_.at("rhoInt").getValue()) / npartInner;
 
         d.resize(d.x.size());
 
@@ -205,6 +206,9 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initKelvinHelmholtzFields(d, settings_, particleMass);
+
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical
+        Base::initSubsets(settings_, rank == 0, d);
 
         return globalBox;
     }
