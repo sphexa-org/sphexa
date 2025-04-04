@@ -49,7 +49,6 @@ void restoreDataset(IFileReader* reader, Dataset& d)
     {
         if (d.isConserved(i))
         {
-            if (reader->rank() == 0) { std::cout << "restoring " << d.fieldNames[i] << std::endl; }
             std::visit([reader, key = d.fieldNames[i]](auto field)
                        { reader->readField(Dataset::prefix + key, field->data()); },
                        fieldPointers[i]);
@@ -79,11 +78,6 @@ class FileInit : public ISimInitializer<Dataset>
     std::string  h5_fname;
     int          initStep = -1;
 
-protected:
-    // TODO: to be discussed with Sebastian, do we override base classes InitSettings because of slicing?
-    using Base::idSelectionDatasets_;
-
-
 public:
     explicit FileInit(const std::string& fname, int initStep_, IFileReader* reader)
         : h5_fname(fname)
@@ -99,25 +93,8 @@ public:
         reader->setStep(h5_fname, initStep, FileMode::collective);
         auto box = restoreData(reader, simData);
 
-        // TODO: can we move the tagging to the ISimInitializer init function in order to avoid code duplication?
-        auto idSelectionSphereRadius = settings_.find("id_selection_sphere_radius");
-        if(idSelectionSphereRadius != settings_.end()) {
-
-            std::cout << "Execution of selected particle identification\n";
-
-            IdSelectionSphere idSelectionSphere{settings_.at("id_selection_sphere_center_x"), settings_.at("id_selection_sphere_center_y"),
-                                                settings_.at("id_selection_sphere_center_z"), idSelectionSphereRadius->second};
-
-            IdVectorType originalTaggedIds;
-            tagIdsInSphere(simData.hydro.id, originalTaggedIds, simData.hydro.x, simData.hydro.y, simData.hydro.z, 0,
-                simData.hydro.id.size(),idSelectionSphere);
-
-            idSelectionDatasets_["id_selection_sphere_0"] = IdSelectionDataset{IdSelectionSettings{idSelectionSphere, 0}, originalTaggedIds};
-
-        }
-        // TODO: add selection from idList case
-        // tagIdsInList(d.id, domain.startIndex(), domain.endIndex(), selParticlesIds);
-
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical
+        Base::initSubsets(settings_, false, simData.hydro, initStep);
 
         reader->closeStep();
         return box;
@@ -126,6 +103,7 @@ public:
     [[nodiscard]] const InitSettings& constants() const override { return settings_; }
 };
 
+// TODO: add tagging to this init case
 template<class Dataset>
 class FileSplitInit : public ISimInitializer<Dataset>
 {
