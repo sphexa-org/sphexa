@@ -43,7 +43,7 @@
 namespace sphexa
 {
 
-std::map<std::string, double> nohConstants()
+InitSettings nohConstants()
 {
     return {{"r0", 0},
             {"r1", 0.5},
@@ -64,24 +64,24 @@ std::map<std::string, double> nohConstants()
 }
 
 template<class Dataset>
-void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
+void initNohFields(Dataset& d, const InitSettings& constants)
 {
     using T = typename Dataset::RealType;
 
-    double r           = constants.at("r1");
+    double r           = std::get<ScalarValue>(constants.at("r1").getValue());
     double totalVolume = 4. * M_PI / 3. * r * r * r;
     double hInit       = std::cbrt(3.0 / (4 * M_PI) * d.ng0 * totalVolume / d.numParticlesGlobal) * 0.5;
-    double mPart       = constants.at("mTotal") / d.numParticlesGlobal;
+    double mPart       = std::get<ScalarValue>(constants.at("mTotal").getValue()) / d.numParticlesGlobal;
 
     auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
-    auto temp0 = constants.at("u0") / cv;
+    auto temp0 = std::get<ScalarValue>(constants.at("u0").getValue()) / cv;
 
     std::fill(d.m.begin(), d.m.end(), mPart);
     std::fill(d.h.begin(), d.h.end(), hInit);
     std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
     std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
     std::fill(d.temp.begin(), d.temp.end(), temp0);
-    std::fill(d.u.begin(), d.u.end(), constants.at("u0"));
+    std::fill(d.u.begin(), d.u.end(), std::get<ScalarValue>(constants.at("u0").getValue()));
     std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
 
     generateParticleIDs(d.id);
@@ -92,19 +92,20 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
         T radius = std::sqrt(d.x[i] * d.x[i] + d.y[i] * d.y[i] + d.z[i] * d.z[i]);
         radius   = std::max(radius, T(1e-10));
 
-        d.vx[i] = constants.at("vr0") * (d.x[i] / radius);
-        d.vy[i] = constants.at("vr0") * (d.y[i] / radius);
-        d.vz[i] = constants.at("vr0") * (d.z[i] / radius);
+        d.vx[i] = std::get<ScalarValue>(constants.at("vr0").getValue()) * (d.x[i] / radius);
+        d.vy[i] = std::get<ScalarValue>(constants.at("vr0").getValue()) * (d.y[i] / radius);
+        d.vz[i] = std::get<ScalarValue>(constants.at("vr0").getValue()) * (d.z[i] / radius);
 
-        d.x_m1[i] = d.vx[i] * constants.at("minDt");
-        d.y_m1[i] = d.vy[i] * constants.at("minDt");
-        d.z_m1[i] = d.vz[i] * constants.at("minDt");
+        d.x_m1[i] = d.vx[i] * std::get<ScalarValue>(constants.at("minDt").getValue());
+        d.y_m1[i] = d.vy[i] * std::get<ScalarValue>(constants.at("minDt").getValue());
+        d.z_m1[i] = d.vz[i] * std::get<ScalarValue>(constants.at("minDt").getValue());
     }
 }
 
 template<class Dataset>
 class NohGlassSphere : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
 
@@ -130,7 +131,7 @@ public:
         int               multi1D      = std::rint(cbrtNumPart / std::cbrt(blockSize));
         cstone::Vec3<int> multiplicity = {multi1D, multi1D, multi1D};
 
-        T              r = settings_.at("r1");
+        T              r = std::get<ScalarValue>(settings_.at("r1").getValue());
         cstone::Box<T> globalBox(-r, r, cstone::BoundaryType::open);
 
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
@@ -147,6 +148,9 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initNohFields(d, settings_);
+
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical
+        Base::initSubsets(settings_, rank == 0, d);
 
         return globalBox;
     }
