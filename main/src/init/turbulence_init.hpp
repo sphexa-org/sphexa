@@ -75,14 +75,14 @@ InitSettings TurbulenceConstants()
 
 //! @brief init particle data fields. Note: Dataset attributes must be initialized
 template<class Dataset>
-void initTurbulenceHydroFields(Dataset& d, const std::map<std::string, double>& constants)
+void initTurbulenceHydroFields(Dataset& d, const InitSettings& constants)
 {
-    double mPart = constants.at("mTotal") / d.numParticlesGlobal;
-    double Lbox  = constants.at("Lbox");
+    double mPart = std::get<ScalarValue>(constants.at("mTotal").getValue()) / d.numParticlesGlobal;
+    double Lbox  = std::get<ScalarValue>(constants.at("Lbox").getValue());
     double hInit = std::cbrt(3.0 / (4. * M_PI) * d.ng0 * std::pow(Lbox, 3) / d.numParticlesGlobal) * 0.5;
 
     auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
-    auto temp0 = constants.at("u0") / cv;
+    auto temp0 = std::get<ScalarValue>(constants.at("u0").getValue()) / cv;
 
     std::fill(d.m.begin(), d.m.end(), mPart);
     std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
@@ -90,7 +90,7 @@ void initTurbulenceHydroFields(Dataset& d, const std::map<std::string, double>& 
     std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
     std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
     std::fill(d.temp.begin(), d.temp.end(), temp0);
-    std::fill(d.u.begin(), d.u.end(), constants.at("u0"));
+    std::fill(d.u.begin(), d.u.end(), std::get<ScalarValue>(constants.at("u0").getValue()));
 
     std::fill(d.vx.begin(), d.vx.end(), 0.);
     std::fill(d.vy.begin(), d.vy.end(), 0.);
@@ -108,11 +108,6 @@ class TurbulenceGlass : public ISimInitializer<Dataset>
     using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
-
-protected:
-    // TODO: to be discussed with Sebastian, do we override base classes InitSettings because of slicing?
-    using Base::idSelectionDatasets_;
-
 
 public:
     explicit TurbulenceGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
@@ -137,7 +132,7 @@ public:
         cstone::Vec3<int> multiplicity       = {multi1D, multi1D, multi1D};
         size_t            numParticlesGlobal = multi1D * multi1D * multi1D * blockSize;
 
-        auto           lBox = settings_.at("Lbox");
+        auto           lBox = std::get<ScalarValue>(settings_.at("Lbox").getValue());
         cstone::Box<T> globalBox(-lBox / 2, lBox / 2, cstone::BoundaryType::periodic);
 
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
@@ -151,25 +146,8 @@ public:
 
         initTurbulenceHydroFields(d, settings_);
 
-        // TODO: can we move the tagging to the ISimInitializer init function in order to avoid code duplication?
-        auto idSelectionSphereRadius = settings_.find("id_selection_sphere_radius");
-        if(idSelectionSphereRadius != settings_.end()) {
-
-            if (rank == 0) { std::cout << "Execution of selected particle identification\n"; }
-
-            IdSelectionSphere idSelectionSphere{settings_.at("id_selection_sphere_center_x"), settings_.at("id_selection_sphere_center_y"),
-                                                settings_.at("id_selection_sphere_center_z"), idSelectionSphereRadius->second};
-
-            IdVectorType originalTaggedIds;
-            tagIdsInSphere(simData.hydro.id, originalTaggedIds, simData.hydro.x, simData.hydro.y, simData.hydro.z, 0,
-                simData.hydro.id.size(),idSelectionSphere);
-
-            idSelectionDatasets_["id_selection_sphere_0"] = IdSelectionDataset{IdSelectionSettings{idSelectionSphere, 0}, originalTaggedIds};
-
-        }
-        // TODO: add selection from idList case
-        // tagIdsInList(d.id, domain.startIndex(), domain.endIndex(), selParticlesIds);
-
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical
+        Base::initSubsets(settings_, rank == 0, d);
 
         return globalBox;
     }
