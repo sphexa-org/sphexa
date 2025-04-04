@@ -48,17 +48,17 @@ std::unique_ptr<IObservables<Dataset>> observablesFactory(const InitSettings& se
         {
             throw std::runtime_error("need gravWaveTheta ant gravWavePhi input attributes for grav waves observable\n");
         }
-        return Observables<Dataset>::makeGravWaveObs(constantsFile, settings.at("gravWaveTheta"),
-                                                     settings.at("gravWavePhi"));
+        return Observables<Dataset>::makeGravWaveObs(constantsFile, std::get<ScalarValue>(settings.at("gravWaveTheta").getValue()),
+                                                     std::get<ScalarValue>(settings.at("gravWavePhi").getValue()));
     }
     if (settings.count("wind-shock"))
     {
-        return Observables<Dataset>::makeWindBubbleObs(constantsFile, settings.at("rhoInt"), settings.at("uExt"),
-                                                       settings.at("rSphere"));
+        return Observables<Dataset>::makeWindBubbleObs(constantsFile, std::get<ScalarValue>(settings.at("rhoInt").getValue()), std::get<ScalarValue>(settings.at("uExt").getValue()),
+                                                       std::get<ScalarValue>(settings.at("rSphere").getValue()));
     }
     if (settings.count("turbulence"))
     {
-        if (settings.contains("eosChoice") && settings.at("eosChoice") == 1)
+        if (settings.contains("eosChoice") && std::get<ScalarValue>(settings.at("eosChoice").getValue()) == 1)
         {
             // isothermal EOS has constant sound speed, mach number is sqrt(2*E_kin)
             return Observables<Dataset>::makeTimeEnergyObs(constantsFile);
