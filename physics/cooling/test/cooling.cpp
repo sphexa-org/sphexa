@@ -34,7 +34,7 @@ TEST(cooling_grackle, testCoolParticles)
 
     cooling::Cooler<Real> cd;
 
-    std::map<std::string, double> grackleOptions;
+    sphexa::InitSettings grackleOptions;
     grackleOptions["cooling::m_code_in_ms"]           = mass_unit;
     grackleOptions["cooling::l_code_in_kpc"]          = 1. / KPCCM;
     grackleOptions["cooling::use_grackle"]            = 1;
@@ -115,7 +115,7 @@ TEST(cooling_grackle2, test2)
 
     using Real = double;
     cooling::Cooler<Real>         cd;
-    std::map<std::string, double> grackleOptions;
+    sphexa::InitSettings grackleOptions;
     grackleOptions["cooling::m_code_in_ms"]           = 1e16;
     grackleOptions["cooling::l_code_in_kpc"]          = 46400;
     grackleOptions["cooling::use_grackle"]            = 1;
