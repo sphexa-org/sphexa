@@ -1,7 +1,7 @@
 #pragma once
 
 #include <chrono>
-#include <iostream>
+#include <map>
 
 #if defined(USE_PROFILING_NVTX) || defined(USE_PROFILING_SCOREP)
 
@@ -52,11 +52,17 @@ public:
         tlast = now;
     }
 
+    void logStatistics(const std::string& name, float value)
+    {
+        perfStats[name].push_back(value);
+    }
+
     //! @brief time elapsed between tstart and last call of step()
     [[nodiscard]] float sumOfSteps() const { return std::chrono::duration_cast<Time>(tlast - tstart).count(); }
 
     //! @brief time elapsed between tstart and now
     [[nodiscard]] float elapsed() const { return std::chrono::duration_cast<Time>(Clock::now() - tstart).count(); }
+    [[nodiscard]] float getLastStepTime() const { return stepTimes.back(); }
 
     template<class Archive>
     void writeTimings(Archive* ar, const std::string& outFile)
@@ -68,8 +74,22 @@ public:
         ar->writeField("timings", stepTimes.data(), stepTimes.size());
         ar->closeStep();
 
+        for (const auto& item : perfStats)
+        {
+            if (item.second.empty()) { continue; }
+            ar->addStep(0, item.second.size(), outFile + ar->suffix());
+            ar->stepAttribute("numRanks", &numRanks, 1);
+            ar->stepAttribute("numIterations", &numStartCalled, 1);
+            ar->writeField(item.first, item.second.data(), item.second.size());
+            ar->closeStep();
+        }
+
         numStartCalled = 0;
         stepTimes.clear();
+        for (auto& item : perfStats)
+        {
+            item.second.clear();
+        }
     }
 
 private:
@@ -79,6 +99,8 @@ private:
     std::chrono::time_point<Clock> tstart, tlast;
     std::vector<float>             stepTimes;
     int                            numStartCalled{0};
+
+    std::map<std::string, std::vector<float>> perfStats;
 };
 
 } // namespace sphexa
