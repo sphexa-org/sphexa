@@ -107,22 +107,16 @@ TEST(IO, tagIdInSphere)
 
     std::vector<uint64_t> taggedIdxRef{444, 445, 454, 455, 544, 545, 554, 555};
     std::vector<uint64_t> taggedIdx;
-    std::vector<uint64_t> originalTaggedIdsRef{444, 445, 454, 455, 544, 545, 554, 555};
-    std::vector<uint64_t> originalTaggedIds;
-    sphexa::tagIdsInSphere(ids, originalTaggedIds, x, y, z, 0, ids.size(), selSphereData);
+    sphexa::tagIdsInSphere(ids, x, y, z, 0, ids.size(), selSphereData);
     sphexa::findTaggedIds(ids, 0, ids.size(), taggedIdx);
     EXPECT_EQ(taggedIdx, taggedIdxRef);
-    EXPECT_EQ(originalTaggedIds, originalTaggedIdsRef);
 
     taggedIdxRef = {444, 445, 454, 455};
-    originalTaggedIdsRef = {444, 445, 454, 455};
     std::iota(std::begin(ids), std::end(ids), 0);
     taggedIdx.clear();
-    originalTaggedIds.clear();
-    sphexa::tagIdsInSphere(ids, originalTaggedIds, x, y, z, first, last, selSphereData);
+    sphexa::tagIdsInSphere(ids, x, y, z, first, last, selSphereData);
     sphexa::findTaggedIds(ids, 0, ids.size(), taggedIdx);
     EXPECT_EQ(taggedIdx, taggedIdxRef);
-    EXPECT_EQ(originalTaggedIds, originalTaggedIdsRef);
 
 }
 

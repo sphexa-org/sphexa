@@ -70,22 +70,24 @@ void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t
 
 /*! @brief Id tagging (in first:last range) from list, CPU version
  *
- * @param[out] ids          ordered id list
- * @param[in]  first        first id index // TODO number of elements and pass iterator?
- * @param[in]  last         last (excluded) id index
- * @param[in]  selectedIds  indexes to be tagged
+ * @param[out] ids               id list
+ * @param[in]  first             first id index // TODO number of elements and pass iterator?
+ * @param[in]  last              last (excluded) id index
+ * @param[in]  selectedIds       indexes to be tagged
  */
 void tagIdsInList(IdVectorType& ids, size_t first, size_t last, const IdVectorType& selectedIds);
 
 /*! @brief Id tagging (in first:last range) from list, GPU version
  *
- * @param[out] ids          ordered id list
- * @param[in]  first        first id index // TODO number of elements and pass iterator?
- * @param[in]  last         last (excluded) id index
- * @param[in]  selectedIds  indexes to be tagged
+ * @param[out] ids               id list
+ * @param[in]  first             first id index // TODO number of elements and pass iterator?
+ * @param[in]  last              last (excluded) id index
+ * @param[in]  selectedIds       indexes to be tagged
  */
 void tagIdsInList(cstone::DeviceVector<IdType>& ids, size_t first, size_t last, const IdVectorType& selectedIds);
 
+
+// Id tagging types selection
 /*! @brief Id tagging spherical volume definition
  */
 struct IdSelectionSphere
@@ -93,11 +95,14 @@ struct IdSelectionSphere
     std::array<CoordinateType, 3> center;
     CoordinateType radius;
 };
+/*! @brief Id tagging list definition
+ */
+using IdSelectionList = IdVectorType;
+
 
 /*! @brief Id tagging (in first:last range) in spherical volume, CPU version
  *
- * @param[out] ids               ordered id list
- * @param[out] originalTaggedIds original values of tagged ids
+ * @param[out] ids               id list
  * @param[in]  x                 x coordinates
  * @param[in]  y                 y coordinates
  * @param[in]  z                 z coordinates
@@ -105,13 +110,12 @@ struct IdSelectionSphere
  * @param[in]  last              last (excluded) id index
  * @param[in]  selSphereData     spherical volume definition
  */
-void tagIdsInSphere(IdVectorType& ids, IdVectorType& originalTaggedIds, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
+void tagIdsInSphere(IdVectorType& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
     const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
 
 /*! @brief Id tagging (in first:last range) in spherical volume, GPU version
  *
  * @param[out] ids               ordered id list
- * @param[out] originalTaggedIds original values of tagged ids
  * @param[in]  x                 x coordinates
  * @param[in]  y                 y coordinates
  * @param[in]  z                 z coordinates
@@ -119,7 +123,7 @@ void tagIdsInSphere(IdVectorType& ids, IdVectorType& originalTaggedIds, const st
  * @param[in]  last              last (excluded) id index
  * @param[in]  selSphereData     spherical volume definition
  */
-void tagIdsInSphere(cstone::DeviceVector<IdType>& ids, IdVectorType& originalTaggedIds, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
+void tagIdsInSphere(cstone::DeviceVector<IdType>& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
     const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
 
 /*! @brief Tagged ids field output

@@ -56,10 +56,10 @@ void tagIdsInList(IdVectorType& ids, size_t first, size_t last, const IdVectorTy
     });
 }
 
+// TODO: should we save here the list of tagged ids without tag?
 /*! @brief Id tagging (in first:last range) in spherical volume, CPU version
  *
  * @param[out] ids                ordered id list
- * @param[out] originalTaggedIds  original values of tagged ids
  * @param[in]  x                  x coordinates
  * @param[in]  y                  y coordinates
  * @param[in]  z                  z coordinates
@@ -67,12 +67,9 @@ void tagIdsInList(IdVectorType& ids, size_t first, size_t last, const IdVectorTy
  * @param[in]  last               last (excluded) id index
  * @param[in]  selSphereData      spherical volume definition
  */
-void tagIdsInSphere(IdVectorType& ids, IdVectorType& originalTaggedIds, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
+void tagIdsInSphere(IdVectorType& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
     const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData)
 {
-    originalTaggedIds.reserve(lastIndex-firstIndex);
-    auto numTaggedIds = 0;
-
     // TODO: can we use C++23 zip iterators? Is there anything already implemented in SPH-EXA?
     const auto squareRadius = selSphereData.radius*selSphereData.radius;
 //#pragma omp parallel for
@@ -83,13 +80,9 @@ void tagIdsInSphere(IdVectorType& ids, IdVectorType& originalTaggedIds, const st
         if((current_x - selSphereData.center[0])*(current_x - selSphereData.center[0]) +
             (current_y - selSphereData.center[1])*(current_y - selSphereData.center[1]) +
             (current_z - selSphereData.center[2])*(current_z - selSphereData.center[2]) <= squareRadius) {
-                originalTaggedIds.push_back(ids[particleIndex]);
                 ids[particleIndex] = ids[particleIndex] | msbMask;
-                numTaggedIds++;
         }
     }
-
-    originalTaggedIds.resize(numTaggedIds);
 }
 
 
