@@ -35,6 +35,7 @@
 
 #include "cstone/sfc/box.hpp"
 #include "cstone/tree/continuum.hpp"
+#include "io/id_tag_utils.hpp"
 #include "sph/eos.hpp"
 
 #include "isim_init.hpp"
@@ -45,18 +46,18 @@
 namespace sphexa
 {
 
-std::map<std::string, double> evrardConstants()
+InitSettings evrardConstants()
 {
     return {{"gravConstant", 1.}, {"r", 1.},          {"mTotal", 1.}, {"gamma", 5. / 3.}, {"u0", 0.05},
             {"minDt", 1e-4},      {"minDt_m1", 1e-4}, {"mui", 10},    {"ng0", 100},       {"ngmax", 150}};
 }
 
 template<class Dataset>
-void initEvrardFields(Dataset& d, const std::map<std::string, double>& constants)
+void initEvrardFields(Dataset& d, const InitSettings& constants)
 {
     using T = typename Dataset::RealType;
 
-    double mPart = constants.at("mTotal") / d.numParticlesGlobal;
+    double mPart = std::get<ScalarValue>(constants.at("mTotal").getValue()) / d.numParticlesGlobal;
 
     std::fill(d.m.begin(), d.m.end(), mPart);
     std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
@@ -74,11 +75,11 @@ void initEvrardFields(Dataset& d, const std::map<std::string, double>& constants
     generateParticleIDs(d.id);
 
     auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
-    auto temp0 = constants.at("u0") / cv;
+    auto temp0 = std::get<ScalarValue>(constants.at("u0").getValue()) / cv;
     std::fill(d.temp.begin(), d.temp.end(), temp0);
-    std::fill(d.u.begin(), d.u.end(), constants.at("u0"));
+    std::fill(d.u.begin(), d.u.end(), std::get<ScalarValue>(constants.at("u0").getValue()));
 
-    T totalVolume = 4 * M_PI / 3 * std::pow(constants.at("r"), 3);
+    T totalVolume = 4 * M_PI / 3 * std::pow(std::get<ScalarValue>(constants.at("r").getValue()), 3);
     // before the contraction with sqrt(r), the sphere has a constant particle concentration of Ntot / Vtot
     // after shifting particles towards the center by factor sqrt(r), the local concentration becomes
     // c(r) = 2/3 * 1/r * Ntot / Vtot
@@ -141,11 +142,6 @@ class EvrardGlassSphere : public ISimInitializer<Dataset>
     std::string          glassBlock;
     mutable InitSettings settings_;
 
-protected:
-    // TODO: to be discussed with Sebastian, do we override base classes InitSettings because of slicing?
-    using Base::idSelectionDatasets_;
-
-
 public:
     explicit EvrardGlassSphere(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
@@ -168,7 +164,7 @@ public:
         int               multi1D      = std::rint(cbrtNumPart / std::cbrt(blockSize));
         cstone::Vec3<int> multiplicity = {multi1D, multi1D, multi1D};
 
-        T              r = settings_.at("r");
+        T              r = std::get<ScalarValue>(settings_.at("r").getValue());
         cstone::Box<T> globalBox(-r, r, cstone::BoundaryType::open);
 
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
@@ -188,6 +184,10 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initEvrardFields(d, settings_);
+
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical.
+        // This is not ideal but alternatively I would need to have settings_ as a member of the base class
+        Base::initSubsets(settings_, rank == 0, d);
 
         return globalBox;
     }
