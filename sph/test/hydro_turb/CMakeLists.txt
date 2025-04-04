@@ -10,7 +10,7 @@ add_executable(${testname} ${UNIT_TESTS})
 target_compile_options(${testname} PRIVATE -Wall -Wextra -Wno-unknown-pragmas)
 
 target_include_directories(${testname} PRIVATE ${CSTONE_DIR})
-target_include_directories(${testname} PRIVATE ${PROJECT_SOURCE_DIR}/include)
+target_include_directories(${testname} PRIVATE ${PROJECT_SOURCE_DIR}/include ${SPH_EXA_DIR})
 
 target_link_libraries(${testname} PRIVATE GTest::gtest_main)
 add_test(NAME ${testname} COMMAND ${testname})
