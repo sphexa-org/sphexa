@@ -97,22 +97,39 @@ void readFileAttributes(InitSettings& settings, const std::string& settingsFile,
         for (const auto& attr : fileAttributes)
         {
             int64_t sz = reader->fileAttributeSize(attr);
-            if (sz == 1)
+            bool settingRecognized = settings.count(attr);
+
+            if(sz == 1) {
+                settings[attr] = ScalarValue{};
+                reader->fileAttribute(attr, &std::get<ScalarValue>(settings[attr].getValue()), sz);
+            } else {
+                settings[attr] = VectorValue(sz);
+                reader->fileAttribute(attr, std::get<VectorValue>(settings[attr].getValue()).data(), sz);
+            }
+            if (reader->rank() == 0 && verbose)
             {
-                bool settingRecognized = settings.count(attr);
-                settings[attr]         = {};
-                reader->fileAttribute(attr, &settings[attr], sz);
-                if (reader->rank() == 0 && verbose)
+                if (settingRecognized)
                 {
-                    if (settingRecognized)
-                    {
-                        std::cout << "Override setting from " << settingsFile << ": " << attr << " = " << settings[attr]
-                                  << std::endl;
+                    if (sz == 1) {
+                        std::cout << "Override setting from " << settingsFile << ": " << attr << " = "
+                            << std::get<ScalarValue>(settings[attr].getValue())<< std::endl;
                     }
-                    else
-                    {
-                        std::cout << "Setting from " << settingsFile << ": " << attr << " = " << settings[attr]
-                                  << " not recognized " << std::endl;
+                    else {
+                        std::cout << "Override setting from " << settingsFile << ": " << attr << " = "
+                            << std::get<VectorValue>(settings[attr].getValue())[0] <<",...,"
+                            << std::get<VectorValue>(settings[attr].getValue())[sz-1] <<std::endl;
+                    }
+                }
+                else
+                {
+                    if (sz == 1) {
+                        std::cout << "Setting from " << settingsFile << ": " << attr << " = "
+                            << std::get<ScalarValue>(settings[attr].getValue()) << " not recognized " << std::endl;
+                    }
+                    else {
+                        std::cout << "Setting from " << settingsFile << ": " << attr << " = "
+                            << std::get<VectorValue>(settings[attr].getValue())[0] <<",...,"
+                            << std::get<VectorValue>(settings[attr].getValue())[sz-1] << " not recognized " << std::endl;
                     }
                 }
             }
