@@ -36,6 +36,7 @@
 
 #include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
+#include "io/id_tag_utils.hpp"
 #include "sphexa/simulation_data.hpp"
 
 #include "settings.hpp"
@@ -52,13 +53,77 @@ public:
 
     virtual const InitSettings& constants() const = 0;
 
-    // // TODO: do we have to keep this class as pure virtual?
-    const IdSubsets& idSubsets() const  { return idSelectionDatasets_; }
+    const IdSubsets& subsets() const  { return idSubsets_; }
 
     virtual ~ISimInitializer() = default;
 
 protected:
-    mutable IdSubsets idSelectionDatasets_;
+
+    // TODO: Base::initSubsets(settings_, &d);// I have to pass a ref to the entire dataset because I could need the coordinates, if selection is geometrical
+    /*! @brief Id tagging
+    *
+    * @param[in]  settings    spherical volume definition
+    * @param[in]  printLog    activate logging
+    * @param[out] d           time step at which selection is done
+    */
+    void initSubsets(const InitSettings& settings, bool printLog, Dataset::HydroData& particlesData, int initStep = 0) const
+    {
+        auto idSelectionSphereRadius = settings.find("id_selection_sphere_radius");
+        if(idSelectionSphereRadius != settings.end()) {
+            if(printLog) { std::cout << "Execution of id subset tagging in sphere" << std::endl; }
+            initSubsets(IdSelectionSphere{std::get<ScalarValue>(settings.at("id_selection_sphere_center_x").getValue()),
+                std::get<ScalarValue>(settings.at("id_selection_sphere_center_y").getValue()), std::get<ScalarValue>(settings.at("id_selection_sphere_center_z").getValue()),
+                std::get<ScalarValue>(idSelectionSphereRadius->second.getValue())}, initStep,
+                particlesData.x, particlesData.y, particlesData.z, particlesData.id);
+        }
+        auto idSelectionList = settings.find("id_selection_list");
+        if(idSelectionList != settings.end()) {
+            if(printLog) { std::cout << "Execution of id subset tagging in list" << std::endl; }
+            if(idSelectionList->second.isVector()) {
+                initSubsets(std::get<VectorValue>(idSelectionList->second.getValue()),
+                initStep, particlesData.id);
+            }
+            else {
+                initSubsets(IdVectorType{IdType(std::get<ScalarValue>(idSelectionList->second.getValue()))},
+                initStep, particlesData.id);
+            }
+        }
+        // TODO: if we only want the subset selection attributes in the subset file, I can delete them from settings_ here, after subset initialization.
+        // If that is the case, do not forgot to call Base::resetConstants(settings_): maybe it's not needed in the simulation but it will keep the settings_
+        // consistent along the inheritance hierachy
+    }
+
+    /*! @brief Id tagging in spherical volume
+    *
+    * @param[in]  selSphereData    spherical volume definition
+    * @param[in]  initStep         time step at which selection is done
+    * @param[in]  x                x coordinates
+    * @param[in]  y                y coordinates
+    * @param[in]  z                z coordinates
+    * @param[out] ids              id list from hydro data
+    */
+    void initSubsets(const IdSelectionSphere& selSphereData, int initStep, const std::vector<CoordinateType>& x,
+        const std::vector<CoordinateType>& y, const std::vector<CoordinateType>& z, IdVectorType& ids) const
+    {
+        tagIdsInSphere(ids, x, y, z, 0, ids.size(), selSphereData);
+
+        idSubsets_["id_selection_sphere"] = IdSelectionSettings{selSphereData, initStep};
+    }
+
+    /*! @brief Id tagging from list
+    *
+    * @param[in]  selectedIds    ids to be tagged
+    * @param[in]  initStep       time step at which selection is done
+    * @param[out] ids            id list from hydro data
+    */
+    void initSubsets(const IdVectorType& selectedIds, int initStep, IdVectorType& ids) const
+    {
+        tagIdsInList(ids, 0, ids.size(), selectedIds);
+
+        idSubsets_["id_selection_list"] = IdSelectionSettings{selectedIds, initStep};
+    }
+
+    mutable IdSubsets idSubsets_;
 
 };
 
