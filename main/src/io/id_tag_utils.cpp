@@ -70,21 +70,16 @@ void tagIdsInList(IdVectorType& ids, size_t first, size_t last, const IdVectorTy
 void tagIdsInSphere(IdVectorType& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
     const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData)
 {
-    // TODO: can we use C++23 zip iterators? Is there anything already implemented in SPH-EXA?
     const auto squareRadius = selSphereData.radius*selSphereData.radius;
-//#pragma omp parallel for
+#pragma omp parallel for schedule(static)
     for(auto particleIndex = firstIndex; particleIndex < lastIndex; particleIndex++){
-        auto current_x = x[particleIndex];
-        auto current_y = y[particleIndex];
-        auto current_z = z[particleIndex];
-        if((current_x - selSphereData.center[0])*(current_x - selSphereData.center[0]) +
-            (current_y - selSphereData.center[1])*(current_y - selSphereData.center[1]) +
-            (current_z - selSphereData.center[2])*(current_z - selSphereData.center[2]) <= squareRadius) {
-                ids[particleIndex] = ids[particleIndex] | msbMask;
+        cstone::Vec3<CoordinateType> currentPosition{x[particleIndex], y[particleIndex], z[particleIndex]};
+        auto squaredDistance = util::norm2(currentPosition - selSphereData.center);
+        if(squaredDistance < squareRadius) {
+            ids[particleIndex] = ids[particleIndex] | msbMask;
         }
     }
 }
-
 
 /*! @brief Tagged id identification function  
  *

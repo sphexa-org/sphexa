@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "cstone/cuda/device_vector.h"
+#include "cstone/tree/definitions.h"
 #include "sph/particles_data.hpp"
 #include "sph/types.hpp"
 #include "io/ifile_io.hpp"
@@ -92,7 +93,7 @@ void tagIdsInList(cstone::DeviceVector<IdType>& ids, size_t first, size_t last, 
  */
 struct IdSelectionSphere
 {
-    std::array<CoordinateType, 3> center;
+    cstone::Vec3<CoordinateType> center;
     CoordinateType radius;
 };
 /*! @brief Id tagging list definition
