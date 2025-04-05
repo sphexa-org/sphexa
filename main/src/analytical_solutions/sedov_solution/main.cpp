@@ -74,17 +74,17 @@ int main(int argc, char** argv)
 
     // Calculate and write theoretical solution profile in one dimension
     auto         constants = sedovConstants();
-    const size_t dim       = constants["dim"];
-    const double r0        = constants["r0"];
-    const double r1        = constants["r1"];
-    const double eblast    = constants["energyTotal"];
-    const double gamma     = constants["gamma"];
-    const double omega     = constants["omega"];
-    const double rho0      = constants["rho0"];
-    const double u0        = constants["u0"];
-    const double p0        = constants["p0"];
-    const double vr0       = constants["vr0"];
-    const double cs0       = constants["cs0"];
+    const size_t dim       = std::get<ScalarValue>(constants["dim"].getValue());
+    const double r0        = std::get<ScalarValue>(constants["r0"].getValue());
+    const double r1        = std::get<ScalarValue>(constants["r1"].getValue());
+    const double eblast    = std::get<ScalarValue>(constants["energyTotal"].getValue());
+    const double gamma     = std::get<ScalarValue>(constants["gamma"].getValue());
+    const double omega     = std::get<ScalarValue>(constants["omega"].getValue());
+    const double rho0      = std::get<ScalarValue>(constants["rho0"].getValue());
+    const double u0        = std::get<ScalarValue>(constants["u0"].getValue());
+    const double p0        = std::get<ScalarValue>(constants["p0"].getValue());
+    const double vr0       = std::get<ScalarValue>(constants["vr0"].getValue());
+    const double cs0       = std::get<ScalarValue>(constants["cs0"].getValue());
 
     double shockFront;
     {
