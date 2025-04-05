@@ -1,6 +1,6 @@
 set(SOURCES sedov_solution.cpp main.cpp)
 add_executable(sedov_solution ${SOURCES})
-target_include_directories(sedov_solution PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE_DIR}/main/src)
+target_include_directories(sedov_solution PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE_DIR}/main/src ${SPH_DIR} ${MPI_CXX_INCLUDE_PATH})
 if(CMAKE_OSX_SYSROOT)
     target_link_libraries(sedov_solution io stdc++)
 else()
