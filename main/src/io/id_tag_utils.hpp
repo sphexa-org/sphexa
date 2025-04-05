@@ -38,7 +38,7 @@
 #include "cstone/tree/definitions.h"
 #include "sph/particles_data.hpp"
 #include "sph/types.hpp"
-#include "io/ifile_io.hpp"
+#include "ifile_io.hpp"
 
 namespace sphexa
 {
