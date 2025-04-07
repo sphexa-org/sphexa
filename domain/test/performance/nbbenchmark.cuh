@@ -114,7 +114,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
                                            .layout          = layout.data(),
                                            .centers         = centers.data(),
                                            .sizes           = sizes.data(),
-                                           .searchExtFactor = searchExtFactor};
+                                           .searchExtFactor = 1};
     LocalIndex zero = 0;
     const GroupView groupView{.firstBody = 0, .lastBody = n, .numGroups = 1, .groupStart = &zero, .groupEnd = &n};
 
