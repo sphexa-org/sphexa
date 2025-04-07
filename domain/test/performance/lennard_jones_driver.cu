@@ -58,7 +58,7 @@ struct LjKernelFun
         using namespace cstone::ijloop;
         const auto [i, iPos, hi, qi] = iData;
         const auto [j, jPos, hj, qj] = jData;
-        const T r2                   = std::max(distSq, T(1));
+        const T r2                   = std::max(distSq, T(1e-1));
         const T rinv                 = rsqrt(r2);
         const T r2inv                = rinv * rinv;
         const T r6inv                = r2inv * r2inv * r2inv;
@@ -93,8 +93,9 @@ void benchmarkMain()
     const auto runBenchmark = [&](const char* name, auto const& neighborhood)
     {
         printf("--- %s ---\n", name);
-        times[name] = benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, searchExtFactor, ngmax,
-                                                                  kernelFun, inputValues, initialOutputValues);
+        times[name] =
+            benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, searchExtFactor, ngmax, kernelFun,
+                                                        inputValues, initialOutputValues, std::is_same_v<T, double>);
         printf("\n");
     };
 

@@ -64,7 +64,8 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
                                           unsigned ngmax,
                                           const Interaction& interaction,
                                           const std::tuple<InputTs...>& inputValues,
-                                          const std::tuple<OutputTs...>& initialOutputValues)
+                                          const std::tuple<OutputTs...>& initialOutputValues,
+                                          bool validate = true)
 {
     using namespace cstone;
     using KeyType = typename StrongKeyType::ValueType;
@@ -233,36 +234,39 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     printf("Performance: %7.6f +- %7.6f, median = %7.6f [Giga Particle Updates / s]\n", meanGigaAtomSteps,
            stdDevGigaAtomSteps, gigaAtomSteps[gigaAtomSteps.size() / 2]);
 
-    unsigned long numFails = 0;
-    const auto isClose     = [](T a, T b)
+    if (validate)
     {
-        constexpr bool isDouble = std::is_same_v<T, double>;
-        constexpr double atol   = isDouble ? 1e-6 : 1e-5;
-        constexpr double rtol   = isDouble ? 1e-5 : 1e-4;
-        return std::abs(a - b) <= atol + rtol * std::abs(b);
-    };
-    util::for_each_tuple(
-        [&](auto const& dOut, auto const& out)
+        unsigned long numFails = 0;
+        const auto isClose     = [](T a, T b)
         {
-            assert(dOut.size() == n && out.size() == n);
-#pragma omp parallel for
-            for (unsigned i = 0; i < n; ++i)
+            constexpr bool isDouble = std::is_same_v<T, double>;
+            constexpr double atol   = isDouble ? 1e-6 : 1e-5;
+            constexpr double rtol   = isDouble ? 1e-5 : 1e-4;
+            return std::abs(a - b) <= atol + rtol * std::abs(b);
+        };
+        util::for_each_tuple(
+            [&](auto const& dOut, auto const& out)
             {
-                if (!isClose(dOut[i], out[i]))
+                assert(dOut.size() == n && out.size() == n);
+#pragma omp parallel for
+                for (unsigned i = 0; i < n; ++i)
                 {
-                    unsigned long failNum;
-#pragma omp atomic capture
-                    failNum = numFails++;
-                    if (failNum < 10)
+                    if (!isClose(dOut[i], out[i]))
                     {
+                        unsigned long failNum;
+#pragma omp atomic capture
+                        failNum = numFails++;
+                        if (failNum < 10)
+                        {
 #pragma omp critical
-                        printf("FAIL %u: %.10f != %.10f\n", i, dOut[i], out[i]);
+                            printf("FAIL %u: %.10f != %.10f\n", i, dOut[i], out[i]);
+                        }
                     }
                 }
-            }
-        },
-        dOutputs, outputs);
-    if (numFails) printf("TOTAL FAILS: %lu\n", numFails);
+            },
+            dOutputs, outputs);
+        if (numFails) printf("TOTAL FAILS: %lu\n", numFails);
+    }
 
     return times;
 }
