@@ -74,7 +74,8 @@ struct GlobalBuildData
 
 constexpr __forceinline__ bool includeNbSymmetric(unsigned i, unsigned j, unsigned first, unsigned last)
 {
-    const bool s = i % 2 == j % 2;
+    constexpr unsigned blockSize = 32;
+    const bool s                 = (i / blockSize) % 2 == (j / blockSize) % 2;
     return (j < first) | (j >= last) | (i == j) | (i < j ? s : !s);
 }
 
