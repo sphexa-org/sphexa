@@ -1008,23 +1008,30 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
             auto jData                   = (nb < iSuperclusterNeighborsCount & j >= firstValidBody & j < totalBodies)
                                                ? loadParticleData(x, y, z, h, input, j)
                                                : dummyParticleData(x, y, z, h, input, j);
+            const auto jRadiusSq         = radiusSq(jData);
             std::get<0>(jData) -= firstValidBody;
             result_t jResult = {};
 
             warpMask >>= iClusterOffset;
-            unsigned i = iSupercluster * Config::superclusterSize + threadIdx.x;
+#pragma unroll
             for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
             {
-                if ((warpMask & 1) && (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j)))
+                const unsigned i = iSupercluster * Config::superclusterSize + threadIdx.x + c * Config::iThreads;
+                if ((warpMask >> (c * iClustersPerWarp)) &
+                    (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j)))
                 {
+                    bool jRequired   = i != j;
                     const auto iData = iSuperclusterData[c * Config::iSize + threadIdx.x];
+                    if (!jRequired) jRequired = (i < firstBody) | (i >= lastBody);
                     assert(std::get<0>(iData) == i - firstValidBody);
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
-                    const auto ijInteraction       = interaction(iData, jData, ijPosDiff, distSq);
-                    if (distSq < radiusSq(iData)) updateResult(iResults[c / iClustersPerWarp], ijInteraction);
-                    if constexpr (Config::symmetric)
+                    const bool iClose              = distSq < radiusSq(iData);
+                    const bool jClose              = Config::symmetric && (/*(distSq < jRadiusSq)*/ iClose & jRequired);
+                    if (iClose | jClose)
                     {
-                        if ((distSq < radiusSq(jData)) & ((i != j) | (i < firstBody) | (i >= lastBody)))
+                        const auto ijInteraction = interaction(iData, jData, ijPosDiff, distSq);
+                        if (iClose) updateResult(iResults[c / iClustersPerWarp], ijInteraction);
+                        if (jClose)
                         {
                             const auto jiInteraction =
                                 selectSymmetric(ijInteraction, interaction(jData, iData, -ijPosDiff, distSq));
@@ -1032,8 +1039,6 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                         }
                     }
                 }
-                warpMask >>= iClustersPerWarp;
-                i += Config::iThreads;
             }
 
             if constexpr (Config::symmetric)
