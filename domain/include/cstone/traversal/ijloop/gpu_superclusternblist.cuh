@@ -213,7 +213,7 @@ __global__ void computeJClusterBboxes(const LocalIndex firstValidBody,
 }
 
 template<class Config, unsigned NumSuperclustersPerBlock>
-__device__ inline void sortCandidates(std::uint32_t* candidates, unsigned numCandidates)
+__device__ __forceinline__ void sortCandidates(std::uint32_t* candidates, unsigned numCandidates)
 {
     const unsigned laneIdx = laneIndex();
     assert(blockDim.x * blockDim.y == GpuConfig::warpSize);
@@ -243,17 +243,17 @@ __device__ inline void sortCandidates(std::uint32_t* candidates, unsigned numCan
 }
 
 template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th>
-__device__ inline void pruneCandidates(const Box<Tc>& box,
-                                       const LocalIndex firstValidBody,
-                                       const LocalIndex totalBodies,
-                                       const Tc* const __restrict__ x,
-                                       const Tc* const __restrict__ y,
-                                       const Tc* const __restrict__ z,
-                                       const Th* const __restrict__ h,
-                                       const Th searchExtFactor,
-                                       const unsigned iSupercluster,
-                                       std::uint32_t* __restrict__ jClusters,
-                                       unsigned& numCandidates)
+__device__ __forceinline__ void pruneCandidates(const Box<Tc>& box,
+                                                const LocalIndex firstValidBody,
+                                                const LocalIndex totalBodies,
+                                                const Tc* const __restrict__ x,
+                                                const Tc* const __restrict__ y,
+                                                const Tc* const __restrict__ z,
+                                                const Th* const __restrict__ h,
+                                                const Th searchExtFactor,
+                                                const unsigned iSupercluster,
+                                                std::uint32_t* __restrict__ jClusters,
+                                                unsigned& numCandidates)
 {
     const unsigned laneIdx = laneIndex();
     assert(blockDim.x * blockDim.y == GpuConfig::warpSize);
@@ -787,7 +787,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
 }
 
 template<class T0, class... T>
-__device__ inline constexpr T0 dynamicTupleGet(std::tuple<T0, T...> const& tuple, int index)
+__device__ __forceinline__ constexpr T0 dynamicTupleGet(std::tuple<T0, T...> const& tuple, int index)
 {
     T0 res;
     int i = 0;
@@ -848,7 +848,7 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
 }
 
 template<class Config, class T0, class... T, class... Ps>
-constexpr __device__ void
+constexpr __device__ __forceinline__ void
 storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const unsigned index, const bool store)
 {
     assert(blockDim.x == Config::iThreads);
@@ -879,7 +879,7 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
 }
 
 template<std::size_t Size, class... Ts>
-constexpr std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...> const&)
+constexpr __forceinline__ std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...> const&)
 {
     return {};
 }
