@@ -925,7 +925,8 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     const unsigned iSuperclusterIndex = blockIdx.x * NumSuperclustersPerBlock + threadIdx.z;
     if (iSuperclusterIndex >= numISuperclusters) return;
 
-    auto [iSupercluster, iSuperclusterNeighborsCount, iSuperclusterDataIndex] = superclusterInfo[iSuperclusterIndex];
+    const auto [iSupercluster, iSuperclusterNeighborsCount, iSuperclusterDataIndex] =
+        superclusterInfo[iSuperclusterIndex];
 
     using particleData_t = decltype(loadParticleData(x, y, z, h, input, 0));
 
@@ -933,7 +934,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     __shared__
         util::Uninitialized<particleData_t[NumSuperclustersPerBlock][Config::iClustersPerSupercluster * Config::iSize]>
             iSuperclusterDataBuffer;
-    particleData_t* iSuperclusterData = iSuperclusterDataBuffer.data()[threadIdx.z];
+    particleData_t* __restrict__ iSuperclusterData = iSuperclusterDataBuffer.data()[threadIdx.z];
     {
         const unsigned base = iSupercluster * Config::superclusterSize;
         for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
@@ -948,13 +949,13 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     }
 
     __shared__ unsigned nbDataBuffer[NumSuperclustersPerBlock][Config::ncMax + masksSize<Config>(Config::ncMax)];
-    unsigned* const nbData = nbDataBuffer[threadIdx.z];
+    unsigned* const __restrict__ nbData = nbDataBuffer[threadIdx.z];
 
-    const unsigned maskSize   = masksSize<Config>(iSuperclusterNeighborsCount);
-    const unsigned nbDataSize = iSuperclusterNeighborsCount + maskSize;
+    const unsigned maskSize = masksSize<Config>(iSuperclusterNeighborsCount);
 
     constexpr unsigned iClustersPerWarp = Config::iThreads / Config::iSize;
-    const unsigned warpIndex            = threadIdx.y / (Config::jSize / Config::numWarpsPerInteraction);
+    const unsigned warpIndex =
+        Config::numWarpsPerInteraction == 1 ? 0 : threadIdx.y / (Config::jSize / Config::numWarpsPerInteraction);
 
     if constexpr (Config::compress)
     {
@@ -972,6 +973,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     }
     else
     {
+        const unsigned nbDataSize = iSuperclusterNeighborsCount + maskSize;
         for (unsigned n = threadIdx.y * Config::iThreads + threadIdx.x; n < nbDataSize;
              n += Config::iThreads * Config::jSize)
             nbData[n] = neighborData[iSuperclusterDataIndex + n];
