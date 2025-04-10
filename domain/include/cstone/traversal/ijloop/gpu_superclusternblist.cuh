@@ -937,6 +937,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     particleData_t* __restrict__ iSuperclusterData = iSuperclusterDataBuffer.data()[threadIdx.z];
     {
         const unsigned base = iSupercluster * Config::superclusterSize;
+#pragma unroll
         for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
              offset += Config::iThreads * Config::jSize)
         {
@@ -1048,12 +1049,14 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
             unwrapModifiers(result_t()))) outputBuffers[NumSuperclustersPerBlock];
         auto outputBufferPtrs = util::tupleMap([](auto& array) { return array.data(); }, outputBuffers[threadIdx.z]);
         auto init             = unwrapModifiers(result_t{});
+#pragma unroll
         for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
              offset += Config::iThreads * Config::jSize)
             storeParticleData(outputBufferPtrs, offset, init);
 
         __syncthreads();
 
+#pragma unroll
         for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
         {
             storeTupleISum<Config>(iResults[c / iClustersPerWarp], outputBufferPtrs, c * Config::iSize + threadIdx.x,
@@ -1063,6 +1066,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
         __syncthreads();
 
         const unsigned base = iSupercluster * Config::superclusterSize;
+#pragma unroll
         for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
              offset += Config::iThreads * Config::jSize)
         {
@@ -1077,6 +1081,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     }
     else
     {
+#pragma unroll
         for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
         {
             const auto i = iSupercluster * Config::superclusterSize + c * Config::iSize + threadIdx.x;
