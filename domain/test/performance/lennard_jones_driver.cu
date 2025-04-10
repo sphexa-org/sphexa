@@ -79,7 +79,7 @@ void benchmarkMain()
 {
     using namespace cstone;
 
-    constexpr unsigned ngmax = 224;
+    constexpr unsigned ngmax = 320;
 
     constexpr unsigned nx           = 100;
     constexpr T h                   = 1.75;
@@ -116,11 +116,11 @@ void benchmarkMain()
     runBenchmark("COMPRESSED CLUSTERED", SymmetricClusterNb::withCompression<7>{});
 
     using BaseSuperclusterNb =
-        ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<64>::withNcMax<1024>;
+        ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<64>::withNcMax<512>;
     runBenchmark("SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withoutCompression{});
     runBenchmark("COMPRESSED SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withCompression{});
 
-    using SymmetricSuperclusterNb = BaseSuperclusterNb::withNcMax<512>::withSymmetry;
+    using SymmetricSuperclusterNb = BaseSuperclusterNb::withNcMax<256>::withSymmetry;
     runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{});
     runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{});
 
