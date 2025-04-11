@@ -38,6 +38,9 @@
 #include "cstone/primitives/clz.hpp"
 #include "cstone/primitives/warpscan.cuh"
 
+// if 1, use compression proposed in Compressed Neighbour Lists for SPH, by S. Band, C. Gissler and M. Teschner, 2020
+#define CSTONE_USE_BAND_ET_AL_COMPRESSION 0
+
 namespace cstone
 {
 
@@ -54,6 +57,45 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
         return;
     }
 
+#if CSTONE_USE_BAND_ET_AL_COMPRESSION
+    GpuConfig::ThreadMask* control = (GpuConfig::ThreadMask*)output + 1;
+    std::uint32_t* first = (std::uint32_t*)(control + (n - 1 + GpuConfig::warpSize - 1) / GpuConfig::warpSize * 2);
+    std::uint8_t* data   = (std::uint8_t*)(first + 1);
+
+    unsigned dataSize = 0;
+    unsigned previous = neighbors[0];
+    if (laneIdx == 0) *first = previous;
+    for (unsigned offset = 1; offset < n; offset += GpuConfig::warpSize)
+    {
+        const unsigned nb           = offset + laneIdx;
+        const unsigned neighbor     = nb < n ? neighbors[nb] : 0;
+        const unsigned leftNeighbor = shflUpSync(neighbor, 1);
+        const unsigned diff         = nb < n ? (neighbor - (laneIdx > 0 ? leftNeighbor : previous)) - 1 : 0;
+        previous                    = shflSync(neighbor, GpuConfig::warpSize - 1);
+
+        const auto firstControl  = ballotSync(diff > 1);
+        const auto secondControl = ballotSync((diff == 1) | (diff >= 256));
+        if (laneIdx == 0)
+        {
+            control[2 * ((offset - 1) / GpuConfig::warpSize)]     = firstControl;
+            control[2 * ((offset - 1) / GpuConfig::warpSize) + 1] = secondControl;
+        }
+
+        const unsigned dataBytes      = diff >= 2 ? (diff >= 256 ? 4 : 1) : 0;
+        const unsigned dataBytesScan  = inclusiveScanInt(dataBytes);
+        const unsigned dataBytesIndex = dataSize + dataBytesScan - dataBytes;
+        dataSize += shflSync(dataBytesScan, GpuConfig::warpSize - 1);
+
+        for (unsigned i = 0; i < dataBytes; ++i)
+            data[dataBytesIndex + i] = (diff >> (8 * i)) & 0xff;
+    }
+
+    const unsigned totalBytes =
+        sizeof(GpuConfig::ThreadMask) * (1 + (n - 1 + GpuConfig::warpSize - 1) / GpuConfig::warpSize * 2) + 4 +
+        dataSize;
+    assert(n < (1 << 16));
+    if (laneIdx == 0) *((unsigned*)output) = totalBytes | (n << 16);
+#else
     GpuConfig::ThreadMask* nonOnes = (GpuConfig::ThreadMask*)output + 1;
     std::uint8_t* data             = (std::uint8_t*)(nonOnes + (n + GpuConfig::warpSize - 1) / GpuConfig::warpSize);
 
@@ -121,6 +163,7 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
         sizeof(GpuConfig::ThreadMask) * (1 + (n + GpuConfig::warpSize - 1) / GpuConfig::warpSize) + (dataSize + 1) / 2;
     assert(n < (1 << 16));
     if (laneIdx == 0) *((unsigned*)output) = totalBytes | (n << 16);
+#endif
 }
 
 __device__ __forceinline__ unsigned compressedNeighborsSize(const char* const input)
@@ -137,6 +180,41 @@ warpDecompressNeighbors(const char* const __restrict__ input, std::uint32_t* con
 
     if (n == 0) return;
 
+#if CSTONE_USE_BAND_ET_AL_COMPRESSION
+    const GpuConfig::ThreadMask* control = (const GpuConfig::ThreadMask*)input + 1;
+    const std::uint32_t* first =
+        (std::uint32_t*)(control + (n - 1 + GpuConfig::warpSize - 1) / GpuConfig::warpSize * 2);
+    const std::uint8_t* data = (std::uint8_t*)(first + 1);
+
+    unsigned dataSize = 0;
+    unsigned previous = *first;
+    if (laneIdx == 0) neighbors[0] = previous;
+    for (unsigned offset = 1; offset < n; offset += GpuConfig::warpSize)
+    {
+        const unsigned nb        = offset + laneIdx;
+        const auto firstControl  = control[2 * ((offset - 1) / GpuConfig::warpSize)];
+        const auto secondControl = control[2 * ((offset - 1) / GpuConfig::warpSize) + 1];
+
+        const bool firstControlBit  = (firstControl >> laneIdx) & 1;
+        const bool secondControlBit = (secondControl >> laneIdx) & 1;
+
+        unsigned diff            = !firstControlBit & secondControlBit;
+        const unsigned dataBytes = firstControlBit ? (secondControlBit ? 4 : 1) : 0;
+
+        const unsigned dataBytesScan  = inclusiveScanInt(dataBytes);
+        const unsigned dataBytesIndex = dataSize + dataBytesScan - dataBytes;
+        dataSize += shflSync(dataBytesScan, GpuConfig::warpSize - 1);
+
+        previous = shflSync(previous, GpuConfig::warpSize - 1);
+
+        for (unsigned i = 0; i < dataBytes; ++i)
+            diff |= unsigned(data[dataBytesIndex + i]) << (8 * i);
+
+        previous += inclusiveScanInt(diff + 1);
+
+        if (nb < n) neighbors[nb] = previous;
+    }
+#else
     const GpuConfig::ThreadMask* nonOnes = (const GpuConfig::ThreadMask*)input + 1;
     const std::uint8_t* data = (const std::uint8_t*)(nonOnes + (n + GpuConfig::warpSize - 1) / GpuConfig::warpSize);
 
@@ -177,6 +255,7 @@ warpDecompressNeighbors(const char* const __restrict__ input, std::uint32_t* con
         previous += inclusiveScanInt(diff);
         if (nb < n) neighbors[nb] = previous;
     }
+#endif
 }
 
 } // namespace cstone
