@@ -277,6 +277,40 @@ void transferToHost(DataType& d, size_t first, size_t last, const std::vector<st
     }
 }
 
+template<class DataType, std::enable_if_t<cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
+void transferSubsetToHost(const DataType& data, const ParticleIndexVectorType& subsetIndexes, const std::vector<std::string>& fields, 
+    std::vector<DataType::FieldVariant>& subsetFields, std::vector<int>& subsetFieldColumns)
+{
+    auto launchTransfer = [subsetIndexes, subsetFields](const auto& field){
+
+        // Allocate memory for the subset field values on the device
+        using DeviceField = decltype(*field);
+        DeviceField deviceSubsetField(subsetIndexes.size());
+
+        // Copy subset field values
+        thrust::gather(thrust::device, subsetIndexes.begin(), subsetIndexes.end(), field.begin(), deviceSubsetField.begin());
+
+        // Allocate memory for the subset field values on the host
+        subsetFields.push_back(std::decay_t<decltype(*field)>(subsetIndexes.size()));
+
+        // Copy subset field values to the host
+        checkGpuErrors(cudaMemcpy(subsetFields.back().data(), deviceSubsetField.data(), subsetIndexes.size()*sizeof(typename DeviceField::value_type), cudaMemcpyDeviceToHost));
+    }
+
+    for(const auto& field : fields)
+    {
+        // TODO: do we need this check?
+        if(data.devData.isAllocated(field)) {
+            int fieldIdx =
+                std::find(DeviceData_t<cstone::GpuTag>::fieldNames.begin(), DeviceData_t<cstone::GpuTag>::fieldNames.end(), field) - DeviceData_t<cstone::GpuTag>::fieldNames.begin();
+            subsetFieldColumns.push_back(fieldIdx);
+            std::visit(launchTransfer, data.devData.data()[fieldIdx]);
+        }
+        else { throw std::runtime_error("Field not allocated on GPU identified during subset transfer to host"); }
+    }
+}
+
+
 template<class Vector, class T, std::enable_if_t<IsDeviceVector<Vector>{}, int> = 0>
 void fill(Vector& v, size_t first, size_t last, T value)
 {
