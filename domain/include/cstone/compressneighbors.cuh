@@ -31,15 +31,17 @@
 
 #pragma once
 
+// if 1, use compression proposed in Compressed Neighbour Lists for SPH, by S. Band, C. Gissler and M. Teschner, 2020
+#ifndef CSTONE_USE_BAND_ET_AL_COMPRESSION
+#define CSTONE_USE_BAND_ET_AL_COMPRESSION 0
+#endif
+
 #include <cassert>
 #include <cstdint>
 
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/primitives/clz.hpp"
 #include "cstone/primitives/warpscan.cuh"
-
-// if 1, use compression proposed in Compressed Neighbour Lists for SPH, by S. Band, C. Gissler and M. Teschner, 2020
-#define CSTONE_USE_BAND_ET_AL_COMPRESSION 0
 
 namespace cstone
 {
