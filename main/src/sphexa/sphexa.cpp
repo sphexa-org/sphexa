@@ -189,7 +189,6 @@ int main(int argc, char** argv)
 
         if (isSubsetOutputTriggered)
         {
-            // TODO: check if we need addStep, saveFields, save, closeStep
             propagator->saveSubsetFields(fileWriter.get(), outFileSubset, domain.startIndex(), domain.endIndex(), simData.hydro);
             isSubsetOutputTriggered = false;
         }
