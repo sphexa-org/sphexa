@@ -36,7 +36,6 @@
 #include "sph/sph_gpu.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/magneto_ve/magneto_data.hpp"
-#include "sph/util/device_math.cuh"
 #include "sph/magneto_ve/magnetic_momentum_energy_kern.hpp"
 
 namespace sph
