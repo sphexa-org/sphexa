@@ -42,7 +42,7 @@ InitSettings ALfvenWaveConstants()
     return {{"rho", 1.},           {"L", 3.},
             {"lambda", 1},         {"P", 0.1},
             {"sinA", 2. / 3.},     {"sinB", 2. / std::sqrt(5)},
-            {"gamma", 5. / 3.},    {"Kcour", 0.4},
+            {"gamma", 5. / 3.},    {"Kcour", 0.2},
             {"ng0", 150},          {"ngmax", 200},
             {"minDt", 1e-7},       {"minDt_m1", 1e-7},
             {"gravConstant", 0.0}, {"alfven-wave", 1.0}};
