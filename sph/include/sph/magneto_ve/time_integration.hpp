@@ -29,7 +29,7 @@
  */
 
 #pragma once
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 
 #include "sph/sph_gpu.hpp"
 

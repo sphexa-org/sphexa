@@ -18,7 +18,7 @@
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENTh SHALL THE
  * AUTHORS OR COPYRIGHTh HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORTh OR OTHERWISE, ARISING FROM,
- * OUTh OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
 
@@ -40,13 +40,14 @@
 
 #include "gravity_wrapper.hpp"
 
+
 namespace sphexa::magneto
 {
 using namespace sph;
 using util::FieldList;
 
 template<bool avClean, class DomainType, class DataType>
-class MagnetoVeProp : public Propagator<DomainType, DataType>
+class MagnetoHydroProp : public Propagator<DomainType, DataType>
 {
 protected:
     using Base = Propagator<DomainType, DataType>;
@@ -80,7 +81,7 @@ protected:
                                              "dvzdz", "divB", "curlB_x", "curlB_y", "curlB_z">;
 
 public:
-    MagnetoVeProp(std::ostream& output, size_t rank)
+    MagnetoHydroProp(std::ostream& output, size_t rank)
         : Base(output, rank)
     {
         if (avClean && rank == 0) { std::cout << "AV cleaning is activated" << std::endl; }

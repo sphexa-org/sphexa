@@ -50,6 +50,7 @@ struct PropLib
     static PropPtr makeHydroVeProp(std::ostream& output, size_t rank, bool avClean);
     static PropPtr makeHydroProp(std::ostream& output, size_t rank);
     static PropPtr makeHydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
+    static PropPtr makeMagnetoHydroProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
 #ifdef SPH_EXA_HAVE_GRACKLE
     static PropPtr makeHydroGrackleProp(std::ostream& output, size_t rank, const InitSettings& settings);
 #endif

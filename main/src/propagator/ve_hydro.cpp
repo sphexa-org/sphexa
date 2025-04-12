@@ -34,6 +34,7 @@
 #include "propagator.h"
 #include "turb_ve.hpp"
 #include "ve_hydro.hpp"
+#include "magneto_ve.hpp"
 
 namespace sphexa
 {
@@ -54,6 +55,15 @@ PropLib<DomainType, ParticleDataType>::makeTurbVeProp(std::ostream& output, size
     if (avClean) { return std::make_unique<TurbVeProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
     else { return std::make_unique<TurbVeProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
 }
+
+template<class DomainType, class ParticleDataType>
+std::unique_ptr<Propagator<DomainType, ParticleDataType>>
+PropLib<DomainType, ParticleDataType>::makeMagnetoHydroProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean)
+{
+    if (avClean) { return std::make_unique<magneto::MagnetoHydroProp<true, DomainType, ParticleDataType>>(output, rank); }
+    else { return std::make_unique<magneto::MagnetoHydroProp<false, DomainType, ParticleDataType>>(output, rank); }
+}
+
 
 #ifdef USE_CUDA
 template struct PropLib<cstone::Domain<SphTypes::KeyType, SphTypes::CoordinateType, cstone::GpuTag>,

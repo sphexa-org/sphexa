@@ -38,7 +38,7 @@
 #include "cstone/cuda/cuda_utils.hpp"
 #include "cstone/fields/data_util.hpp"
 #include "cstone/fields/field_states.hpp"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/reallocate.hpp"
@@ -47,7 +47,6 @@
 #include "sph/particles_data_stubs.hpp"
 
 #if defined(USE_CUDA)
-#include "sph/util/pinned_allocator.cuh"
 #include "magneto_data_gpu.cuh"
 #endif
 
