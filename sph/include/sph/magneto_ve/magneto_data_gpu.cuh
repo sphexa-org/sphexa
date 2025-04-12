@@ -122,7 +122,6 @@ public:
         return std::apply([](auto&... fields) { return std::array<FieldType, sizeof...(fields)>{&fields...}; },
                           dataTuple());
     }
-
     void resize(size_t size, float growthRate)
     {
         auto data_ = data();
@@ -142,7 +141,7 @@ public:
         {
             if (this->isAllocated(i))
             {
-                std::visit([size, growthRate](auto* arg) { reallocateDevice(*arg, size, growthRate); }, data_[i]);
+                std::visit([size, growthRate](auto* arg) { reallocate(*arg, size, growthRate); }, data_[i]);
             }
         }
     }
