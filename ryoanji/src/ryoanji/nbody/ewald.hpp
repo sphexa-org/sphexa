@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Ryoanji N-body solver
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -213,14 +197,6 @@ EwaldParameters<Tc, Tmm> ewaldInitParameters(const CartesianQuadrupole<Tmm>& Mro
     return params;
 }
 
-template<class Tc, class Tmm>
-EwaldParameters<Tc, Tmm> ewaldInitParameters(const SphericalMultipole<Tmm, 4>& /*Mroot*/,
-                                             const Vec3<Tc>& /*Mroot_center*/, int /*numReplicaShells*/, double /*L*/,
-                                             double /*lCut*/, double /*hCut*/, double /*alpha_scale*/)
-{
-    throw std::runtime_error("Ewald periodic gravity correction not implemented for spherical multipoles\n");
-}
-
 //! @brief real space Ewald contribution to the potential and acceleration of a single particle @p r
 template<class T1, class T2>
 HOST_DEVICE_FUN Vec4<T1> computeEwaldRealSpace(Vec3<T1> r, const EwaldParameters<T1, T2>& params)
@@ -380,7 +356,7 @@ HOST_DEVICE_FUN Vec4<T1> computeEwaldKSpace(Vec3<T1> r, const EwaldParameters<T1
 template<class MType, class Tc, class Ta, class Tm, class Tu>
 void computeGravityEwald(const cstone::Vec3<Tc>& rootCenter, const MType& Mroot, LocalIndex firstTarget,
                          LocalIndex lastTarget, const Tc* x, const Tc* y, const Tc* z, const Tm* m,
-                         const cstone::Box<Tc>& box, float G, Tu* ugrav, Ta* ax, Ta* ay, Ta* az, Tu* ugravTot,
+                         const cstone::Box<Tc>& box, float G, Ta* ugrav, Ta* ax, Ta* ay, Ta* az, Tu* ugravTot,
                          EwaldSettings settings)
 {
     if (box.minExtent() != box.maxExtent()) { throw std::runtime_error("Ewald gravity requires cubic bounding boxes"); }

@@ -32,8 +32,6 @@
 
 #pragma once
 
-#include <variant>
-
 #include "cstone/fields/field_get.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/sph.hpp"
@@ -71,7 +69,7 @@ protected:
      *
      * x, y, z, h and m are automatically considered conserved and must not be specified in this list
      */
-    using ConservedFields = FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha">;
+    using ConservedFields = FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "id">;
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ =
@@ -181,7 +179,8 @@ public:
 
         if (avClean)
         {
-            domain.exchangeHalos(get<"dV11", "dV12", "dV22", "dV23", "dV33", "alpha">(d), get<"ax">(d), get<"keys">(d));
+            domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "alpha">(d), get<"ax">(d),
+                                 get<"keys">(d));
         }
         else { domain.exchangeHalos(std::tie(get<"alpha">(d)), get<"ax">(d), get<"keys">(d)); }
         timer.step("mpi::synchronizeHalos");

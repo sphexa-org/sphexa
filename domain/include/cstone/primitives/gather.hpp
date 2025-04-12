@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -34,11 +18,11 @@
 #include <algorithm>
 #include <cassert>
 #include <numeric>
+#include <span>
 #include <tuple>
 #include <vector>
 
 #include "cstone/tree/definitions.h"
-#include "cstone/util/gsl-lite.hpp"
 #include "cstone/util/noinit_alloc.hpp"
 #include "cstone/util/reallocate.hpp"
 
@@ -70,8 +54,8 @@ void sort_by_key(InoutIterator keyBegin, InoutIterator keyEnd, OutputIterator va
         keyIndexPairs[i] = std::make_tuple(keyBegin[i], valueBegin[i]);
 
     // sort, comparing only the first tuple element
-    std::sort(begin(keyIndexPairs), end(keyIndexPairs),
-              [compare](const auto& t1, const auto& t2) { return compare(std::get<0>(t1), std::get<0>(t2)); });
+    std::stable_sort(begin(keyIndexPairs), end(keyIndexPairs),
+                     [compare](const auto& t1, const auto& t2) { return compare(std::get<0>(t1), std::get<0>(t2)); });
 
 // extract the resulting ordering and store back the sorted keys
 #pragma omp parallel for schedule(static)
@@ -104,7 +88,7 @@ void omp_copy(InputIterator first, InputIterator last, OutputIterator out)
 
 //! @brief gather reorder
 template<class IndexType, class ValueType>
-void gather(gsl::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
+void gather(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
 {
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < ordering.size(); ++i)
@@ -114,18 +98,28 @@ void gather(gsl::span<const IndexType> ordering, const ValueType* source, ValueT
 }
 
 //! @brief Lambda to avoid templated functors that would become template-template parameters when passed to functions.
-inline auto gatherCpu = [](const auto* ordering, auto numElements, const auto* src, const auto dest) {
-    gather<LocalIndex>({ordering, numElements}, src, dest);
-};
+inline auto gatherCpu = [](std::span<const LocalIndex> ordering, const auto* src, auto* dest)
+{ gather<LocalIndex>(ordering, src, dest); };
 
 //! @brief scatter reorder
 template<class IndexType, class ValueType>
-void scatter(gsl::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
+void scatter(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
 {
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < ordering.size(); ++i)
     {
         destination[ordering[i]] = source[i];
+    }
+}
+
+//! @brief gather from @p src and scatter into @p dst
+template<class IndexType, class VType>
+void gatherScatter(std::span<const IndexType> gmap, std::span<const IndexType> smap, const VType* src, VType* dst)
+{
+#pragma omp parallel for schedule(static)
+    for (size_t i = 0; i < gmap.size(); ++i)
+    {
+        dst[smap[i]] = src[gmap[i]];
     }
 }
 
@@ -141,17 +135,61 @@ public:
     SfcSorter(const SfcSorter&) = delete;
 
     const IndexType* getMap() const { return ordering(); }
+    std::size_t size() const { return mapSize_; }
 
     template<class KeyType>
-    void setMapFromCodes(KeyType* first, KeyType* last)
+    void setMapFromCodes(std::span<KeyType> keys)
     {
-        mapSize_ = std::size_t(last - first);
-        reallocateBytes(buffer_, mapSize_ * sizeof(IndexType), 1.05);
+        mapSize_ = keys.size();
+        reallocateBytes(buffer_, mapSize_ * sizeof(IndexType), 1.0);
         std::iota(ordering(), ordering() + mapSize_, 0);
-        sort_by_key(first, last, ordering());
+        sort_by_key(keys.begin(), keys.end(), ordering());
+    }
+
+    template<class KeyType>
+    void updateMap(std::span<KeyType> keys)
+    {
+        sort_by_key(keys.begin(), keys.end(), ordering());
     }
 
     auto gatherFunc() const { return gatherCpu; }
+
+    /*! @brief extend ordering map to the left or right
+     *
+     * @param[in] shifts    number of shifts
+     * @param[-]  scratch   scratch space for temporary usage
+     *
+     * Negative shift values extends the ordering map to the left, positive value to the right
+     * Examples: map = [1, 0, 3, 2] -> extendMap(-1) -> map = [0, 2, 1, 4, 3]
+     *           map = [1, 0, 3, 2] -> extendMap(1) -> map = [1, 0, 3, 2, 4]
+     *
+     * This is used to extend the key-buffer passed to setMapFromCodes with additional keys, without
+     * having to restore the original unsorted key-sequence.
+     */
+    template<class Vector>
+    void extendMap(std::make_signed_t<IndexType> shifts, Vector& scratch)
+    {
+        if (shifts == 0) { return; }
+
+        auto newMapSize = mapSize_ + std::abs(shifts);
+        reallocateBytes(scratch, newMapSize * sizeof(IndexType), 1.0);
+        auto* tempMap = reinterpret_cast<IndexType*>(scratch.data());
+
+        if (shifts < 0)
+        {
+            std::iota(tempMap, tempMap - shifts, IndexType(0));
+            std::transform(ordering(), ordering() + mapSize_, tempMap - shifts,
+                           [shifts](auto x) { return x - shifts; });
+        }
+        else if (shifts > 0)
+        {
+            omp_copy(ordering(), ordering() + mapSize_, tempMap);
+            std::iota(tempMap + mapSize_, tempMap + newMapSize, mapSize_);
+        }
+        reallocateBytes(buffer_, newMapSize * sizeof(IndexType), 1.0);
+        omp_copy(tempMap, tempMap + newMapSize, ordering());
+        mapSize_ = newMapSize;
+    }
 
 private:
     IndexType* ordering() { return reinterpret_cast<IndexType*>(buffer_.data()); }

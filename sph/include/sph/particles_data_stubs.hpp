@@ -31,7 +31,7 @@
 
 #pragma once
 
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 
 template<class T>
 class pinned_allocator;

@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -72,41 +56,50 @@ TEST(Macs, evaluateMAC)
     }
 }
 
-TEST(Macs, minMacMutual)
+TEST(Macs, minMacMutualInt)
 {
-    using T = double;
+    using KeyType = uint32_t;
+    using T       = double;
 
-    Vec3<T> cA{0.5, 0.5, 0.5};
-    Vec3<T> sA{0.5, 0.5, 0.5};
+    int maxCoord = 1u << maxTreeLevel<KeyType>{};
 
-    Vec3<T> cB{3.5, 3.5, 3.5};
-    Vec3<T> sB{0.5, 0.5, 0.5};
+    IBox b(100, 110, 100, 110, 100, 105);
+    float invTheta = 1.5;
+    {
+        Box<T> box(0, 1);
+        auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invTheta;
 
-    EXPECT_TRUE(minMacMutual(cA, sA, cB, sB, Box<T>(0, 4, BoundaryType::open), 1.0 / 0.29));
-    EXPECT_FALSE(minMacMutual(cA, sA, cB, sB, Box<T>(0, 4, BoundaryType::open), 1.0 / 0.28));
+        EXPECT_TRUE(minMacMutualInt({83, 84, 100, 101, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_FALSE(minMacMutualInt({84, 85, 100, 101, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_TRUE(minMacMutualInt({100, 101, 83, 84, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_FALSE(minMacMutualInt({100, 101, 84, 85, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_TRUE(minMacMutualInt({100, 101, 100, 101, 121, 122}, b, ellipse, {0, 0, 0}));
+        EXPECT_FALSE(minMacMutualInt({100, 101, 100, 101, 120, 121}, b, ellipse, {0, 0, 0}));
 
-    EXPECT_FALSE(minMacMutual(cA, sA, cB, sB, Box<T>(0, 4, BoundaryType::periodic), 1.0));
-}
-
-TEST(Macs, minVecMacMutual)
-{
-    using T = double;
-
-    Vec3<T> cA{0.5, 0.5, 0.5};
-    Vec3<T> sA{0.5, 0.5, 0.5};
-
-    Vec3<T> cB{3.5, 3.5, 3.5};
-    Vec3<T> sB{0.5, 0.5, 0.5};
-
-    EXPECT_TRUE(minVecMacMutual(cA, sA, cB, sB, Box<T>(0, 4, BoundaryType::open), invThetaVecMac(0.39)));
-    EXPECT_FALSE(minVecMacMutual(cA, sA, cB, sB, Box<T>(0, 4, BoundaryType::open), invThetaVecMac(0.38)));
-
-    EXPECT_FALSE(minVecMacMutual(cA, sA, cB, sB, Box<T>(0, 4, BoundaryType::periodic), invThetaVecMac(1.0)));
+        EXPECT_TRUE(minMacMutualInt({90, 91}, b, ellipse, {0, 0, 0}));
+        EXPECT_FALSE(minMacMutualInt({91, 92}, b, ellipse, {0, 0, 0}));
+    }
+    {
+        Box<T> box(0, 2, 0, 1, 0, 2);
+        auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invTheta;
+        EXPECT_TRUE(minMacMutualInt({83, 84, 100, 101, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_FALSE(minMacMutualInt({84, 85, 100, 101, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_TRUE(minMacMutualInt({100, 101, 68, 69, 100, 101}, b, ellipse, {0, 0, 0}));
+        EXPECT_FALSE(minMacMutualInt({100, 101, 69, 70, 100, 101}, b, ellipse, {0, 0, 0}));
+    }
+    {
+        auto pbc_t = BoundaryType::periodic;
+        Box<T> box(0, 1, pbc_t);
+        auto pbc = Vec3<int>{box.boundaryX() == pbc_t, box.boundaryY() == pbc_t, box.boundaryZ() == pbc_t} * maxCoord;
+        auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invTheta;
+        EXPECT_TRUE(minMacMutualInt({1023 - 67, 1023, 100, 101, 100, 101}, b, ellipse, pbc));
+        EXPECT_FALSE(minMacMutualInt({1023 - 68, 1023, 100, 101, 100, 101}, b, ellipse, pbc));
+    }
 }
 
 template<class KeyType, class T>
 static std::vector<char> markVecMacAll2All(const KeyType* leaves,
-                                           gsl::span<const KeyType> prefixes,
+                                           std::span<const KeyType> prefixes,
                                            const Vec4<T>* centers,
                                            TreeNodeIndex firstLeaf,
                                            TreeNodeIndex lastLeaf,
@@ -149,14 +142,13 @@ static void markMacVector()
     RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box);
     std::vector<T> masses(numParticles, 1.0 / numParticles);
 
-    auto [leaves, counts] = computeOctree(coords.particleKeys().data(),
-                                          coords.particleKeys().data() + coords.particleKeys().size(), bucketSize);
+    auto [leaves, counts] = computeOctree<KeyType>(coords.particleKeys(), bucketSize);
     OctreeData<KeyType, CpuTag> octree;
     octree.resize(nNodes(leaves));
     updateInternalTree<KeyType>(leaves, octree.data());
 
-    std::vector<LocalIndex> layout(octree.numLeafNodes + 1);
-    std::exclusive_scan(counts.begin(), counts.end() + 1, layout.begin(), LocalIndex(0));
+    std::vector<LocalIndex> layout(octree.numLeafNodes + 1, 0);
+    std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
 
     auto toInternal = leafToInternal(octree);
 

@@ -60,17 +60,19 @@ InitSettings TurbulenceConstants()
             {"mTotal", 1.0},
             {"powerLawExp", 5. / 3},
             {"anglesExp", 2.0},
+            {"eosChoice", sph::EosType::idealGas},
             {"gamma", 1.001},
-            {"mui", 0.62},
+            {"muiConst", 0.62},
+            {"soundSpeedConst", 1.0},
             {"u0", 1000.},
-            {"Kcour", 0.4},
+            {"Kcour", 0.2},
             {"gravConstant", 0.0},
             {"ng0", 100},
             {"ngmax", 150},
             {"turbulence", 1.0}};
 }
 
-//! @brief init particle data fiels. Note: Dataset attributes must be initialized
+//! @brief init particle data fields. Note: Dataset attributes must be initialized
 template<class Dataset>
 void initTurbulenceHydroFields(Dataset& d, const std::map<std::string, double>& constants)
 {
@@ -87,6 +89,7 @@ void initTurbulenceHydroFields(Dataset& d, const std::map<std::string, double>& 
     std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
     std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
     std::fill(d.temp.begin(), d.temp.end(), temp0);
+    std::fill(d.u.begin(), d.u.end(), constants.at("u0"));
 
     std::fill(d.vx.begin(), d.vx.end(), 0.);
     std::fill(d.vy.begin(), d.vy.end(), 0.);
@@ -94,6 +97,8 @@ void initTurbulenceHydroFields(Dataset& d, const std::map<std::string, double>& 
     std::fill(d.x_m1.begin(), d.x_m1.end(), 0.);
     std::fill(d.y_m1.begin(), d.y_m1.end(), 0.);
     std::fill(d.z_m1.begin(), d.z_m1.end(), 0.);
+
+    generateParticleIDs(d.id);
 }
 
 template<class Dataset>

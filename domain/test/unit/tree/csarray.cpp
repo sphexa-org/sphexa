@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -41,125 +25,43 @@ using namespace cstone;
 template<class T>
 using pair = util::array<T, 2>;
 
-template<class KeyType>
-static void findSearchBounds()
+static void testBounds(LocalIndex guess, uint64_t searchKey, pair<LocalIndex> ref)
 {
-    //                          0   1   2   3   4   5   6   7   8   9
-    std::vector<KeyType> codes{3, 10, 11, 14, 16, 16, 16, 18, 19, 21};
+    using KeyType = uint64_t;
+    auto e        = nodeRange<KeyType>(0);
+    //                         0   1   2   3   4   5   6   7   8   9 10 11 12
+    std::vector<KeyType> codes{3, 10, 11, 14, 16, 16, 16, 18, 19, 21, e, e, e};
     const KeyType* c = codes.data();
 
-    {
-        // upward search direction, guess distance from target: 0
-        int guess  = 3;
-        auto probe = findSearchBounds(guess, KeyType(14), c, c + codes.size());
-        pair<const KeyType*> reference{c + 2, c + 4};
-        EXPECT_EQ(probe[0] - c, reference[0] - c);
-        EXPECT_EQ(probe[1] - c, reference[1] - c);
-    }
-    {
-        // upward search direction, guess distance from target: 1
-        int guess  = 3;
-        auto probe = findSearchBounds(guess, KeyType(15), c, c + codes.size());
-        pair<const KeyType*> reference{c + 3, c + 4};
-        EXPECT_EQ(probe[0] - c, reference[0] - c);
-        EXPECT_EQ(probe[1] - c, reference[1] - c);
-    }
-    {
-        // upward search direction, guess distance from target: 1
-        int guess  = 3;
-        auto probe = findSearchBounds(guess, KeyType(16), c, c + codes.size());
-        pair<const KeyType*> reference{c + 3, c + 7};
-        EXPECT_EQ(probe[0] - c, reference[0] - c);
-        EXPECT_EQ(probe[1] - c, reference[1] - c);
-    }
-    {
-        // upward search direction, guess distance from target: 6
-        int guess  = 0;
-        auto probe = findSearchBounds(guess, KeyType(17), c, c + codes.size());
-        pair<const KeyType*> reference{c + 0, c + 8};
-        EXPECT_EQ(probe[0] - c, reference[0] - c);
-        EXPECT_EQ(probe[1] - c, reference[1] - c);
-    }
-    {
-        // downward search direction
-        int guess  = 4;
-        auto probe = findSearchBounds(guess, KeyType(12), c, c + codes.size());
-        pair<const KeyType*> reference{c + 2, c + 4};
-        EXPECT_EQ(probe[0] - c, reference[0] - c);
-        EXPECT_EQ(probe[1] - c, reference[1] - c);
-    }
-    {
-        // downward search direction
-        int guess  = 4;
-        auto probe = findSearchBounds(guess, KeyType(11), c, c + codes.size());
-        pair<const KeyType*> reference{c + 0, c + 4};
-        EXPECT_EQ(probe[0] - c, reference[0] - c);
-        EXPECT_EQ(probe[1] - c, reference[1] - c);
-    }
-    {
-        // downward search direction
-        int guess  = 4;
-        auto probe = findSearchBounds(guess, KeyType(10), c, c + codes.size());
-        pair<const KeyType*> reference{c + 0, c + 4};
-        EXPECT_EQ(probe[0] - c, reference[0] - c);
-        EXPECT_EQ(probe[1] - c, reference[1] - c);
-    }
-    {
-        // downward search direction
-        int guess  = 8;
-        auto probe = findSearchBounds(guess, KeyType(16), c, c + codes.size());
-        pair<const KeyType*> reference{c + 0, c + 8};
-        EXPECT_EQ(probe[0] - c, reference[0] - c);
-        EXPECT_EQ(probe[1] - c, reference[1] - c);
-    }
-    {
-        // downward search direction
-        int guess  = 6;
-        auto probe = findSearchBounds(guess, KeyType(16), c, c + codes.size());
-        pair<const KeyType*> reference{c + 3, c + 7};
-        EXPECT_EQ(probe[0] - c, reference[0] - c);
-        EXPECT_EQ(probe[1] - c, reference[1] - c);
-    }
-    {
-        // direct hit on the last element
-        int guess  = 9;
-        auto probe = findSearchBounds(guess, KeyType(21), c, c + codes.size());
-        pair<const KeyType*> reference{c + 8, c + 10};
-        EXPECT_EQ(probe[0] - c, reference[0] - c);
-        EXPECT_EQ(probe[1] - c, reference[1] - c);
-    }
-    {
-        // must be able to handle out-of-bounds guess
-        int guess  = 12;
-        auto probe = findSearchBounds(guess, KeyType(16), c, c + codes.size());
-        pair<const KeyType*> reference{c + 1, c + 9};
-        EXPECT_EQ(probe[0] - c, reference[0] - c);
-        EXPECT_EQ(probe[1] - c, reference[1] - c);
-    }
-    {
-        // must be able to handle the upper bound of the last node
-        std::make_signed_t<KeyType> guess = 8;
-        KeyType targetKey                 = nodeRange<KeyType>(0);
-        auto probe                        = findSearchBounds(guess, targetKey, c, c + codes.size());
-        pair<const KeyType*> reference{c + 8, c + 10};
-        EXPECT_EQ(probe[0] - c, reference[0] - c);
-        EXPECT_EQ(probe[1] - c, reference[1] - c);
-    }
+    auto x = findSearchBounds(guess, searchKey, c, c + codes.size());
+    EXPECT_EQ(x[0], c + ref[0]);
+    EXPECT_EQ(x[1], c + ref[1]);
+    EXPECT_EQ(stl::lower_bound(c, c + codes.size(), searchKey) - c, stl::lower_bound(x[0], x[1], searchKey) - c);
 }
 
-TEST(CornerstoneOctree, findSearchBounds32) { findSearchBounds<unsigned>(); }
-
-TEST(CornerstoneOctree, findSearchBounds64) { findSearchBounds<uint64_t>(); }
+TEST(CornerstoneOctree, searchBounds1) { testBounds(3, 14, {2, 3}); }
+TEST(CornerstoneOctree, searchBounds2) { testBounds(3, 15, {3, 4}); }
+TEST(CornerstoneOctree, searchBounds3) { testBounds(3, 16, {3, 7}); }
+TEST(CornerstoneOctree, searchBounds4) { testBounds(4, 16, {3, 4}); }
+TEST(CornerstoneOctree, searchBounds5) { testBounds(0, 17, {0, 8}); }
+TEST(CornerstoneOctree, searchBounds6) { testBounds(4, 12, {2, 4}); }
+TEST(CornerstoneOctree, searchBounds7) { testBounds(4, 11, {0, 4}); }
+TEST(CornerstoneOctree, searchBounds8) { testBounds(4, 10, {0, 4}); }
+TEST(CornerstoneOctree, searchBounds9) { testBounds(8, 16, {0, 8}); }
+TEST(CornerstoneOctree, searchBounds10) { testBounds(6, 16, {2, 6}); }
+TEST(CornerstoneOctree, searchBounds11) { testBounds(9, 21, {8, 9}); }
+TEST(CornerstoneOctree, searchBounds12) { testBounds(12, 16, {0, 12}); }
+TEST(CornerstoneOctree, searchBounds13) { testBounds(8, nodeRange<uint64_t>(0), {10, 13}); }
 
 //! @brief test that computeNodeCounts correctly counts the number of codes for each node
-template<class CodeType>
+template<class KeyType>
 static void checkCountTreeNodes()
 {
-    std::vector<CodeType> tree = OctreeMaker<CodeType>{}.divide().divide(0).makeTree();
+    std::vector<KeyType> tree = OctreeMaker<KeyType>{}.divide().divide(0).makeTree();
 
-    std::vector<CodeType> codes{tree[1],         tree[1],       tree[1] + 10, tree[1] + 100, tree[2] - 1,
-                                tree[2] + 1,     tree[11],      tree[11] + 2, tree[12],      tree[12] + 1000,
-                                tree[12] + 2000, tree[13] - 10, tree[13],     tree[13] + 1};
+    std::vector<KeyType> keys{tree[1],         tree[1],       tree[1] + 10, tree[1] + 100, tree[2] - 1,
+                              tree[2] + 1,     tree[11],      tree[11] + 2, tree[12],      tree[12] + 1000,
+                              tree[12] + 2000, tree[13] - 10, tree[13],     tree[13] + 1};
 
     //  nodeIdx                     0  1  2  3  4  5  6  7  8  9 10 11 12 13 14
     std::vector<unsigned> reference{0, 5, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 4, 2, 0};
@@ -168,8 +70,7 @@ static void checkCountTreeNodes()
     // Ntot: 14, nNonZeroNodes: 13 (first and last node are empty), avgNodeCount: 14/13 = 1
 
     std::vector<unsigned> counts(nNodes(tree));
-    computeNodeCounts(tree.data(), counts.data(), nNodes(tree), codes.data(), codes.data() + codes.size(),
-                      std::numeric_limits<unsigned>::max());
+    computeNodeCounts<KeyType>(tree.data(), counts.data(), nNodes(tree), keys, std::numeric_limits<unsigned>::max());
 
     EXPECT_EQ(counts, reference);
 }
@@ -187,14 +88,14 @@ static void computeNodeCountsSTree()
     /// 2 particles in the first and last node
 
     /// 2 particles in the first and last node
-    std::vector<KeyType> particleCodes{0, 0, nodeRange<KeyType>(0) - 1, nodeRange<KeyType>(0) - 1};
+    std::vector<KeyType> keys{0, 0, nodeRange<KeyType>(0) - 1, nodeRange<KeyType>(0) - 1};
 
     std::vector<unsigned> countsReference(nNodes(tree), 0);
     countsReference.front() = countsReference.back() = 2;
 
     std::vector<unsigned> countsProbe(nNodes(tree));
-    computeNodeCounts(tree.data(), countsProbe.data(), nNodes(tree), particleCodes.data(),
-                      particleCodes.data() + particleCodes.size(), std::numeric_limits<unsigned>::max());
+    computeNodeCounts<KeyType>(tree.data(), countsProbe.data(), nNodes(tree), keys,
+                               std::numeric_limits<unsigned>::max());
     EXPECT_EQ(countsReference, countsProbe);
 }
 
@@ -320,7 +221,7 @@ static void updateTreelet()
     TreeNodeIndex treeletEnd   = 9;
 
     {
-        gsl::span<const KeyType> treelet(tree.data() + treeletStart, tree.data() + treeletEnd + 1);
+        std::span<const KeyType> treelet(tree.data() + treeletStart, tree.data() + treeletEnd + 1);
         std::vector<unsigned> treeletCounts{bucketSize + 1, bucketSize - 1};
 
         auto newTreelet = updateTreelet<KeyType>(treelet, treeletCounts, bucketSize);
@@ -333,7 +234,7 @@ static void updateTreelet()
         EXPECT_EQ(newTreelet, reference);
     }
     {
-        gsl::span<const KeyType> treelet(tree.data() + treeletStart, tree.data() + treeletEnd + 1);
+        std::span<const KeyType> treelet(tree.data() + treeletStart, tree.data() + treeletEnd + 1);
         std::vector<unsigned> treeletCounts{bucketSize - 1, bucketSize + 1};
 
         auto newTreelet = updateTreelet<KeyType>(treelet, treeletCounts, bucketSize);
@@ -348,7 +249,7 @@ static void updateTreelet()
     treeletStart = 0;
     treeletEnd   = 8;
     {
-        gsl::span<const KeyType> treelet(tree.data() + treeletStart, tree.data() + treeletEnd + 1);
+        std::span<const KeyType> treelet(tree.data() + treeletStart, tree.data() + treeletEnd + 1);
         std::vector<unsigned> treeletCounts{1, 2, 3, 4, 5, 6, 7, 8};
 
         auto newTreelet = updateTreelet<KeyType>(treelet, treeletCounts, bucketSize);
@@ -407,15 +308,15 @@ public:
     {
         int nParticles = 100000;
 
-        std::vector<KeyType> codes = makeRandomGaussianKeys<KeyType>(nParticles);
+        std::vector<KeyType> keys = makeRandomGaussianKeys<KeyType>(nParticles);
 
-        auto [tree, counts] = computeOctree(codes.data(), codes.data() + nParticles, bucketSize);
+        auto [tree, counts] = computeOctree<KeyType>(keys, bucketSize);
 
-        checkOctreeWithCounts(tree, counts, bucketSize, codes, false);
+        checkOctreeWithCounts(tree, counts, bucketSize, keys, false);
 
         // update with unchanged particle codes
-        updateOctree(codes.data(), codes.data() + nParticles, bucketSize, tree, counts);
-        checkOctreeWithCounts(tree, counts, bucketSize, codes, false);
+        updateOctree<KeyType>(keys, bucketSize, tree, counts);
+        checkOctreeWithCounts(tree, counts, bucketSize, keys, false);
 
         // range of smallest treeNode
         KeyType minRange = std::numeric_limits<KeyType>::max();
@@ -426,15 +327,15 @@ public:
         std::mt19937 gen(42);
         std::uniform_int_distribution<std::make_signed_t<KeyType>> displace(-minRange, minRange);
 
-        for (auto& code : codes)
-            code = std::max(std::make_signed_t<KeyType>(0),
-                            std::min(std::make_signed_t<KeyType>(code) + displace(gen),
-                                     std::make_signed_t<KeyType>(nodeRange<KeyType>(0) - 1)));
+        for (auto& key : keys)
+            key = std::max(std::make_signed_t<KeyType>(0),
+                           std::min(std::make_signed_t<KeyType>(key) + displace(gen),
+                                    std::make_signed_t<KeyType>(nodeRange<KeyType>(0) - 1)));
 
-        std::sort(begin(codes), end(codes));
-        updateOctree(codes.data(), codes.data() + nParticles, bucketSize, tree, counts);
+        std::sort(begin(keys), end(keys));
+        updateOctree<KeyType>(keys, bucketSize, tree, counts);
         // count < bucketSize may not be true anymore, but node counts still have to be correct
-        checkOctreeWithCounts(tree, counts, bucketSize, codes, true);
+        checkOctreeWithCounts(tree, counts, bucketSize, keys, true);
     }
 };
 
@@ -476,4 +377,49 @@ TEST(CornerstoneOctree, computeSpanningTree)
 {
     computeSpanningTree<unsigned>();
     computeSpanningTree<uint64_t>();
+}
+
+TEST(CornerstoneOctree, NodeDebug)
+{
+    using T       = double;
+    using KeyType = uint64_t;
+    KeyType a     = 0377400000000000000000lu;
+    KeyType b     = 0500000000000000000000lu;
+    std::vector<KeyType> sdomain{a, b};
+
+    KeyType s0 = 0164640000000000000000lu;
+    KeyType s1 = 0164650000000000000000lu;
+    Box<T> box(0, 1, BoundaryType::periodic);
+    IBox source                     = sfcIBox(sfcKey(s0), sfcKey(s1));
+    auto [sourceCenter, sourceSize] = centerAndSize<KeyType>(source, box);
+    unsigned prefixLength           = 3 * treeLevel(s1 - s0);
+    KeyType sourcePrefix            = encodePlaceholderBit(s0, prefixLength);
+    auto expCenter                  = sourceCenter;
+
+    std::vector<KeyType> spanningTree(spanSfcRange(a, b) + 1);
+    spanSfcRange(a, b, spanningTree.data());
+    spanningTree.back() = b;
+
+    std::vector<T> distances;
+    T domainVol = 0;
+    for (size_t i = 0; i < nNodes(spanningTree); ++i)
+    {
+        IBox target                     = sfcIBox(sfcKey(spanningTree[i]), sfcKey(spanningTree[i + 1]));
+        auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
+
+        auto distVec = minDistance(sourceCenter, sourceSize, targetCenter, targetSize, box);
+        T distNorm   = std::sqrt(norm2(distVec));
+        distances.push_back(distNorm);
+        domainVol += 8 * targetSize[0] * targetSize[1] * targetSize[2];
+
+        // T macSq = computeVecMacR2(sourcePrefix, expCenter, 1.0 / 0.5, box);
+        T macSq = computeMinMacR2(sourcePrefix, invThetaMinMac(0.5), box)[3];
+
+        bool isClose = evaluateMacPbc(expCenter, macSq, targetCenter, targetSize, box);
+        std::cout << std::oct << spanningTree[i] << " - " << spanningTree[i + 1] << std::dec << ": " << distNorm
+                  << " MAC " << (isClose ? "Fail" : "Pass") << std::endl;
+    }
+    T minSTDist = *std::min_element(distances.begin(), distances.end());
+    std::cout << "Min source-target distance is " << minSTDist << std::endl;
+    std::cout << "Domain volume is " << domainVol << ", cubeLength " << std::cbrt(domainVol) << std::endl;
 }

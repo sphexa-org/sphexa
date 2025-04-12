@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -32,10 +16,14 @@
 
 #include "gtest/gtest.h"
 
+#include <thrust/execution_policy.h>
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 
 #include "coord_samples/random.hpp"
+#include "cstone/cuda/device_vector.h"
+#include "cstone/cuda/thrust_util.cuh"
+#include "cstone/primitives/primitives_gpu.h"
 #include "cstone/tree/csarray.hpp"
 #include "cstone/tree/csarray_gpu.h"
 #include "cstone/tree/cs_util.hpp"
@@ -78,14 +66,14 @@ TEST(CsArrayGpu, computeNodeCountsGpu)
     refCounts[0]        = 0;
     *refCounts.rbegin() = 0;
 
-    computeNodeCountsGpu(rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree), rawPtr(d_particleKeys),
-                         rawPtr(d_particleKeys) + d_particleKeys.size(), std::numeric_limits<unsigned>::max(), false);
+    computeNodeCountsGpu(rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree),
+                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), false);
     thrust::host_vector<unsigned> h_counts = d_counts;
     EXPECT_EQ(h_counts, refCounts);
 
     // check again, using previous counts as guesses
-    computeNodeCountsGpu(rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree), rawPtr(d_particleKeys),
-                         rawPtr(d_particleKeys) + d_particleKeys.size(), std::numeric_limits<unsigned>::max(), true);
+    computeNodeCountsGpu(rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree),
+                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), true);
     h_counts = d_counts;
     EXPECT_EQ(h_counts, refCounts);
 }
@@ -150,43 +138,39 @@ public:
         d_tree   = std::vector<KeyType>{0, nodeRange<KeyType>(0)};
         d_counts = std::vector<unsigned>{numParticles};
 
-        thrust::device_vector<KeyType> tmpTree;
-        thrust::device_vector<TreeNodeIndex> workArray;
+        DeviceVector<KeyType> tmpTree;
+        DeviceVector<TreeNodeIndex> workArray;
 
-        while (!updateOctreeGpu(thrust::raw_pointer_cast(d_codes.data()),
-                                thrust::raw_pointer_cast(d_codes.data() + d_codes.size()), bucketSize, d_tree, d_counts,
-                                tmpTree, workArray))
+        while (!updateOctreeGpu<KeyType>({rawPtr(d_codes), d_codes.size()}, bucketSize, d_tree, d_counts, tmpTree,
+                                         workArray))
             ;
     }
 
-    thrust::device_vector<KeyType> d_tree;
-    thrust::device_vector<KeyType> d_codes;
-    thrust::device_vector<unsigned> d_counts;
+    DeviceVector<KeyType> d_tree;
+    DeviceVector<KeyType> d_codes;
+    DeviceVector<unsigned> d_counts;
 };
 
 //! @brief build tree from random particles and compare against CPU
 TEST(CsArrayGpu, computeOctreeRandom)
 {
-    using Integer = unsigned;
+    using KeyType = unsigned;
 
     int nParticles = 100000;
     int bucketSize = 64;
 
     // compute octree starting from default uniform octree
-    auto particleKeys         = makeRandomGaussianKeys<Integer>(nParticles);
-    auto [treeCpu, countsCpu] = computeOctree(particleKeys.data(), particleKeys.data() + nParticles, bucketSize);
+    auto particleKeys         = makeRandomGaussianKeys<KeyType>(nParticles);
+    auto [treeCpu, countsCpu] = computeOctree<KeyType>(particleKeys, bucketSize);
 
-    OctreeFixtureGpu<Integer> fixt(nParticles, bucketSize);
+    OctreeFixtureGpu<KeyType> fixt(nParticles, bucketSize);
 
-    // download tree from device
-    thrust::host_vector<Integer> h_tree     = fixt.d_tree;
-    thrust::host_vector<Integer> refTreeCpu = treeCpu;
+    // upload CPU reference to GPU
+    DeviceVector<KeyType> refTreeCpu    = treeCpu;
+    DeviceVector<unsigned> refCountsCpu = countsCpu;
 
-    thrust::host_vector<Integer> h_counts     = fixt.d_counts;
-    thrust::host_vector<Integer> refCountsCpu = countsCpu;
-
-    EXPECT_EQ(h_tree, refTreeCpu);
-    EXPECT_EQ(h_counts, refCountsCpu);
+    EXPECT_EQ(fixt.d_tree, refTreeCpu);
+    EXPECT_EQ(fixt.d_counts, refCountsCpu);
 }
 
 /*! @brief simulation of distributed tree
@@ -205,7 +189,7 @@ TEST(CsArrayGpu, distributedMockUp)
 
     OctreeFixtureGpu<CodeType> fixt(nParticles, bucketSize);
 
-    thrust::device_vector<CodeType> d_counts_orig = fixt.d_counts;
+    DeviceVector<CodeType> d_counts_orig = fixt.d_counts;
 
     // omit first and last tenth of nodes
     TreeNodeIndex Nodes     = nNodes(fixt.d_tree);
@@ -213,23 +197,22 @@ TEST(CsArrayGpu, distributedMockUp)
     TreeNodeIndex lastNode  = Nodes - Nodes / 10;
 
     // determine the part of the tree that will be empty
-    thrust::host_vector<CodeType> h_codes = fixt.d_codes;
-    unsigned firstParticleIdx =
-        stl::lower_bound(h_codes.begin(), h_codes.end(), fixt.d_tree[firstNode]) - h_codes.begin();
-    unsigned lastParticleIdx =
-        stl::lower_bound(h_codes.begin(), h_codes.end(), fixt.d_tree[lastNode]) - h_codes.begin();
+    CodeType nodeKey1, nodeKey2;
+    memcpyD2H(fixt.d_tree.data() + firstNode, 1, &nodeKey1);
+    memcpyD2H(fixt.d_tree.data() + lastNode, 1, &nodeKey2);
+    unsigned firstIdx = lowerBoundGpu(fixt.d_codes.data(), fixt.d_codes.data() + fixt.d_codes.size(), nodeKey1);
+    unsigned lastIdx  = lowerBoundGpu(fixt.d_codes.data(), fixt.d_codes.data() + fixt.d_codes.size(), nodeKey2);
     std::cout << firstNode << " " << lastNode << std::endl;
-    std::cout << firstParticleIdx << " " << lastParticleIdx << std::endl;
+    std::cout << firstIdx << " " << lastIdx << std::endl;
 
     bool useCountsAsGuess = true;
-    computeNodeCountsGpu(thrust::raw_pointer_cast(fixt.d_tree.data()), thrust::raw_pointer_cast(fixt.d_counts.data()),
-                         nNodes(fixt.d_tree), thrust::raw_pointer_cast(fixt.d_codes.data() + firstParticleIdx),
-                         thrust::raw_pointer_cast(fixt.d_codes.data() + lastParticleIdx),
+    computeNodeCountsGpu(fixt.d_tree.data(), fixt.d_counts.data(), nNodes(fixt.d_tree),
+                         {fixt.d_codes.data() + firstIdx, fixt.d_codes.data() + lastIdx},
                          std::numeric_limits<unsigned>::max(), useCountsAsGuess);
 
-    thrust::device_vector<CodeType> d_counts_ref = d_counts_orig;
-    thrust::fill(d_counts_ref.begin(), d_counts_ref.begin() + firstNode, 0);
-    thrust::fill(d_counts_ref.begin() + lastNode, d_counts_ref.end(), 0);
+    DeviceVector<CodeType> d_counts_ref = d_counts_orig;
+    thrust::fill(thrust::device, d_counts_ref.data(), d_counts_ref.data() + firstNode, 0);
+    thrust::fill(thrust::device, d_counts_ref.data() + lastNode, d_counts_ref.data() + d_counts_ref.size(), 0);
 
     EXPECT_EQ(fixt.d_counts, d_counts_ref);
 }

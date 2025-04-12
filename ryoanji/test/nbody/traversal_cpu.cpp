@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Ryoanji N-body solver
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -45,28 +29,32 @@ TEST(Gravity, TreeWalk)
 {
     using T             = double;
     using KeyType       = uint64_t;
-    using MultipoleType = ryoanji::CartesianQuadrupole<T>;
+    using MultipoleType = ryoanji::CartesianMDQpole<T>;
 
-    float          theta      = 0.5;
+    float          theta      = 0.2;
     float          G          = 1.0;
     unsigned       bucketSize = 64;
     cstone::Box<T> box(-1, 1);
-    int            numShells    = 1;
-    LocalIndex     numParticles = 10000;
+    int            numShells    = 0;
+    LocalIndex     numParticles = 100000;
 
-    RandomCoordinates<T, SfcKind<KeyType>> coordinates(numParticles, box);
+    RandomGaussianCoordinates<T, SfcKind<KeyType>> coordinates(numParticles, box);
 
     const T* x = coordinates.x().data();
     const T* y = coordinates.y().data();
     const T* z = coordinates.z().data();
 
-    std::vector<T> h(numParticles, 0.01);
-    std::vector<T> masses(numParticles);
-    std::generate(begin(masses), end(masses), drand48);
+    std::vector<T> h(numParticles, 0.1);
+    adjustSmoothingLength<KeyType>(h.size(), 2, 5, coordinates.x(), coordinates.y(), coordinates.z(), h, box);
+
+    std::vector<T> masses(numParticles, T(1) / numParticles);
+    for (size_t i = 0; i < masses.size(); ++i)
+    {
+        if (i % 2) masses[i] *= -1.0;
+    }
 
     // the leaf cells and leaf particle counts
-    auto [treeLeaves, counts] =
-        computeOctree(coordinates.particleKeys().data(), coordinates.particleKeys().data() + numParticles, bucketSize);
+    auto [treeLeaves, counts] = computeOctree(std::span(coordinates.particleKeys()), bucketSize);
 
     // fully linked octree, including internal part
     OctreeData<KeyType, CpuTag> octree;
@@ -74,8 +62,8 @@ TEST(Gravity, TreeWalk)
     updateInternalTree<KeyType>(treeLeaves, octree.data());
 
     // layout[i] is equal to the index in (x,y,z,m) of the first particle in leaf cell with index i
-    std::vector<LocalIndex> layout(octree.numLeafNodes + 1);
-    std::exclusive_scan(counts.begin(), counts.end() + 1, layout.begin(), LocalIndex(0));
+    std::vector<LocalIndex> layout(octree.numLeafNodes + 1, 0);
+    std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
 
     auto toInternal = leafToInternal(octree);
 
@@ -88,10 +76,6 @@ TEST(Gravity, TreeWalk)
     std::vector<MultipoleType> multipoles(octree.numNodes);
     computeLeafMultipoles(x, y, z, masses.data(), toInternal, layout.data(), centers.data(), multipoles.data());
     upsweepMultipoles(octree.levelRange, octree.childOffsets.data(), centers.data(), multipoles.data());
-    for (size_t i = 0; i < multipoles.size(); ++i)
-    {
-        multipoles[i] = ryoanji::normalize(multipoles[i]);
-    }
 
     T totalMass = std::accumulate(masses.begin(), masses.end(), 0.0);
     EXPECT_TRUE(std::abs(totalMass - multipoles[0][ryoanji::Cqi::mass]) < 1e-6);
@@ -100,8 +84,8 @@ TEST(Gravity, TreeWalk)
     std::vector<T> ay(numParticles, 0);
     std::vector<T> az(numParticles, 0);
 
-    auto   t0       = std::chrono::high_resolution_clock::now();
-    double egravTot = 0;
+    auto t0       = std::chrono::high_resolution_clock::now();
+    T    egravTot = 0;
     computeGravity(octree.childOffsets.data(), octree.internalToLeaf.data(), centers.data(), multipoles.data(),
                    layout.data(), 0, octree.numLeafNodes, x, y, z, h.data(), masses.data(), box, G, (T*)nullptr,
                    ax.data(), ay.data(), az.data(), &egravTot, numShells);
@@ -138,18 +122,15 @@ TEST(Gravity, TreeWalk)
     std::vector<T> delta(numParticles);
     for (LocalIndex i = 0; i < numParticles; ++i)
     {
-        T dx = ax[i] - Ax[i];
-        T dy = ay[i] - Ay[i];
-        T dz = az[i] - Az[i];
-
-        delta[i] = std::sqrt((dx * dx + dy * dy + dz * dz) / (Ax[i] * Ax[i] + Ay[i] * Ay[i] + Az[i] * Az[i]));
+        ryoanji::Vec3<T> axi{ax[i], ay[i], az[i]}, Axi{Ax[i], Ay[i], Az[i]};
+        delta[i] = std::sqrt(norm2(axi - Axi) / norm2(Axi));
     }
 
     // sort errors in ascending order to infer the error distribution
     std::sort(begin(delta), end(delta));
 
     EXPECT_TRUE(delta[numParticles * 0.99] < 3e-3);
-    EXPECT_TRUE(delta[numParticles - 1] < 2e-2);
+    EXPECT_TRUE(delta[numParticles - 1] < 3e-2);
 
     std::cout.precision(10);
     std::cout << "min Error: " << delta[0] << std::endl;

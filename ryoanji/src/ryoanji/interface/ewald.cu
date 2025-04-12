@@ -1,11 +1,19 @@
+/*
+ * Ryoanji N-body solver
+ *
+ * Copyright (c) 2024 CSCS, ETH Zurich
+ *
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
+ */
+
 /*! @file
  * @brief  Ewald summation on GPUs
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#include <cub/cub.cuh>
-
+#include "cstone/cuda/cub.hpp"
 #include "cstone/traversal/groups.hpp"
 #include "ryoanji/nbody/ewald.hpp"
 
@@ -84,7 +92,7 @@ void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mro
     computeGravityEwaldKernel<<<numBlocks, numThreads>>>(grp, x, y, z, m, G, ugrav, ax, ay, az, ewaldParamsGpu);
 
     float totalPotential;
-    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, totalEwaldPotentialGlob, sizeof(float)));
+    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalEwaldPotentialGlob), sizeof(float)));
     checkGpuErrors(cudaFree(ewaldParamsGpu));
 
     *ugravTot += 0.5 * G * totalPotential;

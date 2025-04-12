@@ -1,25 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2022 CSCS, ETH Zurich
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -30,6 +15,7 @@
 
 #pragma once
 
+#include <iostream>
 #include <numeric>
 #include <vector>
 
@@ -43,8 +29,7 @@
 #include "cstone/primitives/primitives_gpu.h"
 #include "cstone/traversal/collisions.hpp"
 #include "cstone/traversal/collisions_gpu.h"
-#include "cstone/tree/accel_switch.hpp"
-#include "cstone/util/gsl-lite.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/util/reallocate.hpp"
 
 namespace cstone
@@ -54,10 +39,10 @@ namespace detail
 {
 
 //! @brief check that only owned particles in [particleStart_:particleEnd_] are sent out as halos
-void checkIndices(const SendList& sendList,
-                  [[maybe_unused]] LocalIndex start,
-                  [[maybe_unused]] LocalIndex end,
-                  [[maybe_unused]] LocalIndex bufferSize)
+static void checkIndices(const SendList& sendList,
+                         [[maybe_unused]] LocalIndex start,
+                         [[maybe_unused]] LocalIndex end,
+                         [[maybe_unused]] LocalIndex bufferSize)
 {
     for (const auto& manifest : sendList)
     {
@@ -72,9 +57,9 @@ void checkIndices(const SendList& sendList,
 //! @brief check halo discovery for sanity
 template<class KeyType>
 int checkHalos(int myRank,
-               gsl::span<const TreeIndexPair> focusAssignment,
-               gsl::span<const int> haloFlags,
-               gsl::span<const KeyType> ftree)
+               std::span<const TreeIndexPair> focusAssignment,
+               std::span<const int> haloFlags,
+               std::span<const KeyType> ftree)
 {
     TreeNodeIndex firstAssignedNode = focusAssignment[myRank].start();
     TreeNodeIndex lastAssignedNode  = focusAssignment[myRank].end();
@@ -130,23 +115,26 @@ public:
 
     /*! @brief Discover which cells outside myRank's assignment are halos
      *
-     * @param[in] focusedTree      Fully linked octree, focused on the assignment of the executing rank
+     * @param[in] prefixes         LET node prefixes
+     * @param[in] childOffsets     LET connectivity
+     * @param[in] internalToLeaf   LET translate full tree cell index to cornerstone index (i.e. into leaves)
+     * @param[in] leaves           LET cornerstone leaf cell array
      * @param[in] counts           (focus) tree counts
      * @param[in] focusAssignment  Assignment of leaf tree cells to ranks
      * @param[-]  layout           temporary storage for node count scan
      * @param[in] box              Global coordinate bounding box
      * @param[in] h                smoothing lengths of locally owned particles
      * @param[in] searchExtFact    increases halo search radius to extend the depth of the ghost layer
-     * @param[-]  scratchBuffer    host or device buffer for temporary use
+     * @param[-]  scratch          host or device buffer for temporary use
      */
     template<class T, class Th, class Vector>
     void discover(const KeyType* prefixes,
                   const TreeNodeIndex* childOffsets,
                   const TreeNodeIndex* internalToLeaf,
                   const KeyType* leaves,
-                  gsl::span<const unsigned> counts,
-                  gsl::span<const TreeIndexPair> focusAssignment,
-                  gsl::span<LocalIndex> layout,
+                  std::span<const unsigned> counts,
+                  std::span<const TreeIndexPair> focusAssignment,
+                  std::span<LocalIndex> layout,
                   const Box<T>& box,
                   const Th* h,
                   float searchExtFact,
@@ -170,7 +158,8 @@ public:
             auto* d_flags = reinterpret_cast<int*>(rawPtr(scratch));
             auto* d_radii = reinterpret_cast<float*>(rawPtr(scratch)) + flagBytes / sizeof(float);
 
-            exclusiveScanGpu(counts.data() + firstNode, counts.data() + lastNode + 1, layout.data() + firstNode);
+            fillGpu(layout.data() + firstNode, layout.data() + firstNode + 1, LocalIndex(0));
+            inclusiveScanGpu(counts.data() + firstNode, counts.data() + lastNode, layout.data() + firstNode + 1);
             segmentMax(h, layout.data() + firstNode, numNodesSearch, d_radii + firstNode);
             // SPH convention: interaction radius = 2 * h
             scaleGpu(d_radii, d_radii + numLeafNodes, 2.0f * searchExtFact);
@@ -179,11 +168,13 @@ public:
             findHalosGpu(prefixes, childOffsets, internalToLeaf, leaves, d_radii, box, firstNode, lastNode, d_flags);
             memcpyD2H(d_flags, numLeafNodes, haloFlags_.data());
 
-            reallocateDevice(scratch, origSize, 1.0);
+            reallocate(scratch, origSize, 1.0);
         }
         else
         {
-            std::exclusive_scan(counts.begin() + firstNode, counts.begin() + lastNode + 1, layout.begin(), 0);
+            layout[0] = 0;
+            std::inclusive_scan(counts.begin() + firstNode, counts.begin() + lastNode, layout.begin() + 1,
+                                std::plus<>{}, LocalIndex(0));
             std::vector<float> haloRadii(counts.size(), 0.0f);
 #pragma omp parallel for schedule(static)
             for (TreeNodeIndex i = 0; i < numNodesSearch; ++i)
@@ -214,11 +205,11 @@ public:
      *                         and the corresponding layout range has length zero.
      * @return                 0 if all halo cells have been matched with a peer rank, 1 otherwise
      */
-    int computeLayout(gsl::span<const KeyType> leaves,
-                      gsl::span<const unsigned> counts,
-                      gsl::span<const TreeIndexPair> assignment,
-                      gsl::span<const int> peers,
-                      gsl::span<LocalIndex> layout)
+    int computeLayout(std::span<const KeyType> leaves,
+                      std::span<const unsigned> counts,
+                      std::span<const TreeIndexPair> assignment,
+                      std::span<const int> peers,
+                      std::span<LocalIndex> layout)
     {
         computeNodeLayout(counts, haloFlags_, assignment[myRank_].start(), assignment[myRank_].end(), layout);
         auto newParticleStart = layout[assignment[myRank_].start()];
@@ -229,7 +220,7 @@ public:
         if (detail::checkHalos(myRank_, assignment, haloFlags_, leaves)) { return 1; }
         detail::checkIndices(outgoingHaloIndices_, newParticleStart, newParticleEnd, layout.back());
 
-        incomingHaloIndices_ = computeHaloReceiveList(layout, haloFlags_, assignment, peers);
+        incomingHaloIndices_ = computeHaloRecvList(layout, haloFlags_, assignment, peers);
         return 0;
     }
 
@@ -262,12 +253,12 @@ public:
         }
     }
 
-    gsl::span<int> haloFlags() { return haloFlags_; }
+    std::span<int> haloFlags() { return haloFlags_; }
 
 private:
     int myRank_;
 
-    SendList incomingHaloIndices_;
+    RecvList incomingHaloIndices_;
     SendList outgoingHaloIndices_;
 
     std::vector<int> haloFlags_;

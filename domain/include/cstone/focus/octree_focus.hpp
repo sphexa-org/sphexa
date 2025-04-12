@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -43,9 +27,7 @@
 
 #include <vector>
 
-#include "cstone/util/gsl-lite.hpp"
 #include "cstone/domain/index_ranges.hpp"
-
 #include "cstone/focus/inject.hpp"
 #include "cstone/focus/rebalance.hpp"
 #include "cstone/focus/rebalance_gpu.h"
@@ -57,7 +39,6 @@
 #include "cstone/tree/csarray_gpu.h"
 #include "cstone/tree/octree.hpp"
 #include "cstone/tree/octree_gpu.h"
-#include "cstone/traversal/traversal.hpp"
 
 namespace cstone
 {
@@ -86,9 +67,9 @@ struct CombinedUpdate
                             unsigned bucketSize,
                             KeyType focusStart,
                             KeyType focusEnd,
-                            gsl::span<const KeyType> mandatoryKeys,
-                            gsl::span<const unsigned> counts,
-                            gsl::span<const char> macs)
+                            std::span<const KeyType> mandatoryKeys,
+                            std::span<const unsigned> counts,
+                            std::span<const char> macs)
     {
         [[maybe_unused]] TreeNodeIndex numNodes = tree.numLeafNodes + tree.numInternalNodes;
         assert(TreeNodeIndex(counts.size()) == numNodes);
@@ -96,7 +77,7 @@ struct CombinedUpdate
         assert(TreeNodeIndex(tree.internalToLeaf.size()) >= numNodes);
 
         // take op decision per node
-        gsl::span<TreeNodeIndex> nodeOpsAll(tree.internalToLeaf);
+        std::span<TreeNodeIndex> nodeOpsAll(tree.internalToLeaf);
         rebalanceDecisionEssential<KeyType>(tree.prefixes, tree.childOffsets.data(), tree.parents.data(), counts.data(),
                                             macs.data(), focusStart, focusEnd, bucketSize, nodeOpsAll.data());
 
@@ -109,7 +90,7 @@ struct CombinedUpdate
 
         // extract leaf decision, using childOffsets at temp storage, require +1 for exclusive scan last element
         assert(tree.childOffsets.size() >= size_t(tree.numLeafNodes + 1));
-        gsl::span<TreeNodeIndex> nodeOps(tree.childOffsets.data(), tree.numLeafNodes + 1);
+        std::span<TreeNodeIndex> nodeOps(tree.childOffsets.data(), tree.numLeafNodes + 1);
         gather(leafToInternal(tree), nodeOpsAll.data(), nodeOps.data());
 
         if (status == ResolutionStatus::cancelMerge)
@@ -152,15 +133,14 @@ struct CombinedUpdate
      * @param[in] macs            MAC pass/fail results for each node, length = tree_.numTreeNodes()
      * @return                    true if the tree structure did not change
      */
-    template<class Alloc>
     static bool updateFocusGpu(OctreeData<KeyType, GpuTag>& tree,
-                               thrust::device_vector<KeyType, Alloc>& leaves,
+                               DeviceVector<KeyType>& leaves,
                                unsigned bucketSize,
                                KeyType focusStart,
                                KeyType focusEnd,
-                               gsl::span<const KeyType> mandatoryKeys,
-                               gsl::span<const unsigned> counts,
-                               gsl::span<const char> macs)
+                               std::span<const KeyType> mandatoryKeys,
+                               std::span<const unsigned> counts,
+                               std::span<const char> macs)
     {
         TreeNodeIndex numNodes = tree.numLeafNodes + tree.numInternalNodes;
         assert(TreeNodeIndex(counts.size()) == numNodes);
@@ -168,14 +148,14 @@ struct CombinedUpdate
         assert(TreeNodeIndex(tree.internalToLeaf.size()) >= numNodes);
 
         // take op decision per node
-        gsl::span<TreeNodeIndex> nodeOpsAll(rawPtr(tree.internalToLeaf), numNodes);
+        std::span<TreeNodeIndex> nodeOpsAll(rawPtr(tree.internalToLeaf), numNodes);
         rebalanceDecisionEssentialGpu(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(tree.parents),
                                       counts.data(), macs.data(), focusStart, focusEnd, bucketSize, nodeOpsAll.data(),
                                       numNodes);
 
         auto status = ResolutionStatus::converged;
 
-        thrust::device_vector<KeyType, Alloc> d_mandatoryKeys;
+        DeviceVector<KeyType> d_mandatoryKeys;
         reallocate(d_mandatoryKeys, mandatoryKeys.size(), 1.0);
         memcpyH2D(mandatoryKeys.data(), mandatoryKeys.size(), rawPtr(d_mandatoryKeys));
         status         = enforceKeysGpu(rawPtr(d_mandatoryKeys), d_mandatoryKeys.size(), rawPtr(tree.prefixes),
@@ -184,12 +164,12 @@ struct CombinedUpdate
 
         // extract leaf decision, using childOffsets as temp storage
         assert(tree.childOffsets.size() >= size_t(tree.numLeafNodes + 1));
-        gsl::span<TreeNodeIndex> nodeOps(rawPtr(tree.childOffsets), tree.numLeafNodes + 1);
+        std::span<TreeNodeIndex> nodeOps(rawPtr(tree.childOffsets), tree.numLeafNodes + 1);
         gatherGpu(leafToInternal(tree).data(), nNodes(leaves), nodeOpsAll.data(), nodeOps.data());
 
         if (status == ResolutionStatus::cancelMerge)
         {
-            converged = countGpu(nodeOps.begin(), nodeOps.end() - 1, 1) == tree.numLeafNodes;
+            converged = countGpu(nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1) == tree.numLeafNodes;
         }
         else if (status == ResolutionStatus::rebalance) { converged = false; }
 
@@ -206,7 +186,8 @@ struct CombinedUpdate
         if (status == ResolutionStatus::failed)
         {
             converged = false;
-            injectKeysGpu(tree, leaves, d_mandatoryKeys);
+            injectKeysGpu(leaves, {d_mandatoryKeys.data(), d_mandatoryKeys.size()}, tree.prefixes, tree.childOffsets,
+                          tree.internalToLeaf);
         }
 
         tree.resize(nNodes(leaves));
@@ -219,11 +200,11 @@ struct CombinedUpdate
 template<class KeyType>
 bool updateMacRefine(OctreeData<KeyType, CpuTag>& tree,
                      std::vector<KeyType>& leaves,
-                     gsl::span<const char> macs,
+                     std::span<const char> macs,
                      TreeIndexPair focus)
 {
     assert(tree.childOffsets.size() >= size_t(tree.numLeafNodes + 1));
-    gsl::span<TreeNodeIndex> nodeOps(tree.childOffsets.data(), tree.numLeafNodes + 1);
+    std::span<TreeNodeIndex> nodeOps(tree.childOffsets.data(), tree.numLeafNodes + 1);
 
     auto l2i = leafToInternal(tree);
 #pragma omp parallel for schedule(static)
@@ -272,26 +253,26 @@ bool macRefine(OctreeData<KeyType, CpuTag>& tree,
     TreeNodeIndex fEnd   = findNodeAbove(rawPtr(leaves), nNodes(leaves), focusEnd);
 
     markMacs(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(centers), box, rawPtr(leaves) + fStart,
-             fGrowL - fStart, true, rawPtr(macs));
+             fGrowL - fStart, true, macs.data());
     markMacs(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(centers), box, rawPtr(leaves) + fGrowU,
-             fEnd - fGrowU, true, rawPtr(macs));
+             fEnd - fGrowU, true, macs.data());
 
     return updateMacRefine(tree, leaves, macs, {fStart, fEnd});
 }
 
-template<class KeyType, class Alloc>
+template<class KeyType>
 bool updateMacRefineGpu(OctreeData<KeyType, GpuTag>& tree,
-                        thrust::device_vector<KeyType, Alloc>& leaves,
+                        DeviceVector<KeyType>& leaves,
                         const char* macs,
                         TreeIndexPair focus)
 {
     assert(tree.childOffsets.size() >= size_t(tree.numLeafNodes + 1));
-    gsl::span<TreeNodeIndex> nodeOps(rawPtr(tree.childOffsets), tree.numLeafNodes + 1);
+    std::span<TreeNodeIndex> nodeOps(rawPtr(tree.childOffsets), tree.numLeafNodes + 1);
 
     auto l2i = leafToInternal(tree);
     macRefineDecisionGpu(rawPtr(tree.prefixes), macs, l2i.data(), l2i.size(), focus, nodeOps.data());
 
-    bool converged = countGpu(nodeOps.cbegin(), nodeOps.cend() - 1, 1) == tree.numLeafNodes;
+    bool converged = countGpu(nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1) == tree.numLeafNodes;
     exclusiveScanGpu(nodeOps.data(), nodeOps.data() + nodeOps.size(), nodeOps.data());
     TreeNodeIndex newNumLeafNodes;
     memcpyD2H(nodeOps.data() + nodeOps.size() - 1, 1, &newNumLeafNodes);
@@ -307,11 +288,11 @@ bool updateMacRefineGpu(OctreeData<KeyType, GpuTag>& tree,
     return converged;
 }
 
-template<class T, class KeyType, template<class> class Alloc>
+template<class T, class KeyType>
 bool macRefineGpu(OctreeData<KeyType, GpuTag>& tree,
-                  thrust::device_vector<KeyType, Alloc<KeyType>>& leaves,
-                  thrust::device_vector<SourceCenterType<T>, Alloc<SourceCenterType<T>>>& centers,
-                  thrust::device_vector<char, Alloc<char>>& macs,
+                  DeviceVector<KeyType>& leaves,
+                  DeviceVector<SourceCenterType<T>>& centers,
+                  DeviceVector<char>& macs,
                   KeyType oldFocusStart,
                   KeyType oldFocusEnd,
                   KeyType focusStart,
@@ -320,11 +301,11 @@ bool macRefineGpu(OctreeData<KeyType, GpuTag>& tree,
                   const Box<T>& box)
 {
     if (oldFocusStart == focusStart && oldFocusEnd == focusEnd) { return true; }
-    reallocateDevice(centers, tree.numNodes, 1.05);
+    reallocate(centers, tree.numNodes, 1.05);
     geoMacSpheresGpu(rawPtr(tree.prefixes), tree.numNodes, rawPtr(centers), invTheta, box);
 
-    reallocateDevice(macs, tree.numNodes, 1.05);
-    fillGpu(rawPtr(macs), rawPtr(macs) + macs.size(), char(0));
+    reallocate(macs, tree.numNodes, 1.05);
+    fillGpu(macs.data(), macs.data() + macs.size(), char(0));
 
     KeyType growthLower = focusStart < oldFocusStart ? oldFocusStart : focusStart;
     KeyType growthUpper = oldFocusEnd < focusEnd ? oldFocusEnd : focusEnd;
@@ -335,11 +316,11 @@ bool macRefineGpu(OctreeData<KeyType, GpuTag>& tree,
     TreeNodeIndex fGrowU = lowerBoundGpu(rawPtr(leaves), rawPtr(leaves) + nNodes(leaves), growthUpper);
 
     markMacsGpu(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(centers), box, rawPtr(leaves) + fStart,
-                fGrowL - fStart, true, rawPtr(macs));
+                fGrowL - fStart, true, macs.data());
     markMacsGpu(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(centers), box, rawPtr(leaves) + fGrowU,
-                fEnd - fGrowU, true, rawPtr(macs));
+                fEnd - fGrowU, true, macs.data());
 
-    return updateMacRefineGpu(tree, leaves, rawPtr(macs), {fStart, fEnd});
+    return updateMacRefineGpu(tree, leaves, macs.data(), {fStart, fEnd});
 }
 
 /*! @brief A fully traversable octree, locally focused w.r.t a MinMac criterion
@@ -366,10 +347,10 @@ public:
     //! @brief perform a local update step, see FocusedOctreeCore
     template<class T>
     bool update(const Box<T>& box,
-                gsl::span<const KeyType> particleKeys,
+                std::span<const KeyType> particleKeys,
                 KeyType focusStart,
                 KeyType focusEnd,
-                gsl::span<const KeyType> mandatoryKeys)
+                std::span<const KeyType> mandatoryKeys)
     {
         bool converged =
             CB::updateFocus(tree_, leaves_, bucketSize_, focusStart, focusEnd, mandatoryKeys, counts_, macs_);
@@ -392,8 +373,8 @@ public:
                  fEnd - fStart, false, macs_.data());
 
         leafCounts_.resize(nNodes(leaves_));
-        computeNodeCounts(leaves_.data(), leafCounts_.data(), nNodes(leaves_), particleKeys.data(),
-                          particleKeys.data() + particleKeys.size(), std::numeric_limits<unsigned>::max(), true);
+        computeNodeCounts<KeyType>(leaves_.data(), leafCounts_.data(), nNodes(leaves_), particleKeys,
+                                   std::numeric_limits<unsigned>::max(), true);
 
         counts_.resize(tree_.numNodes);
         scatter(leafToInternal(tree_), leafCounts_.data(), counts_.data());
@@ -402,8 +383,8 @@ public:
         return converged;
     }
 
-    gsl::span<const KeyType> treeLeaves() const { return leaves_; }
-    gsl::span<const unsigned> leafCounts() const { return leafCounts_; }
+    std::span<const KeyType> treeLeaves() const { return leaves_; }
+    std::span<const unsigned> leafCounts() const { return leafCounts_; }
 
 private:
     //! @brief opening angle refinement criterion

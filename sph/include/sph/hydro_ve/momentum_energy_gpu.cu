@@ -29,14 +29,13 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#include <cub/cub.cuh>
-
+#include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/primitives/warpscan.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
 
 #include "sph/sph_gpu.hpp"
 #include "sph/particles_data.hpp"
-#include "sph/util/device_math.cuh"
 #include "sph/hydro_ve/momentum_energy_kern.hpp"
 
 namespace sph
@@ -114,7 +113,7 @@ __global__ void momentumEnergyGpu(Tc K, Tc Kcour, T Atmin, T Atmax, T ramp, unsi
     T           blockMin = reduce.Reduce(dt_i, cub::Min());
     __syncthreads();
 
-    if (threadIdx.x == 0) { atomicMinFloat(&minDt_ve_device, blockMin); }
+    if (threadIdx.x == 0) { cstone::atomicMinFloat(&minDt_ve_device, blockMin); }
 }
 
 template<bool avClean, class Dataset>
@@ -124,7 +123,7 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
     auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
 
     float huge = 1e10;
-    checkGpuErrors(cudaMemcpyToSymbol(minDt_ve_device, &huge, sizeof(huge)));
+    checkGpuErrors(cudaMemcpyToSymbol(GPU_SYMBOL(minDt_ve_device), &huge, sizeof(huge)));
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     momentumEnergyGpu<avClean><<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
@@ -140,7 +139,7 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
     checkGpuErrors(cudaGetLastError());
 
     float minDt;
-    checkGpuErrors(cudaMemcpyFromSymbol(&minDt, minDt_ve_device, sizeof(minDt)));
+    checkGpuErrors(cudaMemcpyFromSymbol(&minDt, GPU_SYMBOL(minDt_ve_device), sizeof(minDt)));
     d.minDtCourant = minDt;
 }
 

@@ -35,8 +35,9 @@
 #include <random>
 #include <vector>
 
+#include "cstone/cuda/device_vector.h"
 #include "cstone/cuda/cuda_utils.hpp"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/accel_switch.hpp"
 
 #include "sph/hydro_turb/create_modes.hpp"
 
@@ -48,7 +49,7 @@ class TurbulenceData
 {
     // resulting type is a thrust::device_vector if the Accelerator is a GPU, otherwise a std::vector
     using DeviceVector =
-        typename cstone::AccelSwitchType<Accelerator, std::vector, thrust::device_vector>::template type<T>;
+        typename cstone::AccelSwitchType<Accelerator, std::vector, cstone::DeviceVector>::template type<T>;
 
 public:
     using RealType = T;

@@ -1,3 +1,12 @@
+/*
+ * Cornerstone octree
+ *
+ * Copyright (c) 2024 CSCS, ETH Zurich
+ *
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
+ */
+
 /*! @file
  * @brief Cornerstone octree GPU testing
  *
@@ -7,10 +16,7 @@
 
 #include "gtest/gtest.h"
 
-#include <thrust/device_vector.h>
-#include <thrust/host_vector.h>
-
-#include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/cuda/device_vector.h"
 #include "cstone/tree/cs_util.hpp"
 #include "cstone/focus/octree_focus.hpp"
 
@@ -35,16 +41,16 @@ protected:
         leaves   = h_leaves;
 
         octree.resize(nNodes(h_leaves));
-        buildOctreeGpu<KeyType>(rawPtr(leaves), octree.data());
+        buildOctreeGpu<KeyType>(leaves.data(), octree.data());
         ov = octree.data();
     }
 
     std::vector<KeyType> h_leaves;
-    thrust::device_vector<KeyType> leaves;
+    DeviceVector<KeyType> leaves;
     OctreeData<KeyType, GpuTag> octree;
     OctreeView<KeyType> ov;
-    thrust::device_vector<SourceCenterType<T>> centers;
-    thrust::device_vector<char> macs;
+    DeviceVector<SourceCenterType<T>> centers;
+    DeviceVector<char> macs;
 };
 
 TEST_F(MacRefinementGpu, fullSurface)

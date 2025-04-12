@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -165,11 +149,46 @@ void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d)
     getLevelRange<<<maxTreeLevel<KeyType>{} + 2, 1>>>(d.prefixes, numNodes, d.levelRange);
 
     thrust::fill(thrust::device, d.childOffsets, d.childOffsets + numNodes, 0);
-    linkTree<<<iceil(d.numInternalNodes, numThreads), numThreads>>>(d.prefixes, d.numInternalNodes, d.leafToInternal,
-                                                                    d.levelRange, d.childOffsets, d.parents);
+    if (d.numInternalNodes)
+    {
+        linkTree<<<iceil(d.numInternalNodes, numThreads), numThreads>>>(
+            d.prefixes, d.numInternalNodes, d.leafToInternal, d.levelRange, d.childOffsets, d.parents);
+    }
 }
 
 template void buildOctreeGpu(const uint32_t*, OctreeView<uint32_t>);
 template void buildOctreeGpu(const uint64_t*, OctreeView<uint64_t>);
+
+__global__ void upsweepSumKernel(TreeNodeIndex firstCell,
+                                 TreeNodeIndex lastCell,
+                                 const TreeNodeIndex* childOffsets,
+                                 LocalIndex* nodeCounts)
+{
+    const int cellIdx = blockIdx.x * blockDim.x + threadIdx.x + firstCell;
+    if (cellIdx >= lastCell) return;
+
+    TreeNodeIndex firstChild = childOffsets[cellIdx];
+
+    if (firstChild) { nodeCounts[cellIdx] = NodeCount<LocalIndex>{}(cellIdx, firstChild, nodeCounts); }
+}
+
+void upsweepSumGpu(int numLevels,
+                   const TreeNodeIndex* levelRange,
+                   const TreeNodeIndex* childOffsets,
+                   LocalIndex* nodeCounts)
+{
+    constexpr int numThreads = 128;
+
+    for (int level = numLevels - 1; level >= 0; level--)
+    {
+        int numCellsLevel = levelRange[level + 1] - levelRange[level];
+        int numBlocks     = (numCellsLevel - 1) / numThreads + 1;
+        if (numCellsLevel)
+        {
+            upsweepSumKernel<<<numBlocks, numThreads>>>(levelRange[level], levelRange[level + 1], childOffsets,
+                                                        nodeCounts);
+        }
+    }
+}
 
 } // namespace cstone

@@ -1,25 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2022 CSCS, ETH Zurich
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -40,8 +25,6 @@
  */
 
 #include "gtest/gtest.h"
-
-#include <thrust/device_vector.h>
 
 #include "coord_samples/random.hpp"
 #include "cstone/domain/assignment_gpu.cuh"
@@ -103,18 +86,18 @@ void randomGaussianAssignment(int rank, int numRanks)
     LocalIndex exchangeSizeCpu =
         assignment.assign(bufDesc, cpuGather, s0, s1, keys.data(), x.data(), y.data(), z.data());
 
-    thrust::device_vector<KeyType> d_keys;
-    reallocateDevice(d_keys, numParticles, 1.0);
+    DeviceVector<KeyType> d_keys;
+    reallocate(d_keys, numParticles, 1.0);
 
-    thrust::device_vector<T> d_x = x;
-    thrust::device_vector<T> d_y = y;
-    thrust::device_vector<T> d_z = z;
+    DeviceVector<T> d_x = x;
+    DeviceVector<T> d_y = y;
+    DeviceVector<T> d_z = z;
 
     GlobalAssignmentGpu<KeyType, T> assignmentGpu(rank, numRanks, bucketSize, box);
-    thrust::device_vector<unsigned> sfcScratch;
-    GpuSfcSorter<LocalIndex, thrust::device_vector<unsigned>> deviceSort(sfcScratch);
+    DeviceVector<unsigned> sfcScratch;
+    GpuSfcSorter<LocalIndex, DeviceVector<unsigned>> deviceSort(sfcScratch);
 
-    thrust::device_vector<T> d_s0, d_s1;
+    DeviceVector<T> d_s0, d_s1;
     bufDesc.size =
         assignmentGpu.assign(bufDesc, deviceSort, d_s0, d_s1, rawPtr(d_keys), rawPtr(d_x), rawPtr(d_y), rawPtr(d_z));
 
@@ -123,16 +106,16 @@ void randomGaussianAssignment(int rank, int numRanks)
 
     reallocate(exchangeSizeCpu, 1.01, keys, x, y, z);
 
-    reallocateDevice(d_keys, bufDesc.size, 1.01);
-    reallocateDevice(d_x, bufDesc.size, 1.01);
-    reallocateDevice(d_y, bufDesc.size, 1.01);
-    reallocateDevice(d_z, bufDesc.size, 1.01);
+    reallocate(d_keys, bufDesc.size, 1.01);
+    reallocate(d_x, bufDesc.size, 1.01);
+    reallocate(d_y, bufDesc.size, 1.01);
+    reallocate(d_z, bufDesc.size, 1.01);
 
     std::vector<double> dummy;
     auto [exchangeStartCpu, cpuKeyView] =
         assignment.distribute(bufDesc, cpuGather, dummy, dummy, keys.data(), x.data(), y.data(), z.data());
 
-    thrust::device_vector<T> sendScratch, receiveScratch;
+    DeviceVector<T> sendScratch, receiveScratch;
     auto [exchangeStart, devKeyView] = assignmentGpu.distribute(bufDesc, deviceSort, sendScratch, receiveScratch,
                                                                 rawPtr(d_keys), rawPtr(d_x), rawPtr(d_y), rawPtr(d_z));
 
@@ -141,7 +124,7 @@ void randomGaussianAssignment(int rank, int numRanks)
 
     {
         std::vector<KeyType> keyDownload(devKeyView.size());
-        thrust::copy_n(thrust::device_pointer_cast(devKeyView.data()), devKeyView.size(), keyDownload.data());
+        memcpyD2H(devKeyView.data(), devKeyView.size(), keyDownload.data());
         EXPECT_TRUE(std::equal(keyDownload.begin(), keyDownload.end(), cpuKeyView.begin()));
     }
 }

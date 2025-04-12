@@ -1,8 +1,8 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * SPH-EXA
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Basel, University of Zurich
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -44,6 +44,7 @@
 #include "io/factory.hpp"
 #include "observables/factory.hpp"
 #include "propagator/factory.hpp"
+#include "sph/types.hpp"
 #include "util/timer.hpp"
 #include "util/utils.hpp"
 
@@ -60,6 +61,7 @@ namespace fs = std::filesystem;
 using namespace sphexa;
 
 bool stopConditionReached(size_t iteration, double time, const std::string& maxStepStr);
+bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float dt);
 void printHelp(char* binName, int rank);
 int  getNumLocalRanks(int);
 
@@ -75,7 +77,7 @@ int main(int argc, char** argv)
     }
 
     using Dataset = SimulationData<AccType>;
-    using Domain  = cstone::Domain<SphTypes::KeyType, SphTypes::CoordinateType, AccType>;
+    using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, AccType>;
 
     const std::string        initCond     = parser.get("--init");
     const size_t             problemSize  = parser.get("-n", 50);
@@ -157,7 +159,7 @@ int main(int argc, char** argv)
             observables->computeAndWrite(simData, domain.startIndex(), domain.endIndex(), box);
         }
 
-        bool isWallClockReached = totalTimer.elapsed() > simDuration;
+        bool isWallClockReached = syncedWallClockElapsed(totalTimer.elapsed(), simDuration, propagator->stepElapsed());
 
         isOutputTriggered = isOutputStep(d.iteration, writeFreqStr) ||
                             isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStr) ||
@@ -202,6 +204,23 @@ bool stopConditionReached(size_t iteration, double time, const std::string& maxS
     bool simTimeLimit  = !strIsIntegral(maxStepStr) && time > std::stod(maxStepStr);
 
     return lastIteration || simTimeLimit;
+}
+
+/*! @brief check whether wall clock limit was reached on any rank
+ *
+ * We do this to account for the fact that the total runtime timestamp might not be taken at exactly the same moment
+ * across ranks.
+ */
+bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float dt)
+{
+    // if total time elapsed is getting close to (within dt) of the limit
+    if (totalTimeElapsed + dt > wallClockLimit)
+    {
+        int isLimitReachedAny = totalTimeElapsed > wallClockLimit;
+        mpiAllreduce(MPI_IN_PLACE, &isLimitReachedAny, 1, MPI_SUM);
+        return isLimitReachedAny;
+    }
+    return false;
 }
 
 int getNumLocalRanks(int defValue)

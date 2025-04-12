@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -55,7 +39,7 @@ template<class KeyType, class T>
 class GlobalAssignment
 {
 public:
-    GlobalAssignment(int rank, int nRanks, unsigned bucketSize, const Box<T>& box = Box<T>{0, 1})
+    GlobalAssignment(int rank, int nRanks, unsigned bucketSize, const Box<T>& box)
         : myRank_(rank)
         , numRanks_(nRanks)
         , bucketSize_(bucketSize)
@@ -93,22 +77,23 @@ public:
         // number of locally assigned particles to consider for global tree building
         LocalIndex numParticles = bufDesc.end - bufDesc.start;
 
-        box_ = makeGlobalBox(x + bufDesc.start, y + bufDesc.start, z + bufDesc.start, numParticles, box_);
-
-        gsl::span<KeyType> keyView(particleKeys + bufDesc.start, numParticles);
+        auto fittingBox = makeGlobalBox(x + bufDesc.start, y + bufDesc.start, z + bufDesc.start, numParticles, box_);
+        if (firstCall_) { box_ = fittingBox; }
+        else { box_ = limitBoxShrinking(fittingBox, box_); }
 
         // compute SFC particle keys only for particles participating in tree build
+        std::span<KeyType> keyView(particleKeys + bufDesc.start, numParticles);
         computeSfcKeys(x + bufDesc.start, y + bufDesc.start, z + bufDesc.start, sfcKindPointer(keyView.data()),
                        numParticles, box_);
 
         // sort keys and keep track of ordering for later use
-        reorderFunctor.setMapFromCodes(keyView.begin(), keyView.end());
+        reorderFunctor.setMapFromCodes(keyView);
 
-        updateOctreeGlobal(keyView.begin(), keyView.end(), bucketSize_, tree_, nodeCounts_);
+        updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, nodeCounts_);
         if (firstCall_)
         {
             firstCall_ = false;
-            while (!updateOctreeGlobal(keyView.begin(), keyView.end(), bucketSize_, tree_, nodeCounts_))
+            while (!updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, nodeCounts_))
                 ;
         }
 
@@ -143,7 +128,7 @@ public:
     template<class Reorderer, class Vector, class... Arrays>
     auto distribute(BufferDescription bufDesc,
                     Reorderer& reorderFunctor,
-                    Vector& /*scratch1*/,
+                    Vector& s1,
                     Vector& /*scratch2*/,
                     KeyType* keys,
                     T* x,
@@ -157,11 +142,18 @@ public:
 
         auto [newStart, newEnd] = domain_exchange::assignedEnvelope(bufDesc, numPresent(), numAssigned());
         LocalIndex envelopeSize = newEnd - newStart;
-        gsl::span<KeyType> keyView(keys + newStart, envelopeSize);
+        std::span<KeyType> keyView(keys + newStart, envelopeSize);
 
-        computeSfcKeys(x + newStart, y + newStart, z + newStart, sfcKindPointer(keyView.begin()), envelopeSize, box_);
+        auto recvStart = domain_exchange::receiveStart(bufDesc, numPresent(), numAssigned());
+        auto numRecv   = numAssigned() - numPresent();
+
+        computeSfcKeys(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv, box_);
+        std::make_signed_t<LocalIndex> shifts = -numRecv;
+        if (newEnd > bufDesc.end) { shifts = numRecv; }
+        reorderFunctor.extendMap(shifts, s1);
+
         // sort keys and keep track of the ordering
-        reorderFunctor.setMapFromCodes(keyView.begin(), keyView.end());
+        reorderFunctor.updateMap(keyView);
 
         return std::make_tuple(newStart, keyView.subspan(numSendDown(), numAssigned()));
     }
@@ -178,11 +170,11 @@ public:
     }
 
     //! @brief read only visibility of the global octree leaves to the outside
-    gsl::span<const KeyType> treeLeaves() const { return tree_.treeLeaves(); }
+    std::span<const KeyType> treeLeaves() const { return tree_.treeLeaves(); }
     //! @brief the octree, including the internal part
     const Octree<KeyType>& octree() const { return tree_; }
     //! @brief read only visibility of the global octree leaf counts to the outside
-    gsl::span<const unsigned> nodeCounts() const { return nodeCounts_; }
+    std::span<const unsigned> nodeCounts() const { return nodeCounts_; }
     //! @brief the global coordinate bounding box
     const Box<T>& box() const { return box_; }
     //! @brief return the space filling curve rank assignment of the last call to @a assign()

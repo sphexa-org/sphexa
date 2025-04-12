@@ -1,3 +1,12 @@
+/*
+ * Cornerstone octree
+ *
+ * Copyright (c) 2024 CSCS, ETH Zurich
+ *
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
+ */
+
 /*! @file
  * @brief Cornerstone octree GPU testing
  *
@@ -10,7 +19,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 
-#include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/cuda/thrust_util.cuh"
 #include "cstone/focus/source_center.hpp"
 #include "cstone/traversal/collisions_gpu.h"
 #include "cstone/tree/cs_util.hpp"
@@ -32,7 +41,7 @@ TEST(Macs, limitSource4x4_matchCPU)
     buildOctreeGpu(rawPtr(leaves), fullTree.data());
     OctreeView<KeyType> ov = fullTree.data();
 
-    thrust::host_vector<KeyType> h_prefixes = fullTree.prefixes;
+    std::vector<KeyType> h_prefixes = toHost(fullTree.prefixes);
     std::vector<SourceCenterType<T>> h_centers(ov.numNodes);
     geoMacSpheres<KeyType>(h_prefixes, h_centers.data(), invTheta, box);
     thrust::device_vector<char> macs(ov.numNodes, 0);

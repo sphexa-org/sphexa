@@ -29,7 +29,7 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#include <cstone/tree/accel_switch.hpp>
+#include "cstone/primitives/accel_switch.hpp"
 
 #include "isim_init.hpp"
 

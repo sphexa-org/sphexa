@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -60,11 +44,11 @@ namespace cstone
  *      the assignment of r2.
  */
 template<class KeyType>
-SendList exchangeRequestKeys(gsl::span<const KeyType> treeLeaves,
-                             gsl::span<const int> haloFlags,
-                             gsl::span<const TreeIndexPair> assignment,
-                             gsl::span<const int> peerRanks,
-                             gsl::span<const LocalIndex> layout)
+SendList exchangeRequestKeys(std::span<const KeyType> treeLeaves,
+                             std::span<const int> haloFlags,
+                             std::span<const TreeIndexPair> assignment,
+                             std::span<const int> peerRanks,
+                             std::span<const LocalIndex> layout)
 {
     std::vector<std::vector<KeyType>> sendBuffers;
     sendBuffers.reserve(peerRanks.size());

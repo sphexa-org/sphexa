@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -113,7 +97,8 @@ void exchangeParticles(int epoch,
             size_t numFit        = numElementsFit<alignment>(INT_MAX * sizeof(TransferType) - headerBytes, arrays...);
             size_t nextSendCount = std::min(numFit, numRemaining);
 
-            std::vector<char> sendBuffer(headerBytes + computeByteOffsets(nextSendCount, alignment, arrays...).back());
+            std::vector<char> sendBuffer(headerBytes +
+                                         util::computeByteOffsets(nextSendCount, alignment, arrays...).back());
             encodeSendCountCpu(nextSendCount, sendBuffer.data());
             packArrays<alignment>(gatherCpu, ordering + sends[destinationRank] + numSent, nextSendCount,
                                   sendBuffer.data() + headerBytes, arrays + bufDesc.start...);
@@ -149,7 +134,7 @@ void exchangeParticles(int epoch,
         else { receiveLocation = receiveLog.lookup(receiveRank); }
 
         char* particleData = receiveBuffer.data() + headerBytes;
-        auto packTuple     = packBufferPtrs<alignment>(particleData, receiveCount, (arrays + receiveLocation)...);
+        auto packTuple     = util::packBufferPtrs<alignment>(particleData, receiveCount, (arrays + receiveLocation)...);
         auto scatterRanges = [receiveCount](auto arrayPair) { std::copy_n(arrayPair[1], receiveCount, arrayPair[0]); };
         util::for_each_tuple(scatterRanges, packTuple);
 

@@ -36,7 +36,9 @@
 #include <vector>
 #include <mpi.h>
 
+#include "cstone/primitives/math.hpp"
 #include "cstone/primitives/primitives_gpu.h"
+#include "cstone/util/pack_buffers.hpp"
 #include "sph/kernels.hpp"
 #include "sph/timestep.h"
 
@@ -69,11 +71,18 @@ template<class AccVec>
 void sortGroupDt(float* groupDt, cstone::LocalIndex* groupIndices, cstone::LocalIndex numGroups, AccVec& scratch)
 {
     using cstone::LocalIndex;
-    size_t oldSize  = reallocateBytes(scratch, (sizeof(float) + sizeof(LocalIndex)) * numGroups, 1.05);
-    auto*  keyBuf   = reinterpret_cast<float*>(rawPtr(scratch));
-    auto*  valueBuf = reinterpret_cast<LocalIndex*>(keyBuf + numGroups);
+    size_t oldSize = scratch.size();
+
+    // radix sort temp storage as multiples of float
+    size_t tempElem       = cstone::iceil(cstone::sortByKeyTempStorage<float, LocalIndex>(numGroups), sizeof(float));
+    size_t numElements[3] = {numGroups, numGroups * sizeof(LocalIndex) / sizeof(float), tempElem};
+
+    auto  buffers     = util::packAllocBuffer<float>(scratch, {numElements, 3}, 128);
+    auto* valueBuf    = reinterpret_cast<LocalIndex*>(buffers[1].data());
+    void* tempStorage = buffers[2].data();
     cstone::sequenceGpu(groupIndices, numGroups, 0u);
-    cstone::sortByKeyGpu(groupDt, groupDt + numGroups, groupIndices, keyBuf, valueBuf);
+    cstone::sortByKeyGpu(groupDt, groupDt + numGroups, groupIndices, buffers[0].data(), valueBuf, tempStorage,
+                         tempElem * sizeof(float));
     reallocate(oldSize, 1.0, scratch);
 };
 

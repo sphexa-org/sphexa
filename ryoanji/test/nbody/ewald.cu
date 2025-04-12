@@ -1,3 +1,12 @@
+/*
+ * Ryoanji N-body solver
+ *
+ * Copyright (c) 2024 CSCS, ETH Zurich
+ *
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
+ */
+
 /*! @file
  * @brief Compare the Ewald GPU kernel against the CPU version
  *
@@ -10,8 +19,9 @@
 #include <thrust/device_vector.h>
 
 #include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/cuda/thrust_util.cuh"
 #include "cstone/focus/source_center.hpp"
-#include "cstone/traversal/groups.cuh"
+#include "cstone/traversal/groups_gpu.cu"
 
 #include "dataset.hpp"
 #include "ryoanji/nbody/cartesian_qpole.hpp"

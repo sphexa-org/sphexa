@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -50,6 +34,7 @@
 
 #include <vector>
 
+#include "cstone/cuda/cuda_utils.hpp"
 #include "cstone/domain/domaindecomp.hpp"
 #include "cstone/util/tuple_util.hpp"
 #include "cstone/util/type_list.hpp"
@@ -70,7 +55,7 @@ namespace cstone
  *         that the input ranges did not cover
  */
 inline std::vector<IndexPair<TreeNodeIndex>>
-invertRanges(TreeNodeIndex first, gsl::span<const IndexPair<TreeNodeIndex>> ranges, TreeNodeIndex last)
+invertRanges(TreeNodeIndex first, std::span<const IndexPair<TreeNodeIndex>> ranges, TreeNodeIndex last)
 {
     std::vector<IndexPair<TreeNodeIndex>> invertedRanges;
 
@@ -86,6 +71,21 @@ invertRanges(TreeNodeIndex first, gsl::span<const IndexPair<TreeNodeIndex>> rang
     if (currentIndex < last) { invertedRanges.emplace_back(currentIndex, last); }
 
     return invertedRanges;
+}
+
+//! @brief enumerate all input ranges with std::iota and pack them together in a single vector
+inline std::vector<TreeNodeIndex> enumerateRanges(std::span<const IndexPair<TreeNodeIndex>> ranges)
+{
+    std::vector<TreeNodeIndex> rangeCounts(ranges.size() + 1);
+    std::transform(ranges.begin(), ranges.end(), rangeCounts.begin(), [](auto pair) { return pair.count(); });
+    std::exclusive_scan(rangeCounts.begin(), rangeCounts.end(), rangeCounts.begin(), 0);
+
+    std::vector<TreeNodeIndex> ret(rangeCounts.back());
+    for (size_t i = 0; i < ranges.size(); ++i)
+    {
+        std::iota(ret.begin() + rangeCounts[i], ret.begin() + rangeCounts[i] + ranges[i].count(), ranges[i].start());
+    }
+    return ret;
 }
 
 /*! @brief extract ranges of marked indices from a source array
@@ -107,8 +107,8 @@ invertRanges(TreeNodeIndex first, gsl::span<const IndexPair<TreeNodeIndex>> rang
  *  - Particle offsets from buffer layouts
  */
 template<class IntegralType>
-std::vector<IntegralType> extractMarkedElements(gsl::span<const IntegralType> source,
-                                                gsl::span<const int> flags,
+std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> source,
+                                                std::span<const int> flags,
                                                 TreeNodeIndex firstReqIdx,
                                                 TreeNodeIndex secondReqIdx)
 {
@@ -147,11 +147,11 @@ std::vector<IntegralType> extractMarkedElements(gsl::span<const IntegralType> so
  * @param[out] layout            length N+1. The first element is zero, the last element is
  *                               equal to the sum of all all present (assigned+halo) node counts.
  */
-inline void computeNodeLayout(gsl::span<const unsigned> focusLeafCounts,
-                              gsl::span<const int> haloFlags,
+inline void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
+                              std::span<const int> haloFlags,
                               TreeNodeIndex firstAssignedIdx,
                               TreeNodeIndex lastAssignedIdx,
-                              gsl::span<LocalIndex> layout)
+                              std::span<LocalIndex> layout)
 {
 #pragma omp parallel for
     for (TreeNodeIndex i = 0; i < TreeNodeIndex(focusLeafCounts.size()); ++i)
@@ -160,7 +160,7 @@ inline void computeNodeLayout(gsl::span<const unsigned> focusLeafCounts,
         layout[i]          = -int(haveParticles) & focusLeafCounts[i];
     }
 
-    exclusiveScan(layout.data(), layout.size());
+    std::exclusive_scan(layout.begin(), layout.end(), layout.begin(), LocalIndex{0});
 }
 
 /*! @brief computes a list which local array ranges are going to be filled with halo particles
@@ -172,25 +172,19 @@ inline void computeNodeLayout(gsl::span<const unsigned> focusLeafCounts,
  * @param peerRanks    list of peer ranks
  * @return             list of array index ranges for the receiving part in exchangeHalos
  */
-inline SendList computeHaloReceiveList(gsl::span<const LocalIndex> layout,
-                                       gsl::span<const int> haloFlags,
-                                       gsl::span<const TreeIndexPair> assignment,
-                                       gsl::span<const int> peerRanks)
+inline auto computeHaloRecvList(std::span<const LocalIndex> layout,
+                                std::span<const int> haloFlags,
+                                std::span<const TreeIndexPair> assignment,
+                                std::span<const int> peerRanks)
 {
-    SendList ret(assignment.size());
+    RecvList ret(assignment.size());
 
     for (int peer : peerRanks)
     {
-        TreeNodeIndex peerStartIdx = assignment[peer].start();
-        TreeNodeIndex peerEndIdx   = assignment[peer].end();
-
-        std::vector<LocalIndex> receiveRanges =
-            extractMarkedElements<LocalIndex>(layout, haloFlags, peerStartIdx, peerEndIdx);
-
-        for (std::size_t i = 0; i < receiveRanges.size(); i += 2)
-        {
-            ret[peer].addRange(receiveRanges[i], receiveRanges[i + 1]);
-        }
+        auto pFlags           = haloFlags.subspan(assignment[peer].start(), assignment[peer].count());
+        TreeNodeIndex firstNz = std::distance(haloFlags.begin(), std::find(pFlags.begin(), pFlags.end(), 1));
+        TreeNodeIndex lastNz  = std::distance(haloFlags.begin(), std::find(pFlags.rbegin(), pFlags.rend(), 1).base());
+        ret[peer]             = {layout[firstNz], layout[lastNz]};
     }
 
     return ret;
@@ -221,7 +215,7 @@ void gatherArrays(Gather&& gatherFunc,
         {
             auto& swapSpace = util::pickType<decltype(array)>(scratchBuffers);
             assert(swapSpace.size() == array.size());
-            gatherFunc(ordering, numElements, rawPtr(array) + inputOffset, rawPtr(swapSpace) + outputOffset);
+            gatherFunc({ordering, numElements}, rawPtr(array) + inputOffset, rawPtr(swapSpace) + outputOffset);
             swap(swapSpace, array);
         }
         else
@@ -232,7 +226,7 @@ void gatherArrays(Gather&& gatherFunc,
 
             auto* scratchSpace =
                 reinterpret_cast<typename std::decay_t<VectorRef>::value_type*>(rawPtr(std::get<i>(scratchBuffers)));
-            gatherFunc(ordering, numElements, rawPtr(array) + inputOffset, scratchSpace);
+            gatherFunc({ordering, numElements}, rawPtr(array) + inputOffset, scratchSpace);
             if constexpr (IsDeviceVector<std::decay_t<VectorRef>>{})
             {
                 memcpyD2D(scratchSpace, numElements, rawPtr(array) + outputOffset);
