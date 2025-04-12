@@ -40,7 +40,6 @@
 
 #include "gravity_wrapper.hpp"
 
-
 namespace sphexa::magneto
 {
 using namespace sph;

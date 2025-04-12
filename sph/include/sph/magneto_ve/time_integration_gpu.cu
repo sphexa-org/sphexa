@@ -78,6 +78,6 @@ void integrateMagneticQuantitiesGpu(const GroupView& grp, MagnetoData& md, doubl
         rawPtr(md.devData.d_psi_ch_m1));
 }
 
-template void integrateMagneticQuantitiesGpu(const GroupView& grp, sphexa::magneto::MagnetoData<cstone::GpuTag>& md, double dt,
-                                             double dt_m1);
+template void integrateMagneticQuantitiesGpu(const GroupView& grp, sphexa::magneto::MagnetoData<cstone::GpuTag>& md,
+                                             double dt, double dt_m1);
 } // namespace sph::magneto::cuda

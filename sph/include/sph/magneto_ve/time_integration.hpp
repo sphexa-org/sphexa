@@ -62,8 +62,8 @@ void integrateMagneticField(size_t firstIndex, size_t lastIndex, double dt, doub
 }
 
 template<class Th, class Tm1>
-void integrateAuxiliaryQuantities(size_t firstIndex, size_t lastIndex, double dt, double dt_m1, Th* psi_ch, Th* d_psi_ch,
-                                  Tm1* d_psi_ch_m1)
+void integrateAuxiliaryQuantities(size_t firstIndex, size_t lastIndex, double dt, double dt_m1, Th* psi_ch,
+                                  Th* d_psi_ch, Tm1* d_psi_ch_m1)
 {
 
 #pragma omp parallel for schedule(static)

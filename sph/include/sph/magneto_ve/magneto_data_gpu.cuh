@@ -76,7 +76,7 @@ public:
     DevVector<XM1Type>  dBx_m1, dBy_m1, dBz_m1; // previous Magnetic field rate of change (dB_i/dt)
 
     // fields for divergence cleaning
-    DevVector<HydroType> psi_ch;   // scalar field used for divergence cleaning divided by the cleaning speed
+    DevVector<HydroType> psi_ch;      // scalar field used for divergence cleaning divided by the cleaning speed
     DevVector<HydroType> d_psi_ch;    // rate of change of the scalar field (d/dt(psi/ch))
     DevVector<XM1Type>   d_psi_ch_m1; // previous rate of change
 
@@ -93,9 +93,9 @@ public:
      * Name of each field as string for use e.g in HDF5 output. Order has to correspond to what's returned by data().
      */
     inline static constexpr std::array fieldNames{
-        "Bx",     "By",    "Bz",       "dBx",   "dBy",     "dBz",     "dBx_m1", "dBy_m1", "dBz_m1",
+        "Bx",     "By",       "Bz",          "dBx",   "dBy",     "dBz",     "dBx_m1", "dBy_m1", "dBz_m1",
         "psi_ch", "d_psi_ch", "d_psi_ch_m1", "dvxdx", "dvxdy",   " dvxdz",  "dvydx",  "dvydy",  "dvydz",
-        "dvzdx",  "dvzdy", "dvzdz",    "divB",  "curlB_x", "curlB_y", "curlB_z"};
+        "dvzdx",  "dvzdy",    "dvzdz",       "divB",  "curlB_x", "curlB_y", "curlB_z"};
 
     /*! @brief return a tuple of field references
      *
@@ -103,8 +103,8 @@ public:
      */
     auto dataTuple()
     {
-        auto ret = std::tie(Bx, By, Bz, dBx, dBy, dBz, dBx_m1, dBy_m1, dBz_m1, psi_ch, d_psi_ch, d_psi_ch_m1, dvxdx, dvxdy,
-                            dvxdz, dvydx, dvydy, dvydz, dvzdx, dvzdy, dvzdz, divB, curlB_x, curlB_y, curlB_z);
+        auto ret = std::tie(Bx, By, Bz, dBx, dBy, dBz, dBx_m1, dBy_m1, dBz_m1, psi_ch, d_psi_ch, d_psi_ch_m1, dvxdx,
+                            dvxdy, dvxdz, dvydx, dvydy, dvydz, dvzdx, dvzdy, dvzdz, divB, curlB_x, curlB_y, curlB_z);
 
         static_assert(std::tuple_size_v<decltype(ret)> == fieldNames.size());
         return ret;

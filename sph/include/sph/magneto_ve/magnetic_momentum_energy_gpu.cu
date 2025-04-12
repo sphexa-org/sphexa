@@ -95,18 +95,18 @@ magneticMomentumGpu(Tc K, Tc Kcour, T Atmin, T Atmax, T ramp, unsigned ngmax, co
                 dvzdx, dvzdy, dvzdz, Bx, By, Bz, gradh, grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal);
         }
 
-        //auto dt_lane = (i < bodyEnd) ? tsKCourant(maxvsignal, h[i], c[i], Kcour) : INFINITY;
+        // auto dt_lane = (i < bodyEnd) ? tsKCourant(maxvsignal, h[i], c[i], Kcour) : INFINITY;
         T dt_lane;
-        if( i < bodyEnd )
+        if (i < bodyEnd)
         {
             T rhoi            = kx[i] * m[i] / xm[i];
             T v_alfven2       = (Bx[i] * Bx[i] + By[i] * By[i] + Bz[i] * Bz[i]) / (mu_0 * rhoi);
             T magneticVsignal = std::sqrt(c[i] * c[i] + v_alfven2);
 
-            T dt_lane            = maxvsignal > T(0) ? std::min(Kcour * h[i] / magneticVsignal, Kcour * h[i] / maxvsignal)
-                                      : Kcour * h[i] / magneticVsignal;
+            T dt_lane = maxvsignal > T(0) ? std::min(Kcour * h[i] / magneticVsignal, Kcour * h[i] / maxvsignal)
+                                          : Kcour * h[i] / magneticVsignal;
         }
-        else {dt_lane = INFINITY;}
+        else { dt_lane = INFINITY; }
         if (groupDt != nullptr)
         {
             auto min_dt_group = cstone::warpMin(dt_lane);

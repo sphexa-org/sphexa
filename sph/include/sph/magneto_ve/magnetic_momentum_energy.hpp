@@ -110,11 +110,11 @@ void computeMagneticMomentumEnergyImpl(size_t startIndex, size_t endIndex, SimDa
         T v_alfven2       = (Bx[i] * Bx[i] + By[i] * By[i] + Bz[i] * Bz[i]) / (md.mu_0 * rhoi);
         T magneticVsignal = std::sqrt(c[i] * c[i] + v_alfven2);
 
-        T dt_i            = maxvsignal > T(0) ? std::min(d.Kcour * h[i] / magneticVsignal, d.Kcour * h[i] / maxvsignal)
-                                              : d.Kcour * h[i] / magneticVsignal;
+        T dt_i = maxvsignal > T(0) ? std::min(d.Kcour * h[i] / magneticVsignal, d.Kcour * h[i] / maxvsignal)
+                                   : d.Kcour * h[i] / magneticVsignal;
 
-        //T dt_i = tsKCourant(maxvsignal, h[i], magneticVsignal, d.Kcour);
-        minDt  = std::min(minDt, dt_i);
+        // T dt_i = tsKCourant(maxvsignal, h[i], magneticVsignal, d.Kcour);
+        minDt = std::min(minDt, dt_i);
     }
 
     d.minDtCourant = minDt;

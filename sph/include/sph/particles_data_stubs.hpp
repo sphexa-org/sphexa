@@ -39,7 +39,6 @@ class pinned_allocator;
 namespace sphexa
 {
 
-
 //! @brief std::allocator on the CPU, pinned_allocator on the GPU
 template<class Accelerator, class T>
 using PinnedAlloc_t = typename cstone::AccelSwitchType<Accelerator, std::allocator, pinned_allocator>::template type<T>;
@@ -84,7 +83,6 @@ class DeviceParticlesData;
 template<class Accelerator>
 using DeviceData_t = typename cstone::AccelSwitchTypeSimple<Accelerator, DeviceDataFacade, DeviceParticlesData>::type;
 
-
 namespace magneto
 {
 class DeviceMagnetoData;
@@ -93,6 +91,6 @@ class DeviceMagnetoData;
 template<class Accelerator>
 using DeviceData_t = typename cstone::AccelSwitchTypeSimple<Accelerator, DeviceDataFacade, DeviceMagnetoData>::type;
 
-}
+} // namespace magneto
 
 } // namespace sphexa

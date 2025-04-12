@@ -120,7 +120,7 @@ int main(int argc, char** argv)
     propagator->load(initCond, fileReader.get());
     auto box = simInit->init(rank, numRanks, problemSize, simData, fileReader.get());
 
-    auto& d = simData.hydro;
+    auto& d  = simData.hydro;
     auto& md = simData.magneto;
     transferAllocatedToDevice(d, 0, d.x.size(), propagator->conservedFields());
     transferAllocatedToDevice(md, 0, md.Bx.size(), propagator->conservedFields());

@@ -58,12 +58,15 @@ PropLib<DomainType, ParticleDataType>::makeTurbVeProp(std::ostream& output, size
 
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
-PropLib<DomainType, ParticleDataType>::makeMagnetoHydroProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean)
+PropLib<DomainType, ParticleDataType>::makeMagnetoHydroProp(std::ostream& output, size_t rank,
+                                                            const InitSettings& settings, bool avClean)
 {
-    if (avClean) { return std::make_unique<magneto::MagnetoHydroProp<true, DomainType, ParticleDataType>>(output, rank); }
+    if (avClean)
+    {
+        return std::make_unique<magneto::MagnetoHydroProp<true, DomainType, ParticleDataType>>(output, rank);
+    }
     else { return std::make_unique<magneto::MagnetoHydroProp<false, DomainType, ParticleDataType>>(output, rank); }
 }
-
 
 #ifdef USE_CUDA
 template struct PropLib<cstone::Domain<SphTypes::KeyType, SphTypes::CoordinateType, cstone::GpuTag>,

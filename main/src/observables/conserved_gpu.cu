@@ -126,8 +126,6 @@ struct EMag
     }
 };
 
-
-
 template<class Tc, class Tm>
 double magneticEnergyGpu(Tc mu_0, const Tm* xm, const Tm* kx, const Tc* Bx, const Tc* By, const Tc* Bz, size_t first,
                          size_t last)

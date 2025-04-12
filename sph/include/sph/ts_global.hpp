@@ -101,7 +101,8 @@ void computeTimestep(size_t first, size_t last, Dataset& d, Ts... extraTimesteps
 
     T minDtAcc = (d.g != 0.0) ? accelerationTimestep(first, last, d) : INFINITY;
 
-    T minDtLoc = std::min({minDtAcc, d.minDtCourant, d.minDtRho, d.maxDtIncrease * d.minDt, d.maxDt, extraTimesteps...});
+    T minDtLoc =
+        std::min({minDtAcc, d.minDtCourant, d.minDtRho, d.maxDtIncrease * d.minDt, d.maxDt, extraTimesteps...});
 
     T minDtGlobal;
     MPI_Allreduce(&minDtLoc, &minDtGlobal, 1, MpiType<T>{}, MPI_MIN, MPI_COMM_WORLD);
