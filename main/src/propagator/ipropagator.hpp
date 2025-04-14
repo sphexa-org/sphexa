@@ -232,7 +232,7 @@ protected:
                                        data.subsetOutputFieldIndices.begin();
 
                 // TODO: passing the entire data is not needed
-                transferSubsetToHost(data, selectedParticlesIndexes, data.subsetOutputFieldNames, column, subsetField);
+                transferSubsetToHost(data, selectedParticlesIndexes, column, subsetField);
 
                 std::visit([writer, c = column, key = data.subsetOutputFieldNames.at(i)](auto field){
                         writer->writeField(key, field.data(), c);
