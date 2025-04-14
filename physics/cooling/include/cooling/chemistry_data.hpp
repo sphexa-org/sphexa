@@ -100,7 +100,6 @@ public:
         outFields.erase(std::remove_if(outFields.begin(), outFields.end(), hasField), outFields.end());
     }
 
-    // TODO: to be tested
     // TODO: as for the hydro data case, avoid code duplication between setOutputFields and setSubsetOutputFields
     void setSubsetOutputFields(std::vector<std::string>& outputFieldsSubset)
     {

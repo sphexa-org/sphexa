@@ -32,6 +32,9 @@
 
 #include <variant>
 
+#include <thrust/execution_policy.h>
+#include <thrust/gather.h>
+
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/device_vector.h"
 #include "cstone/fields/field_states.hpp"
@@ -277,38 +280,66 @@ void transferToHost(DataType& d, size_t first, size_t last, const std::vector<st
     }
 }
 
+using FieldVariant = std::variant<std::vector<float>, std::vector<double>, std::vector<unsigned>, std::vector<uint64_t>, std::vector<uint8_t>>;
 template<class DataType, std::enable_if_t<cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
-void transferSubsetToHost(const DataType& data, const ParticleIndexVectorType& subsetIndexes, const std::vector<std::string>& fields, 
-    std::vector<DataType::FieldVariant>& subsetFields, std::vector<int>& subsetFieldColumns)
+void transferSubsetToHost(const DataType& data, const std::vector<uint64_t>& subsetIndexes, int fieldIdx, FieldVariant& subsetField)
 {
-    auto launchTransfer = [subsetIndexes, subsetFields](const auto& field){
+    auto launchTransfer = [subsetIndexes, subsetField](const auto* deviceField){
 
         // Allocate memory for the subset field values on the device
-        using DeviceField = decltype(*field);
+        using DeviceField = std::decay_t<decltype(*deviceField)>;
         DeviceField deviceSubsetField(subsetIndexes.size());
 
         // Copy subset field values
-        thrust::gather(thrust::device, subsetIndexes.begin(), subsetIndexes.end(), field.begin(), deviceSubsetField.begin());
+        thrust::gather(thrust::device, subsetIndexes.begin(), subsetIndexes.end(), deviceField->data(), deviceSubsetField.data());
 
         // Allocate memory for the subset field values on the host
-        subsetFields.push_back(std::decay_t<decltype(*field)>(subsetIndexes.size()));
+        subsetField = std::decay_t<decltype(*deviceField)>(subsetIndexes.size());
 
-        // Copy subset field values to the host
-        checkGpuErrors(cudaMemcpy(subsetFields.back().data(), deviceSubsetField.data(), subsetIndexes.size()*sizeof(typename DeviceField::value_type), cudaMemcpyDeviceToHost));
-    }
+        // Run data transfer
+        checkGpuErrors(std::visit([deviceSubsetField, size = subsetIndexes.size()](auto& hostField){
+            cudaMemcpy(hostField.data(), deviceSubsetField.data(), size*sizeof(typename DeviceField::value_type), cudaMemcpyDeviceToHost);
+            }, &subsetField));
+    };
 
-    for(const auto& field : fields)
-    {
-        // TODO: do we need this check?
-        if(data.devData.isAllocated(field)) {
-            int fieldIdx =
-                std::find(DeviceData_t<cstone::GpuTag>::fieldNames.begin(), DeviceData_t<cstone::GpuTag>::fieldNames.end(), field) - DeviceData_t<cstone::GpuTag>::fieldNames.begin();
-            subsetFieldColumns.push_back(fieldIdx);
-            std::visit(launchTransfer, data.devData.data()[fieldIdx]);
-        }
-        else { throw std::runtime_error("Field not allocated on GPU identified during subset transfer to host"); }
-    }
+    std::visit(launchTransfer, data.devData.data()[fieldIdx]);
 }
+
+// using FieldVariant = std::variant<std::vector<float>, std::vector<double>, std::vector<unsigned>, std::vector<uint64_t>, std::vector<uint8_t>>;
+// template<class DataType, std::enable_if_t<cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
+// void transferSubsetToHost(const DataType& data, const std::vector<uint64_t>& subsetIndexes, const std::vector<std::string>& fields, 
+//     std::vector<FieldVariant>& subsetFields, std::vector<int>& subsetFieldColumns)
+// {
+//     auto launchTransfer = [subsetIndexes, subsetFields](const auto* deviceField){
+
+//         // Allocate memory for the subset field values on the device
+//         using DeviceField = std::decay_t<decltype(*deviceField)>;
+//         DeviceField deviceSubsetField(subsetIndexes.size());
+
+//         // Copy subset field values
+//         thrust::gather(thrust::device, subsetIndexes.begin(), subsetIndexes.end(), deviceField->data(), deviceSubsetField.data());
+
+//         // Allocate memory for the subset field values on the host
+//         subsetFields.push_back(std::decay_t<decltype(*deviceField)>(subsetIndexes.size()));
+
+//         // Run data transfer
+//         checkGpuErrors(std::visit([deviceSubsetField, size = subsetIndexes.size()](auto& hostField){
+//             cudaMemcpy(hostField.data(), deviceSubsetField.data(), size*sizeof(typename DeviceField::value_type), cudaMemcpyDeviceToHost);
+//             }, subsetFields.back()));
+//     };
+
+//     for(const auto& field : fields)
+//     {
+//         // TODO: do we need this check?
+//         if(data.devData.isAllocated(field)) {
+//             int fieldIdx =
+//                 std::find(DeviceData_t<cstone::GpuTag>::fieldNames.begin(), DeviceData_t<cstone::GpuTag>::fieldNames.end(), field) - DeviceData_t<cstone::GpuTag>::fieldNames.begin();
+//             subsetFieldColumns.push_back(fieldIdx);
+//             std::visit(launchTransfer, data.devData.data()[fieldIdx]);
+//         }
+//         else { throw std::runtime_error("Field not allocated on GPU identified during subset transfer to host"); }
+//     }
+// }
 
 
 template<class Vector, class T, std::enable_if_t<IsDeviceVector<Vector>{}, int> = 0>

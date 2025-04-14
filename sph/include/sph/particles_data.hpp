@@ -478,11 +478,14 @@ void transferToHost(Dataset&, size_t, size_t, const std::vector<std::string>&)
 {
 }
 
-template<class Dataset, std::enable_if_t<not cstone::HaveGpu<typename Dataset::AcceleratorType>{}, int> = 0>
-void transferSubsetToHost(const Dataset&, const std::vector<uint64_t>& subsetIndexes, const std::vector<std::string>&, std::vector<typename Dataset::FieldVariant>&, std::vector<int>&)
-{
-    throw std::runtime_error("Not implemented yet");
-}
+// using MyFieldVariant = std::variant<std::vector<float>, std::vector<double>, std::vector<unsigned>,
+// std::vector<uint64_t>, std::vector<uint8_t>>;
+
+// template<class Dataset, std::enable_if_t<not cstone::HaveGpu<typename Dataset::AcceleratorType>{}, int> = 0>
+// void transferSubsetToHost(const Dataset&, const std::vector<uint64_t>& subsetIndexes, const std::vector<std::string>&, std::vector<MyFieldVariant>&, std::vector<int>&)
+// {
+//     throw std::runtime_error("Not implemented yet");
+// }
 
 template<class Vector, class T, std::enable_if_t<not IsDeviceVector<Vector>{}, int> = 0>
 void fill(Vector& v, size_t first, size_t last, T value)

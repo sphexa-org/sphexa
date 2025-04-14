@@ -189,7 +189,7 @@ int main(int argc, char** argv)
 
         if (isSubsetOutputTriggered)
         {
-            propagator->saveSubsetFields(fileWriter.get(), outFileSubset, domain.startIndex(), domain.endIndex(), simData.hydro);
+            propagator->saveSubsetFields(fileWriter.get(), outFileSubset, domain.startIndex(), domain.endIndex(), simData);
             isSubsetOutputTriggered = false;
         }
 
