@@ -33,9 +33,7 @@
 
 #include <cmath>
 #include <cstdio>
-#include <map>
 #include <numeric>
-#include <fstream>
 #include <vector>
 
 #include <thrust/universal_vector.h>
@@ -239,10 +237,14 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
         unsigned long numFails = 0;
         const auto isClose     = [](T a, T b)
         {
-            constexpr bool isDouble = std::is_same_v<T, double>;
-            constexpr double atol   = isDouble ? 1e-6 : 1e-5;
-            constexpr double rtol   = isDouble ? 1e-5 : 1e-4;
-            return std::abs(a - b) <= atol + rtol * std::abs(b);
+            if constexpr (std::is_integral_v<T>) { return a == b; }
+            else
+            {
+                constexpr bool isDouble = std::is_same_v<T, double>;
+                constexpr double atol   = isDouble ? 1e-6 : 1e-5;
+                constexpr double rtol   = isDouble ? 1e-5 : 1e-4;
+                return std::abs(a - b) <= atol + rtol * std::abs(b);
+            }
         };
         util::for_each_tuple(
             [&](auto const& dOut, auto const& out)
@@ -258,8 +260,16 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
                         failNum = numFails++;
                         if (failNum < 10)
                         {
+                            if constexpr (std::is_same_v<std::remove_cvref_t<decltype(dOut[i])>, unsigned>)
+                            {
 #pragma omp critical
-                            printf("FAIL %u: %.10f != %.10f\n", i, dOut[i], out[i]);
+                                printf("FAIL %u: %10u != %10u\n", i, dOut[i], out[i]);
+                            }
+                            else
+                            {
+#pragma omp critical
+                                printf("FAIL %u: %.10f != %.10f\n", i, dOut[i], out[i]);
+                            }
                         }
                     }
                 }
@@ -269,40 +279,4 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     }
 
     return times;
-}
-
-template<class Path, class T>
-void saveCsv(const Path& filename, const std::map<std::string, std::vector<T>>& data)
-{
-    if (data.empty()) throw std::runtime_error("ERROR writing CSV: no data passed!");
-    std::ofstream file(filename);
-    if (!file) throw std::runtime_error("ERROR writing CSV: could not open file for writing!");
-
-    std::size_t numRows = 0;
-    {
-        bool first = true;
-        for (const auto& [name, vec] : data)
-        {
-            if (first)
-                first = false;
-            else
-                file << ",";
-            file << name;
-            numRows = std::max(numRows, vec.size());
-        }
-    }
-    file << "\n";
-    for (std::size_t row = 0; row < numRows; ++row)
-    {
-        bool first = true;
-        for (const auto& [_, vec] : data)
-        {
-            if (first)
-                first = false;
-            else
-                file << ",";
-            if (row < vec.size()) file << vec[row];
-        }
-        file << "\n";
-    }
 }

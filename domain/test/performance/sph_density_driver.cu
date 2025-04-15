@@ -48,6 +48,7 @@
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
 
 #include "../coord_samples/random.hpp"
+#include "./csv.hpp"
 #include "./gromacs_ijloop.cuh"
 #include "./nbbenchmark.cuh"
 
