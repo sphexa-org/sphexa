@@ -52,7 +52,8 @@ __global__ void rountrip(std::uint32_t const* __restrict__ input,
 
     warpCompressNeighbors(input, compressed, n_input);
     __syncthreads();
-    if (threadIdx.x == 0) {
+    if (threadIdx.x == 0)
+    {
         const unsigned nBytes = compressedNeighborsSize(compressed);
         compressed[nBytes]    = 0xff;
     }
