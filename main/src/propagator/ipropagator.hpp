@@ -81,12 +81,22 @@ public:
     //! @brief save particle data fields to file
     virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&){};
 
-    //! @brief save selected particle data fields to file                    // TODO: const ParticleDataType&
+    //! @brief save selected particle data fields to file                    // TODO: should be const ParticleDataType& but at some point we use the data() method which is non-const
     void saveSubsetFields(IFileWriter* writer, std::string selParticlesOutFile, size_t first, size_t last, ParticleDataType& simData)
     {
-        // TODO: outputSelParticlesAllocatedFields not needed, keeping it as separate function for refactoring reasons
-        outputSubsetAllocatedFields(writer, selParticlesOutFile, first, last, simData);
         timer.step("SelectedParticlesFileOutput");
+
+        // Find the selected particles positions in dataset
+        ParticleIndexVectorType selectedParticlesIndexes;
+        findTaggedIds(simData.hydro.id, first, last, selectedParticlesIndexes);
+
+        writer->addStep(0, selectedParticlesIndexes.size(), selParticlesOutFile);
+        simData.hydro.loadOrStoreAttributes(writer);
+
+        outputSubset(writer, selectedParticlesIndexes, simData.hydro);
+        outputSubset(writer, selectedParticlesIndexes, simData.chem);
+
+        writer->closeStep();
     }
 
     //! @brief save internal state to file
@@ -250,105 +260,6 @@ protected:
             }
             std::cout << data.fieldNames[indicesDone.back()] << std::endl;
         }
-
-    }
-
-    // template<class Dataset, std::enable_if_t<cstone::HaveGpu<typename Dataset::AcceleratorType>{}, int> = 0>
-    // void outputSubset(IFileWriter* writer, const ParticleIndexVectorType& selectedParticlesIndexes, Dataset& data)
-    // {
-    //     using FieldVariant = std::variant<std::vector<float>, std::vector<double>, std::vector<unsigned>, std::vector<uint64_t>, std::vector<uint8_t>>;
-
-    //     std::vector<FieldVariant> subsetFields;
-    //     std::vector<int> subsetFieldsColumns;
-    //     transferSubsetToHost(data, selectedParticlesIndexes, data.subsetOutputFieldNames, subsetFields, subsetFieldsColumns);
-    //     // TODO: we assume that all requested field are available and stored in the right order in subsetFields
-    //     for(int i=0; i<data.subsetOutputFieldNames.size(); i++)
-    //     {
-    //         std::visit([writer, c = subsetFieldsColumns.at(i), key = data.subsetOutputFieldNames.at(i)](auto field){
-    //             writer->writeField(key, field.data(), c);
-    //         }, subsetFields.at(i));
-    //     }
-    // }
-
-    // TODO: last parameter should be const& but at some point we use the data() method which is non-const
-    void outputSubsetAllocatedFields(IFileWriter* writer, std::string selParticlesOutFile, size_t first, size_t last, ParticleDataType& simData)
-    {
-        ParticleIndexVectorType selectedParticlesIndexes;
-
-        // Find the selected particles positions in dataset
-        findTaggedIds(simData.hydro.id, first, last, selectedParticlesIndexes);
-
-        writer->addStep(0, selectedParticlesIndexes.size(), selParticlesOutFile);
-        simData.hydro.loadOrStoreAttributes(writer);
-
-        // auto fieldPointers = hydroSimData.data();
-        // auto indicesDone   = hydroSimData.subsetOutputFieldIndices;
-        // auto namesDone     = hydroSimData.subsetOutputFieldNames;
-
-        // // Locally untag the selected particles to print the right ID
-        // // TODO: it can be probably done with templates
-        // constexpr uint64_t msbMask = static_cast<uint64_t>(1) << (sizeof(uint64_t)*8 - 1);
-        // std::vector<uint64_t> localSelectedParticlesIds = {};
-        // std::for_each(selectedParticlesPositions.begin(), selectedParticlesPositions.end(), [&hydroSimData, &localSelectedParticlesIds](auto particlePosition){
-        //     localSelectedParticlesIds.push_back(hydroSimData.id[particlePosition] & ~msbMask);
-        // });
-
-
-        outputSubset(writer, selectedParticlesIndexes, simData.hydro);
-        outputSubset(writer, selectedParticlesIndexes, simData.chem);
-        // using MyFieldVariant = std::variant<std::vector<float>, std::vector<double>, std::vector<unsigned>, std::vector<uint64_t>, std::vector<uint8_t>>;
-
-        // std::vector<MyFieldVariant> subsetFields;
-        // std::vector<int> subsetFieldsColumns;
-        // transferSubsetToHost(hydroSimData, selectedParticlesIndexes, hydroSimData.subsetOutputFieldNames, subsetFields, subsetFieldsColumns);
-        // // TODO: we assume that all requested field are available and stored in the right order in subsetFields
-        // for(int i=0; i<hydroSimData.subsetOutputFieldNames.size(); i++)
-        // {
-        //     std::visit([writer, c = subsetFieldsColumns.at(i), key = hydroSimData.subsetOutputFieldNames.at(i)](auto field){
-        //         writer->writeField(key, field.data(), c);
-        //     }, subsetFields.at(i));
-        // }
-
-
-        // // TODO: check existence of code duplication with outputAllocatedFields
-        // for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
-        // {
-        //     int fidx = indicesDone[i];
-        //     if (hydroSimData.isAllocated(fidx))
-        //     {
-        //         int column = std::find(hydroSimData.subsetOutputFieldIndices.begin(), hydroSimData.subsetOutputFieldIndices.end(), fidx) -
-        //                                hydroSimData.subsetOutputFieldIndices.begin();
-
-        //         // TODO: the call frequency of this and of the outputAllocatedFields method will be different,
-        //         // we can save transfer time with a status flag but it will be the current method the one that
-        //         // will be called more frequently and which will be responsible for the data transfer.
-        //         // TODO: should we just transfer a minimal subset of particles including the selected ones?
-        //         transferToHost(hydroSimData, first, last, {hydroSimData.fieldNames[fidx]});
-
-        //         std::visit([writer, c = column, key = namesDone[i], &selectedParticlesIndexes](auto field){
-        //             outputTaggedIdsField(selectedParticlesIndexes, writer, field, key, c);},fieldPointers[fidx]);
-
-        //         // // Copy current field data to a new vector only for the selected particles
-        //         // std::visit([writer, c = column, key = namesDone[i], &selectedParticlesIndexes](auto field){
-        //         //     std::remove_pointer_t<decltype(field)> selectedParticleFieldValues;
-        //         //     // TODO: use copy_if
-        //         //     // std::copy_if(field->begin(), field->end(), std::back_inserter(selectedParticleFieldPointers),
-        //         //     //     [](){return true;});
-        //         //     std::for_each(selectedParticlesIndexes.begin(), selectedParticlesIndexes.end(),
-        //         //         [&selectedParticleFieldValues, &field](auto particlePosition){
-        //         //             selectedParticleFieldValues.push_back(field->at(particlePosition));
-        //         //         });
-        //         //     writer->writeField(key, selectedParticleFieldValues.data(), c);
-        //         // },
-        //         // fieldPointers[fidx]);
-
-        //         indicesDone.erase(indicesDone.begin() + i);
-        //         namesDone.erase(namesDone.begin() + i);
-        //     }
-        // }
-
-        writer->closeStep();
-
     }
 
     std::ostream& out;
