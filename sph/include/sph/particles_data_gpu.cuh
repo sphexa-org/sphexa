@@ -32,9 +32,6 @@
 
 #include <variant>
 
-#include <thrust/execution_policy.h>
-#include <thrust/gather.h>
-
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/device_vector.h"
 #include "cstone/fields/field_states.hpp"
@@ -282,24 +279,25 @@ void transferToHost(DataType& d, size_t first, size_t last, const std::vector<st
 
 using FieldVariant = std::variant<std::vector<float>, std::vector<double>, std::vector<unsigned>, std::vector<uint64_t>, std::vector<uint8_t>>;
 template<class DataType, std::enable_if_t<cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
-void transferSubsetToHost(const DataType& data, const std::vector<uint64_t>& subsetIndexes, int fieldIdx, FieldVariant& subsetField)
+void transferSubsetToHost(DataType& data, const std::vector<uint64_t>& subsetIndexes, int fieldIdx, FieldVariant& subsetField)
 {
-    auto launchTransfer = [subsetIndexes, subsetField](const auto* deviceField){
+
+    auto launchTransfer = [subsetIndexes, &subsetField](const auto* deviceField){
 
         // Allocate memory for the subset field values on the device
         using DeviceField = std::decay_t<decltype(*deviceField)>;
         DeviceField deviceSubsetField(subsetIndexes.size());
 
         // Copy subset field values
-        thrust::gather(thrust::device, subsetIndexes.begin(), subsetIndexes.end(), deviceField->data(), deviceSubsetField.data());
+        cstone::gatherGpu(subsetIndexes.data(), subsetIndexes.size(), deviceField->data(), deviceSubsetField.data());
 
         // Allocate memory for the subset field values on the host
-        subsetField = std::decay_t<decltype(*deviceField)>(subsetIndexes.size());
+        subsetField = std::vector<typename DeviceField::value_type>(subsetIndexes.size());
 
         // Run data transfer
-        checkGpuErrors(std::visit([deviceSubsetField, size = subsetIndexes.size()](auto& hostField){
-            cudaMemcpy(hostField.data(), deviceSubsetField.data(), size*sizeof(typename DeviceField::value_type), cudaMemcpyDeviceToHost);
-            }, &subsetField));
+        std::visit([size = subsetIndexes.size(), deviceSubsetField](auto& subField){
+            cudaMemcpy(subField.data(), deviceSubsetField.data(), size*sizeof(typename DeviceField::value_type), cudaMemcpyDeviceToHost);
+        },subsetField);
     };
 
     std::visit(launchTransfer, data.devData.data()[fieldIdx]);
