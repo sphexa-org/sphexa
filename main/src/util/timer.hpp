@@ -52,9 +52,11 @@ public:
         tlast = now;
     }
 
-    void logStatistics(const std::string& name, float value)
+    template<class T>
+    void logStatistics(const std::string& name, T value)
     {
-        perfStats[name].push_back(value);
+        if (not std::holds_alternative<std::vector<T>>(perfStats[name])) { perfStats[name] = std::vector<T>{}; }
+        std::get<std::vector<T>>(perfStats[name]).push_back(value);
     }
 
     //! @brief time elapsed between tstart and last call of step()
@@ -73,23 +75,24 @@ public:
         ar->stepAttribute("numIterations", &numStartCalled, 1);
         ar->writeField("timings", stepTimes.data(), stepTimes.size());
         ar->closeStep();
+        stepTimes.clear();
 
-        for (const auto& item : perfStats)
+        for (auto& item : perfStats)
         {
-            if (item.second.empty()) { continue; }
-            ar->addStep(0, item.second.size(), outFile + ar->suffix());
-            ar->stepAttribute("numRanks", &numRanks, 1);
-            ar->stepAttribute("numIterations", &numStartCalled, 1);
-            ar->writeField(item.first, item.second.data(), item.second.size());
-            ar->closeStep();
+            auto writeField = [ar, outFile, numRanks, name = item.first, numSteps = numStartCalled](auto& field)
+            {
+                if (field.empty()) { return; }
+                ar->addStep(0, field.size(), outFile + ar->suffix());
+                ar->stepAttribute("numRanks", &numRanks, 1);
+                ar->stepAttribute("numIterations", &numSteps, 1);
+                ar->writeField(name, field.data(), field.size());
+                ar->closeStep();
+                field.clear();
+            };
+            std::visit(writeField, item.second);
         }
 
         numStartCalled = 0;
-        stepTimes.clear();
-        for (auto& item : perfStats)
-        {
-            item.second.clear();
-        }
     }
 
 private:
@@ -100,7 +103,10 @@ private:
     std::vector<float>             stepTimes;
     int                            numStartCalled{0};
 
-    std::map<std::string, std::vector<float>> perfStats;
+    using SupportedTypes   = util::TypeList<float, double, uint32_t, uint64_t, int32_t, int64_t>;
+    using SupportedVariant = util::Reduce<std::variant, util::Map<std::vector, SupportedTypes>>;
+
+    std::map<std::string, SupportedVariant> perfStats;
 };
 
 } // namespace sphexa

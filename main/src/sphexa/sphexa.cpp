@@ -92,8 +92,8 @@ int main(int argc, char** argv)
     const int                simDuration  = parser.get("--duration", std::numeric_limits<int>::max());
     const std::string        writeFreqStr = parser.get("-w", std::string("0"));
     const bool               writeEnabled = writeFreqStr != "0" || !writeExtra.empty();
-    const std::string        profFreqStr  = parser.get("--profileFreq", maxStepStr);
-    const bool               profEnabled  = !parser.exists("--noprofile") && (profFreqStr != "0" || writeEnabled);
+    const std::string        profFreqStr  = parser.get("--profile", maxStepStr);
+    const bool               profEnabled  = parser.exists("--profile") || writeEnabled;
     const std::string        pmroot       = parser.get("--pmroot", std::string("")); // /sys/cray/pm_counters
     std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
     std::string              profFile     = parser.get("-op", std::string("profile"));
@@ -273,7 +273,7 @@ void printHelp(char* name, int rank)
 
         printf("\t--duration \t Maximum wall-clock run time of the simulation in seconds.[MAX_INT]\n\n");
 
-        printf("\t--noprofile \t\t Disable profiling output,\n\
+        printf("\t--profile \t\t Enable profiling output,\n\
                 \t Profiling is enabled by default if file output is enabled.\n\n");
 
         printf("\t--profileFreq NUM \t\t [default]: the profiling data is outputted at the end of the simulation,\n\
