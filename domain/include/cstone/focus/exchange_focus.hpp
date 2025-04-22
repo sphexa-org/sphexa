@@ -119,7 +119,7 @@ template<class KeyType>
 void pruneTreelets(std::span<const int> peerRanks, std::vector<std::vector<KeyType>>& treelets)
 {
 #pragma omp parallel for
-    for (int r = 0; r < peerRanks.size(); ++r)
+    for (size_t r = 0; r < peerRanks.size(); ++r)
     {
         int rank = peerRanks[r];
         auto it  = std::remove_if(treelets[rank].begin(), treelets[rank].end(), isMasked<KeyType>);
@@ -206,7 +206,7 @@ void syncTreelets(std::span<const int> peers,
     exchangeRejectedKeys<KeyType>(peers, leaves, treelets, nodeOps);
     pruneTreelets<KeyType>(peers, treelets);
 
-    if (std::count(nodeOps.begin(), nodeOps.end(), 1) != nodeOps.size())
+    if (std::count(nodeOps.begin(), nodeOps.end(), 1) != std::make_signed_t<size_t>(nodeOps.size()))
     {
         rebalanceTree(leaves, octree.prefixes, nodeOps.data());
         swap(leaves, octree.prefixes);
@@ -298,7 +298,7 @@ void exchangeTreeletGeneral(std::span<const int> peerRanks,
     constexpr bool useGpu        = IsDeviceVector<DevVec>{};
 
     std::vector<std::size_t> treeletSizes(2 * peerRanks.size());
-    for (int i = 0; i < peerRanks.size(); ++i)
+    for (size_t i = 0; i < peerRanks.size(); ++i)
     {
         treeletSizes[i]                    = treeletIdx[peerRanks[i]].size();       // send buffers
         treeletSizes[i + peerRanks.size()] = focusAssignment[peerRanks[i]].count(); // recv buffers
@@ -312,7 +312,7 @@ void exchangeTreeletGeneral(std::span<const int> peerRanks,
     std::vector<std::vector<T, util::DefaultInitAdaptor<T>>> staging; // only used if GPU-direct is not active
     std::vector<MPI_Request> sendRequests;
     sendRequests.reserve(peerRanks.size());
-    for (int i = 0; i < peerRanks.size(); ++i)
+    for (size_t i = 0; i < peerRanks.size(); ++i)
     {
         gatherAcc<useGpu, TreeNodeIndex>(treeletIdx[peerRanks[i]], quantities.data(), sendBuffers[i].data());
         if constexpr (useGpu) { syncGpu(); }

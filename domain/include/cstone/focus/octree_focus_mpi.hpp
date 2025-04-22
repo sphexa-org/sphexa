@@ -448,7 +448,7 @@ public:
             const KeyType* nodeKeys = treeData_.prefixes.data();
 
 #pragma omp parallel for schedule(static)
-            for (size_t i = 0; i < treeData_.numNodes; ++i)
+            for (TreeNodeIndex i = 0; i < treeData_.numNodes; ++i)
             {
                 //! set centers to geometric centers for min dist Mac
                 centers_[i] = computeMinMacR2(nodeKeys[i], invThetaEff, box_);
