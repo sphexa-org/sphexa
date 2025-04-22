@@ -6,7 +6,6 @@ set(UNIT_TESTS
         fields/field_get.cpp
         focus/octree_focus.cpp
         focus/source_center.cpp
-        neighbors/compressneighbors.cpp
         neighbors/findneighbors.cpp
         primitives/clz.cpp
         primitives/concat_vector.cpp
