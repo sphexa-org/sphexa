@@ -43,7 +43,6 @@
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
-#include "cstone/traversal/ijloop/gpu_clusternblist.cuh"
 #include "cstone/traversal/ijloop/gpu_fullnblist.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
 
@@ -211,14 +210,6 @@ void benchmarkMain()
     runBenchmark("DIRECT TREE TRAVERSAL", ijloop::GpuAlwaysTraverseNeighborhood{ngmax});
     runBenchmark("FULL NB LIST", ijloop::GpuFullNbListNeighborhood{ngmax});
     runBenchmark("GROMACS SUPERCLUSTERED", ijloop::GromacsLikeNeighborhood{ngmax});
-
-    using BaseClusterNb = ijloop::GpuClusterNbListNeighborhood<>::withNcMax<192>::withClusterSize<4, 4>;
-    runBenchmark("CLUSTERED", BaseClusterNb::withoutSymmetry::withoutCompression{});
-    runBenchmark("COMPRESSED CLUSTERED", BaseClusterNb::withoutSymmetry::withCompression<9>{});
-
-    using SymmetricClusterNb = BaseClusterNb::withNcMax<128>::withSymmetry;
-    runBenchmark("CLUSTERED SYMMETRIC", SymmetricClusterNb::withoutCompression{});
-    runBenchmark("COMPRESSED CLUSTERED", SymmetricClusterNb::withCompression<7>{});
 
     using BaseSuperclusterNb =
         ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<64>::withNcMax<1024>;

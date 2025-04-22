@@ -40,7 +40,6 @@
 #include "cstone/traversal/groups_gpu.cuh"
 #include "cstone/traversal/ijloop/cpu.hpp"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
-#include "cstone/traversal/ijloop/gpu_clusternblist.cuh"
 #include "cstone/traversal/ijloop/gpu_fullnblist.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
 
@@ -321,46 +320,6 @@ TEST(IjLoop, CpuAlwaysTraverse) { run(ijloop::CpuAlwaysTraverseNeighborhood{ngma
 TEST(IjLoop, CpuFullNbList) { run(ijloop::CpuFullNbListNeighborhood{ngmax}); }
 TEST(IjLoop, GpuAlwaysTraverse) { run(ijloop::GpuAlwaysTraverseNeighborhood{ngmax}); }
 TEST(IjLoop, GpuFullNbList) { run(ijloop::GpuFullNbListNeighborhood{ngmax}); }
-TEST(IjLoop, GpuClusterNbList4x4WithoutSymmetryWithoutCompression)
-{
-    run(ijloop::GpuClusterNbListNeighborhood<>::withNcMax<ngmax>::withClusterSize<
-        4, 4>::withoutSymmetry::withoutCompression{});
-}
-TEST(IjLoop, GpuClusterNbList4x4WithSymmetryWithoutCompression)
-{
-    run(ijloop::GpuClusterNbListNeighborhood<>::withNcMax<ngmax>::withClusterSize<
-        4, 4>::withSymmetry::withoutCompression{});
-}
-TEST(IjLoop, GpuClusterNbList4x4WithoutSymmetryWithCompression)
-{
-    run(ijloop::GpuClusterNbListNeighborhood<>::withNcMax<ngmax>::withClusterSize<
-        4, 4>::withoutSymmetry::withCompression<8>{});
-}
-TEST(IjLoop, GpuClusterNbList4x4WithSymmetryWithCompression)
-{
-    run(ijloop::GpuClusterNbListNeighborhood<>::withNcMax<ngmax>::withClusterSize<4, 4>::withSymmetry::withCompression<
-        8>{});
-}
-TEST(IjLoop, GpuClusterNbList8x4WithoutSymmetryWithoutCompression)
-{
-    run(ijloop::GpuClusterNbListNeighborhood<>::withNcMax<ngmax>::withClusterSize<
-        8, 4>::withoutSymmetry::withoutCompression{});
-}
-TEST(IjLoop, GpuClusterNbList8x4WithSymmetryWithoutCompression)
-{
-    run(ijloop::GpuClusterNbListNeighborhood<>::withNcMax<ngmax>::withClusterSize<
-        8, 4>::withSymmetry::withoutCompression{});
-}
-TEST(IjLoop, GpuClusterNbList8x4WithoutSymmetryWithCompression)
-{
-    run(ijloop::GpuClusterNbListNeighborhood<>::withNcMax<ngmax>::withClusterSize<
-        8, 4>::withoutSymmetry::withCompression<8>{});
-}
-TEST(IjLoop, GpuClusterNbList8x4WithSymmetryWithCompression)
-{
-    run(ijloop::GpuClusterNbListNeighborhood<>::withNcMax<ngmax>::withClusterSize<8, 4>::withSymmetry::withCompression<
-        8>{});
-}
 
 constexpr unsigned superclusterNcMax = 1024; // needs to be pretty big due to many split groups
 
