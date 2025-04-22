@@ -193,10 +193,9 @@ protected:
         output(first, last, simData.chem, writer);
     }
 
-    template<class Dataset, std::enable_if_t<not cstone::HaveGpu<typename Dataset::AcceleratorType>{}, int> = 0>
+    template<class Dataset>//, std::enable_if_t<not cstone::HaveGpu<typename Dataset::AcceleratorType>{}, int> = 0>
     void outputSubset(IFileWriter* writer, const ParticleIndexVectorType& selectedParticlesIndexes, Dataset& data) 
     {
-        auto fieldPointers = data.data();
         auto indicesDone   = data.subsetOutputFieldIndices;
         auto namesDone     = data.subsetOutputFieldNames;
         for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
@@ -204,37 +203,6 @@ protected:
             int fidx = indicesDone[i];
             if (data.isAllocated(data.subsetOutputFieldNames.at(i)))
             {
-                int column = std::find(data.subsetOutputFieldIndices.begin(), data.subsetOutputFieldIndices.end(), fidx) -
-                                       data.subsetOutputFieldIndices.begin();
-
-                std::visit([writer, c = column, key = data.subsetOutputFieldNames.at(i), &selectedParticlesIndexes](auto field){
-                    outputTaggedIdsField(selectedParticlesIndexes, writer, field, key, c);},fieldPointers[fidx]);
-                indicesDone.erase(indicesDone.begin() + i);
-                namesDone.erase(namesDone.begin() + i);
-            }
-        }
-
-        if (!indicesDone.empty() && writer->rank() == 0)
-        {
-            std::cout << "WARNING: the following fields are not in use and therefore not output for subset: ";
-            for (int fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
-            {
-                std::cout << data.fieldNames[fidx] << ",";
-            }
-            std::cout << data.fieldNames[indicesDone.back()] << std::endl;
-        }
-    }
-
-    template<class Dataset, std::enable_if_t<cstone::HaveGpu<typename Dataset::AcceleratorType>{}, int> = 0>
-    void outputSubset(IFileWriter* writer, const ParticleIndexVectorType& selectedParticlesIndexes, Dataset& data)
-    {
-        auto indicesDone   = data.subsetOutputFieldIndices;
-        auto namesDone     = data.subsetOutputFieldNames;
-        for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
-        {
-            int fidx = indicesDone[i];
-            if(data.devData.isAllocated(data.subsetOutputFieldNames.at(i))) {
-
                 using FieldVariant = std::variant<std::vector<float>, std::vector<double>, std::vector<unsigned>, std::vector<uint64_t>, std::vector<uint8_t>>;
                 FieldVariant subsetField;
 
@@ -242,15 +210,16 @@ protected:
                                        data.subsetOutputFieldIndices.begin();
 
                 // TODO: passing the entire data is not needed
-                transferSubsetToHost(data, selectedParticlesIndexes, column, subsetField);
+                createSubsetFieldsBuffer(data, selectedParticlesIndexes, column, subsetField);
 
                 std::visit([writer, c = column, key = data.subsetOutputFieldNames.at(i)](auto field){
-                        writer->writeField(key, field.data(), c);
+                    writer->writeField(key, field.data(), c);
                     }, subsetField);
                 indicesDone.erase(indicesDone.begin() + i);
                 namesDone.erase(namesDone.begin() + i);
             }
         }
+
         if (!indicesDone.empty() && writer->rank() == 0)
         {
             std::cout << "WARNING: the following fields are not in use and therefore not output for subset: ";
