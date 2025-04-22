@@ -210,7 +210,7 @@ protected:
                                        data.subsetOutputFieldIndices.begin();
 
                 // TODO: passing the entire data is not needed
-                createSubsetFieldsBuffer(data, selectedParticlesIndexes, column, subsetField);
+                createSubsetFieldsBuffer(data, selectedParticlesIndexes, fidx, subsetField);
 
                 std::visit([writer, c = column, key = data.subsetOutputFieldNames.at(i)](auto field){
                     writer->writeField(key, field.data(), c);
