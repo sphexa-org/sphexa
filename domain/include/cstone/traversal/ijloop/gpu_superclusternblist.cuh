@@ -1016,9 +1016,8 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 #pragma unroll
             for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
             {
-                const unsigned i = iSupercluster * Config::superclusterSize + threadIdx.x + c * Config::iThreads;
-                if ((warpMask >> (c * iClustersPerWarp)) &
-                    (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j)))
+                const unsigned i = iSupercluster * Config::superclusterSize + c * Config::iSize + threadIdx.x;
+                if ((warpMask >> c) & (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j)))
                 {
                     bool jRequired   = i != j;
                     const auto iData = iSuperclusterData[c * Config::iSize + threadIdx.x];
