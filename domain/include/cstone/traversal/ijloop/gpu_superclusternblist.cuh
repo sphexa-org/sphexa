@@ -1026,7 +1026,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                     assert(std::get<0>(iData) == i - firstValidBody);
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
                     const bool iClose              = distSq < radiusSq(iData);
-                    const bool jClose              = Config::symmetric && (/*(distSq < jRadiusSq)*/ iClose & jRequired);
+                    const bool jClose              = Config::symmetric && (distSq < jRadiusSq & jRequired);
                     if (iClose | jClose)
                     {
                         const auto ijInteraction = interaction(iData, jData, ijPosDiff, distSq);
