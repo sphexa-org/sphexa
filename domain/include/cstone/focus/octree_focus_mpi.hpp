@@ -549,8 +549,8 @@ public:
 
             fillGpu(haloFlagsAcc_.data(), haloFlagsAcc_.data() + numLeafNodes, uint8_t{0});
             auto let = octreeViewAcc();
-            findHalosGpu(let.prefixes, let.childOffsets, let.internalToLeaf, leavesAcc_.data(), d_radii, box_,
-                         firstNode, lastNode, haloFlagsAcc_.data());
+            findHalosGpu(let.prefixes, let.childOffsets, let.parents, let.internalToLeaf, leavesAcc_.data(), d_radii,
+                         box_, firstNode, lastNode, haloFlagsAcc_.data());
             memcpyD2H(haloFlagsAcc_.data(), numLeafNodes, haloFlags_.data());
 
             reallocate(scratch, origSize, 1.0);
@@ -571,8 +571,8 @@ public:
                 }
             }
             std::fill(begin(haloFlags_), end(haloFlags_), 0);
-            findHalos(let.prefixes, let.childOffsets, let.internalToLeaf, leaves_.data(), haloRadii.data(), box_,
-                      firstNode, lastNode, haloFlags_.data());
+            findHalos(let.prefixes, let.childOffsets, let.parents, let.internalToLeaf, leaves_.data(), haloRadii.data(),
+                      box_, firstNode, lastNode, haloFlags_.data());
         }
     }
 
