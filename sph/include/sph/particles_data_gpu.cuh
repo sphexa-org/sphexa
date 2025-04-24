@@ -288,23 +288,32 @@ void createSubsetFieldsBuffer(DataType& data, const std::vector<uint64_t>& subse
         using DeviceFieldVType = std::decay_t<decltype(*deviceField)>;
         DeviceFieldVType deviceSubsetFieldTmp(subsetIndexes.size());
 
-        // Copy subset field values
-        cstone::gatherGpu(subsetIndexes.data(), subsetIndexes.size(),
-            deviceField->data(), deviceSubsetFieldTmp.data());
-
         // Allocate memory for the subset field values on the host
         std::vector<typename DeviceFieldVType::value_type> subsetFieldTmp(subsetIndexes.size());
-//        subsetField = std::vector<typename DeviceField::value_type>(subsetIndexes.size());
 
-        // Run data transfer
-        // std::visit([size = subsetIndexes.size(), deviceSubsetField](auto& subField){
-        //     using SubFieldT = std::decay_t<decltype(*subField.data())>;
-        //     if constexpr (std::is_same_v<SubFieldT, typename DeviceField::value_type>) {
-        checkGpuErrors(cudaMemcpy(subsetFieldTmp.data(), deviceSubsetFieldTmp.data(),
-                       subsetIndexes.size()*sizeof(typename DeviceFieldVType::value_type),
-                       cudaMemcpyDeviceToHost));
-        //     }
-        // },subsetField);
+        if(subsetIndexes.size()>0)
+        {
+
+            // Copy subset field values
+            cstone::gatherGpu(subsetIndexes.data(), subsetIndexes.size(),
+                deviceField->data(), deviceSubsetFieldTmp.data());
+
+            checkGpuErrors(cudaMemcpy(subsetFieldTmp.data(), deviceSubsetFieldTmp.data(),
+                        subsetIndexes.size()*sizeof(typename DeviceFieldVType::value_type),
+                        cudaMemcpyDeviceToHost));
+
+            // TODO: local tmp buffer can probably be avoided by using the code below
+            // Run data transfer
+            // std::visit([size = subsetIndexes.size(), deviceSubsetField](auto& subField){
+            //     using SubFieldT = std::decay_t<decltype(*subField.data())>;
+            //     if constexpr (std::is_same_v<SubFieldT, typename DeviceField::value_type>) {
+                // checkGpuErrors(cudaMemcpy(subsetFieldTmp.data(), deviceSubsetFieldTmp.data(),
+                // subsetIndexes.size()*sizeof(typename DeviceFieldVType::value_type),
+                // cudaMemcpyDeviceToHost));
+            //     }
+            // },subsetField);
+
+        }
         subsetField = std::move(subsetFieldTmp);
     };
 
