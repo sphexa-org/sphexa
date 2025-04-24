@@ -491,8 +491,11 @@ void createSubsetFieldsBuffer(DataType& data, const std::vector<uint64_t>& subse
         FieldVType subsetFieldTmp(subsetIndexes.size());
 
         // Copy subset field values in tmp container
-        cstone::gather(std::span(subsetIndexes.data(), subsetIndexes.size()), 
-            field->data(), subsetFieldTmp.data());
+        if(subsetIndexes.size()>0)
+        {
+            cstone::gather(std::span(subsetIndexes.data(), subsetIndexes.size()),
+                field->data(), subsetFieldTmp.data());
+        }
 
         // Move subset field values
         subsetField = std::move(subsetFieldTmp);
