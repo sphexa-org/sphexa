@@ -10,7 +10,6 @@
 #include <type_traits>
 
 #include "beta_cooling_gpu.hpp"
-#include "cstone/primitives/accel_switch.hpp"
 #include "get_ptr.hpp"
 
 namespace disk

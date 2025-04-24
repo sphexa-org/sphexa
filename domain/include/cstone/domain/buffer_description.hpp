@@ -108,11 +108,8 @@ exchangeBufferSize(BufferDescription bufDesc, LocalIndex numPresent, LocalIndex 
 }
 
 //! @brief return the index where particles from remote ranks will be received
-[[maybe_unused]] static LocalIndex
-receiveStart(BufferDescription bufDesc, LocalIndex numPresent, LocalIndex numAssigned)
+[[maybe_unused]] static LocalIndex receiveStart(BufferDescription bufDesc, LocalIndex numIncoming)
 {
-    LocalIndex numIncoming = numAssigned - numPresent;
-
     bool fitHead = bufDesc.start >= numIncoming;
     assert(fitHead || /*fitTail*/ bufDesc.size - bufDesc.end >= numIncoming);
 
@@ -121,32 +118,25 @@ receiveStart(BufferDescription bufDesc, LocalIndex numPresent, LocalIndex numAss
 }
 
 //! @brief The index range that contains the locally assigned particles. Can contain left-over particles too.
-[[maybe_unused]] static util::array<LocalIndex, 2>
-assignedEnvelope(BufferDescription bufDesc, LocalIndex numPresent, LocalIndex numAssigned)
+[[maybe_unused]] static util::array<LocalIndex, 2> assignedEnvelope(BufferDescription bufDesc, LocalIndex numIncoming)
 {
-    LocalIndex numIncoming = numAssigned - numPresent;
-
     bool fitHead = bufDesc.start >= numIncoming;
-    assert(fitHead || /*fitTail*/ bufDesc.size - bufDesc.end >= numIncoming);
-
     if (fitHead) { return {bufDesc.start - numIncoming, bufDesc.end}; }
     else { return {bufDesc.start, bufDesc.end + numIncoming}; }
 }
 
+//! @brief realise o1 ordering with gather, then append received elements
 template<class Vector>
-void extractLocallyOwnedImpl(BufferDescription bufDesc,
-                             LocalIndex numPresent,
-                             LocalIndex numAssigned,
-                             const LocalIndex* ordering,
-                             Vector& buffer)
+void extractLocallyOwnedImpl(
+    BufferDescription o1, LocalIndex numPresent, LocalIndex numAssigned, const LocalIndex* ordering, Vector& buffer)
 {
     Vector temp(numAssigned);
 
     // extract what we already had before the exchange
-    gatherCpu({ordering, numPresent}, buffer.data() + bufDesc.start, temp.data());
+    gatherCpu({ordering + o1.start, numPresent}, buffer.data(), temp.data());
 
     // extract what we received during the exchange
-    LocalIndex rStart = receiveStart(bufDesc, numPresent, numAssigned);
+    LocalIndex rStart = receiveStart(o1, numAssigned - numPresent);
     std::copy_n(buffer.data() + rStart, numAssigned - numPresent, temp.data() + numPresent);
     swap(temp, buffer);
 }

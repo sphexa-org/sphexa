@@ -168,14 +168,24 @@ public:
         cstone::Box<T> globalBox(-r, r, cstone::BoundaryType::open);
 
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
+
+        auto t0 = std::chrono::high_resolution_clock::now();
         assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
         cutSphere(r, d.x, d.y, d.z);
+        auto t1 = std::chrono::high_resolution_clock::now();
+        if (rank == 0) std::cout << "assembly " << std::chrono::duration<float>(t1 - t0).count() << std::endl;
 
         size_t numParticlesGlobal = d.x.size();
         MPI_Allreduce(MPI_IN_PLACE, &numParticlesGlobal, 1, MpiType<size_t>{}, MPI_SUM, simData.comm);
 
         contractRhoProfile(d.x, d.y, d.z);
-        syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, d.x, d.y, d.z, globalBox);
+
+        t0 = std::chrono::high_resolution_clock::now();
+        transferToDevice(d, 0, d.x.size(), {"x", "y", "z"});
+        syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, get<"x">(d), get<"y">(d), get<"z">(d), globalBox);
+        transferToHost(d, 0, get<"x">(d).size(), {"x", "y", "z"});
+        t1 = std::chrono::high_resolution_clock::now();
+        if (rank == 0) std::cout << "earlySync " << std::chrono::duration<float>(t1 - t0).count() << std::endl;
 
         d.resize(d.x.size());
 

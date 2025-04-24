@@ -52,6 +52,7 @@ public:
     void resize(std::size_t size);
 
     void reserve(std::size_t size);
+    void shrink_to_fit();
 
     std::size_t size() const;
     bool empty() const;

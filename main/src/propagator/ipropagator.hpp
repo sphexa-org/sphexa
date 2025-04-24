@@ -36,7 +36,6 @@
 #include <variant>
 
 #include "cstone/sfc/box.hpp"
-#include "cstone/primitives/accel_switch.hpp"
 #include "io/ifile_io.hpp"
 #include "io/id_tag_utils.hpp"
 #include "sph/particles_data.hpp"

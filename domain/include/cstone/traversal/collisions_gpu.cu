@@ -29,7 +29,7 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
                                 const Box<T> box,
                                 TreeNodeIndex firstNode,
                                 TreeNodeIndex lastNode,
-                                int* collisionFlags)
+                                uint8_t* collisionFlags)
 {
     unsigned leafIdx = blockIdx.x * blockDim.x + threadIdx.x + firstNode;
 
@@ -78,7 +78,7 @@ void findHalosGpu(const KeyType* prefixes,
                   const Box<T>& box,
                   TreeNodeIndex firstNode,
                   TreeNodeIndex lastNode,
-                  int* collisionFlags)
+                  uint8_t* collisionFlags)
 {
     constexpr unsigned numThreads = 128;
     unsigned numBlocks            = iceil(lastNode - firstNode, numThreads);
@@ -91,7 +91,7 @@ void findHalosGpu(const KeyType* prefixes,
     template void findHalosGpu(const KeyType* prefixes, const TreeNodeIndex* childOffsets,                             \
                                const TreeNodeIndex* internalToLeaf, const KeyType* leaves,                             \
                                const RadiusType* interactionRadii, const Box<T>& box, TreeNodeIndex firstNode,         \
-                               TreeNodeIndex lastNode, int* collisionFlags)
+                               TreeNodeIndex lastNode, uint8_t* collisionFlags)
 
 FIND_HALOS_GPU(uint32_t, float, float);
 FIND_HALOS_GPU(uint32_t, float, double);
@@ -106,7 +106,7 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
                                   const KeyType* focusNodes,
                                   TreeNodeIndex numFocusNodes,
                                   bool limitSource,
-                                  char* markings)
+                                  uint8_t* markings)
 {
     unsigned tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -135,7 +135,7 @@ void markMacsGpu(const KeyType* prefixes,
                  const KeyType* focusNodes,
                  TreeNodeIndex numFocusNodes,
                  bool limitSource,
-                 char* markings)
+                 uint8_t* markings)
 {
     constexpr unsigned numThreads = 128;
     unsigned numBlocks            = iceil(numFocusNodes, numThreads);
@@ -150,7 +150,7 @@ void markMacsGpu(const KeyType* prefixes,
 #define MARK_MACS_GPU(KeyType, T)                                                                                      \
     template void markMacsGpu(const KeyType* prefixes, const TreeNodeIndex* childOffsets, const Vec4<T>* centers,      \
                               const Box<T>& box, const KeyType* focusNodes, TreeNodeIndex numFocusNodes,               \
-                              bool limitSource, char* markings)
+                              bool limitSource, uint8_t* markings)
 
 MARK_MACS_GPU(uint64_t, double);
 MARK_MACS_GPU(uint64_t, float);
