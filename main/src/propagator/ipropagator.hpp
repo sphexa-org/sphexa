@@ -88,8 +88,12 @@ public:
 
         // Find the selected particles positions in dataset
         ParticleIndexVectorType selectedParticlesIndexes;
-        findTaggedIds(simData.hydro.id, first, last, selectedParticlesIndexes);
-
+        if constexpr (cstone::HaveGpu<typename ParticleDataType::AcceleratorType>{}) {
+            findTaggedIds(simData.hydro.devData.id, first, last, selectedParticlesIndexes);
+        }
+        else {
+            findTaggedIds(simData.hydro.id, first, last, selectedParticlesIndexes);
+        }
         writer->addStep(0, selectedParticlesIndexes.size(), selParticlesOutFile);
         simData.hydro.loadOrStoreAttributes(writer);
 
