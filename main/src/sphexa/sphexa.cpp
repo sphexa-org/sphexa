@@ -96,8 +96,8 @@ int main(int argc, char** argv)
     const std::string        writeFreqStrSubset = parser.get("-w-subset", std::string("0"));
     const bool               writeEnabled       = writeFreqStr != "0" || !writeExtra.empty();
     const bool               writeEnabledSubset = writeFreqStrSubset != "0" || !writeExtraSubset.empty();
+    const std::string        profFreqStr        = parser.get("--profile", maxStepStr);
     const bool               profEnabled        = parser.exists("--profile") || writeEnabled;
-    const bool               profEnabled        = parser.exists("--profile");
     const std::string        pmroot             = parser.get("--pmroot", std::string("")); // /sys/cray/pm_counters
     std::string              outFile            = parser.get("-o", "dump_" + removeModifiers(initCond));
     std::string              outFileSubset      = parser.get("-o-subset", "dump_subset_" + removeModifiers(initCond));
