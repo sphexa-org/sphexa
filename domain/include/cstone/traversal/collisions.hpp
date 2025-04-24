@@ -24,6 +24,7 @@ namespace cstone
 template<class KeyType, class F>
 HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
                                     const TreeNodeIndex* childOffsets,
+                                    const TreeNodeIndex* parents,
                                     F&& endpointAction,
                                     const IBox& target,
                                     KeyType excludeStart,
@@ -38,7 +39,8 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
                overlap<KeyType>(sourceBox, target);
     };
 
-    singleTraversal(childOffsets, overlaps, endpointAction);
+    // singleTraversal(childOffsets, overlaps, endpointAction);
+    dfsStackless(childOffsets, parents, overlaps, endpointAction);
 }
 
 /*! @brief mark halo nodes with flags
@@ -63,6 +65,7 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
 template<class KeyType, class RadiusType, class CoordinateType>
 void findHalos(const KeyType* prefixes,
                const TreeNodeIndex* childOffsets,
+               const TreeNodeIndex* parents,
                const TreeNodeIndex* internalToLeaf,
                const KeyType* leaves,
                const RadiusType* interactionRadii,
@@ -85,7 +88,7 @@ void findHalos(const KeyType* prefixes,
         // if the halo box is fully inside the assigned SFC range, we skip collision detection
         if (containedIn(lowestCode, highestCode, haloBox)) { continue; }
 
-        findCollisions(prefixes, childOffsets, markCollisions, haloBox, lowestCode, highestCode);
+        findCollisions(prefixes, childOffsets, parents, markCollisions, haloBox, lowestCode, highestCode);
     }
 }
 

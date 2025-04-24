@@ -56,7 +56,8 @@ void surfaceDetection()
     auto saveBox = [numInternalNodes = fullTree.numInternalNodes(), &surfaceBoxes, &treeBoxes](TreeNodeIndex idx)
     { surfaceBoxes.push_back(treeBoxes[idx]); };
 
-    singleTraversal(fullTree.childOffsets().data(), isSurface, saveBox);
+    // singleTraversal(fullTree.childOffsets().data(), isSurface, saveBox);
+    dfsStackless(fullTree.childOffsets().data(), fullTree.parents().data(), isSurface, saveBox);
 
     std::sort(begin(surfaceBoxes), end(surfaceBoxes));
 
