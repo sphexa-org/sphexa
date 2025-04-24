@@ -49,6 +49,51 @@ namespace cstone
 // }
 
 template<class C, class A>
+HOST_DEVICE_FUN void dfsStackless(const TreeNodeIndex* childOffsets,
+                                  const TreeNodeIndex* parents,
+                                  C&& continuationCriterion,
+                                  A&& endpointAction)
+{
+    TreeNodeIndex initNode = 0;
+    if (!continuationCriterion(initNode)) { return; }
+
+    if (childOffsets[initNode] == 0)
+    {
+        // initNode (root node) is already the endpoint
+        endpointAction(initNode);
+        return;
+    }
+
+    TreeNodeIndex node = childOffsets[initNode];
+    bool backtrack     = false;
+    while (node != initNode)
+    {
+        bool isLeaf  = childOffsets[node] == 0;
+        bool descend = not backtrack && continuationCriterion(node);
+        // process current node
+        if (isLeaf && descend) { endpointAction(node); }
+
+        TreeNodeIndex siblingIdx = (node - 1) % 8;
+        // determine next node
+        if (childOffsets[node] && descend) // can we descend?
+        {
+            node      = childOffsets[node];
+            backtrack = false;
+        }
+        else if (siblingIdx < 7) // can we move to sibling ?
+        {
+            node++;
+            backtrack = false;
+        }
+        else // move to parent
+        {
+            node      = parents[(node - 1) / 8];
+            backtrack = true;
+        }
+    }
+}
+
+template<class C, class A>
 HOST_DEVICE_FUN void singleTraversal(const TreeNodeIndex* childOffsets, C&& continuationCriterion, A&& endpointAction)
 {
     bool descend = continuationCriterion(0);

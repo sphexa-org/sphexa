@@ -24,10 +24,10 @@ using namespace cstone;
 
 template<class KeyType, class T>
 std::vector<uint8_t> findHalosAll2All(std::span<const KeyType> tree,
-                                  const std::vector<T>& haloRadii,
-                                  const Box<T>& box,
-                                  TreeNodeIndex firstNode,
-                                  TreeNodeIndex lastNode)
+                                      const std::vector<T>& haloRadii,
+                                      const Box<T>& box,
+                                      TreeNodeIndex firstNode,
+                                      TreeNodeIndex lastNode)
 {
     std::vector<uint8_t> flags(nNodes(tree));
     auto collisions = findCollisionsAll2all(tree, haloRadii, box);
@@ -58,8 +58,8 @@ void findHalosFlags()
 
     {
         std::vector<uint8_t> collisionFlags(nNodes(tree), 0);
-        findHalos(octree.nodeKeys().data(), octree.childOffsets().data(), octree.toLeafOrder().data(), tree.data(),
-                  interactionRadii.data(), box, 0, 32, collisionFlags.data());
+        findHalos(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(),
+                  octree.toLeafOrder().data(), tree.data(), interactionRadii.data(), box, 0, 32, collisionFlags.data());
 
         std::vector<uint8_t> reference = findHalosAll2All<KeyType>(tree, interactionRadii, box, 0, 32);
 
@@ -69,8 +69,9 @@ void findHalosFlags()
     }
     {
         std::vector<uint8_t> collisionFlags(nNodes(tree), 0);
-        findHalos(octree.nodeKeys().data(), octree.childOffsets().data(), octree.toLeafOrder().data(), tree.data(),
-                  interactionRadii.data(), box, 32, 64, collisionFlags.data());
+        findHalos(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(),
+                  octree.toLeafOrder().data(), tree.data(), interactionRadii.data(), box, 32, 64,
+                  collisionFlags.data());
 
         std::vector<uint8_t> reference = findHalosAll2All<KeyType>(tree, interactionRadii, box, 32, 64);
 

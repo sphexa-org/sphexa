@@ -42,6 +42,7 @@ namespace cstone
 template<class KeyType, class RadiusType, class T>
 extern void findHalosGpu(const KeyType* prefixes,
                          const TreeNodeIndex* childOffsets,
+                         const TreeNodeIndex* parents,
                          const TreeNodeIndex* internalToLeaf,
                          const KeyType* leaves,
                          const RadiusType* interactionRadii,
