@@ -74,7 +74,6 @@ void tagIdsInList(cstone::DeviceVector<IdType>& ids, size_t first, size_t last, 
 /*! @brief Id tagging (in first:last range) in spherical volume, GPU version
  *
  * @param[out] ids               ordered id list
- * @param[out] originalTaggedIds original values of tagged ids
  * @param[in]  x                 x coordinates
  * @param[in]  y                 y coordinates
  * @param[in]  z                 z coordinates
@@ -82,7 +81,7 @@ void tagIdsInList(cstone::DeviceVector<IdType>& ids, size_t first, size_t last, 
  * @param[in]  last              last (excluded) id index
  * @param[in]  selSphereData     spherical volume definition
  */
-void tagIdsInSphere(cstone::DeviceVector<IdType>& ids, IdVectorType& originalTaggedIds, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
+void tagIdsInSphere(cstone::DeviceVector<IdType>& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
     const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData)
 {
     throw std::runtime_error("Not implemented yet");
@@ -134,20 +133,25 @@ void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t
     thrust::inclusive_scan(devMask.begin(), devMask.end(), devScanResult.begin());
 
     // Create particle subset position container on GPU and initialize it sequentially
-    thrust::device_vector<IdType> devSubsetPos(devScanResult.back());
-    thrust::sequence(thrust::device, devSubsetPos.begin(), devSubsetPos.end());
- 
-    // Find the position of the particle in the subset
-    // TODO: can I use a zip iterator here instead of raw pointer?
-    auto* devRawScanResult = thrust::raw_pointer_cast(devScanResult.data());
-    const auto scanResultSize = devScanResult.size();
-    SearchFunctor searchFunctor{devRawScanResult, first, scanResultSize};
-    thrust::for_each(thrust::device, devSubsetPos.begin(), devSubsetPos.end(), searchFunctor);
+    if(devScanResult.back() > 0) {
+        thrust::device_vector<IdType> devSubsetPos(devScanResult.back());
+        thrust::sequence(thrust::device, devSubsetPos.begin(), devSubsetPos.end());
 
-    // Copy result to host
-    // TODO: find better solution
-    thrust::host_vector<IdType> hostSubsetPos(devSubsetPos);
-    taggedIdsIndexes.assign(thrust::raw_pointer_cast(hostSubsetPos.data()), thrust::raw_pointer_cast(hostSubsetPos.data()) + hostSubsetPos.size());
+        // Find the position of the particle in the subset
+        // TODO: can I use a zip iterator here instead of raw pointer?
+        auto* devRawScanResult = thrust::raw_pointer_cast(devScanResult.data());
+        const auto scanResultSize = devScanResult.size();// TODO: this is devIdSize
+        SearchFunctor searchFunctor{devRawScanResult, first, scanResultSize};
+        thrust::for_each(thrust::device, devSubsetPos.begin(), devSubsetPos.end(), searchFunctor);
+
+        // Copy result to host
+        // TODO: find better solution
+        thrust::host_vector<IdType> hostSubsetPos(devSubsetPos);
+        taggedIdsIndexes.assign(thrust::raw_pointer_cast(hostSubsetPos.data()), thrust::raw_pointer_cast(hostSubsetPos.data()) + hostSubsetPos.size());
+    }
+    else {
+        taggedIdsIndexes.clear();
+    }
 
     return;
 }

@@ -127,33 +127,4 @@ void tagIdsInSphere(IdVectorType& ids, const std::vector<CoordinateType>& x, con
 void tagIdsInSphere(cstone::DeviceVector<IdType>& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
     const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
 
-/*! @brief Tagged ids field output
- *
- * @param[in] taggedIdsIndexes  vector of indexes of tagged ids
- * @param[in] writer            file writer
- * @param[in] field             field to be written (ParticlesData::FieldVector* type)
- * @param[in] name              field name
- * @param[in] column            field column
- */
-void outputTaggedIdsField(const IdVectorType& taggedIdsIndexes, IFileWriter* writer, const auto field, const std::string name, int column)
-{
-    std::remove_pointer_t<decltype(field)> taggedIdsFieldValues;
-    taggedIdsFieldValues.reserve(taggedIdsIndexes.size());
-    std::for_each(taggedIdsIndexes.begin(), taggedIdsIndexes.end(),
-        [&taggedIdsFieldValues, &field](auto index){
-            taggedIdsFieldValues.push_back(field->at(index));
-        });
-    writer->writeField(name, taggedIdsFieldValues.data(), column);
-}
-
-// /*! @brief Tagged ids allocated fields output
-//  *
-//  * @param[in] taggedIdsIndexes  vector of indexes of tagged ids
-//  * @param[in] writer            file writer
-//  * @param[in] fieldPointers     pointer collection to allocated fields
-//  * @param[in] fieldNames        field names
-//  */
-// void outputTaggedIdsAllocatedFields(const std::vector<uint64_t>& taggedIdsIndexes, const IFileWriter* writer, const auto& fieldPointers, const std::vector<std::String>& names);
-
-
 }

@@ -92,6 +92,7 @@ void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorT
 {
     // Find the selected particles in local id list and save their indexes
     // TODO: switch to GPU-like implementation?
+    taggedIdsIndexes.clear();
     IdType idIndex = first;
     std::for_each(ids.begin()+first, ids.begin()+last, [&taggedIdsIndexes, &idIndex](auto& id){
         if((id & sphexa::msbMask) != 0) {

@@ -97,7 +97,7 @@ struct IdSelectionSettings
     int selectionTimeStep;
 };
 
-using IdSubsets= std::map<std::string, IdSelectionSettings>;
+using IdSubsets = std::map<std::string, IdSelectionSettings>;
 
 //! @brief write @p InitSettings as file attributes of a new file @p path
 inline void writeSettings(const InitSettings& settings, const std::string& path, IFileWriter* writer)

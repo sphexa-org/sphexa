@@ -39,6 +39,8 @@
 #include "cstone/fields/data_util.hpp"
 #include "cstone/fields/field_states.hpp"
 #include "cstone/primitives/primitives_acc.hpp"
+#include "cstone/primitives/accel_switch.hpp"
+#include "cstone/primitives/gather.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/reallocate.hpp"
@@ -476,6 +478,31 @@ void transferAllocatedToDevice(Dataset&, size_t, size_t, const std::vector<std::
 template<class Dataset, std::enable_if_t<not cstone::HaveGpu<typename Dataset::AcceleratorType>{}, int> = 0>
 void transferToHost(Dataset&, size_t, size_t, const std::vector<std::string>&)
 {
+}
+
+// TODO: passing the entire data is not needed (except for CPU/GPU switching?)
+using FieldVariant = std::variant<std::vector<float>, std::vector<double>, std::vector<unsigned>, std::vector<uint64_t>, std::vector<uint8_t>>;
+template<class DataType, std::enable_if_t<not cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
+void createSubsetFieldsBuffer(DataType& data, const std::vector<uint64_t>& subsetIndexes, int fieldIdx, FieldVariant& subsetField) 
+{
+    auto createBuffer = [subsetIndexes, &subsetField](const auto* field){
+
+        // Allocate memory for the subset field values on the host
+        using FieldVType = std::decay_t<decltype(*field)>;
+        FieldVType subsetFieldTmp(subsetIndexes.size());
+
+        // Copy subset field values in tmp container
+        if(subsetIndexes.size()>0)
+        {
+            cstone::gather(std::span(subsetIndexes.data(), subsetIndexes.size()),
+                field->data(), subsetFieldTmp.data());
+        }
+
+        // Move subset field values
+        subsetField = std::move(subsetFieldTmp);
+    };
+
+    std::visit(createBuffer, data.data()[fieldIdx]);
 }
 
 template<class Vector, class T, std::enable_if_t<not IsDeviceVector<Vector>{}, int> = 0>
