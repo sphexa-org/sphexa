@@ -39,7 +39,6 @@
 #include "cstone/fields/data_util.hpp"
 #include "cstone/fields/field_states.hpp"
 #include "cstone/primitives/primitives_acc.hpp"
-#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/primitives/gather.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/tree/octree.hpp"
