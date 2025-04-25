@@ -102,23 +102,4 @@ void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorT
     });
 }
 
-// /*! @brief Tagged ids allocated fields output
-//  *
-//  * @param[in] taggedIdsIndexes  vector of indexes of tagged ids
-//  * @param[in] writer            file writer
-//  * @param[in] fieldPointers     pointer collection to allocated fields
-//  * @param[in] fieldNames        field names
-//  */
-// void outputTaggedIdsAllocatedFields(const std::vector<uint64_t>& taggedIdsIndexes, const IFileWriter* writer, const auto& fieldPointers, const std::vector<std::String>& names)
-// {
-//     for (int i = int(fieldPointers.size()) - 1; i >= 0; --i)
-//     {
-//         if (fieldPointers[i])
-//         {
-//             outputTaggedIdsField(taggedIdsIndexes, writer, fieldPointers[i], names[i], i);
-//         }
-//     }
-
-// }
-
 }
