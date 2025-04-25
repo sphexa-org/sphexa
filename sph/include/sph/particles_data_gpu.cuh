@@ -39,6 +39,7 @@
 #include "cstone/tree/definitions.h"
 #include "cstone/util/reallocate.hpp"
 
+#include "particles_data.hpp"
 #include "table_lookup.hpp"
 #include "types.hpp"
 
@@ -274,9 +275,8 @@ void transferToHost(DataType& d, size_t first, size_t last, const std::vector<st
     }
 }
 
-using FieldVariant = std::variant<std::vector<float>, std::vector<double>, std::vector<unsigned>, std::vector<uint64_t>, std::vector<uint8_t>>;
 template<class DataType, std::enable_if_t<cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
-void createSubsetFieldsBuffer(DataType& data, const std::vector<uint64_t>& subsetIndexes, int fieldIdx, FieldVariant& subsetField)
+void createSubsetFieldsBuffer(DataType& data, const std::vector<uint64_t>& subsetIndexes, int fieldIdx, BufferFieldVariant& subsetField)
 {
 
     auto createBuffer = [subsetIndexes, &subsetField](const auto* deviceField){

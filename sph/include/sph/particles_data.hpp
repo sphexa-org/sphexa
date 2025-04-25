@@ -479,10 +479,15 @@ void transferToHost(Dataset&, size_t, size_t, const std::vector<std::string>&)
 {
 }
 
+
+// template<class AccType>
+// using BufferFieldVariant = util::Reduce<std::variant, util::Map<std::remove_pointer_t, typename ParticlesData<AccType>::FieldVariant>>;
+//template<class AccType>
+using BufferFieldVariant = util::Reduce<std::variant, util::Map<std::remove_pointer_t, typename ParticlesData<cstone::CpuTag>::FieldVariant>>;
+
 // TODO: passing the entire data is not needed (except for CPU/GPU switching?)
-using FieldVariant = std::variant<std::vector<float>, std::vector<double>, std::vector<unsigned>, std::vector<uint64_t>, std::vector<uint8_t>>;
 template<class DataType, std::enable_if_t<not cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
-void createSubsetFieldsBuffer(DataType& data, const std::vector<uint64_t>& subsetIndexes, int fieldIdx, FieldVariant& subsetField) 
+void createSubsetFieldsBuffer(DataType& data, const std::vector<uint64_t>& subsetIndexes, int fieldIdx, BufferFieldVariant& subsetField)
 {
     auto createBuffer = [subsetIndexes, &subsetField](const auto* field){
 
