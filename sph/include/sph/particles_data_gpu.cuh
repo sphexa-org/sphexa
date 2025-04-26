@@ -39,7 +39,6 @@
 #include "cstone/tree/definitions.h"
 #include "cstone/util/reallocate.hpp"
 
-#include "particles_data.hpp"
 #include "table_lookup.hpp"
 #include "types.hpp"
 
