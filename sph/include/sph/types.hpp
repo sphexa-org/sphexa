@@ -32,6 +32,10 @@
 #pragma once
 
 #include <cstdint>
+#include <variant>
+#include <vector>
+
+#include "cstone/util/type_list.hpp"
 
 namespace sph
 {
@@ -44,5 +48,17 @@ struct SphTypes
     using XM1Type        = float;
     using Tmass          = float;
 };
+
+//TODO: does it make sense to have these definitions here? Same for particles_data_gpu.cuh
+template<class ValueType>
+using FieldVector = std::vector<ValueType, std::allocator<ValueType>>;
+
+using FieldVariant = std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*,
+                                  FieldVector<uint64_t>*, FieldVector<uint8_t>*>;
+
+//TODO: this definition is not strictly related to SPH stuff, I put it here to avoid the creation of a new include
+// In general I need it to have consistency with the types used by ParticlesData for the fields.
+//TODO: what about having something similar for DevVector based variant in particles_data_gpu.cuh?
+using BufferFieldVariant = util::Reduce<std::variant, util::Map<std::remove_pointer_t, FieldVariant>>;
 
 } // namespace sph

@@ -77,10 +77,8 @@ public:
     using PinnedVec = std::vector<ValueType, PinnedAlloc_t<AcceleratorType, ValueType>>;
 
     template<class ValueType>
-    using FieldVector = std::vector<ValueType, std::allocator<ValueType>>;
-
-    using FieldVariant = std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*,
-                                      FieldVector<uint64_t>*, FieldVector<uint8_t>*>;
+    using FieldVector = typename sph::FieldVector<ValueType>;
+    using FieldVariant = sph::FieldVariant;
 
     ParticlesData() { createTables(); }
     ParticlesData(const ParticlesData&) = delete;
@@ -479,15 +477,9 @@ void transferToHost(Dataset&, size_t, size_t, const std::vector<std::string>&)
 {
 }
 
-
-// template<class AccType>
-// using BufferFieldVariant = util::Reduce<std::variant, util::Map<std::remove_pointer_t, typename ParticlesData<AccType>::FieldVariant>>;
-//template<class AccType>
-using BufferFieldVariant = util::Reduce<std::variant, util::Map<std::remove_pointer_t, typename ParticlesData<cstone::CpuTag>::FieldVariant>>;
-
 // TODO: passing the entire data is not needed (except for CPU/GPU switching?)
 template<class DataType, std::enable_if_t<not cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
-void createSubsetFieldsBuffer(DataType& data, const std::vector<uint64_t>& subsetIndexes, int fieldIdx, BufferFieldVariant& subsetField)
+void createSubsetFieldsBuffer(DataType& data, const std::vector<uint64_t>& subsetIndexes, int fieldIdx, sph::BufferFieldVariant& subsetField)
 {
     auto createBuffer = [subsetIndexes, &subsetField](const auto* field){
 

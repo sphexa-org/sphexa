@@ -276,7 +276,7 @@ void transferToHost(DataType& d, size_t first, size_t last, const std::vector<st
 }
 
 template<class DataType, std::enable_if_t<cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
-void createSubsetFieldsBuffer(DataType& data, const std::vector<uint64_t>& subsetIndexes, int fieldIdx, BufferFieldVariant& subsetField)
+void createSubsetFieldsBuffer(DataType& data, const std::vector<uint64_t>& subsetIndexes, int fieldIdx, sph::BufferFieldVariant& subsetField)
 {
 
     auto createBuffer = [subsetIndexes, &subsetField](const auto* deviceField){
