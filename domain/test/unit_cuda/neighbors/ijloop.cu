@@ -259,15 +259,18 @@ auto initialData()
     thrust::universal_vector<KeyT> octreePrefixes                = octree.prefixes;
     thrust::universal_vector<TreeNodeIndex> octreeChildOffsets   = octree.childOffsets,
                                             octreeInternalToLeaf = octree.internalToLeaf,
+                                            octreeLeafToInternal = octree.leafToInternal,
                                             octreeLevelRange     = octree.levelRange;
 
     Result ref =
         reference(box, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(v), totalBodies, firstBody, lastBody);
 
     OctreeNsView<double, KeyT> view{octree.numLeafNodes,
+                                    octree.numNodes,
                                     rawPtr(octreePrefixes),
                                     rawPtr(octreeChildOffsets),
                                     rawPtr(octreeInternalToLeaf),
+                                    rawPtr(octreeLeafToInternal),
                                     rawPtr(octreeLevelRange),
                                     rawPtr(keys),
                                     rawPtr(layout),
@@ -286,9 +289,10 @@ auto initialData()
                               .groupStart = rawPtr(groups),
                               .groupEnd   = rawPtr(groups) + 1};
 
-    auto treeData = std::make_tuple(std::move(keys), std::move(octreePrefixes), std::move(octreeChildOffsets),
-                                    std::move(octreeInternalToLeaf), std::move(octreeLevelRange), std::move(layout),
-                                    std::move(centers), std::move(sizes), std::move(groups));
+    auto treeData =
+        std::make_tuple(std::move(keys), std::move(octreePrefixes), std::move(octreeChildOffsets),
+                        std::move(octreeInternalToLeaf), std::move(octreeLeafToInternal), std::move(octreeLevelRange),
+                        std::move(layout), std::move(centers), std::move(sizes), std::move(groups));
 
     return std::make_tuple(box, totalBodies, groupView, std::move(x), std::move(y), std::move(z), std::move(h),
                            std::move(v), std::move(treeData), std::move(view), std::move(ref));

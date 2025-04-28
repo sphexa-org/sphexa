@@ -104,9 +104,11 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     nodeFpCenters<KeyType>(nodeKeys, centers.data(), sizes.data(), box);
 
     const OctreeNsView<Tc, KeyType> nsView{.numLeafNodes    = octree.numLeafNodes,
+                                           .numNodes        = octree.numNodes,
                                            .prefixes        = octree.prefixes.data(),
                                            .childOffsets    = octree.childOffsets.data(),
                                            .internalToLeaf  = octree.internalToLeaf.data(),
+                                           .leafToInternal  = octree.leafToInternal.data(),
                                            .levelRange      = octree.levelRange.data(),
                                            .leaves          = keys,
                                            .layout          = layout.data(),
@@ -141,6 +143,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     const thrust::universal_vector<KeyType> dPrefixes             = octree.prefixes;
     const thrust::universal_vector<TreeNodeIndex> dChildOffsets   = octree.childOffsets;
     const thrust::universal_vector<TreeNodeIndex> dInternalToLeaf = octree.internalToLeaf;
+    const thrust::universal_vector<TreeNodeIndex> dLeafToInternal = octree.leafToInternal;
     const thrust::universal_vector<TreeNodeIndex> dLevelRange     = octree.levelRange;
     const thrust::universal_vector<LocalIndex> dLayout            = layout;
     const thrust::universal_vector<Vec3<Tc>> dCenters             = centers;
@@ -153,9 +156,11 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
 
     const thrust::universal_vector<KeyType> dCodes(coords.particleKeys().begin(), coords.particleKeys().end());
     const OctreeNsView<Tc, KeyType> dNsView{.numLeafNodes    = octree.numLeafNodes,
+                                            .numNodes        = octree.numNodes,
                                             .prefixes        = rawPtr(dPrefixes),
                                             .childOffsets    = rawPtr(dChildOffsets),
                                             .internalToLeaf  = rawPtr(dInternalToLeaf),
+                                            .leafToInternal  = rawPtr(dLeafToInternal),
                                             .levelRange      = rawPtr(dLevelRange),
                                             .leaves          = rawPtr(dCodes),
                                             .layout          = rawPtr(dLayout),

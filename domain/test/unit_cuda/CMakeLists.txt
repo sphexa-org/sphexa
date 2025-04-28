@@ -20,12 +20,14 @@ set(UNIT_TEST_SOURCES_GPU
         neighbors/compressneighbors.cu
         neighbors/reducearray.cu
         neighbors/ijloop.cu
+        neighbors/ijloop_upsweep.cu
 )
 
 if(CMAKE_HIP_COMPILER)
     set_source_files_properties(${UNIT_TEST_SOURCES_GPU} PROPERTIES LANGUAGE HIP)
 elseif(CMAKE_CUDA_COMPILER)
     set_source_files_properties(neighbors/ijloop.cu PROPERTIES COMPILE_OPTIONS "--expt-relaxed-constexpr")
+    set_source_files_properties(neighbors/ijloop_upsweep.cu PROPERTIES COMPILE_OPTIONS "--expt-relaxed-constexpr")
 endif()
 
 set(testname component_units_cuda)

@@ -50,6 +50,7 @@
 #include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/ijloop/atomic_update_ptr.cuh"
 #include "cstone/traversal/ijloop/ijloop.hpp"
+#include "cstone/traversal/ijloop/upsweep.cuh"
 #include "cstone/util/uninitialized.hpp"
 #include "cstone/tree/octree.hpp"
 
@@ -143,14 +144,16 @@ computeSuperclusterSplitMasks(const LocalIndex firstISupercluster,
     } while (oldSplitMask != newSplitMask);
 }
 
-template<class Config, class Tc>
+template<class Config, class Tc, class Th>
 __global__ void computeJClusterBboxes(const LocalIndex firstValidBody,
                                       const LocalIndex totalBodies,
                                       const Tc* const __restrict__ x,
                                       const Tc* const __restrict__ y,
                                       const Tc* const __restrict__ z,
+                                      const Th* const __restrict__ h,
                                       Vec3<Tc>* const __restrict__ bboxCenters,
-                                      Vec3<Tc>* const __restrict__ bboxSizes)
+                                      Vec3<Tc>* const __restrict__ bboxSizes,
+                                      Th* const __restrict__ rMaxs)
 {
     static_assert(GpuConfig::warpSize % Config::jSize == 0);
 
@@ -209,6 +212,18 @@ __global__ void computeJClusterBboxes(const LocalIndex firstValidBody,
             bboxCenters[jCluster] = center;
             bboxSizes[jCluster]   = size;
         }
+    }
+
+    if constexpr (Config::symmetric)
+    {
+        const Th hi = h[std::max(std::min(i, totalBodies - 1), firstValidBody)];
+        Th rMax     = 2 * hi;
+
+#pragma unroll
+        for (unsigned offset = Config::jSize / 2; offset >= 1; offset /= 2)
+            rMax = std::max(shflDownSync(rMax, offset), rMax);
+
+        if (i % Config::jSize == 0 && jCluster < numJClusters) rMaxs[jCluster] = rMax;
     }
 }
 
@@ -355,9 +370,10 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
                                                           const Tc* const __restrict__ y,
                                                           const Tc* const __restrict__ z,
                                                           const Th* const __restrict__ h,
-                                                          const Th maxH,
                                                           const Vec3<Tc>* const __restrict__ jClusterBboxCenters,
                                                           const Vec3<Tc>* const __restrict__ jClusterBboxSizes,
+                                                          const Th* const __restrict__ jClusterRMax,
+                                                          const Th* const __restrict__ nodeRMax,
                                                           int* __restrict__ globalPool,
                                                           unsigned* candidates,
                                                           unsigned& numCandidates)
@@ -369,18 +385,20 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
     Vec3<Tc> bbMin = {std::numeric_limits<Tc>::max(), std::numeric_limits<Tc>::max(), std::numeric_limits<Tc>::max()};
     Vec3<Tc> bbMax = {std::numeric_limits<Tc>::lowest(), std::numeric_limits<Tc>::lowest(),
                       std::numeric_limits<Tc>::lowest()};
+    Th groupRMax   = 0;
     assert(lastGroupParticle - firstGroupParticle > 0);
 
     for (unsigned i = firstGroupParticle + laneIdx; i < lastGroupParticle; i += GpuConfig::warpSize)
     {
         const Vec3<Tc> iPos = {x[i], y[i], z[i]};
-        const Tc hBound     = Config::symmetric ? maxH : h[i];
+        const Tc hBound     = Config::symmetric ? Tc(0) : h[i];
 #pragma unroll
         for (unsigned d = 0; d < 3; ++d)
         {
             bbMin[d] = std::min(bbMin[d], iPos[d] - 2 * hBound);
             bbMax[d] = std::max(bbMax[d], iPos[d] + 2 * hBound);
         }
+        if constexpr (Config::symmetric) groupRMax = std::max(groupRMax, 2 * h[i]);
     }
 #pragma unroll
     for (unsigned d = 0; d < 3; ++d)
@@ -388,11 +406,10 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
         bbMin[d] = warpMin(bbMin[d]);
         bbMax[d] = warpMax(bbMax[d]);
     }
+    if constexpr (Config::symmetric) groupRMax = warpMax(groupRMax) * tree.searchExtFactor;
 
     const Vec3<Tc> groupCenter = (bbMax + bbMin) * Tc(0.5);
-    const Vec3<Tc> groupSize   = (bbMax - bbMin) * Tc(0.5) * tree.searchExtFactor;
-
-    const bool usePbc = UsePbc && !insideBox(groupCenter, groupSize, box);
+    const Vec3<Tc> groupSize   = (bbMax - bbMin) * Tc(0.5) * (Config::symmetric ? 1.0f : tree.searchExtFactor);
 
     const unsigned firstISupercluster = superclusterIndex<Config>(firstBody);
     const unsigned lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
@@ -418,7 +435,13 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
             if (isNeighbor)
             {
                 const Vec3<Tc> jClusterCenter = jClusterBboxCenters[jCluster];
-                const Vec3<Tc> jClusterSize   = jClusterBboxSizes[jCluster];
+                Vec3<Tc> jClusterSize         = jClusterBboxSizes[jCluster];
+                if constexpr (Config::symmetric)
+                {
+                    const Tc rMaxBound = std::max(groupRMax, jClusterRMax[jCluster] * tree.searchExtFactor);
+                    for (unsigned d = 0; d < 3; ++d)
+                        jClusterSize[d] += rMaxBound;
+                }
                 isNeighbor &= cellOverlap<UsePbc>(jClusterCenter, jClusterSize, groupCenter, groupSize, box);
             }
         }
@@ -461,6 +484,17 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
     int sourceOffset      = 0; // current level stack pointer, once this reaches numSources, the level is done
     int jClusterFillLevel = 0; // fill level of the source jCluster warp queue
 
+    const auto overlaps = [&](const Vec3<Tc>& srcCenter, Vec3<Tc> srcSize, Th srcRMax)
+    {
+        if constexpr (Config::symmetric)
+        {
+            Tc rMaxBound = std::max(groupRMax, srcRMax * tree.searchExtFactor);
+            for (unsigned d = 0; d < 3; ++d)
+                srcSize[d] += rMaxBound;
+        }
+        return cellOverlap<UsePbc>(srcCenter, srcSize, groupCenter, groupSize, box);
+    };
+
     while (numSources > 0) // While there are source cells to traverse
     {
         int sourceIdx   = sourceOffset + laneIdx;
@@ -472,12 +506,12 @@ __device__ __forceinline__ void collectJClusterCandidates(const OctreeNsView<Tc,
         const bool isSource = sourceIdx < numSources; // Source index is within bounds
         if (!isSource) sourceQueue = 0;
 
-        const Vec3<Tc> curSrcCenter = centers[sourceQueue];      // Current source cell center
-        const Vec3<Tc> curSrcSize   = sizes[sourceQueue];        // Current source cell center
+        const Vec3<Tc> curSrcCenter = centers[sourceQueue]; // Current source cell center
+        const Vec3<Tc> curSrcSize   = sizes[sourceQueue];   // Current source cell center
+        const Th curSrcRMax         = Config::symmetric ? nodeRMax[sourceQueue] : Th(0);
         const int childBegin        = childOffsets[sourceQueue]; // First child cell
         const bool isNode           = childBegin;
-        const bool isClose          = usePbc ? cellOverlap<true>(curSrcCenter, curSrcSize, groupCenter, groupSize, box)
-                                             : cellOverlap<false>(curSrcCenter, curSrcSize, groupCenter, groupSize, box);
+        const bool isClose          = overlaps(curSrcCenter, curSrcSize, curSrcRMax);
         const bool isDirect         = isClose && !isNode && isSource;
         const int leafIdx           = isDirect ? internalToLeaf[sourceQueue] : 0; // the cstone leaf index
 
@@ -722,9 +756,10 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
     const Tc* const __restrict__ y,
     const Tc* const __restrict__ z,
     const Th* const __restrict__ h,
-    const Th maxH,
     const Vec3<Tc>* const __restrict__ jClusterBboxCenters,
     const Vec3<Tc>* const __restrict__ jClusterBboxSizes,
+    const Th* const __restrict__ jClusterRMax,
+    const Th* const __restrict__ nodeRMax,
     const typename Config::SuperclusterSplitMask* const __restrict__ superclusterSplitMasks,
     std::uint32_t* const __restrict__ neighborData,
     const std::size_t neighborDataSize,
@@ -768,7 +803,8 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
 
             collectJClusterCandidates<Config, NumSuperclustersPerBlock, UsePbc>(
                 tree, box, firstValidBody, totalBodies, firstBody, lastBody, firstGroupParticle, lastGroupParticle, x,
-                y, z, h, maxH, jClusterBboxCenters, jClusterBboxSizes, globalPool, jClusters, numCandidates);
+                y, z, h, jClusterBboxCenters, jClusterBboxSizes, jClusterRMax, nodeRMax, globalPool, jClusters,
+                numCandidates);
         }
 
         __shared__ std::uint32_t masksBuffer[NumSuperclustersPerBlock][masksSize<Config>(Config::ncMax)];
@@ -1132,6 +1168,24 @@ __global__ void applyPostamble(const LocalIndex totalBodies,
     storeParticleData(output, i, postamble(iData, result));
 }
 
+struct H2R
+{
+    template<class T>
+    constexpr std::tuple<T> operator()(std::tuple<T> h) const
+    {
+        return {T(2) * std::get<0>(h)};
+    }
+};
+
+struct RMaxFun
+{
+    template<class T>
+    constexpr std::tuple<T> operator()(std::tuple<T> accum, std::tuple<T> r) const
+    {
+        return {std::max(std::get<0>(accum), std::get<0>(r))};
+    }
+};
+
 template<class Config, class Tc, class Th>
 struct GpuSuperclusterNbListNeighborhoodImpl
 {
@@ -1335,13 +1389,21 @@ struct GpuSuperclusterNbListNeighborhood
         }
 
         thrust::device_vector<Vec3<Tc>> jClusterBboxCenters(numJClusters), jClusterBboxSizes(numJClusters);
+        thrust::device_vector<Th> jClusterRMax(Config::symmetric ? numJClusters : 0);
 
         {
             constexpr unsigned numThreads = 256;
             unsigned numBlocks            = iceil(numJClusters * Config::jSize, numThreads);
-            computeJClusterBboxes<Config><<<numBlocks, numThreads>>>(
-                firstValidBody, totalBodies, x, y, z, rawPtr(jClusterBboxCenters), rawPtr(jClusterBboxSizes));
+            computeJClusterBboxes<Config><<<numBlocks, numThreads>>>(firstValidBody, totalBodies, x, y, z, h,
+                                                                     rawPtr(jClusterBboxCenters),
+                                                                     rawPtr(jClusterBboxSizes), rawPtr(jClusterRMax));
             checkGpuErrors(cudaGetLastError());
+        }
+
+        thrust::device_vector<Th> nodeRMax(Config::symmetric ? tree.numNodes : 0);
+        if constexpr (Config::symmetric)
+        {
+            upsweep(tree, std::tuple(Th(0)), H2R(), RMaxFun(), std::tuple(h), std::tuple(rawPtr(nodeRMax)));
         }
 
         thrust::device_vector<GlobalBuildData> globalBuildData(1);
@@ -1355,9 +1417,6 @@ struct GpuSuperclusterNbListNeighborhood
                      (numISuperclusters + numSuperclustersPerBlock - 1) / numSuperclustersPerBlock);
 
         thrust::device_vector<int> globalPool(TravConfig::memPerWarp * numSuperclustersPerBlock * numBlocks);
-        Th maxH = 0;
-        if constexpr (Config::symmetric)
-            maxH = thrust::reduce(thrust::device, h + firstValidBody, h + totalBodies, Th(0), thrust::maximum<Th>());
 
         const auto runBuildKernel = [&]
         {
@@ -1366,10 +1425,11 @@ struct GpuSuperclusterNbListNeighborhood
             auto run = [&](auto usePbc)
             {
                 buildNbList<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize>>>(
-                    tree, box, firstValidBody, totalBodies, groups.firstBody, groups.lastBody, x, y, z, h, maxH,
-                    rawPtr(jClusterBboxCenters), rawPtr(jClusterBboxSizes), rawPtr(superclusterSplitMasks),
-                    rawPtr(nbList.neighborData), nbList.neighborData.size(), rawPtr(nbList.superclusterInfo),
-                    nbList.superclusterInfo.size(), rawPtr(globalPool), rawPtr(globalBuildData));
+                    tree, box, firstValidBody, totalBodies, groups.firstBody, groups.lastBody, x, y, z, h,
+                    rawPtr(jClusterBboxCenters), rawPtr(jClusterBboxSizes), rawPtr(jClusterRMax), rawPtr(nodeRMax),
+                    rawPtr(superclusterSplitMasks), rawPtr(nbList.neighborData), nbList.neighborData.size(),
+                    rawPtr(nbList.superclusterInfo), nbList.superclusterInfo.size(), rawPtr(globalPool),
+                    rawPtr(globalBuildData));
             };
             if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
                 box.boundaryZ() == BoundaryType::periodic)

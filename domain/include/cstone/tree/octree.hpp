@@ -280,10 +280,12 @@ template<class T, class KeyType>
 struct OctreeNsView
 {
     TreeNodeIndex numLeafNodes;
+    TreeNodeIndex numNodes;
     //! @brief see OctreeData
     const KeyType* prefixes;
     const TreeNodeIndex* childOffsets;
     const TreeNodeIndex* internalToLeaf;
+    const TreeNodeIndex* leafToInternal;
     const TreeNodeIndex* levelRange;
     const KeyType* leaves;
 

@@ -1,0 +1,166 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2021 CSCS, ETH Zurich
+ *               2021 University of Basel
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+/*! @file
+ * @brief Tree upsweep test
+ *
+ * @author Felix Thaler <thaler@cscs.ch>
+ */
+
+#include <span>
+
+#include <thrust/universal_vector.h>
+
+#include "cstone/cuda/thrust_util.cuh"
+#include "cstone/traversal/ijloop/upsweep.cuh"
+#include "cstone/util/tuple_util.hpp"
+
+#include "../../coord_samples/random.hpp"
+
+#include "gtest/gtest.h"
+
+using namespace cstone;
+
+using StrongKeyT = HilbertKey<std::uint64_t>;
+using KeyT       = StrongKeyT::ValueType;
+
+template<class Tc, class KeyType, class TransformOp, class BinaryOp, class... In, class... Out>
+void upsweepReference(const OctreeNsView<Tc, KeyType>& tree,
+                      const std::tuple<Out...>& init,
+                      TransformOp&& transformOp,
+                      BinaryOp&& binaryOp,
+                      const std::tuple<In*...>& input,
+                      std::tuple<Out*...> output)
+{
+#pragma omp parallel for
+    for (std::size_t leafIdx = 0; leafIdx < tree.numLeafNodes; ++leafIdx)
+    {
+        TreeNodeIndex nodeIdx = tree.leafToInternal[leafIdx];
+        auto accum            = init;
+        for (LocalIndex i = tree.layout[leafIdx]; i < tree.layout[leafIdx + 1]; ++i)
+            accum = binaryOp(accum, transformOp(util::tupleMap([&](const auto* ptr) { return ptr[i]; }, input)));
+        util::for_each_tuple([&](auto* ptr, auto value) { ptr[nodeIdx] = value; }, output, accum);
+    }
+
+    for (int currentLevel = maxTreeLevel<KeyType>(); currentLevel >= 0; --currentLevel)
+    {
+        const TreeNodeIndex start = tree.levelRange[currentLevel];
+        const TreeNodeIndex end   = tree.levelRange[currentLevel + 1];
+#pragma omp parallel for
+        for (TreeNodeIndex nodeIdx = start; nodeIdx < end; ++nodeIdx)
+        {
+            const TreeNodeIndex firstChild = tree.childOffsets[nodeIdx];
+            if (firstChild)
+            {
+                auto accum = init;
+                for (TreeNodeIndex childIdx = firstChild; childIdx < firstChild + eightSiblings; ++childIdx)
+                    accum = binaryOp(accum, util::tupleMap([&](const auto* ptr) { return ptr[childIdx]; }, output));
+
+                util::for_each_tuple([&](auto* ptr, auto value) { ptr[nodeIdx] = value; }, output, accum);
+            }
+        }
+    }
+}
+
+struct TransformOp
+{
+    constexpr std::tuple<long> operator()(const std::tuple<long, bool>& value) const
+    {
+        const auto [v, inv] = value;
+        return {inv ? -v : v};
+    }
+};
+
+struct BinaryOp
+{
+    constexpr std::tuple<long> operator()(const std::tuple<long>& accum, const std::tuple<long>& value) const
+    {
+        return util::tupleMap(std::plus<void>(), accum, value);
+    }
+};
+
+TEST(IjLoop, Upsweep)
+{
+    const unsigned totalBodies = 997;
+    Box<double> box{0, 1, BoundaryType::periodic};
+    RandomCoordinates<double, StrongKeyT> coords(totalBodies, box);
+
+    thrust::universal_vector<double> x  = coords.x();
+    thrust::universal_vector<double> y  = coords.y();
+    thrust::universal_vector<double> z  = coords.z();
+    thrust::universal_vector<KeyT> keys = coords.particleKeys();
+
+    thrust::universal_vector<double> h(totalBodies), v(totalBodies);
+    std::mt19937 gen(42);
+    std::generate(h.begin(), h.end(), std::bind(std::uniform_real_distribution<double>(0.03, 0.15), std::ref(gen)));
+    std::generate(v.begin(), v.end(), std::bind(std::uniform_real_distribution<double>(-100, 100), std::ref(gen)));
+
+    auto [csTree, counts] = computeOctree(std::span<const KeyT>(rawPtr(keys), keys.size()), 8);
+    OctreeData<KeyT, CpuTag> octree;
+    octree.resize(nNodes(csTree));
+    updateInternalTree<KeyT>(csTree, octree.data());
+
+    thrust::universal_vector<LocalIndex> layout(nNodes(csTree) + 1, 0);
+    std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
+
+    thrust::universal_vector<Vec3<double>> centers(octree.numNodes), sizes(octree.numNodes);
+    std::span<const KeyT> nodeKeys(rawPtr(octree.prefixes), octree.numNodes);
+    nodeFpCenters(nodeKeys, rawPtr(centers), rawPtr(sizes), box);
+
+    thrust::universal_vector<KeyT> octreePrefixes                = octree.prefixes;
+    thrust::universal_vector<TreeNodeIndex> octreeChildOffsets   = octree.childOffsets,
+                                            octreeInternalToLeaf = octree.internalToLeaf,
+                                            octreeLeafToInternal = octree.leafToInternal,
+                                            octreeLevelRange     = octree.levelRange;
+
+    OctreeNsView<double, KeyT> view{octree.numLeafNodes,
+                                    octree.numNodes,
+                                    rawPtr(octreePrefixes),
+                                    rawPtr(octreeChildOffsets),
+                                    rawPtr(octreeInternalToLeaf),
+                                    rawPtr(octreeLeafToInternal),
+                                    rawPtr(octreeLevelRange),
+                                    rawPtr(keys),
+                                    rawPtr(layout),
+                                    rawPtr(centers),
+                                    rawPtr(sizes)};
+
+    thrust::universal_vector<long> dataLong(totalBodies);
+    thrust::universal_vector<bool> dataBool(totalBodies);
+    std::generate(dataLong.begin(), dataLong.end(),
+                  std::bind(std::uniform_int_distribution<long>(-100, 100), std::ref(gen)));
+    std::generate(dataBool.begin(), dataBool.end(), std::bind(std::bernoulli_distribution(), std::ref(gen)));
+
+    thrust::universal_vector<long> reference(octree.numNodes);
+    upsweepReference(view, std::tuple(0l), TransformOp(), BinaryOp(), std::tuple(rawPtr(dataLong), rawPtr(dataBool)),
+                     std::tuple(rawPtr(reference)));
+
+    thrust::universal_vector<long> result(octree.numNodes);
+    ijloop::upsweep(view, std::tuple(0l), TransformOp(), BinaryOp(), std::tuple(rawPtr(dataLong), rawPtr(dataBool)),
+                    std::tuple(rawPtr(result)));
+    checkGpuErrors(cudaDeviceSynchronize());
+
+    EXPECT_EQ(result, reference);
+}
