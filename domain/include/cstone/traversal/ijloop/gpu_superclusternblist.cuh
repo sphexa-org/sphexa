@@ -966,7 +966,6 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 
     using particleData_t = decltype(loadParticleData(x, y, z, h, input, 0));
 
-    // TODO: bank-conflict friendly SoA layout?
     __shared__
         util::Uninitialized<particleData_t[NumSuperclustersPerBlock][Config::iClustersPerSupercluster * Config::iSize]>
             iSuperclusterDataBuffer;
@@ -999,7 +998,6 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
         for (unsigned n = threadIdx.y * Config::iThreads + threadIdx.x; n < maskSize;
              n += Config::iThreads * Config::jSize)
             nbData[n] = neighborData[iSuperclusterDataIndex + n];
-        // TODO: use all warps?
         if (warpIndex == 0)
         {
             unsigned n;
