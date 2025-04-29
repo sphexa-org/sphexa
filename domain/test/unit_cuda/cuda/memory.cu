@@ -17,8 +17,6 @@
 
 #include "cstone/cuda/memory.cuh"
 
-using namespace cstone;
-
 template<class T>
 __global__ void deviceAccess(T* ptr, T value)
 {
