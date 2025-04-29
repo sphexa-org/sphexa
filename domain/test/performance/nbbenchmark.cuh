@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <numeric>
@@ -179,8 +180,14 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
                                .groupEnd   = rawPtr(groups) + 1};
     printf("Number of groups: %u (unsplit: %u)\n", dGroupView.numGroups, (n + groupSize - 1) / groupSize);
 
+    using Clock     = std::chrono::high_resolution_clock;
+    auto buildStart = Clock::now();
     const auto neighborhoodGPU =
         neighborhood.build(dNsView, box, n, dGroupView, rawPtr(dX), rawPtr(dY), rawPtr(dZ), rawPtr(dH));
+    checkGpuErrors(cudaDeviceSynchronize());
+    auto buildEnd = Clock::now();
+    printf("Neighborhood build time (CPU time): %7.6f s\n",
+           std::chrono::duration<double>(buildEnd - buildStart).count());
     const ijloop::Statistics stats = neighborhoodGPU.stats();
     printf("Memory usage of neighborhood data: %.2f MB (%.1f B/particle)\n", stats.numBytes / 1.0e6,
            stats.numBytes / double(stats.numBodies));
