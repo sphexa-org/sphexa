@@ -24,7 +24,7 @@
  */
 
 /*! @file
- * @brief Neighbor search on GPU
+ * @brief Neighbor search on the GPU using fixed-size particle clusters similar to GROMACS.
  *
  * @author Felix Thaler <thaler@cscs.ch>
  */
@@ -62,42 +62,77 @@ namespace gpu_supercluster_nb_list_neighborhood_detail
 
 struct SuperclusterInfo
 {
-    unsigned index, neighborsCount, dataIndex;
+    //! @brief index of the supercluster, defining which particles belong to it
+    unsigned index;
+    //! @brief number of neighbor clusters
+    unsigned neighborsCount;
+    //! @brief start index in the neighbor data arra.
+    unsigned dataIndex;
 
+    //! @brief less-than operator for sorting superclusters by descending neighbor count (for load balancing)
     constexpr bool operator<(const SuperclusterInfo& other) const { return neighborsCount > other.neighborsCount; }
 };
 
 struct GlobalBuildData
 {
+    //! @brief total size of neighbor data, atomically increased during build to "allocate" required storage for each
+    //! supercluster during build in a pre-allocated array
     unsigned long long neighborDataSize;
+    //! @brief global group index counter, atomically increased during build
     unsigned index;
 };
 
+/*! decide if a neighbor index should be included in the symmetric neighbor list
+ *
+ * @param[in] i     own index
+ * @param[in] j     neighbor index
+ * @param[in] first start index of traversed entities
+ * @param[in] last  end index of traversed entities
+ *
+ * @return true if the neighbor j should be included in the neighbor list of i, else false
+ */
 constexpr __forceinline__ bool includeNbSymmetric(unsigned i, unsigned j, unsigned first, unsigned last)
 {
+    // larger blockSize leads to more consecutive neighbors in list and thus improved neighbor list compression ratio
+    // and cache locality
     constexpr unsigned blockSize = 32;
     const bool s                 = (i / blockSize) % 2 == (j / blockSize) % 2;
     return (j < first) | (j >= last) | (i == j) | (i < j ? s : !s);
 }
 
+/*! amount of storage required by the bitmasks stored per supercluster
+ *
+ * @param[in] numJClusters number of neighboring j clusters of the supercluster
+ *
+ * @return number of 32bit integers required to store the bitmasks
+ */
 template<class Config>
 constexpr __forceinline__ unsigned masksSize(unsigned numJClusters)
 {
     return (numJClusters * Config::iClustersPerSupercluster * Config::numWarpsPerInteraction + 31) / 32;
 }
 
+//! supercluster index of a particle
 template<class Config>
 constexpr __forceinline__ unsigned superclusterIndex(unsigned i)
 {
     return i / Config::superclusterSize;
 }
 
+//! j-cluster index of a particle
 template<class Config>
 constexpr __forceinline__ unsigned jClusterIndex(unsigned j)
 {
     return j / Config::jSize;
 }
 
+/*! start particle index offset of the first supercluster, required to align the supercluster boundaries to the first
+ * traversed particle (i.e. first domain particle instead of first halo particle)
+ *
+ * @param[in] firstBody index of the first domain particle
+ *
+ * @return required particle index shift
+ */
 template<class Config>
 constexpr __forceinline__ unsigned clusterOffset(unsigned firstBody)
 {
@@ -120,7 +155,6 @@ __global__ static void initSuperclusterInfo(const LocalIndex firstISupercluster,
 template<class Config>
 __global__ void
 computeSuperclusterSplitMasks(const LocalIndex firstISupercluster,
-                              const LocalIndex lastISupercluster,
                               const LocalIndex firstValidBody,
                               const GroupView __grid_constant__ groups,
                               typename Config::SuperclusterSplitMask* __restrict__ superclusterSplitMasks)
@@ -1382,7 +1416,7 @@ struct GpuSuperclusterNbListNeighborhood
             constexpr unsigned numThreads = 256;
             const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
             computeSuperclusterSplitMasks<Config><<<numBlocks, numThreads>>>(
-                firstISupercluster, lastISupercluster, firstValidBody, groups, rawPtr(superclusterSplitMasks));
+                firstISupercluster, firstValidBody, groups, rawPtr(superclusterSplitMasks));
             checkGpuErrors(cudaGetLastError());
         }
 
