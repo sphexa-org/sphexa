@@ -1358,6 +1358,8 @@ struct GpuSuperclusterNbListNeighborhood
     static constexpr bool compress             = Config::compress;
     static constexpr bool symmetric            = Config::symmetric;
 
+    std::size_t upperBoundBytesPerParticle = 128;
+
     template<class Tc, class KeyType, class Th>
     gpu_supercluster_nb_list_neighborhood_detail::GpuSuperclusterNbListNeighborhoodImpl<Config, Tc, Th>
     build(const OctreeNsView<Tc, KeyType>& tree,
@@ -1386,7 +1388,7 @@ struct GpuSuperclusterNbListNeighborhood
         const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
         const LocalIndex numJClusters       = jClusterIndex<Config>(totalBodies - 1) + 1;
 
-        std::size_t neighborDataSize = previousSize;
+        std::size_t neighborDataVirtualSize = upperBoundBytesPerParticle * totalBodies / sizeof(std::uint32_t);
 
         GpuSuperclusterNbListNeighborhoodImpl<Config, Tc, Th> nbList{
             box,
@@ -1398,7 +1400,7 @@ struct GpuSuperclusterNbListNeighborhood
             y,
             z,
             h,
-            util::deviceAlloc<std::uint32_t[]>(neighborDataSize),
+            util::deviceAllocVirtual<std::uint32_t[]>(neighborDataVirtualSize),
             util::deviceAlloc<SuperclusterInfo[]>(numISuperclusters),
             0ul};
 
@@ -1457,7 +1459,7 @@ struct GpuSuperclusterNbListNeighborhood
                 buildNbList<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize>>>(
                     tree, box, firstValidBody, totalBodies, groups.firstBody, groups.lastBody, x, y, z, h,
                     jClusterBboxCenters.get(), jClusterBboxSizes.get(), jClusterRMax.get(), nodeRMax.get(),
-                    superclusterSplitMasks.get(), nbList.neighborData.get(), neighborDataSize,
+                    superclusterSplitMasks.get(), nbList.neighborData.get(), neighborDataVirtualSize,
                     nbList.superclusterInfo.get(), numISuperclusters, globalPool.get(), globalBuildData.get());
             };
             if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
@@ -1473,30 +1475,15 @@ struct GpuSuperclusterNbListNeighborhood
         unsigned long long requiredSize;
         checkGpuErrors(cudaMemcpy(&requiredSize, &globalBuildData->neighborDataSize, sizeof(unsigned long long),
                                   cudaMemcpyDeviceToHost));
-        if (requiredSize > neighborDataSize)
-        {
-            neighborDataSize    = requiredSize;
-            nbList.neighborData = util::deviceAlloc<std::uint32_t[]>(neighborDataSize);
-            runBuildKernel();
-            checkGpuErrors(cudaDeviceSynchronize());
-            previousSize = requiredSize * 1.5;
-#ifndef NDEBUG
-            checkGpuErrors(cudaMemcpy(&requiredSize, &globalBuildData->neighborDataSize, sizeof(unsigned long long),
-                                      cudaMemcpyDeviceToHost));
-            assert(requiredSize <= neighborDataSize);
-#endif
-        }
+        assert(requiredSize < neighborDataVirtualSize);
 
-        nbList.numBytes = sizeof(std::uint32_t) * neighborDataSize + sizeof(SuperclusterInfo) * numISuperclusters;
+        nbList.numBytes = sizeof(std::uint32_t) * requiredSize + sizeof(SuperclusterInfo) * numISuperclusters;
 
         thrust::stable_sort(thrust::device, nbList.superclusterInfo.get(),
                             nbList.superclusterInfo.get() + numISuperclusters);
 
         return nbList;
     }
-
-private:
-    mutable std::size_t previousSize = 0;
 };
 
 } // namespace cstone::ijloop
