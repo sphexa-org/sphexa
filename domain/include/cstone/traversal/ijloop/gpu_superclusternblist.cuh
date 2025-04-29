@@ -1450,27 +1450,23 @@ struct GpuSuperclusterNbListNeighborhood
 
         auto globalPool = util::deviceAlloc<int[]>(TravConfig::memPerWarp * numSuperclustersPerBlock * numBlocks);
 
-        const auto runBuildKernel = [&]
-        {
-            checkGpuErrors(cudaMemsetAsync(globalBuildData.get(), 0, sizeof(GlobalBuildData)));
+        checkGpuErrors(cudaMemsetAsync(globalBuildData.get(), 0, sizeof(GlobalBuildData)));
 
-            auto run = [&](auto usePbc)
-            {
-                buildNbList<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize>>>(
-                    tree, box, firstValidBody, totalBodies, groups.firstBody, groups.lastBody, x, y, z, h,
-                    jClusterBboxCenters.get(), jClusterBboxSizes.get(), jClusterRMax.get(), nodeRMax.get(),
-                    superclusterSplitMasks.get(), nbList.neighborData.get(), neighborDataVirtualSize,
-                    nbList.superclusterInfo.get(), numISuperclusters, globalPool.get(), globalBuildData.get());
-            };
-            if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
-                box.boundaryZ() == BoundaryType::periodic)
-                run(std::true_type());
-            else
-                run(std::false_type());
+        auto run = [&](auto usePbc)
+        {
+            buildNbList<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize>>>(
+                tree, box, firstValidBody, totalBodies, groups.firstBody, groups.lastBody, x, y, z, h,
+                jClusterBboxCenters.get(), jClusterBboxSizes.get(), jClusterRMax.get(), nodeRMax.get(),
+                superclusterSplitMasks.get(), nbList.neighborData.get(), neighborDataVirtualSize,
+                nbList.superclusterInfo.get(), numISuperclusters, globalPool.get(), globalBuildData.get());
             checkGpuErrors(cudaGetLastError());
         };
 
-        runBuildKernel();
+        if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
+            box.boundaryZ() == BoundaryType::periodic)
+            run(std::true_type());
+        else
+            run(std::false_type());
 
         unsigned long long requiredSize;
         checkGpuErrors(cudaMemcpy(&requiredSize, &globalBuildData->neighborDataSize, sizeof(unsigned long long),
