@@ -44,6 +44,7 @@
 
 #include "cstone/compressneighbors.cuh"
 #include "cstone/cuda/cub.hpp"
+#include "cstone/cuda/memory.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/reducearray.cuh"
@@ -1225,8 +1226,9 @@ struct GpuSuperclusterNbListNeighborhoodImpl
     LocalIndex firstValidBody, totalBodies, firstBody, lastBody;
     const Tc *x, *y, *z;
     const Th* h;
-    thrust::device_vector<std::uint32_t> neighborData;
-    thrust::device_vector<SuperclusterInfo> superclusterInfo;
+    util::UniqueDevicePtr<std::uint32_t[]> neighborData;
+    util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo;
+    std::size_t numBytes;
 
     template<class... In, class... Out, class Interaction, class Postamble>
     void
@@ -1259,8 +1261,8 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         {
             runIjLoop<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize>>>(
                 box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
-                std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), rawPtr(neighborData),
-                rawPtr(superclusterInfo));
+                std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), neighborData.get(),
+                superclusterInfo.get());
             checkGpuErrors(cudaGetLastError());
         };
         if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
@@ -1281,12 +1283,7 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         }
     }
 
-    Statistics stats() const
-    {
-        return {.numBodies = lastBody - firstBody,
-                .numBytes  = neighborData.size() * sizeof(typename decltype(neighborData)::value_type) +
-                            superclusterInfo.size() * sizeof(typename decltype(superclusterInfo)::value_type)};
-    }
+    Statistics stats() const { return {.numBodies = lastBody - firstBody, .numBytes = numBytes}; }
 };
 
 template<unsigned NcMax            = 256,
@@ -1389,6 +1386,8 @@ struct GpuSuperclusterNbListNeighborhood
         const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
         const LocalIndex numJClusters       = jClusterIndex<Config>(totalBodies - 1) + 1;
 
+        std::size_t neighborDataSize = previousSize;
+
         GpuSuperclusterNbListNeighborhoodImpl<Config, Tc, Th> nbList{
             box,
             firstValidBody,
@@ -1399,46 +1398,45 @@ struct GpuSuperclusterNbListNeighborhood
             y,
             z,
             h,
-            thrust::device_vector<std::uint32_t>(previousSize),
-            thrust::device_vector<SuperclusterInfo>(numISuperclusters)};
+            util::deviceAlloc<std::uint32_t[]>(neighborDataSize),
+            util::deviceAlloc<SuperclusterInfo[]>(numISuperclusters),
+            0ul};
 
         if (numISuperclusters == 0) return nbList;
 
-        thrust::device_vector<typename Config::SuperclusterSplitMask> superclusterSplitMasks(numISuperclusters);
+        auto superclusterSplitMasks = util::deviceAlloc<typename Config::SuperclusterSplitMask[]>(numISuperclusters);
         {
             constexpr unsigned numThreads = 256;
             const unsigned numBlocks      = iceil(numISuperclusters, numThreads);
             initSuperclusterInfo<<<numBlocks, numThreads>>>(firstISupercluster, lastISupercluster,
-                                                            rawPtr(nbList.superclusterInfo));
+                                                            nbList.superclusterInfo.get());
             checkGpuErrors(cudaGetLastError());
         }
         {
             constexpr unsigned numThreads = 256;
             const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
-            computeSuperclusterSplitMasks<Config><<<numBlocks, numThreads>>>(
-                firstISupercluster, firstValidBody, groups, rawPtr(superclusterSplitMasks));
+            computeSuperclusterSplitMasks<Config>
+                <<<numBlocks, numThreads>>>(firstISupercluster, firstValidBody, groups, superclusterSplitMasks.get());
             checkGpuErrors(cudaGetLastError());
         }
 
-        thrust::device_vector<Vec3<Tc>> jClusterBboxCenters(numJClusters), jClusterBboxSizes(numJClusters);
-        thrust::device_vector<Th> jClusterRMax(Config::symmetric ? numJClusters : 0);
-
+        auto jClusterBboxCenters = util::deviceAlloc<Vec3<Tc>[]>(numJClusters);
+        auto jClusterBboxSizes   = util::deviceAlloc<Vec3<Tc>[]>(numJClusters);
+        auto jClusterRMax        = util::deviceAlloc<Th[]>(Config::symmetric ? numJClusters : 0);
         {
             constexpr unsigned numThreads = 256;
             unsigned numBlocks            = iceil(numJClusters * Config::jSize, numThreads);
             computeJClusterBboxes<Config><<<numBlocks, numThreads>>>(firstValidBody, totalBodies, x, y, z, h,
-                                                                     rawPtr(jClusterBboxCenters),
-                                                                     rawPtr(jClusterBboxSizes), rawPtr(jClusterRMax));
+                                                                     jClusterBboxCenters.get(), jClusterBboxSizes.get(),
+                                                                     jClusterRMax.get());
             checkGpuErrors(cudaGetLastError());
         }
 
-        thrust::device_vector<Th> nodeRMax(Config::symmetric ? tree.numNodes : 0);
+        auto nodeRMax = util::deviceAlloc<Th[]>(Config::symmetric ? tree.numNodes : 0);
         if constexpr (Config::symmetric)
-        {
-            upsweep(tree, std::tuple(Th(0)), H2R(), RMaxFun(), std::tuple(h), std::tuple(rawPtr(nodeRMax)));
-        }
+            upsweep(tree, std::tuple(Th(0)), H2R(), RMaxFun(), std::tuple(h), std::tuple(nodeRMax.get()));
 
-        thrust::device_vector<GlobalBuildData> globalBuildData(1);
+        auto globalBuildData = util::deviceAlloc<GlobalBuildData>();
 
         constexpr unsigned numSuperclustersPerBlock =
             64 / (Config::iThreads * Config::jSize / Config::numWarpsPerInteraction);
@@ -1448,20 +1446,19 @@ struct GpuSuperclusterNbListNeighborhood
             std::min(GpuConfig::smCount * (TravConfig::numWarpsPerSm / numSuperclustersPerBlock),
                      (numISuperclusters + numSuperclustersPerBlock - 1) / numSuperclustersPerBlock);
 
-        thrust::device_vector<int> globalPool(TravConfig::memPerWarp * numSuperclustersPerBlock * numBlocks);
+        auto globalPool = util::deviceAlloc<int[]>(TravConfig::memPerWarp * numSuperclustersPerBlock * numBlocks);
 
         const auto runBuildKernel = [&]
         {
-            checkGpuErrors(cudaMemsetAsync(rawPtr(globalBuildData), 0, sizeof(GlobalBuildData)));
+            checkGpuErrors(cudaMemsetAsync(globalBuildData.get(), 0, sizeof(GlobalBuildData)));
 
             auto run = [&](auto usePbc)
             {
                 buildNbList<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize>>>(
                     tree, box, firstValidBody, totalBodies, groups.firstBody, groups.lastBody, x, y, z, h,
-                    rawPtr(jClusterBboxCenters), rawPtr(jClusterBboxSizes), rawPtr(jClusterRMax), rawPtr(nodeRMax),
-                    rawPtr(superclusterSplitMasks), rawPtr(nbList.neighborData), nbList.neighborData.size(),
-                    rawPtr(nbList.superclusterInfo), nbList.superclusterInfo.size(), rawPtr(globalPool),
-                    rawPtr(globalBuildData));
+                    jClusterBboxCenters.get(), jClusterBboxSizes.get(), jClusterRMax.get(), nodeRMax.get(),
+                    superclusterSplitMasks.get(), nbList.neighborData.get(), neighborDataSize,
+                    nbList.superclusterInfo.get(), numISuperclusters, globalPool.get(), globalBuildData.get());
             };
             if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
                 box.boundaryZ() == BoundaryType::periodic)
@@ -1474,22 +1471,26 @@ struct GpuSuperclusterNbListNeighborhood
         runBuildKernel();
 
         unsigned long long requiredSize;
-        checkGpuErrors(cudaMemcpy(&requiredSize, &rawPtr(globalBuildData)->neighborDataSize, sizeof(unsigned long long),
+        checkGpuErrors(cudaMemcpy(&requiredSize, &globalBuildData->neighborDataSize, sizeof(unsigned long long),
                                   cudaMemcpyDeviceToHost));
-        if (requiredSize > nbList.neighborData.size())
+        if (requiredSize > neighborDataSize)
         {
-            nbList.neighborData.resize(requiredSize);
+            neighborDataSize    = requiredSize;
+            nbList.neighborData = util::deviceAlloc<std::uint32_t[]>(neighborDataSize);
             runBuildKernel();
             checkGpuErrors(cudaDeviceSynchronize());
             previousSize = requiredSize * 1.5;
 #ifndef NDEBUG
-            checkGpuErrors(cudaMemcpy(&requiredSize, &rawPtr(globalBuildData)->neighborDataSize,
-                                      sizeof(unsigned long long), cudaMemcpyDeviceToHost));
-            assert(requiredSize <= nbList.neighborData.size());
+            checkGpuErrors(cudaMemcpy(&requiredSize, &globalBuildData->neighborDataSize, sizeof(unsigned long long),
+                                      cudaMemcpyDeviceToHost));
+            assert(requiredSize <= neighborDataSize);
 #endif
         }
 
-        thrust::stable_sort(thrust::device, nbList.superclusterInfo.begin(), nbList.superclusterInfo.end());
+        nbList.numBytes = sizeof(std::uint32_t) * neighborDataSize + sizeof(SuperclusterInfo) * numISuperclusters;
+
+        thrust::stable_sort(thrust::device, nbList.superclusterInfo.get(),
+                            nbList.superclusterInfo.get() + numISuperclusters);
 
         return nbList;
     }
