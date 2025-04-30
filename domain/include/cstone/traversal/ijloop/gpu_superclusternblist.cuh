@@ -267,30 +267,48 @@ __device__ __forceinline__ void
 sortCandidates(util::SharedMemAllocator& sharedAllocator, std::uint32_t* candidates, unsigned numCandidates)
 {
     const unsigned laneIdx = laneIndex();
-    assert(blockDim.x * blockDim.y == GpuConfig::warpSize);
-    assert(blockDim.z == NumSuperclustersPerBlock);
 
-    constexpr unsigned itemsPerWarp = Config::ncMax / GpuConfig::warpSize;
-    std::uint32_t items[itemsPerWarp];
-#pragma unroll
-    for (unsigned i = 0; i < itemsPerWarp; ++i)
+    auto histograms = sharedAllocator.alloc<unsigned[]>(128);
+    auto tmp        = sharedAllocator.alloc<std::uint32_t[]>(Config::ncMax);
+
+    for (unsigned i = laneIdx; i < 128; i += GpuConfig::warpSize)
+        histograms[i] = 0;
+
+    syncWarp();
+
+    for (unsigned i = laneIdx; i < numCandidates; i += GpuConfig::warpSize)
     {
-        const unsigned c = laneIdx * itemsPerWarp + i;
-        items[i]         = c < numCandidates ? candidates[c] : std::numeric_limits<std::uint32_t>::max();
-    }
-
-    using WarpSort = cub::WarpMergeSort<std::uint32_t, itemsPerWarp, GpuConfig::warpSize>;
-    auto sortTmp   = sharedAllocator.alloc<typename WarpSort::TempStorage>();
-    WarpSort(*sortTmp).Sort(items, std::less<unsigned>());
-
-#pragma unroll
-    for (unsigned i = 0; i < itemsPerWarp; ++i)
-    {
-        const unsigned c = laneIdx * itemsPerWarp + i;
-        if (c < numCandidates) candidates[c] = items[i];
+        const auto value = candidates[i];
+        for (unsigned digit = 0; digit < 8; ++digit)
+            atomicAdd(&histograms[digit * 16 + ((value >> (4 * digit)) & 0xf)], 1);
     }
 
     syncWarp();
+
+    for (unsigned i = laneIdx; i < 128; i += GpuConfig::warpSize)
+    {
+        const unsigned hist = histograms[i];
+        unsigned index      = inclusiveScanInt(hist) - hist;
+        index -= shflSync(index, (i / 16) * 16);
+        histograms[i] = index;
+    }
+
+    syncWarp();
+
+    for (unsigned digit = 0; digit < 8; ++digit)
+    {
+        const std::uint32_t* in = digit % 2 ? tmp.get() : candidates;
+        std::uint32_t* out      = digit % 2 ? candidates : tmp.get();
+
+        for (unsigned i = laneIdx; i < numCandidates; i += GpuConfig::warpSize)
+        {
+            const auto value     = in[i];
+            const unsigned index = atomicAdd(&histograms[digit * 16 + ((value >> (digit * 4)) & 0xf)], 1);
+            out[index]           = value;
+        }
+
+        syncWarp();
+    }
 }
 
 template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th>
@@ -782,9 +800,8 @@ constexpr unsigned buildNbListSharedMemPerSupercluster()
     constexpr unsigned jClustersSize = Config::ncMax * sizeof(unsigned);
     constexpr unsigned masksDataSize = masksSize<Config>(Config::ncMax) * sizeof(std::uint32_t);
 
-    constexpr unsigned itemsPerWarp = Config::ncMax / GpuConfig::warpSize;
-    using WarpSort                  = cub::WarpMergeSort<std::uint32_t, itemsPerWarp, GpuConfig::warpSize>;
-    constexpr unsigned tmpSortSize  = sizeof(typename WarpSort::TempStorage);
+    constexpr unsigned histogramsSize = 128 * sizeof(unsigned);
+    constexpr unsigned tmpSize        = Config::ncMax * sizeof(std::uint32_t);
 
     constexpr unsigned xisSize = Config::superclusterSize * sizeof(Tc);
     constexpr unsigned yisSize = Config::superclusterSize * sizeof(Tc);
@@ -796,7 +813,7 @@ constexpr unsigned buildNbListSharedMemPerSupercluster()
     constexpr unsigned compressedJClustersSize = (Config::compress ? Config::ncMax : 0) * sizeof(std::uint32_t);
 
     return jClustersSize + masksDataSize +
-           std::max({compressedJClustersSize, tmpSortSize + sharedPoolSize,
+           std::max({compressedJClustersSize, histogramsSize + tmpSize + sharedPoolSize,
                      xisSize + yisSize + zisSize + hisSize + sharedPoolSize});
 }
 
