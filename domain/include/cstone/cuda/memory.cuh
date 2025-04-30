@@ -74,26 +74,28 @@ struct SharedMemAllocator
     template<class T>
     struct SharedMemPtr
     {
-        __device__ std::remove_extent_t<T>* get() { return ptr; }
-        __device__ const T* get() const { return ptr; }
+        __device__ constexpr std::remove_extent_t<T>* get() { return ptr; }
+        __device__ constexpr const T* get() const { return ptr; }
 
-        __device__ std::remove_extent_t<T>& operator*() { return *ptr; }
-        __device__ const T& operator*() const { return *ptr; }
-        __device__ T* operator->() { return ptr; }
-        __device__ const T* operator->() const { return ptr; }
+        __device__ constexpr std::remove_extent_t<T>& operator*() { return *ptr; }
+        __device__ constexpr const T& operator*() const { return *ptr; }
+        __device__ constexpr T* operator->() { return ptr; }
+        __device__ constexpr const T* operator->() const { return ptr; }
 
-        __device__ std::remove_extent_t<T>& operator[](unsigned i) { return ptr[i]; }
-        __device__ const std::remove_extent_t<T>& operator[](unsigned i) const { return ptr[i]; }
+        __device__ constexpr std::remove_extent_t<T>& operator[](unsigned i) { return ptr[i]; }
+        __device__ constexpr const std::remove_extent_t<T>& operator[](unsigned i) const { return ptr[i]; }
 
-        SharedMemPtr(const SharedMemPtr&) = delete;
-        SharedMemPtr(SharedMemPtr&&)      = default;
+        constexpr SharedMemPtr(const SharedMemPtr&) = delete;
+        constexpr SharedMemPtr(SharedMemPtr&&)      = default;
 
-        __device__ ~SharedMemPtr() { allocator.ptr -= allocSize; }
+        __device__ constexpr ~SharedMemPtr() { allocator.ptr -= allocSize; }
 
     private:
         friend struct SharedMemAllocator;
 
-        __device__ SharedMemPtr(SharedMemAllocator& allocator, std::remove_extent_t<T>* ptr, unsigned allocSize)
+        __device__ constexpr SharedMemPtr(SharedMemAllocator& allocator,
+                                          std::remove_extent_t<T>* ptr,
+                                          unsigned allocSize)
             : allocator(allocator)
             , ptr(ptr)
             , allocSize(allocSize)
@@ -112,14 +114,14 @@ struct SharedMemAllocator
     }
 
     template<class T, std::enable_if_t<!std::is_array_v<T>, int> = 0>
-    __device__ SharedMemPtr<T> alloc()
+    __device__ constexpr SharedMemPtr<T> alloc()
     {
         auto [allocPtr, allocSize] = allocImpl<T>(1);
         return {*this, allocPtr, allocSize};
     }
 
     template<class T, std::enable_if_t<std::is_array_v<T>, int> = 0>
-    __device__ SharedMemPtr<T> alloc(unsigned size)
+    __device__ constexpr SharedMemPtr<T> alloc(unsigned size)
     {
         auto [allocPtr, allocSize] = allocImpl<std::remove_extent_t<T>>(size);
         return {*this, allocPtr, allocSize};
@@ -127,7 +129,7 @@ struct SharedMemAllocator
 
 private:
     template<class T>
-    __device__ std::tuple<T*, unsigned> allocImpl(unsigned size)
+    __device__ constexpr std::tuple<T*, unsigned> allocImpl(unsigned size)
     {
 
         unsigned offset    = (alignof(T) - reinterpret_cast<std::size_t>(ptr)) % alignof(T);
