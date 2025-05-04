@@ -35,7 +35,7 @@
 #include "cstone/cuda/device_vector.h"
 #include "cstone/fields/field_states.hpp"
 #include "cstone/primitives/primitives_gpu.h"
-#include "cstone/primitives/accel_switch.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/util/reallocate.hpp"
 

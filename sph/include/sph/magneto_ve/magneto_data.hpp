@@ -38,7 +38,7 @@
 #include "cstone/cuda/cuda_utils.hpp"
 #include "cstone/fields/data_util.hpp"
 #include "cstone/fields/field_states.hpp"
-#include "cstone/primitives/accel_switch.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/reallocate.hpp"
@@ -96,7 +96,7 @@ public:
     FieldVector<HydroType> divB;
     FieldVector<HydroType> curlB_x, curlB_y, curlB_z;
 
-    DeviceData_t<AccType> devData;
+    DeviceMagneto_t<AccType> devData;
 
     /* Is this a good idea?
      *
@@ -119,7 +119,7 @@ public:
 
     static const inline std::string prefix{"magneto::"};
 
-    static_assert(!cstone::HaveGpu<AcceleratorType>{} || fieldNames.size() == DeviceData_t<AccType>::fieldNames.size(),
+    static_assert(!cstone::HaveGpu<AcceleratorType>{} || fieldNames.size() == DeviceMagneto_t<AccType>::fieldNames.size(),
                   "MagnetoData on CPU and GPU must have the same fields");
 
     /*! @brief return a tuple of field references

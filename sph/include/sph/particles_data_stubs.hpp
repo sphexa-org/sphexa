@@ -89,8 +89,7 @@ class DeviceMagnetoData;
 
 //! @brief Just a facade on the CPU, DeviceParticlesData on the GPU
 template<class Accelerator>
-using DeviceData_t = typename cstone::AccelSwitchTypeSimple<Accelerator, DeviceDataFacade, DeviceMagnetoData>::type;
-
+using DeviceMagneto_t = std::conditional_t<cstone::HaveGpu<Accelerator>{}, DeviceMagnetoData, DeviceDataFacade>;
 } // namespace magneto
 
 } // namespace sphexa
