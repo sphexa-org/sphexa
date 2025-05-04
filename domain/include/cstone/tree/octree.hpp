@@ -30,8 +30,8 @@
 #include "cstone/cuda/cuda_utils.hpp"
 #include "cstone/cuda/device_vector.h"
 #include "cstone/primitives/gather.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/sfc.hpp"
-#include "cstone/primitives/accel_switch.hpp"
 #include "cstone/tree/csarray.hpp"
 
 namespace cstone
@@ -304,7 +304,7 @@ class OctreeData
 {
     //! @brief A vector template that resides on the hardware specified as Accelerator
     template<class ValueType>
-    using AccVector = typename AccelSwitchType<Accelerator, std::vector, DeviceVector>::template type<ValueType>;
+    using AccVector = std::conditional_t<HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
 
 public:
     void resize(TreeNodeIndex numCsLeafNodes)

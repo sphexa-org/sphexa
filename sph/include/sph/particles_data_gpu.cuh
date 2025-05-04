@@ -35,8 +35,7 @@
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/device_vector.h"
 #include "cstone/fields/field_states.hpp"
-#include "cstone/primitives/primitives_gpu.h"
-#include "cstone/primitives/accel_switch.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/util/reallocate.hpp"
 
@@ -66,7 +65,7 @@ public:
         cudaStream_t stream;
     };
 
-    struct neighbors_stream d_stream[NST];
+    neighbors_stream d_stream[NST];
 
     /*! @brief Particle fields
      *
@@ -221,8 +220,7 @@ void transferToDevice(DataType& d, size_t first, size_t last, const std::vector<
         using Type2 = std::decay_t<decltype(*deviceField)>;
         if constexpr (std::is_same_v<typename Type1::value_type, typename Type2::value_type>)
         {
-            assert(hostField->size() > 0);
-            assert(deviceField->size() > 0);
+            if (hostField->size()) { deviceField->resize(hostField->size()); }
             size_t transferSize = (last - first) * sizeof(typename Type1::value_type);
             checkGpuErrors(cudaMemcpy(rawPtr(*deviceField) + first, hostField->data() + first, transferSize,
                                       cudaMemcpyHostToDevice));
@@ -260,8 +258,7 @@ void transferToHost(DataType& d, size_t first, size_t last, const std::vector<st
         using Type2 = std::decay_t<decltype(*deviceField)>;
         if constexpr (std::is_same_v<typename Type1::value_type, typename Type2::value_type>)
         {
-            assert(hostField->size() > 0);
-            assert(deviceField->size() > 0);
+            hostField->resize(deviceField->size());
             size_t transferSize = (last - first) * sizeof(typename Type1::value_type);
             checkGpuErrors(cudaMemcpy(hostField->data() + first, rawPtr(*deviceField) + first, transferSize,
                                       cudaMemcpyDeviceToHost));

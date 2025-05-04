@@ -101,3 +101,13 @@ TEST(DeviceVector, Capacity)
     EXPECT_EQ(a.size(), 0);
     EXPECT_EQ(a.capacity(), 10);
 }
+
+TEST(DeviceVector, ShrinkToFit)
+{
+    DeviceVector<int> a(10);
+    EXPECT_EQ(a.capacity(), 10);
+    reallocate(a, 8, 1.0);
+    a.shrink_to_fit();
+    EXPECT_EQ(a.size(), 8);
+    EXPECT_EQ(a.capacity(), 8);
+}

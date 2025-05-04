@@ -10,7 +10,6 @@
 #include "accretion_impl.hpp"
 #include "accretion_gpu.hpp"
 #include "buffer_reduce.hpp"
-#include "cstone/primitives/accel_switch.hpp"
 #include "get_ptr.hpp"
 
 namespace disk
