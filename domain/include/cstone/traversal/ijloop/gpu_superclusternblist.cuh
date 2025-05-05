@@ -39,20 +39,16 @@
 
 #include <thrust/execution_policy.h>
 #include <thrust/functional.h>
-#include <thrust/reduce.h>
 #include <thrust/sort.h>
 
 #include "cstone/compressneighbors.cuh"
-#include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/memory.cuh"
-#include "cstone/cuda/thrust_util.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/reducearray.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/ijloop/atomic_update_ptr.cuh"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 #include "cstone/traversal/ijloop/upsweep.cuh"
-#include "cstone/util/uninitialized.hpp"
 #include "cstone/tree/octree.hpp"
 
 namespace cstone::ijloop

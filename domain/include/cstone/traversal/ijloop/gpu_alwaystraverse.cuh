@@ -34,7 +34,6 @@
 #include <tuple>
 
 #include "cstone/cuda/memory.cuh"
-#include "cstone/cuda/thrust_util.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 #include "cstone/tree/octree.hpp"
