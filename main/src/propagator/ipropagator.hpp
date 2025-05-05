@@ -73,13 +73,13 @@ public:
     virtual void integrate(DomainType& domain, ParticleDataType& d) = 0;
 
     //! @brief save particle data fields to file
-    virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&){};
+    virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&) {}
 
     //! @brief save internal state to file
-    virtual void save(IFileWriter*){};
+    virtual void save(IFileWriter*) {}
 
     //! @brief load internal state from file
-    virtual void load(const std::string& path, IFileReader*){};
+    virtual void load(const std::string& path, IFileReader*) {}
 
     //! @brief whether conserved quantities are time-synchronized (when completing a full time-step hierarchy)
     virtual bool isSynced() { return true; }
@@ -147,8 +147,7 @@ protected:
                                  d.outputFieldIndices.begin();
                     transferToHost(d, first, last, {d.fieldNames[fidx]});
                     std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writer->writeField(key, field->data(), c); },
-                               fieldPointers[fidx]);
+                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
