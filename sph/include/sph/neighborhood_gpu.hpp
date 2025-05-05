@@ -17,10 +17,9 @@ namespace detail
 {
 
 // TODO: re-enable symmetry once NB list build times are optimized for varying smoothing lengths
-template<unsigned NcMax, bool Symmetric>
-using NeighborhoodInfo =
-    cstone::ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<
-        cstone::TravConfig::targetSize>::withNcMax<NcMax>::template setSymmetry<false>::withCompression;
+template<bool Symmetric>
+using NeighborhoodInfo = cstone::ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<
+    8, 8>::withSuperclusterSize<cstone::TravConfig::targetSize>::template setSymmetry<false>::withCompression;
 
 template<class Dataset, class NeighborhoodInfo>
 using NeighborhoodData = decltype(std::declval<NeighborhoodInfo>().build(
@@ -41,15 +40,14 @@ struct NeighborhoodDataVariant<Dataset, std::variant<NeighborhoodInfos...>>
 template<class Variant, class Dataset, class... Variants>
 void setInfo(Dataset const& d, std::variant<Variants...>& info, bool alwaysTraverse)
 {
-    const unsigned ngmaxClustered = std::max(std::bit_ceil(d.ngmax * 2), 128u);
     if constexpr (std::is_same_v<Variant, cstone::ijloop::GpuAlwaysTraverseNeighborhood>)
     {
-        if (alwaysTraverse || ngmaxClustered > 1024) info = Variant{d.ngmax};
+        if (alwaysTraverse) info = Variant{d.ngmax};
     }
     else
     {
-        if (!alwaysTraverse && !std::holds_alternative<Variant>(info) && Variant::ncMax == ngmaxClustered)
-            info = Variant{};
+        const unsigned ncmax = std::bit_ceil(d.ngmax * 2);
+        if (!alwaysTraverse) info = Variant{ncmax};
     }
 }
 
@@ -62,14 +60,25 @@ void setInfo(Dataset& d, std::variant<Variants...>& v, bool alwaysTraverse)
 template<class Dataset, bool Symmetric>
 struct NeighborhoodDataGpu
 {
-    using InfoVariant = std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, NeighborhoodInfo<128, Symmetric>,
-                                     NeighborhoodInfo<256, Symmetric>, NeighborhoodInfo<512, Symmetric>,
-                                     NeighborhoodInfo<1024, Symmetric>>;
+    using InfoVariant = std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, NeighborhoodInfo<Symmetric>>;
     using DataVariant = typename NeighborhoodDataVariant<Dataset, InfoVariant>::type;
 
     bool        alwaysTraverse;
     InfoVariant info;
     DataVariant data;
+
+    NeighborhoodDataGpu()
+        : alwaysTraverse(false)
+        , info()
+        , data()
+    {
+    }
+    NeighborhoodDataGpu(NeighborhoodDataGpu&&) = default;
+    NeighborhoodDataGpu(const NeighborhoodDataGpu&)
+    {
+        // copy constructor required by std::any
+        throw std::runtime_error("Called copy constructor of NeighborhoodDataGpu");
+    }
 
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
     {

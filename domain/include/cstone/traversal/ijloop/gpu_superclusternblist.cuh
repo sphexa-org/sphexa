@@ -262,14 +262,14 @@ __global__ void computeJClusterBboxes(const LocalIndex firstValidBody,
     }
 }
 
-template<class Config, unsigned NumSuperclustersPerBlock>
+template<unsigned NumSuperclustersPerBlock>
 __device__ __forceinline__ void
 sortCandidates(util::SharedMemAllocator& sharedAllocator, std::uint32_t* candidates, unsigned numCandidates)
 {
     const unsigned laneIdx = laneIndex();
 
     auto histograms = sharedAllocator.alloc<unsigned[]>(128);
-    auto tmp        = sharedAllocator.alloc<std::uint32_t[]>(Config::ncMax);
+    auto tmp        = sharedAllocator.alloc<std::uint32_t[]>(numCandidates);
 
     for (unsigned i = laneIdx; i < 128; i += GpuConfig::warpSize)
         histograms[i] = 0;
@@ -428,7 +428,8 @@ __device__ __forceinline__ void collectJClusterCandidates(util::SharedMemAllocat
                                                           const Th* const __restrict__ nodeRMax,
                                                           int* __restrict__ globalPool,
                                                           unsigned* candidates,
-                                                          unsigned& numCandidates)
+                                                          unsigned& numCandidates,
+                                                          const unsigned ncmax)
 {
     const unsigned laneIdx = laneIndex();
     assert(blockDim.x * blockDim.y == GpuConfig::warpSize);
@@ -500,17 +501,18 @@ __device__ __forceinline__ void collectJClusterCandidates(util::SharedMemAllocat
 
         const unsigned nbIndex    = exclusiveScanBool(isNeighbor);
         unsigned newNumCandidates = shflSync(numCandidates + nbIndex + isNeighbor, GpuConfig::warpSize - 1);
-        if (newNumCandidates >= Config::ncMax)
+        if (newNumCandidates >= ncmax)
         {
-            sortCandidates<Config, NumSuperclustersPerBlock>(sharedAllocator, candidates, numCandidates);
+            sortCandidates<NumSuperclustersPerBlock>(sharedAllocator, candidates, numCandidates);
             pruneCandidates<Config, NumSuperclustersPerBlock, UsePbc>(sharedAllocator, box, firstValidBody, totalBodies,
                                                                       x, y, z, h, (Th)tree.searchExtFactor,
                                                                       iSupercluster, candidates, numCandidates);
             newNumCandidates = shflSync(numCandidates + nbIndex + isNeighbor, GpuConfig::warpSize - 1);
         }
         // TODO: proper error handling
-        assert(newNumCandidates < Config::ncMax);
-        if (isNeighbor & (numCandidates + nbIndex < Config::ncMax)) candidates[numCandidates + nbIndex] = jCluster;
+        assert(newNumCandidates < ncmax);
+        if (isNeighbor & (numCandidates + nbIndex < ncmax)) candidates[numCandidates + nbIndex] = jCluster;
+
         numCandidates = newNumCandidates;
     };
 
@@ -768,7 +770,7 @@ __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& shar
     const unsigned mSize = masksSize<Config>(info.neighborsCount);
     unsigned nbSize      = info.neighborsCount;
 
-    auto compressedJClusters = sharedAllocator.alloc<std::uint32_t[]>(Config::compress ? Config::ncMax : 0);
+    auto compressedJClusters = sharedAllocator.alloc<std::uint32_t[]>(Config::compress ? info.neighborsCount : 0);
 
     if constexpr (Config::compress)
     {
@@ -795,13 +797,13 @@ __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& shar
 }
 
 template<class Config, class Tc, class Th>
-constexpr unsigned buildNbListSharedMemPerSupercluster()
+constexpr unsigned buildNbListSharedMemPerSupercluster(const unsigned ncmax)
 {
-    constexpr unsigned jClustersSize = Config::ncMax * sizeof(unsigned);
-    constexpr unsigned masksDataSize = masksSize<Config>(Config::ncMax) * sizeof(std::uint32_t);
+    const unsigned jClustersSize = ncmax * sizeof(unsigned);
+    const unsigned masksDataSize = masksSize<Config>(ncmax) * sizeof(std::uint32_t);
 
     constexpr unsigned histogramsSize = 128 * sizeof(unsigned);
-    constexpr unsigned tmpSize        = Config::ncMax * sizeof(std::uint32_t);
+    const unsigned tmpSize            = ncmax * sizeof(std::uint32_t);
 
     constexpr unsigned xisSize = Config::superclusterSize * sizeof(Tc);
     constexpr unsigned yisSize = Config::superclusterSize * sizeof(Tc);
@@ -810,7 +812,7 @@ constexpr unsigned buildNbListSharedMemPerSupercluster()
 
     constexpr unsigned sharedPoolSize = GpuConfig::warpSize * sizeof(int);
 
-    constexpr unsigned compressedJClustersSize = (Config::compress ? Config::ncMax : 0) * sizeof(std::uint32_t);
+    const unsigned compressedJClustersSize = (Config::compress ? ncmax : 0) * sizeof(std::uint32_t);
 
     return jClustersSize + masksDataSize +
            std::max({compressedJClustersSize, histogramsSize + tmpSize + sharedPoolSize,
@@ -833,6 +835,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
     const Vec3<Tc>* const __restrict__ jClusterBboxSizes,
     const Th* const __restrict__ jClusterRMax,
     const Th* const __restrict__ nodeRMax,
+    const unsigned ncmax,
     const typename Config::SuperclusterSplitMask* const __restrict__ superclusterSplitMasks,
     std::uint32_t* const __restrict__ neighborData,
     const std::size_t neighborDataSize,
@@ -846,9 +849,9 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
     assert(blockDim.y == GpuConfig::warpSize / Config::iThreads);
     assert(blockDim.z == NumSuperclustersPerBlock);
 
-    util::SharedMemAllocator sharedAllocator(buildNbListSharedMemPerSupercluster<Config, Tc, Th>(), threadIdx.z);
+    util::SharedMemAllocator sharedAllocator(buildNbListSharedMemPerSupercluster<Config, Tc, Th>(ncmax), threadIdx.z);
 
-    auto jClusters = sharedAllocator.alloc<std::uint32_t[]>(Config::ncMax);
+    auto jClusters = sharedAllocator.alloc<std::uint32_t[]>(ncmax);
 
     while (true)
     {
@@ -878,12 +881,12 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
             collectJClusterCandidates<Config, NumSuperclustersPerBlock, UsePbc>(
                 sharedAllocator, tree, box, firstValidBody, totalBodies, firstBody, lastBody, firstGroupParticle,
                 lastGroupParticle, x, y, z, h, jClusterBboxCenters, jClusterBboxSizes, jClusterRMax, nodeRMax,
-                globalPool, jClusters.get(), numCandidates);
+                globalPool, jClusters.get(), numCandidates, ncmax);
         }
 
-        auto masks = sharedAllocator.alloc<std::uint32_t[]>(masksSize<Config>(Config::ncMax));
+        auto masks = sharedAllocator.alloc<std::uint32_t[]>(masksSize<Config>(numCandidates));
 
-        sortCandidates<Config, NumSuperclustersPerBlock>(sharedAllocator, jClusters.get(), numCandidates);
+        sortCandidates<NumSuperclustersPerBlock>(sharedAllocator, jClusters.get(), numCandidates);
         pruneCandidatesAndComputeMasks<Config, NumSuperclustersPerBlock, UsePbc>(
             sharedAllocator, box, firstValidBody, totalBodies, x, y, z, h, (Th)tree.searchExtFactor, info.index,
             jClusters.get(), masks.get(), numCandidates, info.neighborsCount);
@@ -994,7 +997,7 @@ constexpr __forceinline__ std::tuple<std::array<Ts, Size>...> buffersForResults(
 }
 
 template<class Config, class Tc, class Th, class In, class Interaction>
-constexpr unsigned runIjLoopSharedMemPerSupercluster()
+constexpr unsigned runIjLoopSharedMemPerSupercluster(unsigned ncmax)
 {
     using particleData_t = decltype(loadParticleData((Tc*)0, (Tc*)0, (Tc*)0, (Th*)0, In{}, 0));
     using result_t =
@@ -1002,7 +1005,7 @@ constexpr unsigned runIjLoopSharedMemPerSupercluster()
 
     constexpr unsigned iSuperclusterDataSize =
         (Config::iClustersPerSupercluster * Config::iSize) * sizeof(particleData_t);
-    constexpr unsigned nbDataSize = (Config::ncMax + masksSize<Config>(Config::ncMax)) * sizeof(unsigned);
+    unsigned nbDataSize = (ncmax + masksSize<Config>(ncmax)) * sizeof(unsigned);
     constexpr unsigned outputBuffersSize =
         !Config::symmetric && Config::numWarpsPerInteraction > 1
             ? sizeof(decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(result_t()))))
@@ -1035,9 +1038,10 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     const Interaction interaction,
     const Postamble postamble,
     const std::uint32_t* const __restrict__ neighborData,
-    const SuperclusterInfo* const __restrict__ superclusterInfo)
+    const SuperclusterInfo* const __restrict__ superclusterInfo,
+    const unsigned ncmax)
 {
-    static_assert(Config::ncMax % GpuConfig::warpSize == 0);
+    assert(ncmax % GpuConfig::warpSize == 0);
     static_assert(NumSuperclustersPerBlock > 0);
     static_assert(Config::iThreads * Config::jSize >= GpuConfig::warpSize);
     static_assert(Config::iThreads * Config::jSize % GpuConfig::warpSize == 0);
@@ -1058,7 +1062,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     using particleData_t = decltype(loadParticleData(x, y, z, h, input, 0));
     using result_t       = std::decay_t<decltype(interaction(particleData_t(), particleData_t(), Vec3<Tc>(), Tc(0)))>;
 
-    util::SharedMemAllocator sharedAllocator(runIjLoopSharedMemPerSupercluster<Config, Tc, Th, In, Interaction>(),
+    util::SharedMemAllocator sharedAllocator(runIjLoopSharedMemPerSupercluster<Config, Tc, Th, In, Interaction>(ncmax),
                                              threadIdx.z);
 
     auto iSuperclusterData = sharedAllocator.alloc<particleData_t[]>(Config::iClustersPerSupercluster * Config::iSize);
@@ -1076,7 +1080,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
         }
     }
 
-    auto nbData = sharedAllocator.alloc<unsigned[]>(Config::ncMax + masksSize<Config>(Config::ncMax));
+    auto nbData = sharedAllocator.alloc<unsigned[]>(ncmax + masksSize<Config>(ncmax));
 
     const unsigned maskSize = masksSize<Config>(iSuperclusterNeighborsCount);
 
@@ -1283,6 +1287,7 @@ struct GpuSuperclusterNbListNeighborhoodImpl
     const Th* h;
     util::UniqueDevicePtr<std::uint32_t[]> neighborData;
     util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo;
+    unsigned ncmax;
     std::size_t numBytes;
 
     template<class... In, class... Out, class Interaction, class Postamble>
@@ -1315,13 +1320,13 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         const unsigned sharedMem =
             numSuperclustersPerBlock *
             runIjLoopSharedMemPerSupercluster<Config, Tc, Th, std::decay_t<decltype(makeConstRestrict(input))>,
-                                              std::decay_t<Interaction>>();
+                                              std::decay_t<Interaction>>(ncmax);
         const auto runKernel = [&](auto usePbc)
         {
             runIjLoop<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, sharedMem>>>(
                 box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
                 std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), neighborData.get(),
-                superclusterInfo.get());
+                superclusterInfo.get(), ncmax);
             checkGpuErrors(cudaGetLastError());
         };
         if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
@@ -1345,8 +1350,7 @@ struct GpuSuperclusterNbListNeighborhoodImpl
     Statistics stats() const { return {.numBodies = lastBody - firstBody, .numBytes = numBytes}; }
 };
 
-template<unsigned NcMax            = 256,
-         unsigned ISize            = 8,
+template<unsigned ISize            = 8,
          unsigned JSize            = 8,
          unsigned SuperclusterSize = ISize * std::max(JSize, GpuConfig::warpSize / ISize),
          bool Compress             = false,
@@ -1358,7 +1362,6 @@ struct GpuSuperclusterNbListNeighborhoodConfig
     static_assert(SuperclusterSize % ISize == 0, "SuperclusterSize must be divisible by ISize");
     static_assert(SuperclusterSize % JSize == 0, "SuperclusterSize must be divisible by JSize");
 
-    static constexpr unsigned ncMax            = NcMax;
     static constexpr unsigned iSize            = ISize;
     static constexpr unsigned jSize            = JSize;
     static constexpr unsigned superclusterSize = SuperclusterSize;
@@ -1369,23 +1372,17 @@ struct GpuSuperclusterNbListNeighborhoodConfig
     static constexpr unsigned iThreads                 = std::max(iSize, GpuConfig::warpSize / jSize);
     static constexpr unsigned numWarpsPerInteraction = (iSize * jSize + GpuConfig::warpSize - 1) / GpuConfig::warpSize;
 
-    template<unsigned NewNcMax>
-    using withNcMax =
-        GpuSuperclusterNbListNeighborhoodConfig<NewNcMax, ISize, JSize, SuperclusterSize, Compress, Symmetric>;
-
     template<unsigned NewISize, unsigned NewJSize>
     using withClusterSize =
-        GpuSuperclusterNbListNeighborhoodConfig<NcMax, NewISize, NewJSize, SuperclusterSize, Compress, Symmetric>;
+        GpuSuperclusterNbListNeighborhoodConfig<NewISize, NewJSize, SuperclusterSize, Compress, Symmetric>;
     template<unsigned NewSuperclusterSize>
     using withSuperclusterSize =
-        GpuSuperclusterNbListNeighborhoodConfig<NcMax, ISize, JSize, NewSuperclusterSize, Compress, Symmetric>;
-    using withCompression =
-        GpuSuperclusterNbListNeighborhoodConfig<NcMax, ISize, JSize, SuperclusterSize, true, Symmetric>;
+        GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, NewSuperclusterSize, Compress, Symmetric>;
+    using withCompression = GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, SuperclusterSize, true, Symmetric>;
     using withoutCompression =
-        GpuSuperclusterNbListNeighborhoodConfig<NcMax, ISize, JSize, SuperclusterSize, false, Symmetric>;
+        GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, SuperclusterSize, false, Symmetric>;
     template<bool NewSymmetric>
-    using setSymmetry =
-        GpuSuperclusterNbListNeighborhoodConfig<NcMax, ISize, JSize, SuperclusterSize, Compress, NewSymmetric>;
+    using setSymmetry = GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, SuperclusterSize, Compress, NewSymmetric>;
 
     using SuperclusterSplitMask = std::conditional_t<(superclusterSize > 32), unsigned long long, unsigned>;
     static_assert(superclusterSize <= 64, "superclusters with more than 64 particles are not supported");
@@ -1396,8 +1393,6 @@ struct GpuSuperclusterNbListNeighborhoodConfig
 template<class Config = gpu_supercluster_nb_list_neighborhood_detail::GpuSuperclusterNbListNeighborhoodConfig<>>
 struct GpuSuperclusterNbListNeighborhood
 {
-    template<unsigned NcMax>
-    using withNcMax = GpuSuperclusterNbListNeighborhood<typename Config::template withNcMax<NcMax>>;
     template<unsigned ISize, unsigned JSize>
     using withClusterSize = GpuSuperclusterNbListNeighborhood<typename Config::template withClusterSize<ISize, JSize>>;
     template<unsigned SuperclusterSize>
@@ -1410,13 +1405,13 @@ struct GpuSuperclusterNbListNeighborhood
     using withSymmetry    = setSymmetry<true>;
     using withoutSymmetry = setSymmetry<false>;
 
-    static constexpr unsigned ncMax            = Config::ncMax;
     static constexpr unsigned iSize            = Config::iSize;
     static constexpr unsigned jSize            = Config::jSize;
     static constexpr unsigned superclusterSize = Config::superclusterSize;
     static constexpr bool compress             = Config::compress;
     static constexpr bool symmetric            = Config::symmetric;
 
+    unsigned ncmax;
     std::size_t upperBoundBytesPerParticle = 128;
 
     template<class Tc, class KeyType, class Th>
@@ -1461,6 +1456,7 @@ struct GpuSuperclusterNbListNeighborhood
             h,
             util::deviceAllocVirtual<std::uint32_t[]>(neighborDataVirtualSize),
             util::deviceAlloc<SuperclusterInfo[]>(numISuperclusters),
+            ncmax,
             0ul};
 
         if (numISuperclusters == 0) return nbList;
@@ -1506,7 +1502,8 @@ struct GpuSuperclusterNbListNeighborhood
         const unsigned numBlocks =
             std::min(GpuConfig::smCount * (TravConfig::numWarpsPerSm / numSuperclustersPerBlock),
                      (numISuperclusters + numSuperclustersPerBlock - 1) / numSuperclustersPerBlock);
-        const unsigned sharedMem = numSuperclustersPerBlock * buildNbListSharedMemPerSupercluster<Config, Tc, Th>();
+        const unsigned sharedMem =
+            numSuperclustersPerBlock * buildNbListSharedMemPerSupercluster<Config, Tc, Th>(ncmax);
 
         auto globalPool = util::deviceAlloc<int[]>(TravConfig::memPerWarp * numSuperclustersPerBlock * numBlocks);
 
@@ -1516,7 +1513,7 @@ struct GpuSuperclusterNbListNeighborhood
         {
             buildNbList<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, sharedMem>>>(
                 tree, box, firstValidBody, totalBodies, groups.firstBody, groups.lastBody, x, y, z, h,
-                jClusterBboxCenters.get(), jClusterBboxSizes.get(), jClusterRMax.get(), nodeRMax.get(),
+                jClusterBboxCenters.get(), jClusterBboxSizes.get(), jClusterRMax.get(), nodeRMax.get(), ncmax,
                 superclusterSplitMasks.get(), nbList.neighborData.get(), neighborDataVirtualSize,
                 nbList.superclusterInfo.get(), numISuperclusters, globalPool.get(), globalBuildData.get());
             checkGpuErrors(cudaGetLastError());

@@ -212,13 +212,13 @@ void benchmarkMain()
     runBenchmark("GROMACS SUPERCLUSTERED", ijloop::GromacsLikeNeighborhood{ngmax});
 
     using BaseSuperclusterNb =
-        ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<64>::withNcMax<1024>;
-    runBenchmark("SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withoutCompression{});
-    runBenchmark("COMPRESSED SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withCompression{});
+        ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<64>;
+    runBenchmark("SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withoutCompression{1024});
+    runBenchmark("COMPRESSED SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withCompression{1024});
 
-    using SymmetricSuperclusterNb = BaseSuperclusterNb::withNcMax<512>::withSymmetry;
-    runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{});
-    runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{});
+    using SymmetricSuperclusterNb = BaseSuperclusterNb::withSymmetry;
+    runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{512});
+    runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{512});
 
     saveCsv(std::format("sph_density_results_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), times);
 }
