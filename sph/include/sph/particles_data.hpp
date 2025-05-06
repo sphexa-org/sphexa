@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include <any>
 #include <array>
 #include <iostream>
 #include <vector>
@@ -45,6 +44,7 @@
 #include "cstone/util/reallocate.hpp"
 
 #include "sph/eos.hpp"
+#include "sph/neighborhood.hpp"
 #include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"
 #include "sph/types.hpp"
@@ -249,7 +249,7 @@ public:
     FieldVector<uint64_t>  id;                                 // unique particle id
     FieldVector<HydroType> dtCourant;                          // per-particle timestep restriction
 
-    std::any                                neighborhood;
+    sph::NeighborhoodData                   neighborhood; // CPU neighborhood, device neighborhood is in devData
     cstone::OctreeNsView<RealType, KeyType> treeView;
 
     DeviceData_t<AccType> devData;

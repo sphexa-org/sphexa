@@ -44,11 +44,10 @@ template<class Dataset>
 void computeIadDivvCurlv(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
     // TODO: the following two loops could theoretically be merged into one with two reductions!
-    const auto& neighborhood = getNeighborhoodGpu(d);
-    IADIjLoop(neighborhood, d.K, rawPtr(d.devData.xm), rawPtr(d.devData.kx), rawPtr(d.devData.wh),
+    IADIjLoop(d.devData.neighborhood, d.K, rawPtr(d.devData.xm), rawPtr(d.devData.kx), rawPtr(d.devData.wh),
               rawPtr(d.devData.c11), rawPtr(d.devData.c12), rawPtr(d.devData.c13), rawPtr(d.devData.c22),
               rawPtr(d.devData.c23), rawPtr(d.devData.c33));
-    divVCurlVIjLoop(neighborhood, d.K, rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
+    divVCurlVIjLoop(d.devData.neighborhood, d.K, rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
                     rawPtr(d.devData.xm), rawPtr(d.devData.kx), rawPtr(d.devData.c11), rawPtr(d.devData.c12),
                     rawPtr(d.devData.c13), rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33),
                     rawPtr(d.devData.wh), rawPtr(d.devData.divv),

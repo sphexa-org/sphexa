@@ -55,7 +55,7 @@ namespace cuda
 template<class Dataset>
 void computeXMass(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    xmassIjLoop(getNeighborhoodGpu(d), d.K, rawPtr(d.devData.m), rawPtr(d.devData.wh), rawPtr(d.devData.xm));
+    xmassIjLoop(d.devData.neighborhood, d.K, rawPtr(d.devData.m), rawPtr(d.devData.wh), rawPtr(d.devData.xm));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
@@ -65,7 +65,7 @@ template void computeXMass(const GroupView& grp, sphexa::ParticlesData<cstone::G
 template<class Dataset>
 void computeDensity(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    densityIjLoop(getNeighborhoodGpu<true>(d), d.K, rawPtr(d.devData.m), rawPtr(d.devData.wh), rawPtr(d.devData.rho));
+    densityIjLoop(d.devData.neighborhood, d.K, rawPtr(d.devData.m), rawPtr(d.devData.wh), rawPtr(d.devData.rho));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 

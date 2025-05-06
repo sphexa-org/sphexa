@@ -44,7 +44,7 @@ template<class Dataset>
 void computeAVswitches(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
     // TODO: d.alpha is used as input and output, this fails on neighborhoods that exploit symmetry!
-    AVswitchesIjLoop(getNeighborhoodGpu(d), d.K, d.minDt, d.alphamin, d.alphamax, d.decay_constant,
+    AVswitchesIjLoop(d.devData.neighborhood, d.K, d.minDt, d.alphamin, d.alphamax, d.decay_constant,
                      rawPtr(d.devData.xm), rawPtr(d.devData.kx), rawPtr(d.devData.divv), rawPtr(d.devData.alpha),
                      rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz), rawPtr(d.devData.c),
                      rawPtr(d.devData.c11), rawPtr(d.devData.c12), rawPtr(d.devData.c13), rawPtr(d.devData.c22),

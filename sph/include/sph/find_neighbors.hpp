@@ -21,7 +21,7 @@ void findNeighborsSfc(const cstone::GroupView& groups, Dataset& d, const cstone:
     {
         findNeighborsSfcGpu(groups, d, box, symmetric, clustered);
     }
-    else { buildNeighborhood(groups, d, box); }
+    else { d.neighborhood.build(groups, d, box, symmetric, clustered); }
 }
 
 } // namespace sph

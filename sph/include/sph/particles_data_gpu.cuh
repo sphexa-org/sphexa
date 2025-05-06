@@ -40,6 +40,7 @@
 #include "cstone/tree/definitions.h"
 #include "cstone/util/reallocate.hpp"
 
+#include "neighborhood_gpu.hpp"
 #include "table_lookup.hpp"
 #include "types.hpp"
 
@@ -111,6 +112,8 @@ public:
 
     //! @brief non-stateful variables for statistics
     size_t stackUsedNc, stackUsedGravity;
+
+    sph::DeviceNeighborhoodData neighborhood;
 
     /*! @brief
      * Name of each field as string for use e.g in HDF5 output. Order has to correspond to what's returned by data().

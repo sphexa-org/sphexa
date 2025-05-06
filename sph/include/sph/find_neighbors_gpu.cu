@@ -9,10 +9,7 @@ template<class T, class Dataset>
 void findNeighborsSfcGpu(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool symmetric,
                          bool clustered)
 {
-    if (symmetric)
-        buildNeighborhoodGpu<true>(groups, d, box, clustered);
-    else
-        buildNeighborhoodGpu<false>(groups, d, box, clustered);
+    d.devData.neighborhood.build(groups, d, box, symmetric, clustered);
 }
 
 template void findNeighborsSfcGpu(const cstone::GroupView&, sphexa::ParticlesData<cstone::GpuTag>&,

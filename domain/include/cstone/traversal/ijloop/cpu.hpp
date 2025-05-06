@@ -96,7 +96,7 @@ template<class Tc, class KeyType, class Th>
 struct CpuFullNbListNeighborhoodImpl
 {
     OctreeNsView<Tc, KeyType> tree;
-    Box<Tc> box;
+    Box<Tc> box = {0, 0};
     LocalIndex firstBody, lastBody;
     std::vector<LocalIndex> neighborsCount, neighbors;
     const Tc *x, *y, *z;

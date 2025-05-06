@@ -43,7 +43,7 @@ void computeVeDefGradh(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& 
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeVeDefGradh(grp, d, box); }
     else
     {
-        veDefGradhIjLoop(getNeighborhood(d), d.K, d.m.data(), d.xm.data(), d.wh.data(), d.whd.data(), d.kx.data(),
+        veDefGradhIjLoop(d.neighborhood, d.K, d.m.data(), d.xm.data(), d.wh.data(), d.whd.data(), d.kx.data(),
                          d.gradh.data());
     }
 }

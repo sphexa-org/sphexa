@@ -44,8 +44,8 @@ void computeIAD(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { computeIADGpu(groups, d, box); }
     else
     {
-        IADIjLoop(getNeighborhood(d), d.K, d.m.data(), d.rho.data(), d.wh.data(), d.c11.data(), d.c12.data(),
-                  d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data());
+        IADIjLoop(d.neighborhood, d.K, d.m.data(), d.rho.data(), d.wh.data(), d.c11.data(), d.c12.data(), d.c13.data(),
+                  d.c22.data(), d.c23.data(), d.c33.data());
     }
 }
 

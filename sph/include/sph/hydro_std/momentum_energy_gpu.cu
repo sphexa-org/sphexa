@@ -46,7 +46,7 @@ namespace sph
 template<class Dataset>
 void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    momentumAndEnergyIjLoop(getNeighborhoodGpu<true>(d), d.K, d.Kcour, rawPtr(d.devData.m), rawPtr(d.devData.rho),
+    momentumAndEnergyIjLoop(d.devData.neighborhood, d.K, d.Kcour, rawPtr(d.devData.m), rawPtr(d.devData.rho),
                             rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz), rawPtr(d.devData.p),
                             rawPtr(d.devData.c), rawPtr(d.devData.c11), rawPtr(d.devData.c12), rawPtr(d.devData.c13),
                             rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33), rawPtr(d.devData.wh),

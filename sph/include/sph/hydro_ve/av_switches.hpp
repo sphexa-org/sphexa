@@ -44,7 +44,7 @@ void computeAVswitches(const GroupView& grp, Dataset& d, const cstone::Box<T>& b
     else
     {
         // caution: d.alpha is used as input and output, this fails on neighborhoods that exploit symmetry!
-        AVswitchesIjLoop(getNeighborhood(d), d.K, d.minDt, d.alphamin, d.alphamax, d.decay_constant, d.xm.data(),
+        AVswitchesIjLoop(d.neighborhood, d.K, d.minDt, d.alphamin, d.alphamax, d.decay_constant, d.xm.data(),
                          d.kx.data(), d.divv.data(), d.alpha.data(), d.vx.data(), d.vy.data(), d.vz.data(), d.c.data(),
                          d.c11.data(), d.c12.data(), d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data(),
                          d.wh.data(), d.alpha.data());

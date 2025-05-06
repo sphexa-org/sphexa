@@ -1,96 +1,66 @@
 #pragma once
 
-#include <any>
-#include <bit>
-#include <cassert>
-#include <stdexcept>
+#include <memory>
 #include <variant>
 
 #include "cstone/traversal/groups.hpp"
+#include "sph/neighborhood.hpp"
+
+#if defined(__CUDACC__) || defined(__HIP__)
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
+#include "neighborhood_gpu.hpp"
+#endif
 
 namespace sph
 {
 
-namespace detail
+struct DeviceNeighborhoodData
 {
+    DeviceNeighborhoodData();
+    ~DeviceNeighborhoodData();
 
-// TODO: re-enable symmetry once NB list build times are optimized for varying smoothing lengths
-template<bool Symmetric>
-using NeighborhoodInfo = cstone::ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<
-    8, 8>::withSuperclusterSize<cstone::TravConfig::targetSize>::template setSymmetry<false>::withCompression;
+    template<class Dataset, class T>
+    void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool symmetric, bool clustered);
 
-template<class Dataset, class NeighborhoodInfo>
-using NeighborhoodData = decltype(std::declval<NeighborhoodInfo>().build(
-    std::declval<Dataset>().treeView, std::declval<cstone::Box<typename Dataset::RealType>>(), 0,
-    std::declval<cstone::GroupView>(), rawPtr(std::declval<Dataset>().devData.x),
-    rawPtr(std::declval<Dataset>().devData.y), rawPtr(std::declval<Dataset>().devData.z),
-    rawPtr(std::declval<Dataset>().devData.h)));
+    template<class... Args>
+    void ijLoop(Args&&... args) const;
 
-template<class Dataset, class NeighborhoodInfoVariant>
-struct NeighborhoodDataVariant;
-
-template<class Dataset, class... NeighborhoodInfos>
-struct NeighborhoodDataVariant<Dataset, std::variant<NeighborhoodInfos...>>
-{
-    using type = std::variant<NeighborhoodData<Dataset, NeighborhoodInfos>...>;
+private:
+    struct Impl;
+    std::unique_ptr<Impl> impl;
 };
 
-template<class Variant, class Dataset, class... Variants>
-void setInfo(Dataset const& d, std::variant<Variants...>& info, bool alwaysTraverse)
+#if defined(__CUDACC__) || defined(__HIP__)
+template<bool Symmetric>
+using ClusteredNeighborhood = cstone::ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<
+    8, 8>::withSuperclusterSize<cstone::TravConfig::targetSize>::template setSymmetry<Symmetric>::withCompression;
+
+struct DeviceNeighborhoodData::Impl
 {
-    if constexpr (std::is_same_v<Variant, cstone::ijloop::GpuAlwaysTraverseNeighborhood>)
+    template<class Dataset, class T>
+    void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool symmetric, bool clustered)
     {
-        if (alwaysTraverse) info = Variant{d.ngmax};
-    }
-    else
-    {
-        const unsigned ncmax = std::bit_ceil(d.ngmax * 2);
-        if (!alwaysTraverse) info = Variant{ncmax};
-    }
-}
-
-template<class Dataset, class... Variants>
-void setInfo(Dataset& d, std::variant<Variants...>& v, bool alwaysTraverse)
-{
-    (..., setInfo<Variants>(d, v, alwaysTraverse));
-}
-
-template<class Dataset, bool Symmetric>
-struct NeighborhoodDataGpu
-{
-    using InfoVariant = std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, NeighborhoodInfo<Symmetric>>;
-    using DataVariant = typename NeighborhoodDataVariant<Dataset, InfoVariant>::type;
-
-    bool        alwaysTraverse;
-    InfoVariant info;
-    DataVariant data;
-
-    NeighborhoodDataGpu()
-        : alwaysTraverse(false)
-        , info()
-        , data()
-    {
-    }
-    NeighborhoodDataGpu(NeighborhoodDataGpu&&) = default;
-    NeighborhoodDataGpu(const NeighborhoodDataGpu&)
-    {
-        // copy constructor required by std::any
-        throw std::runtime_error("Called copy constructor of NeighborhoodDataGpu");
-    }
-
-    void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
-    {
-        setInfo(d, info, alwaysTraverse);
         data.template emplace<0>();
+
+        std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, /*ClusteredNeighborhood<true>,*/
+                     ClusteredNeighborhood<false>>
+                       neighborhood;
+        const unsigned ncmax = std::bit_ceil(d.ngmax * 2);
+
+        if (!clustered) neighborhood = cstone::ijloop::GpuAlwaysTraverseNeighborhood{d.ngmax};
+        /*else if (symmetric)
+            neighborhood = ClusteredNeighborhood<true>{ncmax};*/
+        else
+            neighborhood = ClusteredNeighborhood<false>{ncmax};
+
         std::visit(
             [&](auto const& nb)
             {
                 data = nb.build(d.treeView, box, d.size(), groups, rawPtr(d.devData.x), rawPtr(d.devData.y),
                                 rawPtr(d.devData.z), rawPtr(d.devData.h));
             },
-            info);
+            neighborhood);
     }
 
     template<class... Args>
@@ -98,25 +68,28 @@ struct NeighborhoodDataGpu
     {
         std::visit([&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); }, data);
     }
+
+    std::variant<
+        NeighborhoodDataType<
+            cstone::ijloop::GpuAlwaysTraverseNeighborhood>, /*NeighborhoodDataType<ClusteredNeighborhood<true>>,*/
+        NeighborhoodDataType<ClusteredNeighborhood<false>>>
+        data;
 };
 
-} // namespace detail
-
-template<bool Symmetric = false, class Dataset>
-inline void buildNeighborhoodGpu(const cstone::GroupView& groups, Dataset& d,
-                                 const cstone::Box<typename Dataset::RealType>& box, bool clustered)
+template<class Dataset, class T>
+void DeviceNeighborhoodData::build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box,
+                                   bool symmetric, bool clustered)
 {
-    if (!d.neighborhood.has_value()) d.neighborhood = detail::NeighborhoodDataGpu<Dataset, Symmetric>{};
-
-    auto& nb          = std::any_cast<detail::NeighborhoodDataGpu<Dataset, Symmetric>&>(d.neighborhood);
-    nb.alwaysTraverse = !clustered;
-    nb.build(groups, d, box);
+    assert(impl);
+    impl->build(groups, d, box, symmetric, clustered);
 }
 
-template<bool Symmetric = false, class Dataset>
-inline const detail::NeighborhoodDataGpu<Dataset, Symmetric>& getNeighborhoodGpu(const Dataset& d)
+template<class... Args>
+void DeviceNeighborhoodData::ijLoop(Args&&... args) const
 {
-    return std::any_cast<const detail::NeighborhoodDataGpu<Dataset, Symmetric>&>(d.neighborhood);
+    assert(impl);
+    impl->ijLoop(std::forward<Args>(args)...);
 }
+#endif
 
 } // namespace sph
