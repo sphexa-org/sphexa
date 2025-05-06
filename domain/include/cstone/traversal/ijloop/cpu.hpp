@@ -36,6 +36,7 @@
 #include <utility>
 #include <vector>
 
+#include "cstone/findneighbors.hpp"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 #include "cstone/tree/octree.hpp"
