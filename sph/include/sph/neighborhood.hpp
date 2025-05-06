@@ -21,7 +21,7 @@ struct NeighborhoodData
     NeighborhoodData() {}
 
     template<class Dataset, class T>
-    auto build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool /* symmetric */,
+    void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool /* symmetric */,
                bool /* clustered */)
     {
         data = CpuNeighborhood{d.ngmax}.build(d.treeView, box, d.size(), groups, d.x.data(), d.y.data(), d.z.data(),
