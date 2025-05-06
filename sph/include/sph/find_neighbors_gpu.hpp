@@ -3,11 +3,12 @@
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/groups.hpp"
 
+#include "sph/particles_data.hpp"
+
 namespace sph
 {
 
-template<class T, class Dataset>
-extern void findNeighborsSfcGpu(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool symmetric,
-                                bool clustered);
+void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cstone::GpuTag>& d,
+                      const cstone::Box<SphTypes::CoordinateType>& box, bool symmetric = false, bool clustered = true);
 
 }
