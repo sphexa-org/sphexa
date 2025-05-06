@@ -41,7 +41,7 @@ struct DeviceNeighborhoodData::Impl
     template<class Dataset, class T>
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool symmetric, bool clustered)
     {
-        data.template emplace<0>();
+        data.emplace<0>();
 
         std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, /*ClusteredNeighborhood<true>,*/
                      ClusteredNeighborhood<false>>
