@@ -166,30 +166,27 @@ __global__ static void initSuperclusterInfo(const LocalIndex firstISupercluster,
  * @param[out] superclusterSplitMasks binary masks per supercluster, with ones where superclusters are spanning group
  *                                    boundaries, zeros elsewhere (i.e., one bit per particle)
  */
-template<class Config>
-__global__ void
-computeSuperclusterSplitMasks(const LocalIndex firstISupercluster,
-                              const LocalIndex firstValidBody,
-                              const GroupView __grid_constant__ groups,
-                              typename Config::SuperclusterSplitMask* __restrict__ superclusterSplitMasks)
+template<class Config, class SplitMask>
+__global__ void computeSuperclusterSplitMasks(const LocalIndex firstISupercluster,
+                                              const LocalIndex firstValidBody,
+                                              const GroupView __grid_constant__ groups,
+                                              SplitMask* __restrict__ superclusterSplitMasks)
 {
     const LocalIndex index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= groups.numGroups) return;
 
     const LocalIndex groupEnd      = groups.groupEnd[index] + firstValidBody;
     const LocalIndex splitPosition = groupEnd % Config::superclusterSize;
+
+    // no action required if the group's end is aligned to a supercluster boundary
     if (splitPosition == 0) return;
 
-    const LocalIndex supercluster                       = groupEnd / Config::superclusterSize;
-    auto* splitMaskPtr                                  = &superclusterSplitMasks[supercluster - firstISupercluster];
-    typename Config::SuperclusterSplitMask oldSplitMask = *splitMaskPtr;
-    typename Config::SuperclusterSplitMask newSplitMask;
+    const LocalIndex supercluster = groupEnd / Config::superclusterSize;
+    auto* splitMaskPtr            = &superclusterSplitMasks[supercluster - firstISupercluster];
+    const auto splitMask          = SplitMask(1) << splitPosition;
 
-    do
-    {
-        newSplitMask = oldSplitMask | ((typename Config::SuperclusterSplitMask)(1) << splitPosition);
-        oldSplitMask = atomicCAS(splitMaskPtr, oldSplitMask, newSplitMask);
-    } while (oldSplitMask != newSplitMask);
+    // atomic update as multiple groups can split the same supercluster
+    atomicOr(splitMaskPtr, splitMask);
 }
 
 /*! compute bounding boxes and max. particle radii of j-clusters, i.e., neighbor clusters
