@@ -909,13 +909,13 @@ __device__ __forceinline__ constexpr T0 dynamicTupleGet(std::tuple<T0, T...> con
     return res;
 }
 
-template<class Config, class T0, class... T, class... Ps, class Postamble, class IData>
+template<class Config, class T0, class... T, class... Ps, class Postamble, class ParticleData>
 __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
                                                std::tuple<Ps*...> const& ptrs,
                                                const unsigned index,
                                                const bool store,
                                                Postamble const& postamble,
-                                               IData const& iData)
+                                               ParticleData const& iData)
 {
     assert(blockDim.x == Config::iThreads);
 
@@ -997,7 +997,7 @@ template<class Config, class Tc, class Th, class In, class Interaction>
 constexpr unsigned runIjLoopSharedMemPerSupercluster(unsigned ncmax)
 {
     using particleData_t = decltype(loadParticleData((Tc*)0, (Tc*)0, (Tc*)0, (Th*)0, In{}, 0));
-    using result_t =
+    using Result =
         std::decay_t<decltype(std::declval<Interaction>()(particleData_t(), particleData_t(), Vec3<Tc>(), Tc(0)))>;
 
     constexpr unsigned iSuperclusterDataSize =
@@ -1005,7 +1005,7 @@ constexpr unsigned runIjLoopSharedMemPerSupercluster(unsigned ncmax)
     unsigned nbDataSize = (ncmax + masksSize<Config>(ncmax)) * sizeof(unsigned);
     constexpr unsigned outputBuffersSize =
         !Config::symmetric && Config::numWarpsPerInteraction > 1
-            ? sizeof(decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(result_t()))))
+            ? sizeof(decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(Result()))))
             : 0;
 
     return iSuperclusterDataSize + nbDataSize + outputBuffersSize;
@@ -1056,13 +1056,13 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     const auto [iSupercluster, iSuperclusterNeighborsCount, iSuperclusterDataIndex] =
         superclusterInfo[iSuperclusterIndex];
 
-    using particleData_t = decltype(loadParticleData(x, y, z, h, input, 0));
-    using result_t       = std::decay_t<decltype(interaction(particleData_t(), particleData_t(), Vec3<Tc>(), Tc(0)))>;
+    using ParticleData = decltype(loadParticleData(x, y, z, h, input, firstBody));
+    using Result       = std::decay_t<decltype(interaction(ParticleData(), ParticleData(), Vec3<Tc>(), Tc(0)))>;
 
     util::SharedMemAllocator sharedAllocator(runIjLoopSharedMemPerSupercluster<Config, Tc, Th, In, Interaction>(ncmax),
                                              threadIdx.z);
 
-    auto iSuperclusterData = sharedAllocator.alloc<particleData_t[]>(Config::iClustersPerSupercluster * Config::iSize);
+    auto iSuperclusterData = sharedAllocator.alloc<ParticleData[]>(Config::iClustersPerSupercluster * Config::iSize);
     {
         const unsigned base = iSupercluster * Config::superclusterSize;
 #pragma unroll
@@ -1108,7 +1108,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 
     __syncthreads();
 
-    std::array<result_t, Config::iClustersPerSupercluster / iClustersPerWarp> iResults = {};
+    std::array<Result, Config::iClustersPerSupercluster / iClustersPerWarp> iResults = {};
     const unsigned iClusterOffset = iClustersPerWarp == 1 ? 0 : threadIdx.x / Config::iSize;
 
     for (unsigned nb = 0; nb < iSuperclusterNeighborsCount; ++nb)
@@ -1128,7 +1128,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                                                : dummyParticleData(x, y, z, h, input, j);
             const auto jRadiusSq         = radiusSq(jData);
             std::get<0>(jData) -= firstValidBody;
-            result_t jResult = {};
+            Result jResult = {};
 
             warpMask >>= iClusterOffset;
 #pragma unroll
@@ -1168,9 +1168,9 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     if constexpr (!Config::symmetric && Config::numWarpsPerInteraction > 1)
     {
         auto outputBuffers =
-            sharedAllocator.alloc<decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(result_t())))>();
+            sharedAllocator.alloc<decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(Result())))>();
         auto outputBufferPtrs = util::tupleMap([](auto& array) { return array.data(); }, *outputBuffers);
-        auto init             = unwrapModifiers(result_t{});
+        auto init             = unwrapModifiers(Result{});
 #pragma unroll
         for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
              offset += Config::iThreads * Config::jSize)
@@ -1304,22 +1304,20 @@ auto allocateOrMapTemporaries(const LocalIndex firstBody,
     return std::make_tuple(allocOrMap(Indices{}, Tmp{})...);
 }
 
-template<class Config, class Tc, class Th, class... In, class... Out, class Interaction>
+template<class Config, class Tc, class Th, class Input, class... Out, class Interaction>
 auto allocateTemporaries(LocalIndex firstBody,
                          LocalIndex lastBody,
-                         const Tc* x,
-                         const Tc* y,
-                         const Tc* z,
-                         const Th* h,
-                         std::tuple<In*...> const& input,
+                         Input const&,
                          std::tuple<Out*...> const& output,
                          Interaction&& interaction)
 {
     if constexpr (Config::symmetric)
     {
-        using IData  = decltype(loadParticleData(x, y, z, h, input, 0));
-        using Result = decltype(unwrapModifiers(
-            std::forward<Interaction>(interaction)(IData{}, IData{}, Vec3<Tc>{0, 0, 0}, Tc(0))));
+        using ParticleData =
+            decltype(loadParticleData(std::declval<Tc*>(), std::declval<Tc*>(), std::declval<Tc*>(),
+                                      std::declval<Th*>(), std::declval<Input>(), std::declval<LocalIndex>()));
+        using Result = decltype(unwrapModifiers(std::forward<Interaction>(interaction)(
+            std::declval<ParticleData>(), std::declval<ParticleData>(), std::declval<Vec3<Tc>>(), std::declval<Tc>())));
 
         using PtrMap = MapTemporarySizes<Result, util::TypeList<Out...>>;
 
@@ -1332,15 +1330,6 @@ auto allocateTemporaries(LocalIndex firstBody,
         return std::make_tuple(std::move(ptrs), std::move(holders));
     }
     else { return std::make_tuple(std::tuple(), std::tuple()); }
-}
-
-template<class Config, class Tmp, class Out>
-auto& selectOutput(Tmp& tmp, Out& out)
-{
-    if constexpr (Config::symmetric)
-        return tmp;
-    else
-        return out;
 }
 
 template<class Tc, class Th, class In, class Out, class Interaction>
@@ -1357,8 +1346,8 @@ __global__ void initResult(const LocalIndex firstBody,
     const LocalIndex i = blockDim.x * blockIdx.x + threadIdx.x + firstBody;
     if (i >= lastBody) return;
 
-    using IData  = decltype(loadParticleData(x, y, z, h, input, 0));
-    using Result = decltype(interaction(IData{}, IData{}, Vec3<Tc>{0, 0, 0}, Tc(0)));
+    using ParticleData = decltype(loadParticleData(x, y, z, h, input, firstBody));
+    using Result       = decltype(interaction(ParticleData{}, ParticleData{}, Vec3<Tc>{0, 0, 0}, Tc(0)));
     storeParticleData(output, i, unwrapModifiers(Result{}));
 }
 
@@ -1424,10 +1413,16 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, input);
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, output);
 
-        auto [tmp, tmpHolders] = allocateTemporaries<Config>(firstBody, lastBody, x, y, z, h, makeConstRestrict(input),
-                                                             output, std::forward<Interaction>(interaction));
+        auto [tmp, tmpHolder] = allocateTemporaries<Config, Tc, Th>(firstBody, lastBody, makeConstRestrict(input),
+                                                                    output, std::forward<Interaction>(interaction));
 
-        auto& tmpOrOutput = selectOutput<Config>(tmp, output);
+        auto tmpOrOutput = [&]
+        {
+            if constexpr (Config::symmetric)
+                return tmp;
+            else
+                return output;
+        }();
 
         if constexpr (Config::symmetric)
         {
