@@ -140,6 +140,13 @@ constexpr __forceinline__ unsigned clusterOffset(unsigned firstBody)
     return offset;
 }
 
+/*! initialize supercluster indices, required as superclusterInfo is later reordered by descending number of neighbors
+ * to schedule more expensive warps earlier for better load balancing
+ *
+ * @param[in]  firstISupercluster index of first supercluster, i.e., the one containing firstBody
+ * @param[in]  lastISupercluster  index of last supercluster
+ * @param[out] superclusterInfo   indices to be filled with values from [firstISupercluster, lastISupercluster)
+ */
 __global__ static void initSuperclusterInfo(const LocalIndex firstISupercluster,
                                             const LocalIndex lastISupercluster,
                                             SuperclusterInfo* superclusterInfo)
@@ -150,6 +157,15 @@ __global__ static void initSuperclusterInfo(const LocalIndex firstISupercluster,
     if (index < numISuperclusters) superclusterInfo[index] = {index + firstISupercluster, 0, 0};
 }
 
+/*! compute supercluster split masks based on the given groups; split superclusters will execute multiple tree
+ * traversals, i.e., one for each subgroup
+ *
+ * @param[in]  firstISupercluster     index of first supercluster, i.e., the one containing firstBody
+ * @param[in]  lastISupercluster      index of last supercluster
+ * @param[in]  groups                 particle group information
+ * @param[out] superclusterSplitMasks binary masks per supercluster, with ones where superclusters are spanning group
+ *                                    boundaries, zeros elsewhere (i.e., one bit per particle)
+ */
 template<class Config>
 __global__ void
 computeSuperclusterSplitMasks(const LocalIndex firstISupercluster,
@@ -176,6 +192,18 @@ computeSuperclusterSplitMasks(const LocalIndex firstISupercluster,
     } while (oldSplitMask != newSplitMask);
 }
 
+/*! compute bounding boxes and max. particle radii of j-clusters, i.e., neighbor clusters
+ *
+ * @param[in]  firstValidBody index of first valid particle, particle before are ignored
+ * @param[in]  totalBodies    total number of particles, including invalid
+ * @param[in]  x              particle x coordinates
+ * @param[in]  y              particle y coordinates
+ * @param[in]  z              particle z coordinates
+ * @param[in]  h              particle smoothing lengths
+ * @param[out] bboxCenters    j-cluster bounding box centers
+ * @param[out] bboxSizes      j-cluster bounding box sizes
+ * @param[out] rMax           max. particle radius (2 * h) in each j-cluster, computed iff Config::symmetric
+ */
 template<class Config, class Tc, class Th>
 __global__ void computeJClusterBboxes(const LocalIndex firstValidBody,
                                       const LocalIndex totalBodies,
