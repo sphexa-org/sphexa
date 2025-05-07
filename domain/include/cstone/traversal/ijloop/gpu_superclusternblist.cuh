@@ -154,7 +154,7 @@ __global__ static void initSuperclusterInfo(const LocalIndex firstISupercluster,
     const LocalIndex index = blockIdx.x * blockDim.x + threadIdx.x;
 
     const LocalIndex numISuperclusters = lastISupercluster - firstISupercluster;
-    if (index < numISuperclusters) superclusterInfo[index] = {index + firstISupercluster, 0, 0};
+    if (index < numISuperclusters) superclusterInfo[index].index = index + firstISupercluster;
 }
 
 /*! compute supercluster split masks based on the given groups; split superclusters will execute multiple tree
