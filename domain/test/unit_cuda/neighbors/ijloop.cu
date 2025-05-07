@@ -63,7 +63,7 @@ struct NeighborFun
         const auto [i, iPos, hi, vi] = iData;
         const auto [j, jPos, hj, vj] = jData;
         return std::make_tuple(i, j, iPos, jPos, ijloop::symmetric::odd(ijPosDiff), ijloop::symmetric::even(distSq), hi,
-                               hj, vi, vj, ijloop::symmetric::even(1u), hi, ijloop::reduction::min(j));
+                               hj, vi, vj, ijloop::symmetric::even(1u), ijloop::reduction::min(j), 37.5f);
     }
 };
 
@@ -72,8 +72,10 @@ struct PostambleFun
     template<class ParticleData, class Result>
     constexpr auto operator()(ParticleData const& /* iData */, Result jResult) const
     {
-        std::get<11>(jResult) /= std::get<10>(jResult);
-        return jResult;
+        auto [iSum, jSum, iPosSum, jPosSum, ijPosDiffSum, distSqSum, hiSum, hjSum, viSum, vjSum, neighborsCount, jMin,
+              constantShortSum] = jResult;
+        return std::make_tuple(iSum, jSum, iPosSum, jPosSum, ijPosDiffSum, distSqSum, hiSum, hjSum, viSum, vjSum,
+                               neighborsCount, hiSum / neighborsCount, jMin);
     }
 };
 

@@ -1107,13 +1107,6 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 
     __syncthreads();
 
-    static_assert(
-        !Config::symmetric ||
-            std::is_same<std::decay_t<decltype(postamble(particleData_t(), unwrapModifiers(result_t())))>,
-                         decltype(unwrapModifiers(result_t()))>(),
-        "postamble that changes the result type is not supported in combination with symmetric neighborhood or more "
-        "than one warp per cluster-cluster interaction");
-
     std::array<result_t, Config::iClustersPerSupercluster / iClustersPerWarp> iResults = {};
     const unsigned iClusterOffset = iClustersPerWarp == 1 ? 0 : threadIdx.x / Config::iSize;
 
@@ -1219,6 +1212,120 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     }
 }
 
+struct NeedsAllocation
+{
+};
+
+template<class Size>
+consteval auto findMatchingOutput(Size, std::tuple<>)
+{
+    return NeedsAllocation{};
+}
+
+template<class Size, class OutIndex, class OutSize, class... IndexedOutSizes>
+consteval auto findMatchingOutput(Size, std::tuple<std::tuple<OutIndex, OutSize>, IndexedOutSizes...>)
+{
+    if constexpr (Size::value == OutSize::value)
+        return OutIndex{};
+    else
+        return findMatchingOutput(Size{}, std::tuple<IndexedOutSizes...>{});
+}
+
+template<class Index>
+consteval auto dropByIndex(Index, std::tuple<>) {
+    return std::tuple();
+}
+
+template<class Index, class OutIndex, class OutSize, class... IndexedOutSizes>
+consteval auto dropByIndex(Index, std::tuple<std::tuple<OutIndex, OutSize>, IndexedOutSizes...>)
+{
+    if constexpr (std::is_same_v<Index, NeedsAllocation>)
+        return std::tuple<std::tuple<OutIndex, OutSize>, IndexedOutSizes...>{};
+    else if constexpr (Index::value == OutIndex::value)
+        return std::tuple<IndexedOutSizes...>{};
+    else
+        return std::tuple_cat(std::tuple<std::tuple<OutIndex, OutSize>>{},
+                              dropByIndex(Index{}, std::tuple<IndexedOutSizes...>{}));
+}
+
+template<class... OutSizes>
+consteval auto mapTemporarySizesImpl(std::tuple<>, std::tuple<OutSizes...>)
+{
+    return std::make_tuple();
+}
+
+template<class TmpSize, class... TmpSizes, class... OutSizes>
+consteval auto mapTemporarySizesImpl(std::tuple<TmpSize, TmpSizes...>, std::tuple<OutSizes...>)
+{
+    constexpr auto index = findMatchingOutput(TmpSize{}, std::tuple<OutSizes...>{});
+    return std::tuple_cat(std::make_tuple(index), mapTemporarySizesImpl(std::tuple<TmpSizes...>{},
+                                                                        dropByIndex(index, std::tuple<OutSizes...>{})));
+}
+
+template<class... Tmp, class... Out>
+consteval auto mapTemporarySizes(std::tuple<Tmp*...> tmp, std::tuple<Out*...> output)
+{
+    auto tmpSizes = util::tupleMap([]<class T>(T*) { return std::integral_constant<std::size_t, sizeof(T)>(); }, tmp);
+    auto indexedOutputSizes =
+        util::tupleMapIndexed([]<class Index, class O>(Index, O*)
+                              { return std::tuple<Index, std::integral_constant<std::size_t, sizeof(O)>>{}; }, output);
+
+    return mapTemporarySizesImpl(tmpSizes, indexedOutputSizes);
+}
+
+struct None
+{
+};
+
+template<class Config, class Tc, class Th, class... In, class... Out, class Interaction, class Postamble>
+auto allocateTemporaries(LocalIndex firstBody,
+                         LocalIndex lastBody,
+                         const Tc* x,
+                         const Tc* y,
+                         const Tc* z,
+                         const Th* h,
+                         std::tuple<In*...> const& input,
+                         std::tuple<Out*...> const& output,
+                         Interaction&& interaction,
+                         Postamble)
+{
+    if constexpr (Config::symmetric && !std::is_same<Postamble, detail::EmptyPostamble>())
+    {
+        using IData      = decltype(loadParticleData(x, y, z, h, input, 0));
+        using Result     = decltype(std::forward<Interaction>(interaction)(IData{}, IData{}, Vec3<Tc>{0, 0, 0}, Tc(0)));
+        using ResultPtrs = decltype(util::tupleMap([]<class T>(T) { return (T*)nullptr; }, unwrapModifiers(Result{})));
+
+        constexpr auto ptrMap = mapTemporarySizes(ResultPtrs{}, std::tuple<Out*...>{});
+
+        auto allocated = util::tupleMap(
+            [&]<class T, class OutIndex>(T*, OutIndex i)
+            {
+                if constexpr (std::is_same_v<OutIndex, NeedsAllocation>)
+                {
+                    auto holder = util::deviceAlloc<T[]>(lastBody - firstBody);
+                    return std::make_tuple(holder.get() - firstBody, std::move(holder));
+                }
+                else { return std::make_tuple(std::get<i>(output), None{}); }
+            },
+            ResultPtrs{}, ptrMap);
+
+        auto ptrs    = util::tupleMap([](auto const& alloc) { return std::get<0>(alloc); }, allocated);
+        auto holders = util::tupleMap([](auto&& alloc) { return std::get<1>(std::move(alloc)); }, std::move(allocated));
+
+        return std::make_tuple(ptrs, std::move(holders));
+    }
+    else { return std::make_tuple(std::tuple(), std::tuple()); }
+}
+
+template<class Config, class Tmp, class Out, class Postamble>
+auto& selectOutput(Tmp& tmp, Out& out, Postamble)
+{
+    if constexpr (Config::symmetric && !std::is_same<Postamble, detail::EmptyPostamble>())
+        return tmp;
+    else
+        return out;
+}
+
 template<class Tc, class Th, class In, class Out, class Interaction>
 __global__ void initResult(const LocalIndex firstBody,
                            const LocalIndex lastBody,
@@ -1238,21 +1345,25 @@ __global__ void initResult(const LocalIndex firstBody,
     storeParticleData(output, i, unwrapModifiers(Result{}));
 }
 
-template<class Tc, class Th, class In, class Out, class Postamble>
-__global__ void applyPostamble(const LocalIndex totalBodies,
+template<class Tc, class Th, class In, class Tmp, class Out, class Postamble>
+__global__ void applyPostamble(const LocalIndex firstBody,
+                               const LocalIndex lastBody,
+                               const LocalIndex firstValidBody,
                                const Tc* __restrict__ x,
                                const Tc* __restrict__ y,
                                const Tc* __restrict__ z,
                                const Th* __restrict__ h,
                                const In __grid_constant__ input,
+                               const Tmp __grid_constant__ tmp,
                                const Out __grid_constant__ output,
                                const Postamble postamble)
 {
-    const LocalIndex i = blockDim.x * blockIdx.x + threadIdx.x;
-    if (i > totalBodies) return;
+    const LocalIndex i = blockDim.x * blockIdx.x + threadIdx.x + firstBody;
+    if (i >= lastBody) return;
 
-    const auto iData  = loadParticleData(x, y, z, h, input, i);
-    const auto result = util::tupleMap([&](auto* ptr) { return ptr[i]; }, output);
+    auto iData = loadParticleData(x, y, z, h, input, i);
+    std::get<0>(iData) -= firstValidBody;
+    const auto result = util::tupleMap([&](auto* ptr) { return ptr[i]; }, tmp);
     storeParticleData(output, i, postamble(iData, result));
 }
 
@@ -1296,11 +1407,17 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, input);
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, output);
 
+        auto [tmp, tmpHolders] =
+            allocateTemporaries<Config>(firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
+                                        std::forward<Interaction>(interaction), std::forward<Postamble>(postamble));
+
+        auto& tmpOrOutput = selectOutput<Config>(tmp, output, std::forward<Postamble>(postamble));
+
         if constexpr (Config::symmetric)
         {
             constexpr unsigned threads = 256;
             const unsigned numBlocks   = iceil(numBodies, threads);
-            initResult<<<numBlocks, threads>>>(firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
+            initResult<<<numBlocks, threads>>>(firstBody, lastBody, x, y, z, h, makeConstRestrict(input), tmpOrOutput,
                                                std::forward<Interaction>(interaction));
             checkGpuErrors(cudaGetLastError());
         }
@@ -1320,9 +1437,9 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         const auto runKernel = [&](auto usePbc)
         {
             runIjLoop<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, sharedMem>>>(
-                box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
-                std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), neighborData.get(),
-                superclusterInfo.get(), ncmax);
+                box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConstRestrict(input),
+                tmpOrOutput, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
+                neighborData.get(), superclusterInfo.get(), ncmax);
             checkGpuErrors(cudaGetLastError());
         };
         if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
@@ -1333,13 +1450,14 @@ struct GpuSuperclusterNbListNeighborhoodImpl
 
         if constexpr (Config::symmetric && !std::is_same<std::decay_t<Postamble>, detail::EmptyPostamble>())
         {
-            util::for_each_tuple([&](auto& ptr) { ptr += firstValidBody; }, input);
-            util::for_each_tuple([&](auto& ptr) { ptr += firstValidBody; }, output);
             constexpr unsigned threads = 256;
             const unsigned numBlocks   = iceil(totalBodies, threads);
-            applyPostamble<<<numBlocks, threads>>>(totalBodies - firstValidBody, x + firstValidBody, y + firstValidBody,
-                                                   z + firstValidBody, h + firstValidBody, makeConstRestrict(input),
-                                                   output, std::forward<Postamble>(postamble));
+            applyPostamble<<<numBlocks, threads>>>(firstBody, lastBody, firstValidBody, x, y, z, h,
+                                                   makeConstRestrict(input), makeConstRestrict(tmp), output,
+                                                   std::forward<Postamble>(postamble));
+            checkGpuErrors(cudaGetLastError());
+            // device sync required due to possible use of allocated temporaries
+            checkGpuErrors(cudaDeviceSynchronize());
         }
     }
 
