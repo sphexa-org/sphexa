@@ -33,8 +33,7 @@
 
 #include <algorithm>
 #include <tuple>
-#include <utility>
-#include <vector>
+#include <memory>
 
 #include "cstone/findneighbors.hpp"
 #include "cstone/traversal/groups.hpp"
@@ -65,7 +64,7 @@ struct CpuAlwaysTraverseNeighborhoodImpl
         const auto constInput = makeConstRestrict(input);
 #pragma omp parallel
         {
-            std::vector<LocalIndex> neighbors(ngmax);
+            std::unique_ptr<LocalIndex[]> neighbors = std::make_unique_for_overwrite<LocalIndex[]>(ngmax);
 
 #pragma omp for
             for (LocalIndex i = firstBody; i < lastBody; ++i)
@@ -73,7 +72,7 @@ struct CpuAlwaysTraverseNeighborhoodImpl
                 const auto iData  = loadParticleData(x, y, z, h, constInput, i);
                 const bool usePbc = requiresPbcHandling(box, iData);
 
-                const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, neighbors.data()), ngmax);
+                const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, neighbors.get()), ngmax);
                 auto result        = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
                 for (unsigned nb = 0; nb < nbs; ++nb)
                 {
@@ -99,7 +98,7 @@ struct CpuFullNbListNeighborhoodImpl
     OctreeNsView<Tc, KeyType> tree;
     Box<Tc> box = {0, 0};
     LocalIndex firstBody, lastBody;
-    std::vector<LocalIndex> neighborsCount, neighbors;
+    std::unique_ptr<LocalIndex[]> neighborsCount, neighbors;
     const Tc *x, *y, *z;
     const Th* h;
     unsigned ngmax;
@@ -135,9 +134,9 @@ struct CpuFullNbListNeighborhoodImpl
 
     Statistics stats() const
     {
-        return {.numBodies = lastBody - firstBody,
-                .numBytes  = neighborsCount.size() * sizeof(typename decltype(neighborsCount)::value_type) +
-                            neighbors.size() * sizeof(typename decltype(neighbors)::value_type)};
+        const LocalIndex numBodies = lastBody - firstBody;
+        return {.numBodies = numBodies,
+                .numBytes  = sizeof(LocalIndex) * numBodies + sizeof(LocalIndex) * numBodies * ngmax};
     }
 };
 } // namespace cpu_nb_list_detail
@@ -178,23 +177,24 @@ struct CpuFullNbListNeighborhood
 
         const LocalIndex numBodies = groups.lastBody - groups.firstBody;
 
-        CpuFullNbListNeighborhoodImpl<Tc, KeyType, Th> nbList{tree,
-                                                              box,
-                                                              groups.firstBody,
-                                                              groups.lastBody,
-                                                              std::vector<LocalIndex>(numBodies),
-                                                              std::vector<LocalIndex>(numBodies * ngmax),
-                                                              x,
-                                                              y,
-                                                              z,
-                                                              h,
-                                                              ngmax};
+        CpuFullNbListNeighborhoodImpl<Tc, KeyType, Th> nbList{
+            tree,
+            box,
+            groups.firstBody,
+            groups.lastBody,
+            std::make_unique_for_overwrite<LocalIndex[]>(numBodies),
+            std::make_unique_for_overwrite<LocalIndex[]>(std::size_t(numBodies) * ngmax),
+            x,
+            y,
+            z,
+            h,
+            ngmax};
 
         Th const* hExt = h;
         std::unique_ptr<Th[]> hExtData;
         if (tree.searchExtFactor != 1)
         {
-            hExtData = std::make_unique<Th[]>(totalBodies);
+            hExtData = std::make_unique_for_overwrite<Th[]>(totalBodies);
 #pragma omp parallel for
             for (LocalIndex i = 0; i < numBodies; ++i)
                 hExtData[i] = h[i] * tree.searchExtFactor;
