@@ -50,6 +50,7 @@
 #include "cstone/traversal/ijloop/ijloop.hpp"
 #include "cstone/traversal/ijloop/upsweep.cuh"
 #include "cstone/tree/octree.hpp"
+#include "cstone/util/type_list.hpp"
 
 namespace cstone::ijloop
 {
@@ -1212,72 +1213,98 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     }
 }
 
-struct NeedsAllocation
-{
-};
-
-template<class Size>
-consteval auto findMatchingOutput(Size, std::tuple<>)
-{
-    return NeedsAllocation{};
-}
-
-template<class Size, class OutIndex, class OutSize, class... IndexedOutSizes>
-consteval auto findMatchingOutput(Size, std::tuple<std::tuple<OutIndex, OutSize>, IndexedOutSizes...>)
-{
-    if constexpr (Size::value == OutSize::value)
-        return OutIndex{};
-    else
-        return findMatchingOutput(Size{}, std::tuple<IndexedOutSizes...>{});
-}
-
-template<class Index>
-consteval auto dropByIndex(Index, std::tuple<>) {
-    return std::tuple();
-}
-
-template<class Index, class OutIndex, class OutSize, class... IndexedOutSizes>
-consteval auto dropByIndex(Index, std::tuple<std::tuple<OutIndex, OutSize>, IndexedOutSizes...>)
-{
-    if constexpr (std::is_same_v<Index, NeedsAllocation>)
-        return std::tuple<std::tuple<OutIndex, OutSize>, IndexedOutSizes...>{};
-    else if constexpr (Index::value == OutIndex::value)
-        return std::tuple<IndexedOutSizes...>{};
-    else
-        return std::tuple_cat(std::tuple<std::tuple<OutIndex, OutSize>>{},
-                              dropByIndex(Index{}, std::tuple<IndexedOutSizes...>{}));
-}
-
-template<class... OutSizes>
-consteval auto mapTemporarySizesImpl(std::tuple<>, std::tuple<OutSizes...>)
-{
-    return std::make_tuple();
-}
-
-template<class TmpSize, class... TmpSizes, class... OutSizes>
-consteval auto mapTemporarySizesImpl(std::tuple<TmpSize, TmpSizes...>, std::tuple<OutSizes...>)
-{
-    constexpr auto index = findMatchingOutput(TmpSize{}, std::tuple<OutSizes...>{});
-    return std::tuple_cat(std::make_tuple(index), mapTemporarySizesImpl(std::tuple<TmpSizes...>{},
-                                                                        dropByIndex(index, std::tuple<OutSizes...>{})));
-}
-
-template<class... Tmp, class... Out>
-consteval auto mapTemporarySizes(std::tuple<Tmp*...> tmp, std::tuple<Out*...> output)
-{
-    auto tmpSizes = util::tupleMap([]<class T>(T*) { return std::integral_constant<std::size_t, sizeof(T)>(); }, tmp);
-    auto indexedOutputSizes =
-        util::tupleMapIndexed([]<class Index, class O>(Index, O*)
-                              { return std::tuple<Index, std::integral_constant<std::size_t, sizeof(O)>>{}; }, output);
-
-    return mapTemporarySizesImpl(tmpSizes, indexedOutputSizes);
-}
-
 struct None
 {
 };
 
-template<class Config, class Tc, class Th, class... In, class... Out, class Interaction, class Postamble>
+template<class T, class... Ts>
+consteval auto tail(util::TypeList<T, Ts...>)
+{
+    return util::TypeList<Ts...>{};
+}
+
+consteval auto tail(util::TypeList<>) { return util::TypeList<>{}; }
+
+template<class Size, class IndexedOutSizes>
+consteval auto findMatchingOutput(Size, IndexedOutSizes)
+{
+    if constexpr (util::TypeListSize<IndexedOutSizes>::value == 0) { return None{}; }
+    else
+    {
+        using Head      = util::TypeListElement_t<0, IndexedOutSizes>;
+        using HeadIndex = util::TypeListElement_t<0, Head>;
+        using HeadSize  = util::TypeListElement_t<1, Head>;
+        if constexpr (std::is_same_v<Size, HeadSize>)
+            return HeadIndex{};
+        else
+            return findMatchingOutput(Size{}, tail(IndexedOutSizes{}));
+    }
+}
+
+template<class Index, class IndexedOutSizes>
+consteval auto dropByIndex(Index, IndexedOutSizes)
+{
+    if constexpr (std::is_same_v<Index, None>) { return IndexedOutSizes{}; }
+    else if constexpr (util::TypeListSize<IndexedOutSizes>::value == 0) { return util::TypeList<>{}; }
+    else
+    {
+        using Head      = util::TypeListElement_t<0, IndexedOutSizes>;
+        using HeadIndex = util::TypeListElement_t<0, Head>;
+        if constexpr (std::is_same_v<Index, HeadIndex>)
+            return tail(IndexedOutSizes{});
+        else
+            return util::FuseTwo<util::TypeList<Head>, decltype(dropByIndex(Index{}, tail(IndexedOutSizes{})))>{};
+    }
+}
+
+template<class TmpSizes, class OutSizes>
+consteval auto mapTemporarySizes(TmpSizes, OutSizes)
+{
+    if constexpr (util::TypeListSize<TmpSizes>::value == 0) { return util::TypeList<>{}; }
+    else
+    {
+        using Index       = decltype(findMatchingOutput(util::TypeListElement_t<0, TmpSizes>{}, OutSizes{}));
+        using TailIndices = decltype(mapTemporarySizes(tail(TmpSizes{}), dropByIndex(Index{}, OutSizes{})));
+        return util::FuseTwo<util::TypeList<Index>, TailIndices>{};
+    }
+}
+
+template<class T>
+using SizeOf = std::integral_constant<std::size_t, sizeof(T)>;
+
+template<class... T, std::size_t... Indices>
+consteval auto addIndices(util::TypeList<T...>, std::index_sequence<Indices...>)
+{
+    return util::TypeList<util::TypeList<std::integral_constant<std::size_t, Indices>, T>...>{};
+}
+
+template<class T>
+using AddIndices = decltype(addIndices(T{}, std::make_index_sequence<util::TypeListSize<T>::value>{}));
+
+template<class Tmp, class Out>
+using MapTemporarySizes = decltype(mapTemporarySizes(util::Map<SizeOf, Tmp>{}, AddIndices<util::Map<SizeOf, Out>>{}));
+
+template<class... Indices, class... Tmp, class Output>
+auto allocateOrMapTemporaries(const LocalIndex firstBody,
+                              const LocalIndex lastBody,
+                              util::TypeList<Indices...>,
+                              std::tuple<Tmp...>,
+                              const Output& output)
+{
+    auto allocOrMap = [&]<class Index, class T>(Index, T)
+    {
+        if constexpr (std::is_same_v<Index, None>)
+        {
+            auto holder = util::deviceAlloc<T[]>(lastBody - firstBody);
+            return std::make_tuple(holder.get() - firstBody, std::move(holder));
+        }
+        else { return std::make_tuple(std::get<Index::value>(output), None{}); }
+    };
+
+    return std::make_tuple(allocOrMap(Indices{}, Tmp{})...);
+}
+
+template<class Config, class Tc, class Th, class... In, class... Out, class Interaction>
 auto allocateTemporaries(LocalIndex firstBody,
                          LocalIndex lastBody,
                          const Tc* x,
@@ -1286,41 +1313,31 @@ auto allocateTemporaries(LocalIndex firstBody,
                          const Th* h,
                          std::tuple<In*...> const& input,
                          std::tuple<Out*...> const& output,
-                         Interaction&& interaction,
-                         Postamble)
+                         Interaction&& interaction)
 {
-    if constexpr (Config::symmetric && !std::is_same<Postamble, detail::EmptyPostamble>())
+    if constexpr (Config::symmetric)
     {
-        using IData      = decltype(loadParticleData(x, y, z, h, input, 0));
-        using Result     = decltype(std::forward<Interaction>(interaction)(IData{}, IData{}, Vec3<Tc>{0, 0, 0}, Tc(0)));
-        using ResultPtrs = decltype(util::tupleMap([]<class T>(T) { return (T*)nullptr; }, unwrapModifiers(Result{})));
+        using IData  = decltype(loadParticleData(x, y, z, h, input, 0));
+        using Result = decltype(unwrapModifiers(
+            std::forward<Interaction>(interaction)(IData{}, IData{}, Vec3<Tc>{0, 0, 0}, Tc(0))));
 
-        constexpr auto ptrMap = mapTemporarySizes(ResultPtrs{}, std::tuple<Out*...>{});
+        using PtrMap = MapTemporarySizes<Result, util::TypeList<Out...>>;
 
-        auto allocated = util::tupleMap(
-            [&]<class T, class OutIndex>(T*, OutIndex i)
-            {
-                if constexpr (std::is_same_v<OutIndex, NeedsAllocation>)
-                {
-                    auto holder = util::deviceAlloc<T[]>(lastBody - firstBody);
-                    return std::make_tuple(holder.get() - firstBody, std::move(holder));
-                }
-                else { return std::make_tuple(std::get<i>(output), None{}); }
-            },
-            ResultPtrs{}, ptrMap);
+        auto ptrsAndHolders = allocateOrMapTemporaries(firstBody, lastBody, PtrMap{}, Result{}, output);
 
-        auto ptrs    = util::tupleMap([](auto const& alloc) { return std::get<0>(alloc); }, allocated);
-        auto holders = util::tupleMap([](auto&& alloc) { return std::get<1>(std::move(alloc)); }, std::move(allocated));
+        auto ptrs = util::tupleMap([](auto const& alloc) { return std::get<0>(alloc); }, ptrsAndHolders);
+        auto holders =
+            util::tupleMap([](auto&& alloc) { return std::get<1>(std::move(alloc)); }, std::move(ptrsAndHolders));
 
-        return std::make_tuple(ptrs, std::move(holders));
+        return std::make_tuple(std::move(ptrs), std::move(holders));
     }
     else { return std::make_tuple(std::tuple(), std::tuple()); }
 }
 
-template<class Config, class Tmp, class Out, class Postamble>
-auto& selectOutput(Tmp& tmp, Out& out, Postamble)
+template<class Config, class Tmp, class Out>
+auto& selectOutput(Tmp& tmp, Out& out)
 {
-    if constexpr (Config::symmetric && !std::is_same<Postamble, detail::EmptyPostamble>())
+    if constexpr (Config::symmetric)
         return tmp;
     else
         return out;
@@ -1407,11 +1424,10 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, input);
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, output);
 
-        auto [tmp, tmpHolders] =
-            allocateTemporaries<Config>(firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
-                                        std::forward<Interaction>(interaction), std::forward<Postamble>(postamble));
+        auto [tmp, tmpHolders] = allocateTemporaries<Config>(firstBody, lastBody, x, y, z, h, makeConstRestrict(input),
+                                                             output, std::forward<Interaction>(interaction));
 
-        auto& tmpOrOutput = selectOutput<Config>(tmp, output, std::forward<Postamble>(postamble));
+        auto& tmpOrOutput = selectOutput<Config>(tmp, output);
 
         if constexpr (Config::symmetric)
         {
