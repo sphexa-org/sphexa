@@ -51,6 +51,19 @@ using CoordinateType = sph::SphTypes::CoordinateType;
  */
 constexpr IdType msbMask = static_cast<IdType>(1) << (sizeof(IdType)*8 - 1);
 
+/*! @brief Tagged id identification condition functor
+ */
+struct MaskFunctor
+{
+#if defined(__CUDACC__) || defined(__HIPCC__)
+    __device__
+#endif
+    IdType operator()(IdType id) const
+    {
+        return (id & msbMask) != 0;
+    }
+};
+
 /*! @brief Tagged id (in first:last range) identification, CPU version
  *
  * @param[in]  ids          ordered id list
