@@ -37,27 +37,79 @@
 //TODO: create tagged id list, it will be used in multiple tests
 TEST(IO, taggedIdIdentificationGpu)
 {
-    const uint64_t first = 3;
-    const uint64_t last = 10;
+    uint64_t first;
+    uint64_t last;
     std::vector<uint64_t> ids(100);
+    std::vector<uint64_t> taggedIdPos;
+
+    // Full range test 1
+    std::vector<uint64_t> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::iota(std::begin(ids), std::end(ids), 0);
-    std::vector<uint64_t> taggedIdxRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
-    std::vector<uint64_t> taggedIdxRefWRange;
-    std::copy_if(taggedIdxRef.begin(), taggedIdxRef.end(), std::back_inserter(taggedIdxRefWRange), [first, last](auto idx){
-        return idx >= first && idx < last;
+    std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
+        ids[idPos] = ids[idPos] | sphexa::msbMask;
     });
-
-    std::vector<uint64_t> taggedIdx;
-
-    std::for_each(taggedIdxRef.begin(), taggedIdxRef.end(), [&ids = ids](auto taggedIdx){
-            ids[taggedIdx] = ids[taggedIdx] | sphexa::msbMask;
-    });
-
     cstone::DeviceVector<uint64_t> idsDev(ids);
-    sphexa::findTaggedIds(idsDev, 0, idsDev.size(), taggedIdx);
-    EXPECT_EQ(taggedIdx, taggedIdxRef);
+    sphexa::findTaggedIds(idsDev, 0, idsDev.size(), taggedIdPos);
+    EXPECT_EQ(taggedIdPos, taggedIdPosRef);
 
-    taggedIdx.clear();
-    sphexa::findTaggedIds(idsDev, 3, 10, taggedIdx);
-    EXPECT_EQ(taggedIdx, taggedIdxRefWRange);
+    // Range test 1
+    first = 3;
+    last = 10;
+    std::vector<uint64_t> taggedIdPosRefRange;
+    std::copy_if(taggedIdPosRef.begin(), taggedIdPosRef.end(), std::back_inserter(taggedIdPosRefRange), [first, last](auto idPos){
+        return idPos >= first && idPos < last;
+    });
+    sphexa::findTaggedIds(idsDev, first, last, taggedIdPos);
+    EXPECT_EQ(taggedIdPos, taggedIdPosRefRange);
+
+    // Range test 2
+    first = 0;
+    last = 100;
+    taggedIdPosRefRange.clear();
+    std::copy_if(taggedIdPosRef.begin(), taggedIdPosRef.end(), std::back_inserter(taggedIdPosRefRange), [first, last](auto idPos){
+        return idPos >= first && idPos < last;
+    });
+    sphexa::findTaggedIds(idsDev, first, last, taggedIdPos);
+    EXPECT_EQ(taggedIdPos, taggedIdPosRefRange);
+
+    // Range test 3
+    first = 0;
+    last = 1;
+    taggedIdPosRefRange.clear();
+    std::copy_if(taggedIdPosRef.begin(), taggedIdPosRef.end(), std::back_inserter(taggedIdPosRefRange), [first, last](auto idPos){
+        return idPos >= first && idPos < last;
+    });
+    sphexa::findTaggedIds(idsDev, first, last, taggedIdPos);
+    EXPECT_EQ(taggedIdPos, taggedIdPosRefRange);
+
+    // Range test 4
+    first = 99;
+    last = 100;
+    taggedIdPosRefRange.clear();
+    std::copy_if(taggedIdPosRef.begin(), taggedIdPosRef.end(), std::back_inserter(taggedIdPosRefRange), [first, last](auto idPos){
+        return idPos >= first && idPos < last;
+    });
+    sphexa::findTaggedIds(idsDev, first, last, taggedIdPos);
+    EXPECT_EQ(taggedIdPos, taggedIdPosRefRange);
+
+    // Full range test 2
+    taggedIdPosRef = {0};
+    std::iota(std::begin(ids), std::end(ids), 0);
+    std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
+            ids[idPos] = ids[idPos] | sphexa::msbMask;
+    });
+    idsDev = ids;
+    sphexa::findTaggedIds(idsDev, 0, idsDev.size(), taggedIdPos);
+    EXPECT_EQ(taggedIdPos, taggedIdPosRef);
+
+    // Full range test 3
+    taggedIdPosRef = {99};
+    std::iota(std::begin(ids), std::end(ids), 0);
+    std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
+            ids[idPos] = ids[idPos] | sphexa::msbMask;
+    });
+    idsDev = ids;
+    sphexa::findTaggedIds(idsDev, 0, idsDev.size(), taggedIdPos);
+    EXPECT_EQ(taggedIdPos, taggedIdPosRef);
+
 }
