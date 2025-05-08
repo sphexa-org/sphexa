@@ -38,25 +38,13 @@
 #include <thrust/functional.h>
 #include <thrust/host_vector.h>
 #include <thrust/scan.h>
+#include <thrust/scatter.h>
 #include <thrust/transform.h>
 
 #include "id_tag_utils.hpp"
 
 namespace sphexa
 {
-
-// TODO: retrieve particle id type from ParticlesData
-/*! @brief Tagged id identification condition functor  
- */
-struct MaskFunctor
-{
-    __device__
-    IdType operator()(IdType id) const
-    {
-        return (id & msbMask) != 0;
-    }
-};
-
 
 /*! @brief Id tagging (in first:last range) from list
  *
@@ -87,29 +75,6 @@ void tagIdsInSphere(cstone::DeviceVector<IdType>& ids, const std::vector<Coordin
     throw std::runtime_error("Not implemented yet");
 }
 
-
-// TODO: retrieve particle id type from ParticlesData
-/*! @brief Linear search functor  
- */
-struct SearchFunctor
-{
-    const IdType* m_devRawScanResult;
-    const IdType m_first;
-    const IdType m_scanResultSize;
-
-    __device__
-    void operator()(IdType& i) const
-    {
-        for(auto j = i; j<m_scanResultSize; j++){ // TODO: check performance penalty due to break
-            if(m_devRawScanResult[j] == i+1){
-                i = j+m_first;
-                break;
-            }
-        }
-    }
-};
-
-
 /*! @brief Tagged id identification
  *
  * @param[in]  ids              ordered id list
@@ -119,37 +84,34 @@ struct SearchFunctor
  */
 void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t last, std::vector<IdType>& taggedIdsIndexes)
 {
-    auto devRawId = ids.data();
     const auto devIdSize = last - first;
-
-    // Create device containers
-    thrust::device_vector<IdType> devMask(devIdSize, 0);
-    thrust::device_vector<IdType> devScanResult(devIdSize, 0);
+    thrust::device_vector<IdType> devMask(devIdSize);
+    thrust::device_vector<IdType> devScanResult(devIdSize);
 
     // Generate mask
-    thrust::transform(devRawId + first, devRawId + last, devMask.begin(), MaskFunctor{});
+    thrust::transform(ids.data() + first, ids.data() + last, devMask.begin(), MaskFunctor{});
 
     // Run scan
-    thrust::inclusive_scan(devMask.begin(), devMask.end(), devScanResult.begin());
+    thrust::exclusive_scan(devMask.begin(), devMask.end(), devScanResult.begin());
 
-    // Create particle subset position container on GPU and initialize it sequentially
-    if(devScanResult.back() > 0) {
+    if(devScanResult.back() > 0 || devMask.back() == 1)
+    {
+        // Scatter the tagged ids positions
         thrust::device_vector<IdType> devSubsetPos(devScanResult.back());
-        thrust::sequence(thrust::device, devSubsetPos.begin(), devSubsetPos.end());
-
-        // Find the position of the particle in the subset
-        // TODO: can I use a zip iterator here instead of raw pointer?
-        auto* devRawScanResult = thrust::raw_pointer_cast(devScanResult.data());
-        const auto scanResultSize = devScanResult.size();// TODO: this is devIdSize
-        SearchFunctor searchFunctor{devRawScanResult, first, scanResultSize};
-        thrust::for_each(thrust::device, devSubsetPos.begin(), devSubsetPos.end(), searchFunctor);
+        if(devMask.back() == 1){
+            devSubsetPos.resize(devScanResult.back()+1);
+        }
+        thrust::device_vector<IdType> devSequence(devIdSize);
+        thrust::sequence(thrust::device, devSequence.begin(), devSequence.end(), first);
+        thrust::scatter_if(thrust::device, devSequence.begin(), devSequence.end(), devScanResult.begin(), devMask.begin(), devSubsetPos.begin());
 
         // Copy result to host
         // TODO: find better solution
         thrust::host_vector<IdType> hostSubsetPos(devSubsetPos);
         taggedIdsIndexes.assign(thrust::raw_pointer_cast(hostSubsetPos.data()), thrust::raw_pointer_cast(hostSubsetPos.data()) + hostSubsetPos.size());
     }
-    else {
+    else
+    {
         taggedIdsIndexes.clear();
     }
 
