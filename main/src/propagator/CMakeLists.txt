@@ -18,6 +18,7 @@ target_include_directories(propagator PRIVATE ${PROJECT_SOURCE_DIR}/main/src ${C
 target_link_libraries(propagator PRIVATE ${MPI_CXX_LIBRARIES} util OpenMP::OpenMP_CXX)
 enableDiskPhysics(propagator FALSE)
 enableGrackle(propagator)
+enableLogging(propagator)
 
 if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     add_library(propagator_gpu ${PROP_SOURCES})
@@ -27,6 +28,7 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     target_link_libraries(propagator_gpu PRIVATE ${MPI_CXX_LIBRARIES} cstone_gpu ryoanji sph_gpu util OpenMP::OpenMP_CXX)
     enableDiskPhysics(propagator_gpu TRUE)
     enableGrackle(propagator_gpu)
+    enableLogging(propagator_gpu)
 endif ()
 
 if (CMAKE_CUDA_COMPILER)

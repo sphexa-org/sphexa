@@ -3,6 +3,7 @@ target_include_directories(sim_init PRIVATE ${PROJECT_SOURCE_DIR}/main/src ${COO
         ${MPI_CXX_INCLUDE_PATH})
 target_link_libraries(sim_init PRIVATE ${MPI_CXX_LIBRARIES} OpenMP::OpenMP_CXX)
 enableGrackle(sim_init)
+enableLogging(sim_init)
 
 if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     add_library(sim_init_gpu sim_init.cpp)
@@ -11,6 +12,7 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
             ${SPH_DIR} ${MPI_CXX_INCLUDE_PATH})
     target_link_libraries(sim_init_gpu PRIVATE ${MPI_CXX_LIBRARIES} OpenMP::OpenMP_CXX)
     enableGrackle(sim_init_gpu)
+    enableLogging(sim_init_gpu)
 endif ()
 
 if (CMAKE_CUDA_COMPILER)

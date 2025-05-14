@@ -22,9 +22,9 @@ target_include_directories(${exename} PRIVATE ${SPH_EXA_INCLUDE_DIRS})
 target_link_libraries(${exename} PRIVATE io sim_init propagator observables OpenMP::OpenMP_CXX ${MPI_CXX_LIBRARIES})
 target_include_directories(${exename} PRIVATE ${PROJECT_SOURCE_DIR}/physics/cooling/include/)
 
-enableLogging(${exename})
 enableInSituViz(${exename})
 enableGrackle(${exename})
+enableLogging(${exename})
 
 install(TARGETS ${exename} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
@@ -49,5 +49,6 @@ elseif (CMAKE_HIP_COMPILER)
     set_target_properties(${exename}-hip PROPERTIES LINKER_LANGUAGE CXX)
     enableInSituViz(${exename}-hip)
     enableGrackle(${exename}-hip)
+    enableLogging(${exename}-hip)
     install(TARGETS ${exename}-hip RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif ()
