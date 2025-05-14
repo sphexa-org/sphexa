@@ -100,7 +100,7 @@ struct MpiType<unsigned long long>
 template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
 auto mpiSendAsync(T* data, size_t count, int rank, int tag, std::vector<MPI_Request>& requests)
 {
-    spdlog::info("{:15} {}, {}, {}, {}, {}", "mpiSendAsync", (void*)(data), count, rank, tag, MPI_COMM_WORLD);
+    spdlog::info("{:15} {}, {}, {}, {}", "mpiSendAsync", (void*)(data), count, rank, tag);
     assert(count <= std::numeric_limits<int>::max());
     requests.push_back(MPI_Request{});
     return MPI_Isend(data, int(count), MpiType<std::decay_t<T>>{}, rank, tag, MPI_COMM_WORLD, &requests.back());
@@ -129,7 +129,7 @@ auto mpiSendAsyncAs(char* data, size_t numBytes, int rank, int tag, std::vector<
 template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
 auto mpiRecvSync(T* data, int count, int rank, int tag, MPI_Status* status)
 {
-    spdlog::info("{:15} {}, {}, {}, {}, {}", "mpiRecvSync", (void*)(data), count, rank, tag, MPI_COMM_WORLD);
+    spdlog::info("{:15} {}, {}, {}, {}", "mpiRecvSync", (void*)(data), count, rank, tag);
     return MPI_Recv(data, count, MpiType<std::decay_t<T>>{}, rank, tag, MPI_COMM_WORLD, status);
 }
 
@@ -137,7 +137,7 @@ auto mpiRecvSync(T* data, int count, int rank, int tag, MPI_Status* status)
 template<class T, std::enable_if_t<!std::is_arithmetic_v<T>, int> = 0>
 auto mpiRecvSync(T* data, int count, int rank, int tag, MPI_Status* status)
 {
-    spdlog::info("{:15} {}, {}, {}, {}, {}", "mpiRecvSync", (void*)(data), count, rank, tag, MPI_COMM_WORLD);
+    spdlog::info("{:15} {}, {}, {}, {}", "mpiRecvSync", (void*)(data), count, rank, tag);
     using ValueType    = typename T::value_type;
     constexpr size_t N = T{}.size();
     ValueType* ptr     = reinterpret_cast<ValueType*>(data);
@@ -148,15 +148,14 @@ auto mpiRecvSync(T* data, int count, int rank, int tag, MPI_Status* status)
 template<class T>
 auto mpiRecvSyncAs(char* data, size_t numBytes, int rank, int tag, MPI_Status* status)
 {
-    spdlog::info("{:15} {}, {}, {}, {}, {}", "mpiRecvSyncAs", (void*)(data), numBytes, rank, tag, MPI_COMM_WORLD);
+    spdlog::info("{:15} {}, {}, {}, {}", "mpiRecvSyncAs", (void*)(data), numBytes, rank, tag);
     return mpiRecvSync(reinterpret_cast<T*>(data), numBytes / sizeof(T), rank, tag, status);
 }
 
 template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
 auto mpiRecvAsync(T* data, int count, int rank, int tag, std::vector<MPI_Request>& requests)
 {
-    spdlog::info("{:15} {}, {}, {}, {}, {}, {}", "mpiRecvAsync", (void*)(data), count, rank, tag, MPI_COMM_WORLD,
-                 typeid(T).name());
+    spdlog::info("{:15} {}, {}, {}, {}, {}", "mpiRecvAsync", (void*)(data), count, rank, tag, typeid(T).name());
     requests.push_back(MPI_Request{});
     return MPI_Irecv(data, count, MpiType<std::decay_t<T>>{}, rank, tag, MPI_COMM_WORLD, &requests.back());
 }
@@ -165,7 +164,7 @@ auto mpiRecvAsync(T* data, int count, int rank, int tag, std::vector<MPI_Request
 template<class T, std::enable_if_t<!std::is_arithmetic_v<T>, int> = 0>
 auto mpiRecvAsync(T* data, int count, int rank, int tag, std::vector<MPI_Request>& requests)
 {
-    spdlog::info("{:15} {}, {}, {}, {}, {}", "mpiRecvAsync", (void*)(data), count, rank, tag, MPI_COMM_WORLD);
+    spdlog::info("{:15} {}, {}, {}, {}", "mpiRecvAsync", (void*)(data), count, rank, tag);
     using ValueType    = typename T::value_type;
     constexpr size_t N = T{}.size();
     ValueType* ptr     = reinterpret_cast<ValueType*>(data);
