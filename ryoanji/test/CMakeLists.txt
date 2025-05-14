@@ -24,10 +24,7 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     target_include_directories(${testname} PRIVATE ${RYOANJI_TEST_INCLUDE_DIRS})
 
     target_link_libraries(${testname} PRIVATE cstone_gpu ryoanji)
-    if (SPH_EXA_WITH_LOGGING)
-        target_link_libraries(${testname} PRIVATE spdlog::spdlog fmt::fmt)
-        target_compile_definitions(${testname} PRIVATE SPDLOG_FMT_EXTERNAL)
-    endif()
+    enableLogging(${testname})
 
     if (CMAKE_HIP_COMPILER)
         target_link_libraries(${testname} PRIVATE hip::host)
