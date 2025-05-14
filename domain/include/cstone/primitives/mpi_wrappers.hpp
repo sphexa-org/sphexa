@@ -16,6 +16,10 @@
 #pragma once
 
 #include <mpi.h>
+//
+#include "spdlog/spdlog.h"
+#include "spdlog/cfg/env.h" // support for loading levels from the environment variable
+//
 #include <algorithm>
 #include <cassert>
 #include <limits>
@@ -96,6 +100,7 @@ struct MpiType<unsigned long long>
 template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
 auto mpiSendAsync(T* data, size_t count, int rank, int tag, std::vector<MPI_Request>& requests)
 {
+    spdlog::info("{:15} {}, {}, {}, {}, {}", "mpiSendAsync", (void*)(data), count, rank, tag, MPI_COMM_WORLD);
     assert(count <= std::numeric_limits<int>::max());
     requests.push_back(MPI_Request{});
     return MPI_Isend(data, int(count), MpiType<std::decay_t<T>>{}, rank, tag, MPI_COMM_WORLD, &requests.back());
@@ -105,6 +110,7 @@ auto mpiSendAsync(T* data, size_t count, int rank, int tag, std::vector<MPI_Requ
 template<class T, std::enable_if_t<!std::is_arithmetic_v<T>, int> = 0>
 auto mpiSendAsync(T* data, size_t count, int rank, int tag, std::vector<MPI_Request>& requests)
 {
+    spdlog::info("{:15} {}, {}, {}, {}", "mpiSendAsync", (void*)(data), count, rank, tag);
     using ValueType    = typename T::value_type;
     constexpr size_t N = T{}.size();
     ValueType* ptr     = reinterpret_cast<ValueType*>(data);
@@ -116,12 +122,14 @@ auto mpiSendAsync(T* data, size_t count, int rank, int tag, std::vector<MPI_Requ
 template<class T>
 auto mpiSendAsyncAs(char* data, size_t numBytes, int rank, int tag, std::vector<MPI_Request>& requests)
 {
+    spdlog::info("{:15} {}, {}, {}, {}", "mpiSendAsyncAs", (void*)(data), numBytes, rank, tag);
     return mpiSendAsync(reinterpret_cast<T*>(data), numBytes / sizeof(T), rank, tag, requests);
 }
 
 template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
 auto mpiRecvSync(T* data, int count, int rank, int tag, MPI_Status* status)
 {
+    spdlog::info("{:15} {}, {}, {}, {}, {}", "mpiRecvSync", (void*)(data), count, rank, tag, MPI_COMM_WORLD);
     return MPI_Recv(data, count, MpiType<std::decay_t<T>>{}, rank, tag, MPI_COMM_WORLD, status);
 }
 
@@ -129,6 +137,7 @@ auto mpiRecvSync(T* data, int count, int rank, int tag, MPI_Status* status)
 template<class T, std::enable_if_t<!std::is_arithmetic_v<T>, int> = 0>
 auto mpiRecvSync(T* data, int count, int rank, int tag, MPI_Status* status)
 {
+    spdlog::info("{:15} {}, {}, {}, {}, {}", "mpiRecvSync", (void*)(data), count, rank, tag, MPI_COMM_WORLD);
     using ValueType    = typename T::value_type;
     constexpr size_t N = T{}.size();
     ValueType* ptr     = reinterpret_cast<ValueType*>(data);
@@ -139,12 +148,15 @@ auto mpiRecvSync(T* data, int count, int rank, int tag, MPI_Status* status)
 template<class T>
 auto mpiRecvSyncAs(char* data, size_t numBytes, int rank, int tag, MPI_Status* status)
 {
+    spdlog::info("{:15} {}, {}, {}, {}, {}", "mpiRecvSyncAs", (void*)(data), numBytes, rank, tag, MPI_COMM_WORLD);
     return mpiRecvSync(reinterpret_cast<T*>(data), numBytes / sizeof(T), rank, tag, status);
 }
 
 template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
 auto mpiRecvAsync(T* data, int count, int rank, int tag, std::vector<MPI_Request>& requests)
 {
+    spdlog::info("{:15} {}, {}, {}, {}, {}, {}", "mpiRecvAsync", (void*)(data), count, rank, tag, MPI_COMM_WORLD,
+                 typeid(T).name());
     requests.push_back(MPI_Request{});
     return MPI_Irecv(data, count, MpiType<std::decay_t<T>>{}, rank, tag, MPI_COMM_WORLD, &requests.back());
 }
@@ -153,6 +165,7 @@ auto mpiRecvAsync(T* data, int count, int rank, int tag, std::vector<MPI_Request
 template<class T, std::enable_if_t<!std::is_arithmetic_v<T>, int> = 0>
 auto mpiRecvAsync(T* data, int count, int rank, int tag, std::vector<MPI_Request>& requests)
 {
+    spdlog::info("{:15} {}, {}, {}, {}, {}", "mpiRecvAsync", (void*)(data), count, rank, tag, MPI_COMM_WORLD);
     using ValueType    = typename T::value_type;
     constexpr size_t N = T{}.size();
     ValueType* ptr     = reinterpret_cast<ValueType*>(data);
@@ -164,6 +177,7 @@ auto mpiRecvAsync(T* data, int count, int rank, int tag, std::vector<MPI_Request
 template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
 auto mpiGetCount(MPI_Status* status, int* count)
 {
+    spdlog::info("mpiGetCount 1");
     return MPI_Get_count(status, MpiType<T>{}, count);
 }
 
@@ -171,6 +185,7 @@ auto mpiGetCount(MPI_Status* status, int* count)
 template<class T, std::enable_if_t<!std::is_arithmetic_v<T>, int> = 0>
 auto mpiGetCount(MPI_Status* status, int* count)
 {
+    spdlog::info("mpiGetCount 2");
     using ValueType    = typename T::value_type;
     constexpr size_t N = T{}.size();
     static_assert(N && "array length must be nonzero");
@@ -182,6 +197,7 @@ auto mpiGetCount(MPI_Status* status, int* count)
 template<class Ts, class Td, std::enable_if_t<std::is_arithmetic_v<Td>, int> = 0>
 auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op)
 {
+    spdlog::info("{:15} {}, {}, {}", "mpiAllreduce", (void*)(src), (void*)(dest), count);
     return MPI_Allreduce(src, dest, count, MpiType<Td>{}, op, MPI_COMM_WORLD);
 }
 
@@ -189,6 +205,7 @@ auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op)
 template<class Ts, class Td, std::enable_if_t<!std::is_arithmetic_v<Td>, int> = 0>
 auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op)
 {
+    spdlog::info("{:15} {}, {}, {}", "mpiAllreduce", (void*)(src), (void*)(dest), count);
     using ValueType    = typename Td::value_type;
     constexpr size_t N = Td{}.size();
 
@@ -202,6 +219,7 @@ auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op)
 template<class Ts, class Td, std::enable_if_t<std::is_arithmetic_v<Td>, int> = 0>
 auto mpiAllgatherv(const Ts* src, int sendCount, Td* dest, int* counts, int* displ, MPI_Comm comm)
 {
+    spdlog::info("{:15} {}, {}, {}, {}, {}", "mpiAllgatherv", (void*)(src), (void*)(dest), sendCount, *counts, *displ);
     return MPI_Allgatherv(src, sendCount, MpiType<Td>{}, dest, counts, displ, MpiType<Td>{}, comm);
 }
 
@@ -209,6 +227,7 @@ auto mpiAllgatherv(const Ts* src, int sendCount, Td* dest, int* counts, int* dis
 template<class Ts, class Td, std::enable_if_t<!std::is_arithmetic_v<Td>, int> = 0>
 auto mpiAllgatherv(const Ts* src, int sendCount, Td* dest, const int* counts, const int* displ, MPI_Comm comm)
 {
+    spdlog::info("{:15} {}, {}, {}, {}, {}", "mpiAllgatherv", (void*)(src), (void*)(dest), sendCount, *counts, *displ);
     using ValueType    = typename Td::value_type;
     constexpr size_t N = Td{}.size();
 

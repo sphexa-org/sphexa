@@ -88,6 +88,13 @@ if (SPH_EXA_WITH_H5HUT)
     endif ()
 endif ()
 
+option(SPH_EXA_WITH_LOGGING "Enable Logging for debug purposes" OFF)
+if (SPH_EXA_WITH_LOGGING)
+  find_package(spdlog REQUIRED)
+  find_package(fmt REQUIRED)
+  add_compile_definitions(SPDLOG_FMT_EXTERNAL)
+endif ()
+
 set(INSITU None CACHE STRING "Enable in-situ support")
 set_property(CACHE INSITU PROPERTY STRINGS None Catalyst Ascent)
 
