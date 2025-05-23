@@ -69,7 +69,7 @@ void computeIadDivvCurlvImpl(size_t startIndex, size_t endIndex, Dataset& d, con
     bool doGradV = d.dV11.size() == d.x.size();
 
     auto* divv  = d.divv.data();
-    auto* curlv = d.curlv.data();
+    auto* curlv = (d.x.size() == d.curlv.size()) ? d.curlv.data() : nullptr;
 
     const auto* wh  = d.wh.data();
     const auto* whd = d.whd.data();
@@ -91,13 +91,10 @@ void computeIadDivvCurlvImpl(size_t startIndex, size_t endIndex, Dataset& d, con
 }
 
 template<class Tc, class Dataset>
-void computeIadDivvCurlv(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box)
+void computeIadDivvCurlv(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
-    {
-        cuda::computeIadDivvCurlv(startIndex, endIndex, d, box);
-    }
-    else { computeIadDivvCurlvImpl(startIndex, endIndex, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeIadDivvCurlv(grp, d, box); }
+    else { computeIadDivvCurlvImpl(grp.firstBody, grp.lastBody, d, box); }
 }
 
 } // namespace sph

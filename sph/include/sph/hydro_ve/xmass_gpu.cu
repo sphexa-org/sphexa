@@ -1,8 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Basel, University of Zurich
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -32,9 +31,7 @@
 #include <thrust/transform.h>
 
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/findneighbors.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
-#include "cstone/traversal/groups.cuh"
 
 #include "sph/sph_gpu.hpp"
 #include "sph/particles_data.hpp"
@@ -44,9 +41,12 @@ namespace sph
 {
 
 using cstone::GpuConfig;
+using cstone::LocalIndex;
 using cstone::NcStats;
 using cstone::TravConfig;
 using cstone::TreeNodeIndex;
+
+unsigned nsGroupSize() { return TravConfig::targetSize; }
 
 namespace cuda
 {
@@ -54,17 +54,16 @@ namespace cuda
 __device__ bool nc_h_convergenceFailure = false;
 
 template<class Tc, class Tm, class T, class KeyType>
-__global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box,
-                         const cstone::LocalIndex* groups, cstone::LocalIndex numGroups,
-                         const cstone::OctreeNsView<Tc, KeyType> tree, unsigned* nc, const Tc* x, const Tc* y,
-                         const Tc* z, T* h, const Tm* m, const T* wh, const T* whd, T* xm, cstone::LocalIndex* nidx,
-                         TreeNodeIndex* globalPool)
+__global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box, const LocalIndex* grpStart,
+                         const LocalIndex* grpEnd, LocalIndex numGroups, const cstone::OctreeNsView<Tc, KeyType> tree,
+                         unsigned* nc, const Tc* x, const Tc* y, const Tc* z, T* h, const Tm* m, const T* wh,
+                         const T* whd, T* xm, LocalIndex* nidx, TreeNodeIndex* globalPool)
 {
     unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned targetIdx   = 0;
     unsigned warpIdxGrid = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
 
-    cstone::LocalIndex* neighborsWarp = nidx + ngmax * TravConfig::targetSize * warpIdxGrid;
+    LocalIndex* neighborsWarp = nidx + ngmax * TravConfig::targetSize * warpIdxGrid;
 
     while (true)
     {
@@ -74,9 +73,9 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
 
         if (targetIdx >= numGroups) return;
 
-        cstone::LocalIndex bodyBegin = groups[targetIdx];
-        cstone::LocalIndex bodyEnd   = groups[targetIdx + 1];
-        cstone::LocalIndex i         = bodyBegin + laneIdx;
+        LocalIndex bodyBegin = grpStart[targetIdx];
+        LocalIndex bodyEnd   = grpEnd[targetIdx];
+        LocalIndex i         = bodyBegin + laneIdx;
 
         unsigned ncSph =
             1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
@@ -103,26 +102,22 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
 }
 
 template<class Dataset>
-void computeXMass(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
+void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    unsigned numBodies = endIndex - startIndex;
-    unsigned numBlocks = TravConfig::numBlocks(numBodies);
-
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, numBodies, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
 
-    unsigned numGroups = d.devData.targetGroups.size() - 1;
-    xmassGpu<<<numBlocks, TravConfig::numThreads>>>(
-        d.K, d.ng0, d.ngmax, box, rawPtr(d.devData.targetGroups), numGroups, d.treeView.nsView(), rawPtr(d.devData.nc),
+    xmassGpu<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
+        d.K, d.ng0, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.nc),
         rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.m),
         rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.xm), nidxPool, traversalPool);
     checkGpuErrors(cudaDeviceSynchronize());
 
     NcStats::type stats[NcStats::numStats];
-    checkGpuErrors(cudaMemcpyFromSymbol(stats, cstone::ncStats, NcStats::numStats * sizeof(NcStats::type)));
+    checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(cstone::ncStats), NcStats::numStats * sizeof(NcStats::type)));
 
     bool convergenceFailure;
-    checkGpuErrors(cudaMemcpyFromSymbol(&convergenceFailure, nc_h_convergenceFailure, sizeof(bool)));
+    checkGpuErrors(cudaMemcpyFromSymbol(&convergenceFailure, GPU_SYMBOL(nc_h_convergenceFailure), sizeof(bool)));
 
     NcStats::type maxP2P   = stats[cstone::NcStats::maxP2P];
     NcStats::type maxStack = stats[cstone::NcStats::maxStack];
@@ -133,41 +128,44 @@ void computeXMass(size_t startIndex, size_t endIndex, Dataset& d, const cstone::
     if (convergenceFailure) { throw std::runtime_error("coupled nc/h-updated failed to converge"); }
 }
 
-template void computeXMass(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d,
+template void computeXMass(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
                            const cstone::Box<SphTypes::CoordinateType>&);
 
-template<class Dataset>
-void computeDensity(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
+template<class Tm, class Trho>
+__global__ void convertXmassToRho(const LocalIndex* grpStart, const LocalIndex* grpEnd, LocalIndex numGroups,
+                                  const Tm* m, Trho* rho)
 {
-    swap(d.devData.xm, d.devData.rho);
-    computeXMass(startIndex, endIndex, d, box);
-    swap(d.devData.xm, d.devData.rho);
+    LocalIndex tid = blockDim.x * blockIdx.x + threadIdx.x;
 
-    // rho[i] = m[i] / rho[i];
-    thrust::transform(d.devData.m.begin() + startIndex, d.devData.m.begin() + endIndex,
-                      d.devData.rho.begin() + startIndex, d.devData.rho.begin() + startIndex,
-                      thrust::divides<typename decltype(d.devData.m)::value_type>{});
+    if (tid >= numGroups) { return; }
+
+    LocalIndex bodyBegin = grpStart[tid];
+    LocalIndex bodyEnd   = grpEnd[tid];
+
+    for (auto i = bodyBegin; i < bodyEnd; ++i)
+    {
+        rho[i] = m[i] / rho[i];
+    }
 }
 
-template void computeDensity(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d,
+template<class Dataset>
+void computeDensity(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
+{
+    swap(d.devData.xm, d.devData.rho);
+    computeXMass(grp, d, box);
+    swap(d.devData.xm, d.devData.rho);
+
+    unsigned numThreads = 256;
+    unsigned numBlocks  = (grp.numGroups + numThreads - 1) / numThreads;
+    if (numBlocks == 0) { return; }
+
+    // rho[i] = m[i] / rho[i];
+    convertXmassToRho<<<numBlocks, numThreads>>>(grp.groupStart, grp.groupEnd, grp.numGroups, rawPtr(d.devData.m),
+                                                 rawPtr(d.devData.rho));
+}
+
+template void computeDensity(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,
                              const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace cuda
-
-template<class Dataset>
-void computeTargetGroups(size_t startIndex, size_t endIndex, Dataset& d,
-                         const cstone::Box<typename Dataset::RealType>& box)
-{
-    thrust::device_vector<util::array<GpuConfig::ThreadMask, TravConfig::nwt>> S;
-
-    float tolFactor = 2.0f;
-    cstone::computeGroupSplits<TravConfig::targetSize>(startIndex, endIndex, rawPtr(d.devData.x), rawPtr(d.devData.y),
-                                                       rawPtr(d.devData.z), rawPtr(d.devData.h), d.treeView.leaves,
-                                                       d.treeView.tree.numLeafNodes, d.treeView.layout, box, tolFactor,
-                                                       S, d.devData.traversalStack, d.devData.targetGroups);
-}
-
-template void computeTargetGroups(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d,
-                                  const cstone::Box<SphTypes::CoordinateType>&);
-
 } // namespace sph

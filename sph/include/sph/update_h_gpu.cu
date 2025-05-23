@@ -28,34 +28,38 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#include <cmath>
-
-#include "cstone/primitives/math.hpp"
-#include "cstone/tree/definitions.h"
+#include "cstone/cuda/gpu_config.cuh"
+#include "sph/sph_gpu.hpp"
 #include "sph/kernels.hpp"
 
 namespace sph
 {
+using cstone::LocalIndex;
 
 template<class Th>
-__global__ void updateSmoothingLengthGpuKernel(size_t first, size_t last, unsigned ng0, const unsigned* nc, Th* h)
+__global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, const unsigned* nc, Th* h)
 {
-    cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
-    if (i >= last) { return; }
+    LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
+    LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
+    if (warpIdx >= grp.numGroups) { return; }
+
+    LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
+    if (i >= grp.groupEnd[warpIdx]) { return; }
 
     h[i] = updateH(ng0, nc[i], h[i]);
 }
 
 template<class Th>
-void updateSmoothingLengthGpu(size_t first, size_t last, unsigned ng0, const unsigned* nc, Th* h)
+void updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, Th* h)
 {
-    unsigned numThreads = 256;
-    unsigned numBlocks  = cstone::iceil(last - first, 256);
-
-    updateSmoothingLengthGpuKernel<<<numBlocks, numThreads>>>(first, last, ng0, nc, h);
+    unsigned numThreads       = 256;
+    unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
+    unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+    if (numBlocks == 0) { return; }
+    updateSmoothingLengthGpuKernel<<<numBlocks, numThreads>>>(grp, ng0, nc, h);
 }
 
-template void updateSmoothingLengthGpu(size_t first, size_t last, unsigned ng0, const unsigned* nc, float* h);
-template void updateSmoothingLengthGpu(size_t first, size_t last, unsigned ng0, const unsigned* nc, double* h);
+template void updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, float* h);
+template void updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, double* h);
 
 } // namespace sph

@@ -49,10 +49,19 @@ void restoreDataset(IFileReader* reader, Dataset& d)
     {
         if (d.isConserved(i))
         {
-            if (reader->rank() == 0) { std::cout << "restoring " << d.fieldNames[i] << std::endl; }
+            if (reader->rank() == 0) { std::cout << "restoring " << d.fieldNames[i]; }
+            auto t0 = std::chrono::high_resolution_clock::now();
             std::visit([reader, key = d.fieldNames[i]](auto field)
-                       { reader->readField(Dataset::prefix + key, field->data()); },
-                       fieldPointers[i]);
+                       { reader->readField(Dataset::prefix + key, field->data()); }, fieldPointers[i]);
+            auto  t1       = std::chrono::high_resolution_clock::now();
+            int   typeSize = std::visit([](auto field) { return sizeof(*field->data()); }, fieldPointers[i]);
+            float readTime = std::chrono::duration<float>(t1 - t0).count();
+            if (reader->rank() == 0)
+            {
+                float sizeGB = float(typeSize) * reader->globalNumParticles() / 1024 / 1024 / 1024;
+                std::cout << ", " << sizeGB << " GB in " << readTime << " s, " << sizeGB / readTime << " GB/s"
+                          << std::endl;
+            }
         }
     }
 }
@@ -219,6 +228,7 @@ public:
         replicateField(reader, "temp", d.temp, T(1));
 
         std::fill(d.du_m1.begin(), d.du_m1.end(), 0);
+        std::fill(d.rung.begin(), d.rung.end(), 0);
         std::transform(d.vx.begin(), d.vx.end(), d.x_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
         std::transform(d.vy.begin(), d.vy.end(), d.y_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
         std::transform(d.vz.begin(), d.vz.end(), d.z_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });

@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -32,10 +16,9 @@
 #include <gtest/gtest.h>
 
 #include <vector>
-#include <thrust/device_vector.h>
-#include <thrust/host_vector.h>
 
 #include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/cuda/device_vector.h"
 #include "cstone/halos/exchange_halos_gpu.cuh"
 
 using namespace cstone;
@@ -44,8 +27,8 @@ using namespace cstone;
 void gpuDirect(int rank)
 {
     std::vector<int> msg{0, 1, 2, 3, 4};
-    thrust::device_vector<int> src  = msg;
-    thrust::device_vector<int> dest = std::vector<int>{-1, -1, -1, -1, -1};
+    DeviceVector<int> src  = msg;
+    DeviceVector<int> dest = std::vector<int>{-1, -1, -1, -1, -1};
 
     std::vector<MPI_Request> sendRequests;
     int tag = 0;
@@ -60,15 +43,14 @@ void gpuDirect(int rank)
         int err = mpiRecvSync(rawPtr(dest), msg.size(), 0, tag, MPI_STATUS_IGNORE);
         EXPECT_EQ(err, MPI_SUCCESS);
 
-        std::vector<int> probe(msg.size());
-        thrust::copy(dest.begin(), dest.end(), probe.begin());
+        std::vector<int> probe = toHost(dest);
         EXPECT_EQ(probe, msg);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
 }
 
-#ifdef USE_GPU_DIRECT
+#ifdef CSTONE_HAVE_GPU_AWARE_MPI
 TEST(HaloExchange, gpuDirect)
 #else
 TEST(HaloExchange, DISABLED_gpuDirect)
@@ -110,23 +92,21 @@ void simpleTest(int thisRank, int numRanks)
      *  Precondition: outgoing number of messages+sizes sender side have to match incoming messages+sizes
      *  receiver side.
      */
-    SendList incomingHalos(numRanks);
+    RecvList incomingHalos(numRanks);
     SendList outgoingHalos(numRanks);
     if (thisRank == 0)
     {
         //! send out indices 0-3 in two separate messages
         outgoingHalos[1].addRange(0, 1);
         outgoingHalos[1].addRange(1, 3);
-        incomingHalos[1].addRange(3, 6);
-        incomingHalos[1].addRange(6, 10);
+        incomingHalos[1] = {3, 10};
     }
     if (thisRank == 1)
     {
         //! send out indices 3-10 in two separate messages
         outgoingHalos[0].addRange(3, 6);
         outgoingHalos[0].addRange(6, 10);
-        incomingHalos[0].addRange(0, 1);
-        incomingHalos[0].addRange(1, 3);
+        incomingHalos[0] = {0, 3};
     }
 
     //! The expected result post-exchange
@@ -136,21 +116,20 @@ void simpleTest(int thisRank, int numRanks)
                                           {5, 6, 7}, {6, 7, 8}, {7, 8, 9}, {8, 9, 10}, {9, 10, 11}};
 
     //! upload to device
-    thrust::device_vector<double> d_x              = x;
-    thrust::device_vector<float> d_y               = y;
-    thrust::device_vector<util::array<int, 3>> d_z = z;
+    DeviceVector<double> d_x              = x;
+    DeviceVector<float> d_y               = y;
+    DeviceVector<util::array<int, 3>> d_z = z;
 
-    thrust::device_vector<char> sendBuffer    = std::vector<char>(7 * 24);
-    thrust::device_vector<char> receiveBuffer = std::vector<char>(7 * 24);
+    DeviceVector<char> sendBuffer    = std::vector<char>(7 * 24);
+    DeviceVector<char> receiveBuffer = std::vector<char>(7 * 24);
 
     //! Perform exchange with GPU buffers
-    haloExchangeGpu(0, incomingHalos, outgoingHalos, sendBuffer, receiveBuffer, thrust::raw_pointer_cast(d_x.data()),
-                    thrust::raw_pointer_cast(d_y.data()), thrust::raw_pointer_cast(d_z.data()));
+    haloExchangeGpu(0, incomingHalos, outgoingHalos, sendBuffer, receiveBuffer, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z));
 
     //! download from device
-    thrust::copy(d_x.begin(), d_x.end(), x.begin());
-    thrust::copy(d_y.begin(), d_y.end(), y.begin());
-    thrust::copy(d_z.begin(), d_z.end(), z.begin());
+    memcpyD2H(d_x.data(), d_x.size(), x.data());
+    memcpyD2H(d_y.data(), d_y.size(), y.data());
+    memcpyD2H(d_z.data(), d_z.size(), z.data());
 
     EXPECT_EQ(xRef, x);
     EXPECT_EQ(yRef, y);

@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -34,11 +18,11 @@
 #include <algorithm>
 #include <cassert>
 #include <numeric>
+#include <span>
 #include <tuple>
 #include <vector>
 
 #include "cstone/tree/definitions.h"
-#include "cstone/util/gsl-lite.hpp"
 #include "cstone/util/noinit_alloc.hpp"
 #include "cstone/util/reallocate.hpp"
 
@@ -70,8 +54,8 @@ void sort_by_key(InoutIterator keyBegin, InoutIterator keyEnd, OutputIterator va
         keyIndexPairs[i] = std::make_tuple(keyBegin[i], valueBegin[i]);
 
     // sort, comparing only the first tuple element
-    std::sort(begin(keyIndexPairs), end(keyIndexPairs),
-              [compare](const auto& t1, const auto& t2) { return compare(std::get<0>(t1), std::get<0>(t2)); });
+    std::stable_sort(begin(keyIndexPairs), end(keyIndexPairs),
+                     [compare](const auto& t1, const auto& t2) { return compare(std::get<0>(t1), std::get<0>(t2)); });
 
 // extract the resulting ordering and store back the sorted keys
 #pragma omp parallel for schedule(static)
@@ -104,7 +88,7 @@ void omp_copy(InputIterator first, InputIterator last, OutputIterator out)
 
 //! @brief gather reorder
 template<class IndexType, class ValueType>
-void gather(gsl::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
+void gather(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
 {
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < ordering.size(); ++i)
@@ -114,13 +98,12 @@ void gather(gsl::span<const IndexType> ordering, const ValueType* source, ValueT
 }
 
 //! @brief Lambda to avoid templated functors that would become template-template parameters when passed to functions.
-inline auto gatherCpu = [](const auto* ordering, auto numElements, const auto* src, const auto dest) {
-    gather<LocalIndex>({ordering, numElements}, src, dest);
-};
+inline auto gatherCpu = [](std::span<const LocalIndex> ordering, const auto* src, auto* dest)
+{ gather<LocalIndex>(ordering, src, dest); };
 
 //! @brief scatter reorder
 template<class IndexType, class ValueType>
-void scatter(gsl::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
+void scatter(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
 {
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < ordering.size(); ++i)
@@ -129,7 +112,18 @@ void scatter(gsl::span<const IndexType> ordering, const ValueType* source, Value
     }
 }
 
-template<class IndexType, class BufferType>
+//! @brief gather from @p src and scatter into @p dst
+template<class IndexType, class VType>
+void gatherScatter(std::span<const IndexType> gmap, std::span<const IndexType> smap, const VType* src, VType* dst)
+{
+#pragma omp parallel for schedule(static)
+    for (size_t i = 0; i < gmap.size(); ++i)
+    {
+        dst[smap[i]] = src[gmap[i]];
+    }
+}
+
+template<class BufferType>
 class SfcSorter
 {
 public:
@@ -140,26 +134,15 @@ public:
 
     SfcSorter(const SfcSorter&) = delete;
 
-    const IndexType* getMap() const { return ordering(); }
-
-    template<class KeyType>
-    void setMapFromCodes(KeyType* first, KeyType* last)
-    {
-        mapSize_ = std::size_t(last - first);
-        reallocateBytes(buffer_, mapSize_ * sizeof(IndexType));
-        std::iota(ordering(), ordering() + mapSize_, 0);
-        sort_by_key(first, last, ordering());
-    }
-
-    auto gatherFunc() const { return gatherCpu; }
+    LocalIndex* getMap() { return ordering(); }
+    BufferType& getBuf() { return buffer_; }
 
 private:
-    IndexType* ordering() { return reinterpret_cast<IndexType*>(buffer_.data()); }
-    const IndexType* ordering() const { return reinterpret_cast<const IndexType*>(buffer_.data()); }
+    LocalIndex* ordering() { return reinterpret_cast<LocalIndex*>(buffer_.data()); }
+    const LocalIndex* ordering() const { return reinterpret_cast<const LocalIndex*>(buffer_.data()); }
 
     //! @brief reference to (non-owning) buffer for ordering
     BufferType& buffer_;
-    std::size_t mapSize_{0};
 };
 
 } // namespace cstone

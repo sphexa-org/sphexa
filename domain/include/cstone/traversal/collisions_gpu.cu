@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -45,7 +29,7 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
                                 const Box<T> box,
                                 TreeNodeIndex firstNode,
                                 TreeNodeIndex lastNode,
-                                int* collisionFlags)
+                                uint8_t* collisionFlags)
 {
     unsigned leafIdx = blockIdx.x * blockDim.x + threadIdx.x + firstNode;
 
@@ -94,7 +78,7 @@ void findHalosGpu(const KeyType* prefixes,
                   const Box<T>& box,
                   TreeNodeIndex firstNode,
                   TreeNodeIndex lastNode,
-                  int* collisionFlags)
+                  uint8_t* collisionFlags)
 {
     constexpr unsigned numThreads = 128;
     unsigned numBlocks            = iceil(lastNode - firstNode, numThreads);
@@ -107,7 +91,7 @@ void findHalosGpu(const KeyType* prefixes,
     template void findHalosGpu(const KeyType* prefixes, const TreeNodeIndex* childOffsets,                             \
                                const TreeNodeIndex* internalToLeaf, const KeyType* leaves,                             \
                                const RadiusType* interactionRadii, const Box<T>& box, TreeNodeIndex firstNode,         \
-                               TreeNodeIndex lastNode, int* collisionFlags)
+                               TreeNodeIndex lastNode, uint8_t* collisionFlags)
 
 FIND_HALOS_GPU(uint32_t, float, float);
 FIND_HALOS_GPU(uint32_t, float, double);
@@ -121,7 +105,8 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
                                   const Box<T> box,
                                   const KeyType* focusNodes,
                                   TreeNodeIndex numFocusNodes,
-                                  char* markings)
+                                  bool limitSource,
+                                  uint8_t* markings)
 {
     unsigned tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -136,7 +121,10 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
     if (containedIn(focusStart, focusEnd, targetExt)) { return; }
 
     auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
-    markMacPerBox(targetCenter, targetSize, prefixes, childOffsets, centers, box, focusStart, focusEnd, markings);
+    unsigned maxLevel               = maxTreeLevel<KeyType>{};
+    if (limitSource) { maxLevel = stl::max(int(treeLevel(focusNodes[tid + 1] - focusNodes[tid])) - 1, 0); }
+    markMacPerBox(targetCenter, targetSize, maxLevel, prefixes, childOffsets, centers, box, focusStart, focusEnd,
+                  markings);
 }
 
 template<class T, class KeyType>
@@ -146,19 +134,23 @@ void markMacsGpu(const KeyType* prefixes,
                  const Box<T>& box,
                  const KeyType* focusNodes,
                  TreeNodeIndex numFocusNodes,
-                 char* markings)
+                 bool limitSource,
+                 uint8_t* markings)
 {
     constexpr unsigned numThreads = 128;
     unsigned numBlocks            = iceil(numFocusNodes, numThreads);
 
-    markMacsGpuKernel<<<numBlocks, numThreads>>>(prefixes, childOffsets, centers, box, focusNodes, numFocusNodes,
-                                                 markings);
+    if (numFocusNodes)
+    {
+        markMacsGpuKernel<<<numBlocks, numThreads>>>(prefixes, childOffsets, centers, box, focusNodes, numFocusNodes,
+                                                     limitSource, markings);
+    }
 }
 
 #define MARK_MACS_GPU(KeyType, T)                                                                                      \
     template void markMacsGpu(const KeyType* prefixes, const TreeNodeIndex* childOffsets, const Vec4<T>* centers,      \
                               const Box<T>& box, const KeyType* focusNodes, TreeNodeIndex numFocusNodes,               \
-                              char* markings)
+                              bool limitSource, uint8_t* markings)
 
 MARK_MACS_GPU(uint64_t, double);
 MARK_MACS_GPU(uint64_t, float);

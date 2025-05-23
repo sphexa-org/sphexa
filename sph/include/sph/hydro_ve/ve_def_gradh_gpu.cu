@@ -30,7 +30,6 @@
  */
 
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/findneighbors.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
 
 #include "sph/sph_gpu.hpp"
@@ -43,14 +42,16 @@ namespace cuda
 {
 
 using cstone::GpuConfig;
+using cstone::LocalIndex;
 using cstone::TravConfig;
 using cstone::TreeNodeIndex;
 
 template<typename Tc, class Tm, class T, class KeyType>
-__global__ void veDefGradhGpu(Tc K, unsigned ngmax, const cstone::Box<Tc> box, const cstone::LocalIndex* groups,
-                              cstone::LocalIndex numGroups, const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* x,
-                              const Tc* y, const Tc* z, const T* h, const Tm* m, const T* wh, const T* whd, const T* xm,
-                              T* kx, T* gradh, cstone::LocalIndex* nidx, TreeNodeIndex* globalPool)
+__global__ void veDefGradhGpu(Tc K, unsigned ngmax, const cstone::Box<Tc> box, const LocalIndex* grpStart,
+                              const LocalIndex* grpEnd, LocalIndex numGroups,
+                              const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* x, const Tc* y, const Tc* z,
+                              const T* h, const Tm* m, const T* wh, const T* whd, const T* xm, T* kx, T* gradh,
+                              LocalIndex* nidx, TreeNodeIndex* globalPool)
 {
     unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned targetIdx   = 0;
@@ -66,9 +67,9 @@ __global__ void veDefGradhGpu(Tc K, unsigned ngmax, const cstone::Box<Tc> box, c
 
         if (targetIdx >= numGroups) return;
 
-        cstone::LocalIndex bodyBegin = groups[targetIdx];
-        cstone::LocalIndex bodyEnd   = groups[targetIdx + 1];
-        cstone::LocalIndex i         = bodyBegin + laneIdx;
+        LocalIndex bodyBegin = grpStart[targetIdx];
+        LocalIndex bodyEnd   = grpEnd[targetIdx];
+        LocalIndex i         = bodyBegin + laneIdx;
 
         auto ncTrue = traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool);
 
@@ -81,18 +82,13 @@ __global__ void veDefGradhGpu(Tc K, unsigned ngmax, const cstone::Box<Tc> box, c
 }
 
 template<class Dataset>
-void computeVeDefGradh(size_t startIndex, size_t endIndex, Dataset& d,
-                       const cstone::Box<typename Dataset::RealType>& box)
+void computeVeDefGradh(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    unsigned numBodies = endIndex - startIndex;
-    unsigned numBlocks = TravConfig::numBlocks(numBodies);
-
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, numBodies, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
 
-    unsigned numGroups = d.devData.targetGroups.size() - 1;
-    veDefGradhGpu<<<numBlocks, TravConfig::numThreads>>>(
-        d.K, d.ngmax, box, rawPtr(d.devData.targetGroups), numGroups, d.treeView.nsView(), rawPtr(d.devData.x),
+    veDefGradhGpu<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
+        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x),
         rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.m), rawPtr(d.devData.wh),
         rawPtr(d.devData.whd), rawPtr(d.devData.xm), rawPtr(d.devData.kx), rawPtr(d.devData.gradh), nidxPool,
         traversalPool);
@@ -100,7 +96,7 @@ void computeVeDefGradh(size_t startIndex, size_t endIndex, Dataset& d,
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeVeDefGradh(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d,
+template void computeVeDefGradh(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,
                                 const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace cuda

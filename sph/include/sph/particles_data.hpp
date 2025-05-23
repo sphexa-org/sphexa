@@ -31,17 +31,19 @@
 #pragma once
 
 #include <array>
+#include <iostream>
 #include <vector>
 #include <variant>
 
 #include "cstone/cuda/cuda_utils.hpp"
 #include "cstone/fields/data_util.hpp"
 #include "cstone/fields/field_states.hpp"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/reallocate.hpp"
 
+#include "sph/eos.hpp"
 #include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"
 #include "sph/types.hpp"
@@ -50,7 +52,6 @@
 #include "sph_kernel_tables.hpp"
 
 #if defined(USE_CUDA)
-#include "sph/util/pinned_allocator.cuh"
 #include "particles_data_gpu.cuh"
 #endif
 
@@ -77,8 +78,8 @@ public:
     template<class ValueType>
     using FieldVector = std::vector<ValueType, std::allocator<ValueType>>;
 
-    using FieldVariant =
-        std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*, FieldVector<uint64_t>*>;
+    using FieldVariant = std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*,
+                                      FieldVector<uint64_t>*, FieldVector<uint8_t>*>;
 
     ParticlesData() { createTables(); }
     ParticlesData(const ParticlesData&) = delete;
@@ -112,11 +113,18 @@ public:
     //! @brief acceleration based time-step control
     RealType etaAcc{0.2};
 
+    //! @brief EOS parameters
+    sph::EosType eosChoice{sph::EosType::idealGas};
     //! @brief adiabatic index
     RealType gamma{5.0 / 3.0};
-
+    //! @brief polytropic index
+    RealType polytropic_index{5. / 3.};
+    //! @brief polytropic constant
+    RealType polytropic_const{1.};
     //! @brief mean molecular weight of ions for models that use one value for all particles
     Tmass muiConst{10.0};
+    //! @brief constant sound speed for isothermal EOS
+    HydroType soundSpeedConst{1.0};
 
     // AV switches floor and ceiling
     HydroType alphamin{0.05};
@@ -177,10 +185,16 @@ public:
         optionalIO("Kcour", &Kcour, 1);
         optionalIO("Krho", &Krho, 1);
         ar->stepAttribute("gravConstant", &g, 1);
-        optionalIO("gamma", &gamma, 1);
         optionalIO("eps", &eps, 1);
         optionalIO("etaAcc", &etaAcc, 1);
+
+        // EOS parameters
+        optionalIO("gamma", &gamma, 1);
+        optionalIO("eosChoice", &eosChoice, 1);
         optionalIO("muiConst", &muiConst, 1);
+        optionalIO("soundSpeedConst", &soundSpeedConst, 1);
+        optionalIO("polytropic_index", &polytropic_index, 1);
+        optionalIO("polytropic_const", &polytropic_const, 1);
 
         optionalIO("alphamin", &alphamin, 1);
         optionalIO("alphamax", &alphamax, 1);
@@ -218,6 +232,7 @@ public:
     FieldVector<HydroType> cv;                                 // Specific heat
     FieldVector<HydroType> mue, mui;                           // mean molecular weight (electrons, ions)
     FieldVector<HydroType> divv, curlv;                        // Div(velocity), Curl(velocity)
+    FieldVector<HydroType> ugrav;                              // Gravitational potential
     FieldVector<HydroType> ax, ay, az;                         // acceleration
     FieldVector<RealType>  du;                                 // energy rate of change (du/dt)
     FieldVector<XM1Type>   du_m1;                              // previous energy rate of change (du/dt)
@@ -229,10 +244,12 @@ public:
     FieldVector<KeyType>   keys;                               // Particle space-filling-curve keys
     FieldVector<unsigned>  nc;                                 // number of neighbors of each particle
     FieldVector<HydroType> dV11, dV12, dV13, dV22, dV23, dV33; // Velocity gradient components
+    FieldVector<uint8_t>   rung;                               // rung per particle of previous timestep
+    FieldVector<uint64_t>  id;                                 // unique particle id
 
     //! @brief Indices of neighbors for each particle, length is number of assigned particles * ngmax. CPU version only.
-    std::vector<cstone::LocalIndex>             neighbors;
-    cstone::OctreeProperties<RealType, KeyType> treeView;
+    std::vector<cstone::LocalIndex>         neighbors;
+    cstone::OctreeNsView<RealType, KeyType> treeView;
 
     DeviceData_t<AccType> devData;
 
@@ -243,10 +260,10 @@ public:
      * Name of each field as string for use e.g in HDF5 output. Order has to correspond to what's returned by data().
      */
     inline static constexpr std::array fieldNames{
-        "x",     "y",        "z",    "x_m1", "y_m1", "z_m1", "vx",   "vy",   "vz",   "rho",   "u",    "p",
-        "prho",  "tdpdTrho", "h",    "m",    "c",    "ax",   "ay",   "az",   "du",   "du_m1", "c11",  "c12",
-        "c13",   "c22",      "c23",  "c33",  "mue",  "mui",  "temp", "cv",   "xm",   "kx",    "divv", "curlv",
-        "alpha", "gradh",    "keys", "nc",   "dV11", "dV12", "dV13", "dV22", "dV23", "dV33"};
+        "x",        "y",   "z",    "x_m1", "y_m1",  "z_m1", "vx",   "vy",   "vz",   "rho",   "u",     "p",     "prho",
+        "tdpdTrho", "h",   "m",    "c",    "ugrav", "ax",   "ay",   "az",   "du",   "du_m1", "c11",   "c12",   "c13",
+        "c22",      "c23", "c33",  "mue",  "mui",   "temp", "cv",   "xm",   "kx",   "divv",  "curlv", "alpha", "gradh",
+        "keys",     "nc",  "dV11", "dV12", "dV13",  "dV22", "dV23", "dV33", "rung", "id"};
 
     //! @brief dataset prefix to be prepended to fieldNames for structured output
     static const inline std::string prefix{};
@@ -260,9 +277,10 @@ public:
      */
     auto dataTuple()
     {
-        auto ret = std::tie(x, y, z, x_m1, y_m1, z_m1, vx, vy, vz, rho, u, p, prho, tdpdTrho, h, m, c, ax, ay, az, du,
-                            du_m1, c11, c12, c13, c22, c23, c33, mue, mui, temp, cv, xm, kx, divv, curlv, alpha, gradh,
-                            keys, nc, dV11, dV12, dV13, dV22, dV23, dV33);
+        auto ret = std::tie(x, y, z, x_m1, y_m1, z_m1, vx, vy, vz, rho, u, p, prho, tdpdTrho, h, m, c, ugrav, ax, ay,
+                            az, du, du_m1, c11, c12, c13, c22, c23, c33, mue, mui, temp, cv, xm, kx, divv, curlv, alpha,
+                            gradh, keys, nc, dV11, dV12, dV13, dV22, dV23, dV33, rung, id);
+
 #if defined(__clang__) || __GNUC__ > 11
         static_assert(std::tuple_size_v<decltype(ret)> == fieldNames.size());
 #endif
@@ -301,23 +319,62 @@ public:
 
     void resize(size_t size)
     {
-        double growthRate = 1.05;
-        auto   data_      = data();
+        auto data_ = data();
+
+        auto deallocateVector = [size](auto* devVectorPtr)
+        {
+            using DevVector = std::decay_t<decltype(*devVectorPtr)>;
+            if (devVectorPtr->capacity() < size) { *devVectorPtr = DevVector{}; }
+        };
+
+        for (size_t i = 0; i < data_.size(); ++i)
+        {
+            if (this->isAllocated(i) && not this->isConserved(i)) { std::visit(deallocateVector, data_[i]); }
+        }
 
         for (size_t i = 0; i < data_.size(); ++i)
         {
             if (this->isAllocated(i))
             {
-                std::visit([size, growthRate](auto& arg) { reallocate(*arg, size, growthRate); }, data_[i]);
+                std::visit([size, gr = allocGrowthRate_](auto* arg) { reallocate(*arg, size, gr); }, data_[i]);
             }
         }
 
-        devData.resize(size);
+        devData.resize(size, allocGrowthRate_);
+    }
+
+    size_t size()
+    {
+        auto data_ = data();
+        for (size_t i = 0; i < data_.size(); ++i)
+        {
+            if (this->isAllocated(i))
+            {
+                return std::visit([](auto* arg) { return arg->size(); }, data_[i]);
+            }
+        }
+        return 0;
+    }
+
+    //! @brief resize GPU arrays if in use, CPU arrays otherwise
+    void resizeAcc(size_t size)
+    {
+        if (cstone::HaveGpu<AccType>{}) { devData.resize(size, allocGrowthRate_); }
+        else { resize(size); }
+    }
+
+    //! @brief return the size of GPU arrays if in use, CPU arrays otherwise
+    size_t accSize()
+    {
+        if (cstone::HaveGpu<AccType>{}) { return devData.size(); }
+        else { return size(); }
     }
 
     //! @brief particle fields selected for file output
     std::vector<int>         outputFieldIndices;
     std::vector<std::string> outputFieldNames;
+
+    float getAllocGrowthRate() const { return allocGrowthRate_; }
 
 private:
     void createTables()
@@ -328,13 +385,16 @@ private:
         whd     = sph::tabulateFunction<H, lt::kTableSize>(sph::getSphKernelDerivative(kernelChoice, sincIndex), 0, 2);
         devData.uploadTables(wh, whd);
     }
+
+    //! @brief buffer growth factor when reallocating
+    float allocGrowthRate_{1.05};
 };
 
 //! @brief resizes the neighbors list, only used in the CPU version
 template<class Dataset>
 void resizeNeighbors(Dataset& d, size_t size)
 {
-    double growthRate = 1.05;
+    auto growthRate = d.getAllocGrowthRate();
     //! If we have a GPU, neighbors are calculated on-the-fly, so we don't need space to store them
     reallocate(d.neighbors, cstone::HaveGpu<typename Dataset::AcceleratorType>{} ? 0 : size, growthRate);
 }

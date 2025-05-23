@@ -45,7 +45,7 @@ TEST(DeviceParticlesData, resize)
     dev.setDependent("du");
 
     size_t size = 10;
-    dev.resize(10);
+    dev.resize(10, 1.01);
 
     EXPECT_EQ(dev.x.size(), size);
     EXPECT_EQ(dev.y.size(), size);

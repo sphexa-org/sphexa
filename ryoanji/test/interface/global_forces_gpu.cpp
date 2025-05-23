@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Ryoanji N-body solver
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -32,11 +16,9 @@
 
 #include <mpi.h>
 
-#include <thrust/device_vector.h>
-#include <thrust/host_vector.h>
-
 #define USE_CUDA
 #include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/cuda/device_vector.h"
 #include "cstone/domain/domain.hpp"
 #include "cstone/findneighbors.hpp"
 #include "coord_samples/random.hpp"
@@ -85,16 +67,16 @@ static int multipoleHolderTest(int thisRank, int numRanks)
 
     MultipoleHolder<T, T, T, T, T, KeyType, MultipoleType> multipoleHolder;
 
-    thrust::device_vector<KeyType> d_keys = h_keys;
-    thrust::device_vector<T>       d_x = x, d_y = y, d_z = z, d_h = h;
-    thrust::device_vector<T>       d_m = m;
-    thrust::device_vector<T>       s1;
-    thrust::device_vector<T>       s2, s3;
+    cstone::DeviceVector<KeyType> d_keys = h_keys;
+    cstone::DeviceVector<T>       d_x = x, d_y = y, d_z = z, d_h = h;
+    cstone::DeviceVector<T>       d_m = m;
+    cstone::DeviceVector<T>       s1;
+    cstone::DeviceVector<T>       s2, s3;
     domain.syncGrav(d_keys, d_x, d_y, d_z, d_h, d_m, std::tuple{}, std::tie(s1, s2, s3));
     domain.exchangeHalos(std::tie(d_m), s1, s2);
 
     h_keys.resize(domain.nParticles());
-    thrust::copy(d_keys.begin() + domain.startIndex(), d_keys.begin() + domain.endIndex(), h_keys.begin());
+    memcpyD2H(d_keys.data() + domain.startIndex(), domain.nParticles(), h_keys.data());
 
     /*! The range [firstGlobalIdx:lastGlobalIdx] of the global set @a coords is identical to the locally
      *  present particles contained in the range [domain.startIndex():domain.endIndex()] of arrays (d_x, d_y, d_z)
@@ -113,7 +95,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     const cstone::FocusedOctree<KeyType, T, cstone::GpuTag>& focusTree = domain.focusTree();
     //! the focused octree, structure only
     auto                                         octree  = focusTree.octreeViewAcc();
-    gsl::span<const cstone::SourceCenterType<T>> centers = focusTree.expansionCentersAcc();
+    std::span<const cstone::SourceCenterType<T>> centers = focusTree.expansionCentersAcc();
 
     std::vector<MultipoleType> multipoles(octree.numNodes);
     multipoleHolder.upsweep(rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), domain.globalTree(), domain.focusTree(),
@@ -124,30 +106,37 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     bool                pass;
     std::vector<double> firstPercentiles(numRanks), maxErrors(numRanks);
     {
-        thrust::device_vector<T> d_ax, d_ay, d_az;
+        cstone::DeviceVector<T> d_ax, d_ay, d_az;
         d_ax = std::vector<T>(domain.nParticlesWithHalos(), 0);
         d_ay = std::vector<T>(domain.nParticlesWithHalos(), 0);
         d_az = std::vector<T>(domain.nParticlesWithHalos(), 0);
 
-        multipoleHolder.createGroups(domain.startIndex(), domain.endIndex(), rawPtr(d_x), rawPtr(d_y), rawPtr(d_z),
-                                     rawPtr(d_h), domain.focusTree(), domain.layout().data(), domain.box());
-        double bhPotential = multipoleHolder.compute(rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), rawPtr(d_h), G,
-                                                     0, box, rawPtr(d_ax), rawPtr(d_ay), rawPtr(d_az));
+        auto   grp = multipoleHolder.computeSpatialGroups(domain.startIndex(), domain.endIndex(), rawPtr(d_x),
+                                                          rawPtr(d_y), rawPtr(d_z), rawPtr(d_h), domain.focusTree(),
+                                                          domain.layout().data(), domain.box());
+        double bhPotential =
+            multipoleHolder.compute(grp, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), rawPtr(d_h), G, 0, box,
+                                    nullptr, rawPtr(d_ax), rawPtr(d_ay), rawPtr(d_az));
+
+        // create a host vector and download a device pointer range into it
+        auto dl = [](auto* p1, auto* p2)
+        {
+            std::vector<std::remove_pointer_t<decltype(p1)>> ret(p2 - p1);
+            memcpyD2H(p1, p2 - p1, ret.data());
+            return ret;
+        };
 
         // download BH accelerations for locally present particles
-        thrust::host_vector<T> ax(d_ax.begin() + domain.startIndex(), d_ax.begin() + domain.endIndex());
-        thrust::host_vector<T> ay(d_ay.begin() + domain.startIndex(), d_ay.begin() + domain.endIndex());
-        thrust::host_vector<T> az(d_az.begin() + domain.startIndex(), d_az.begin() + domain.endIndex());
+        std::vector<T> ax = dl(d_ax.data() + domain.startIndex(), d_ax.data() + domain.endIndex());
+        std::vector<T> ay = dl(d_ay.data() + domain.startIndex(), d_ay.data() + domain.endIndex());
+        std::vector<T> az = dl(d_az.data() + domain.startIndex(), d_az.data() + domain.endIndex());
 
-        thrust::device_vector<T> d_xref = coords.x(), d_yref = coords.y(), d_zref = coords.z();
-        thrust::device_vector<T> d_mref = globalMasses;
-        thrust::device_vector<T> d_href = globalH;
+        cstone::DeviceVector<T> d_xref = coords.x(), d_yref = coords.y(), d_zref = coords.z();
+        cstone::DeviceVector<T> d_mref = globalMasses;
+        cstone::DeviceVector<T> d_href = globalH;
 
-        thrust::device_vector<T> d_potref, d_axref, d_ayref, d_azref;
-        reallocateDevice(d_potref, numParticles, 1.0);
-        reallocateDevice(d_axref, numParticles, 1.0);
-        reallocateDevice(d_ayref, numParticles, 1.0);
-        reallocateDevice(d_azref, numParticles, 1.0);
+        cstone::DeviceVector<T> d_potref(numParticles, 0);
+        cstone::DeviceVector<T> d_axref(numParticles, 0), d_ayref(numParticles, 0), d_azref(numParticles, 0);
 
         // reference direct sum calculation with the global set of sources
         directSum(firstGlobalIdx, lastGlobalIdx, numParticles, {box.lx(), box.ly(), box.lz()}, numShells,
@@ -155,10 +144,10 @@ static int multipoleHolderTest(int thisRank, int numRanks)
                   rawPtr(d_axref), rawPtr(d_ayref), rawPtr(d_azref));
 
         // download reference direct sum accelerations due to global source set
-        thrust::host_vector<T> pRef(d_potref.begin() + firstGlobalIdx, d_potref.begin() + lastGlobalIdx);
-        thrust::host_vector<T> axRef(d_axref.begin() + firstGlobalIdx, d_axref.begin() + lastGlobalIdx);
-        thrust::host_vector<T> ayRef(d_ayref.begin() + firstGlobalIdx, d_ayref.begin() + lastGlobalIdx);
-        thrust::host_vector<T> azRef(d_azref.begin() + firstGlobalIdx, d_azref.begin() + lastGlobalIdx);
+        std::vector<T> pRef  = dl(d_potref.data() + firstGlobalIdx, d_potref.data() + lastGlobalIdx);
+        std::vector<T> axRef = dl(d_axref.data() + firstGlobalIdx, d_axref.data() + lastGlobalIdx);
+        std::vector<T> ayRef = dl(d_ayref.data() + firstGlobalIdx, d_ayref.data() + lastGlobalIdx);
+        std::vector<T> azRef = dl(d_azref.data() + firstGlobalIdx, d_azref.data() + lastGlobalIdx);
 
         double         potentialSumRef = 0;
         std::vector<T> errors(ax.size());
@@ -201,6 +190,53 @@ static int multipoleHolderTest(int thisRank, int numRanks)
         bool passPot    = std::abs((bhPotentialGlob - potentialSumRefGlob) / potentialSumRefGlob) < ptol;
 
         pass = passAcc1pc && passAccMax && passPot;
+
+        // Test separate targets and sources
+        {
+            auto extract = [](cstone::DeviceVector<T>& dv, LocalIndex a, LocalIndex b)
+            {
+                cstone::DeviceVector<T> ret(b - a);
+                memcpyD2D(dv.data() + a, ret.size(), ret.data());
+                return ret;
+            };
+
+            /* Compute accelerations for some target particles. We pick the first numTarget sources because
+             * we already have the reference values. But the target particles can be distinct from the sources.
+             * The only concern is performance: this only runs efficiently if the targets are SFC sorted and grouped
+             * by MultipoleHolder::computeSpatialGroups to ensure that target groups have compact bounding boxes.
+             */
+            LocalIndex              numTargets = 100;
+            cstone::DeviceVector<T> d_xt       = extract(d_x, domain.startIndex(), domain.startIndex() + numTargets);
+            cstone::DeviceVector<T> d_yt       = extract(d_y, domain.startIndex(), domain.startIndex() + numTargets);
+            cstone::DeviceVector<T> d_zt       = extract(d_z, domain.startIndex(), domain.startIndex() + numTargets);
+            cstone::DeviceVector<T> d_mt       = extract(d_m, domain.startIndex(), domain.startIndex() + numTargets);
+            cstone::DeviceVector<T> d_ht       = extract(d_h, domain.startIndex(), domain.startIndex() + numTargets);
+
+            auto targetGroups =
+                multipoleHolder.computeSpatialGroups(0, numTargets, d_xt.data(), d_yt.data(), d_zt.data(), d_ht.data(),
+                                                     focusTree, domain.layout().data(), box);
+
+            cstone::DeviceVector<T> d_axt(numTargets, 0), d_ayt(numTargets, 0), d_azt(numTargets, 0);
+
+            multipoleHolder.compute(targetGroups, d_xt.data(), d_yt.data(), d_zt.data(), d_mt.data(), d_ht.data(),
+                                    d_x.data(), d_y.data(), d_z.data(), d_m.data(), d_h.data(), G, 0, box, nullptr,
+                                    rawPtr(d_axt), rawPtr(d_ayt), rawPtr(d_azt));
+
+            std::vector<T> axt = toHost(d_axt);
+            std::vector<T> ayt = toHost(d_ayt);
+            std::vector<T> azt = toHost(d_azt);
+
+            bool passTargets = true;
+            for (int i = 0; i < numTargets; i++)
+            {
+                Vec3<T> ref   = {axRef[i], ayRef[i], azRef[i]};
+                Vec3<T> probe = {axt[i], ayt[i], azt[i]};
+                T       error = std::sqrt(norm2(ref - probe) / norm2(ref));
+                if (error > atolmax) { passTargets = false; }
+            }
+            if (not passTargets) { std::cout << "Separate targets were not correct" << std::endl; }
+            pass = pass && passTargets;
+        }
     }
 
     if (thisRank == 0)

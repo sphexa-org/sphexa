@@ -27,16 +27,14 @@
  * @brief A Propagator class for standard SPH including Grackle chemistry and cooling
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
- * @author Jose A. Escartin <ja.escartin@gmail.com>
  * @author Noah Kubli <noah.kubli@uzh.ch>
  */
 
 #pragma once
 
-#include <variant>
-
 #include "cstone/fields/field_get.hpp"
 #include "cstone/util/value_list.hpp"
+#include "io/arg_parser.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/sph.hpp"
 
@@ -56,6 +54,7 @@ template<class DomainType, class DataType>
 class HydroGrackleProp final : public HydroProp<DomainType, DataType>
 {
     using Base = HydroProp<DomainType, DataType>;
+    using Base::groups_;
     using Base::timer;
 
     using T        = typename DataType::RealType;
@@ -68,7 +67,7 @@ class HydroGrackleProp final : public HydroProp<DomainType, DataType>
      *
      * x, y, z, h and m are automatically considered conserved and must not be specified in this list
      */
-    using ConservedFields = FieldList<"u", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1">;
+    using ConservedFields = FieldList<"u", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "id">;
 
     //! @brief the list of dependent particle fields, these may be used as scratch space during domain sync
     using DependentFields =
@@ -166,9 +165,10 @@ public:
 
         resizeNeighbors(d, domain.nParticles() * d.ngmax);
         findNeighborsSfc(first, last, d, domain.box());
+        computeGroups(first, last, d, domain.box(), groups_);
         timer.step("FindNeighbors");
 
-        computeDensity(first, last, d, domain.box());
+        computeDensity(groups_.view(), d, domain.box());
         timer.step("Density");
 
         transferToHost(d, first, last, {"rho", "u"});
@@ -180,20 +180,21 @@ public:
         domain.exchangeHalos(get<"vx", "vy", "vz", "rho", "p", "c">(d), get<"ax">(d), get<"ay">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeIAD(first, last, d, domain.box());
+        computeIAD(groups_.view(), d, domain.box());
         timer.step("IAD");
 
         domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33">(d), get<"ax">(d), get<"ay">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeMomentumEnergySTD(first, last, d, domain.box());
+        computeMomentumEnergySTD(groups_.view(), d, domain.box());
         timer.step("MomentumEnergyIAD");
 
         if (d.g != 0.0)
         {
+            auto groups = Base::mHolder_.computeSpatialGroups(d, domain);
             Base::mHolder_.upsweep(d, domain);
             timer.step("Upsweep");
-            Base::mHolder_.traverse(d, domain);
+            Base::mHolder_.traverse(groups, d, domain);
             timer.step("Gravity");
         }
     }
@@ -216,9 +217,9 @@ public:
         transferToDevice(d, first, last, {"du"});
         timer.step("GRACKLE chemistry and cooling");
 
-        computePositions(first, last, d, domain.box());
+        computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
         timer.step("UpdateQuantities");
-        updateSmoothingLength(first, last, d);
+        updateSmoothingLength(groups_.view(), d);
         timer.step("UpdateSmoothingLength");
     }
 };

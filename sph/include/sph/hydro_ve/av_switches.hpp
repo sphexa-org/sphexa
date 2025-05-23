@@ -79,13 +79,10 @@ void computeAVswitchesImpl(size_t startIndex, size_t endIndex, Dataset& d, const
 }
 
 template<class T, class Dataset>
-void computeAVswitches(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
+void computeAVswitches(const GroupView& grp, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
-    {
-        cuda::computeAVswitches(startIndex, endIndex, d, box);
-    }
-    else { computeAVswitchesImpl(startIndex, endIndex, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeAVswitches(grp, d, box); }
+    else { computeAVswitchesImpl(grp.firstBody, grp.lastBody, d, box); }
 }
 
 } // namespace sph

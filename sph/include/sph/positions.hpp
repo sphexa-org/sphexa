@@ -35,7 +35,7 @@
 #include "cstone/sfc/box.hpp"
 #include "cstone/util/array.hpp"
 #include "cstone/util/tuple.hpp"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 
 #include "sph/sph_gpu.hpp"
 #include "sph/eos.hpp"
@@ -51,31 +51,40 @@ HOST_DEVICE_FUN bool fbcCheck(Tc coord, Th h, Tc top, Tc bottom, bool fbc)
 }
 
 //! @brief update the energy according to Adams-Bashforth (2nd order)
-template<class T1, class T2>
-HOST_DEVICE_FUN double energyUpdate(double u_old, double dt, double dt_m1, T1 du, T2 du_m1)
+template<class TU>
+HOST_DEVICE_FUN TU energyUpdate(TU u_old, double dt, double dt_m1, double du, double du_m1)
 {
-    double deltaA = 0.5 * dt * dt / dt_m1;
-    double deltaB = dt + deltaA;
-    double u_new  = u_old + du * deltaB - du_m1 * deltaA;
+    TU u_new = u_old + du * dt + 0.5 * (du - du_m1) / dt_m1 * std::abs(dt) * dt;
     // To prevent u < 0 (when cooling with GRACKLE is active)
     if (u_new < 0.) { u_new = u_old * std::exp(u_new * dt / u_old); }
     return u_new;
 }
 
-//! @brief Update positions according to Press (2nd order)
+/*! @brief Update positions according to Press (2nd order)
+ *
+ * @tparam T      float or double
+ * @param dt      time delta from step n to n+1
+ * @param dt_m1   time delta from step n-1 to n
+ * @param Xn      coordinates at step n
+ * @param An      acceleration at step n
+ * @param dXn     X_n - X_n-1
+ * @param box     global coordinate bounding box
+ * @return        tuple(X_n+1, V_n+1, dX_n+1)
+ *
+ * time-reversibility:
+ * positionUpdate(-dt, dt_m1, X_n+1, An, dXn, box) will back-propagate X_n+1 to X_n
+ */
 template<class T>
-HOST_DEVICE_FUN auto positionUpdate(double dt, double dt_m1, cstone::Vec3<T> X, cstone::Vec3<T> A, cstone::Vec3<T> X_m1,
-                                    const cstone::Box<T>& box)
+HOST_DEVICE_FUN auto positionUpdate(double dt, double dt_m1, cstone::Vec3<T> Xn, cstone::Vec3<T> An,
+                                    cstone::Vec3<T> dXn, const cstone::Box<T>& box)
 {
-    double deltaA = dt + T(0.5) * dt_m1;
-    double deltaB = T(0.5) * (dt + dt_m1);
+    auto Vnmhalf = dXn * (T(1) / dt_m1);
+    auto Vn      = Vnmhalf + T(0.5) * dt_m1 * An;
+    auto Vnp1    = Vn + An * dt;
+    auto dXnp1   = (Vn + T(0.5) * An * std::abs(dt)) * dt;
+    auto Xnp1    = cstone::putInBox(Xn + dXnp1, box);
 
-    auto Val = X_m1 * (T(1) / dt_m1);
-    auto V   = Val + A * deltaA;
-    auto dX  = dt * Val + A * deltaB * dt;
-    X        = cstone::putInBox(X + dX, box);
-
-    return util::tuple<cstone::Vec3<T>, cstone::Vec3<T>, cstone::Vec3<T>>{X, V, dX};
+    return util::tuple<cstone::Vec3<T>, cstone::Vec3<T>, cstone::Vec3<T>>{Xnp1, Vnp1, dXnp1};
 }
 
 template<class T, class Dataset>
@@ -139,27 +148,54 @@ void updateIntEnergyHost(size_t startIndex, size_t endIndex, Dataset& d)
     }
 }
 
+/*! @brief drift particles to a certain time within a time-step hierarchy
+ *
+ * @param grp            groups of particles to modify
+ * @param d
+ * @param dt_forward    new delta-t relative to start of current time-step hierarchy
+ * @param dt_backward   current delta-t relative to start of current time-step hierarchy
+ * @param dt_prevRung   minimum time step of the previous hierarchy
+ * @param rung          rung per particle in before the last integration step
+ */
+template<class Dataset>
+void driftPositions(const GroupView& grp, Dataset& d, float dt_forward, float dt_backward,
+                    util::array<float, Timestep::maxNumRungs> dt_prevRung, const uint8_t* rung)
+{
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    {
+        auto  constCv = d.mui.empty() ? idealGasCv(d.muiConst, d.gamma) : -1.0;
+        auto* d_mui   = d.mui.empty() ? nullptr : rawPtr(d.devData.mui);
+
+        driftPositionsGpu(grp, dt_forward, dt_backward, dt_prevRung, rawPtr(d.devData.x), rawPtr(d.devData.y),
+                          rawPtr(d.devData.z), rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
+                          rawPtr(d.devData.x_m1), rawPtr(d.devData.y_m1), rawPtr(d.devData.z_m1), rawPtr(d.devData.ax),
+                          rawPtr(d.devData.ay), rawPtr(d.devData.az), rung, rawPtr(d.devData.temp), rawPtr(d.devData.u),
+                          rawPtr(d.devData.du), rawPtr(d.devData.du_m1), d_mui, d.gamma, constCv);
+    }
+}
+
 template<class T, class Dataset>
-void computePositions(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
+void computePositions(const GroupView& grp, Dataset& d, const cstone::Box<T>& box, float dt_forward,
+                      util::array<float, Timestep::maxNumRungs> dt_m1, const uint8_t* rung = nullptr)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         T     constCv = d.mui.empty() ? idealGasCv(d.muiConst, d.gamma) : -1.0;
         auto* d_mui   = d.mui.empty() ? nullptr : rawPtr(d.devData.mui);
 
-        computePositionsGpu(startIndex, endIndex, d.minDt, d.minDt_m1, rawPtr(d.devData.x), rawPtr(d.devData.y),
-                            rawPtr(d.devData.z), rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
-                            rawPtr(d.devData.x_m1), rawPtr(d.devData.y_m1), rawPtr(d.devData.z_m1),
-                            rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az), rawPtr(d.devData.temp),
-                            rawPtr(d.devData.u), rawPtr(d.devData.du), rawPtr(d.devData.du_m1), rawPtr(d.devData.h),
-                            d_mui, d.gamma, constCv, box);
+        computePositionsGpu(grp, dt_forward, dt_m1, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
+                            rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz), rawPtr(d.devData.x_m1),
+                            rawPtr(d.devData.y_m1), rawPtr(d.devData.z_m1), rawPtr(d.devData.ax), rawPtr(d.devData.ay),
+                            rawPtr(d.devData.az), rung, rawPtr(d.devData.temp), rawPtr(d.devData.u),
+                            rawPtr(d.devData.du), rawPtr(d.devData.du_m1), rawPtr(d.devData.h), d_mui, d.gamma, constCv,
+                            box);
     }
     else
     {
-        updatePositionsHost(startIndex, endIndex, d, box);
+        updatePositionsHost(grp.firstBody, grp.lastBody, d, box);
 
-        if (!d.temp.empty()) { updateTempHost(startIndex, endIndex, d); }
-        else if (!d.u.empty()) { updateIntEnergyHost(startIndex, endIndex, d); }
+        if (!d.temp.empty()) { updateTempHost(grp.firstBody, grp.lastBody, d); }
+        else if (!d.u.empty()) { updateIntEnergyHost(grp.firstBody, grp.lastBody, d); }
     }
 }
 

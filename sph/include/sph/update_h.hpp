@@ -24,14 +24,14 @@ void updateSmoothingLengthCpu(size_t startIndex, size_t endIndex, unsigned ng0, 
 }
 
 template<class Dataset>
-void updateSmoothingLength(size_t startIndex, size_t endIndex, Dataset& d)
+void updateSmoothingLength(const GroupView& grp, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        updateSmoothingLengthGpu(startIndex, endIndex, d.ng0, rawPtr(d.devData.nc), rawPtr(d.devData.h));
+        updateSmoothingLengthGpu(grp, d.ng0, rawPtr(d.devData.nc), rawPtr(d.devData.h));
         syncGpu();
     }
-    else { updateSmoothingLengthCpu(startIndex, endIndex, d.ng0, rawPtr(d.nc), rawPtr(d.h)); }
+    else { updateSmoothingLengthCpu(grp.firstBody, grp.lastBody, d.ng0, rawPtr(d.nc), rawPtr(d.h)); }
 }
 
 } // namespace sph

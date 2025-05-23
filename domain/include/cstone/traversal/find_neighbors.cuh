@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -31,12 +15,13 @@
 
 #pragma once
 
-#include <algorithm>
-
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/primitives/warpscan.cuh"
+#include "cstone/sfc/box.hpp"
+#include "cstone/findneighbors.hpp"
 #include "cstone/tree/definitions.h"
+#include "cstone/tree/octree.hpp"
 
 namespace cstone
 {
@@ -53,7 +38,7 @@ struct TravConfig
     static constexpr unsigned numWarpsPerSm = 40;
     //! @brief maximum number of simultaneously active blocks
     inline static unsigned maxNumActiveBlocks =
-        GpuConfig::smCount * (TravConfig::numWarpsPerSm / (TravConfig::numThreads / GpuConfig::warpSize));
+        GpuConfig::smCount * (numWarpsPerSm / (numThreads / GpuConfig::warpSize));
 
     //! @brief number of particles per target, i.e. per warp
     static constexpr unsigned targetSize = GpuConfig::warpSize;
@@ -61,21 +46,14 @@ struct TravConfig
     //! @brief number of warps per target, used all over the place, hence the short name
     static constexpr unsigned nwt = targetSize / GpuConfig::warpSize;
 
-    //! @brief compute minimum number of simultaneously active blocks needed to saturate the device
-    static unsigned numBlocks(LocalIndex numBodies)
-    {
-        unsigned numWarpsPerBlock = TravConfig::numThreads / GpuConfig::warpSize;
-        unsigned numWarps         = (numBodies - 1) / TravConfig::targetSize + 1;
-        unsigned numBlocks        = (numWarps - 1) / numWarpsPerBlock + 1;
-        return std::min(numBlocks, TravConfig::maxNumActiveBlocks);
-    }
+    //! @brief number of blocks to launch, no longer adapts to grids that are too small to saturate all SMs
+    static unsigned numBlocks() { return TravConfig::maxNumActiveBlocks; }
 
     //! @brief compute storage needed for traversal stack
-    static unsigned poolSize(unsigned numBodies)
+    static unsigned poolSize()
     {
-        unsigned blocks_          = numBlocks(numBodies);
         unsigned numWarpsPerBlock = TravConfig::numThreads / GpuConfig::warpSize;
-        return TravConfig::memPerWarp * numWarpsPerBlock * blocks_;
+        return TravConfig::memPerWarp * numWarpsPerBlock * maxNumActiveBlocks;
     }
 };
 
@@ -234,11 +212,11 @@ __device__ uint2 traverseWarp(unsigned* nc_i,
     if (laneIdx == 0) { cellQueue[0] = initNodeIdx; }
 
     // these variables are always identical on all warp lanes
-    int numSources   = 1;  // current stack size
-    int newSources   = 0;  // stack size for next level
-    int oldSources   = 0;  // cell indices done
-    int sourceOffset = 0;  // current level stack pointer, once this reaches numSources, the level is done
-    int bdyFillLevel = 0;  // fill level of the source body warp queue
+    int numSources   = 1; // current stack size
+    int newSources   = 0; // stack size for next level
+    int oldSources   = 0; // cell indices done
+    int sourceOffset = 0; // current level stack pointer, once this reaches numSources, the level is done
+    int bdyFillLevel = 0; // fill level of the source body warp queue
 
     while (numSources > 0) // While there are source cells to traverse
     {
@@ -248,15 +226,16 @@ __device__ uint2 traverseWarp(unsigned* nc_i,
         {
             sourceQueue = cellQueue[ringAddr(oldSources + sourceIdx)]; // Global source cell index in queue
         }
-        sourceQueue = spreadSeg8(sourceQueue);
-        sourceIdx   = shflSync(sourceIdx, laneIdx >> 3);
+        sourceQueue         = spreadSeg8(sourceQueue);
+        sourceIdx           = shflSync(sourceIdx, laneIdx >> 3);
+        const bool isSource = sourceIdx < numSources; // Source index is within bounds
+        if (!isSource) { sourceQueue = 0; }
 
         const Vec3<Tc> curSrcCenter = centers[sourceQueue];      // Current source cell center
         const Vec3<Tc> curSrcSize   = sizes[sourceQueue];        // Current source cell center
         const int childBegin        = childOffsets[sourceQueue]; // First child cell
         const bool isNode           = childBegin;
         const bool isClose          = cellOverlap<UsePbc>(curSrcCenter, curSrcSize, targetCenter, targetSize, box);
-        const bool isSource         = sourceIdx < numSources;                       // Source index is within bounds
         const bool isDirect         = isClose && !isNode && isSource;
         const int leafIdx           = (isDirect) ? internalToLeaf[sourceQueue] : 0; // the cstone leaf index
 
@@ -270,7 +249,7 @@ __device__ uint2 traverseWarp(unsigned* nc_i,
         newSources += numChildWarp; // Increment source cell count for next loop
 
         // check for cellQueue overflow
-        const unsigned stackUsed = newSources + numSources - sourceOffset;         // current cellQueue size
+        const unsigned stackUsed = newSources + numSources - sourceOffset; // current cellQueue size
         maxStack                 = max(stackUsed, maxStack);
         if (stackUsed > TravConfig::memPerWarp) { return {0xFFFFFFFF, maxStack}; } // Exit if cellQueue overflows
 
@@ -278,11 +257,11 @@ __device__ uint2 traverseWarp(unsigned* nc_i,
         const int firstBody     = layout[leafIdx];
         const int numBodies     = (layout[leafIdx + 1] - firstBody) & -int(isDirect); // Number of bodies in cell
         bool directTodo         = numBodies;
-        const int numBodiesScan = inclusiveScanInt(numBodies);                        // Inclusive scan of numBodies
-        int numBodiesLane       = numBodiesScan - numBodies;                          // Exclusive scan of numBodies
-        int numBodiesWarp       = shflSync(numBodiesScan, GpuConfig::warpSize - 1);   // Total numBodies of current warp
+        const int numBodiesScan = inclusiveScanInt(numBodies);                      // Inclusive scan of numBodies
+        int numBodiesLane       = numBodiesScan - numBodies;                        // Exclusive scan of numBodies
+        int numBodiesWarp       = shflSync(numBodiesScan, GpuConfig::warpSize - 1); // Total numBodies of current warp
         int prevBodyIdx         = 0;
-        while (numBodiesWarp > 0)   // While there are bodies to process from current source cell set
+        while (numBodiesWarp > 0) // While there are bodies to process from current source cell set
         {
             tempQueue[laneIdx] = 1; // Default scan input is 1, such that consecutive lanes load consecutive bodies
             if (directTodo && (numBodiesLane < GpuConfig::warpSize))
@@ -412,8 +391,8 @@ warpBbox(const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i)
     Xmin = {warpMin(Xmin[0]), warpMin(Xmin[1]), warpMin(Xmin[2])};
     Xmax = {warpMax(Xmax[0]), warpMax(Xmax[1]), warpMax(Xmax[2])};
 
-    const Vec3<Tc> targetCenter = (Xmax + Xmin) * Tc(0.5);
-    const Vec3<Tc> targetSize   = (Xmax - Xmin) * Tc(0.5);
+    Vec3<Tc> targetCenter = (Xmax + Xmin) * Tc(0.5);
+    Vec3<Tc> targetSize   = (Xmax - Xmin) * Tc(0.5);
 
     return thrust::make_tuple(targetCenter, targetSize);
 }
@@ -462,7 +441,8 @@ __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::Loca
     int* cellQueue = globalPool + TravConfig::memPerWarp * ((blockIdx.x * numWarpsPerBlock) + warpIdx);
 
     util::array<Vec4<Tc>, TravConfig::nwt> pos_i = loadTarget(bodyBegin, bodyEnd, laneIdx, x, y, z, h);
-    const auto [targetCenter, targetSize]        = warpBbox(pos_i);
+    auto [targetCenter, targetSize]              = warpBbox(pos_i);
+    targetSize *= Tc(tree.searchExtFactor);
 
 #pragma unroll
     for (int k = 0; k < TravConfig::nwt; ++k)
@@ -510,11 +490,10 @@ __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::Loca
 
 //! @brief combine temp space for tree traversal and neighbor search into a single allocation
 template<class DeviceVector>
-std::tuple<TreeNodeIndex*, LocalIndex*> allocateNcStacks(DeviceVector& stack, unsigned numBodies, unsigned ngmax)
+std::tuple<TreeNodeIndex*, LocalIndex*> allocateNcStacks(DeviceVector& stack, unsigned ngmax)
 {
-    unsigned numBlocks = TravConfig::numBlocks(numBodies);
-    unsigned poolSize  = TravConfig::poolSize(numBodies);
-    unsigned nidxSize  = ngmax * numBlocks * TravConfig::numThreads;
+    unsigned poolSize = TravConfig::poolSize();
+    unsigned nidxSize = ngmax * TravConfig::numBlocks() * TravConfig::numThreads;
 
     static_assert(sizeof(LocalIndex) == sizeof(typename DeviceVector::value_type));
     reallocateDestructive(stack, poolSize + nidxSize, 1.01);

@@ -39,28 +39,24 @@ namespace sph
 {
 
 template<typename Tc, class Dataset>
-void computeDensityImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box)
+void computeDensityImpl(const GroupView& groups, Dataset& d, const cstone::Box<Tc>& box)
 {
     swap(d.xm, d.rho);
-    computeXMass(startIndex, endIndex, d, box);
+    computeXMass(groups, d, box);
     swap(d.xm, d.rho);
     // Convert XMass to density
 #pragma omp parallel for schedule(static)
-    for (size_t i = startIndex; i < endIndex; i++)
+    for (size_t i = groups.firstBody; i < groups.lastBody; i++)
     {
         d.rho[i] = d.m[i] / d.rho[i];
     }
 }
 
 template<class T, class Dataset>
-void computeDensity(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
+void computeDensity(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
-    {
-        computeTargetGroups(startIndex, endIndex, d, box);
-        cuda::computeDensity(startIndex, endIndex, d, box);
-    }
-    else { computeDensityImpl(startIndex, endIndex, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeDensity(groups, d, box); }
+    else { computeDensityImpl(groups, d, box); }
 }
 
 } // namespace sph

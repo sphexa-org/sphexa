@@ -44,7 +44,7 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     // declare a scene (s1) and pseudocolor plot (p1)
     conduit::Node& scenes          = add_scene["scenes"];
     scenes["s1/plots/p1/type"]     = "pseudocolor";
-    scenes["s1/plots/p1/pipeline"] = "pl1";
+    //scenes["s1/plots/p1/pipeline"] = "pl1";
     scenes["s1/plots/p1/field"]    = "Density";
     // scenes["s1/plots/p1/points/radius"] = .5;
     // scenes["s1/plots/p1/points/radius_delta"] = .01;
@@ -82,7 +82,8 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     savedata["e1/type"] = "relay";
     // savedata["e1/pipeline"] = "pl1";
     savedata["e1/params/path"]     = "out_export_particles";
-    savedata["e1/params/protocol"] = "blueprint/mesh/hdf5";
+    savedata["e1/params/protocol"] = "hdf5";
+    //actions.to_yaml();
 }
 
 /*! @brief Add a volume-independent vertex field to a mesh
@@ -111,33 +112,30 @@ void Execute(DataType& d, long startIndex, long endIndex)
     mesh["state/time"].set_external(&d.ttot);
 
     mesh["coordsets/coords/type"] = "explicit";
-    mesh["coordsets/coords/values/x"].set_external(&d.x[startIndex], endIndex - startIndex);
-    mesh["coordsets/coords/values/y"].set_external(&d.y[startIndex], endIndex - startIndex);
-    mesh["coordsets/coords/values/z"].set_external(&d.z[startIndex], endIndex - startIndex);
-
-    mesh["topologies/mesh/type"]     = "unstructured";
+    mesh["coordsets/coords/values/x"].set_external(get<"x">(d).data() + startIndex, endIndex - startIndex);
+    mesh["coordsets/coords/values/y"].set_external(get<"y">(d).data() + startIndex, endIndex - startIndex);
+    mesh["coordsets/coords/values/z"].set_external(get<"z">(d).data() + startIndex, endIndex - startIndex);
+    mesh["topologies/mesh/type"]     = "points";
     mesh["topologies/mesh/coordset"] = "coords";
 
-    addField(mesh, "x", d.x.data(), startIndex, endIndex);
-    addField(mesh, "y", d.y.data(), startIndex, endIndex);
-    addField(mesh, "z", d.z.data(), startIndex, endIndex);
-    addField(mesh, "vx", d.vx.data(), startIndex, endIndex);
-    addField(mesh, "vy", d.vy.data(), startIndex, endIndex);
-    addField(mesh, "vz", d.vz.data(), startIndex, endIndex);
-    addField(mesh, "Mass", d.m.data(), startIndex, endIndex);
-    addField(mesh, "Smoothing Length", d.h.data(), startIndex, endIndex);
-    addField(mesh, "Density", d.rho.data(), startIndex, endIndex);
-    addField(mesh, "Internal Energy", d.u.data(), startIndex, endIndex);
-    addField(mesh, "Pressure", d.p.data(), startIndex, endIndex);
-    addField(mesh, "Speed of Sound", d.c.data(), startIndex, endIndex);
-    addField(mesh, "ax", d.ax.data(), startIndex, endIndex);
-    addField(mesh, "ax", d.ay.data(), startIndex, endIndex);
-    addField(mesh, "ax", d.az.data(), startIndex, endIndex);
-
-    std::vector<conduit_int64> conn(endIndex - startIndex);
-    std::iota(conn.begin(), conn.end(), 0);
-    mesh["topologies/mesh/elements/connectivity"].set_external(conn);
-    mesh["topologies/mesh/elements/shape"] = "point";
+    addField(mesh, "x", get<"x">(d).data(), startIndex, endIndex);
+    addField(mesh, "y", get<"y">(d).data(), startIndex, endIndex);
+    addField(mesh, "z", get<"z">(d).data(), startIndex, endIndex);
+    addField(mesh, "vx", get<"vx">(d).data(), startIndex, endIndex);
+    addField(mesh, "vy", get<"vy">(d).data(), startIndex, endIndex);
+    addField(mesh, "vz", get<"vz">(d).data(), startIndex, endIndex);
+    addField(mesh, "kx", get<"kx">(d).data(), startIndex, endIndex);
+    addField(mesh, "xm", get<"xm">(d).data(), startIndex, endIndex);
+    addField(mesh, "Temperature", get<"temp">(d).data(), startIndex, endIndex);
+    addField(mesh, "Mass", get<"m">(d).data(), startIndex, endIndex);
+    addField(mesh, "Smoothing Length", get<"h">(d).data(), startIndex, endIndex);
+    addField(mesh, "Density", get<"rho">(d).data(), startIndex, endIndex);
+    addField(mesh, "Internal Energy", get<"u">(d).data(), startIndex, endIndex);
+    addField(mesh, "Pressure", get<"p">(d).data(), startIndex, endIndex);
+    addField(mesh, "Speed of Sound", get<"c">(d).data(), startIndex, endIndex);
+    addField(mesh, "ax", get<"ax">(d).data(), startIndex, endIndex);
+    addField(mesh, "ay", get<"ay">(d).data(), startIndex, endIndex);
+    addField(mesh, "az", get<"az">(d).data(), startIndex, endIndex);
 
     conduit::Node verify_info;
     if (!conduit::blueprint::mesh::verify(mesh, verify_info))

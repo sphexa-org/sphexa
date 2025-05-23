@@ -37,6 +37,7 @@
 
 #include "cstone/util/constexpr_string.hpp"
 #include "cstone/fields/field_get.hpp"
+#include "io/arg_parser.hpp"
 #include "sph/sph.hpp"
 #include "sph/hydro_turb/turbulence_data.hpp"
 
@@ -48,7 +49,6 @@ namespace sphexa
 
 using namespace sph;
 
-//! @brief VE hydro propagator that adds turbulence stirring to the acceleration prior to position update
 template<bool avClean, class DomainType, class DataType>
 class TurbVeProp final : public HydroVeProp<avClean, DomainType, DataType>
 {
@@ -56,9 +56,7 @@ class TurbVeProp final : public HydroVeProp<avClean, DomainType, DataType>
     using Base::rank_;
     using Base::timer;
 
-    using RealType = typename DataType::RealType;
-
-    sph::TurbulenceData<RealType, typename DataType::AcceleratorType> turbulenceData;
+    sph::TurbulenceData<typename DataType::RealType, typename DataType::AcceleratorType> turbulenceData;
 
 public:
     TurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings)
@@ -70,22 +68,8 @@ public:
     void computeForces(DomainType& domain, DataType& simData) override
     {
         Base::computeForces(domain, simData);
-        driveTurbulence(domain.startIndex(), domain.endIndex(), simData.hydro, turbulenceData);
+        driveTurbulence(Base::groups_.view(), simData.hydro, turbulenceData);
         timer.step("Turbulence Stirring");
-    }
-
-    void integrate(DomainType& domain, DataType& simData) override
-    {
-        auto&  d     = simData.hydro;
-        size_t first = domain.startIndex();
-        size_t last  = domain.endIndex();
-
-        computeTimestep(first, last, d);
-        timer.step("Timestep");
-
-        computePositions(first, last, d, domain.box());
-        updateSmoothingLength(first, last, d);
-        timer.step("UpdateQuantities");
     }
 
     void save(IFileWriter* writer) override { turbulenceData.loadOrStore(writer); }

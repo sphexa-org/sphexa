@@ -50,6 +50,11 @@ class MultipoleHolderCpu
 public:
     MultipoleHolderCpu() = default;
 
+    cstone::GroupView computeSpatialGroups(const DataType& /*d*/, const DomainType& domain)
+    {
+        return {.firstBody = domain.startIndex(), .lastBody = domain.endIndex()};
+    }
+
     void upsweep(const DataType& d, const DomainType& domain)
     {
         //! includes tree plus associated information, like peer ranks, assignment, counts, centers, etc
@@ -61,7 +66,7 @@ public:
                                          multipoles_.data());
     }
 
-    void traverse(DataType& d, const DomainType& domain)
+    void traverse(cstone::GroupView /*grp*/, DataType& d, const DomainType& domain)
     {
         //! includes tree plus associated information, like peer ranks, assignment, counts, centers, etc
         const auto& focusTree = domain.focusTree();
@@ -76,13 +81,13 @@ public:
         ryoanji::computeGravity(octree.childOffsets, octree.internalToLeaf, focusTree.expansionCentersAcc().data(),
                                 multipoles_.data(), domain.layout().data(), domain.startCell(), domain.endCell(),
                                 d.x.data(), d.y.data(), d.z.data(), d.h.data(), d.m.data(), domain.box(), d.g,
-                                (Tu*)nullptr, d.ax.data(), d.ay.data(), d.az.data(), &d.egrav, numShells);
+                                d.ugrav.data(), d.ax.data(), d.ay.data(), d.az.data(), &d.egrav, numShells);
 
         if (usePbc)
         {
             ryoanji::computeGravityEwald(makeVec3(focusTree.expansionCentersAcc()[0]), multipoles_.front(),
                                          domain.startIndex(), domain.endIndex(), d.x.data(), d.y.data(), d.z.data(),
-                                         d.m.data(), box, d.g, (Tu*)nullptr, d.ax.data(), d.ay.data(), d.az.data(),
+                                         d.m.data(), box, d.g, d.ugrav.data(), d.ax.data(), d.ay.data(), d.az.data(),
                                          &d.egrav, ewaldSettings_);
         }
     }
@@ -109,29 +114,31 @@ class MultipoleHolderGpu
 public:
     MultipoleHolderGpu() = default;
 
+    cstone::GroupView computeSpatialGroups(const DataType& d, const DomainType& domain)
+    {
+        return mHolder_.computeSpatialGroups(domain.startIndex(), domain.endIndex(), rawPtr(d.devData.x),
+                                             rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h),
+                                             domain.focusTree(), domain.layout().data(), domain.box());
+    }
+
     void upsweep(const DataType& d, const DomainType& domain)
     {
-        //! includes tree plus associated information, like peer ranks, assignment, counts, centers, etc
         const auto& focusTree = domain.focusTree();
-
-        mHolder_.createGroups(domain.startIndex(), domain.endIndex(), rawPtr(d.devData.x), rawPtr(d.devData.y),
-                              rawPtr(d.devData.z), rawPtr(d.devData.h), focusTree, domain.layout().data(),
-                              domain.box());
-
         reallocate(multipoles_, focusTree.octreeViewAcc().numNodes, 1.05);
         mHolder_.upsweep(rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.m),
                          domain.globalTree(), focusTree, domain.layout().data(), multipoles_.data());
     }
 
-    void traverse(DataType& d, const DomainType& domain)
+    void traverse(cstone::GroupView grp, DataType& d, const DomainType& domain)
     {
         const auto& box       = domain.box();
         bool        usePbc    = box.boundaryX() == cstone::BoundaryType::periodic;
         int         numShells = usePbc ? ewaldSettings_.numReplicaShells : 0;
 
-        d.egrav = mHolder_.compute(rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.m),
-                                   rawPtr(d.devData.h), d.g, numShells, domain.box(), rawPtr(d.devData.ax),
-                                   rawPtr(d.devData.ay), rawPtr(d.devData.az));
+        d.egrav =
+            mHolder_.compute(grp, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.m),
+                             rawPtr(d.devData.h), d.g, numShells, domain.box(), rawPtr(d.devData.ugrav),
+                             rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az));
 
         auto stats = mHolder_.readStats();
 
@@ -145,10 +152,10 @@ public:
             MType rootM;
             memcpyD2H(mHolder_.deviceMultipoles(), 1, &rootM);
 
-            computeGravityEwaldGpu(makeVec3(rootCenter), rootM, domain.startIndex(), domain.endIndex(),
-                                   rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.m),
-                                   box, d.g, (Ta*)nullptr, rawPtr(d.devData.ax), rawPtr(d.devData.ay),
-                                   rawPtr(d.devData.az), &d.egrav, ewaldSettings_);
+            computeGravityEwaldGpu(makeVec3(rootCenter), rootM, grp, rawPtr(d.devData.x), rawPtr(d.devData.y),
+                                   rawPtr(d.devData.z), rawPtr(d.devData.m), box, d.g, rawPtr(d.devData.ugrav),
+                                   rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az), &d.egrav,
+                                   ewaldSettings_);
         }
 
         d.devData.stackUsedGravity = stats[4];

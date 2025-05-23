@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -30,7 +14,7 @@
  *
  * In the cornerstone format, the octree is stored as sequence of SFC codes
  * fulfilling three invariants. Each code in the sequence both signifies the
- * the start SFC code of an octree leaf node and serves as an upper SFC code bound
+ * start SFC code of an octree leaf node and serves as an upper SFC code bound
  * for the previous node.
  *
  * The invariants of the cornerstone format are:
@@ -54,12 +38,11 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <span>
 #include <vector>
 #include <tuple>
 
 #include "cstone/sfc/common.hpp"
-#include "cstone/primitives/scan.hpp"
-#include "cstone/util/gsl-lite.hpp"
 #include "cstone/util/tuple.hpp"
 
 #include "definitions.h"
@@ -102,15 +85,16 @@ HOST_DEVICE_FUN unsigned calculateNodeCount(
     return stl::min(count, maxCount);
 }
 
-/*! @brief determine search bound for @p targetCode in an array of sorted particle SFC codes
+/*! @brief Narrow search bound for @p targetCode in an array of sorted particle SFC codes
  *
  * @tparam KeyType    32- or 64-bit unsigned integer type
- * @param firstIdx    first (of two) search boundary, must be non-negative, but can exceed the codes range
+ * @param firstIdx    first (of two) search boundaries, may be out of bounds
  *                    (the guess for the location of @p targetCode in [codesStart:codesEnd]
  * @param targetCode  code to look for in [codesStart:codesEnd]
  * @param codesStart  particle SFC code array start
  * @param codesEnd    particle SFC code array end
- * @return            the sub-range in [codesStart:codesEnd] containing @p targetCode
+ * @return            a sub-range of [codesStart:codesEnd] that fulfills
+ *                    lower_bound(codesStart, codesEnd, targetCode) == lower_bound(ret[0], ret[0], targetCode)
  */
 template<class KeyType>
 HOST_DEVICE_FUN util::array<const KeyType*, 2> findSearchBounds(std::make_signed_t<KeyType> firstIdx,
@@ -118,23 +102,19 @@ HOST_DEVICE_FUN util::array<const KeyType*, 2> findSearchBounds(std::make_signed
                                                                 const KeyType* codesStart,
                                                                 const KeyType* codesEnd)
 {
-    assert(firstIdx >= 0);
-
     using SI  = std::make_signed_t<KeyType>;
     SI nCodes = codesEnd - codesStart;
+    if (nCodes == 0) { return {codesStart, codesStart}; }
 
     // firstIdx must be an accessible index
+    firstIdx = stl::max(firstIdx, SI(0));
     firstIdx = stl::min(nCodes - 1, firstIdx);
 
     // the last node in 64-bit is 2^63, which can't be represented as a negative number
-    if (targetCode == nodeRange<KeyType>(0)) { return {codesStart + firstIdx, codesEnd}; }
+    if (targetCode >= nodeRange<KeyType>(0)) { return {stl::lower_bound(codesStart, codesEnd, targetCode), codesEnd}; }
 
-    KeyType firstCode = codesStart[firstIdx];
-    if (firstCode == targetCode) { firstIdx++; }
-
-    // d = 1 : search towards codesEnd
-    // d = -1 : search towards codesStart
-    SI d = (firstCode < targetCode) ? 1 : -1;
+    // d = 1 : search towards codesEnd, d = -1 : search towards codesStart
+    SI d = (codesStart[firstIdx] < targetCode) ? 1 : -1;
 
     SI targetCodeTimesD = targetCode * d;
 
@@ -194,8 +174,7 @@ HOST_DEVICE_FUN unsigned updateNodeCount(TreeNodeIndex nodeIdx,
  *                            needs to satisfy the octree invariants
  * @param[inout] counts       output particle counts per node, length = @a nNodes
  * @param[in]    nNodes       number of nodes in tree
- * @param[in]    codesStart   sorted particle SFC code range start
- * @param[in]    codesEnd     sorted particle SFC code range end
+ * @param[in]    keys         sorted particle SFC keys
  * @param[in]    maxCount     maximum particle count per node to store, this is used
  *                            to prevent overflow in MPI_Allreduce
  */
@@ -203,17 +182,16 @@ template<class KeyType>
 void computeNodeCounts(const KeyType* tree,
                        unsigned* counts,
                        TreeNodeIndex nNodes,
-                       const KeyType* codesStart,
-                       const KeyType* codesEnd,
+                       std::span<const KeyType> keys,
                        unsigned maxCount,
                        bool useCountsAsGuess = false)
 {
     TreeNodeIndex firstNode = 0;
     TreeNodeIndex lastNode  = nNodes;
-    if (codesStart != codesEnd)
+    if (not keys.empty())
     {
-        firstNode = std::upper_bound(tree, tree + nNodes, *codesStart) - tree - 1;
-        lastNode  = std::upper_bound(tree, tree + nNodes, *(codesEnd - 1)) - tree;
+        firstNode = std::upper_bound(tree, tree + nNodes, keys.front()) - tree - 1;
+        lastNode  = std::upper_bound(tree, tree + nNodes, keys.back()) - tree;
         assert(firstNode <= lastNode && "Are your particle codes sorted?");
     }
     else
@@ -235,14 +213,14 @@ void computeNodeCounts(const KeyType* tree,
 
     if (useCountsAsGuess)
     {
-        exclusiveScan(counts + firstNode, nNonZeroNodes);
+        std::exclusive_scan(counts + firstNode, counts + firstNode + nNonZeroNodes, counts + firstNode, LocalIndex{0});
 #pragma omp parallel for schedule(static)
         for (TreeNodeIndex i = 0; i < nNonZeroNodes; ++i)
         {
-            unsigned firstGuess  = counts[i + firstNode];
-            unsigned secondGuess = counts[std::min(i + firstNode + 1, nNodes - 1)];
-            counts[i + firstNode] =
-                updateNodeCount(i, populatedTree, firstGuess, secondGuess, codesStart, codesEnd, maxCount);
+            unsigned firstGuess   = counts[i + firstNode];
+            unsigned secondGuess  = counts[std::min(i + firstNode + 1, nNodes - 1)];
+            counts[i + firstNode] = updateNodeCount(i, populatedTree, firstGuess, secondGuess, keys.data(),
+                                                    keys.data() + keys.size(), maxCount);
         }
     }
     else
@@ -250,8 +228,8 @@ void computeNodeCounts(const KeyType* tree,
 #pragma omp parallel for schedule(static)
         for (TreeNodeIndex i = 0; i < nNonZeroNodes; ++i)
         {
-            counts[i + firstNode] =
-                calculateNodeCount(populatedTree[i], populatedTree[i + 1], codesStart, codesEnd, maxCount);
+            counts[i + firstNode] = calculateNodeCount(populatedTree[i], populatedTree[i + 1], keys.data(),
+                                                       keys.data() + keys.size(), maxCount);
         }
     }
 }
@@ -389,7 +367,6 @@ processNode(TreeNodeIndex nodeIndex, const KeyType* oldTree, const TreeNodeIndex
 
 /*! @brief split or fuse octree nodes based on node counts relative to bucketSize
  *
- * @tparam       KeyType      32- or 64-bit unsigned integer type
  * @param[in]    tree         cornerstone octree
  * @param[out]   newTree      rebalanced cornerstone octree
  * @param[in]    nodeOps      rebalance decision for each node, length @p numNodes(tree) + 1
@@ -400,7 +377,7 @@ void rebalanceTree(const InputVector& tree, OutputVector& newTree, TreeNodeIndex
 {
     TreeNodeIndex numNodes = nNodes(tree);
 
-    exclusiveScan(nodeOps, numNodes + 1);
+    std::exclusive_scan(nodeOps, nodeOps + numNodes + 1, nodeOps, TreeNodeIndex{0});
     newTree.resize(nodeOps[numNodes] + 1);
 
 #pragma omp parallel for schedule(static)
@@ -414,8 +391,7 @@ void rebalanceTree(const InputVector& tree, OutputVector& newTree, TreeNodeIndex
 /*! @brief update the octree with a single rebalance/count step
  *
  * @tparam       KeyType     32- or 64-bit unsigned integer for SFC code
- * @param[in]    codesStart  local particle SFC codes start
- * @param[in]    codesEnd    local particle SFC codes end
+ * @param[in]    keys        local particle SFC keys
  * @param[in]    bucketSize  maximum number of particles per node
  * @param[inout] tree        the octree leaf nodes (cornerstone format)
  * @param[inout] counts      the octree leaf node particle count
@@ -430,8 +406,7 @@ void rebalanceTree(const InputVector& tree, OutputVector& newTree, TreeNodeIndex
  *    in MPI_Allreduce, therefore, maxCount should be set to 2^32/numRanks - 1 for distributed tree builds.
  */
 template<class KeyType>
-bool updateOctree(const KeyType* codesStart,
-                  const KeyType* codesEnd,
+bool updateOctree(std::span<const KeyType> keys,
                   unsigned bucketSize,
                   std::vector<KeyType>& tree,
                   std::vector<unsigned>& counts,
@@ -445,23 +420,20 @@ bool updateOctree(const KeyType* codesStart,
     swap(tree, newTree);
 
     counts.resize(nNodes(tree));
-    computeNodeCounts(tree.data(), counts.data(), nNodes(tree), codesStart, codesEnd, maxCount, true);
+    computeNodeCounts(tree.data(), counts.data(), nNodes(tree), keys, maxCount, true);
 
     return converged;
 }
 
 //! @brief Convenience wrapper for updateOctree. Start from scratch and return a fully converged cornerstone tree.
 template<class KeyType>
-std::tuple<std::vector<KeyType>, std::vector<unsigned>>
-computeOctree(const KeyType* codesStart,
-              const KeyType* codesEnd,
-              unsigned bucketSize,
-              unsigned maxCount = std::numeric_limits<unsigned>::max())
+std::tuple<std::vector<KeyType>, std::vector<unsigned>> computeOctree(
+    std::span<const KeyType> keys, unsigned bucketSize, unsigned maxCount = std::numeric_limits<unsigned>::max())
 {
     std::vector<KeyType> tree{0, nodeRange<KeyType>(0)};
-    std::vector<unsigned> counts{unsigned(codesEnd - codesStart)};
+    std::vector<unsigned> counts{unsigned(keys.size())};
 
-    while (!updateOctree(codesStart, codesEnd, bucketSize, tree, counts, maxCount))
+    while (!updateOctree(keys, bucketSize, tree, counts, maxCount))
         ;
 
     return std::make_tuple(std::move(tree), std::move(counts));
@@ -479,7 +451,7 @@ computeOctree(const KeyType* codesStart,
  */
 template<class KeyType>
 std::vector<KeyType>
-updateTreelet(gsl::span<const KeyType> treelet, gsl::span<const unsigned> counts, unsigned bucketSize)
+updateTreelet(std::span<const KeyType> treelet, std::span<const unsigned> counts, unsigned bucketSize)
 {
     std::vector<TreeNodeIndex> nodeOps(nNodes(treelet) + 1);
     rebalanceDecision(treelet.data(), counts.data(), nNodes(treelet), bucketSize, nodeOps.data());
@@ -492,7 +464,7 @@ updateTreelet(gsl::span<const KeyType> treelet, gsl::span<const unsigned> counts
 
 /*! @brief create a cornerstone octree around a series of given SFC codes
  *
- * @tparam InputIterator  iterator to 32- or 64-bit unsigned integer
+ * @tparam KeyType        iterator to 32- or 64-bit unsigned integer
  * @param  spanningKeys   input SFC key sequence
  * @return                the cornerstone octree containing all values in the given code sequence
  *                        plus any additional intermediate SFC codes between them required to fulfill
@@ -508,7 +480,7 @@ updateTreelet(gsl::span<const KeyType> treelet, gsl::span<const unsigned> counts
  *      - must be sorted
  */
 template<class KeyType>
-std::vector<KeyType> computeSpanningTree(gsl::span<const KeyType> spanningKeys)
+std::vector<KeyType> computeSpanningTree(std::span<const KeyType> spanningKeys)
 {
     assert(spanningKeys.size() > 1);
     assert(spanningKeys.front() == 0 && spanningKeys.back() == nodeRange<KeyType>(0));
@@ -521,7 +493,7 @@ std::vector<KeyType> computeSpanningTree(gsl::span<const KeyType> spanningKeys)
         offsets[i] = spanSfcRange(spanningKeys[i], spanningKeys[i + 1]);
     }
 
-    exclusiveScanSerialInplace(offsets.data(), offsets.size(), 0);
+    std::exclusive_scan(offsets.begin(), offsets.end(), offsets.begin(), TreeNodeIndex{0});
 
     std::vector<KeyType> spanningTree(offsets.back() + 1);
     for (TreeNodeIndex i = 0; i < numIntervals; ++i)

@@ -83,9 +83,10 @@ public:
             h5part_int64_t numSteps = H5PartGetNumSteps(h5File_);
             H5PartSetStep(h5File_, numSteps);
 
-            uint64_t numParticles = lastIndex - firstIndex;
+            localCount_ = lastIndex - firstIndex;
             // set number of particles that each rank will write
-            H5PartSetNumParticles(h5File_, numParticles);
+            H5PartSetNumParticles(h5File_, localCount_);
+            globalCount_ = H5PartGetNumParticles(h5File_);
         }
         pathStep_ = path;
     }
@@ -107,6 +108,10 @@ public:
         std::visit([this, &key](auto arg) { fileutils::writeH5PartField(h5File_, key, arg + firstIndex_); }, field);
     }
 
+    uint64_t localNumParticles() override { return localCount_; }
+
+    uint64_t globalNumParticles() override { return globalCount_; }
+
     void closeStep() override
     {
         if (h5File_)
@@ -121,6 +126,8 @@ private:
     MPI_Comm comm_;
 
     size_t      firstIndex_{0};
+    uint64_t    localCount_{0};
+    uint64_t    globalCount_{0};
     std::string pathStep_;
 
     H5PartFile* h5File_{nullptr};

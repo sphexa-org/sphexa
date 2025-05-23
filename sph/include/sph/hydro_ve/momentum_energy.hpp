@@ -105,13 +105,13 @@ void computeMomentumEnergyImpl(size_t startIndex, size_t endIndex, Dataset& d, c
 }
 
 template<bool avClean, class T, class Dataset>
-void computeMomentumEnergy(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
+void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d, const cstone::Box<T>& box)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        cuda::computeMomentumEnergy<avClean>(startIndex, endIndex, d, box);
+        cuda::computeMomentumEnergy<avClean>(grp, groupDt, d, box);
     }
-    else { computeMomentumEnergyImpl<avClean>(startIndex, endIndex, d, box); }
+    else { computeMomentumEnergyImpl<avClean>(grp.firstBody, grp.lastBody, d, box); }
 }
 
 } // namespace sph

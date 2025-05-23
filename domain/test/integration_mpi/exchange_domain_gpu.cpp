@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -32,8 +16,6 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-
-#include <thrust/device_vector.h>
 
 #include "cstone/domain/layout.hpp"
 #include "cstone/domain/domaindecomp_mpi_gpu.cuh"
@@ -82,11 +64,7 @@ void exchangeAllToAll(int thisRank, int numRanks)
     sends.back() = gridSize;
     for (int rank = 0; rank < numRanks; ++rank)
     {
-        int lower = rank * segmentSize;
-        int upper = lower + segmentSize;
-
-        if (rank == numRanks - 1) upper += gridSize % numRanks;
-
+        int lower   = rank * segmentSize;
         sends[rank] = lower;
     }
 
@@ -94,28 +72,30 @@ void exchangeAllToAll(int thisRank, int numRanks)
     segmentSize              = sends.count(thisRank);
     int numParticlesThisRank = segmentSize * numRanks;
 
-    thrust::device_vector<double> sendScratch, receiveScratch;
+    DeviceVector<double> sendScratch, receiveScratch;
 
-    reallocate(std::max(numParticlesThisRank, int(x.size())), x, y);
+    reallocate(std::max(numParticlesThisRank, int(x.size())), 1.01, x, y);
 
-    thrust::device_vector<LocalIndex> d_ordering = ordering;
-    thrust::device_vector<T> d_x                 = x;
-    thrust::device_vector<T> d_y                 = y;
+    DeviceVector<LocalIndex> d_ordering = ordering;
+    DeviceVector<T> d_x                 = x;
+    DeviceVector<T> d_y                 = y;
 
     BufferDescription bufDesc{0, gridSize, gridSize};
     LocalIndex numPartPresent  = sends.count(thisRank);
     LocalIndex numPartAssigned = numPartPresent * numRanks;
     bufDesc.size               = ex::exchangeBufferSize(bufDesc, numPartPresent, numPartAssigned);
-    reallocateDevice(d_x, bufDesc.size, 1.0);
-    reallocateDevice(d_y, bufDesc.size, 1.0);
+    reallocate(d_x, bufDesc.size, 1.0);
+    reallocate(d_y, bufDesc.size, 1.0);
 
     ExchangeLog log;
-    exchangeParticlesGpu(0, log, sends, thisRank, bufDesc, numParticlesThisRank, sendScratch, receiveScratch,
-                         rawPtr(d_ordering), rawPtr(d_x), rawPtr(d_y));
+    auto recvStart = domain_exchange::receiveStart(bufDesc, numPartAssigned - numPartPresent);
+    auto recvEnd   = recvStart + numPartAssigned - numPartPresent;
+    exchangeParticlesGpu(0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch, rawPtr(d_ordering),
+                         rawPtr(d_x), rawPtr(d_y));
 
-    reallocate(bufDesc.size, x, y);
-    thrust::copy(d_x.begin(), d_x.end(), x.begin());
-    thrust::copy(d_y.begin(), d_y.end(), y.begin());
+    reallocate(bufDesc.size, 1.01, x, y);
+    memcpyD2H(d_x.data(), d_x.size(), x.data());
+    memcpyD2H(d_y.data(), d_y.size(), y.data());
 
     ex::extractLocallyOwned(bufDesc, numPartPresent, numPartAssigned, ordering.data() + sends[thisRank], x, y);
 
@@ -163,6 +143,7 @@ void exchangeCyclicNeighbors(int thisRank, int numRanks)
     std::vector<double> x(gridSize, thisRank);
     std::vector<float> y(gridSize, -thisRank);
     std::vector<util::array<int, 2>> testArray(gridSize, {thisRank, -thisRank});
+    std::vector<uint8_t> uint8Array(gridSize, thisRank);
 
     std::vector<LocalIndex> ordering(gridSize);
     std::iota(begin(ordering), end(ordering), 0);
@@ -177,32 +158,38 @@ void exchangeCyclicNeighbors(int thisRank, int numRanks)
     sends[nextRank] = nex;
     std::exclusive_scan(sends.begin(), sends.end(), sends.begin(), 0);
 
-    thrust::device_vector<double> sendScratch, receiveScratch;
+    DeviceVector<double> sendScratch, receiveScratch;
 
-    thrust::device_vector<LocalIndex> d_ordering           = ordering;
-    thrust::device_vector<double> d_x                      = x;
-    thrust::device_vector<float> d_y                       = y;
-    thrust::device_vector<util::array<int, 2>> d_testArray = testArray;
+    DeviceVector<LocalIndex> d_ordering           = ordering;
+    DeviceVector<double> d_x                      = x;
+    DeviceVector<float> d_y                       = y;
+    DeviceVector<util::array<int, 2>> d_testArray = testArray;
+    DeviceVector<uint8_t> d_uint8Array            = uint8Array;
 
     BufferDescription bufDesc{0, gridSize, gridSize};
     LocalIndex numPartPresent  = sends.count(thisRank);
     LocalIndex numPartAssigned = gridSize;
     bufDesc.size               = ex::exchangeBufferSize(bufDesc, numPartPresent, numPartAssigned);
-    reallocateDevice(d_x, bufDesc.size, 1.0);
-    reallocateDevice(d_y, bufDesc.size, 1.0);
-    reallocateDevice(d_testArray, bufDesc.size, 1.0);
+    reallocate(d_x, bufDesc.size, 1.0);
+    reallocate(d_y, bufDesc.size, 1.0);
+    reallocate(d_testArray, bufDesc.size, 1.0);
+    reallocate(d_uint8Array, bufDesc.size, 1.0);
+    reallocate(bufDesc.size * 10, 1.01, sendScratch, receiveScratch);
 
     ExchangeLog log;
-    exchangeParticlesGpu(0, log, sends, thisRank, bufDesc, gridSize, sendScratch, receiveScratch, rawPtr(d_ordering),
-                         rawPtr(d_x), rawPtr(d_y), rawPtr(d_testArray));
+    auto recvStart = domain_exchange::receiveStart(bufDesc, numPartAssigned - numPartPresent);
+    auto recvEnd   = recvStart + numPartAssigned - numPartPresent;
+    exchangeParticlesGpu(0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch, rawPtr(d_ordering),
+                         rawPtr(d_x), rawPtr(d_y), rawPtr(d_uint8Array), rawPtr(d_testArray));
 
-    reallocate(bufDesc.size, x, y, testArray);
-    thrust::copy(d_x.begin(), d_x.end(), x.begin());
-    thrust::copy(d_y.begin(), d_y.end(), y.begin());
-    thrust::copy(d_testArray.begin(), d_testArray.end(), testArray.begin());
+    reallocate(bufDesc.size, 1.01, x, y, testArray, uint8Array);
+    memcpyD2H(d_x.data(), d_x.size(), x.data());
+    memcpyD2H(d_y.data(), d_y.size(), y.data());
+    memcpyD2H(d_testArray.data(), d_testArray.size(), testArray.data());
+    memcpyD2H(d_uint8Array.data(), d_uint8Array.size(), uint8Array.data());
 
     ex::extractLocallyOwned(bufDesc, numPartPresent, numPartAssigned, ordering.data() + sends[thisRank], x, y,
-                            testArray);
+                            testArray, uint8Array);
 
     int incomingRank = (thisRank - 1 + numRanks) % numRanks;
     std::vector<double> refX(gridSize, thisRank);
@@ -215,9 +202,13 @@ void exchangeCyclicNeighbors(int thisRank, int numRanks)
     std::fill(begin(testArrayRef) + gridSize - nex, end(testArrayRef),
               util::array<int, 2>{incomingRank, -incomingRank});
 
+    std::vector<uint8_t> refUint8(gridSize, thisRank);
+    std::fill(begin(refUint8) + gridSize - nex, end(refUint8), incomingRank);
+
     EXPECT_EQ(refX, x);
     EXPECT_EQ(refY, y);
     EXPECT_EQ(testArrayRef, testArray);
+    EXPECT_EQ(uint8Array, refUint8);
 }
 
 TEST(GlobalDomain, exchangeCyclicNeighbors)

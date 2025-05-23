@@ -81,6 +81,12 @@ struct H5PartType<char>
 };
 
 template<>
+struct H5PartType<unsigned char>
+{
+    operator h5part_int64_t() const noexcept { return H5PART_CHAR; } // NOLINT
+};
+
+template<>
 struct H5PartType<int>
 {
     operator h5part_int64_t() const noexcept { return H5PART_INT32; } // NOLINT
@@ -253,9 +259,14 @@ inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fi
     return H5PartReadDataFloat32(h5_file, fieldName.c_str(), field);
 }
 
-inline h5part_int64_t readH5PartField(H5PartFile* /*h5_file*/, const std::string& /*fieldName*/, char* /*field*/)
+inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, uint8_t* field)
 {
-    throw std::runtime_error("H5Part read char field not implemented");
+    return H5PartReadDataInt8(h5_file, fieldName.c_str(), field);
+}
+
+inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, char* field)
+{
+    return H5PartReadDataInt8(h5_file, fieldName.c_str(), (uint8_t*)field);
 }
 
 inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, int* field)
@@ -293,9 +304,14 @@ inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& f
     return H5PartWriteDataFloat32(h5_file, fieldName.c_str(), field);
 }
 
-inline h5part_int64_t writeH5PartField(H5PartFile* /*h5_file*/, const std::string& /*fieldName*/, const char* /*field*/)
+inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const uint8_t* field)
 {
-    throw std::runtime_error("H5Part write char field not implemented");
+    return H5PartWriteDataInt8(h5_file, fieldName.c_str(), field);
+}
+
+inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const char* field)
+{
+    return H5PartWriteDataInt8(h5_file, fieldName.c_str(), (const uint8_t*)field);
 }
 
 inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const int* field)

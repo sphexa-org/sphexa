@@ -67,14 +67,10 @@ void computeXMassImpl(size_t startIndex, size_t endIndex, Dataset& d, const csto
 }
 
 template<typename Tc, class Dataset>
-void computeXMass(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box)
+void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
-    {
-        computeTargetGroups(startIndex, endIndex, d, box);
-        cuda::computeXMass(startIndex, endIndex, d, box);
-    }
-    else { computeXMassImpl(startIndex, endIndex, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeXMass(grp, d, box); }
+    else { computeXMassImpl(grp.firstBody, grp.lastBody, d, box); }
 }
 
 } // namespace sph

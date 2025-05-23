@@ -32,6 +32,7 @@
 #pragma once
 
 #include <numeric>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -118,6 +119,25 @@ void readFileAttributes(InitSettings& settings, const std::string& settingsFile,
         }
         reader->closeStep();
     }
+}
+
+//! @brief generate particle IDs at the beginning of the simulation initialization
+void generateParticleIDs(std::span<uint64_t> id)
+{
+    int rank = 0, numRanks = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
+
+    std::vector<uint64_t> ranksLocalParticles(numRanks);
+    size_t                localNumRanks = id.size();
+
+    // fill ranksLocalParticles with the number of particles per rank
+    MPI_Allgather(&localNumRanks, 1, MpiType<uint64_t>{}, ranksLocalParticles.data(), 1, MpiType<uint64_t>{},
+                  MPI_COMM_WORLD);
+
+    std::exclusive_scan(ranksLocalParticles.begin(), ranksLocalParticles.end(), ranksLocalParticles.begin(),
+                        uint64_t(0));
+    std::iota(id.begin(), id.end(), ranksLocalParticles[rank]);
 }
 
 //! @brief Used to read the default values of dataset attributes

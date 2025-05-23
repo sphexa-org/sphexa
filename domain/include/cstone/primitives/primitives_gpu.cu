@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -29,7 +13,7 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#include <cub/cub.cuh>
+#include <stdexcept>
 
 #include <thrust/binary_search.h>
 #include <thrust/count.h>
@@ -39,6 +23,7 @@
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
 
+#include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/errorcheck.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/util/array.hpp"
@@ -56,6 +41,7 @@ void fillGpu(T* first, T* last, T value)
 template void fillGpu(double*, double*, double);
 template void fillGpu(float*, float*, float);
 template void fillGpu(int*, int*, int);
+template void fillGpu(uint8_t*, uint8_t*, uint8_t);
 template void fillGpu(char*, char*, char);
 template void fillGpu(unsigned*, unsigned*, unsigned);
 template void fillGpu(uint64_t*, uint64_t*, uint64_t);
@@ -82,6 +68,29 @@ void scaleGpu(T* first, T* last, T value)
 template void scaleGpu(double*, double*, double);
 template void scaleGpu(float*, float*, float);
 
+template<class T>
+struct IncrementFunctor
+{
+    const T s;
+
+    IncrementFunctor(T s_)
+        : s(s_)
+    {
+    }
+
+    __host__ __device__ T operator()(const T& x) const { return x + s; }
+};
+
+template<class T>
+void incrementGpu(const T* first, const T* last, T* d_first, T value)
+{
+    thrust::transform(thrust::device, first, last, d_first, IncrementFunctor<T>(value));
+}
+
+#define INCREMENT_GPU(T) template void incrementGpu(const T* first, const T* last, T* d_first, T value)
+INCREMENT_GPU(unsigned);
+INCREMENT_GPU(uint64_t);
+
 template<class T, class IndexType>
 __global__ void gatherGpuKernel(const IndexType* map, size_t n, const T* source, T* destination)
 {
@@ -100,6 +109,16 @@ void gatherGpu(const IndexType* map, size_t n, const T* source, T* destination)
 }
 
 template void gatherGpu(const int*, size_t, const int*, int*);
+template void gatherGpu(const int*, size_t, const uint32_t*, uint32_t*);
+template void gatherGpu(const int*, size_t, const uint64_t*, uint64_t*);
+template void gatherGpu(const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+template void gatherGpu(const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
+template void gatherGpu(const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*);
+template void gatherGpu(const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
+template void gatherGpu(const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
+template void gatherGpu(const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
+
+template void gatherGpu(const unsigned*, size_t, const uint8_t*, uint8_t*);
 template void gatherGpu(const unsigned*, size_t, const double*, double*);
 template void gatherGpu(const unsigned*, size_t, const float*, float*);
 template void gatherGpu(const unsigned*, size_t, const char*, char*);
@@ -113,12 +132,32 @@ template void gatherGpu(const unsigned*, size_t, const util::array<float, 2>*, u
 template void gatherGpu(const unsigned*, size_t, const util::array<float, 3>*, util::array<float, 3>*);
 template void gatherGpu(const unsigned*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
 
-template void gatherGpu(const uint64_t*, size_t, const double*, double*);
-template void gatherGpu(const uint64_t*, size_t, const float*, float*);
-template void gatherGpu(const uint64_t*, size_t, const util::array<float, 1>*, util::array<float, 1>*);
-template void gatherGpu(const uint64_t*, size_t, const util::array<float, 2>*, util::array<float, 2>*);
-template void gatherGpu(const uint64_t*, size_t, const util::array<float, 3>*, util::array<float, 3>*);
-template void gatherGpu(const uint64_t*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+template<class T, class IndexType>
+__global__ void scatterGpuKernel(const IndexType* map, size_t n, const T* source, T* destination)
+{
+    size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (tid < n) { destination[map[tid]] = source[tid]; }
+}
+
+template<class T, class IndexType>
+void scatterGpu(const IndexType* map, size_t n, const T* source, T* destination)
+{
+    int numThreads = 256;
+    int numBlocks  = iceil(n, numThreads);
+
+    scatterGpuKernel<<<numBlocks, numThreads>>>(map, n, source, destination);
+}
+
+template void scatterGpu(const int*, size_t, const int*, int*);
+template void scatterGpu(const int*, size_t, const uint32_t*, uint32_t*);
+template void scatterGpu(const int*, size_t, const uint64_t*, uint64_t*);
+template void scatterGpu(const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+template void scatterGpu(const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
+template void scatterGpu(const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*);
+template void scatterGpu(const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
+template void scatterGpu(const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
+template void scatterGpu(const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
 
 template<class T>
 std::tuple<T, T> MinMaxGpu<T>::operator()(const T* first, const T* last)
@@ -170,6 +209,7 @@ template size_t lowerBoundGpu(const unsigned*, const unsigned*, unsigned);
 template size_t lowerBoundGpu(const uint64_t*, const uint64_t*, uint64_t);
 template size_t lowerBoundGpu(const int*, const int*, int);
 template size_t lowerBoundGpu(const int64_t*, const int64_t*, int64_t);
+template size_t lowerBoundGpu(const float*, const float*, float);
 
 template<class T, class IndexType>
 void lowerBoundGpu(const T* first, const T* last, const T* valueFirst, const T* valueLast, IndexType* result)
@@ -266,22 +306,36 @@ void sortGpu(KeyType* first, KeyType* last, KeyType* keyBuf)
 
 template void sortGpu(uint32_t*, uint32_t*, uint32_t*);
 template void sortGpu(uint64_t*, uint64_t*, uint64_t*);
+template void sortGpu(float*, float*, float*);
+
+// Determine temporary device storage requirements
+template<class KeyType, class ValueType>
+uint64_t sortByKeyTempStorage(uint64_t numElements)
+{
+    cub::DoubleBuffer<KeyType> d_keys(nullptr, nullptr);
+    cub::DoubleBuffer<ValueType> d_values(nullptr, nullptr);
+
+    uint64_t tempStorageBytes = 0;
+    cub::DeviceRadixSort::SortPairs(nullptr, tempStorageBytes, d_keys, d_values, numElements);
+    return tempStorageBytes;
+}
 
 template<class KeyType, class ValueType>
-void sortByKeyGpu(KeyType* first, KeyType* last, ValueType* values, KeyType* keyBuf, ValueType* valueBuf)
+void sortByKeyGpu(KeyType* first,
+                  KeyType* last,
+                  ValueType* values,
+                  KeyType* keyBuf,
+                  ValueType* valueBuf,
+                  void* d_tempStorage,
+                  uint64_t tempStorageBytes)
 {
     size_t numElements = last - first;
 
     cub::DoubleBuffer<KeyType> d_keys(first, keyBuf);
     cub::DoubleBuffer<ValueType> d_values(values, valueBuf);
 
-    // Determine temporary device storage requirements
-    void* d_tempStorage     = nullptr;
-    size_t tempStorageBytes = 0;
-    cub::DeviceRadixSort::SortPairs(d_tempStorage, tempStorageBytes, d_keys, d_values, numElements);
-
-    // Allocate temporary storage
-    checkGpuErrors(cudaMalloc(&d_tempStorage, tempStorageBytes));
+    auto tempBytesCheck = sortByKeyTempStorage<KeyType, ValueType>(numElements);
+    if (tempStorageBytes < tempBytesCheck) { throw std::runtime_error("temp storage too small\n"); };
 
     // Run sorting operation
     checkGpuErrors(cub::DeviceRadixSort::SortPairs(d_tempStorage, tempStorageBytes, d_keys, d_values, numElements));
@@ -297,15 +351,18 @@ void sortByKeyGpu(KeyType* first, KeyType* last, ValueType* values, KeyType* key
     {
         checkGpuErrors(cudaMemcpy(values, curValues, numElements * sizeof(ValueType), cudaMemcpyDeviceToDevice));
     }
-
-    checkGpuErrors(cudaFree(d_tempStorage));
 }
 
-template void sortByKeyGpu(unsigned*, unsigned*, unsigned*, unsigned*, unsigned*);
-template void sortByKeyGpu(unsigned*, unsigned*, int*, unsigned*, int*);
-template void sortByKeyGpu(uint64_t*, uint64_t*, unsigned*, uint64_t*, unsigned*);
-template void sortByKeyGpu(uint64_t*, uint64_t*, int*, uint64_t*, int*);
-template void sortByKeyGpu(uint64_t*, uint64_t*, uint64_t*, uint64_t*, uint64_t*);
+#define SORT_BY_KEY_GPU_DB(KeyType, ValueType)                                                                         \
+    template void sortByKeyGpu(KeyType*, KeyType*, ValueType*, KeyType*, ValueType*, void*, uint64_t);                 \
+    template uint64_t sortByKeyTempStorage<KeyType, ValueType>(uint64_t)
+
+SORT_BY_KEY_GPU_DB(unsigned, unsigned);
+SORT_BY_KEY_GPU_DB(unsigned, int);
+SORT_BY_KEY_GPU_DB(uint64_t, unsigned);
+SORT_BY_KEY_GPU_DB(uint64_t, int);
+SORT_BY_KEY_GPU_DB(uint64_t, uint64_t);
+SORT_BY_KEY_GPU_DB(float, unsigned);
 
 template<class KeyType, class ValueType>
 void sortByKeyGpu(KeyType* first, KeyType* last, ValueType* values)
@@ -331,6 +388,40 @@ template void exclusiveScanGpu(const int*, const int*, uint64_t*, uint64_t);
 template void exclusiveScanGpu(const unsigned*, const unsigned*, unsigned*, unsigned);
 template void exclusiveScanGpu(const unsigned*, const unsigned*, uint64_t*, uint64_t);
 
+template<class IndexType, class SumType>
+void inclusiveScanGpu(const IndexType* first, const IndexType* last, SumType* output)
+{
+    thrust::inclusive_scan(thrust::device, first, last, output);
+
+    /*! Accumulation in 64-bit from 32-bit inputs only works by explicitly setting the type of the initial
+     *  value, which is only supported in Thrust/CUB version shipped with CUDA 12.7 and later
+     */
+    // thrust::inclusive_scan(thrust::device, first, last, output, SumType(0), thrust::plus<>{});
+    /*
+    SumType init = 0;
+    size_t temp_storage_bytes{};
+    size_t num_elements = last - first;
+    cub::DeviceScan::InclusiveScanInit(nullptr, temp_storage_bytes, first, output, thrust::plus<>{}, init,
+                                       num_elements);
+
+    // Allocate temporary storage for inclusive scan
+    uint8_t* temp_storage;
+    checkGpuErrors(cudaMalloc(&temp_storage, temp_storage_bytes));
+
+    // Run inclusive prefix sum
+    cub::DeviceScan::InclusiveScanInit(temp_storage, temp_storage_bytes, first, output, thrust::plus<>{}, init,
+                                       num_elements);
+
+    checkGpuErrors(cudaFree(temp_storage));
+    */
+}
+
+template void inclusiveScanGpu(const int*, const int*, int*);
+template void inclusiveScanGpu(const int*, const int*, unsigned*);
+// template void inclusiveScanGpu(const int*, const int*, uint64_t*);
+template void inclusiveScanGpu(const unsigned*, const unsigned*, unsigned*);
+// template void inclusiveScanGpu(const unsigned*, const unsigned*, uint64_t*);
+
 template<class ValueType>
 size_t countGpu(const ValueType* first, const ValueType* last, ValueType v)
 {
@@ -340,5 +431,23 @@ size_t countGpu(const ValueType* first, const ValueType* last, ValueType v)
 template size_t countGpu(const int* first, const int* last, int v);
 template size_t countGpu(const unsigned* first, const unsigned* last, unsigned v);
 template size_t countGpu(const uint64_t* first, const uint64_t* last, uint64_t v);
+
+template<class T, class S>
+__global__ void selectCopyKernel(const T* src, LocalIndex n, const S* selectFlags, T* dest)
+{
+    LocalIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid < n && selectFlags[tid]) { dest[tid] = src[tid]; }
+}
+
+template<class T, class S>
+void selectCopy(const T* src, LocalIndex n, const S* selectFlags, T* dest)
+{
+    int numThreads = 256;
+    int numBlocks  = iceil(n, numThreads);
+    if (numBlocks == 0) { return; }
+    selectCopyKernel<<<numBlocks, numThreads>>>(src, n, selectFlags, dest);
+}
+
+template void selectCopy(const unsigned*, LocalIndex, const uint8_t*, unsigned*);
 
 } // namespace cstone

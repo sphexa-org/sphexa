@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Ryoanji N-body solver
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -46,6 +30,16 @@ const int TEST_RNG_SEED = 42;
 
 const int verbose = 0;
 #define V(level) if ((level) == verbose)
+
+template<class T>
+std::ostream& operator<<(std::ostream& os, const CartesianQuadrupole<T>& M)
+{
+    os << "m:  " << M[Cqi::mass] << " tr: " << M[Cqi::trace] << std::endl
+       << "xx: " << M[Cqi::qxx] << " xy: " << M[Cqi::qxy] << " xz: " << M[Cqi::qxz] << std::endl
+       << "yy: " << M[Cqi::qyy] << " yz: " << M[Cqi::qyz] << " zz: " << M[Cqi::qzz] << std::endl;
+
+    return os;
+}
 
 template<class T, class KeyType_>
 class GridCoordinates
@@ -162,8 +156,7 @@ makeTestTree(Coords& coordinates, cstone::Box<T> box, float mass_scale, float th
     }
 
     // the leaf cells and leaf particle counts
-    auto [treeLeaves, counts] =
-        computeOctree(coordinates.particleKeys().data(), coordinates.particleKeys().data() + numParticles, bucketSize);
+    auto [treeLeaves, counts] = computeOctree(std::span(coordinates.particleKeys()), bucketSize);
 
     // fully linked octree, including internal part
     OctreeData<KeyType, CpuTag> octree;
@@ -171,8 +164,8 @@ makeTestTree(Coords& coordinates, cstone::Box<T> box, float mass_scale, float th
     updateInternalTree<KeyType>(treeLeaves, octree.data());
 
     // layout[i] is equal to the index in (x,y,z,m) of the first particle in leaf cell with index i
-    std::vector<LocalIndex> layout(octree.numLeafNodes + 1);
-    std::exclusive_scan(counts.begin(), counts.end() + 1, layout.begin(), LocalIndex(0));
+    std::vector<LocalIndex> layout(octree.numLeafNodes + 1, 0);
+    std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
 
     auto toInternal = leafToInternal(octree);
 
@@ -184,10 +177,6 @@ makeTestTree(Coords& coordinates, cstone::Box<T> box, float mass_scale, float th
     std::vector<MultipoleType> multipoles(octree.numNodes);
     computeLeafMultipoles(x, y, z, masses.data(), toInternal, layout.data(), centers.data(), multipoles.data());
     upsweepMultipoles(octree.levelRange, octree.childOffsets.data(), centers.data(), multipoles.data());
-    for (size_t i = 0; i < multipoles.size(); ++i)
-    {
-        multipoles[i] = ryoanji::normalize(multipoles[i]);
-    }
 
     T totalMass = std::accumulate(masses.begin(), masses.end(), 0.0);
     EXPECT_NEAR(totalMass, multipoles[0][ryoanji::Cqi::mass], 1e-6);

@@ -1,8 +1,8 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * SPH-EXA
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Basel, University of Zurich
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -44,6 +44,7 @@
 #include "io/factory.hpp"
 #include "observables/factory.hpp"
 #include "propagator/factory.hpp"
+#include "sph/types.hpp"
 #include "util/timer.hpp"
 #include "util/utils.hpp"
 
@@ -60,6 +61,7 @@ namespace fs = std::filesystem;
 using namespace sphexa;
 
 bool stopConditionReached(size_t iteration, double time, const std::string& maxStepStr);
+bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float dt);
 void printHelp(char* binName, int rank);
 int  getNumLocalRanks(int);
 
@@ -75,7 +77,7 @@ int main(int argc, char** argv)
     }
 
     using Dataset = SimulationData<AccType>;
-    using Domain  = cstone::Domain<SphTypes::KeyType, SphTypes::CoordinateType, AccType>;
+    using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, AccType>;
 
     const std::string        initCond     = parser.get("--init");
     const size_t             problemSize  = parser.get("-n", 50);
@@ -91,9 +93,10 @@ int main(int argc, char** argv)
     const std::string        writeFreqStr = parser.get("-w", std::string("0"));
     const bool               writeEnabled = writeFreqStr != "0" || !writeExtra.empty();
     const std::string        profFreqStr  = parser.get("--profile", maxStepStr);
-    const bool               profEnabled  = parser.exists("--profile");
-    const std::string        pmroot       = parser.get("--pmroot", std::string("/sys/cray/pm_counters"));
+    const bool               profEnabled  = parser.exists("--profile") || writeEnabled;
+    const std::string        pmroot       = parser.get("--pmroot", std::string("")); // /sys/cray/pm_counters
     std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
+    std::string              profFile     = parser.get("-op", std::string("profile"));
 
     std::ofstream nullOutput("/dev/null");
     std::ostream& output = (quiet || rank) ? nullOutput : std::cout;
@@ -113,7 +116,7 @@ int main(int argc, char** argv)
     MPI_Barrier(MPI_COMM_WORLD);
     totalTimer.start();
 
-    propagator->addCounters(profEnabled ? pmroot : "", getNumLocalRanks(numRanks));
+    propagator->addCounters(pmroot, getNumLocalRanks(numRanks));
     propagator->activateFields(simData);
     propagator->load(initCond, fileReader.get());
     auto box = simInit->init(rank, numRanks, problemSize, simData, fileReader.get());
@@ -131,9 +134,10 @@ int main(int argc, char** argv)
     if (rank == 0) { std::cout << "Data generated for " << d.numParticlesGlobal << " global particles\n"; }
 
     uint64_t bucketSizeFocus = 64;
-    // we want about 100 global nodes per rank to decompose the domain with +-1% accuracy
+    // ~100 global nodes per rank to decompose the domain with +-1% accuracy
     uint64_t bucketSize = std::max(bucketSizeFocus, d.numParticlesGlobal / (100 * numRanks));
     Domain   domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, box);
+    domain.setGrowthAllocRate(simData.hydro.getAllocGrowthRate());
 
     propagator->sync(domain, simData);
     if (rank == 0) std::cout << "Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
@@ -141,20 +145,28 @@ int main(int argc, char** argv)
     viz::init_catalyst(argc, argv);
     viz::init_ascent(d, domain.startIndex());
 
-    size_t startIteration = d.iteration;
-    bool   keepRunning    = true;
-    for (; keepRunning; d.iteration++)
+    size_t startIteration    = d.iteration;
+    bool   isOutputTriggered = false;
+
+    for (bool keepRunning = true; keepRunning; d.iteration++)
     {
         propagator->computeForces(domain, simData);
         box = domain.box();
 
-        observables->computeAndWrite(simData, domain.startIndex(), domain.endIndex(), box);
+        if (propagator->isSynced())
+        {
+            observables->computeAndWrite(simData, domain.startIndex(), domain.endIndex(), box);
+        }
 
-        bool isWallClockReached = totalTimer.elapsed() > simDuration;
+        bool isWallClockReached = syncedWallClockElapsed(totalTimer.elapsed(), simDuration, propagator->stepElapsed());
 
-        if (isOutputStep(d.iteration, writeFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStr) ||
-            isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtra) ||
-            (isWallClockReached && writeEnabled))
+        isOutputTriggered =
+            (isOutputStep(d.iteration, writeFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStr) ||
+             isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtra) ||
+             (isWallClockReached && writeEnabled) || isOutputTriggered) &&
+            d.iteration > startIteration;
+
+        if (isOutputTriggered && propagator->isSynced())
         {
             fileWriter->addStep(domain.startIndex(), domain.endIndex(), outFile);
             simData.hydro.loadOrStoreAttributes(fileWriter.get());
@@ -162,13 +174,15 @@ int main(int argc, char** argv)
             propagator->saveFields(fileWriter.get(), domain.startIndex(), domain.endIndex(), simData, box);
             propagator->save(fileWriter.get());
             fileWriter->closeStep();
+            isOutputTriggered = false;
         }
         if (isOutputStep(d.iteration, profFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, profFreqStr) ||
             isWallClockReached)
         {
-            if (profEnabled) { propagator->writeMetrics(fileWriter.get(), "profile"); }
+            if (profEnabled) { propagator->writeMetrics(fileWriter.get(), profFile); }
         }
-        keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached);
+        keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
+                      not propagator->isSynced();
 
         viz::execute(d, domain.startIndex(), domain.endIndex());
 
@@ -190,6 +204,23 @@ bool stopConditionReached(size_t iteration, double time, const std::string& maxS
     bool simTimeLimit  = !strIsIntegral(maxStepStr) && time > std::stod(maxStepStr);
 
     return lastIteration || simTimeLimit;
+}
+
+/*! @brief check whether wall clock limit was reached on any rank
+ *
+ * We do this to account for the fact that the total runtime timestamp might not be taken at exactly the same moment
+ * across ranks.
+ */
+bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float dt)
+{
+    // if total time elapsed is getting close to (within dt) of the limit
+    if (totalTimeElapsed + dt > wallClockLimit)
+    {
+        int isLimitReachedAny = totalTimeElapsed > wallClockLimit;
+        mpiAllreduce(MPI_IN_PLACE, &isLimitReachedAny, 1, MPI_SUM);
+        return isLimitReachedAny;
+    }
+    return false;
 }
 
 int getNumLocalRanks(int defValue)
@@ -217,7 +248,7 @@ void printHelp(char* name, int rank)
         printf("\t--prop STRING \t Choice of SPH propagator [default: modern SPH]. For standard SPH, use \"std\" \n\n");
 
         printf("\t-s NUM \t\t int(NUM):  Number of iterations (time-steps) [200],\n\
-                \t real(NUM): Time   of simulation (time-model)\n\n");
+                \t real(NUM): Time of simulation (time-model)\n\n");
 
         printf("\t--wextra LIST \t Comma-separated list of steps (integers) or ~times (floating point)\n"
                "\t\t\t at which to trigger file output\n"
@@ -235,11 +266,19 @@ void printHelp(char* name, int rank)
         printf("\t--ascii \t Dump file in ASCII format [binary HDF5 by default]\n\n");
 
         printf("\t--outDir PATH \t Path to directory where output will be saved [./].\n\
-                    \t Note that directory must exist and be provided with ending slash,\n\
-                    \t e.g: --outDir /home/user/folderToSaveOutputFiles/\n\n");
+                \t Note that directory must exist and be provided with ending slash,\n\
+                \t e.g: --outDir /home/user/folderToSaveOutputFiles/\n\n");
 
         printf("\t--quiet \t Don't print anything to stdout\n\n");
 
         printf("\t--duration \t Maximum wall-clock run time of the simulation in seconds.[MAX_INT]\n\n");
+
+        printf("\t--profile \t\t Enable profiling output,\n\
+                \t Profiling is enabled by default if file output is enabled.\n\n");
+
+        printf("\t--profileFreq NUM \t\t [default]: the profiling data is outputted at the end of the simulation,\n\
+                \t NUM<=0:    Disable profiling output,\n\
+                \t int(NUM):  Dump profiling data every NUM iteration steps,\n\
+                \t real(NUM): Dump profiling data every NUM seconds of simulation (not wall-clock) time \n\n");
     }
 }

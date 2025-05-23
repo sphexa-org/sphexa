@@ -33,6 +33,7 @@
 #include <cmath>
 
 #include "cstone/cuda/annotation.hpp"
+#include "cstone/traversal/groups.hpp"
 #include "cstone/util/tuple.hpp"
 
 namespace sph
@@ -100,25 +101,28 @@ HOST_DEVICE_FUN auto stirParticle(size_t ndim, Tc xi, Tc yi, Tc zi, size_t numMo
  *
  */
 template<class Tc, class Ta, class T>
-void computeStirring(size_t startIndex, size_t endIndex, size_t numDim, const Tc* x, const Tc* y, const Tc* z, Ta* ax,
-                     Ta* ay, Ta* az, size_t numModes, const T* modes, const T* phaseReal, const T* phaseImag,
+void computeStirring(cstone::GroupView grp, size_t numDim, const Tc* x, const Tc* y, const Tc* z, Ta* ax, Ta* ay,
+                     Ta* az, size_t numModes, const T* modes, const T* phaseReal, const T* phaseImag,
                      const T* amplitudes, T solWeightNorm)
 {
 #pragma omp parallel for schedule(static)
-    for (size_t i = startIndex; i < endIndex; ++i)
+    for (cstone::LocalIndex gi = 0; gi < grp.numGroups; ++gi)
     {
-        auto [turbAx, turbAy, turbAz] =
-            stirParticle<Tc, Ta, T>(numDim, x[i], y[i], z[i], numModes, modes, phaseReal, phaseImag, amplitudes);
+        for (cstone::LocalIndex i = grp.groupStart[gi]; i < grp.groupEnd[gi]; ++i)
+        {
+            auto [turbAx, turbAy, turbAz] =
+                stirParticle<Tc, Ta, T>(numDim, x[i], y[i], z[i], numModes, modes, phaseReal, phaseImag, amplitudes);
 
-        ax[i] += solWeightNorm * turbAx;
-        ay[i] += solWeightNorm * turbAy;
-        az[i] += solWeightNorm * turbAz;
+            ax[i] += solWeightNorm * turbAx;
+            ay[i] += solWeightNorm * turbAy;
+            az[i] += solWeightNorm * turbAz;
+        }
     }
 }
 
 template<class Tc, class Ta, class T>
-extern void computeStirringGpu(size_t startIndex, size_t endIndex, size_t numDim, const Tc* x, const Tc* y, const Tc* z,
-                               Ta* ax, Ta* ay, Ta* az, size_t numModes, const T* modes, const T* phaseReal,
-                               const T* phaseImag, const T* amplitudes, T solWeightNorm);
+extern void computeStirringGpu(cstone::GroupView grp, size_t numDim, const Tc* x, const Tc* y, const Tc* z, Ta* ax,
+                               Ta* ay, Ta* az, size_t numModes, const T* modes, const T* phaseReal, const T* phaseImag,
+                               const T* amplitudes, T solWeightNorm);
 
 } // namespace sph

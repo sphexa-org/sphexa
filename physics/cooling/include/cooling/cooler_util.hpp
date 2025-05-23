@@ -9,9 +9,25 @@
 
 namespace cooling
 {
+
+template<size_t... J>
+struct is_all_equal
+{
+    using type = std::bool_constant<true>;
+};
+
+template<size_t I, size_t... J>
+struct is_all_equal<I, J...>
+{
+    using type = std::bool_constant<((I == J) && ...)>;
+};
+
+template<typename... Tuples>
+concept same_sizes = (is_all_equal<std::tuple_size_v<Tuples>...>::type::value);
+
 //! @brief For Tuples A, B ... call f(a1, b1 ...), f(a2, b2 ...)
 template<typename... Tuples, typename F>
-requires(std::tuple_size_v<std::decay_t<Tuples>> == ...) void for_each_tuples(F&& f, Tuples&&... tuples)
+requires same_sizes<std::decay_t<Tuples>...> void for_each_tuples(F&& f, Tuples&&... tuples)
 {
     auto f_i = [&](auto I) { return f(std::get<I>(std::forward<Tuples>(tuples))...); };
 

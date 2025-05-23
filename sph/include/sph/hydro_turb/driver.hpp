@@ -100,7 +100,7 @@ void updateNoise(std::vector<T>& phases, T stddev, T dt, T ts, std::mt19937& gen
  * @param  turb             Turbulence modes
  */
 template<class Dataset>
-void driveTurbulence(size_t startIndex, size_t endIndex, Dataset& d,
+void driveTurbulence(GroupView grp, Dataset& d,
                      TurbulenceData<typename Dataset::RealType, typename Dataset::AcceleratorType>& turb)
 {
     updateNoise(turb.phases, turb.variance, d.minDt, turb.decayTime, turb.gen);
@@ -113,16 +113,16 @@ void driveTurbulence(size_t startIndex, size_t endIndex, Dataset& d,
         turb.d_phasesReal = turb.phasesReal;
         turb.d_phasesImag = turb.phasesImag;
 
-        computeStirringGpu(startIndex, endIndex, turb.numDim, rawPtr(d.devData.x), rawPtr(d.devData.y),
-                           rawPtr(d.devData.z), rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az),
-                           turb.numModes, rawPtr(turb.d_modes), rawPtr(turb.d_phasesReal), rawPtr(turb.d_phasesImag),
+        computeStirringGpu(grp, turb.numDim, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
+                           rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az), turb.numModes,
+                           rawPtr(turb.d_modes), rawPtr(turb.d_phasesReal), rawPtr(turb.d_phasesImag),
                            rawPtr(turb.d_amplitudes), turb.solWeightNorm);
         syncGpu();
     }
     else
     {
-        computeStirring(startIndex, endIndex, turb.numDim, d.x.data(), d.y.data(), d.z.data(), d.ax.data(), d.ay.data(),
-                        d.az.data(), turb.numModes, turb.modes.data(), turb.phasesReal.data(), turb.phasesImag.data(),
+        computeStirring(grp, turb.numDim, d.x.data(), d.y.data(), d.z.data(), d.ax.data(), d.ay.data(), d.az.data(),
+                        turb.numModes, turb.modes.data(), turb.phasesReal.data(), turb.phasesImag.data(),
                         turb.amplitudes.data(), turb.solWeightNorm);
     }
 }
