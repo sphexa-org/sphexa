@@ -30,6 +30,11 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include <omp.h>
+
+#include <algorithm>
+#include <execution>
+
 #include "id_tag_utils.hpp"
 
 namespace sphexa
@@ -81,6 +86,107 @@ void tagIdsInSphere(IdVectorType& ids, const std::vector<CoordinateType>& x, con
     }
 }
 
+#if 1
+
+// TODO: to be removed togheter with the findTaggedIds below
+void exclusive_scan(const std::vector<IdType>& input, std::vector<IdType>& output)
+{
+    IdType n = input.size();
+    unsigned int nthreads = 1;
+    std::vector<IdType> thread_sums;
+
+    #pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        #pragma omp single
+        {
+            nthreads = omp_get_num_threads();
+            thread_sums.resize(nthreads + 1, 0);
+        }
+
+        IdType sum = 0;
+        #pragma omp for schedule(static)
+        for (int i = 0; i < n; ++i)
+        {
+            output[i] = sum;
+            sum += input[i];
+        }
+        thread_sums[tid + 1] = sum;
+
+        #pragma omp barrier
+        #pragma omp single
+        {
+            for (int i = 1; i <= nthreads; ++i)
+                thread_sums[i] += thread_sums[i - 1];
+        }
+
+        #pragma omp for schedule(static)
+        for (int i = 0; i < n; ++i)
+        {
+            output[i] += thread_sums[tid];
+        }
+    }
+}
+
+
+// TODO: to be removed, the fastest findTaggedIds implementation is the next one
+/*! @brief Tagged id identification function
+ *
+ * @param[in]  ids          ordered id list
+ * @param[in]  first        first id index // TODO number of elements and pass iterator?
+ * @param[in]  last         last (excluded) id index
+ * @param[out] taggedIdsIndexes  vector of indexes (positions wrt of selected particles
+ */
+void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes)
+{
+    const IdType hostIdSize = last - first;
+    std::vector<IdType> hostMask(hostIdSize);
+    std::vector<IdType> hostScanResult(hostIdSize);
+
+    // Generate mask
+//    std::transform(std::execution::par, ids.begin()+first, ids.begin()+last, hostMask.begin(), MaskFunctor{});
+    #pragma omp parallel for
+    for(IdType index=0; index<hostIdSize; ++index)
+    {
+        hostMask[index] = MaskFunctor{}(ids[index+first]);
+    }
+
+
+    // Run scan
+//    std::exclusive_scan(std::execution::par, hostMask.begin(), hostMask.end(), hostScanResult.begin(), 0);
+    exclusive_scan(hostMask, hostScanResult);
+
+    if(hostScanResult.back() > 0 || hostMask.back() == 1) {
+
+        // Scatter the tagged ids positions
+        taggedIdsIndexes.resize(hostScanResult.back());
+        if(hostMask.back() == 1) {
+            taggedIdsIndexes.resize(hostScanResult.back()+1);
+        }
+        std::vector<IdType> hostSequence(hostIdSize);
+        #pragma omp parallel for
+        for(IdType i=0; i<hostIdSize; i++)
+        {
+            hostSequence[i] = first + i;
+        }
+//        std::iota(hostSequence.begin(), hostSequence.end(), first);
+
+        #pragma omp parallel for
+        for(IdType i=0; i<hostIdSize; i++)
+        {
+            if(hostMask[i])
+            {
+                taggedIdsIndexes[hostScanResult[i]] = hostSequence[i];
+            }
+        }
+    }
+    else {
+        taggedIdsIndexes.clear();
+    }
+
+    return;
+}
+#else
 /*! @brief Tagged id identification function  
  *
  * @param[in]  ids          ordered id list
@@ -90,16 +196,25 @@ void tagIdsInSphere(IdVectorType& ids, const std::vector<CoordinateType>& x, con
  */
 void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes)
 {
-    // Find the selected particles in local id list and save their indexes
-    // TODO: switch to GPU-like implementation?
+    const IdType hostIdSize = last - first;
     taggedIdsIndexes.clear();
-    IdType idIndex = first;
-    std::for_each(ids.begin()+first, ids.begin()+last, [&taggedIdsIndexes, &idIndex](auto& id){
-        if((id & sphexa::msbMask) != 0) {
-            taggedIdsIndexes.push_back(idIndex); // TODO: inefficient due to resizing, avoid push_back usage
+    taggedIdsIndexes.reserve(hostIdSize);
+
+    #pragma omp parallel
+    {
+        IdVectorType tmpTaggedIdsIndexes;
+//        tmpTaggedIdsIndexes.reserve(hostIdSize); // TODO: without a better estimate of the size, this is not efficient
+        #pragma omp for nowait
+        for (IdType index = first; index<last; ++index)
+        {
+            if (MaskFunctor{}(ids[index]))
+                tmpTaggedIdsIndexes.push_back(index);
         }
-        idIndex++;
-    });
+        #pragma omp critical
+        taggedIdsIndexes.insert(taggedIdsIndexes.end(), tmpTaggedIdsIndexes.begin(), tmpTaggedIdsIndexes.end());
+    }
+    std::sort(std::execution::par, taggedIdsIndexes.begin(), taggedIdsIndexes.end());
 }
+#endif
 
 }
