@@ -163,7 +163,13 @@ TEST(Grids, assembleCuboid)
                 auto selectBox = cstone::FBox<T>(box.xmin() + i * frag[0], box.xmin() + (i + 1) * frag[0],
                                                  box.ymin() + j * frag[1], box.ymin() + (j + 1) * frag[1],
                                                  box.zmin() + k * frag[2], box.zmin() + (k + 1) * frag[2]);
-                extractBlock<T>(selectBox, box, {i, j, k}, multiplicity, xb, yb, zb, X, Y, Z);
+                auto np        = countSelection<T>(selectBox, box, {i, j, k}, multiplicity, xb, yb, zb);
+                X.resize(X.size() + np);
+                Y.resize(Y.size() + np);
+                Z.resize(Z.size() + np);
+                extractBlock<T>(selectBox, box, {i, j, k}, multiplicity, xb, yb, zb,
+                                std::span(X).subspan(X.size() - np), std::span(Y).subspan(Y.size() - np),
+                                std::span(Z).subspan(Z.size() - np));
             }
         }
     }

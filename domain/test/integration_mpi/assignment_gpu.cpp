@@ -26,11 +26,9 @@
 
 #include "gtest/gtest.h"
 
+#define USE_CUDA
 #include "coord_samples/random.hpp"
-#include "cstone/domain/assignment_gpu.cuh"
 #include "cstone/domain/assignment.hpp"
-
-#include "cstone/util/reallocate.hpp"
 
 using namespace cstone;
 
@@ -80,7 +78,7 @@ void randomGaussianAssignment(int rank, int numRanks)
     GlobalAssignment<KeyType, T> assignment(rank, numRanks, bucketSize, box);
     BufferDescription bufDesc{0, numParticles, numParticles};
     std::vector<unsigned> sfcScratchCpu;
-    SfcSorter<LocalIndex, std::vector<unsigned>> cpuGather(sfcScratchCpu);
+    SfcSorter cpuGather(sfcScratchCpu);
 
     std::vector<T> s0, s1;
     LocalIndex exchangeSizeCpu =
@@ -93,9 +91,9 @@ void randomGaussianAssignment(int rank, int numRanks)
     DeviceVector<T> d_y = y;
     DeviceVector<T> d_z = z;
 
-    GlobalAssignmentGpu<KeyType, T> assignmentGpu(rank, numRanks, bucketSize, box);
+    GlobalAssignment<KeyType, T, GpuTag> assignmentGpu(rank, numRanks, bucketSize, box);
     DeviceVector<unsigned> sfcScratch;
-    GpuSfcSorter<LocalIndex, DeviceVector<unsigned>> deviceSort(sfcScratch);
+    SfcSorter deviceSort(sfcScratch);
 
     DeviceVector<T> d_s0, d_s1;
     bufDesc.size =

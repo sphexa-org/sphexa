@@ -1,9 +1,9 @@
-![License](https://img.shields.io/github/license/unibas-dmi-hpc/SPH-EXA_mini-app)
-[![Documentation Status](https://readthedocs.org/projects/sph-exa/badge/?version=latest)](https://sph-exa.readthedocs.io/en/latest/?badge=latest)
-[![Unit tests](https://github.com/unibas-dmi-hpc/SPH-EXA_mini-app/actions/workflows/unittest.yml/badge.svg?branch=develop)](https://github.com/unibas-dmi-hpc/SPH-EXA_mini-app/actions/workflows/unittest.yml)
-![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/unibas-dmi-hpc/SPH-EXA_mini-app?include_prereleases)
+![License](https://img.shields.io/github/license/sphexa-org/sphexa)
+
+![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/sphexa-org/sphexa?include_prereleases)
+
 <p align="center">
-  <img src="https://raw.githubusercontent.com/unibas-dmi-hpc/SPH-EXA/develop/docs/artwork/SPH-EXA_logo.png" alt="SPH-EXA logo" width="200"/>
+  <img src="https://raw.githubusercontent.com/sphexa-org/sphexa/refs/heads/develop/docs/artwork/SPH-EXA_logo.png" alt="SPH-EXA logo" width="200"/>
 </p>
 
 # SPH
@@ -103,8 +103,8 @@ Module and CMake configuration on LUMI (ROCm 6.2.2)
 ```shell
 module swap PrgEnv-cray PrgEnv-gnu
 module load CrayEnv buildtools craype-accel-amd-gfx90a rocm cray-hdf5-parallel
-cd <GIT_SOURCE_DIR>;
-cmake -DCMAKE_CXX_COMPILER=CC -DCMAKE_HIP_ARCHITECTURES=gfx90a -DCMAKE_HIP_COMPILER=CC -DCSTONE_WITH_GPU_AWARE_MPI=ON -S <GIT_SOURCE_DIR>
+export MPICH_GPU_SUPPORT_ENABLED=1
+cmake -DCMAKE_CXX_COMPILER=CC -DCMAKE_HIP_ARCHITECTURES=gfx90a -DCSTONE_WITH_GPU_AWARE_MPI=ON -S <GIT_SOURCE_DIR>
 ```
 
 Build everything: ```make -j```
@@ -124,7 +124,7 @@ Arguments:
 * ```-s NUM``` : Run the simulation with NUM of iterations (time-steps) if NUM is integer. Run until the specified physical time if NUM is real. 
 * ```-w NUM``` : Dump particle data every NUM iterations (time-steps) if NUM is integer. Dump data at the specified physical time if NUM is real.
 * ```-f FIELDS```: Comma separated list of particle fields for file output dumps. See a list of common ouput fields below.
-* ```--quiet``` : Don't print any output to stdout
+* ```--quiet``` : Do not print any output to stdout
 
 Implemented cases:
 * ```--sedov```: spherical blast wave
@@ -221,8 +221,8 @@ and a warp-aware tree-traversal inspired by the
 * Yiqing Zhu
 
 ## Paper references
-* [Keller, S., Cavelan, A., Cabezon, R. M., Mayer L., Ciorba, F. M. (2023) Cornerstone: Octree Construction Algorithms for Scalable Particle Simulations. (PASC '23)](https://dl.acm.org/doi/abs/10.1145/3592979.3593417)
-* [Cavelan, A., Cabezon, R. M., Grabarczyk, M., Ciorba, F. M. (2020). A Smoothed Particle Hydrodynamics Mini-App for Exascale. (PASC '20)](https://dl.acm.org/doi/10.1145/3394277.3401855)
+* [Keller, S., Cavelan, A., Cabezon, R. M., Mayer L., Ciorba, F. M. (2023) Cornerstone: Octree Construction Algorithms for Scalable Particle Simulations. (PASC 23)](https://dl.acm.org/doi/abs/10.1145/3592979.3593417)
+* [Cavelan, A., Cabezon, R. M., Grabarczyk, M., Ciorba, F. M. (2020). A Smoothed Particle Hydrodynamics Mini-App for Exascale. (PASC 20)](https://dl.acm.org/doi/10.1145/3394277.3401855)
 
 ## License
 
