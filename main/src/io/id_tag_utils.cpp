@@ -86,7 +86,7 @@ void tagIdsInSphere(IdVectorType& ids, const std::vector<CoordinateType>& x, con
     }
 }
 
-#if 1
+#if 0
 
 // TODO: to be removed togheter with the findTaggedIds below
 void exclusive_scan(const std::vector<IdType>& input, std::vector<IdType>& output)
