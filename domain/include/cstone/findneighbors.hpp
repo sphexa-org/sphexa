@@ -140,8 +140,8 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
         }
     };
 
-    if (usePbc) { singleTraversal(tree.childOffsets, overlapsPbc, searchBoxPbc); }
-    else { singleTraversal(tree.childOffsets, overlaps, searchBox); }
+    if (usePbc) { singleTraversal(tree.childOffsets, tree.parents, overlapsPbc, searchBoxPbc); }
+    else { singleTraversal(tree.childOffsets, tree.parents, overlaps, searchBox); }
 
     return numNeighbors;
 }

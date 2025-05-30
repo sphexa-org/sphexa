@@ -146,7 +146,7 @@ std::vector<int> findPeersMacStt(int myRank,
             peers[peerRank] = 1;
         };
 
-        singleTraversal(octree.childOffsets().data(), violatesMac, markLeafIdx);
+        singleTraversal(octree.childOffsets().data(), octree.parents().data(), violatesMac, markLeafIdx);
     }
 
     std::vector<int> ret;

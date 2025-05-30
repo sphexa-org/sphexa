@@ -41,7 +41,7 @@ auto benchmarkMacsCpu(const OctreeView<KeyType>& octree,
     std::vector<uint8_t> macs(octree.numNodes, 0);
     auto findMacsLambda = [&octree, &centers, &box, &leaves, &macs, firstFocusNode, lastFocusNode]()
     {
-        markMacs(octree.prefixes, octree.childOffsets, centers, box, leaves.data() + firstFocusNode,
+        markMacs(octree.prefixes, octree.childOffsets, octree.parents, centers, box, leaves.data() + firstFocusNode,
                  lastFocusNode - firstFocusNode, false, macs.data());
     };
 
@@ -83,9 +83,8 @@ int main()
     std::cout << "build time from scratch " << buildTime / 1000 << " nNodes(tree): " << nNodes(tree)
               << " count: " << thrust::reduce(counts.begin(), counts.end(), 0) << std::endl;
 
-    auto updateTree = [&]() {
-        updateOctreeGpu<KeyType>({rawPtr(particleCodes), numParticles}, bucketSize, tree, counts, tmpTree, workArray);
-    };
+    auto updateTree = [&]()
+    { updateOctreeGpu<KeyType>({rawPtr(particleCodes), numParticles}, bucketSize, tree, counts, tmpTree, workArray); };
 
     float updateTime = timeGpu(updateTree);
     std::cout << "build time with guess " << updateTime / 1000 << " nNodes(tree): " << nNodes(tree)
@@ -170,8 +169,8 @@ int main()
 
     auto findMacsLambda = [octree = octreeView, &centers, &box, &tree, &macs, firstFocusNode, lastFocusNode]()
     {
-        markMacsGpu(octree.prefixes, octree.childOffsets, rawPtr(centers), box, rawPtr(tree) + firstFocusNode,
-                    lastFocusNode - firstFocusNode, false, rawPtr(macs));
+        markMacsGpu(octree.prefixes, octree.childOffsets, octree.parents, rawPtr(centers), box,
+                    rawPtr(tree) + firstFocusNode, lastFocusNode - firstFocusNode, false, rawPtr(macs));
     };
 
     float macTime = timeGpu(findMacsLambda);

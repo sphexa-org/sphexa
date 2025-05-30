@@ -680,9 +680,9 @@ TEST(EwaldGravity, UniformGrid)
             {
                 EwaldSettings settings{.numReplicaShells = 1, .lCut = 2.6, .hCut = 2.8, .alpha_scale = 2.0};
 
-                computeGravity(octree.childOffsets.data(), octree.internalToLeaf.data(), centers.data(),
-                               multipoles.data(), layout.data(), 0, octree.numLeafNodes, x, y, z, h.data(),
-                               masses.data(), box, G, u.data(), ax.data(), ay.data(), az.data(), &utot,
+                computeGravity(octree.childOffsets.data(), octree.parents.data(), octree.internalToLeaf.data(),
+                               centers.data(), multipoles.data(), layout.data(), 0, octree.numLeafNodes, x, y, z,
+                               h.data(), masses.data(), box, G, u.data(), ax.data(), ay.data(), az.data(), &utot,
                                numReplicaShells);
                 computeGravityEwald(makeVec3(centers[0]), multipoles[0], 0, numParticles, x, y, z, masses.data(), box,
                                     G, u.data(), ax.data(), ay.data(), az.data(), &utot, settings);
@@ -800,9 +800,9 @@ TEST(EwaldGravity, UniformGridCenterParticle)
 
             {
                 EwaldSettings settings{.numReplicaShells = 1, .lCut = 2.6, .hCut = 2.8, .alpha_scale = 2.0};
-                computeGravity(octree.childOffsets.data(), octree.internalToLeaf.data(), centers.data(),
-                               multipoles.data(), layout.data(), 0, octree.numLeafNodes, x, y, z, h.data(),
-                               masses.data(), box, G, u.data(), ax.data(), ay.data(), az.data(), &utot,
+                computeGravity(octree.childOffsets.data(), octree.parents.data(), octree.internalToLeaf.data(),
+                               centers.data(), multipoles.data(), layout.data(), 0, octree.numLeafNodes, x, y, z,
+                               h.data(), masses.data(), box, G, u.data(), ax.data(), ay.data(), az.data(), &utot,
                                numReplicaShells);
                 computeGravityEwald(makeVec3(centers[0]), multipoles[0], 0, numParticles, x, y, z, masses.data(), box,
                                     G, u.data(), ax.data(), ay.data(), az.data(), &utot, settings);
@@ -1085,9 +1085,9 @@ TEST(EwaldGravity, SingleParticleChangingGrid)
             const T* z = coordinates.z().data();
 
             EwaldSettings settings{.numReplicaShells = 1, .lCut = 2.6, .hCut = 2.8, .alpha_scale = 2.0};
-            computeGravity(octree.childOffsets.data(), octree.internalToLeaf.data(), centers.data(), multipoles.data(),
-                           layout.data(), 0, octree.numLeafNodes, x, y, z, h.data(), masses.data(), box, G, u.data(),
-                           ax.data(), ay.data(), az.data(), &utot, numReplicaShells);
+            computeGravity(octree.childOffsets.data(), octree.parents.data(), octree.internalToLeaf.data(),
+                           centers.data(), multipoles.data(), layout.data(), 0, octree.numLeafNodes, x, y, z, h.data(),
+                           masses.data(), box, G, u.data(), ax.data(), ay.data(), az.data(), &utot, numReplicaShells);
             computeGravityEwald(makeVec3(centers[0]), multipoles[0], 0, numParticles, x, y, z, masses.data(), box, G,
                                 u.data(), ax.data(), ay.data(), az.data(), &utot, settings);
 
@@ -1116,9 +1116,10 @@ TEST(EwaldGravity, SingleParticleChangingGrid)
             const T* z = coordinates.z().data();
 
             EwaldSettings settings{.numReplicaShells = 1, .lCut = 2.6, .hCut = 2.8, .alpha_scale = 2.0};
-            computeGravity(octree.childOffsets.data(), octree.internalToLeaf.data(), centers.data(), multipoles.data(),
-                           layout.data(), 0, octree.numLeafNodes, x, y, z, h.data(), masses.data(), box, G, u1.data(),
-                           ax1.data(), ay1.data(), az1.data(), &utot1, numReplicaShells);
+            computeGravity(octree.childOffsets.data(), octree.parents.data(), octree.internalToLeaf.data(),
+                           centers.data(), multipoles.data(), layout.data(), 0, octree.numLeafNodes, x, y, z, h.data(),
+                           masses.data(), box, G, u1.data(), ax1.data(), ay1.data(), az1.data(), &utot1,
+                           numReplicaShells);
             computeGravityEwald(makeVec3(centers[0]), multipoles[0], 0, numParticles, x, y, z, masses.data(), box, G,
                                 u1.data(), ax1.data(), ay1.data(), az1.data(), &utot1, settings);
 
