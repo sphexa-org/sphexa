@@ -39,8 +39,7 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
                overlap<KeyType>(sourceBox, target);
     };
 
-    // singleTraversal(childOffsets, overlaps, endpointAction);
-    dfsStackless(childOffsets, parents, overlaps, endpointAction);
+    singleTraversal(childOffsets, parents, overlaps, endpointAction);
 }
 
 /*! @brief mark halo nodes with flags

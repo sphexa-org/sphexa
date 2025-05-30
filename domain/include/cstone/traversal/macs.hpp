@@ -152,6 +152,7 @@ HOST_DEVICE_FUN void markMacPerBox(const Vec3<T>& targetCenter,
                                    unsigned maxSourceLevel,
                                    const KeyType* prefixes,
                                    const TreeNodeIndex* childOffsets,
+                                   const TreeNodeIndex* parents,
                                    const Vec4<T>* centers,
                                    const Box<T>& box,
                                    KeyType focusStart,
@@ -175,18 +176,20 @@ HOST_DEVICE_FUN void markMacPerBox(const Vec3<T>& targetCenter,
         return violatesMac;
     };
 
-    singleTraversal(childOffsets, checkAndMarkMac, [](TreeNodeIndex) {});
+    singleTraversal(childOffsets, parents, checkAndMarkMac, [](TreeNodeIndex) {});
 }
 
 /*! @brief Mark each node in an octree that fails the MAC paired with any node from a given focus SFC range
  *
  * @tparam     T            float or double
  * @tparam     KeyType      32- or 64-bit unsigned integer
- * @param[in]  octree       octree, including internal part
+ * @param[in]  prefixes     SFC key for each tree cell with WS prefix bit
+ * @param[in]  childOffsets index of first child for each node
+ * @param[in]  parents      parent of each node i, stored at index (i-1)/8
  * @param[in]  centers      tree cell expansion (com) center coordinates and mac radius, size @p octree.numTreeNodes()
  * @param[in]  box          global coordinate bounding box
- * @param[in]  focusStart   lower SFC focus code
- * @param[in]  focusEnd     upper SFC focus code
+ * @param[in]  focusNodes   pointer to first LET leaf node in focus
+ * @param[in]  numFocusNodes number of LET leaf nodes in focus
  * @param[in]  limitSource  if true, source cells are only marked if the tree-level is bigger than the target
  * @param[out] markings     array of length @p octree.numTreeNodes(), each position i
  *                          will be set to 1, if the node of @p octree with index i fails the MAC paired with
@@ -195,6 +198,7 @@ HOST_DEVICE_FUN void markMacPerBox(const Vec3<T>& targetCenter,
 template<class T, class KeyType>
 void markMacs(const KeyType* prefixes,
               const TreeNodeIndex* childOffsets,
+              const TreeNodeIndex* parents,
               const Vec4<T>* centers,
               const Box<T>& box,
               const KeyType* focusNodes,
@@ -216,8 +220,8 @@ void markMacs(const KeyType* prefixes,
         auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
         unsigned maxLevel               = maxTreeLevel<KeyType>{};
         if (limitSource) { maxLevel = std::max(int(treeLevel(focusNodes[i + 1] - focusNodes[i])) - 1, 0); }
-        markMacPerBox(targetCenter, targetSize, maxLevel, prefixes, childOffsets, centers, box, focusStart, focusEnd,
-                      markings);
+        markMacPerBox(targetCenter, targetSize, maxLevel, prefixes, childOffsets, parents, centers, box, focusStart,
+                      focusEnd, markings);
     }
 }
 

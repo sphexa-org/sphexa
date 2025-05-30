@@ -27,6 +27,7 @@ namespace cstone
  * @tparam T                     float or double
  * @param[in]  prefixes          Warren-Salmon node keys of the octree, length = numTreeNodes
  * @param[in]  childOffsets      child offsets array, length = numTreeNodes
+ * @param[in]  parents           parent of each node i, stored at index (i-1)/8
  * @param[in]  internalToLeaf    map leaf node indices of fully linked format to cornerstone order
  * @param[in]  leaves            cstone array of leaf node keys
  * @param[in]  interactionRadii  effective halo search radii per octree (leaf) node
@@ -54,6 +55,7 @@ extern void findHalosGpu(const KeyType* prefixes,
 template<class T, class KeyType>
 extern void markMacsGpu(const KeyType* prefixes,
                         const TreeNodeIndex* childOffsets,
+                        const TreeNodeIndex* parents,
                         const Vec4<T>* centers,
                         const Box<T>& box,
                         const KeyType* focusNodes,

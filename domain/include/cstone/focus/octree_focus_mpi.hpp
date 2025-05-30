@@ -498,16 +498,18 @@ public:
         {
             reallocate(macsAcc_, octreeAcc_.numNodes, allocGrowthRate_);
             fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0));
-            markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(centersAcc_), box_,
-                        rawPtr(leavesAcc_) + fAssignStart, fAssignEnd - fAssignStart, false, rawPtr(macsAcc_));
+            markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(octreeAcc_.parents),
+                        rawPtr(centersAcc_), box_, rawPtr(leavesAcc_) + fAssignStart, fAssignEnd - fAssignStart, false,
+                        rawPtr(macsAcc_));
 
             memcpyD2H(rawPtr(macsAcc_), macsAcc_.size(), macs_.data());
         }
         else
         {
             std::fill(rawPtr(macs_), rawPtr(macs_) + macs_.size(), uint8_t(0));
-            markMacs(rawPtr(treeData_.prefixes), rawPtr(treeData_.childOffsets), rawPtr(centers_), box_,
-                     rawPtr(leaves_) + fAssignStart, fAssignEnd - fAssignStart, false, rawPtr(macs_));
+            markMacs(rawPtr(treeData_.prefixes), rawPtr(treeData_.childOffsets), rawPtr(treeData_.parents),
+                     rawPtr(centers_), box_, rawPtr(leaves_) + fAssignStart, fAssignEnd - fAssignStart, false,
+                     rawPtr(macs_));
         }
 
         rebalanceStatus_ |= macCriterion;
@@ -521,10 +523,7 @@ public:
      * @param[-]  scratch          host or device buffer for temporary use
      */
     template<class Th, class Vector>
-    void discoverHalos(std::span<LocalIndex> layout,
-                       const Th* h,
-                       float searchExtFact,
-                       Vector& scratch)
+    void discoverHalos(std::span<LocalIndex> layout, const Th* h, float searchExtFact, Vector& scratch)
     {
         TreeNodeIndex firstNode      = assignment_[myRank_].start();
         TreeNodeIndex lastNode       = assignment_[myRank_].end();
