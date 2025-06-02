@@ -41,6 +41,7 @@ void fillGpu(T* first, T* last, T value)
 template void fillGpu(double*, double*, double);
 template void fillGpu(float*, float*, float);
 template void fillGpu(int*, int*, int);
+template void fillGpu(uint8_t*, uint8_t*, uint8_t);
 template void fillGpu(char*, char*, char);
 template void fillGpu(unsigned*, unsigned*, unsigned);
 template void fillGpu(uint64_t*, uint64_t*, uint64_t);
@@ -430,5 +431,23 @@ size_t countGpu(const ValueType* first, const ValueType* last, ValueType v)
 template size_t countGpu(const int* first, const int* last, int v);
 template size_t countGpu(const unsigned* first, const unsigned* last, unsigned v);
 template size_t countGpu(const uint64_t* first, const uint64_t* last, uint64_t v);
+
+template<class T, class S>
+__global__ void selectCopyKernel(const T* src, LocalIndex n, const S* selectFlags, T* dest)
+{
+    LocalIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid < n && selectFlags[tid]) { dest[tid] = src[tid]; }
+}
+
+template<class T, class S>
+void selectCopy(const T* src, LocalIndex n, const S* selectFlags, T* dest)
+{
+    int numThreads = 256;
+    int numBlocks  = iceil(n, numThreads);
+    if (numBlocks == 0) { return; }
+    selectCopyKernel<<<numBlocks, numThreads>>>(src, n, selectFlags, dest);
+}
+
+template void selectCopy(const unsigned*, LocalIndex, const uint8_t*, unsigned*);
 
 } // namespace cstone

@@ -64,11 +64,7 @@ void exchangeAllToAll(int thisRank, int numRanks)
     sends.back() = gridSize;
     for (int rank = 0; rank < numRanks; ++rank)
     {
-        int lower = rank * segmentSize;
-        int upper = lower + segmentSize;
-
-        if (rank == numRanks - 1) upper += gridSize % numRanks;
-
+        int lower   = rank * segmentSize;
         sends[rank] = lower;
     }
 
@@ -92,8 +88,10 @@ void exchangeAllToAll(int thisRank, int numRanks)
     reallocate(d_y, bufDesc.size, 1.0);
 
     ExchangeLog log;
-    exchangeParticlesGpu(0, log, sends, thisRank, bufDesc, numParticlesThisRank, sendScratch, receiveScratch,
-                         rawPtr(d_ordering), rawPtr(d_x), rawPtr(d_y));
+    auto recvStart = domain_exchange::receiveStart(bufDesc, numPartAssigned - numPartPresent);
+    auto recvEnd   = recvStart + numPartAssigned - numPartPresent;
+    exchangeParticlesGpu(0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch, rawPtr(d_ordering),
+                         rawPtr(d_x), rawPtr(d_y));
 
     reallocate(bufDesc.size, 1.01, x, y);
     memcpyD2H(d_x.data(), d_x.size(), x.data());
@@ -179,7 +177,9 @@ void exchangeCyclicNeighbors(int thisRank, int numRanks)
     reallocate(bufDesc.size * 10, 1.01, sendScratch, receiveScratch);
 
     ExchangeLog log;
-    exchangeParticlesGpu(0, log, sends, thisRank, bufDesc, gridSize, sendScratch, receiveScratch, rawPtr(d_ordering),
+    auto recvStart = domain_exchange::receiveStart(bufDesc, numPartAssigned - numPartPresent);
+    auto recvEnd   = recvStart + numPartAssigned - numPartPresent;
+    exchangeParticlesGpu(0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch, rawPtr(d_ordering),
                          rawPtr(d_x), rawPtr(d_y), rawPtr(d_uint8Array), rawPtr(d_testArray));
 
     reallocate(bufDesc.size, 1.01, x, y, testArray, uint8Array);

@@ -61,7 +61,8 @@ TEST(DomainDecomposition, invertRanges)
 TEST(Layout, extractMarkedElements)
 {
     std::vector<unsigned> leaves{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-    std::vector<int> haloFlags{0, 0, 0, 1, 1, 1, 0, 1, 0, 1};
+    // std::vector<LocalIndex> haloFlags{0, 0, 0, 1, 1, 1, 0, 1, 0, 1};
+    std::vector<LocalIndex> haloFlags{0, 0, 0, 0, 1, 2, 3, 3, 4, 4, 5};
 
     {
         std::vector<unsigned> reqKeys = extractMarkedElements<unsigned>(leaves, haloFlags, 0, 0);
@@ -100,40 +101,17 @@ TEST(Layout, extractMarkedElements)
     }
 }
 
-TEST(Layout, computeHaloReceiveList)
-{
-    std::vector<LocalIndex> layout{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-    std::vector<int> haloFlags{1, 0, 1, 1, 0, 0, 0, 1, 1, 0};
-
-    std::vector<int> peers{0, 2};
-
-    int numRanks = 3;
-    std::vector<TreeIndexPair> assignment(numRanks);
-
-    assignment[0] = TreeIndexPair(0, 4);
-    assignment[1] = TreeIndexPair(4, 6);
-    assignment[2] = TreeIndexPair(6, 10);
-
-    auto recvList = computeHaloRecvList(layout, haloFlags, assignment, peers);
-
-    std::vector<IndexPair<LocalIndex>> reference(numRanks);
-    reference[0] = {LocalIndex(0), LocalIndex(4)};
-    reference[2] = {LocalIndex(7), LocalIndex(9)};
-
-    EXPECT_EQ(recvList, reference);
-}
 
 TEST(Layout, gatherArrays)
 {
-    std::vector<LocalIndex> ordering{1, 0, 2, 3};
+    std::vector<LocalIndex> ordering{2, 1, 3, 4};
     std::vector<float> a{0., 1., 2., 3., 4.};
     std::vector<unsigned char> b{0, 1, 2, 3, 4};
 
     std::vector<float> scratch(a.size());
 
-    LocalIndex inOffset  = 1;
     LocalIndex outOffset = 1;
-    gatherArrays(gatherCpu, ordering.data(), ordering.size(), inOffset, outOffset, std::tie(a, b), std::tie(scratch));
+    gatherArrays({ordering.data(), ordering.size()}, outOffset, std::tie(a, b), std::tie(scratch));
 
     static_assert(not SmallerElementSize<0, std::vector<int>, std::tuple<std::vector<char>, std::vector<int>>>{});
     static_assert(SmallerElementSize<1, std::vector<int>, std::tuple<std::vector<char>, std::vector<int>>>{});
