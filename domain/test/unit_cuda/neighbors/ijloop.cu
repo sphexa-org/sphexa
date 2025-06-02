@@ -114,8 +114,7 @@ Result reference(const Box<double>& box,
                  const double* const h,
                  const double* const v,
                  const LocalIndex numBodies,
-                 const LocalIndex firstBody,
-                 const LocalIndex lastBody)
+                 const GroupView& groups)
 {
     thrust::universal_vector<LocalIndex> iSum(numBodies), jSum(numBodies), jMin(numBodies);
     thrust::universal_vector<Vec3<double>> iPosSum(numBodies), jPosSum(numBodies), ijPosDiffSum(numBodies);
@@ -123,64 +122,69 @@ Result reference(const Box<double>& box,
         vjSum(numBodies), hiSumNormalized(numBodies);
     thrust::universal_vector<unsigned> neighborsCount(numBodies);
 
-    for (unsigned i = firstBody; i < lastBody; ++i)
+    for (unsigned g = 0; g < groups.numGroups; ++g)
     {
-        jMin[i] = std::numeric_limits<LocalIndex>::max();
-
-        for (unsigned j = 0; j < numBodies; ++j)
+        const LocalIndex firstBody = groups.groupStart[g];
+        const LocalIndex lastBody  = groups.groupEnd[g];
+        for (unsigned i = firstBody; i < lastBody; ++i)
         {
-            const double xi = x[i];
-            const double yi = y[i];
-            const double zi = z[i];
-            const double xj = x[j];
-            const double yj = y[j];
-            const double zj = z[j];
+            jMin[i] = std::numeric_limits<LocalIndex>::max();
 
-            double xij = xi - xj;
-            double yij = yi - yj;
-            double zij = zi - zj;
+            for (unsigned j = 0; j < numBodies; ++j)
+            {
+                const double xi = x[i];
+                const double yi = y[i];
+                const double zi = z[i];
+                const double xj = x[j];
+                const double yj = y[j];
+                const double zj = z[j];
 
-            if (box.boundaryX() == BoundaryType::periodic)
-            {
-                if (xij < -0.5 * box.lx())
-                    xij += box.lx();
-                else if (xij > 0.5 * box.lx())
-                    xij -= box.lx();
-            }
-            if (box.boundaryY() == BoundaryType::periodic)
-            {
-                if (yij < -0.5 * box.ly())
-                    yij += box.ly();
-                else if (yij > 0.5 * box.ly())
-                    yij -= box.ly();
-            }
-            if (box.boundaryZ() == BoundaryType::periodic)
-            {
-                if (zij < -0.5 * box.lz())
-                    zij += box.lz();
-                else if (zij > 0.5 * box.lz())
-                    zij -= box.lz();
-            }
+                double xij = xi - xj;
+                double yij = yi - yj;
+                double zij = zi - zj;
 
-            const double d2 = xij * xij + yij * yij + zij * zij;
+                if (box.boundaryX() == BoundaryType::periodic)
+                {
+                    if (xij < -0.5 * box.lx())
+                        xij += box.lx();
+                    else if (xij > 0.5 * box.lx())
+                        xij -= box.lx();
+                }
+                if (box.boundaryY() == BoundaryType::periodic)
+                {
+                    if (yij < -0.5 * box.ly())
+                        yij += box.ly();
+                    else if (yij > 0.5 * box.ly())
+                        yij -= box.ly();
+                }
+                if (box.boundaryZ() == BoundaryType::periodic)
+                {
+                    if (zij < -0.5 * box.lz())
+                        zij += box.lz();
+                    else if (zij > 0.5 * box.lz())
+                        zij -= box.lz();
+                }
 
-            if (d2 < 4 * h[i] * h[i])
-            {
-                iSum[i] += i;
-                jSum[i] += j;
-                iPosSum[i] += Vec3<double>{xi, yi, zi};
-                jPosSum[i] += Vec3<double>{xj, yj, zj};
-                ijPosDiffSum[i] += Vec3<double>{xij, yij, zij};
-                distSqSum[i] += d2;
-                hiSum[i] += h[i];
-                hjSum[i] += h[j];
-                viSum[i] += v[i];
-                vjSum[i] += v[j];
-                neighborsCount[i] += 1;
-                jMin[i] = std::min(jMin[i], LocalIndex(j));
+                const double d2 = xij * xij + yij * yij + zij * zij;
+
+                if (d2 < 4 * h[i] * h[i])
+                {
+                    iSum[i] += i;
+                    jSum[i] += j;
+                    iPosSum[i] += Vec3<double>{xi, yi, zi};
+                    jPosSum[i] += Vec3<double>{xj, yj, zj};
+                    ijPosDiffSum[i] += Vec3<double>{xij, yij, zij};
+                    distSqSum[i] += d2;
+                    hiSum[i] += h[i];
+                    hjSum[i] += h[j];
+                    viSum[i] += v[i];
+                    vjSum[i] += v[j];
+                    neighborsCount[i] += 1;
+                    jMin[i] = std::min(jMin[i], LocalIndex(j));
+                }
             }
+            hiSumNormalized[i] = hiSum[i] / neighborsCount[i];
         }
-        hiSumNormalized[i] = hiSum[i] / neighborsCount[i];
     }
 
     return Result(std::move(iSum), std::move(jSum), std::move(iPosSum), std::move(jPosSum), std::move(ijPosDiffSum),
@@ -316,8 +320,7 @@ auto run(Neighborhood const& nb)
                  NeighborFun{}, PostambleFun{});
     checkGpuErrors(cudaDeviceSynchronize());
 
-    Result ref = reference(box, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(v), totalBodies, groupView.firstBody,
-                           groupView.lastBody);
+    Result ref = reference(box, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(v), totalBodies, groupView);
 
     validate(ref, actual);
 }
