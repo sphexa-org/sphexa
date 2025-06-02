@@ -86,9 +86,15 @@ void tagIdsInSphere(IdVectorType& ids, const std::vector<CoordinateType>& x, con
     }
 }
 
+// TODO: the following two functions provides two different implementations of the tagged id identification.
+// The first one uses a prefix scan + scatter based algorithm, similar to the corresponding GPU case
+// while the second one just uses a copy_if step, again as in the corresponding GPU case.
+// According to some performace tests, namely the turbulence case of SPH-RUN with 1000^3
+// particles and a synthetic data case with 1B ids and 10% tagged ids (see find_tagged_ids_test.cpp),
+// the second one is ~30x (synthetic data) faster and 0.1x (turbulence) slower than the first one with 64 threads.
+// To put the above performance numbers into perspective, for 1000^3 particles and a 10% tagged ids, the identication
+// in the slow case takes around 0.05s.
 #if 0
-
-// TODO: to be removed togheter with the findTaggedIds below
 void exclusive_scan(const std::vector<IdType>& input, std::vector<IdType>& output)
 {
     IdType n = input.size();
@@ -128,14 +134,12 @@ void exclusive_scan(const std::vector<IdType>& input, std::vector<IdType>& outpu
     }
 }
 
-
-// TODO: to be removed, the fastest findTaggedIds implementation is the next one
-/*! @brief Tagged id identification function
+/*! @brief Tagged id identification
  *
- * @param[in]  ids          ordered id list
- * @param[in]  first        first id index // TODO number of elements and pass iterator?
- * @param[in]  last         last (excluded) id index
- * @param[out] taggedIdsIndexes  vector of indexes (positions wrt of selected particles
+ * @param[in]  ids              ordered id list
+ * @param[in]  first            first id index // TODO number of elements and pass iterator?
+ * @param[in]  last             last (excluded) id index
+ * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
  */
 void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes)
 {
@@ -187,12 +191,12 @@ void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorT
     return;
 }
 #else
-/*! @brief Tagged id identification function  
+/*! @brief Tagged id identification
  *
- * @param[in]  ids          ordered id list
- * @param[in]  first        first id index // TODO number of elements and pass iterator?
- * @param[in]  last         last (excluded) id index
- * @param[out] taggedIdsIndexes  vector of indexes (positions wrt of selected particles
+ * @param[in]  ids              ordered id list
+ * @param[in]  first            first id index // TODO number of elements and pass iterator?
+ * @param[in]  last             last (excluded) id index
+ * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
  */
 void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes)
 {
