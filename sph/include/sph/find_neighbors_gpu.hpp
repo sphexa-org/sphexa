@@ -9,6 +9,6 @@ namespace sph
 {
 
 void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cstone::GpuTag>& d,
-                      const cstone::Box<SphTypes::CoordinateType>& box, bool symmetric = false, bool clustered = true);
+                      const cstone::Box<SphTypes::CoordinateType>& box, bool clustered = true);
 
 }
