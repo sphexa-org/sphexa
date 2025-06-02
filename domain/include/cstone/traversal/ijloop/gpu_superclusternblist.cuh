@@ -161,7 +161,7 @@ __global__ static void initSuperclusterInfo(const LocalIndex firstISupercluster,
  * traversals, i.e., one for each subgroup
  *
  * @param[in]  firstISupercluster     index of first supercluster, i.e., the one containing firstBody
- * @param[in]  lastISupercluster      index of last supercluster
+ * @param[in]  firstValidBody         index of first valid particle, particles before are ignored
  * @param[in]  groups                 particle group information
  * @param[out] superclusterSplitMasks binary masks per supercluster, with ones where superclusters are spanning group
  *                                    boundaries, zeros elsewhere (i.e., one bit per particle)
@@ -191,7 +191,7 @@ __global__ void computeSuperclusterSplitMasks(const LocalIndex firstISupercluste
 
 /*! compute bounding boxes and max. particle radii of j-clusters, i.e., neighbor clusters
  *
- * @param[in]  firstValidBody index of first valid particle, particle before are ignored
+ * @param[in]  firstValidBody index of first valid particle, particles before are ignored
  * @param[in]  totalBodies    total number of particles, including invalid
  * @param[in]  x              particle x coordinates
  * @param[in]  y              particle y coordinates
@@ -284,6 +284,12 @@ __global__ void computeJClusterBboxes(const LocalIndex firstValidBody,
     }
 }
 
+/*! sort candidate neighbor indices, does not require a fixed number of items per thread in contrast to CUB warp sort
+ *
+ * @param[inout] sharedAllocator shared memory allocator for temporary storage
+ * @param[inout] candidates      neighbor cluster indices to be sorted
+ * @param[in]    numCandidates   number of neighbor cluster candidates
+ */
 template<unsigned NumSuperclustersPerBlock>
 __device__ __forceinline__ void
 sortCandidates(util::SharedMemAllocator& sharedAllocator, std::uint32_t* candidates, unsigned numCandidates)
@@ -333,6 +339,21 @@ sortCandidates(util::SharedMemAllocator& sharedAllocator, std::uint32_t* candida
     }
 }
 
+/*! filter neighbor cluster candidates based on particle-particle distance checks and remove double entries
+ *
+ * @param[inout] sharedAllocator shared memory allocator for temporary storage
+ * @param[in]    box             domain box
+ * @param[in]    firstValidBody  index of first valid particle, particle before are ignored
+ * @param[in]    totalBodies     total number of particles, including invalid
+ * @param[in]    x               particle x coordinates
+ * @param[in]    y               particle y coordinates
+ * @param[in]    z               particle z coordinates
+ * @param[in]    h               particle smoothing lengths
+ * @param[in]    searchExtFactor factor to extend search radius
+ * @param[in]    iSupercluster   current supercluster index
+ * @param[inout] jClusters       array of candidate indices to be pruned, pruning happens in-place
+ * @param[inout] numCandidates   number of neighbor clusters
+ */
 template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th>
 __device__ __forceinline__ void pruneCandidates(util::SharedMemAllocator& sharedAllocator,
                                                 const Box<Tc>& box,
@@ -430,6 +451,30 @@ __device__ __forceinline__ void pruneCandidates(util::SharedMemAllocator& shared
     syncWarp();
 }
 
+/*! collect neighbor cluster candidates by traversing the octree and comparing bounding boxes of clusters
+ *
+ * @param[inout] sharedAllocator     shared memory allocator for temporary storage
+ * @param[in]    tree                octree
+ * @param[in]    box                 domain box
+ * @param[in]    firstValidBody      index of first valid particle, particles before are ignored
+ * @param[in]    totalBodies         total number of particles
+ * @param[in]    firstBody           index of first particle
+ * @param[in]    lastBody            index of last particle
+ * @param[in]    firstGroupParticle  index of first particle in current consecutive group
+ * @param[in]    lastGroupParticle   index of last particle in current consecutive group
+ * @param[in]    x                   particle x coordinates
+ * @param[in]    y                   particle y coordinates
+ * @param[in]    z                   particle z coordinates
+ * @param[in]    h                   particle smoothing lengths
+ * @param[in]    jClusterBboxCenters bounding box centers of j-clusters
+ * @param[in]    jClusterBboxSizes   bounding box sizes of j-clusters
+ * @param[in]    jClusterRMax        max. particle radii of j-clusters
+ * @param[in]    nodeRMax            max. particle radii of tree nodes
+ * @param[in]    globalPool          global memory pool
+ * @param[inout] candidates          array of candidate neighbor cluster indices
+ * @param[inout] numCandidates       number of candidate cluster indices
+ * @param[in]    ncmax               max. number of neighbor clusters (upper bound for numCandidates)
+ */
 template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th, class KeyType>
 __device__ __forceinline__ void collectJClusterCandidates(util::SharedMemAllocator& sharedAllocator,
                                                           const OctreeNsView<Tc, KeyType>& tree,
@@ -666,6 +711,24 @@ __device__ __forceinline__ void collectJClusterCandidates(util::SharedMemAllocat
         checkOverlap(jClusterQueue, jClusterFillLevel);
 }
 
+/*! filter neighbor cluster candidates based on particle-particle distance checks, remove double entries, and compute
+ * cluster-cluster interaction bitmasks
+ *
+ * @param[inout] sharedAllocator shared memory allocator for temporary storage
+ * @param[in]    box             domain box
+ * @param[in]    firstValidBody  index of first valid particle, particle before are ignored
+ * @param[in]    totalBodies     total number of particles, including invalid
+ * @param[in]    x               particle x coordinates
+ * @param[in]    y               particle y coordinates
+ * @param[in]    z               particle z coordinates
+ * @param[in]    h               particle smoothing lengths
+ * @param[in]    searchExtFactor factor to extend search radius
+ * @param[in]    iSupercluster   current supercluster index
+ * @param[inout] jClusters       array of candidate indices to be pruned, pruning happens in-place
+ * @param[out]   masks           array of cluster-cluster interaction bitmasks
+ * @param[in]    numCandidates   number of neighbor cluster candidates
+ * @param[out]   numJClusters    number of neighbor clusters
+ */
 template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th>
 __device__ __forceinline__ void pruneCandidatesAndComputeMasks(util::SharedMemAllocator& sharedAllocator,
                                                                const Box<Tc>& box,
@@ -776,6 +839,17 @@ __device__ __forceinline__ void pruneCandidatesAndComputeMasks(util::SharedMemAl
     }
 }
 
+/*! store neighbor index data in global memory
+ *
+ * @param[inout] sharedAllocator  shared memory allocator
+ * @param[in]    jClusters        sorted array of neighbor cluster indices
+ * @param[in]    masks            array of cluster-cluster interaction bitmasks
+ * @param[out]   neighborData     global memory neighbor data array where (possibly compressed) neighbor indices will be
+ * stored
+ * @param[in]    neighborDataSize size of neighborData array to avoid out of bounds accesses
+ * @param[inout] info             supercluster info, will be updated with proper data index
+ * @param[inout] globalBuildData  global build data used to get a global memory region
+ */
 template<class Config, unsigned NumSuperclustersPerBlock>
 __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& sharedAllocator,
                                                   const std::uint32_t* const __restrict__ jClusters,
@@ -818,22 +892,32 @@ __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& shar
     }
 }
 
+/*! compute required shared memory amount
+ *
+ * @param[in] ncmax maximum number of neighbor clusters
+ */
 template<class Config, class Tc, class Th>
 constexpr unsigned buildNbListSharedMemPerSupercluster(const unsigned ncmax)
 {
+    // storage requirements for uncompressed neighbor indices
     const unsigned jClustersSize = ncmax * sizeof(unsigned);
+    // storage requirements for cluster-cluster interaction bitmasks
     const unsigned masksDataSize = masksSize<Config>(ncmax) * sizeof(std::uint32_t);
 
+    // storage requirements for sortCandidates
     constexpr unsigned histogramsSize = 128 * sizeof(unsigned);
     const unsigned tmpSize            = ncmax * sizeof(std::uint32_t);
 
+    // storage requirements for cached particle coordinates and radii
     constexpr unsigned xisSize = Config::superclusterSize * sizeof(Tc);
     constexpr unsigned yisSize = Config::superclusterSize * sizeof(Tc);
     constexpr unsigned zisSize = Config::superclusterSize * sizeof(Tc);
     constexpr unsigned hisSize = Config::superclusterSize * sizeof(Th);
 
+    // storage requirements for tree traversal
     constexpr unsigned sharedPoolSize = GpuConfig::warpSize * sizeof(int);
 
+    // storage requirements for temporary array used for compression
     const unsigned compressedJClustersSize = (Config::compress ? ncmax : 0) * sizeof(std::uint32_t);
 
     return jClustersSize + masksDataSize +
@@ -841,6 +925,34 @@ constexpr unsigned buildNbListSharedMemPerSupercluster(const unsigned ncmax)
                      xisSize + yisSize + zisSize + hisSize + sharedPoolSize});
 }
 
+/*! main GPU kernel for building the supercluster neighbor list
+ *
+ * @param[in]    tree                   octree
+ * @param[in]    box                    domain box
+ * @param[in]    firstValidBody         index of first valid particle, particles before are ignored
+ * @param[in]    totalBodies            total number of particles
+ * @param[in]    firstBody              index of first particle
+ * @param[in]    lastBody               index of last particle
+ * @param[in]    x                      particle x coordinates
+ * @param[in]    y                      particle y coordinates
+ * @param[in]    z                      particle z coordinates
+ * @param[in]    h                      particle smoothing lengths
+ * @param[in]    jClusterBboxCenters    bounding box centers of j-clusters
+ * @param[in]    jClusterBboxSizes      bounding box sizes of j-clusters
+ * @param[in]    jClusterRMax           max. particle radii of j-clusters
+ * @param[in]    nodeRMax               max. particle radii of tree nodes
+ * @param[in]    ncmax                  max. number of neighbor clusters (upper bound for numCandidates)
+ * @param[in]    superclusterSplitMasks binary masks per supercluster, with ones where superclusters are spanning group
+ *                                      boundaries, zeros elsewhere (i.e., one bit per particle)
+ * @param[out]   neighborData           global memory neighbor data array where (possibly compressed) neighbor indices
+ * will be stored
+ * @param[in]    neighborDataSize       size of neighborData array to avoid out of bounds accesses
+ * @param[inout] superclusterInfo       supercluster info
+ * @param[in]    numSuperClusters       number of superclusters
+ * @param[in]    globalPool             global memory pool used during tree traversal
+ * @param[inout] globalBuildData        global build data used to 'allocate' global memory regions per supercluster in a
+ * pre-allocated array
+ */
 template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th, class KeyType>
 __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void buildNbList(
     const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
