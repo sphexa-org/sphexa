@@ -264,9 +264,6 @@ auto initialData()
                                             octreeLeafToInternal = octree.leafToInternal,
                                             octreeLevelRange     = octree.levelRange;
 
-    Result ref =
-        reference(box, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(v), totalBodies, firstBody, lastBody);
-
     OctreeNsView<double, KeyT> view{octree.numLeafNodes,
                                     octree.numNodes,
                                     rawPtr(octreePrefixes),
@@ -297,13 +294,13 @@ auto initialData()
                         std::move(layout), std::move(centers), std::move(sizes), std::move(groups));
 
     return std::make_tuple(box, totalBodies, groupView, std::move(x), std::move(y), std::move(z), std::move(h),
-                           std::move(v), std::move(treeData), std::move(view), std::move(ref));
+                           std::move(v), std::move(treeData), std::move(view));
 }
 
 template<ijloop::Neighborhood Neighborhood>
 auto run(Neighborhood const& nb)
 {
-    auto [box, totalBodies, groupView, x, y, z, h, v, treeData, nsView, ref] = initialData();
+    auto [box, totalBodies, groupView, x, y, z, h, v, treeData, nsView] = initialData();
 
     Result actual;
     const auto built = nb.build(nsView, box, totalBodies, groupView, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h));
@@ -318,6 +315,9 @@ auto run(Neighborhood const& nb)
                      actual),
                  NeighborFun{}, PostambleFun{});
     checkGpuErrors(cudaDeviceSynchronize());
+
+    Result ref = reference(box, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(v), totalBodies, groupView.firstBody,
+                           groupView.lastBody);
 
     validate(ref, actual);
 }

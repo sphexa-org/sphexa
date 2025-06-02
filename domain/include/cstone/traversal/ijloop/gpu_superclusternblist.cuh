@@ -71,6 +71,13 @@ struct SuperclusterInfo
     constexpr bool operator<(const SuperclusterInfo& other) const { return neighborsCount > other.neighborsCount; }
 };
 
+enum struct BuildStatus
+{
+    success = 0,
+    neighbor_list_overflow,
+    neighbor_data_overflow,
+};
+
 struct GlobalBuildData
 {
     //! @brief total size of neighbor data, atomically increased during build to "allocate" required storage for each
@@ -78,6 +85,7 @@ struct GlobalBuildData
     unsigned long long neighborDataSize;
     //! @brief global group index counter, atomically increased during build
     unsigned index;
+    BuildStatus status;
 };
 
 /*! decide if a neighbor index should be included in the symmetric neighbor list
@@ -576,8 +584,6 @@ __device__ __forceinline__ void collectJClusterCandidates(util::SharedMemAllocat
                                                                       iSupercluster, candidates, numCandidates);
             newNumCandidates = shflSync(numCandidates + nbIndex + isNeighbor, GpuConfig::warpSize - 1);
         }
-        // TODO: proper error handling
-        assert(newNumCandidates < ncmax);
         if (isNeighbor & (numCandidates + nbIndex < ncmax)) candidates[numCandidates + nbIndex] = jCluster;
 
         numCandidates = newNumCandidates;
@@ -881,14 +887,23 @@ __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& shar
     for (unsigned n = laneIdx; n < mSize; n += GpuConfig::warpSize)
     {
         const auto index = info.dataIndex + n;
-        if (index < neighborDataSize) neighborData[index] = masks[n];
+        if (index >= neighborDataSize)
+        {
+            globalBuildData->status = BuildStatus::neighbor_data_overflow;
+            return;
+        }
+        neighborData[index] = masks[n];
     }
 
     for (unsigned n = laneIdx; n < nbSize; n += GpuConfig::warpSize)
     {
         const auto index = info.dataIndex + mSize + n;
-        if (index < neighborDataSize)
-            neighborData[index] = (Config::compress ? compressedJClusters.get() : jClusters)[n];
+        if (index >= neighborDataSize)
+        {
+            globalBuildData->status = BuildStatus::neighbor_data_overflow;
+            return;
+        }
+        neighborData[index] = (Config::compress ? compressedJClusters.get() : jClusters)[n];
     }
 }
 
@@ -1016,6 +1031,12 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
                 sharedAllocator, tree, box, firstValidBody, totalBodies, firstBody, lastBody, firstGroupParticle,
                 lastGroupParticle, x, y, z, h, jClusterBboxCenters, jClusterBboxSizes, jClusterRMax, nodeRMax,
                 globalPool, jClusters.get(), numCandidates, ncmax);
+
+            if (numCandidates > ncmax)
+            {
+                globalBuildData->status = BuildStatus::neighbor_list_overflow;
+                return;
+            }
         }
 
         auto masks = sharedAllocator.alloc<std::uint32_t[]>(masksSize<Config>(numCandidates));
@@ -1787,12 +1808,21 @@ struct GpuSuperclusterNbListNeighborhood
         else
             run(std::false_type());
 
-        unsigned long long requiredSize;
-        checkGpuErrors(cudaMemcpy(&requiredSize, &globalBuildData->neighborDataSize, sizeof(unsigned long long),
-                                  cudaMemcpyDeviceToHost));
-        assert(requiredSize < neighborDataVirtualSize);
+        GlobalBuildData buildData;
+        checkGpuErrors(cudaMemcpy(&buildData, globalBuildData.get(), sizeof(GlobalBuildData), cudaMemcpyDeviceToHost));
+        switch (buildData.status)
+        {
+            case BuildStatus::success: break;
+            case BuildStatus::neighbor_list_overflow:
+                throw std::runtime_error(
+                    "overflow in cluster neighbor list in supercluster neighborhood, try to increase ncmax");
+            case BuildStatus::neighbor_data_overflow: throw std::runtime_error("overflow in cluster neighbor data");
+        }
 
-        nbList.numBytes = sizeof(std::uint32_t) * requiredSize + sizeof(SuperclusterInfo) * numISuperclusters;
+        assert(buildData.neighborDataSize < neighborDataVirtualSize);
+
+        nbList.numBytes =
+            sizeof(std::uint32_t) * buildData.neighborDataSize + sizeof(SuperclusterInfo) * numISuperclusters;
 
         thrust::stable_sort(thrust::device, nbList.superclusterInfo.get(),
                             nbList.superclusterInfo.get() + numISuperclusters);
