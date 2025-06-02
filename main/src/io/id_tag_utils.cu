@@ -41,6 +41,10 @@
 #include <thrust/scatter.h>
 #include <thrust/transform.h>
 
+#include <thrust/count.h>
+#include <thrust/copy.h>
+#include <thrust/iterator/counting_iterator.h>
+
 #include "id_tag_utils.hpp"
 
 namespace sphexa
@@ -75,12 +79,19 @@ void tagIdsInSphere(cstone::DeviceVector<IdType>& ids, const std::vector<Coordin
     throw std::runtime_error("Not implemented yet");
 }
 
+// TODO: the following two functions provides two different implementations of the tagged id identification.
+// The first one uses a prefix scan + scatter based algorithm, while the second one just uses a count_if step: 
+// according to some performace tests, namely the turbulence case of SPH-RUN with 1000^3
+// particles and a synthetic data case with 1B ids and 10% tagged ids (see find_tagged_ids_test.cpp),
+// the second one is ~2.6x/2.8x faster
+
+#if 0
 /*! @brief Tagged id identification
  *
  * @param[in]  ids              ordered id list
  * @param[in]  first            first id index // TODO number of elements and pass iterator?
  * @param[in]  last             last (excluded) id index
- * @param[out] taggedIdsIndexes vector of indexes (positions wrt of selected particles)
+ * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
  */
 void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t last, std::vector<IdType>& taggedIdsIndexes)
 {
@@ -106,9 +117,8 @@ void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t
         thrust::scatter_if(thrust::device, devSequence.begin(), devSequence.end(), devScanResult.begin(), devMask.begin(), devSubsetPos.begin());
 
         // Copy result to host
-        // TODO: find better solution
-        thrust::host_vector<IdType> hostSubsetPos(devSubsetPos);
-        taggedIdsIndexes.assign(thrust::raw_pointer_cast(hostSubsetPos.data()), thrust::raw_pointer_cast(hostSubsetPos.data()) + hostSubsetPos.size());
+        taggedIdsIndexes.resize(devSubsetPos.size());
+        thrust::copy(devSubsetPos.begin(), devSubsetPos.end(), taggedIdsIndexes.begin());
     }
     else
     {
@@ -117,5 +127,49 @@ void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t
 
     return;
 }
+#else
 
+struct IsTaggedIdsFunctor
+{
+    const IdType* ids_ptr;
+
+    __host__ __device__
+    IsTaggedIdsFunctor(const IdType* ids_ptr_) : ids_ptr(ids_ptr_) {}
+
+    __device__
+    bool operator()(size_t idx) const
+    {
+        return MaskFunctor{}(ids_ptr[idx]);
+    }
+};
+/*! @brief Tagged id identification
+ *
+ * @param[in]  ids              ordered id list
+ * @param[in]  first            first id index // TODO number of elements and pass iterator?
+ * @param[in]  last             last (excluded) id index
+ * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
+ */
+void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t last, std::vector<IdType>& taggedIdsIndexes)
+{
+
+    // Count number of tagged ids
+    IsTaggedIdsFunctor isTaggedFunctor(ids.data());
+    auto begin = thrust::make_counting_iterator<size_t>(first);
+    auto end   = thrust::make_counting_iterator<size_t>(last);
+    const size_t nTaggedIds = thrust::count_if(thrust::device, begin, end, isTaggedFunctor);
+
+    // Save indexes of tagged ids
+    thrust::device_vector<IdType> deviceTaggedIdsIndexes(last - first);
+    deviceTaggedIdsIndexes.resize(nTaggedIds);
+    thrust::copy_if(thrust::device, begin, end, deviceTaggedIdsIndexes.begin(), isTaggedFunctor);
+
+    // Copy indices of tagged ids to host vector
+    taggedIdsIndexes.clear();
+    taggedIdsIndexes.resize(nTaggedIds);
+    thrust::copy(deviceTaggedIdsIndexes.begin(), deviceTaggedIdsIndexes.end(), taggedIdsIndexes.begin());
+
+    return;
+
+}
+#endif
 }
