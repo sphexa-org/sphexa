@@ -22,6 +22,9 @@ target_include_directories(${exename} PRIVATE ${SPH_EXA_INCLUDE_DIRS})
 target_link_libraries(${exename} PRIVATE io sim_init propagator observables OpenMP::OpenMP_CXX ${MPI_CXX_LIBRARIES})
 target_include_directories(${exename} PRIVATE ${PROJECT_SOURCE_DIR}/physics/cooling/include/)
 
+set(find_tag_test_exename find_tag_test)
+
+
 enableInSituViz(${exename})
 enableGrackle(${exename})
 
@@ -37,6 +40,15 @@ if (CMAKE_CUDA_COMPILER)
     enableInSituViz(${exename}-cuda)
     enableGrackle(${exename}-cuda)
     install(TARGETS ${exename}-cuda RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+    add_executable(${find_tag_test_exename}-cuda find_tag_test.cpp)
+    target_include_directories(${find_tag_test_exename}-cuda PRIVATE ${SPH_EXA_INCLUDE_DIRS})
+    target_include_directories(${find_tag_test_exename}-cuda PUBLIC ${CMAKE_BINARY_DIR}/main/src)
+    target_compile_definitions(${find_tag_test_exename}-cuda PRIVATE USE_CUDA)
+    target_link_libraries(${find_tag_test_exename}-cuda PRIVATE ryoanji sph_gpu io sim_init_gpu propagator_gpu observables_gpu OpenMP::OpenMP_CXX
+            ${MPI_CXX_LIBRARIES} CUDA::cudart)
+    install(TARGETS ${find_tag_test_exename}-cuda RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 
 elseif (CMAKE_HIP_COMPILER)
     add_executable(${exename}-hip sphexa.cpp)
