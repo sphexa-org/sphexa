@@ -80,7 +80,7 @@ void tagIdsInSphere(cstone::DeviceVector<IdType>& ids, const std::vector<Coordin
 }
 
 // TODO: the following two functions provides two different implementations of the tagged id identification.
-// The first one uses a prefix scan + scatter based algorithm, while the second one just uses a count_if step: 
+// The first one uses a prefix scan + scatter based algorithm, while the second one just uses a copy_if step:
 // according to some performace tests, namely the turbulence case of SPH-RUN with 1000^3
 // particles and a synthetic data case with 1B ids and 10% tagged ids (see find_tagged_ids_test.cpp),
 // the second one is ~2.6x/2.8x faster
@@ -129,6 +129,7 @@ void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t
 }
 #else
 
+// TODO: move to hpp in case of unification with CPU version
 struct IsTaggedIdsFunctor
 {
     const IdType* ids_ptr;
@@ -142,6 +143,7 @@ struct IsTaggedIdsFunctor
         return MaskFunctor{}(ids_ptr[idx]);
     }
 };
+
 /*! @brief Tagged id identification
  *
  * @param[in]  ids              ordered id list
