@@ -70,6 +70,42 @@ __global__ __launch_bounds__(MaxThreads) void gpuFullNbListNeighborhoodBuild(
     neighborsCount[threadId] = findNeighbors(i, x, y, z, h, tree, box, ngmax, neighbors + threadId, neighborsStride);
 }
 
+template<class Tc, class Th, class Input, class Output, class Interaction, class Postamble>
+__forceinline__ __device__ void jLoop(const Box<Tc>& box,
+                                      const LocalIndex firstBody,
+                                      const std::size_t neighborsStride,
+                                      const Tc* __restrict__ x,
+                                      const Tc* __restrict__ y,
+                                      const Tc* __restrict__ z,
+                                      const Th* __restrict__ h,
+                                      Input&& input,
+                                      Output&& output,
+                                      Interaction&& interaction,
+                                      Postamble&& postamble,
+                                      const unsigned ngmax,
+                                      const LocalIndex* __restrict__ neighbors,
+                                      const unsigned* __restrict__ neighborsCount,
+                                      const LocalIndex i)
+{
+    const unsigned nbs = imin(neighborsCount[i - firstBody], ngmax);
+
+    const auto iData  = loadParticleData(x, y, z, h, std::forward<Input>(input), i);
+    const bool usePbc = requiresPbcHandling(box, iData);
+
+    auto result = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
+    for (unsigned nb = 0; nb < nbs; ++nb)
+    {
+        const LocalIndex j = neighbors[i - firstBody + nb * neighborsStride];
+        const auto jData   = loadParticleData(x, y, z, h, std::forward<Input>(input), j);
+
+        const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
+
+        if (distSq < radiusSq(iData)) updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
+    }
+
+    storeParticleData(std::forward<Output>(output), i, postamble(iData, unwrapModifiers(result)));
+}
+
 template<int MaxThreads, class Tc, class Th, class In, class Out, class Interaction, class Postamble>
 __global__ __launch_bounds__(MaxThreads) void runIjLoop(const Box<Tc> __grid_constant__ box,
                                                         const LocalIndex firstBody,
@@ -86,28 +122,11 @@ __global__ __launch_bounds__(MaxThreads) void runIjLoop(const Box<Tc> __grid_con
                                                         const LocalIndex* __restrict__ neighbors,
                                                         const unsigned* __restrict__ neighborsCount)
 {
-    const LocalIndex threadId = blockDim.x * blockIdx.x + threadIdx.x;
-    const LocalIndex i        = firstBody + threadId;
+    const LocalIndex i = firstBody + blockDim.x * blockIdx.x + threadIdx.x;
     if (i >= lastBody) return;
 
-    const std::size_t neighborsStride = lastBody - firstBody;
-    const unsigned nbs                = imin(neighborsCount[threadId], ngmax);
-
-    const auto iData  = loadParticleData(x, y, z, h, input, i);
-    const bool usePbc = requiresPbcHandling(box, iData);
-
-    auto result = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
-    for (unsigned nb = 0; nb < nbs; ++nb)
-    {
-        const LocalIndex j = neighbors[threadId + nb * neighborsStride];
-        const auto jData   = loadParticleData(x, y, z, h, input, j);
-
-        const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
-
-        if (distSq < radiusSq(iData)) updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
-    }
-
-    storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
+    jLoop(box, firstBody, lastBody - firstBody, x, y, z, h, input, output, interaction, postamble, ngmax, neighbors,
+          neighborsCount, i);
 }
 
 template<class T>
