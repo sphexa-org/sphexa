@@ -129,6 +129,35 @@ __global__ __launch_bounds__(MaxThreads) void runIjLoop(const Box<Tc> __grid_con
           neighborsCount, i);
 }
 
+template<int MaxThreads, class Tc, class Th, class In, class Out, class Interaction, class Postamble>
+__global__ __launch_bounds__(MaxThreads) void runIjLoopGrouped(const Box<Tc> __grid_constant__ box,
+                                                               const LocalIndex firstBody,
+                                                               const LocalIndex lastBody,
+                                                               const Tc* __restrict__ x,
+                                                               const Tc* __restrict__ y,
+                                                               const Tc* __restrict__ z,
+                                                               const Th* __restrict__ h,
+                                                               const In __grid_constant__ input,
+                                                               const Out __grid_constant__ output,
+                                                               const Interaction interaction,
+                                                               const Postamble postamble,
+                                                               const unsigned ngmax,
+                                                               const LocalIndex* __restrict__ neighbors,
+                                                               const unsigned* __restrict__ neighborsCount,
+                                                               const GroupView __grid_constant__ groups)
+{
+    const unsigned laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
+    const LocalIndex g     = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
+    if (g >= groups.numGroups) return;
+
+    assert(groups.groupEnd[g] - groups.groupStart[g] <= GpuConfig::warpSize);
+    const LocalIndex i = groups.groupStart[g] + laneIdx;
+    if (i >= groups.groupEnd[g]) return;
+
+    jLoop(box, firstBody, lastBody - firstBody, x, y, z, h, input, output, interaction, postamble, ngmax, neighbors,
+          neighborsCount, i);
+}
+
 template<class T>
 struct ScaleFunctor
 {
@@ -170,6 +199,30 @@ struct GpuFullNbListNeighborhoodImpl
                 .numBytes  = neighbors.size() * sizeof(typename decltype(neighbors)::value_type) +
                             neighborsCount.size() * sizeof(typename decltype(neighborsCount)::value_type)};
     }
+
+    struct Subgroup
+    {
+        GpuFullNbListNeighborhoodImpl const& parent;
+        GroupView groups;
+
+        template<class... In, class... Out, class Interaction, class Postamble>
+        void ijLoop(std::tuple<In*...> const& input,
+                    std::tuple<Out*...> const& output,
+                    Interaction&& interaction,
+                    Postamble&& postamble) const
+        {
+            if (groups.numGroups == 0) return;
+            constexpr int numThreads = 128;
+            runIjLoopGrouped<numThreads><<<iceil(groups.numGroups * GpuConfig::warpSize, numThreads), numThreads>>>(
+                parent.box, parent.firstBody, parent.lastBody, parent.x, parent.y, parent.z, parent.h,
+                makeConstRestrict(input), output, std::forward<Interaction>(interaction),
+                std::forward<Postamble>(postamble), parent.ngmax, rawPtr(parent.neighbors),
+                rawPtr(parent.neighborsCount), groups);
+            checkGpuErrors(cudaGetLastError());
+        }
+    };
+
+    Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
 };
 } // namespace gpu_full_nb_list_neighborhood_detail
 
