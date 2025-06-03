@@ -75,6 +75,33 @@ struct CpuAlwaysTraverseNeighborhoodImpl
 
     Statistics stats() const { return {.numBodies = lastBody - firstBody, .numBytes = 0}; }
 
+    struct Subgroup
+    {
+        CpuAlwaysTraverseNeighborhoodImpl const& parent;
+        GroupView groups;
+
+        template<class... In, class... Out, class Interaction, class Postamble>
+        void ijLoop(std::tuple<In*...> const& input,
+                    std::tuple<Out*...> const& output,
+                    Interaction&& interaction,
+                    Postamble&& postamble) const
+        {
+            const auto constInput = makeConstRestrict(input);
+#pragma omp parallel
+            {
+                std::unique_ptr<LocalIndex[]> neighbors = std::make_unique_for_overwrite<LocalIndex[]>(parent.ngmax);
+
+#pragma omp for collapse(2)
+                for (LocalIndex g = 0; g < groups.numGroups; ++g)
+                    for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
+                        parent.jLoop(constInput, output, std::forward<Interaction>(interaction),
+                                     std::forward<Postamble>(postamble), i, neighbors.get());
+            }
+        }
+    };
+
+    Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
+
 protected:
     template<class Input, class Output, class Interaction, class Postamble>
     void jLoop(Input&& input,
