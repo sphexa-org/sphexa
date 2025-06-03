@@ -123,6 +123,47 @@ struct GpuAlwaysTraverseNeighborhoodImpl
                 Interaction&& interaction,
                 Postamble&& postamble) const
     {
+        ijLoop(input, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), groups);
+    }
+
+    Statistics stats() const
+    {
+        return {.numBodies = groups.lastBody - groups.firstBody,
+                .numBytes  = neighborsSize(ngmax) * sizeof(LocalIndex) + TravConfig::poolSize() * sizeof(int)};
+    }
+
+    static unsigned neighborsSize(unsigned ngmax)
+    {
+        return ngmax * TravConfig::numBlocks() * (TravConfig::numThreads / GpuConfig::warpSize) *
+               TravConfig::targetSize;
+    }
+
+    struct Subgroup
+    {
+        GpuAlwaysTraverseNeighborhoodImpl const& parent;
+        GroupView groups;
+
+        template<class... In, class... Out, class Interaction, class Postamble>
+        void ijLoop(std::tuple<In*...> const& input,
+                    std::tuple<Out*...> const& output,
+                    Interaction&& interaction,
+                    Postamble&& postamble) const
+        {
+            parent.ijLoop(input, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
+                          groups);
+        }
+    };
+
+    Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
+
+protected:
+    template<class... In, class... Out, class Interaction, class Postamble>
+    void ijLoop(std::tuple<In*...> const& input,
+                std::tuple<Out*...> const& output,
+                Interaction&& interaction,
+                Postamble&& postamble,
+                GroupView const& groups) const
+    {
         if (groups.numGroups == 0) return;
         resetTraversalCounters<<<1, 1>>>();
 
@@ -140,18 +181,6 @@ struct GpuAlwaysTraverseNeighborhoodImpl
                 std::forward<Postamble>(postamble), ngmax, neighbors.get(), globalPool.get());
         }
         checkGpuErrors(cudaGetLastError());
-    }
-
-    Statistics stats() const
-    {
-        return {.numBodies = groups.lastBody - groups.firstBody,
-                .numBytes  = neighborsSize(ngmax) * sizeof(LocalIndex) + TravConfig::poolSize() * sizeof(int)};
-    }
-
-    static unsigned neighborsSize(unsigned ngmax)
-    {
-        return ngmax * TravConfig::numBlocks() * (TravConfig::numThreads / GpuConfig::warpSize) *
-               TravConfig::targetSize;
     }
 };
 } // namespace gpu_always_traverse_neighborhood_detail
