@@ -151,6 +151,18 @@ struct IjLoopTest : testing::Test
                            numLeafNodes, rawPtr(layout), box, groupSize, 7, temp, dGroups);
         groups.resize(dGroups.size());
         thrust::copy_n(dGroups.data(), dGroups.size(), groups.data());
+
+        if (!groups.empty())
+        {
+            for (std::size_t g = 0; g < groups.size() - 1; ++g)
+            {
+                if (g % 3 == 0 && g % 5 == 0)
+                {
+                    subgroupStart.push_back(groups[g]);
+                    subgroupEnd.push_back(groups[g + 1]);
+                }
+            }
+        }
     }
 
     void setBoundaryType(BoundaryType boundaryType)
@@ -181,6 +193,15 @@ struct IjLoopTest : testing::Test
                 .numGroups  = LocalIndex(groups.size() - 1),
                 .groupStart = rawPtr(groups),
                 .groupEnd   = rawPtr(groups) + 1};
+    }
+
+    GroupView subgroupView() const
+    {
+        return {.firstBody  = 0,
+                .lastBody   = 0,
+                .numGroups  = LocalIndex(subgroupStart.size()),
+                .groupStart = rawPtr(subgroupStart),
+                .groupEnd   = rawPtr(subgroupEnd)};
     }
 
     Result reference(const GroupView& groups) const
@@ -311,7 +332,7 @@ struct IjLoopTest : testing::Test
     thrust::universal_vector<Vec3<double>> centers, sizes;
     thrust::universal_vector<TreeNodeIndex> childOffsets, internalToLeaf, leafToInternal, levelRange;
 
-    thrust::universal_vector<LocalIndex> groups;
+    thrust::universal_vector<LocalIndex> groups, subgroupStart, subgroupEnd;
 };
 
 using Neighborhoods = ::testing::Types<
@@ -357,4 +378,42 @@ TYPED_TEST(IjLoopTest, IjLoop)
         Result reference = this->reference(this->groupView());
         this->validate(reference, result);
     }
+}
+
+template<ijloop::Neighborhood Neighborhood>
+consteval bool supportsSubgroup(Neighborhood)
+{
+    return false;
+}
+
+TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
+{
+    using Neighborhood = TypeParam;
+
+    if constexpr (supportsSubgroup(Neighborhood{}))
+    {
+        for (BoundaryType boundaryType : {BoundaryType::open, BoundaryType::periodic, BoundaryType::fixed})
+        {
+            this->setBoundaryType(boundaryType);
+
+            const auto nb =
+                Neighborhood{1024}.build(this->treeView(), this->box, this->totalBodies, this->groupView(),
+                                         rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
+
+            const auto subgroupNb = nb.subgroup(this->subgroupView());
+
+            Result result;
+            util::for_each_tuple([&](auto& v) { v.resize(this->totalBodies); }, result);
+
+            auto input  = std::make_tuple(rawPtr(this->v));
+            auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
+
+            subgroupNb.ijLoop(input, output, NeighborFun{}, PostambleFun{});
+            checkGpuErrors(cudaDeviceSynchronize());
+
+            Result reference = this->reference(this->subgroupView());
+            this->validate(reference, result);
+        }
+    }
+    else { GTEST_SKIP() << "subgroups not supported"; }
 }
