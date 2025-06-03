@@ -383,16 +383,14 @@ TYPED_TEST(IjLoopTest, IjLoop)
 template<ijloop::Neighborhood Neighborhood>
 consteval bool supportsSubgroup(Neighborhood)
 {
-    return false;
+    return true;
 }
 
-consteval bool supportsSubgroup(ijloop::CpuAlwaysTraverseNeighborhood) { return true; }
-
-consteval bool supportsSubgroup(ijloop::CpuFullNbListNeighborhood) { return true; }
-
-consteval bool supportsSubgroup(ijloop::GpuAlwaysTraverseNeighborhood) { return true; }
-
-consteval bool supportsSubgroup(ijloop::GpuFullNbListNeighborhood) { return true; }
+template<class Config>
+consteval bool supportsSubgroup(ijloop::GpuSuperclusterNbListNeighborhood<Config>)
+{
+    return false;
+}
 
 TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
 {
