@@ -160,6 +160,28 @@ struct CpuFullNbListNeighborhoodImpl
                 .numBytes  = sizeof(LocalIndex) * numBodies + sizeof(LocalIndex) * numBodies * ngmax};
     }
 
+    struct Subgroup
+    {
+        CpuFullNbListNeighborhoodImpl const& parent;
+        GroupView groups;
+
+        template<class... In, class... Out, class Interaction, class Postamble>
+        void ijLoop(std::tuple<In*...> const& input,
+                    std::tuple<Out*...> const& output,
+                    Interaction&& interaction,
+                    Postamble&& postamble) const
+        {
+            const auto constInput = makeConstRestrict(input);
+#pragma omp parallel for simd collapse(2)
+            for (LocalIndex g = 0; g < groups.numGroups; ++g)
+                for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
+                    parent.jLoop(constInput, output, std::forward<Interaction>(interaction),
+                                 std::forward<Postamble>(postamble), i);
+        }
+    };
+
+    Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
+
 protected:
     template<class Input, class Output, class Interaction, class Postamble>
     void

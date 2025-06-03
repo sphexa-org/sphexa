@@ -388,6 +388,8 @@ consteval bool supportsSubgroup(Neighborhood)
 
 consteval bool supportsSubgroup(ijloop::CpuAlwaysTraverseNeighborhood) { return true; }
 
+consteval bool supportsSubgroup(ijloop::CpuFullNbListNeighborhood) { return true; }
+
 TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
 {
     using Neighborhood = TypeParam;
