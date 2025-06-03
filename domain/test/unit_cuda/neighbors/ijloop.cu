@@ -109,7 +109,6 @@ template<class Neighborhood>
 struct IjLoopTest : testing::Test
 {
     static constexpr LocalIndex totalBodies = 997, firstBody = 241, lastBody = 701;
-    static constexpr Box<double> box = {0, 1, BoundaryType::periodic};
 
     IjLoopTest()
     {
@@ -152,6 +151,12 @@ struct IjLoopTest : testing::Test
                            numLeafNodes, rawPtr(layout), box, groupSize, 7, temp, dGroups);
         groups.resize(dGroups.size());
         thrust::copy_n(dGroups.data(), dGroups.size(), groups.data());
+    }
+
+    void setBoundaryType(BoundaryType boundaryType)
+    {
+        box = {box.xmin(), box.xmax(),   box.ymin(),   box.ymax(),  box.zmin(),
+               box.zmax(), boundaryType, boundaryType, boundaryType};
     }
 
     OctreeNsView<double, KeyT> treeView() const
@@ -297,6 +302,7 @@ struct IjLoopTest : testing::Test
             expected, actual, resultNames);
     }
 
+    Box<double> box = {0, 1, BoundaryType::periodic};
     thrust::universal_vector<double> x, y, z, h, v;
 
     TreeNodeIndex numLeafNodes, numNodes;
@@ -332,18 +338,23 @@ TYPED_TEST(IjLoopTest, IjLoop)
 {
     using Neighborhood = TypeParam;
 
-    const auto nb = Neighborhood{1024}.build(this->treeView(), this->box, this->totalBodies, this->groupView(),
-                                             rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
+    for (BoundaryType boundaryType : {BoundaryType::open, BoundaryType::periodic, BoundaryType::fixed})
+    {
+        this->setBoundaryType(boundaryType);
 
-    Result result;
-    util::for_each_tuple([&](auto& v) { v.resize(this->totalBodies); }, result);
+        const auto nb = Neighborhood{1024}.build(this->treeView(), this->box, this->totalBodies, this->groupView(),
+                                                 rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
 
-    auto input  = std::make_tuple(rawPtr(this->v));
-    auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
+        Result result;
+        util::for_each_tuple([&](auto& v) { v.resize(this->totalBodies); }, result);
 
-    nb.ijLoop(input, output, NeighborFun{}, PostambleFun{});
-    checkGpuErrors(cudaDeviceSynchronize());
+        auto input  = std::make_tuple(rawPtr(this->v));
+        auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
-    Result reference = this->reference(this->groupView());
-    this->validate(reference, result);
+        nb.ijLoop(input, output, NeighborFun{}, PostambleFun{});
+        checkGpuErrors(cudaDeviceSynchronize());
+
+        Result reference = this->reference(this->groupView());
+        this->validate(reference, result);
+    }
 }
