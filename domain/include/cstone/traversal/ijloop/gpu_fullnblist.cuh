@@ -71,21 +71,20 @@ __global__ __launch_bounds__(MaxThreads) void gpuFullNbListNeighborhoodBuild(
 }
 
 template<int MaxThreads, class Tc, class Th, class In, class Out, class Interaction, class Postamble>
-__global__
-__launch_bounds__(MaxThreads) void gpuFullNbListNeighborhoodKernel(const Box<Tc> __grid_constant__ box,
-                                                                   const LocalIndex firstBody,
-                                                                   const LocalIndex lastBody,
-                                                                   const Tc* __restrict__ x,
-                                                                   const Tc* __restrict__ y,
-                                                                   const Tc* __restrict__ z,
-                                                                   const Th* __restrict__ h,
-                                                                   const In __grid_constant__ input,
-                                                                   const Out __grid_constant__ output,
-                                                                   const Interaction interaction,
-                                                                   const Postamble postamble,
-                                                                   const unsigned ngmax,
-                                                                   const LocalIndex* __restrict__ neighbors,
-                                                                   const unsigned* __restrict__ neighborsCount)
+__global__ __launch_bounds__(MaxThreads) void runIjLoop(const Box<Tc> __grid_constant__ box,
+                                                        const LocalIndex firstBody,
+                                                        const LocalIndex lastBody,
+                                                        const Tc* __restrict__ x,
+                                                        const Tc* __restrict__ y,
+                                                        const Tc* __restrict__ z,
+                                                        const Th* __restrict__ h,
+                                                        const In __grid_constant__ input,
+                                                        const Out __grid_constant__ output,
+                                                        const Interaction interaction,
+                                                        const Postamble postamble,
+                                                        const unsigned ngmax,
+                                                        const LocalIndex* __restrict__ neighbors,
+                                                        const unsigned* __restrict__ neighborsCount)
 {
     const LocalIndex threadId = blockDim.x * blockIdx.x + threadIdx.x;
     const LocalIndex i        = firstBody + threadId;
@@ -139,7 +138,7 @@ struct GpuFullNbListNeighborhoodImpl
         const LocalIndex numBodies = lastBody - firstBody;
         if (numBodies == 0) return;
         constexpr int numThreads = 128;
-        gpuFullNbListNeighborhoodKernel<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
+        runIjLoop<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
             box, firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
             std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), ngmax, rawPtr(neighbors),
             rawPtr(neighborsCount));
