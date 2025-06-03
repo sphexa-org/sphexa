@@ -30,7 +30,8 @@
 
 #pragma once
 
-#include <map>
+#include <chrono>
+#include <iostream>
 #include <string>
 #include <variant>
 #include <vector>
@@ -63,12 +64,14 @@ public:
 
     virtual ~IFileWriter() = default;
 
-    virtual void    addStep(size_t firstIndex, size_t lastIndex, std::string path, bool settingsWriting = false) = 0;
-    virtual int64_t stepAttributeSize(const std::string& /*key*/) { return 0; }
-    virtual void    stepAttribute(const std::string& key, FieldType val, int64_t size) = 0;
-    virtual void    fileAttribute(const std::string& key, FieldType val, int64_t size) = 0;
-    virtual void    writeField(const std::string& key, FieldType field, int col)       = 0;
-    virtual void    closeStep()                                                        = 0;
+    virtual void     addStep(size_t firstIndex, size_t lastIndex, std::string path, bool settingsWriting = false) = 0;
+    virtual int64_t  stepAttributeSize(const std::string& /*key*/) { return 0; }
+    virtual void     stepAttribute(const std::string& key, FieldType val, int64_t size) = 0;
+    virtual void     fileAttribute(const std::string& key, FieldType val, int64_t size) = 0;
+    virtual void     writeField(const std::string& key, FieldType field, int col)       = 0;
+    virtual uint64_t localNumParticles()                                                = 0;
+    virtual uint64_t globalNumParticles()                                               = 0;
+    virtual void     closeStep()                                                        = 0;
 };
 
 enum class FileMode
@@ -143,5 +146,20 @@ public:
 private:
     static void throwError() { throw std::runtime_error("File reader not implemented\n"); }
 };
+
+inline void writeField(IFileWriter* writer, const std::string& key, IFileWriter::FieldType field, int column)
+{
+    auto t0 = std::chrono::high_resolution_clock::now();
+    std::visit([writer, c = column, key](auto field) { writer->writeField(key, field, c); }, field);
+    auto  t1        = std::chrono::high_resolution_clock::now();
+    int   typeSize  = std::visit([](auto field) { return sizeof(*field); }, field);
+    float writeTime = std::chrono::duration<float>(t1 - t0).count();
+    if (writer->rank() == 0 && writer->suffix() == ".h5")
+    {
+        float sizeGB = float(typeSize) * writer->globalNumParticles() / 1024 / 1024 / 1024;
+        std::cout << "writing " << key << ", " << sizeGB << " GB in " << writeTime << " s, " << sizeGB / writeTime
+                  << " GB/s" << std::endl;
+    }
+}
 
 } // namespace sphexa

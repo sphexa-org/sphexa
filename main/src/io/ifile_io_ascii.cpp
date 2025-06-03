@@ -64,7 +64,10 @@ public:
     {
         firstIndexStep_ = firstIndex;
         lastIndexStep_  = lastIndex;
-        pathStep_       = path;
+
+        globalCount_ = lastIndexStep_ - firstIndexStep_;
+        MPI_Allreduce(MPI_IN_PLACE, &globalCount_, 1, MPI_UINT64_T, MPI_SUM, comm_);
+        pathStep_ = path;
     }
 
     void stepAttribute(const std::string& key, FieldType val, int64_t /*size*/) override
@@ -86,6 +89,10 @@ public:
             },
             field);
     }
+
+    uint64_t localNumParticles() override { return lastIndexStep_ - firstIndexStep_; }
+
+    uint64_t globalNumParticles() override { return globalCount_; }
 
     void closeStep() override
     {
@@ -133,6 +140,7 @@ private:
     int                            rank_{0}, numRanks_{0};
     MPI_Comm                       comm_;
     int64_t                        firstIndexStep_{0}, lastIndexStep_{0};
+    uint64_t                       globalCount_;
     std::string                    pathStep_;
     std::vector<int>               columns_;
     std::vector<Base::FieldVector> stepBuffer_;
