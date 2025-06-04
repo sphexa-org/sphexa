@@ -173,6 +173,7 @@ template<class Dataset>
     // first layer: class member defaults in code
     BuiltinReader extractor(settings);
     d.hydro.loadOrStoreAttributes(&extractor);
+    d.magneto.loadOrStoreAttributes(&extractor);
 
     // second layer: test-case specific settings
     for (const auto& kv : testCaseSettings)
