@@ -32,8 +32,9 @@ private:
 };
 
 #if defined(__CUDACC__) || defined(__HIP__)
+template<bool Symmetric>
 using ClusteredNeighborhood = cstone::ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<
-    8, 8>::withSuperclusterSize<cstone::TravConfig::targetSize>::withSymmetry::withCompression;
+    8, 8>::withSuperclusterSize<cstone::TravConfig::targetSize>::setSymmetry<Symmetric>::withCompression;
 
 struct DeviceNeighborhoodData::Impl
 {
@@ -42,13 +43,13 @@ struct DeviceNeighborhoodData::Impl
     {
         data.emplace<0>();
 
-        std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, ClusteredNeighborhood> neighborhood;
+        std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, ClusteredNeighborhood<true>> neighborhood;
         const unsigned ncmax = std::bit_ceil(d.ngmax * 2);
 
         if (!clustered)
             neighborhood = cstone::ijloop::GpuAlwaysTraverseNeighborhood{d.ngmax};
         else
-            neighborhood = ClusteredNeighborhood{ncmax};
+            neighborhood = ClusteredNeighborhood<true>{ncmax};
 
         std::visit(
             [&](auto const& nb)
@@ -66,7 +67,7 @@ struct DeviceNeighborhoodData::Impl
     }
 
     std::variant<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhood>,
-                 NeighborhoodDataType<ClusteredNeighborhood>>
+                 NeighborhoodDataType<ClusteredNeighborhood<true>>>
         data;
 };
 
