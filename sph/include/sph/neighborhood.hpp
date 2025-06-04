@@ -16,6 +16,10 @@ using NeighborhoodDataType = decltype(std::declval<Neighborhood>().build(
     std::declval<sph::SphTypes::CoordinateType*>(), std::declval<sph::SphTypes::CoordinateType*>(),
     std::declval<sph::SphTypes::CoordinateType*>(), std::declval<sph::SphTypes::HydroType*>()));
 
+template<class Neighborhood>
+using NeighborhoodSubgroupType =
+    decltype(std::declval<NeighborhoodDataType<Neighborhood>>().subgroup(std::declval<cstone::GroupView>()));
+
 struct NeighborhoodData
 {
     NeighborhoodData() {}

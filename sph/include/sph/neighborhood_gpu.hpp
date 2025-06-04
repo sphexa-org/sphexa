@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <variant>
 
 #include "cstone/traversal/groups.hpp"
@@ -41,34 +42,47 @@ struct DeviceNeighborhoodData::Impl
     template<class Dataset, class T>
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool subgroups)
     {
-        data.emplace<0>();
-
-        std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, ClusteredNeighborhood<true>> neighborhood;
-        const unsigned ncmax = std::bit_ceil(d.ngmax * 2);
-
-        if (subgroups)
-            neighborhood = cstone::ijloop::GpuAlwaysTraverseNeighborhood{d.ngmax};
+        if (subgroups && groups.firstBody == 0 && groups.lastBody == 0)
+        {
+            auto& nb = std::get<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhood>>(data);
+            subgroupData.emplace(nb.subgroup(groups));
+        }
         else
-            neighborhood = ClusteredNeighborhood<true>{ncmax};
+        {
+            data.emplace<0>();
+            subgroupData.reset();
 
-        std::visit(
-            [&](auto const& nb)
-            {
-                data = nb.build(d.treeView, box, d.size(), groups, rawPtr(d.devData.x), rawPtr(d.devData.y),
-                                rawPtr(d.devData.z), rawPtr(d.devData.h));
-            },
-            neighborhood);
+            std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, ClusteredNeighborhood<true>> neighborhood;
+            const unsigned ncmax = std::bit_ceil(d.ngmax * 2);
+
+            if (subgroups)
+                neighborhood = cstone::ijloop::GpuAlwaysTraverseNeighborhood{d.ngmax};
+            else
+                neighborhood = ClusteredNeighborhood<true>{ncmax};
+
+            std::visit(
+                [&](auto const& nb)
+                {
+                    data = nb.build(d.treeView, box, d.size(), groups, rawPtr(d.devData.x), rawPtr(d.devData.y),
+                                    rawPtr(d.devData.z), rawPtr(d.devData.h));
+                },
+                neighborhood);
+        }
     }
 
     template<class... Args>
     void ijLoop(Args&&... args) const
     {
-        std::visit([&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); }, data);
+        if (subgroupData)
+            subgroupData.value().ijLoop(std::forward<Args>(args)...);
+        else
+            std::visit([&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); }, data);
     }
 
     std::variant<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhood>,
                  NeighborhoodDataType<ClusteredNeighborhood<true>>>
-        data;
+                                                                                           data;
+    std::optional<NeighborhoodSubgroupType<cstone::ijloop::GpuAlwaysTraverseNeighborhood>> subgroupData;
 };
 
 template<class Dataset, class T>
