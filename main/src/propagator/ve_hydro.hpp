@@ -73,8 +73,8 @@ protected:
     using ConservedFields = FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "id">;
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
-    using DependentFields_ =
-        FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33", "xm", "kx", "nc">;
+    using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
+                                       "xm", "kx", "nc", "gradh">;
 
     //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
@@ -158,8 +158,6 @@ public:
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        release(d, "ay");
-        acquire(d, "gradh");
         computeVeDefGradh(groups_.view(), d, domain.box());
         timer.step("Normalization & Gradh");
 
@@ -169,7 +167,7 @@ public:
         domain.exchangeHalos(get<"vx", "vy", "vz", "prho", "c", "kx">(d), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        release(d, "gradh", "az");
+        release(d, "ay", "az");
         acquire(d, "divv", "curlv");
         computeIadDivvCurlv(groups_.view(), d, domain.box());
         d.minDtRho = rhoTimestep(first, last, d);
