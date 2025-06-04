@@ -389,7 +389,7 @@ consteval bool supportsSubgroup(Neighborhood)
 template<class Config>
 consteval bool supportsSubgroup(ijloop::GpuSuperclusterNbListNeighborhood<Config>)
 {
-    return false;
+    return !Config::symmetric;
 }
 
 TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)

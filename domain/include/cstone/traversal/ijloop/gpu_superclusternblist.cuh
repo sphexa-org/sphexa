@@ -1177,7 +1177,8 @@ template<class Config,
          class In,
          class Out,
          class Interaction,
-         class Postamble>
+         class Postamble,
+         class Mask = void>
 __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPerBlock) void runIjLoop(
     const Box<Tc> __grid_constant__ box,
     const LocalIndex firstValidBody,
@@ -1194,6 +1195,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     const Postamble postamble,
     const std::uint32_t* const __restrict__ neighborData,
     const SuperclusterInfo* const __restrict__ superclusterInfo,
+    const Mask* const __restrict__ activeMasks,
     const unsigned ncmax)
 {
     assert(ncmax % GpuConfig::warpSize == 0);
@@ -1323,6 +1325,9 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
         }
     }
 
+    auto activeMask = ~Config::SuperclusterSplitMask(0);
+    if constexpr (!std::is_same_v<Mask, void>) activeMask = activeMasks[iSupercluster - firstISupercluster];
+
     if constexpr (!Config::symmetric && Config::numWarpsPerInteraction > 1)
     {
         auto outputBuffers =
@@ -1350,8 +1355,9 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
         for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
              offset += Config::iThreads * Config::jSize)
         {
-            const unsigned i = base + offset;
-            if (i >= firstBody & i < lastBody)
+            const unsigned i  = base + offset;
+            const bool active = (activeMask >> offset) & 1;
+            if (i >= firstBody & i < lastBody & active)
             {
                 const auto iData   = iSuperclusterData[offset];
                 const auto iResult = util::tupleMap([&](auto const* ptr) { return ptr[offset]; }, outputBufferPtrs);
@@ -1364,9 +1370,10 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 #pragma unroll
         for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
         {
-            const auto i = iSupercluster * Config::superclusterSize + c * Config::iSize + threadIdx.x;
-            storeTupleISum<Config>(iResults[c / iClustersPerWarp], output, i, i >= firstBody & i < lastBody, postamble,
-                                   iSuperclusterData[c * Config::iSize + threadIdx.x]);
+            const auto i      = iSupercluster * Config::superclusterSize + c * Config::iSize + threadIdx.x;
+            const bool active = (activeMask >> (c * Config::iSize + threadIdx.x)) & 1;
+            storeTupleISum<Config>(iResults[c / iClustersPerWarp], output, i, i >= firstBody & i < lastBody & active,
+                                   postamble, iSuperclusterData[c * Config::iSize + threadIdx.x]);
         }
     }
 }
@@ -1531,6 +1538,33 @@ __global__ void applyPostamble(const LocalIndex firstBody,
     storeParticleData(output, i, postamble(iData, result));
 }
 
+template<class Config, class Mask>
+__global__ void computeActiveMasks(const LocalIndex firstISupercluster,
+                                   const LocalIndex firstValidBody,
+                                   const GroupView __grid_constant__ groups,
+                                   Mask* __restrict__ activeMasks)
+{
+    const LocalIndex index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= groups.numGroups) return;
+
+    const LocalIndex groupStart = groups.groupStart[index] + firstValidBody;
+    const LocalIndex groupEnd   = groups.groupEnd[index] + firstValidBody;
+    assert(groupStart < groupEnd);
+    assert(superclusterIndex<Config>(groupStart) == superclusterIndex<Config>(groupEnd - 1));
+
+    const LocalIndex supercluster = groupStart / Config::superclusterSize;
+    const LocalIndex startOffset  = groupStart - supercluster * Config::superclusterSize;
+    const LocalIndex endOffset    = groupEnd - supercluster * Config::superclusterSize;
+    assert(startOffset < GpuConfig::warpSize);
+    assert(endOffset <= GpuConfig::warpSize);
+
+    auto* activeMaskPtr   = &activeMasks[supercluster - firstISupercluster];
+    const Mask activeMask = ~(~Mask(0) << endOffset) & (~Mask(0) << startOffset);
+
+    // atomic update as multiple groups can be inside the same supercluster
+    atomicOr(activeMaskPtr, activeMask);
+}
+
 struct H2R
 {
     template<class T>
@@ -1565,6 +1599,77 @@ struct GpuSuperclusterNbListNeighborhoodImpl
     void
     ijLoop(std::tuple<In*...> input, std::tuple<Out*...> output, Interaction&& interaction, Postamble&& postamble) const
     {
+        assert(firstBody < lastBody);
+        const LocalIndex firstISupercluster = superclusterIndex<Config>(firstBody);
+        const LocalIndex lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
+        const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
+
+        ijLoop(input, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
+               superclusterInfo.get(), numISuperclusters);
+    }
+
+    Statistics stats() const { return {.numBodies = lastBody - firstBody, .numBytes = numBytes}; }
+
+    struct Subgroup
+    {
+        GpuSuperclusterNbListNeighborhoodImpl const& parent;
+        GroupView groups;
+        util::UniqueDevicePtr<typename Config::SuperclusterSplitMask[]> activeMasks;
+        util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo;
+        LocalIndex numISuperclusters;
+
+        template<class... In, class... Out, class Interaction, class Postamble>
+        void ijLoop(std::tuple<In*...> input,
+                    std::tuple<Out*...> output,
+                    Interaction&& interaction,
+                    Postamble&& postamble) const
+        {
+            if (groups.numGroups == 0) return;
+
+            parent.ijLoop(input, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
+                          superclusterInfo.get(), numISuperclusters, activeMasks.get());
+        }
+    };
+
+    Subgroup subgroup(GroupView const& groups) const
+    {
+        static_assert(!Config::symmetric, "subgroup only supported in non-symmetric neighborhoods");
+        const LocalIndex firstISupercluster = superclusterIndex<Config>(firstBody);
+        const LocalIndex lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
+        const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
+
+        auto activeMasks = util::deviceAlloc<typename Config::SuperclusterSplitMask[]>(numISuperclusters);
+        checkGpuErrors(
+            cudaMemsetAsync(activeMasks.get(), 0, sizeof(typename Config::SuperclusterSplitMask) * numISuperclusters));
+
+        constexpr unsigned numThreads = 256;
+        const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
+        computeActiveMasks<Config>
+            <<<numBlocks, numThreads>>>(firstISupercluster, firstValidBody, groups, activeMasks.get());
+        checkGpuErrors(cudaGetLastError());
+
+        auto activeSuperclusterInfo = util::deviceAlloc<SuperclusterInfo[]>(numISuperclusters);
+
+        SuperclusterInfo* lastCopied = thrust::copy_if(
+            thrust::device, superclusterInfo.get(), superclusterInfo.get() + numISuperclusters,
+            activeSuperclusterInfo.get(),
+            [activeMasksPtr = activeMasks.get(), firstISupercluster] __device__(const SuperclusterInfo& info)
+            { return activeMasksPtr[info.index - firstISupercluster] != 0; });
+        const LocalIndex activeNumISuperclusters = lastCopied - activeSuperclusterInfo.get();
+
+        return {*this, groups, std::move(activeMasks), std::move(activeSuperclusterInfo), activeNumISuperclusters};
+    }
+
+protected:
+    template<class... In, class... Out, class Interaction, class Postamble, class Mask = void>
+    void ijLoop(std::tuple<In*...> input,
+                std::tuple<Out*...> output,
+                Interaction&& interaction,
+                Postamble&& postamble,
+                const SuperclusterInfo* superclusterInfo,
+                const LocalIndex numISuperclusters,
+                const Mask* activeMasks = nullptr) const
+    {
         const LocalIndex numBodies = lastBody - firstBody;
         if (numBodies == 0) return;
 
@@ -1591,11 +1696,6 @@ struct GpuSuperclusterNbListNeighborhoodImpl
             checkGpuErrors(cudaGetLastError());
         }
 
-        assert(firstBody < lastBody);
-        const LocalIndex firstISupercluster = superclusterIndex<Config>(firstBody);
-        const LocalIndex lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
-        const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
-
         constexpr unsigned numSuperclustersPerBlock = 64 / (Config::iThreads * Config::jSize);
         const dim3 blockSize                        = {Config::iThreads, Config::jSize, numSuperclustersPerBlock};
         const unsigned numBlocks                    = iceil(numISuperclusters, numSuperclustersPerBlock);
@@ -1608,7 +1708,7 @@ struct GpuSuperclusterNbListNeighborhoodImpl
             runIjLoop<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, sharedMem>>>(
                 box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConstRestrict(input),
                 tmpOrOutput, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
-                neighborData.get(), superclusterInfo.get(), ncmax);
+                neighborData.get(), superclusterInfo, activeMasks, ncmax);
             checkGpuErrors(cudaGetLastError());
         };
         if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
@@ -1629,8 +1729,6 @@ struct GpuSuperclusterNbListNeighborhoodImpl
             checkGpuErrors(cudaDeviceSynchronize());
         }
     }
-
-    Statistics stats() const { return {.numBodies = lastBody - firstBody, .numBytes = numBytes}; }
 };
 
 template<unsigned ISize            = 8,

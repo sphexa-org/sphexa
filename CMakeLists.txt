@@ -55,6 +55,8 @@ if(SPH_EXA_WITH_CUDA)
         set(CMAKE_CUDA_STANDARD 20)
         # allow to call any constexpr function on device (e.g., from STL)
         add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+        # allow to use __device__ lambdas
+        add_compile_options($<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
     else()
         message(STATUS "No CUDA support")
         set(SPH_EXA_WITH_CUDA OFF)
