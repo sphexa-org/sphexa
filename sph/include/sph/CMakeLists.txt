@@ -14,7 +14,6 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     add_library(timesteps_gpu OBJECT ${TIMESTEP_GPU_KERNELS})
     target_include_directories(timesteps_gpu PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE_DIR}/include)
     target_compile_definitions(timesteps_gpu PRIVATE USE_CUDA)
-    target_compile_options(timesteps_gpu PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 
     add_library(sph_gpu
             $<TARGET_OBJECTS:timesteps_gpu>
@@ -22,5 +21,4 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
             $<TARGET_OBJECTS:hydro_turb_gpu>
             $<TARGET_OBJECTS:hydro_ve_gpu>)
     set_target_properties(sph_gpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-    target_compile_options(sph_gpu PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
 endif ()
