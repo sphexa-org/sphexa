@@ -156,7 +156,7 @@ struct IjLoopTest : testing::Test
         {
             for (std::size_t g = 0; g < groups.size() - 1; ++g)
             {
-                if (g % 3 == 0 && g % 5 == 0)
+                if (g % 3 == 0 || g % 5 == 0)
                 {
                     subgroupStart.push_back(groups[g]);
                     subgroupEnd.push_back(groups[g + 1]);
