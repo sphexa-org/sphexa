@@ -21,7 +21,7 @@ struct DeviceNeighborhoodData
     ~DeviceNeighborhoodData();
 
     template<class Dataset, class T>
-    void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool clustered);
+    void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool subgroups);
 
     template<class... Args>
     void ijLoop(Args&&... args) const;
@@ -39,14 +39,14 @@ using ClusteredNeighborhood = cstone::ijloop::GpuSuperclusterNbListNeighborhood<
 struct DeviceNeighborhoodData::Impl
 {
     template<class Dataset, class T>
-    void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool clustered)
+    void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool subgroups)
     {
         data.emplace<0>();
 
         std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, ClusteredNeighborhood<true>> neighborhood;
         const unsigned ncmax = std::bit_ceil(d.ngmax * 2);
 
-        if (!clustered)
+        if (subgroups)
             neighborhood = cstone::ijloop::GpuAlwaysTraverseNeighborhood{d.ngmax};
         else
             neighborhood = ClusteredNeighborhood<true>{ncmax};
@@ -73,10 +73,10 @@ struct DeviceNeighborhoodData::Impl
 
 template<class Dataset, class T>
 void DeviceNeighborhoodData::build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box,
-                                   bool clustered)
+                                   bool subgroups)
 {
     assert(impl);
-    impl->build(groups, d, box, clustered);
+    impl->build(groups, d, box, subgroups);
 }
 
 template<class... Args>

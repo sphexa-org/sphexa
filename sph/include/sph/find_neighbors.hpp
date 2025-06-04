@@ -10,11 +10,11 @@ namespace sph
 {
 
 inline void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cstone::CpuTag>& d,
-                             const cstone::Box<SphTypes::CoordinateType>& box, bool clustered = true)
+                             const cstone::Box<SphTypes::CoordinateType>& box, bool subgroups = false)
 {
     if (d.ng0 > d.ngmax) { throw std::runtime_error("ng0 should be smaller than ngmax\n"); }
 
-    d.neighborhood.build(groups, d, box, clustered);
+    d.neighborhood.build(groups, d, box, subgroups);
 }
 
 } // namespace sph

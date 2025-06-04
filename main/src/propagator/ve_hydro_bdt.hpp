@@ -241,7 +241,7 @@ public:
         fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
 
         updateSmoothingLengthIterative(activeRungs_, d, domain.box());
-        findNeighborsSfc(activeRungs_, d, domain.box(), false);
+        findNeighborsSfc(activeRungs_, d, domain.box(), true);
         timer.step("FindNeighbors");
         pmReader.step();
 
