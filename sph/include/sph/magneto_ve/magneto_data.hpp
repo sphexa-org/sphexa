@@ -76,7 +76,11 @@ public:
     MagnetoData() {}
     MagnetoData(const MagnetoData&) = delete;
 
-    RealType mu_0{1.0}, eMag{0.0};
+    // Parameters, should maybe move the induction/dissipation constants here
+    RealType mu_0{1.0};
+
+    // Observables
+    RealType eMag{0.0}, meanDivBError{0.0}, maxDivBError{0.0};
 
     //!@brief particle fields used for magneto-hydrodynamics
     FieldVector<RealType> Bx, By, Bz;             // Magnetic field components

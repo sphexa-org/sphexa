@@ -62,8 +62,8 @@ conservedQuantitiesGpu(double cv, const Tc* x, const Tc* y, const Tc* z, const T
 /*! @brief compute the magnetic energy on the GPU
  *
  * @param mu_0  magnetic permeability
- * @param xm    volume element definition
- * @param kx    volume element normalization
+ * @param divB  divergence of B-field
+ * @param h     smoothing length
  * @param Bx    Magnetic field x-component
  * @param By    Magnetic field y-component
  * @param Bz    Magnetic field z-component
@@ -71,8 +71,9 @@ conservedQuantitiesGpu(double cv, const Tc* x, const Tc* y, const Tc* z, const T
  * @param last  last particle index to include in the sum
  * @return      total magnetic energy of the range [first, last]
  */
-template<class Tc, class Tm>
-extern double magneticEnergyGpu(Tc mu_0, const Tm* xm, const Tm* kx, const Tc* Bx, const Tc* By, const Tc* Bz,
-                                size_t first, size_t last);
+template<class Tc, class Th>
+extern std::tuple<double, double, double> magneticEnergyGpu(Tc mu_0, const Th* xm, const Th* kx, const Th* divB,
+                                                            const Th* h, const Tc* Bx, const Tc* By, const Tc* Bz,
+                                                            size_t first, size_t last);
 
 } // namespace sphexa

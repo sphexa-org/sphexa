@@ -51,14 +51,23 @@ public:
     {
         int rank;
         MPI_Comm_rank(simData.comm, &rank);
-        auto& d = simData.hydro;
+        auto& d  = simData.hydro;
+        auto& md = simData.magneto;
 
         computeConservedQuantities(firstIndex, lastIndex, simData, simData.comm);
 
         if (rank == 0)
         {
-            fileutils::writeColumns(constantsFile, ' ', d.iteration, d.ttot, d.minDt, d.etot, d.ecin, d.eint, d.egrav,
-                                    d.linmom, d.angmom);
+            if (md.eMag > 0)
+            {
+                fileutils::writeColumns(constantsFile, ' ', d.iteration, d.ttot, d.minDt, d.etot, d.ecin, d.eint,
+                                        d.egrav, d.linmom, d.angmom, md.eMag, md.meanDivBError, md.maxDivBError);
+            }
+            else
+            {
+                fileutils::writeColumns(constantsFile, ' ', d.iteration, d.ttot, d.minDt, d.etot, d.ecin, d.eint,
+                                        d.egrav, d.linmom, d.angmom);
+            }
         }
     }
 };

@@ -33,6 +33,7 @@
 #include <thrust/inner_product.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/transform_reduce.h>
+#include <thrust/extrema.h>
 
 #include "cstone/util/tuple.hpp"
 
@@ -107,45 +108,51 @@ CONSERVED_Q_GPU(float, float, float, float);
 /*! @brief Functor to compute magnetic energy
  *
  * @tparam Tc   type of Bx,By,Bz
- * @tparam Tm   type of volume definitions (kx,xm)
+ * @tparam Th   type of hydro fields (div(B), h, kx, xm)
+ *
  */
-template<class Tc, class Tm>
+template<class Tc, class Th>
 struct EMag
 {
-    /*! @brief compute energies and momenta for a single particle
+    /*! @brief calculate magnetic field magnitude and divergence error for a single particle
      *
-     * @param p   Tuple<xm.kx.Bx.By,Bz> with data for one particle
-     * @return    magnetic Energy
+     * @param p   Tuple<Bx, By, Bz, div(B), h, xm, kx> with data for one particle
+     * @return    magnetic Energy, divergence of B error
      */
     HOST_DEVICE_FUN
-    double operator()(const thrust::tuple<Tm, Tm, Tc, Tc, Tc>& p)
+    thrust::tuple<double, double> operator()(const thrust::tuple<Tc, Tc, Tc, Th, Th, Th, Th>& p)
     {
-        Vec3<double> B{get<2>(p), get<3>(p), get<4>(p)};
-        Tm           vol = get<0>(p) / get<1>(p);
-        return norm2(B) * vol;
+        const Vec3<double> B{get<0>(p), get<1>(p), get<2>(p)};
+        Tc                 magB2 = norm2(B);
+        Th                 vol   = get<5>(p) / get<6>(p);
+        return {magB2 * vol, abs(get<3>(p)) * get<4>(p) / sqrt(magB2)};
     }
 };
 
-template<class Tc, class Tm>
-double magneticEnergyGpu(Tc mu_0, const Tm* xm, const Tm* kx, const Tc* Bx, const Tc* By, const Tc* Bz, size_t first,
-                         size_t last)
+template<class Tc, class Th>
+std::tuple<double, double, double> magneticEnergyGpu(Tc mu_0, const Th* xm, const Th* kx, const Th* divB, const Th* h,
+                                                     const Tc* Bx, const Tc* By, const Tc* Bz, size_t first,
+                                                     size_t last)
 {
-    auto it1 =
-        thrust::make_zip_iterator(thrust::make_tuple(xm + first, kx + first, Bx + first, By + first, Bz + first));
-    auto it2 = thrust::make_zip_iterator(thrust::make_tuple(xm + last, kx + last, Bx + last, By + last, Bz + last));
+    auto it1 = thrust::make_zip_iterator(
+        thrust::make_tuple(Bx + first, By + first, Bz + first, divB + first, h + first, xm + first, kx + first));
+    auto it2 = thrust::make_zip_iterator(
+        thrust::make_tuple(Bx + last, By + last, Bz + last, divB + last, h + last, xm + last, kx + last));
 
-    auto   plus = thrust::plus<double>{};
-    double eMag = 0.0;
+    auto plus = util::TuplePlus<thrust::tuple<double, double>>{};
+    auto init = thrust::make_tuple<double>(0.0, 0.0);
 
     //! apply EMom to each particle and reduce results into a single sum
-    eMag = thrust::transform_reduce(thrust::device, it1, it2, EMag<Tc, Tm>{}, eMag, plus);
+    auto [BMag, cumulativeDivBError] = thrust::transform_reduce(thrust::device, it1, it2, EMag<Tc, Tc>{}, init, plus);
+    auto localMaxDivBError           = thrust::max_element(thrust::device, divB + first, divB + last);
 
-    return 0.5 * eMag / mu_0;
+    return {0.5 * BMag / mu_0, cumulativeDivBError, *localMaxDivBError};
 }
 
-#define EMAG(Tc, Tm)                                                                                                   \
-    template double magneticEnergyGpu(Tc mu_0, const Tm* xm, const Tm* kx, const Tc* Bx, const Tc* By, const Tc* Bz,   \
-                                      size_t first, size_t last);
+#define EMAG(Tc, Th)                                                                                                   \
+    template std::tuple<double, double, double> magneticEnergyGpu(Tc mu_0, const Th* xm, const Th* kx, const Th* divB, \
+                                                                  const Th* h, const Tc* Bx, const Tc* By,             \
+                                                                  const Tc* Bz, size_t first, size_t last);
 
 EMAG(double, double);
 EMAG(double, float);
