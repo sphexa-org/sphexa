@@ -285,40 +285,40 @@ struct IjLoopTest : testing::Test
 
     void validate(const Result& expected, const Result& actual) const
     {
-        auto validateElem = [](auto ei, auto ai, const char* name, std::size_t i)
-        {
-            if constexpr (std::is_same_v<decltype(ei), double>)
-            {
-                if (std::abs(ei - ai) > 1e-8)
-                    return testing::AssertionFailure() << name << "[" << i << "]: " << ai << " != " << ei;
-            }
-            else if constexpr (std::is_same_v<decltype(ei), Vec3<double>>)
-            {
-                for (unsigned d = 0; d < 3; ++d)
-                {
-                    if (std::abs(ei[d] - ai[d]) > 1e-8)
-                    {
-                        return testing::AssertionFailure()
-                               << name << "[" << i << "]: {" << ai[0] << ", " << ai[1] << ", " << ai[2] << "} != {"
-                               << ei[0] << ", " << ei[1] << ", " << ei[2] << "}";
-                    }
-                }
-            }
-            else
-            {
-                if (ei != ai)
-                    return testing::AssertionFailure()
-                           << name << "[" << i << "]: " << ai << " (actual) != " << ei << " (expected)";
-            }
-            return testing::AssertionSuccess();
-        };
 
         util::for_each_tuple(
-            [&validateElem](auto const& e, auto const& a, const char* name)
+            [](auto const& e, auto const& a, const char* name)
             {
                 ASSERT_EQ(e.size(), a.size());
+
+                std::ostringstream failures;
+                auto validateElem = [&failures](auto ei, auto ai, const char* name, std::size_t i)
+                {
+                    if constexpr (std::is_same_v<decltype(ei), double>)
+                    {
+                        if (std::abs(ei - ai) > 1e-8)
+                            failures << "  " << name << "[" << i << "] == " << ai << " != " << ei << "\n";
+                    }
+                    else if constexpr (std::is_same_v<decltype(ei), Vec3<double>>)
+                    {
+                        if (std::abs(ei[0] - ai[0]) > 1e-8 || std::abs(ei[1] - ai[1]) > 1e-8 ||
+                            std::abs(ei[2] - ai[2]) > 1e-8)
+                            failures << "  " << name << "[" << i << "] == {" << ai[0] << ", " << ai[1] << ", " << ai[2]
+                                     << "} != {" << ei[0] << ", " << ei[1] << ", " << ei[2] << "}\n";
+                    }
+                    else
+                    {
+                        if (ei != ai)
+                            failures << "  " << name << "[" << i << "] == " << ai << " (actual) != " << ei
+                                     << " (expected)\n";
+                    }
+                };
+
                 for (std::size_t i = 0; i < e.size(); ++i)
-                    ASSERT_TRUE(validateElem(e[i], a[i], name, i));
+                    validateElem(e[i], a[i], name, i);
+
+                auto output = failures.view();
+                if (!output.empty()) ADD_FAILURE() << output;
             },
             expected, actual, resultNames);
     }
