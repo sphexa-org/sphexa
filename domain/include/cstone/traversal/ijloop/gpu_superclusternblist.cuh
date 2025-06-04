@@ -985,7 +985,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
     const Th* const __restrict__ jClusterRMax,
     const Th* const __restrict__ nodeRMax,
     const unsigned ncmax,
-    const typename Config::SuperclusterSplitMask* const __restrict__ superclusterSplitMasks,
+    const typename Config::SuperclusterParticleMask* const __restrict__ superclusterSplitMasks,
     std::uint32_t* const __restrict__ neighborData,
     const std::size_t neighborDataSize,
     SuperclusterInfo* const __restrict__ superclusterInfo,
@@ -1325,7 +1325,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
         }
     }
 
-    auto activeMask = ~Config::SuperclusterSplitMask(0);
+    auto activeMask = ~Config::SuperclusterParticleMask(0);
     if constexpr (!std::is_same_v<Mask, void>) activeMask = activeMasks[iSupercluster - firstISupercluster];
 
     if constexpr (!Config::symmetric && Config::numWarpsPerInteraction > 1)
@@ -1614,7 +1614,7 @@ struct GpuSuperclusterNbListNeighborhoodImpl
     {
         GpuSuperclusterNbListNeighborhoodImpl const& parent;
         GroupView groups;
-        util::UniqueDevicePtr<typename Config::SuperclusterSplitMask[]> activeMasks;
+        util::UniqueDevicePtr<typename Config::SuperclusterParticleMask[]> activeMasks;
         util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo;
         LocalIndex numISuperclusters;
 
@@ -1638,9 +1638,9 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         const LocalIndex lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
         const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
 
-        auto activeMasks = util::deviceAlloc<typename Config::SuperclusterSplitMask[]>(numISuperclusters);
-        checkGpuErrors(
-            cudaMemsetAsync(activeMasks.get(), 0, sizeof(typename Config::SuperclusterSplitMask) * numISuperclusters));
+        auto activeMasks = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(numISuperclusters);
+        checkGpuErrors(cudaMemsetAsync(activeMasks.get(), 0,
+                                       sizeof(typename Config::SuperclusterParticleMask) * numISuperclusters));
 
         constexpr unsigned numThreads = 256;
         const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
@@ -1765,7 +1765,7 @@ struct GpuSuperclusterNbListNeighborhoodConfig
     template<bool NewSymmetric>
     using setSymmetry = GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, SuperclusterSize, Compress, NewSymmetric>;
 
-    using SuperclusterSplitMask = std::conditional_t<(superclusterSize > 32), unsigned long long, unsigned>;
+    using SuperclusterParticleMask = std::conditional_t<(superclusterSize > 32), unsigned long long, unsigned>;
     static_assert(superclusterSize <= 64, "superclusters with more than 64 particles are not supported");
 };
 
@@ -1842,7 +1842,7 @@ struct GpuSuperclusterNbListNeighborhood
 
         if (numISuperclusters == 0) return nbList;
 
-        auto superclusterSplitMasks = util::deviceAlloc<typename Config::SuperclusterSplitMask[]>(numISuperclusters);
+        auto superclusterSplitMasks = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(numISuperclusters);
         {
             constexpr unsigned numThreads = 256;
             const unsigned numBlocks      = iceil(numISuperclusters, numThreads);
