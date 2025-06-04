@@ -44,7 +44,7 @@ struct DeviceNeighborhoodData::Impl
     {
         if (subgroups && groups.firstBody == 0 && groups.lastBody == 0)
         {
-            auto& nb = std::get<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhood>>(data);
+            auto& nb = std::get<NeighborhoodDataType<ClusteredNeighborhood<false>>>(data);
             subgroupData.emplace(nb.subgroup(groups));
         }
         else
@@ -52,11 +52,11 @@ struct DeviceNeighborhoodData::Impl
             data.emplace<0>();
             subgroupData.reset();
 
-            std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, ClusteredNeighborhood<true>> neighborhood;
             const unsigned ncmax = std::bit_ceil(d.ngmax * 2);
 
+            std::variant<ClusteredNeighborhood<false>, ClusteredNeighborhood<true>> neighborhood;
             if (subgroups)
-                neighborhood = cstone::ijloop::GpuAlwaysTraverseNeighborhood{d.ngmax};
+                neighborhood = ClusteredNeighborhood<false>{ncmax};
             else
                 neighborhood = ClusteredNeighborhood<true>{ncmax};
 
@@ -79,10 +79,9 @@ struct DeviceNeighborhoodData::Impl
             std::visit([&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); }, data);
     }
 
-    std::variant<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhood>,
-                 NeighborhoodDataType<ClusteredNeighborhood<true>>>
-                                                                                           data;
-    std::optional<NeighborhoodSubgroupType<cstone::ijloop::GpuAlwaysTraverseNeighborhood>> subgroupData;
+    std::variant<NeighborhoodDataType<ClusteredNeighborhood<false>>, NeighborhoodDataType<ClusteredNeighborhood<true>>>
+                                                                          data;
+    std::optional<NeighborhoodSubgroupType<ClusteredNeighborhood<false>>> subgroupData;
 };
 
 template<class Dataset, class T>
