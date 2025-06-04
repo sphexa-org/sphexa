@@ -41,7 +41,7 @@
 
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/sfc/box.hpp"
-#include "cstone/traversal/ijloop/cpu.hpp"
+#include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/groups_gpu.cuh"

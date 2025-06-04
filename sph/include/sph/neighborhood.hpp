@@ -1,7 +1,7 @@
 #pragma once
 
 #include "cstone/traversal/groups.hpp"
-#include "cstone/traversal/ijloop/cpu.hpp"
+#include "cstone/traversal/ijloop/cpu_fullnblist.hpp"
 #include "sph/types.hpp"
 
 namespace sph
