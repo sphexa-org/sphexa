@@ -189,7 +189,7 @@ __global__ void computeSuperclusterSplitMasks(const LocalIndex firstISupercluste
     // no action required if the group's end is aligned to a supercluster boundary
     if (splitPosition == 0) return;
 
-    const LocalIndex supercluster = groupEnd / Config::superclusterSize;
+    const LocalIndex supercluster = superclusterIndex<Config>(groupEnd);
     auto* splitMaskPtr            = &superclusterSplitMasks[supercluster - firstISupercluster];
     const auto splitMask          = SplitMask(1) << splitPosition;
 
@@ -1552,7 +1552,7 @@ __global__ void computeActiveMasks(const LocalIndex firstISupercluster,
     assert(groupStart < groupEnd);
     assert(superclusterIndex<Config>(groupStart) == superclusterIndex<Config>(groupEnd - 1));
 
-    const LocalIndex supercluster = groupStart / Config::superclusterSize;
+    const LocalIndex supercluster = superclusterIndex<Config>(groupStart);
     const LocalIndex startOffset  = groupStart - supercluster * Config::superclusterSize;
     const LocalIndex endOffset    = groupEnd - supercluster * Config::superclusterSize;
     assert(startOffset < GpuConfig::warpSize);
