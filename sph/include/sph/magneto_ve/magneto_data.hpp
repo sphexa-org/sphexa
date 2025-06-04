@@ -227,5 +227,37 @@ public:
     float allocGrowthRate_{1.05};
 
     float getAllocGrowthRate() const { return allocGrowthRate_; }
+
+    //! @brief Unified interface to attribute initialization, reading and writing
+    template<class Archive>
+    void loadOrStoreAttributes(Archive* ar)
+    {
+        //! @brief load or store an attribute, skips non-existing attributes on load.
+        auto optionalIO = [ar](const std::string& attribute, auto* location, size_t attrSize)
+        {
+            try
+            {
+                if constexpr (std::is_enum_v<std::decay_t<decltype(*location)>>)
+                {
+                    // handle pointers to enum by casting to the underlying type
+                    using EType = std::decay_t<decltype(*location)>;
+                    using UType = std::underlying_type_t<EType>;
+                    auto tmp    = static_cast<UType>(*location);
+                    ar->stepAttribute(attribute, &tmp, attrSize);
+                    *location = static_cast<EType>(tmp);
+                }
+                else { ar->stepAttribute(attribute, location, attrSize); }
+            }
+            catch (std::out_of_range&)
+            {
+                if (ar->rank() == 0)
+                {
+                    std::cout << "Attribute " << attribute << " not set in file, setting to default value " << *location
+                              << std::endl;
+                }
+            }
+        };
+        optionalIO("mu_0", &mu_0, 1);
+    }
 };
 } // namespace sphexa::magneto
