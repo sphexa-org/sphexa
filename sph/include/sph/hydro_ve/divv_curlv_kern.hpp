@@ -31,11 +31,8 @@
 
 #pragma once
 
-#include "cstone/cuda/annotation.hpp"
-#include "cstone/sfc/box.hpp"
-#include "cstone/traversal/ijloop/common.hpp"
+#include "cstone/traversal/ijloop/ijloop.hpp"
 
-#include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"
 
 namespace sph
@@ -113,63 +110,6 @@ struct DivVCurlVPostamble
             return std::make_tuple(divvi);
     }
 };
-
-template<size_t stride = 1, typename Tc, class T>
-HOST_DEVICE_FUN inline void
-divV_curlVJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
-                unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy, const T* vz,
-                const T* h, const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
-                const T* wh, const T* /*whd*/, const T* kx, const T* xm, T* divv, T* curlv, T* dV11, T* dV12, T* dV13,
-                T* dV22, T* dV23, T* dV33, bool doGradV)
-{
-    DivVCurlVInteraction<T> interaction{wh};
-
-    const auto input = std::make_tuple(vx, vy, vz, xm, kx, c11, c12, c13, c22, c23, c33);
-
-    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
-    const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
-
-    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
-    for (unsigned pj = 0; pj < neighborsCount; ++pj)
-    {
-        cstone::LocalIndex j = neighbors[stride * pj];
-
-        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
-
-        const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
-
-        cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
-    }
-
-    if (curlv && doGradV)
-    {
-        DivVCurlVPostamble<true, true, T, Tc> postamble{K};
-        const auto                            presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
-        const auto                            output = std::make_tuple(divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33);
-        cstone::ijloop::storeParticleData(output, i, presult);
-    }
-    else if (curlv)
-    {
-        DivVCurlVPostamble<true, false, T, Tc> postamble{K};
-        const auto                             presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
-        const auto                             output  = std::make_tuple(divv, curlv);
-        cstone::ijloop::storeParticleData(output, i, presult);
-    }
-    else if (doGradV)
-    {
-        DivVCurlVPostamble<false, true, T, Tc> postamble{K};
-        const auto                             presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
-        const auto                             output  = std::make_tuple(divv, dV11, dV12, dV13, dV22, dV23, dV33);
-        cstone::ijloop::storeParticleData(output, i, presult);
-    }
-    else
-    {
-        DivVCurlVPostamble<false, false, T, Tc> postamble{K};
-        const auto                              presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
-        const auto                              output  = std::make_tuple(divv);
-        cstone::ijloop::storeParticleData(output, i, presult);
-    }
-}
 
 template<class Neighborhood, class Tc, class T>
 void divVCurlVIjLoop(const Neighborhood& neighborhood, Tc K, const T* vx, const T* vy, const T* vz, const T* xm,

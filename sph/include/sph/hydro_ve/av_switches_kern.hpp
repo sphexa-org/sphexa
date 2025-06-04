@@ -31,11 +31,8 @@
 
 #pragma once
 
-#include "cstone/cuda/annotation.hpp"
-#include "cstone/sfc/box.hpp"
-#include "cstone/traversal/ijloop/common.hpp"
+#include "cstone/traversal/ijloop/ijloop.hpp"
 
-#include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"
 
 namespace sph
@@ -126,43 +123,6 @@ struct AVswitchesPostamble
         return std::make_tuple(alpha_i);
     }
 };
-
-template<size_t stride = 1, class Tc, class T>
-HOST_DEVICE_FUN inline T
-AVswitchesJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
-                unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy, const T* vz,
-                const T* h, const T* c, const T* c11, const T* c12, const T* c13, const T* c22, const T* c23,
-                const T* c33, const T* wh, const T* /*whd*/, const T* kx, const T* xm, const T* divv, const T* alpha,
-                const Tc dt, const T alphamin, const T alphamax, const T decay_constant)
-{
-    AVswitchesInteraction<T, Tc> interaction{wh, K};
-    AVswitchesPostamble<T, Tc>   postamble{alphamin, alphamax, decay_constant, dt};
-
-    const auto input   = std::make_tuple(xm, kx, divv, alpha, vx, vy, vz, c, c11, c12, c13, c22, c23, c33);
-    T          alpha_i = 0;
-    const auto output  = std::make_tuple((&alpha_i) - i);
-
-    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
-    const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
-
-    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
-    for (unsigned pj = 0; pj < neighborsCount; ++pj)
-    {
-        cstone::LocalIndex j = neighbors[stride * pj];
-
-        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
-
-        const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
-
-        cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
-    }
-
-    auto presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
-
-    cstone::ijloop::storeParticleData(output, i, presult);
-
-    return alpha_i;
-}
 
 template<class Neighborhood, class Tc, class T>
 void AVswitchesIjLoop(Neighborhood const& neighborhood, Tc K, Tc dt, T alphamin, T alphamax, T decay_constant,

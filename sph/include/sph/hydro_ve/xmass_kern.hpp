@@ -31,11 +31,8 @@
 
 #pragma once
 
-#include "cstone/cuda/annotation.hpp"
-#include "cstone/sfc/box.hpp"
-#include "cstone/traversal/ijloop/common.hpp"
+#include "cstone/traversal/ijloop/ijloop.hpp"
 
-#include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"
 
 namespace sph
@@ -66,7 +63,7 @@ struct XmassInteraction
 
 //! @brief a particular choice of defining generalized volume elements
 template<class T, class Tm>
-HOST_DEVICE_FUN inline T veDefinition(Tm mass, T rhoZero)
+constexpr inline T veDefinition(Tm mass, T rhoZero)
 {
     return mass / rhoZero;
 }
@@ -108,40 +105,6 @@ struct XmassToDensityPostamble : XmassPostamble<T, Tc>
         return std::make_tuple(mi / xmassi);
     }
 };
-
-template<size_t stride = 1, class Tc, class Tm, class T>
-HOST_DEVICE_FUN inline T xmassJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
-                                    const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
-                                    const Tc* y, const Tc* z, const T* h, const Tm* m, const T* wh, const T* /*whd*/)
-{
-    XmassInteraction      interaction{wh};
-    XmassPostamble<T, Tc> postamble{K};
-
-    const auto input  = std::make_tuple(m);
-    T          xmassi = 0;
-    const auto output = std::make_tuple((&xmassi) - i);
-
-    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
-    const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
-
-    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
-    for (unsigned pj = 0; pj < neighborsCount; ++pj)
-    {
-        cstone::LocalIndex j = neighbors[stride * pj];
-
-        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
-
-        const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
-
-        cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
-    }
-
-    auto presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
-
-    cstone::ijloop::storeParticleData(output, i, presult);
-
-    return xmassi;
-}
 
 template<class Neighborhood, class Tc, class T, class Tm>
 void xmassIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* wh, T* xmass)

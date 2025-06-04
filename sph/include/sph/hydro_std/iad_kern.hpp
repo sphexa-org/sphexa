@@ -1,10 +1,7 @@
 #pragma once
 
-#include "cstone/cuda/annotation.hpp"
-#include "cstone/sfc/box.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
-#include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"
 
 namespace sph
@@ -84,38 +81,6 @@ struct IADPostambleSTD
             (tau11 * tau22 - tau12 * tau12) * factor);
     }
 };
-
-template<size_t stride = 1, class Tc, class Tm, class T>
-HOST_DEVICE_FUN inline void IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
-                                        const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
-                                        const Tc* y, const Tc* z, const T* h, const Tm* m, const T* rho, const T* wh,
-                                        const T* /*whd*/, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33)
-{
-    IADInteractionSTD      interaction{wh};
-    IADPostambleSTD<T, Tc> postamble{K};
-
-    const auto input  = std::make_tuple(m, rho);
-    const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33);
-
-    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
-    const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
-
-    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
-    for (unsigned pj = 0; pj < neighborsCount; ++pj)
-    {
-        cstone::LocalIndex j = neighbors[stride * pj];
-
-        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
-
-        const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
-
-        cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
-    }
-
-    result = postamble(iData, result);
-
-    cstone::ijloop::storeParticleData(output, i, result);
-}
 
 template<class Neighborhood, class Tc, class Tm, class T>
 void IADIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* rho, const T* wh, T* c11, T* c12, T* c13,
