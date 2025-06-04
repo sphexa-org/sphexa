@@ -1565,24 +1565,6 @@ __global__ void computeActiveMasks(const LocalIndex firstISupercluster,
     atomicOr(activeMaskPtr, activeMask);
 }
 
-struct H2R
-{
-    template<class T>
-    constexpr std::tuple<T> operator()(std::tuple<T> h) const
-    {
-        return {T(2) * std::get<0>(h)};
-    } // namespace gpu_supercluster_nb_list_neighborhood_detail
-}; // namespace cstone::ijloop
-
-struct RMaxFun
-{
-    template<class T>
-    constexpr std::tuple<T> operator()(std::tuple<T> accum, std::tuple<T> r) const
-    {
-        return {std::max(std::get<0>(accum), std::get<0>(r))};
-    }
-};
-
 template<class Config, class Tc, class Th>
 struct GpuSuperclusterNbListNeighborhoodImpl
 {
@@ -1873,7 +1855,11 @@ struct GpuSuperclusterNbListNeighborhood
 
         auto nodeRMax = util::deviceAlloc<Th[]>(Config::symmetric ? tree.numNodes : 0);
         if constexpr (Config::symmetric)
-            upsweep(tree, std::tuple(Th(0)), H2R(), RMaxFun(), std::tuple(h), std::tuple(nodeRMax.get()));
+            upsweep(
+                tree, std::tuple(Th(0)), [] __device__(auto h) { return std::make_tuple(2 * std::get<0>(h)); },
+                [] __device__(auto accum, auto r)
+                { return std::make_tuple(std::max(std::get<0>(accum), std::get<0>(r))); }, std::tuple(h),
+                std::tuple(nodeRMax.get()));
 
         auto globalBuildData = util::deviceAlloc<GlobalBuildData>();
 
