@@ -35,7 +35,7 @@
 
 #include "cstone/cuda/memory.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
-#include "cstone/traversal/ijloop/ijloop.hpp"
+#include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/tree/octree.hpp"
 
 namespace cstone::ijloop

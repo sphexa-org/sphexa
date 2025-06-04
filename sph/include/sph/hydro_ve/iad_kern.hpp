@@ -33,7 +33,7 @@
 
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/sfc/box.hpp"
-#include "cstone/traversal/ijloop/ijloop.hpp"
+#include "cstone/traversal/ijloop/common.hpp"
 
 #include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"

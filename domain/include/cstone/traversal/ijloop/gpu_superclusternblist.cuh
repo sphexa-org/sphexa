@@ -47,7 +47,7 @@
 #include "cstone/reducearray.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/ijloop/atomic_update_ptr.cuh"
-#include "cstone/traversal/ijloop/ijloop.hpp"
+#include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/traversal/ijloop/upsweep.cuh"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/type_list.hpp"
