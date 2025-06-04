@@ -15,7 +15,6 @@
 
 #pragma once
 
-#include <functional>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -75,7 +74,7 @@ inline constexpr void for_each_tuple(F&& f, Tuples&&... tuples)
 }
 
 //! @brief convert an index_sequence into a tuple of integral constants (e.g. for use with for_each_tuple)
-template<size_t... Is>
+template<std::size_t... Is>
 constexpr auto makeIntegralTuple(std::index_sequence<Is...>)
 {
     return std::make_tuple(std::integral_constant<size_t, Is>{}...);
