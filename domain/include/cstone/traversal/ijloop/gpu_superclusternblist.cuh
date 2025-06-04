@@ -1765,6 +1765,7 @@ struct GpuSuperclusterNbListNeighborhoodConfig
     template<bool NewSymmetric>
     using setSymmetry = GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, SuperclusterSize, Compress, NewSymmetric>;
 
+    // per-particle mask type for superclusters, always 32 or 64 bits to support atomic operations
     using SuperclusterParticleMask = std::conditional_t<(superclusterSize > 32), unsigned long long, unsigned>;
     static_assert(superclusterSize <= 64, "superclusters with more than 64 particles are not supported");
 };
