@@ -91,7 +91,7 @@ struct CpuAlwaysTraverseNeighborhoodImpl
             {
                 std::unique_ptr<LocalIndex[]> neighbors = std::make_unique_for_overwrite<LocalIndex[]>(parent.ngmax);
 
-#pragma omp for collapse(2)
+#pragma omp for
                 for (LocalIndex g = 0; g < groups.numGroups; ++g)
                     for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
                         parent.jLoop(constInput, output, std::forward<Interaction>(interaction),
@@ -172,8 +172,9 @@ struct CpuFullNbListNeighborhoodImpl
                     Postamble&& postamble) const
         {
             const auto constInput = makeConstRestrict(input);
-#pragma omp parallel for simd collapse(2)
+#pragma omp parallel for
             for (LocalIndex g = 0; g < groups.numGroups; ++g)
+#pragma omp simd
                 for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
                     parent.jLoop(constInput, output, std::forward<Interaction>(interaction),
                                  std::forward<Postamble>(postamble), i);
