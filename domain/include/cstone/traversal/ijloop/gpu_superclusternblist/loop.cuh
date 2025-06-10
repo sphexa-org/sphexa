@@ -172,7 +172,7 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
 
 /*! compile-time utility to get an array buffer type for each tuple element */
 template<std::size_t Size, class... Ts>
-constexpr __forceinline__ std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...> const&)
+consteval std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...> const&)
 {
     return {};
 }
