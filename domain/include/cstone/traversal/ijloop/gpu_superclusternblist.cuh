@@ -177,14 +177,11 @@ protected:
         else
             runKernel(std::false_type());
 
-        if constexpr (Config::symmetric && !std::is_same<std::decay_t<Postamble>, detail::EmptyPostamble>())
+        if constexpr (Config::symmetric)
         {
-            constexpr unsigned threads = 256;
-            const unsigned numBlocks   = iceil(totalBodies, threads);
-            applyPostamble<<<numBlocks, threads>>>(firstBody, lastBody, firstValidBody, x, y, z, h,
-                                                   makeConstRestrict(input), makeConstRestrict(tmpOrOutput), output,
-                                                   std::forward<Postamble>(postamble));
-            checkGpuErrors(cudaGetLastError());
+            applyPostamble<Config>(firstBody, lastBody, firstValidBody, x, y, z, h, makeConstRestrict(input),
+                                   makeConstRestrict(tmpOrOutput), output, std::forward<Postamble>(postamble));
+
             // device sync required due to possible use of allocated temporaries
             checkGpuErrors(cudaDeviceSynchronize());
         }

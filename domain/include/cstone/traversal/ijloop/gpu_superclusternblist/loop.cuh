@@ -407,17 +407,17 @@ void initResult(const LocalIndex firstBody,
 }
 
 template<class Tc, class Th, class In, class Tmp, class Out, class Postamble>
-__global__ void applyPostamble(const LocalIndex firstBody,
-                               const LocalIndex lastBody,
-                               const LocalIndex firstValidBody,
-                               const Tc* __restrict__ x,
-                               const Tc* __restrict__ y,
-                               const Tc* __restrict__ z,
-                               const Th* __restrict__ h,
-                               const In __grid_constant__ input,
-                               const Tmp __grid_constant__ tmp,
-                               const Out __grid_constant__ output,
-                               const Postamble postamble)
+__global__ void applyPostambleKernel(const LocalIndex firstBody,
+                                     const LocalIndex lastBody,
+                                     const LocalIndex firstValidBody,
+                                     const Tc* __restrict__ x,
+                                     const Tc* __restrict__ y,
+                                     const Tc* __restrict__ z,
+                                     const Th* __restrict__ h,
+                                     const In __grid_constant__ input,
+                                     const Tmp __grid_constant__ tmp,
+                                     const Out __grid_constant__ output,
+                                     const Postamble postamble)
 {
     const LocalIndex i = blockDim.x * blockIdx.x + threadIdx.x + firstBody;
     if (i >= lastBody) return;
@@ -426,6 +426,32 @@ __global__ void applyPostamble(const LocalIndex firstBody,
     std::get<0>(iData) -= firstValidBody;
     const auto result = util::tupleMap([&](auto* ptr) { return ptr[i]; }, tmp);
     storeParticleData(output, i, postamble(iData, result));
+}
+
+template<class Config, class Tc, class Th, class Input, class Tmp, class Output, class Postamble>
+void applyPostamble(const LocalIndex firstBody,
+                    const LocalIndex lastBody,
+                    const LocalIndex firstValidBody,
+                    const Tc* x,
+                    const Tc* y,
+                    const Tc* z,
+                    const Th* h,
+                    Input&& input,
+                    Tmp&& tmp,
+                    Output&& output,
+                    Postamble&& postamble)
+{
+    static_assert(Config::symmetric);
+
+    if constexpr (std::is_same_v<std::remove_cvref_t<Postamble>, detail::EmptyPostamble>) return;
+
+    const LocalIndex numBodies = lastBody - firstBody;
+    constexpr unsigned threads = 256;
+    const unsigned numBlocks   = iceil(numBodies, threads);
+    applyPostambleKernel<<<numBlocks, threads>>>(firstBody, lastBody, firstValidBody, x, y, z, h,
+                                                 std::forward<Input>(input), std::forward<Tmp>(tmp),
+                                                 std::forward<Output>(output), std::forward<Postamble>(postamble));
+    checkGpuErrors(cudaGetLastError());
 }
 
 template<class Config, class Mask>
