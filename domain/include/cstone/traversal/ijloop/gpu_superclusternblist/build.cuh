@@ -967,7 +967,7 @@ constexpr unsigned buildNbListSharedMemPerSupercluster(const unsigned ncmax)
  * pre-allocated array
  */
 template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th, class KeyType>
-__global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void buildNbList(
+__global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void buildNbListKernel(
     const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
     const Box<Tc> __grid_constant__ box,
     const LocalIndex firstValidBody,
@@ -1048,4 +1048,69 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
         if (laneIdx == 0) superclusterInfo[index] = info;
     }
 }
+
+template<class Config, class Tc, class Th, class KeyType>
+std::size_t buildNbList(const OctreeNsView<Tc, KeyType>& tree,
+                        const Box<Tc>& box,
+                        const LocalIndex totalBodies,
+                        const GroupView& groups,
+                        const Tc* const x,
+                        const Tc* const y,
+                        const Tc* const z,
+                        const Th* const h,
+                        const LocalIndex firstValidBody,
+                        const LocalIndex numISuperclusters,
+                        const JClusterBbox<Config, Tc>* const jClusterBboxes,
+                        const Th* const nodeRMax,
+                        const unsigned ncmax,
+                        const typename Config::SuperclusterParticleMask* const superclusterSplitMasks,
+                        std::uint32_t* const neighborData,
+                        const std::size_t neighborDataVirtualSize,
+                        SuperclusterInfo* const superclusterInfo)
+{
+    auto globalBuildData = util::deviceAlloc<GlobalBuildData>();
+
+    constexpr unsigned numSuperclustersPerBlock =
+        64 / (Config::iThreads * Config::jSize / Config::numWarpsPerInteraction);
+    const dim3 blockSize = {Config::iThreads, Config::jSize / Config::numWarpsPerInteraction, numSuperclustersPerBlock};
+    const unsigned numBlocks = std::min(GpuConfig::smCount * (TravConfig::numWarpsPerSm / numSuperclustersPerBlock),
+                                        (numISuperclusters + numSuperclustersPerBlock - 1) / numSuperclustersPerBlock);
+    const unsigned sharedMem = numSuperclustersPerBlock * buildNbListSharedMemPerSupercluster<Config, Tc, Th>(ncmax);
+
+    auto globalPool = util::deviceAlloc<int[]>(TravConfig::memPerWarp * numSuperclustersPerBlock * numBlocks);
+
+    checkGpuErrors(cudaMemsetAsync(globalBuildData.get(), 0, sizeof(GlobalBuildData)));
+
+    auto run = [&](auto usePbc)
+    {
+        buildNbListKernel<Config, numSuperclustersPerBlock, decltype(usePbc)::value>
+            <<<numBlocks, blockSize, sharedMem>>>(
+                tree, box, firstValidBody, totalBodies, groups.firstBody, groups.lastBody, x, y, z, h, jClusterBboxes,
+                nodeRMax, ncmax, superclusterSplitMasks, neighborData, neighborDataVirtualSize, superclusterInfo,
+                numISuperclusters, globalPool.get(), globalBuildData.get());
+        checkGpuErrors(cudaGetLastError());
+    };
+
+    if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
+        box.boundaryZ() == BoundaryType::periodic)
+        run(std::true_type());
+    else
+        run(std::false_type());
+
+    GlobalBuildData buildData;
+    checkGpuErrors(cudaMemcpy(&buildData, globalBuildData.get(), sizeof(GlobalBuildData), cudaMemcpyDeviceToHost));
+    switch (buildData.status)
+    {
+        case BuildStatus::success: break;
+        case BuildStatus::neighbor_list_overflow:
+            throw std::runtime_error(
+                "overflow in cluster neighbor list in supercluster neighborhood, try to increase ncmax");
+        case BuildStatus::neighbor_data_overflow: throw std::runtime_error("overflow in cluster neighbor data");
+    }
+
+    assert(buildData.neighborDataSize < neighborDataVirtualSize);
+
+    return buildData.neighborDataSize;
+}
+
 } // namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail

@@ -317,53 +317,12 @@ struct GpuSuperclusterNbListNeighborhood
 
         auto nodeRMax = computeNodeRMax<Config>(tree, h);
 
-        auto globalBuildData = util::deviceAlloc<GlobalBuildData>();
+        std::size_t neighborDataSize =
+            buildNbList<Config>(tree, box, totalBodies, groups, x, y, z, h, firstValidBody, numISuperclusters,
+                                jClusterBboxes.get(), nodeRMax.get(), ncmax, superclusterSplitMasks.get(),
+                                nbList.neighborData.get(), neighborDataVirtualSize, nbList.superclusterInfo.get());
 
-        constexpr unsigned numSuperclustersPerBlock =
-            64 / (Config::iThreads * Config::jSize / Config::numWarpsPerInteraction);
-        const dim3 blockSize = {Config::iThreads, Config::jSize / Config::numWarpsPerInteraction,
-                                numSuperclustersPerBlock};
-        const unsigned numBlocks =
-            std::min(GpuConfig::smCount * (TravConfig::numWarpsPerSm / numSuperclustersPerBlock),
-                     (numISuperclusters + numSuperclustersPerBlock - 1) / numSuperclustersPerBlock);
-        const unsigned sharedMem =
-            numSuperclustersPerBlock * buildNbListSharedMemPerSupercluster<Config, Tc, Th>(ncmax);
-
-        auto globalPool = util::deviceAlloc<int[]>(TravConfig::memPerWarp * numSuperclustersPerBlock * numBlocks);
-
-        checkGpuErrors(cudaMemsetAsync(globalBuildData.get(), 0, sizeof(GlobalBuildData)));
-
-        auto run = [&](auto usePbc)
-        {
-            buildNbList<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, sharedMem>>>(
-                tree, box, firstValidBody, totalBodies, groups.firstBody, groups.lastBody, x, y, z, h,
-                jClusterBboxes.get(), nodeRMax.get(), ncmax, superclusterSplitMasks.get(), nbList.neighborData.get(),
-                neighborDataVirtualSize, nbList.superclusterInfo.get(), numISuperclusters, globalPool.get(),
-                globalBuildData.get());
-            checkGpuErrors(cudaGetLastError());
-        };
-
-        if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
-            box.boundaryZ() == BoundaryType::periodic)
-            run(std::true_type());
-        else
-            run(std::false_type());
-
-        GlobalBuildData buildData;
-        checkGpuErrors(cudaMemcpy(&buildData, globalBuildData.get(), sizeof(GlobalBuildData), cudaMemcpyDeviceToHost));
-        switch (buildData.status)
-        {
-            case BuildStatus::success: break;
-            case BuildStatus::neighbor_list_overflow:
-                throw std::runtime_error(
-                    "overflow in cluster neighbor list in supercluster neighborhood, try to increase ncmax");
-            case BuildStatus::neighbor_data_overflow: throw std::runtime_error("overflow in cluster neighbor data");
-        }
-
-        assert(buildData.neighborDataSize < neighborDataVirtualSize);
-
-        nbList.numBytes =
-            sizeof(std::uint32_t) * buildData.neighborDataSize + sizeof(SuperclusterInfo) * numISuperclusters;
+        nbList.numBytes = sizeof(std::uint32_t) * neighborDataSize + sizeof(SuperclusterInfo) * numISuperclusters;
 
         thrust::stable_sort(thrust::device, nbList.superclusterInfo.get(),
                             nbList.superclusterInfo.get() + numISuperclusters);
