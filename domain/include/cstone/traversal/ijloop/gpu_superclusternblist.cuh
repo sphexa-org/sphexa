@@ -306,19 +306,11 @@ struct GpuSuperclusterNbListNeighborhood
             z,
             h,
             util::deviceAllocVirtual<std::uint32_t[]>(neighborDataVirtualSize),
-            util::deviceAlloc<SuperclusterInfo[]>(numISuperclusters),
+            initSuperclusterInfo(firstISupercluster, numISuperclusters),
             ncmax,
             0ul};
 
         if (numISuperclusters == 0) return nbList;
-
-        {
-            constexpr unsigned numThreads = 256;
-            const unsigned numBlocks      = iceil(numISuperclusters, numThreads);
-            initSuperclusterInfo<<<numBlocks, numThreads>>>(firstISupercluster, lastISupercluster,
-                                                            nbList.superclusterInfo.get());
-            checkGpuErrors(cudaGetLastError());
-        }
 
         auto superclusterSplitMasks =
             computeSuperclusterSplitMasks<Config>(firstValidBody, groups, firstISupercluster, numISuperclusters);

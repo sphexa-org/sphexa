@@ -66,14 +66,25 @@ struct GlobalBuildData
  * @param[in]  lastISupercluster  index of last supercluster
  * @param[out] superclusterInfo   indices to be filled with values from [firstISupercluster, lastISupercluster)
  */
-__global__ static void initSuperclusterInfo(const LocalIndex firstISupercluster,
-                                            const LocalIndex lastISupercluster,
-                                            SuperclusterInfo* superclusterInfo)
+__global__ static void initSuperclusterInfoKernel(const LocalIndex firstISupercluster,
+                                                  const LocalIndex numISuperclusters,
+                                                  SuperclusterInfo* superclusterInfo)
 {
     const LocalIndex index = blockIdx.x * blockDim.x + threadIdx.x;
 
-    const LocalIndex numISuperclusters = lastISupercluster - firstISupercluster;
     if (index < numISuperclusters) superclusterInfo[index].index = index + firstISupercluster;
+}
+
+inline util::UniqueDevicePtr<SuperclusterInfo[]> initSuperclusterInfo(const LocalIndex firstISupercluster,
+                                                                      const LocalIndex numISuperclusters)
+{
+    auto superclusterInfo         = util::deviceAlloc<SuperclusterInfo[]>(numISuperclusters);
+    constexpr unsigned numThreads = 256;
+    const unsigned numBlocks      = iceil(numISuperclusters, numThreads);
+    initSuperclusterInfoKernel<<<numBlocks, numThreads>>>(firstISupercluster, numISuperclusters,
+                                                          superclusterInfo.get());
+    checkGpuErrors(cudaGetLastError());
+    return superclusterInfo;
 }
 
 /*! compute supercluster split masks based on the given groups; split superclusters will execute multiple tree
