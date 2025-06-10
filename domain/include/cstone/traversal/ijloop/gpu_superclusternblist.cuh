@@ -67,6 +67,8 @@ struct GpuSuperclusterNbListNeighborhoodImpl
     void
     ijLoop(std::tuple<In*...> input, std::tuple<Out*...> output, Interaction&& interaction, Postamble&& postamble) const
     {
+        if (totalBodies == 0) return;
+
         assert(firstBody < lastBody);
         const LocalIndex firstISupercluster = superclusterIndex<Config>(firstBody);
         const LocalIndex lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
