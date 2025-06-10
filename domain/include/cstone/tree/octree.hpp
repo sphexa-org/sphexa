@@ -283,6 +283,7 @@ struct OctreeNsView
     //! @brief see OctreeData
     const KeyType* prefixes;
     const TreeNodeIndex* childOffsets;
+    const TreeNodeIndex* parents;
     const TreeNodeIndex* internalToLeaf;
     const TreeNodeIndex* levelRange;
     const KeyType* leaves;

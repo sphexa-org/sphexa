@@ -375,6 +375,7 @@ public:
         return {ft.numLeafNodes,
                 ft.prefixes,
                 ft.childOffsets,
+                ft.parents,
                 ft.internalToLeaf,
                 ft.levelRange,
                 focusTree_.treeLeavesAcc().data(),

@@ -498,16 +498,18 @@ public:
         {
             reallocate(macsAcc_, octreeAcc_.numNodes, allocGrowthRate_);
             fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0));
-            markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(centersAcc_), box_,
-                        rawPtr(leavesAcc_) + fAssignStart, fAssignEnd - fAssignStart, false, rawPtr(macsAcc_));
+            markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(octreeAcc_.parents),
+                        rawPtr(centersAcc_), box_, rawPtr(leavesAcc_) + fAssignStart, fAssignEnd - fAssignStart, false,
+                        rawPtr(macsAcc_));
 
             memcpyD2H(rawPtr(macsAcc_), macsAcc_.size(), macs_.data());
         }
         else
         {
             std::fill(rawPtr(macs_), rawPtr(macs_) + macs_.size(), uint8_t(0));
-            markMacs(rawPtr(treeData_.prefixes), rawPtr(treeData_.childOffsets), rawPtr(centers_), box_,
-                     rawPtr(leaves_) + fAssignStart, fAssignEnd - fAssignStart, false, rawPtr(macs_));
+            markMacs(rawPtr(treeData_.prefixes), rawPtr(treeData_.childOffsets), rawPtr(treeData_.parents),
+                     rawPtr(centers_), box_, rawPtr(leaves_) + fAssignStart, fAssignEnd - fAssignStart, false,
+                     rawPtr(macs_));
         }
 
         rebalanceStatus_ |= macCriterion;
@@ -521,10 +523,7 @@ public:
      * @param[-]  scratch          host or device buffer for temporary use
      */
     template<class Th, class Vector>
-    void discoverHalos(std::span<LocalIndex> layout,
-                       const Th* h,
-                       float searchExtFact,
-                       Vector& scratch)
+    void discoverHalos(std::span<LocalIndex> layout, const Th* h, float searchExtFact, Vector& scratch)
     {
         TreeNodeIndex firstNode      = assignment_[myRank_].start();
         TreeNodeIndex lastNode       = assignment_[myRank_].end();
@@ -549,8 +548,8 @@ public:
 
             fillGpu(haloFlagsAcc_.data(), haloFlagsAcc_.data() + numLeafNodes, uint8_t{0});
             auto let = octreeViewAcc();
-            findHalosGpu(let.prefixes, let.childOffsets, let.internalToLeaf, leavesAcc_.data(), d_radii, box_,
-                         firstNode, lastNode, haloFlagsAcc_.data());
+            findHalosGpu(let.prefixes, let.childOffsets, let.parents, let.internalToLeaf, leavesAcc_.data(), d_radii,
+                         box_, firstNode, lastNode, haloFlagsAcc_.data());
             memcpyD2H(haloFlagsAcc_.data(), numLeafNodes, haloFlags_.data());
 
             reallocate(scratch, origSize, 1.0);
@@ -571,8 +570,8 @@ public:
                 }
             }
             std::fill(begin(haloFlags_), end(haloFlags_), 0);
-            findHalos(let.prefixes, let.childOffsets, let.internalToLeaf, leaves_.data(), haloRadii.data(), box_,
-                      firstNode, lastNode, haloFlags_.data());
+            findHalos(let.prefixes, let.childOffsets, let.parents, let.internalToLeaf, leaves_.data(), haloRadii.data(),
+                      box_, firstNode, lastNode, haloFlags_.data());
         }
     }
 

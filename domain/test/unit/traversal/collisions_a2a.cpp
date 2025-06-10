@@ -51,8 +51,8 @@ static void generalCollisionTest(const std::vector<KeyType>& tree, const std::ve
         auto storeCollisions = [&collisionList = collisions[leafIdx], toLeaf = octree.toLeafOrder()](TreeNodeIndex i)
         { collisionList.push_back(toLeaf[i]); };
 
-        findCollisions(octree.nodeKeys().data(), octree.childOffsets().data(), storeCollisions, haloBox, KeyType(0),
-                       KeyType(0));
+        findCollisions(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(), storeCollisions,
+                       haloBox, KeyType(0), KeyType(0));
     }
 
     // naive all-to-all algorithm

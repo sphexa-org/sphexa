@@ -188,6 +188,7 @@ void benchmarkGpu()
     OctreeNsView<T, KeyType> nsView{octree.numLeafNodes,
                                     octree.prefixes.data(),
                                     octree.childOffsets.data(),
+                                    octree.parents.data(),
                                     octree.internalToLeaf.data(),
                                     octree.levelRange.data(),
                                     nullptr,
@@ -221,15 +222,23 @@ void benchmarkGpu()
 
     thrust::device_vector<KeyType> d_prefixes             = octree.prefixes;
     thrust::device_vector<TreeNodeIndex> d_childOffsets   = octree.childOffsets;
+    thrust::device_vector<TreeNodeIndex> d_parents        = octree.parents;
     thrust::device_vector<TreeNodeIndex> d_internalToLeaf = octree.internalToLeaf;
     thrust::device_vector<TreeNodeIndex> d_levelRange     = octree.levelRange;
     thrust::device_vector<LocalIndex> d_layout            = layout;
     thrust::device_vector<Vec3<T>> d_centers              = centers;
     thrust::device_vector<Vec3<T>> d_sizes                = sizes;
 
-    OctreeNsView<T, KeyType> nsViewGpu{octree.numLeafNodes,      rawPtr(d_prefixes),   rawPtr(d_childOffsets),
-                                       rawPtr(d_internalToLeaf), rawPtr(d_levelRange), nullptr,
-                                       rawPtr(d_layout),         rawPtr(d_centers),    rawPtr(d_sizes)};
+    OctreeNsView<T, KeyType> nsViewGpu{octree.numLeafNodes,
+                                       rawPtr(d_prefixes),
+                                       rawPtr(d_childOffsets),
+                                       rawPtr(d_parents),
+                                       rawPtr(d_internalToLeaf),
+                                       rawPtr(d_levelRange),
+                                       nullptr,
+                                       rawPtr(d_layout),
+                                       rawPtr(d_centers),
+                                       rawPtr(d_sizes)};
 
     thrust::device_vector<LocalIndex> d_neighbors(neighborsGPU.size());
     thrust::device_vector<unsigned> d_neighborsCount(neighborsCountGPU.size());
