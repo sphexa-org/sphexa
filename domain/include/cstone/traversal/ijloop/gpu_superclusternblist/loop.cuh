@@ -66,7 +66,7 @@ __device__ __forceinline__ constexpr T0 dynamicTupleGet(std::tuple<T0, T...> con
     return res;
 }
 
-/*! reduces and stores cluster-cluster interaction results along the j-direction, i.e., computes the reduction for each
+/*! reduce and store cluster-cluster interaction results along the j-direction, i.e., computes the reduction for each
  * i-particle
  *
  * @param[in]    tuple     tuple of values to be reduced and stored
@@ -89,6 +89,8 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
     if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < GpuConfig::warpSize / Config::iThreads &&
                   std::is_same<Postamble, detail::EmptyPostamble>())
     {
+        // fast path: specialized reduction on multiple elements at the same time if all types in the tuple are the same
+
         const T0 res =
             reduceTuple<GpuConfig::warpSize / Config::iThreads, true>(tuple,
                                                                       [](auto result, auto const& value)
@@ -107,6 +109,8 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
     }
     else
     {
+        // "slow" path: standard shuffle-based reduction for each tuple element
+
 #pragma unroll
         for (unsigned offset = GpuConfig::warpSize / 2; offset >= Config::iThreads; offset /= 2)
             util::for_each_tuple([&](auto& t) { detail::updateResultImpl(t, shflDownSync(t, offset)); }, tuple);
@@ -123,7 +127,7 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
     }
 }
 
-/*! reduces and stores cluster-cluster interaction results along the i-direction, i.e., computes the reduction for each
+/*! reduce and store cluster-cluster interaction results along the i-direction, i.e., computes the reduction for each
  * j-particle
  *
  * @param[in]    tuple     tuple of values to be reduced and stored
@@ -139,6 +143,8 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
 
     if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < Config::iThreads)
     {
+        // fast path: specialized reduction on multiple elements at the same time if all types in the tuple are the same
+
         const T0 res = reduceTuple<Config::iThreads, false>(tuple,
                                                             [](auto result, auto const& value)
                                                             {
@@ -153,6 +159,8 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
     }
     else
     {
+        // "slow" path: standard shuffle-based reduction for each tuple element
+
 #pragma unroll
         for (unsigned offset = Config::iThreads / 2; offset >= 1; offset /= 2)
             util::for_each_tuple([&](auto& t) { detail::updateResultImpl(t, shflDownSync(t, offset)); }, tuple);
@@ -162,12 +170,18 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
     }
 }
 
+/*! compile-time utility to get an array buffer type for each tuple element */
 template<std::size_t Size, class... Ts>
 constexpr __forceinline__ std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...> const&)
 {
     return {};
 }
 
+/*! compute the amount of shared memory required per supercluster for the ij-loop kernel
+ *
+ * @param[in] ncmax maximum number of neighbor clusters for any supercluster
+ * @return          total shared memory required per supercluster, in bytes
+ */
 template<class Config, class Tc, class Th, class In, class Interaction>
 constexpr unsigned runIjLoopSharedMemPerSupercluster(unsigned ncmax)
 {
