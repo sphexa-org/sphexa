@@ -290,7 +290,6 @@ struct GpuSuperclusterNbListNeighborhood
         const LocalIndex firstISupercluster = superclusterIndex<Config>(groups.firstBody);
         const LocalIndex lastISupercluster  = superclusterIndex<Config>(groups.lastBody - 1) + 1;
         const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
-        const LocalIndex numJClusters       = jClusterIndex<Config>(totalBodies - 1) + 1;
 
         std::size_t neighborDataVirtualSize = upperBoundBytesPerParticle * totalBodies / sizeof(std::uint32_t);
 
