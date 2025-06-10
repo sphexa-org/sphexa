@@ -315,15 +315,14 @@ struct GpuSuperclusterNbListNeighborhood
         auto superclusterSplitMasks =
             computeSuperclusterSplitMasks<Config>(firstValidBody, groups, firstISupercluster, numISuperclusters);
 
-        auto jClusterBboxCenters = util::deviceAlloc<Vec3<Tc>[]>(numJClusters);
-        auto jClusterBboxSizes   = util::deviceAlloc<Vec3<Tc>[]>(numJClusters);
-        auto jClusterRMax        = util::deviceAlloc<Th[]>(Config::symmetric ? numJClusters : 0);
+        auto jClusterBboxes =
+            util::deviceAlloc<std::conditional_t<Config::symmetric, JClusterBboxWithRMax<Tc>, JClusterBbox<Tc>>[]>(
+                numJClusters);
         {
             constexpr unsigned numThreads = 256;
             unsigned numBlocks            = iceil(numJClusters * Config::jSize, numThreads);
-            computeJClusterBboxes<Config><<<numBlocks, numThreads>>>(firstValidBody, totalBodies, x, y, z, h,
-                                                                     jClusterBboxCenters.get(), jClusterBboxSizes.get(),
-                                                                     jClusterRMax.get());
+            computeJClusterBboxes<Config>
+                <<<numBlocks, numThreads>>>(firstValidBody, totalBodies, x, y, z, h, jClusterBboxes.get());
             checkGpuErrors(cudaGetLastError());
         }
 
@@ -355,9 +354,9 @@ struct GpuSuperclusterNbListNeighborhood
         {
             buildNbList<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, sharedMem>>>(
                 tree, box, firstValidBody, totalBodies, groups.firstBody, groups.lastBody, x, y, z, h,
-                jClusterBboxCenters.get(), jClusterBboxSizes.get(), jClusterRMax.get(), nodeRMax.get(), ncmax,
-                superclusterSplitMasks.get(), nbList.neighborData.get(), neighborDataVirtualSize,
-                nbList.superclusterInfo.get(), numISuperclusters, globalPool.get(), globalBuildData.get());
+                jClusterBboxes.get(), nodeRMax.get(), ncmax, superclusterSplitMasks.get(), nbList.neighborData.get(),
+                neighborDataVirtualSize, nbList.superclusterInfo.get(), numISuperclusters, globalPool.get(),
+                globalBuildData.get());
             checkGpuErrors(cudaGetLastError());
         };
 
