@@ -55,7 +55,7 @@ void computeDensityImpl(const GroupView& groups, Dataset& d, const cstone::Box<T
 template<class T, class Dataset>
 void computeDensity(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeDensity(groups, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeDensity(groups, d, box); }
     else { computeDensityImpl(groups, d, box); }
 }
 

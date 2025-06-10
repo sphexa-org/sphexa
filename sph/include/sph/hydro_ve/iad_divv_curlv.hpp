@@ -93,7 +93,7 @@ void computeIadDivvCurlvImpl(size_t startIndex, size_t endIndex, Dataset& d, con
 template<class Tc, class Dataset>
 void computeIadDivvCurlv(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeIadDivvCurlv(grp, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeIadDivvCurlv(grp, d, box); }
     else { computeIadDivvCurlvImpl(grp.firstBody, grp.lastBody, d, box); }
 }
 
