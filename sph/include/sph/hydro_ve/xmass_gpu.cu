@@ -48,7 +48,7 @@ using cstone::TreeNodeIndex;
 
 unsigned nsGroupSize() { return TravConfig::targetSize; }
 
-namespace cuda
+namespace gpu
 {
 
 __device__ bool nc_h_convergenceFailure = false;
@@ -167,5 +167,5 @@ void computeDensity(const GroupView& grp, Dataset& d, const cstone::Box<typename
 template void computeDensity(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,
                              const cstone::Box<SphTypes::CoordinateType>&);
 
-} // namespace cuda
+} // namespace gpu
 } // namespace sph
