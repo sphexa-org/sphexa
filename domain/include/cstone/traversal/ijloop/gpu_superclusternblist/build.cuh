@@ -86,10 +86,10 @@ __global__ static void initSuperclusterInfo(const LocalIndex firstISupercluster,
  *                                    boundaries, zeros elsewhere (i.e., one bit per particle)
  */
 template<class Config, class SplitMask>
-__global__ void computeSuperclusterSplitMasks(const LocalIndex firstISupercluster,
-                                              const LocalIndex firstValidBody,
-                                              const GroupView __grid_constant__ groups,
-                                              SplitMask* __restrict__ superclusterSplitMasks)
+__global__ void computeSuperclusterSplitMasksKernel(const LocalIndex firstValidBody,
+                                                    const GroupView __grid_constant__ groups,
+                                                    const LocalIndex firstISupercluster,
+                                                    SplitMask* __restrict__ superclusterSplitMasks)
 {
     const LocalIndex index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= groups.numGroups) return;
@@ -106,6 +106,23 @@ __global__ void computeSuperclusterSplitMasks(const LocalIndex firstISupercluste
 
     // atomic update as multiple groups can split the same supercluster
     atomicOr(splitMaskPtr, splitMask);
+}
+
+template<class Config>
+util::UniqueDevicePtr<typename Config::SuperclusterParticleMask[]>
+computeSuperclusterSplitMasks(const LocalIndex firstValidBody,
+                              const GroupView& groups,
+                              const LocalIndex firstISupercluster,
+                              const LocalIndex numISuperclusters)
+{
+    auto superclusterSplitMasks   = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(numISuperclusters);
+    constexpr unsigned numThreads = 256;
+    const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
+    computeSuperclusterSplitMasksKernel<Config>
+        <<<numBlocks, numThreads>>>(firstValidBody, groups, firstISupercluster, superclusterSplitMasks.get());
+    checkGpuErrors(cudaGetLastError());
+
+    return superclusterSplitMasks;
 }
 
 /*! compute bounding boxes and max. particle radii of j-clusters, i.e., neighbor clusters

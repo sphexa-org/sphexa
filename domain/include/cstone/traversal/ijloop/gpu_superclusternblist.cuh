@@ -312,7 +312,6 @@ struct GpuSuperclusterNbListNeighborhood
 
         if (numISuperclusters == 0) return nbList;
 
-        auto superclusterSplitMasks = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(numISuperclusters);
         {
             constexpr unsigned numThreads = 256;
             const unsigned numBlocks      = iceil(numISuperclusters, numThreads);
@@ -320,13 +319,9 @@ struct GpuSuperclusterNbListNeighborhood
                                                             nbList.superclusterInfo.get());
             checkGpuErrors(cudaGetLastError());
         }
-        {
-            constexpr unsigned numThreads = 256;
-            const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
-            computeSuperclusterSplitMasks<Config>
-                <<<numBlocks, numThreads>>>(firstISupercluster, firstValidBody, groups, superclusterSplitMasks.get());
-            checkGpuErrors(cudaGetLastError());
-        }
+
+        auto superclusterSplitMasks =
+            computeSuperclusterSplitMasks<Config>(firstValidBody, groups, firstISupercluster, numISuperclusters);
 
         auto jClusterBboxCenters = util::deviceAlloc<Vec3<Tc>[]>(numJClusters);
         auto jClusterBboxSizes   = util::deviceAlloc<Vec3<Tc>[]>(numJClusters);
