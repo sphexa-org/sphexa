@@ -37,6 +37,7 @@
 #include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/common.cuh"
+#include "cstone/traversal/ijloop/upsweep.cuh"
 #include "cstone/tree/octree.hpp"
 
 namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail
@@ -260,6 +261,21 @@ util::UniqueDevicePtr<JClusterBbox<Config, Tc>[]> computeJClusterBboxes(const Lo
         <<<numBlocks, numThreads>>>(firstValidBody, totalBodies, x, y, z, h, jClusterBboxes.get());
     checkGpuErrors(cudaGetLastError());
     return jClusterBboxes;
+}
+
+template<class Config, class Tc, class KeyType, class Th>
+util::UniqueDevicePtr<Th[]> computeNodeRMax(const OctreeNsView<Tc, KeyType>& tree, const Th* h)
+{
+    util::UniqueDevicePtr<Th[]> nodeRMax;
+    if constexpr (Config::symmetric)
+    {
+        nodeRMax = util::deviceAlloc<Th[]>(tree.numNodes);
+        upsweep(
+            tree, std::tuple(Th(0)), [] __device__(auto h) { return std::make_tuple(2 * std::get<0>(h)); },
+            [] __device__(auto accum, auto r) { return std::make_tuple(std::max(std::get<0>(accum), std::get<0>(r))); },
+            std::tuple(h), std::tuple(nodeRMax.get()));
+    }
+    return nodeRMax;
 }
 
 /*! sort candidate neighbor indices, does not require a fixed number of items per thread in contrast to CUB warp sort

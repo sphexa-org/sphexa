@@ -43,7 +43,6 @@
 #include "cstone/traversal/ijloop/gpu_superclusternblist/build.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/loop.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/temporaries.cuh"
-#include "cstone/traversal/ijloop/upsweep.cuh"
 #include "cstone/tree/octree.hpp"
 
 namespace cstone::ijloop
@@ -317,13 +316,7 @@ struct GpuSuperclusterNbListNeighborhood
 
         auto jClusterBboxes = computeJClusterBboxes<Config>(firstValidBody, totalBodies, x, y, z, h);
 
-        auto nodeRMax = util::deviceAlloc<Th[]>(Config::symmetric ? tree.numNodes : 0);
-        if constexpr (Config::symmetric)
-            upsweep(
-                tree, std::tuple(Th(0)), [] __device__(auto h) { return std::make_tuple(2 * std::get<0>(h)); },
-                [] __device__(auto accum, auto r)
-                { return std::make_tuple(std::max(std::get<0>(accum), std::get<0>(r))); }, std::tuple(h),
-                std::tuple(nodeRMax.get()));
+        auto nodeRMax = computeNodeRMax<Config>(tree, h);
 
         auto globalBuildData = util::deviceAlloc<GlobalBuildData>();
 
