@@ -504,12 +504,14 @@ void applyPostamble(const LocalIndex firstBody,
     checkGpuErrors(cudaGetLastError());
 }
 
-template<class Config, class Mask>
-__global__ void computeActiveMasks(const LocalIndex firstISupercluster,
-                                   const LocalIndex firstValidBody,
-                                   const GroupView __grid_constant__ groups,
-                                   Mask* __restrict__ activeMasks)
+template<class Config>
+__global__ void computeActiveMasksKernel(const LocalIndex firstISupercluster,
+                                         const LocalIndex firstValidBody,
+                                         const GroupView __grid_constant__ groups,
+                                         typename Config::SuperclusterParticleMask* __restrict__ activeMasks)
 {
+    using Mask = typename Config::SuperclusterParticleMask;
+
     const LocalIndex index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= groups.numGroups) return;
 
@@ -529,6 +531,25 @@ __global__ void computeActiveMasks(const LocalIndex firstISupercluster,
 
     // atomic update as multiple groups can be inside the same supercluster
     atomicOr(activeMaskPtr, activeMask);
+}
+
+template<class Config>
+util::UniqueDevicePtr<typename Config::SuperclusterParticleMask[]>
+computeActiveMasks(const LocalIndex firstISupercluster,
+                   const LocalIndex numISuperclusters,
+                   const LocalIndex firstValidBody,
+                   const GroupView& groups)
+{
+    auto activeMasks = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(numISuperclusters);
+    checkGpuErrors(
+        cudaMemsetAsync(activeMasks.get(), 0, sizeof(typename Config::SuperclusterParticleMask) * numISuperclusters));
+
+    constexpr unsigned numThreads = 256;
+    const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
+    computeActiveMasksKernel<Config>
+        <<<numBlocks, numThreads>>>(firstISupercluster, firstValidBody, groups, activeMasks.get());
+    checkGpuErrors(cudaGetLastError());
+    return activeMasks;
 }
 
 } // namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail

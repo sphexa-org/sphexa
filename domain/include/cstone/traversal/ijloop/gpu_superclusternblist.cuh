@@ -108,23 +108,16 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         const LocalIndex lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
         const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
 
-        auto activeMasks = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(numISuperclusters);
-        checkGpuErrors(cudaMemsetAsync(activeMasks.get(), 0,
-                                       sizeof(typename Config::SuperclusterParticleMask) * numISuperclusters));
+        auto activeMasks = computeActiveMasks<Config>(firstISupercluster, numISuperclusters, firstValidBody, groups);
 
-        constexpr unsigned numThreads = 256;
-        const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
-        computeActiveMasks<Config>
-            <<<numBlocks, numThreads>>>(firstISupercluster, firstValidBody, groups, activeMasks.get());
-        checkGpuErrors(cudaGetLastError());
+        const auto superclusterIsActive =
+            [activeMasksPtr = activeMasks.get(), firstISupercluster] __device__(const SuperclusterInfo& info)
+        { return activeMasksPtr[info.index - firstISupercluster] != 0; };
 
         auto activeSuperclusterInfo = util::deviceAlloc<SuperclusterInfo[]>(numISuperclusters);
-
-        SuperclusterInfo* lastCopied = thrust::copy_if(
-            thrust::device, superclusterInfo.get(), superclusterInfo.get() + numISuperclusters,
-            activeSuperclusterInfo.get(),
-            [activeMasksPtr = activeMasks.get(), firstISupercluster] __device__(const SuperclusterInfo& info)
-            { return activeMasksPtr[info.index - firstISupercluster] != 0; });
+        SuperclusterInfo* lastCopied =
+            thrust::copy_if(thrust::device, superclusterInfo.get(), superclusterInfo.get() + numISuperclusters,
+                            activeSuperclusterInfo.get(), superclusterIsActive);
         const LocalIndex activeNumISuperclusters = lastCopied - activeSuperclusterInfo.get();
 
         return {*this, groups, std::move(activeMasks), std::move(activeSuperclusterInfo), activeNumISuperclusters};
