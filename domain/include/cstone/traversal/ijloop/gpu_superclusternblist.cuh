@@ -25,8 +25,48 @@
 
 /*! @file
  * @brief Neighbor search on the GPU using fixed-size particle clusters similar to GROMACS.
+ * Publication about GROMACS' implementation: "A flexible algorithm for calculating pair interactions on SIMD
+ * architectures" by Pall and Hess, 2013
  *
  * @author Felix Thaler <thaler@cscs.ch>
+ *
+ * The ij-loop implementation is close to GROMACS' one, but significantly more general. The neighborhood data structure
+ * differs significantly and optionally incorporates index list compression. The build process is a custom development,
+ * based on the cornerstone octree.
+ *
+ * In the present implementation, cluster sizes can be chosen at compile-time using template parameters. GROMACS uses
+ * clusters of 8 particles on GPUs, which is also the default here. Then, 8 consecutive particles in memory are assumed
+ * to be acluster. The following memory layout is assumed for particle data:
+ *
+ * 0           firstBody    lastBody    totalBodies
+ * |-----------|------------|-----------|
+ *   halo data   local data   halo data
+ *
+ * Halo data is only read if the halo particles are neighbors to local particles (with firstBody <= i < lastBody).
+ * For efficient clustering however, the above memory layout is internally shifted to align firstBody with a cluster
+ * boundary. Thus, the updated layout looks as follows (with the value of firstValidBody added to firstBody, lastBody,
+ * and totalBodies):
+ *
+ * 0         firstValidBody  firstBody    lastBody    totalBodies
+ * |---------|---------------|------------|-----------|
+ *   padding     halo data     local data   halo data
+ *
+ * The particle-particle interactions in the ij-loop are implemented in terms of cluster-cluster interactions.
+ * Thus 8x8 particle interactions are computed at once using two warps (in the most common case of warp size 32).
+ * The following table summarizes how the 64 particle-particle interactions of one cluster-cluster interaction are
+ * distributed among the available warps (w0, w1) and lanes (l0, ..., l31).
+ *
+ * | j \ i  | i0 + 0 | i0 + 1 | i0 + 2 | i0 + 3 | i0 + 4 | i0 + 5 | i0 + 6 | i0 + 7 |
+ * |--------|--------|--------|--------|--------|--------|--------|--------|--------|
+ * | j0 + 0 | w0/l0  | w0/l1  | w0/l2  | w0/l3  | w0/l4  | w0/l5  | w0/l6  | w0/l7  |
+ * | j0 + 1 | w0/l8  | w0/l9  | w0/l10 | w0/l11 | w0/l12 | w0/l13 | w0/l14 | w0/l15 |
+ * | j0 + 2 | w0/l16 | w0/l17 | w0/l18 | w0/l19 | w0/l20 | w0/l21 | w0/l22 | w0/l23 |
+ * | j0 + 3 | w0/l24 | w0/l25 | w0/l26 | w0/l27 | w0/l28 | w0/l29 | w0/l30 | w0/l31 |
+ * | j0 + 4 | w1/l0  | w1/l1  | w1/l2  | w1/l3  | w1/l4  | w1/l5  | w1/l6  | w1/l7  |
+ * | j0 + 5 | w1/l8  | w1/l9  | w1/l10 | w1/l11 | w1/l12 | w1/l13 | w1/l14 | w1/l15 |
+ * | j0 + 6 | w1/l16 | w1/l17 | w1/l18 | w1/l19 | w1/l20 | w1/l21 | w1/l22 | w1/l23 |
+ * | j0 + 7 | w1/l24 | w1/l25 | w1/l26 | w1/l27 | w1/l28 | w1/l29 | w1/l30 | w1/l31 |
+ *
  */
 
 #pragma once

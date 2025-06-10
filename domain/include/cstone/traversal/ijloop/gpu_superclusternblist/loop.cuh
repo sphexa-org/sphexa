@@ -42,6 +42,16 @@
 namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail
 {
 
+/*! retrieve the element at the specified dynamic index from a tuple
+ *
+ * @param[in] tuple the tuple from which to retrieve the element
+ * @param[in] index the zero-based index of the element to retrieve
+
+ * @return the element at the specified index, cast to type of first element
+ *
+ * @note The caller is responsible for ensuring that the type T0 matches the type
+ *       of the element at the specified index. No bounds checking is performed.
+ */
 template<class T0, class... T>
 __device__ __forceinline__ constexpr T0 dynamicTupleGet(std::tuple<T0, T...> const& tuple, int index)
 {
@@ -56,6 +66,16 @@ __device__ __forceinline__ constexpr T0 dynamicTupleGet(std::tuple<T0, T...> con
     return res;
 }
 
+/*! reduces and stores cluster-cluster interaction results along the j-direction, i.e., computes the reduction for each
+ * i-particle
+ *
+ * @param[in]    tuple     tuple of values to be reduced and stored
+ * @param[inout] ptrs      tuple of pointers to storage locations for each value
+ * @param[in]    index     index at which to store the result in the output arrays
+ * @param[in]    store     boolean flag indicating whether to perform the store operation
+ * @param[in]    postamble functor to apply to the data before storage
+ * @param[in]    iData     particle data to be passed to the postamble
+ */
 template<class Config, class T0, class... T, class... Ps, class Postamble, class ParticleData>
 __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
                                                std::tuple<Ps*...> const& ptrs,
@@ -103,6 +123,14 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
     }
 }
 
+/*! reduces and stores cluster-cluster interaction results along the i-direction, i.e., computes the reduction for each
+ * j-particle
+ *
+ * @param[in]    tuple     tuple of values to be reduced and stored
+ * @param[inout] ptrs      tuple of pointers to storage locations for each value
+ * @param[in]    index     index at which to store the result in the output arrays
+ * @param[in]    store     boolean flag indicating whether to perform the store operation
+ */
 template<class Config, class T0, class... T, class... Ps>
 constexpr __device__ __forceinline__ void
 storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const unsigned index, const bool store)
