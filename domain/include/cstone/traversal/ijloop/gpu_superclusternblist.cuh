@@ -156,26 +156,9 @@ protected:
                                std::forward<Interaction>(interaction));
         }
 
-        constexpr unsigned numSuperclustersPerBlock = 64 / (Config::iThreads * Config::jSize);
-        const dim3 blockSize                        = {Config::iThreads, Config::jSize, numSuperclustersPerBlock};
-        const unsigned numBlocks                    = iceil(numISuperclusters, numSuperclustersPerBlock);
-        const unsigned sharedMem =
-            numSuperclustersPerBlock *
-            runIjLoopSharedMemPerSupercluster<Config, Tc, Th, std::decay_t<decltype(makeConstRestrict(input))>,
-                                              std::decay_t<Interaction>>(ncmax);
-        const auto runKernel = [&](auto usePbc)
-        {
-            runIjLoop<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, sharedMem>>>(
-                box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConstRestrict(input),
-                tmpOrOutput, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
-                neighborData.get(), superclusterInfo, activeMasks, ncmax);
-            checkGpuErrors(cudaGetLastError());
-        };
-        if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
-            box.boundaryZ() == BoundaryType::periodic)
-            runKernel(std::true_type());
-        else
-            runKernel(std::false_type());
+        runIjLoop<Config>(box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConstRestrict(input),
+                          tmpOrOutput, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
+                          neighborData.get(), superclusterInfo, numISuperclusters, activeMasks, ncmax);
 
         if constexpr (Config::symmetric)
         {

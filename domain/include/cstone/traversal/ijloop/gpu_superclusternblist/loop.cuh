@@ -168,7 +168,7 @@ template<class Config,
          class Interaction,
          class Postamble,
          class Mask = void>
-__global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPerBlock) void runIjLoop(
+__global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPerBlock) void runIjLoopKernel(
     const Box<Tc> __grid_constant__ box,
     const LocalIndex firstValidBody,
     const LocalIndex totalBodies,
@@ -365,6 +365,56 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                                    postamble, iSuperclusterData[c * Config::iSize + threadIdx.x]);
         }
     }
+}
+
+template<class Config,
+         class Tc,
+         class Th,
+         class Input,
+         class Output,
+         class Interaction,
+         class Postamble,
+         class Mask = void>
+void runIjLoop(const Box<Tc>& box,
+               const LocalIndex firstValidBody,
+               const LocalIndex totalBodies,
+               const LocalIndex firstBody,
+               const LocalIndex lastBody,
+               const Tc* const x,
+               const Tc* const y,
+               const Tc* const z,
+               const Th* const h,
+               Input&& input,
+               Output&& output,
+               Interaction&& interaction,
+               Postamble&& postamble,
+               const std::uint32_t* const neighborData,
+               const SuperclusterInfo* const superclusterInfo,
+               const LocalIndex numISuperclusters,
+               const Mask* const activeMasks,
+               const unsigned ncmax)
+{
+    constexpr unsigned numSuperclustersPerBlock = 64 / (Config::iThreads * Config::jSize);
+    const dim3 blockSize                        = {Config::iThreads, Config::jSize, numSuperclustersPerBlock};
+    const unsigned numBlocks                    = iceil(numISuperclusters, numSuperclustersPerBlock);
+    const unsigned sharedMem =
+        numSuperclustersPerBlock *
+        runIjLoopSharedMemPerSupercluster<Config, Tc, Th, std::decay_t<decltype(makeConstRestrict(input))>,
+                                          std::decay_t<Interaction>>(ncmax);
+    const auto run = [&](auto usePbc)
+    {
+        runIjLoopKernel<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, sharedMem>>>(
+            box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, std::forward<Input>(input),
+            std::forward<Output>(output), std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
+            neighborData, superclusterInfo, activeMasks, ncmax);
+        checkGpuErrors(cudaGetLastError());
+    };
+
+    if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
+        box.boundaryZ() == BoundaryType::periodic)
+        run(std::true_type());
+    else
+        run(std::false_type());
 }
 
 template<class Tc, class Th, class In, class Out, class Interaction>
