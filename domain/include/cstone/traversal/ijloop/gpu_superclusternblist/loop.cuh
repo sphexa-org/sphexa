@@ -185,12 +185,12 @@ consteval std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...
 template<class Config, class Tc, class Th, class In, class Interaction>
 constexpr unsigned runIjLoopSharedMemPerSupercluster(unsigned ncmax)
 {
-    using particleData_t = decltype(loadParticleData((Tc*)0, (Tc*)0, (Tc*)0, (Th*)0, In{}, 0));
+    using ParticleData = decltype(loadParticleData((Tc*)0, (Tc*)0, (Tc*)0, (Th*)0, In{}, 0));
     using Result =
-        std::decay_t<decltype(std::declval<Interaction>()(particleData_t(), particleData_t(), Vec3<Tc>(), Tc(0)))>;
+        std::decay_t<decltype(std::declval<Interaction>()(ParticleData(), ParticleData(), Vec3<Tc>(), Tc(0)))>;
 
     constexpr unsigned iSuperclusterDataSize =
-        (Config::iClustersPerSupercluster * Config::iSize) * sizeof(particleData_t);
+        (Config::iClustersPerSupercluster * Config::iSize) * sizeof(ParticleData);
     unsigned nbDataSize = (ncmax + masksSize<Config>(ncmax)) * sizeof(unsigned);
     constexpr unsigned outputBuffersSize =
         !Config::symmetric && Config::numWarpsPerInteraction > 1
