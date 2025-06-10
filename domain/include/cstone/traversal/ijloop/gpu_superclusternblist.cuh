@@ -315,16 +315,7 @@ struct GpuSuperclusterNbListNeighborhood
         auto superclusterSplitMasks =
             computeSuperclusterSplitMasks<Config>(firstValidBody, groups, firstISupercluster, numISuperclusters);
 
-        auto jClusterBboxes =
-            util::deviceAlloc<std::conditional_t<Config::symmetric, JClusterBboxWithRMax<Tc>, JClusterBbox<Tc>>[]>(
-                numJClusters);
-        {
-            constexpr unsigned numThreads = 256;
-            unsigned numBlocks            = iceil(numJClusters * Config::jSize, numThreads);
-            computeJClusterBboxes<Config>
-                <<<numBlocks, numThreads>>>(firstValidBody, totalBodies, x, y, z, h, jClusterBboxes.get());
-            checkGpuErrors(cudaGetLastError());
-        }
+        auto jClusterBboxes = computeJClusterBboxes<Config>(firstValidBody, totalBodies, x, y, z, h);
 
         auto nodeRMax = util::deviceAlloc<Th[]>(Config::symmetric ? tree.numNodes : 0);
         if constexpr (Config::symmetric)

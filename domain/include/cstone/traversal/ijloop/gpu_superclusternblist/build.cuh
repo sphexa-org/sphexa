@@ -60,16 +60,19 @@ struct GlobalBuildData
 };
 
 template<class Tc>
-struct JClusterBbox
+struct JClusterBboxAsymmetric
 {
     Vec3<Tc> center, size;
 };
 
 template<class Tc>
-struct JClusterBboxWithRMax : JClusterBbox<Tc>
+struct JClusterBboxSymmetric : JClusterBboxAsymmetric<Tc>
 {
     Tc rMax;
 };
+
+template<class Config, class Tc>
+using JClusterBbox = std::conditional_t<Config::symmetric, JClusterBboxSymmetric<Tc>, JClusterBboxAsymmetric<Tc>>;
 
 /*! initialize supercluster indices, required as superclusterInfo is later reordered by descending number of neighbors
  * to schedule more expensive warps earlier for better load balancing
@@ -160,14 +163,14 @@ computeSuperclusterSplitMasks(const LocalIndex firstValidBody,
  * @param[out] bboxSizes      j-cluster bounding box sizes
  * @param[out] rMax           max. particle radius (2 * h) in each j-cluster, computed iff Config::symmetric
  */
-template<class Config, class Tc, class Th, class Bbox>
-__global__ void computeJClusterBboxes(const LocalIndex firstValidBody,
-                                      const LocalIndex totalBodies,
-                                      const Tc* const __restrict__ x,
-                                      const Tc* const __restrict__ y,
-                                      const Tc* const __restrict__ z,
-                                      const Th* const __restrict__ h,
-                                      Bbox* const __restrict__ bboxes)
+template<class Config, class Tc, class Th>
+__global__ void computeJClusterBboxesKernel(const LocalIndex firstValidBody,
+                                            const LocalIndex totalBodies,
+                                            const Tc* const __restrict__ x,
+                                            const Tc* const __restrict__ y,
+                                            const Tc* const __restrict__ z,
+                                            const Th* const __restrict__ h,
+                                            JClusterBbox<Config, Tc>* const __restrict__ bboxes)
 {
     static_assert(GpuConfig::warpSize % Config::jSize == 0);
 
@@ -239,6 +242,24 @@ __global__ void computeJClusterBboxes(const LocalIndex firstValidBody,
 
         if (i % Config::jSize == 0 && jCluster < numJClusters) bboxes[jCluster].rMax = rMax;
     }
+}
+
+template<class Config, class Tc, class Th>
+util::UniqueDevicePtr<JClusterBbox<Config, Tc>[]> computeJClusterBboxes(const LocalIndex firstValidBody,
+                                                                        const LocalIndex totalBodies,
+                                                                        const Tc* const __restrict__ x,
+                                                                        const Tc* const __restrict__ y,
+                                                                        const Tc* const __restrict__ z,
+                                                                        const Th* const __restrict__ h)
+{
+    const LocalIndex numJClusters = jClusterIndex<Config>(totalBodies - 1) + 1;
+    auto jClusterBboxes           = util::deviceAlloc<JClusterBbox<Config, Tc>[]>(numJClusters);
+    constexpr unsigned numThreads = 256;
+    unsigned numBlocks            = iceil(numJClusters * Config::jSize, numThreads);
+    computeJClusterBboxesKernel<Config>
+        <<<numBlocks, numThreads>>>(firstValidBody, totalBodies, x, y, z, h, jClusterBboxes.get());
+    checkGpuErrors(cudaGetLastError());
+    return jClusterBboxes;
 }
 
 /*! sort candidate neighbor indices, does not require a fixed number of items per thread in contrast to CUB warp sort
@@ -448,26 +469,27 @@ constexpr __forceinline__ bool includeNbSymmetric(unsigned i, unsigned j, unsign
  * @param[inout] numCandidates       number of candidate cluster indices
  * @param[in]    ncmax               max. number of neighbor clusters (upper bound for numCandidates)
  */
-template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th, class KeyType, class Bbox>
-__device__ __forceinline__ void collectJClusterCandidates(util::SharedMemAllocator& sharedAllocator,
-                                                          const OctreeNsView<Tc, KeyType>& tree,
-                                                          const Box<Tc>& box,
-                                                          const LocalIndex firstValidBody,
-                                                          const LocalIndex totalBodies,
-                                                          const LocalIndex firstBody,
-                                                          const LocalIndex lastBody,
-                                                          const LocalIndex firstGroupParticle,
-                                                          const LocalIndex lastGroupParticle,
-                                                          const Tc* const __restrict__ x,
-                                                          const Tc* const __restrict__ y,
-                                                          const Tc* const __restrict__ z,
-                                                          const Th* const __restrict__ h,
-                                                          const Bbox* const __restrict__ jClusterBboxes,
-                                                          const Th* const __restrict__ nodeRMax,
-                                                          int* __restrict__ globalPool,
-                                                          unsigned* candidates,
-                                                          unsigned& numCandidates,
-                                                          const unsigned ncmax)
+template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th, class KeyType>
+__device__ __forceinline__ void
+collectJClusterCandidates(util::SharedMemAllocator& sharedAllocator,
+                          const OctreeNsView<Tc, KeyType>& tree,
+                          const Box<Tc>& box,
+                          const LocalIndex firstValidBody,
+                          const LocalIndex totalBodies,
+                          const LocalIndex firstBody,
+                          const LocalIndex lastBody,
+                          const LocalIndex firstGroupParticle,
+                          const LocalIndex lastGroupParticle,
+                          const Tc* const __restrict__ x,
+                          const Tc* const __restrict__ y,
+                          const Tc* const __restrict__ z,
+                          const Th* const __restrict__ h,
+                          const JClusterBbox<Config, Tc>* const __restrict__ jClusterBboxes,
+                          const Th* const __restrict__ nodeRMax,
+                          int* __restrict__ globalPool,
+                          unsigned* candidates,
+                          unsigned& numCandidates,
+                          const unsigned ncmax)
 {
     const unsigned laneIdx = laneIndex();
     assert(blockDim.x * blockDim.y == GpuConfig::warpSize);
@@ -928,7 +950,7 @@ constexpr unsigned buildNbListSharedMemPerSupercluster(const unsigned ncmax)
  * @param[inout] globalBuildData        global build data used to 'allocate' global memory regions per supercluster in a
  * pre-allocated array
  */
-template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th, class KeyType, class Bbox>
+template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th, class KeyType>
 __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void buildNbList(
     const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
     const Box<Tc> __grid_constant__ box,
@@ -940,7 +962,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
     const Tc* const __restrict__ y,
     const Tc* const __restrict__ z,
     const Th* const __restrict__ h,
-    const Bbox* const __restrict__ jClusterBboxes,
+    const JClusterBbox<Config, Tc>* const __restrict__ jClusterBboxes,
     const Th* const __restrict__ nodeRMax,
     const unsigned ncmax,
     const typename Config::SuperclusterParticleMask* const __restrict__ superclusterSplitMasks,
