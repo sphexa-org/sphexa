@@ -54,14 +54,14 @@ namespace gpu_supercluster_nb_list_neighborhood_detail
 template<class Config, class Tc, class Th>
 struct GpuSuperclusterNbListNeighborhoodImpl
 {
-    Box<Tc> box = {0, 0};
-    LocalIndex firstValidBody, totalBodies, firstBody, lastBody;
-    const Tc *x, *y, *z;
-    const Th* h;
+    Box<Tc> box               = {0, 0};
+    LocalIndex firstValidBody = 0, totalBodies = 0, firstBody = 0, lastBody = 0;
+    const Tc *x = nullptr, *y = nullptr, *z = nullptr;
+    const Th* h = nullptr;
     util::UniqueDevicePtr<std::uint32_t[]> neighborData;
     util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo;
-    unsigned ncmax;
-    std::size_t numBytes;
+    unsigned ncmax       = 0;
+    std::size_t numBytes = 0;
 
     template<class... In, class... Out, class Interaction, class Postamble>
     void
@@ -277,11 +277,18 @@ struct GpuSuperclusterNbListNeighborhood
     {
         using namespace gpu_supercluster_nb_list_neighborhood_detail;
 
+        if (totalBodies == 0) return {};
+
+        // align particle indices to cluster boundaries: insert invalid particles at the beginning of the particle
+        // array, to make sure particle with index firstBody is the first particle of a supercluster
         const LocalIndex firstValidBody = clusterOffset<Config>(groups.firstBody);
         groups.firstBody += firstValidBody;
-        assert(groups.firstBody % Config::superclusterSize == 0);
         groups.lastBody += firstValidBody;
         totalBodies += firstValidBody;
+
+        assert(groups.firstBody % Config::superclusterSize == 0);
+
+        // modify particle pointers to adhere to supercluster-aligned indexing
         x -= firstValidBody;
         y -= firstValidBody;
         z -= firstValidBody;
@@ -291,43 +298,46 @@ struct GpuSuperclusterNbListNeighborhood
         const LocalIndex lastISupercluster  = superclusterIndex<Config>(groups.lastBody - 1) + 1;
         const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
 
+        if (numISuperclusters == 0) return {};
+
+        // first main data array: a hugely oversized array to store neighbor indices is allocated in *virtual* memory,
+        // as its final size is unknown a priori; in *physical* memory, only the required pages will be allocated
         std::size_t neighborDataVirtualSize = upperBoundBytesPerParticle * totalBodies / sizeof(std::uint32_t);
+        auto neighborData                   = util::deviceAllocVirtual<std::uint32_t[]>(neighborDataVirtualSize);
 
-        GpuSuperclusterNbListNeighborhoodImpl<Config, Tc, Th> nbList{
-            box,
-            firstValidBody,
-            totalBodies,
-            groups.firstBody,
-            groups.lastBody,
-            x,
-            y,
-            z,
-            h,
-            util::deviceAllocVirtual<std::uint32_t[]>(neighborDataVirtualSize),
-            initSuperclusterInfo(firstISupercluster, numISuperclusters),
-            ncmax,
-            0ul};
+        // second main data array: storing some data for each supercluster
+        auto superclusterInfo = initSuperclusterInfo(firstISupercluster, numISuperclusters);
 
-        if (numISuperclusters == 0) return nbList;
-
+        // temporary data arrays, only used during build
+        auto jClusterBboxes = computeJClusterBboxes<Config>(firstValidBody, totalBodies, x, y, z, h);
+        auto nodeRMax       = computeNodeRMax<Config>(tree, h);
         auto superclusterSplitMasks =
             computeSuperclusterSplitMasks<Config>(firstValidBody, groups, firstISupercluster, numISuperclusters);
 
-        auto jClusterBboxes = computeJClusterBboxes<Config>(firstValidBody, totalBodies, x, y, z, h);
-
-        auto nodeRMax = computeNodeRMax<Config>(tree, h);
-
+        // main build with octree traversal
         std::size_t neighborDataSize =
             buildNbList<Config>(tree, box, totalBodies, groups, x, y, z, h, firstValidBody, numISuperclusters,
                                 jClusterBboxes.get(), nodeRMax.get(), ncmax, superclusterSplitMasks.get(),
-                                nbList.neighborData.get(), neighborDataVirtualSize, nbList.superclusterInfo.get());
+                                neighborData.get(), neighborDataVirtualSize, superclusterInfo.get());
 
-        nbList.numBytes = sizeof(std::uint32_t) * neighborDataSize + sizeof(SuperclusterInfo) * numISuperclusters;
+        // sort supercluster array by descending neighbor count for load balancing (schedule large work packages first)
+        thrust::stable_sort(thrust::device, superclusterInfo.get(), superclusterInfo.get() + numISuperclusters);
 
-        thrust::stable_sort(thrust::device, nbList.superclusterInfo.get(),
-                            nbList.superclusterInfo.get() + numISuperclusters);
+        std::size_t numBytes = sizeof(std::uint32_t) * neighborDataSize + sizeof(SuperclusterInfo) * numISuperclusters;
 
-        return nbList;
+        return {box,
+                firstValidBody,
+                totalBodies,
+                groups.firstBody,
+                groups.lastBody,
+                x,
+                y,
+                z,
+                h,
+                std::move(neighborData),
+                std::move(superclusterInfo),
+                ncmax,
+                numBytes};
     }
 };
 
