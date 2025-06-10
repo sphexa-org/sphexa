@@ -368,15 +368,15 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 }
 
 template<class Tc, class Th, class In, class Out, class Interaction>
-__global__ void initResult(const LocalIndex firstBody,
-                           const LocalIndex lastBody,
-                           const Tc* __restrict__ x,
-                           const Tc* __restrict__ y,
-                           const Tc* __restrict__ z,
-                           const Th* __restrict__ h,
-                           const In __grid_constant__ input,
-                           const Out __grid_constant__ output,
-                           Interaction interaction)
+__global__ void initResultKernel(const LocalIndex firstBody,
+                                 const LocalIndex lastBody,
+                                 const Tc* __restrict__ x,
+                                 const Tc* __restrict__ y,
+                                 const Tc* __restrict__ z,
+                                 const Th* __restrict__ h,
+                                 const In __grid_constant__ input,
+                                 const Out __grid_constant__ output,
+                                 Interaction interaction)
 {
     const LocalIndex i = blockDim.x * blockIdx.x + threadIdx.x + firstBody;
     if (i >= lastBody) return;
@@ -384,6 +384,26 @@ __global__ void initResult(const LocalIndex firstBody,
     using ParticleData = decltype(loadParticleData(x, y, z, h, input, firstBody));
     using Result       = decltype(interaction(ParticleData{}, ParticleData{}, Vec3<Tc>{0, 0, 0}, Tc(0)));
     storeParticleData(output, i, unwrapModifiers(Result{}));
+}
+
+template<class Config, class Tc, class Th, class Input, class Output, class Interaction>
+void initResult(const LocalIndex firstBody,
+                const LocalIndex lastBody,
+                const Tc* x,
+                const Tc* y,
+                const Tc* z,
+                const Th* h,
+                Input&& input,
+                Output&& output,
+                Interaction&& interaction)
+{
+    static_assert(Config::symmetric);
+    const LocalIndex numBodies = lastBody - firstBody;
+    constexpr unsigned threads = 256;
+    const unsigned numBlocks   = iceil(numBodies, threads);
+    initResultKernel<<<numBlocks, threads>>>(firstBody, lastBody, x, y, z, h, std::forward<Input>(input),
+                                             std::forward<Output>(output), std::forward<Interaction>(interaction));
+    checkGpuErrors(cudaGetLastError());
 }
 
 template<class Tc, class Th, class In, class Tmp, class Out, class Postamble>

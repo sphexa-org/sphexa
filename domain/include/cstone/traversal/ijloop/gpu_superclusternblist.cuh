@@ -152,11 +152,8 @@ protected:
 
         if constexpr (Config::symmetric)
         {
-            constexpr unsigned threads = 256;
-            const unsigned numBlocks   = iceil(numBodies, threads);
-            initResult<<<numBlocks, threads>>>(firstBody, lastBody, x, y, z, h, makeConstRestrict(input), tmpOrOutput,
-                                               std::forward<Interaction>(interaction));
-            checkGpuErrors(cudaGetLastError());
+            initResult<Config>(firstBody, lastBody, x, y, z, h, makeConstRestrict(input), tmpOrOutput,
+                               std::forward<Interaction>(interaction));
         }
 
         constexpr unsigned numSuperclustersPerBlock = 64 / (Config::iThreads * Config::jSize);
