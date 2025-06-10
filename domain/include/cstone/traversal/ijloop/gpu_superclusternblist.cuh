@@ -143,19 +143,12 @@ protected:
         const LocalIndex numBodies = lastBody - firstBody;
         if (numBodies == 0) return;
 
+        // modify particle pointers to adhere to supercluster-aligned indexing
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, input);
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, output);
 
-        auto [tmp, tmpHolder] = allocateTemporaries<Config, Tc, Th>(firstBody, lastBody, makeConstRestrict(input),
-                                                                    output, std::forward<Interaction>(interaction));
-
-        auto tmpOrOutput = [&]
-        {
-            if constexpr (Config::symmetric)
-                return tmp;
-            else
-                return output;
-        }();
+        auto [tmpOrOutput, tmpHolder] = allocateTemporaries<Config, Tc, Th>(
+            firstBody, lastBody, makeConstRestrict(input), output, std::forward<Interaction>(interaction));
 
         if constexpr (Config::symmetric)
         {
@@ -192,7 +185,7 @@ protected:
             constexpr unsigned threads = 256;
             const unsigned numBlocks   = iceil(totalBodies, threads);
             applyPostamble<<<numBlocks, threads>>>(firstBody, lastBody, firstValidBody, x, y, z, h,
-                                                   makeConstRestrict(input), makeConstRestrict(tmp), output,
+                                                   makeConstRestrict(input), makeConstRestrict(tmpOrOutput), output,
                                                    std::forward<Postamble>(postamble));
             checkGpuErrors(cudaGetLastError());
             // device sync required due to possible use of allocated temporaries

@@ -153,6 +153,6 @@ auto allocateTemporaries(LocalIndex firstBody,
 
         return std::make_tuple(std::move(ptrs), std::move(holders));
     }
-    else { return std::make_tuple(std::tuple(), std::tuple()); }
+    else { return std::make_tuple(output, std::tuple()); }
 }
 } // namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail
