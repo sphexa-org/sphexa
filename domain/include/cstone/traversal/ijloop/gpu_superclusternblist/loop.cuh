@@ -200,6 +200,37 @@ constexpr unsigned runIjLoopSharedMemPerSupercluster(unsigned ncmax)
     return iSuperclusterDataSize + nbDataSize + outputBuffersSize;
 }
 
+template<class Config, class ParticleData, class Tc, class Th, class Input>
+__device__ __forceinline__ util::SharedMemAllocator::SharedMemPtr<ParticleData[]>
+loadSuperclusterIParticleData(util::SharedMemAllocator& sharedAllocator,
+                              const LocalIndex firstValidBody,
+                              const LocalIndex totalBodies,
+                              const LocalIndex iSupercluster,
+                              const Tc* const __restrict__ x,
+                              const Tc* const __restrict__ y,
+                              const Tc* const __restrict__ z,
+                              const Th* const __restrict__ h,
+                              Input&& input)
+
+{
+    auto iSuperclusterData = sharedAllocator.alloc<ParticleData[]>(Config::iClustersPerSupercluster * Config::iSize);
+    {
+        const unsigned base = iSupercluster * Config::superclusterSize;
+#pragma unroll
+        for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
+             offset += Config::iThreads * Config::jSize)
+        {
+            const unsigned i = base + offset;
+            auto iData       = (i >= firstValidBody & i < totalBodies)
+                                   ? loadParticleData(x, y, z, h, std::forward<Input>(input), i)
+                                   : dummyParticleData(x, y, z, h, std::forward<Input>(input), i);
+            std::get<0>(iData) -= firstValidBody;
+            iSuperclusterData[offset] = iData;
+        }
+    }
+    return iSuperclusterData;
+}
+
 template<class Config,
          unsigned NumSuperclustersPerBlock,
          bool UsePbc,
@@ -253,20 +284,8 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     util::SharedMemAllocator sharedAllocator(runIjLoopSharedMemPerSupercluster<Config, Tc, Th, In, Interaction>(ncmax),
                                              threadIdx.z);
 
-    auto iSuperclusterData = sharedAllocator.alloc<ParticleData[]>(Config::iClustersPerSupercluster * Config::iSize);
-    {
-        const unsigned base = iSupercluster * Config::superclusterSize;
-#pragma unroll
-        for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
-             offset += Config::iThreads * Config::jSize)
-        {
-            const unsigned i = base + offset;
-            auto iData       = (i >= firstValidBody & i < totalBodies) ? loadParticleData(x, y, z, h, input, i)
-                                                                       : dummyParticleData(x, y, z, h, input, i);
-            std::get<0>(iData) -= firstValidBody;
-            iSuperclusterData[offset] = iData;
-        }
-    }
+    const auto iSuperclusterData = loadSuperclusterIParticleData<Config, ParticleData>(
+        sharedAllocator, firstValidBody, totalBodies, iSupercluster, x, y, z, h, input);
 
     auto nbData = sharedAllocator.alloc<unsigned[]>(ncmax + masksSize<Config>(ncmax));
 
