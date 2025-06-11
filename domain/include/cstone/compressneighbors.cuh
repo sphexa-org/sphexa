@@ -46,11 +46,22 @@
 namespace cstone
 {
 
+/*! compress a list of neighbor indices with a single warp
+ *
+ * This function compresses an array of neighbor indices using either the compression scheme proposed in 'Compressed
+ * Neighbour Lists for SPH', by S. Band, C. Gissler and M. Teschner, 2020 or a custom nibble-based scheme, depending on
+ * the CSTONE_USE_BAND_ET_AL_COMPRESSION macro.
+ *
+ * Note that the input values need to be the same for all threads in a warp. Caution: if the output buffer is too small,
+ * it will overflow.
+ *
+ * @param[in]  neighbors  pointer to the array of neighbor indices to compress
+ * @param[out] output     pointer to the output buffer where compressed data will be written
+ * @param[in]  n          number of neighbor indices in the input array
+ */
 __device__ __forceinline__ void
 warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restrict__ output, const unsigned n)
 {
-    // TODO: add a buffer size limit, currently we just overflow
-
     const unsigned laneIdx = laneIndex();
 
     if (n == 0)
@@ -168,11 +179,26 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
 #endif
 }
 
+/*! extract the size of a neighbor list compressed by warpCompressNeighbors
+ *
+ * @param[in] input pointer to the buffer containing the compressed neighbor list
+ * @return          the size (in bytes) of the compressed neighbor list
+ */
 __device__ __forceinline__ unsigned compressedNeighborsSize(const char* const input)
 {
     return *((const unsigned*)input) & 0xffff;
 }
 
+/*! decompress a list of neighbor indices which was compressed using warpCompressNeighbors with a single warp
+ *
+ * The function reads the compressed neighbor list from the input buffer and reconstructs
+ * the original neighbor indices, storing them in the provided neighbors array.
+ * The number of decompressed neighbor indices is returned via the reference parameter n.
+ *
+ * @param[in]  input     pointer to the buffer containing the compressed neighbor list
+ * @param[out] neighbors pointer to the array where decompressed neighbor indices will be stored
+ * @param[out] n         reference to an unsigned integer where the number of neighbor indices will be stored
+ */
 __device__ __forceinline__ void
 warpDecompressNeighbors(const char* const __restrict__ input, std::uint32_t* const __restrict__ neighbors, unsigned& n)
 {
