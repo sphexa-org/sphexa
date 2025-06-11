@@ -142,6 +142,7 @@ struct IjLoopTest : testing::Test
         numNodes       = octree.numNodes;
         prefixes       = octree.prefixes;
         childOffsets   = octree.childOffsets;
+        parents        = octree.parents;
         internalToLeaf = octree.internalToLeaf;
         leafToInternal = octree.leafToInternal;
         levelRange     = octree.levelRange;
@@ -331,7 +332,7 @@ struct IjLoopTest : testing::Test
     thrust::universal_vector<KeyT> leaves, prefixes;
     thrust::universal_vector<LocalIndex> layout;
     thrust::universal_vector<Vec3<double>> centers, sizes;
-    thrust::universal_vector<TreeNodeIndex> childOffsets, internalToLeaf, leafToInternal, levelRange;
+    thrust::universal_vector<TreeNodeIndex> childOffsets, parents, internalToLeaf, leafToInternal, levelRange;
 
     thrust::universal_vector<LocalIndex> groups, subgroupStart, subgroupEnd;
 };

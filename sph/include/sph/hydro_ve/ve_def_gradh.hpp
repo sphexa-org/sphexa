@@ -40,7 +40,7 @@ namespace sph
 template<typename Tc, class Dataset>
 void computeVeDefGradh(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeVeDefGradh(grp, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeVeDefGradh(grp, d, box); }
     else
     {
         veDefGradhIjLoop(d.neighborhood, d.K, d.m.data(), d.xm.data(), d.wh.data(), d.whd.data(), d.kx.data(),

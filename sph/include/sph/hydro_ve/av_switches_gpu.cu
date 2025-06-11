@@ -37,7 +37,7 @@
 #include "sph/particles_data.hpp"
 #include "sph/hydro_ve/av_switches_kern.hpp"
 
-namespace sph::cuda
+namespace sph::gpu
 {
 
 template<class Dataset>
@@ -56,4 +56,4 @@ void computeAVswitches(const GroupView&, Dataset& d, const cstone::Box<typename 
 template void computeAVswitches(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
                                 const cstone::Box<SphTypes::CoordinateType>&);
 
-} // namespace sph::cuda
+} // namespace sph::gpu

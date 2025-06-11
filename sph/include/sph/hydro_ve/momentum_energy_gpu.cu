@@ -40,7 +40,7 @@
 
 namespace sph
 {
-namespace cuda
+namespace gpu
 {
 
 using cstone::GpuConfig;
@@ -106,5 +106,5 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
 MOM_ENERGY(true);
 MOM_ENERGY(false);
 
-} // namespace cuda
+} // namespace gpu
 } // namespace sph

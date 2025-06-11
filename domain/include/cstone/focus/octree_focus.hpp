@@ -252,10 +252,10 @@ bool macRefine(OctreeData<KeyType, CpuTag>& tree,
     TreeNodeIndex fStart = findNodeAbove(rawPtr(leaves), nNodes(leaves), focusStart);
     TreeNodeIndex fEnd   = findNodeAbove(rawPtr(leaves), nNodes(leaves), focusEnd);
 
-    markMacs(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(centers), box, rawPtr(leaves) + fStart,
-             fGrowL - fStart, true, macs.data());
-    markMacs(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(centers), box, rawPtr(leaves) + fGrowU,
-             fEnd - fGrowU, true, macs.data());
+    markMacs(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(tree.parents), rawPtr(centers), box,
+             rawPtr(leaves) + fStart, fGrowL - fStart, true, macs.data());
+    markMacs(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(tree.parents), rawPtr(centers), box,
+             rawPtr(leaves) + fGrowU, fEnd - fGrowU, true, macs.data());
 
     return updateMacRefine(tree, leaves, macs, {fStart, fEnd});
 }
@@ -315,10 +315,10 @@ bool macRefineGpu(OctreeData<KeyType, GpuTag>& tree,
     TreeNodeIndex fEnd   = lowerBoundGpu(rawPtr(leaves), rawPtr(leaves) + nNodes(leaves), focusEnd);
     TreeNodeIndex fGrowU = lowerBoundGpu(rawPtr(leaves), rawPtr(leaves) + nNodes(leaves), growthUpper);
 
-    markMacsGpu(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(centers), box, rawPtr(leaves) + fStart,
-                fGrowL - fStart, true, macs.data());
-    markMacsGpu(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(centers), box, rawPtr(leaves) + fGrowU,
-                fEnd - fGrowU, true, macs.data());
+    markMacsGpu(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(tree.parents), rawPtr(centers), box,
+                rawPtr(leaves) + fStart, fGrowL - fStart, true, macs.data());
+    markMacsGpu(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(tree.parents), rawPtr(centers), box,
+                rawPtr(leaves) + fGrowU, fEnd - fGrowU, true, macs.data());
 
     return updateMacRefineGpu(tree, leaves, macs.data(), {fStart, fEnd});
 }
@@ -369,8 +369,8 @@ public:
         std::fill(macs_.begin(), macs_.end(), 0);
         TreeNodeIndex fStart = findNodeAbove(rawPtr(leaves_), nNodes(leaves_), focusStart);
         TreeNodeIndex fEnd   = findNodeAbove(rawPtr(leaves_), nNodes(leaves_), focusEnd);
-        markMacs(tree_.prefixes.data(), tree_.childOffsets.data(), centers_.data(), box, rawPtr(leaves_) + fStart,
-                 fEnd - fStart, false, macs_.data());
+        markMacs(tree_.prefixes.data(), tree_.childOffsets.data(), tree_.parents.data(), centers_.data(), box,
+                 rawPtr(leaves_) + fStart, fEnd - fStart, false, macs_.data());
 
         leafCounts_.resize(nNodes(leaves_));
         computeNodeCounts<KeyType>(leaves_.data(), leafCounts_.data(), nNodes(leaves_), particleKeys,

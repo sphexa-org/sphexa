@@ -37,7 +37,7 @@
 
 namespace sph
 {
-namespace cuda
+namespace gpu
 {
 
 template<class Dataset>
@@ -61,5 +61,5 @@ void computeIadDivvCurlv(const GroupView&, Dataset& d, const cstone::Box<typenam
 template void computeIadDivvCurlv(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
                                   const cstone::Box<SphTypes::CoordinateType>&);
 
-} // namespace cuda
+} // namespace gpu
 } // namespace sph

@@ -376,6 +376,7 @@ public:
                 ft.numNodes,
                 ft.prefixes,
                 ft.childOffsets,
+                ft.parents,
                 ft.internalToLeaf,
                 ft.leafToInternal,
                 ft.levelRange,

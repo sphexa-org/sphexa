@@ -41,7 +41,7 @@ namespace sph
 template<class Tc, class Dataset>
 void computeIadDivvCurlv(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeIadDivvCurlv(grp, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeIadDivvCurlv(grp, d, box); }
     else
     {
         IADIjLoop(d.neighborhood, d.K, d.xm.data(), d.kx.data(), d.wh.data(), d.c11.data(), d.c12.data(), d.c13.data(),

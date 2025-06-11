@@ -39,7 +39,7 @@
 
 namespace sph
 {
-namespace cuda
+namespace gpu
 {
 
 template<class Dataset>
@@ -53,5 +53,5 @@ void computeVeDefGradh(const GroupView&, Dataset& d, const cstone::Box<typename 
 template void computeVeDefGradh(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,
                                 const cstone::Box<SphTypes::CoordinateType>&);
 
-} // namespace cuda
+} // namespace gpu
 } // namespace sph

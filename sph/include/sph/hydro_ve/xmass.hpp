@@ -41,7 +41,7 @@ namespace sph
 template<typename Tc, class Dataset>
 void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeXMass(grp, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeXMass(grp, d, box); }
     else { xmassIjLoop(d.neighborhood, d.K, d.m.data(), d.wh.data(), d.xm.data()); }
 }
 

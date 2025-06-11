@@ -40,7 +40,7 @@ namespace sph
 template<class T, class Dataset>
 void computeAVswitches(const GroupView& grp, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeAVswitches(grp, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeAVswitches(grp, d, box); }
     else
     {
         // caution: d.alpha is used as input and output, this fails on neighborhoods that exploit symmetry!

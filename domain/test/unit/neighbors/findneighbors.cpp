@@ -75,6 +75,7 @@ void neighborCheck(const Coordinates& coords, T radius, const Box<T>& box)
                                     octree.numNodes,
                                     octree.prefixes.data(),
                                     octree.childOffsets.data(),
+                                    octree.parents.data(),
                                     octree.internalToLeaf.data(),
                                     octree.leafToInternal.data(),
                                     octree.levelRange.data(),

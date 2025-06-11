@@ -129,8 +129,8 @@ TEST(IjLoop, Upsweep)
     std::span<const KeyT> nodeKeys(rawPtr(octree.prefixes), octree.numNodes);
     nodeFpCenters(nodeKeys, rawPtr(centers), rawPtr(sizes), box);
 
-    thrust::universal_vector<KeyT> octreePrefixes                = octree.prefixes;
-    thrust::universal_vector<TreeNodeIndex> octreeChildOffsets   = octree.childOffsets,
+    thrust::universal_vector<KeyT> octreePrefixes              = octree.prefixes;
+    thrust::universal_vector<TreeNodeIndex> octreeChildOffsets = octree.childOffsets, octreeParents = octree.parents,
                                             octreeInternalToLeaf = octree.internalToLeaf,
                                             octreeLeafToInternal = octree.leafToInternal,
                                             octreeLevelRange     = octree.levelRange;
@@ -138,6 +138,7 @@ TEST(IjLoop, Upsweep)
     OctreeNsView<double, KeyT> view{octree.numLeafNodes,
                                     octree.numNodes,
                                     rawPtr(octreePrefixes),
+                                    rawPtr(octreeParents),
                                     rawPtr(octreeChildOffsets),
                                     rawPtr(octreeInternalToLeaf),
                                     rawPtr(octreeLeafToInternal),

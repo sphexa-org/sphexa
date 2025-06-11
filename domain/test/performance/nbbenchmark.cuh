@@ -112,6 +112,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
                                            .numNodes        = octree.numNodes,
                                            .prefixes        = octree.prefixes.data(),
                                            .childOffsets    = octree.childOffsets.data(),
+                                           .parents         = octree.parents.data(),
                                            .internalToLeaf  = octree.internalToLeaf.data(),
                                            .leafToInternal  = octree.leafToInternal.data(),
                                            .levelRange      = octree.levelRange.data(),
@@ -151,6 +152,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     // move tree data to the GPU
     const thrust::universal_vector<KeyType> dPrefixes             = octree.prefixes;
     const thrust::universal_vector<TreeNodeIndex> dChildOffsets   = octree.childOffsets;
+    const thrust::universal_vector<TreeNodeIndex> dParents        = octree.parents;
     const thrust::universal_vector<TreeNodeIndex> dInternalToLeaf = octree.internalToLeaf;
     const thrust::universal_vector<TreeNodeIndex> dLeafToInternal = octree.leafToInternal;
     const thrust::universal_vector<TreeNodeIndex> dLevelRange     = octree.levelRange;
@@ -168,6 +170,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
                                             .numNodes        = octree.numNodes,
                                             .prefixes        = rawPtr(dPrefixes),
                                             .childOffsets    = rawPtr(dChildOffsets),
+                                            .parents         = rawPtr(dParents),
                                             .internalToLeaf  = rawPtr(dInternalToLeaf),
                                             .leafToInternal  = rawPtr(dLeafToInternal),
                                             .levelRange      = rawPtr(dLevelRange),

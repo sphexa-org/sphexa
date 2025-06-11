@@ -77,8 +77,8 @@ void halo_discovery(Box<double> box, const std::vector<KeyType>& tree, const std
 
         OctreeView<KeyType> o = octree.data();
         auto tp0              = std::chrono::high_resolution_clock::now();
-        findHalos(o.prefixes, o.childOffsets, o.internalToLeaf, tree.data(), haloRadii.data(), box, lowerNode,
-                  upperNode, collisionFlags.data());
+        findHalos(o.prefixes, o.childOffsets, o.parents, o.internalToLeaf, tree.data(), haloRadii.data(), box,
+                  lowerNode, upperNode, collisionFlags.data());
         auto tp1 = std::chrono::high_resolution_clock::now();
 
         double t2 = std::chrono::duration<double>(tp1 - tp0).count();
@@ -92,7 +92,7 @@ int main()
     using KeyType = uint64_t;
     Box<double> box{-1, 1};
 
-    int numParticles = 2000000;
+    int numParticles = 20000000;
     int bucketSize   = 16;
 
     RandomGaussianCoordinates<double, HilbertKey<KeyType>> randomBox(numParticles, box);
