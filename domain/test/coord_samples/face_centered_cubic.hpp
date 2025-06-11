@@ -16,7 +16,6 @@
 #pragma once
 
 #include <algorithm>
-#include <random>
 #include <vector>
 
 #include "cstone/primitives/gather.hpp"
@@ -40,8 +39,6 @@ public:
         , z_(nx * ny * nz * 4)
         , codes_(nx * ny * nz * 4)
     {
-        std::mt19937 gen(seed);
-
         const T dx       = box.lx() / nx;
         const T dy       = box.ly() / ny;
         const T dz       = box.lz() / nz;
