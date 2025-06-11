@@ -15,6 +15,11 @@
 
 #pragma once
 
+#include <cstddef>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+
 #include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/util/type_list.hpp"
 

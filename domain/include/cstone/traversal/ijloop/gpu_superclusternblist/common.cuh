@@ -15,6 +15,8 @@
 
 #pragma once
 
+#include <cassert>
+
 namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail
 {
 

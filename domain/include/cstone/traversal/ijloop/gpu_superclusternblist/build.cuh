@@ -15,6 +15,16 @@
 
 #pragma once
 
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <stdexcept>
+#include <tuple>
+#include <type_traits>
+
 #include "cstone/compressneighbors.cuh"
 #include "cstone/cuda/memory.cuh"
 #include "cstone/reducearray.cuh"
