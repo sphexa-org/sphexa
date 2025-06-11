@@ -57,8 +57,10 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
 #include <tuple>
 #include <type_traits>
+#include <utility>
 
 #include <thrust/execution_policy.h>
 #include <thrust/functional.h>
@@ -88,8 +90,10 @@ struct GpuSuperclusterNbListNeighborhoodImpl
     std::size_t numBytes = 0;
 
     template<class... In, class... Out, class Interaction, class Postamble>
-    void
-    ijLoop(std::tuple<In*...> input, std::tuple<Out*...> output, Interaction&& interaction, Postamble&& postamble) const
+    void ijLoop(const std::tuple<In*...>& input,
+                const std::tuple<Out*...>& output,
+                Interaction&& interaction,
+                Postamble&& postamble) const
     {
         if (totalBodies == 0) return;
 
@@ -113,8 +117,8 @@ struct GpuSuperclusterNbListNeighborhoodImpl
         LocalIndex numISuperclusters;
 
         template<class... In, class... Out, class Interaction, class Postamble>
-        void ijLoop(std::tuple<In*...> input,
-                    std::tuple<Out*...> output,
+        void ijLoop(const std::tuple<In*...>& input,
+                    const std::tuple<Out*...>& output,
                     Interaction&& interaction,
                     Postamble&& postamble) const
         {
