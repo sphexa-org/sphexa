@@ -32,7 +32,7 @@ public:
     using KeyType = KeyType_;
     using Integer = typename KeyType::ValueType;
 
-    FaceCenteredCubicCoordinates(unsigned nx, unsigned ny, unsigned nz, Box<T> box, int seed = 42)
+    FaceCenteredCubicCoordinates(unsigned nx, unsigned ny, unsigned nz, Box<T> box)
         : box_(std::move(box))
         , x_(nx * ny * nz * 4)
         , y_(nx * ny * nz * 4)
