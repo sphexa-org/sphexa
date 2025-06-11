@@ -115,6 +115,11 @@ struct EmptyPostamble
 //! optimizations in the neighborhood implementations.
 constexpr detail::EmptyPostamble empty_postamble;
 
+struct Statistics
+{
+    const std::size_t numBodies, numBytes;
+};
+
 namespace detail
 {
 
@@ -128,11 +133,6 @@ struct ConceptTestInteraction
 };
 
 } // namespace detail
-
-struct Statistics
-{
-    const std::size_t numBodies, numBytes;
-};
 
 template<class T>
 concept Neighborhood = requires(T nb,
