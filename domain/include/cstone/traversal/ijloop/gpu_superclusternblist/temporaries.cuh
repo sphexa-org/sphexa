@@ -31,14 +31,10 @@
 
 #pragma once
 
-#include "cstone/cuda/memory.cuh"
 #include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/util/type_list.hpp"
 
 namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail
-{
-
-namespace detail
 {
 
 struct None
@@ -132,8 +128,6 @@ auto allocateOrMapTemporaries(const LocalIndex firstBody,
     return std::make_tuple(allocOrMap(Indices{}, Tmp{})...);
 }
 
-} // namespace detail
-
 /*! allocate or map temporary storage for output arrays required by the interaction kernel
  *
  * This function determines the required temporary storage for the given interaction kernel and either
@@ -166,9 +160,9 @@ auto allocateTemporaries(LocalIndex firstBody,
         using Result = decltype(unwrapModifiers(std::forward<Interaction>(interaction)(
             std::declval<ParticleData>(), std::declval<ParticleData>(), std::declval<Vec3<Tc>>(), std::declval<Tc>())));
 
-        using PtrMap = detail::MapTemporarySizes<Result, util::TypeList<Out...>>;
+        using PtrMap = MapTemporarySizes<Result, util::TypeList<Out...>>;
 
-        auto ptrsAndHolders = detail::allocateOrMapTemporaries(firstBody, lastBody, PtrMap{}, Result{}, output);
+        auto ptrsAndHolders = allocateOrMapTemporaries(firstBody, lastBody, PtrMap{}, Result{}, output);
 
         auto ptrs = util::tupleMap([](auto const& alloc) { return std::get<0>(alloc); }, ptrsAndHolders);
         auto holders =
