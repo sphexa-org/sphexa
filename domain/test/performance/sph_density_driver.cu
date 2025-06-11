@@ -30,9 +30,7 @@
  */
 
 #include <cmath>
-#include <cstdint>
 #include <cstdio>
-#include <format>
 #include <limits>
 #include <map>
 #include <tuple>
