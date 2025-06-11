@@ -134,6 +134,21 @@ auto allocateOrMapTemporaries(const LocalIndex firstBody,
 
 } // namespace detail
 
+/*! allocate or map temporary storage for output arrays required by the interaction kernel
+ *
+ * This function determines the required temporary storage for the given interaction kernel and either
+ * allocates new device memory or maps to the provided output pointers, depending on whether the
+ * temporary storage matches the output types. It returns a tuple containing the pointers to the
+ * temporaries (or mapped outputs) and holders for any allocated memory.
+ *
+ * @param firstBody    index of the first body to process
+ * @param lastBody     index of the last body to process
+ * @param input        input data for the interaction
+ * @param output       tuple of output pointers
+ * @param interaction  interaction kernel (callable)
+ * @return std::tuple of a tuple of temporary pointers and a data holder, which releases all allocated data as soon as
+ * it is destructed
+ */
 template<class Config, class Tc, class Th, class Input, class... Out, class Interaction>
 auto allocateTemporaries(LocalIndex firstBody,
                          LocalIndex lastBody,
@@ -143,6 +158,8 @@ auto allocateTemporaries(LocalIndex firstBody,
 {
     if constexpr (Config::symmetric)
     {
+        // in the symmetric case, temporary arrays are required iff the result of the interaction invocation returns
+        // more values or data types of different sizes than the final output of the postamble
         using ParticleData =
             decltype(loadParticleData(std::declval<Tc*>(), std::declval<Tc*>(), std::declval<Tc*>(),
                                       std::declval<Th*>(), std::declval<Input>(), std::declval<LocalIndex>()));
@@ -159,6 +176,10 @@ auto allocateTemporaries(LocalIndex firstBody,
 
         return std::make_tuple(std::move(ptrs), std::move(holders));
     }
-    else { return std::make_tuple(output, std::tuple()); }
+    else
+    {
+        // in the asymmetric case, no temporary storage is required ever
+        return std::make_tuple(output, std::tuple());
+    }
 }
 } // namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail
