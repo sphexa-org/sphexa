@@ -111,6 +111,8 @@ struct EmptyPostamble
 
 } // namespace detail
 
+//! Empty postamble that does nothing. Should always be prefered over a custom empty postamble, as it enables certain
+//! optimizations in the neighborhood implementations.
 constexpr detail::EmptyPostamble empty_postamble;
 
 namespace detail
