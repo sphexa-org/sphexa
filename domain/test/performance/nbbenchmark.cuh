@@ -70,11 +70,14 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     using KeyType = typename StrongKeyType::ValueType;
 
     const unsigned n = coords.x().size();
+    printf("Number of particles: %u\n", n);
+
     const std::vector<T> h(n, hVal);
-    const Box<Tc> box               = coords.box();
+    const Box<Tc> box = coords.box();
+
+    // compute average number of neighbor particles assuming a random uniform particle distribution
     const double r                  = 2 * hVal;
     const double expected_neighbors = 4.0 / 3.0 * M_PI * r * r * r * n / (box.lx() * box.ly() * box.lz());
-    printf("Number of particles: %u\n", n);
     printf("Expected average number of neighbors for computations: %.0f\n", expected_neighbors);
     if (searchExtFactor != 1)
     {
@@ -89,6 +92,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     const Tc* z         = coords.z().data();
     const KeyType* keys = coords.particleKeys().data();
 
+    // build the cornerstone octree on the CPU
     constexpr unsigned bucketSize = 64;
     const auto [csTree, counts]   = computeOctree(std::span(coords.particleKeys()), bucketSize);
     OctreeData<KeyType, CpuTag> octree;
@@ -119,6 +123,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     LocalIndex zero = 0;
     const GroupView groupView{.firstBody = 0, .lastBody = n, .numGroups = 1, .groupStart = &zero, .groupEnd = &n};
 
+    // compute reference using basic CPU neighborhood
     const auto allocVec = [n]<class Tv>(Tv initialValue) { return std::vector<Tv>(n, initialValue); };
     const std::tuple<std::vector<InputTs>...> inputs = util::tupleMap(allocVec, inputValues);
     std::tuple<std::vector<OutputTs>...> outputs     = util::tupleMap(allocVec, initialOutputValues);
@@ -127,6 +132,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
         .ijLoop(util::tupleMap([](auto const& v) { return v.data(); }, inputs),
                 util::tupleMap([](auto& v) { return v.data(); }, outputs), interaction, ijloop::empty_postamble);
 
+    // allocate GPU data, use thrust::universal_vector to support neighborhoods that build on the CPU
     const thrust::universal_vector<Tc> dX(coords.x().begin(), coords.x().end()),
         dY(coords.y().begin(), coords.y().end()), dZ(coords.z().begin(), coords.z().end());
     const auto allocGpuVec = [n]<class Tv>(Tv initialValue) { return thrust::universal_vector<Tv>(n, initialValue); };
@@ -134,6 +140,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     const std::tuple<thrust::universal_vector<InputTs>...> dInputs = util::tupleMap(allocGpuVec, inputValues);
     std::tuple<thrust::universal_vector<OutputTs>...> dOutputs     = util::tupleMap(allocGpuVec, initialOutputValues);
 
+    // compute particle memory usage
     std::size_t particleMemoryUsage = (dX.size() + dY.size() + dZ.size()) * sizeof(Tc);
     const auto addMemoryUsage       = [&]<class Tv>(thrust::universal_vector<Tv> const& v)
     { particleMemoryUsage += v.size() * sizeof(Tv); };
@@ -141,6 +148,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     util::for_each_tuple(addMemoryUsage, dOutputs);
     printf("Memory usage of particle data: %.2f MB\n", particleMemoryUsage / 1.0e6);
 
+    // move tree data to the GPU
     const thrust::universal_vector<KeyType> dPrefixes             = octree.prefixes;
     const thrust::universal_vector<TreeNodeIndex> dChildOffsets   = octree.childOffsets;
     const thrust::universal_vector<TreeNodeIndex> dInternalToLeaf = octree.internalToLeaf;
@@ -169,6 +177,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
                                             .sizes           = rawPtr(dSizes),
                                             .searchExtFactor = searchExtFactor};
 
+    // split particles into consecutive groups
     constexpr unsigned groupSize = TravConfig::targetSize;
     DeviceVector<LocalIndex> temp, groups;
     computeGroupSplits(0, n, rawPtr(dX), rawPtr(dY), rawPtr(dZ), rawPtr(dH), dNsView.leaves, dNsView.numLeafNodes,
@@ -180,6 +189,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
                                .groupEnd   = rawPtr(groups) + 1};
     printf("Number of groups: %u (unsplit: %u)\n", dGroupView.numGroups, (n + groupSize - 1) / groupSize);
 
+    // build neighborhood, measure CPU time
     using Clock     = std::chrono::high_resolution_clock;
     auto buildStart = Clock::now();
     const auto neighborhoodGPU =
@@ -192,6 +202,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     printf("Memory usage of neighborhood data: %.2f MB (%.1f B/particle)\n", stats.numBytes / 1.0e6,
            stats.numBytes / double(stats.numBodies));
 
+    // prefetch vectors to device memory, required on some AMD hardware/software for reasonable performance
     int device;
     checkGpuErrors(cudaGetDevice(&device));
     auto const prefetchToDevice = [&]<class Tv>(const thrust::universal_vector<Tv>& v)
@@ -200,6 +211,7 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     util::for_each_tuple(prefetchToDevice, dInputs);
     util::for_each_tuple(prefetchToDevice, dOutputs);
 
+    // run the actual interaction kernel and measure time with GPU timers
     std::vector<double> times(101);
     std::vector<cudaEvent_t> events(times.size() + 1);
     for (auto& event : events)
@@ -222,27 +234,28 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
         times[i] = millisecs / 1000.0;
     }
 
-    std::vector<double> gigaAtomSteps(times.size());
-    std::transform(times.begin(), times.end(), gigaAtomSteps.begin(), [&](auto t) { return n / 1.0e9 / t; });
+    // compute and print mean and standard deviation of performance measurements
+    std::vector<double> gigaParticleUpdates(times.size());
+    std::transform(times.begin(), times.end(), gigaParticleUpdates.begin(), [&](auto t) { return n / 1.0e9 / t; });
 
     const float meanTime = std::accumulate(times.begin(), times.end(), 0.0) / times.size();
-    const float meanGigaAtomSteps =
-        std::accumulate(gigaAtomSteps.begin(), gigaAtomSteps.end(), 0.0f) / gigaAtomSteps.size();
+    const float meanGigaParticleUpdates =
+        std::accumulate(gigaParticleUpdates.begin(), gigaParticleUpdates.end(), 0.0f) / gigaParticleUpdates.size();
 
     const float stdDevTime = std::sqrt(std::accumulate(times.begin(), times.end(), 0.0, [&](auto a, auto t)
                                                        { return a + (t - meanTime) * (t - meanTime); }) /
                                        (times.size() - 1));
-    const float stdDevGigaAtomSteps =
-        std::sqrt(std::accumulate(gigaAtomSteps.begin(), gigaAtomSteps.end(), 0.0, [&](auto a, auto s)
-                                  { return a + (s - meanGigaAtomSteps) * (s - meanGigaAtomSteps); }) /
-                  (gigaAtomSteps.size() - 1));
+    const float stdDevGigaParticleUpdates =
+        std::sqrt(std::accumulate(gigaParticleUpdates.begin(), gigaParticleUpdates.end(), 0.0, [&](auto a, auto s)
+                                  { return a + (s - meanGigaParticleUpdates) * (s - meanGigaParticleUpdates); }) /
+                  (gigaParticleUpdates.size() - 1));
 
     std::sort(times.begin(), times.end());
-    std::sort(gigaAtomSteps.begin(), gigaAtomSteps.end());
+    std::sort(gigaParticleUpdates.begin(), gigaParticleUpdates.end());
 
     printf("GPU Time:    %7.6f +- %7.6f, median = %7.6f [s]\n", meanTime, stdDevTime, times[times.size() / 2]);
-    printf("Performance: %7.6f +- %7.6f, median = %7.6f [Giga Particle Updates / s]\n", meanGigaAtomSteps,
-           stdDevGigaAtomSteps, gigaAtomSteps[gigaAtomSteps.size() / 2]);
+    printf("Performance: %7.6f +- %7.6f, median = %7.6f [Giga Particle Updates / s]\n", meanGigaParticleUpdates,
+           stdDevGigaParticleUpdates, gigaParticleUpdates[gigaParticleUpdates.size() / 2]);
 
     if (validate)
     {
