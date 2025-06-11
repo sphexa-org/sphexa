@@ -31,9 +31,9 @@
 
 #pragma once
 
+#include <concepts>
 #include <tuple>
 #include <limits>
-#include <type_traits>
 
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/groups.hpp"
