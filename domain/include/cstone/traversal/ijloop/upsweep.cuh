@@ -83,6 +83,19 @@ __global__ void upsweepAccumulateInternalNodes(const TreeNodeIndex firstNode,
 
 } // namespace detail
 
+/*! upsweep operation for an octree
+ *
+ * This function performs an upsweep (bottom-up reduction) over an octree, accumulating data from child nodes
+ * to their respective parent internal nodes. It first processes all leaf nodes using the provided transform
+ * and binary operation, then iteratively processes internal nodes level by level up to the root.
+ *
+ * @param[in]  tree        octree view containing structure and metadata
+ * @param[in]  init        tuple of initial values for the accumulation
+ * @param[in]  transformOp unary operation to transform input data at the leaves
+ * @param[in]  binaryOp    binary operation to combine values during accumulation
+ * @param[in]  input       tuple of input pointers for leaf data
+ * @param[out] output      tuple of output pointers for accumulated results
+ */
 template<class Tc, class KeyType, class TransformOp, class BinaryOp, class... In, class... Out>
 void upsweep(const OctreeNsView<Tc, KeyType>& tree,
              const std::tuple<Out...>& init,
