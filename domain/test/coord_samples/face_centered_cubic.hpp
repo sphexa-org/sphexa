@@ -8,7 +8,7 @@
  */
 
 /*! @file
- * @brief Random coordinates generation for testing
+ * @brief FCC coordinates generation for testing
  *
  * @author Felix Thaler <thaler@cscs.ch>
  */
@@ -25,61 +25,6 @@
 
 namespace cstone
 {
-
-template<class T, class KeyType_>
-class RandomCoordinates
-{
-public:
-    using KeyType = KeyType_;
-    using Integer = typename KeyType::ValueType;
-
-    RandomCoordinates(size_t n, Box<T> box, int seed = 42)
-        : box_(std::move(box))
-        , x_(n)
-        , y_(n)
-        , z_(n)
-        , codes_(n)
-    {
-        // std::random_device rd;
-        std::mt19937 gen(seed);
-        std::uniform_real_distribution<T> disX(box_.xmin(), box_.xmax());
-        std::uniform_real_distribution<T> disY(box_.ymin(), box_.ymax());
-        std::uniform_real_distribution<T> disZ(box_.zmin(), box_.zmax());
-
-        auto randX = [&disX, &gen]() { return disX(gen); };
-        auto randY = [&disY, &gen]() { return disY(gen); };
-        auto randZ = [&disZ, &gen]() { return disZ(gen); };
-
-        std::generate(begin(x_), end(x_), randX);
-        std::generate(begin(y_), end(y_), randY);
-        std::generate(begin(z_), end(z_), randZ);
-
-        auto keyData = (KeyType*)(codes_.data());
-        computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box);
-
-        std::vector<LocalIndex> sfcOrder(n);
-        std::iota(begin(sfcOrder), end(sfcOrder), LocalIndex(0));
-        sort_by_key(begin(codes_), end(codes_), begin(sfcOrder));
-
-        std::vector<T> temp(x_.size());
-        gather<LocalIndex>(sfcOrder, x_.data(), temp.data());
-        swap(x_, temp);
-        gather<LocalIndex>(sfcOrder, y_.data(), temp.data());
-        swap(y_, temp);
-        gather<LocalIndex>(sfcOrder, z_.data(), temp.data());
-        swap(z_, temp);
-    }
-
-    const std::vector<T>& x() const { return x_; }
-    const std::vector<T>& y() const { return y_; }
-    const std::vector<T>& z() const { return z_; }
-    const std::vector<Integer>& particleKeys() const { return codes_; }
-
-private:
-    Box<T> box_;
-    std::vector<T> x_, y_, z_;
-    std::vector<Integer> codes_;
-};
 
 template<class T, class KeyType_>
 class FaceCenteredCubicCoordinates
