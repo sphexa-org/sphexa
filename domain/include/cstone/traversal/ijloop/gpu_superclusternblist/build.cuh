@@ -172,8 +172,8 @@ __global__ void computeJClusterBboxesKernel(const LocalIndex firstValidBody,
 
     if constexpr (Config::jSize >= 3)
     {
-        util::array<Tc, 3> bboxMin{xi, yi, zi};
-        util::array<Tc, 3> bboxMax{xi, yi, zi};
+        std::array<Tc, 3> bboxMin{xi, yi, zi};
+        std::array<Tc, 3> bboxMax{xi, yi, zi};
 
         const Tc vMin = reduceArray<Config::jSize, false>(bboxMin, [](auto a, auto b) { return std::min(a, b); });
         const Tc vMax = reduceArray<Config::jSize, false>(bboxMax, [](auto a, auto b) { return std::max(a, b); });

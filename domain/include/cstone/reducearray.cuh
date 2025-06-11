@@ -15,17 +15,17 @@
 
 #pragma once
 
+#include <array>
 #include <tuple>
 
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/primitives/warpscan.cuh"
-#include "cstone/util/array.hpp"
 
 namespace cstone
 {
 
 template<unsigned ReductionSize, bool Interleave, class T, std::size_t ArraySize, class Op>
-constexpr __device__ __forceinline__ T reduceArray(util::array<T, ArraySize> in, Op const& op)
+constexpr __device__ __forceinline__ T reduceArray(std::array<T, ArraySize> in, Op const& op)
 {
     static_assert(ArraySize <= ReductionSize);
     const unsigned laneIdx        = laneIndex();
@@ -55,7 +55,7 @@ template<unsigned ReductionSize, bool Interleave, class T, class... Ts, class Op
 constexpr __device__ __forceinline__ T reduceTuple(std::tuple<T, Ts...> const& in, Op const& op)
 {
     static_assert(std::conjunction_v<std::is_same<T, Ts>...>);
-    auto inArray = std::apply([](auto const&... args) { return util::array<T, sizeof...(Ts) + 1>{args...}; }, in);
+    auto inArray = std::apply([](auto const&... args) { return std::array<T, sizeof...(Ts) + 1>{args...}; }, in);
     return reduceArray<ReductionSize, Interleave>(inArray, op);
 }
 

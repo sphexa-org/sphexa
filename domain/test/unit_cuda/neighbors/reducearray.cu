@@ -13,6 +13,7 @@
  * @author Felix Thaler <thaler@cscs.ch>
  */
 
+#include <array>
 #include <tuple>
 #include <type_traits>
 
@@ -26,8 +27,8 @@
 using namespace cstone;
 
 template<unsigned ReductionSize, bool Interleave, std::size_t ArraySize>
-__global__ void runReduction(util::array<int, ArraySize> const* __restrict__ in,
-                             util::array<int, ArraySize>* __restrict__ out)
+__global__ void runReduction(std::array<int, ArraySize> const* __restrict__ in,
+                             std::array<int, ArraySize>* __restrict__ out)
 {
     constexpr unsigned reductions = GpuConfig::warpSize / ReductionSize;
     const unsigned i              = threadIdx.x;
@@ -38,11 +39,11 @@ __global__ void runReduction(util::array<int, ArraySize> const* __restrict__ in,
 }
 
 template<unsigned ReductionSize, bool Interleave, std::size_t ArraySize>
-thrust::universal_vector<util::array<int, ArraySize>>
-reference(const thrust::universal_vector<util::array<int, ArraySize>>& in)
+thrust::universal_vector<std::array<int, ArraySize>>
+reference(const thrust::universal_vector<std::array<int, ArraySize>>& in)
 {
     constexpr unsigned reductions = GpuConfig::warpSize / ReductionSize;
-    thrust::universal_vector<util::array<int, ArraySize>> res(reductions);
+    thrust::universal_vector<std::array<int, ArraySize>> res(reductions);
     for (unsigned i = 0; i < reductions; ++i)
     {
         auto& resI = res[i];
@@ -57,9 +58,9 @@ reference(const thrust::universal_vector<util::array<int, ArraySize>>& in)
 }
 
 template<unsigned N>
-thrust::universal_vector<util::array<int, N>> testData()
+thrust::universal_vector<std::array<int, N>> testData()
 {
-    thrust::universal_vector<util::array<int, N>> data(GpuConfig::warpSize);
+    thrust::universal_vector<std::array<int, N>> data(GpuConfig::warpSize);
     int value = 0;
     for (unsigned i = 0; i < data.size(); ++i)
         for (unsigned j = 0; j < N; ++j)
@@ -115,9 +116,9 @@ TYPED_TEST_SUITE(ReduceArrayGpu, TestTypes);
 
 TYPED_TEST(ReduceArrayGpu, full)
 {
-    thrust::universal_vector<util::array<int, TypeParam::arraySize>> in = testData<TypeParam::arraySize>();
+    thrust::universal_vector<std::array<int, TypeParam::arraySize>> in = testData<TypeParam::arraySize>();
     const auto ref = reference<TypeParam::reductionSize, TypeParam::interleave>(in);
-    thrust::universal_vector<util::array<int, TypeParam::arraySize>> out(ref.size());
+    thrust::universal_vector<std::array<int, TypeParam::arraySize>> out(ref.size());
     runReduction<TypeParam::reductionSize, TypeParam::interleave><<<1, GpuConfig::warpSize>>>(rawPtr(in), rawPtr(out));
     checkGpuErrors(cudaDeviceSynchronize());
     EXPECT_EQ(out, ref);
