@@ -485,7 +485,7 @@ public:
      * centers_ = geo centers, invTheta = 1/theta + 0.5     -> Identical to MinMac along the axes through the center,
      *                                                         slightly less restrictive in the diagonal directions
      */
-    void updateMacs(const SfcAssignment<KeyType>& assignment, float invTheta)
+    void updateMacs(const SfcAssignment<KeyType>& assignment, float invTheta, bool accumulate = false)
     {
         setMacRadius(invTheta);
         macs_.resize(treeData_.numNodes);
@@ -497,7 +497,7 @@ public:
         if constexpr (HaveGpu<Accelerator>{})
         {
             reallocate(macsAcc_, octreeAcc_.numNodes, allocGrowthRate_);
-            fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0));
+            if (not accumulate) { fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
             markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(octreeAcc_.parents),
                         rawPtr(centersAcc_), box_, rawPtr(leavesAcc_) + fAssignStart, fAssignEnd - fAssignStart, false,
                         rawPtr(macsAcc_));
@@ -506,7 +506,7 @@ public:
         }
         else
         {
-            std::fill(rawPtr(macs_), rawPtr(macs_) + macs_.size(), uint8_t(0));
+            if (not accumulate) { std::fill(rawPtr(macs_), rawPtr(macs_) + macs_.size(), uint8_t(0)); }
             markMacs(rawPtr(treeData_.prefixes), rawPtr(treeData_.childOffsets), rawPtr(treeData_.parents),
                      rawPtr(centers_), box_, rawPtr(leaves_) + fAssignStart, fAssignEnd - fAssignStart, false,
                      rawPtr(macs_));

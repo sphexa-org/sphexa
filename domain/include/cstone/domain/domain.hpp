@@ -251,7 +251,7 @@ public:
         int fail = 0;
         do
         {
-            focusTree_.updateMacs(global_.assignment(), centerDriftTol_ / theta_);
+            focusTree_.updateMacs(global_.assignment(), centerDriftTol_ / theta_, false);
             focusTree_.updateTree(peers, global_.assignment(), box());
             focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
             focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(), std::get<0>(scratch),
