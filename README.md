@@ -96,7 +96,7 @@ uenv start prgenv-gnu/24.11:v1 --view=default
 mkdir build
 cd build
 
-CC=mpicc CXX=mpicxx cmake -DCMAKE_CUDA_ARCHITECTURES=90 -DCSTONE_WITH_GPU_AWARE_MPI=ON -S <GIT_SOURCE_DIR
+CC=mpicc CXX=mpicxx cmake -DCMAKE_CUDA_ARCHITECTURES=90 -DCSTONE_WITH_GPU_AWARE_MPI=ON -DCMAKE_CUDA_FLAGS=-ccbin=mpicxx -S <GIT_SOURCE_DIR
 ```
 
 Module and CMake configuration on LUMI (ROCm 6.2.2)
