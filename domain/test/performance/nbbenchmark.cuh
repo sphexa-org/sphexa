@@ -15,11 +15,19 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cassert>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 #include <numeric>
+#include <span>
+#include <tuple>
+#include <type_traits>
 #include <vector>
+
+#include <cuda_runtime.h>
 
 #include <thrust/universal_vector.h>
 
