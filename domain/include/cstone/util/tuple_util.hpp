@@ -28,17 +28,19 @@ namespace detail
 template<std::size_t... Is, class F, class... Tuples>
 inline constexpr auto tupleMapImpl(std::index_sequence<Is...>, F&& f, Tuples&&... tuples)
 {
-    return std::make_tuple([&f](auto i, auto&&... ts) -> decltype(auto)
-                           { return f(std::get<i>(std::forward<decltype(ts)>(ts))...); }(
-                               std::integral_constant<std::size_t, Is>(), std::forward<Tuples>(tuples)...)...);
+    return std::make_tuple(
+        [&f](auto i, auto&&... ts) -> decltype(auto) {
+            return f(std::get<i>(std::forward<decltype(ts)>(ts))...);
+        }(std::integral_constant<std::size_t, Is>(), std::forward<Tuples>(tuples)...)...);
 }
 
 template<std::size_t... Is, class F, class... Tuples>
 inline constexpr auto tupleMapIndexedImpl(std::index_sequence<Is...>, F&& f, Tuples&&... tuples)
 {
-    return std::make_tuple([&f](auto i, auto&&... ts) -> decltype(auto)
-                           { return f(i, std::get<i>(std::forward<decltype(ts)>(ts))...); }(
-                               std::integral_constant<std::size_t, Is>(), std::forward<Tuples>(tuples)...)...);
+    return std::make_tuple(
+        [&f](auto i, auto&&... ts) -> decltype(auto) {
+            return f(i, std::get<i>(std::forward<decltype(ts)>(ts))...);
+        }(std::integral_constant<std::size_t, Is>(), std::forward<Tuples>(tuples)...)...);
 }
 } // namespace detail
 
@@ -88,8 +90,8 @@ std::tuple<std::tuple_element_t<Ints, std::decay_t<Tuple>>...> selectTuple(Tuple
 }
 
 template<std::size_t... Is>
-constexpr auto indexSequenceReverse(std::index_sequence<Is...> const&)
-    -> decltype(std::index_sequence<sizeof...(Is) - 1U - Is...>{});
+constexpr auto
+indexSequenceReverse(std::index_sequence<Is...> const&) -> decltype(std::index_sequence<sizeof...(Is) - 1U - Is...>{});
 
 template<std::size_t N>
 using makeIndexSequenceReverse = decltype(indexSequenceReverse(std::make_index_sequence<N>{}));
