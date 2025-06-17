@@ -212,6 +212,26 @@ HOST_DEVICE_FUN constexpr KeyType decodePlaceholderBit(KeyType code)
     return ret << (3 * maxTreeLevel<KeyType>{} - prefixLength);
 }
 
+/*! @brief decode an SFC key in Warren-Salmon placeholder bit format
+ *
+ * @tparam KeyType   32- or 64-bit unsigned integer
+ * @param code       input SFC key with 1-bit prepended
+ * @return           SFC-key without 1-bit and shifted to most significant bit
+ *
+ * Inverts encodePlaceholderBit.
+ */
+template<class KeyType>
+HOST_DEVICE_FUN constexpr util::tuple<KeyType, KeyType> decodePlaceholderBit2K(KeyType code)
+{
+    int prefixLength        = decodePrefixLength(code);
+    KeyType placeHolderMask = KeyType(1) << prefixLength;
+    KeyType ret             = code ^ placeHolderMask;
+
+    int nShifts = 3 * maxTreeLevel<KeyType>{} - prefixLength;
+    auto k1     = ret << nShifts;
+    return {k1, k1 + (KeyType(1) << nShifts)};
+}
+
 //! @brief Mask key to set special status. Does not support WS-prefix keys.
 template<class KeyType>
 KeyType maskKey(KeyType key)
