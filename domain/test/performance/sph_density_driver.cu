@@ -14,10 +14,14 @@
  */
 
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
+#include <format>
 #include <limits>
 #include <map>
 #include <tuple>
+#include <type_traits>
+#include <typeinfo>
 #include <vector>
 
 #include <thrust/universal_vector.h>

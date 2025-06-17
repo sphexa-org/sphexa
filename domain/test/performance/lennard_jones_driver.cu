@@ -13,12 +13,16 @@
  * @author Felix Thaler <thaler@cscs.ch>
  */
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <format>
 #include <limits>
 #include <map>
 #include <tuple>
+#include <type_traits>
+#include <typeinfo>
 #include <vector>
 
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
