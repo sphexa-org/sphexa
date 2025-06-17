@@ -26,7 +26,7 @@ using namespace cstone;
  *
  * @tparam KeyType     32- or 64-bit unsigned integer
  * @tparam T           float or double
- * @param  tree        cornerstone octree leaves
+ * @param  octree        cornerstone octree leaves
  * @param  haloRadii   floating point collision radius per octree leaf
  * @param  box         bounding box used to construct the octree
  *
@@ -36,34 +36,34 @@ using namespace cstone;
  * naive all-to-all algorithm and the results are compared.
  */
 template<class KeyType, class T>
-static void generalCollisionTest(const std::vector<KeyType>& tree, const std::vector<T>& haloRadii, const Box<T>& box)
+static void generalCollisionTest(const Octree<KeyType>& octree, const std::vector<T>& haloRadii, const Box<T>& box)
 {
-    Octree<KeyType> octree;
-    octree.update(tree.data(), nNodes(tree));
-
     // tree traversal collision detection
-    std::vector<std::vector<TreeNodeIndex>> collisions(nNodes(tree));
-    for (std::size_t leafIdx = 0; leafIdx < nNodes(tree); ++leafIdx)
+    std::vector<std::vector<TreeNodeIndex>> collisions(octree.numTreeNodes());
+    for (TreeNodeIndex i = 0; i < octree.numTreeNodes(); ++i)
     {
-        T radius     = haloRadii[leafIdx];
-        IBox haloBox = makeHaloBox(tree[leafIdx], tree[leafIdx + 1], radius, box);
+        auto [k1, k2] = decodePlaceholderBit2K(octree.nodeKeys()[i]);
+        IBox haloBox  = makeHaloBox(k1, k2, haloRadii[i], box);
 
-        auto storeCollisions = [&collisionList = collisions[leafIdx], toLeaf = octree.toLeafOrder()](TreeNodeIndex i)
-        { collisionList.push_back(toLeaf[i]); };
+        std::vector<uint8_t> flags(octree.numTreeNodes(), 0);
+        findCollisions(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(), haloBox,
+                       KeyType(0), KeyType(0), flags.data());
 
-        findCollisions(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(), storeCollisions,
-                       haloBox, KeyType(0), KeyType(0));
+        for (std::size_t fi = 0; fi < flags.size(); ++fi)
+        {
+            if (flags[fi]) { collisions[i].push_back(fi); }
+        }
     }
 
     // naive all-to-all algorithm
-    std::vector<std::vector<TreeNodeIndex>> refCollisions = findCollisionsAll2all<KeyType>(tree, haloRadii, box);
+    auto refCollisions = findCollisionsAll2all<KeyType>(octree.nodeKeys(), haloRadii, box);
 
-    for (std::size_t nodeIndex = 0; nodeIndex < nNodes(tree); ++nodeIndex)
+    for (TreeNodeIndex i = 0; i < octree.numTreeNodes(); ++i)
     {
-        std::sort(begin(collisions[nodeIndex]), end(collisions[nodeIndex]));
-        std::sort(begin(refCollisions[nodeIndex]), end(refCollisions[nodeIndex]));
+        std::ranges::sort(begin(collisions[i]), end(collisions[i]));
+        std::ranges::sort(begin(refCollisions[i]), end(refCollisions[i]));
 
-        EXPECT_EQ(collisions[nodeIndex], refCollisions[nodeIndex]);
+        EXPECT_EQ(collisions[i], refCollisions[i]);
     }
 }
 
@@ -72,10 +72,12 @@ template<class I, class T, BoundaryType Pbc>
 void irregularTreeTraversal()
 {
     auto tree = OctreeMaker<I>{}.divide().divide(0).divide(0, 7).makeTree();
+    Octree<I> octree;
+    octree.update(tree.data(), nNodes(tree));
 
     Box<T> box(0, 1, 0, 1, 0, 1, Pbc, Pbc, Pbc);
-    std::vector<T> haloRadii(nNodes(tree), 0.1);
-    generalCollisionTest(tree, haloRadii, box);
+    std::vector<T> haloRadii(octree.numTreeNodes(), 0.1);
+    generalCollisionTest(octree, haloRadii, box);
 }
 
 TEST(Collisions, irregularTreeTraversal)
@@ -99,11 +101,13 @@ template<class I, class T, BoundaryType Pbc>
 void regularTreeTraversal()
 {
     auto tree = makeUniformNLevelTree<I>(512, 1);
+    Octree<I> octree;
+    octree.update(tree.data(), nNodes(tree));
 
     Box<T> box(0, 1, 0, 1, 0, 1, Pbc, Pbc, Pbc);
     // node edge length is 0.125
-    std::vector<T> haloRadii(nNodes(tree), 0.124);
-    generalCollisionTest(tree, haloRadii, box);
+    std::vector<T> haloRadii(octree.numTreeNodes(), 0.124);
+    generalCollisionTest(octree, haloRadii, box);
 }
 
 TEST(Collisions, regularTreeTraversal)
@@ -124,7 +128,7 @@ TEST(Collisions, regularTreeTraversalPbc)
 
 /*! @brief test tree traversal with anisotropic boxes
  *
- * anisotropic boxes with a single halo radius per node
+ * Boxes with a single halo radius per node
  * results in different x,y,z halo search lengths once
  * the coordinates are normalized to the cubic unit box.
  */
@@ -136,14 +140,16 @@ public:
     {
         // 8x8x8 grid
         auto tree = makeUniformNLevelTree<I>(512, 1);
+        Octree<I> octree;
+        octree.update(tree.data(), nNodes(tree));
 
         Box<T> box(std::get<0>(GetParam()), std::get<1>(GetParam()), std::get<2>(GetParam()), std::get<3>(GetParam()),
                    std::get<4>(GetParam()), std::get<5>(GetParam()));
 
         // node edge length is 0.125 in the compressed dimension
         // and 0.250 in the other two dimensions
-        std::vector<T> haloRadii(nNodes(tree), 0.175);
-        generalCollisionTest(tree, haloRadii, box);
+        std::vector<T> haloRadii(octree.numTreeNodes(), 0.175);
+        generalCollisionTest(octree, haloRadii, box);
     }
 };
 

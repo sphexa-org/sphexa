@@ -435,9 +435,9 @@ public:
      *
      * @tparam    T            float or double
      * @param[in] assignment   assignment of the global leaf tree to ranks
-     * @param[in] invTheta     inverse effective opening angle, 1/theta + 0.5
+     * @param[in] invThetaEff  inverse effective opening angle, 1/theta + 0.5
      */
-    void updateMinMac(const SfcAssignment<KeyType>& assignment, float invThetaEff)
+    void updateMinMac(const SfcAssignment<KeyType>& assignment, float invThetaEff, bool accumulate)
     {
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -457,7 +457,7 @@ public:
             }
         }
 
-        updateMacs(assignment, invThetaEff);
+        updateMacs(assignment, invThetaEff, accumulate);
     }
 
     //! @brief Compute MAC acceptance radius of each cell based on @p invTheta and previously computed expansion centers
@@ -485,8 +485,13 @@ public:
      * centers_ = geo centers, invTheta = 1/theta + 0.5     -> Identical to MinMac along the axes through the center,
      *                                                         slightly less restrictive in the diagonal directions
      */
-    void updateMacs(const SfcAssignment<KeyType>& assignment, float invTheta, bool accumulate = false)
+    void updateMacs(const SfcAssignment<KeyType>& assignment, float invTheta, bool accumulate)
     {
+        if (accumulate &&
+            (TreeNodeIndex(macs_.size()) != treeData_.numNodes && TreeNodeIndex(macsAcc_.size()) != treeData_.numNodes))
+        {
+            throw std::runtime_error("MAC flags not correctly allocated\n");
+        }
         setMacRadius(invTheta);
         macs_.resize(treeData_.numNodes);
 
@@ -523,7 +528,7 @@ public:
      * @param[-]  scratch          host or device buffer for temporary use
      */
     template<class Th, class Vector>
-    void discoverHalos(std::span<LocalIndex> layout, const Th* h, float searchExtFact, Vector& scratch)
+    void discoverHalos(std::span<LocalIndex> layout, const Th* h, float searchExtFact, Vector& scratch, bool accumulate)
     {
         TreeNodeIndex firstNode      = assignment_[myRank_].start();
         TreeNodeIndex lastNode       = assignment_[myRank_].end();
@@ -531,7 +536,12 @@ public:
         TreeNodeIndex numNodesSearch = lastNode - firstNode;
         TreeNodeIndex numLeafNodes   = let.numLeafNodes;
 
-        reallocate(numLeafNodes, allocGrowthRate_, haloFlags_, haloFlagsAcc_);
+        if (accumulate &&
+            (TreeNodeIndex(macs_.size()) != let.numNodes && TreeNodeIndex(macsAcc_.size()) != let.numNodes))
+        {
+            throw std::runtime_error("halo flags not correctly allocated\n");
+        }
+        reallocate(let.numNodes, allocGrowthRate_, macs_, macsAcc_);
 
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -546,11 +556,10 @@ public:
             // SPH convention: interaction radius = 2 * h
             scaleGpu(d_radii, d_radii + numLeafNodes, 2.0f * searchExtFact);
 
-            fillGpu(haloFlagsAcc_.data(), haloFlagsAcc_.data() + numLeafNodes, uint8_t{0});
-            auto let = octreeViewAcc();
-            findHalosGpu(let.prefixes, let.childOffsets, let.parents, let.internalToLeaf, leavesAcc_.data(), d_radii,
-                         box_, firstNode, lastNode, haloFlagsAcc_.data());
-            memcpyD2H(haloFlagsAcc_.data(), numLeafNodes, haloFlags_.data());
+            if (not accumulate) { fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
+            findHalosGpu(let.prefixes, let.childOffsets, let.parents, leavesAcc_.data(), d_radii, box_, firstNode,
+                         lastNode, macsAcc_.data());
+            memcpyD2H(macsAcc_.data(), let.numNodes, macs_.data());
 
             reallocate(scratch, origSize, 1.0);
         }
@@ -569,26 +578,15 @@ public:
                     haloRadii[i + firstNode] = *std::max_element(h + layout[i], h + layout[i + 1]) * 2 * searchExtFact;
                 }
             }
-            std::fill(begin(haloFlags_), end(haloFlags_), 0);
-            findHalos(let.prefixes, let.childOffsets, let.parents, let.internalToLeaf, leaves_.data(), haloRadii.data(),
-                      box_, firstNode, lastNode, haloFlags_.data());
-        }
-    }
-
-    void addMacs()
-    {
-        const TreeNodeIndex* toInternal = leafToInternal(treeData_).data();
-#pragma omp parallel for schedule(static)
-        for (std::size_t i = 0; i < haloFlags_.size(); ++i)
-        {
-            size_t iIdx = toInternal[i];
-            if (macs_[iIdx] && !haloFlags_[i]) { haloFlags_[i] = 1; }
+            if (not accumulate) { std::fill(rawPtr(macs_), rawPtr(macs_) + macs_.size(), uint8_t(0)); }
+            findHalos(let.prefixes, let.childOffsets, let.parents, leaves_.data(), haloRadii.data(), box_, firstNode,
+                      lastNode, macs_.data());
         }
     }
 
     int computeLayout(std::span<LocalIndex> layout) const
     {
-        computeNodeLayout<false>(leafCounts_, haloFlags_, assignment_[myRank_], layout);
+        computeNodeLayout<false>(leafCounts_, macs_, leafToInternal(treeData_), assignment_[myRank_], layout);
         return checkLayout(myRank_, assignment_, layout, treeLeaves());
     }
 
@@ -606,7 +604,7 @@ public:
         int converged = 0;
         while (converged != numRanks_)
         {
-            updateMinMac(assignment, invThetaEff);
+            updateMinMac(assignment, invThetaEff, false);
             converged = updateTree(peers, assignment, box);
             updateCounts(particleKeys, globalTreeLeaves, globalCounts, scratch);
             updateGeoCenters();
@@ -660,7 +658,7 @@ public:
     std::span<const Vec3<RealType>> geoCentersAcc() const { return {rawPtr(geoCentersAcc_), geoCentersAcc_.size()}; }
     std::span<const Vec3<RealType>> geoSizesAcc() const { return {rawPtr(geoSizesAcc_), geoSizesAcc_.size()}; }
 
-    std::span<const uint8_t> haloFlags() const { return haloFlags_; }
+    //std::span<const uint8_t> haloFlags() const { return haloFlags_; }
 
 private:
     //! @brief compute geometrical center and size of each tree cell in terms of x,y,z coordinates
@@ -769,8 +767,6 @@ private:
     //! @brief mac evaluation result relative to focus area (pass or fail)
     std::vector<uint8_t> macs_;
     AccVector<uint8_t> macsAcc_;
-    std::vector<uint8_t> haloFlags_;
-    AccVector<uint8_t> haloFlagsAcc_;
     //! @brief the expansion (com) centers of each cell of tree_.octree()
     std::vector<SourceCenterType<RealType>> centers_;
     AccVector<SourceCenterType<RealType>> centersAcc_;
