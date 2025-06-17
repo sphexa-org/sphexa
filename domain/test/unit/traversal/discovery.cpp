@@ -23,20 +23,23 @@
 using namespace cstone;
 
 template<class KeyType, class T>
-std::vector<uint8_t> findHalosAll2All(std::span<const KeyType> tree,
+std::vector<uint8_t> findHalosAll2All(std::span<const KeyType> nodeKeys,
                                       const std::vector<T>& haloRadii,
                                       const Box<T>& box,
-                                      TreeNodeIndex firstNode,
-                                      TreeNodeIndex lastNode)
+                                      KeyType exclStart,
+                                      KeyType exclEnd)
 {
-    std::vector<uint8_t> flags(nNodes(tree));
-    auto collisions = findCollisionsAll2all(tree, haloRadii, box);
+    std::vector<uint8_t> flags(nodeKeys.size());
+    auto collisions = findCollisionsAll2all(nodeKeys, haloRadii, box);
 
-    for (TreeNodeIndex i = firstNode; i < lastNode; ++i)
+    for (size_t i = 0; i < collisions.size(); ++i)
     {
-        for (TreeNodeIndex cidx : collisions[i])
+        auto [k1, k2] = decodePlaceholderBit2K(nodeKeys[i]);
+        if (!containedIn(k1, k2, exclStart, exclEnd)) { continue; } // select only targets in excluded range
+        for (size_t cidx : collisions[i])
         {
-            if (cidx < firstNode || cidx >= lastNode) { flags[cidx] = 1; }
+            auto [k1, k2] = decodePlaceholderBit2K(nodeKeys[cidx]);
+            if (!containedIn(k1, k2, exclStart, exclEnd)) { flags[cidx] = 1; } // only count sources outside exclusion
         }
     }
 
@@ -50,33 +53,41 @@ void findHalosFlags()
 
     Box<double> box(0, 1);
 
-    // size of one node is 0.25^3
-    std::vector<double> interactionRadii(nNodes(tree), 0.1);
-
     Octree<KeyType> octree;
     octree.update(tree.data(), nNodes(tree));
+    auto leaf2int = octree.internalOrder();
 
     {
-        std::vector<uint8_t> collisionFlags(nNodes(tree), 0);
-        findHalos(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(),
-                  octree.toLeafOrder().data(), tree.data(), interactionRadii.data(), box, 0, 32, collisionFlags.data());
+        // size of one node is 0.25^3
+        std::vector<double> interactionRadii(nNodes(tree), 0.1);
+        std::vector<double> iRadiiInt(octree.numTreeNodes(), 0.1);
 
-        std::vector<uint8_t> reference = findHalosAll2All<KeyType>(tree, interactionRadii, box, 0, 32);
+        std::vector<uint8_t> collisionFlags(octree.numTreeNodes(), 0);
+        findHalos(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(), tree.data(),
+                  interactionRadii.data(), box, 0, 32, collisionFlags.data());
+
+        std::vector<uint8_t> reference =
+            findHalosAll2All<KeyType>(octree.nodeKeys(), iRadiiInt, box, tree[0], tree[32]);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes
-        EXPECT_EQ(16, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
+        EXPECT_EQ(21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
+        EXPECT_EQ(21, std::accumulate(reference.begin(), reference.end(), 0));
         EXPECT_EQ(collisionFlags, reference);
     }
     {
-        std::vector<uint8_t> collisionFlags(nNodes(tree), 0);
-        findHalos(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(),
-                  octree.toLeafOrder().data(), tree.data(), interactionRadii.data(), box, 32, 64,
-                  collisionFlags.data());
+        // size of one node is 0.25^3
+        std::vector<double> interactionRadii(nNodes(tree), 0.1);
+        std::vector<double> iRadiiInt(octree.numTreeNodes(), 0.1);
 
-        std::vector<uint8_t> reference = findHalosAll2All<KeyType>(tree, interactionRadii, box, 32, 64);
+        std::vector<uint8_t> collisionFlags(octree.numTreeNodes(), 0);
+        findHalos(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(), tree.data(),
+                  interactionRadii.data(), box, 32, 64, collisionFlags.data());
+
+        std::vector<uint8_t> reference =
+            findHalosAll2All<KeyType>(octree.nodeKeys(), iRadiiInt, box, tree[32], tree[64]);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes
-        EXPECT_EQ(16, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
+        EXPECT_EQ(21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
         EXPECT_EQ(collisionFlags, reference);
     }
 }

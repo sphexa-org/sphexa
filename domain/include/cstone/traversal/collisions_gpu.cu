@@ -24,7 +24,6 @@ template<class KeyType, class RadiusType, class T>
 __global__ void findHalosKernel(const KeyType* nodePrefixes,
                                 const TreeNodeIndex* childOffsets,
                                 const TreeNodeIndex* parents,
-                                const TreeNodeIndex* internalToLeaf,
                                 const KeyType* leaves,
                                 const RadiusType* interactionRadii,
                                 const Box<T> box,
@@ -33,8 +32,6 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
                                 uint8_t* collisionFlags)
 {
     unsigned leafIdx = blockIdx.x * blockDim.x + threadIdx.x + firstNode;
-
-    auto markCollisions = [collisionFlags, internalToLeaf](TreeNodeIndex i) { collisionFlags[internalToLeaf[i]] = 1; };
 
     if (leafIdx < lastNode)
     {
@@ -47,7 +44,7 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
         if (containedIn(lowestKey, highestKey, haloBox)) { return; }
 
         // mark all colliding node indices outside [lowestKey:highestKey]
-        findCollisions(nodePrefixes, childOffsets, parents, markCollisions, haloBox, lowestKey, highestKey);
+        findCollisions(nodePrefixes, childOffsets, parents, haloBox, lowestKey, highestKey, collisionFlags);
     }
 }
 
@@ -74,7 +71,6 @@ template<class KeyType, class RadiusType, class T>
 void findHalosGpu(const KeyType* prefixes,
                   const TreeNodeIndex* childOffsets,
                   const TreeNodeIndex* parents,
-                  const TreeNodeIndex* internalToLeaf,
                   const KeyType* leaves,
                   const RadiusType* interactionRadii,
                   const Box<T>& box,
@@ -86,15 +82,15 @@ void findHalosGpu(const KeyType* prefixes,
     unsigned numBlocks            = iceil(lastNode - firstNode, numThreads);
 
     if (numBlocks == 0) { return; }
-    findHalosKernel<<<numBlocks, numThreads>>>(prefixes, childOffsets, parents, internalToLeaf, leaves,
-                                               interactionRadii, box, firstNode, lastNode, collisionFlags);
+    findHalosKernel<<<numBlocks, numThreads>>>(prefixes, childOffsets, parents, leaves, interactionRadii, box,
+                                               firstNode, lastNode, collisionFlags);
 }
 
 #define FIND_HALOS_GPU(KeyType, RadiusType, T)                                                                         \
     template void findHalosGpu(const KeyType* prefixes, const TreeNodeIndex* childOffsets,                             \
-                               const TreeNodeIndex* parents, const TreeNodeIndex* internalToLeaf,                      \
-                               const KeyType* leaves, const RadiusType* interactionRadii, const Box<T>& box,           \
-                               TreeNodeIndex firstNode, TreeNodeIndex lastNode, uint8_t* collisionFlags)
+                               const TreeNodeIndex* parents, const KeyType* leaves,                                    \
+                               const RadiusType* interactionRadii, const Box<T>& box, TreeNodeIndex firstNode,         \
+                               TreeNodeIndex lastNode, uint8_t* collisionFlags)
 
 FIND_HALOS_GPU(uint32_t, float, float);
 FIND_HALOS_GPU(uint32_t, float, double);

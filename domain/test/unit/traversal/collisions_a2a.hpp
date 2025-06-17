@@ -32,13 +32,14 @@ namespace cstone
  * and testing purposes
  */
 template<class KeyType>
-void findCollisions2All(std::span<const KeyType> tree,
+void findCollisions2All(std::span<const KeyType> nodeKeys,
                         std::vector<TreeNodeIndex>& collisionList,
                         const IBox& collisionBox)
 {
-    for (TreeNodeIndex idx = 0; idx < TreeNodeIndex(nNodes(tree)); ++idx)
+    for (TreeNodeIndex idx = 0; idx < TreeNodeIndex(nodeKeys.size()); ++idx)
     {
-        IBox nodeBox = sfcIBox(sfcKey(tree[idx]), sfcKey(tree[idx + 1]));
+        auto [k1, k2] = decodePlaceholderBit2K(nodeKeys[idx]);
+        IBox nodeBox  = sfcIBox(sfcKey(k1), sfcKey(k2));
         if (overlap<KeyType>(nodeBox, collisionBox)) { collisionList.push_back(idx); }
     }
 }
@@ -46,16 +47,17 @@ void findCollisions2All(std::span<const KeyType> tree,
 //! @brief all-to-all implementation of findAllCollisions
 template<class KeyType, class T>
 std::vector<std::vector<TreeNodeIndex>>
-findCollisionsAll2all(std::span<const KeyType> tree, const std::vector<T>& haloRadii, const Box<T>& globalBox)
+findCollisionsAll2all(std::span<const KeyType> nodeKeys, const std::vector<T>& haloRadii, const Box<T>& globalBox)
 {
-    std::vector<std::vector<TreeNodeIndex>> collisions(tree.size() - 1);
+    std::vector<std::vector<TreeNodeIndex>> collisions(nodeKeys.size());
 
-    for (TreeNodeIndex leafIdx = 0; leafIdx < TreeNodeIndex(nNodes(tree)); ++leafIdx)
+    for (TreeNodeIndex i = 0; i < TreeNodeIndex(nodeKeys.size()); ++i)
     {
-        T radius = haloRadii[leafIdx];
+        T radius = haloRadii[i];
 
-        IBox haloBox = makeHaloBox(tree[leafIdx], tree[leafIdx + 1], radius, globalBox);
-        findCollisions2All<KeyType>(tree, collisions[leafIdx], haloBox);
+        auto [k1, k2] = decodePlaceholderBit2K(nodeKeys[i]);
+        IBox haloBox = makeHaloBox(k1, k2, radius, globalBox);
+        findCollisions2All<KeyType>(nodeKeys, collisions[i], haloBox);
     }
 
     return collisions;

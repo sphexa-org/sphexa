@@ -54,6 +54,7 @@ void exchangeKeys(int myRank, int numRanks)
 {
     std::vector<unsigned> counts{2, 2, 1, 1, 1, 1, 2, 2};
     std::vector<uint8_t> haloFlags{0, 1, 0, 0, 0, 0, 1, 0};
+    std::vector<TreeNodeIndex> fakeLeaf2Internal{0, 1, 2, 3, 4, 5, 6, 7};
 
     std::vector<unsigned> layout(counts.size() + 1);
 
@@ -72,7 +73,7 @@ void exchangeKeys(int myRank, int numRanks)
     }
 
     assignment[myRank] = TreeIndexPair(2, 6);
-    computeNodeLayout<false>(counts, haloFlags, assignment[myRank], layout);
+    computeNodeLayout<false>(counts, haloFlags, fakeLeaf2Internal, assignment[myRank], layout);
 
     if (myRank < numRanks - 1)
     {
@@ -121,8 +122,9 @@ void unequalSurface(int myRank, int numRanks)
     if (myRank == 1)
     {
         haloFlags = std::vector<uint8_t>{1, 1, 0, 1, 1, 1, 1, 1};
+        std::vector<TreeNodeIndex> fakeLeaf2Internal{0, 1, 2, 3, 4, 5, 6, 7};
         peers.push_back(0);
-        computeNodeLayout<false>(counts, haloFlags, assignment[1], layout);
+        computeNodeLayout<false>(counts, haloFlags, fakeLeaf2Internal, assignment[1], layout);
         EXPECT_EQ(layout[7], 6);
         reference[0].addRange(layout[7], layout[8]);
 
@@ -133,8 +135,9 @@ void unequalSurface(int myRank, int numRanks)
     if (myRank == 0)
     {
         haloFlags = std::vector<uint8_t>{0, 0, 0, 0, 0, 0, 0, 1};
+        std::vector<TreeNodeIndex> fakeLeaf2Internal{0, 1, 2, 3, 4, 5, 6, 7};
         peers.push_back(1);
-        computeNodeLayout<false>(counts, haloFlags, assignment[0], layout);
+        computeNodeLayout<false>(counts, haloFlags, fakeLeaf2Internal, assignment[0], layout);
         reference[1].addRange(layout[0], layout[2]);
         reference[1].addRange(layout[3], layout[7]);
     }

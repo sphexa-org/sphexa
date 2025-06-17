@@ -206,9 +206,8 @@ TEST(Grids, assembleCuboidAdditive)
     std::vector<T> xRef, yRef, zRef;
     assembleCuboid<T>(KeyType(0), cstone::nodeRange<KeyType>(0), box, multiplicity, xb, yb, zb, xRef, yRef, zRef);
 
-    [](auto&&... vecs) {
-        [[maybe_unused]] std::initializer_list<int>{(std::sort(vecs.begin(), vecs.end()), 0)...};
-    }(x, y, z, xRef, yRef, zRef);
+    [](auto&&... vecs)
+    { std::initializer_list<int>{(std::sort(vecs.begin(), vecs.end()), 0)...}; }(x, y, z, xRef, yRef, zRef);
 
     EXPECT_EQ(x, xRef);
     EXPECT_EQ(y, yRef);
