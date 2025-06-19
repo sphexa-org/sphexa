@@ -584,9 +584,20 @@ public:
         }
     }
 
-    int computeLayout(std::span<LocalIndex> layout) const
+    int computeLayout(std::span<LocalIndex> layoutAcc, std::span<LocalIndex> layout) const
     {
-        computeNodeLayout<false>(leafCounts_, macs_, leafToInternal(treeData_), assignment_[myRank_], layout);
+        if constexpr (HaveGpu<Accelerator>{})
+        {
+            computeNodeLayout<true>({leafCountsAcc_.data(), leafCountsAcc().size()}, {macsAcc_.data(), macsAcc_.size()},
+                                    leafToInternal(octreeAcc_), assignment_[myRank_], layoutAcc);
+            memcpyD2H(layoutAcc.data(), layoutAcc.size(), layout.data());
+        }
+        else
+        {
+            computeNodeLayout<false>({leafCounts_.data(), leafCountsAcc().size()}, {macs_.data(), macs_.size()},
+                                     leafToInternal(treeData_), assignment_[myRank_], layout);
+        }
+
         return checkLayout(myRank_, assignment_, layout, treeLeaves());
     }
 
