@@ -111,7 +111,7 @@ void globalRandomGaussian(int thisRank, int numRanks)
     int converged = 0;
     while (converged != numRanks)
     {
-        converged = focusTree.updateTree(peers, assignment, box);
+        converged = focusTree.updateTree(peers, assignment, box, scratch);
         focusTree.updateCounts(particleKeys, tree, counts, scratch);
         focusTree.updateMinMac(assignment, invThetaEff, false);
         MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);

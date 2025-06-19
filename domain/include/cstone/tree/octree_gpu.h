@@ -33,6 +33,14 @@ namespace cstone
 template<class KeyType>
 extern void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d);
 
+//! @brief same as above, but using existing buffers to avoid temporary memory allocation
+template<class KeyType>
+extern void buildOctreeGpu(const KeyType* cstoneTree,
+                           OctreeView<KeyType> d,
+                           std::span<KeyType> keyBuf,
+                           std::span<TreeNodeIndex> valueBuf,
+                           std::span<char> cubTmp);
+
 //! @brief Upsweep by summing up child nodes, e.g. to compute particle node counts
 void upsweepSumGpu(int numLvl, const TreeNodeIndex* lvlRange, const TreeNodeIndex* childOffsets, LocalIndex* counts);
 

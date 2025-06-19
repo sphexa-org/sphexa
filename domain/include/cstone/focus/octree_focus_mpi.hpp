@@ -82,11 +82,17 @@ public:
      *
      * @param[in] peerRanks        list of ranks with nodes that fail the MAC in the SFC part assigned to @p myRank
      * @param[in] assignment       assignment of the global leaf tree to ranks
+     * @param[in] box              global coordinate bounding box
+     * @param     scratch          memory buffer for temporary usage, on device for the GPU version
      * @return                     true if the tree structure did not change
      *
      * The part of the SFC that is assigned to @p myRank is considered as the focus area.
      */
-    bool updateTree(std::span<const int> peerRanks, const SfcAssignment<KeyType>& assignment, const Box<RealType>& box)
+    template<class Vector>
+    bool updateTree(std::span<const int> peerRanks,
+                    const SfcAssignment<KeyType>& assignment,
+                    const Box<RealType>& box,
+                    Vector& scratch)
     {
         if (rebalanceStatus_ != valid)
         {
@@ -123,7 +129,7 @@ public:
         {
             converged = CombinedUpdate<KeyType>::updateFocusGpu(
                 octreeAcc_, leavesAcc_, bucketSize_, focusStart, focusEnd, enforcedKeys,
-                {rawPtr(countsAcc_), countsAcc_.size()}, {rawPtr(macsAcc_), macsAcc_.size()});
+                {rawPtr(countsAcc_), countsAcc_.size()}, {rawPtr(macsAcc_), macsAcc_.size()}, scratch);
 
             while (not macRefineGpu(octreeAcc_, leavesAcc_, centersAcc_, macsAcc_, prevFocusStart, prevFocusEnd,
                                     focusStart, focusEnd, invThetaRefine, box))
@@ -610,7 +616,7 @@ public:
         while (converged != numRanks_)
         {
             updateMinMac(assignment, invThetaEff, false);
-            converged = updateTree(peers, assignment, box);
+            converged = updateTree(peers, assignment, box, scratch);
             updateCounts(particleKeys, globalTreeLeaves, globalCounts, scratch);
             updateGeoCenters();
             MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);

@@ -19,6 +19,7 @@
 #include <thrust/fill.h>
 
 #include "cstone/primitives/math.hpp"
+#include "cstone/primitives/primitives_gpu.h"
 #include "cstone/sfc/common.hpp"
 #include "cstone/tree/octree_gpu.h"
 
@@ -134,7 +135,11 @@ invertOrder(TreeNodeIndex* order, TreeNodeIndex* inverseOrder, TreeNodeIndex num
 }
 
 template<class KeyType>
-void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d)
+void buildOctreeGpu(const KeyType* cstoneTree,
+                    OctreeView<KeyType> d,
+                    std::span<KeyType> keyBuf,
+                    std::span<TreeNodeIndex> valueBuf,
+                    std::span<char> cubTmp)
 {
     constexpr unsigned numThreads = 256;
 
@@ -142,7 +147,9 @@ void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d)
     createUnsortedLayout<<<iceil(numNodes, numThreads), numThreads>>>(cstoneTree, d.numInternalNodes, d.numLeafNodes,
                                                                       d.prefixes, d.internalToLeaf);
 
-    thrust::sort_by_key(thrust::device, d.prefixes, d.prefixes + numNodes, d.internalToLeaf);
+    assert(keyBuf.size() == d.numNodes && valueBuf.size() == d.numNodes);
+    sortByKeyGpu(d.prefixes, d.prefixes + numNodes, d.internalToLeaf, keyBuf.data(), valueBuf.data(), cubTmp.data(),
+                 cubTmp.size());
 
     invertOrder<<<iceil(numNodes, numThreads), numThreads>>>(d.internalToLeaf, d.leafToInternal, numNodes,
                                                              d.numInternalNodes);
@@ -154,6 +161,30 @@ void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d)
         linkTree<<<iceil(d.numInternalNodes, numThreads), numThreads>>>(
             d.prefixes, d.numInternalNodes, d.leafToInternal, d.levelRange, d.childOffsets, d.parents);
     }
+}
+
+template void
+buildOctreeGpu(const uint32_t*, OctreeView<uint32_t>, std::span<uint32_t>, std::span<TreeNodeIndex>, std::span<char>);
+template void
+buildOctreeGpu(const uint64_t*, OctreeView<uint64_t>, std::span<uint64_t>, std::span<TreeNodeIndex>, std::span<char>);
+
+template<class KeyType>
+void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d)
+{
+    KeyType* keyBuf;
+    TreeNodeIndex* valueBuf;
+    char* cubTmp;
+    uint64_t spaceForLevelRange = sizeof(TreeNodeIndex) * maxTreeLevel<KeyType>{} + 2;
+    uint64_t tmpStorage = std::max(sortByKeyTempStorage<KeyType, TreeNodeIndex>(d.numNodes), spaceForLevelRange);
+    checkGpuErrors(cudaMalloc(&keyBuf, sizeof(KeyType) * d.numNodes));
+    checkGpuErrors(cudaMalloc(&valueBuf, sizeof(TreeNodeIndex) * d.numNodes));
+    checkGpuErrors(cudaMalloc(&cubTmp, tmpStorage));
+
+    buildOctreeGpu(cstoneTree, d, {keyBuf, size_t(d.numNodes)}, {valueBuf, size_t(d.numNodes)}, {cubTmp, tmpStorage});
+
+    checkGpuErrors(cudaFree(keyBuf));
+    checkGpuErrors(cudaFree(valueBuf));
+    checkGpuErrors(cudaFree(cubTmp));
 }
 
 template void buildOctreeGpu(const uint32_t*, OctreeView<uint32_t>);
