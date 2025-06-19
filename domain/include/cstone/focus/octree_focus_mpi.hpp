@@ -647,9 +647,6 @@ public:
         else { return leaves_; }
     }
 
-    //! brief particle counts per focus tree leaf cell
-    std::span<const unsigned> leafCounts() const { return leafCounts_; }
-
     //! @brief the cornerstone leaf cell particle counts
     std::span<const unsigned> leafCountsAcc() const
     {
@@ -662,8 +659,6 @@ public:
 
     std::span<const Vec3<RealType>> geoCentersAcc() const { return {rawPtr(geoCentersAcc_), geoCentersAcc_.size()}; }
     std::span<const Vec3<RealType>> geoSizesAcc() const { return {rawPtr(geoSizesAcc_), geoSizesAcc_.size()}; }
-
-    //std::span<const uint8_t> haloFlags() const { return haloFlags_; }
 
 private:
     //! @brief compute geometrical center and size of each tree cell in terms of x,y,z coordinates
