@@ -54,7 +54,7 @@ public:
         , bucketSize_(bucketSize)
         , treelets_(numRanks_)
         , counts_{bucketSize + 1}
-        , macs_{1}
+        , macsAcc_(1, 1)
         , centers_(1)
         , globAssignment_(numRanks + 1)
     {
@@ -69,7 +69,6 @@ public:
             reallocate(countsAcc_, counts_.size(), 1.0);
             memcpyH2D(counts_.data(), counts_.size(), rawPtr(countsAcc_));
 
-            reallocate(macsAcc_, macs_.size(), 1.0);
             reallocate(geoCentersAcc_, centers_.size(), 1.0);
             reallocate(centersAcc_, centers_.size(), 1.0);
         }
@@ -136,8 +135,8 @@ public:
         else
         {
             converged = CombinedUpdate<KeyType>::updateFocus(treeData_, leaves_, bucketSize_, focusStart, focusEnd,
-                                                             enforcedKeys, counts_, macs_);
-            while (not macRefine(treeData_, leaves_, centers_, macs_, prevFocusStart, prevFocusEnd, focusStart,
+                                                             enforcedKeys, counts_, macsAcc_);
+            while (not macRefine(treeData_, leaves_, centers_, macsAcc_, prevFocusStart, prevFocusEnd, focusStart,
                                  focusEnd, invThetaRefine, box))
                 ;
         }
@@ -487,13 +486,12 @@ public:
      */
     void updateMacs(const SfcAssignment<KeyType>& assignment, float invTheta, bool accumulate)
     {
-        if (accumulate &&
-            (TreeNodeIndex(macs_.size()) != treeData_.numNodes && TreeNodeIndex(macsAcc_.size()) != treeData_.numNodes))
+        if (accumulate && TreeNodeIndex(macsAcc_.size()) != treeData_.numNodes)
         {
             throw std::runtime_error("MAC flags not correctly allocated\n");
         }
         setMacRadius(invTheta);
-        macs_.resize(treeData_.numNodes);
+        reallocate(treeData_.numNodes, allocGrowthRate_, macsAcc_);
 
         // need to find again assignment start and end indices in focus tree because assignment might have changed
         TreeNodeIndex fAssignStart = findNodeAbove(rawPtr(leaves_), nNodes(leaves_), assignment[myRank_]);
@@ -506,15 +504,13 @@ public:
             markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(octreeAcc_.parents),
                         rawPtr(centersAcc_), box_, rawPtr(leavesAcc_) + fAssignStart, fAssignEnd - fAssignStart, false,
                         rawPtr(macsAcc_));
-
-            memcpyD2H(rawPtr(macsAcc_), macsAcc_.size(), macs_.data());
         }
         else
         {
-            if (not accumulate) { std::fill(rawPtr(macs_), rawPtr(macs_) + macs_.size(), uint8_t(0)); }
+            if (not accumulate) { std::fill(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
             markMacs(rawPtr(treeData_.prefixes), rawPtr(treeData_.childOffsets), rawPtr(treeData_.parents),
                      rawPtr(centers_), box_, rawPtr(leaves_) + fAssignStart, fAssignEnd - fAssignStart, false,
-                     rawPtr(macs_));
+                     rawPtr(macsAcc_));
         }
 
         rebalanceStatus_ |= macCriterion;
@@ -536,12 +532,11 @@ public:
         TreeNodeIndex numNodesSearch = lastNode - firstNode;
         TreeNodeIndex numLeafNodes   = let.numLeafNodes;
 
-        if (accumulate &&
-            (TreeNodeIndex(macs_.size()) != let.numNodes && TreeNodeIndex(macsAcc_.size()) != let.numNodes))
+        if (accumulate && TreeNodeIndex(macsAcc_.size()) != let.numNodes)
         {
             throw std::runtime_error("halo flags not correctly allocated\n");
         }
-        reallocate(let.numNodes, allocGrowthRate_, macs_, macsAcc_);
+        reallocate(let.numNodes, allocGrowthRate_, macsAcc_);
 
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -559,7 +554,6 @@ public:
             if (not accumulate) { fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
             findHalosGpu(let.prefixes, let.childOffsets, let.parents, leavesAcc_.data(), d_radii, box_, firstNode,
                          lastNode, macsAcc_.data());
-            memcpyD2H(macsAcc_.data(), let.numNodes, macs_.data());
 
             reallocate(scratch, origSize, 1.0);
         }
@@ -578,9 +572,9 @@ public:
                     haloRadii[i + firstNode] = *std::max_element(h + layout[i], h + layout[i + 1]) * 2 * searchExtFact;
                 }
             }
-            if (not accumulate) { std::fill(rawPtr(macs_), rawPtr(macs_) + macs_.size(), uint8_t(0)); }
+            if (not accumulate) { std::fill(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
             findHalos(let.prefixes, let.childOffsets, let.parents, leaves_.data(), haloRadii.data(), box_, firstNode,
-                      lastNode, macs_.data());
+                      lastNode, macsAcc_.data());
         }
     }
 
@@ -594,7 +588,7 @@ public:
         }
         else
         {
-            computeNodeLayout<false>({leafCounts_.data(), leafCountsAcc().size()}, {macs_.data(), macs_.size()},
+            computeNodeLayout<false>({leafCounts_.data(), leafCountsAcc().size()}, {macsAcc_.data(), macsAcc_.size()},
                                      leafToInternal(treeData_), assignment_[myRank_], layout);
         }
 
@@ -776,7 +770,6 @@ private:
     std::vector<unsigned> counts_;
     AccVector<unsigned> countsAcc_;
     //! @brief mac evaluation result relative to focus area (pass or fail)
-    std::vector<uint8_t> macs_;
     AccVector<uint8_t> macsAcc_;
     //! @brief the expansion (com) centers of each cell of tree_.octree()
     std::vector<SourceCenterType<RealType>> centers_;
