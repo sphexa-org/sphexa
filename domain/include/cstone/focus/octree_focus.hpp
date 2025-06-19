@@ -131,8 +131,10 @@ struct CombinedUpdate
      *                            resolved, even if the update did not converge.
      * @param[in] counts          node particle counts (including internal nodes), length = tree_.numTreeNodes()
      * @param[in] macs            MAC pass/fail results for each node, length = tree_.numTreeNodes()
+     * @param     scratch         device memory buffer for temporary usage
      * @return                    true if the tree structure did not change
      */
+    template<class Vector>
     static bool updateFocusGpu(OctreeData<KeyType, GpuTag>& tree,
                                DeviceVector<KeyType>& leaves,
                                unsigned bucketSize,
@@ -140,7 +142,8 @@ struct CombinedUpdate
                                KeyType focusEnd,
                                std::span<const KeyType> mandatoryKeys,
                                std::span<const unsigned> counts,
-                               std::span<const uint8_t> macs)
+                               std::span<const uint8_t> macs,
+                               Vector& scratch)
     {
         TreeNodeIndex numNodes = tree.numLeafNodes + tree.numInternalNodes;
         assert(TreeNodeIndex(counts.size()) == numNodes);
@@ -191,7 +194,17 @@ struct CombinedUpdate
         }
 
         tree.resize(nNodes(leaves));
-        buildOctreeGpu(rawPtr(leaves), tree.data());
+
+        size_t newNumNodes        = tree.numNodes;
+        size_t spaceForLevelRange = sizeof(TreeNodeIndex) * maxTreeLevel<KeyType>{} + 2;
+        size_t cubTmpSize = std::max(sortByKeyTempStorage<KeyType, TreeNodeIndex>(newNumNodes), spaceForLevelRange);
+
+        auto originalSize               = scratch.size();
+        auto [keyBuf, valueBuf, cubTmp] = util::packAllocBuffer(scratch, util::TypeList<KeyType, TreeNodeIndex, char>{},
+                                                                {newNumNodes, newNumNodes, cubTmpSize}, 128);
+
+        buildOctreeGpu(rawPtr(leaves), tree.data(), keyBuf, valueBuf, cubTmp);
+        scratch.resize(originalSize);
 
         return converged;
     }

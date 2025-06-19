@@ -106,6 +106,20 @@ inline std::vector<size_t> computeByteOffsets(std::span<const size_t> numElement
     return ret;
 }
 
+//! calculate needed space in bytes
+template<std::size_t N>
+constexpr std::array<size_t, N + 1>
+computeByteOffsets(std::array<size_t, N> numElements, std::array<std::size_t, N> elementSizes, int alignment)
+{
+    std::array<size_t, N + 1> ret;
+    for (std::size_t i = 0; i < numElements.size(); ++i)
+    {
+        ret[i] = cstone::round_up(numElements[i] * elementSizes[i], alignment);
+    }
+    std::exclusive_scan(ret.begin(), ret.end(), ret.begin(), size_t(0));
+    return ret;
+}
+
 /*! @brief allocate space for sum(numElements) elements and return pointers to each subrange
  *
  * @param[inout]  vec          vector-like container with linear memory
@@ -126,6 +140,24 @@ std::vector<std::span<T>> packAllocBuffer(Vector& vec, std::span<const size_t> n
         ret[i] = {reinterpret_cast<T*>(basePtr + sizeBytes[i]), numElements[i]};
     }
     return ret;
+}
+
+template<class Vector, class... Ts>
+std::tuple<std::span<Ts>...>
+packAllocBuffer(Vector& vec, TypeList<Ts...>, std::array<std::size_t, sizeof...(Ts)> numElements, int alignment)
+{
+    std::array<std::size_t, sizeof...(Ts)> elementSizes{sizeof(Ts)...};
+    auto offsets = computeByteOffsets(numElements, elementSizes, alignment);
+
+    reallocateBytes(vec, offsets.back(), 1.0);
+    char* basePtr = reinterpret_cast<char*>(vec.data());
+
+    auto packBuffers = [basePtr, &offsets, &numElements]<std::size_t... Is>(std::index_sequence<Is...>)
+    {
+        return std::make_tuple(std::span<Ts>{reinterpret_cast<Ts*>(basePtr + offsets[Is]), numElements[Is]}...);
+    };
+
+    return packBuffers(std::make_index_sequence<sizeof...(Ts)>{});
 }
 
 } // namespace util
