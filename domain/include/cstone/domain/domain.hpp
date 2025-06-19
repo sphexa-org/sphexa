@@ -197,7 +197,7 @@ public:
         reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
         focusTree_.discoverHalos({rawPtr(layoutAcc_), layoutAcc_.size()}, rawPtr(h), haloSearchExt_, get<0>(scratch),
                                  false);
-        focusTree_.computeLayout(layout_);
+        focusTree_.computeLayout({rawPtr(layoutAcc_), layoutAcc_.size()}, layout_);
         halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), peers, layout_);
 
         updateLayout(sorter, keyView, particleKeys, std::tie(h), std::tuple_cat(std::tie(x, y, z), particleProperties),
@@ -262,7 +262,7 @@ public:
             reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
             focusTree_.discoverHalos({rawPtr(layoutAcc_), layoutAcc_.size()}, rawPtr(h), haloSearchExt_,
                                      get<0>(scratch), true);
-            fail = focusTree_.computeLayout(layout_);
+            fail = focusTree_.computeLayout({rawPtr(layoutAcc_), layoutAcc_.size()}, layout_);
             MPI_Allreduce(MPI_IN_PLACE, &fail, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
             halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), peers, layout_);

@@ -91,16 +91,16 @@ void incrementGpu(const T* first, const T* last, T* d_first, T value)
 INCREMENT_GPU(unsigned);
 INCREMENT_GPU(uint64_t);
 
-template<class T, class IndexType>
-__global__ void gatherGpuKernel(const IndexType* map, size_t n, const T* source, T* destination)
+template<class TS, class TD, class IndexType>
+__global__ void gatherGpuKernel(const IndexType* map, size_t n, const TS* source, TD* destination)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (tid < n) { destination[tid] = source[map[tid]]; }
 }
 
-template<class T, class IndexType>
-void gatherGpu(const IndexType* map, size_t n, const T* source, T* destination)
+template<class TS, class TD, class IndexType>
+void gatherGpu(const IndexType* map, size_t n, const TS* source, TD* destination)
 {
     int numThreads = 256;
     int numBlocks  = iceil(n, numThreads);
@@ -108,6 +108,7 @@ void gatherGpu(const IndexType* map, size_t n, const T* source, T* destination)
     gatherGpuKernel<<<numBlocks, numThreads>>>(map, n, source, destination);
 }
 
+template void gatherGpu(const int*, size_t, const uint8_t*, uint32_t*);
 template void gatherGpu(const int*, size_t, const int*, int*);
 template void gatherGpu(const int*, size_t, const uint32_t*, uint32_t*);
 template void gatherGpu(const int*, size_t, const uint64_t*, uint64_t*);
@@ -432,15 +433,15 @@ template size_t countGpu(const int* first, const int* last, int v);
 template size_t countGpu(const unsigned* first, const unsigned* last, unsigned v);
 template size_t countGpu(const uint64_t* first, const uint64_t* last, uint64_t v);
 
-template<class T, class S>
-__global__ void selectCopyKernel(const T* src, LocalIndex n, const S* selectFlags, T* dest)
+template<class TS, class TD, class S>
+__global__ void selectCopyKernel(const TS* src, LocalIndex n, const S* selectFlags, TD* dest)
 {
     LocalIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < n && selectFlags[tid]) { dest[tid] = src[tid]; }
 }
 
-template<class T, class S>
-void selectCopy(const T* src, LocalIndex n, const S* selectFlags, T* dest)
+template<class TS, class TD, class S>
+void selectCopyGpu(const TS* src, LocalIndex n, const S* selectFlags, TD* dest)
 {
     int numThreads = 256;
     int numBlocks  = iceil(n, numThreads);
@@ -448,6 +449,7 @@ void selectCopy(const T* src, LocalIndex n, const S* selectFlags, T* dest)
     selectCopyKernel<<<numBlocks, numThreads>>>(src, n, selectFlags, dest);
 }
 
-template void selectCopy(const unsigned*, LocalIndex, const uint8_t*, unsigned*);
+template void selectCopyGpu(const int*, LocalIndex, const unsigned*, unsigned*);
+template void selectCopyGpu(const unsigned*, LocalIndex, const unsigned*, unsigned*);
 
 } // namespace cstone

@@ -142,10 +142,10 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
 
 /*! @brief calculate the location (offset) of each focus tree leaf node in the particle arrays
  *
- * @param[in]  focusLeafCounts   node counts of the focus leaves, size N
- * @param[in]  flags             flag for each node, with a non-zero value if present as halo node, size N
+ * @param[in]  focusLeafCounts   node counts of the focus leaves, size numLeafNodes
+ * @param[in]  flags             flag for each node, with a non-zero value if present as halo node, size numNodes
  * @param[in]  idx               first and last focus leaf idx of the assigned nodes on the executing rank
- * @param[out] layout            length N+1. The first element is zero, the last element is
+ * @param[out] layout            size numLeafNodes + 1. The first element is zero, the last element is
  *                               equal to the sum of all present (assigned+halo) node counts.
  */
 template<bool useGpu>
@@ -158,9 +158,15 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
     if constexpr (useGpu)
     {
         memcpyD2D(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start());
-        selectCopyGpu(focusLeafCounts.data(), idx.start(), flags.data(), layout.data());
-        selectCopyGpu(focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(),
-                      flags.data() + idx.end(), layout.data() + idx.end());
+
+        gatherGpu(leafToInternal.data(), idx.start(), flags.data(), layout.data());
+        selectCopyGpu(focusLeafCounts.data(), idx.start(), layout.data(), layout.data());
+
+        gatherGpu(leafToInternal.data() + idx.end(), leafToInternal.size() - idx.end(), flags.data(),
+                  layout.data() + idx.end());
+        selectCopyGpu(focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(), layout.data() + idx.end(),
+                      layout.data() + idx.end());
+
         exclusiveScanGpu(layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0});
     }
     else
