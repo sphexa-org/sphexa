@@ -117,7 +117,7 @@ void globalRandomGaussian(int thisRank, int numRanks)
         MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
         // particle counts must always be valid, whatever state of convergence
-        auto focusCounts      = focusTree.leafCounts();
+        auto focusCounts      = focusTree.leafCountsAcc();
         LocalIndex totalCount = std::accumulate(focusCounts.begin(), focusCounts.end(), LocalIndex(0));
         EXPECT_EQ(totalCount, numParticles * numRanks);
 
@@ -132,7 +132,7 @@ void globalRandomGaussian(int thisRank, int numRanks)
     // the locally built reference tree should be identical to the tree built with distributed particles
     EXPECT_TRUE(std::equal(focusTree.treeLeaves().begin(), focusTree.treeLeaves().end(),
                            referenceFocusTree.treeLeaves().begin()));
-    EXPECT_TRUE(std::equal(focusTree.leafCounts().begin(), focusTree.leafCounts().end(),
+    EXPECT_TRUE(std::equal(focusTree.leafCountsAcc().begin(), focusTree.leafCountsAcc().end(),
                            referenceFocusTree.leafCounts().begin()));
 }
 
