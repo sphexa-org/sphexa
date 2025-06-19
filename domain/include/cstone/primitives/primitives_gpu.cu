@@ -105,6 +105,7 @@ void gatherGpu(const IndexType* map, size_t n, const TS* source, TD* destination
     int numThreads = 256;
     int numBlocks  = iceil(n, numThreads);
 
+    if (numBlocks == 0) { return; }
     gatherGpuKernel<<<numBlocks, numThreads>>>(map, n, source, destination);
 }
 
@@ -147,6 +148,7 @@ void scatterGpu(const IndexType* map, size_t n, const T* source, T* destination)
     int numThreads = 256;
     int numBlocks  = iceil(n, numThreads);
 
+    if (numBlocks == 0) { return; }
     scatterGpuKernel<<<numBlocks, numThreads>>>(map, n, source, destination);
 }
 
@@ -250,6 +252,7 @@ void segmentMax(const Tin* input, const IndexType* segments, size_t numSegments,
     int numThreads = 256;
     int numBlocks  = iceil(numSegments, numThreads);
 
+    if (numBlocks == 0) { return; }
     segmentMaxKernel<<<numBlocks, numThreads>>>(input, segments, numSegments, output);
 }
 
