@@ -220,12 +220,12 @@ public:
             reallocateDestructive(countsAcc_, octreeAcc_.numNodes, allocGrowthRate_);
             scatterGpu(leafToInternal(octreeAcc_).data(), numLeafNodes, rawPtr(leafCountsAcc_), rawPtr(countsAcc_));
 
-            upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(treeData_.levelRange), rawPtr(octreeAcc_.childOffsets),
+            upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(octreeAcc_.levelRange), rawPtr(octreeAcc_.childOffsets),
                           rawPtr(countsAcc_));
             std::span<unsigned> countsAccView{rawPtr(countsAcc_), countsAcc_.size()};
             peerExchangeGpu(countsAccView, static_cast<int>(P2pTags::focusPeerCounts), scratch);
 
-            upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(treeData_.levelRange), rawPtr(octreeAcc_.childOffsets),
+            upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(octreeAcc_.levelRange), rawPtr(octreeAcc_.childOffsets),
                           rawPtr(countsAcc_));
             gatherAcc<HaveGpu<Accelerator>{}>(leafToInternal(octreeAcc_), rawPtr(countsAcc_), rawPtr(leafCountsAcc_));
 
@@ -383,7 +383,7 @@ public:
             computeLeafSourceCenterGpu(x, y, z, m, octree.leafToInternal + octree.numInternalNodes, octree.numLeafNodes,
                                        d_layout, rawPtr(centersAcc_));
             //! upsweep with local data in place
-            upsweepCentersGpu(maxTreeLevel<KeyType>{}, treeData_.levelRange.data(), octree.childOffsets,
+            upsweepCentersGpu(maxTreeLevel<KeyType>{}, octreeAcc_.levelRange.data(), octree.childOffsets,
                               rawPtr(centersAcc_));
             memcpyD2H(rawPtr(centersAcc_), numNodes, centers_.data());
 
@@ -422,7 +422,7 @@ public:
             memcpyH2D(centers_.data(), centers_.size(), rawPtr(centersAcc_));
             peerExchangeGpu(std::span{centersAcc_.data(), centersAcc_.size()},
                             static_cast<int>(P2pTags::focusPeerCenters), scratch1);
-            upsweepCentersGpu(maxTreeLevel<KeyType>{}, treeData_.levelRange.data(), octree.childOffsets,
+            upsweepCentersGpu(maxTreeLevel<KeyType>{}, octreeAcc_.levelRange.data(), octree.childOffsets,
                               rawPtr(centersAcc_));
         }
         else
@@ -681,27 +681,6 @@ private:
         else { nodeFpCenters<KeyType>(treeData_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_); }
     }
 
-    void uploadOctree()
-    {
-        if constexpr (HaveGpu<Accelerator>{})
-        {
-            TreeNodeIndex numLeafNodes = treeData_.numLeafNodes;
-            TreeNodeIndex numNodes     = treeData_.numNodes;
-
-            octreeAcc_.resize(numLeafNodes);
-            reallocateDestructive(leavesAcc_, numLeafNodes + 1, allocGrowthRate_);
-
-            memcpyH2D(treeData_.prefixes.data(), numNodes, rawPtr(octreeAcc_.prefixes));
-            memcpyH2D(treeData_.childOffsets.data(), numNodes, rawPtr(octreeAcc_.childOffsets));
-            memcpyH2D(treeData_.parents.data(), treeData_.parents.size(), rawPtr(octreeAcc_.parents));
-            memcpyH2D(treeData_.levelRange.data(), treeData_.levelRange.size(), rawPtr(octreeAcc_.levelRange));
-            memcpyH2D(treeData_.internalToLeaf.data(), numNodes, rawPtr(octreeAcc_.internalToLeaf));
-            memcpyH2D(treeData_.leafToInternal.data(), numNodes, rawPtr(octreeAcc_.leafToInternal));
-
-            memcpyH2D(leaves_.data(), numLeafNodes + 1, rawPtr(leavesAcc_));
-        }
-    }
-
     void downloadOctree()
     {
         if constexpr (HaveGpu<Accelerator>{})
@@ -710,15 +689,16 @@ private:
             TreeNodeIndex numNodes     = octreeAcc_.numNodes;
 
             treeData_.resize(numLeafNodes);
-            reallocateDestructive(leaves_, numLeafNodes + 1, allocGrowthRate_);
 
             memcpyD2H(rawPtr(octreeAcc_.prefixes), numNodes, treeData_.prefixes.data());
-            memcpyD2H(rawPtr(octreeAcc_.childOffsets), numNodes, treeData_.childOffsets.data());
-            memcpyD2H(rawPtr(octreeAcc_.parents), octreeAcc_.parents.size(), treeData_.parents.data());
-            memcpyD2H(rawPtr(octreeAcc_.levelRange), octreeAcc_.levelRange.size(), treeData_.levelRange.data());
-            memcpyD2H(rawPtr(octreeAcc_.internalToLeaf), numNodes, treeData_.internalToLeaf.data());
+            std::copy_n(octreeAcc_.levelRange.data(), octreeAcc_.levelRange.size(), treeData_.levelRange.data());
+
+            //memcpyD2H(rawPtr(octreeAcc_.childOffsets), numNodes, treeData_.childOffsets.data());
+            //memcpyD2H(rawPtr(octreeAcc_.parents), octreeAcc_.parents.size(), treeData_.parents.data());
+            //memcpyD2H(rawPtr(octreeAcc_.internalToLeaf), numNodes, treeData_.internalToLeaf.data());
             memcpyD2H(rawPtr(octreeAcc_.leafToInternal), numNodes, treeData_.leafToInternal.data());
 
+            reallocateDestructive(leaves_, numLeafNodes + 1, allocGrowthRate_);
             memcpyD2H(rawPtr(leavesAcc_), numLeafNodes + 1, leaves_.data());
         }
     }

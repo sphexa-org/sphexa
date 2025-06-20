@@ -96,12 +96,11 @@ int main()
     octree.resize(nNodes(tree));
     auto buildInternal = [&]() { buildOctreeGpu(rawPtr(tree), octree.data()); };
 
-    float internalBuildTime           = timeGpu(buildInternal);
-    std::vector<TreeNodeIndex> ranges = toHost(octree.levelRange);
+    float internalBuildTime = timeGpu(buildInternal);
     std::cout << "internal build time " << internalBuildTime / 1000 << std::endl;
     std::cout << "level ranges: ";
     for (int i = 0; i <= maxTreeLevel<KeyType>{}; ++i)
-        std::cout << ranges[i] << " ";
+        std::cout << octree.levelRange[i] << " ";
     std::cout << std::endl;
 
     // halo discovery benchmark

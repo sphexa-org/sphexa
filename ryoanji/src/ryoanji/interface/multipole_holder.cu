@@ -65,17 +65,14 @@ public:
         computeLeafMultipoles(x, y, z, m, octree_.leafToInternal + octree_.numInternalNodes, octree_.numLeafNodes,
                               layout_, centers_, rawPtr(multipoles_));
 
-        std::vector<TreeNodeIndex> levelRange(cstone::maxTreeLevel<KeyType>{} + 2);
-        memcpyD2H(octree_.levelRange, levelRange.size(), levelRange.data());
-
         //! first upsweep with local data, start at lowest possible level - 1, lowest level can only be leaves
         int numLevels = cstone::maxTreeLevel<KeyType>{};
         for (int level = numLevels - 1; level >= 0; level--)
         {
-            int numCellsLevel = levelRange[level + 1] - levelRange[level];
+            int numCellsLevel = octree_.levelRange[level + 1] - octree_.levelRange[level];
             if (numCellsLevel)
             {
-                upsweepMultipoles(levelRange[level], levelRange[level + 1], octree_.childOffsets, centers_,
+                upsweepMultipoles(octree_.levelRange[level], octree_.levelRange[level + 1], octree_.childOffsets, centers_,
                                   rawPtr(multipoles_));
             }
         }
@@ -98,10 +95,10 @@ public:
         //! second upsweep with leaf data from peer and global ranks in place
         for (int level = numLevels - 1; level >= 0; level--)
         {
-            int numCellsLevel = levelRange[level + 1] - levelRange[level];
+            int numCellsLevel = octree_.levelRange[level + 1] - octree_.levelRange[level];
             if (numCellsLevel)
             {
-                upsweepMultipoles(levelRange[level], levelRange[level + 1], octree_.childOffsets, centers_,
+                upsweepMultipoles(octree_.levelRange[level], octree_.levelRange[level + 1], octree_.childOffsets, centers_,
                                   rawPtr(multipoles_));
             }
         }
