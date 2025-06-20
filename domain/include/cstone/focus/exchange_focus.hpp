@@ -215,13 +215,14 @@ void syncTreelets(std::span<const int> peers,
     }
 }
 
-template<class KeyType>
+template<class KeyType, class Vector>
 void syncTreeletsGpu(std::span<const int> peers,
                      std::span<const IndexPair<TreeNodeIndex>> assignment,
                      std::span<const KeyType> leaves,
                      OctreeData<KeyType, GpuTag>& octreeAcc,
                      DeviceVector<KeyType>& leavesAcc,
-                     std::vector<std::vector<KeyType>>& treelets)
+                     std::vector<std::vector<KeyType>>& treelets,
+                     Vector& scratch)
 {
     exchangeTreelets<KeyType>(peers, assignment, leaves, treelets);
     checkTreelets<KeyType>(peers, leaves, treelets);
@@ -246,7 +247,17 @@ void syncTreeletsGpu(std::span<const int> peers,
         swap(newLeaves, leavesAcc);
 
         octreeAcc.resize(nNodes(leavesAcc));
-        buildOctreeGpu(rawPtr(leavesAcc), octreeAcc.data());
+
+        size_t newNumNodes        = octreeAcc.numNodes;
+        size_t spaceForLevelRange = sizeof(TreeNodeIndex) * (maxTreeLevel<KeyType>{} + 2);
+        size_t cubTmpSize = std::max(sortByKeyTempStorage<KeyType, TreeNodeIndex>(newNumNodes), spaceForLevelRange);
+
+        auto originalSize               = scratch.size();
+        auto [keyBuf, valueBuf, cubTmp] = util::packAllocBuffer(scratch, util::TypeList<KeyType, TreeNodeIndex, char>{},
+                                                                {newNumNodes, newNumNodes, cubTmpSize}, 128);
+
+        buildOctreeGpu(rawPtr(leavesAcc), octreeAcc.data(), keyBuf, valueBuf, cubTmp);
+        scratch.resize(originalSize);
     }
 }
 

@@ -147,7 +147,7 @@ public:
 
         if constexpr (HaveGpu<Accelerator>{})
         {
-            syncTreeletsGpu<KeyType>(peers_, assignment_, leaves_, octreeAcc_, leavesAcc_, treelets_);
+            syncTreeletsGpu<KeyType>(peers_, assignment_, leaves_, octreeAcc_, leavesAcc_, treelets_, scratch);
             downloadOctree();
         }
         else
