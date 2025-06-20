@@ -93,3 +93,16 @@ auto mpiRecvSyncAcc(T* data, int count, int rank, int tag, MPI_Status* status)
     if constexpr (useGpu) { mpiRecvGpuDirect(data, count, rank, tag, status); }
     else { mpiRecvSync(data, count, rank, tag, status); }
 }
+
+template<class T>
+auto mpiAllreduceGpuDirect(const T* src, T* dest, size_t count, MPI_Op op, MPI_Comm comm)
+{
+    if constexpr (!useGpuDirect)
+    {
+        std::vector<T> srcBuf(count), destBuf(count);
+        memcpyD2H(src, count, srcBuf.data());
+        mpiAllreduce(srcBuf.data(), destBuf.data(), count, op, comm);
+        memcpyH2D(destBuf.data(), count, dest);
+    }
+    else { mpiAllreduce(src, dest, count, op, comm); }
+}

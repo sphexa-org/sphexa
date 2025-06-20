@@ -217,7 +217,7 @@ bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float 
     if (totalTimeElapsed + dt > wallClockLimit)
     {
         int isLimitReachedAny = totalTimeElapsed > wallClockLimit;
-        mpiAllreduce(MPI_IN_PLACE, &isLimitReachedAny, 1, MPI_SUM);
+        mpiAllreduce(MPI_IN_PLACE, &isLimitReachedAny, 1, MPI_SUM, MPI_COMM_WORLD);
         return isLimitReachedAny;
     }
     return false;

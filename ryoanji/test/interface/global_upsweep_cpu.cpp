@@ -82,7 +82,7 @@ static int multipoleExchangeTest(int thisRank, int numRanks)
 
     bool pass      = maxDiff < 1e-10;
     int  numPassed = pass;
-    mpiAllreduce(MPI_IN_PLACE, &numPassed, 1, MPI_SUM);
+    mpiAllreduce(MPI_IN_PLACE, &numPassed, 1, MPI_SUM, MPI_COMM_WORLD);
 
     if (thisRank == 0)
     {
