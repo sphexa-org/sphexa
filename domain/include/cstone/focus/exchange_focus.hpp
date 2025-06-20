@@ -280,7 +280,7 @@ void indexTreelets(std::span<const int> peerRanks,
         for (int i = 0; i < numNodes; ++i)
         {
             tlIdx[i] = locateNode(treelet[i], treelet[i + 1], nodeKeys.data(), levelRange.data());
-            assert(tlIdx[i] < nodeKeys.size());
+            assert(tlIdx[i] < TreeNodeIndex(nodeKeys.size()));
         }
     }
 }
