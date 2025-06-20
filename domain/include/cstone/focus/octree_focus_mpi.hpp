@@ -288,21 +288,41 @@ public:
     {
         assert(localQuantities.size() == octreeAcc_.numNodes);
 
-        TreeNodeIndex firstGlobIdx = findNodeAbove(globalLeaves.data(), globalLeaves.size(), prevFocusStart);
-        TreeNodeIndex lastGlobIdx  = findNodeAbove(globalLeaves.data(), globalLeaves.size(), prevFocusEnd);
-        auto globLeavesFoc         = globalLeaves.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx + 1);
-        auto globQFoc              = globalQuantities.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx);
-
-        const KeyType* nodeKeys         = rawPtr(hostPrefixes_);
-        const TreeNodeIndex* levelRange = rawPtr(octreeAcc_.levelRange);
-
-        std::vector<TreeNodeIndex> gmap(lastGlobIdx - firstGlobIdx);
-#pragma omp parallel for schedule(static)
-        for (TreeNodeIndex i = 0; i < globLeavesFoc.size() - 1; ++i)
+        if constexpr (HaveGpu<Accelerator>{})
         {
-            gmap[i] = locateNode(globLeavesFoc[i], globLeavesFoc[i + 1], nodeKeys, levelRange);
+            DeviceVector<KeyType> d_globLeaf(globalLeaves.data(), globalLeaves.data() + globalLeaves.size());
+            DeviceVector<T> d_locQ(localQuantities.data(), localQuantities.data() + localQuantities.size());
+            DeviceVector<T> d_globQ(globalQuantities.size());
+
+            auto firstGlobIdx = lowerBoundGpu(d_globLeaf.data(), d_globLeaf.data() + d_globLeaf.size(), prevFocusStart);
+            auto lastGlobIdx  = lowerBoundGpu(d_globLeaf.data(), d_globLeaf.data() + d_globLeaf.size(), prevFocusEnd);
+            std::span globLeavesFoc{d_globLeaf.data() + firstGlobIdx, lastGlobIdx - firstGlobIdx + 1};
+            std::span globQFoc{d_globQ.data() + firstGlobIdx, lastGlobIdx - firstGlobIdx};
+
+            DeviceVector<TreeNodeIndex> gmap(lastGlobIdx - firstGlobIdx);
+            locateNodesGpu(globLeavesFoc.data(), globLeavesFoc.data() + globLeavesFoc.size(),
+                           octreeAcc_.prefixes.data(), octreeAcc_.d_levelRange.data(), gmap.data());
+            gatherGpu(gmap.data(), gmap.size(), d_locQ.data(), globQFoc.data());
+            memcpyD2H(globQFoc.data(), globQFoc.size(), globalQuantities.data() + firstGlobIdx);
         }
-        gather<TreeNodeIndex>(gmap, localQuantities.data(), globQFoc.data());
+        else
+        {
+            TreeNodeIndex firstGlobIdx = findNodeAbove(globalLeaves.data(), globalLeaves.size(), prevFocusStart);
+            TreeNodeIndex lastGlobIdx  = findNodeAbove(globalLeaves.data(), globalLeaves.size(), prevFocusEnd);
+            auto globLeavesFoc         = globalLeaves.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx + 1);
+            auto globQFoc              = globalQuantities.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx);
+
+            const KeyType* nodeKeys         = rawPtr(hostPrefixes_);
+            const TreeNodeIndex* levelRange = rawPtr(octreeAcc_.levelRange);
+
+            std::vector<TreeNodeIndex> gmap(lastGlobIdx - firstGlobIdx);
+#pragma omp parallel for schedule(static)
+            for (TreeNodeIndex i = 0; i < globLeavesFoc.size() - 1; ++i)
+            {
+                gmap[i] = locateNode(globLeavesFoc[i], globLeavesFoc[i + 1], nodeKeys, levelRange);
+            }
+            gather<TreeNodeIndex>(gmap, localQuantities.data(), globQFoc.data());
+        }
     }
 
     /*! @brief transfer missing cell quantities from global tree into localQuantities
@@ -318,20 +338,48 @@ public:
                        std::span<const T> globalQuantities,
                        std::span<T> localQuantities) const
     {
-        const KeyType* prefixes         = rawPtr(hostPrefixes_);
-        const TreeNodeIndex* toInternal = hostLeafToInternal_.data() + octreeAcc_.numInternalNodes;
         //! list of leaf cell indices in the locally focused tree that need global information
         auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, octreeAcc_.numLeafNodes));
-        std::transform(idxFromGlob.begin(), idxFromGlob.end(), idxFromGlob.begin(),
-                       [m = toInternal](auto i) { return m[i]; });
-
-        std::vector<TreeNodeIndex> gmap(idxFromGlob.size());
-#pragma omp parallel for schedule(static)
-        for (TreeNodeIndex i = 0; i < idxFromGlob.size(); ++i)
+        if constexpr (HaveGpu<Accelerator>{})
         {
-            gmap[i] = locateNode(prefixes[idxFromGlob[i]], globalNodeKeys, globalLevelRange);
+            const TreeNodeIndex* toInternal           = leafToInternal(octreeAcc_).data();
+            DeviceVector<TreeNodeIndex> d_idxFromGlob = idxFromGlob;
+            gatherGpu(d_idxFromGlob.data(), d_idxFromGlob.size(), toInternal, d_idxFromGlob.data());
+
+            DeviceVector<TreeNodeIndex> gmap(d_idxFromGlob.size());
+            TreeNodeIndex numGlobNodes = globalLevelRange[maxTreeLevel<KeyType>{} + 1];
+            DeviceVector<KeyType> d_globPrefixes(globalNodeKeys, globalNodeKeys + numGlobNodes);
+            DeviceVector<T> d_locQ(localQuantities.data(), localQuantities.data() + localQuantities.size());
+            DeviceVector<TreeNodeIndex> d_globLvlRange(globalLevelRange,
+                                                       globalLevelRange + maxTreeLevel<KeyType>{} + 2);
+            DeviceVector<T> d_globQ(globalQuantities.data(), globalQuantities.data() + globalQuantities.size());
+
+            locateNodesGpu(octreeAcc_.prefixes.data(), d_idxFromGlob.data(), d_idxFromGlob.size(),
+                           d_globPrefixes.data(), d_globLvlRange.data(), gmap.data());
+
+            gatherScatterGpu(gmap.data(), d_idxFromGlob.data(), d_idxFromGlob.size(), d_globQ.data(), d_locQ.data());
+
+            //syncGpu();
+            //std::cout << myRank_ << " gather-scatter done" << std::endl;
+            //MPI_Barrier(MPI_COMM_WORLD);
+            //MPI_Abort(MPI_COMM_WORLD, 13);
+
+            memcpyD2H(d_locQ.data(), d_locQ.size(), localQuantities.data());
         }
-        gatherScatter<TreeNodeIndex>(gmap, idxFromGlob, globalQuantities.data(), localQuantities.data());
+        else
+        {
+            const KeyType* prefixes = rawPtr(hostPrefixes_);
+            const TreeNodeIndex* toInternal = hostLeafToInternal_.data() + octreeAcc_.numInternalNodes;
+            gather<TreeNodeIndex>(idxFromGlob, toInternal, idxFromGlob.data());
+
+            std::vector<TreeNodeIndex> gmap(idxFromGlob.size());
+#pragma omp parallel for schedule(static)
+            for (TreeNodeIndex i = 0; i < idxFromGlob.size(); ++i)
+            {
+                gmap[i] = locateNode(prefixes[idxFromGlob[i]], globalNodeKeys, globalLevelRange);
+            }
+            gatherScatter<TreeNodeIndex>(gmap, idxFromGlob, globalQuantities.data(), localQuantities.data());
+        }
     }
 
     //! @brief Distribute global leaf quantities with local part filled in

@@ -41,6 +41,9 @@ inline auto gatherGpuL = [](std::span<const LocalIndex> ordering, const auto* sr
 template<class T, class IndexType>
 extern void scatterGpu(const IndexType* ordering, size_t numElements, const T* src, T* buffer);
 
+template<class T, class IndexType>
+extern void gatherScatterGpu(const IndexType* gmap, const IndexType* smap, size_t numElements, const T* src, T* buffer);
+
 template<class T>
 struct MinMaxGpu
 {
