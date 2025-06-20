@@ -263,6 +263,14 @@ template void segmentMax(const float*, const uint64_t*, size_t, float*);
 template void segmentMax(const double*, const uint64_t*, size_t, float*);
 template void segmentMax(const double*, const uint64_t*, size_t, double*);
 
+template<class T1, class T2, class Tout>
+void sequenceMax(const T1* i1_begin, const T1* i1_end, const T2* i2, Tout* output)
+{
+    thrust::transform(thrust::device, i1_begin, i1_end, i2, output, thrust::maximum<unsigned>{});
+}
+
+template void sequenceMax(const unsigned*, const unsigned*, const unsigned*, unsigned*);
+
 template<class Tin, class Tout>
 Tout reduceGpu(const Tin* input, size_t numElements, Tout init)
 {

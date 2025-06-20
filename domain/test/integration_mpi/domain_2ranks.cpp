@@ -348,7 +348,7 @@ void multiStepSync(int rank, int numRanks)
     // global number of particles is unchanged
     LocalIndex numAssigned = domain.nParticles();
     LocalIndex numGlobal   = 0;
-    mpiAllreduce(&numAssigned, &numGlobal, 1, MPI_SUM);
+    mpiAllreduce(&numAssigned, &numGlobal, 1, MPI_SUM, MPI_COMM_WORLD);
     EXPECT_EQ(numGlobal, xGlobal.size());
 
     // global keys are unique, each particle was only assigned to 1 rank

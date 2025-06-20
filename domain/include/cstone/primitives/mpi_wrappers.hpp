@@ -180,14 +180,14 @@ auto mpiGetCount(MPI_Status* status, int* count)
 }
 
 template<class Ts, class Td, std::enable_if_t<std::is_arithmetic_v<Td>, int> = 0>
-auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op)
+auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op, MPI_Comm comm)
 {
-    return MPI_Allreduce(src, dest, count, MpiType<Td>{}, op, MPI_COMM_WORLD);
+    return MPI_Allreduce(src, dest, count, MpiType<Td>{}, op, comm);
 }
 
 //! @brief adaptor to wrap compile-time size arrays into flattened arrays of the underlying type
 template<class Ts, class Td, std::enable_if_t<!std::is_arithmetic_v<Td>, int> = 0>
-auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op)
+auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op,  MPI_Comm comm)
 {
     using ValueType    = typename Td::value_type;
     constexpr size_t N = Td{}.size();
@@ -196,7 +196,7 @@ auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op)
     auto src_ptr  = reinterpret_cast<const SrcType*>(src);
     auto dest_ptr = reinterpret_cast<ValueType*>(dest);
 
-    return mpiAllreduce(src_ptr, dest_ptr, count * N, op);
+    return mpiAllreduce(src_ptr, dest_ptr, count * N, op, comm);
 }
 
 template<class Ts, class Td, std::enable_if_t<std::is_arithmetic_v<Td>, int> = 0>

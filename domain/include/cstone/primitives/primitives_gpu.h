@@ -69,6 +69,9 @@ extern void lowerBoundGpu(const T* first, const T* last, const T* valueFirst, co
 template<class Tin, class Tout, class IndexType>
 extern void segmentMax(const Tin* input, const IndexType* segments, size_t numSegments, Tout* output);
 
+template<class T1, class T2, class Tout>
+extern void sequenceMax(const T1* i1_begin, const T1* i1_end, const T2* i2, Tout* output);
+
 template<class Tin, class Tout>
 extern Tout reduceGpu(const Tin* input, size_t numElements, Tout init);
 

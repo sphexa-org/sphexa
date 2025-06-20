@@ -94,7 +94,7 @@ void ryoanjiTest(int thisRank, int numRanks, size_t numParticlesGlobal)
     auto dt = std::chrono::duration<double>(t1 - t0).count();
 
     float totalPotentialGlobal;
-    mpiAllreduce(&totalPotential, &totalPotentialGlobal, 1, MPI_SUM);
+    mpiAllreduce(&totalPotential, &totalPotentialGlobal, 1, MPI_SUM, MPI_COMM_WORLD);
 
     auto [numP2P, maxP2P, numM2P, maxM2P, maxStack] = multipoleHolder.readStats();
     double flops                                    = (numP2P * 23 + numM2P * 65) / dt / 1e12;
