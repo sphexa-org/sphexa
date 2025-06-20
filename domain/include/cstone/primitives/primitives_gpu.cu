@@ -162,6 +162,36 @@ template void scatterGpu(const int*, size_t, const util::array<double, 4>*, util
 template void scatterGpu(const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
 template void scatterGpu(const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
 
+template<class T, class IndexType>
+__global__ void
+gatherScatterGpuKernel(const IndexType* gmap, const IndexType* smap, size_t n, const T* source, T* destination)
+{
+    size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (tid < n) { destination[smap[tid]] = source[gmap[tid]]; }
+}
+
+template<class T, class IndexType>
+void gatherScatterGpu(const IndexType* gmap, const IndexType* smap, size_t n, const T* source, T* destination)
+{
+    int numThreads = 256;
+    int numBlocks  = iceil(n, numThreads);
+
+    if (numBlocks == 0) { return; }
+    gatherScatterGpuKernel<<<numBlocks, numThreads>>>(gmap, smap, n, source, destination);
+}
+
+template void gatherScatterGpu(const int*, const int*, size_t, const int*, int*);
+template void gatherScatterGpu(const int*, const int*, size_t, const uint32_t*, uint32_t*);
+template void gatherScatterGpu(const int*, const int*, size_t, const uint64_t*, uint64_t*);
+template void gatherScatterGpu(const int*, const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+template void gatherScatterGpu(const int*, const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
+template void gatherScatterGpu(const int*, const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*);
+template void gatherScatterGpu(const int*, const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
+template void gatherScatterGpu(const int*, const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
+template void
+gatherScatterGpu(const int*, const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
+
 template<class T>
 std::tuple<T, T> MinMaxGpu<T>::operator()(const T* first, const T* last)
 {

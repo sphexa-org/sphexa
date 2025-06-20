@@ -70,7 +70,6 @@ HOST_DEVICE_FUN constexpr TreeNodeIndex binaryKeyWeight(KeyType key, unsigned le
  * @param[in]  leaves            cornerstone SFC keys, length numLeafNodes + 1
  * @param[in]  numInternalNodes  number of internal octree nodes
  * @param[in]  numLeafNodes      total number of nodes
- * @param[in]  binaryToOct       translation map from binary to octree nodes
  * @param[out] prefixes          output octree SFC keys, length @p numInternalNodes + numLeafNodes
  *                               NOTE: keys are prefixed with Warren-Salmon placeholder bits!
  * @param[out] internalToLeaf    iota 0,1,2,3,... sequence for later use, length same as @p prefixes
@@ -196,33 +195,6 @@ void buildOctreeCpu(const KeyType* cstoneTree,
     linkTreeCpu(prefixes, numInternalNodes, leafToInternal, levelRange, childOffsets, parents);
 }
 
-//! @brief locate with @p nodeKey given in Warren-Salmon placeholder-bit format
-template<class KeyType>
-HOST_DEVICE_FUN TreeNodeIndex locateNode(KeyType nodeKey, const KeyType* prefixes, const TreeNodeIndex* levelRange)
-{
-    TreeNodeIndex numNodes = levelRange[maxTreeLevel<KeyType>{} + 1];
-    unsigned level         = decodePrefixLength(nodeKey) / 3;
-    auto it                = stl::lower_bound(prefixes + levelRange[level], prefixes + levelRange[level + 1], nodeKey);
-    if (it != prefixes + numNodes && *it == nodeKey) { return it - prefixes; }
-    else { return numNodes; }
-}
-
-/*! @brief finds the index of the node with SFC key range [startKey:endKey]
- *
- * @param startKey   lower SFC key
- * @param endKey     upper SFC key
- * @return           The index i of the node that satisfies codeStart(i) == startKey
- *                   and codeEnd(i) == endKey, or numTreeNodes() if no such node exists.
- */
-template<class KeyType>
-HOST_DEVICE_FUN TreeNodeIndex
-locateNode(KeyType startKey, KeyType endKey, const KeyType* prefixes, const TreeNodeIndex* levelRange)
-{
-    //! prefixLength is 3 * treeLevel(endKey - startKey)
-    unsigned prefixLength = countLeadingZeros(endKey - startKey - 1) - unusedBits<KeyType>{};
-    return locateNode(encodePlaceholderBit(startKey, prefixLength), prefixes, levelRange);
-}
-
 //! @brief return the smallest node that contains @p nodeKey
 template<class KeyType>
 HOST_DEVICE_FUN TreeNodeIndex containingNode(KeyType nodeKey,
@@ -271,6 +243,7 @@ struct OctreeView
     NodeType* childOffsets;
     NodeType* parents;
     NodeType* levelRange;
+    NodeType* d_levelRange;
     NodeType* internalToLeaf;
     NodeType* leafToInternal;
 };
@@ -322,21 +295,21 @@ public:
         reallocateDestructive(parents, parentSize, 1.01);
 
         //+1 due to level 0 and +1 due to the upper bound for the last level
-        levelRange.resize(maxTreeLevel<KeyType>{} + 2);
+        reallocate(maxTreeLevel<KeyType>{} + 2, 1.0, levelRange, d_levelRange);
     }
 
     OctreeView<KeyType> data()
     {
-        return {numLeafNodes,       numInternalNodes,       numNodes,
-                rawPtr(prefixes),   rawPtr(childOffsets),   rawPtr(parents),
-                rawPtr(levelRange), rawPtr(internalToLeaf), rawPtr(leafToInternal)};
+        return {numLeafNodes,           numInternalNodes,      numNodes,           rawPtr(prefixes),
+                rawPtr(childOffsets),   rawPtr(parents),       rawPtr(levelRange), rawPtr(d_levelRange),
+                rawPtr(internalToLeaf), rawPtr(leafToInternal)};
     }
 
     OctreeView<const KeyType> data() const
     {
-        return {numLeafNodes,       numInternalNodes,       numNodes,
-                rawPtr(prefixes),   rawPtr(childOffsets),   rawPtr(parents),
-                rawPtr(levelRange), rawPtr(internalToLeaf), rawPtr(leafToInternal)};
+        return {numLeafNodes,           numInternalNodes,      numNodes,           rawPtr(prefixes),
+                rawPtr(childOffsets),   rawPtr(parents),       rawPtr(levelRange), rawPtr(d_levelRange),
+                rawPtr(internalToLeaf), rawPtr(leafToInternal)};
     }
 
     TreeNodeIndex numNodes{0};
@@ -351,6 +324,7 @@ public:
     AccVector<TreeNodeIndex> parents;
     //! @brief store the first node index of every tree level, length = maxTreeLevel + 2
     std::vector<TreeNodeIndex> levelRange;
+    AccVector<TreeNodeIndex> d_levelRange;
 
     //! @brief maps internal to leaf (cstone) order
     AccVector<TreeNodeIndex> internalToLeaf;
