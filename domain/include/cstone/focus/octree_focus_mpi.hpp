@@ -58,13 +58,15 @@ public:
         , centers_(1)
         , globAssignment_(numRanks + 1)
     {
+        octreeAcc_.resize(1);
+        leaves_ = std::vector<KeyType>{0, nodeRange<KeyType>(0)};
+        leafCounts_ = std::vector<unsigned>{bucketSize + 1};
+
         if constexpr (HaveGpu<Accelerator>{})
         {
-            std::vector<KeyType> init{0, nodeRange<KeyType>(0)};
-            reallocate(leavesAcc_, init.size(), 1.0);
-            memcpyH2D(init.data(), init.size(), rawPtr(leavesAcc_));
-            octreeAcc_.resize(nNodes(leavesAcc_));
+            leavesAcc_ = leaves_;
             buildOctreeGpu(rawPtr(leavesAcc_), octreeAcc_.data());
+            downloadOctree();
 
             reallocate(countsAcc_, counts_.size(), 1.0);
             memcpyH2D(counts_.data(), counts_.size(), rawPtr(countsAcc_));
@@ -72,10 +74,7 @@ public:
             reallocate(geoCentersAcc_, centers_.size(), 1.0);
             reallocate(centersAcc_, centers_.size(), 1.0);
         }
-
-        leaves_ = std::vector<KeyType>{0, nodeRange<KeyType>(0)};
-        treeData_.resize(nNodes(leaves_));
-        updateInternalTree<KeyType>(leaves_, treeData_.data());
+        else { updateInternalTree<KeyType>(leaves_, octreeAcc_.data()); }
     }
 
     /*! @brief Update the tree structure according to previously calculated criteria (MAC and particle counts)
@@ -113,6 +112,7 @@ public:
         std::vector<KeyType> enforcedKeys;
         enforcedKeys.reserve(peers_.size() * 2);
 
+        assert(leafCounts_.size() == octreeAcc_.numLeafNodes);
         focusTransfer<KeyType>(leaves_, leafCounts_, bucketSize_, myRank_, prevFocusStart, prevFocusEnd, focusStart,
                                focusEnd, enforcedKeys);
         for (int peer : peers_)
@@ -140,9 +140,9 @@ public:
         }
         else
         {
-            converged = CombinedUpdate<KeyType>::updateFocus(treeData_, leaves_, bucketSize_, focusStart, focusEnd,
+            converged = CombinedUpdate<KeyType>::updateFocus(octreeAcc_, leaves_, bucketSize_, focusStart, focusEnd,
                                                              enforcedKeys, counts_, macsAcc_);
-            while (not macRefine(treeData_, leaves_, centers_, macsAcc_, prevFocusStart, prevFocusEnd, focusStart,
+            while (not macRefine(octreeAcc_, leaves_, centers_, macsAcc_, prevFocusStart, prevFocusEnd, focusStart,
                                  focusEnd, invThetaRefine, box))
                 ;
         }
@@ -153,9 +153,14 @@ public:
             syncTreeletsGpu<KeyType>(peers_, assignment_, leaves_, octreeAcc_, leavesAcc_, treelets_);
             downloadOctree();
         }
-        else { syncTreelets(peers_, assignment_, treeData_, leaves_, treelets_); }
+        else
+        {
+            syncTreelets(peers_, assignment_, octreeAcc_, leaves_, treelets_);
+            hostPrefixes_ = octreeAcc_.prefixes;
+            hostLeafToInternal_ = octreeAcc_.leafToInternal;
+        }
 
-        indexTreelets<KeyType>(peerRanks, treeData_.prefixes, treeData_.levelRange, treelets_, treeletIdx_);
+        indexTreelets<KeyType>(peerRanks, hostPrefixes_, octreeAcc_.levelRange, treelets_, treeletIdx_);
 
         translateAssignment<KeyType>(assignment, leaves_, peers_, myRank_, assignment_);
         std::copy_n(assignment.data(), numRanks_ + 1, globAssignment_.data());
@@ -243,16 +248,16 @@ public:
             rangeCount<KeyType>(globalTreeLeaves, globalCounts, leaves, idxFromGlob, leafCounts_);
 
             // 1st upsweep with local and global data
-            counts_.resize(treeData_.numNodes);
-            scatter<TreeNodeIndex>(leafToInternal(treeData_), leafCounts_.data(), counts_.data());
-            upsweep(treeData_.levelRange, treeData_.childOffsets, counts_.data(), NodeCount<unsigned>{});
+            counts_.resize(octreeAcc_.numNodes);
+            scatter<TreeNodeIndex>(leafToInternal(octreeAcc_), leafCounts_.data(), counts_.data());
+            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, counts_.data(), NodeCount<unsigned>{});
 
             // add counts from neighboring peers
             peerExchange(std::span(counts_), static_cast<int>(P2pTags::focusPeerCounts), scratch);
 
             // 2nd upsweep with peer data present
-            upsweep(treeData_.levelRange, treeData_.childOffsets, counts_.data(), NodeCount<unsigned>{});
-            gather(leafToInternal(treeData_), counts_.data(), leafCounts_.data());
+            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, counts_.data(), NodeCount<unsigned>{});
+            gather(leafToInternal(octreeAcc_), counts_.data(), leafCounts_.data());
         }
         reallocate(scratch, origSize, 1.0);
 
@@ -262,7 +267,7 @@ public:
     template<class T, class DevVec>
     void peerExchange(std::span<T> q, int commTag, DevVec& s) const
     {
-        exchangeTreeletGeneral<T>(peers_, treeletIdx_.view(), assignment_, leafToInternal(treeData_), q, commTag, s);
+        exchangeTreeletGeneral<T>(peers_, treeletIdx_.view(), assignment_, leafToInternal(octreeAcc_), q, commTag, s);
     }
 
     template<class T, class DevVec>
@@ -284,15 +289,15 @@ public:
                         std::span<const T> localQuantities,
                         std::span<T> globalQuantities) const
     {
-        assert(localQuantities.size() == treeData_.numNodes);
+        assert(localQuantities.size() == octreeAcc_.numNodes);
 
         TreeNodeIndex firstGlobIdx = findNodeAbove(globalLeaves.data(), globalLeaves.size(), prevFocusStart);
         TreeNodeIndex lastGlobIdx  = findNodeAbove(globalLeaves.data(), globalLeaves.size(), prevFocusEnd);
         auto globLeavesFoc         = globalLeaves.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx + 1);
         auto globQFoc              = globalQuantities.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx);
 
-        const KeyType* nodeKeys         = rawPtr(treeData_.prefixes);
-        const TreeNodeIndex* levelRange = rawPtr(treeData_.levelRange);
+        const KeyType* nodeKeys         = rawPtr(hostPrefixes_);
+        const TreeNodeIndex* levelRange = rawPtr(octreeAcc_.levelRange);
 
         std::vector<TreeNodeIndex> gmap(lastGlobIdx - firstGlobIdx);
 #pragma omp parallel for schedule(static)
@@ -316,10 +321,10 @@ public:
                        std::span<const T> globalQuantities,
                        std::span<T> localQuantities) const
     {
-        const KeyType* prefixes         = rawPtr(treeData_.prefixes);
-        const TreeNodeIndex* toInternal = leafToInternal(treeData_).data();
+        const KeyType* prefixes         = rawPtr(hostPrefixes_);
+        const TreeNodeIndex* toInternal = hostLeafToInternal_.data() + octreeAcc_.numInternalNodes;
         //! list of leaf cell indices in the locally focused tree that need global information
-        auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, treeData_.numLeafNodes));
+        auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, octreeAcc_.numLeafNodes));
         std::transform(idxFromGlob.begin(), idxFromGlob.end(), idxFromGlob.begin(),
                        [m = toInternal](auto i) { return m[i]; });
 
@@ -396,14 +401,14 @@ public:
             std::inclusive_scan(leafCounts_.begin() + firstIdx, leafCounts_.begin() + lastIdx,
                                 layout.begin() + firstIdx + 1, std::plus<>{}, LocalIndex(0));
 #pragma omp parallel for schedule(static)
-            for (TreeNodeIndex leafIdx = 0; leafIdx < treeData_.numLeafNodes; ++leafIdx)
+            for (TreeNodeIndex leafIdx = 0; leafIdx < octreeAcc_.numLeafNodes; ++leafIdx)
             {
                 //! prepare local leaf centers
                 TreeNodeIndex nodeIdx = octree.leafToInternal[octree.numInternalNodes + leafIdx];
                 centers_[nodeIdx]     = massCenter<RealType>(x, y, z, m, layout[leafIdx], layout[leafIdx + 1]);
             }
             //! upsweep with local data in place
-            upsweep(treeData_.levelRange, treeData_.childOffsets, centers_.data(), CombineSourceCenter<RealType>{});
+            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, centers_.data(), CombineSourceCenter<RealType>{});
         }
 
         //! global exchange for the top nodes that are bigger than local domains
@@ -432,7 +437,7 @@ public:
             peerExchange(std::span{centers_.data(), centers_.size()}, static_cast<int>(P2pTags::focusPeerCenters),
                          hScratch);
             //! upsweep with all (leaf) data in place
-            upsweep(treeData_.levelRange, treeData_.childOffsets, centers_.data(), CombineSourceCenter<RealType>{});
+            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, centers_.data(), CombineSourceCenter<RealType>{});
         }
     }
 
@@ -451,11 +456,11 @@ public:
         }
         else
         {
-            centers_.resize(treeData_.numNodes);
-            const KeyType* nodeKeys = treeData_.prefixes.data();
+            centers_.resize(octreeAcc_.numNodes);
+            const KeyType* nodeKeys = octreeAcc_.prefixes.data();
 
 #pragma omp parallel for schedule(static)
-            for (TreeNodeIndex i = 0; i < treeData_.numNodes; ++i)
+            for (TreeNodeIndex i = 0; i < octreeAcc_.numNodes; ++i)
             {
                 //! set centers to geometric centers for min dist Mac
                 centers_[i] = computeMinMacR2(nodeKeys[i], invThetaEff, box_);
@@ -472,7 +477,7 @@ public:
         {
             setMacGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box_);
         }
-        else { setMac<RealType, KeyType>(treeData_.prefixes, centers_, invTheta, box_); }
+        else { setMac<RealType, KeyType>(octreeAcc_.prefixes, centers_, invTheta, box_); }
     }
 
     /*! @brief Update the MAC criteria based on given expansion centers and effective inverse theta
@@ -492,12 +497,12 @@ public:
      */
     void updateMacs(const SfcAssignment<KeyType>& assignment, float invTheta, bool accumulate)
     {
-        if (accumulate && TreeNodeIndex(macsAcc_.size()) != treeData_.numNodes)
+        if (accumulate && TreeNodeIndex(macsAcc_.size()) != octreeAcc_.numNodes)
         {
             throw std::runtime_error("MAC flags not correctly allocated\n");
         }
         setMacRadius(invTheta);
-        reallocate(treeData_.numNodes, allocGrowthRate_, macsAcc_);
+        reallocate(octreeAcc_.numNodes, allocGrowthRate_, macsAcc_);
 
         // need to find again assignment start and end indices in focus tree because assignment might have changed
         TreeNodeIndex fAssignStart = findNodeAbove(rawPtr(leaves_), nNodes(leaves_), assignment[myRank_]);
@@ -514,7 +519,7 @@ public:
         else
         {
             if (not accumulate) { std::fill(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
-            markMacs(rawPtr(treeData_.prefixes), rawPtr(treeData_.childOffsets), rawPtr(treeData_.parents),
+            markMacs(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(octreeAcc_.parents),
                      rawPtr(centers_), box_, rawPtr(leaves_) + fAssignStart, fAssignEnd - fAssignStart, false,
                      rawPtr(macsAcc_));
         }
@@ -595,7 +600,7 @@ public:
         else
         {
             computeNodeLayout<false>({leafCounts_.data(), leafCountsAcc().size()}, {macsAcc_.data(), macsAcc_.size()},
-                                     leafToInternal(treeData_), assignment_[myRank_], layout);
+                                     leafToInternal(octreeAcc_), assignment_[myRank_], layout);
         }
 
         return checkLayout(myRank_, assignment_, layout, treeLeaves());
@@ -624,7 +629,7 @@ public:
     }
 
     //! @brief returns the tree depth
-    TreeNodeIndex depth() const { return maxDepth(treeData_.levelRange.data(), treeData_.levelRange.size()); }
+    TreeNodeIndex depth() const { return maxDepth(octreeAcc_.levelRange.data(), octreeAcc_.levelRange.size()); }
 
     //! @brief the cornerstone leaf cell array
     std::span<const KeyType> treeLeaves() const { return leaves_; }
@@ -640,11 +645,7 @@ public:
     std::span<const SourceCenterType<RealType>> globalExpansionCenters() const { return globalCenters_; }
 
     //! @brief return a view to the octree on the active accelerator
-    OctreeView<const KeyType> octreeViewAcc() const
-    {
-        if constexpr (HaveGpu<Accelerator>{}) { return ((const decltype(octreeAcc_)&)octreeAcc_).data(); }
-        else { return treeData_.data(); }
-    }
+    OctreeView<const KeyType> octreeViewAcc() const { return ((const decltype(octreeAcc_)&)octreeAcc_).data(); }
 
     //! @brief the cornerstone leaf cell array on the accelerator
     std::span<const KeyType> treeLeavesAcc() const
@@ -670,15 +671,15 @@ private:
     //! @brief compute geometrical center and size of each tree cell in terms of x,y,z coordinates
     void updateGeoCenters()
     {
-        reallocate(geoCentersAcc_, treeData_.numNodes, allocGrowthRate_);
-        reallocate(geoSizesAcc_, treeData_.numNodes, allocGrowthRate_);
+        reallocate(geoCentersAcc_, octreeAcc_.numNodes, allocGrowthRate_);
+        reallocate(geoSizesAcc_, octreeAcc_.numNodes, allocGrowthRate_);
 
         if constexpr (HaveGpu<Accelerator>{})
         {
-            computeGeoCentersGpu(rawPtr(octreeAcc_.prefixes), treeData_.numNodes, rawPtr(geoCentersAcc_),
+            computeGeoCentersGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(geoCentersAcc_),
                                  rawPtr(geoSizesAcc_), box_);
         }
-        else { nodeFpCenters<KeyType>(treeData_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_); }
+        else { nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_); }
     }
 
     void downloadOctree()
@@ -688,15 +689,9 @@ private:
             TreeNodeIndex numLeafNodes = octreeAcc_.numLeafNodes;
             TreeNodeIndex numNodes     = octreeAcc_.numNodes;
 
-            treeData_.resize(numLeafNodes);
-
-            memcpyD2H(rawPtr(octreeAcc_.prefixes), numNodes, treeData_.prefixes.data());
-            std::copy_n(octreeAcc_.levelRange.data(), octreeAcc_.levelRange.size(), treeData_.levelRange.data());
-
-            //memcpyD2H(rawPtr(octreeAcc_.childOffsets), numNodes, treeData_.childOffsets.data());
-            //memcpyD2H(rawPtr(octreeAcc_.parents), octreeAcc_.parents.size(), treeData_.parents.data());
-            //memcpyD2H(rawPtr(octreeAcc_.internalToLeaf), numNodes, treeData_.internalToLeaf.data());
-            memcpyD2H(rawPtr(octreeAcc_.leafToInternal), numNodes, treeData_.leafToInternal.data());
+            reallocate(numNodes, allocGrowthRate_, hostPrefixes_, hostLeafToInternal_);
+            memcpyD2H(rawPtr(octreeAcc_.prefixes), numNodes, hostPrefixes_.data());
+            memcpyD2H(rawPtr(octreeAcc_.leafToInternal), numNodes, hostLeafToInternal_.data());
 
             reallocateDestructive(leaves_, numLeafNodes + 1, allocGrowthRate_);
             memcpyD2H(rawPtr(leavesAcc_), numLeafNodes + 1, leaves_.data());
@@ -732,7 +727,8 @@ private:
     ConcatVector<TreeNodeIndex> treeletIdx_;
     ConcatVector<TreeNodeIndex, AccVector> treeletIdxAcc_;
 
-    OctreeData<KeyType, CpuTag> treeData_;
+    std::vector<KeyType> hostPrefixes_;
+    std::vector<TreeNodeIndex> hostLeafToInternal_;
     OctreeData<KeyType, Accelerator> octreeAcc_;
 
     //! @brief leaves in cstone format for tree_
