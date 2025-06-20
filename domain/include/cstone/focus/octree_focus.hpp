@@ -196,7 +196,7 @@ struct CombinedUpdate
         tree.resize(nNodes(leaves));
 
         size_t newNumNodes        = tree.numNodes;
-        size_t spaceForLevelRange = sizeof(TreeNodeIndex) * maxTreeLevel<KeyType>{} + 2;
+        size_t spaceForLevelRange = sizeof(TreeNodeIndex) * (maxTreeLevel<KeyType>{} + 2);
         size_t cubTmpSize = std::max(sortByKeyTempStorage<KeyType, TreeNodeIndex>(newNumNodes), spaceForLevelRange);
 
         auto originalSize               = scratch.size();

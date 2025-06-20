@@ -153,13 +153,16 @@ void buildOctreeGpu(const KeyType* cstoneTree,
 
     invertOrder<<<iceil(numNodes, numThreads), numThreads>>>(d.internalToLeaf, d.leafToInternal, numNodes,
                                                              d.numInternalNodes);
-    getLevelRange<<<maxTreeLevel<KeyType>{} + 2, 1>>>(d.prefixes, numNodes, d.levelRange);
+    assert(cubTmp.size() >= sizeof(TreeNodeIndex) * maxTreeLevel<KeyType>{} + 2);
+    TreeNodeIndex* d_tmpLevelRange = reinterpret_cast<TreeNodeIndex*>(cubTmp.data());
+    getLevelRange<<<maxTreeLevel<KeyType>{} + 2, 1>>>(d.prefixes, numNodes, d_tmpLevelRange);
+    memcpyD2H(d_tmpLevelRange, maxTreeLevel<KeyType>{} + 2, d.levelRange);
 
     thrust::fill(thrust::device, d.childOffsets, d.childOffsets + numNodes, 0);
     if (d.numInternalNodes)
     {
         linkTree<<<iceil(d.numInternalNodes, numThreads), numThreads>>>(
-            d.prefixes, d.numInternalNodes, d.leafToInternal, d.levelRange, d.childOffsets, d.parents);
+            d.prefixes, d.numInternalNodes, d.leafToInternal, d_tmpLevelRange, d.childOffsets, d.parents);
     }
 }
 
@@ -174,7 +177,7 @@ void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d)
     KeyType* keyBuf;
     TreeNodeIndex* valueBuf;
     char* cubTmp;
-    uint64_t spaceForLevelRange = sizeof(TreeNodeIndex) * maxTreeLevel<KeyType>{} + 2;
+    uint64_t spaceForLevelRange = sizeof(TreeNodeIndex) * (maxTreeLevel<KeyType>{} + 2);
     uint64_t tmpStorage = std::max(sortByKeyTempStorage<KeyType, TreeNodeIndex>(d.numNodes), spaceForLevelRange);
     checkGpuErrors(cudaMalloc(&keyBuf, sizeof(KeyType) * d.numNodes));
     checkGpuErrors(cudaMalloc(&valueBuf, sizeof(TreeNodeIndex) * d.numNodes));

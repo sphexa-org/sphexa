@@ -322,7 +322,7 @@ public:
         reallocateDestructive(parents, parentSize, 1.01);
 
         //+1 due to level 0 and +1 due to the upper bound for the last level
-        reallocateDestructive(levelRange, maxTreeLevel<KeyType>{} + 2, 1.01);
+        levelRange.resize(maxTreeLevel<KeyType>{} + 2);
     }
 
     OctreeView<KeyType> data()
@@ -350,7 +350,7 @@ public:
     //! @brief stores the parent index for every group of 8 sibling nodes, length the (numNodes - 1) / 8
     AccVector<TreeNodeIndex> parents;
     //! @brief store the first node index of every tree level, length = maxTreeLevel + 2
-    AccVector<TreeNodeIndex> levelRange;
+    std::vector<TreeNodeIndex> levelRange;
 
     //! @brief maps internal to leaf (cstone) order
     AccVector<TreeNodeIndex> internalToLeaf;
