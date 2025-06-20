@@ -53,7 +53,6 @@ public:
         , numRanks_(numRanks)
         , bucketSize_(bucketSize)
         , treelets_(numRanks_)
-        , counts_{bucketSize + 1}
         , macsAcc_(1, 1)
         , centers_(1)
         , globAssignment_(numRanks + 1)
@@ -61,15 +60,13 @@ public:
         octreeAcc_.resize(1);
         leaves_ = std::vector<KeyType>{0, nodeRange<KeyType>(0)};
         leafCounts_ = std::vector<unsigned>{bucketSize + 1};
+        countsAcc_ = leafCounts_;
 
         if constexpr (HaveGpu<Accelerator>{})
         {
             leavesAcc_ = leaves_;
             buildOctreeGpu(rawPtr(leavesAcc_), octreeAcc_.data());
             downloadOctree();
-
-            reallocate(countsAcc_, counts_.size(), 1.0);
-            memcpyH2D(counts_.data(), counts_.size(), rawPtr(countsAcc_));
 
             reallocate(geoCentersAcc_, centers_.size(), 1.0);
             reallocate(centersAcc_, centers_.size(), 1.0);
@@ -141,7 +138,7 @@ public:
         else
         {
             converged = CombinedUpdate<KeyType>::updateFocus(octreeAcc_, leaves_, bucketSize_, focusStart, focusEnd,
-                                                             enforcedKeys, counts_, macsAcc_);
+                                                             enforcedKeys, countsAcc_, macsAcc_);
             while (not macRefine(octreeAcc_, leaves_, centers_, macsAcc_, prevFocusStart, prevFocusEnd, focusStart,
                                  focusEnd, invThetaRefine, box))
                 ;
@@ -248,16 +245,16 @@ public:
             rangeCount<KeyType>(globalTreeLeaves, globalCounts, leaves, idxFromGlob, leafCounts_);
 
             // 1st upsweep with local and global data
-            counts_.resize(octreeAcc_.numNodes);
-            scatter<TreeNodeIndex>(leafToInternal(octreeAcc_), leafCounts_.data(), counts_.data());
-            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, counts_.data(), NodeCount<unsigned>{});
+            countsAcc_.resize(octreeAcc_.numNodes);
+            scatter<TreeNodeIndex>(leafToInternal(octreeAcc_), leafCounts_.data(), countsAcc_.data());
+            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, countsAcc_.data(), NodeCount<unsigned>{});
 
             // add counts from neighboring peers
-            peerExchange(std::span(counts_), static_cast<int>(P2pTags::focusPeerCounts), scratch);
+            peerExchange(std::span(countsAcc_), static_cast<int>(P2pTags::focusPeerCounts), scratch);
 
             // 2nd upsweep with peer data present
-            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, counts_.data(), NodeCount<unsigned>{});
-            gather(leafToInternal(octreeAcc_), counts_.data(), leafCounts_.data());
+            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, countsAcc_.data(), NodeCount<unsigned>{});
+            gather(leafToInternal(octreeAcc_), countsAcc_.data(), leafCounts_.data());
         }
         reallocate(scratch, origSize, 1.0);
 
@@ -744,7 +741,6 @@ private:
     std::vector<unsigned> leafCounts_;
     AccVector<unsigned> leafCountsAcc_;
     //! @brief particle counts of the full tree, tree_.octree()
-    std::vector<unsigned> counts_;
     AccVector<unsigned> countsAcc_;
     //! @brief mac evaluation result relative to focus area (pass or fail)
     AccVector<uint8_t> macsAcc_;
