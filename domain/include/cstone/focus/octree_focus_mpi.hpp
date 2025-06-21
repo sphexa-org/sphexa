@@ -54,7 +54,7 @@ public:
         , bucketSize_(bucketSize)
         , treelets_(numRanks_)
         , macsAcc_(1, 1)
-        , centers_(1)
+        , centersAcc_(1)
         , globNumNodes_(numRanks)
         , globDispl_(numRanks + 1)
     {
@@ -69,8 +69,7 @@ public:
             buildOctreeGpu(rawPtr(leavesAcc_), octreeAcc_.data());
             downloadOctree();
 
-            reallocate(geoCentersAcc_, centers_.size(), 1.0);
-            reallocate(centersAcc_, centers_.size(), 1.0);
+            reallocate(geoCentersAcc_, 1, 1.0);
         }
         else { updateInternalTree<KeyType>(leaves_, octreeAcc_.data()); }
     }
@@ -140,7 +139,7 @@ public:
         {
             converged = CombinedUpdate<KeyType>::updateFocus(octreeAcc_, leaves_, bucketSize_, focusStart, focusEnd,
                                                              enforcedKeys, countsAcc_, macsAcc_);
-            while (not macRefine(octreeAcc_, leaves_, centers_, macsAcc_, prevFocusStart, prevFocusEnd, focusStart,
+            while (not macRefine(octreeAcc_, leaves_, centersAcc_, macsAcc_, prevFocusStart, prevFocusEnd, focusStart,
                                  focusEnd, invThetaRefine, box))
                 ;
         }
@@ -398,7 +397,7 @@ public:
         TreeNodeIndex numNodes           = octree.numInternalNodes + octree.numLeafNodes;
 
         globalCenters_.resize(globalTree.numTreeNodes());
-        reallocate(numNodes, allocGrowthRate_, centersAcc_, centers_);
+        reallocate(numNodes, allocGrowthRate_, centersAcc_);
 
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -429,36 +428,24 @@ public:
             {
                 //! prepare local leaf centers
                 TreeNodeIndex nodeIdx = octree.leafToInternal[octree.numInternalNodes + leafIdx];
-                centers_[nodeIdx]     = massCenter<RealType>(x, y, z, m, layout[leafIdx], layout[leafIdx + 1]);
+                centersAcc_[nodeIdx]     = massCenter<RealType>(x, y, z, m, layout[leafIdx], layout[leafIdx + 1]);
             }
             //! upsweep with local data in place
-            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, centers_.data(), CombineSourceCenter<RealType>{});
+            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, centersAcc_.data(),
+                    CombineSourceCenter<RealType>{});
         }
 
         //! global exchange for the top nodes that are bigger than local domains
         std::vector<SourceCenterType<RealType>> globalLeafCenters(globalTree.numLeafNodes());
-        if constexpr (HaveGpu<Accelerator>{})
-        {
-            populateGlobal<SourceCenterType<RealType>>(globalTree.treeLeaves(),
-                                                       {centersAcc_.data(), centersAcc_.size()}, globalLeafCenters);
-        }
-        else { populateGlobal<SourceCenterType<RealType>>(globalTree.treeLeaves(), centers_, globalLeafCenters); }
+        populateGlobal<SourceCenterType<RealType>>(globalTree.treeLeaves(), {centersAcc_.data(), centersAcc_.size()},
+                                                   globalLeafCenters);
 
         gatherGlobalLeaves<SourceCenterType<RealType>>(globalLeafCenters);
         scatter(globalTree.internalOrder(), globalLeafCenters.data(), globalCenters_.data());
         upsweep(globalTree.levelRange(), globalTree.childOffsets(), globalCenters_.data(),
                 CombineSourceCenter<RealType>{});
-
-        if constexpr (HaveGpu<Accelerator>{})
-        {
-            extractGlobal<SourceCenterType<RealType>>(globalTree.nodeKeys().data(), globalTree.levelRange().data(),
-                                                      globalCenters_, {centersAcc_.data(), centersAcc_.size()});
-        }
-        else
-        {
-            extractGlobal<SourceCenterType<RealType>>(globalTree.nodeKeys().data(), globalTree.levelRange().data(),
-                                                      globalCenters_, centers_);
-        }
+        extractGlobal<SourceCenterType<RealType>>(globalTree.nodeKeys().data(), globalTree.levelRange().data(),
+                                                  globalCenters_, {centersAcc_.data(), centersAcc_.size()});
 
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -471,10 +458,11 @@ public:
         {
             //! exchange information with peer close to focus
             std::vector<int, util::DefaultInitAdaptor<int>> hScratch;
-            peerExchange(std::span{centers_.data(), centers_.size()}, static_cast<int>(P2pTags::focusPeerCenters),
+            peerExchange(std::span{centersAcc_.data(), centersAcc_.size()}, static_cast<int>(P2pTags::focusPeerCenters),
                          hScratch);
             //! upsweep with all (leaf) data in place
-            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, centers_.data(), CombineSourceCenter<RealType>{});
+            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, centersAcc_.data(),
+                    CombineSourceCenter<RealType>{});
         }
     }
 
@@ -493,14 +481,14 @@ public:
         }
         else
         {
-            centers_.resize(octreeAcc_.numNodes);
+            centersAcc_.resize(octreeAcc_.numNodes);
             const KeyType* nodeKeys = octreeAcc_.prefixes.data();
 
 #pragma omp parallel for schedule(static)
             for (TreeNodeIndex i = 0; i < octreeAcc_.numNodes; ++i)
             {
                 //! set centers to geometric centers for min dist Mac
-                centers_[i] = computeMinMacR2(nodeKeys[i], invThetaEff, box_);
+                centersAcc_[i] = computeMinMacR2(nodeKeys[i], invThetaEff, box_);
             }
         }
 
@@ -514,7 +502,7 @@ public:
         {
             setMacGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box_);
         }
-        else { setMac<RealType, KeyType>(octreeAcc_.prefixes, centers_, invTheta, box_); }
+        else { setMac<RealType, KeyType>(octreeAcc_.prefixes, centersAcc_, invTheta, box_); }
     }
 
     /*! @brief Update the MAC criteria based on given expansion centers and effective inverse theta
@@ -547,7 +535,6 @@ public:
 
         if constexpr (HaveGpu<Accelerator>{})
         {
-            reallocate(macsAcc_, octreeAcc_.numNodes, allocGrowthRate_);
             if (not accumulate) { fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
             markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(octreeAcc_.parents),
                         rawPtr(centersAcc_), box_, rawPtr(leavesAcc_) + fAssignStart, fAssignEnd - fAssignStart, false,
@@ -557,7 +544,7 @@ public:
         {
             if (not accumulate) { std::fill(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
             markMacs(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(octreeAcc_.parents),
-                     rawPtr(centers_), box_, rawPtr(leaves_) + fAssignStart, fAssignEnd - fAssignStart, false,
+                     rawPtr(centersAcc_), box_, rawPtr(leaves_) + fAssignStart, fAssignEnd - fAssignStart, false,
                      rawPtr(macsAcc_));
         }
 
@@ -675,8 +662,7 @@ public:
     //! @brief Expansion (com) centers of each cell
     std::span<const SourceCenterType<RealType>> expansionCentersAcc() const
     {
-        if constexpr (HaveGpu<Accelerator>{}) { return {rawPtr(centersAcc_), centersAcc_.size()}; }
-        else { return centers_; }
+        return {rawPtr(centersAcc_), centersAcc_.size()};
     }
     //! @brief Expansion (com) centers of each global cell
     std::span<const SourceCenterType<RealType>> globalExpansionCenters() const { return globalCenters_; }
@@ -785,7 +771,6 @@ private:
     //! @brief mac evaluation result relative to focus area (pass or fail)
     AccVector<uint8_t> macsAcc_;
     //! @brief the expansion (com) centers of each cell of tree_.octree()
-    std::vector<SourceCenterType<RealType>> centers_;
     AccVector<SourceCenterType<RealType>> centersAcc_;
     //! @brief geometric center and size per cell
     AccVector<Vec3<RealType>> geoCentersAcc_;
