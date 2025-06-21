@@ -293,7 +293,6 @@ public:
         if constexpr (HaveGpu<Accelerator>{})
         {
             DeviceVector<KeyType> d_globLeaf(globalLeaves.data(), globalLeaves.data() + globalLeaves.size());
-            DeviceVector<T> d_locQ(localQuantities.data(), localQuantities.data() + localQuantities.size());
             DeviceVector<T> d_globQ(globalQuantities.size());
 
             auto firstGlobIdx = lowerBoundGpu(d_globLeaf.data(), d_globLeaf.data() + d_globLeaf.size(), prevFocusStart);
@@ -304,7 +303,7 @@ public:
             DeviceVector<TreeNodeIndex> gmap(lastGlobIdx - firstGlobIdx);
             locateNodesGpu(globLeavesFoc.data(), globLeavesFoc.data() + globLeavesFoc.size(),
                            octreeAcc_.prefixes.data(), octreeAcc_.d_levelRange.data(), gmap.data());
-            gatherGpu(gmap.data(), gmap.size(), d_locQ.data(), globQFoc.data());
+            gatherGpu(gmap.data(), gmap.size(), localQuantities.data(), globQFoc.data());
             memcpyD2H(globQFoc.data(), globQFoc.size(), globalQuantities.data() + firstGlobIdx);
         }
         else
@@ -351,22 +350,14 @@ public:
             DeviceVector<TreeNodeIndex> gmap(d_idxFromGlob.size());
             TreeNodeIndex numGlobNodes = globalLevelRange[maxTreeLevel<KeyType>{} + 1];
             DeviceVector<KeyType> d_globPrefixes(globalNodeKeys, globalNodeKeys + numGlobNodes);
-            DeviceVector<T> d_locQ(localQuantities.data(), localQuantities.data() + localQuantities.size());
             DeviceVector<TreeNodeIndex> d_globLvlRange(globalLevelRange,
                                                        globalLevelRange + maxTreeLevel<KeyType>{} + 2);
             DeviceVector<T> d_globQ(globalQuantities.data(), globalQuantities.data() + globalQuantities.size());
 
             locateNodesGpu(octreeAcc_.prefixes.data(), d_idxFromGlob.data(), d_idxFromGlob.size(),
                            d_globPrefixes.data(), d_globLvlRange.data(), gmap.data());
-
-            gatherScatterGpu(gmap.data(), d_idxFromGlob.data(), d_idxFromGlob.size(), d_globQ.data(), d_locQ.data());
-
-            //syncGpu();
-            //std::cout << myRank_ << " gather-scatter done" << std::endl;
-            //MPI_Barrier(MPI_COMM_WORLD);
-            //MPI_Abort(MPI_COMM_WORLD, 13);
-
-            memcpyD2H(d_locQ.data(), d_locQ.size(), localQuantities.data());
+            gatherScatterGpu(gmap.data(), d_idxFromGlob.data(), d_idxFromGlob.size(), d_globQ.data(),
+                             localQuantities.data());
         }
         else
         {
@@ -407,8 +398,7 @@ public:
         TreeNodeIndex numNodes           = octree.numInternalNodes + octree.numLeafNodes;
 
         globalCenters_.resize(globalTree.numTreeNodes());
-        centers_.resize(numNodes);
-        reallocateDestructive(centersAcc_, centers_.size(), allocGrowthRate_);
+        reallocate(numNodes, allocGrowthRate_, centersAcc_, centers_);
 
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -425,7 +415,6 @@ public:
             //! upsweep with local data in place
             upsweepCentersGpu(maxTreeLevel<KeyType>{}, octreeAcc_.levelRange.data(), octree.childOffsets,
                               rawPtr(centersAcc_));
-            memcpyD2H(rawPtr(centersAcc_), numNodes, centers_.data());
 
             reallocate(scratch1, osz1, 1.0);
         }
@@ -448,18 +437,31 @@ public:
 
         //! global exchange for the top nodes that are bigger than local domains
         std::vector<SourceCenterType<RealType>> globalLeafCenters(globalTree.numLeafNodes());
-        populateGlobal<SourceCenterType<RealType>>(globalTree.treeLeaves(), centers_, globalLeafCenters);
+        if constexpr (HaveGpu<Accelerator>{})
+        {
+            populateGlobal<SourceCenterType<RealType>>(globalTree.treeLeaves(),
+                                                       {centersAcc_.data(), centersAcc_.size()}, globalLeafCenters);
+        }
+        else { populateGlobal<SourceCenterType<RealType>>(globalTree.treeLeaves(), centers_, globalLeafCenters); }
+
         gatherGlobalLeaves<SourceCenterType<RealType>>(globalLeafCenters);
         scatter(globalTree.internalOrder(), globalLeafCenters.data(), globalCenters_.data());
         upsweep(globalTree.levelRange(), globalTree.childOffsets(), globalCenters_.data(),
                 CombineSourceCenter<RealType>{});
-        extractGlobal<SourceCenterType<RealType>>(globalTree.nodeKeys().data(), globalTree.levelRange().data(),
-                                                  globalCenters_, centers_);
 
         if constexpr (HaveGpu<Accelerator>{})
         {
-            reallocate(centersAcc_, octreeAcc_.numNodes, allocGrowthRate_);
-            memcpyH2D(centers_.data(), centers_.size(), rawPtr(centersAcc_));
+            extractGlobal<SourceCenterType<RealType>>(globalTree.nodeKeys().data(), globalTree.levelRange().data(),
+                                                      globalCenters_, {centersAcc_.data(), centersAcc_.size()});
+        }
+        else
+        {
+            extractGlobal<SourceCenterType<RealType>>(globalTree.nodeKeys().data(), globalTree.levelRange().data(),
+                                                      globalCenters_, centers_);
+        }
+
+        if constexpr (HaveGpu<Accelerator>{})
+        {
             peerExchangeGpu(std::span{centersAcc_.data(), centersAcc_.size()},
                             static_cast<int>(P2pTags::focusPeerCenters), scratch1);
             upsweepCentersGpu(maxTreeLevel<KeyType>{}, octreeAcc_.levelRange.data(), octree.childOffsets,
