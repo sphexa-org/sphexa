@@ -51,8 +51,7 @@ public:
     }
 
     void upsweep(const Tc* x, const Tc* y, const Tc* z, const Tm* m, const cstone::Octree<KeyType>& globalOctree,
-                 const cstone::FocusedOctree<KeyType, Tf, cstone::GpuTag>& focusTree, const cstone::LocalIndex* layout,
-                 MType* multipoles)
+                 const cstone::FocusedOctree<KeyType, Tf, cstone::GpuTag>& focusTree, const cstone::LocalIndex* layout)
     {
         octree_ = focusTree.octreeViewAcc();
         resize(octree_.numLeafNodes);
@@ -72,23 +71,17 @@ public:
             int numCellsLevel = octree_.levelRange[level + 1] - octree_.levelRange[level];
             if (numCellsLevel)
             {
-                upsweepMultipoles(octree_.levelRange[level], octree_.levelRange[level + 1], octree_.childOffsets, centers_,
-                                  rawPtr(multipoles_));
+                upsweepMultipoles(octree_.levelRange[level], octree_.levelRange[level + 1], octree_.childOffsets,
+                                  centers_, rawPtr(multipoles_));
             }
         }
-
-        memcpyD2H(rawPtr(multipoles_), multipoles_.size(), multipoles);
 
         auto ryUpsweep = [](auto levelRange, auto childOffsets, auto M, auto centers)
         { upsweepMultipoles(levelRange, childOffsets.data(), centers, M); };
 
-        std::span multipoleSpan{multipoles, size_t(octree_.numNodes)};
-        cstone::globalFocusExchange(globalOctree, focusTree, multipoleSpan, ryUpsweep, globalCenters.data());
-
-        // H2D multipoles
-        memcpyH2D(multipoles, multipoles_.size(), rawPtr(multipoles_));
-
         std::span d_multipoleSpan{rawPtr(multipoles_), size_t(octree_.numNodes)};
+        cstone::globalFocusExchange(globalOctree, focusTree, d_multipoleSpan, ryUpsweep, globalCenters.data());
+
         focusTree.peerExchangeGpu(d_multipoleSpan, static_cast<int>(cstone::P2pTags::focusPeerCenters) + 1,
                                   traversalStack_);
 
@@ -171,9 +164,9 @@ GroupView MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::computeSpatialGro
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
 void MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::upsweep(
     const Tc* x, const Tc* y, const Tc* z, const Tm* m, const cstone::Octree<KeyType>& globalTree,
-    const cstone::FocusedOctree<KeyType, Tf, cstone::GpuTag>& focusTree, const LocalIndex* layout, MType* multipoles)
+    const cstone::FocusedOctree<KeyType, Tf, cstone::GpuTag>& focusTree, const LocalIndex* layout)
 {
-    impl_->upsweep(x, y, z, m, globalTree, focusTree, layout, multipoles);
+    impl_->upsweep(x, y, z, m, globalTree, focusTree, layout);
 }
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>

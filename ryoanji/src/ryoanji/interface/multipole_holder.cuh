@@ -43,11 +43,9 @@ public:
      * @param[in]  globalOctree  global octree replicated across nodes on GPU
      * @param[in]  focusTree     locally essential octree focused on local domain
      * @param[in]  layout        for each leaf cell, stores the index of the first source body in cell, on GPU
-     * @param[out] multipoles    output array multipoles, length=focusTree.numNodes, on host
      */
     void upsweep(const Tc* x, const Tc* y, const Tc* z, const Tm* m, const cstone::Octree<KeyType>& globalOctree,
-                 const cstone::FocusedOctree<KeyType, Tf, cstone::GpuTag>& focusTree, const cstone::LocalIndex* layout,
-                 MType* multipoles);
+                 const cstone::FocusedOctree<KeyType, Tf, cstone::GpuTag>& focusTree, const cstone::LocalIndex* layout);
 
     /*! @brief compute accelerations on target particles, assuming sources = targets
      *

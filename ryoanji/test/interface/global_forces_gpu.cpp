@@ -97,9 +97,8 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     auto                                         octree  = focusTree.octreeViewAcc();
     std::span<const cstone::SourceCenterType<T>> centers = focusTree.expansionCentersAcc();
 
-    std::vector<MultipoleType> multipoles(octree.numNodes);
     multipoleHolder.upsweep(rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), domain.globalTree(), domain.focusTree(),
-                            domain.layout().data(), multipoles.data());
+                            domain.layout().data());
 
     // Check Barnes-Hut accelerations from distributed particle set
     // against the direct-sum reference computed with the (single node) common pool

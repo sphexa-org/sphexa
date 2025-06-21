@@ -77,12 +77,11 @@ void ryoanjiTest(int thisRank, int numRanks, size_t numParticlesGlobal)
 
     MultipoleHolder<T, T, T, T, T, KeyType, MultipoleType> multipoleHolder;
 
-    std::vector<MultipoleType> multipoles(octree.numNodes);
     auto grp = multipoleHolder.computeSpatialGroups(domain.startIndex(), domain.endIndex(), rawPtr(d_x), rawPtr(d_y),
                                                     rawPtr(d_z), rawPtr(d_h), domain.focusTree(),
                                                     domain.layout().data(), domain.box());
     multipoleHolder.upsweep(rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), domain.globalTree(), domain.focusTree(),
-                            domain.layout().data(), multipoles.data());
+                            domain.layout().data());
 
     auto t0 = std::chrono::high_resolution_clock::now();
     // compute accelerations for locally owned particles based on globally valid multipoles and
