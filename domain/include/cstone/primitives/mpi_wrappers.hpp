@@ -200,7 +200,7 @@ auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op,  MPI_Comm comm)
 }
 
 template<class Ts, class Td, std::enable_if_t<std::is_arithmetic_v<Td>, int> = 0>
-auto mpiAllgatherv(const Ts* src, int sendCount, Td* dest, int* counts, int* displ, MPI_Comm comm)
+auto mpiAllgatherv(const Ts* src, int sendCount, Td* dest, const int* counts, const int* displ, MPI_Comm comm)
 {
     return MPI_Allgatherv(src, sendCount, MpiType<Td>{}, dest, counts, displ, MpiType<Td>{}, comm);
 }

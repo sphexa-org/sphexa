@@ -81,6 +81,12 @@ TEST(DomainDecomposition, makeSfcAssignment)
     EXPECT_EQ(a[0], 0);
     EXPECT_EQ(a[1], 20);
     EXPECT_EQ(a[2], 40);
+
+    std::vector<TreeNodeIndex> refOffsets{0, 2, 4};
+    EXPECT_TRUE(std::equal(a.treeOffsets().begin(), a.treeOffsets().end(), refOffsets.begin()));
+
+    std::vector<TreeNodeIndex> refNumNodesPerRank{2, 2};
+    EXPECT_TRUE(std::equal(a.numNodesPerRank().begin(), a.numNodesPerRank().end(), refNumNodesPerRank.begin()));
 }
 
 //! @brief test that the SfcLookupKey can lookup the rank for a given code
@@ -133,6 +139,15 @@ TEST(DomainDecomposition, limitBoundaryShifts)
         EXPECT_EQ(newAssignment.totalCount(0), 10);
         EXPECT_EQ(newAssignment.totalCount(1), 11);
         EXPECT_EQ(newAssignment.totalCount(2), 0);
+
+        std::vector<TreeNodeIndex> refNumNodesPerRank{4, 2, 0};
+        std::vector<TreeNodeIndex> refTreeOffsets{0, 4, 6, 6};
+
+        std::span numNodesPerRank = newAssignment.numNodesPerRank();
+        EXPECT_TRUE(std::equal(numNodesPerRank.begin(), numNodesPerRank.end(), refNumNodesPerRank.begin()));
+
+        std::span treeOffsets     = newAssignment.treeOffsets();
+        EXPECT_TRUE(std::equal(treeOffsets.begin(), treeOffsets.end(), refTreeOffsets.begin()));
     }
 }
 

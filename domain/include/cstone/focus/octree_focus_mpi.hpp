@@ -55,7 +55,8 @@ public:
         , treelets_(numRanks_)
         , macsAcc_(1, 1)
         , centers_(1)
-        , globAssignment_(numRanks + 1)
+        , globNumNodes_(numRanks)
+        , globDispl_(numRanks + 1)
     {
         octreeAcc_.resize(1);
         leaves_ = std::vector<KeyType>{0, nodeRange<KeyType>(0)};
@@ -160,7 +161,8 @@ public:
         indexTreelets<KeyType>(peerRanks, hostPrefixes_, octreeAcc_.levelRange, treelets_, treeletIdx_);
 
         translateAssignment<KeyType>(assignment, leaves_, peers_, myRank_, assignment_);
-        std::copy_n(assignment.data(), numRanks_ + 1, globAssignment_.data());
+        std::copy_n(assignment.numNodesPerRankConst().begin(), numRanks_, globNumNodes_.begin());
+        std::copy_n(assignment.treeOffsetsConst().begin(), numRanks_ + 1, globDispl_.begin());
         copy(treeletIdx_, treeletIdxAcc_);
 
         /*! Store box for use in all property updates (counts, centers, MACs, etc) until updateTree() is called again.
@@ -384,21 +386,9 @@ public:
 
     //! @brief Distribute global leaf quantities with local part filled in
     template<class T>
-    void gatherGlobalLeaves(std::span<const KeyType> globalLeaves, std::span<T> globalLeafQuantities) const
+    void gatherGlobalLeaves(std::span<T> globalLeafQuantities) const
     {
-        std::vector<TreeNodeIndex> numGlobNodesPerRank(numRanks_), globNodesDispl(numRanks_ + 1);
-
-        for (int rank = 0; rank < numRanks_; ++rank)
-        {
-            globNodesDispl[rank] = findNodeAbove(globalLeaves.data(), nNodes(globalLeaves), globAssignment_[rank]);
-        }
-        globNodesDispl.back() = nNodes(globalLeaves);
-        for (int rank = 0; rank < numRanks_; ++rank)
-        {
-            numGlobNodesPerRank[rank] = globNodesDispl[rank + 1] - globNodesDispl[rank];
-        }
-
-        mpiAllgatherv(MPI_IN_PLACE, 0, globalLeafQuantities.data(), numGlobNodesPerRank.data(), globNodesDispl.data(),
+        mpiAllgatherv(MPI_IN_PLACE, 0, globalLeafQuantities.data(), globNumNodes_.data(), globDispl_.data(),
                       MPI_COMM_WORLD);
     }
 
@@ -459,7 +449,7 @@ public:
         //! global exchange for the top nodes that are bigger than local domains
         std::vector<SourceCenterType<RealType>> globalLeafCenters(globalTree.numLeafNodes());
         populateGlobal<SourceCenterType<RealType>>(globalTree.treeLeaves(), centers_, globalLeafCenters);
-        gatherGlobalLeaves<SourceCenterType<RealType>>(globalTree.treeLeaves(), globalLeafCenters);
+        gatherGlobalLeaves<SourceCenterType<RealType>>(globalLeafCenters);
         scatter(globalTree.internalOrder(), globalLeafCenters.data(), globalCenters_.data());
         upsweep(globalTree.levelRange(), globalTree.childOffsets(), globalCenters_.data(),
                 CombineSourceCenter<RealType>{});
@@ -803,8 +793,8 @@ private:
     std::vector<SourceCenterType<RealType>> globalCenters_;
     //! @brief the assignment of peer ranks to tree_.treeLeaves()
     std::vector<TreeIndexPair> assignment_;
-    //! @brief global domain boundary SFC keys
-    std::vector<KeyType> globAssignment_;
+    //! @brief number of global nodes per rank and scan for allgatherv
+    std::vector<TreeNodeIndex> globNumNodes_, globDispl_;
 
     //! @brief the status of the macs_ and counts_ rebalance criteria
     int rebalanceStatus_{valid};
@@ -848,7 +838,7 @@ void globalFocusExchange(const Octree<KeyType>& globalOctree,
     focusTree.template populateGlobal<Q>(globalOctree.treeLeaves(), quantities, globalLeafQuantities);
 
     //! exchange global leaves
-    focusTree.template gatherGlobalLeaves<Q>(globalOctree.treeLeaves(), globalLeafQuantities);
+    focusTree.template gatherGlobalLeaves<Q>(globalLeafQuantities);
 
     std::vector<Q> globalQuantities(globalOctree.numTreeNodes());
     scatter(globalOctree.internalOrder(), globalLeafQuantities.data(), globalQuantities.data());
