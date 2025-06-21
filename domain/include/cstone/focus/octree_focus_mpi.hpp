@@ -154,7 +154,6 @@ public:
         {
             syncTreelets(peers_, assignment_, octreeAcc_, leaves_, treelets_);
             hostPrefixes_ = octreeAcc_.prefixes;
-            hostLeafToInternal_ = octreeAcc_.leafToInternal;
         }
 
         indexTreelets<KeyType>(peerRanks, hostPrefixes_, octreeAcc_.levelRange, treelets_, treeletIdx_);
@@ -312,7 +311,7 @@ public:
             auto globLeavesFoc         = globalLeaves.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx + 1);
             auto globQFoc              = globalQuantities.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx);
 
-            const KeyType* nodeKeys         = rawPtr(hostPrefixes_);
+            const KeyType* nodeKeys         = rawPtr(octreeAcc_.prefixes);
             const TreeNodeIndex* levelRange = rawPtr(octreeAcc_.levelRange);
 
             std::vector<TreeNodeIndex> gmap(lastGlobIdx - firstGlobIdx);
@@ -339,10 +338,10 @@ public:
                        std::span<T> localQuantities) const
     {
         //! list of leaf cell indices in the locally focused tree that need global information
-        auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, octreeAcc_.numLeafNodes));
+        auto idxFromGlob                = enumerateRanges(invertRanges(0, assignment_, octreeAcc_.numLeafNodes));
+        const TreeNodeIndex* toInternal = leafToInternal(octreeAcc_).data();
         if constexpr (HaveGpu<Accelerator>{})
         {
-            const TreeNodeIndex* toInternal           = leafToInternal(octreeAcc_).data();
             DeviceVector<TreeNodeIndex> d_idxFromGlob = idxFromGlob;
             gatherGpu(d_idxFromGlob.data(), d_idxFromGlob.size(), toInternal, d_idxFromGlob.data());
 
@@ -360,15 +359,13 @@ public:
         }
         else
         {
-            const KeyType* prefixes = rawPtr(hostPrefixes_);
-            const TreeNodeIndex* toInternal = hostLeafToInternal_.data() + octreeAcc_.numInternalNodes;
             gather<TreeNodeIndex>(idxFromGlob, toInternal, idxFromGlob.data());
 
             std::vector<TreeNodeIndex> gmap(idxFromGlob.size());
 #pragma omp parallel for schedule(static)
             for (TreeNodeIndex i = 0; i < idxFromGlob.size(); ++i)
             {
-                gmap[i] = locateNode(prefixes[idxFromGlob[i]], globalNodeKeys, globalLevelRange);
+                gmap[i] = locateNode(octreeAcc_.prefixes[idxFromGlob[i]], globalNodeKeys, globalLevelRange);
             }
             gatherScatter<TreeNodeIndex>(gmap, idxFromGlob, globalQuantities.data(), localQuantities.data());
         }
@@ -712,9 +709,8 @@ private:
             TreeNodeIndex numLeafNodes = octreeAcc_.numLeafNodes;
             TreeNodeIndex numNodes     = octreeAcc_.numNodes;
 
-            reallocate(numNodes, allocGrowthRate_, hostPrefixes_, hostLeafToInternal_);
+            reallocate(numNodes, allocGrowthRate_, hostPrefixes_);
             memcpyD2H(rawPtr(octreeAcc_.prefixes), numNodes, hostPrefixes_.data());
-            memcpyD2H(rawPtr(octreeAcc_.leafToInternal), numNodes, hostLeafToInternal_.data());
 
             reallocateDestructive(leaves_, numLeafNodes + 1, allocGrowthRate_);
             memcpyD2H(rawPtr(leavesAcc_), numLeafNodes + 1, leaves_.data());
@@ -751,7 +747,6 @@ private:
     ConcatVector<TreeNodeIndex, AccVector> treeletIdxAcc_;
 
     std::vector<KeyType> hostPrefixes_;
-    std::vector<TreeNodeIndex> hostLeafToInternal_;
     OctreeData<KeyType, Accelerator> octreeAcc_;
 
     //! @brief leaves in cstone format for tree_
