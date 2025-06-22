@@ -70,9 +70,13 @@ HOST_DEVICE_FUN void fbcAdjust(const cstone::Vec3<Tc> X, cstone::Vec3<Tc>& V_nm,
             Th minDistance    = relDistanceMin < relDistanceMax ? relDistanceMin : relDistanceMax;
 
             // if (minDistance < 2 * threshold) { V[j] *= -1 + invTHold * minDistance; }
-            auto correction = 1 - lt::lookup(wh, minDistance * invTHold);
-            A[j] *= correction;
-            V_nm[j] *= correction;
+            // auto correction = 1 - lt::lookup(wh, minDistance * invTHold);
+            if (minDistance < 2 * threshold)
+            {
+                Tc correction = 0.5 * (std::tanh(4 * minDistance * invTHold - 4) + 1);
+                A[j] *= correction;
+                V_nm[j] *= correction;
+            }
         }
     }
 }
