@@ -30,7 +30,6 @@
  */
 
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/findneighbors.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
 
 #include "sph/sph_gpu.hpp"
@@ -39,7 +38,7 @@
 
 namespace sph
 {
-namespace cuda
+namespace gpu
 {
 
 using cstone::GpuConfig;
@@ -100,5 +99,5 @@ void computeVeDefGradh(const GroupView& grp, Dataset& d, const cstone::Box<typen
 template void computeVeDefGradh(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,
                                 const cstone::Box<SphTypes::CoordinateType>&);
 
-} // namespace cuda
+} // namespace gpu
 } // namespace sph

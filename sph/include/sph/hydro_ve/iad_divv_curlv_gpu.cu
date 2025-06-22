@@ -30,7 +30,6 @@
  */
 
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/findneighbors.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
 
 #include "sph/sph_gpu.hpp"
@@ -40,7 +39,7 @@
 
 namespace sph
 {
-namespace cuda
+namespace gpu
 {
 
 using cstone::GpuConfig;
@@ -110,5 +109,5 @@ void computeIadDivvCurlv(const GroupView& grp, Dataset& d, const cstone::Box<typ
 template void computeIadDivvCurlv(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
                                   const cstone::Box<SphTypes::CoordinateType>&);
 
-} // namespace cuda
+} // namespace gpu
 } // namespace sph

@@ -1,31 +1,16 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 #pragma once
 
-#include <cstdint>
+#include <cassert>
+#include <type_traits>
 #include "cstone/cuda/annotation.hpp"
 
 #include "cstone/primitives/stl.hpp"
@@ -81,6 +66,14 @@ struct maxTreeLevel<unsigned long> : stl::integral_constant<unsigned, 21>
 {
 };
 
+//! @brief A special key value that cannot result from valid coordinates. Used to flag particles for removal.
+template<class KeyType>
+struct removeKey
+{
+    static constexpr KeyType value = KeyType(1ul << (3 * maxTreeLevel<KeyType>{}));
+    HOST_DEVICE_FUN constexpr operator KeyType() const noexcept { return value; }
+};
+
 //! @brief maximum integer coordinate
 template<class KeyType>
 struct maxCoord : stl::integral_constant<unsigned, (1u << maxTreeLevel<KeyType>{})>
@@ -96,11 +89,12 @@ using Vec4 = util::array<T, 4>;
 enum class P2pTags : int
 {
     focusTransfer    = 1000,
-    focusPeerCounts  = 2000,
-    focusPeerCenters = 3000,
-    haloRequestKeys  = 4000,
-    domainExchange   = 5000,
-    haloExchange     = 6000
+    focusTreelets    = 2000,
+    focusPeerCounts  = 3000,
+    focusPeerCenters = 4000,
+    haloRequestKeys  = 5000,
+    domainExchange   = 6000,
+    haloExchange     = 7000
 };
 
 /*! @brief returns the number of nodes in a tree

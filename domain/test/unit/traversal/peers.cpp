@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -28,6 +12,8 @@
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
+
+#include <fstream>
 
 #include "gtest/gtest.h"
 
@@ -42,28 +28,28 @@ using namespace cstone;
 template<class KeyType, class T>
 static std::vector<int> findPeersAll2All(int myRank,
                                          const SfcAssignment<KeyType>& assignment,
-                                         gsl::span<const KeyType> tree,
+                                         std::span<const KeyType> tree,
                                          const Box<T>& box,
                                          float invThetaEff)
 {
     TreeNodeIndex firstIdx = findNodeAbove(tree.data(), nNodes(tree), assignment[myRank]);
     TreeNodeIndex lastIdx  = findNodeAbove(tree.data(), nNodes(tree), assignment[myRank + 1]);
 
-    std::vector<Vec3<T>> boxCenter(nNodes(tree));
-    std::vector<Vec3<T>> boxSize(nNodes(tree));
+    int maxCoord = 1u << maxTreeLevel<KeyType>{};
+    auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invThetaEff;
+    auto pbc_t   = BoundaryType::periodic;
+    auto pbc     = Vec3<int>{box.boundaryX() == pbc_t, box.boundaryY() == pbc_t, box.boundaryZ() == pbc_t} * maxCoord;
+
+    std::vector<IBox> boxes(nNodes(tree));
     for (TreeNodeIndex i = 0; i < TreeNodeIndex(nNodes(tree)); ++i)
     {
-        IBox ibox                          = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]));
-        std::tie(boxCenter[i], boxSize[i]) = centerAndSize<KeyType>(ibox, box);
+        boxes[i] = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]));
     }
 
     std::vector<int> peers(assignment.numRanks());
     for (TreeNodeIndex i = firstIdx; i < lastIdx; ++i)
         for (TreeNodeIndex j = 0; j < TreeNodeIndex(nNodes(tree)); ++j)
-            if (!minVecMacMutual(boxCenter[i], boxSize[i], boxCenter[j], boxSize[j], box, invThetaEff))
-            {
-                peers[assignment.findRank(tree[j])] = 1;
-            }
+            if (!minMacMutualInt(boxes[i], boxes[j], ellipse, pbc)) { peers[assignment.findRank(tree[j])] = 1; }
 
     std::vector<int> ret;
     for (int i = 0; i < int(peers.size()); ++i)
@@ -86,10 +72,9 @@ static void findMacPeers64grid(int rank, float theta, BoundaryType pbc, int /*re
         assignment.set(i, leaves[i], 1);
     }
 
-    std::vector<int> peers     = findPeersMac(rank, assignment, octree, box, invThetaVecMac(theta));
-    std::vector<int> reference = findPeersAll2All(rank, assignment, octree.treeLeaves(), box, invThetaVecMac(theta));
+    std::vector<int> peers     = findPeersMac(rank, assignment, octree, box, invThetaMinToVec(theta));
+    std::vector<int> reference = findPeersAll2All(rank, assignment, octree.treeLeaves(), box, invThetaMinToVec(theta));
 
-    // EXPECT_EQ(refNumPeers, peers.size());
     EXPECT_EQ(peers, reference);
 }
 
@@ -120,10 +105,10 @@ static void findPeers()
     int nParticles    = 100000;
     int bucketSize    = 64;
     int numRanks      = 50;
-    float invThetaEff = invThetaVecMac(0.5f);
+    float invThetaEff = invThetaMinToVec(0.5f);
 
     auto particleKeys   = makeRandomGaussianKeys<KeyType>(nParticles);
-    auto [tree, counts] = computeOctree(particleKeys.data(), particleKeys.data() + nParticles, bucketSize);
+    auto [tree, counts] = computeOctree<KeyType>(particleKeys, bucketSize);
 
     Octree<KeyType> octree;
     octree.update(tree.data(), nNodes(tree));
@@ -156,4 +141,185 @@ TEST(Peers, find)
 {
     findPeers<unsigned>();
     findPeers<uint64_t>();
+}
+
+// A few harder tests to catch the FP-round-off asymmetric case
+
+static bool isSymmetric(std::vector<std::vector<int>> matrix)
+{
+    int numRanks = matrix[0].size();
+    for (int i = 0; i < numRanks; ++i)
+        for (int j = i; j < numRanks; ++j)
+        {
+            if (matrix[i][j] != matrix[j][i]) { return false; }
+        }
+    return true;
+}
+
+//! @brief return number of rank pairs missing in probe relative to ref
+static int compareMatrices(std::vector<std::vector<int>> ref, std::vector<std::vector<int>> probe)
+{
+    int np1 = 0, np2 = 0, missed = 0, extra = 0;
+    int numRanks = ref[0].size();
+    for (int i = 0; i < numRanks; ++i)
+        for (int j = i; j < numRanks; ++j)
+        {
+            np1 += ref[i][j];
+            np2 += probe[i][j];
+            if (ref[i][j] and not probe[i][j]) missed++;
+            if (probe[i][j] and not ref[i][j]) extra++;
+        }
+    std::cout << "numPairs " << np1 << "/" << np2 << " missed " << missed << " extra " << extra << std::endl;
+    return missed;
+}
+
+template<class KeyType, class T>
+auto peerMatrix(const std::vector<KeyType>& leaves,
+                const std::vector<KeyType>& assignmentKeys,
+                Box<T> box,
+                float invThetaEff)
+{
+    Octree<KeyType> octree;
+    octree.update(leaves.data(), nNodes(leaves));
+
+    int numRanks = assignmentKeys.size() - 1;
+    SfcAssignment<KeyType> assignment(numRanks);
+    for (int r = 0; r <= numRanks; ++r)
+    {
+        assignment.set(r, assignmentKeys[r], 0);
+    }
+
+    std::vector matrix(numRanks, std::vector<int>(numRanks));
+
+    for (int i = 0; i < numRanks; ++i)
+    {
+        auto peers = findPeersMac(i, assignment, octree, box, invThetaEff);
+        for (auto j : peers)
+        {
+            matrix[i][j] = 1;
+        }
+    }
+    return matrix;
+}
+
+//! @brief compute peer matrix with Mac traversal, putting the expansion centers in a random corner
+template<class KeyType, class T>
+auto vecMacMatrix(const std::vector<KeyType>& leaves,
+                  const std::vector<KeyType>& assignmentKeys,
+                  Box<T> box,
+                  float invTheta)
+{
+    Octree<KeyType> octree;
+    octree.update(leaves.data(), nNodes(leaves));
+
+    TreeNodeIndex numNodes = octree.numTreeNodes();
+
+    int numRanks = assignmentKeys.size() - 1;
+    SfcAssignment<KeyType> assignment(numRanks);
+    for (int r = 0; r <= numRanks; ++r)
+    {
+        assignment.set(r, assignmentKeys[r], 0);
+    }
+
+    std::vector<Vec3<T>> centers(numNodes), sizes(numNodes);
+    nodeFpCenters(octree.nodeKeys(), centers.data(), sizes.data(), box);
+
+    std::vector<Vec4<T>> c4(numNodes);
+
+    T margin        = 0.99;
+    auto randCorner = [margin] { return drand48() > 0.5 ? margin : -margin; };
+    for (size_t i = 0; i < c4.size(); ++i)
+    {
+        c4[i][0] = centers[i][0] + randCorner() * sizes[i][0];
+        c4[i][1] = centers[i][1] + randCorner() * sizes[i][1];
+        c4[i][2] = centers[i][2] + randCorner() * sizes[i][2];
+        c4[i][3] = 1;
+    }
+    setMac<T, KeyType>(octree.nodeKeys(), c4, invTheta, box);
+
+    std::vector matrix(numRanks, std::vector<int>(numRanks));
+    for (int i = 0; i < numRanks; ++i)
+    {
+        TreeNodeIndex iStart = findNodeAbove(leaves.data(), nNodes(leaves), assignment[i]);
+        TreeNodeIndex iEnd   = findNodeAbove(leaves.data(), nNodes(leaves), assignment[i + 1]);
+        std::vector<uint8_t> macs_internal(numNodes, 0);
+        markMacs(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(), c4.data(), box,
+                 leaves.data() + iStart, iEnd - iStart, false, macs_internal.data());
+
+        std::vector<uint8_t> macs(octree.numLeafNodes(), 0);
+        gather(octree.internalOrder(), macs_internal.data(), macs.data());
+
+        for (int j = 0; j < numRanks; ++j)
+        {
+            TreeNodeIndex jStart = findNodeAbove(leaves.data(), nNodes(leaves), assignment[j]);
+            TreeNodeIndex jEnd   = findNodeAbove(leaves.data(), nNodes(leaves), assignment[j + 1]);
+            matrix[i][j] = std::any_of(macs.begin() + jStart, macs.begin() + jEnd, [](auto x) { return x > 0; });
+        }
+    }
+    return matrix;
+}
+
+template<class KeyType>
+std::vector<KeyType> makeAssignment(int numRanks)
+{
+    auto ret      = initialDomainSplits<KeyType>(numRanks, 5);
+    KeyType delta = ret[1] / 64;
+
+    auto randInt = [] { return int(6 * (drand48() - 0.5)); };
+
+    for (size_t i = 1; i < ret.size() - 1; ++i)
+    {
+        ret[i] += randInt() * delta;
+    }
+    return ret;
+}
+
+TEST(Peers, pairs_nograv)
+{
+    using KeyType = uint64_t;
+
+    std::vector<KeyType> ak = makeAssignment<KeyType>(256);
+
+    std::vector<KeyType> leaves = computeSpanningTree<KeyType>(ak);
+
+    int numRanks = 256;
+    SfcAssignment<KeyType> assignment(numRanks);
+    for (int r = 0; r <= numRanks; ++r)
+    {
+        assignment.set(r, ak[r], 0);
+    }
+
+    Box<double> box(-0.028, 0.028, BoundaryType::periodic);
+
+    float theta      = 1.0;
+    auto mat_int_min = peerMatrix(leaves, ak, box, 1.0 / theta);
+
+    // fp-based peers would not be symmetric
+    EXPECT_TRUE(isSymmetric(mat_int_min));
+}
+
+TEST(Peers, pairs_grav)
+{
+    using KeyType = uint64_t;
+
+    std::vector<KeyType> ak     = makeAssignment<KeyType>(256);
+    std::vector<KeyType> leaves = computeSpanningTree<KeyType>(ak);
+
+    int numRanks = 256;
+    SfcAssignment<KeyType> assignment(numRanks);
+    for (int r = 0; r <= numRanks; ++r)
+    {
+        assignment.set(r, ak[r], 0);
+    }
+
+    Box<double> box(-0.028, 0.028, -0.04, 0.04, -0.1, 0.1, BoundaryType::periodic, BoundaryType::periodic /*Z open */);
+
+    float theta          = 0.5;
+    float invThetaIntMin = invThetaMinToVec(theta);
+    auto mat_int_min     = peerMatrix(leaves, ak, box, invThetaIntMin);
+
+    auto mat_vecmac = vecMacMatrix(leaves, ak, box, 1.0f / theta);
+
+    EXPECT_TRUE(isSymmetric(mat_int_min));
+    EXPECT_EQ(compareMatrices(mat_vecmac, mat_int_min), 0);
 }

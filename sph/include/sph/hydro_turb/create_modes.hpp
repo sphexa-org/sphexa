@@ -1,28 +1,3 @@
-/*
- * MIT License
- *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
 /*! @file
  * @brief Turbulence simulation data initialization
  *
@@ -59,6 +34,10 @@ template<class Dataset, class T>
 void createStirringModes(Dataset& d, T Lx, T Ly, T Lz, size_t st_maxmodes, T stirMax, T stirMin, size_t ndim,
                          size_t spectForm, T powerLawExp, T anglesExp, bool verbose)
 {
+    // TODO: this should not take the whole Dataset, only modes and amplitudes are needed
+    // TODO: st_maxmodes should not be an input parameter. the caller will have determineNumModes
+    // TODO: and it's up to the call-site to decide if they want to create as many as it takes (or skip the check)
+
     const T twopi = 2.0 * M_PI;
 
     // characteristic k for scaling the amplitude below
@@ -73,6 +52,7 @@ void createStirringModes(Dataset& d, T Lx, T Ly, T Lz, size_t st_maxmodes, T sti
     size_t ikymax = (ndim > 1) ? 256 : 0;
     size_t ikzmax = (ndim > 2) ? 256 : 0;
 
+    // TODO: this should be a separate function "determineNumModes".
     // determine the number of required modes (in case of full sampling)
     d.numModes = 0;
     for (size_t ikx = ikxmin; ikx <= ikxmax; ikx++)
@@ -98,6 +78,7 @@ void createStirringModes(Dataset& d, T Lx, T Ly, T Lz, size_t st_maxmodes, T sti
 
     d.numModes = -1;
 
+    // TODO: should be a separate function
     if (spectForm != 2)
     {
         if (verbose) std::cout << "Generating " << st_tot_nmodes << " driving modes..." << std::endl;
@@ -176,18 +157,19 @@ void createStirringModes(Dataset& d, T Lx, T Ly, T Lz, size_t st_maxmodes, T sti
         }             // ikx
     }
 
+    // TODO: should be a separate function
     if (spectForm == 2)
     {
         std::uniform_real_distribution<T> uniDist(0, 1);
         auto                              uniRng = [&d, &uniDist] { return uniDist(d.gen); };
 
         // loop between smallest and largest k
-        size_t ikmin = std::max(1, int(stirMin * Lx / twopi + 0.5));
-        size_t ikmax = int(stirMax * Lx / twopi + 0.5);
+        int ikmin = std::max(1, int(stirMin * Lx / twopi + 0.5));
+        int ikmax = int(stirMax * Lx / twopi + 0.5);
 
         for (int ik = ikmin; ik <= ikmax; ik++)
         {
-            size_t nang = std::pow(2, ndim) * ceil(std::pow(ik, anglesExp));
+            int nang = std::pow(2, ndim) * ceil(std::pow(ik, anglesExp));
             if (verbose) std::cout << "ik = " << ik << " , number of angles = " << nang << std::endl;
 
             for (int iang = 1; iang <= nang; iang++)

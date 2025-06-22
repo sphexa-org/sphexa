@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -33,7 +17,7 @@
 
 #include "gtest/gtest.h"
 
-#include "cstone/primitives/gather.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 
 using namespace cstone;
 
@@ -51,23 +35,24 @@ TEST(GatherCpu, sortInvert)
     EXPECT_EQ(values, reference);
 }
 
-template<class ValueType, class KeyType, class IndexType>
+template<class ValueType, class KeyType>
 void CpuGatherTest()
 {
-    std::vector<KeyType> codes{0, 50, 10, 60, 20, 70, 30, 80, 40, 90};
+    constexpr bool gpu = false;
+    std::vector<KeyType> keys{0, 50, 10, 60, 20, 70, 30, 80, 40, 90};
 
-    std::vector<unsigned> scratch;
-    SfcSorter<IndexType, std::vector<unsigned>> sorter(scratch);
-    sorter.setMapFromCodes(codes.data(), codes.data() + codes.size());
+    std::vector<unsigned> obuf, s0, s1;
+    sequence<gpu>(0, keys.size(), obuf, 1.0);
+    sortByKey<gpu>(std::span(keys), std::span(obuf), s0, s1, 1.0);
 
     {
         std::vector<KeyType> refCodes{0, 10, 20, 30, 40, 50, 60, 70, 80, 90};
-        EXPECT_EQ(codes, refCodes);
+        EXPECT_EQ(keys, refCodes);
     }
 
     std::vector<ValueType> values{-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
     std::vector<ValueType> probe = values;
-    gatherCpu(sorter.getMap(), codes.size(), values.data() + 2, probe.data() + 2);
+    gatherCpu({obuf.data(), keys.size()}, values.data() + 2, probe.data() + 2);
     std::vector<ValueType> reference{-2, -1, 0, 2, 4, 6, 8, 1, 3, 5, 7, 9, 10, 11};
 
     EXPECT_EQ(probe, reference);
@@ -75,8 +60,8 @@ void CpuGatherTest()
 
 TEST(GatherCpu, CpuGather)
 {
-    CpuGatherTest<float, unsigned, unsigned>();
-    CpuGatherTest<float, uint64_t, unsigned>();
-    CpuGatherTest<double, unsigned, unsigned>();
-    CpuGatherTest<double, uint64_t, unsigned>();
+    CpuGatherTest<float, unsigned>();
+    CpuGatherTest<float, uint64_t>();
+    CpuGatherTest<double, unsigned>();
+    CpuGatherTest<double, uint64_t>();
 }

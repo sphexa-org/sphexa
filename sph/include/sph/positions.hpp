@@ -35,7 +35,7 @@
 #include "cstone/sfc/box.hpp"
 #include "cstone/util/array.hpp"
 #include "cstone/util/tuple.hpp"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 
 #include "sph/sph_gpu.hpp"
 #include "sph/eos.hpp"
@@ -78,8 +78,8 @@ HOST_DEVICE_FUN void fbcAdjust(const cstone::Vec3<Tc> X, cstone::Vec3<Tc>& V_nm,
 }
 
 //! @brief update the energy according to Adams-Bashforth (2nd order)
-template<class TU, class TD>
-HOST_DEVICE_FUN TU energyUpdate(TU u_old, double dt, double dt_m1, TD du, TD du_m1)
+template<class TU>
+HOST_DEVICE_FUN TU energyUpdate(TU u_old, double dt, double dt_m1, double du, double du_m1)
 {
     TU u_new = u_old + du * dt + 0.5 * (du - du_m1) / dt_m1 * std::abs(dt) * dt;
     // To prevent u < 0 (when cooling with GRACKLE is active)
@@ -146,7 +146,6 @@ void updatePositionsHost(size_t startIndex, size_t endIndex, Dataset& d, const c
 template<class Dataset, class T>
 void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
 {
-    using Tdu    = decltype(d.du[0]);
     bool haveMui = !d.mui.empty();
     auto constCv = idealGasCv(d.muiConst, d.gamma);
 
@@ -155,7 +154,7 @@ void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone
     {
         auto cv    = haveMui ? idealGasCv(d.mui[i], d.gamma) : constCv;
         auto u_old = cv * d.temp[i];
-        d.temp[i]  = energyUpdate(u_old, d.minDt, d.minDt_m1, d.du[i], Tdu(d.du_m1[i])) / cv;
+        d.temp[i]  = energyUpdate(u_old, d.minDt, d.minDt_m1, d.du[i], d.du_m1[i]) / cv;
         d.du_m1[i] = d.du[i];
     }
 }
@@ -163,11 +162,10 @@ void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone
 template<class Dataset, class T>
 void updateIntEnergyHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
 {
-    using Tdu = decltype(d.du[0]);
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; i++)
     {
-        d.u[i]     = energyUpdate(d.u[i], d.minDt, d.minDt_m1, d.du[i], Tdu(d.du_m1[i]));
+        d.u[i]     = energyUpdate(d.u[i], d.minDt, d.minDt_m1, d.du[i], d.du_m1[i]);
         d.du_m1[i] = d.du[i];
     }
 }

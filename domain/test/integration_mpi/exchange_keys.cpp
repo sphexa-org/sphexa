@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -69,7 +53,7 @@ template<class KeyType>
 void exchangeKeys(int myRank, int numRanks)
 {
     std::vector<unsigned> counts{2, 2, 1, 1, 1, 1, 2, 2};
-    std::vector<int> haloFlags{0, 1, 0, 0, 0, 0, 1, 0};
+    std::vector<uint8_t> haloFlags{0, 1, 0, 0, 0, 0, 1, 0};
 
     std::vector<unsigned> layout(counts.size() + 1);
 
@@ -88,7 +72,7 @@ void exchangeKeys(int myRank, int numRanks)
     }
 
     assignment[myRank] = TreeIndexPair(2, 6);
-    computeNodeLayout(counts, haloFlags, assignment[myRank].start(), assignment[myRank].end(), layout);
+    computeNodeLayout<false>(counts, haloFlags, assignment[myRank], layout);
 
     if (myRank < numRanks - 1)
     {
@@ -97,7 +81,7 @@ void exchangeKeys(int myRank, int numRanks)
         reference[myRank + 1].addRange(4, 6);
     }
 
-    SendList probe = exchangeRequestKeys<KeyType>(treeLeaves, haloFlags, assignment, peers, layout);
+    SendList probe = exchangeRequestKeys<KeyType>(treeLeaves, assignment, peers, layout);
 
     EXPECT_EQ(probe, reference);
 }
@@ -123,7 +107,7 @@ void unequalSurface(int myRank, int numRanks)
     std::vector<KeyType> treeLeaves = OctreeMaker<KeyType>().divide().makeTree();
     std::vector<unsigned> counts(nNodes(treeLeaves), 1);
 
-    std::vector<int> haloFlags(nNodes(treeLeaves));
+    std::vector<uint8_t> haloFlags(nNodes(treeLeaves));
     std::vector<int> peers;
 
     std::vector<TreeIndexPair> assignment(numRanks);
@@ -136,25 +120,27 @@ void unequalSurface(int myRank, int numRanks)
 
     if (myRank == 1)
     {
-        int offset = nNodes(treeLeaves) - 1;
-        haloFlags  = std::vector<int>{1, 1, 0, 1, 1, 1, 1, 1};
+        haloFlags = std::vector<uint8_t>{1, 1, 0, 1, 1, 1, 1, 1};
         peers.push_back(0);
-        reference[0].addRange(offset, offset + 1);
-        computeNodeLayout(counts, haloFlags, 2, 3, layout);
+        computeNodeLayout<false>(counts, haloFlags, assignment[1], layout);
+        EXPECT_EQ(layout[7], 6);
+        reference[0].addRange(layout[7], layout[8]);
+
+        std::vector<unsigned> refLayout{0, 1, 2, 2, 3, 4, 5, 6, 7};
+        EXPECT_EQ(refLayout, layout);
     }
 
     if (myRank == 0)
     {
-        haloFlags = std::vector<int>{0, 0, 0, 0, 0, 0, 0, 1};
+        haloFlags = std::vector<uint8_t>{0, 0, 0, 0, 0, 0, 0, 1};
         peers.push_back(1);
-        reference[1].addRange(0, nNodes(treeLeaves) - 1);
-        computeNodeLayout(counts, haloFlags, 0, 7, layout);
+        computeNodeLayout<false>(counts, haloFlags, assignment[0], layout);
+        reference[1].addRange(layout[0], layout[2]);
+        reference[1].addRange(layout[3], layout[7]);
     }
 
-    SendList probe = exchangeRequestKeys<KeyType>(treeLeaves, haloFlags, assignment, peers, layout);
-
-    if (myRank == 1) { EXPECT_EQ(probe, reference); }
-    if (myRank == 0) { EXPECT_EQ(probe[1].totalCount(), nNodes(treeLeaves) - 2); }
+    SendList probe = exchangeRequestKeys<KeyType>(treeLeaves, assignment, peers, layout);
+    EXPECT_EQ(probe, reference);
 }
 
 TEST(ExchangeKeys, unequalSurface)

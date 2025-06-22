@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -48,7 +32,7 @@ static IBox makeLevelBox(unsigned ix, unsigned iy, unsigned iz, unsigned level)
 
 template<class KeyType>
 static std::vector<TreeNodeIndex>
-findCollidingIndices(IBox target, gsl::span<const KeyType> leaves, KeyType exclStart, KeyType exclEnd)
+findCollidingIndices(IBox target, std::span<const KeyType> leaves, KeyType exclStart, KeyType exclEnd)
 {
     Octree<KeyType> octree;
     octree.update(leaves.data(), nNodes(leaves));
@@ -57,7 +41,8 @@ findCollidingIndices(IBox target, gsl::span<const KeyType> leaves, KeyType exclS
     auto storeCollisions = [toLeaf = octree.toLeafOrder().data(), &collisions](TreeNodeIndex i)
     { collisions.push_back(toLeaf[i]); };
 
-    findCollisions(octree.nodeKeys().data(), octree.childOffsets().data(), storeCollisions, target, exclStart, exclEnd);
+    findCollisions(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(), storeCollisions,
+                   target, exclStart, exclEnd);
     std::sort(collisions.begin(), collisions.end());
 
     return collisions;
@@ -65,7 +50,7 @@ findCollidingIndices(IBox target, gsl::span<const KeyType> leaves, KeyType exclS
 
 template<class KeyType>
 static std::vector<IBox>
-findCollidingBoxes(IBox target, gsl::span<const KeyType> leaves, KeyType exclStart, KeyType exclEnd)
+findCollidingBoxes(IBox target, std::span<const KeyType> leaves, KeyType exclStart, KeyType exclEnd)
 {
     std::vector<TreeNodeIndex> collisions = findCollidingIndices(target, leaves, exclStart, exclEnd);
 

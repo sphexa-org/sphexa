@@ -33,7 +33,6 @@
 
 #include <tuple>
 #include "cstone/sfc/box.hpp"
-#include "cstone/tree/definitions.h"
 
 namespace sphexa
 {
@@ -85,9 +84,8 @@ extern double machSquareSumGpu(const Tv* vx, const Tv* vy, const Tv* vz, const T
  * @return
  */
 template<class T, class Tt, class Tm>
-extern size_t survivorsGpu(const Tt* temp, const T* kx, const T* xmass, const Tm* m, double rhoBubble, double tempWind,
-                           size_t first, size_t last);
-
+extern double survivingMassGpu(const Tt* temp, const T* kx, const T* xmass, const Tm* m, double rhoBubble,
+                               double tempWind, size_t first, size_t last);
 /*!
  * @brief struct and sorting functors for the Rayleigh-Taylor Observable
  * @tparam T floating point type of coordinates and velocities

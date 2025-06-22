@@ -1,25 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2022 CSCS, ETH Zurich
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -49,7 +34,7 @@ namespace cstone
  * This means that each subdividing a node, all 8 children always have to be added.
  */
 template<class KeyType, class Alloc>
-void injectKeys(std::vector<KeyType, Alloc>& tree, gsl::span<const KeyType> keys)
+void injectKeys(std::vector<KeyType, Alloc>& tree, std::span<const KeyType> keys)
 {
     std::vector<KeyType> spanningKeys(keys.begin(), keys.end());
     spanningKeys.push_back(0);
@@ -71,29 +56,43 @@ void injectKeys(std::vector<KeyType, Alloc>& tree, gsl::span<const KeyType> keys
     tree.erase(uit, end(tree));
 }
 
-template<class Otree, class DevVec>
-void injectKeysGpu(Otree& tree, DevVec& leaves, const DevVec& keys)
+/*! @brief inject specified keys into a gpu cornerstone leaf tree
+ *
+ * @tparam
+ * @param[inout] leaves       cornerstone leaf key array
+ * @param[in]    keys         SFC keys to inject into @p leaves
+ * @param[-]     keyScratch   temporary space, content will be overwritten and resized
+ * @param[-]     spanOps      temporary space, content will be overwritten and resized
+ * @param[-]     spanOpsScan  temporary space, content will be overwritten and resized
+ *
+ * Injects keys into leaves, sorts and adds missing keys inbetween to satisfy power-of-8 differences
+ * between consecutive keys.
+ */
+template<class KeyType>
+void injectKeysGpu(DeviceVector<KeyType>& leaves,
+                   std::span<const KeyType> keys,
+                   DeviceVector<KeyType>& keyScratch,
+                   DeviceVector<TreeNodeIndex>& spanOps,
+                   DeviceVector<TreeNodeIndex>& spanOpsScan)
 {
     reallocate(leaves, leaves.size() + keys.size(), 1.0);
-    memcpyD2D(rawPtr(keys), keys.size(), rawPtr(leaves) + leaves.size() - keys.size());
+    memcpyD2D(keys.data(), keys.size(), leaves.data() + leaves.size() - keys.size());
 
-    reallocateDestructive(tree.prefixes, leaves.size(), 1.0);
-    sortGpu(rawPtr(leaves), rawPtr(leaves) + leaves.size(), rawPtr(tree.prefixes));
+    reallocateDestructive(keyScratch, leaves.size(), 1.0);
+    sortGpu(rawPtr(leaves), rawPtr(leaves) + leaves.size(), rawPtr(keyScratch));
 
-    reallocateDestructive(tree.childOffsets, nNodes(leaves), 1.0);
-    TreeNodeIndex* spanOps = rawPtr(tree.childOffsets);
-    reallocateDestructive(tree.internalToLeaf, leaves.size(), 1.0);
-    TreeNodeIndex* spanOpsScan = rawPtr(tree.internalToLeaf);
+    reallocateDestructive(spanOps, leaves.size(), 1.0);
+    reallocateDestructive(spanOpsScan, leaves.size(), 1.0);
 
-    countSfcGapsGpu(rawPtr(leaves), nNodes(leaves), spanOps);
-    exclusiveScanGpu(spanOps, spanOps + leaves.size(), spanOpsScan);
+    countSfcGapsGpu(leaves.data(), nNodes(leaves), spanOps.data());
+    exclusiveScanGpu(spanOps.data(), spanOps.data() + leaves.size(), spanOpsScan.data());
 
     TreeNodeIndex numNodesGap;
-    memcpyD2H(spanOpsScan + leaves.size() - 1, 1, &numNodesGap);
+    memcpyD2H(spanOpsScan.data() + leaves.size() - 1, 1, &numNodesGap);
 
-    reallocateDestructive(tree.prefixes, numNodesGap + 1, 1.0);
-    fillSfcGapsGpu(rawPtr(leaves), nNodes(leaves), spanOpsScan, rawPtr(tree.prefixes));
-    swap(leaves, tree.prefixes);
+    reallocateDestructive(keyScratch, numNodesGap + 1, 1.0);
+    fillSfcGapsGpu(leaves.data(), nNodes(leaves), spanOpsScan.data(), keyScratch.data());
+    swap(leaves, keyScratch);
 }
 
 } // namespace cstone

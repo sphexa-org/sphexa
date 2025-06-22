@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -40,7 +24,7 @@ namespace cstone
 template<class KeyType>
 static auto computeNodeOps(const OctreeView<KeyType>& octree,
                            const std::vector<unsigned>& leafCounts,
-                           const std::vector<char>& csMacs,
+                           const std::vector<uint8_t>& csMacs,
                            KeyType focusStart,
                            KeyType focusEnd,
                            unsigned bucketSize,
@@ -48,14 +32,14 @@ static auto computeNodeOps(const OctreeView<KeyType>& octree,
 {
     std::vector<unsigned> counts(octree.numNodes);
 
-    gsl::span<const TreeNodeIndex> leafToInternal(octree.leafToInternal + octree.numInternalNodes, octree.numLeafNodes);
-    gsl::span<const TreeNodeIndex> childOffsets{octree.childOffsets, size_t(octree.numNodes)};
-    gsl::span<const TreeNodeIndex> levelRange(octree.levelRange, maxTreeLevel<KeyType>{} + 2);
+    std::span<const TreeNodeIndex> leafToInternal(octree.leafToInternal + octree.numInternalNodes, octree.numLeafNodes);
+    std::span<const TreeNodeIndex> childOffsets{octree.childOffsets, size_t(octree.numNodes)};
+    std::span<const TreeNodeIndex> levelRange(octree.levelRange, maxTreeLevel<KeyType>{} + 2);
 
     scatter(leafToInternal, leafCounts.data(), counts.data());
     upsweep(levelRange, childOffsets, counts.data(), NodeCount<unsigned>{});
 
-    std::vector<char> macs(octree.numNodes);
+    std::vector<uint8_t> macs(octree.numNodes);
     scatter(leafToInternal, csMacs.data(), macs.data());
 
     // transfer values for internal node macs
@@ -70,7 +54,7 @@ static auto computeNodeOps(const OctreeView<KeyType>& octree,
     rebalanceDecisionEssential({octree.prefixes, size_t(octree.numNodes)}, octree.childOffsets, octree.parents,
                                counts.data(), macs.data(), focusStart, focusEnd, bucketSize, nodeOps.data());
     bool converged =
-        protectAncestors(gsl::span<const KeyType>(octree.prefixes, octree.numNodes), octree.parents, nodeOps.data());
+        protectAncestors(std::span<const KeyType>(octree.prefixes, octree.numNodes), octree.parents, nodeOps.data());
 
     std::vector<int> ret(octree.numLeafNodes);
     gather(leafToInternal, nodeOps.data(), ret.data());
@@ -94,7 +78,7 @@ static void rebalanceDecision()
         // fused
         //                               0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21
         std::vector<unsigned> leafCounts{1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0};
-        std::vector<char> macs{/*     */ 0, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0};
+        std::vector<uint8_t> macs{/*     */ 0, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0};
 
         std::vector<int> reference{1, 1, 1, 8, 1, 1, 1, 1, 1, 1, 8, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0};
 
@@ -116,7 +100,7 @@ static void rebalanceDecision()
         // MAC wins, nodes stay, but are not split
         //                               0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21
         std::vector<unsigned> leafCounts{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 2, 1, 0, 0, 0, 0};
-        std::vector<char> macs{/*     */ 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0};
+        std::vector<uint8_t> macs{/*     */ 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0};
         //                            ^
         //                            parent of leaf nodes 14-21
         std::vector<int> reference{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
@@ -137,7 +121,7 @@ static void rebalanceDecision()
         // nodes 14-21 should stay based on counts, and should be fused based on MACs. MAC wins, nodes are fused
         //                               0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21
         std::vector<unsigned> leafCounts{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 2, 1, 0, 0, 0, 0};
-        std::vector<char> macs{/*     */ 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0};
+        std::vector<uint8_t> macs{/*     */ 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0};
         //                            ^
         //                            parent of leaf nodes 14-21
         std::vector<int> reference{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0};
@@ -159,7 +143,7 @@ static void rebalanceDecision()
         //                               |                     |                       |
         //                               0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21
         std::vector<unsigned> leafCounts{1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 2, 1, 2, 1, 1, 2, 1, 1};
-        std::vector<char> macs{/*     */ 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0};
+        std::vector<uint8_t> macs{/*     */ 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0};
         //                 root ^  ^  ^
         //   parent of leaves 0-7  |  | parent of leaf nodes 8-15                  ^ here count says split, mac says
         //                                                                           merge, result: stay
@@ -187,7 +171,7 @@ static void rebalanceDecision()
         //                               |                |                      |-----------------------
         //                               0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21
         std::vector<unsigned> leafCounts{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-        std::vector<char> macs{/*     */ 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        std::vector<uint8_t> macs{/*     */ 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
         std::vector<int> reference{1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1};
         // Check that nodes 6-13, directly adjacent to the focus area can be merged
@@ -285,7 +269,7 @@ TEST(FocusedOctree, keyEnforcement)
 
             //                   0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16
             std::vector<int> ref{1, 8, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0};
-            protectAncestors(gsl::span<const KeyType>(octree.prefixes, octree.numNodes), octree.parents,
+            protectAncestors(std::span<const KeyType>(octree.prefixes, octree.numNodes), octree.parents,
                              nodeOps.data());
             EXPECT_EQ(status, ResolutionStatus::rebalance);
             EXPECT_EQ(nodeOps, ref);
@@ -310,7 +294,7 @@ TEST(FocusedOctree, keyEnforcement)
 }
 
 template<class KeyType>
-TreeNodeIndex numNodesInRange(gsl::span<const KeyType> tree, KeyType a, KeyType b)
+TreeNodeIndex numNodesInRange(std::span<const KeyType> tree, KeyType a, KeyType b)
 {
     auto itb = std::lower_bound(tree.begin(), tree.end(), b);
     auto ita = std::lower_bound(tree.begin(), tree.end(), a);
@@ -322,7 +306,7 @@ TreeNodeIndex numNodesInRange(gsl::span<const KeyType> tree, KeyType a, KeyType 
 }
 
 template<class KeyType>
-std::vector<TreeNodeIndex> octantNodeCount(gsl::span<const KeyType> tree)
+std::vector<TreeNodeIndex> octantNodeCount(std::span<const KeyType> tree)
 {
     std::vector<TreeNodeIndex> counts;
     for (int octant = 0; octant < 8; ++octant)
@@ -344,11 +328,11 @@ static void computeEssentialTree()
     int nParticles        = 200000;
     unsigned csBucketSize = 16;
 
-    std::vector<KeyType> codes(nParticles);
-    std::iota(codes.begin(), codes.end(), 0);
-    std::for_each(codes.begin(), codes.end(), [n = nParticles](auto& k) { k *= double(nodeRange<KeyType>(0)) / n; });
+    std::vector<KeyType> keys(nParticles);
+    std::iota(keys.begin(), keys.end(), 0);
+    std::for_each(keys.begin(), keys.end(), [n = nParticles](auto& k) { k *= double(nodeRange<KeyType>(0)) / n; });
 
-    auto [csTree, csCounts] = computeOctree(codes.data(), codes.data() + nParticles, csBucketSize);
+    auto [csTree, csCounts] = computeOctree<KeyType>(keys, csBucketSize);
     Octree<KeyType> globalTree;
     globalTree.update(csTree.data(), nNodes(csTree));
 
@@ -363,14 +347,14 @@ static void computeEssentialTree()
     KeyType focusStart = 1;
     KeyType focusEnd   = pad(KeyType(1), 3);
 
-    tree.update(box, codes, focusStart, focusEnd, {});
+    tree.update(box, keys, focusStart, focusEnd, {});
     // The focus boundaries have to be contained in the tree, even after just one update step.
     // This example here is the worst-case scenario with a focus boundary at the highest possible
     // octree subdivision level. Key-0 is always present, so the node with Key-1 is always at index 1, if present.
     EXPECT_EQ(tree.treeLeaves()[1], focusStart);
 
     // update until converged
-    while (!tree.update(box, codes, focusStart, focusEnd, {})) {}
+    while (!tree.update(box, keys, focusStart, focusEnd, {})) {}
 
     {
         // the first node in the cornerstone tree that starts at or above focusStart
@@ -390,8 +374,8 @@ static void computeEssentialTree()
         // From 0 to matchingFocusNode, the focusTree should be identical to the spanningTree
         std::vector<KeyType> spanningKeys{0, focusStart, nodeRange<KeyType>(0)};
         auto spanningTree = computeSpanningTree<KeyType>(spanningKeys);
-        EXPECT_EQ(tree.treeLeaves().first(matchingFocusNode),
-                  gsl::span<KeyType>(spanningTree.data(), matchingFocusNode));
+        auto a            = tree.treeLeaves().first(matchingFocusNode);
+        EXPECT_TRUE(std::equal(a.begin(), a.end(), spanningTree.data()));
 
         auto nodeCounts = octantNodeCount<KeyType>(tree.treeLeaves());
         EXPECT_EQ(nodeCounts, refCounts);
@@ -399,7 +383,7 @@ static void computeEssentialTree()
 
     focusStart = pad(KeyType(7), 3);
     focusEnd   = nodeRange<KeyType>(0) - 1;
-    while (!tree.update(box, codes, focusStart, focusEnd, {})) {}
+    while (!tree.update(box, keys, focusStart, focusEnd, {})) {}
 
     {
         auto nodeCounts = octantNodeCount<KeyType>(tree.treeLeaves());
@@ -408,7 +392,7 @@ static void computeEssentialTree()
 
     focusStart = 0; // slight variation; start from zero instead of 1
     focusEnd   = pad(KeyType(1), 3);
-    while (!tree.update(box, codes, focusStart, focusEnd, {})) {}
+    while (!tree.update(box, keys, focusStart, focusEnd, {})) {}
 
     {
         TreeNodeIndex lastFocusNode = findNodeAbove(tree.treeLeaves().data(), tree.treeLeaves().size(), focusEnd);
@@ -424,6 +408,79 @@ TEST(FocusedOctree, compute)
 {
     computeEssentialTree<unsigned>();
     computeEssentialTree<uint64_t>();
+}
+
+class MacRefinement : public testing::Test
+{
+protected:
+    using KeyType = uint64_t;
+    using T       = double;
+
+    void SetUp() override
+    {
+        OctreeMaker<KeyType> om;
+        om.divide().divide(0);
+        for (int j = 0; j < 8; ++j)
+            om.divide(0, j);
+        om.divide(0, 0, 0);
+
+        // L3 in first octant, L1 otherwise
+        leaves = om.makeTree();
+        octree.resize(nNodes(leaves));
+        ov = octree.data();
+        updateInternalTree<KeyType>(leaves, ov);
+    }
+
+    std::vector<KeyType> leaves;
+    OctreeData<KeyType, CpuTag> octree;
+    OctreeView<KeyType> ov;
+    std::vector<SourceCenterType<T>> centers;
+    std::vector<uint8_t> macs;
+};
+
+TEST_F(MacRefinement, fullSurface)
+{
+    Box<T> box(0, 1);
+    float invTheta = sqrt(3) / 2 + 1e-6;
+
+    KeyType focusStart = 0;
+    KeyType focusEnd   = decodePlaceholderBit(KeyType(011));
+    while (!macRefine(octree, leaves, centers, macs, focusEnd, focusEnd, focusStart, focusEnd, invTheta, box)) {}
+
+    int numNodesVertex = 7 + 8;
+    int numNodesEdge   = 6 + 2 * 8;
+    int numNodesFace   = 4 + 4 * 8;
+    EXPECT_EQ(nNodes(leaves), 64 + 7 + 3 * numNodesFace + 3 * numNodesEdge + numNodesVertex);
+}
+
+TEST_F(MacRefinement, noSurface)
+{
+    Box<T> box(0, 1);
+    float invTheta              = sqrt(3) / 2 + 1e-6;
+    TreeNodeIndex numNodesStart = octree.numLeafNodes;
+
+    KeyType oldFStart  = decodePlaceholderBit(KeyType(0101));
+    KeyType oldFEnd    = decodePlaceholderBit(KeyType(011));
+    KeyType focusStart = 0;
+    KeyType focusEnd   = decodePlaceholderBit(KeyType(011));
+    while (!macRefine(octree, leaves, centers, macs, oldFStart, oldFEnd, focusStart, focusEnd, invTheta, box)) {}
+
+    EXPECT_EQ(nNodes(leaves), numNodesStart);
+}
+
+TEST_F(MacRefinement, partialSurface)
+{
+    Box<T> box(0, 1);
+    float invTheta              = sqrt(3) / 2 + 1e-6;
+    TreeNodeIndex numNodesStart = octree.numLeafNodes;
+
+    KeyType oldFStart  = 0;
+    KeyType oldFEnd    = decodePlaceholderBit(KeyType(0107));
+    KeyType focusStart = 0;
+    KeyType focusEnd   = decodePlaceholderBit(KeyType(011));
+    while (!macRefine(octree, leaves, centers, macs, oldFStart, oldFEnd, focusStart, focusEnd, invTheta, box)) {}
+
+    EXPECT_EQ(nNodes(leaves), numNodesStart + 5 * 7);
 }
 
 } // namespace cstone

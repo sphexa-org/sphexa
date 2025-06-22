@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -39,15 +23,16 @@ using namespace cstone;
 TEST(DomainDecomposition, uniformBins)
 {
     {
+        unsigned umax = std::numeric_limits<unsigned>::max();
         int numSplits = 2;
-        std::vector<unsigned> counts{5, 5, 5, 5, 5, 6};
+        std::vector<unsigned> counts{umax - 10, 5, 5, umax - 11, 5, 6};
 
         std::vector<TreeNodeIndex> bins(numSplits + 1);
         std::vector<unsigned> binCounts(numSplits);
         uniformBins(counts, bins, binCounts);
 
         std::vector<TreeNodeIndex> ref{0, 3, 6};
-        std::vector<unsigned> refCnt{15, 16};
+        std::vector<unsigned> refCnt{umax, umax};
         EXPECT_EQ(bins, ref);
         EXPECT_EQ(binCounts, refCnt);
     }
@@ -151,29 +136,28 @@ TEST(DomainDecomposition, limitBoundaryShifts)
     }
 }
 
-TEST(DomainDecomposition, createSendList)
+TEST(DomainDecomposition, createSendRanges)
 {
     using KeyType = uint64_t;
 
-    std::vector<KeyType> tree{0, 2, 6, 8, 10};
-    std::vector<KeyType> codes{0, 0, 1, 3, 4, 5, 6, 6, 9};
+    std::vector<KeyType> keys{0, 0, 1, 3, 4, 5, 6, 6, 9, 10};
 
     int numRanks = 2;
     SfcAssignment<KeyType> assignment(numRanks);
-    assignment.set(0, 0, 6);
-    assignment.set(1, 6, 21);
-    assignment.set(2, 10, 0);
+    LocalIndex ignored = -1;
+    assignment.set(0, 0, ignored);
+    assignment.set(1, 6, ignored);
+    assignment.set(2, 10, ignored); // note: this excludes the last key
 
-    // note: codes input needs to be sorted
-    auto sendList = createSendRanges<KeyType>(assignment, codes);
+    // note: input keys need to be sorted
+    auto sendList = createSendRanges<KeyType>(assignment, keys);
 
     EXPECT_EQ(sendList.count(0), 6);
     EXPECT_EQ(sendList.count(1), 3);
 
     EXPECT_EQ(sendList[0], 0);
-    EXPECT_EQ(sendList[0] + sendList.count(0), 6);
     EXPECT_EQ(sendList[1], 6);
-    EXPECT_EQ(sendList[1] + sendList.count(1), 9);
+    EXPECT_EQ(sendList[2], 9);
 }
 
 TEST(DomainDecomposition, initialDomainSplit)

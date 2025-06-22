@@ -1,8 +1,8 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * SPH-EXA
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Basel, University of Zurich
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -34,7 +34,9 @@
 
 #include <variant>
 
+#include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
+#include "sph/particles_data.hpp"
 #include "util/pm_reader.hpp"
 #include "util/timer.hpp"
 
@@ -71,16 +73,13 @@ public:
     virtual void integrate(DomainType& domain, ParticleDataType& d) = 0;
 
     //! @brief save particle data fields to file
-    virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&){};
-
-    //! @brief save extra customizable stuff
-    virtual void saveExtra(IFileWriter*, ParticleDataType&){};
+    virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&) {}
 
     //! @brief save internal state to file
-    virtual void save(IFileWriter*){};
+    virtual void save(IFileWriter*) {}
 
     //! @brief load internal state from file
-    virtual void load(const std::string& path, IFileReader*){};
+    virtual void load(const std::string& path, IFileReader*) {}
 
     //! @brief whether conserved quantities are time-synchronized (when completing a full time-step hierarchy)
     virtual bool isSynced() { return true; }
@@ -96,6 +95,9 @@ public:
     };
 
     virtual ~Propagator() = default;
+
+    //! @brief Returns time elapsed since the start of last call to computeForces()
+    float stepElapsed() const { return timer.sumOfSteps(); }
 
     void printIterationTimings(const DomainType& domain, const ParticleDataType& simData)
     {
@@ -145,8 +147,7 @@ protected:
                                  d.outputFieldIndices.begin();
                     transferToHost(d, first, last, {d.fieldNames[fidx]});
                     std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writer->writeField(key, field->data(), c); },
-                               fieldPointers[fidx]);
+                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }

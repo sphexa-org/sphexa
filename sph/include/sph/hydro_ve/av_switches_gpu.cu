@@ -30,14 +30,13 @@
  */
 
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/findneighbors.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
 
 #include "sph/sph_gpu.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/hydro_ve/av_switches_kern.hpp"
 
-namespace sph::cuda
+namespace sph::gpu
 {
 
 using cstone::GpuConfig;
@@ -102,4 +101,4 @@ void computeAVswitches(const GroupView& grp, Dataset& d, const cstone::Box<typen
 template void computeAVswitches(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
                                 const cstone::Box<SphTypes::CoordinateType>&);
 
-} // namespace sph::cuda
+} // namespace sph::gpu

@@ -35,7 +35,6 @@
 #include "cstone/sfc/box.hpp"
 #include "cstone/sfc/sfc.hpp"
 #include "cstone/util/array.hpp"
-#include "cstone/util/gsl-lite.hpp"
 
 namespace sphexa
 {
@@ -182,26 +181,42 @@ cstone::Vec3<T> scaleBlockToGlobal(cstone::Vec3<T> uX, cstone::Vec3<int> gridIdx
     return gX;
 }
 
-/*! @brief extract (push into vector) coordinates of the virtual global box that are contained in @p selectBox
+template<class T>
+cstone::LocalIndex countSelection(const cstone::FBox<T>& selectBox, const cstone::Box<T>& globalBox,
+                                  cstone::Vec3<int> gridIdx, cstone::Vec3<int> m, std::span<const T> xBlock,
+                                  std::span<const T> yBlock, std::span<const T> zBlock)
+{
+    cstone::LocalIndex numSelected = 0;
+    for (size_t i = 0; i < xBlock.size(); ++i)
+    {
+        auto sX = scaleBlockToGlobal({xBlock[i], yBlock[i], zBlock[i]}, gridIdx, m, globalBox);
+
+        numSelected += (selectBox.xmin() <= sX[0] && sX[0] < selectBox.xmax()) &&
+                       (selectBox.ymin() <= sX[1] && sX[1] < selectBox.ymax()) &&
+                       (selectBox.zmin() <= sX[2] && sX[2] < selectBox.zmax());
+    }
+    return numSelected;
+}
+
+/*! @brief extract coordinates of the virtual global box that are contained in @p selectBox
  *
- * @tparam T
- * @tparam Vector
  * @param[in]  selectBox    a sub box of @p globalBox
  * @param[in]  globalBox    global coordinate bounding box
  * @param[in]  gridIdx      3D integer coordinate in [0,m-1]^3
  * @param[in]  m            multiplicity of the global grid
- * @param[in]  xBlock       x-coords of the template block in [0,1]
- * @param[in]  yBlock       y-coords of the template block in [0,1]
- * @param[in]  zBlock       z-coords of the template block in [0,1]
+ * @param[in]  xBlock       x-coords of the template block in [0,1)
+ * @param[in]  yBlock       y-coords of the template block in [0,1)
+ * @param[in]  zBlock       z-coords of the template block in [0,1)
  * @param[out] x            output x-coords that lie in @p selectBox
  * @param[out] y            output y-coords that lie in @p selectBox
  * @param[out] z            output z-coords that lie in @p selectBox
  */
-template<class T, class Vector>
+template<class T>
 void extractBlock(const cstone::FBox<T>& selectBox, const cstone::Box<T>& globalBox, cstone::Vec3<int> gridIdx,
-                  cstone::Vec3<int> m, gsl::span<const T> xBlock, gsl::span<const T> yBlock, gsl::span<const T> zBlock,
-                  Vector& x, Vector& y, Vector& z)
+                  cstone::Vec3<int> m, std::span<const T> xBlock, std::span<const T> yBlock, std::span<const T> zBlock,
+                  std::span<T> x, std::span<T> y, std::span<T> z)
 {
+    cstone::LocalIndex counter = 0;
     for (size_t i = 0; i < xBlock.size(); ++i)
     {
         auto sX = scaleBlockToGlobal({xBlock[i], yBlock[i], zBlock[i]}, gridIdx, m, globalBox);
@@ -211,9 +226,9 @@ void extractBlock(const cstone::FBox<T>& selectBox, const cstone::Box<T>& global
                       (selectBox.zmin() <= sX[2] && sX[2] < selectBox.zmax());
         if (select)
         {
-            x.push_back(sX[0]);
-            y.push_back(sX[1]);
-            z.push_back(sX[2]);
+            x[counter]   = sX[0];
+            y[counter]   = sX[1];
+            z[counter++] = sX[2];
         }
     }
 }
@@ -227,23 +242,34 @@ void extractBlock(const cstone::FBox<T>& selectBox, const cstone::Box<T>& global
  * @param[in]  keyEnd       SFC key end
  * @param[in]  globalBox    global coordinate bounding box
  * @param[in]  multiplicity multiplicity of the global grid
- * @param[in]  xBlock       x-coords of the template block in [0,1]
- * @param[in]  yBlock       y-coords of the template block in [0,1]
- * @param[in]  zBlock       z-coords of the template block in [0,1]
+ * @param[in]  xBlock       x-coords of the template block in [0,1)
+ * @param[in]  yBlock       y-coords of the template block in [0,1)
+ * @param[in]  zBlock       z-coords of the template block in [0,1)
  * @param[out] x            output x-coords with SFC keys in @p [keyStart:keyEnd]
  * @param[out] y            output y-coords with SFC keys in @p [keyStart:keyEnd]
  * @param[out] z            output z-coords with SFC keys in @p [keyStart:keyEnd]
  */
 template<class T, class KeyType, class Vector>
 void assembleCuboid(KeyType keyStart, KeyType keyEnd, const cstone::Box<T>& globalBox, cstone::Vec3<int> multiplicity,
-                    gsl::span<const T> xBlock, gsl::span<const T> yBlock, gsl::span<const T> zBlock, Vector& x,
+                    std::span<const T> xBlock, std::span<const T> yBlock, std::span<const T> zBlock, Vector& x,
                     Vector& y, Vector& z)
 {
+
+    auto outOfBounds = [](auto it1, auto it2)
+    { return *std::min_element(it1, it2) < 0.0 || *std::max_element(it1, it2) >= 1.0; };
+    if (outOfBounds(xBlock.begin(), xBlock.end()) || outOfBounds(yBlock.begin(), yBlock.end()) ||
+        outOfBounds(zBlock.begin(), zBlock.end()))
+    {
+        throw std::runtime_error("template glass block coordinates have to be in [0,1)^3\n");
+    }
+
     // span the assigned SFC range with valid octree cells
     int                  numCells = cstone::spanSfcRange(keyStart, keyEnd);
     std::vector<KeyType> cells(numCells + 1);
     cstone::spanSfcRange(keyStart, keyEnd, cells.data());
     cells.back() = keyEnd;
+
+    std::vector<std::tuple<cstone::FBox<T>, int, int, int>> tasks;
 
     // extract the volume of each cell from the virtual global glass block grid
     for (size_t i = 0; i < cstone::nNodes(cells); ++i)
@@ -258,50 +284,38 @@ void assembleCuboid(KeyType keyStart, KeyType keyEnd, const cstone::Box<T>& glob
             for (int iy = lowerIdx[1]; iy < upperIdx[1]; ++iy)
                 for (int iz = lowerIdx[2]; iz < upperIdx[2]; ++iz)
                 {
-                    extractBlock<T>(selectBox, globalBox, {ix, iy, iz}, multiplicity, xBlock, yBlock, zBlock, x, y, z);
+                    tasks.push_back({selectBox, ix, iy, iz});
                 }
     }
-}
 
-//! @brief Discard any particles outside a sphere with radius @p r centered on the origin
-template<class T, class Vector>
-void cutSphere(T radius, Vector& x, Vector& y, Vector& z)
-{
-    std::vector<int> particleSelection(x.size());
-
-#pragma omp parallel for schedule(static)
-    for (size_t i = 0; i < x.size(); ++i)
+    std::vector<cstone::LocalIndex> numTaskSel(tasks.size() + 1);
+#pragma omp parallel for
+    for (size_t i = 0; i < tasks.size(); ++i)
     {
-        T rp                 = std::sqrt(x[i] * x[i] + y[i] * y[i] + z[i] * z[i]);
-        particleSelection[i] = (rp <= radius);
+        auto [selectBox, ix, iy, iz] = tasks[i];
+        numTaskSel[i] = countSelection<T>(selectBox, globalBox, {ix, iy, iz}, multiplicity, xBlock, yBlock, zBlock);
     }
 
-    size_t numSelect = std::count(particleSelection.begin(), particleSelection.end(), 1);
+    std::exclusive_scan(numTaskSel.begin(), numTaskSel.end(), numTaskSel.begin(), cstone::LocalIndex{0});
+    x.resize(numTaskSel.back());
+    y.resize(numTaskSel.back());
+    z.resize(numTaskSel.back());
 
-    Vector xSphere, ySphere, zSphere;
-    xSphere.reserve(numSelect);
-    ySphere.reserve(numSelect);
-    zSphere.reserve(numSelect);
-
-    for (size_t i = 0; i < x.size(); ++i)
+#pragma omp parallel for
+    for (size_t i = 0; i < tasks.size(); ++i)
     {
-        if (particleSelection[i])
-        {
-            xSphere.push_back(x[i]);
-            ySphere.push_back(y[i]);
-            zSphere.push_back(z[i]);
-        }
+        auto [selectBox, ix, iy, iz] = tasks[i];
+        extractBlock<T>(selectBox, globalBox, {ix, iy, iz}, multiplicity, xBlock, yBlock, zBlock,
+                        std::span(x).subspan(numTaskSel[i]), std::span(y).subspan(numTaskSel[i]),
+                        std::span(z).subspan(numTaskSel[i]));
     }
-
-    swap(x, xSphere);
-    swap(y, ySphere);
-    swap(z, zSphere);
 }
 
 template<class Vector, class Criterion>
 void selectParticles(Vector& x, Vector& y, Vector& z, Criterion&& crit)
 {
-    std::vector<int> particleSelection(x.size());
+    using LI = cstone::LocalIndex;
+    std::vector<LI> particleSelection(x.size() + 1);
 
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < x.size(); ++i)
@@ -309,26 +323,33 @@ void selectParticles(Vector& x, Vector& y, Vector& z, Criterion&& crit)
         particleSelection[i] = crit(x[i], y[i], z[i]);
     }
 
-    size_t numSelect = std::count(particleSelection.begin(), particleSelection.end(), 1);
+    std::exclusive_scan(particleSelection.begin(), particleSelection.end(), particleSelection.begin(), LI{0});
+    auto numSelect = particleSelection.back();
 
-    Vector xSphere, ySphere, zSphere;
-    xSphere.reserve(numSelect);
-    ySphere.reserve(numSelect);
-    zSphere.reserve(numSelect);
+    Vector xSel(numSelect), ySel(numSelect), zSel(numSelect);
 
+#pragma omp parallel for schedule(static)
     for (size_t i = 0; i < x.size(); ++i)
     {
-        if (particleSelection[i])
+        auto pi = particleSelection[i];
+        if (particleSelection[i + 1] > pi)
         {
-            xSphere.push_back(x[i]);
-            ySphere.push_back(y[i]);
-            zSphere.push_back(z[i]);
+            xSel[pi] = x[i];
+            ySel[pi] = y[i];
+            zSel[pi] = z[i];
         }
     }
 
-    swap(x, xSphere);
-    swap(y, ySphere);
-    swap(z, zSphere);
+    swap(x, xSel);
+    swap(y, ySel);
+    swap(z, zSel);
+}
+
+//! @brief Discard any particles outside a sphere with radius @p r centered on the origin
+template<class T, class Vector>
+void cutSphere(T radius, Vector& x, Vector& y, Vector& z)
+{
+    selectParticles(x, y, z, [radius](T x, T y, T z) { return std::sqrt(x * x + y * y + z * z) <= radius; });
 }
 
 /*! @brief compute the shift factor towards the center for point X in a capped pyramid

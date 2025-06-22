@@ -52,7 +52,7 @@ InitSettings WindShockConstants()
 {
     return {{"r", .125},           {"rSphere", .025},   {"rhoInt", 10.}, {"rhoExt", 1.},     {"uExt", 3. / 2.},
             {"vxExt", 2.7},        {"vyExt", .0},       {"vzExt", .0},   {"dim", 3},         {"gamma", 5. / 3.},
-            {"minDt", 1e-10},      {"minDt_m1", 1e-10}, {"Kcour", 0.4},  {"epsilon", 0.},    {"mui", 10.},
+            {"minDt", 1e-10},      {"minDt_m1", 1e-10}, {"Kcour", 0.2},  {"epsilon", 0.},    {"mui", 10.},
             {"gravConstant", 0.0}, {"ng0", 100},        {"ngmax", 150},  {"wind-shock", 1.0}};
 }
 
@@ -81,11 +81,14 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
     std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
 
+    generateParticleIDs(d.id);
+
     T uInt = uExt / (rhoInt / rhoExt);
 
     T k = d.ngmax / r;
 
     util::array<T, 3> blobCenter{r, r, r};
+    auto*             u_or_t = d.u.empty() ? d.temp.data() : d.u.data();
 
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
@@ -107,7 +110,7 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
                 d.h[i] = hInt + 0.5 * (hExt - hInt) * (1. + std::tanh(k * (rPos - rSphere - hExt)));
             }
 
-            d.temp[i] = uExt / cv;
+            u_or_t[i] = uExt;
             d.vx[i]   = vxExt;
             d.vy[i]   = vyExt;
             d.vz[i]   = vzExt;
@@ -115,7 +118,7 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
         else
         {
             d.h[i]    = hInt;
-            d.temp[i] = uInt / cv;
+            u_or_t[i] = uInt;
             d.vx[i]   = 0.;
             d.vy[i]   = 0.;
             d.vz[i]   = 0.;
@@ -124,6 +127,10 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
         d.x_m1[i] = d.vx[i] * d.minDt;
         d.y_m1[i] = d.vy[i] * d.minDt;
         d.z_m1[i] = d.vz[i] * d.minDt;
+    }
+    if (d.u.empty())
+    {
+        std::for_each(d.temp.begin(), d.temp.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
     }
 }
 

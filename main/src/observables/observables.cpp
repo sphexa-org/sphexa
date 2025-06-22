@@ -1,8 +1,7 @@
 
-#include <iostream>
 #include <memory>
 
-#include "cstone/tree/accel_switch.hpp"
+#include "sphexa/simulation_data.hpp"
 
 #include "gravitational_waves.hpp"
 #include "time_energies.hpp"

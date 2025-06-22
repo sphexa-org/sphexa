@@ -1,8 +1,7 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Basel, University of Zurich
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -47,7 +46,9 @@ using cstone::NcStats;
 using cstone::TravConfig;
 using cstone::TreeNodeIndex;
 
-namespace cuda
+unsigned nsGroupSize() { return TravConfig::targetSize; }
+
+namespace gpu
 {
 
 __device__ bool nc_h_convergenceFailure = false;
@@ -113,10 +114,10 @@ void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<typename D
     checkGpuErrors(cudaDeviceSynchronize());
 
     NcStats::type stats[NcStats::numStats];
-    checkGpuErrors(cudaMemcpyFromSymbol(stats, cstone::ncStats, NcStats::numStats * sizeof(NcStats::type)));
+    checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(cstone::ncStats), NcStats::numStats * sizeof(NcStats::type)));
 
     bool convergenceFailure;
-    checkGpuErrors(cudaMemcpyFromSymbol(&convergenceFailure, nc_h_convergenceFailure, sizeof(bool)));
+    checkGpuErrors(cudaMemcpyFromSymbol(&convergenceFailure, GPU_SYMBOL(nc_h_convergenceFailure), sizeof(bool)));
 
     NcStats::type maxP2P   = stats[cstone::NcStats::maxP2P];
     NcStats::type maxStack = stats[cstone::NcStats::maxStack];
@@ -166,5 +167,5 @@ void computeDensity(const GroupView& grp, Dataset& d, const cstone::Box<typename
 template void computeDensity(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,
                              const cstone::Box<SphTypes::CoordinateType>&);
 
-} // namespace cuda
+} // namespace gpu
 } // namespace sph

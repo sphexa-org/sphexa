@@ -10,7 +10,7 @@ function(enableH5Part exename)
     endif()
 endfunction()
 
-add_library(io ifile_io_ascii.cpp ifile_io_hdf5.cpp)
+add_library(io ifile_io_ascii.cpp ifile_io_hdf5.cpp arg_parser.cpp)
 target_include_directories(io PRIVATE ${CSTONE_DIR} ${MPI_CXX_INCLUDE_PATH})
 target_link_libraries(io PRIVATE ${MPI_CXX_LIBRARIES})
 enableH5Part(io)
