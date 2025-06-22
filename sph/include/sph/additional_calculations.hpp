@@ -62,7 +62,7 @@ template<class T, class Dataset>
 void computeMarkRamp(const GroupView& grp, Dataset& d, const cstone::Box<T>& box)
 {
 
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeMarkRamp(grp, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeMarkRamp(grp, d, box); }
     else { computeMarkRampImpl(grp.firstBody, grp.lastBody, d); }
 }
 
@@ -72,7 +72,7 @@ void artificialGravity(size_t startIndex, size_t endIndex, Dataset& d, T grav)
 
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        cuda::artificialGravity(startIndex, endIndex, d, grav);
+        gpu::artificialGravity(startIndex, endIndex, d, grav);
     }
     else
     {

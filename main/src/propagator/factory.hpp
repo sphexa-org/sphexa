@@ -36,6 +36,8 @@
 #include "ipropagator.hpp"
 #include "propagator.h"
 
+#include <regex.h>
+
 namespace sphexa
 {
 
@@ -66,11 +68,7 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
     }
     if (choice == "RT-ve")
     {
-        if (avClean)
-        {
-            return std::make_unique<RTVeProp<true, DomainType, ParticleDataType>>(output, rank, s.at("gravityConstant"));
-        }
-        else { return std::make_unique<RTVeProp<false, DomainType, ParticleDataType>>(output, rank, s.at("gravityConstant")); }
+        return PropLib<DomainType, ParticleDataType>::makeRayleighVeProp(output, rank, s, avClean);
     }
 #ifdef SPH_EXA_HAVE_DISKS
     if (choice == "std-disk") { return PropLib<DomainType, ParticleDataType>::makeDiskProp(output, rank, s); }

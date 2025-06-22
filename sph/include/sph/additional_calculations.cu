@@ -42,7 +42,7 @@
 
 namespace sph
 {
-namespace cuda
+namespace gpu
 {
 
 using cstone::GpuConfig;
@@ -117,5 +117,5 @@ void artificialGravity(size_t first, size_t last, Dataset& d, T grav)
 template void artificialGravity(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d, double);
 template void artificialGravity(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d, float);
 
-} // namespace cuda
+} // namespace gpu
 } // namespace sph
