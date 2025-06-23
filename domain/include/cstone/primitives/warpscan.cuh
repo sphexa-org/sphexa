@@ -63,48 +63,104 @@ __device__ __forceinline__ void syncWarp()
 #endif
 }
 
+namespace detail
+{
+
+template<class T, class = void>
+struct IsHardwareShuffleable : std::false_type
+{
+};
+
+template<class T>
+struct IsHardwareShuffleable<T,
+                             std::void_t<decltype(
+#if defined(__CUDACC__) && !defined(__HIPCC__)
+                                 __shfl_sync(0xFFFFFFFF, std::declval<T>(), 0, 0)
+#else
+                                 __shfl(std::declval<T>(), 0)
+#endif
+                                     )>> : std::true_type
+{
+};
+
+template<class T, class Op>
+__device__ __forceinline__ T shflSyncImpl(T value, Op&& shflOp)
+{
+    if constexpr (detail::IsHardwareShuffleable<T>::value) { return shflOp(value); }
+    else
+    {
+        static_assert(std::is_trivially_copyable_v<T>);
+        constexpr int numInts = (sizeof(T) + sizeof(int) - 1) / sizeof(int);
+        int buffer[numInts];
+        memcpy(buffer, &value, sizeof(value));
+#pragma unroll
+        for (int i = 0; i < numInts; ++i)
+            buffer[i] = shflOp(buffer[i]);
+        memcpy(&value, buffer, sizeof(value));
+        return value;
+    }
+}
+
+} // namespace detail
+
 //! @brief Compatibility wrapper for AMD.
 template<class T>
 __device__ __forceinline__ T shflSync(T value, int srcLane)
 {
+    return detail::shflSyncImpl(value,
+                                [=](auto v)
+                                {
 #if defined(__CUDACC__) && !defined(__HIPCC__)
-    return __shfl_sync(0xFFFFFFFF, value, srcLane);
+                                    return __shfl_sync(0xFFFFFFFF, v, srcLane);
 #else
-    return __shfl(value, srcLane);
+                                    return __shfl(v, srcLane);
 #endif
+                                });
 }
 
 //! @brief Compatibility wrapper for AMD.
 template<class T>
 __device__ __forceinline__ T shflXorSync(T value, int width)
 {
+    return detail::shflSyncImpl(value,
+                                [=](auto v)
+                                {
 #if defined(__CUDACC__) && !defined(__HIPCC__)
-    return __shfl_xor_sync(0xFFFFFFFF, value, width);
+                                    return __shfl_xor_sync(0xFFFFFFFF, v, width);
 #else
-    return __shfl_xor(value, width);
+                                    return __shfl_xor(v, width);
 #endif
+                                });
 }
 
 //! @brief Compatibility wrapper for AMD.
 template<class T>
 __device__ __forceinline__ T shflUpSync(T value, int distance)
 {
+    return detail::shflSyncImpl(value,
+                                [=](auto v)
+                                {
 #if defined(__CUDACC__) && !defined(__HIPCC__)
-    return __shfl_up_sync(0xFFFFFFFF, value, distance);
+                                    return __shfl_up_sync(0xFFFFFFFF, v, distance);
 #else
-    return __shfl_up(value, distance);
+                                    return __shfl_up(v, distance);
 #endif
+                                });
 }
 
 //! @brief Compatibility wrapper for AMD.
 template<class T>
 __device__ __forceinline__ T shflDownSync(T value, int distance)
 {
+    return detail::shflSyncImpl(value,
+                                [=](auto v)
+                                {
 #if defined(__CUDACC__) && !defined(__HIPCC__)
-    return __shfl_down_sync(0xFFFFFFFF, value, distance);
+                                    return __shfl_down_sync(0xFFFFFFFF, v, distance);
 #else
-    return __shfl_down(value, distance);
+                                    return __shfl_down(v, distance);
 #endif
+                                });
 }
 
 //! @brief Compatibility wrapper for AMD.
