@@ -110,7 +110,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
 
     auto upsweepFunction = [](auto levelRange, auto childOffsets, auto M)
     { upsweep(levelRange, childOffsets, M, NodeCount<unsigned>{}); };
-    globalFocusExchange<unsigned>(domainTree, focusTree, testCounts, upsweepFunction);
+    globalFocusExchange<unsigned>(domainTree, focusTree, testCounts, scratch, upsweepFunction);
 
     upsweep({octree.levelRange, maxTreeLevel<KeyType>{} + 2}, {octree.childOffsets, size_t(octree.numNodes)},
             testCounts.data(), NodeCount<unsigned>{});
@@ -195,7 +195,7 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks)
 
     auto octree = focusTree.octreeViewAcc();
 
-    focusTree.updateCenters(x.data(), y.data(), z.data(), m.data(), domainTree, box);
+    focusTree.updateCenters(x.data(), y.data(), z.data(), m.data(), domainTree);
     auto sourceCenter = focusTree.expansionCentersAcc();
 
     constexpr T tol = std::is_same_v<T, double> ? 1e-10 : 1e-4;
