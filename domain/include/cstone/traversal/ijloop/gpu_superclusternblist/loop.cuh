@@ -223,6 +223,42 @@ loadSuperclusterIParticleData(util::SharedMemAllocator& sharedAllocator,
     return iSuperclusterData;
 }
 
+template<class Config>
+__device__ __forceinline__ std::tuple<util::SharedMemAllocator::SharedMemPtr<unsigned[]>, unsigned>
+loadSuperclusterNeighborData(util::SharedMemAllocator& sharedAllocator,
+                             const unsigned warpIndex,
+                             const LocalIndex iSuperclusterDataIndex,
+                             const unsigned iSuperclusterNeighborsCount,
+                             const std::uint32_t* const __restrict__ neighborData,
+                             const unsigned ncmax)
+{
+    auto nbData             = sharedAllocator.alloc<unsigned[]>(ncmax + masksSize<Config>(ncmax));
+    const unsigned maskSize = masksSize<Config>(iSuperclusterNeighborsCount);
+
+    if constexpr (Config::compress)
+    {
+        for (unsigned n = threadIdx.y * Config::iThreads + threadIdx.x; n < maskSize;
+             n += Config::iThreads * Config::jSize)
+            nbData[n] = neighborData[iSuperclusterDataIndex + n];
+        if (warpIndex == 0)
+        {
+            unsigned n;
+            warpDecompressNeighbors((const char*)&neighborData[iSuperclusterDataIndex + maskSize], &nbData[maskSize],
+                                    n);
+            assert(n == iSuperclusterNeighborsCount);
+        }
+    }
+    else
+    {
+        const unsigned nbDataSize = iSuperclusterNeighborsCount + maskSize;
+        for (unsigned n = threadIdx.y * Config::iThreads + threadIdx.x; n < nbDataSize;
+             n += Config::iThreads * Config::jSize)
+            nbData[n] = neighborData[iSuperclusterDataIndex + n];
+    }
+
+    return {std::move(nbData), maskSize};
+}
+
 template<class Config,
          unsigned NumSuperclustersPerBlock,
          bool UsePbc,
@@ -261,6 +297,11 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     assert(blockDim.y == Config::jSize);
     assert(blockDim.z == NumSuperclustersPerBlock);
 
+    constexpr unsigned iClustersPerWarp = Config::iThreads / Config::iSize;
+
+    const unsigned warpIndex =
+        Config::numWarpsPerInteraction == 1 ? 0 : threadIdx.y / (Config::jSize / Config::numWarpsPerInteraction);
+
     const unsigned firstISupercluster = superclusterIndex<Config>(firstBody);
     const unsigned lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
     const unsigned numISuperclusters  = lastISupercluster - firstISupercluster;
@@ -279,34 +320,8 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     const auto iSuperclusterData = loadSuperclusterIParticleData<Config, ParticleData>(
         sharedAllocator, firstValidBody, totalBodies, iSupercluster, x, y, z, h, input);
 
-    auto nbData = sharedAllocator.alloc<unsigned[]>(ncmax + masksSize<Config>(ncmax));
-
-    const unsigned maskSize = masksSize<Config>(iSuperclusterNeighborsCount);
-
-    constexpr unsigned iClustersPerWarp = Config::iThreads / Config::iSize;
-    const unsigned warpIndex =
-        Config::numWarpsPerInteraction == 1 ? 0 : threadIdx.y / (Config::jSize / Config::numWarpsPerInteraction);
-
-    if constexpr (Config::compress)
-    {
-        for (unsigned n = threadIdx.y * Config::iThreads + threadIdx.x; n < maskSize;
-             n += Config::iThreads * Config::jSize)
-            nbData[n] = neighborData[iSuperclusterDataIndex + n];
-        if (warpIndex == 0)
-        {
-            unsigned n;
-            warpDecompressNeighbors((const char*)&neighborData[iSuperclusterDataIndex + maskSize], &nbData[maskSize],
-                                    n);
-            assert(n == iSuperclusterNeighborsCount);
-        }
-    }
-    else
-    {
-        const unsigned nbDataSize = iSuperclusterNeighborsCount + maskSize;
-        for (unsigned n = threadIdx.y * Config::iThreads + threadIdx.x; n < nbDataSize;
-             n += Config::iThreads * Config::jSize)
-            nbData[n] = neighborData[iSuperclusterDataIndex + n];
-    }
+    const auto [nbData, maskSize] = loadSuperclusterNeighborData<Config>(
+        sharedAllocator, warpIndex, iSuperclusterDataIndex, iSuperclusterNeighborsCount, neighborData, ncmax);
 
     __syncthreads();
 
