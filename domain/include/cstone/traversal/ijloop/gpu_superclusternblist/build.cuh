@@ -25,11 +25,11 @@
 #include <tuple>
 #include <type_traits>
 
-#include "cstone/compressneighbors.cuh"
 #include "cstone/cuda/memory.cuh"
 #include "cstone/reducearray.cuh"
-#include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
+#include "cstone/traversal/groups.hpp"
+#include "cstone/traversal/ijloop/compressneighbors.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/common.cuh"
 #include "cstone/traversal/ijloop/upsweep.cuh"
 #include "cstone/tree/octree.hpp"

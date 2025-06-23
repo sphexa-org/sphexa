@@ -20,10 +20,10 @@
 
 #include "gtest/gtest.h"
 
-#include "cstone/compressneighbors.cuh"
 #include "cstone/cuda/errorcheck.cuh"
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/cuda/thrust_util.cuh"
+#include "cstone/traversal/ijloop/compressneighbors.cuh"
 
 using namespace cstone;
 

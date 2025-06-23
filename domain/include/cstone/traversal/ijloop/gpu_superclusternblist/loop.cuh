@@ -24,10 +24,10 @@
 #include <utility>
 
 #include "cstone/cuda/memory.cuh"
-#include "cstone/compressneighbors.cuh"
 #include "cstone/reducearray.cuh"
 #include "cstone/traversal/ijloop/atomic_update_ptr.cuh"
 #include "cstone/traversal/ijloop/common.hpp"
+#include "cstone/traversal/ijloop/compressneighbors.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/common.cuh"
 #include "cstone/util/tuple_util.hpp"
 
