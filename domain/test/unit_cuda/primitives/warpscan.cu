@@ -201,15 +201,15 @@ __global__ void applyAtomicMinFloat(float* addr, float value)
 
 TEST(WarpScan, atomicMinFloat)
 {
-    thrust::device_vector<float> d_values(1);
+    thrust::device_vector<float> d_value(1);
 
     // check especially corner cases -0.0f, 0.0f
     for (float firstSign : {-1.0f, -0.0f, 0.0f, 1.0f})
         for (float secondSign : {-1.0f, -0.0f, 0.0f, 1.0f})
         {
-            d_values[0] = 42.0f * firstSign;
-            applyAtomicMinFloat<<<2, 128>>>(rawPtr(d_values), 37.5f * secondSign);
-            EXPECT_EQ(float(d_values[0]), std::min(42.0f * firstSign, 37.5f * secondSign));
+            d_value[0] = 42.0f * firstSign;
+            applyAtomicMinFloat<<<2, 128>>>(rawPtr(d_value), 37.5f * secondSign);
+            EXPECT_EQ(float(d_value[0]), std::min(42.0f * firstSign, 37.5f * secondSign));
         }
 }
 
@@ -221,14 +221,14 @@ __global__ void applyAtomicMaxFloat(float* addr, float value)
 
 TEST(WarpScan, atomicMaxFloat)
 {
-    thrust::device_vector<float> d_values(1);
+    thrust::device_vector<float> d_value(1);
 
     // check especially corner cases -0.0f, 0.0f
     for (float firstSign : {1.0f, -0.0f, 0.0f, 1.0f})
         for (float secondSign : {-1.0f, -0.0f, 0.0f, 1.0f})
         {
-            d_values[0] = 42.0f * firstSign;
-            applyAtomicMaxFloat<<<2, 128>>>(rawPtr(d_values), 37.5f * secondSign);
-            EXPECT_EQ(float(d_values[0]), std::max(42.0f * firstSign, 37.5f * secondSign));
+            d_value[0] = 42.0f * firstSign;
+            applyAtomicMaxFloat<<<2, 128>>>(rawPtr(d_value), 37.5f * secondSign);
+            EXPECT_EQ(float(d_value[0]), std::max(42.0f * firstSign, 37.5f * secondSign));
         }
 }
