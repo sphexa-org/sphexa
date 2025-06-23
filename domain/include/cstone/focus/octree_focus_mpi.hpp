@@ -291,18 +291,15 @@ public:
         if constexpr (HaveGpu<Accelerator>{})
         {
             DeviceVector<KeyType> d_globLeaf(globalLeaves.data(), globalLeaves.data() + globalLeaves.size());
-            DeviceVector<T> d_globQ(globalQuantities.size());
 
             auto firstGlobIdx = lowerBoundGpu(d_globLeaf.data(), d_globLeaf.data() + d_globLeaf.size(), prevFocusStart);
             auto lastGlobIdx  = lowerBoundGpu(d_globLeaf.data(), d_globLeaf.data() + d_globLeaf.size(), prevFocusEnd);
             std::span globLeavesFoc{d_globLeaf.data() + firstGlobIdx, lastGlobIdx - firstGlobIdx + 1};
-            std::span globQFoc{d_globQ.data() + firstGlobIdx, lastGlobIdx - firstGlobIdx};
 
             DeviceVector<TreeNodeIndex> gmap(lastGlobIdx - firstGlobIdx);
             locateNodesGpu(globLeavesFoc.data(), globLeavesFoc.data() + globLeavesFoc.size(),
                            octreeAcc_.prefixes.data(), octreeAcc_.d_levelRange.data(), gmap.data());
-            gatherGpu(gmap.data(), gmap.size(), localQuantities.data(), globQFoc.data());
-            memcpyD2H(globQFoc.data(), globQFoc.size(), globalQuantities.data() + firstGlobIdx);
+            gatherGpu(gmap.data(), gmap.size(), localQuantities.data(), globalQuantities.data() + firstGlobIdx);
         }
         else
         {
@@ -375,6 +372,7 @@ public:
     template<class T>
     void gatherGlobalLeaves(std::span<T> globalLeafQuantities) const
     {
+        if constexpr (HaveGpu<Accelerator>{}) { syncGpu(); }
         mpiAllgatherv(MPI_IN_PLACE, 0, globalLeafQuantities.data(), globNumNodes_.data(), globDispl_.data(),
                       MPI_COMM_WORLD);
     }
@@ -391,10 +389,9 @@ public:
         TreeNodeIndex firstIdx           = assignment_[myRank_].start();
         TreeNodeIndex lastIdx            = assignment_[myRank_].end();
         OctreeView<const KeyType> octree = octreeViewAcc();
-        TreeNodeIndex numNodes           = octree.numInternalNodes + octree.numLeafNodes;
 
         globalCenters_.resize(globalTree.numTreeNodes());
-        reallocate(numNodes, allocGrowthRate_, centersAcc_);
+        reallocate(octree.numNodes, allocGrowthRate_, centersAcc_);
 
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -433,9 +430,18 @@ public:
         }
 
         //! global exchange for the top nodes that are bigger than local domains
-        std::vector<SourceCenterType<RealType>> globalLeafCenters(globalTree.numLeafNodes());
+        auto [globalLeafCentersAcc] = util::packAllocBuffer(scratch1, util::TypeList<SourceCenterType<RealType>>{},
+                                                            {size_t(globalTree.numLeafNodes())}, 128);
+
         populateGlobal<SourceCenterType<RealType>>(globalTree.treeLeaves(), {centersAcc_.data(), centersAcc_.size()},
-                                                   globalLeafCenters);
+                                                   {globalLeafCentersAcc.data(), globalLeafCentersAcc.size()});
+
+        std::vector<SourceCenterType<RealType>> globalLeafCenters(globalTree.numLeafNodes());
+        if constexpr (HaveGpu<Accelerator>{})
+        {
+            memcpyD2H(globalLeafCentersAcc.data(), globalLeafCentersAcc.size(), globalLeafCenters.data());
+        }
+        else { std::copy(globalLeafCentersAcc.begin(), globalLeafCentersAcc.end(), globalLeafCenters.begin()); }
 
         gatherGlobalLeaves<SourceCenterType<RealType>>(globalLeafCenters);
         scatter(globalTree.internalOrder(), globalLeafCenters.data(), globalCenters_.data());
@@ -808,18 +814,27 @@ private:
  * Postcondition: each element of quantities corresponding to non-local cells not owned by any of the peer
  *                ranks contains data obtained through global collective communication between ranks
  */
-template<class Q, class KeyType, class T, class F, class Accelerator, class... UArgs>
+template<class Q, class KeyType, class T, class F, class Accelerator, class Vector, class... UArgs>
 void globalFocusExchange(const Octree<KeyType>& globalOctree,
                          const FocusedOctree<KeyType, T, Accelerator>& focusTree,
                          std::span<Q> quantities,
+                         Vector& scratch,
                          F&& upsweepFunction,
                          UArgs&&... upsweepArgs)
 {
-    TreeNodeIndex numGlobalLeaves = globalOctree.numLeafNodes();
-    std::vector<Q> globalLeafQuantities(numGlobalLeaves);
-    focusTree.template populateGlobal<Q>(globalOctree.treeLeaves(), quantities, globalLeafQuantities);
+    static_assert(HaveGpu<Accelerator>{} == IsDeviceVector<Vector>{});
+    std::size_t numGlobalLeaves = globalOctree.numLeafNodes();
+    auto s = scratch.size();
+    auto [globalLeafAcc] = util::packAllocBuffer(scratch, util::TypeList<Q>{}, {numGlobalLeaves}, 128);
+    focusTree.template populateGlobal<Q>(globalOctree.treeLeaves(), quantities, globalLeafAcc);
 
     //! exchange global leaves
+    //focusTree.template gatherGlobalLeaves<Q>(globalLeafAcc);
+
+    std::vector<Q> globalLeafQuantities(numGlobalLeaves);
+    if constexpr (HaveGpu<Accelerator>{}) { memcpyD2H(globalLeafAcc.data(), globalLeafAcc.size(), globalLeafQuantities.data()); }
+    else { std::copy(globalLeafAcc.begin(), globalLeafAcc.end(), globalLeafQuantities.begin()); }
+
     focusTree.template gatherGlobalLeaves<Q>(globalLeafQuantities);
 
     std::vector<Q> globalQuantities(globalOctree.numTreeNodes());
@@ -830,6 +845,7 @@ void globalFocusExchange(const Octree<KeyType>& globalOctree,
     //! from the global tree, extract the part that the executing rank was missing
     focusTree.template extractGlobal<Q>(globalOctree.nodeKeys().data(), globalOctree.levelRange().data(),
                                         globalQuantities, quantities);
+    reallocate(scratch, s, 1.0);
 }
 
 } // namespace cstone
