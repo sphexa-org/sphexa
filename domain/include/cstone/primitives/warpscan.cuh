@@ -23,6 +23,17 @@
 namespace cstone
 {
 
+__device__ __forceinline__ unsigned laneIndex()
+{
+#ifdef __CUDACC__
+    unsigned laneIdx;
+    asm volatile("mov.u32 %0, %laneid;" : "=r"(laneIdx));
+    return laneIdx;
+#else
+    return (threadIdx.z * blockDim.y * blockDim.x + threadIdx.y * blockDim.x + threadIdx.x) & (GpuConfig::warpSize - 1);
+#endif
+}
+
 //! @brief there's no int overload for min in AMD ROCM
 __device__ __forceinline__ int imin(int a, int b) { return a < b ? a : b; }
 __device__ __forceinline__ unsigned imin(unsigned a, unsigned b) { return a < b ? a : b; }
