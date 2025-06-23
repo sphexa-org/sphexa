@@ -113,7 +113,7 @@ __device__ __forceinline__ T shflSync(T value, int srcLane)
 #if defined(__CUDACC__) && !defined(__HIPCC__)
                                     return __shfl_sync(0xFFFFFFFF, v, srcLane);
 #else
-        return __shfl(v, srcLane);
+                                    return __shfl(v, srcLane);
 #endif
                                 });
 }
@@ -128,7 +128,7 @@ __device__ __forceinline__ T shflXorSync(T value, int width)
 #if defined(__CUDACC__) && !defined(__HIPCC__)
                                     return __shfl_xor_sync(0xFFFFFFFF, v, width);
 #else
-    return __shfl_xor(v, width);
+                                    return __shfl_xor(v, width);
 #endif
                                 });
 }
@@ -143,7 +143,7 @@ __device__ __forceinline__ T shflUpSync(T value, int distance)
 #if defined(__CUDACC__) && !defined(__HIPCC__)
                                     return __shfl_up_sync(0xFFFFFFFF, v, distance);
 #else
-    return __shfl_up(v, distance);
+                                    return __shfl_up(v, distance);
 #endif
                                 });
 }
@@ -158,7 +158,7 @@ __device__ __forceinline__ T shflDownSync(T value, int distance)
 #if defined(__CUDACC__) && !defined(__HIPCC__)
                                     return __shfl_down_sync(0xFFFFFFFF, v, distance);
 #else
-    return __shfl_down(v, distance);
+                                    return __shfl_down(v, distance);
 #endif
                                 });
 }
