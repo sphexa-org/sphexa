@@ -207,7 +207,6 @@ TEST(WarpScan, atomicMinFloat)
     for (float firstSign : {-1.0f, -0.0f, 0.0f, 1.0f})
         for (float secondSign : {-1.0f, -0.0f, 0.0f, 1.0f})
         {
-
             d_values[0] = 42.0f * firstSign;
             applyAtomicMinFloat<<<2, 128>>>(rawPtr(d_values), 37.5f * secondSign);
             EXPECT_EQ(float(d_values[0]), std::min(42.0f * firstSign, 37.5f * secondSign));
@@ -228,7 +227,6 @@ TEST(WarpScan, atomicMaxFloat)
     for (float firstSign : {1.0f, -0.0f, 0.0f, 1.0f})
         for (float secondSign : {-1.0f, -0.0f, 0.0f, 1.0f})
         {
-
             d_values[0] = 42.0f * firstSign;
             applyAtomicMaxFloat<<<2, 128>>>(rawPtr(d_values), 37.5f * secondSign);
             EXPECT_EQ(float(d_values[0]), std::max(42.0f * firstSign, 37.5f * secondSign));
