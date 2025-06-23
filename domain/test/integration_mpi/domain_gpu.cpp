@@ -272,3 +272,29 @@ TEST(DomainGpu, reapplySync)
         EXPECT_EQ(numCommon, domain.nParticles());
     }
 }
+
+TEST(DomainGpu, Allgatherv)
+{
+    int rank = 0, numRanks = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
+
+    using T = int;
+
+    std::vector<T> h_dst(numRanks, 0);
+    h_dst[rank]         = 100 + rank;
+    DeviceVector<T> dst = h_dst;
+
+    std::vector<int> counts(numRanks, 1);
+    std::vector<int> displ(numRanks);
+    std::iota(displ.begin(), displ.end(), 0);
+
+    mpiAllgathervGpuDirect<true>(MPI_IN_PLACE, 0, dst.data(), counts.data(), displ.data(), MPI_COMM_WORLD);
+
+    std::vector dstDl = toHost(dst);
+    std::vector<T> ref(numRanks);
+
+    std::iota(ref.begin(), ref.end(), 100);
+
+    EXPECT_EQ(dstDl, ref);
+}
