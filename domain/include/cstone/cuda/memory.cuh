@@ -126,6 +126,8 @@ struct SharedMemAllocator
     {
         extern __shared__ char basePtr[];
         ptr = basePtr + capacityPerArea * areaIndex;
+        size = 0;
+        capacity = capacityPerArea;
     }
 
     template<class T, std::enable_if_t<!std::is_array_v<T>, int> = 0>
@@ -151,10 +153,13 @@ private:
         unsigned allocSize = size * sizeof(T) + offset;
         T* allocated       = reinterpret_cast<T*>(ptr + offset);
         ptr += allocSize;
+        size += allocSize;
+        assert(size <= capacity);
         return {allocated, allocSize};
     }
 
     char* ptr;
+    unsigned size, capacity;
 };
 
 } // namespace util
