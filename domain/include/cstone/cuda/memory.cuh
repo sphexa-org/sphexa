@@ -74,19 +74,34 @@ struct SharedMemAllocator
     template<class T>
     struct SharedMemPtr
     {
-        __device__ constexpr std::remove_extent_t<T>* get() { return ptr; }
-        __device__ constexpr const T* get() const { return ptr; }
+        __device__ constexpr std::remove_extent_t<T>* get()
+        {
+            assert(ptr);
+            return ptr;
+        }
+        __device__ constexpr const std::remove_extent_t<T>* get() const
+        {
+            assert(ptr);
+            return ptr;
+        }
 
-        __device__ constexpr std::remove_extent_t<T>& operator*() { return *ptr; }
-        __device__ constexpr const T& operator*() const { return *ptr; }
-        __device__ constexpr T* operator->() { return ptr; }
-        __device__ constexpr const T* operator->() const { return ptr; }
+        __device__ constexpr std::remove_extent_t<T>& operator*() { return *get(); }
+        __device__ constexpr const T& operator*() const { return *get(); }
+        __device__ constexpr std::remove_extent_t<T>* operator->() { return get(); }
+        __device__ constexpr const std::remove_extent_t<T>* operator->() const { return get(); }
 
-        __device__ constexpr std::remove_extent_t<T>& operator[](unsigned i) { return ptr[i]; }
-        __device__ constexpr const std::remove_extent_t<T>& operator[](unsigned i) const { return ptr[i]; }
+        __device__ constexpr std::remove_extent_t<T>& operator[](unsigned i) { return get()[i]; }
+        __device__ constexpr const std::remove_extent_t<T>& operator[](unsigned i) const { return get()[i]; }
 
         constexpr SharedMemPtr(const SharedMemPtr&) = delete;
-        constexpr SharedMemPtr(SharedMemPtr&&)      = default;
+        constexpr SharedMemPtr(SharedMemPtr&& other)
+            : allocator(other.allocator)
+            , ptr(other.ptr)
+            , allocSize(other.allocSize)
+        {
+            other.ptr       = nullptr;
+            other.allocSize = 0;
+        }
 
         __device__ constexpr ~SharedMemPtr() { allocator.ptr -= allocSize; }
 

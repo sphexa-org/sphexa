@@ -73,6 +73,12 @@ __global__ void testSharedMemAlloc(bool* failed)
             printf("doubleData check failed\n");
             *failed = true;
         }
+        auto movedDoubleData = std::move(doubleData);
+        if (movedDoubleData[laneIdx] != threadIdx.x)
+        {
+            printf("movedDoubleData check failed\n");
+            *failed = true;
+        }
     }
 
     {
@@ -80,6 +86,12 @@ __global__ void testSharedMemAlloc(bool* failed)
         if (i64Data.get() != ptr)
         {
             printf("i64Data check failed\n");
+            *failed = true;
+        }
+        auto movedI64Data = std::move(i64Data);
+        if (movedI64Data.get() != ptr)
+        {
+            printf("movedI64Data check failed\n");
             *failed = true;
         }
     }
