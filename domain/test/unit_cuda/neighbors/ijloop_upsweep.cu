@@ -119,18 +119,18 @@ TEST(IjLoop, Upsweep)
                                             octreeLeafToInternal = octree.leafToInternal,
                                             octreeLevelRange     = octree.levelRange;
 
-    OctreeNsView<double, KeyT> view{octree.numLeafNodes,
-                                    octree.numNodes,
-                                    rawPtr(octreePrefixes),
-                                    rawPtr(octreeParents),
-                                    rawPtr(octreeChildOffsets),
-                                    rawPtr(octreeInternalToLeaf),
-                                    rawPtr(octreeLeafToInternal),
-                                    rawPtr(octreeLevelRange),
-                                    rawPtr(keys),
-                                    rawPtr(layout),
-                                    rawPtr(centers),
-                                    rawPtr(sizes)};
+    OctreeNsView<double, KeyT> view{.numLeafNodes   = octree.numLeafNodes,
+                                    .numNodes       = octree.numNodes,
+                                    .prefixes       = rawPtr(octreePrefixes),
+                                    .childOffsets   = rawPtr(octreeChildOffsets),
+                                    .parents        = rawPtr(octreeParents),
+                                    .internalToLeaf = rawPtr(octreeInternalToLeaf),
+                                    .leafToInternal = rawPtr(octreeLeafToInternal),
+                                    .levelRange     = rawPtr(octreeLevelRange),
+                                    .leaves         = rawPtr(keys),
+                                    .layout         = rawPtr(layout),
+                                    .centers        = rawPtr(centers),
+                                    .sizes          = rawPtr(sizes)};
 
     thrust::universal_vector<long> dataLong(totalBodies);
     thrust::universal_vector<bool> dataBool(totalBodies);
