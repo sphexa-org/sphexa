@@ -155,10 +155,10 @@ void computeIdealGasEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        cuda::computeIdealGasEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.devData.temp), rawPtr(d.devData.u),
-                                 rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
-                                 rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.c),
-                                 rawPtr(d.devData.rho), rawPtr(d.devData.p));
+        gpu::computeIdealGasEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.devData.temp), rawPtr(d.devData.u),
+                                rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
+                                rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.c),
+                                rawPtr(d.devData.rho), rawPtr(d.devData.p));
     }
     else { computeIdealGasEOS_Impl(startIndex, endIndex, d); }
 }
@@ -168,9 +168,9 @@ void computeIsothermalEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        cuda::computeIsothermalEOS(startIndex, endIndex, d.soundSpeedConst, rawPtr(d.devData.c), rawPtr(d.devData.rho),
-                                   rawPtr(d.devData.p), rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
-                                   rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.temp));
+        gpu::computeIsothermalEOS(startIndex, endIndex, d.soundSpeedConst, rawPtr(d.devData.c), rawPtr(d.devData.rho),
+                                  rawPtr(d.devData.p), rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
+                                  rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.temp));
     }
     else { computeIsothermalEOS_Impl(startIndex, endIndex, d); }
 }
@@ -180,10 +180,10 @@ void computePolytropicEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        cuda::computePolytropicEOS(startIndex, endIndex, d.polytropic_const, d.polytropic_index, rawPtr(d.devData.rho),
-                                   rawPtr(d.devData.p), rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
-                                   rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.temp),
-                                   rawPtr(d.devData.c));
+        gpu::computePolytropicEOS(startIndex, endIndex, d.polytropic_const, d.polytropic_index, rawPtr(d.devData.rho),
+                                  rawPtr(d.devData.p), rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
+                                  rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.temp),
+                                  rawPtr(d.devData.c));
     }
     else { computePolytropicEOS_Impl(startIndex, endIndex, d); }
 }

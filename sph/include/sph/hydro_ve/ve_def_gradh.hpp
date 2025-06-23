@@ -80,7 +80,7 @@ void computeVeDefGradhImpl(size_t startIndex, size_t endIndex, Dataset& d, const
 template<typename Tc, class Dataset>
 void computeVeDefGradh(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeVeDefGradh(grp, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeVeDefGradh(grp, d, box); }
     else { computeVeDefGradhImpl(grp.firstBody, grp.lastBody, d, box); }
 }
 
