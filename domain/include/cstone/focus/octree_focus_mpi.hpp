@@ -373,8 +373,8 @@ public:
     void gatherGlobalLeaves(std::span<T> globalLeafQuantities) const
     {
         if constexpr (HaveGpu<Accelerator>{}) { syncGpu(); }
-        mpiAllgatherv(MPI_IN_PLACE, 0, globalLeafQuantities.data(), globNumNodes_.data(), globDispl_.data(),
-                      MPI_COMM_WORLD);
+        mpiAllgathervGpuDirect<HaveGpu<Accelerator>{}>(MPI_IN_PLACE, 0, globalLeafQuantities.data(),
+                                                       globNumNodes_.data(), globDispl_.data(), MPI_COMM_WORLD);
     }
 
     template<class Tm, class DevVec1 = std::vector<LocalIndex>, class DevVec2 = std::vector<LocalIndex>>
@@ -434,7 +434,8 @@ public:
                                                             {size_t(globalTree.numLeafNodes())}, 128);
 
         populateGlobal<SourceCenterType<RealType>>(globalTree.treeLeaves(), {centersAcc_.data(), centersAcc_.size()},
-                                                   {globalLeafCentersAcc.data(), globalLeafCentersAcc.size()});
+                                                   globalLeafCentersAcc);
+        gatherGlobalLeaves<SourceCenterType<RealType>>(globalLeafCentersAcc);
 
         std::vector<SourceCenterType<RealType>> globalLeafCenters(globalTree.numLeafNodes());
         if constexpr (HaveGpu<Accelerator>{})
@@ -443,7 +444,6 @@ public:
         }
         else { std::copy(globalLeafCentersAcc.begin(), globalLeafCentersAcc.end(), globalLeafCenters.begin()); }
 
-        gatherGlobalLeaves<SourceCenterType<RealType>>(globalLeafCenters);
         scatter(globalTree.internalOrder(), globalLeafCenters.data(), globalCenters_.data());
         upsweep(globalTree.levelRange(), globalTree.childOffsets(), globalCenters_.data(),
                 CombineSourceCenter<RealType>{});
@@ -829,13 +829,11 @@ void globalFocusExchange(const Octree<KeyType>& globalOctree,
     focusTree.template populateGlobal<Q>(globalOctree.treeLeaves(), quantities, globalLeafAcc);
 
     //! exchange global leaves
-    //focusTree.template gatherGlobalLeaves<Q>(globalLeafAcc);
+    focusTree.template gatherGlobalLeaves<Q>(globalLeafAcc);
 
     std::vector<Q> globalLeafQuantities(numGlobalLeaves);
     if constexpr (HaveGpu<Accelerator>{}) { memcpyD2H(globalLeafAcc.data(), globalLeafAcc.size(), globalLeafQuantities.data()); }
     else { std::copy(globalLeafAcc.begin(), globalLeafAcc.end(), globalLeafQuantities.begin()); }
-
-    focusTree.template gatherGlobalLeaves<Q>(globalLeafQuantities);
 
     std::vector<Q> globalQuantities(globalOctree.numTreeNodes());
     scatter(globalOctree.internalOrder(), globalLeafQuantities.data(), globalQuantities.data());
