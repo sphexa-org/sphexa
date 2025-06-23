@@ -209,6 +209,19 @@ __device__ __forceinline__ T warpMax(T laneVal)
     return laneVal;
 }
 
+//! @brief compute warp-wide bitwise or
+template<class T>
+__device__ __forceinline__ T warpBitwiseOr(T laneVal)
+{
+#pragma unroll
+    for (int i = 0; i < GpuConfig::warpSizeLog2; i++)
+    {
+        laneVal |= shflXorSync(laneVal, 1 << i);
+    }
+
+    return laneVal;
+}
+
 //! @brief standard inclusive warp-scan
 __device__ __forceinline__ int inclusiveScanInt(int value)
 {
