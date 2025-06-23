@@ -28,20 +28,11 @@ namespace detail
 template<std::size_t... Is, class F, class... Tuples>
 inline constexpr auto tupleMapImpl(std::index_sequence<Is...>, F&& f, Tuples&&... tuples)
 {
-    return std::make_tuple(
-        [&f](auto i, auto&&... ts) -> decltype(auto) {
-            return f(std::get<i>(std::forward<decltype(ts)>(ts))...);
-        }(std::integral_constant<std::size_t, Is>(), std::forward<Tuples>(tuples)...)...);
+    return std::make_tuple([&f](auto i, auto&&... ts) -> decltype(auto)
+                           { return f(std::get<i>(std::forward<decltype(ts)>(ts))...); }(
+                               std::integral_constant<std::size_t, Is>(), std::forward<Tuples>(tuples)...)...);
 }
 
-template<std::size_t... Is, class F, class... Tuples>
-inline constexpr auto tupleMapIndexedImpl(std::index_sequence<Is...>, F&& f, Tuples&&... tuples)
-{
-    return std::make_tuple(
-        [&f](auto i, auto&&... ts) -> decltype(auto) {
-            return f(i, std::get<i>(std::forward<decltype(ts)>(ts))...);
-        }(std::integral_constant<std::size_t, Is>(), std::forward<Tuples>(tuples)...)...);
-}
 } // namespace detail
 
 template<class F, class Tuple, class... Tuples>
@@ -51,15 +42,6 @@ inline constexpr auto tupleMap(F&& f, Tuple&& tuple, Tuples&&... tuples)
     static_assert((... && (std::tuple_size_v<std::decay_t<Tuples>> == n)), "All tuples must have same size");
     return detail::tupleMapImpl(std::make_index_sequence<n>(), std::forward<F>(f), std::forward<Tuple>(tuple),
                                 std::forward<Tuples>(tuples)...);
-}
-
-template<class F, class Tuple, class... Tuples>
-inline constexpr auto tupleMapIndexed(F&& f, Tuple&& tuple, Tuples&&... tuples)
-{
-    constexpr auto n = std::tuple_size_v<std::decay_t<Tuple>>;
-    static_assert((... && (std::tuple_size_v<std::decay_t<Tuples>> == n)), "All tuples must have same size");
-    return detail::tupleMapIndexedImpl(std::make_index_sequence<n>(), std::forward<F>(f), std::forward<Tuple>(tuple),
-                                       std::forward<Tuples>(tuples)...);
 }
 
 //! @brief Utility to call function with each element in tuples
@@ -90,8 +72,8 @@ std::tuple<std::tuple_element_t<Ints, std::decay_t<Tuple>>...> selectTuple(Tuple
 }
 
 template<std::size_t... Is>
-constexpr auto
-indexSequenceReverse(std::index_sequence<Is...> const&) -> decltype(std::index_sequence<sizeof...(Is) - 1U - Is...>{});
+constexpr auto indexSequenceReverse(std::index_sequence<Is...> const&)
+    -> decltype(std::index_sequence<sizeof...(Is) - 1U - Is...>{});
 
 template<std::size_t N>
 using makeIndexSequenceReverse = decltype(indexSequenceReverse(std::make_index_sequence<N>{}));
