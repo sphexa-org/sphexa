@@ -163,6 +163,7 @@ struct IjLoopTest : testing::Test
                 .numNodes       = numNodes,
                 .prefixes       = rawPtr(prefixes),
                 .childOffsets   = rawPtr(childOffsets),
+                .parents        = rawPtr(parents),
                 .internalToLeaf = rawPtr(internalToLeaf),
                 .leafToInternal = rawPtr(leafToInternal),
                 .levelRange     = rawPtr(levelRange),
