@@ -20,6 +20,7 @@
 
 #include "cstone/primitives/mpi_cuda.cuh"
 #include "cstone/tree/csarray_gpu.h"
+#include "cstone/tree/octree_gpu.h"
 #include "cstone/tree/octree.hpp"
 #include "cstone/tree/update_mpi.hpp"
 #include "cstone/util/pack_buffers.hpp"
@@ -40,30 +41,31 @@ namespace cstone
 template<class KeyType, class DevKeyVec, class DevCountVec>
 bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
                            unsigned bucketSize,
-                           OctreeData<KeyType, CpuTag>& tree,
+                           OctreeData<KeyType, GpuTag>& tree,
                            std::vector<KeyType>& leaves,
                            DevKeyVec& d_csTree,
                            std::vector<unsigned>& counts,
                            DevCountVec& d_countsBuf)
 {
     unsigned maxCount = std::numeric_limits<unsigned>::max();
-    bool converged =
-        rebalanceDecision(leaves.data(), counts.data(), nNodes(leaves), bucketSize, tree.childOffsets.data());
-    rebalanceTree(leaves, tree.prefixes, tree.childOffsets.data());
-    swap(leaves, tree.prefixes);
+    auto newNumNodes =
+        computeNodeOpsGpu(d_csTree.data(), nNodes(d_csTree), d_countsBuf.data(), bucketSize, tree.childOffsets.data());
+    reallocate(tree.prefixes, newNumNodes + 1, 1.01);
+    bool converged = rebalanceTreeGpu(d_csTree.data(), nNodes(d_csTree), newNumNodes, tree.childOffsets.data(),
+                                      tree.prefixes.data());
+    swap(d_csTree, tree.prefixes);
 
-    tree.resize(nNodes(leaves));
-    updateInternalTree<KeyType>(leaves, tree.data());
+    tree.resize(newNumNodes);
+    buildOctreeGpu(d_csTree.data(), tree.data());
 
     counts.resize(tree.numLeafNodes);
-    reallocate(d_csTree, tree.numLeafNodes + 1, 1.01);
-    reallocate(d_countsBuf, 2 * tree.numLeafNodes, 1.01);
+    reallocate(leaves, tree.numLeafNodes + 1, 1.01);
+    memcpyD2H(d_csTree.data(), d_csTree.size(), leaves.data());
 
     size_t numLeafNodes = tree.numLeafNodes;
     auto [d_counts, d_countsRed] =
         util::packAllocBuffer(d_countsBuf, util::TypeList<unsigned, unsigned>{}, {numLeafNodes, numLeafNodes}, 128);
 
-    memcpyH2D(leaves.data(), d_csTree.size(), d_csTree.data());
     computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys, maxCount, true);
 
     syncGpu();
@@ -77,16 +79,19 @@ bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
     return converged;
 }
 
-template<bool useGpu, class KeyType, class DevKeyVec, class DevCountVec>
+template<class KeyType, class Accelerator, class DevKeyVec, class DevCountVec>
 bool updateOctreeGlobal(std::span<const KeyType> keys,
                         unsigned bucketSize,
-                        OctreeData<KeyType, CpuTag>& tree,
+                        OctreeData<KeyType, Accelerator>& tree,
                         std::vector<KeyType>& leaves,
                         DevKeyVec& d_csTree,
                         std::vector<unsigned>& counts,
                         DevCountVec& d_counts)
 {
-    if constexpr (useGpu) { return updateOctreeGlobalGpu(keys, bucketSize, tree, leaves, d_csTree, counts, d_counts); }
+    if constexpr (HaveGpu<Accelerator>{})
+    {
+        return updateOctreeGlobalGpu(keys, bucketSize, tree, leaves, d_csTree, counts, d_counts);
+    }
     else { return updateOctreeGlobal(keys, bucketSize, tree, leaves, counts); }
 }
 
