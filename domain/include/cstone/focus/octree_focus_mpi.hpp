@@ -247,13 +247,13 @@ public:
             // 1st upsweep with local and global data
             countsAcc_.resize(octreeAcc_.numNodes);
             scatter<TreeNodeIndex>(leafToInternal(octreeAcc_), leafCounts_.data(), countsAcc_.data());
-            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, countsAcc_.data(), NodeCount<unsigned>{});
+            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets.data(), countsAcc_.data(), NodeCount<unsigned>{});
 
             // add counts from neighboring peers
             peerExchange(std::span(countsAcc_), static_cast<int>(P2pTags::focusPeerCounts), scratch);
 
             // 2nd upsweep with peer data present
-            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, countsAcc_.data(), NodeCount<unsigned>{});
+            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets.data(), countsAcc_.data(), NodeCount<unsigned>{});
             gather(leafToInternal(octreeAcc_), countsAcc_.data(), leafCounts_.data());
         }
         reallocate(scratch, origSize, 1.0);
@@ -277,12 +277,12 @@ public:
     /*! @brief transfer quantities of leaf cells inside the focus into a global array
      *
      * @tparam     T                 an arithmetic type or compile-time constant size arrays thereof
-     * @param[in]  globalLeaves      cstone SFC key leaf cell array of the global tree
+     * @param[in]  gLeaves      cstone SFC key leaf cell array of the global tree
      * @param[in]  localQuantities   cell properties of the locally focused tree, length = octree().numTreeNodes()
      * @param[out] globalQuantities  cell properties of the global tree
      */
     template<class T>
-    void populateGlobal(std::span<const KeyType> globalLeaves,
+    void populateGlobal(std::span<const KeyType> gLeaves,
                         std::span<const T> localQuantities,
                         std::span<T> globalQuantities) const
     {
@@ -290,11 +290,9 @@ public:
 
         if constexpr (HaveGpu<Accelerator>{})
         {
-            DeviceVector<KeyType> d_globLeaf(globalLeaves.data(), globalLeaves.data() + globalLeaves.size());
-
-            auto firstGlobIdx = lowerBoundGpu(d_globLeaf.data(), d_globLeaf.data() + d_globLeaf.size(), prevFocusStart);
-            auto lastGlobIdx  = lowerBoundGpu(d_globLeaf.data(), d_globLeaf.data() + d_globLeaf.size(), prevFocusEnd);
-            std::span globLeavesFoc{d_globLeaf.data() + firstGlobIdx, lastGlobIdx - firstGlobIdx + 1};
+            auto firstGlobIdx = lowerBoundGpu(gLeaves.data(), gLeaves.data() + gLeaves.size(), prevFocusStart);
+            auto lastGlobIdx  = lowerBoundGpu(gLeaves.data(), gLeaves.data() + gLeaves.size(), prevFocusEnd);
+            std::span globLeavesFoc{gLeaves.data() + firstGlobIdx, lastGlobIdx - firstGlobIdx + 1};
 
             DeviceVector<TreeNodeIndex> gmap(lastGlobIdx - firstGlobIdx);
             locateNodesGpu(globLeavesFoc.data(), globLeavesFoc.data() + globLeavesFoc.size(),
@@ -303,9 +301,9 @@ public:
         }
         else
         {
-            TreeNodeIndex firstGlobIdx = findNodeAbove(globalLeaves.data(), globalLeaves.size(), prevFocusStart);
-            TreeNodeIndex lastGlobIdx  = findNodeAbove(globalLeaves.data(), globalLeaves.size(), prevFocusEnd);
-            auto globLeavesFoc         = globalLeaves.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx + 1);
+            TreeNodeIndex firstGlobIdx = findNodeAbove(gLeaves.data(), gLeaves.size(), prevFocusStart);
+            TreeNodeIndex lastGlobIdx  = findNodeAbove(gLeaves.data(), gLeaves.size(), prevFocusEnd);
+            auto globLeavesFoc         = gLeaves.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx + 1);
             auto globQFoc              = globalQuantities.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx);
 
             const KeyType* nodeKeys         = rawPtr(octreeAcc_.prefixes);
@@ -324,7 +322,8 @@ public:
     /*! @brief transfer missing cell quantities from global tree into localQuantities
      *
      * @tparam     T                 an arithmetic type or compile-time constant size arrays thereof
-     * @param[in]  globalTree
+     * @param[in]  globalNodeKeys    WS-prefix-bit keys of the global octree
+     * @param[in]  globalLevelRange  tree node index ranges per level for @p globalNodeKeys
      * @param[in]  globalQuantities  tree cell properties for each cell in @p globalTree include internal cells
      * @param[out] localQuantities   local tree cell properties
      */
@@ -382,15 +381,16 @@ public:
                        const RealType* y,
                        const RealType* z,
                        const Tm* m,
-                       const Octree<KeyType>& globalTree,
+                       OctreeView<const KeyType> gOctree,
                        DevVec1&& scratch1 = std::vector<LocalIndex>{},
                        DevVec2&& scratch2 = std::vector<LocalIndex>{})
     {
+        assert(gOctree.leaves != nullptr);
         TreeNodeIndex firstIdx           = assignment_[myRank_].start();
         TreeNodeIndex lastIdx            = assignment_[myRank_].end();
         OctreeView<const KeyType> octree = octreeViewAcc();
 
-        globalCenters_.resize(globalTree.numTreeNodes());
+        globalCenters_.resize(gOctree.numNodes);
         reallocate(octree.numNodes, allocGrowthRate_, centersAcc_);
 
         if constexpr (HaveGpu<Accelerator>{})
@@ -422,33 +422,31 @@ public:
             {
                 //! prepare local leaf centers
                 TreeNodeIndex nodeIdx = octree.leafToInternal[octree.numInternalNodes + leafIdx];
-                centersAcc_[nodeIdx]     = massCenter<RealType>(x, y, z, m, layout[leafIdx], layout[leafIdx + 1]);
+                centersAcc_[nodeIdx]  = massCenter<RealType>(x, y, z, m, layout[leafIdx], layout[leafIdx + 1]);
             }
             //! upsweep with local data in place
-            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, centersAcc_.data(),
+            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets.data(), centersAcc_.data(),
                     CombineSourceCenter<RealType>{});
         }
 
         //! global exchange for the top nodes that are bigger than local domains
         auto [globalLeafCentersAcc] = util::packAllocBuffer(scratch1, util::TypeList<SourceCenterType<RealType>>{},
-                                                            {size_t(globalTree.numLeafNodes())}, 128);
-
-        populateGlobal<SourceCenterType<RealType>>(globalTree.treeLeaves(), {centersAcc_.data(), centersAcc_.size()},
+                                                            {size_t(gOctree.numLeafNodes)}, 128);
+        populateGlobal<SourceCenterType<RealType>>(gOctree.leafSpan(), {centersAcc_.data(), centersAcc_.size()},
                                                    globalLeafCentersAcc);
         gatherGlobalLeaves<SourceCenterType<RealType>>(globalLeafCentersAcc);
 
-        std::vector<SourceCenterType<RealType>> globalLeafCenters(globalTree.numLeafNodes());
+        std::vector<SourceCenterType<RealType>> globalLeafCenters(gOctree.numLeafNodes);
         if constexpr (HaveGpu<Accelerator>{})
         {
             memcpyD2H(globalLeafCentersAcc.data(), globalLeafCentersAcc.size(), globalLeafCenters.data());
         }
         else { std::copy(globalLeafCentersAcc.begin(), globalLeafCentersAcc.end(), globalLeafCenters.begin()); }
 
-        scatter(globalTree.internalOrder(), globalLeafCenters.data(), globalCenters_.data());
-        upsweep(globalTree.levelRange(), globalTree.childOffsets(), globalCenters_.data(),
-                CombineSourceCenter<RealType>{});
-        extractGlobal<SourceCenterType<RealType>>(globalTree.nodeKeys().data(), globalTree.levelRange().data(),
-                                                  globalCenters_, {centersAcc_.data(), centersAcc_.size()});
+        scatter(gOctree.leafToInternalSpan(), globalLeafCenters.data(), globalCenters_.data());
+        upsweep(gOctree.levelRangeSpan(), gOctree.childOffsets, globalCenters_.data(), CombineSourceCenter<RealType>{});
+        extractGlobal<SourceCenterType<RealType>>(gOctree.prefixes, gOctree.levelRange, globalCenters_,
+                                                  {centersAcc_.data(), centersAcc_.size()});
 
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -464,8 +462,7 @@ public:
             peerExchange(std::span{centersAcc_.data(), centersAcc_.size()}, static_cast<int>(P2pTags::focusPeerCenters),
                          hScratch);
             //! upsweep with all (leaf) data in place
-            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets, centersAcc_.data(),
-                    CombineSourceCenter<RealType>{});
+            upsweep(octree.levelRangeSpan(), octree.childOffsets, centersAcc_.data(), CombineSourceCenter<RealType>{});
         }
     }
 
@@ -793,7 +790,7 @@ private:
  * @tparam        Q                an arithmetic type, or compile-time fix-sized arrays thereof
  * @tparam        T                float or double
  * @tparam        F                function object for octree upsweep
- * @param[in]     globalOctree     a global (replicated on all ranks) tree
+ * @param[in]     gOctree          a global (replicated on all ranks) tree
  * @param[in]     focusTree        octree focused on the executing rank
  * @param[inout]  quantities       an array of length focusTree.octree().numTreeNodes() with cell properties of the
  *                                 locally focused octree
@@ -815,34 +812,37 @@ private:
  *                ranks contains data obtained through global collective communication between ranks
  */
 template<class Q, class KeyType, class T, class F, class Accelerator, class Vector, class... UArgs>
-void globalFocusExchange(const Octree<KeyType>& globalOctree,
+void globalFocusExchange(OctreeView<const KeyType> gOctree,
                          const FocusedOctree<KeyType, T, Accelerator>& focusTree,
                          std::span<Q> quantities,
                          Vector& scratch,
                          F&& upsweepFunction,
                          UArgs&&... upsweepArgs)
 {
+    assert(gOctree.leaves != nullptr);
     static_assert(HaveGpu<Accelerator>{} == IsDeviceVector<Vector>{});
-    std::size_t numGlobalLeaves = globalOctree.numLeafNodes();
+    std::size_t numGlobalLeaves = gOctree.numLeafNodes;
     auto s = scratch.size();
     auto [globalLeafAcc] = util::packAllocBuffer(scratch, util::TypeList<Q>{}, {numGlobalLeaves}, 128);
-    focusTree.template populateGlobal<Q>(globalOctree.treeLeaves(), quantities, globalLeafAcc);
+    focusTree.template populateGlobal<Q>(gOctree.leafSpan(), quantities, globalLeafAcc);
 
     //! exchange global leaves
     focusTree.template gatherGlobalLeaves<Q>(globalLeafAcc);
 
     std::vector<Q> globalLeafQuantities(numGlobalLeaves);
-    if constexpr (HaveGpu<Accelerator>{}) { memcpyD2H(globalLeafAcc.data(), globalLeafAcc.size(), globalLeafQuantities.data()); }
+    if constexpr (HaveGpu<Accelerator>{})
+    {
+        memcpyD2H(globalLeafAcc.data(), globalLeafAcc.size(), globalLeafQuantities.data());
+    }
     else { std::copy(globalLeafAcc.begin(), globalLeafAcc.end(), globalLeafQuantities.begin()); }
 
-    std::vector<Q> globalQuantities(globalOctree.numTreeNodes());
-    scatter(globalOctree.internalOrder(), globalLeafQuantities.data(), globalQuantities.data());
+    std::vector<Q> globalQuantities(gOctree.numNodes);
+    scatter(gOctree.leafToInternalSpan(), globalLeafQuantities.data(), globalQuantities.data());
     //! upsweep with the global tree
-    upsweepFunction(globalOctree.levelRange(), globalOctree.childOffsets(), globalQuantities.data(), upsweepArgs...);
+    upsweepFunction(gOctree.levelRangeSpan(), gOctree.childOffsets, globalQuantities.data(), upsweepArgs...);
 
     //! from the global tree, extract the part that the executing rank was missing
-    focusTree.template extractGlobal<Q>(globalOctree.nodeKeys().data(), globalOctree.levelRange().data(),
-                                        globalQuantities, quantities);
+    focusTree.template extractGlobal<Q>(gOctree.prefixes, gOctree.levelRange, globalQuantities, quantities);
     reallocate(scratch, s, 1.0);
 }
 

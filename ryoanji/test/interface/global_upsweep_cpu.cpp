@@ -67,6 +67,9 @@ static int multipoleExchangeTest(int thisRank, int numRanks)
     auto                                         octree  = focusTree.octreeViewAcc();
     std::span<const cstone::SourceCenterType<T>> centers = focusTree.expansionCentersAcc();
 
+    cstone::SourceCenterType<T> refCenter = cstone::massCenter<T>(
+        coords.x().data(), coords.y().data(), coords.z().data(), globalMasses.data(), 0, globalMasses.size());
+
     std::vector<MultipoleType> multipoles(octree.numNodes);
     ryoanji::computeGlobalMultipoles(x.data(), y.data(), z.data(), m.data(), x.size(), domain.globalTree(), focusTree,
                                      domain.layout().data(), multipoles.data());
@@ -78,19 +81,23 @@ static int multipoleExchangeTest(int thisRank, int numRanks)
     P2M(coords.x().data(), coords.y().data(), coords.z().data(), globalMasses.data(), 0, numParticles * numRanks,
         centers[octree.levelRange[0]], reference);
 
-    double maxDiff = max(abs(reference - globalRootMultipole));
+    double maxDiffCe = max(abs(makeVec3(refCenter - centers[0])));
+    bool   passCe    = maxDiffCe < 1e-10;
+    double maxDiffMp = max(abs(reference - globalRootMultipole));
+    bool   passMp    = maxDiffMp < 1e-10;
 
-    bool pass      = maxDiff < 1e-10;
-    int  numPassed = pass;
-    mpiAllreduce(MPI_IN_PLACE, &numPassed, 1, MPI_SUM, MPI_COMM_WORLD);
+    int numPassed[2] = {passCe, passMp};
+    mpiAllreduce(MPI_IN_PLACE, numPassed, 2, MPI_SUM, MPI_COMM_WORLD);
 
     if (thisRank == 0)
     {
-        std::string testResult = (numPassed == numRanks) ? "PASS" : "FAIL";
-        std::cout << "Test result: " << testResult << std::endl;
+        std::string testResultCe = (numPassed[0] == numRanks) ? "PASS" : "FAIL";
+        std::string testResultMp = (numPassed[1] == numRanks) ? "PASS" : "FAIL";
+        std::cout << "COM       test result: " << testResultCe << std::endl;
+        std::cout << "Multipole test result: " << testResultMp << std::endl;
     }
 
-    if (numPassed == numRanks) { return EXIT_SUCCESS; }
+    if (numPassed[0] == numRanks && numPassed[1] == numRanks) { return EXIT_SUCCESS; }
     else { return EXIT_FAILURE; }
 }
 

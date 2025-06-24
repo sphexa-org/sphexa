@@ -211,8 +211,17 @@ public:
         else { return nodeCounts_; }
     }
 
-    //! @brief the octree, including the internal part
-    const Octree<KeyType>& octree() const { return tree_; }
+    /*! @brief the octree, internal part and leaves
+     *
+     * All data is on the host, except treeData.leaves which is on the GPU if gpu == true
+     */
+    OctreeView<const KeyType> octree() const
+    {
+        auto treeData   = tree_.cdata();
+        treeData.leaves = treeLeaves().data();
+        return treeData;
+    }
+
     //! @brief the global coordinate bounding box
     const Box<T>& box() const { return box_; }
     //! @brief return the space filling curve rank assignment of the last call to @a assign()

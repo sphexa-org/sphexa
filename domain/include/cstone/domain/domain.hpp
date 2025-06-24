@@ -340,8 +340,8 @@ public:
     [[nodiscard]] LocalIndex nParticles() const { return endIndex() - startIndex(); }
     //! @brief return number of locally assigned particles plus number of halos
     [[nodiscard]] LocalIndex nParticlesWithHalos() const { return bufDesc_.size; }
-    //! @brief read only visibility of the global octree leaves to the outside
-    const Octree<KeyType>& globalTree() const { return global_.octree(); }
+    //! @brief read only visibility of the global octree in traversible layout
+    OctreeView<const KeyType> globalTree() const { return global_.octree(); }
     //! @brief read only visibility of the focused octree
     const FocusedOctree<KeyType, T, Accelerator>& focusTree() const { return focusTree_; }
     //! @brief the index of the first locally assigned cell in focusTree()

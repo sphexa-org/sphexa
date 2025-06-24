@@ -62,7 +62,7 @@ void globalRandomGaussian(int thisRank, int numRanks)
 
     /*******************************/
 
-    auto peers = findPeersMac(thisRank, assignment, domainTree, box, invThetaEff);
+    auto peers = findPeersMac(thisRank, assignment, domainTree.cdata(), box, invThetaEff);
 
     // peer boundaries are required to be present in the focus tree at all times
     std::vector<KeyType> peerBoundaries;

@@ -246,6 +246,12 @@ struct OctreeView
     NodeType* d_levelRange;
     NodeType* internalToLeaf;
     NodeType* leafToInternal;
+    KeyType*  leaves{nullptr};
+
+    std::span<NodeType> leafToInternalSpan() { return {leafToInternal + numInternalNodes, size_t(numLeafNodes)}; }
+    std::span<NodeType> levelRangeSpan() { return {levelRange, maxTreeLevel<std::decay_t<KeyType>>{} + 2}; }
+    std::span<NodeType> childOffsetsSpan() { return {childOffsets, numNodes}; }
+    std::span<KeyType> leafSpan() { return {leaves, size_t(numLeafNodes + 1)}; }
 };
 
 //! @brief Octree data and properties needed for neighbor search traversal
@@ -302,14 +308,14 @@ public:
     {
         return {numLeafNodes,           numInternalNodes,      numNodes,           rawPtr(prefixes),
                 rawPtr(childOffsets),   rawPtr(parents),       rawPtr(levelRange), rawPtr(d_levelRange),
-                rawPtr(internalToLeaf), rawPtr(leafToInternal)};
+                rawPtr(internalToLeaf), rawPtr(leafToInternal), nullptr};
     }
 
     OctreeView<const KeyType> data() const
     {
         return {numLeafNodes,           numInternalNodes,      numNodes,           rawPtr(prefixes),
                 rawPtr(childOffsets),   rawPtr(parents),       rawPtr(levelRange), rawPtr(d_levelRange),
-                rawPtr(internalToLeaf), rawPtr(leafToInternal)};
+                rawPtr(internalToLeaf), rawPtr(leafToInternal), nullptr};
     }
 
     TreeNodeIndex numNodes{0};
@@ -387,14 +393,14 @@ public:
     {
         return {numLeafNodes_,      numInternalNodes_,      levelRange_.back(),
                 prefixes_.data(),   childOffsets_.data(),   parents_.data(),
-                levelRange_.data(), internalToLeaf_.data(), leafToInternal_.data()};
+                levelRange_.data(), nullptr, internalToLeaf_.data(), leafToInternal_.data()};
     }
 
-    OctreeView<const KeyType> data() const
+    OctreeView<const KeyType> cdata() const
     {
         return {numLeafNodes_,      numInternalNodes_,      levelRange_.back(),
                 prefixes_.data(),   childOffsets_.data(),   parents_.data(),
-                levelRange_.data(), internalToLeaf_.data(), leafToInternal_.data()};
+                levelRange_.data(), nullptr, internalToLeaf_.data(), leafToInternal_.data()};
     }
 
     //! @brief return a const view of the cstone leaf array
@@ -540,7 +546,7 @@ private:
 
 template<class T, class CombinationFunction>
 void upsweep(std::span<const TreeNodeIndex> levelOffset,
-             std::span<const TreeNodeIndex> childOffsets,
+             const TreeNodeIndex* childOffsets,
              T* quantities,
              CombinationFunction&& combinationFunction)
 {
