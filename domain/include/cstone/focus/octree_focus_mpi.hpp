@@ -430,18 +430,18 @@ public:
         }
 
         //! global exchange for the top nodes that are bigger than local domains
-        auto [globalLeafCentersAcc] = util::packAllocBuffer(scratch1, util::TypeList<SourceCenterType<RealType>>{},
-                                                            {size_t(gOctree.numLeafNodes)}, 128);
+        auto [gLeafCentersAcc] = util::packAllocBuffer(scratch1, util::TypeList<SourceCenterType<RealType>>{},
+                                                       {size_t(gOctree.numLeafNodes)}, 128);
         populateGlobal<SourceCenterType<RealType>>(gOctree.leafSpan(), {centersAcc_.data(), centersAcc_.size()},
-                                                   globalLeafCentersAcc);
-        gatherGlobalLeaves<SourceCenterType<RealType>>(globalLeafCentersAcc);
+                                                   gLeafCentersAcc);
+        gatherGlobalLeaves<SourceCenterType<RealType>>(gLeafCentersAcc);
 
         std::vector<SourceCenterType<RealType>> globalLeafCenters(gOctree.numLeafNodes);
         if constexpr (HaveGpu<Accelerator>{})
         {
-            memcpyD2H(globalLeafCentersAcc.data(), globalLeafCentersAcc.size(), globalLeafCenters.data());
+            memcpyD2H(gLeafCentersAcc.data(), gLeafCentersAcc.size(), globalLeafCenters.data());
         }
-        else { std::copy(globalLeafCentersAcc.begin(), globalLeafCentersAcc.end(), globalLeafCenters.begin()); }
+        else { std::copy(gLeafCentersAcc.begin(), gLeafCentersAcc.end(), globalLeafCenters.begin()); }
 
         scatter(gOctree.leafToInternalSpan(), globalLeafCenters.data(), globalCenters_.data());
         upsweep(gOctree.levelRangeSpan(), gOctree.childOffsets, globalCenters_.data(), CombineSourceCenter<RealType>{});

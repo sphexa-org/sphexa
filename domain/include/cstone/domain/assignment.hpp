@@ -57,11 +57,12 @@ public:
         , bucketSize_(bucketSize)
         , box_(box)
     {
-        unsigned level            = log8ceil<KeyType>(100 * nRanks);
-        auto initialBoundaries    = initialDomainSplits<KeyType>(nRanks, level);
-        std::vector<KeyType> init = computeSpanningTree<KeyType>(initialBoundaries);
-        tree_.update(init.data(), nNodes(init));
-        nodeCounts_ = std::vector<unsigned>(nNodes(init), bucketSize_ - 1);
+        unsigned level         = log8ceil<KeyType>(100 * nRanks);
+        auto initialBoundaries = initialDomainSplits<KeyType>(nRanks, level);
+        leaves_                = computeSpanningTree<KeyType>(initialBoundaries);
+        tree_.resize(nNodes(leaves_));
+        updateInternalTree<KeyType>(leaves_, tree_.data());
+        nodeCounts_ = std::vector<unsigned>(nNodes(leaves_), bucketSize_ - 1);
 
         if constexpr (gpu) { reallocate(numRanks_ + 1, 1.0, d_boundaryKeys_, d_boundaryIndices_); }
     }
@@ -104,17 +105,17 @@ public:
         sequence<gpu>(o1.start, numPart, reorderFunctor.getBuf(), growthRate_);
         sortByKey<gpu>(keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_);
 
-        updateOctreeGlobal<gpu, KeyType>(keyView, bucketSize_, tree_, d_csTree_, nodeCounts_, d_nodeCounts_);
+        updateOctreeGlobal<gpu, KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_, d_nodeCounts_);
         if (firstCall_)
         {
             firstCall_ = false;
-            while (
-                !updateOctreeGlobal<gpu, KeyType>(keyView, bucketSize_, tree_, d_csTree_, nodeCounts_, d_nodeCounts_))
+            while (!updateOctreeGlobal<gpu, KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
+                                                     d_nodeCounts_))
                 ;
         }
 
-        auto newAssignment = makeSfcAssignment(numRanks_, nodeCounts_, tree_.treeLeaves().data());
-        limitBoundaryShifts<KeyType>(assignment_, newAssignment, tree_.treeLeaves(), nodeCounts_);
+        auto newAssignment = makeSfcAssignment(numRanks_, nodeCounts_, leaves_.data());
+        limitBoundaryShifts<KeyType>(assignment_, newAssignment, leaves_, nodeCounts_);
         assignment_ = std::move(newAssignment);
 
         if constexpr (gpu)
@@ -201,7 +202,7 @@ public:
     std::span<const KeyType> treeLeaves() const
     {
         if (gpu) { return {rawPtr(d_csTree_), d_csTree_.size()}; }
-        else { return tree_.treeLeaves(); }
+        else { return leaves_; }
     }
 
     //! @brief read only visibility of the global octree leaf counts to the outside
@@ -217,7 +218,7 @@ public:
      */
     OctreeView<const KeyType> octree() const
     {
-        auto treeData   = tree_.cdata();
+        auto treeData   = tree_.data();
         treeData.leaves = treeLeaves().data();
         return treeData;
     }
@@ -261,7 +262,8 @@ private:
     AccVector<unsigned> d_nodeCounts_;
 
     //! @brief the fully linked octree
-    Octree<KeyType> tree_;
+    OctreeData<KeyType, CpuTag> tree_;
+    std::vector<KeyType> leaves_;
     AccVector<KeyType> d_csTree_;
 
     bool firstCall_{true};
