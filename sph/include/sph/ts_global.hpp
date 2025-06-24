@@ -36,36 +36,42 @@
 #include <vector>
 #include <mpi.h>
 
+#include "acceleration_timestep_gpu.hpp"
 #include "cstone/primitives/mpi_wrappers.hpp"
-#include "cstone/primitives/primitives_gpu.h"
+#include "cstone/tree/definitions.h"
+#include "cstone/util/array.hpp"
 #include "kernels.hpp"
 
 namespace sph
 {
 
 //! @brief limit time-step based on accelerations when gravity is enabled
+//! Computes etaAcc * min(sqrt(h[i] / norm(a[i])))
 template<class Dataset>
 auto accelerationTimestep(size_t first, size_t last, const Dataset& d)
 {
     using T = typename Dataset::RealType;
+    //    using HType = decltype(d.h)::value_type;
+    if (last <= first) return std::numeric_limits<T>::infinity();
 
-    T maxAccSq = 0.0;
+    //! @brief minimum value of all {h_i^2 / a_i^2}
+    T minH2_A2 = std::numeric_limits<T>::infinity();
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        maxAccSq = cstone::maxNormSquareGpu(rawPtr(d.devData.ax) + first, rawPtr(d.devData.ay) + first,
-                                            rawPtr(d.devData.az) + first, last - first);
+        minH2_A2 = accelerationTimestepGPU(first, last, rawPtr(d.devData.ax), rawPtr(d.devData.ay),
+                                            rawPtr(d.devData.az), rawPtr(d.devData.h));
     }
     else
     {
-#pragma omp parallel for reduction(max : maxAccSq)
+#pragma omp parallel for reduction(min : minH2_A2)
         for (size_t i = first; i < last; ++i)
         {
-            cstone::Vec3<T> X{d.ax[i], d.ay[i], d.az[i]};
-            maxAccSq = std::max(norm2(X), maxAccSq);
+            cstone::Vec3<T> A{d.ax[i], d.ay[i], d.az[i]};
+            minH2_A2 = std::min(minH2_A2, d.h[i] * d.h[i] / norm2(A));
         }
     }
 
-    return d.etaAcc * std::sqrt(d.eps / std::sqrt(maxAccSq));
+    return d.etaAcc * std::pow(minH2_A2, 0.25);
 }
 
 //! @brief limit time-step based on divergence of velocity, this is called in the propagator when Divv is available
