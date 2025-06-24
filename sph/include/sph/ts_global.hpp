@@ -51,7 +51,6 @@ template<class Dataset>
 auto accelerationTimestep(size_t first, size_t last, const Dataset& d)
 {
     using T = typename Dataset::RealType;
-    //    using HType = decltype(d.h)::value_type;
     if (last <= first) return std::numeric_limits<T>::infinity();
 
     //! @brief minimum value of all {h_i^2 / a_i^2}
@@ -59,7 +58,7 @@ auto accelerationTimestep(size_t first, size_t last, const Dataset& d)
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         minH2_A2 = accelerationTimestepGPU(first, last, rawPtr(d.devData.ax), rawPtr(d.devData.ay),
-                                            rawPtr(d.devData.az), rawPtr(d.devData.h));
+                                           rawPtr(d.devData.az), rawPtr(d.devData.h));
     }
     else
     {
