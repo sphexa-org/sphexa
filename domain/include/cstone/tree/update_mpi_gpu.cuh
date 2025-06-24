@@ -40,24 +40,31 @@ namespace cstone
 template<class KeyType, class DevKeyVec, class DevCountVec>
 bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
                            unsigned bucketSize,
-                           Octree<KeyType>& tree,
+                           OctreeData<KeyType, CpuTag>& tree,
+                           std::vector<KeyType>& leaves,
                            DevKeyVec& d_csTree,
                            std::vector<unsigned>& counts,
                            DevCountVec& d_countsBuf)
 {
     unsigned maxCount = std::numeric_limits<unsigned>::max();
-    bool converged    = tree.rebalance(bucketSize, counts);
+    bool converged =
+        rebalanceDecision(leaves.data(), counts.data(), nNodes(leaves), bucketSize, tree.childOffsets.data());
+    rebalanceTree(leaves, tree.prefixes, tree.childOffsets.data());
+    swap(leaves, tree.prefixes);
 
-    counts.resize(tree.numLeafNodes());
-    reallocate(d_csTree, tree.numLeafNodes() + 1, 1.01);
-    reallocate(d_countsBuf, 2 * tree.numLeafNodes(), 1.01);
+    tree.resize(nNodes(leaves));
+    updateInternalTree<KeyType>(leaves, tree.data());
 
-    size_t numLeafNodes = tree.numLeafNodes();
+    counts.resize(tree.numLeafNodes);
+    reallocate(d_csTree, tree.numLeafNodes + 1, 1.01);
+    reallocate(d_countsBuf, 2 * tree.numLeafNodes, 1.01);
+
+    size_t numLeafNodes = tree.numLeafNodes;
     auto [d_counts, d_countsRed] =
         util::packAllocBuffer(d_countsBuf, util::TypeList<unsigned, unsigned>{}, {numLeafNodes, numLeafNodes}, 128);
 
-    memcpyH2D(tree.treeLeaves().data(), d_csTree.size(), d_csTree.data());
-    computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), tree.numLeafNodes(), keys, maxCount, true);
+    memcpyH2D(leaves.data(), d_csTree.size(), d_csTree.data());
+    computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys, maxCount, true);
 
     syncGpu();
     mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, MPI_COMM_WORLD);
@@ -73,13 +80,14 @@ bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
 template<bool useGpu, class KeyType, class DevKeyVec, class DevCountVec>
 bool updateOctreeGlobal(std::span<const KeyType> keys,
                         unsigned bucketSize,
-                        Octree<KeyType>& tree,
+                        OctreeData<KeyType, CpuTag>& tree,
+                        std::vector<KeyType>& leaves,
                         DevKeyVec& d_csTree,
                         std::vector<unsigned>& counts,
                         DevCountVec& d_counts)
 {
-    if constexpr (useGpu) { return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, counts, d_counts); }
-    else { return updateOctreeGlobal(keys, bucketSize, tree, counts); }
+    if constexpr (useGpu) { return updateOctreeGlobalGpu(keys, bucketSize, tree, leaves, d_csTree, counts, d_counts); }
+    else { return updateOctreeGlobal(keys, bucketSize, tree, leaves, counts); }
 }
 
 } // namespace cstone

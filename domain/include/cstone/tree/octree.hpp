@@ -393,14 +393,14 @@ public:
     {
         return {numLeafNodes_,      numInternalNodes_,      levelRange_.back(),
                 prefixes_.data(),   childOffsets_.data(),   parents_.data(),
-                levelRange_.data(), nullptr, internalToLeaf_.data(), leafToInternal_.data()};
+                levelRange_.data(), nullptr, internalToLeaf_.data(), leafToInternal_.data(), nullptr};
     }
 
     OctreeView<const KeyType> cdata() const
     {
         return {numLeafNodes_,      numInternalNodes_,      levelRange_.back(),
                 prefixes_.data(),   childOffsets_.data(),   parents_.data(),
-                levelRange_.data(), nullptr, internalToLeaf_.data(), leafToInternal_.data()};
+                levelRange_.data(), nullptr, internalToLeaf_.data(), leafToInternal_.data(), nullptr};
     }
 
     //! @brief return a const view of the cstone leaf array
