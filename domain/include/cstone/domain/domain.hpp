@@ -182,7 +182,7 @@ public:
         gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0, std::tie(h),
                      util::reverse(scratch));
 
-        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), 1.0 / theta_);
+        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octreeHost(), box(), 1.0 / theta_);
         float invThetaEff      = invThetaMinMac(theta_);
 
         if (firstCall_)
@@ -228,7 +228,7 @@ public:
                      std::tie(x, y, z, h, m), util::reverse(scratch));
 
         float invThetaEff      = invThetaMinToVec(theta_);
-        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), invThetaEff);
+        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octreeHost(), box(), invThetaEff);
 
         if (firstCall_)
         {
