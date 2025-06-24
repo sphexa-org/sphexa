@@ -391,7 +391,7 @@ public:
 
         counts_.resize(tree_.numNodes);
         scatter(leafToInternal(tree_), leafCounts_.data(), counts_.data());
-        upsweep(tree_.levelRange, tree_.childOffsets, counts_.data(), NodeCount<unsigned>{});
+        upsweep(tree_.levelRange, tree_.childOffsets.data(), counts_.data(), NodeCount<unsigned>{});
 
         return converged;
     }

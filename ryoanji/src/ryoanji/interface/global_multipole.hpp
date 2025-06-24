@@ -25,33 +25,29 @@ namespace ryoanji
 
 template<class Tc, class Tm, class Tf, class KeyType, class MType>
 void computeGlobalMultipoles(const Tc* x, const Tc* y, const Tc* z, const Tm* m, cstone::LocalIndex numParticles,
-                             const cstone::Octree<KeyType>&                            globalOctree,
+                             cstone::OctreeView<const KeyType>                         gOctree,
                              const cstone::FocusedOctree<KeyType, Tf, cstone::CpuTag>& focusTree,
                              const cstone::LocalIndex* layout, MType* multipoles)
 {
-    auto octree        = focusTree.octreeViewAcc();
+    auto let           = focusTree.octreeViewAcc(); // locally essential octree
     auto centers       = focusTree.expansionCentersAcc();
     auto globalCenters = focusTree.globalExpansionCenters();
 
-    std::span multipoleSpan{multipoles, size_t(octree.numNodes)};
-    ryoanji::computeLeafMultipoles(x, y, z, m,
-                                   {octree.leafToInternal + octree.numInternalNodes, size_t(octree.numLeafNodes)},
-                                   layout, centers.data(), multipoles);
+    std::span multipoleSpan{multipoles, size_t(let.numNodes)};
+    ryoanji::computeLeafMultipoles(x, y, z, m, let.leafToInternalSpan(), layout, centers.data(), multipoles);
 
     //! first upsweep with local data
-    ryoanji::upsweepMultipoles({octree.levelRange, cstone::maxTreeLevel<KeyType>{} + 2}, octree.childOffsets,
-                               centers.data(), multipoles);
+    ryoanji::upsweepMultipoles(let.levelRangeSpan(), let.childOffsets, centers.data(), multipoles);
 
     auto ryUpsweep = [](auto levelRange, auto childOffsets, auto M, auto centers)
-    { ryoanji::upsweepMultipoles(levelRange, childOffsets.data(), centers, M); };
+    { ryoanji::upsweepMultipoles(levelRange, childOffsets, centers, M); };
 
     std::vector<int, util::DefaultInitAdaptor<int>> scratch;
-    cstone::globalFocusExchange(globalOctree, focusTree, multipoleSpan, scratch, ryUpsweep, globalCenters.data());
+    cstone::globalFocusExchange(gOctree, focusTree, multipoleSpan, scratch, ryUpsweep, globalCenters.data());
     focusTree.peerExchange(multipoleSpan, static_cast<int>(cstone::P2pTags::focusPeerCenters) + 1, scratch);
 
     //! second upsweep with leaf data from peer and global ranks in place
-    ryoanji::upsweepMultipoles({octree.levelRange, cstone::maxTreeLevel<KeyType>{} + 2}, octree.childOffsets,
-                               centers.data(), multipoles);
+    ryoanji::upsweepMultipoles(let.levelRangeSpan(), let.childOffsets, centers.data(), multipoles);
 }
 
 } // namespace ryoanji

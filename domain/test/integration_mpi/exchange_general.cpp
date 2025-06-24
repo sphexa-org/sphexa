@@ -56,8 +56,10 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
 
     auto [tree, counts] = computeOctree<KeyType>(coords.particleKeys(), bucketSize);
 
-    Octree<KeyType> domainTree;
-    domainTree.update(tree.data(), nNodes(tree));
+    Octree<KeyType> domainTree_;
+    domainTree_.update(tree.data(), nNodes(tree));
+    auto domainTree   = domainTree_.cdata();
+    domainTree.leaves = tree.data();
 
     auto assignment = makeSfcAssignment(numRanks, counts, tree.data());
 
@@ -102,8 +104,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
         }
     }
 
-    upsweep({octree.levelRange, maxTreeLevel<KeyType>{} + 2}, {octree.childOffsets, size_t(octree.numNodes)},
-            testCounts.data(), NodeCount<unsigned>{});
+    upsweep(octree.levelRangeSpan(), octree.childOffsets, testCounts.data(), NodeCount<unsigned>{});
 
     std::vector<int> scratch;
     focusTree.template peerExchange<unsigned>(testCounts, static_cast<int>(P2pTags::focusPeerCounts) + 2, scratch);
@@ -112,8 +113,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
     { upsweep(levelRange, childOffsets, M, NodeCount<unsigned>{}); };
     globalFocusExchange<unsigned>(domainTree, focusTree, testCounts, scratch, upsweepFunction);
 
-    upsweep({octree.levelRange, maxTreeLevel<KeyType>{} + 2}, {octree.childOffsets, size_t(octree.numNodes)},
-            testCounts.data(), NodeCount<unsigned>{});
+    upsweep(octree.levelRangeSpan(), octree.childOffsets, testCounts.data(), NodeCount<unsigned>{});
 
     {
         for (size_t i = 0; i < testCounts.size(); ++i)
@@ -163,8 +163,10 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks)
 
     auto [tree, counts] = computeOctree(std::span(coords.particleKeys()), bucketSize);
 
-    Octree<KeyType> domainTree;
-    domainTree.update(tree.data(), nNodes(tree));
+    Octree<KeyType> domainTree_;
+    domainTree_.update(tree.data(), nNodes(tree));
+    auto domainTree   = domainTree_.cdata();
+    domainTree.leaves = tree.data();
 
     auto assignment = makeSfcAssignment(numRanks, counts, tree.data());
 

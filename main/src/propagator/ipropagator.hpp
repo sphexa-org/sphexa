@@ -104,7 +104,7 @@ public:
         const auto& d   = simData.hydro;
         const auto& box = domain.box();
 
-        auto nodeCount          = domain.globalTree().numLeafNodes();
+        auto nodeCount          = domain.globalTree().numLeafNodes;
         auto particleCount      = domain.nParticles();
         auto haloCount          = domain.nParticlesWithHalos() - domain.nParticles();
         auto totalNeighbors     = d.totalNeighbors;

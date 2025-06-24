@@ -40,11 +40,11 @@ public:
     /*! @brief compute multipole moments with an upsweep from leaves to the tree root
      *
      * @param[in]  x, y, z, m    source particles in SFC order as referenced by layout, on GPU
-     * @param[in]  globalOctree  global octree replicated across nodes on GPU
+     * @param[in]  gOctree       global octree replicated across nodes on GPU (fully traversible, internal in leaf part)
      * @param[in]  focusTree     locally essential octree focused on local domain
      * @param[in]  layout        for each leaf cell, stores the index of the first source body in cell, on GPU
      */
-    void upsweep(const Tc* x, const Tc* y, const Tc* z, const Tm* m, const cstone::Octree<KeyType>& globalOctree,
+    void upsweep(const Tc* x, const Tc* y, const Tc* z, const Tm* m, cstone::OctreeView<const KeyType> gOctree,
                  const cstone::FocusedOctree<KeyType, Tf, cstone::GpuTag>& focusTree, const cstone::LocalIndex* layout);
 
     /*! @brief compute accelerations on target particles, assuming sources = targets

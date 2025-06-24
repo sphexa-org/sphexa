@@ -103,7 +103,7 @@ void randomGaussianAssignment(int rank, int numRanks)
     ASSERT_EQ(domainCpu.startIndex(), domainGpu.startIndex());
     ASSERT_EQ(domainCpu.endIndex(), domainGpu.endIndex());
     EXPECT_EQ(domainCpu.nParticlesWithHalos(), domainGpu.nParticlesWithHalos());
-    EXPECT_EQ(domainCpu.globalTree().treeLeaves().size(), domainGpu.globalTree().treeLeaves().size());
+    EXPECT_EQ(domainCpu.globalTree().numNodes, domainGpu.globalTree().numNodes);
     EXPECT_EQ(d_x.size(), x.size());
 
     {
