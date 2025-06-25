@@ -27,7 +27,7 @@ struct SuperclusterInfo
     //! @brief number of neighbor clusters
     unsigned neighborsCount;
     //! @brief start index in the neighbor data arra.
-    unsigned dataIndex;
+    std::size_t dataIndex;
 
     //! @brief less-than operator for sorting superclusters by descending neighbor count (for load balancing)
     constexpr bool operator<(const SuperclusterInfo& other) const { return neighborsCount > other.neighborsCount; }

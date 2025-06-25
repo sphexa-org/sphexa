@@ -855,7 +855,7 @@ __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& shar
                                                   const std::uint32_t* const __restrict__ jClusters,
                                                   const std::uint32_t* const __restrict__ masks,
                                                   std::uint32_t* const __restrict__ neighborData,
-                                                  const unsigned neighborDataSize,
+                                                  const std::size_t neighborDataSize,
                                                   SuperclusterInfo& info,
                                                   GlobalBuildData* __restrict__ globalBuildData)
 {
@@ -880,7 +880,7 @@ __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& shar
 
     for (unsigned n = laneIdx; n < mSize; n += GpuConfig::warpSize)
     {
-        const auto index = info.dataIndex + n;
+        const std::size_t index = info.dataIndex + n;
         if (index >= neighborDataSize)
         {
             globalBuildData->status = BuildStatus::neighbor_data_overflow;
@@ -891,7 +891,7 @@ __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& shar
 
     for (unsigned n = laneIdx; n < nbSize; n += GpuConfig::warpSize)
     {
-        const auto index = info.dataIndex + mSize + n;
+        const std::size_t index = info.dataIndex + mSize + n;
         if (index >= neighborDataSize)
         {
             globalBuildData->status = BuildStatus::neighbor_data_overflow;

@@ -300,8 +300,8 @@ struct GpuSuperclusterNbListNeighborhood
 
         // first main data array: a hugely oversized array to store neighbor indices is allocated in *virtual* memory,
         // as its final size is unknown a priori; in *physical* memory, only the required pages will be allocated
-        std::size_t neighborDataVirtualSize = upperBoundBytesPerParticle * totalBodies / sizeof(std::uint32_t);
-        auto neighborData                   = util::deviceAllocVirtual<std::uint32_t[]>(neighborDataVirtualSize);
+        const std::size_t neighborDataVirtualSize = upperBoundBytesPerParticle * totalBodies / sizeof(std::uint32_t);
+        auto neighborData                         = util::deviceAllocVirtual<std::uint32_t[]>(neighborDataVirtualSize);
 
         // second main data array: storing some data for each supercluster
         auto superclusterInfo = initSuperclusterInfo(firstISupercluster, numISuperclusters);
