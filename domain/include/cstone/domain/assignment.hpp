@@ -235,7 +235,7 @@ public:
      */
     OctreeView<const KeyType> octree() const
     {
-        auto treeData   = tree_.data();
+        auto treeData   = tree_.cdata();
         treeData.leaves = treeLeaves().data();
         return treeData;
     }
@@ -244,7 +244,7 @@ public:
     {
         if constexpr (gpu)
         {
-            auto treeData   = hostTree_.data();
+            auto treeData   = hostTree_.cdata();
             treeData.leaves = leaves_.data();
             return treeData;
         }

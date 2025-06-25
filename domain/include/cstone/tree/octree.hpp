@@ -311,7 +311,7 @@ public:
                 rawPtr(internalToLeaf), rawPtr(leafToInternal), nullptr};
     }
 
-    OctreeView<const KeyType> data() const
+    OctreeView<const KeyType> cdata() const
     {
         return {numLeafNodes,           numInternalNodes,      numNodes,           rawPtr(prefixes),
                 rawPtr(childOffsets),   rawPtr(parents),       rawPtr(levelRange), rawPtr(d_levelRange),
@@ -344,6 +344,7 @@ void updateInternalTree(std::span<const KeyType> leaves, OctreeView<KeyType> o)
     assert(size_t(o.numLeafNodes) == nNodes(leaves));
     buildOctreeCpu(leaves.data(), o.numLeafNodes, o.numInternalNodes, o.prefixes, o.childOffsets, o.parents,
                    o.levelRange, o.internalToLeaf, o.leafToInternal);
+    std::copy(o.levelRangeSpan().begin(), o.levelRangeSpan().end(), o.d_levelRange);
 }
 
 template<class KeyType, class Accelerator>

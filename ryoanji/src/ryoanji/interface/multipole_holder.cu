@@ -64,38 +64,31 @@ public:
         computeLeafMultipoles(x, y, z, m, octree_.leafToInternal + octree_.numInternalNodes, octree_.numLeafNodes,
                               layout_, centers_, rawPtr(multipoles_));
 
-        //! first upsweep with local data, start at lowest possible level - 1, lowest level can only be leaves
-        int numLevels = cstone::maxTreeLevel<KeyType>{};
-        for (int level = numLevels - 1; level >= 0; level--)
+        auto upsweepGpu = [](auto levelRange, auto childOffsets, auto M, auto centers)
         {
-            int numCellsLevel = octree_.levelRange[level + 1] - octree_.levelRange[level];
-            if (numCellsLevel)
+            int numLevels = levelRange.size() - 2;
+            for (int level = numLevels - 1; level >= 0; level--)
             {
-                upsweepMultipoles(octree_.levelRange[level], octree_.levelRange[level + 1], octree_.childOffsets,
-                                  centers_, rawPtr(multipoles_));
+                int numCellsLevel = levelRange[level + 1] - levelRange[level];
+                if (numCellsLevel)
+                {
+                    upsweepMultipoles(levelRange[level], levelRange[level + 1], childOffsets, centers, M);
+                }
             }
-        }
+        };
 
-        auto ryUpsweep = [](auto levelRange, auto childOffsets, auto M, auto centers)
-        { upsweepMultipoles(levelRange, childOffsets, centers, M); };
+        //! first upsweep with local data, start at lowest possible level - 1, lowest level can only be leaves
+        upsweepGpu(octree_.levelRangeSpan(), octree_.childOffsets, multipoles_.data(), centers_);
 
         std::span d_multipoleSpan{rawPtr(multipoles_), size_t(octree_.numNodes)};
-        cstone::globalFocusExchange(gOctree, focusTree, d_multipoleSpan, traversalStack_, ryUpsweep,
+        cstone::globalFocusExchange(gOctree, focusTree, d_multipoleSpan, traversalStack_, upsweepGpu,
                                     globalCenters.data());
 
         focusTree.peerExchangeGpu(d_multipoleSpan, static_cast<int>(cstone::P2pTags::focusPeerCenters) + 1,
                                   traversalStack_);
 
         //! second upsweep with leaf data from peer and global ranks in place
-        for (int level = numLevels - 1; level >= 0; level--)
-        {
-            int numCellsLevel = octree_.levelRange[level + 1] - octree_.levelRange[level];
-            if (numCellsLevel)
-            {
-                upsweepMultipoles(octree_.levelRange[level], octree_.levelRange[level + 1], octree_.childOffsets, centers_,
-                                  rawPtr(multipoles_));
-            }
-        }
+        upsweepGpu(octree_.levelRangeSpan(), octree_.childOffsets, multipoles_.data(), centers_);
     }
 
     float compute(GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m, const Th* h, Tc G, int numShells,
