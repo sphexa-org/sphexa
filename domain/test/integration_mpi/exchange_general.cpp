@@ -56,8 +56,9 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
 
     auto [tree, counts] = computeOctree<KeyType>(coords.particleKeys(), bucketSize);
 
-    Octree<KeyType> domainTree_;
-    domainTree_.update(tree.data(), nNodes(tree));
+    OctreeData<KeyType, CpuTag> domainTree_;
+    domainTree_.resize(nNodes(tree));
+    updateInternalTree<KeyType>(tree, domainTree_.data());
     auto domainTree   = domainTree_.cdata();
     domainTree.leaves = tree.data();
 
@@ -163,8 +164,9 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks)
 
     auto [tree, counts] = computeOctree(std::span(coords.particleKeys()), bucketSize);
 
-    Octree<KeyType> domainTree_;
-    domainTree_.update(tree.data(), nNodes(tree));
+    OctreeData<KeyType, CpuTag> domainTree_;
+    domainTree_.resize(nNodes(tree));
+    updateInternalTree<KeyType>(tree, domainTree_.data());
     auto domainTree   = domainTree_.cdata();
     domainTree.leaves = tree.data();
 
