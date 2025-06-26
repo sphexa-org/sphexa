@@ -5,7 +5,6 @@
 #include "cstone/tree/octree.hpp"
 #include "cstone/tree/definitions.h"
 #include "sph/timestep.h"
-#include "helmholtz_eos.hpp"
 
 namespace sph
 {
@@ -57,12 +56,6 @@ template<class Th, class Tt>
 extern void computePolytropicEOS(size_t firstParticle, size_t lastParticle, Tt polytropic_const, Tt polytropic_index,
                                  Th* rho, Th* p, const Th* m, const Th* kx, const Th* xm, const Th* gradh, Th* prho,
                                  Tt* temp, Th* c);
-
-template<typename Th, typename Tt>
-extern void computeHelmholtzEOS(size_t first, size_t last, sph::helmholtz_constants::Helmholtz_EOS* helmEOS,
-                                const Tt* temp, const Tt* abar, const Tt* zbar, const Th* m,
-                                const Th* kx, const Th* xm, Th* c, Th* p, Th* cv, Tt* u);
-
 
 template<class Dataset>
 extern void computeIdealGasEOS_HydroStd(size_t firstParticle, size_t lastParticle, Dataset& d);

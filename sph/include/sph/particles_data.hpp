@@ -125,8 +125,6 @@ public:
     Tmass muiConst{10.0};
     //! @brief constant sound speed for isothermal EOS
     HydroType soundSpeedConst{1.0};
-    //! @brief object that holds Helmholtz EOS info
-    sph::helmholtz_constants::Helmholtz_EOS* helmEOS;
 
     // AV switches floor and ceiling
     HydroType alphamin{0.05};
@@ -388,12 +386,6 @@ private:
         wh      = sph::tabulateFunction<H, lt::kTableSize>(sph::getSphKernel(kernelChoice, sincIndex), 0, 2);
         whd     = sph::tabulateFunction<H, lt::kTableSize>(sph::getSphKernelDerivative(kernelChoice, sincIndex), 0, 2);
         devData.uploadTables(wh, whd);
-
-        if (eosChoice == sph::EosType::helmholtz)
-        {
-            helmEOS = new sph::helmholtz_constants::Helmholtz_EOS();
-            devData.uploadHelmEOS(helmEOS);
-        }
     }
 
     //! @brief buffer growth factor when reallocating

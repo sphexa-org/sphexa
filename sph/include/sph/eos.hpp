@@ -95,8 +95,8 @@ HOST_DEVICE_FUN auto polytropicEOS(T1 K_poly, T2 gamma_poly, T3 rho)
  *
  */
 template<typename T1, typename T2>
-HOST_DEVICE_FUN auto helmholtzEOS(sph::helmholtz_constants::Helmholtz_EOS* helmEOS, const T1 temp, T2 rho, const T1 abar,
-                                  const T1 zbar)
+HOST_DEVICE_FUN auto helmholtzEOS(helmholtz_constants::Helmholtz_EOS* helmEOS, const T1 temp, const T2 rho, T1 abar,
+                                  T1 zbar)
 {
     using T = std::common_type_t<T1, T2>;
     // coefficients
@@ -113,7 +113,7 @@ HOST_DEVICE_FUN auto helmholtzEOS(sph::helmholtz_constants::Helmholtz_EOS* helmE
     helmEOS->getTableIndices(iat, jat, temp, rho, abar, zbar);
 
     T ytot1 = 1.0 / abar;
-    T ye    = std::max((T)1e-16, ytot1 * zbar);
+    T ye    = std::max<T>((T)1e-16, ytot1 * zbar);
     T din   = ye * rho;
 
     // initialize (checked)
@@ -218,12 +218,10 @@ HOST_DEVICE_FUN auto helmholtzEOS(sph::helmholtz_constants::Helmholtz_EOS* helmE
     fi[35] = helmEOS->fddtt[iat + 1][jat + 1];
 
     // various differences (checked and updated with djat,diat)
-    int jmax = JMAX;
-    int imax = IMAX;
-    int djat = std::min(jmax - 2, jat);
-    int diat = std::min(imax - 2, iat);
-    T   xt   = max((temp - helmEOS->t_[jat]) * helmEOS->dti_sav[djat], 0.);
-    T   xd   = max((din - helmEOS->d[iat]) * helmEOS->ddi_sav[diat], 0.);
+    int djat = std::min(JMAX - 2, jat);
+    int diat = std::min(IMAX - 2, iat);
+    T   xt   = std::max<T>((temp - helmEOS->t_[jat]) * helmEOS->dti_sav[djat], 0.);
+    T   xd   = std::max<T>((din - helmEOS->d[iat]) * helmEOS->ddi_sav[diat], 0.);
     T   mxt  = 1. - xt;
     T   mxd  = 1. - xd;
 
@@ -343,7 +341,7 @@ HOST_DEVICE_FUN auto helmholtzEOS(sph::helmholtz_constants::Helmholtz_EOS* helmE
     fi[15] = helmEOS->dpdfdt[iat + 1][jat + 1];
 
     T dpepdd = helmEOS->h3(fi, si0t, si1t, si0mt, si1mt, si0d, si1d, si0md, si1md);
-    dpepdd   = max(ye * dpepdd, (T)1.e-30);
+    dpepdd   = std::max<T>(ye * dpepdd, (T)1.e-30);
 
     // move table values into coefficient table
     fi[0]  = helmEOS->ef[iat + 0][jat + 0];
@@ -400,7 +398,7 @@ HOST_DEVICE_FUN auto helmholtzEOS(sph::helmholtz_constants::Helmholtz_EOS* helmE
 
     // derivative with respect to  density
     x = helmEOS->h3(fi, si0t, si1t, si0mt, si1mt, dsi0d, dsi1d, dsi0md, dsi1md);
-    x = max(x, (T)1e-30);
+    x = std::max<T>(x, (T)1e-30);
     // T dxnedd = ye * x; // unused
 
     // derivative with respect to temperature (unused)
@@ -659,8 +657,7 @@ HOST_DEVICE_FUN auto helmholtzEOS(sph::helmholtz_constants::Helmholtz_EOS* helmE
     p     = pres;
     u     = ener;
 
-    // return tie(c, p, cv, u);
-    return util::tuple<T,T,T,T>(c, p, cv, u);
+    return std::tie(c, p, cv, u);
 }
 
 } // namespace sph

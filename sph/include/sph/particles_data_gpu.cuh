@@ -42,7 +42,6 @@
 
 #include "table_lookup.hpp"
 #include "types.hpp"
-#include "helmholtz_eos.hpp"
 
 namespace sphexa
 {
@@ -108,9 +107,6 @@ public:
 
     //! @brief SPH interpolation kernel lookup tables
     DevVector<HydroType> wh, whd;
-
-    //! @brief Helmholtz EOS lookup table and constants
-    sph::helmholtz_constants::Helmholtz_EOS *devHelmEOS;
 
     DevVector<cstone::LocalIndex> traversalStack;
 
@@ -204,12 +200,6 @@ public:
     {
         wh  = DevVector<HydroType>(whTable.begin(), whTable.end());
         whd = DevVector<HydroType>(whdTable.begin(), whdTable.end());
-    }
-
-    void uploadHelmEOS(const sph::helmholtz_constants::Helmholtz_EOS* helmEOS)
-    {
-        cudaMalloc(&devHelmEOS, sizeof(helmEOS));
-        cudaMemcpy(devHelmEOS, helmEOS, sizeof(helmEOS), cudaMemcpyHostToDevice);
     }
 
     ~DeviceParticlesData()
