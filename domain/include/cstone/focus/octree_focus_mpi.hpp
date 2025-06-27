@@ -296,7 +296,6 @@ public:
             auto lastGlobIdx  = lowerBoundGpu(gLeaves.data(), gLeaves.data() + gLeaves.size(), prevFocusEnd);
             std::span globLeavesFoc{gLeaves.data() + firstGlobIdx, lastGlobIdx - firstGlobIdx + 1};
 
-            //DeviceVector<TreeNodeIndex> gmap(lastGlobIdx - firstGlobIdx);
             auto gmap = gmapScratch.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx);
             locateNodesGpu(globLeavesFoc.data(), globLeavesFoc.data() + globLeavesFoc.size(),
                            octreeAcc_.prefixes.data(), octreeAcc_.d_levelRange.data(), gmap.data());
@@ -312,7 +311,6 @@ public:
             const KeyType* nodeKeys         = rawPtr(octreeAcc_.prefixes);
             const TreeNodeIndex* levelRange = rawPtr(octreeAcc_.levelRange);
 
-            //std::vector<TreeNodeIndex> gmap(lastGlobIdx - firstGlobIdx);
             auto gmap = gmapScratch.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx);
 #pragma omp parallel for schedule(static)
             for (TreeNodeIndex i = 0; i < globLeavesFoc.size() - 1; ++i)
@@ -330,38 +328,43 @@ public:
      * @param[in]  globalLevelRange  tree node index ranges per level for @p globalNodeKeys
      * @param[in]  globalQuantities  tree cell properties for each cell in @p globalTree include internal cells
      * @param[out] localQuantities   local tree cell properties
+     * @param[-]   letIdxBuf         temp buffer, size = octreeAcc_.numLeafNodes - assignment_[myRank_].count()
+     *                               size is an upper bound, fewer elements may be used
+     * @param[-]   letToGlobBuf      temp buffer, size = letIdx.size()
      */
     template<class T>
     void extractGlobal(const KeyType* globalNodeKeys,
                        const TreeNodeIndex* globalLevelRange,
                        std::span<const T> globalQuantities,
-                       std::span<T> localQuantities) const
+                       std::span<T> localQuantities,
+                       TreeNodeIndex* letIdxBuf,
+                       TreeNodeIndex* letToGlobBuf) const
     {
         //! list of leaf cell indices in the locally focused tree that need global information
         auto idxFromGlob                = enumerateRanges(invertRanges(0, assignment_, octreeAcc_.numLeafNodes));
         const TreeNodeIndex* toInternal = leafToInternal(octreeAcc_).data();
+        std::span letIdx{letIdxBuf, idxFromGlob.size()};
+        std::span letToGlob{letToGlobBuf, idxFromGlob.size()};
         if constexpr (HaveGpu<Accelerator>{})
         {
-            DeviceVector<TreeNodeIndex> d_idxFromGlob = idxFromGlob;
-            gatherGpu(d_idxFromGlob.data(), d_idxFromGlob.size(), toInternal, d_idxFromGlob.data());
+            memcpyH2D(idxFromGlob.data(), idxFromGlob.size(), letIdx.data());
+            gatherGpu(letIdx.data(), idxFromGlob.size(), toInternal, letIdx.data());
 
-            DeviceVector<TreeNodeIndex> gmap(d_idxFromGlob.size());
-            locateNodesGpu(octreeAcc_.prefixes.data(), d_idxFromGlob.data(), d_idxFromGlob.size(), globalNodeKeys,
-                           globalLevelRange, gmap.data());
-            gatherScatterGpu(gmap.data(), d_idxFromGlob.data(), d_idxFromGlob.size(), globalQuantities.data(),
+            locateNodesGpu(octreeAcc_.prefixes.data(), letIdx.data(), idxFromGlob.size(), globalNodeKeys,
+                           globalLevelRange, letToGlob.data());
+            gatherScatterGpu(letToGlob.data(), letIdx.data(), idxFromGlob.size(), globalQuantities.data(),
                              localQuantities.data());
         }
         else
         {
             gather<TreeNodeIndex>(idxFromGlob, toInternal, idxFromGlob.data());
-
-            std::vector<TreeNodeIndex> gmap(idxFromGlob.size());
 #pragma omp parallel for schedule(static)
             for (TreeNodeIndex i = 0; i < idxFromGlob.size(); ++i)
             {
-                gmap[i] = locateNode(octreeAcc_.prefixes[idxFromGlob[i]], globalNodeKeys, globalLevelRange);
+                letToGlob[i] = locateNode(octreeAcc_.prefixes[idxFromGlob[i]], globalNodeKeys, globalLevelRange);
             }
-            gatherScatter<TreeNodeIndex>(gmap, idxFromGlob, globalQuantities.data(), localQuantities.data());
+            gatherScatter<TreeNodeIndex>(letToGlob, idxFromGlob, globalQuantities.data(), localQuantities.data());
+
         }
     }
 
@@ -448,9 +451,13 @@ public:
                     CombineSourceCenter<RealType>{});
         }
 
-        extractGlobal<SourceCenterType<RealType>>(gOctree.prefixes, gOctree.d_levelRange,
-                                                  {globalCentersAcc_.data(), globalCentersAcc_.size()},
-                                                  {centersAcc_.data(), centersAcc_.size()});
+        std::size_t numLetIdx    = octreeAcc_.numLeafNodes - assignment_[myRank_].count();
+        auto [letIdx, letToGlob] = util::packAllocBuffer(scratch1, util::TypeList<TreeNodeIndex, TreeNodeIndex>{},
+                                                         {numLetIdx, numLetIdx}, 128);
+
+        extractGlobal<SourceCenterType<RealType>>(
+            gOctree.prefixes, gOctree.d_levelRange, {globalCentersAcc_.data(), globalCentersAcc_.size()},
+            {centersAcc_.data(), centersAcc_.size()}, letIdx.data(), letToGlob.data());
 
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -828,10 +835,11 @@ void globalFocusExchange(OctreeView<const KeyType> gOctree,
     assert(gOctree.leaves != nullptr);
     static_assert(HaveGpu<Accelerator>{} == IsDeviceVector<Vector>{});
     std::size_t numGlobalLeaves = gOctree.numLeafNodes;
+    std::size_t numLetIdx       = focusTree.octreeViewAcc().numLeafNodes;
     auto s                      = scratch.size();
-    auto [globalLeafQ, globalQuantities, gmapScratch] =
-        util::packAllocBuffer(scratch, util::TypeList<Q, Q, TreeNodeIndex>{},
-                              {numGlobalLeaves, size_t(gOctree.numNodes), numGlobalLeaves}, 128);
+    auto [globalLeafQ, globalQuantities, gmapScratch, letIdx, letToGlob] =
+        util::packAllocBuffer(scratch, util::TypeList<Q, Q, TreeNodeIndex, TreeNodeIndex, TreeNodeIndex>{},
+                              {numGlobalLeaves, size_t(gOctree.numNodes), numGlobalLeaves, numLetIdx, numLetIdx}, 128);
     focusTree.template populateGlobal<Q>(gOctree.leafSpan(), quantities, globalLeafQ, gmapScratch);
 
     //! exchange global leaves
@@ -842,7 +850,8 @@ void globalFocusExchange(OctreeView<const KeyType> gOctree,
     upsweepFunction(gOctree.levelRangeSpan(), gOctree.childOffsets, globalQuantities.data(), upsweepArgs...);
 
     //! from the global tree, extract the part that the executing rank was missing
-    focusTree.template extractGlobal<Q>(gOctree.prefixes, gOctree.d_levelRange, globalQuantities, quantities);
+    focusTree.template extractGlobal<Q>(gOctree.prefixes, gOctree.d_levelRange, globalQuantities, quantities,
+                                        letIdx.data(), letToGlob.data());
     reallocate(scratch, s, 1.0);
 }
 
