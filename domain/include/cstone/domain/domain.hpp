@@ -542,6 +542,14 @@ private:
         auto focusTree       = focusTree_.treeLeaves();
         auto globalTree      = global_.treeLeaves();
 
+        std::vector<KeyType> globalTreeBackingBuffer;
+        if constexpr (cstone::HaveGpu<Accelerator>{})
+        {
+            globalTreeBackingBuffer.resize(globalTree.size());
+            memcpyD2H(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data());
+            globalTree = std::span(globalTreeBackingBuffer);
+        }
+
         TreeNodeIndex numFocusPeers    = 0;
         TreeNodeIndex numFocusTruePeer = 0;
         for (int i = 0; i < numRanks_; ++i)
@@ -553,7 +561,7 @@ private:
                 {
                     KeyType fnstart  = focusTree[fi];
                     KeyType fnend    = focusTree[fi + 1];
-                    TreeNodeIndex gi = findNodeAbove(globalTree, fnstart);
+                    TreeNodeIndex gi = findNodeAbove(globalTree.data(), globalTree.size(), fnstart);
                     if (!(gi < nNodes(globalTree) && globalTree[gi] == fnstart && globalTree[gi + 1] <= fnend))
                     {
                         numFocusTruePeer++;
@@ -562,7 +570,7 @@ private:
             }
         }
 
-        int numFlags = std::count(halos_.haloFlags().cbegin(), halos_.haloFlags().cend(), 1);
+        int numFlags = std::count(focusTree_.haloFlags().begin(), focusTree_.haloFlags().end(), 1);
         for (int i = 0; i < numRanks_; ++i)
         {
             if (i == myRank_)
@@ -570,7 +578,7 @@ private:
                 std::cout << "rank " << i << " " << assignedSize << " " << layout_.back()
                           << " focus h/true/peers/loc/tot: " << numFlags << "/" << numFocusTruePeer << "/"
                           << numFocusPeers << "/" << focusAssignment[myRank_].count() << "/"
-                          << halos_.haloFlags().size() << " peers: [" << peers.size() << "] ";
+                          << focusTree_.haloFlags().size() << " peers: [" << peers.size() << "] ";
                 if (numRanks_ <= 32)
                 {
                     for (auto r : peers)
