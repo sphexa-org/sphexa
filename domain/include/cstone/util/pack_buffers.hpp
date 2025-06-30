@@ -80,12 +80,13 @@ using PackType = std::conditional_t<sizeof(T) < sizeof(float), T, util::array<fl
  * to reduce the number of gather/scatter GPU kernel template instantiations.
  */
 template<int alignment, class... Arrays>
-auto packBufferPtrs(char* packedBufferBase, size_t arraySize, Arrays... arrays)
+auto packBufferPtrs(void* packedBufferBase, size_t arraySize, Arrays... arrays)
 {
     static_assert((... && std::is_pointer_v<Arrays>)&&"all arrays must be pointers");
     constexpr int numArrays = sizeof...(Arrays);
     constexpr auto indices  = util::makeIntegralTuple(std::make_index_sequence<numArrays>{});
 
+    auto* packedBufferBase_ = reinterpret_cast<char*>(packedBufferBase);
     const std::array<char*, numArrays> data{reinterpret_cast<char*>(arrays)...};
 
     auto arrayByteOffsets = computeByteOffsets(arraySize, alignment, arrays...);
@@ -96,11 +97,11 @@ auto packBufferPtrs(char* packedBufferBase, size_t arraySize, Arrays... arrays)
 
     TupleType ret;
 
-    auto packOneBuffer = [packedBufferBase, &data, &arrayByteOffsets, &ret](auto index)
+    auto packOneBuffer = [base = packedBufferBase_, &data, &arrayByteOffsets, &ret](auto index)
     {
         using ElementType = TypeListElement_t<index, Types>;
         auto* srcPtr      = reinterpret_cast<ElementType*>(data[index]);
-        auto* packedPtr   = reinterpret_cast<ElementType*>(packedBufferBase + arrayByteOffsets[index]);
+        auto* packedPtr   = reinterpret_cast<ElementType*>(base + arrayByteOffsets[index]);
 
         std::get<index>(ret) = util::array<ElementType*, 2>{srcPtr, packedPtr};
     };
