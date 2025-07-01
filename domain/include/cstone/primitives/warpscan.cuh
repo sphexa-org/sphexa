@@ -277,13 +277,18 @@ __device__ __forceinline__ int spreadSeg8(int val)
     return shflSync(val, laneIdx >> 3) + (laneIdx & 7);
 }
 
+// source: https://stackoverflow.com/a/72461459 CC BY-SA 4.0 by user timothygiraffe
 __device__ __forceinline__ float atomicMinFloat(float* addr, float value)
 {
-    float old;
-    old = (value >= 0) ? __int_as_float(atomicMin((int*)addr, __float_as_int(value)))
-                       : __uint_as_float(atomicMax((unsigned int*)addr, __float_as_uint(value)));
+    return !signbit(value) ? __int_as_float(atomicMin((int*)addr, __float_as_int(value)))
+                           : __uint_as_float(atomicMax((unsigned int*)addr, __float_as_uint(value)));
+}
 
-    return old;
+// source: https://stackoverflow.com/a/72461459 CC BY-SA 4.0 by user timothygiraffe
+__device__ __forceinline__ float atomicMaxFloat(float* addr, float value)
+{
+    return !signbit(value) ? __int_as_float(atomicMax((int*)addr, __float_as_int(value)))
+                           : __uint_as_float(atomicMin((unsigned int*)addr, __float_as_uint(value)));
 }
 
 } // namespace cstone
