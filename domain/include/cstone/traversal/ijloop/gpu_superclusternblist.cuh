@@ -308,7 +308,7 @@ struct GpuSuperclusterNbListNeighborhood
 
         // temporary data arrays, only used during build
         auto jClusterBboxes = computeJClusterBboxes<Config>(firstValidBody, totalBodies, x, y, z, h);
-        auto nodeRMax       = computeNodeRMax<Config>(tree, h);
+        auto nodeRMax       = computeNodeRMax<Config>(tree, h + firstValidBody);
         auto superclusterSplitMasks =
             computeSuperclusterSplitMasks<Config>(firstValidBody, groups, firstISupercluster, numISuperclusters);
 
