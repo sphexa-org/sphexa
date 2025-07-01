@@ -136,7 +136,9 @@ computeSuperclusterSplitMasks(const LocalIndex firstValidBody,
                               const LocalIndex firstISupercluster,
                               const LocalIndex numISuperclusters)
 {
-    auto superclusterSplitMasks   = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(numISuperclusters);
+    auto superclusterSplitMasks = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(numISuperclusters);
+    checkGpuErrors(cudaMemsetAsync(superclusterSplitMasks.get(), 0,
+                                   sizeof(typename Config::SuperclusterParticleMask) * numISuperclusters));
     constexpr unsigned numThreads = 256;
     const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
     computeSuperclusterSplitMasksKernel<Config>
