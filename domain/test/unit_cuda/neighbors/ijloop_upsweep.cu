@@ -38,10 +38,11 @@ void upsweepReference(const OctreeNsView<Tc, KeyType>& tree,
                       const std::tuple<In*...>& input,
                       std::tuple<Out*...> output)
 {
+    auto numInternalNodes = tree.numNodes - tree.numLeafNodes;
 #pragma omp parallel for
     for (std::size_t leafIdx = 0; leafIdx < tree.numLeafNodes; ++leafIdx)
     {
-        TreeNodeIndex nodeIdx = tree.leafToInternal[leafIdx];
+        TreeNodeIndex nodeIdx = tree.leafToInternal[numInternalNodes + leafIdx];
         auto accum            = init;
         for (LocalIndex i = tree.layout[leafIdx]; i < tree.layout[leafIdx + 1]; ++i)
             accum = binaryOp(accum, transformOp(util::tupleMap([&](const auto* ptr) { return ptr[i]; }, input)));

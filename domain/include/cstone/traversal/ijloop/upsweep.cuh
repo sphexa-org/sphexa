@@ -92,9 +92,10 @@ void upsweep(const OctreeNsView<Tc, KeyType>& tree,
 
     if (tree.numLeafNodes)
     {
+        auto numInternalNodes = tree.numNodes - tree.numLeafNodes;
         detail::upsweepAccumulateLeafNodes<<<iceil(tree.numLeafNodes, numThreads), numThreads>>>(
-            tree.leafToInternal, tree.numLeafNodes, tree.layout, init, std::forward<TransformOp>(transformOp),
-            std::forward<BinaryOp>(binaryOp), input, output);
+            tree.leafToInternal + numInternalNodes, tree.numLeafNodes, tree.layout, init,
+            std::forward<TransformOp>(transformOp), std::forward<BinaryOp>(binaryOp), input, output);
         checkGpuErrors(cudaGetLastError());
     }
 
