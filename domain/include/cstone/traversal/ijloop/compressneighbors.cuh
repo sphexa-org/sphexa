@@ -50,7 +50,7 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
 
     if (n == 0)
     {
-        if (laneIdx == 0) *((unsigned*)output) = 0;
+        if (laneIdx == 0) *((unsigned*)output) = sizeof(unsigned);
         return;
     }
 
@@ -158,6 +158,7 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
 
     const unsigned totalBytes =
         sizeof(GpuConfig::ThreadMask) * (1 + (n + GpuConfig::warpSize - 1) / GpuConfig::warpSize) + (dataSize + 1) / 2;
+    assert(totalBytes < (1 << 16));
     assert(n < (1 << 16));
     if (laneIdx == 0) *((unsigned*)output) = totalBytes | (n << 16);
 #endif
