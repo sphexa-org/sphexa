@@ -873,7 +873,8 @@ __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& shar
     if constexpr (Config::compress)
     {
         warpCompressNeighbors(jClusters, (char*)compressedJClusters.get(), info.neighborsCount);
-        nbSize = compressedNeighborsSize((const char*)compressedJClusters.get());
+        nbSize = (compressedNeighborsSize((const char*)compressedJClusters.get()) + sizeof(std::uint32_t) - 1) /
+                 sizeof(std::uint32_t);
     }
 
     const unsigned long long totalSize = nbSize + mSize;
