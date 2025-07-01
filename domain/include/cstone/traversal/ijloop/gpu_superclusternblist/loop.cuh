@@ -591,8 +591,6 @@ __global__ void computeActiveMasksKernel(const LocalIndex firstISupercluster,
     const LocalIndex supercluster = superclusterIndex<Config>(groupStart);
     const LocalIndex startOffset  = groupStart - supercluster * Config::superclusterSize;
     const LocalIndex endOffset    = groupEnd - supercluster * Config::superclusterSize;
-    assert(startOffset < GpuConfig::warpSize);
-    assert(endOffset <= GpuConfig::warpSize);
 
     auto* activeMaskPtr   = &activeMasks[supercluster - firstISupercluster];
     const Mask activeMask = ~(~Mask(0) << endOffset) & (~Mask(0) << startOffset);
