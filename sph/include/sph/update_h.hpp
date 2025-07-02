@@ -68,7 +68,7 @@ void updateSmoothingLengthIterativeCpu(const Tc* x, const Tc* y, const Tc* z, T*
             }
             numFails += (iteration >= maxIteration);
 
-            nc[i] = ncSph;
+            nc[id] = ncSph;
         }
     }
 
