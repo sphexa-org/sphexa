@@ -405,10 +405,10 @@ __device__ __forceinline__ void pruneCandidates(util::SharedMemAllocator& shared
             for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
             {
                 const unsigned ci = c + iClusterOffset;
-                const unsigned i  = ci * Config::iSize + threadIdx.x % Config::iSize;
+                const unsigned si = ci * Config::iSize + threadIdx.x % Config::iSize;
+                const unsigned i  = iSupercluster * Config::superclusterSize + si;
                 if (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j))
                 {
-                    const unsigned si = ci * Config::iSize + threadIdx.x % Config::iSize;
                     const Tc xi       = xis[si];
                     const Tc yi       = yis[si];
                     const Tc zi       = zis[si];
@@ -799,10 +799,10 @@ __device__ __forceinline__ void pruneCandidatesAndComputeMasks(util::SharedMemAl
                 for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
                 {
                     const unsigned ci = c + iClusterOffset;
-                    const unsigned i  = ci * Config::iSize + threadIdx.x % Config::iSize;
+                    const unsigned si = ci * Config::iSize + threadIdx.x % Config::iSize;
+                    const unsigned i = iSupercluster * Config::superclusterSize + si;
                     if (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j))
                     {
-                        const unsigned si = ci * Config::iSize + threadIdx.x % Config::iSize;
                         const Tc xi       = xis[si];
                         const Tc yi       = yis[si];
                         const Tc zi       = zis[si];
