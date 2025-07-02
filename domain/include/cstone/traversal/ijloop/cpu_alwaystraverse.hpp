@@ -33,7 +33,7 @@ template<class Tc, class KeyType, class Th>
 struct CpuAlwaysTraverseNeighborhoodImpl
 {
     OctreeNsView<Tc, KeyType> tree;
-    Box<Tc> box;
+    Box<Tc> box = {0, 0};
     LocalIndex firstBody, lastBody;
     const Tc *x, *y, *z;
     const Th* h;
