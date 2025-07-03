@@ -1,4 +1,3 @@
-
 /*! @file
  * @brief EOS unit tests
  *
@@ -42,11 +41,11 @@ TEST(EOSTests, helmholtzEOS_test)
 
     std::vector<T> p(input_size), c(input_size), cv(input_size), u(input_size);
 
-    helmholtz_constants::Helmholtz_EOS* helmEOS = new helmholtz_constants::Helmholtz_EOS();
+    auto& helmEOS = sph::Helmholtz_EOS::init_helmEOS_instance();
 
     for (int i = 0; i < input_size; ++i)
     {
-        std::tie(c[i], p[i], cv[i], u[i]) = helmholtzEOS<T, T>(helmEOS, temp_in[i], rho_in[i], abar, zbar);
+        std::tie(c[i], p[i], cv[i], u[i]) = helmEOS.helmholtzEOS(temp_in[i], rho_in[i], abar, zbar);
     }
 
     for (int i = 0; i < input_size; ++i)
@@ -55,5 +54,4 @@ TEST(EOSTests, helmholtzEOS_test)
         EXPECT_NEAR(std::abs(c[i] - c_sol[i]) / c_sol[i], 0.0, 1.0e-6);
         EXPECT_NEAR(std::abs(u[i] - u_sol[i]) / u_sol[i], 0.0, 1.0e-6);
     }
-    delete helmEOS;
 }

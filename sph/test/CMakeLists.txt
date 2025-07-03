@@ -13,7 +13,7 @@ add_executable(${testname} ${UNIT_TESTS})
 
 target_compile_options(${testname} PRIVATE -Wall -Wextra -Wno-unknown-pragmas)
 target_include_directories(${testname} PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE_DIR}/include)
-target_link_libraries(${testname} PRIVATE GTest::gtest_main)
+target_link_libraries(${testname} PRIVATE GTest::gtest_main helmEOS)
 add_test(NAME ${testname} COMMAND ${testname})
 
 install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/hydro)
@@ -23,6 +23,11 @@ install(FILES ${PROJECT_SOURCE_DIR}/test/example_data.txt DESTINATION ${CMAKE_IN
 add_custom_command(TARGET ${testname} PRE_BUILD
     COMMAND ${CMAKE_COMMAND} -E create_symlink
     ${PROJECT_SOURCE_DIR}/test/example_data.txt $<TARGET_FILE_DIR:${testname}>/example_data.txt)
+
+# create a symlink helm_table.dat to the test binary directory before building sph_tests
+add_custom_command(TARGET ${testname} PRE_BUILD
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+    ${PROJECT_SOURCE_DIR}/include/sph/helm_table.dat $<TARGET_FILE_DIR:${testname}>/helm_table.dat)
 
 set(UNIT_TESTS_GPU timestep.cu)
 

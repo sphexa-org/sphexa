@@ -2,6 +2,9 @@ add_subdirectory(hydro_std)
 add_subdirectory(hydro_turb)
 add_subdirectory(hydro_ve)
 
+add_library(helmEOS STATIC helmholtz_eos.cpp)
+target_include_directories(helmEOS PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE_DIR}/include)
+
 set(TIMESTEP_GPU_KERNELS
         positions_gpu.cu ts_groups.cu update_h_gpu.cu
 )
