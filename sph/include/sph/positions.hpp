@@ -46,7 +46,7 @@ namespace sph
 //! @brief checks whether a particle is close to a fixed boundary and reflects the acceleration if so
 template<class Tc, class Th>
 HOST_DEVICE_FUN void fbcAdjust(const cstone::Vec3<Tc> X, cstone::Vec3<Tc>& V_nm, cstone::Vec3<Tc>& A,
-                               const cstone::Box<Tc>& box, const Th& hi, const Th* wh)
+                               const cstone::Box<Tc>& box, const Th& hi)
 {
     constexpr Th       threshold       = 2.;
     constexpr Th       invTHold        = 1 / threshold;
@@ -107,18 +107,15 @@ HOST_DEVICE_FUN TU energyUpdate(TU u_old, double dt, double dt_m1, double du, do
  */
 template<class T, class Th>
 HOST_DEVICE_FUN auto positionUpdate(double dt, double dt_m1, cstone::Vec3<T> Xn, cstone::Vec3<T> An,
-                                    cstone::Vec3<T> dXn, const cstone::Box<T>& box, bool anyFbc, const Th& hi,
-                                    const Th* wh)
+                                    cstone::Vec3<T> dXn, const cstone::Box<T>& box, bool anyFbc, const Th& hi)
 {
     auto Vnmhalf = dXn * (T(1) / dt_m1);
-    if (anyFbc) { fbcAdjust(Xn, Vnmhalf, An, box, hi, wh); }
+    if (anyFbc) { fbcAdjust(Xn, Vnmhalf, An, box, hi); }
 
     auto Vn    = Vnmhalf + T(0.5) * dt_m1 * An;
     auto Vnp1  = Vn + An * dt;
     auto dXnp1 = (Vn + T(0.5) * An * std::abs(dt)) * dt;
-    // auto dt_mod = 0.5*(std::abs(dt)+dt_m1)/(std::abs(dt)+0.5*dt_m1);
-    // auto dXnp1 = dt*(Vnmhalf + (Vnp1 - Vnmhalf)*dt_mod); not reversible :/
-    auto Xnp1 = cstone::putInBox(Xn + dXnp1, box);
+    auto Xnp1  = cstone::putInBox(Xn + dXnp1, box);
 
     return util::tuple<cstone::Vec3<T>, cstone::Vec3<T>, cstone::Vec3<T>>{Xnp1, Vnp1, dXnp1};
 }
@@ -139,7 +136,7 @@ void updatePositionsHost(size_t startIndex, size_t endIndex, Dataset& d, const c
         cstone::Vec3<T> X{d.x[i], d.y[i], d.z[i]};
         cstone::Vec3<T> X_m1{d.x_m1[i], d.y_m1[i], d.z_m1[i]};
         cstone::Vec3<T> V;
-        util::tie(X, V, X_m1) = positionUpdate(d.minDt, d.minDt_m1, X, A, X_m1, box, anyFBC, d.h[i], d.wh.data());
+        util::tie(X, V, X_m1) = positionUpdate(d.minDt, d.minDt_m1, X, A, X_m1, box, anyFBC, d.h[i]);
 
         util::tie(d.x[i], d.y[i], d.z[i])          = util::tie(X[0], X[1], X[2]);
         util::tie(d.x_m1[i], d.y_m1[i], d.z_m1[i]) = util::tie(X_m1[0], X_m1[1], X_m1[2]);
@@ -213,8 +210,8 @@ void computePositions(const GroupView& grp, Dataset& d, const cstone::Box<T>& bo
                             rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz), rawPtr(d.devData.x_m1),
                             rawPtr(d.devData.y_m1), rawPtr(d.devData.z_m1), rawPtr(d.devData.ax), rawPtr(d.devData.ay),
                             rawPtr(d.devData.az), rung, rawPtr(d.devData.temp), rawPtr(d.devData.u),
-                            rawPtr(d.devData.du), rawPtr(d.devData.du_m1), rawPtr(d.devData.h), rawPtr(d.devData.wh),
-                            d_mui, d.gamma, constCv, box);
+                            rawPtr(d.devData.du), rawPtr(d.devData.du_m1), rawPtr(d.devData.h), d_mui, d.gamma, constCv,
+                            box);
     }
     else
     {
