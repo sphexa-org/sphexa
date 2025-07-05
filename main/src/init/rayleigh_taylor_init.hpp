@@ -195,6 +195,8 @@ public:
             cstone::Box<T> layer2(0, xSize, ySize / 2., ySize, 0, zSize, cstone::BoundaryType::periodic,
                                   cstone::BoundaryType::periodic, cstone::BoundaryType::periodic);
 
+            assembleCuboid<T>(keyStart, keyEnd, layer2, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
+
             std::vector<T> xStretch, yStretch, zStretch;
             assembleCuboid<T>(keyStart, keyEnd, layer1, multiplicity, xBlock, yBlock, zBlock, xStretch, yStretch,
                               zStretch);
@@ -214,8 +216,6 @@ public:
                     d.z.push_back(X[2]);
                 }
             }
-
-            assembleCuboid<T>(keyStart, keyEnd, layer2, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
         }
 
         size_t numParticlesGlobal = d.x.size();
