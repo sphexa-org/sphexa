@@ -8,9 +8,7 @@
 #include "sph/neighborhood.hpp"
 
 #if defined(__CUDACC__) || defined(__HIP__)
-#include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
-#include "neighborhood_gpu.hpp"
 #endif
 
 namespace sph
@@ -63,7 +61,7 @@ struct DeviceNeighborhoodData::Impl
             std::visit(
                 [&](auto const& nb)
                 {
-                    data = nb.build(d.treeView, box, d.size(), groups, rawPtr(d.devData.x), rawPtr(d.devData.y),
+                    data = nb.build(d.treeView, box, d.devData.size(), groups, rawPtr(d.devData.x), rawPtr(d.devData.y),
                                     rawPtr(d.devData.z), rawPtr(d.devData.h));
                 },
                 neighborhood);
