@@ -16,11 +16,15 @@
 #include "gtest/gtest.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <functional>
+#include <numeric>
 #include <random>
 #include <ranges>
 #include <span>
+#include <tuple>
 #include <type_traits>
+#include <utility>
 
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
