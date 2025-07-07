@@ -16,6 +16,7 @@
 #include "gtest/gtest.h"
 
 #include <algorithm>
+#include <functional>
 #include <random>
 #include <ranges>
 #include <span>
@@ -43,23 +44,51 @@ __global__ void applyWarpFunction(InputT* const input, OutputT* output, F f)
     output[index]        = f(input[index]);
 }
 
+struct SomeStruct
+{
+    int a;
+    float b;
+    double c;
+    bool d;
+
+    bool operator==(SomeStruct const& other) const
+    {
+        return a == other.a && b == other.b && c == other.c && d == other.d;
+    }
+};
+
 template<class T>
 std::tuple<dim3, dim3, thrust::host_vector<T>> testData()
 {
     const dim3 numBlocks = {5, 2, 3};
     const dim3 blockSize = {GpuConfig::warpSize / 4, 2, 6};
 
-    thrust::host_vector<T> data(blockSize.x * blockSize.y * blockSize.z * numBlocks.x * numBlocks.y * numBlocks.z,
-                                T(0));
-    std::fill(data.begin() + GpuConfig::warpSize, data.begin() + GpuConfig::warpSize * 2, T(1));
+    thrust::host_vector<T> data(blockSize.x * blockSize.y * blockSize.z * numBlocks.x * numBlocks.y * numBlocks.z, T{});
 
-    using Dist = std::conditional_t<
-        std::is_floating_point_v<T>, std::uniform_real_distribution<T>,
-        std::conditional_t<std::is_same_v<T, bool>, std::bernoulli_distribution, std::uniform_int_distribution<T>>>;
-
-    Dist dist;
     std::default_random_engine eng;
-    std::generate(data.begin() + GpuConfig::warpSize * 2, data.end(), std::bind(dist, std::ref(eng)));
+    if constexpr (std::is_same_v<T, SomeStruct>)
+    {
+        using IntDist    = std::uniform_int_distribution<int>;
+        using FloatDist  = std::uniform_real_distribution<float>;
+        using DoubleDist = std::uniform_real_distribution<double>;
+        using BoolDist   = std::bernoulli_distribution;
+
+        auto randomInt    = std::bind(IntDist{}, std::ref(eng));
+        auto randomFloat  = std::bind(FloatDist{}, std::ref(eng));
+        auto randomDouble = std::bind(DoubleDist{}, std::ref(eng));
+        auto randomBool   = std::bind(BoolDist{}, std::ref(eng));
+
+        std::generate(data.begin(), data.end() - GpuConfig::warpSize,
+                      [&] { return SomeStruct{randomInt(), randomFloat(), randomDouble(), randomBool()}; });
+    }
+    else
+    {
+        using Dist = std::conditional_t<
+            std::is_floating_point_v<T>, std::uniform_real_distribution<T>,
+            std::conditional_t<std::is_same_v<T, bool>, std::bernoulli_distribution, std::uniform_int_distribution<T>>>;
+
+        std::generate(data.begin(), data.end() - GpuConfig::warpSize, std::bind(Dist{}, std::ref(eng)));
+    }
 
     return {std::move(numBlocks), std::move(blockSize), std::move(data)};
 }
@@ -95,6 +124,148 @@ void testOnDevice(F f)
 
     EXPECT_EQ(output, reference);
 }
+
+struct WarpLaneIndex
+{
+    __device__ unsigned operator()(unsigned) const { return laneIndex(); }
+
+    static constexpr auto reference = [](auto input, auto output) { std::iota(output.begin(), output.end(), 0u); };
+};
+
+TEST(WarpScan, laneIndex) { testOnDevice<unsigned>(WarpLaneIndex{}); }
+
+template<int Src>
+struct WarpShflSync
+{
+    template<class T>
+    __device__ T operator()(T x) const
+    {
+        return shflSync(x, Src);
+    };
+
+    static constexpr auto reference = [](auto input, auto output) { std::ranges::fill(output, input[Src]); };
+};
+
+TEST(WarpScan, shflSync)
+{
+    testOnDevice<int>(WarpShflSync<GpuConfig::warpSize / 10>{});
+    testOnDevice<int>(WarpShflSync<GpuConfig::warpSize - 1>{});
+    testOnDevice<float>(WarpShflSync<GpuConfig::warpSize / 3>{});
+    testOnDevice<float>(WarpShflSync<GpuConfig::warpSize - 1>{});
+    testOnDevice<double>(WarpShflSync<GpuConfig::warpSize / 7>{});
+    testOnDevice<double>(WarpShflSync<GpuConfig::warpSize - 1>{});
+    testOnDevice<SomeStruct>(WarpShflSync<GpuConfig::warpSize / 2>{});
+    testOnDevice<SomeStruct>(WarpShflSync<GpuConfig::warpSize - 1>{});
+}
+
+template<GpuConfig::ThreadMask LaneMask>
+struct WarpShflXorSync
+{
+    template<class T>
+    __device__ T operator()(T x) const
+    {
+        return shflXorSync(x, LaneMask);
+    };
+
+    static constexpr auto reference = [](auto input, auto output)
+    {
+        for (std::size_t i = 0; i < output.size(); ++i)
+            output[i] = input[i ^ LaneMask];
+    };
+};
+
+TEST(WarpScan, shflXorSync)
+{
+    testOnDevice<int>(WarpShflXorSync<2>{});
+    testOnDevice<int>(WarpShflXorSync<4>{});
+    testOnDevice<float>(WarpShflXorSync<8>{});
+    testOnDevice<float>(WarpShflXorSync<16>{});
+    testOnDevice<double>(WarpShflXorSync<2>{});
+    testOnDevice<double>(WarpShflXorSync<4>{});
+    testOnDevice<SomeStruct>(WarpShflXorSync<8>{});
+    testOnDevice<SomeStruct>(WarpShflXorSync<16>{});
+}
+
+template<unsigned Delta>
+struct WarpShflUpSync
+{
+    template<class T>
+    __device__ T operator()(T x) const
+    {
+        return shflUpSync(x, Delta);
+    };
+
+    static constexpr auto reference = [](auto input, auto output)
+    {
+        std::copy_n(input.begin(), Delta, output.begin());
+        std::copy_n(input.begin(), GpuConfig::warpSize - Delta, output.begin() + Delta);
+    };
+};
+
+TEST(WarpScan, shflUpSync)
+{
+    testOnDevice<int>(WarpShflUpSync<1>{});
+    testOnDevice<int>(WarpShflUpSync<2>{});
+    testOnDevice<float>(WarpShflUpSync<3>{});
+    testOnDevice<float>(WarpShflUpSync<4>{});
+    testOnDevice<double>(WarpShflUpSync<5>{});
+    testOnDevice<double>(WarpShflUpSync<6>{});
+    testOnDevice<SomeStruct>(WarpShflUpSync<7>{});
+    testOnDevice<SomeStruct>(WarpShflUpSync<8>{});
+}
+
+template<unsigned Delta>
+struct WarpShflDownSync
+{
+    template<class T>
+    __device__ T operator()(T x) const
+    {
+        return shflDownSync(x, Delta);
+    };
+
+    static constexpr auto reference = [](auto input, auto output)
+    {
+        std::copy_n(input.begin() + Delta, GpuConfig::warpSize - Delta, output.begin());
+        std::copy_n(input.end() - Delta, Delta, output.end() - Delta);
+    };
+};
+
+TEST(WarpScan, shflDownSync)
+{
+    testOnDevice<int>(WarpShflDownSync<1>{});
+    testOnDevice<int>(WarpShflDownSync<2>{});
+    testOnDevice<float>(WarpShflDownSync<3>{});
+    testOnDevice<float>(WarpShflDownSync<4>{});
+    testOnDevice<double>(WarpShflDownSync<5>{});
+    testOnDevice<double>(WarpShflDownSync<6>{});
+    testOnDevice<SomeStruct>(WarpShflDownSync<7>{});
+    testOnDevice<SomeStruct>(WarpShflDownSync<8>{});
+}
+
+struct WarpBallotSync
+{
+    __device__ GpuConfig::ThreadMask operator()(bool x) const { return ballotSync(x); };
+
+    static constexpr auto reference = [](auto input, auto output)
+    {
+        GpuConfig::ThreadMask result = 0;
+        for (std::size_t i = 0; i < output.size(); ++i)
+            result |= input[i] << i;
+        std::ranges::fill(output, result);
+    };
+};
+
+TEST(WarpScan, ballotSync) { testOnDevice<bool, GpuConfig::ThreadMask>(WarpBallotSync{}); }
+
+struct WarpAnySync
+{
+    __device__ bool operator()(bool x) const { return anySync(x); };
+
+    static constexpr auto reference = [](auto input, auto output)
+    { std::ranges::fill(output, std::accumulate(input.begin(), input.end(), false, std::logical_or<bool>{})); };
+};
+
+TEST(WarpScan, anySync) { testOnDevice<bool>(WarpAnySync{}); }
 
 struct WarpMin
 {
@@ -134,6 +305,27 @@ TEST(WarpScan, warpMax)
     testOnDevice<double>(WarpMax{});
 }
 
+struct WarpBitwiseOr
+{
+    template<class T>
+    __device__ T operator()(T x) const
+    {
+        return warpBitwiseOr(x);
+    }
+
+    static constexpr auto reference = [](auto input, auto output)
+    {
+        using T = decltype(output)::value_type;
+        std::ranges::fill(output, std::accumulate(input.begin(), input.end(), T(0), std::bit_or<T>{}));
+    };
+};
+
+TEST(WarpScan, warpBitwiseOr)
+{
+    testOnDevice<int>(WarpBitwiseOr{});
+    testOnDevice<unsigned>(WarpBitwiseOr{});
+}
+
 struct WarpInclusiveScanInt
 {
     __device__ int operator()(int x) const { return inclusiveScanInt(x); }
@@ -153,6 +345,16 @@ struct WarpExclusiveScanBool
 };
 
 TEST(WarpScan, exclusiveScanBool) { testOnDevice<bool, int>(WarpExclusiveScanBool{}); }
+
+struct WarpReduceBool
+{
+    __device__ int operator()(bool x) const { return reduceBool(x); }
+
+    static constexpr auto reference = [](auto input, auto output)
+    { std::ranges::fill(output, std::accumulate(input.begin(), input.end(), 0)); };
+};
+
+TEST(WarpScan, reduceBool) { testOnDevice<bool, int>(WarpReduceBool{}); }
 
 template<int Carry>
 struct WarpInclusiveSegscanInt
