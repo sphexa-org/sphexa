@@ -283,6 +283,8 @@ struct GpuSuperclusterNbListNeighborhood
         groups.firstBody += firstValidBody;
         groups.lastBody += firstValidBody;
         totalBodies += firstValidBody;
+        assert(groups.firstBody <= groups.lastBody);
+        assert(groups.lastBody <= totalBodies);
 
         assert(groups.firstBody % Config::superclusterSize == 0);
 
