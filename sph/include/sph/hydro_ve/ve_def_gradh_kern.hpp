@@ -92,8 +92,8 @@ struct VeDefGradHPostamble
 #ifndef NDEBUG
         if (std::isnan(rhoi))
         {
-            printf("ERROR::Density(%zu) density %f, position: (%f %f %f), h: %f\n", size_t(i), rhoi, iPos[0], iPos[1],
-                   iPos[2], hi);
+            printf("ERROR::Density(%u) density %f, position: (%f %f %f), h: %f\n", i, rhoi, iPos[0], iPos[1], iPos[2],
+                   hi);
         }
 #endif
         return std::make_tuple(kxi, gradhi);
