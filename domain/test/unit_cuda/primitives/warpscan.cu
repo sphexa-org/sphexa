@@ -15,6 +15,12 @@
 
 #include "gtest/gtest.h"
 
+#include <algorithm>
+#include <random>
+#include <ranges>
+#include <span>
+#include <type_traits>
+
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 
@@ -23,172 +29,188 @@
 
 using namespace cstone;
 
-__global__ void testMin(int* values)
+__device__ unsigned globalIndex()
 {
-    int laneValue = threadIdx.x;
-
-    values[threadIdx.x] = warpMin(laneValue);
+    const auto blockIndex = blockIdx.x + blockIdx.y * gridDim.x + blockIdx.z * gridDim.x * gridDim.y;
+    return blockIndex * blockDim.x * blockDim.y * blockDim.z + threadIdx.x + threadIdx.y * blockDim.x +
+           threadIdx.z * blockDim.x * blockDim.y;
 }
 
-TEST(WarpScan, min)
+template<class InputT, class OutputT = InputT, class F>
+__global__ void applyWarpFunction(InputT* const input, OutputT* output, F f)
 {
-    thrust::host_vector<int> h_v(GpuConfig::warpSize);
-    thrust::device_vector<int> d_v = h_v;
-
-    testMin<<<1, GpuConfig::warpSize>>>(thrust::raw_pointer_cast(d_v.data()));
-
-    h_v = d_v;
-    thrust::host_vector<int> reference(GpuConfig::warpSize, 0);
-
-    EXPECT_EQ(h_v, reference);
+    const unsigned index = globalIndex();
+    output[index]        = f(input[index]);
 }
 
-__global__ void testMax(int* values)
+template<class T>
+std::tuple<dim3, dim3, thrust::host_vector<T>> testData()
 {
-    int laneValue = threadIdx.x;
+    const dim3 numBlocks = {5, 2, 3};
+    const dim3 blockSize = {GpuConfig::warpSize / 4, 2, 6};
 
-    values[threadIdx.x] = warpMax(laneValue);
+    thrust::host_vector<T> data(blockSize.x * blockSize.y * blockSize.z * numBlocks.x * numBlocks.y * numBlocks.z,
+                                T(0));
+    std::fill(data.begin() + GpuConfig::warpSize, data.begin() + GpuConfig::warpSize * 2, T(1));
+
+    using Dist = std::conditional_t<
+        std::is_floating_point_v<T>, std::uniform_real_distribution<T>,
+        std::conditional_t<std::is_same_v<T, bool>, std::bernoulli_distribution, std::uniform_int_distribution<T>>>;
+
+    Dist dist;
+    std::default_random_engine eng;
+    std::generate(data.begin() + GpuConfig::warpSize * 2, data.end(), std::bind(dist, std::ref(eng)));
+
+    return {std::move(numBlocks), std::move(blockSize), std::move(data)};
 }
 
-TEST(WarpScan, max)
+template<class T>
+using WarpSpan = std::span<T, GpuConfig::warpSize>;
+
+template<class InputT, class OutputT, class WarpF>
+thrust::host_vector<OutputT> computeReference(thrust::host_vector<InputT> const& input, WarpF warpF)
 {
-    thrust::host_vector<int> h_v(GpuConfig::warpSize);
-    thrust::device_vector<int> d_v = h_v;
-
-    testMax<<<1, GpuConfig::warpSize>>>(thrust::raw_pointer_cast(d_v.data()));
-
-    h_v = d_v;
-    thrust::host_vector<int> reference(GpuConfig::warpSize, GpuConfig::warpSize - 1);
-
-    EXPECT_EQ(h_v, reference);
-}
-
-__global__ void testScan(int* values)
-{
-    int val             = 1;
-    int scan            = inclusiveScanInt(val);
-    values[threadIdx.x] = scan;
-}
-
-TEST(WarpScan, inclusiveInt)
-{
-    thrust::device_vector<int> d_values(2 * GpuConfig::warpSize);
-    testScan<<<1, 2 * GpuConfig::warpSize>>>(rawPtr(d_values));
-    thrust::host_vector<int> h_values = d_values;
-
-    for (int i = 0; i < 2 * GpuConfig::warpSize; ++i)
+    thrust::host_vector<OutputT> output(input.size());
+    for (std::size_t warp = 0; warp < input.size() / GpuConfig::warpSize; ++warp)
     {
-        EXPECT_EQ(h_values[i], i % GpuConfig::warpSize + 1);
+        WarpSpan<const InputT> warpInput(&input[warp * GpuConfig::warpSize], &input[(warp + 1) * GpuConfig::warpSize]);
+        WarpSpan<OutputT> warpOutput(&output[warp * GpuConfig::warpSize], &output[(warp + 1) * GpuConfig::warpSize]);
+        warpF(warpInput, warpOutput);
     }
+    return output;
 }
 
-__global__ void testScanBool(int* result)
+template<class InputT, class OutputT = InputT, class F>
+void testOnDevice(F f)
 {
-    bool val            = threadIdx.x % 2;
-    result[threadIdx.x] = exclusiveScanBool(val);
+    const auto [numBlocks, blockSize, input] = testData<InputT>();
+
+    thrust::device_vector<InputT> deviceInput = input;
+    thrust::device_vector<OutputT> deviceOutput(input.size());
+    applyWarpFunction<<<numBlocks, blockSize>>>(rawPtr(deviceInput), rawPtr(deviceOutput), f);
+    checkGpuErrors(cudaDeviceSynchronize());
+
+    thrust::host_vector<OutputT> reference = computeReference<InputT, OutputT>(input, F::reference);
+    thrust::host_vector<OutputT> output    = deviceOutput;
+
+    EXPECT_EQ(output, reference);
 }
 
-TEST(WarpScan, bools)
+struct WarpMin
 {
-    thrust::device_vector<int> d_values(2 * GpuConfig::warpSize);
-    testScanBool<<<1, 2 * GpuConfig::warpSize>>>(rawPtr(d_values));
-    thrust::host_vector<int> h_values = d_values;
-
-    for (int i = 0; i < 2 * GpuConfig::warpSize; ++i)
+    template<class T>
+    __device__ T operator()(T x) const
     {
-        EXPECT_EQ(h_values[i], (i % GpuConfig::warpSize) / 2);
+        return warpMin(x);
     }
+
+    static constexpr auto reference = [](auto input, auto output)
+    { std::ranges::fill(output, *std::ranges::min_element(input)); };
+};
+
+TEST(WarpScan, warpMin)
+{
+    testOnDevice<int>(WarpMin{});
+    testOnDevice<float>(WarpMin{});
+    testOnDevice<double>(WarpMin{});
 }
 
-__global__ void testSegScan(int* values)
+struct WarpMax
 {
-    int val = 1;
-
-    if (threadIdx.x == 8) val = 2;
-
-    if (threadIdx.x == 16) val = -2;
-
-    if (threadIdx.x == 31) val = -3;
-
-    int carry           = 1;
-    int scan            = inclusiveSegscanInt(val, carry);
-    values[threadIdx.x] = scan;
-}
-
-TEST(WarpScan, inclusiveSegInt)
-{
-    thrust::device_vector<int> d_values(GpuConfig::warpSize);
-    testSegScan<<<1, GpuConfig::warpSize>>>(rawPtr(d_values));
-    thrust::host_vector<int> h_values = d_values;
-
-    //                         carry is one, first segment starts with offset of 1
-    //                         |                                           | value(16) = -2, scan restarts at 2 - 1
-    std::vector<int> reference{2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17, 18,
-                               1, 2, 3, 4, 5, 6, 7, 8, 9,  10, 11, 12, 13, 14, 15, 2};
-    //                                                              value(31) = -3, scan restarts at 3 - 1  ^
-
-    // we only check the first 32
-    for (int i = 0; i < 32; ++i)
+    template<class T>
+    __device__ T operator()(T x) const
     {
-        EXPECT_EQ(h_values[i], reference[i]);
+        return warpMax(x);
     }
-}
 
-__global__ void streamCompactTest(int* result)
+    static constexpr auto reference = [](auto input, auto output)
+    { std::ranges::fill(output, *std::ranges::max_element(input)); };
+};
+
+TEST(WarpScan, warpMax)
 {
-    __shared__ int exchange[GpuConfig::warpSize];
-
-    int val     = threadIdx.x;
-    bool keep   = threadIdx.x % 2 == 0;
-    int numKeep = streamCompact(&val, keep, exchange);
-
-    result[threadIdx.x] = val;
+    testOnDevice<int>(WarpMax{});
+    testOnDevice<float>(WarpMax{});
+    testOnDevice<double>(WarpMax{});
 }
+
+struct WarpInclusiveScanInt
+{
+    __device__ int operator()(int x) const { return inclusiveScanInt(x); }
+
+    static constexpr auto reference = [](auto input, auto output)
+    { std::inclusive_scan(input.begin(), input.end(), output.begin()); };
+};
+
+TEST(WarpScan, inclusiveScanInt) { testOnDevice<int>(WarpInclusiveScanInt{}); }
+
+struct WarpExclusiveScanBool
+{
+    __device__ int operator()(bool x) const { return exclusiveScanBool(x); }
+
+    static constexpr auto reference = [](auto input, auto output)
+    { std::exclusive_scan(input.begin(), input.end(), output.begin(), 0, std::plus<int>()); };
+};
+
+TEST(WarpScan, exclusiveScanBool) { testOnDevice<bool, int>(WarpExclusiveScanBool{}); }
+
+template<int Carry>
+struct WarpInclusiveSegscanInt
+{
+    __device__ int operator()(int x) const { return inclusiveSegscanInt(x, Carry); }
+
+    static constexpr auto reference = [](auto input, auto output)
+    {
+        int result = Carry;
+        for (std::size_t i = 0; i < input.size(); ++i)
+        {
+            result    = input[i] < 0 ? -input[i] - 1 : result + input[i];
+            output[i] = result;
+        }
+    };
+};
+
+TEST(WarpScan, inclusiveSegscanInt)
+{
+    testOnDevice<int>(WarpInclusiveSegscanInt<1>{});
+    testOnDevice<int>(WarpInclusiveSegscanInt<42>{});
+    testOnDevice<int>(WarpInclusiveSegscanInt<-42>{});
+}
+
+struct WarpStreamCompact
+{
+    template<class T>
+    __device__ T operator()(T x) const
+    {
+        __shared__ T buffer[GpuConfig::warpSize * 3];
+        T* tmp            = buffer + GpuConfig::warpSize * (threadIdx.z / 2);
+        const int numKeep = streamCompact(&x, x <= 0, tmp);
+        return laneIndex() < numKeep ? x : T(42);
+    }
+
+    static constexpr auto reference = [](auto input, auto output)
+    {
+        auto [_, out] = std::ranges::copy_if(input, output.begin(), [](auto x) { return x <= 0; });
+        std::fill(out, output.end(), 42);
+    };
+};
 
 TEST(WarpScan, streamCompact)
 {
-    thrust::device_vector<int> d_values(GpuConfig::warpSize);
-    streamCompactTest<<<1, GpuConfig::warpSize>>>(rawPtr(d_values));
-    thrust::host_vector<int> h_values = d_values;
-
-    for (int i = 0; i < GpuConfig::warpSize / 2; ++i)
-    {
-        EXPECT_EQ(h_values[i], 2 * i);
-    }
+    testOnDevice<int>(WarpStreamCompact{});
+    testOnDevice<float>(WarpStreamCompact{});
+    testOnDevice<double>(WarpStreamCompact{});
 }
 
-__global__ void spread(int* result)
+struct WarpSpreadSeg8
 {
-    int val = 0;
-    if (threadIdx.x < 4) val = result[threadIdx.x];
+    __device__ int operator()(int x) const { return spreadSeg8(x); }
 
-    result[threadIdx.x] = spreadSeg8(val);
-}
-
-TEST(WarpScan, spreadSeg8)
-{
-    thrust::device_vector<int> d_values(GpuConfig::warpSize);
-
-    d_values[0] = 10;
-    d_values[1] = 20;
-    d_values[2] = 30;
-    d_values[3] = 40;
-
-    spread<<<1, GpuConfig::warpSize>>>(rawPtr(d_values));
-    thrust::host_vector<int> h_values = d_values;
-
-    thrust::host_vector<int> reference =
-        std::vector<int>{10, 11, 12, 13, 14, 15, 16, 17, 20, 21, 22, 23, 24, 25, 26, 27,
-                         30, 31, 32, 33, 34, 35, 36, 37, 40, 41, 42, 43, 44, 45, 46, 47};
-
-    if (GpuConfig::warpSize == 64) // NOLINT
+    static constexpr auto reference = [](auto input, auto output)
     {
-        std::vector<int> tail{0, 1, 2, 3, 4, 5, 6, 7};
-        for (int i = 0; i < 4; ++i)
-        {
-            std::copy(tail.begin(), tail.end(), std::back_inserter(reference));
-        }
-    }
+        for (std::size_t i = 0; i < output.size(); ++i)
+            output[i] = i % 8 == 0 ? input[i / 8] : output[i - 1] + 1;
+    };
+};
 
-    EXPECT_EQ(reference, h_values);
-}
+TEST(WarpScan, warpSpreadSeg8) { testOnDevice<int>(WarpSpreadSeg8{}); }
