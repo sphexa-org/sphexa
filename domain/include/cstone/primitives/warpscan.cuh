@@ -83,6 +83,15 @@ struct IsHardwareShuffleable<T,
 {
 };
 
+static_assert(IsHardwareShuffleable<int>::value);
+static_assert(IsHardwareShuffleable<unsigned>::value);
+static_assert(IsHardwareShuffleable<long>::value);
+static_assert(IsHardwareShuffleable<unsigned long>::value);
+static_assert(IsHardwareShuffleable<long long>::value);
+static_assert(IsHardwareShuffleable<unsigned long long>::value);
+static_assert(IsHardwareShuffleable<float>::value);
+static_assert(IsHardwareShuffleable<double>::value);
+
 template<class T, class Op>
 __device__ __forceinline__ T shflSyncImpl(T value, Op&& shflOp)
 {
