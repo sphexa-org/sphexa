@@ -22,32 +22,26 @@
 namespace util
 {
 
-namespace detail
-{
-
-template<std::size_t... Is, class F, class... Tuples>
-inline constexpr auto tupleMapImpl(std::index_sequence<Is...>, F&& f, Tuples&&... tuples)
-{
-    return std::make_tuple(
-        [&f](auto i, auto&&... ts) -> decltype(auto) {
-            return f(std::get<i>(std::forward<decltype(ts)>(ts))...);
-        }(std::integral_constant<std::size_t, Is>(), std::forward<Tuples>(tuples)...)...);
-}
-
-} // namespace detail
-
-template<class F, class Tuple, class... Tuples>
-inline constexpr auto tupleMap(F&& f, Tuple&& tuple, Tuples&&... tuples)
-{
-    constexpr auto n = std::tuple_size_v<std::decay_t<Tuple>>;
-    static_assert((... && (std::tuple_size_v<std::decay_t<Tuples>> == n)), "All tuples must have same size");
-    return detail::tupleMapImpl(std::make_index_sequence<n>(), std::forward<F>(f), std::forward<Tuple>(tuple),
-                                std::forward<Tuples>(tuples)...);
-}
-
-//! @brief Utility to call function with each element in tuples
+//! @brief Calls function @p f(get<Is>(tuples...)... and return results in a new tuple
 template<class F, class... Tuples>
-inline constexpr void for_each_tuple(F&& f, Tuples&&... tuples)
+constexpr auto tupleMap(F&& f, Tuples&&... tuples)
+{
+    constexpr auto n = std::min({std::tuple_size_v<std::decay_t<Tuples>>...});
+    static_assert(n == std::max({std::tuple_size_v<std::decay_t<Tuples>>...}), "All tuples must have same size");
+
+    auto impl = [&f]<std::size_t... Is>(std::index_sequence<Is...>, auto&&... ts)
+    {
+        return std::make_tuple(
+            [&f](auto i, auto&&... ts_) -> decltype(auto) {
+                return f(std::get<i>(std::forward<decltype(ts_)>(ts_))...);
+            }(std::integral_constant<std::size_t, Is>{}, std::forward<Tuples>(ts)...)...);
+    };
+    return impl(std::make_index_sequence<n>{}, std::forward<Tuples>(tuples)...);
+}
+
+//! @brief Calls void returning function @p f(get<Is>(tuples...)...
+template<class F, class... Tuples>
+constexpr void for_each_tuple(F&& f, Tuples&&... tuples)
 {
     tupleMap(
         [&f](auto&&... args)
