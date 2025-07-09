@@ -31,7 +31,7 @@ namespace util
 template<class... Arrays>
 auto computeByteOffsets(size_t count, int alignment, Arrays... arrays)
 {
-    static_assert((... && std::is_pointer_v<Arrays>)&&"all arrays must be pointers");
+    static_assert((... && std::is_pointer_v<Arrays>), "all arrays must be pointers");
 
     util::array<size_t, sizeof...(Arrays) + 1> byteOffsets{sizeof(std::decay_t<decltype(*arrays)>)...};
     byteOffsets *= count;
@@ -79,11 +79,11 @@ using PackType = std::conditional_t<sizeof(T) < sizeof(float), T, util::array<fl
 template<int alignment, class... Arrays>
 auto packBufferPtrs(void* base, size_t arraySize, Arrays... arrays)
 {
-    static_assert((... && std::is_pointer_v<Arrays>)&&"all arrays must be pointers");
+    static_assert((... && std::is_pointer_v<Arrays>), "all arrays must be pointers");
     auto arrayByteOffsets = computeByteOffsets(arraySize, alignment, arrays...);
     using Types           = TypeList<aux_traits::PackType<std::decay_t<decltype(*arrays)>>...>;
 
-    auto packBuffers = [ base, &arrayByteOffsets ]<std::size_t... Is>(std::index_sequence<Is...>, auto data)
+    auto packBuffers = [base, &arrayByteOffsets]<std::size_t... Is>(std::index_sequence<Is...>, auto data)
     {
         auto* base_c = reinterpret_cast<char*>(base);
         return std::make_tuple(util::array<TypeListElement_t<Is, Types>*, 2>{
