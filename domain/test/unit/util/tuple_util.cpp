@@ -14,6 +14,7 @@
  */
 
 #include <numeric>
+#include <string>
 #include <vector>
 #include "gtest/gtest.h"
 
@@ -25,6 +26,29 @@ using namespace util;
 
 template<class T>
 using AllocatorType = DefaultInitAdaptor<T, AlignedAllocator<T, 64>>;
+
+TEST(Utils, TupleMap)
+{
+    auto testee = std::tuple(42, std::string("hello"));
+
+    EXPECT_EQ(tupleMap([](auto) { return 0; }, testee), std::tuple(0, 0));
+    EXPECT_EQ(tupleMap([](auto x) { return x + x; }, testee), std::tuple(84, "hellohello"));
+
+    auto testee2 = std::tuple(-42, std::string(" world"));
+    EXPECT_EQ(tupleMap([](auto x, auto y) { return x + y; }, testee, testee2), std::tuple(0, "hello world"));
+
+    EXPECT_EQ(tupleMap(
+                  [](auto& x, auto& y)
+                  {
+                      auto oldX = x;
+                      std::swap(x, y);
+                      return oldX;
+                  },
+                  testee, testee2),
+              std::tuple(42, std::string("hello")));
+    EXPECT_EQ(testee, std::tuple(-42, std::string(" world")));
+    EXPECT_EQ(testee2, std::tuple(42, std::string("hello")));
+}
 
 TEST(Utils, ForEachTuple)
 {
@@ -116,26 +140,5 @@ TEST(Utils, discardLastElement)
         auto probe = discardLastElement(std::tie(v1, v2));
         EXPECT_EQ(probe, std::tie(v1));
         EXPECT_EQ(std::get<0>(probe).data(), v1.data());
-    }
-}
-
-TEST(Utils, zipView)
-{
-    {
-        auto t1   = std::make_tuple(1, 2, 3);
-        auto t2   = std::make_tuple("a", "b", "c");
-        auto view = zipTuples(t1, t2);
-
-        EXPECT_EQ(std::get<0>(std::get<0>(view)), 1);
-        EXPECT_EQ(std::get<1>(std::get<0>(view)), "a");
-    }
-    {
-        std::vector<int> vi1{1, 2, 3, 4}, vi2{5, 6, 7};
-        std::vector<std::string> vs1{"a", "b", "c", "d"}, vs2{"x", "y", "z"};
-
-        auto zipped = zipTuples(std::tie(vi1, vi2), std::tie(vs1, vs2));
-
-        EXPECT_EQ(get<1>(get<0>(zipped)).back(), "d");
-        EXPECT_EQ(get<1>(get<0>(zipped)).data(), vs1.data());
     }
 }
