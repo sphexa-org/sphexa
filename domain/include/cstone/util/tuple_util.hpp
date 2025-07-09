@@ -22,6 +22,20 @@
 namespace util
 {
 
+namespace detail
+{
+
+template<std::size_t... Is, class F, class... Tuples>
+constexpr auto tupleMapImpl(std::index_sequence<Is...>, F&& f, Tuples&&... ts)
+{
+    return std::make_tuple(
+        [&f](auto i, auto&&... ts_) -> decltype(auto) {
+            return f(std::get<i>(std::forward<decltype(ts_)>(ts_))...);
+        }(std::integral_constant<std::size_t, Is>{}, std::forward<Tuples>(ts)...)...);
+}
+
+} // namespace detail
+
 //! @brief Calls function @p f(get<Is>(tuples...)... and return results in a new tuple
 template<class F, class... Tuples>
 constexpr auto tupleMap(F&& f, Tuples&&... tuples)
@@ -29,14 +43,8 @@ constexpr auto tupleMap(F&& f, Tuples&&... tuples)
     constexpr auto n = std::min({std::tuple_size_v<std::decay_t<Tuples>>...});
     static_assert(n == std::max({std::tuple_size_v<std::decay_t<Tuples>>...}), "All tuples must have same size");
 
-    auto impl = [&f]<std::size_t... Is>(std::index_sequence<Is...>, auto&&... ts)
-    {
-        return std::make_tuple(
-            [&f](auto i, auto&&... ts_) -> decltype(auto) {
-                return f(std::get<i>(std::forward<decltype(ts_)>(ts_))...);
-            }(std::integral_constant<std::size_t, Is>{}, std::forward<Tuples>(ts)...)...);
-    };
-    return impl(std::make_index_sequence<n>{}, std::forward<Tuples>(tuples)...);
+    // auto impl = [&f]<std::size_t... Is>(std::index_sequence<Is...>, auto&&... ts) // nvcc chokes on this lambda
+    return detail::tupleMapImpl(std::make_index_sequence<n>{}, std::forward<F>(f), std::forward<Tuples>(tuples)...);
 }
 
 //! @brief Calls void returning function @p f(get<Is>(tuples...)...
@@ -50,13 +58,6 @@ constexpr void for_each_tuple(F&& f, Tuples&&... tuples)
             return 0;
         },
         std::forward<Tuples>(tuples)...);
-}
-
-//! @brief convert an index_sequence into a tuple of integral constants (e.g. for use with for_each_tuple)
-template<std::size_t... Is>
-constexpr auto makeIntegralTuple(std::index_sequence<Is...>)
-{
-    return std::make_tuple(std::integral_constant<size_t, Is>{}...);
 }
 
 //! @brief Select tuple elements specified by the argument sequence
