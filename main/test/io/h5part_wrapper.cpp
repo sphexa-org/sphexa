@@ -51,7 +51,7 @@ TEST(H5PartCpp, typesafeStepAttrRead)
         writeH5PartStepAttrib(h5File, "float64Attr", &float64Attr, 1);
         int64_t int64Attr = -42;
         writeH5PartStepAttrib(h5File, "int64Attr", &int64Attr, 1);
-        uint64_t uint64Attr = uint64_t(2) << 40 + uint64_t(1) << 63;
+        uint64_t uint64Attr = (uint64_t(2) << 40) + (uint64_t(1) << 63);
         writeH5PartStepAttrib(h5File, "uint64Attr", &uint64Attr, 1);
         char int8Attr = 1;
         writeH5PartStepAttrib(h5File, "int8Attr", &int8Attr, 1);
@@ -93,7 +93,7 @@ TEST(H5PartCpp, typesafeStepAttrRead)
         {
             std::vector<uint64_t> a(1);
             readH5PartStepAttribute(a.data(), a.size(), 2, h5File);
-            EXPECT_EQ(a[0], uint64_t(2) << 40 + uint64_t(1) << 63);
+            EXPECT_EQ(a[0], (uint64_t(2) << 40) + (uint64_t(1) << 63));
         }
         {
             std::vector<char> a(1);

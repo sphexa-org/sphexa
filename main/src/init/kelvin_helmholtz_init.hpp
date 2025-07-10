@@ -160,8 +160,6 @@ public:
         cstone::Box<T> layer2(0, 1, 0.25, 0.75, 0, 0.0625, pbc, pbc, pbc);
         cstone::Box<T> layer3(0, 1, 0.75, 1, 0, 0.0625, pbc, pbc, pbc);
 
-        assembleCuboid<T>(keyStart, keyEnd, layer2, innerMulti, xBlock, yBlock, zBlock, d.x, d.y, d.z);
-
         std::vector<T> x, y, z;
         assembleCuboid<T>(keyStart, keyEnd, layer1, outerMulti, xBlock, yBlock, zBlock, x, y, z);
 
@@ -189,6 +187,8 @@ public:
                 d.z.push_back(X[2]);
             }
         }
+
+        assembleCuboid<T>(keyStart, keyEnd, layer2, innerMulti, xBlock, yBlock, zBlock, d.x, d.y, d.z);
 
         size_t numParticlesGlobal = d.x.size();
         MPI_Allreduce(MPI_IN_PLACE, &numParticlesGlobal, 1, MpiType<size_t>{}, MPI_SUM, simData.comm);
