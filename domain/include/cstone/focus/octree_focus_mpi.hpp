@@ -43,6 +43,8 @@ class FocusedOctree
 
     using SType = SourceCenterType<RealType>;
 
+    constexpr static bool useGpu = HaveGpu<Accelerator>{};
+
 public:
     /*! @brief constructor
      *
@@ -61,9 +63,9 @@ public:
         , globDispl_(numRanks + 1)
     {
         octreeAcc_.resize(1);
-        leaves_ = std::vector<KeyType>{0, nodeRange<KeyType>(0)};
-        leafCounts_ = std::vector<unsigned>{bucketSize + 1};
-        countsAcc_ = leafCounts_;
+        leaves_        = std::vector<KeyType>{0, nodeRange<KeyType>(0)};
+        leafCountsAcc_ = std::vector<unsigned>{bucketSize + 1};
+        countsAcc_     = leafCountsAcc_;
 
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -112,8 +114,8 @@ public:
         enforcedKeys.reserve(peers_.size() * 2);
 
         assert(leafCounts_.size() == octreeAcc_.numLeafNodes);
-        focusTransfer<KeyType>(leaves_, leafCounts_, bucketSize_, myRank_, prevFocusStart, prevFocusEnd, focusStart,
-                               focusEnd, enforcedKeys);
+        focusTransfer<KeyType, useGpu>(leaves_, {leafCountsAcc_.data(), leafCountsAcc_.size()}, bucketSize_, myRank_,
+                                       prevFocusStart, prevFocusEnd, focusStart, focusEnd, enforcedKeys);
         for (int peer : peers_)
         {
             enforcedKeys.push_back(assignment[peer]);
@@ -203,11 +205,9 @@ public:
 
         TreeNodeIndex numLeafNodes = octreeAcc_.numLeafNodes;
         auto idxFromGlob           = enumerateRanges(invertRanges(0, assignment_, numLeafNodes));
-        leafCounts_.resize(numLeafNodes);
+        reallocate(numLeafNodes, allocGrowthRate_, leafCountsAcc_);
         if constexpr (HaveGpu<Accelerator>{})
         {
-            reallocateDestructive(leafCountsAcc_, nNodes(leavesAcc_), allocGrowthRate_);
-
             computeNodeCountsGpu(rawPtr(leavesAcc_), rawPtr(leafCountsAcc_), numLeafNodes, particleKeys,
                                  std::numeric_limits<unsigned>::max(), false);
 
@@ -231,20 +231,16 @@ public:
             upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(octreeAcc_.levelRange), rawPtr(octreeAcc_.childOffsets),
                           rawPtr(countsAcc_));
             gatherAcc<HaveGpu<Accelerator>{}>(leafToInternal(octreeAcc_), rawPtr(countsAcc_), rawPtr(leafCountsAcc_));
-
-            memcpyD2H(rawPtr(leafCountsAcc_), numLeafNodes, rawPtr(leafCounts_));
         }
         else
         {
-            // local node counts
-            assert(std::is_sorted(particleKeys.begin(), particleKeys.end()));
-            computeNodeCounts<KeyType>(leaves_.data(), leafCounts_.data(), nNodes(leaves_), particleKeys,
+            computeNodeCounts<KeyType>(leaves_.data(), leafCountsAcc_.data(), nNodes(leaves_), particleKeys,
                                        std::numeric_limits<unsigned>::max(), true);
-            rangeCount<KeyType>(globalTreeLeaves, globalCounts, leaves, idxFromGlob, leafCounts_);
+            rangeCount<KeyType>(globalTreeLeaves, globalCounts, leaves, idxFromGlob, leafCountsAcc_);
 
             // 1st upsweep with local and global data
             countsAcc_.resize(octreeAcc_.numNodes);
-            scatter<TreeNodeIndex>(leafToInternal(octreeAcc_), leafCounts_.data(), countsAcc_.data());
+            scatter<TreeNodeIndex>(leafToInternal(octreeAcc_), leafCountsAcc_.data(), countsAcc_.data());
             upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets.data(), countsAcc_.data(), NodeCount<unsigned>{});
 
             // add counts from neighboring peers
@@ -252,7 +248,7 @@ public:
 
             // 2nd upsweep with peer data present
             upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets.data(), countsAcc_.data(), NodeCount<unsigned>{});
-            gather(leafToInternal(octreeAcc_), countsAcc_.data(), leafCounts_.data());
+            gather(leafToInternal(octreeAcc_), countsAcc_.data(), leafCountsAcc_.data());
         }
         reallocate(scratch, origSize, 1.0);
 
@@ -400,8 +396,8 @@ public:
         else
         {
             //! compute temporary pre-halo exchange particle layout for local particles only
-            std::vector<LocalIndex> layout(leafCounts_.size() + 1, 0);
-            std::inclusive_scan(leafCounts_.begin() + firstIdx, leafCounts_.begin() + lastIdx,
+            std::vector<LocalIndex> layout(leafCountsAcc_.size() + 1, 0);
+            std::inclusive_scan(leafCountsAcc_.begin() + firstIdx, leafCountsAcc_.begin() + lastIdx,
                                 layout.begin() + firstIdx + 1, std::plus<>{}, LocalIndex(0));
 #pragma omp parallel for schedule(static)
             for (TreeNodeIndex leafIdx = 0; leafIdx < octreeAcc_.numLeafNodes; ++leafIdx)
@@ -552,9 +548,9 @@ public:
         else
         {
             layout[0] = 0;
-            std::inclusive_scan(leafCounts_.begin() + firstNode, leafCounts_.begin() + lastNode, layout.begin() + 1,
+            std::inclusive_scan(leafCountsAcc_.begin() + firstNode, leafCountsAcc_.begin() + lastNode, layout.begin() + 1,
                                 std::plus{}, LocalIndex{0});
-            std::vector<float> haloRadii(leafCounts_.size(), 0.0f);
+            std::vector<float> haloRadii(leafCountsAcc_.size(), 0.0f);
 #pragma omp parallel for schedule(static)
             for (TreeNodeIndex i = 0; i < numNodesSearch; ++i)
             {
@@ -572,17 +568,9 @@ public:
 
     int computeLayout(std::span<LocalIndex> layoutAcc, std::span<LocalIndex> layout) const
     {
-        if constexpr (HaveGpu<Accelerator>{})
-        {
-            computeNodeLayout<true>({leafCountsAcc_.data(), leafCountsAcc().size()}, {macsAcc_.data(), macsAcc_.size()},
-                                    leafToInternal(octreeAcc_), assignment_[myRank_], layoutAcc);
-            memcpyD2H(layoutAcc.data(), layoutAcc.size(), layout.data());
-        }
-        else
-        {
-            computeNodeLayout<false>({leafCounts_.data(), leafCountsAcc().size()}, {macsAcc_.data(), macsAcc_.size()},
-                                     leafToInternal(octreeAcc_), assignment_[myRank_], layout);
-        }
+        computeNodeLayout<useGpu>({leafCountsAcc_.data(), leafCountsAcc().size()}, {macsAcc_.data(), macsAcc_.size()},
+                                  leafToInternal(octreeAcc_), assignment_[myRank_], useGpu ? layoutAcc : layout);
+        if constexpr (useGpu) { memcpyD2H(layoutAcc.data(), layoutAcc.size(), layout.data()); }
 
         return checkLayout(myRank_, assignment_, layout, treeLeaves());
     }
@@ -685,11 +673,7 @@ public:
     }
 
     //! @brief the cornerstone leaf cell particle counts
-    std::span<const unsigned> leafCountsAcc() const
-    {
-        if constexpr (HaveGpu<Accelerator>{}) { return {rawPtr(leafCountsAcc_), leafCountsAcc_.size()}; }
-        else { return leafCounts_; }
-    }
+    std::span<const unsigned> leafCountsAcc() const { return {rawPtr(leafCountsAcc_), leafCountsAcc_.size()}; }
 
     //! brief particle counts per focus tree leaf cell
     std::span<const unsigned> countsAcc() const { return {rawPtr(countsAcc_), countsAcc_.size()}; }
@@ -769,7 +753,6 @@ private:
     KeyType prevFocusEnd = 0;
 
     //! @brief particle counts of the focused tree leaves, tree_.treeLeaves()
-    std::vector<unsigned> leafCounts_;
     AccVector<unsigned> leafCountsAcc_;
     //! @brief particle counts of the full tree, tree_.octree()
     AccVector<unsigned> countsAcc_;
