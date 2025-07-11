@@ -385,6 +385,15 @@ public:
         reallocate(gOctree.numNodes, allocGrowthRate_, globalCentersAcc_);
         reallocate(octree.numNodes, allocGrowthRate_, centersAcc_);
 
+        auto upsweepCenters = [](auto levelRange, auto childOffsets, auto centers)
+        {
+            if constexpr (HaveGpu<Accelerator>{})
+            {
+                upsweepCentersGpu(maxTreeLevel<KeyType>{}, levelRange.data(), childOffsets, centers);
+            }
+            else { upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{}); }
+        };
+
         if constexpr (HaveGpu<Accelerator>{})
         {
             static_assert(IsDeviceVector<std::decay_t<DevVec1>>{} && IsDeviceVector<std::decay_t<DevVec2>>{});
@@ -397,10 +406,6 @@ public:
                              d_layout + firstIdx + 1);
             computeLeafSourceCenterGpu(x, y, z, m, octree.leafToInternal + octree.numInternalNodes, octree.numLeafNodes,
                                        d_layout, rawPtr(centersAcc_));
-            //! upsweep with local data in place
-            upsweepCentersGpu(maxTreeLevel<KeyType>{}, octreeAcc_.levelRange.data(), octree.childOffsets,
-                              rawPtr(centersAcc_));
-
             reallocate(scratch1, osz1, 1.0);
         }
         else
@@ -421,15 +426,8 @@ public:
                     CombineSourceCenter<RealType>{});
         }
 
-        auto upsweepCenters = [](auto levelRange, auto childOffsets, auto centers)
-        {
-            if constexpr (HaveGpu<Accelerator>{})
-            {
-                upsweepCentersGpu(maxTreeLevel<KeyType>{}, levelRange.data(), childOffsets, centers);
-            }
-            else { upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{}); }
-        };
-
+        //! upsweep with local data in place
+        upsweepCenters(octree.levelRangeSpan(), octree.childOffsets, centersAcc_.data());
         globalExchange<SType>(gOctree, {centersAcc_.data(), centersAcc_.size()},
                               {globalCentersAcc_.data(), globalCentersAcc_.size()}, scratch1, upsweepCenters);
 
@@ -437,17 +435,15 @@ public:
         {
             peerExchangeGpu(std::span{centersAcc_.data(), centersAcc_.size()},
                             static_cast<int>(P2pTags::focusPeerCenters), scratch1);
-            upsweepCentersGpu(maxTreeLevel<KeyType>{}, octreeAcc_.levelRange.data(), octree.childOffsets,
-                              rawPtr(centersAcc_));
         }
         else
         {
             //! exchange information with peer close to focus
             peerExchange(std::span{centersAcc_.data(), centersAcc_.size()}, static_cast<int>(P2pTags::focusPeerCenters),
                          scratch1);
-            //! upsweep with all (leaf) data in place
-            upsweep(octree.levelRangeSpan(), octree.childOffsets, centersAcc_.data(), CombineSourceCenter<RealType>{});
         }
+        //! upsweep with all (leaf) data in place
+        upsweepCenters(octree.levelRangeSpan(), octree.childOffsets, centersAcc_.data());
     }
 
     /*! @brief Update the MAC criteria based on a min distance MAC
