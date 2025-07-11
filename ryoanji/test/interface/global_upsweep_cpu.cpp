@@ -71,8 +71,8 @@ static int multipoleExchangeTest(int thisRank, int numRanks)
         coords.x().data(), coords.y().data(), coords.z().data(), globalMasses.data(), 0, globalMasses.size());
 
     std::vector<MultipoleType> multipoles(octree.numNodes);
-    ryoanji::computeGlobalMultipoles(x.data(), y.data(), z.data(), m.data(), x.size(), domain.globalTree(), focusTree,
-                                     domain.layout().data(), multipoles.data());
+    ryoanji::computeMultipoles(x.data(), y.data(), z.data(), m.data(), domain.globalTree(), focusTree,
+                               domain.layout().data(), multipoles.data());
 
     MultipoleType globalRootMultipole = multipoles[octree.levelRange[0]];
 

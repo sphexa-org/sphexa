@@ -112,7 +112,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
 
     auto upsweepFunction = [](auto levelRange, auto childOffsets, auto M)
     { upsweep(levelRange, childOffsets, M, NodeCount<unsigned>{}); };
-    globalFocusExchange<unsigned>(domainTree, focusTree, testCounts, scratch, upsweepFunction);
+    focusTree.template globalExchange<unsigned>(domainTree, testCounts, scratch, upsweepFunction);
 
     upsweep(octree.levelRangeSpan(), octree.childOffsets, testCounts.data(), NodeCount<unsigned>{});
 
