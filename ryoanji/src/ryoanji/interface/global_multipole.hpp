@@ -43,7 +43,7 @@ void computeMultipoles(const Tc* x, const Tc* y, const Tc* z, const Tm* m, cston
     upsweep(let.levelRangeSpan(), let.childOffsets, multipoles, centers.data());
 
     std::vector<int, util::DefaultInitAdaptor<int>> scratch;
-    focusTree.globalExchange(gOctree, multipoleSpan, scratch, upsweep, globalCenters.data());
+    focusTree.globalExchange(gOctree, multipoleSpan, std::span<MType>{}, scratch, upsweep, globalCenters.data());
     focusTree.peerExchange(multipoleSpan, static_cast<int>(cstone::P2pTags::focusPeerCenters) + 1, scratch);
 
     //! second upsweep with leaf data from peer and global ranks in place

@@ -421,33 +421,17 @@ public:
                     CombineSourceCenter<RealType>{});
         }
 
-        //! global exchange for the top nodes that are bigger than local domains
-        auto [gLeafCentersAll, gLeafCentersLoc, gmap] = util::packAllocBuffer(
-            scratch1, util::TypeList<SType, SType, TreeNodeIndex>{},
-            {size_t(gOctree.numLeafNodes), size_t(globNumNodes_[myRank_]), size_t(globNumNodes_[myRank_])}, 128);
-        populateGlobal<SType>(gOctree.leafSpan(), {centersAcc_.data(), centersAcc_.size()}, gLeafCentersLoc, gmap);
-        gatherGlobalLeaves<SourceCenterType<RealType>>(gLeafCentersLoc, gLeafCentersAll);
-
-        scatterAcc<HaveGpu<Accelerator>{}>(gOctree.leafToInternalSpan(), gLeafCentersAll.data(),
-                                           globalCentersAcc_.data());
-        if constexpr (HaveGpu<Accelerator>{})
+        auto upsweepCenters = [](auto levelRange, auto childOffsets, auto centers)
         {
-            upsweepCentersGpu(maxTreeLevel<KeyType>{}, gOctree.levelRange, gOctree.childOffsets,
-                              globalCentersAcc_.data());
-        }
-        else
-        {
-            upsweep(gOctree.levelRangeSpan(), gOctree.childOffsets, globalCentersAcc_.data(),
-                    CombineSourceCenter<RealType>{});
-        }
+            if constexpr (HaveGpu<Accelerator>{})
+            {
+                upsweepCentersGpu(maxTreeLevel<KeyType>{}, levelRange.data(), childOffsets, centers);
+            }
+            else { upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{}); }
+        };
 
-        std::size_t numLetIdx    = octreeAcc_.numLeafNodes - assignment_[myRank_].count();
-        auto [letIdx, letToGlob] = util::packAllocBuffer(scratch1, util::TypeList<TreeNodeIndex, TreeNodeIndex>{},
-                                                         {numLetIdx, numLetIdx}, 128);
-
-        extractGlobal<SourceCenterType<RealType>>(
-            gOctree.prefixes, gOctree.d_levelRange, {globalCentersAcc_.data(), globalCentersAcc_.size()},
-            {centersAcc_.data(), centersAcc_.size()}, letIdx.data(), letToGlob.data());
+        globalExchange<SType>(gOctree, {centersAcc_.data(), centersAcc_.size()},
+                              {globalCentersAcc_.data(), globalCentersAcc_.size()}, scratch1, upsweepCenters);
 
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -658,6 +642,7 @@ public:
      * @tparam        F                function object for octree upsweep
      * @param[in]     gOctree          a global (replicated on all ranks) tree
      * @param[inout]  quantities       an array of length LET numTreeNodes with cell properties of the LET
+     * @param[out]    globQOut         output for quantities of the global octree, can be nullptr if not needed
      * @param[in]     upsweepFunction  callable object that will be used to compute internal cell properties of the
      *                                 global tree based on global leaf quantities
      * @param[in]     upsweepArgs      additional arguments that might be required for a tree upsweep, such as expansion
@@ -669,6 +654,7 @@ public:
     template<class Q, class F, class Vector, class... UArgs>
     void globalExchange(OctreeView<const KeyType> gOctree,
                         std::span<Q> quantities,
+                        std::span<Q> globQOut,
                         Vector& scratch,
                         F&& upsweepFunction,
                         UArgs&&... upsweepArgs) const
@@ -687,12 +673,13 @@ public:
         //! exchange global leaves
         gatherGlobalLeaves<Q>(gLeafQLoc, gLeafQAll);
 
-        scatterAcc<HaveGpu<Accelerator>{}>(gOctree.leafToInternalSpan(), gLeafQAll.data(), globQ.data());
+        auto globQuse = globQOut.data() ? globQOut : globQ;
+        scatterAcc<HaveGpu<Accelerator>{}>(gOctree.leafToInternalSpan(), gLeafQAll.data(), globQuse.data());
         //! upsweep with the global tree
-        upsweepFunction(gOctree.levelRangeSpan(), gOctree.childOffsets, globQ.data(), upsweepArgs...);
+        upsweepFunction(gOctree.levelRangeSpan(), gOctree.childOffsets, globQuse.data(), upsweepArgs...);
 
         //! from the global tree, extract the part that the executing rank was missing
-        extractGlobal<Q>(gOctree.prefixes, gOctree.d_levelRange, globQ, quantities, letIdx.data(), letToGlob.data());
+        extractGlobal<Q>(gOctree.prefixes, gOctree.d_levelRange, globQuse, quantities, letIdx.data(), letToGlob.data());
         reallocate(scratch, s, 1.0);
     }
 
