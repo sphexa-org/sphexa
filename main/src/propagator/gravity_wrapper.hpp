@@ -61,9 +61,8 @@ public:
         const auto& focusTree = domain.focusTree();
 
         reallocate(multipoles_, focusTree.octreeViewAcc().numNodes, 1.05);
-        ryoanji::computeGlobalMultipoles(d.x.data(), d.y.data(), d.z.data(), d.m.data(), d.x.size(),
-                                         domain.globalTree(), domain.focusTree(), domain.layout().data(),
-                                         multipoles_.data());
+        ryoanji::computeMultipoles(d.x.data(), d.y.data(), d.z.data(), d.m.data(), domain.globalTree(),
+                                   domain.focusTree(), domain.layout().data(), multipoles_.data());
     }
 
     void traverse(cstone::GroupView /*grp*/, DataType& d, const DomainType& domain)

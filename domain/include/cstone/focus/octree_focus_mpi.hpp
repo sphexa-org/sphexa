@@ -653,6 +653,50 @@ public:
         }
     }
 
+    /*! @brief exchange data of non-peer (beyond focus) tree cells
+     *
+     * @tparam        Q                an arithmetic type, or compile-time fix-sized arrays thereof
+     * @tparam        F                function object for octree upsweep
+     * @param[in]     gOctree          a global (replicated on all ranks) tree
+     * @param[inout]  quantities       an array of length LET numTreeNodes with cell properties of the LET
+     * @param[in]     upsweepFunction  callable object that will be used to compute internal cell properties of the
+     *                                 global tree based on global leaf quantities
+     * @param[in]     upsweepArgs      additional arguments that might be required for a tree upsweep, such as expansion
+     *                                 centers if Q is a multipole type.
+     *
+     * This function obtains missing information for tree cell quantities belonging to far-away ranks which are not
+     * peer ranks of the executing rank.
+     */
+    template<class Q, class F, class Vector, class... UArgs>
+    void globalExchange(OctreeView<const KeyType> gOctree,
+                        std::span<Q> quantities,
+                        Vector& scratch,
+                        F&& upsweepFunction,
+                        UArgs&&... upsweepArgs) const
+    {
+        assert(gOctree.leaves != nullptr);
+        static_assert(HaveGpu<Accelerator>{} == IsDeviceVector<Vector>{});
+        std::size_t numGlobalLeaves                                          = gOctree.numLeafNodes;
+        std::size_t numLetIdx                                                = octreeAcc_.numLeafNodes;
+        auto s                                                               = scratch.size();
+        auto [globalLeafQ, globalQuantities, gmapScratch, letIdx, letToGlob] = util::packAllocBuffer(
+            scratch, util::TypeList<Q, Q, TreeNodeIndex, TreeNodeIndex, TreeNodeIndex>{},
+            {numGlobalLeaves, size_t(gOctree.numNodes), numGlobalLeaves, numLetIdx, numLetIdx}, 128);
+        populateGlobal<Q>(gOctree.leafSpan(), quantities, globalLeafQ, gmapScratch);
+
+        //! exchange global leaves
+        gatherGlobalLeaves<Q>(globalLeafQ);
+
+        scatterAcc<HaveGpu<Accelerator>{}>(gOctree.leafToInternalSpan(), globalLeafQ.data(), globalQuantities.data());
+        //! upsweep with the global tree
+        upsweepFunction(gOctree.levelRangeSpan(), gOctree.childOffsets, globalQuantities.data(), upsweepArgs...);
+
+        //! from the global tree, extract the part that the executing rank was missing
+        extractGlobal<Q>(gOctree.prefixes, gOctree.d_levelRange, globalQuantities, quantities, letIdx.data(),
+                         letToGlob.data());
+        reallocate(scratch, s, 1.0);
+    }
+
     //! @brief returns the tree depth
     TreeNodeIndex depth() const { return maxDepth(octreeAcc_.levelRange.data(), octreeAcc_.levelRange.size()); }
 
@@ -788,62 +832,5 @@ private:
     //! @brief the status of the macs_ and counts_ rebalance criteria
     int rebalanceStatus_{valid};
 };
-
-/*! @brief exchange data of non-peer (beyond focus) tree cells
- *
- * @tparam        Q                an arithmetic type, or compile-time fix-sized arrays thereof
- * @tparam        T                float or double
- * @tparam        F                function object for octree upsweep
- * @param[in]     gOctree          a global (replicated on all ranks) tree
- * @param[in]     focusTree        octree focused on the executing rank
- * @param[inout]  quantities       an array of length focusTree.octree().numTreeNodes() with cell properties of the
- *                                 locally focused octree
- * @param[in]     upsweepFunction  callable object that will be used to compute internal cell properties of the
- *                                 global tree based on global leaf quantities
- * @param[in]     upsweepArgs      additional arguments that might be required for a tree upsweep, such as expansion
- *                                 centers if Q is a multipole type.
- *
- * This function obtains missing information for tree cell quantities belonging to far-away ranks which are not
- * peer ranks of the executing rank.
- *
- * The data flow is:
- * cell quantities owned by executing rank -> globalLeafQuantities -> global collective communication -> upsweep
- *   -> back-contribution from globalQuantities into @p quantities
- *
- * Precondition:  quantities contains valid data for each cell, including internal cells,
- *                that fall into the focus range of the executing rank
- * Postcondition: each element of quantities corresponding to non-local cells not owned by any of the peer
- *                ranks contains data obtained through global collective communication between ranks
- */
-template<class Q, class KeyType, class T, class F, class Accelerator, class Vector, class... UArgs>
-void globalFocusExchange(OctreeView<const KeyType> gOctree,
-                         const FocusedOctree<KeyType, T, Accelerator>& focusTree,
-                         std::span<Q> quantities,
-                         Vector& scratch,
-                         F&& upsweepFunction,
-                         UArgs&&... upsweepArgs)
-{
-    assert(gOctree.leaves != nullptr);
-    static_assert(HaveGpu<Accelerator>{} == IsDeviceVector<Vector>{});
-    std::size_t numGlobalLeaves = gOctree.numLeafNodes;
-    std::size_t numLetIdx       = focusTree.octreeViewAcc().numLeafNodes;
-    auto s                      = scratch.size();
-    auto [globalLeafQ, globalQuantities, gmapScratch, letIdx, letToGlob] =
-        util::packAllocBuffer(scratch, util::TypeList<Q, Q, TreeNodeIndex, TreeNodeIndex, TreeNodeIndex>{},
-                              {numGlobalLeaves, size_t(gOctree.numNodes), numGlobalLeaves, numLetIdx, numLetIdx}, 128);
-    focusTree.template populateGlobal<Q>(gOctree.leafSpan(), quantities, globalLeafQ, gmapScratch);
-
-    //! exchange global leaves
-    focusTree.template gatherGlobalLeaves<Q>(globalLeafQ);
-
-    scatterAcc<HaveGpu<Accelerator>{}>(gOctree.leafToInternalSpan(), globalLeafQ.data(), globalQuantities.data());
-    //! upsweep with the global tree
-    upsweepFunction(gOctree.levelRangeSpan(), gOctree.childOffsets, globalQuantities.data(), upsweepArgs...);
-
-    //! from the global tree, extract the part that the executing rank was missing
-    focusTree.template extractGlobal<Q>(gOctree.prefixes, gOctree.d_levelRange, globalQuantities, quantities,
-                                        letIdx.data(), letToGlob.data());
-    reallocate(scratch, s, 1.0);
-}
 
 } // namespace cstone

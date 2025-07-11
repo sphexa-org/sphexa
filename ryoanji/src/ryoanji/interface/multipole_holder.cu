@@ -81,8 +81,7 @@ public:
         upsweepGpu(octree_.levelRangeSpan(), octree_.childOffsets, multipoles_.data(), centers_);
 
         std::span d_multipoleSpan{rawPtr(multipoles_), size_t(octree_.numNodes)};
-        cstone::globalFocusExchange(gOctree, focusTree, d_multipoleSpan, traversalStack_, upsweepGpu,
-                                    globalCenters.data());
+        focusTree.globalExchange(gOctree, d_multipoleSpan, traversalStack_, upsweepGpu, globalCenters.data());
 
         focusTree.peerExchangeGpu(d_multipoleSpan, static_cast<int>(cstone::P2pTags::focusPeerCenters) + 1,
                                   traversalStack_);
