@@ -280,15 +280,14 @@ public:
      * @param[in]  gLeaves           cstone SFC key leaf cell array of the global tree
      * @param[in]  localQuantities   cell properties of the locally focused tree, length = octree().numTreeNodes()
      * @param[out] globalQuantities  cell properties of the global tree
-     * @param[-]   gmapScratch       scratch space for global tree indices to populate, length = gLeaves.size()
+     * @param[-]   gmap              scratch space for global to LET index translation, length = numGlobalNodes[myRank_]
      */
     template<class T>
     void populateGlobal(std::span<const KeyType> gLeaves,
                         std::span<const T> localQuantities,
                         std::span<T> globalQuantities,
-                        std::span<TreeNodeIndex> gmapScratch) const
+                        std::span<TreeNodeIndex> gmap) const
     {
-        auto gmap       = gmapScratch.subspan(globDispl_[myRank_], globNumNodes_[myRank_]);
         auto gLeavesFoc = gLeaves.subspan(globDispl_[myRank_], globNumNodes_[myRank_] + 1);
 
         if constexpr (HaveGpu<Accelerator>{})
@@ -422,11 +421,11 @@ public:
         }
 
         //! global exchange for the top nodes that are bigger than local domains
-        auto [gLeafCentersAcc, gmapScratch] =
+        auto [gLeafCentersAcc, gmap] =
             util::packAllocBuffer(scratch1, util::TypeList<SourceCenterType<RealType>, TreeNodeIndex>{},
-                                  {size_t(gOctree.numLeafNodes), size_t(gOctree.numLeafNodes)}, 128);
+                                  {size_t(gOctree.numLeafNodes), size_t(globNumNodes_[myRank_])}, 128);
         populateGlobal<SourceCenterType<RealType>>(gOctree.leafSpan(), {centersAcc_.data(), centersAcc_.size()},
-                                                   gLeafCentersAcc, gmapScratch);
+                                                   gLeafCentersAcc, gmap);
         gatherGlobalLeaves<SourceCenterType<RealType>>(gLeafCentersAcc);
 
         scatterAcc<HaveGpu<Accelerator>{}>(gOctree.leafToInternalSpan(), gLeafCentersAcc.data(),
@@ -679,10 +678,10 @@ public:
         std::size_t numGlobalLeaves                                          = gOctree.numLeafNodes;
         std::size_t numLetIdx                                                = octreeAcc_.numLeafNodes;
         auto s                                                               = scratch.size();
-        auto [globalLeafQ, globalQuantities, gmapScratch, letIdx, letToGlob] = util::packAllocBuffer(
+        auto [globalLeafQ, globalQuantities, gmap, letIdx, letToGlob]        = util::packAllocBuffer(
             scratch, util::TypeList<Q, Q, TreeNodeIndex, TreeNodeIndex, TreeNodeIndex>{},
-            {numGlobalLeaves, size_t(gOctree.numNodes), numGlobalLeaves, numLetIdx, numLetIdx}, 128);
-        populateGlobal<Q>(gOctree.leafSpan(), quantities, globalLeafQ, gmapScratch);
+            {numGlobalLeaves, size_t(gOctree.numNodes), size_t(globNumNodes_[myRank_]), numLetIdx, numLetIdx}, 128);
+        populateGlobal<Q>(gOctree.leafSpan(), quantities, globalLeafQ, gmap);
 
         //! exchange global leaves
         gatherGlobalLeaves<Q>(globalLeafQ);
