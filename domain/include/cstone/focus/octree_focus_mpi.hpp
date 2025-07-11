@@ -201,17 +201,16 @@ public:
         std::size_t origSize = scratch.size();
         std::span<const KeyType> leaves(leaves_);
 
-        leafCounts_.resize(nNodes(leaves_));
+        TreeNodeIndex numLeafNodes = octreeAcc_.numLeafNodes;
+        auto idxFromGlob           = enumerateRanges(invertRanges(0, assignment_, numLeafNodes));
+        leafCounts_.resize(numLeafNodes);
         if constexpr (HaveGpu<Accelerator>{})
         {
             reallocateDestructive(leafCountsAcc_, nNodes(leavesAcc_), allocGrowthRate_);
-            TreeNodeIndex numLeafNodes = octreeAcc_.numLeafNodes;
 
             computeNodeCountsGpu(rawPtr(leavesAcc_), rawPtr(leafCountsAcc_), numLeafNodes, particleKeys,
                                  std::numeric_limits<unsigned>::max(), false);
 
-            // add counts from global tree
-            auto idxFromGlob       = enumerateRanges(invertRanges(0, assignment_, numLeafNodes));
             std::size_t numIndices = idxFromGlob.size();
             auto* d_indices        = util::packAllocBuffer<TreeNodeIndex>(scratch, {&numIndices, 1}, 64)[0].data();
             memcpyH2D(idxFromGlob.data(), idxFromGlob.size(), d_indices);
@@ -227,13 +226,13 @@ public:
             upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(octreeAcc_.levelRange), rawPtr(octreeAcc_.childOffsets),
                           rawPtr(countsAcc_));
             std::span<unsigned> countsAccView{rawPtr(countsAcc_), countsAcc_.size()};
-            peerExchangeGpu(countsAccView, static_cast<int>(P2pTags::focusPeerCounts), scratch);
+            peerExchange(countsAccView, static_cast<int>(P2pTags::focusPeerCounts), scratch);
 
             upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(octreeAcc_.levelRange), rawPtr(octreeAcc_.childOffsets),
                           rawPtr(countsAcc_));
             gatherAcc<HaveGpu<Accelerator>{}>(leafToInternal(octreeAcc_), rawPtr(countsAcc_), rawPtr(leafCountsAcc_));
 
-            memcpyD2H(rawPtr(leafCountsAcc_), octreeAcc_.numLeafNodes, rawPtr(leafCounts_));
+            memcpyD2H(rawPtr(leafCountsAcc_), numLeafNodes, rawPtr(leafCounts_));
         }
         else
         {
@@ -241,9 +240,6 @@ public:
             assert(std::is_sorted(particleKeys.begin(), particleKeys.end()));
             computeNodeCounts<KeyType>(leaves_.data(), leafCounts_.data(), nNodes(leaves_), particleKeys,
                                        std::numeric_limits<unsigned>::max(), true);
-
-            // add counts from global tree
-            auto idxFromGlob = enumerateRanges(invertRanges(0, assignment_, nNodes(leaves_)));
             rangeCount<KeyType>(globalTreeLeaves, globalCounts, leaves, idxFromGlob, leafCounts_);
 
             // 1st upsweep with local and global data
@@ -264,16 +260,9 @@ public:
     }
 
     template<class T, class DevVec>
-    void peerExchange(std::span<T> q, int commTag, DevVec& s) const
+    void peerExchange(std::span<T> q, int tag, DevVec& s) const
     {
-        exchangeTreeletGeneral<T>(peers_, treeletIdx_.view(), assignment_, leafToInternal(octreeAcc_), q, commTag, s);
-    }
-
-    template<class T, class DevVec>
-    void peerExchangeGpu(std::span<T> q, int commTag, DevVec& s) const
-    {
-        exchangeTreeletGeneral<T>(peers_, treeletIdxAcc_.view(), assignment_, leafToInternal(octreeAcc_), q, commTag,
-                                  s);
+        exchangeTreeletGeneral<T>(peers_, treeletIdxAcc_.view(), assignment_, leafToInternal(octreeAcc_), q, tag, s);
     }
 
     /*! @brief transfer quantities of leaf cells inside the focus into a global array
@@ -421,27 +410,15 @@ public:
                 TreeNodeIndex nodeIdx = octree.leafToInternal[octree.numInternalNodes + leafIdx];
                 centersAcc_[nodeIdx]  = massCenter<RealType>(x, y, z, m, layout[leafIdx], layout[leafIdx + 1]);
             }
-            //! upsweep with local data in place
-            upsweep(octreeAcc_.levelRange, octreeAcc_.childOffsets.data(), centersAcc_.data(),
-                    CombineSourceCenter<RealType>{});
         }
 
         //! upsweep with local data in place
         upsweepCenters(octree.levelRangeSpan(), octree.childOffsets, centersAcc_.data());
         globalExchange<SType>(gOctree, {centersAcc_.data(), centersAcc_.size()},
                               {globalCentersAcc_.data(), globalCentersAcc_.size()}, scratch1, upsweepCenters);
-
-        if constexpr (HaveGpu<Accelerator>{})
-        {
-            peerExchangeGpu(std::span{centersAcc_.data(), centersAcc_.size()},
-                            static_cast<int>(P2pTags::focusPeerCenters), scratch1);
-        }
-        else
-        {
-            //! exchange information with peer close to focus
-            peerExchange(std::span{centersAcc_.data(), centersAcc_.size()}, static_cast<int>(P2pTags::focusPeerCenters),
-                         scratch1);
-        }
+        //! exchange information with peer close to focus
+        peerExchange(std::span{centersAcc_.data(), centersAcc_.size()}, static_cast<int>(P2pTags::focusPeerCenters),
+                     scratch1);
         //! upsweep with all (leaf) data in place
         upsweepCenters(octree.levelRangeSpan(), octree.childOffsets, centersAcc_.data());
     }
