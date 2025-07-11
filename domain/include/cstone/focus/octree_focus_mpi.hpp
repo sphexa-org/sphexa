@@ -41,6 +41,8 @@ class FocusedOctree
     template<class ValueType>
     using AccVector = std::conditional_t<HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
 
+    using SType = SourceCenterType<RealType>;
+
 public:
     /*! @brief constructor
      *
@@ -278,9 +280,9 @@ public:
      *
      * @tparam     T                 an arithmetic type or compile-time constant size arrays thereof
      * @param[in]  gLeaves           cstone SFC key leaf cell array of the global tree
-     * @param[in]  localQuantities   cell properties of the locally focused tree, length = octree().numTreeNodes()
-     * @param[out] globalQuantities  cell properties of the global tree
-     * @param[-]   gmap              scratch space for global to LET index translation, length = numGlobalNodes[myRank_]
+     * @param[in]  localQuantities   cell properties of the locally focused tree, size = octree().numTreeNodes()
+     * @param[out] globalQuantities  cell properties for the local part of the global tree, size == gmap.size()
+     * @param[-]   gmap              scratch space for global to LET index translation, size = numGlobalNodes[myRank_]
      */
     template<class T>
     void populateGlobal(std::span<const KeyType> gLeaves,
@@ -307,8 +309,7 @@ public:
             }
         }
 
-        gatherAcc<HaveGpu<Accelerator>{}, TreeNodeIndex>(gmap, localQuantities.data(),
-                                                         globalQuantities.data() + globDispl_[myRank_]);
+        gatherAcc<HaveGpu<Accelerator>{}, TreeNodeIndex>(gmap, localQuantities.data(), globalQuantities.data());
     }
 
     /*! @brief transfer missing cell quantities from global tree into localQuantities
@@ -360,10 +361,10 @@ public:
 
     //! @brief Distribute global leaf quantities with local part filled in
     template<class T>
-    void gatherGlobalLeaves(std::span<T> globalLeafQuantities) const
+    void gatherGlobalLeaves(std::span<T> gLeafQLoc, std::span<T> gLeafQAll) const
     {
         if constexpr (HaveGpu<Accelerator>{}) { syncGpu(); }
-        mpiAllgathervGpuDirect<HaveGpu<Accelerator>{}>(MPI_IN_PLACE, 0, globalLeafQuantities.data(),
+        mpiAllgathervGpuDirect<HaveGpu<Accelerator>{}>(gLeafQLoc.data(), globNumNodes_[myRank_], gLeafQAll.data(),
                                                        globNumNodes_.data(), globDispl_.data(), MPI_COMM_WORLD);
     }
 
@@ -421,14 +422,13 @@ public:
         }
 
         //! global exchange for the top nodes that are bigger than local domains
-        auto [gLeafCentersAcc, gmap] =
-            util::packAllocBuffer(scratch1, util::TypeList<SourceCenterType<RealType>, TreeNodeIndex>{},
-                                  {size_t(gOctree.numLeafNodes), size_t(globNumNodes_[myRank_])}, 128);
-        populateGlobal<SourceCenterType<RealType>>(gOctree.leafSpan(), {centersAcc_.data(), centersAcc_.size()},
-                                                   gLeafCentersAcc, gmap);
-        gatherGlobalLeaves<SourceCenterType<RealType>>(gLeafCentersAcc);
+        auto [gLeafCentersAll, gLeafCentersLoc, gmap] = util::packAllocBuffer(
+            scratch1, util::TypeList<SType, SType, TreeNodeIndex>{},
+            {size_t(gOctree.numLeafNodes), size_t(globNumNodes_[myRank_]), size_t(globNumNodes_[myRank_])}, 128);
+        populateGlobal<SType>(gOctree.leafSpan(), {centersAcc_.data(), centersAcc_.size()}, gLeafCentersLoc, gmap);
+        gatherGlobalLeaves<SourceCenterType<RealType>>(gLeafCentersLoc, gLeafCentersAll);
 
-        scatterAcc<HaveGpu<Accelerator>{}>(gOctree.leafToInternalSpan(), gLeafCentersAcc.data(),
+        scatterAcc<HaveGpu<Accelerator>{}>(gOctree.leafToInternalSpan(), gLeafCentersAll.data(),
                                            globalCentersAcc_.data());
         if constexpr (HaveGpu<Accelerator>{})
         {
@@ -674,25 +674,25 @@ public:
                         UArgs&&... upsweepArgs) const
     {
         assert(gOctree.leaves != nullptr);
-        static_assert(HaveGpu<Accelerator>{} == IsDeviceVector<Vector>{});
-        std::size_t numGlobalLeaves                                          = gOctree.numLeafNodes;
-        std::size_t numLetIdx                                                = octreeAcc_.numLeafNodes;
-        auto s                                                               = scratch.size();
-        auto [globalLeafQ, globalQuantities, gmap, letIdx, letToGlob]        = util::packAllocBuffer(
-            scratch, util::TypeList<Q, Q, TreeNodeIndex, TreeNodeIndex, TreeNodeIndex>{},
-            {numGlobalLeaves, size_t(gOctree.numNodes), size_t(globNumNodes_[myRank_]), numLetIdx, numLetIdx}, 128);
-        populateGlobal<Q>(gOctree.leafSpan(), quantities, globalLeafQ, gmap);
+        std::size_t numGlobalLeaves = gOctree.numLeafNodes;
+        std::size_t numLetIdx       = octreeAcc_.numLeafNodes;
+        auto s                      = scratch.size();
+        auto [gLeafQAll, gLeafQLoc, globQ, gmap, letIdx, letToGlob] =
+            util::packAllocBuffer(scratch, util::TypeList<Q, Q, Q, TreeNodeIndex, TreeNodeIndex, TreeNodeIndex>{},
+                                  {numGlobalLeaves, size_t(globNumNodes_[myRank_]), size_t(gOctree.numNodes),
+                                   size_t(globNumNodes_[myRank_]), numLetIdx, numLetIdx},
+                                  128);
+        populateGlobal<Q>(gOctree.leafSpan(), quantities, gLeafQLoc, gmap);
 
         //! exchange global leaves
-        gatherGlobalLeaves<Q>(globalLeafQ);
+        gatherGlobalLeaves<Q>(gLeafQLoc, gLeafQAll);
 
-        scatterAcc<HaveGpu<Accelerator>{}>(gOctree.leafToInternalSpan(), globalLeafQ.data(), globalQuantities.data());
+        scatterAcc<HaveGpu<Accelerator>{}>(gOctree.leafToInternalSpan(), gLeafQAll.data(), globQ.data());
         //! upsweep with the global tree
-        upsweepFunction(gOctree.levelRangeSpan(), gOctree.childOffsets, globalQuantities.data(), upsweepArgs...);
+        upsweepFunction(gOctree.levelRangeSpan(), gOctree.childOffsets, globQ.data(), upsweepArgs...);
 
         //! from the global tree, extract the part that the executing rank was missing
-        extractGlobal<Q>(gOctree.prefixes, gOctree.d_levelRange, globalQuantities, quantities, letIdx.data(),
-                         letToGlob.data());
+        extractGlobal<Q>(gOctree.prefixes, gOctree.d_levelRange, globQ, quantities, letIdx.data(), letToGlob.data());
         reallocate(scratch, s, 1.0);
     }
 
