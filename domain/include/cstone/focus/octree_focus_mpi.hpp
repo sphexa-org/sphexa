@@ -280,7 +280,7 @@ public:
      * @param[in]  gLeaves           cstone SFC key leaf cell array of the global tree
      * @param[in]  localQuantities   cell properties of the locally focused tree, length = octree().numTreeNodes()
      * @param[out] globalQuantities  cell properties of the global tree
-     * @param[-]   gmapScratch       scratch space for global tree indices to populate, length = gleaves.size()
+     * @param[-]   gmapScratch       scratch space for global tree indices to populate, length = gLeaves.size()
      */
     template<class T>
     void populateGlobal(std::span<const KeyType> gLeaves,
@@ -288,37 +288,28 @@ public:
                         std::span<T> globalQuantities,
                         std::span<TreeNodeIndex> gmapScratch) const
     {
-        assert(localQuantities.size() == octreeAcc_.numNodes);
+        auto gmap       = gmapScratch.subspan(globDispl_[myRank_], globNumNodes_[myRank_]);
+        auto gLeavesFoc = gLeaves.subspan(globDispl_[myRank_], globNumNodes_[myRank_] + 1);
 
         if constexpr (HaveGpu<Accelerator>{})
         {
-            auto firstGlobIdx = lowerBoundGpu(gLeaves.data(), gLeaves.data() + gLeaves.size(), prevFocusStart);
-            auto lastGlobIdx  = lowerBoundGpu(gLeaves.data(), gLeaves.data() + gLeaves.size(), prevFocusEnd);
-            std::span globLeavesFoc{gLeaves.data() + firstGlobIdx, lastGlobIdx - firstGlobIdx + 1};
-
-            auto gmap = gmapScratch.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx);
-            locateNodesGpu(globLeavesFoc.data(), globLeavesFoc.data() + globLeavesFoc.size(),
-                           octreeAcc_.prefixes.data(), octreeAcc_.d_levelRange.data(), gmap.data());
-            gatherGpu(gmap.data(), gmap.size(), localQuantities.data(), globalQuantities.data() + firstGlobIdx);
+            locateNodesGpu(gLeavesFoc.data(), gLeavesFoc.data() + gLeavesFoc.size(), octreeAcc_.prefixes.data(),
+                           octreeAcc_.d_levelRange.data(), gmap.data());
         }
         else
         {
-            TreeNodeIndex firstGlobIdx = findNodeAbove(gLeaves.data(), gLeaves.size(), prevFocusStart);
-            TreeNodeIndex lastGlobIdx  = findNodeAbove(gLeaves.data(), gLeaves.size(), prevFocusEnd);
-            auto globLeavesFoc         = gLeaves.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx + 1);
-            auto globQFoc              = globalQuantities.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx);
-
             const KeyType* nodeKeys         = rawPtr(octreeAcc_.prefixes);
             const TreeNodeIndex* levelRange = rawPtr(octreeAcc_.levelRange);
 
-            auto gmap = gmapScratch.subspan(firstGlobIdx, lastGlobIdx - firstGlobIdx);
 #pragma omp parallel for schedule(static)
-            for (TreeNodeIndex i = 0; i < globLeavesFoc.size() - 1; ++i)
+            for (TreeNodeIndex i = 0; i < globNumNodes_[myRank_]; ++i)
             {
-                gmap[i] = locateNode(globLeavesFoc[i], globLeavesFoc[i + 1], nodeKeys, levelRange);
+                gmap[i] = locateNode(gLeavesFoc[i], gLeavesFoc[i + 1], nodeKeys, levelRange);
             }
-            gather<TreeNodeIndex>(gmap, localQuantities.data(), globQFoc.data());
         }
+
+        gatherAcc<HaveGpu<Accelerator>{}, TreeNodeIndex>(gmap, localQuantities.data(),
+                                                         globalQuantities.data() + globDispl_[myRank_]);
     }
 
     /*! @brief transfer missing cell quantities from global tree into localQuantities
