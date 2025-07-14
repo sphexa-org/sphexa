@@ -74,6 +74,7 @@ std::ostream& operator<<(std::ostream& out, SomeStruct const& s)
 template<class T>
 std::tuple<dim3, dim3, thrust::host_vector<T>> testData()
 {
+    // Note: we use 3D thread blocks here to test proper lane indexing in multi-D blocks (test data is still 1D)
     const dim3 numBlocks = {5, 2, 3};
     const dim3 blockSize = {GpuConfig::warpSize / 4, 2, 6};
 
