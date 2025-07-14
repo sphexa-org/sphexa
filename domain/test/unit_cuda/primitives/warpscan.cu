@@ -137,7 +137,7 @@ void verify(thrust::host_vector<InputT> const& input, WarpF warpF, thrust::host_
 }
 
 template<class InputT, class OutputT = InputT, class F>
-void testOnDevice(F f)
+void testWarpCollectiveFunction(F f)
 {
     const auto [numBlocks, blockSize, input] = testData<InputT>();
 
@@ -158,7 +158,7 @@ struct WarpLaneIndex
     { std::iota(output.begin(), output.end(), 0u); };
 };
 
-TEST(WarpScan, laneIndex) { testOnDevice<unsigned>(WarpLaneIndex{}); }
+TEST(WarpScan, laneIndex) { testWarpCollectiveFunction<unsigned>(WarpLaneIndex{}); }
 
 template<int Src>
 struct WarpShflSync
@@ -175,14 +175,14 @@ struct WarpShflSync
 
 TEST(WarpScan, shflSync)
 {
-    testOnDevice<int>(WarpShflSync<GpuConfig::warpSize / 10>{});
-    testOnDevice<int>(WarpShflSync<GpuConfig::warpSize - 1>{});
-    testOnDevice<float>(WarpShflSync<GpuConfig::warpSize / 3>{});
-    testOnDevice<float>(WarpShflSync<GpuConfig::warpSize - 1>{});
-    testOnDevice<double>(WarpShflSync<GpuConfig::warpSize / 7>{});
-    testOnDevice<double>(WarpShflSync<GpuConfig::warpSize - 1>{});
-    testOnDevice<SomeStruct>(WarpShflSync<GpuConfig::warpSize / 2>{});
-    testOnDevice<SomeStruct>(WarpShflSync<GpuConfig::warpSize - 1>{});
+    testWarpCollectiveFunction<int>(WarpShflSync<GpuConfig::warpSize / 10>{});
+    testWarpCollectiveFunction<int>(WarpShflSync<GpuConfig::warpSize - 1>{});
+    testWarpCollectiveFunction<float>(WarpShflSync<GpuConfig::warpSize / 3>{});
+    testWarpCollectiveFunction<float>(WarpShflSync<GpuConfig::warpSize - 1>{});
+    testWarpCollectiveFunction<double>(WarpShflSync<GpuConfig::warpSize / 7>{});
+    testWarpCollectiveFunction<double>(WarpShflSync<GpuConfig::warpSize - 1>{});
+    testWarpCollectiveFunction<SomeStruct>(WarpShflSync<GpuConfig::warpSize / 2>{});
+    testWarpCollectiveFunction<SomeStruct>(WarpShflSync<GpuConfig::warpSize - 1>{});
 }
 
 template<GpuConfig::ThreadMask LaneMask>
@@ -203,14 +203,14 @@ struct WarpShflXorSync
 
 TEST(WarpScan, shflXorSync)
 {
-    testOnDevice<int>(WarpShflXorSync<2>{});
-    testOnDevice<int>(WarpShflXorSync<4>{});
-    testOnDevice<float>(WarpShflXorSync<8>{});
-    testOnDevice<float>(WarpShflXorSync<16>{});
-    testOnDevice<double>(WarpShflXorSync<2>{});
-    testOnDevice<double>(WarpShflXorSync<4>{});
-    testOnDevice<SomeStruct>(WarpShflXorSync<8>{});
-    testOnDevice<SomeStruct>(WarpShflXorSync<16>{});
+    testWarpCollectiveFunction<int>(WarpShflXorSync<2>{});
+    testWarpCollectiveFunction<int>(WarpShflXorSync<4>{});
+    testWarpCollectiveFunction<float>(WarpShflXorSync<8>{});
+    testWarpCollectiveFunction<float>(WarpShflXorSync<16>{});
+    testWarpCollectiveFunction<double>(WarpShflXorSync<2>{});
+    testWarpCollectiveFunction<double>(WarpShflXorSync<4>{});
+    testWarpCollectiveFunction<SomeStruct>(WarpShflXorSync<8>{});
+    testWarpCollectiveFunction<SomeStruct>(WarpShflXorSync<16>{});
 }
 
 template<unsigned Delta>
@@ -231,14 +231,14 @@ struct WarpShflUpSync
 
 TEST(WarpScan, shflUpSync)
 {
-    testOnDevice<int>(WarpShflUpSync<1>{});
-    testOnDevice<int>(WarpShflUpSync<2>{});
-    testOnDevice<float>(WarpShflUpSync<3>{});
-    testOnDevice<float>(WarpShflUpSync<4>{});
-    testOnDevice<double>(WarpShflUpSync<5>{});
-    testOnDevice<double>(WarpShflUpSync<6>{});
-    testOnDevice<SomeStruct>(WarpShflUpSync<7>{});
-    testOnDevice<SomeStruct>(WarpShflUpSync<8>{});
+    testWarpCollectiveFunction<int>(WarpShflUpSync<1>{});
+    testWarpCollectiveFunction<int>(WarpShflUpSync<2>{});
+    testWarpCollectiveFunction<float>(WarpShflUpSync<3>{});
+    testWarpCollectiveFunction<float>(WarpShflUpSync<4>{});
+    testWarpCollectiveFunction<double>(WarpShflUpSync<5>{});
+    testWarpCollectiveFunction<double>(WarpShflUpSync<6>{});
+    testWarpCollectiveFunction<SomeStruct>(WarpShflUpSync<7>{});
+    testWarpCollectiveFunction<SomeStruct>(WarpShflUpSync<8>{});
 }
 
 template<unsigned Delta>
@@ -259,14 +259,14 @@ struct WarpShflDownSync
 
 TEST(WarpScan, shflDownSync)
 {
-    testOnDevice<int>(WarpShflDownSync<1>{});
-    testOnDevice<int>(WarpShflDownSync<2>{});
-    testOnDevice<float>(WarpShflDownSync<3>{});
-    testOnDevice<float>(WarpShflDownSync<4>{});
-    testOnDevice<double>(WarpShflDownSync<5>{});
-    testOnDevice<double>(WarpShflDownSync<6>{});
-    testOnDevice<SomeStruct>(WarpShflDownSync<7>{});
-    testOnDevice<SomeStruct>(WarpShflDownSync<8>{});
+    testWarpCollectiveFunction<int>(WarpShflDownSync<1>{});
+    testWarpCollectiveFunction<int>(WarpShflDownSync<2>{});
+    testWarpCollectiveFunction<float>(WarpShflDownSync<3>{});
+    testWarpCollectiveFunction<float>(WarpShflDownSync<4>{});
+    testWarpCollectiveFunction<double>(WarpShflDownSync<5>{});
+    testWarpCollectiveFunction<double>(WarpShflDownSync<6>{});
+    testWarpCollectiveFunction<SomeStruct>(WarpShflDownSync<7>{});
+    testWarpCollectiveFunction<SomeStruct>(WarpShflDownSync<8>{});
 }
 
 struct WarpBallotSync
@@ -282,7 +282,7 @@ struct WarpBallotSync
     };
 };
 
-TEST(WarpScan, ballotSync) { testOnDevice<bool, GpuConfig::ThreadMask>(WarpBallotSync{}); }
+TEST(WarpScan, ballotSync) { testWarpCollectiveFunction<bool, GpuConfig::ThreadMask>(WarpBallotSync{}); }
 
 struct WarpAnySync
 {
@@ -292,7 +292,7 @@ struct WarpAnySync
     { std::ranges::fill(output, std::accumulate(input.begin(), input.end(), false, std::logical_or<bool>{})); };
 };
 
-TEST(WarpScan, anySync) { testOnDevice<bool>(WarpAnySync{}); }
+TEST(WarpScan, anySync) { testWarpCollectiveFunction<bool>(WarpAnySync{}); }
 
 struct WarpMin
 {
@@ -308,9 +308,9 @@ struct WarpMin
 
 TEST(WarpScan, warpMin)
 {
-    testOnDevice<int>(WarpMin{});
-    testOnDevice<float>(WarpMin{});
-    testOnDevice<double>(WarpMin{});
+    testWarpCollectiveFunction<int>(WarpMin{});
+    testWarpCollectiveFunction<float>(WarpMin{});
+    testWarpCollectiveFunction<double>(WarpMin{});
 }
 
 struct WarpMax
@@ -327,9 +327,9 @@ struct WarpMax
 
 TEST(WarpScan, warpMax)
 {
-    testOnDevice<int>(WarpMax{});
-    testOnDevice<float>(WarpMax{});
-    testOnDevice<double>(WarpMax{});
+    testWarpCollectiveFunction<int>(WarpMax{});
+    testWarpCollectiveFunction<float>(WarpMax{});
+    testWarpCollectiveFunction<double>(WarpMax{});
 }
 
 struct WarpBitwiseOr
@@ -346,8 +346,8 @@ struct WarpBitwiseOr
 
 TEST(WarpScan, warpBitwiseOr)
 {
-    testOnDevice<int>(WarpBitwiseOr{});
-    testOnDevice<unsigned>(WarpBitwiseOr{});
+    testWarpCollectiveFunction<int>(WarpBitwiseOr{});
+    testWarpCollectiveFunction<unsigned>(WarpBitwiseOr{});
 }
 
 struct WarpInclusiveScanInt
@@ -358,7 +358,7 @@ struct WarpInclusiveScanInt
     { std::inclusive_scan(input.begin(), input.end(), output.begin()); };
 };
 
-TEST(WarpScan, inclusiveScanInt) { testOnDevice<int>(WarpInclusiveScanInt{}); }
+TEST(WarpScan, inclusiveScanInt) { testWarpCollectiveFunction<int>(WarpInclusiveScanInt{}); }
 
 struct WarpExclusiveScanBool
 {
@@ -368,7 +368,7 @@ struct WarpExclusiveScanBool
     { std::exclusive_scan(input.begin(), input.end(), output.begin(), 0, std::plus<int>()); };
 };
 
-TEST(WarpScan, exclusiveScanBool) { testOnDevice<bool, int>(WarpExclusiveScanBool{}); }
+TEST(WarpScan, exclusiveScanBool) { testWarpCollectiveFunction<bool, int>(WarpExclusiveScanBool{}); }
 
 struct WarpReduceBool
 {
@@ -378,7 +378,7 @@ struct WarpReduceBool
     { std::ranges::fill(output, std::accumulate(input.begin(), input.end(), 0)); };
 };
 
-TEST(WarpScan, reduceBool) { testOnDevice<bool, int>(WarpReduceBool{}); }
+TEST(WarpScan, reduceBool) { testWarpCollectiveFunction<bool, int>(WarpReduceBool{}); }
 
 template<int Carry>
 struct WarpInclusiveSegscanInt
@@ -398,9 +398,9 @@ struct WarpInclusiveSegscanInt
 
 TEST(WarpScan, inclusiveSegscanInt)
 {
-    testOnDevice<int>(WarpInclusiveSegscanInt<1>{});
-    testOnDevice<int>(WarpInclusiveSegscanInt<42>{});
-    testOnDevice<int>(WarpInclusiveSegscanInt<-42>{});
+    testWarpCollectiveFunction<int>(WarpInclusiveSegscanInt<1>{});
+    testWarpCollectiveFunction<int>(WarpInclusiveSegscanInt<42>{});
+    testWarpCollectiveFunction<int>(WarpInclusiveSegscanInt<-42>{});
 }
 
 struct WarpStreamCompact
@@ -423,9 +423,9 @@ struct WarpStreamCompact
 
 TEST(WarpScan, streamCompact)
 {
-    testOnDevice<int>(WarpStreamCompact{});
-    testOnDevice<float>(WarpStreamCompact{});
-    testOnDevice<double>(WarpStreamCompact{});
+    testWarpCollectiveFunction<int>(WarpStreamCompact{});
+    testWarpCollectiveFunction<float>(WarpStreamCompact{});
+    testWarpCollectiveFunction<double>(WarpStreamCompact{});
 }
 
 struct WarpSpreadSeg8
@@ -439,7 +439,7 @@ struct WarpSpreadSeg8
     };
 };
 
-TEST(WarpScan, warpSpreadSeg8) { testOnDevice<int>(WarpSpreadSeg8{}); }
+TEST(WarpScan, warpSpreadSeg8) { testWarpCollectiveFunction<int>(WarpSpreadSeg8{}); }
 
 __global__ void applyAtomicMinFloat(float* addr, float value)
 {
