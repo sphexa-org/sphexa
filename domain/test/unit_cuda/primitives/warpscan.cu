@@ -153,9 +153,10 @@ void testOnDevice(F f)
 
 struct WarpLaneIndex
 {
-    __device__ unsigned operator()(unsigned) const { return laneIndex(); }
+    __device__ unsigned operator()(unsigned /* unused */) const { return laneIndex(); }
 
-    static constexpr auto reference = [](auto input, auto output) { std::iota(output.begin(), output.end(), 0u); };
+    static constexpr auto reference = [](WarpSpan<const unsigned> /* input */, WarpSpan<unsigned> output)
+    { std::iota(output.begin(), output.end(), 0u); };
 };
 
 TEST(WarpScan, laneIndex) { testOnDevice<unsigned>(WarpLaneIndex{}); }
@@ -169,7 +170,8 @@ struct WarpShflSync
         return shflSync(x, Src);
     };
 
-    static constexpr auto reference = [](auto input, auto output) { std::ranges::fill(output, input[Src]); };
+    static constexpr auto reference = []<class T>(WarpSpan<const T> input, WarpSpan<T> output)
+    { std::ranges::fill(output, input[Src]); };
 };
 
 TEST(WarpScan, shflSync)
@@ -193,7 +195,7 @@ struct WarpShflXorSync
         return shflXorSync(x, LaneMask);
     };
 
-    static constexpr auto reference = [](auto input, auto output)
+    static constexpr auto reference = []<class T>(WarpSpan<const T> input, WarpSpan<T> output)
     {
         for (std::size_t i = 0; i < output.size(); ++i)
             output[i] = input[i ^ LaneMask];
@@ -221,7 +223,7 @@ struct WarpShflUpSync
         return shflUpSync(x, Delta);
     };
 
-    static constexpr auto reference = [](auto input, auto output)
+    static constexpr auto reference = []<class T>(WarpSpan<const T> input, WarpSpan<T> output)
     {
         std::copy_n(input.begin(), Delta, output.begin());
         std::copy_n(input.begin(), GpuConfig::warpSize - Delta, output.begin() + Delta);
@@ -249,7 +251,7 @@ struct WarpShflDownSync
         return shflDownSync(x, Delta);
     };
 
-    static constexpr auto reference = [](auto input, auto output)
+    static constexpr auto reference = []<class T>(WarpSpan<const T> input, WarpSpan<T> output)
     {
         std::copy_n(input.begin() + Delta, GpuConfig::warpSize - Delta, output.begin());
         std::copy_n(input.end() - Delta, Delta, output.end() - Delta);
@@ -272,7 +274,7 @@ struct WarpBallotSync
 {
     __device__ GpuConfig::ThreadMask operator()(bool x) const { return ballotSync(x); };
 
-    static constexpr auto reference = [](auto input, auto output)
+    static constexpr auto reference = [](WarpSpan<const bool> input, WarpSpan<GpuConfig::ThreadMask> output)
     {
         GpuConfig::ThreadMask result = 0;
         for (std::size_t i = 0; i < output.size(); ++i)
@@ -287,7 +289,7 @@ struct WarpAnySync
 {
     __device__ bool operator()(bool x) const { return anySync(x); };
 
-    static constexpr auto reference = [](auto input, auto output)
+    static constexpr auto reference = [](WarpSpan<const bool> input, WarpSpan<bool> output)
     { std::ranges::fill(output, std::accumulate(input.begin(), input.end(), false, std::logical_or<bool>{})); };
 };
 
@@ -301,7 +303,7 @@ struct WarpMin
         return warpMin(x);
     }
 
-    static constexpr auto reference = [](auto input, auto output)
+    static constexpr auto reference = []<class T>(WarpSpan<const T> input, WarpSpan<T> output)
     { std::ranges::fill(output, *std::ranges::min_element(input)); };
 };
 
@@ -320,7 +322,7 @@ struct WarpMax
         return warpMax(x);
     }
 
-    static constexpr auto reference = [](auto input, auto output)
+    static constexpr auto reference = []<class T>(WarpSpan<const T> input, WarpSpan<T> output)
     { std::ranges::fill(output, *std::ranges::max_element(input)); };
 };
 
@@ -339,11 +341,8 @@ struct WarpBitwiseOr
         return warpBitwiseOr(x);
     }
 
-    static constexpr auto reference = [](auto input, auto output)
-    {
-        using T = decltype(output)::value_type;
-        std::ranges::fill(output, std::accumulate(input.begin(), input.end(), T(0), std::bit_or<T>{}));
-    };
+    static constexpr auto reference = []<class T>(WarpSpan<const T> input, WarpSpan<T> output)
+    { std::ranges::fill(output, std::accumulate(input.begin(), input.end(), T(0), std::bit_or<T>{})); };
 };
 
 TEST(WarpScan, warpBitwiseOr)
@@ -356,7 +355,7 @@ struct WarpInclusiveScanInt
 {
     __device__ int operator()(int x) const { return inclusiveScanInt(x); }
 
-    static constexpr auto reference = [](auto input, auto output)
+    static constexpr auto reference = [](WarpSpan<const int> input, WarpSpan<int> output)
     { std::inclusive_scan(input.begin(), input.end(), output.begin()); };
 };
 
@@ -366,7 +365,7 @@ struct WarpExclusiveScanBool
 {
     __device__ int operator()(bool x) const { return exclusiveScanBool(x); }
 
-    static constexpr auto reference = [](auto input, auto output)
+    static constexpr auto reference = [](WarpSpan<const bool> input, WarpSpan<int> output)
     { std::exclusive_scan(input.begin(), input.end(), output.begin(), 0, std::plus<int>()); };
 };
 
@@ -376,7 +375,7 @@ struct WarpReduceBool
 {
     __device__ int operator()(bool x) const { return reduceBool(x); }
 
-    static constexpr auto reference = [](auto input, auto output)
+    static constexpr auto reference = [](WarpSpan<const bool> input, WarpSpan<int> output)
     { std::ranges::fill(output, std::accumulate(input.begin(), input.end(), 0)); };
 };
 
@@ -387,7 +386,7 @@ struct WarpInclusiveSegscanInt
 {
     __device__ int operator()(int x) const { return inclusiveSegscanInt(x, Carry); }
 
-    static constexpr auto reference = [](auto input, auto output)
+    static constexpr auto reference = [](WarpSpan<const int> input, WarpSpan<int> output)
     {
         int result = Carry;
         for (std::size_t i = 0; i < input.size(); ++i)
@@ -416,7 +415,7 @@ struct WarpStreamCompact
         return laneIndex() < numKeep ? x : T(42);
     }
 
-    static constexpr auto reference = [](auto input, auto output)
+    static constexpr auto reference = []<class T>(WarpSpan<const T> input, WarpSpan<T> output)
     {
         auto [_, out] = std::ranges::copy_if(input, output.begin(), [](auto x) { return x <= 0; });
         std::fill(out, output.end(), 42);
@@ -434,7 +433,7 @@ struct WarpSpreadSeg8
 {
     __device__ int operator()(int x) const { return spreadSeg8(x); }
 
-    static constexpr auto reference = [](auto input, auto output)
+    static constexpr auto reference = [](WarpSpan<const int> input, WarpSpan<int> output)
     {
         for (std::size_t i = 0; i < output.size(); ++i)
             output[i] = i % 8 == 0 ? input[i / 8] : output[i - 1] + 1;
