@@ -16,12 +16,15 @@
 #include "gtest/gtest.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <functional>
+#include <iomanip>
 #include <numeric>
 #include <random>
 #include <ranges>
-#include <span>
+#include <ranges>
+#include <sstream>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -60,6 +63,11 @@ struct SomeStruct
         return a == other.a && b == other.b && c == other.c && d == other.d;
     }
 };
+
+std::ostream& operator<<(std::ostream& out, SomeStruct const& s) {
+    out << "SomeStruct {" << s.a << ", " << s.b << ", " << s.c << ", " << s.d << "}";
+    return out;
+}
 
 template<class T>
 std::tuple<dim3, dim3, thrust::host_vector<T>> testData()
@@ -101,16 +109,26 @@ template<class T>
 using WarpSpan = std::span<T, GpuConfig::warpSize>;
 
 template<class InputT, class OutputT, class WarpF>
-thrust::host_vector<OutputT> computeReference(thrust::host_vector<InputT> const& input, WarpF warpF)
+void verify(thrust::host_vector<InputT> const& input, WarpF warpF, thrust::host_vector<OutputT> const& output)
 {
-    thrust::host_vector<OutputT> output(input.size());
+    ASSERT_EQ(input.size(), output.size());
+    ASSERT_EQ(input.size() % GpuConfig::warpSize, 0);
     for (std::size_t warp = 0; warp < input.size() / GpuConfig::warpSize; ++warp)
     {
         WarpSpan<const InputT> warpInput(&input[warp * GpuConfig::warpSize], &input[(warp + 1) * GpuConfig::warpSize]);
-        WarpSpan<OutputT> warpOutput(&output[warp * GpuConfig::warpSize], &output[(warp + 1) * GpuConfig::warpSize]);
-        warpF(warpInput, warpOutput);
+        WarpSpan<const OutputT> warpOutput(&output[warp * GpuConfig::warpSize], &output[(warp + 1) * GpuConfig::warpSize]);
+        std::array<OutputT, GpuConfig::warpSize> expectedWarpOutput;
+
+        warpF(warpInput, WarpSpan<OutputT>(expectedWarpOutput));
+
+        if (!std::ranges::equal(warpOutput, expectedWarpOutput)) {
+            std::ostringstream failures;
+            for (unsigned i = 0; i < GpuConfig::warpSize; ++i)
+                failures << "Lane " << std::setw(2) << i << " - input: " << warpInput[i] << ", output: " << warpOutput[i] << ", expected output: " << expectedWarpOutput[i] << "\n";
+
+            ADD_FAILURE() << failures.view();
+        }
     }
-    return output;
 }
 
 template<class InputT, class OutputT = InputT, class F>
@@ -123,10 +141,8 @@ void testOnDevice(F f)
     applyWarpFunction<<<numBlocks, blockSize>>>(rawPtr(deviceInput), rawPtr(deviceOutput), f);
     checkGpuErrors(cudaDeviceSynchronize());
 
-    thrust::host_vector<OutputT> reference = computeReference<InputT, OutputT>(input, F::reference);
-    thrust::host_vector<OutputT> output    = deviceOutput;
-
-    EXPECT_EQ(output, reference);
+    thrust::host_vector<OutputT> output = deviceOutput;
+    verify(input, F::reference, output);
 }
 
 struct WarpLaneIndex
