@@ -161,7 +161,7 @@ struct MomentumAndEnergyInteraction
         T    momentum_z = momentum_i * termA3_i + momentum_j * termA3_j + a_visc_z;
 
         return std::make_tuple(a_visc_energy, energy, momentum_x, momentum_y, momentum_z,
-                               cstone::ijloop::reduction::max(vijsignal));
+                               cstone::ijloop::symmetric::even(cstone::ijloop::reduction::max(vijsignal)));
     }
 };
 
