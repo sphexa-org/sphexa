@@ -46,7 +46,7 @@ __device__ unsigned globalIndex()
 }
 
 template<class InputT, class OutputT = InputT, class F>
-__global__ void applyWarpFunction(InputT* const input, OutputT* output, F f)
+__global__ void applyWarpCollectiveFunction(InputT* const input, OutputT* output, F f)
 {
     const unsigned index = globalIndex();
     output[index]        = f(input[index]);
@@ -72,7 +72,7 @@ std::ostream& operator<<(std::ostream& out, SomeStruct const& s)
 }
 
 template<class T>
-std::tuple<dim3, dim3, thrust::host_vector<T>> testData()
+std::tuple<dim3, dim3, thrust::host_vector<T>> warpCollectiveFunctionTestData()
 {
     // Note: we use 3D thread blocks here to test proper lane indexing in multi-D blocks (test data is still 1D)
     const dim3 numBlocks = {5, 2, 3};
@@ -112,7 +112,9 @@ template<class T>
 using WarpSpan = std::span<T, GpuConfig::warpSize>;
 
 template<class InputT, class OutputT, class WarpF>
-void verify(thrust::host_vector<InputT> const& input, WarpF warpF, thrust::host_vector<OutputT> const& output)
+void verifyWarpCollectiveFunctionOutput(thrust::host_vector<InputT> const& input,
+                                        WarpF warpF,
+                                        thrust::host_vector<OutputT> const& output)
 {
     ASSERT_EQ(input.size(), output.size());
     ASSERT_EQ(input.size() % GpuConfig::warpSize, 0);
@@ -136,25 +138,31 @@ void verify(thrust::host_vector<InputT> const& input, WarpF warpF, thrust::host_
     }
 }
 
+/* Helper to test warp-collective functions on the GPU. InputT/OutputT are per-thread input/output types
+ * The functor f provides a reference implementation on the host to the against. It must:
+ * - be a device-callable functor, taking a single argument,
+ * - have static member F::reference which is a functor with signature
+ *   (WarpSpan<const InputT>, WarpSpan<OutputT>) -> void.
+ */
 template<class InputT, class OutputT = InputT, class F>
 void testWarpCollectiveFunction(F f)
 {
-    const auto [numBlocks, blockSize, input] = testData<InputT>();
+    const auto [numBlocks, blockSize, input] = warpCollectiveFunctionTestData<InputT>();
 
     thrust::device_vector<InputT> deviceInput = input;
     thrust::device_vector<OutputT> deviceOutput(input.size());
-    applyWarpFunction<<<numBlocks, blockSize>>>(rawPtr(deviceInput), rawPtr(deviceOutput), f);
+    applyWarpCollectiveFunction<<<numBlocks, blockSize>>>(rawPtr(deviceInput), rawPtr(deviceOutput), f);
     checkGpuErrors(cudaDeviceSynchronize());
 
     thrust::host_vector<OutputT> output = deviceOutput;
-    verify(input, F::reference, output);
+    verifyWarpCollectiveFunctionOutput(input, F::reference, output);
 }
 
 struct WarpLaneIndex
 {
     __device__ unsigned operator()(unsigned /* unused */) const { return laneIndex(); }
 
-    static constexpr auto reference = [](WarpSpan<const unsigned> /* input */, WarpSpan<unsigned> output)
+    static constexpr auto reference = [](WarpSpan<const unsigned> /* unused */, WarpSpan<unsigned> output)
     { std::iota(output.begin(), output.end(), 0u); };
 };
 
