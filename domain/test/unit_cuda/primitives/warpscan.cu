@@ -254,7 +254,7 @@ struct WarpBallotSync
     {
         GpuConfig::ThreadMask result = 0;
         for (std::size_t i = 0; i < output.size(); ++i)
-            result |= input[i] << i;
+            result |= GpuConfig::ThreadMask(input[i]) << i;
         std::ranges::fill(output, result);
     };
 };
