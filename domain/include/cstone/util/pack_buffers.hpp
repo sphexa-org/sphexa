@@ -31,7 +31,7 @@ namespace util
 template<class... Arrays>
 auto computeByteOffsets(size_t count, int alignment, Arrays... arrays)
 {
-    static_assert((... && std::is_pointer_v<Arrays>)&&"all arrays must be pointers");
+    static_assert((... && std::is_pointer_v<Arrays>), "all arrays must be pointers");
 
     util::array<size_t, sizeof...(Arrays) + 1> byteOffsets{sizeof(std::decay_t<decltype(*arrays)>)...};
     byteOffsets *= count;
@@ -50,20 +50,17 @@ auto computeByteOffsets(size_t count, int alignment, Arrays... arrays)
 namespace aux_traits
 {
 template<class T>
-using MakeL2ArrayPtrs = util::array<T*, 2>;
-
-template<class T>
 using PackType = std::conditional_t<sizeof(T) < sizeof(float), T, util::array<float, sizeof(T) / sizeof(float)>>;
 } // namespace aux_traits
 
 /*! @brief Compute multiple pointers such that the argument @p arrays can be mapped into a single buffer
  *
- * @tparam alignment        byte alignment of the individual arrays in the packed buffer
- * @tparam Arrays           arbitrary type of size 16 bytes or smaller
- * @param packedBufferBase  base address of the packed buffer
- * @param arraySize         number of elements of each @p array
- * @param arrays            independent array pointers
- * @return                  a tuple with (src, packed) pointers for each array
+ * @tparam alignment    byte alignment of the individual arrays in the packed buffer
+ * @tparam Arrays       arbitrary type of size 16 bytes or smaller
+ * @param base          base address of the packed buffer
+ * @param arraySize     number of elements of each @p array
+ * @param arrays        independent array pointers
+ * @return              a tuple with (src, packed) pointers for each array
  *
  * @p arrays:    ------      ------         ------
  *   (pointers)  a           b              c
@@ -80,35 +77,21 @@ using PackType = std::conditional_t<sizeof(T) < sizeof(float), T, util::array<fl
  * to reduce the number of gather/scatter GPU kernel template instantiations.
  */
 template<int alignment, class... Arrays>
-auto packBufferPtrs(void* packedBufferBase, size_t arraySize, Arrays... arrays)
+auto packBufferPtrs(void* base, size_t arraySize, Arrays... arrays)
 {
-    static_assert((... && std::is_pointer_v<Arrays>)&&"all arrays must be pointers");
-    constexpr int numArrays = sizeof...(Arrays);
-    constexpr auto indices  = util::makeIntegralTuple(std::make_index_sequence<numArrays>{});
-
-    auto* packedBufferBase_ = reinterpret_cast<char*>(packedBufferBase);
-    const std::array<char*, numArrays> data{reinterpret_cast<char*>(arrays)...};
-
+    static_assert((... && std::is_pointer_v<Arrays>), "all arrays must be pointers");
     auto arrayByteOffsets = computeByteOffsets(arraySize, alignment, arrays...);
+    using Types           = TypeList<aux_traits::PackType<std::decay_t<decltype(*arrays)>>...>;
 
-    using Types     = TypeList<aux_traits::PackType<std::decay_t<decltype(*arrays)>>...>;
-    using PtrTypes  = Map<aux_traits::MakeL2ArrayPtrs, Types>;
-    using TupleType = Reduce<std::tuple, PtrTypes>;
-
-    TupleType ret;
-
-    auto packOneBuffer = [base = packedBufferBase_, &data, &arrayByteOffsets, &ret](auto index)
+    auto packBuffers = [base, &arrayByteOffsets]<std::size_t... Is>(std::index_sequence<Is...>, auto data)
     {
-        using ElementType = TypeListElement_t<index, Types>;
-        auto* srcPtr      = reinterpret_cast<ElementType*>(data[index]);
-        auto* packedPtr   = reinterpret_cast<ElementType*>(base + arrayByteOffsets[index]);
-
-        std::get<index>(ret) = util::array<ElementType*, 2>{srcPtr, packedPtr};
+        auto* base_c = reinterpret_cast<char*>(base);
+        return std::make_tuple(util::array<TypeListElement_t<Is, Types>*, 2>{
+            reinterpret_cast<TypeListElement_t<Is, Types>*>(std::get<Is>(data)),
+            reinterpret_cast<TypeListElement_t<Is, Types>*>(base_c + arrayByteOffsets[Is])}...);
     };
 
-    util::for_each_tuple(packOneBuffer, indices);
-
-    return ret;
+    return packBuffers(std::make_index_sequence<sizeof...(Arrays)>{}, std::make_tuple(arrays...));
 }
 
 //! calculate needed space in bytes

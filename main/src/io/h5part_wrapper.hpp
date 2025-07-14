@@ -44,7 +44,7 @@ namespace sphexa
 namespace fileutils
 {
 
-using H5PartTypes = util::TypeList<double, float, char, int, int64_t, unsigned, uint64_t>;
+using H5PartTypes = util::TypeList<double, float, char, int, int64_t>;
 
 std::string H5PartTypeToString(h5part_int64_t type)
 {
@@ -197,25 +197,25 @@ void readAttribute(ExtractType* attr, int attrSizeBuf, int attrIndex, Reader&& r
 
     auto readTypesafe = [&](auto dummyValue)
     {
-        using TypeInFile = std::decay_t<decltype(dummyValue)>;
-        if (fileutils::H5PartType<TypeInFile>{} == typeId && not breakLoop)
+        using TrialType = std::decay_t<decltype(dummyValue)>;
+        if (fileutils::H5PartType<TrialType>{} == typeId && not breakLoop)
         {
-            std::vector<TypeInFile> attrBuf(attrSizeFile);
+            std::vector<TrialType> attrBuf(attrSizeFile);
             if (readAttrib(attrName, attrBuf.data()) != H5PART_SUCCESS)
             {
                 throw std::runtime_error("Could not read attribute " + std::string(attrName) + "\n");
             }
 
-            bool bothFloating        = std::is_floating_point_v<TypeInFile> && std::is_floating_point_v<ExtractType>;
-            bool extractToCommonType = std::is_same_v<std::common_type_t<TypeInFile, ExtractType>, ExtractType>;
-            if (bothFloating || extractToCommonType) { std::copy(attrBuf.begin(), attrBuf.end(), attr); }
+            bool h5IsSame            = H5PartType<TrialType>{} == H5PartType<ExtractType>{};
+            bool bothFloating        = std::is_floating_point_v<TrialType> && std::is_floating_point_v<ExtractType>;
+            bool extractToCommonType = std::is_same_v<std::common_type_t<TrialType, ExtractType>, ExtractType>;
+            if (h5IsSame || bothFloating || extractToCommonType) { std::copy(attrBuf.begin(), attrBuf.end(), attr); }
             else
             {
                 int64_t memTypeId = fileutils::H5PartType<ExtractType>{};
                 throw std::runtime_error("Reading attribute " + std::string(attrName) +
-                                         " failed: " + "type in file is " + fileutils::H5PartTypeToString(typeId) +
-                                         ", but supplied buffer type is " + fileutils::H5PartTypeToString(memTypeId) +
-                                         "\n");
+                                         " failed: " + "type in file is " + H5PartTypeToString(typeId) +
+                                         ", but supplied buffer type is " + H5PartTypeToString(memTypeId) + "\n");
             }
             breakLoop = true;
         }
