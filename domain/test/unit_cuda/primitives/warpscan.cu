@@ -116,11 +116,10 @@ void verify(thrust::host_vector<InputT> const& input, WarpF warpF, thrust::host_
 {
     ASSERT_EQ(input.size(), output.size());
     ASSERT_EQ(input.size() % GpuConfig::warpSize, 0);
-    for (std::size_t warp = 0; warp < input.size() / GpuConfig::warpSize; ++warp)
+    for (std::size_t i = 0; i < input.size(); i += GpuConfig::warpSize)
     {
-        WarpSpan<const InputT> warpInput(&input[warp * GpuConfig::warpSize], &input[(warp + 1) * GpuConfig::warpSize]);
-        WarpSpan<const OutputT> warpOutput(&output[warp * GpuConfig::warpSize],
-                                           &output[(warp + 1) * GpuConfig::warpSize]);
+        WarpSpan<const InputT> warpInput(&input[i], &input[i + GpuConfig::warpSize]);
+        WarpSpan<const OutputT> warpOutput(&output[i], &output[i + GpuConfig::warpSize]);
         std::array<OutputT, GpuConfig::warpSize> expectedWarpOutput;
 
         warpF(warpInput, WarpSpan<OutputT>(expectedWarpOutput));
