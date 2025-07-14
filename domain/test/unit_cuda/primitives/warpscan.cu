@@ -11,6 +11,7 @@
  * @brief  Tests for warp-level primitives
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
+ * @author Felix Thaler <thaler@cscs.ch>
  */
 
 #include "gtest/gtest.h"
@@ -64,7 +65,8 @@ struct SomeStruct
     }
 };
 
-std::ostream& operator<<(std::ostream& out, SomeStruct const& s) {
+std::ostream& operator<<(std::ostream& out, SomeStruct const& s)
+{
     out << "SomeStruct {" << s.a << ", " << s.b << ", " << s.c << ", " << s.d << "}";
     return out;
 }
@@ -116,15 +118,18 @@ void verify(thrust::host_vector<InputT> const& input, WarpF warpF, thrust::host_
     for (std::size_t warp = 0; warp < input.size() / GpuConfig::warpSize; ++warp)
     {
         WarpSpan<const InputT> warpInput(&input[warp * GpuConfig::warpSize], &input[(warp + 1) * GpuConfig::warpSize]);
-        WarpSpan<const OutputT> warpOutput(&output[warp * GpuConfig::warpSize], &output[(warp + 1) * GpuConfig::warpSize]);
+        WarpSpan<const OutputT> warpOutput(&output[warp * GpuConfig::warpSize],
+                                           &output[(warp + 1) * GpuConfig::warpSize]);
         std::array<OutputT, GpuConfig::warpSize> expectedWarpOutput;
 
         warpF(warpInput, WarpSpan<OutputT>(expectedWarpOutput));
 
-        if (!std::ranges::equal(warpOutput, expectedWarpOutput)) {
+        if (!std::ranges::equal(warpOutput, expectedWarpOutput))
+        {
             std::ostringstream failures;
             for (unsigned i = 0; i < GpuConfig::warpSize; ++i)
-                failures << "Lane " << std::setw(2) << i << " - input: " << warpInput[i] << ", output: " << warpOutput[i] << ", expected output: " << expectedWarpOutput[i] << "\n";
+                failures << "Lane " << std::setw(2) << i << " - input: " << warpInput[i]
+                         << ", output: " << warpOutput[i] << ", expected output: " << expectedWarpOutput[i] << "\n";
 
             ADD_FAILURE() << failures.view();
         }
