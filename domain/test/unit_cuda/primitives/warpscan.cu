@@ -139,7 +139,8 @@ void verifyWarpCollectiveFunctionOutput(thrust::host_vector<InputT> const& input
 }
 
 /* Helper to test warp-collective functions on the GPU. InputT/OutputT are per-thread input/output types
- * The functor f provides a reference implementation for a single warp on the host to test against. It must:
+ * The functor f will be invoked on device and must also provide a reference implementation for a single warp on the
+ * host to verify against. I.e., f must:
  * - be a device-callable functor, taking a single argument,
  * - have static member F::reference which is a functor with signature
  *   (WarpSpan<const InputT>, WarpSpan<OutputT>) -> void.
