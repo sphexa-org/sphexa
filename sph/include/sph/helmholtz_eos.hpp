@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <iostream>
 #include <cstring>
+#include <memory>
 
 namespace sph
 {
@@ -81,30 +82,30 @@ public:
     double dt2i_sav[JMAX - 1] = {0};
     double dt3i_sav[JMAX - 1] = {0};
 
-    double f[IMAX][JMAX]     = {{0}};
-    double fd[IMAX][JMAX]    = {{0}};
-    double ft[IMAX][JMAX]    = {{0}};
-    double fdd[IMAX][JMAX]   = {{0}};
-    double ftt[IMAX][JMAX]   = {{0}};
-    double fdt[IMAX][JMAX]   = {{0}};
-    double fddt[IMAX][JMAX]  = {{0}};
-    double fdtt[IMAX][JMAX]  = {{0}};
-    double fddtt[IMAX][JMAX] = {{0}};
+    double f[IMAX*JMAX]     = {{0}};
+    double fd[IMAX*JMAX]    = {{0}};
+    double ft[IMAX*JMAX]    = {{0}};
+    double fdd[IMAX*JMAX]   = {{0}};
+    double ftt[IMAX*JMAX]   = {{0}};
+    double fdt[IMAX*JMAX]   = {{0}};
+    double fddt[IMAX*JMAX]  = {{0}};
+    double fdtt[IMAX*JMAX]  = {{0}};
+    double fddtt[IMAX*JMAX] = {{0}};
 
-    double dpdf[IMAX][JMAX]   = {{0}};
-    double dpdfd[IMAX][JMAX]  = {{0}};
-    double dpdft[IMAX][JMAX]  = {{0}};
-    double dpdfdt[IMAX][JMAX] = {{0}};
+    double dpdf[IMAX*JMAX]   = {{0}};
+    double dpdfd[IMAX*JMAX]  = {{0}};
+    double dpdft[IMAX*JMAX]  = {{0}};
+    double dpdfdt[IMAX*JMAX] = {{0}};
 
-    double ef[IMAX][JMAX]   = {{0}};
-    double efd[IMAX][JMAX]  = {{0}};
-    double eft[IMAX][JMAX]  = {{0}};
-    double efdt[IMAX][JMAX] = {{0}};
+    double ef[IMAX*JMAX]   = {{0}};
+    double efd[IMAX*JMAX]  = {{0}};
+    double eft[IMAX*JMAX]  = {{0}};
+    double efdt[IMAX*JMAX] = {{0}};
 
-    double xf[IMAX][JMAX]   = {{0}};
-    double xfd[IMAX][JMAX]  = {{0}};
-    double xft[IMAX][JMAX]  = {{0}};
-    double xfdt[IMAX][JMAX] = {{0}};
+    double xf[IMAX*JMAX]   = {{0}};
+    double xfd[IMAX*JMAX]  = {{0}};
+    double xft[IMAX*JMAX]  = {{0}};
+    double xfdt[IMAX*JMAX] = {{0}};
 
     HelmholtzTableManager() = default;
 
@@ -128,22 +129,22 @@ public:
             t_[j]       = std::pow(10.0, tsav);
             for (int i = 0; i < IMAX; ++i)
             {
-                file >> f[i][j] >> fd[i][j] >> ft[i][j] >> fdd[i][j] >> ftt[i][j] >> fdt[i][j] >> fddt[i][j] >>
-                    fdtt[i][j] >> fddtt[i][j];
+                file >> f[i*JMAX+j] >> fd[i*JMAX+j] >> ft[i*JMAX+j] >> fdd[i*JMAX+j] >> ftt[i*JMAX+j] >> fdt[i*JMAX+j] >> fddt[i*JMAX+j] >>
+                    fdtt[i*JMAX+j] >> fddtt[i*JMAX+j];
             }
         }
         // read the pressure derivative with rhosity table
         for (int j = 0; j < JMAX; ++j)
             for (int i = 0; i < IMAX; ++i)
-                file >> dpdf[i][j] >> dpdfd[i][j] >> dpdft[i][j] >> dpdfdt[i][j];
+                file >> dpdf[i*JMAX+j] >> dpdfd[i*JMAX+j] >> dpdft[i*JMAX+j] >> dpdfdt[i*JMAX+j];
         // read the electron chemical potential table
         for (int j = 0; j < JMAX; ++j)
             for (int i = 0; i < IMAX; ++i)
-                file >> ef[i][j] >> efd[i][j] >> eft[i][j] >> efdt[i][j];
+                file >> ef[i*JMAX+j] >> efd[i*JMAX+j] >> eft[i*JMAX+j] >> efdt[i*JMAX+j];
         // read the number rhosity table
         for (int j = 0; j < JMAX; ++j)
             for (int i = 0; i < IMAX; ++i)
-                file >> xf[i][j] >> xfd[i][j] >> xft[i][j] >> xfdt[i][j];
+                file >> xf[i*JMAX+j] >> xfd[i*JMAX+j] >> xft[i*JMAX+j] >> xfdt[i*JMAX+j];
 
         // construct the temperature and rhosity deltas and their inverses
         for (int j = 0; j < JMAX - 1; ++j)
@@ -405,42 +406,42 @@ public:
         // T xnem = xni * zbar; // unused
 
         // move table values into coefficient table
-        fi[0]  = tableManager_->f[iat + 0][jat + 0];
-        fi[1]  = tableManager_->f[iat + 1][jat + 0];
-        fi[2]  = tableManager_->f[iat + 0][jat + 1];
-        fi[3]  = tableManager_->f[iat + 1][jat + 1];
-        fi[4]  = tableManager_->ft[iat + 0][jat + 0];
-        fi[5]  = tableManager_->ft[iat + 1][jat + 0];
-        fi[6]  = tableManager_->ft[iat + 0][jat + 1];
-        fi[7]  = tableManager_->ft[iat + 1][jat + 1];
-        fi[8]  = tableManager_->ftt[iat + 0][jat + 0];
-        fi[9]  = tableManager_->ftt[iat + 1][jat + 0];
-        fi[10] = tableManager_->ftt[iat + 0][jat + 1];
-        fi[11] = tableManager_->ftt[iat + 1][jat + 1];
-        fi[12] = tableManager_->fd[iat + 0][jat + 0];
-        fi[13] = tableManager_->fd[iat + 1][jat + 0];
-        fi[14] = tableManager_->fd[iat + 0][jat + 1];
-        fi[15] = tableManager_->fd[iat + 1][jat + 1];
-        fi[16] = tableManager_->fdd[iat + 0][jat + 0];
-        fi[17] = tableManager_->fdd[iat + 1][jat + 0];
-        fi[18] = tableManager_->fdd[iat + 0][jat + 1];
-        fi[19] = tableManager_->fdd[iat + 1][jat + 1];
-        fi[20] = tableManager_->fdt[iat + 0][jat + 0];
-        fi[21] = tableManager_->fdt[iat + 1][jat + 0];
-        fi[22] = tableManager_->fdt[iat + 0][jat + 1];
-        fi[23] = tableManager_->fdt[iat + 1][jat + 1];
-        fi[24] = tableManager_->fddt[iat + 0][jat + 0];
-        fi[25] = tableManager_->fddt[iat + 1][jat + 0];
-        fi[26] = tableManager_->fddt[iat + 0][jat + 1];
-        fi[27] = tableManager_->fddt[iat + 1][jat + 1];
-        fi[28] = tableManager_->fdtt[iat + 0][jat + 0];
-        fi[29] = tableManager_->fdtt[iat + 1][jat + 0];
-        fi[30] = tableManager_->fdtt[iat + 0][jat + 1];
-        fi[31] = tableManager_->fdtt[iat + 1][jat + 1];
-        fi[32] = tableManager_->fddtt[iat + 0][jat + 0];
-        fi[33] = tableManager_->fddtt[iat + 1][jat + 0];
-        fi[34] = tableManager_->fddtt[iat + 0][jat + 1];
-        fi[35] = tableManager_->fddtt[iat + 1][jat + 1];
+        fi[0]  = tableManager_->f[(iat + 0)*JMAX + jat + 0];
+        fi[1]  = tableManager_->f[(iat + 1)*JMAX + jat + 0];
+        fi[2]  = tableManager_->f[(iat + 0)*JMAX + jat + 1];
+        fi[3]  = tableManager_->f[(iat + 1)*JMAX + jat + 1];
+        fi[4]  = tableManager_->ft[(iat + 0)*JMAX + jat + 0];
+        fi[5]  = tableManager_->ft[(iat + 1)*JMAX + jat + 0];
+        fi[6]  = tableManager_->ft[(iat + 0)*JMAX + jat + 1];
+        fi[7]  = tableManager_->ft[(iat + 1)*JMAX + jat + 1];
+        fi[8]  = tableManager_->ftt[(iat + 0)*JMAX + jat + 0];
+        fi[9]  = tableManager_->ftt[(iat + 1)*JMAX + jat + 0];
+        fi[10] = tableManager_->ftt[(iat + 0)*JMAX + jat + 1];
+        fi[11] = tableManager_->ftt[(iat + 1)*JMAX + jat + 1];
+        fi[12] = tableManager_->fd[(iat + 0)*JMAX + jat + 0];
+        fi[13] = tableManager_->fd[(iat + 1)*JMAX + jat + 0];
+        fi[14] = tableManager_->fd[(iat + 0)*JMAX + jat + 1];
+        fi[15] = tableManager_->fd[(iat + 1)*JMAX + jat + 1];
+        fi[16] = tableManager_->fdd[(iat + 0)*JMAX + jat + 0];
+        fi[17] = tableManager_->fdd[(iat + 1)*JMAX + jat + 0];
+        fi[18] = tableManager_->fdd[(iat + 0)*JMAX + jat + 1];
+        fi[19] = tableManager_->fdd[(iat + 1)*JMAX + jat + 1];
+        fi[20] = tableManager_->fdt[(iat + 0)*JMAX + jat + 0];
+        fi[21] = tableManager_->fdt[(iat + 1)*JMAX + jat + 0];
+        fi[22] = tableManager_->fdt[(iat + 0)*JMAX + jat + 1];
+        fi[23] = tableManager_->fdt[(iat + 1)*JMAX + jat + 1];
+        fi[24] = tableManager_->fddt[(iat + 0)*JMAX + jat + 0];
+        fi[25] = tableManager_->fddt[(iat + 1)*JMAX + jat + 0];
+        fi[26] = tableManager_->fddt[(iat + 0)*JMAX + jat + 1];
+        fi[27] = tableManager_->fddt[(iat + 1)*JMAX + jat + 1];
+        fi[28] = tableManager_->fdtt[(iat + 0)*JMAX + jat + 0];
+        fi[29] = tableManager_->fdtt[(iat + 1)*JMAX + jat + 0];
+        fi[30] = tableManager_->fdtt[(iat + 0)*JMAX + jat + 1];
+        fi[31] = tableManager_->fdtt[(iat + 1)*JMAX + jat + 1];
+        fi[32] = tableManager_->fddtt[(iat + 0)*JMAX + jat + 0];
+        fi[33] = tableManager_->fddtt[(iat + 1)*JMAX + jat + 0];
+        fi[34] = tableManager_->fddtt[(iat + 0)*JMAX + jat + 1];
+        fi[35] = tableManager_->fddtt[(iat + 1)*JMAX + jat + 1];
 
         // various differences (checked and updated with djat,diat)
         int djat = std::min(JMAX - 2, jat);
@@ -548,43 +549,43 @@ public:
         dsi1md = xdpsi1(mxd);
 
         // move table values into coefficient table
-        fi[0]  = tableManager_->dpdf[iat + 0][jat + 0];
-        fi[1]  = tableManager_->dpdf[iat + 1][jat + 0];
-        fi[2]  = tableManager_->dpdf[iat + 0][jat + 1];
-        fi[3]  = tableManager_->dpdf[iat + 1][jat + 1];
-        fi[4]  = tableManager_->dpdft[iat + 0][jat + 0];
-        fi[5]  = tableManager_->dpdft[iat + 1][jat + 0];
-        fi[6]  = tableManager_->dpdft[iat + 0][jat + 1];
-        fi[7]  = tableManager_->dpdft[iat + 1][jat + 1];
-        fi[8]  = tableManager_->dpdfd[iat + 0][jat + 0];
-        fi[9]  = tableManager_->dpdfd[iat + 1][jat + 0];
-        fi[10] = tableManager_->dpdfd[iat + 0][jat + 1];
-        fi[11] = tableManager_->dpdfd[iat + 1][jat + 1];
-        fi[12] = tableManager_->dpdfdt[iat + 0][jat + 0];
-        fi[13] = tableManager_->dpdfdt[iat + 1][jat + 0];
-        fi[14] = tableManager_->dpdfdt[iat + 0][jat + 1];
-        fi[15] = tableManager_->dpdfdt[iat + 1][jat + 1];
+        fi[0]  = tableManager_->dpdf[(iat + 0)*JMAX + jat + 0];
+        fi[1]  = tableManager_->dpdf[(iat + 1)*JMAX + jat + 0];
+        fi[2]  = tableManager_->dpdf[(iat + 0)*JMAX + jat + 1];
+        fi[3]  = tableManager_->dpdf[(iat + 1)*JMAX + jat + 1];
+        fi[4]  = tableManager_->dpdft[(iat + 0)*JMAX + jat + 0];
+        fi[5]  = tableManager_->dpdft[(iat + 1)*JMAX + jat + 0];
+        fi[6]  = tableManager_->dpdft[(iat + 0)*JMAX + jat + 1];
+        fi[7]  = tableManager_->dpdft[(iat + 1)*JMAX + jat + 1];
+        fi[8]  = tableManager_->dpdfd[(iat + 0)*JMAX + jat + 0];
+        fi[9]  = tableManager_->dpdfd[(iat + 1)*JMAX + jat + 0];
+        fi[10] = tableManager_->dpdfd[(iat + 0)*JMAX + jat + 1];
+        fi[11] = tableManager_->dpdfd[(iat + 1)*JMAX + jat + 1];
+        fi[12] = tableManager_->dpdfdt[(iat + 0)*JMAX + jat + 0];
+        fi[13] = tableManager_->dpdfdt[(iat + 1)*JMAX + jat + 0];
+        fi[14] = tableManager_->dpdfdt[(iat + 0)*JMAX + jat + 1];
+        fi[15] = tableManager_->dpdfdt[(iat + 1)*JMAX + jat + 1];
 
         T dpepdd = h3(fi, si0t, si1t, si0mt, si1mt, si0d, si1d, si0md, si1md);
         dpepdd   = std::max<T>(ye * dpepdd, (T)1.e-30);
 
         // move table values into coefficient table
-        fi[0]  = tableManager_->ef[iat + 0][jat + 0];
-        fi[1]  = tableManager_->ef[iat + 1][jat + 0];
-        fi[2]  = tableManager_->ef[iat + 0][jat + 1];
-        fi[3]  = tableManager_->ef[iat + 1][jat + 1];
-        fi[4]  = tableManager_->eft[iat + 0][jat + 0];
-        fi[5]  = tableManager_->eft[iat + 1][jat + 0];
-        fi[6]  = tableManager_->eft[iat + 0][jat + 1];
-        fi[7]  = tableManager_->eft[iat + 1][jat + 1];
-        fi[8]  = tableManager_->efd[iat + 0][jat + 0];
-        fi[9]  = tableManager_->efd[iat + 1][jat + 0];
-        fi[10] = tableManager_->efd[iat + 0][jat + 1];
-        fi[11] = tableManager_->efd[iat + 1][jat + 1];
-        fi[12] = tableManager_->efdt[iat + 0][jat + 0];
-        fi[13] = tableManager_->efdt[iat + 1][jat + 0];
-        fi[14] = tableManager_->efdt[iat + 0][jat + 1];
-        fi[15] = tableManager_->efdt[iat + 1][jat + 1];
+        fi[0]  = tableManager_->ef[(iat + 0)*JMAX + jat + 0];
+        fi[1]  = tableManager_->ef[(iat + 1)*JMAX + jat + 0];
+        fi[2]  = tableManager_->ef[(iat + 0)*JMAX + jat + 1];
+        fi[3]  = tableManager_->ef[(iat + 1)*JMAX + jat + 1];
+        fi[4]  = tableManager_->eft[(iat + 0)*JMAX + jat + 0];
+        fi[5]  = tableManager_->eft[(iat + 1)*JMAX + jat + 0];
+        fi[6]  = tableManager_->eft[(iat + 0)*JMAX + jat + 1];
+        fi[7]  = tableManager_->eft[(iat + 1)*JMAX + jat + 1];
+        fi[8]  = tableManager_->efd[(iat + 0)*JMAX + jat + 0];
+        fi[9]  = tableManager_->efd[(iat + 1)*JMAX + jat + 0];
+        fi[10] = tableManager_->efd[(iat + 0)*JMAX + jat + 1];
+        fi[11] = tableManager_->efd[(iat + 1)*JMAX + jat + 1];
+        fi[12] = tableManager_->efdt[(iat + 0)*JMAX + jat + 0];
+        fi[13] = tableManager_->efdt[(iat + 1)*JMAX + jat + 0];
+        fi[14] = tableManager_->efdt[(iat + 0)*JMAX + jat + 1];
+        fi[15] = tableManager_->efdt[(iat + 1)*JMAX + jat + 1];
 
         // electron chemical potential etaele (unused)
         // T etaele = h3(fi, si0t, si1t, si0mt, si1mt, si0d, si1d, si0md, si1md);
@@ -601,22 +602,22 @@ public:
         // T detadz = x * rho * ytot1;
 
         // move table values into coefficient table
-        fi[0]  = tableManager_->xf[iat + 0][jat + 0];
-        fi[1]  = tableManager_->xf[iat + 1][jat + 0];
-        fi[2]  = tableManager_->xf[iat + 0][jat + 1];
-        fi[3]  = tableManager_->xf[iat + 1][jat + 1];
-        fi[4]  = tableManager_->xft[iat + 0][jat + 0];
-        fi[5]  = tableManager_->xft[iat + 1][jat + 0];
-        fi[6]  = tableManager_->xft[iat + 0][jat + 1];
-        fi[7]  = tableManager_->xft[iat + 1][jat + 1];
-        fi[8]  = tableManager_->xfd[iat + 0][jat + 0];
-        fi[9]  = tableManager_->xfd[iat + 1][jat + 0];
-        fi[10] = tableManager_->xfd[iat + 0][jat + 1];
-        fi[11] = tableManager_->xfd[iat + 1][jat + 1];
-        fi[12] = tableManager_->xfdt[iat + 0][jat + 0];
-        fi[13] = tableManager_->xfdt[iat + 1][jat + 0];
-        fi[14] = tableManager_->xfdt[iat + 0][jat + 1];
-        fi[15] = tableManager_->xfdt[iat + 1][jat + 1];
+        fi[0]  = tableManager_->xf[(iat + 0)*JMAX + jat + 0];
+        fi[1]  = tableManager_->xf[(iat + 1)*JMAX + jat + 0];
+        fi[2]  = tableManager_->xf[(iat + 0)*JMAX + jat + 1];
+        fi[3]  = tableManager_->xf[(iat + 1)*JMAX + jat + 1];
+        fi[4]  = tableManager_->xft[(iat + 0)*JMAX + jat + 0];
+        fi[5]  = tableManager_->xft[(iat + 1)*JMAX + jat + 0];
+        fi[6]  = tableManager_->xft[(iat + 0)*JMAX + jat + 1];
+        fi[7]  = tableManager_->xft[(iat + 1)*JMAX + jat + 1];
+        fi[8]  = tableManager_->xfd[(iat + 0)*JMAX + jat + 0];
+        fi[9]  = tableManager_->xfd[(iat + 1)*JMAX + jat + 0];
+        fi[10] = tableManager_->xfd[(iat + 0)*JMAX + jat + 1];
+        fi[11] = tableManager_->xfd[(iat + 1)*JMAX + jat + 1];
+        fi[12] = tableManager_->xfdt[(iat + 0)*JMAX + jat + 0];
+        fi[13] = tableManager_->xfdt[(iat + 1)*JMAX + jat + 0];
+        fi[14] = tableManager_->xfdt[(iat + 0)*JMAX + jat + 1];
+        fi[15] = tableManager_->xfdt[(iat + 1)*JMAX + jat + 1];
 
         // electron + positron number densities (unused)
         // T xnefer = h3(fi, si0t, si1t, si0mt, si1mt, si0d, si1d, si0md, si1md);
