@@ -61,8 +61,8 @@ void groupAccTimestep(const GroupView& grp, float* groupDt, const Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        groupAccTimestepGpu(d.etaAcc * std::sqrt(d.eps), grp, rawPtr(d.devData.ax), rawPtr(d.devData.ay),
-                            rawPtr(d.devData.az), groupDt);
+        groupAccTimestepGpu(d.etaAcc, grp, rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az),
+                            rawPtr(d.devData.h), groupDt);
     }
 }
 

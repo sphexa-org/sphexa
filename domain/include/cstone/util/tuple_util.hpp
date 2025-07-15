@@ -23,19 +23,42 @@
 namespace util
 {
 
-//! @brief Utility to call function with each element in tuple_
-template<class F, class Tuple>
-void for_each_tuple(F&& func, Tuple&& tuple_)
+namespace detail
 {
-    std::apply([f = func](auto&&... args) { [[maybe_unused]] auto list = std::initializer_list<int>{(f(args), 0)...}; },
-               std::forward<Tuple>(tuple_));
+
+template<std::size_t... Is, class F, class... Tuples>
+constexpr auto tupleMapImpl(std::index_sequence<Is...>, F&& f, Tuples&&... ts)
+{
+    return std::make_tuple(
+        [&f](auto i, auto&&... ts_) -> decltype(auto) {
+            return f(std::get<i>(std::forward<decltype(ts_)>(ts_))...);
+        }(std::integral_constant<std::size_t, Is>{}, std::forward<Tuples>(ts)...)...);
 }
 
-//! @brief convert an index_sequence into a tuple of integral constants (e.g. for use with for_each_tuple)
-template<size_t... Is>
-constexpr auto makeIntegralTuple(std::index_sequence<Is...>)
+} // namespace detail
+
+//! @brief Calls function @p f(get<Is>(tuples...)... and return results in a new tuple
+template<class F, class... Tuples>
+constexpr auto tupleMap(F&& f, Tuples&&... tuples)
 {
-    return std::make_tuple(std::integral_constant<size_t, Is>{}...);
+    constexpr auto n = std::min({std::tuple_size_v<std::decay_t<Tuples>>...});
+    static_assert(n == std::max({std::tuple_size_v<std::decay_t<Tuples>>...}), "All tuples must have same size");
+
+    // auto impl = [&f]<std::size_t... Is>(std::index_sequence<Is...>, auto&&... ts) // nvcc chokes on this lambda
+    return detail::tupleMapImpl(std::make_index_sequence<n>{}, std::forward<F>(f), std::forward<Tuples>(tuples)...);
+}
+
+//! @brief Calls void returning function @p f(get<Is>(tuples...)...
+template<class F, class... Tuples>
+constexpr void for_each_tuple(F&& f, Tuples&&... tuples)
+{
+    tupleMap(
+        [&f](auto&&... args)
+        {
+            f(std::forward<decltype(args)>(args)...);
+            return 0;
+        },
+        std::forward<Tuples>(tuples)...);
 }
 
 //! @brief Select tuple elements specified by the argument sequence
@@ -46,8 +69,8 @@ std::tuple<std::tuple_element_t<Ints, std::decay_t<Tuple>>...> selectTuple(Tuple
 }
 
 template<std::size_t... Is>
-constexpr auto indexSequenceReverse(std::index_sequence<Is...> const&)
-    -> decltype(std::index_sequence<sizeof...(Is) - 1U - Is...>{});
+constexpr auto
+indexSequenceReverse(std::index_sequence<Is...> const&) -> decltype(std::index_sequence<sizeof...(Is) - 1U - Is...>{});
 
 template<std::size_t N>
 using makeIndexSequenceReverse = decltype(indexSequenceReverse(std::make_index_sequence<N>{}));
@@ -64,28 +87,6 @@ template<class Tp>
 constexpr auto discardLastElement(Tp&& tp)
 {
     return selectTuple(std::forward<Tp>(tp), std::make_index_sequence<std::tuple_size_v<std::decay_t<Tp>> - 1>{});
-}
-
-/*! @brief Zip multiple tuples into a single tuple, similar to C++23 std::views::zip, but for tuples (no iterators)
- *
- * @tparam Tps types of tuples
- * @param tps  some tuples, tuple(A0, ..., An), tuple(B0, ..., Bn)
- * @return     a single  tuple( tuple(A0, B0, ...), ...)
- */
-template<class... Tps>
-constexpr auto zipTuples(Tps&&... tps)
-{
-    constexpr std::size_t N = std::min({std::tuple_size_v<std::decay_t<Tps>>...});
-
-    // auto zip = [&tps...]<std::size_t... Is>(std::index_sequence<Is...>) // C++20 (not supported by CUDA 11)
-    auto zip = [&tps...](auto... Is)
-    {
-        auto getIs = [](auto I, Tps&&... tps)
-        { return std::tuple<std::tuple_element_t<I, std::decay_t<Tps>>...>{std::get<I>(std::forward<Tps>(tps))...}; };
-        return std::make_tuple(getIs(std::integral_constant<size_t, Is>{}, std::forward<Tps>(tps)...)...);
-    };
-
-    return std::apply(zip, makeIntegralTuple(std::make_index_sequence<N>{})); // zip(std::make_index_sequence<N>{})
 }
 
 } // namespace util
