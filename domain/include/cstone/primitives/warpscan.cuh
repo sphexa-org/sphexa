@@ -23,6 +23,17 @@
 namespace cstone
 {
 
+__device__ __forceinline__ unsigned laneIndex()
+{
+#ifdef __CUDACC__
+    unsigned laneIdx;
+    asm volatile("mov.u32 %0, %laneid;" : "=r"(laneIdx));
+    return laneIdx;
+#else
+    return (threadIdx.z * blockDim.y * blockDim.x + threadIdx.y * blockDim.x + threadIdx.x) & (GpuConfig::warpSize - 1);
+#endif
+}
+
 //! @brief there's no int overload for min in AMD ROCM
 __device__ __forceinline__ int imin(int a, int b) { return a < b ? a : b; }
 __device__ __forceinline__ unsigned imin(unsigned a, unsigned b) { return a < b ? a : b; }
@@ -45,53 +56,120 @@ __device__ __forceinline__ int popCount(T x)
 
 __device__ __forceinline__ void syncWarp()
 {
-#if defined(__CUDACC__) && !defined(__HIPCC__)
+#if defined(__CUDACC__)
     __syncwarp();
+#elif defined(__HIP_PLATFORM_AMD__)
+    __builtin_amdgcn_fence(__ATOMIC_ACQ_REL, "agent");
 #endif
 }
+
+namespace detail
+{
+
+template<class T, class = void>
+struct IsHardwareShuffleable : std::false_type
+{
+};
+
+template<class T>
+struct IsHardwareShuffleable<T,
+                             std::void_t<decltype(
+#if defined(__CUDACC__) && !defined(__HIPCC__)
+                                 __shfl_sync(0xFFFFFFFF, std::declval<T>(), 0, 0)
+#else
+                                 __shfl(std::declval<T>(), 0)
+#endif
+                                     )>> : std::true_type
+{
+};
+
+static_assert(IsHardwareShuffleable<int>::value);
+static_assert(IsHardwareShuffleable<unsigned>::value);
+static_assert(IsHardwareShuffleable<long>::value);
+static_assert(IsHardwareShuffleable<unsigned long>::value);
+static_assert(IsHardwareShuffleable<long long>::value);
+static_assert(IsHardwareShuffleable<unsigned long long>::value);
+static_assert(IsHardwareShuffleable<float>::value);
+static_assert(IsHardwareShuffleable<double>::value);
+
+template<class T, class Op>
+__device__ __forceinline__ T shflSyncImpl(T value, Op&& shflOp)
+{
+    if constexpr (detail::IsHardwareShuffleable<T>::value) { return shflOp(value); }
+    else
+    {
+        static_assert(std::is_trivially_copyable_v<T>);
+        constexpr int numInts = (sizeof(T) + sizeof(int) - 1) / sizeof(int);
+        int buffer[numInts];
+        memcpy(buffer, &value, sizeof(value));
+#pragma unroll
+        for (int i = 0; i < numInts; ++i)
+            buffer[i] = shflOp(buffer[i]);
+        memcpy(&value, buffer, sizeof(value));
+        return value;
+    }
+}
+
+} // namespace detail
 
 //! @brief Compatibility wrapper for AMD.
 template<class T>
 __device__ __forceinline__ T shflSync(T value, int srcLane)
 {
+    return detail::shflSyncImpl(value,
+                                [=](auto v)
+                                {
 #if defined(__CUDACC__) && !defined(__HIPCC__)
-    return __shfl_sync(0xFFFFFFFF, value, srcLane);
+                                    return __shfl_sync(0xFFFFFFFF, v, srcLane);
 #else
-    return __shfl(value, srcLane);
+                                    return __shfl(v, srcLane);
 #endif
+                                });
 }
 
 //! @brief Compatibility wrapper for AMD.
 template<class T>
-__device__ __forceinline__ T shflXorSync(T value, int width)
+__device__ __forceinline__ T shflXorSync(T value, int laneMask)
 {
+    return detail::shflSyncImpl(value,
+                                [=](auto v)
+                                {
 #if defined(__CUDACC__) && !defined(__HIPCC__)
-    return __shfl_xor_sync(0xFFFFFFFF, value, width);
+                                    return __shfl_xor_sync(0xFFFFFFFF, v, laneMask);
 #else
-    return __shfl_xor(value, width);
+                                    return __shfl_xor(v, laneMask);
 #endif
+                                });
 }
 
 //! @brief Compatibility wrapper for AMD.
 template<class T>
 __device__ __forceinline__ T shflUpSync(T value, int distance)
 {
+    return detail::shflSyncImpl(value,
+                                [=](auto v)
+                                {
 #if defined(__CUDACC__) && !defined(__HIPCC__)
-    return __shfl_up_sync(0xFFFFFFFF, value, distance);
+                                    return __shfl_up_sync(0xFFFFFFFF, v, distance);
 #else
-    return __shfl_up(value, distance);
+                                    return __shfl_up(v, distance);
 #endif
+                                });
 }
 
 //! @brief Compatibility wrapper for AMD.
 template<class T>
 __device__ __forceinline__ T shflDownSync(T value, int distance)
 {
+    return detail::shflSyncImpl(value,
+                                [=](auto v)
+                                {
 #if defined(__CUDACC__) && !defined(__HIPCC__)
-    return __shfl_down_sync(0xFFFFFFFF, value, distance);
+                                    return __shfl_down_sync(0xFFFFFFFF, v, distance);
 #else
-    return __shfl_down(value, distance);
+                                    return __shfl_down(v, distance);
 #endif
+                                });
 }
 
 //! @brief Compatibility wrapper for AMD.
@@ -101,6 +179,16 @@ __device__ __forceinline__ GpuConfig::ThreadMask ballotSync(bool flag)
     return __ballot_sync(0xFFFFFFFF, flag);
 #else
     return __ballot(flag);
+#endif
+}
+
+//! @brief Compatibility wrapper for AMD.
+__device__ __forceinline__ GpuConfig::ThreadMask anySync(bool flag)
+{
+#if defined(__CUDACC__) && !defined(__HIPCC__)
+    return __any_sync(0xFFFFFFFF, flag);
+#else
+    return __any(flag);
 #endif
 }
 
@@ -130,10 +218,23 @@ __device__ __forceinline__ T warpMax(T laneVal)
     return laneVal;
 }
 
+//! @brief compute warp-wide bitwise or
+template<class T>
+__device__ __forceinline__ T warpBitwiseOr(T laneVal)
+{
+#pragma unroll
+    for (int i = 0; i < GpuConfig::warpSizeLog2; i++)
+    {
+        laneVal |= shflXorSync(laneVal, 1 << i);
+    }
+
+    return laneVal;
+}
+
 //! @brief standard inclusive warp-scan
 __device__ __forceinline__ int inclusiveScanInt(int value)
 {
-    unsigned lane = threadIdx.x & (GpuConfig::warpSize - 1);
+    unsigned lane = laneIndex();
 #pragma unroll
     for (int i = 1; i < GpuConfig::warpSize; i *= 2)
     {
@@ -146,7 +247,7 @@ __device__ __forceinline__ int inclusiveScanInt(int value)
 //! @brief returns a mask with bits set for each warp lane before the calling lane
 __device__ __forceinline__ GpuConfig::ThreadMask lanemask_lt()
 {
-    GpuConfig::ThreadMask lane = threadIdx.x & (GpuConfig::warpSize - 1);
+    GpuConfig::ThreadMask lane = laneIndex();
     return (GpuConfig::ThreadMask(1) << lane) - 1;
 }
 
@@ -169,7 +270,7 @@ __device__ __forceinline__ int reduceBool(const bool p)
 //! @brief returns a mask with bits set for each warp lane before and including the calling lane
 __device__ __forceinline__ GpuConfig::ThreadMask lanemask_le()
 {
-    GpuConfig::ThreadMask lane = threadIdx.x & (GpuConfig::warpSize - 1);
+    GpuConfig::ThreadMask lane = laneIndex();
     return (GpuConfig::ThreadMask(2) << lane) - 1;
 }
 
@@ -207,7 +308,7 @@ __device__ __forceinline__ int inclusiveSegscan(int value, int distance)
  */
 __device__ __forceinline__ int inclusiveSegscanInt(const int packedValue, const int carryValue)
 {
-    int laneIdx = int(threadIdx.x) & (GpuConfig::warpSize - 1);
+    int laneIdx = laneIndex();
 
     int isNegative = packedValue < 0;
     int mask       = -isNegative;
@@ -258,7 +359,7 @@ __device__ __forceinline__ int streamCompact(T* value, bool keep, volatile T* sm
     if (keep) { sm_exchange[laneCompacted] = *value; }
     syncWarp();
 
-    int laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
+    int laneIdx = laneIndex();
     *value      = sm_exchange[laneIdx];
 
     int numKeep = popCount(SignedMask(keepBallot));
@@ -273,7 +374,7 @@ __device__ __forceinline__ int streamCompact(T* value, bool keep, volatile T* sm
  */
 __device__ __forceinline__ int spreadSeg8(int val)
 {
-    int laneIdx = int(threadIdx.x) & (GpuConfig::warpSize - 1);
+    int laneIdx = laneIndex();
     return shflSync(val, laneIdx >> 3) + (laneIdx & 7);
 }
 
