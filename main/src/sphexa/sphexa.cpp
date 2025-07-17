@@ -94,6 +94,7 @@ int main(int argc, char** argv)
     const bool               writeEnabled = writeFreqStr != "0" || !writeExtra.empty();
     const std::string        profFreqStr  = parser.get("--profile", maxStepStr);
     const bool               profEnabled  = parser.exists("--profile");
+    const std::string        helmTablePath = parser.get("--helmTablePath", std::string(""));
     const std::string        pmroot       = parser.get("--pmroot", std::string("/sys/cray/pm_counters"));
     std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
 
@@ -114,6 +115,10 @@ int main(int argc, char** argv)
     Timer totalTimer(output);
     MPI_Barrier(MPI_COMM_WORLD);
     totalTimer.start();
+    
+    // EOS choice should be set before the necessary fields are activated
+    simData.hydro.eosChoice = helmTablePath.empty() ? sph::EosType::idealGas : sph::EosType::helmholtz;
+    if (simData.hydro.eosChoice == sph::EosType::helmholtz) { propagator->readHelmEOSTable(helmTablePath); }
 
     propagator->addCounters(profEnabled ? pmroot : "", getNumLocalRanks(numRanks));
     propagator->activateFields(simData);

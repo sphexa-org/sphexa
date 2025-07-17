@@ -85,6 +85,8 @@ public:
     //! @brief whether conserved quantities are time-synchronized (when completing a full time-step hierarchy)
     virtual bool isSynced() { return true; }
 
+    virtual void readHelmEOSTable(const std::string path) {};
+
     //! @brief add pm counters if they exist
     void addCounters(const std::string& pmRoot, int numRanksPerNode) { pmReader.addCounters(pmRoot, numRanksPerNode); }
 

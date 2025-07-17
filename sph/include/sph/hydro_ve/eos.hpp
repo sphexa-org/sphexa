@@ -34,6 +34,7 @@
 
 #include "sph/sph_gpu.hpp"
 #include "sph/eos.hpp"
+#include "sph/helmholtz_eos.hpp"
 
 namespace sph
 {
@@ -165,16 +166,14 @@ void computeHelmholtzEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     auto* cv = d.cv.data();
     auto* u  = d.u.data();
 
-    helmholtz_constants::Helmholtz_EOS* helmEOS = new helmholtz_constants::Helmholtz_EOS();
+    Helmholtz_EOS& helmEOS = sph::Helmholtz_EOS::instance();
 
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
         auto rho                          = kx[i] * m[i] / xm[i];
-        std::tie(c[i], p[i], cv[i], u[i]) = helmholtzEOS(helmEOS, temp[i], rho, abar[i], zbar[i]);
+        std::tie(c[i], p[i], cv[i], u[i]) = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i]);
     }
-
-    delete helmEOS;
 }
 
 template<class Dataset>

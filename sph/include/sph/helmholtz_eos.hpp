@@ -26,7 +26,6 @@ constexpr double      dlo             = -12.;
 constexpr double      dhi             = 15.;
 constexpr double      dstp            = (dhi - dlo) / (IMAX - 1);
 constexpr double      dstpi           = 1. / dstp;
-constexpr const char* HELM_TABLE_PATH = "helm_table.dat";
 
 // Physical constants and parameters
 constexpr double g       = 6.6742867e-8;
@@ -82,40 +81,41 @@ public:
     double dt2i_sav[JMAX - 1] = {0};
     double dt3i_sav[JMAX - 1] = {0};
 
-    double f[IMAX*JMAX]     = {{0}};
-    double fd[IMAX*JMAX]    = {{0}};
-    double ft[IMAX*JMAX]    = {{0}};
-    double fdd[IMAX*JMAX]   = {{0}};
-    double ftt[IMAX*JMAX]   = {{0}};
-    double fdt[IMAX*JMAX]   = {{0}};
-    double fddt[IMAX*JMAX]  = {{0}};
-    double fdtt[IMAX*JMAX]  = {{0}};
-    double fddtt[IMAX*JMAX] = {{0}};
+    double f[IMAX*JMAX]     = {0};
+    double fd[IMAX*JMAX]    = {0};
+    double ft[IMAX*JMAX]    = {0};
+    double fdd[IMAX*JMAX]   = {0};
+    double ftt[IMAX*JMAX]   = {0};
+    double fdt[IMAX*JMAX]   = {0};
+    double fddt[IMAX*JMAX]  = {0};
+    double fdtt[IMAX*JMAX]  = {0};
+    double fddtt[IMAX*JMAX] = {0};
 
-    double dpdf[IMAX*JMAX]   = {{0}};
-    double dpdfd[IMAX*JMAX]  = {{0}};
-    double dpdft[IMAX*JMAX]  = {{0}};
-    double dpdfdt[IMAX*JMAX] = {{0}};
+    double dpdf[IMAX*JMAX]   = {0};
+    double dpdfd[IMAX*JMAX]  = {0};
+    double dpdft[IMAX*JMAX]  = {0};
+    double dpdfdt[IMAX*JMAX] = {0};
 
-    double ef[IMAX*JMAX]   = {{0}};
-    double efd[IMAX*JMAX]  = {{0}};
-    double eft[IMAX*JMAX]  = {{0}};
-    double efdt[IMAX*JMAX] = {{0}};
+    double ef[IMAX*JMAX]   = {0};
+    double efd[IMAX*JMAX]  = {0};
+    double eft[IMAX*JMAX]  = {0};
+    double efdt[IMAX*JMAX] = {0};
 
-    double xf[IMAX*JMAX]   = {{0}};
-    double xfd[IMAX*JMAX]  = {{0}};
-    double xft[IMAX*JMAX]  = {{0}};
-    double xfdt[IMAX*JMAX] = {{0}};
+    double xf[IMAX*JMAX]   = {0};
+    double xfd[IMAX*JMAX]  = {0};
+    double xft[IMAX*JMAX]  = {0};
+    double xfdt[IMAX*JMAX] = {0};
 
     HelmholtzTableManager() = default;
 
-    bool readHelmTable()
+    bool readHelmTable(const std::string helmEOSPath)
     {
-        std::ifstream file(HELM_TABLE_PATH);
+        std::ifstream file(helmEOSPath);
         if (!file.is_open())
         {
-            std::cerr << "Failed to open " << HELM_TABLE_PATH << std::endl;
-            return false;
+            std::cerr << "Failed to open " << helmEOSPath << std::endl;
+            exit(EXIT_FAILURE);
+            // return false;
         }
         // Read the helmholtz free energy and its derivatives
         for (int i = 0; i < IMAX; ++i)
@@ -182,6 +182,12 @@ public:
 class Helmholtz_EOS
 {
 private:
+    explicit Helmholtz_EOS(const std::string& path)
+        : tableManager_(std::make_unique<HelmholtzTableManager>())
+    {
+        table_read_success = tableManager_->readHelmTable(path);
+    }
+
     std::unique_ptr<HelmholtzTableManager> tableManager_;
     bool                                   table_read_success = false;
 
@@ -303,17 +309,18 @@ private:
                fi[10] * w1d * w0mt + fi[11] * w1md * w0mt + fi[12] * w1d * w1t + fi[13] * w1md * w1t +
                fi[14] * w1d * w1mt + fi[15] * w1md * w1mt;
     }
-    Helmholtz_EOS()
-        : tableManager_(std::make_unique<HelmholtzTableManager>())
-    {
-        table_read_success = tableManager_->readHelmTable();
-    }
+
+    static Helmholtz_EOS* instance_;
 
 public:
-    ~Helmholtz_EOS() = default;
 
-    static Helmholtz_EOS& init_helmEOS_instance();
+    Helmholtz_EOS(const Helmholtz_EOS&) = delete;
+    Helmholtz_EOS& operator=(const Helmholtz_EOS&) = delete;
 
+    // Call this ONCE before instance()
+    static void init(const std::string& path);
+    static Helmholtz_EOS& instance();
+    
     /*! @brief Helmholtz EOS for a given temperature and density
      *
      * @param abar_ mean atomic weight

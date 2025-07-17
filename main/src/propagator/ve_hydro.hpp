@@ -81,7 +81,7 @@ protected:
     //! @brief what will be allocated based AV cleaning choice
     using DependentFields =
         std::conditional_t<avClean, decltype(DependentFields_{} + GradVFields{}), decltype(DependentFields_{})>;
-
+    
 public:
     HydroVeProp(std::ostream& output, size_t rank)
         : Base(output, rank)
@@ -103,12 +103,18 @@ public:
         d.setConserved("x", "y", "z", "h", "m");
         d.setDependent("keys");
         std::apply([&d](auto... f) { d.setConserved(f.value...); }, make_tuple(ConservedFields{}));
-        std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
+        std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields_{}));
+        if (d.eosChoice == EosType::helmholtz) {
+            d.setDependent("abar", "zbar");
+        }
 
         d.devData.setConserved("x", "y", "z", "h", "m");
         d.devData.setDependent("keys");
         std::apply([&d](auto... f) { d.devData.setConserved(f.value...); }, make_tuple(ConservedFields{}));
-        std::apply([&d](auto... f) { d.devData.setDependent(f.value...); }, make_tuple(DependentFields{}));
+        std::apply([&d](auto... f) { d.devData.setDependent(f.value...); }, make_tuple(DependentFields_{}));
+        if (d.eosChoice == EosType::helmholtz) {
+            d.devData.setDependent("abar", "zbar");
+        }
     }
 
     void sync(DomainType& domain, DataType& simData) override
@@ -279,6 +285,11 @@ public:
             std::cout << d.fieldNames[indicesDone.back()] << std::endl;
         }
         timer.step("FileOutput");
+    }
+
+    void readHelmEOSTable(const std::string path) override
+    {
+        Helmholtz_EOS::init(path);
     }
 };
 

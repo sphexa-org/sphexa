@@ -41,7 +41,8 @@ TEST(EOSTests, helmholtzEOS_test)
 
     std::vector<T> p(input_size), c(input_size), cv(input_size), u(input_size);
 
-    auto& helmEOS = sph::Helmholtz_EOS::init_helmEOS_instance();
+    Helmholtz_EOS::init("helm_table.dat");
+    auto& helmEOS = Helmholtz_EOS::instance();
 
     for (int i = 0; i < input_size; ++i)
     {
