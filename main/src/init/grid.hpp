@@ -254,7 +254,7 @@ void assembleCuboid(KeyType keyStart, KeyType keyEnd, const cstone::Box<T>& glob
                     std::span<const T> xBlock, std::span<const T> yBlock, std::span<const T> zBlock, Vector& x,
                     Vector& y, Vector& z)
 {
-
+    assert(x.size() == y.size() && x.size() == z.size());
     auto outOfBounds = [](auto it1, auto it2)
     { return *std::min_element(it1, it2) < 0.0 || *std::max_element(it1, it2) >= 1.0; };
     if (outOfBounds(xBlock.begin(), xBlock.end()) || outOfBounds(yBlock.begin(), yBlock.end()) ||
@@ -296,7 +296,8 @@ void assembleCuboid(KeyType keyStart, KeyType keyEnd, const cstone::Box<T>& glob
         numTaskSel[i] = countSelection<T>(selectBox, globalBox, {ix, iy, iz}, multiplicity, xBlock, yBlock, zBlock);
     }
 
-    std::exclusive_scan(numTaskSel.begin(), numTaskSel.end(), numTaskSel.begin(), cstone::LocalIndex{0});
+    std::size_t oldSize = x.size();
+    std::exclusive_scan(numTaskSel.begin(), numTaskSel.end(), numTaskSel.begin(), oldSize);
     x.resize(numTaskSel.back());
     y.resize(numTaskSel.back());
     z.resize(numTaskSel.back());

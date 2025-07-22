@@ -94,7 +94,8 @@ template<class T>
 extern void groupDivvTimestepGpu(float Krho, const GroupView&, const T* divv, float* groupDt);
 
 template<class T>
-extern void groupAccTimestepGpu(float etaAcc, const GroupView&, const T* ax, const T* ay, const T* az, float* groupDt);
+extern void groupAccTimestepGpu(float etaAcc, const GroupView&, const T* ax, const T* ay, const T* az, const T* h,
+                                float* groupDt);
 
 void storeRungGpu(const GroupView& grp, uint8_t rung, uint8_t* particleRungs);
 
