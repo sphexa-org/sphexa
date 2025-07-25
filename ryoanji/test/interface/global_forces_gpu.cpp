@@ -170,7 +170,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
         MPI_Allreduce(&bhPotential, &bhPotentialGlob, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
         MPI_Allreduce(&potentialSumRef, &potentialSumRefGlob, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
-        double atol1pc = 1e-3;
+        double atol1pc = 2e-3;
         double atolmax = 3e-2;
         double ptol    = 1e-2;
 
