@@ -106,7 +106,7 @@ public:
 
         auto nodeCount          = domain.globalTree().numLeafNodes;
         auto particleCount      = domain.nParticles();
-        auto haloCount          = domain.nParticlesWithHalos() - domain.nParticles();
+        auto haloCount          = d.maxHalos;
         auto totalNeighbors     = d.totalNeighbors;
         auto totalParticleCount = d.numParticlesGlobal;
 
