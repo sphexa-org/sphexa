@@ -69,7 +69,7 @@ __device__ util::array<GpuConfig::ThreadMask, N> findSplits(util::array<Vec4<T>,
     for (int k = 0; k < N; ++k)
     {
         T distSq   = norm2(Xnext[k] - Xlane[k]);
-        bool split = distSq > distCritSq;
+        bool split = distSq > stl::min(distCritSq, pos[k][3] * pos[k][3]);
         splits[k]  = ballotSync(split);
     }
 
@@ -198,7 +198,7 @@ __global__ void groupSplitsKernel(LocalIndex first,
     for (int k = 0; k < nwt; k++)
     {
         pos_i[k] = {x[bodyIdx[k]] * box.ilx(), y[bodyIdx[k]] * box.ily(), z[bodyIdx[k]] * box.ilz(),
-                    h ? Tc(2) * h[bodyIdx[k]] : Tc(0)};
+                    h ? Tc(2) * h[bodyIdx[k]] / box.minExtent() : Tc(1)};
     }
 
     auto splitMask = findSplits(pos_i, distCrit * distCrit);
