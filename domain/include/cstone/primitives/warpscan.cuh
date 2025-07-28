@@ -83,6 +83,15 @@ struct IsHardwareShuffleable<T,
 {
 };
 
+static_assert(IsHardwareShuffleable<int>::value);
+static_assert(IsHardwareShuffleable<unsigned>::value);
+static_assert(IsHardwareShuffleable<long>::value);
+static_assert(IsHardwareShuffleable<unsigned long>::value);
+static_assert(IsHardwareShuffleable<long long>::value);
+static_assert(IsHardwareShuffleable<unsigned long long>::value);
+static_assert(IsHardwareShuffleable<float>::value);
+static_assert(IsHardwareShuffleable<double>::value);
+
 template<class T, class Op>
 __device__ __forceinline__ T shflSyncImpl(T value, Op&& shflOp)
 {
@@ -120,15 +129,15 @@ __device__ __forceinline__ T shflSync(T value, int srcLane)
 
 //! @brief Compatibility wrapper for AMD.
 template<class T>
-__device__ __forceinline__ T shflXorSync(T value, int width)
+__device__ __forceinline__ T shflXorSync(T value, int laneMask)
 {
     return detail::shflSyncImpl(value,
                                 [=](auto v)
                                 {
 #if defined(__CUDACC__) && !defined(__HIPCC__)
-                                    return __shfl_xor_sync(0xFFFFFFFF, v, width);
+                                    return __shfl_xor_sync(0xFFFFFFFF, v, laneMask);
 #else
-                                    return __shfl_xor(v, width);
+                                    return __shfl_xor(v, laneMask);
 #endif
                                 });
 }
