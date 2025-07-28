@@ -15,6 +15,12 @@
 
 #pragma once
 
+// if 1, a bank-conflict reducing shared memory layout is used which might increase register count
+// and required load/store instructions and thus not necessarily improve performance
+#ifndef CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
+#define CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS 0
+#endif
+
 #include <array>
 #include <cassert>
 #include <cstddef>
@@ -193,34 +199,53 @@ constexpr unsigned runIjLoopSharedMemPerSupercluster(unsigned ncmax)
 }
 
 template<class Config, class ParticleData, class Tc, class Th, class Input>
-__device__ __forceinline__ util::SharedMemAllocator::SharedMemPtr<ParticleData[]>
-loadSuperclusterIParticleData(util::SharedMemAllocator& sharedAllocator,
-                              const LocalIndex firstValidBody,
-                              const LocalIndex totalBodies,
-                              const LocalIndex iSupercluster,
-                              const Tc* const __restrict__ x,
-                              const Tc* const __restrict__ y,
-                              const Tc* const __restrict__ z,
-                              const Th* const __restrict__ h,
-                              Input&& input)
+__device__ __forceinline__ auto loadSuperclusterIParticleData(util::SharedMemAllocator& sharedAllocator,
+                                                              const LocalIndex firstValidBody,
+                                                              const LocalIndex totalBodies,
+                                                              const LocalIndex iSupercluster,
+                                                              const Tc* const __restrict__ x,
+                                                              const Tc* const __restrict__ y,
+                                                              const Tc* const __restrict__ z,
+                                                              const Th* const __restrict__ h,
+                                                              Input const& input)
 
 {
+#if CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
+    auto iSuperclusterData =
+        sharedAllocator
+            .alloc<decltype(buffersForResults<Config::iClustersPerSupercluster * Config::iSize>(ParticleData{}))>();
+#else
     auto iSuperclusterData = sharedAllocator.alloc<ParticleData[]>(Config::iClustersPerSupercluster * Config::iSize);
-    {
-        const unsigned base = iSupercluster * Config::superclusterSize;
+#endif
+
+    const unsigned base = iSupercluster * Config::superclusterSize;
 #pragma unroll
-        for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
-             offset += Config::iThreads * Config::jSize)
-        {
-            const unsigned i = base + offset;
-            auto iData       = (i >= firstValidBody & i < totalBodies)
-                                   ? loadParticleData(x, y, z, h, std::forward<Input>(input), i)
-                                   : dummyParticleData(x, y, z, h, std::forward<Input>(input), i);
-            std::get<0>(iData) -= firstValidBody;
-            iSuperclusterData[offset] = iData;
-        }
+    for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
+         offset += Config::iThreads * Config::jSize)
+    {
+        const unsigned i = base + offset;
+        auto iData       = (i >= firstValidBody & i < totalBodies) ? loadParticleData(x, y, z, h, input, i)
+                                                                   : dummyParticleData(x, y, z, h, input, i);
+        std::get<0>(iData) -= firstValidBody;
+#if CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
+        util::for_each_tuple([offset](auto& array, auto const& value) { array[offset] = value; }, *iSuperclusterData,
+                             iData);
+#else
+        iSuperclusterData[offset] = iData;
+#endif
     }
+
     return iSuperclusterData;
+}
+
+template<class ISuperclusterData>
+__device__ __forceinline__ auto getIData(ISuperclusterData const& iSuperclusterData, const unsigned offset)
+{
+#if CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
+    return util::tupleMap([&](auto const& array) { return array[offset]; }, *iSuperclusterData);
+#else
+    return iSuperclusterData[offset];
+#endif
 }
 
 template<class Config>
@@ -354,8 +379,8 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                 const unsigned i = iSupercluster * Config::superclusterSize + c * Config::iSize + threadIdx.x;
                 if ((warpMask >> c) & (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j)))
                 {
-                    bool jRequired   = i != j;
-                    const auto iData = iSuperclusterData[c * Config::iSize + threadIdx.x];
+                    bool jRequired     = i != j;
+                    const auto&& iData = getIData(iSuperclusterData, c * Config::iSize + threadIdx.x);
                     if (!jRequired) jRequired = (i < firstBody) | (i >= lastBody);
                     assert(std::get<0>(iData) == i - firstValidBody);
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
@@ -401,8 +426,11 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 #pragma unroll
         for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
         {
+            const unsigned offset = c * Config::iSize + threadIdx.x;
+            const unsigned i      = iSupercluster * Config::superclusterSize + offset;
+            const auto iData      = getIData(iSuperclusterData, offset);
             storeTupleISum<Config>(iResults[c / iClustersPerWarp], outputBufferPtrs, c * Config::iSize + threadIdx.x,
-                                   true, detail::EmptyPostamble{}, iSuperclusterData[c * Config::iSize + threadIdx.x]);
+                                   true, detail::EmptyPostamble{}, iData);
         }
 
         __syncthreads();
@@ -416,7 +444,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
             const bool active = (activeMask >> offset) & 1;
             if (i >= firstBody & i < lastBody & active)
             {
-                const auto iData   = iSuperclusterData[offset];
+                const auto iData   = getIData(iSuperclusterData, offset);
                 const auto iResult = util::tupleMap([&](auto const* ptr) { return ptr[offset]; }, outputBufferPtrs);
                 storeParticleData(output, i, postamble(iData, unwrapModifiers(iResult)));
             }
@@ -427,10 +455,12 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 #pragma unroll
         for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
         {
-            const auto i      = iSupercluster * Config::superclusterSize + c * Config::iSize + threadIdx.x;
-            const bool active = (activeMask >> (c * Config::iSize + threadIdx.x)) & 1;
+            const unsigned offset = c * Config::iSize + threadIdx.x;
+            const auto i          = iSupercluster * Config::superclusterSize + offset;
+            const bool active     = (activeMask >> (c * Config::iSize + threadIdx.x)) & 1;
+            const auto iData      = getIData(iSuperclusterData, offset);
             storeTupleISum<Config>(iResults[c / iClustersPerWarp], output, i, i >= firstBody & i < lastBody & active,
-                                   postamble, iSuperclusterData[c * Config::iSize + threadIdx.x]);
+                                   postamble, iData);
         }
     }
 }
