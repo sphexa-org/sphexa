@@ -43,7 +43,8 @@ namespace sph::gpu
 template<class Dataset>
 void computeAVswitches(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    // alpha is an input and output field, thus first copy alpha to a temporary vector to properly support symmetric neighborhoods
+    // alpha is an input and output field, thus first copy alpha to a temporary vector to properly support symmetric
+    // neighborhoods
     auto& tmp = d.devData.ax;
     assert(d.devData.ax.size() >= d.devData.alpha.size());
     checkGpuErrors(cudaMemcpyAsync(rawPtr(tmp), rawPtr(d.devData.alpha),
