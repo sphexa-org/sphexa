@@ -14,7 +14,6 @@
  */
 
 #include <algorithm>
-#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <format>
@@ -28,6 +27,7 @@
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
 #include "cstone/traversal/ijloop/gpu_fullnblist.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
+#include "cstone/util/fastmath.hpp"
 
 #include "../coord_samples/face_centered_cubic.hpp"
 #include "./csv.hpp"
@@ -47,16 +47,12 @@ struct LjKernelFun
         const auto [i, iPos, hi, qi] = iData;
         const auto [j, jPos, hj, qj] = jData;
         const T r2                   = std::max(distSq, T(1e-1));
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-        const T rinv = rsqrt(r2);
-#else
-        const T rinv = T(1) / std::sqrt(r2);
-#endif
-        const T r2inv     = rinv * rinv;
-        const T r6inv     = r2inv * r2inv * r2inv;
-        const T forcelj   = r6inv * (lj1 * r6inv - lj2) * r2inv;
-        const T forcecoul = qi * qj * r2inv * rinv;
-        const T fpair     = i == j ? 0 : forcelj + forcecoul;
+        const T rinv                 = util::fastmath::rsqrt(r2);
+        const T r2inv                = rinv * rinv;
+        const T r6inv                = r2inv * r2inv * r2inv;
+        const T forcelj              = r6inv * (lj1 * r6inv - lj2) * r2inv;
+        const T forcecoul            = qi * qj * r2inv * rinv;
+        const T fpair                = i == j ? 0 : forcelj + forcecoul;
         return std::make_tuple(symmetric::odd(T(ijPosDiff[0]) * fpair), symmetric::odd(T(ijPosDiff[1]) * fpair),
                                symmetric::odd(T(ijPosDiff[2]) * fpair));
     }

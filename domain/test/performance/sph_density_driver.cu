@@ -20,17 +20,17 @@
 #include <limits>
 #include <map>
 #include <tuple>
-#include <type_traits>
 #include <typeinfo>
 #include <vector>
 
 #include <thrust/universal_vector.h>
 
-#include "cstone/cuda/thrust_util.cuh"
 #include "cstone/cuda/cuda_runtime.hpp"
+#include "cstone/cuda/thrust_util.cuh"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
 #include "cstone/traversal/ijloop/gpu_fullnblist.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
+#include "cstone/util/fastmath.hpp"
 
 #include "../coord_samples/random.hpp"
 #include "./csv.hpp"
@@ -41,61 +41,13 @@
 
 constexpr int kTableSize = 20000;
 
-template<class T>
-constexpr __forceinline__ T fastSin(T x)
-{
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-    if constexpr (std::is_same_v<T, float>)
-        x = __sinf(x);
-    else
-#endif
-        x = std::sin(x);
-    return x;
-}
-
-template<class T>
-constexpr __forceinline__ T fastInv(T x)
-{
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-    if constexpr (std::is_same_v<T, float>)
-#if defined(__CUDA_ARCH__)
-        asm("rcp.approx.ftz.f32 %0,%0;" : "+f"(x) :);
-#else
-        x = __frcp_rn(x);
-#endif
-    else if constexpr (std::is_same_v<T, double>)
-#if defined(__CUDA_ARCH__)
-        asm("rcp.approx.ftz.f64 %0,%0;" : "+d"(x) :);
-#else
-        x = __drcp_rn(x);
-#endif
-    else
-#endif
-        x = T(1) / x;
-    return x;
-}
-
-template<class T>
-constexpr __forceinline__ T fastSqrt(T x)
-{
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-    if constexpr (std::is_same_v<T, float>)
-        x = __fsqrt_rn(x);
-    else if constexpr (std::is_same_v<T, double>)
-        x = __dsqrt_rn(x);
-    else
-#endif
-        x = std::sqrt(x);
-    return x;
-}
-
 template<typename T>
 constexpr inline T wharmonic_std(T v)
 {
     if (v == 0) { return 1; }
 
     const T Pv = T(M_PI_2) * v;
-    return fastSin(Pv) * fastInv(Pv);
+    return util::fastmath::sin(Pv) * util::fastmath::rcp(Pv);
 }
 
 template<class T, class F>
@@ -158,8 +110,8 @@ struct DensityKernelFun
     {
         const auto [i, iPos, hi, mi] = iData;
         const auto [j, jPos, hj, mj] = jData;
-        const T dist                 = fastSqrt(distSq);
-        const T vloc                 = dist * fastInv(hi);
+        const T dist                 = util::fastmath::sqrt(distSq);
+        const T vloc                 = dist * util::fastmath::rcp(hi);
         const T w                    = i == j ? T(1) : table_lookup<UseKernelTable>(wh, vloc);
         return std::make_tuple(cstone::ijloop::symmetric::even(w * mj));
     }
