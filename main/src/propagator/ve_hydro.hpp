@@ -32,8 +32,6 @@
 
 #pragma once
 
-#include <variant>
-
 #include "cstone/fields/field_get.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/sph.hpp"
@@ -61,16 +59,18 @@ protected:
     using MultipoleType = ryoanji::CartesianQuadrupole<Tmass>;
 
     using Acc       = typename DataType::AcceleratorType;
-    using MHolder_t = typename cstone::AccelSwitchType<Acc, MultipoleHolderCpu, MultipoleHolderGpu>::template type<
-        MultipoleType, DomainType, typename DataType::HydroData>;
+    using MHolder_t = std::conditional_t<cstone::HaveGpu<Acc>{},
+                                         MultipoleHolderGpu<MultipoleType, DomainType, typename DataType::HydroData>,
+                                         MultipoleHolderCpu<MultipoleType, DomainType, typename DataType::HydroData>>;
 
-    MHolder_t mHolder_;
+    MHolder_t      mHolder_;
+    GroupData<Acc> groups_;
 
     /*! @brief the list of conserved particles fields with values preserved between iterations
      *
      * x, y, z, h and m are automatically considered conserved and must not be specified in this list
      */
-    using ConservedFields = FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha">;
+    using ConservedFields = FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "id">;
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ =
@@ -126,9 +126,12 @@ public:
                         std::tuple_cat(std::tie(get<"m">(d)), get<ConservedFields>(d)), get<DependentFields>(d));
         }
         d.treeView = domain.octreeProperties();
+        timer.logStatistics("numParticles", domain.nParticles());
+        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
+        timer.logStatistics("assignment", domain.assignmentStart());
     }
 
-    void computeForces(DomainType& domain, DataType& simData)
+    void computeForces(DomainType& domain, DataType& simData) override
     {
         timer.start();
         pmReader.start();
@@ -136,7 +139,7 @@ public:
         timer.step("domain::sync");
 
         auto& d = simData.hydro;
-        d.resize(domain.nParticlesWithHalos());
+        d.resizeAcc(domain.nParticlesWithHalos());
         resizeNeighbors(d, domain.nParticles() * d.ngmax);
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
@@ -146,19 +149,18 @@ public:
         fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
 
         findNeighborsSfc(first, last, d, domain.box());
+        computeGroups(first, last, d, domain.box(), groups_);
         timer.step("FindNeighbors");
         pmReader.step();
 
-        computeXMass(first, last, d, domain.box());
+        computeXMass(groups_.view(), d, domain.box());
         timer.step("XMass");
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        d.release("ay");
-        d.devData.release("ay");
-        d.acquire("gradh");
-        d.devData.acquire("gradh");
-        computeVeDefGradh(first, last, d, domain.box());
+        release(d, "ay");
+        acquire(d, "gradh");
+        computeVeDefGradh(groups_.view(), d, domain.box());
         timer.step("Normalization & Gradh");
 
         computeEOS(first, last, d);
@@ -167,69 +169,69 @@ public:
         domain.exchangeHalos(get<"vx", "vy", "vz", "prho", "c", "kx">(d), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        d.release("gradh", "az");
-        d.devData.release("gradh", "az");
-        d.acquire("divv", "curlv");
-        d.devData.acquire("divv", "curlv");
-        computeIadDivvCurlv(first, last, d, domain.box());
+        release(d, "gradh", "az");
+        acquire(d, "divv", "curlv");
+        computeIadDivvCurlv(groups_.view(), d, domain.box());
         d.minDtRho = rhoTimestep(first, last, d);
         timer.step("IadVelocityDivCurl");
 
         domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv">(d), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeAVswitches(first, last, d, domain.box());
+        computeAVswitches(groups_.view(), d, domain.box());
         timer.step("AVswitches");
 
         if (avClean)
         {
-            domain.exchangeHalos(get<"dV11", "dV12", "dV22", "dV23", "dV33", "alpha">(d), get<"ax">(d), get<"keys">(d));
+            domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "alpha">(d), get<"ax">(d),
+                                 get<"keys">(d));
         }
         else { domain.exchangeHalos(std::tie(get<"alpha">(d)), get<"ax">(d), get<"keys">(d)); }
         timer.step("mpi::synchronizeHalos");
 
-        d.release("divv", "curlv");
-        d.devData.release("divv", "curlv");
-        d.acquire("ay", "az");
-        d.devData.acquire("ay", "az");
-        computeMomentumEnergy<avClean>(first, last, d, domain.box());
+        release(d, "divv", "curlv");
+        acquire(d, "ay", "az");
+        computeMomentumEnergy<avClean>(groups_.view(), nullptr, d, domain.box());
         timer.step("MomentumAndEnergy");
         pmReader.step();
 
         if (d.g != 0.0)
         {
+            auto groups = mHolder_.computeSpatialGroups(d, domain);
             mHolder_.upsweep(d, domain);
             timer.step("Upsweep");
             pmReader.step();
-            mHolder_.traverse(d, domain);
+            mHolder_.traverse(groups, d, domain);
             timer.step("Gravity");
             pmReader.step();
+
+            auto stats = mHolder_.readStats();
+            timer.logStatistics("sumP2P", stats[0] / timer.getLastStepTime());
+            timer.logStatistics("sumM2P", stats[2] / timer.getLastStepTime());
         }
     }
 
-    void step(DomainType& domain, DataType& simData) override
+    void integrate(DomainType& domain, DataType& simData) override
     {
-        computeForces(domain, simData);
-
         auto&  d     = simData.hydro;
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
         computeTimestep(first, last, d);
         timer.step("Timestep");
-        computePositions(first, last, d, domain.box());
+        computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
+        updateSmoothingLength(groups_.view(), d);
         timer.step("UpdateQuantities");
-        updateSmoothingLength(first, last, d);
-        timer.step("UpdateSmoothingLength");
     }
 
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,
                     const cstone::Box<T>& box) override
     {
-        auto& d             = simData.hydro;
-        auto  fieldPointers = d.data();
-        auto  indicesDone   = d.outputFieldIndices;
-        auto  namesDone     = d.outputFieldNames;
+        auto& d = simData.hydro;
+        d.resize(d.accSize());
+        auto fieldPointers = d.data();
+        auto indicesDone   = d.outputFieldIndices;
+        auto namesDone     = d.outputFieldNames;
 
         auto output = [&]()
         {
@@ -242,38 +244,37 @@ public:
                                  d.outputFieldIndices.begin();
                     transferToHost(d, first, last, {d.fieldNames[fidx]});
                     std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writer->writeField(key, field->data(), c); },
-                               fieldPointers[fidx]);
+                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
             }
         };
 
-        // first output pass: write everything allocated at the end of the step
+        // first output pass: write everything allocated at the end of computeForces()
         output();
-
-        d.release("ax", "ay", "az");
-        d.devData.release("ax", "ay", "az");
 
         // second output pass: write temporary quantities produced by the EOS
-        d.acquire("rho", "p", "gradh");
-        d.devData.acquire("rho", "p", "gradh");
+        release(d, "c11", "c12", "c13");
+        acquire(d, "rho", "p", "gradh");
         computeEOS(first, last, d);
         output();
-        d.devData.release("rho", "p", "gradh");
-        d.release("rho", "p", "gradh");
+        release(d, "rho", "p", "gradh");
+        acquire(d, "c11", "c12", "c13");
 
-        // third output pass: curlv and divv
-        d.acquire("divv", "curlv");
-        d.devData.acquire("divv", "curlv");
-        if (!indicesDone.empty()) { computeIadDivvCurlv(first, last, d, box); }
+        // third output pass: recover temporary curlv and divv quantities
+        release(d, "prho", "c");
+        acquire(d, "divv", "curlv");
+        // partial recovery of cij in range [first:last] without halos, which are not needed for divv and curlv
+        if (!indicesDone.empty()) { computeIadDivvCurlv(groups_.view(), d, box); }
         output();
-        d.release("divv", "curlv");
-        d.devData.release("divv", "curlv");
+        release(d, "divv", "curlv");
+        acquire(d, "prho", "c");
 
-        d.acquire("ax", "ay", "az");
-        d.devData.acquire("ax", "ay", "az");
+        /* The following data is now lost and no longer available in the integration step
+         *  c11, c12, c12: halos invalidated
+         *  prho, c: destroyed
+         */
 
         if (!indicesDone.empty() && Base::rank_ == 0)
         {
@@ -284,6 +285,7 @@ public:
             }
             std::cout << d.fieldNames[indicesDone.back()] << std::endl;
         }
+        timer.step("FileOutput");
     }
 };
 

@@ -28,20 +28,13 @@
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  * @author Jose A. Escartin <ja.escartin@gmail.com>
+ * @author ChristopherBignamini <christopher.bignamini@gmail.com>
  */
 
 #pragma once
 
-#include <variant>
-
 #include "ipropagator.hpp"
-#include "nbody.hpp"
-#include "std_hydro.hpp"
-#include "ve_hydro.hpp"
-#ifdef SPH_EXA_HAVE_GRACKLE
-#include "std_hydro_grackle.hpp"
-#endif
-#include "turb_ve.hpp"
+#include "propagator.h"
 
 namespace sphexa
 {
@@ -50,24 +43,30 @@ template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
 propagatorFactory(const std::string& choice, bool avClean, std::ostream& output, size_t rank, const InitSettings& s)
 {
-    if (choice == "ve")
+    if (choice == "ve") { return PropLib<DomainType, ParticleDataType>::makeHydroVeProp(output, rank, avClean); }
+    if (choice == "ve-bdt")
     {
-        if (avClean) { return std::make_unique<HydroVeProp<true, DomainType, ParticleDataType>>(output, rank); }
-        else { return std::make_unique<HydroVeProp<false, DomainType, ParticleDataType>>(output, rank); }
+        return PropLib<DomainType, ParticleDataType>::makeHydroVeBdtProp(output, rank, s, avClean);
     }
-    if (choice == "std") { return std::make_unique<HydroProp<DomainType, ParticleDataType>>(output, rank); }
+    if (choice == "std") { return PropLib<DomainType, ParticleDataType>::makeHydroProp(output, rank); }
 #ifdef SPH_EXA_HAVE_GRACKLE
     if (choice == "std-cooling")
     {
-        return std::make_unique<HydroGrackleProp<DomainType, ParticleDataType>>(output, rank);
+        return PropLib<DomainType, ParticleDataType>::makeHydroGrackleProp(output, rank, s);
     }
 #endif
-    if (choice == "nbody") { return std::make_unique<NbodyProp<DomainType, ParticleDataType>>(output, rank); }
+    if (choice == "nbody") { return PropLib<DomainType, ParticleDataType>::makeNbodyProp(output, rank); }
     if (choice == "turbulence")
     {
-        if (avClean) { return std::make_unique<TurbVeProp<true, DomainType, ParticleDataType>>(output, rank, s); }
-        else { return std::make_unique<TurbVeProp<false, DomainType, ParticleDataType>>(output, rank, s); }
+        return PropLib<DomainType, ParticleDataType>::makeTurbVeBdtProp(output, rank, s, avClean);
     }
+    if (choice == "turbulence-ve")
+    {
+        return PropLib<DomainType, ParticleDataType>::makeTurbVeProp(output, rank, s, avClean);
+    }
+#ifdef SPH_EXA_HAVE_DISKS
+    if (choice == "std-disk") { return PropLib<DomainType, ParticleDataType>::makeDiskProp(output, rank, s); }
+#endif
 
     throw std::runtime_error("Unknown propagator choice: " + choice);
 }

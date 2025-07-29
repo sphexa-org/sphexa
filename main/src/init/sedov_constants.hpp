@@ -3,7 +3,7 @@
 #include <map>
 #include <string>
 
-#include "init/isim_init.hpp"
+#include "init/settings.hpp"
 
 namespace sphexa
 {

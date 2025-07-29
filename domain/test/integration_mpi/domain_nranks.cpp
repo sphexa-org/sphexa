@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -131,7 +115,7 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks, bool equalize
     std::vector<cstone::LocalIndex> neighbors(localCount * ngmax);
     std::vector<unsigned> neighborsCount(localCount);
     findNeighbors(x.data(), y.data(), z.data(), h.data(), domain.startIndex(), domain.endIndex(), box,
-                  domain.octreeProperties().nsView(), ngmax, neighbors.data(), neighborsCount.data());
+                  domain.octreeProperties(), ngmax, neighbors.data(), neighborsCount.data());
 
     uint64_t neighborSum = std::accumulate(begin(neighborsCount), end(neighborsCount), 0);
     MPI_Allreduce(MPI_IN_PLACE, &neighborSum, 1, MpiType<uint64_t>{}, MPI_SUM, MPI_COMM_WORLD);
@@ -259,6 +243,60 @@ TEST(FocusDomain, assignmentShift)
     EXPECT_TRUE(std::count(property.begin(), property.end(), rank) == domain.nParticles());
 }
 
+TEST(FocusDomain, removeParticle)
+{
+    int rank = 0, numRanks = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
+
+    using Real    = double;
+    using KeyType = unsigned;
+
+    Box<Real> box(0, 1);
+    LocalIndex numParticlesPerRank = 1000;
+    unsigned bucketSize            = 64;
+    unsigned bucketSizeFocus       = 8;
+    float theta                    = 0.5;
+
+    RandomCoordinates<Real, SfcKind<KeyType>> coordinates(numParticlesPerRank, box, rank);
+
+    std::vector<Real> x(coordinates.x().begin(), coordinates.x().end());
+    std::vector<Real> y(coordinates.y().begin(), coordinates.y().end());
+    std::vector<Real> z(coordinates.z().begin(), coordinates.z().end());
+    std::vector<Real> h(numParticlesPerRank, 0.1 / std::cbrt(numRanks));
+
+    std::vector<uint64_t> id(x.size());
+    std::iota(begin(id), end(id), uint64_t(rank * numParticlesPerRank));
+
+    Domain<KeyType, Real> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, box);
+
+    std::vector<KeyType> particleKeys(x.size());
+
+    std::vector<Real> s1, s2, s3;
+    domain.sync(particleKeys, x, y, z, h, std::tie(id), std::tie(s1, s2, s3));
+
+    // pick a particle to remove on each rank
+    LocalIndex removeIndex = domain.startIndex() + domain.nParticles() / 2;
+    assert(removeIndex < domain.endIndex());
+    particleKeys[removeIndex] = removeKey<KeyType>::value;
+    uint64_t removeID         = id[removeIndex];
+
+    domain.sync(particleKeys, x, y, z, h, std::tie(id), std::tie(s1, s2, s3));
+
+    uint64_t numLocalParticles = domain.nParticles();
+    uint64_t numGlobalParticles;
+    MPI_Allreduce(&numLocalParticles, &numGlobalParticles, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
+    EXPECT_EQ(numGlobalParticles, numRanks * numParticlesPerRank - numRanks);
+
+    // check that removed particles are gone by checking their IDs
+    std::vector<uint64_t> removedIDs(numRanks);
+    MPI_Allgather(&removeID, 1, MPI_UNSIGNED_LONG_LONG, removedIDs.data(), 1, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD);
+    for (uint64_t rid : removedIDs)
+    {
+        EXPECT_EQ(std::count(id.begin() + domain.startIndex(), id.begin() + domain.endIndex(), rid), 0);
+    }
+}
+
 TEST(FocusDomain, reapplySync)
 {
     int rank = 0, numRanks = 0;
@@ -297,9 +335,9 @@ TEST(FocusDomain, reapplySync)
     }
 
     std::vector<Real> property(x.size());
-    for (size_t i = 0; i < x.size(); ++i)
+    for (size_t i = domain.startIndex(); i < domain.endIndex(); ++i)
     {
-        property[i] = numParticlesPerRank * rank + i;
+        property[i] = numParticlesPerRank * rank + i - domain.startIndex();
     }
 
     std::vector<Real> propertyCpy = property;

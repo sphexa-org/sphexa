@@ -10,7 +10,7 @@ endfunction()
 
 if (SPH_EXA_WITH_H5PART)
     addFrontendMpiTest(hdf5.cpp hdf5io HDF5IO 2)
-    enableH5Part(hdf5io)
+    target_link_libraries(hdf5io PRIVATE io)
 endif()
 
 

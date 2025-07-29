@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <functional>
 #include <numeric>
@@ -111,12 +112,23 @@ T powSincDerivative(T x, T sincIndex)
 template<class T>
 struct SincN1SincN2
 {
-    T kernel(T x) const { return a * std::pow(wharmonic_std(x), n1) + (1 - a) * std::pow(wharmonic_std(x), n2); }
-    T derivative(T x) const { return a * powSincDerivative(x, n1) + (1 - a) * powSincDerivative(x, n2); }
+    SincN1SincN2()
+    {
+        T support = 2.0;
+        K1        = kernel_3D_k([this](auto x) { return std::pow(wharmonic_std(x), n1); }, support);
+        K2        = kernel_3D_k([this](auto x) { return std::pow(wharmonic_std(x), n2); }, support);
+    }
+
+    T kernel(T x) const
+    {
+        return a * K1 * std::pow(wharmonic_std(x), n1) + (1 - a) * K2 * std::pow(wharmonic_std(x), n2);
+    }
+    T derivative(T x) const { return a * K1 * powSincDerivative(x, n1) + (1 - a) * K2 * powSincDerivative(x, n2); }
 
     T a  = 0.9;
     T n1 = 4.0;
     T n2 = 9.0;
+    T K1, K2;
 };
 
 enum SphKernelType : int

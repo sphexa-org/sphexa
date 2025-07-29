@@ -32,31 +32,17 @@
 
 #include <memory>
 
-#include "ifile_io.hpp"
-#include "ifile_io_ascii.hpp"
-#ifdef SPH_EXA_HAVE_H5PART
-#include "ifile_io_hdf5.hpp"
-#endif
+#include "ifile_io_impl.h"
 
 namespace sphexa
 {
 
 std::unique_ptr<IFileWriter> fileWriterFactory(bool ascii, MPI_Comm comm)
 {
-    if (ascii) { return std::make_unique<AsciiWriter>(comm); }
-#ifdef SPH_EXA_HAVE_H5PART
-    else { return std::make_unique<H5PartWriter>(comm); }
-#endif
-    throw std::runtime_error("unsupported file i/o choice\n");
+    if (ascii) { return makeAsciiWriter(comm); }
+    else { return makeH5PartWriter(comm); }
 }
 
-std::unique_ptr<IFileReader> fileReaderFactory(bool /*ascii*/, MPI_Comm comm)
-{
-#if defined(SPH_EXA_HAVE_H5PART)
-    return std::make_unique<H5PartReader>(comm);
-#else
-    return std::make_unique<UnimplementedReader>();
-#endif
-}
+std::unique_ptr<IFileReader> fileReaderFactory(bool /*ascii*/, MPI_Comm comm) { return makeH5PartReader(comm); }
 
 } // namespace sphexa

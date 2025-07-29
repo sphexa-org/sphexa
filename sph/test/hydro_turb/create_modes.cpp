@@ -1,75 +1,100 @@
+#include <map>
+#include <string>
 
-#include "stir_init.hpp"
-#include "st_ounoise.hpp"
-#include "st_calcPhases.hpp"
-#include "st_calcAccel.hpp"
-#include <vector>
-#include <iostream>
-int main()
+#include "gtest/gtest.h"
+
+#include "sph/hydro_turb/create_modes.hpp"
+
+std::map<std::string, double> TurbulenceConstants()
 {
-    using T            = double;
-    T      dt          = 0.1;
-    T      eps         = 1.e-16;
-    size_t stMaxModes  = 100000;
-    T      Lbox        = 1.0;
-    T      velocity    = 0.3;
-    int    stSeed      = 251299;
-    size_t stSpectForm = 1;
+    return {{"solWeight", 0.5},        {"stMaxModes", 100000}, {"Lbox", 1.0},       {"stEnergyPrefac", 5.0e-3},
+            {"stMachVelocity", 0.3e0}, {"epsilon", 1e-15},     {"rngSeed", 251299}, {"stSpectForm", 1},
+            {"powerLawExp", 5. / 3},   {"anglesExp", 2.0}};
+};
 
-    T twopi     = 8 * std::atan(1.0);
-    T stEnergy  = 5.0e-3 * std::pow(velocity, 3) / Lbox;
-    T stStirMin = (1.0 - eps) * twopi / Lbox;
-    T stStirMax = (3.0 + eps) * twopi / Lbox;
+TEST(Turbulence, spectForm1_unifdimensions)
+{
+    using T = double;
 
-    size_t         dim         = 3;
-    T              stDecay     = Lbox / (2.0 * velocity);
-    T              stSolWeight = 0.5;
-    T              stSolWeightNorm;
-    T              stOUVar;
-    std::vector<T> stAmpl(stMaxModes);
-    std::vector<T> stMode(stMaxModes * dim);
+    const T twopi = 6.283185307179586;
+    const T tol   = 1.e-6;
 
-    size_t stNModes;
+    T      Lx          = 1.0;
+    T      Ly          = 1.0;
+    T      Lz          = 1.0;
+    T      stirMax     = 3.000000000000000 * twopi / Lx;
+    T      stirMin     = (1.0) * twopi / Lx;
+    size_t st_maxmodes = 100000;
+    size_t ndim        = 3;
+    int    numModes    = 0;
+    // T      modes[st_maxmodes];
+    // T      amplitudes[st_maxmodes];
+    bool verbose = true;
 
-    stir_init(stAmpl, stMode, stNModes, stSolWeight, stSolWeightNorm, stOUVar, stDecay, Lbox, Lbox, Lbox, stMaxModes,
-              stEnergy, stStirMax, stStirMin, dim, stSpectForm);
+    sph::TurbulenceData<T, cstone::CpuTag> turbulenceData(TurbulenceConstants(), verbose);
+    sph::createStirringModes(turbulenceData, Lx, Ly, Lz, st_maxmodes, stirMax, stirMin, ndim, 1, 0.0, 0.0, verbose);
 
-    std::vector<T> stOUPhases(6 * stNModes);
-    st_ounoiseinit(stOUPhases, 6 * stNModes, stOUVar, stSeed);
+    numModes         = turbulenceData.numModes;
+    auto& modes      = turbulenceData.modes;
+    auto& amplitudes = turbulenceData.amplitudes;
 
-    st_ounoiseupdate(stOUPhases, 6 * stNModes, stOUVar, dt, stDecay, stSeed);
+    EXPECT_EQ(numModes, 112);
 
-    // Problem!!!, st_OUphases, st_nmodes, st_OUvar & st_seed must be output too, need to store values between
-    // iterations
-    std::vector<T> st_aka(dim * stNModes);
-    std::vector<T> st_akb(dim * stNModes);
+    EXPECT_NEAR(modes[3 * (10 - 1) + 0], 0.0000000000000000, tol);
+    EXPECT_NEAR(modes[3 * (10 - 1) + 1], -0.0000000000000000, tol);
+    EXPECT_NEAR(modes[3 * (10 - 1) + 2], 18.849556446075439, tol);
+    EXPECT_NEAR(0.5 * amplitudes[(10 - 1)], 0.0000000000000000, tol);
 
-    st_calcPhases(stNModes, dim, stOUPhases, stSolWeight, stMode, st_aka, st_akb);
+    EXPECT_NEAR(modes[3 * (54 - 1) + 0], 6.2831854820251465, tol);
+    EXPECT_NEAR(modes[3 * (54 - 1) + 1], -6.2831854820251465, tol);
+    EXPECT_NEAR(modes[3 * (54 - 1) + 2], 0.0000000000000000, tol);
+    EXPECT_NEAR(0.5 * amplitudes[(54 - 1)], 1.1461712345826693, tol);
 
-    std::vector<T> xCoord{-0.4, -0.2, 0.0, 0.2, 0.4, -0.5};
-    std::vector<T> yCoord{0.4, -0.2, 0.0, -0.2, 0.4, -0.5};
-    std::vector<T> zCoord{0.4, 0.2, 0.0, -0.2, -0.4, -0.5};
-    std::vector<T> accx{0.0, 0.0, 0.0, 0.0, 0.0, -0.5};
-    std::vector<T> accy{0.0, 0.0, 0.0, 0.0, 0.0, -0.5};
-    std::vector<T> accz{0.0, 0.0, 0.0, 0.0, 0.0, -0.5};
+    EXPECT_NEAR(modes[3 * (78 - 1) + 0], 12.566370964050293, tol);
+    EXPECT_NEAR(modes[3 * (78 - 1) + 1], -0.0000000000000000, tol);
+    EXPECT_NEAR(modes[3 * (78 - 1) + 2], 0.0000000000000000, tol);
+    EXPECT_NEAR(0.5 * amplitudes[(78 - 1)], 1.0000000000000000, tol);
+}
 
-    size_t npart = 6;
+TEST(Turbulence, spectForm1_nonunifdimensions)
+{
+    using T = double;
 
-    st_calcAccel(0, npart, dim, xCoord, yCoord, zCoord, accx, accy, accz, stNModes, stMode, st_aka, st_akb, stAmpl,
-                 stSolWeightNorm);
+    const T twopi       = 2.0 * M_PI;
+    const T tol         = 1.e-6;
+    T       Lx          = 0.7;
+    T       Ly          = 1.2;
+    T       Lz          = 1.5;
+    T       stirMax     = 3.000000000000001 * twopi / Lx;
+    T       stirMin     = (0.999999999999999) * twopi / Lx;
+    size_t  st_maxmodes = 100000;
+    size_t  ndim        = 3;
+    int     numModes    = 0;
+    // T modes[st_maxmodes];
+    // T amplitudes[st_maxmodes];
+    bool verbose = true;
 
-    for (int i = 0; i < npart; ++i)
-    {
+    sph::TurbulenceData<T, cstone::CpuTag> turbulenceData(TurbulenceConstants(), verbose);
+    sph::createStirringModes(turbulenceData, Lx, Ly, Lz, st_maxmodes, stirMax, stirMin, ndim, 1, 0.0, 0.0, verbose);
 
-        std::cout << accx[i] << ' ' << accy[i] << ' ' << accz[i] << std::endl;
-    }
-    /*
-    accx, accy, accz
-    ----------------
-    3.662459567254532E-01  1.259446841690182E-01 -1.125844123111067E-01
-    1.384560977280313E-02 -3.799734689699691E-02 -1.793841332102599E-01
-   -8.006708921589355E-02  5.960035530834547E-02 -4.877338914905545E-02
-    2.394216045884232E-02 -7.479786887141186E-02 -1.467975759746282E-01
-   -5.687601045457229E-02  1.256956770910929E-01  7.292293303985517E-02
-    */
+    numModes         = turbulenceData.numModes;
+    auto& modes      = turbulenceData.modes;
+    auto& amplitudes = turbulenceData.amplitudes;
+
+    EXPECT_EQ(numModes, 300);
+
+    EXPECT_NEAR(modes[3 * (10 - 1) + 0], 0.0000000000000000, tol);
+    EXPECT_NEAR(modes[3 * (10 - 1) + 1], -0.0000000000000000, tol);
+    EXPECT_NEAR(modes[3 * (10 - 1) + 2], 20.943951606750488, tol);
+    EXPECT_NEAR(0.5 * amplitudes[(10 - 1)], 0.80812206144596110, tol);
+
+    EXPECT_NEAR(modes[3 * (54 - 1) + 0], 0.0000000000000000, tol);
+    EXPECT_NEAR(modes[3 * (54 - 1) + 1], -10.471975387256329, tol);
+    EXPECT_NEAR(modes[3 * (54 - 1) + 2], 16.755161285400391, tol);
+    EXPECT_NEAR(0.5 * amplitudes[(54 - 1)], 0.88997794370873951, tol);
+
+    EXPECT_NEAR(modes[3 * (78 - 1) + 0], 0.0000000000000000, tol);
+    EXPECT_NEAR(modes[3 * (78 - 1) + 1], -15.707963080884493, tol);
+    EXPECT_NEAR(modes[3 * (78 - 1) + 2], 16.755161285400391, tol);
+    EXPECT_NEAR(0.5 * amplitudes[(78 - 1)], 0.64827464011102576, tol);
 }

@@ -33,7 +33,6 @@
 
 #include "gtest/gtest.h"
 
-#include "sph/hydro_std/density_kern.hpp"
 #include "sph/hydro_std/iad_kern.hpp"
 #include "sph/hydro_std/momentum_energy_kern.hpp"
 #include "sph/sph_kernel_tables.hpp"
@@ -95,14 +94,6 @@ protected:
      * j = 4   4.63465
      */
 };
-
-TEST_F(SphKernelTestsStd, Density)
-{
-    T rho = densityJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(),
-                         m.data(), wh.data(), whd.data());
-
-    EXPECT_NEAR(rho, 0.022492200847107912, 1e-10);
-}
 
 TEST_F(SphKernelTestsStd, IAD)
 {

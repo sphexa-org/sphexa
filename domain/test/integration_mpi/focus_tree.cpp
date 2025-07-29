@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -69,13 +53,12 @@ void globalRandomGaussian(int thisRank, int numRanks)
     // common pool of coordinates, identical on all ranks
     RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numRanks * numParticles, box);
 
-    auto [tree, counts] = computeOctree(coords.particleKeys().data(),
-                                        coords.particleKeys().data() + coords.particleKeys().size(), bucketSize);
+    auto [tree, counts] = computeOctree(std::span(coords.particleKeys()), bucketSize);
 
     Octree<KeyType> domainTree;
     domainTree.update(tree.data(), nNodes(tree));
 
-    auto assignment = singleRangeSfcSplit(counts, numRanks);
+    auto assignment = makeSfcAssignment(numRanks, counts, tree.data());
 
     /*******************************/
 
@@ -85,12 +68,12 @@ void globalRandomGaussian(int thisRank, int numRanks)
     std::vector<KeyType> peerBoundaries;
     for (auto peer : peers)
     {
-        peerBoundaries.push_back(tree[assignment.firstNodeIdx(peer)]);
-        peerBoundaries.push_back(tree[assignment.lastNodeIdx(peer)]);
+        peerBoundaries.push_back(assignment[peer]);
+        peerBoundaries.push_back(assignment[peer + 1]);
     }
 
-    KeyType focusStart = tree[assignment.firstNodeIdx(thisRank)];
-    KeyType focusEnd   = tree[assignment.lastNodeIdx(thisRank)];
+    KeyType focusStart = assignment[thisRank];
+    KeyType focusEnd   = assignment[thisRank + 1];
 
     // build the reference focus tree from the common pool of coordinates, focused on the executing rank
     FocusedOctreeSingleNode<KeyType> referenceFocusTree(bucketSizeLocal, theta);
@@ -122,14 +105,15 @@ void globalRandomGaussian(int thisRank, int numRanks)
     std::vector<KeyType> particleKeys(lastAssignedIndex - firstAssignedIndex);
     computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box);
 
-    FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal, theta);
+    FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal);
+    std::vector<int, util::DefaultInitAdaptor<int>> scratch;
 
     int converged = 0;
     while (converged != numRanks)
     {
-        converged = focusTree.updateTree(peers, assignment, tree);
-        focusTree.updateCounts(particleKeys, tree, counts);
-        focusTree.updateMinMac(box, assignment, tree, invThetaEff);
+        converged = focusTree.updateTree(peers, assignment, box);
+        focusTree.updateCounts(particleKeys, tree, counts, scratch);
+        focusTree.updateMinMac(assignment, invThetaEff);
         MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
         // particle counts must always be valid, whatever state of convergence
@@ -146,8 +130,10 @@ void globalRandomGaussian(int thisRank, int numRanks)
     }
 
     // the locally built reference tree should be identical to the tree built with distributed particles
-    EXPECT_EQ(focusTree.treeLeaves(), referenceFocusTree.treeLeaves());
-    EXPECT_EQ(focusTree.leafCounts(), referenceFocusTree.leafCounts());
+    EXPECT_TRUE(std::equal(focusTree.treeLeaves().begin(), focusTree.treeLeaves().end(),
+                           referenceFocusTree.treeLeaves().begin()));
+    EXPECT_TRUE(std::equal(focusTree.leafCounts().begin(), focusTree.leafCounts().end(),
+                           referenceFocusTree.leafCounts().begin()));
 }
 
 TEST(GlobalTreeDomain, randomGaussian)
@@ -156,8 +142,6 @@ TEST(GlobalTreeDomain, randomGaussian)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
 
-    globalRandomGaussian<unsigned, double>(rank, nRanks);
     globalRandomGaussian<uint64_t, double>(rank, nRanks);
     globalRandomGaussian<unsigned, float>(rank, nRanks);
-    globalRandomGaussian<uint64_t, float>(rank, nRanks);
 }

@@ -1,9 +1,9 @@
-![License](https://img.shields.io/github/license/unibas-dmi-hpc/SPH-EXA_mini-app)
-[![Documentation Status](https://readthedocs.org/projects/sph-exa/badge/?version=latest)](https://sph-exa.readthedocs.io/en/latest/?badge=latest)
-[![Unit tests](https://github.com/unibas-dmi-hpc/SPH-EXA_mini-app/actions/workflows/unittest.yml/badge.svg?branch=develop)](https://github.com/unibas-dmi-hpc/SPH-EXA_mini-app/actions/workflows/unittest.yml)
-![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/unibas-dmi-hpc/SPH-EXA_mini-app?include_prereleases)
+![License](https://img.shields.io/github/license/sphexa-org/sphexa)
+
+![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/sphexa-org/sphexa?include_prereleases)
+
 <p align="center">
-  <img src="https://raw.githubusercontent.com/unibas-dmi-hpc/SPH-EXA/develop/docs/artwork/SPH-EXA_logo.png" alt="SPH-EXA logo" width="200"/>
+  <img src="https://raw.githubusercontent.com/sphexa-org/sphexa/refs/heads/develop/docs/artwork/SPH-EXA_logo.png" alt="SPH-EXA logo" width="200"/>
 </p>
 
 # SPH
@@ -63,11 +63,11 @@ SPH-EXA
 ```
 #### Toolchain requirements
 
-The C++ (.cpp) part of the code requires a **C++20 compiler**, at least GCC 11, clang 12 or cray-clang 14.
-For CUDA (.cu), the minimum supported CUDA version is **CUDA 11.2** with a C++17 host compiler, e.g. GCC 9.3.0.
-
-For ease of use, the recommended minimum version of CUDA is 11.4.1 which supports GCC 11, providing both the required
-C++20 support and bug-free CUDA host compilation. [**NOTE:** CUDA/11.3.1 seems to have solved the compatibility issues with GCC 10.3.0]
+The code requires a **C++20 compiler** for both the CPU and GPU parts.
+* GCC 12 and later
+* Clang 16 and later
+* CUDA 12 and later
+* ROCm 6 and later. ROCm 5 compiles, but has bugs preventing the reliable use of GPU-aware-MPI
 
 #### Compilation
 
@@ -87,29 +87,24 @@ mkdir build
 cd build
 cmake <GIT_SOURCE_DIR>
 ```
-CMake configuration on Piz Daint for clang:
-**Cray-clang 14** for CPU code (.cpp), **CUDA 11.6 + GCC 11.2.0** for GPU code (.cu):
+CMake configuration on Daint on Alps:
+**CUDA 12.6 + GCC 13.3**:
 ```shell
-module load daint-gpu
-module load CMake/3.22.1
-module load PrgEnv-cray
-module load cdt/22.05           # will load cce/14.0.0
-module load nvhpc-nompi/22.2    # will load nvcc/11.6
-module load gcc/11.2.0
-module load cray-hdf5-parallel
+uenv image pull prgenv-gnu/24.11:v1
+uenv start prgenv-gnu/24.11:v1 --view=default
 
 mkdir build
 cd build
 
-# C-compiler is needed for hdf5 detection
-CC=cc CXX=CC cmake -DCMAKE_CUDA_ARCHITECTURES=60 -S <GIT_SOURCE_DIR>
-
+CC=mpicc CXX=mpicxx cmake -DCMAKE_CUDA_ARCHITECTURES=90 -DCSTONE_WITH_GPU_AWARE_MPI=ON -DCMAKE_CUDA_FLAGS=-ccbin=mpicxx -S <GIT_SOURCE_DIR
 ```
-Module and CMake configuration on LUMI
+
+Module and CMake configuration on LUMI (ROCm 6.2.2)
 ```shell
-module load CrayEnv buildtools/22.08 craype-accel-amd-gfx90a rocm cray-hdf5-parallel
-cd <GIT_SOURCE_DIR>; hipify-perl -inplace `find -name *.cu -o -name *.cuh` && find -name *.prehip -delete
-cmake -DCMAKE_CXX_COMPILER=CC -DCMAKE_HIP_ARCHITECTURES=gfx90a -DCMAKE_HIP_COMPILER=CC -DCMAKE_HIP_COMPILER_FORCED=ON -DGPU_DIRECT=<ON/OFF> -S <GIT_SOURCE_DIR>
+module swap PrgEnv-cray PrgEnv-gnu
+module load CrayEnv buildtools craype-accel-amd-gfx90a rocm cray-hdf5-parallel
+export MPICH_GPU_SUPPORT_ENABLED=1
+cmake -DCMAKE_CXX_COMPILER=CC -DCMAKE_HIP_ARCHITECTURES=gfx90a -DCSTONE_WITH_GPU_AWARE_MPI=ON -S <GIT_SOURCE_DIR>
 ```
 
 Build everything: ```make -j```
@@ -129,7 +124,7 @@ Arguments:
 * ```-s NUM``` : Run the simulation with NUM of iterations (time-steps) if NUM is integer. Run until the specified physical time if NUM is real. 
 * ```-w NUM``` : Dump particle data every NUM iterations (time-steps) if NUM is integer. Dump data at the specified physical time if NUM is real.
 * ```-f FIELDS```: Comma separated list of particle fields for file output dumps. See a list of common ouput fields below.
-* ```--quiet``` : Don't print any output to stdout
+* ```--quiet``` : Do not print any output to stdout
 
 Implemented cases:
 * ```--sedov```: spherical blast wave
@@ -226,8 +221,8 @@ and a warp-aware tree-traversal inspired by the
 * Yiqing Zhu
 
 ## Paper references
-* [Keller, S., Cavelan, A., Cabezon, R. M., Mayer L., Ciorba, F. M. (2023) Cornerstone: Octree Construction Algorithms for Scalable Particle Simulations. (PASC '23)](https://dl.acm.org/doi/abs/10.1145/3592979.3593417)
-* [Cavelan, A., Cabezon, R. M., Grabarczyk, M., Ciorba, F. M. (2020). A Smoothed Particle Hydrodynamics Mini-App for Exascale. (PASC '20)](https://dl.acm.org/doi/10.1145/3394277.3401855)
+* [Keller, S., Cavelan, A., Cabezon, R. M., Mayer L., Ciorba, F. M. (2023) Cornerstone: Octree Construction Algorithms for Scalable Particle Simulations. (PASC 23)](https://dl.acm.org/doi/abs/10.1145/3592979.3593417)
+* [Cavelan, A., Cabezon, R. M., Grabarczyk, M., Ciorba, F. M. (2020). A Smoothed Particle Hydrodynamics Mini-App for Exascale. (PASC 20)](https://dl.acm.org/doi/10.1145/3394277.3401855)
 
 ## License
 

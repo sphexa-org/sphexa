@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -34,12 +18,10 @@
 #include <cmath>
 
 #include "cstone/focus/source_center.hpp"
-#include "cstone/primitives/stl.hpp"
 #include "cstone/sfc/sfc.hpp"
 #include "cstone/traversal/traversal.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/util/array.hpp"
-#include "cstone/util/tuple.hpp"
 
 namespace cstone
 {
@@ -108,7 +90,8 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
     auto zi = z[i];
     auto hi = h[i];
 
-    auto radiusSq = Th(4.0) * hi * hi;
+    auto radiusSq     = Th(4.0) * hi * hi;
+    auto cellRadiusSq = radiusSq * tree.searchExtFactor * tree.searchExtFactor;
     Vec3<Tc> particle{xi, yi, zi};
     unsigned numNeighbors = 0;
 
@@ -116,19 +99,11 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
     bool anyPbc = box.boundaryX() == pbc || box.boundaryY() == pbc || box.boundaryZ() == pbc;
     bool usePbc = anyPbc && !insideBox(particle, {Tc(2) * hi, Tc(2) * hi, Tc(2) * hi}, box);
 
-    auto overlapsPbc = [particle, radiusSq, centers = tree.centers, sizes = tree.sizes, &box](TreeNodeIndex idx)
-    {
-        auto nodeCenter = centers[idx];
-        auto nodeSize   = sizes[idx];
-        return norm2(minDistance(particle, nodeCenter, nodeSize, box)) < radiusSq;
-    };
+    auto overlapsPbc = [particle, cellRadiusSq, centers = tree.centers, sizes = tree.sizes, &box](TreeNodeIndex idx)
+    { return norm2(minDistance(particle, centers[idx], sizes[idx], box)) < cellRadiusSq; };
 
-    auto overlaps = [particle, radiusSq, centers = tree.centers, sizes = tree.sizes](TreeNodeIndex idx)
-    {
-        auto nodeCenter = centers[idx];
-        auto nodeSize   = sizes[idx];
-        return norm2(minDistance(particle, nodeCenter, nodeSize)) < radiusSq;
-    };
+    auto overlaps = [particle, cellRadiusSq, centers = tree.centers, sizes = tree.sizes](TreeNodeIndex idx)
+    { return norm2(minDistance(particle, centers[idx], sizes[idx])) < cellRadiusSq; };
 
     auto searchBoxPbc =
         [i, particle, radiusSq, &tree, x, y, z, ngmax, neighbors, &numNeighbors, &box](TreeNodeIndex idx)
@@ -165,8 +140,8 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
         }
     };
 
-    if (usePbc) { singleTraversal(tree.childOffsets, overlapsPbc, searchBoxPbc); }
-    else { singleTraversal(tree.childOffsets, overlaps, searchBox); }
+    if (usePbc) { singleTraversal(tree.childOffsets, tree.parents, overlapsPbc, searchBoxPbc); }
+    else { singleTraversal(tree.childOffsets, tree.parents, overlaps, searchBox); }
 
     return numNeighbors;
 }

@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -45,7 +29,7 @@ using namespace cstone;
 template<class KeyType>
 void exchangeFocusIrregular(int myRank, int numRanks)
 {
-    std::vector<KeyType> treeLeavesRef[numRanks];
+    std::vector<KeyType> treeLeavesRef[numRanks], treeLeavesInitial[numRanks];
     std::vector<int> peers;
     std::vector<IndexPair<TreeNodeIndex>> peerFocusIndices(numRanks);
 
@@ -56,15 +40,18 @@ void exchangeFocusIrregular(int myRank, int numRanks)
         // regular level-3 grid in the half cube with x = 0...0.5
         for (int i = 0; i < 4; ++i)
         {
-            octreeMaker.divide({i}, 1);
+            octreeMaker.divide(i);
             for (int j = 0; j < 8; ++j)
             {
-                octreeMaker.divide({i, j}, 2);
+                octreeMaker.divide(i, j);
             }
         }
-        // finer resolution at one location outside the regular grid
+        // finer resolution at one location outside the regular grid + cells that don't exist on rank 1
         octreeMaker.divide(7).divide(7, 0);
         treeLeavesRef[0] = octreeMaker.makeTree();
+        octreeMaker.divide(7, 0, 3);
+        treeLeavesInitial[0] = octreeMaker.makeTree();
+        EXPECT_EQ(treeLeavesRef[0].size() + 7, treeLeavesInitial[0].size());
     }
     {
         OctreeMaker<KeyType> octreeMaker;
@@ -72,18 +59,23 @@ void exchangeFocusIrregular(int myRank, int numRanks)
         // regular level-3 grid in the half cube with x = 0.5...1
         for (int i = 4; i < 8; ++i)
         {
-            octreeMaker.divide({i}, 1);
+            octreeMaker.divide(i);
             for (int j = 0; j < 8; ++j)
             {
-                octreeMaker.divide({i, j}, 2);
+                octreeMaker.divide(i, j);
             }
         }
         // finer resolution at one location outside the regular grid
         octreeMaker.divide(1).divide(1, 6);
-        treeLeavesRef[1] = octreeMaker.makeTree();
+        treeLeavesRef[1]     = octreeMaker.makeTree();
+        treeLeavesInitial[1] = treeLeavesRef[1];
     }
 
-    std::vector<KeyType> treeLeaves = treeLeavesRef[myRank];
+    std::vector<KeyType> treeLeaves = treeLeavesInitial[myRank];
+
+    OctreeData<KeyType, CpuTag> octree;
+    octree.resize(nNodes(treeLeaves));
+    updateInternalTree<KeyType>(treeLeaves, octree.data());
 
     if (myRank == 0)
     {
@@ -101,17 +93,38 @@ void exchangeFocusIrregular(int myRank, int numRanks)
     }
 
     std::vector<std::vector<KeyType>> treelets(numRanks);
-    std::vector<MPI_Request> requests;
-    exchangeTreelets<KeyType>(peers, peerFocusIndices, treeLeaves, treelets, requests);
-    MPI_Waitall(requests.size(), requests.data(), MPI_STATUS_IGNORE);
+    ConcatVector<TreeNodeIndex> treeletIdx;
+    syncTreelets(peers, peerFocusIndices, octree, treeLeaves, treelets);
+    indexTreelets<KeyType>(peers, octree.prefixes, octree.levelRange, treelets, treeletIdx);
 
-    if (myRank == 0) { EXPECT_TRUE(std::equal(begin(treelets[1]), end(treelets[1]), treeLeavesRef[1].begin())); }
+    auto treeletView = treeletIdx.view();
+    if (myRank == 0)
+    {
+        KeyType boundary = decodePlaceholderBit(KeyType(014));
+        EXPECT_EQ(treeletView[1].size(), findNodeAbove(treeLeavesRef[1].data(), nNodes(treeLeavesRef[1]), boundary));
+        // check that rank 0's interior tree matches the exterior tree of rank 1
+        for (size_t i = 0; i < treeletView[1].size(); ++i)
+        {
+            KeyType tlKey = octree.prefixes[treeletView[1][i]];
+            EXPECT_EQ(tlKey, encodePlaceholderBit2K(treeLeavesRef[1][i], treeLeavesRef[1][i + 1]));
+        }
+    }
     else
     {
         TreeNodeIndex peerStartIdx =
             std::lower_bound(begin(treeLeavesRef[0]), end(treeLeavesRef[0]), codeFromIndices<KeyType>({4})) -
             begin(treeLeavesRef[0]);
-        EXPECT_TRUE(std::equal(begin(treelets[0]), end(treelets[0]), treeLeavesRef[0].begin() + peerStartIdx));
+
+        TreeNodeIndex numNodesExtTreeRank0 = nNodes(treeLeavesRef[0]) - peerStartIdx;
+        // size of rank 0's exterior tree should match interior treelet size on rank 1
+        EXPECT_EQ(numNodesExtTreeRank0, treeletView[0].size());
+
+        for (size_t i = 0; i < treeletView[0].size(); ++i)
+        {
+            const KeyType* refTree = &treeLeavesRef[0][peerStartIdx];
+            KeyType tlKey          = octree.prefixes[treeletView[0][i]];
+            EXPECT_EQ(tlKey, encodePlaceholderBit2K(refTree[i], refTree[i + 1]));
+        }
     }
 }
 

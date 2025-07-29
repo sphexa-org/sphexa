@@ -32,18 +32,9 @@
 
 #pragma once
 
-#include <span>
 #include <string>
 
-#include "cstone/sfc/box.hpp"
-#include "io/ifile_io.hpp"
-
 #include "iobservables.hpp"
-#include "time_energy_growth.hpp"
-#include "time_energies.hpp"
-#include "gravitational_waves.hpp"
-#include "wind_bubble_fraction.hpp"
-#include "turbulence_mach_rms.hpp"
 
 namespace sphexa
 {
@@ -57,21 +48,26 @@ std::unique_ptr<IObservables<Dataset>> observablesFactory(const InitSettings& se
         {
             throw std::runtime_error("need gravWaveTheta ant gravWavePhi input attributes for grav waves observable\n");
         }
-        return std::make_unique<GravWaves<Dataset>>(constantsFile, settings.at("gravWaveTheta"),
-                                                    settings.at("gravWavePhi"));
+        return Observables<Dataset>::makeGravWaveObs(constantsFile, settings.at("gravWaveTheta"),
+                                                     settings.at("gravWavePhi"));
     }
     if (settings.count("wind-shock"))
     {
-        double rhoInt       = settings.at("rhoInt");
-        double uExt         = settings.at("uExt");
-        double bubbleVolume = std::pow(settings.at("rSphere"), 3) * 4.0 / 3.0 * M_PI;
-        double bubbleMass   = bubbleVolume * rhoInt;
-        return std::make_unique<WindBubble<Dataset>>(constantsFile, rhoInt, uExt, bubbleMass);
+        return Observables<Dataset>::makeWindBubbleObs(constantsFile, settings.at("rhoInt"), settings.at("uExt"),
+                                                       settings.at("rSphere"));
     }
-    if (settings.count("turbulence")) { return std::make_unique<TurbulenceMachRMS<Dataset>>(constantsFile); }
-    if (settings.count("kelvin-helmholtz")) { return std::make_unique<TimeEnergyGrowth<Dataset>>(constantsFile); }
+    if (settings.count("turbulence"))
+    {
+        if (settings.contains("eosChoice") && settings.at("eosChoice") == 1)
+        {
+            // isothermal EOS has constant sound speed, mach number is sqrt(2*E_kin)
+            return Observables<Dataset>::makeTimeEnergyObs(constantsFile);
+        }
+        return Observables<Dataset>::makeTurbMachObs(constantsFile);
+    }
+    if (settings.count("kelvin-helmholtz")) { return Observables<Dataset>::makeTimeEnergyGrowthObs(constantsFile); }
 
-    return std::make_unique<TimeAndEnergy<Dataset>>(constantsFile);
+    return Observables<Dataset>::makeTimeEnergyObs(constantsFile);
 }
 
 } // namespace sphexa

@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Ryoanji N-body solver
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -56,7 +40,7 @@ namespace ryoanji
  */
 template<class T1, class T2, class MType>
 void computeLeafMultipoles(const T1* x, const T1* y, const T1* z, const T2* m,
-                           gsl::span<const cstone::TreeNodeIndex> leafToInternal, const LocalIndex* layout,
+                           std::span<const cstone::TreeNodeIndex> leafToInternal, const LocalIndex* layout,
                            const cstone::SourceCenterType<T1>* centers, MType* multipoles)
 {
 #pragma omp parallel for schedule(static)
@@ -68,7 +52,7 @@ void computeLeafMultipoles(const T1* x, const T1* y, const T1* z, const T2* m,
 }
 
 template<class T, class MType>
-void upsweepMultipoles(gsl::span<const cstone::TreeNodeIndex> levelOffset, const cstone::TreeNodeIndex* childOffsets,
+void upsweepMultipoles(std::span<const cstone::TreeNodeIndex> levelOffset, const cstone::TreeNodeIndex* childOffsets,
                        const cstone::SourceCenterType<T>* centers, MType* multipoles)
 {
     int currentLevel = levelOffset.size() - 2;

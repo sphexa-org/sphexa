@@ -105,8 +105,11 @@ divV_curlVJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cs
     T norm_kxi = K * hiInv3 / kxi;
     divv[i]    = norm_kxi * (dVxi[0] + dVyi[1] + dVzi[2]);
 
-    cstone::Vec3<T> curlV{dVzi[1] - dVyi[2], dVxi[2] - dVzi[0], dVyi[0] - dVxi[1]};
-    curlv[i] = norm_kxi * std::sqrt(norm2(curlV));
+    if (curlv != nullptr)
+    {
+        cstone::Vec3<T> curlV{dVzi[1] - dVyi[2], dVxi[2] - dVzi[0], dVyi[0] - dVxi[1]};
+        curlv[i] = norm_kxi * std::sqrt(norm2(curlV));
+    }
 
     if (doGradV)
     {

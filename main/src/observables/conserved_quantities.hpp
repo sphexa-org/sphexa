@@ -39,6 +39,8 @@
 #include "mpi.h"
 
 #include "cstone/util/array.hpp"
+#include "cstone/primitives/primitives_gpu.h"
+#include "sph/eos.hpp"
 #include "conserved_gpu.h"
 
 namespace sphexa

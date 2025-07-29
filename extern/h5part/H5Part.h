@@ -156,6 +156,13 @@ H5PartWriteDataInt32 (
     const h5part_int32_t *array
     );
 
+h5part_int64_t
+H5PartWriteDataInt8 (
+    H5PartFile *f,
+    const char *name,
+    const uint8_t *array
+);
+
 /*================== File Reading Routines =================*/
 h5part_int64_t
 H5PartSetStep (
@@ -265,6 +272,13 @@ H5PartReadDataInt32 (
     const char *name,
     h5part_int32_t *array
     );
+
+h5part_int64_t
+H5PartReadDataInt8 (
+    H5PartFile *f,
+    const char *name,
+    uint8_t *array
+);
 
 h5part_int64_t
 H5PartReadParticleStep (

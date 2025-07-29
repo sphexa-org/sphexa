@@ -22,67 +22,96 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     conduit::Node ascent_options;
     // ascent_options["default_dir"] = "/scratch/snx3000/jfavre/DummySPH/datasets";
     ascent_options["mpi_comm"] = MPI_Comm_c2f(MPI_COMM_WORLD);
+#ifdef CAMP_HAVE_CUDA
+  ascent_options["runtine/vtkm/backend"] = "cuda";
+#endif
     a.open(ascent_options);
 
-    // Create an action that tells Ascent to:
-    //  add a scene (s1) with one plot (p1)
-    //  that will render a pseudocolor of
-    //  the mesh field `rho`
+    conduit::Node clip_actions;
+    bool dump_data_todisk = false;
+    if(dump_data_todisk == false)
+    {
+    conduit::Node queries;
+    queries["q1/params/expression"] = "field('kx') * field('m') / field('xm')";
+    queries["q1/params/name"] = "density";
+    
+    conduit::Node &add_queries = clip_actions.append();
+    add_queries["action"] = "add_queries";
+    add_queries["queries"] = queries;
+    
+    conduit::Node pipelines;
+    pipelines["pl_threshold_thin_clip_z/f1/type"] = "threshold";
+    conduit::Node &params1 = pipelines["pl_threshold_thin_clip_z/f1/params"];
+    params1["field"] = "z";
+    params1["min_value"] = 0.12425;
+    params1["max_value"] = 0.12575;
+    pipelines["pl_threshold_thin_clip_y/f1/type"] = "threshold";
+    conduit::Node &params2 = pipelines["pl_threshold_thin_clip_y/f1/params"];
+    params2["field"] = "y";
+    params2["min_value"] = 0.12425;
+    params2["max_value"] = 0.12575;
 
-    conduit::Node& add_pipe      = actions.append();
-    add_pipe["action"]           = "add_pipelines";
-    conduit::Node& pipes         = add_pipe["pipelines"];
-    pipes["pl1/f1/type"]         = "threshold";
-    conduit::Node& thresh_params = pipes["pl1/f1/params"];
-    thresh_params["field"]       = "Density";
-    thresh_params["min_value"]   = 1.4;
-    thresh_params["max_value"]   = 2000;
+    conduit::Node scenes;
+    scenes["s1/plots/p1/type"]         = "pseudocolor";
+    scenes["s1/plots/p1/field"] = "density";
+    scenes["s1/plots/p1/pipeline"] = "pl_threshold_thin_clip_z";
+    scenes["s1/plots/p1/min_value"] = 1;
+    scenes["s1/plots/p1/max_value"] = 10;
+    scenes["s1/plots/p1/color_table/name"] = "Yellow - Gray - Blue";
+    scenes["s1/plots/p1/color_table/annotation"] = "false";
+    scenes["s1/plots/p1/points/radius"] = 0.001;
+    
+    scenes["s1/plots/p2/type"]         = "pseudocolor";
+    scenes["s1/plots/p2/field"] = "density";
+    scenes["s1/plots/p2/pipeline"] = "pl_threshold_thin_clip_y";
+    scenes["s1/plots/p2/min_value"] = 1;
+    scenes["s1/plots/p2/max_value"] = 10;
+    scenes["s1/plots/p2/color_table/name"] = "Yellow - Gray - Blue";
+    scenes["s1/plots/p2/color_table/annotation"] = "true";
+    scenes["s1/plots/p2/points/radius"] = 0.001;
+    
+    scenes["s1/renders/r1/image_prefix"] = "datasets/density.%05d";
+    scenes["s1/renders/r1/image_width"] = 1920;
+    scenes["s1/renders/r1/image_height"] = 1080;
 
-    conduit::Node& add_scene = actions.append();
-    add_scene["action"]      = "add_scenes";
+    scenes["s1/renders/r1/camera/look_at"].set({0.5, 0.125, 0.125});
+    scenes["s1/renders/r1/camera/position"].set({0.5, 0.125, 3.0});
+    scenes["s1/renders/r1/camera/up"].set({0.0, 1.0, 0.0});
 
-    // declare a scene (s1) and pseudocolor plot (p1)
-    conduit::Node& scenes          = add_scene["scenes"];
-    scenes["s1/plots/p1/type"]     = "pseudocolor";
-    scenes["s1/plots/p1/pipeline"] = "pl1";
-    scenes["s1/plots/p1/field"]    = "Density";
-    // scenes["s1/plots/p1/points/radius"] = .5;
-    // scenes["s1/plots/p1/points/radius_delta"] = .01;
-    scenes["s1/renders/r1/image_prefix"] = "DensityThreshold1.4.%05d";
+    scenes["s1/renders/r1/camera/azimuth"] = -35.0;
+    scenes["s1/renders/r1/camera/elevation"] = 25.0;
+    scenes["s1/renders/r1/camera/zoom"] = 5.25;
 
-    double vec3[3];
-    vec3[0] = vec3[1] = vec3[2] = 0;
-    scenes["s1/renders/r1/camera/look_at"].set_float64_ptr(vec3, 3);
+    scenes["s1/renders/r1/dataset_bounds"].set({0.0, 1.0, 0.0, 0.25, 0.0, 0.25});
+    scenes["s1/renders/r1/color_bar_position"].set({0.2, 0.9, -0.9, -0.75});
+    
+    conduit::Node &add_pipelines = clip_actions.append();
+    add_pipelines["action"] = "add_pipelines";
+    add_pipelines["pipelines"] = pipelines;
 
-    vec3[0] = -2.1709899968205337;
-    vec3[1] = 1.797907520678797;
-    vec3[2] = 1.8029059671481107;
-    scenes["s1/renders/r1/camera/position"].set_float64_ptr(vec3, 3);
-
-    vec3[0] = 0.4479257557058854;
-    vec3[1] = 0.8420981185224633;
-    vec3[2] = -0.30038854198560727;
-    scenes["s1/renders/r1/camera/up"].set_float64_ptr(vec3, 3);
-    scenes["s1/renders/r1/camera/zoom"] = 2;
-
-    /*
-    scenes["s1/renders/r1/type"] = "cinema";
-    scenes["s1/renders/r1/phi"] = 8;
-    scenes["s1/renders/r1/theta"] = 8;
-    scenes["s1/renders/r1/db_name"] = "example_db";
-    */
-
-    /* IO to disk */
-    conduit::Node& add_extr = actions.append();
+    conduit::Node &add_scenes= clip_actions.append();
+    add_scenes["action"] = "add_scenes";
+    add_scenes["scenes"] = scenes;
+    }
+    else
+    {
+     /* IO to disk */
+    conduit::Node& add_extr = clip_actions.append();
     add_extr["action"]      = "add_extracts";
     conduit::Node& savedata = add_extr["extracts"];
-
-    // add a relay extract that will write mesh data to
-    // blueprint hdf5 files
     savedata["e1/type"] = "relay";
-    // savedata["e1/pipeline"] = "pl1";
-    savedata["e1/params/path"]     = "out_export_particles";
-    savedata["e1/params/protocol"] = "blueprint/mesh/hdf5";
+    savedata["e1/params/path"]     = "particles";
+    savedata["e1/params/protocol"] = "hdf5";
+    }
+    std::string condition = "cycle() % 1 == 0";
+    conduit::Node triggers;
+    triggers["t1/params/condition"] = condition;
+    triggers["t1/params/actions"] = clip_actions;
+    conduit::Node &add_triggers= actions.append();
+    add_triggers["action"] = "add_triggers";
+    add_triggers["triggers"] = triggers;
+
+    //actions.print();
 }
 
 /*! @brief Add a volume-independent vertex field to a mesh
@@ -111,33 +140,40 @@ void Execute(DataType& d, long startIndex, long endIndex)
     mesh["state/time"].set_external(&d.ttot);
 
     mesh["coordsets/coords/type"] = "explicit";
-    mesh["coordsets/coords/values/x"].set_external(&d.x[startIndex], endIndex - startIndex);
-    mesh["coordsets/coords/values/y"].set_external(&d.y[startIndex], endIndex - startIndex);
-    mesh["coordsets/coords/values/z"].set_external(&d.z[startIndex], endIndex - startIndex);
-
-    mesh["topologies/mesh/type"]     = "unstructured";
+    mesh["coordsets/coords/values/x"].set_external(get<"x">(d).data() + startIndex, endIndex - startIndex);
+    mesh["coordsets/coords/values/y"].set_external(get<"y">(d).data() + startIndex, endIndex - startIndex);
+    mesh["coordsets/coords/values/z"].set_external(get<"z">(d).data() + startIndex, endIndex - startIndex);
+//#define IMPLICIT_CONNECTIVITY_LIST 1 // the connectivity list is not given, but created by vtkm
+#ifdef  IMPLICIT_CONNECTIVITY_LIST
+  mesh["topologies/mesh/type"] = "points";
+#else
+  mesh["topologies/mesh/type"] = "unstructured";
+  std::vector<conduit_int32> conn(endIndex - startIndex);
+  std::iota(conn.begin(), conn.end(), 0);
+  mesh["topologies/mesh/elements/connectivity"].set(conn);
+  mesh["topologies/mesh/elements/shape"] = "point";
+#endif
     mesh["topologies/mesh/coordset"] = "coords";
 
-    addField(mesh, "x", d.x.data(), startIndex, endIndex);
-    addField(mesh, "y", d.y.data(), startIndex, endIndex);
-    addField(mesh, "z", d.z.data(), startIndex, endIndex);
-    addField(mesh, "vx", d.vx.data(), startIndex, endIndex);
-    addField(mesh, "vy", d.vy.data(), startIndex, endIndex);
-    addField(mesh, "vz", d.vz.data(), startIndex, endIndex);
-    addField(mesh, "Mass", d.m.data(), startIndex, endIndex);
-    addField(mesh, "Smoothing Length", d.h.data(), startIndex, endIndex);
-    addField(mesh, "Density", d.rho.data(), startIndex, endIndex);
-    addField(mesh, "Internal Energy", d.u.data(), startIndex, endIndex);
-    addField(mesh, "Pressure", d.p.data(), startIndex, endIndex);
-    addField(mesh, "Speed of Sound", d.c.data(), startIndex, endIndex);
-    addField(mesh, "ax", d.ax.data(), startIndex, endIndex);
-    addField(mesh, "ax", d.ay.data(), startIndex, endIndex);
-    addField(mesh, "ax", d.az.data(), startIndex, endIndex);
-
-    std::vector<conduit_int64> conn(endIndex - startIndex);
-    std::iota(conn.begin(), conn.end(), 0);
-    mesh["topologies/mesh/elements/connectivity"].set_external(conn);
-    mesh["topologies/mesh/elements/shape"] = "point";
+    addField(mesh, "x", get<"x">(d).data(), startIndex, endIndex);
+    addField(mesh, "y", get<"y">(d).data(), startIndex, endIndex);
+    addField(mesh, "z", get<"z">(d).data(), startIndex, endIndex);
+    addField(mesh, "vx", get<"vx">(d).data(), startIndex, endIndex);
+    addField(mesh, "vy", get<"vy">(d).data(), startIndex, endIndex);
+    addField(mesh, "vz", get<"vz">(d).data(), startIndex, endIndex);
+    addField(mesh, "kx", get<"kx">(d).data(), startIndex, endIndex);
+    addField(mesh, "xm", get<"xm">(d).data(), startIndex, endIndex);
+    //addField(mesh, "Temperature", get<"temp">(d).data(), startIndex, endIndex);
+    addField(mesh, "alpha", get<"alpha">(d).data(), startIndex, endIndex);
+    addField(mesh, "m", get<"m">(d).data(), startIndex, endIndex);
+    //addField(mesh, "Smoothing Length", get<"h">(d).data(), startIndex, endIndex);
+    //addField(mesh, "Density", get<"rho">(d).data(), startIndex, endIndex);
+    //addField(mesh, "Internal Energy", get<"u">(d).data(), startIndex, endIndex);
+    //addField(mesh, "Pressure", get<"p">(d).data(), startIndex, endIndex);
+    //addField(mesh, "Speed of Sound", get<"c">(d).data(), startIndex, endIndex);
+    //addField(mesh, "ax", get<"ax">(d).data(), startIndex, endIndex);
+    //addField(mesh, "ay", get<"ay">(d).data(), startIndex, endIndex);
+    //addField(mesh, "az", get<"az">(d).data(), startIndex, endIndex);
 
     conduit::Node verify_info;
     if (!conduit::blueprint::mesh::verify(mesh, verify_info))

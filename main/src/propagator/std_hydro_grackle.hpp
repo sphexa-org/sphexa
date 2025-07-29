@@ -27,16 +27,14 @@
  * @brief A Propagator class for standard SPH including Grackle chemistry and cooling
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
- * @author Jose A. Escartin <ja.escartin@gmail.com>
  * @author Noah Kubli <noah.kubli@uzh.ch>
  */
 
 #pragma once
 
-#include <variant>
-
 #include "cstone/fields/field_get.hpp"
 #include "cstone/util/value_list.hpp"
+#include "io/arg_parser.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/sph.hpp"
 
@@ -56,6 +54,7 @@ template<class DomainType, class DataType>
 class HydroGrackleProp final : public HydroProp<DomainType, DataType>
 {
     using Base = HydroProp<DomainType, DataType>;
+    using Base::groups_;
     using Base::timer;
 
     using T        = typename DataType::RealType;
@@ -68,43 +67,39 @@ class HydroGrackleProp final : public HydroProp<DomainType, DataType>
      *
      * x, y, z, h and m are automatically considered conserved and must not be specified in this list
      */
-    using ConservedFields = FieldList<"u", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1">;
+    using ConservedFields = FieldList<"u", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "id">;
 
     //! @brief the list of dependent particle fields, these may be used as scratch space during domain sync
     using DependentFields =
         FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33", "nc">;
 
     //! @brief All fields listed in Chemistry data are used. This could be overridden with a sublist if desired
-    using CoolingFields = typename util::MakeFieldList<ChemData>::Fields;
+    using CoolingFields = typename cooling::Cooler<T>::CoolingFields;
 
 public:
-    HydroGrackleProp(std::ostream& output, size_t rank)
+    HydroGrackleProp(std::ostream& output, size_t rank, const InitSettings& settings)
         : Base(output, rank)
     {
+        BuiltinWriter attributeSetter(settings);
+        cooling_data.loadOrStoreAttributes(&attributeSetter);
+        cooling_data.init(0);
     }
 
     void load(const std::string& initCond, IFileReader* reader) override
     {
-        if (initCond == "evrard-cooling")
+        std::string path = removeModifiers(initCond);
+        if (std::filesystem::exists(path))
         {
-            BuiltinWriter attributeSetter(evrardCoolingConstants());
-            cooling_data.loadOrStoreAttributes(&attributeSetter);
+            int snapshotIndex = numberAfterSign(initCond, ":");
+            reader->setStep(path, snapshotIndex, FileMode::independent);
+            cooling_data.loadOrStoreAttributes(reader);
+            reader->closeStep();
         }
-        else
+        else if (path != "evrard-cooling")
         {
-            std::string path = removeModifiers(initCond);
-            if (std::filesystem::exists(path))
-            {
-                int snapshotIndex = numberAfterSign(initCond, ":");
-                reader->setStep(path, snapshotIndex, FileMode::independent);
-                cooling_data.loadOrStoreAttributes(reader);
-                reader->closeStep();
-            }
-            else
-                throw std::runtime_error("Cooling propagator has to be used with the evrard-cooling builtin test-case "
-                                         "or a suitable init file");
+            throw std::runtime_error("Cooling propagator has to be used with the evrard-cooling builtin test-case "
+                                     "or a suitable init file");
         }
-        cooling_data.init(0);
     }
 
     void save(IFileWriter* writer) override { cooling_data.loadOrStoreAttributes(writer); }
@@ -113,6 +108,7 @@ public:
     {
         std::vector<std::string> ret{"x", "y", "z", "h", "m"};
         for_each_tuple([&ret](auto f) { ret.push_back(f.value); }, make_tuple(ConservedFields{}));
+        for_each_tuple([&ret](auto f) { ret.push_back(f.value); }, make_tuple(CoolingFields{}));
         return ret;
     }
 
@@ -154,46 +150,7 @@ public:
         d.treeView = domain.octreeProperties();
     }
 
-    void computeForces(DomainType& domain, DataType& simData)
-    {
-        size_t first = domain.startIndex();
-        size_t last  = domain.endIndex();
-        auto&  d     = simData.hydro;
-
-        resizeNeighbors(d, domain.nParticles() * d.ngmax);
-        findNeighborsSfc(first, last, d, domain.box());
-        timer.step("FindNeighbors");
-
-        computeDensity(first, last, d, domain.box());
-        timer.step("Density");
-
-        transferToHost(d, first, last, {"rho", "u"});
-        eos_cooling(first, last, d, simData.chem, cooling_data);
-        transferToDevice(d, first, last, {"p", "c"});
-        timer.step("EquationOfState");
-
-        domain.exchangeHalos(get<"vx", "vy", "vz", "rho", "p", "c">(d), get<"ax">(d), get<"ay">(d));
-        timer.step("mpi::synchronizeHalos");
-
-        computeIAD(first, last, d, domain.box());
-        timer.step("IAD");
-
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33">(d), get<"ax">(d), get<"ay">(d));
-        timer.step("mpi::synchronizeHalos");
-
-        computeMomentumEnergySTD(first, last, d, domain.box());
-        timer.step("MomentumEnergyIAD");
-
-        if (d.g != 0.0)
-        {
-            Base::mHolder_.upsweep(d, domain);
-            timer.step("Upsweep");
-            Base::mHolder_.traverse(d, domain);
-            timer.step("Gravity");
-        }
-    }
-
-    void step(DomainType& domain, DataType& simData) override
+    void computeForces(DomainType& domain, DataType& simData) override
     {
         auto& d = simData.hydro;
         timer.start();
@@ -202,11 +159,49 @@ public:
         // halo exchange for masses, allows for particles with variable masses
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
         timer.step("domain::sync");
-
         d.resize(domain.nParticlesWithHalos());
+        size_t first = domain.startIndex();
+        size_t last  = domain.endIndex();
 
-        computeForces(domain, simData);
+        resizeNeighbors(d, domain.nParticles() * d.ngmax);
+        findNeighborsSfc(first, last, d, domain.box());
+        computeGroups(first, last, d, domain.box(), groups_);
+        timer.step("FindNeighbors");
 
+        computeDensity(groups_.view(), d, domain.box());
+        timer.step("Density");
+
+        transferToHost(d, first, last, {"rho", "u"});
+
+        eos_cooling(first, last, d, simData.chem, cooling_data);
+        transferToDevice(d, first, last, {"p", "c"});
+        timer.step("EquationOfState");
+
+        domain.exchangeHalos(get<"vx", "vy", "vz", "rho", "p", "c">(d), get<"ax">(d), get<"ay">(d));
+        timer.step("mpi::synchronizeHalos");
+
+        computeIAD(groups_.view(), d, domain.box());
+        timer.step("IAD");
+
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33">(d), get<"ax">(d), get<"ay">(d));
+        timer.step("mpi::synchronizeHalos");
+
+        computeMomentumEnergySTD(groups_.view(), d, domain.box());
+        timer.step("MomentumEnergyIAD");
+
+        if (d.g != 0.0)
+        {
+            auto groups = Base::mHolder_.computeSpatialGroups(d, domain);
+            Base::mHolder_.upsweep(d, domain);
+            timer.step("Upsweep");
+            Base::mHolder_.traverse(groups, d, domain);
+            timer.step("Gravity");
+        }
+    }
+
+    void integrate(DomainType& domain, DataType& simData) override
+    {
+        auto&  d     = simData.hydro;
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
@@ -215,23 +210,16 @@ public:
         timer.step("Timestep");
 
         transferToHost(d, first, last, {"du"});
-#pragma omp parallel for schedule(static)
-        for (size_t i = first; i < last; i++)
-        {
-            T u_old  = d.u[i];
-            T u_cool = d.u[i];
-            T rhoi   = d.rho[i];
-            cooling_data.cool_particle(T(d.minDt), rhoi, u_cool,
-                                       cstone::getPointers(get<CoolingFields>(simData.chem), i));
-            const T du = (u_cool - u_old) / d.minDt;
-            d.du[i] += du;
-        }
+
+        cooling_data.cool_particles(T(d.minDt), d.rho.data(), d.u.data(),
+                                    cstone::getPointers(get<CoolingFields>(simData.chem), 0), d.du.data(), first, last);
+
         transferToDevice(d, first, last, {"du"});
         timer.step("GRACKLE chemistry and cooling");
 
-        computePositions(first, last, d, domain.box());
+        computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
         timer.step("UpdateQuantities");
-        updateSmoothingLength(first, last, d);
+        updateSmoothingLength(groups_.view(), d);
         timer.step("UpdateSmoothingLength");
     }
 };

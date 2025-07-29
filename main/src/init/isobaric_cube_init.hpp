@@ -90,6 +90,10 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
     std::fill(d.vy.begin(), d.vy.end(), 0.0);
     std::fill(d.vz.begin(), d.vz.end(), 0.0);
 
+    generateParticleIDs(d.id);
+
+    auto* u_or_t = d.temp.empty() ? d.u.data() : d.temp.data();
+
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
@@ -111,97 +115,27 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
                 d.h[i] = hInt * (1 - dist / (2 * hExt)) + hExt * dist / (2 * hExt);
             }
 
-            d.temp[i] = uExt / cv;
+            u_or_t[i] = uExt;
         }
         else
         {
             d.h[i]    = hInt;
-            d.temp[i] = uInt / cv;
+            u_or_t[i] = uInt;
         }
 
         d.x_m1[i] = d.vx[i] * constants.at("minDt");
         d.y_m1[i] = d.vy[i] * constants.at("minDt");
         d.z_m1[i] = d.vz[i] * constants.at("minDt");
     }
-}
 
-/*! @brief compute the shift factor towards the center for point X in a capped pyramid
- *
- * @tparam T      float or double
- * @param  X      a 3D point with at least one coordinate > s and all coordinates < rExt
- * @param  rInt   half cube length of the internal high-density cube
- * @param  s      compression radius used to create the high-density cube, in [rInt, rExt]
- * @param  rExt   half cube length of the external low-density cube
- * @return        factor in [0:1]
- */
-template<class T>
-T cappedPyramidStretch(cstone::Vec3<T> X, T rInt, T s, T rExt)
-{
-    assert(rInt < s && s < rExt);
-
-    X = abs(X);
-
-    //! the intersection of the ray from the coordinate origin through X with the outer cube
-    cstone::Vec3<T> pointA = X * (rExt / util::max(X));
-    //! the intersection of the ray from the coordinate origin through X with the stretch cube [-s, s]^3
-    cstone::Vec3<T> pointB = X * (s / util::max(X));
-    //! the intersection of the ray from the coordinate origin through X with the inner cube
-    cstone::Vec3<T> pointC = X * (rInt / util::max(X));
-
-    // distances of points A, B and C from the coordinate origin
-    T hp     = std::sqrt(norm2(pointC));
-    T sp     = std::sqrt(norm2(pointB));
-    T rp     = std::sqrt(norm2(pointA));
-    T radius = std::sqrt(norm2(X));
-
-    /*! transformation map: particle X is moved towards the coordinate origin
-     * known mapped values:
-     * (1) if X == pointA, X is not moved
-     * (2) if X == pointB, X is moved to point C
-     *
-     * The map is not linear to compensate for the shrinking area of the capped pyramid top and keep density constant.
-     */
-    T expo = 0.75;
-    //! normalization constant to satisfy (1) and (2)
-    T a         = (rp - hp) / std::pow(rp - sp, expo);
-    T newRadius = a * std::pow(radius - sp, expo) + hp;
-
-    T scaleFactor = newRadius / radius;
-
-    return scaleFactor;
-}
-
-/*! returns a value in [rInt:rExt]
- *
- * @tparam T         float or double
- * @param  rInt      inner cube half side
- * @param  rExt      outer dube half side
- * @param  rhoRatio  the desired density ratio between inner and outer
- * @return           value s, such that if [-s, s]^3 gets contracted into the inner cube
- *                   and [s:rExt, s:rExt]^3 is expanded into the resulting empty area,
- *                   the inner and outer cubes will have a density ratio of @p rhoRatio
- *
- * Derivation:
- *      internal density: rho_int = rho_0 * (s / rInt)^3
- *
- *      external density: rho_ext = rho_0  * (2rExt)^3 - (2s)^3
- *                                           ------------------
- *                                           (2rExt)^3 - (2rInt)^3
- *
- * The return value is the solution of rho_int / rho_ext == rhoRatio for s
- */
-template<class T>
-T computeStretchFactor(T rInt, T rExt, T rhoRatio)
-{
-    T hc = rInt * rInt * rInt;
-    T rc = rExt * rExt * rExt;
-    T s  = std::cbrt(rhoRatio * hc * rc / (rc - hc + rhoRatio * hc));
-    assert(rInt < s && s < rExt);
-    return s;
+    if (d.u.empty())
+    {
+        std::for_each(d.temp.begin(), d.temp.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
+    }
 }
 
 template<class T>
-void compressCenterCube(gsl::span<T> x, gsl::span<T> y, gsl::span<T> z, T rInt, T s, T rExt, T epsilon)
+void compressCenterCube(std::span<T> x, std::span<T> y, std::span<T> z, T rInt, T s, T rExt, T epsilon)
 {
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < x.size(); i++)

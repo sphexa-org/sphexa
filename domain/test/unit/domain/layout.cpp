@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -77,7 +61,8 @@ TEST(DomainDecomposition, invertRanges)
 TEST(Layout, extractMarkedElements)
 {
     std::vector<unsigned> leaves{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-    std::vector<int> haloFlags{0, 0, 0, 1, 1, 1, 0, 1, 0, 1};
+    // std::vector<LocalIndex> haloFlags{0, 0, 0, 1, 1, 1, 0, 1, 0, 1};
+    std::vector<LocalIndex> haloFlags{0, 0, 0, 0, 1, 2, 3, 3, 4, 4, 5};
 
     {
         std::vector<unsigned> reqKeys = extractMarkedElements<unsigned>(leaves, haloFlags, 0, 0);
@@ -116,26 +101,32 @@ TEST(Layout, extractMarkedElements)
     }
 }
 
-TEST(Layout, computeHaloReceiveList)
+
+TEST(Layout, gatherArrays)
 {
-    std::vector<LocalIndex> layout{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-    std::vector<int> haloFlags{1, 0, 1, 1, 0, 0, 0, 1, 1, 0};
+    std::vector<LocalIndex> ordering{2, 1, 3, 4};
+    std::vector<float> a{0., 1., 2., 3., 4.};
+    std::vector<unsigned char> b{0, 1, 2, 3, 4};
 
-    std::vector<int> peers{0, 2};
+    std::vector<float> scratch(a.size());
 
-    int numRanks = 3;
-    std::vector<TreeIndexPair> assignment(numRanks);
+    LocalIndex outOffset = 1;
+    gatherArrays({ordering.data(), ordering.size()}, outOffset, std::tie(a, b), std::tie(scratch));
 
-    assignment[0] = TreeIndexPair(0, 4);
-    assignment[1] = TreeIndexPair(4, 6);
-    assignment[2] = TreeIndexPair(6, 10);
+    static_assert(not SmallerElementSize<0, std::vector<int>, std::tuple<std::vector<char>, std::vector<int>>>{});
+    static_assert(SmallerElementSize<1, std::vector<int>, std::tuple<std::vector<char>, std::vector<int>>>{});
 
-    SendList receiveList = computeHaloReceiveList(layout, haloFlags, assignment, peers);
+    std::vector<float> refA{0, 2., 1., 3., 4.};
+    std::vector<unsigned char> refB{0, 2, 1, 3, 4};
 
-    SendList reference(numRanks);
-    reference[0].addRange(0, 1);
-    reference[0].addRange(2, 4);
-    reference[2].addRange(7, 9);
+    EXPECT_TRUE(std::equal(&refA[outOffset], &refA[a.size()], &a[outOffset]));
+    EXPECT_TRUE(std::equal(&refB[outOffset], &refB[b.size()], &b[outOffset]));
+}
 
-    EXPECT_EQ(receiveList, reference);
+TEST(Layout, enumerateRanges)
+{
+    std::vector<IndexPair<TreeNodeIndex>> ranges{{10, 13}, {30, 32}};
+    auto probe = enumerateRanges(ranges);
+    std::vector<TreeNodeIndex> ref{10, 11, 12, 30, 31};
+    EXPECT_EQ(probe, ref);
 }

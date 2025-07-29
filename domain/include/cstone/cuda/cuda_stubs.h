@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2022 Politechnical University of Catalonia UPC
- *               2022 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -46,26 +30,17 @@ const T* rawPtr(const std::vector<T, Alloc>& p)
 }
 
 template<class T>
-void memcpyH2D(const T* src, size_t n, T* dest);
+void memcpyH2D(const T* src, std::size_t n, T* dest);
 
 template<class T>
-void memcpyD2H(const T* src, size_t n, T* dest);
+void memcpyD2H(const T* src, std::size_t n, T* dest);
 
 template<class T>
-void memcpyD2D(const T* src, size_t n, T* dest);
+void memcpyD2D(const T* src, std::size_t n, T* dest);
 
-namespace thrust
-{
+void syncGpu();
 
-template<class T>
-class device_allocator;
-
-template<class T, class Alloc>
-class device_vector;
-
-} // namespace thrust
-
-/*! @brief detection trait to determine whether a template parameter is an instance of thrust::device_vector
+/*! @brief detection trait to determine whether a template parameter is a device vector
  *
  * @tparam Vector the Vector type to check
  *
@@ -73,11 +48,5 @@ class device_vector;
  */
 template<class Vector>
 struct IsDeviceVector : public std::false_type
-{
-};
-
-//! @brief detection of thrust device vectors
-template<class T, class Alloc>
-struct IsDeviceVector<thrust::device_vector<T, Alloc>> : public std::true_type
 {
 };

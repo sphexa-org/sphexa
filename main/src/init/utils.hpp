@@ -32,12 +32,14 @@
 #pragma once
 
 #include <numeric>
+#include <span>
 #include <string>
 #include <vector>
 
 #include "cstone/primitives/gather.hpp"
 #include "cstone/sfc/sfc.hpp"
 #include "io/ifile_io.hpp"
+#include "init/settings.hpp"
 
 namespace sphexa
 {
@@ -84,82 +86,103 @@ void readTemplateBlock(const std::string& block, IFileReader* reader, Vector& x,
     reader->closeStep();
 }
 
-/*!@brief apply fixed boundary conditions to one axis
- *
- * @tparam T    field type
- * @param pos   position data of axis to be applied
- * @param axisMax max coordinate of the box in the axis of pos
- * @param axisMin min coordinate of the box in the axis of pos
- * @param size  number of particles
- */
-template<class T, class Th>
-void initFixedBoundaries(T* pos, Th* vx, Th* vy, Th* vz, Th* h, T axisMax, T axisMin, size_t size, int thickness)
+//! @brief read file attributes into an associative container
+void readFileAttributes(InitSettings& settings, const std::string& settingsFile, IFileReader* reader, bool verbose)
 {
-
-#pragma omp parallel for
-    for (size_t i = 0; i < size; i++)
+    if (not settingsFile.empty())
     {
-        T distMax = std::abs(axisMax - pos[i]);
-        T distMin = std::abs(axisMin - pos[i]);
+        reader->setStep(settingsFile, -1, FileMode::independent);
 
-        if (distMax < 2.0 * h[i] * thickness || distMin < 2.0 * h[i] * thickness)
+        auto fileAttributes = reader->fileAttributes();
+        for (const auto& attr : fileAttributes)
         {
-            vx[i] = 0.0;
-            vy[i] = 0.0;
-            vz[i] = 0.0;
+            int64_t sz = reader->fileAttributeSize(attr);
+            if (sz == 1)
+            {
+                bool settingRecognized = settings.count(attr);
+                settings[attr]         = {};
+                reader->fileAttribute(attr, &settings[attr], sz);
+                if (reader->rank() == 0 && verbose)
+                {
+                    if (settingRecognized)
+                    {
+                        std::cout << "Override setting from " << settingsFile << ": " << attr << " = " << settings[attr]
+                                  << std::endl;
+                    }
+                    else
+                    {
+                        std::cout << "Setting from " << settingsFile << ": " << attr << " = " << settings[attr]
+                                  << " not recognized " << std::endl;
+                    }
+                }
+            }
         }
+        reader->closeStep();
     }
 }
 
-struct
+//! @brief generate particle IDs at the beginning of the simulation initialization
+void generateParticleIDs(std::span<uint64_t> id)
 {
-    cstone::Vec3<int> x = {1, 0, 0};
-    cstone::Vec3<int> y = {0, 1, 0};
-    cstone::Vec3<int> z = {0, 0, 1};
-} Axis;
+    int rank = 0, numRanks = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
 
-/*! @brief add additional particles as a fixed boundary layer
- *
- * @tparam T coordinate floating point type
- * @tparam Th
- * @tparam Vector coordinate vector type
- * @param axis  axis to add particles to, for example Axis::x
- * @param x     x-coordinates of particles
- * @param y     y-coordinates of particles
- * @param z     z-coordinates of particles
- * @param h     smoothing lengths
- * @param box   global bounding box
- * @param thickness thickness of particle layer to be added, in  2 * h per SPH convention
- */
-template<class T, class Vector>
-void addFixedBoundaryLayer(cstone::Vec3<int> axis, Vector& x, Vector& y, Vector& z, std::vector<T> h, size_t size,
-                           cstone::Box<T>& box)
+    std::vector<uint64_t> ranksLocalParticles(numRanks);
+    size_t                localNumRanks = id.size();
+
+    // fill ranksLocalParticles with the number of particles per rank
+    MPI_Allgather(&localNumRanks, 1, MpiType<uint64_t>{}, ranksLocalParticles.data(), 1, MpiType<uint64_t>{},
+                  MPI_COMM_WORLD);
+
+    std::exclusive_scan(ranksLocalParticles.begin(), ranksLocalParticles.end(), ranksLocalParticles.begin(),
+                        uint64_t(0));
+    std::iota(id.begin(), id.end(), ranksLocalParticles[rank]);
+}
+
+//! @brief Used to read the default values of dataset attributes
+class BuiltinReader
 {
-    int             thickness = box.fbcThickness();
-    int             axisIndex = axis[0] * 1 + axis[1] * 2 + axis[2] * 3;
-    cstone::Vec3<T> boxMax    = {box.xmax(), box.ymax(), box.zmax()};
-    cstone::Vec3<T> boxMin    = {box.xmin(), box.ymin(), box.zmin()};
+public:
+    using FieldType = util::Reduce<std::variant, util::Map<std::add_pointer_t, IO::Types>>;
 
-    for (int i = 0; i < size; ++i)
+    explicit BuiltinReader(InitSettings& attrs)
+        : attributes_(attrs)
     {
-        cstone::Vec3<T> X           = {x[i], y[i], z[i]};
-        T               distanceMax = std::abs(boxMax[axisIndex - 1] - X[axisIndex - 1]);
-        T               distanceMin = std::abs(boxMin[axisIndex - 1] - X[axisIndex - 1]);
-        if (distanceMax < 2 * h[i] * thickness)
-        {
-            X[axisIndex - 1] += 2.0 * distanceMax;
-            x.push_back(X[0]);
-            y.push_back(X[1]);
-            z.push_back(X[2]);
-        }
-        if (distanceMin < 2 * h[i] * thickness)
-        {
-            X[axisIndex - 1] -= 2.0 * distanceMin;
-            x.push_back(X[0]);
-            y.push_back(X[1]);
-            z.push_back(X[2]);
-        }
     }
+
+    [[nodiscard]] static int rank() { return -1; }
+
+    void stepAttribute(const std::string& key, FieldType val, int64_t /*size*/)
+    {
+        std::visit([this, &key](auto arg) { attributes_[key] = *arg; }, val);
+    };
+
+private:
+    //! @brief reference to attributes
+    InitSettings& attributes_;
+};
+
+//! @brief build up an associative container with test case settings
+template<class Dataset>
+[[nodiscard]] InitSettings buildSettings(Dataset&& d, const InitSettings& testCaseSettings,
+                                         const std::string& settingsFile, IFileReader* reader)
+{
+    InitSettings settings;
+    // first layer: class member defaults in code
+    BuiltinReader extractor(settings);
+    d.hydro.loadOrStoreAttributes(&extractor);
+
+    // second layer: test-case specific settings
+    for (const auto& kv : testCaseSettings)
+    {
+        settings[kv.first] = kv.second;
+    }
+
+    // third layer: settings override by file given on commandline (highest precedence)
+    readFileAttributes(settings, settingsFile, reader, true);
+
+    return settings;
 }
 
 } // namespace sphexa

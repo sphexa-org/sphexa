@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -33,7 +17,7 @@
 
 #pragma once
 
-#include <limits>
+#include <span>
 
 #include "csarray.hpp"
 
@@ -46,9 +30,8 @@ namespace cstone
  * @param[in]  tree         octree nodes given as Morton codes of length @a nNodes+1
  *                          needs to satisfy the octree invariants
  * @param[out] counts       output particle counts per node, length = @a nNodes
- * @param[in]  numNodes       number of nodes in tree
- * @param[in]  firstKey   sorted particle SFC code range start
- * @param[in]  lastKey     sorted particle SFC code range end
+ * @param[in]  numNodes     number of nodes in tree
+ * @param[in]  keys         sorted particle SFC keys
  * @param[in]  maxCount     maximum particle count per node to store, this is used
  *                          to prevent overflow in MPI_Allreduce
  */
@@ -56,8 +39,7 @@ template<class KeyType>
 extern void computeNodeCountsGpu(const KeyType* tree,
                                  unsigned* counts,
                                  TreeNodeIndex numNodes,
-                                 const KeyType* firstKey,
-                                 const KeyType* lastKey,
+                                 std::span<const KeyType> keys,
                                  unsigned maxCount,
                                  bool useCountsAsGuess = false);
 
@@ -81,5 +63,11 @@ extern bool rebalanceTreeGpu(const KeyType* tree,
                              TreeNodeIndex newNumNodes,
                              const TreeNodeIndex* nodeOps,
                              KeyType* newTree);
+
+template<class KeyType>
+extern void countSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps);
+
+template<class KeyType>
+extern void fillSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree);
 
 } // namespace cstone

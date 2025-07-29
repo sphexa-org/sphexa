@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -39,37 +23,45 @@
 namespace util
 {
 
-//! @brief Utility to call function with each element in tuple_
-template<class F, class Tuple>
-void for_each_tuple(F&& func, Tuple&& tuple_)
+namespace detail
 {
-    std::apply([f = func](auto&&... args) { [[maybe_unused]] auto list = std::initializer_list<int>{(f(args), 0)...}; },
-               std::forward<Tuple>(tuple_));
+
+template<std::size_t... Is, class F, class... Tuples>
+constexpr auto tupleMapImpl(std::index_sequence<Is...>, F&& f, Tuples&&... ts)
+{
+    return std::make_tuple(
+        [&f](auto i, auto&&... ts_) -> decltype(auto) {
+            return f(std::get<i>(std::forward<decltype(ts_)>(ts_))...);
+        }(std::integral_constant<std::size_t, Is>{}, std::forward<Tuples>(ts)...)...);
 }
 
-//! @brief convert an index_sequence into a tuple of integral constants (e.g. for use with for_each_tuple)
-template<size_t... Is>
-constexpr auto makeIntegralTuple(std::index_sequence<Is...>)
+} // namespace detail
+
+//! @brief Calls function @p f(get<Is>(tuples...)... and return results in a new tuple
+template<class F, class... Tuples>
+constexpr auto tupleMap(F&& f, Tuples&&... tuples)
 {
-    return std::make_tuple(std::integral_constant<size_t, Is>{}...);
+    constexpr auto n = std::min({std::tuple_size_v<std::decay_t<Tuples>>...});
+    static_assert(n == std::max({std::tuple_size_v<std::decay_t<Tuples>>...}), "All tuples must have same size");
+
+    // auto impl = [&f]<std::size_t... Is>(std::index_sequence<Is...>, auto&&... ts) // nvcc chokes on this lambda
+    return detail::tupleMapImpl(std::make_index_sequence<n>{}, std::forward<F>(f), std::forward<Tuples>(tuples)...);
 }
 
-template<class Tuple, size_t... Is>
-constexpr auto discardLastImpl(const Tuple& tuple, std::index_sequence<Is...>)
+//! @brief Calls void returning function @p f(get<Is>(tuples...)...
+template<class F, class... Tuples>
+constexpr void for_each_tuple(F&& f, Tuples&&... tuples)
 {
-    return std::tie(std::get<Is>(tuple)...);
+    tupleMap(
+        [&f](auto&&... args)
+        {
+            f(std::forward<decltype(args)>(args)...);
+            return 0;
+        },
+        std::forward<Tuples>(tuples)...);
 }
 
-template<class Tuple>
-constexpr auto discardLastElement(const Tuple& tuple)
-{
-    constexpr int tupleSize = std::tuple_size_v<Tuple>;
-    static_assert(tupleSize > 1);
-
-    using Seq = std::make_index_sequence<tupleSize - 1>;
-    return discardLastImpl(tuple, Seq{});
-}
-
+//! @brief Select tuple elements specified by the argument sequence
 template<class Tuple, std::size_t... Ints>
 std::tuple<std::tuple_element_t<Ints, std::decay_t<Tuple>>...> selectTuple(Tuple&& tuple, std::index_sequence<Ints...>)
 {
@@ -77,16 +69,24 @@ std::tuple<std::tuple_element_t<Ints, std::decay_t<Tuple>>...> selectTuple(Tuple
 }
 
 template<std::size_t... Is>
-constexpr auto indexSequenceReverse(std::index_sequence<Is...> const&)
-    -> decltype(std::index_sequence<sizeof...(Is) - 1U - Is...>{});
+constexpr auto
+indexSequenceReverse(std::index_sequence<Is...> const&) -> decltype(std::index_sequence<sizeof...(Is) - 1U - Is...>{});
 
 template<std::size_t N>
 using makeIndexSequenceReverse = decltype(indexSequenceReverse(std::make_index_sequence<N>{}));
 
+//! @brief Create a new tuple by reversing the element order of the argument tuple
 template<class Tuple>
 decltype(auto) reverse(Tuple&& tuple)
 {
     return selectTuple(std::forward<Tuple>(tuple), makeIndexSequenceReverse<std::tuple_size_v<std::decay_t<Tuple>>>{});
+}
+
+//! @brief Return a new tuple without the last element of the argument tuple
+template<class Tp>
+constexpr auto discardLastElement(Tp&& tp)
+{
+    return selectTuple(std::forward<Tp>(tp), std::make_index_sequence<std::tuple_size_v<std::decay_t<Tp>> - 1>{});
 }
 
 } // namespace util

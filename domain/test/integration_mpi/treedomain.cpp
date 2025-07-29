@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -80,17 +64,14 @@ void globalRandomGaussian(int thisRank, int numRanks)
     std::vector<KeyType> tree = makeRootNodeTree<KeyType>();
     std::vector<unsigned> counts{numRanks * unsigned(numParticles)};
 
-    while (!updateOctreeGlobal(coords.particleKeys().data(), coords.particleKeys().data() + numParticles, bucketSize,
-                               tree, counts))
-    {
-    }
+    while (!updateOctreeGlobal<KeyType>(coords.particleKeys(), bucketSize, tree, counts)) {}
 
     std::vector<LocalIndex> ordering(numParticles);
     // particles are in SFC order
     std::iota(begin(ordering), end(ordering), 0);
 
-    auto assignment = singleRangeSfcSplit(counts, numRanks);
-    auto sends      = createSendRanges<KeyType>(assignment, tree, coords.particleKeys());
+    auto assignment = makeSfcAssignment(numRanks, counts, tree.data());
+    auto sends      = createSendRanges<KeyType>(assignment, coords.particleKeys());
 
     EXPECT_EQ(std::accumulate(begin(counts), end(counts), std::size_t(0)), numParticles * numRanks);
 
@@ -103,9 +84,11 @@ void globalRandomGaussian(int thisRank, int numRanks)
 
     BufferDescription bufDesc{0, numParticles, numParticles};
     bufDesc.size = domain_exchange::exchangeBufferSize(bufDesc, numPresent, numAssigned);
-    reallocate(bufDesc.size, x, y, z);
+    reallocate(bufDesc.size, 1.01, x, y, z);
     ExchangeLog log;
-    exchangeParticles(0, log, sends, thisRank, bufDesc, numAssigned, ordering.data(), x.data(), y.data(), z.data());
+    auto recvStart = domain_exchange::receiveStart(bufDesc, numAssigned - numPresent);
+    auto recvEnd   = recvStart + numAssigned - numPresent;
+    exchangeParticles(0, log, sends, thisRank, recvStart, recvEnd, ordering.data(), x.data(), y.data(), z.data());
 
     domain_exchange::extractLocallyOwned(bufDesc, numPresent, numAssigned, ordering.data() + sends[thisRank], x, y, z);
 
@@ -123,14 +106,14 @@ void globalRandomGaussian(int thisRank, int numRanks)
 
     std::vector<KeyType> newTree = makeRootNodeTree<KeyType>();
     std::vector<unsigned> newCounts{unsigned(x.size())};
-    while (!updateOctreeGlobal(newCodes.data(), newCodes.data() + x.size(), bucketSize, newTree, newCounts))
+    while (!updateOctreeGlobal<KeyType>(newCodes, bucketSize, newTree, newCounts))
         ;
 
     // global tree and counts stay the same
     EXPECT_EQ(tree, newTree);
     EXPECT_EQ(counts, newCounts);
 
-    auto newSends = createSendRanges<KeyType>(assignment, newTree, {newCodes.data(), numAssigned});
+    auto newSends = createSendRanges<KeyType>(assignment, {newCodes.data(), numAssigned});
 
     for (int rank = 0; rank < numRanks; ++rank)
     {
@@ -149,7 +132,6 @@ TEST(GlobalTreeDomain, randomGaussian)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
 
-    globalRandomGaussian<unsigned, double>(rank, nRanks);
     globalRandomGaussian<uint64_t, double>(rank, nRanks);
     globalRandomGaussian<unsigned, float>(rank, nRanks);
     globalRandomGaussian<uint64_t, float>(rank, nRanks);

@@ -1,8 +1,8 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * SPH-EXA
+ * Copyright (c) 2024 CSCS, ETH Zurich, University of Basel, University of Zurich
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -34,7 +34,9 @@
 
 #include <variant>
 
+#include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
+#include "sph/particles_data.hpp"
 #include "util/pm_reader.hpp"
 #include "util/timer.hpp"
 
@@ -64,17 +66,23 @@ public:
     //! @brief synchronize computational domain
     virtual void sync(DomainType& domain, ParticleDataType& d) = 0;
 
-    //! @brief advance one time-step
-    virtual void step(DomainType& domain, ParticleDataType& d) = 0;
+    //! @brief synchronize domain and compute forces
+    virtual void computeForces(DomainType& domain, ParticleDataType& d) = 0;
+
+    //! @brief integrate and/or drift particles in time
+    virtual void integrate(DomainType& domain, ParticleDataType& d) = 0;
 
     //! @brief save particle data fields to file
-    virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&){};
+    virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&) {}
 
     //! @brief save internal state to file
-    virtual void save(IFileWriter*){};
+    virtual void save(IFileWriter*) {}
 
     //! @brief load internal state from file
-    virtual void load(const std::string& path, IFileReader*){};
+    virtual void load(const std::string& path, IFileReader*) {}
+
+    //! @brief whether conserved quantities are time-synchronized (when completing a full time-step hierarchy)
+    virtual bool isSynced() { return true; }
 
     //! @brief add pm counters if they exist
     void addCounters(const std::string& pmRoot, int numRanksPerNode) { pmReader.addCounters(pmRoot, numRanksPerNode); }
@@ -88,13 +96,30 @@ public:
 
     virtual ~Propagator() = default;
 
+    //! @brief Returns time elapsed since the start of last call to computeForces()
+    float stepElapsed() const { return timer.sumOfSteps(); }
+
     void printIterationTimings(const DomainType& domain, const ParticleDataType& simData)
     {
-        const auto& d = simData.hydro;
-        printCheck(d.ttot, d.minDt, d.etot, d.eint, d.ecin, d.egrav, domain.box(), d.numParticlesGlobal,
-                   domain.nParticles(), domain.globalTree().numLeafNodes(),
-                   domain.nParticlesWithHalos() - domain.nParticles(), d.totalNeighbors);
+        const auto& d   = simData.hydro;
+        const auto& box = domain.box();
 
+        auto nodeCount          = domain.globalTree().numLeafNodes();
+        auto particleCount      = domain.nParticles();
+        auto haloCount          = domain.nParticlesWithHalos() - domain.nParticles();
+        auto totalNeighbors     = d.totalNeighbors;
+        auto totalParticleCount = d.numParticlesGlobal;
+
+        out << "### Check ### Global Tree Nodes: " << nodeCount << ", Particles: " << particleCount
+            << ", Halos: " << haloCount << std::endl;
+        out << "### Check ### Computational domain: " << box.xmin() << " " << box.xmax() << " " << box.ymin() << " "
+            << box.ymax() << " " << box.zmin() << " " << box.zmax() << std::endl;
+        out << "### Check ### Total Neighbors: " << totalNeighbors
+            << ", Avg neighbor count per particle: " << totalNeighbors / totalParticleCount << std::endl;
+        out << "### Check ### Total time: " << d.ttot - d.minDt << ", current time-step: " << d.minDt << std::endl;
+        out << "### Check ### Total energy: " << d.etot << ", (internal: " << d.eint << ", kinetic: " << d.ecin;
+        out << ", gravitational: " << d.egrav;
+        out << ")" << std::endl;
         out << "### Check ### Focus Tree Nodes: " << domain.focusTree().octreeViewAcc().numLeafNodes << ", maxDepth "
             << domain.focusTree().depth();
         if constexpr (cstone::HaveGpu<typename ParticleDataType::AcceleratorType>{})
@@ -105,28 +130,48 @@ public:
     }
 
 protected:
+    static void outputAllocatedFields(IFileWriter* writer, size_t first, size_t last, ParticleDataType& simData)
+    {
+        auto output = [](size_t first, size_t last, auto& d, IFileWriter* writer)
+        {
+            auto fieldPointers = d.data();
+            auto indicesDone   = d.outputFieldIndices;
+            auto namesDone     = d.outputFieldNames;
+
+            for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
+            {
+                int fidx = indicesDone[i];
+                if (d.isAllocated(fidx))
+                {
+                    int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
+                                 d.outputFieldIndices.begin();
+                    transferToHost(d, first, last, {d.fieldNames[fidx]});
+                    std::visit([writer, c = column, key = namesDone[i]](auto field)
+                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
+                    indicesDone.erase(indicesDone.begin() + i);
+                    namesDone.erase(namesDone.begin() + i);
+                }
+            }
+
+            if (!indicesDone.empty() && writer->rank() == 0)
+            {
+                std::cout << "WARNING: the following fields are not in use and therefore not output: ";
+                for (int fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
+                {
+                    std::cout << d.fieldNames[fidx] << ",";
+                }
+                std::cout << d.fieldNames[indicesDone.back()] << std::endl;
+            }
+        };
+
+        output(first, last, simData.hydro, writer);
+        output(first, last, simData.chem, writer);
+    }
+
     std::ostream& out;
     Timer         timer;
     PmReader      pmReader;
     int           rank_;
-
-    template<class Box>
-    void printCheck(double totalTime, double minTimeStep, double totalEnergy, double internalEnergy,
-                    double kineticEnergy, double gravitationalEnergy, const Box& box, size_t totalParticleCount,
-                    size_t particleCount, size_t nodeCount, size_t haloCount, size_t totalNeighbors)
-    {
-        out << "### Check ### Global Tree Nodes: " << nodeCount << ", Particles: " << particleCount
-            << ", Halos: " << haloCount << std::endl;
-        out << "### Check ### Computational domain: " << box.xmin() << " " << box.xmax() << " " << box.ymin() << " "
-            << box.ymax() << " " << box.zmin() << " " << box.zmax() << std::endl;
-        out << "### Check ### Total Neighbors: " << totalNeighbors
-            << ", Avg neighbor count per particle: " << totalNeighbors / totalParticleCount << std::endl;
-        out << "### Check ### Total time: " << totalTime << ", current time-step: " << minTimeStep << std::endl;
-        out << "### Check ### Total energy: " << totalEnergy << ", (internal: " << internalEnergy
-            << ", kinetic: " << kineticEnergy;
-        out << ", gravitational: " << gravitationalEnergy;
-        out << ")" << std::endl;
-    }
 };
 
 } // namespace sphexa

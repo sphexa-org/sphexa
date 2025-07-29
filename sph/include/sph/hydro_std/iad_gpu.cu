@@ -31,7 +31,6 @@
  */
 
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/findneighbors.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
 
 #include "sph/sph_gpu.hpp"
@@ -53,7 +52,8 @@ using cstone::TreeNodeIndex;
  * @param[in]  K
  * @param[in]  ngmax           maximum number of neighbors per particle to use
  * @param[in]  box             global coordinate bounding box
- * @param[in]  groups          groups of TravConfig::targetSize particles to traverse with a warp
+ * @param[in]  grpStart        start of each particle group, length @p numGroups
+ * @param[in]  grpEnd          end of each particle groups, length @p numGroups
  * @param[in]  numGroups       number of groups
  * @param[in]  numParticles    number of local particles + halos
  * @param[in]  particleKeys    SFC keys of particles, sorted in ascending order
@@ -73,17 +73,17 @@ using cstone::TreeNodeIndex;
  * @param[out] c33
  */
 template<class Tc, class Tm, class T, class KeyType>
-__global__ void IADGpuKernel(Tc K, unsigned ngmax, cstone::Box<Tc> box, const cstone::LocalIndex* groups,
-                             cstone::LocalIndex numGroups, const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* x,
-                             const Tc* y, const Tc* z, const T* h, const Tm* m, const T* rho, const T* wh, const T* whd,
-                             T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, LocalIndex* nidx,
-                             TreeNodeIndex* globalPool)
+__global__ void IADGpuKernel(Tc K, unsigned ngmax, cstone::Box<Tc> box, const LocalIndex* grpStart,
+                             const LocalIndex* grpEnd, LocalIndex numGroups,
+                             const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* x, const Tc* y, const Tc* z,
+                             const T* h, const Tm* m, const T* rho, const T* wh, const T* whd, T* c11, T* c12, T* c13,
+                             T* c22, T* c23, T* c33, LocalIndex* nidx, TreeNodeIndex* globalPool)
 {
     unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned targetIdx   = 0;
     unsigned warpIdxGrid = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
 
-    cstone::LocalIndex* neighborsWarp = nidx + ngmax * TravConfig::targetSize * warpIdxGrid;
+    LocalIndex* neighborsWarp = nidx + ngmax * TravConfig::targetSize * warpIdxGrid;
 
     while (true)
     {
@@ -93,9 +93,9 @@ __global__ void IADGpuKernel(Tc K, unsigned ngmax, cstone::Box<Tc> box, const cs
 
         if (targetIdx >= numGroups) { return; }
 
-        cstone::LocalIndex bodyBegin = groups[targetIdx];
-        cstone::LocalIndex bodyEnd   = groups[targetIdx + 1];
-        cstone::LocalIndex i         = bodyBegin + laneIdx;
+        LocalIndex bodyBegin = grpStart[targetIdx];
+        LocalIndex bodyEnd   = grpEnd[targetIdx];
+        LocalIndex i         = bodyBegin + laneIdx;
 
         auto ncTrue = traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool);
 
@@ -108,17 +108,13 @@ __global__ void IADGpuKernel(Tc K, unsigned ngmax, cstone::Box<Tc> box, const cs
 }
 
 template<class Dataset>
-void computeIADGpu(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
+void computeIADGpu(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    unsigned numBodies = endIndex - startIndex;
-    unsigned numBlocks = TravConfig::numBlocks(numBodies);
-
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, numBodies, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
 
-    unsigned numGroups = d.devData.targetGroups.size() - 1;
-    IADGpuKernel<<<numBlocks, TravConfig::numThreads>>>(
-        d.K, d.ngmax, box, rawPtr(d.devData.targetGroups), numGroups, d.treeView.nsView(), rawPtr(d.devData.x),
+    IADGpuKernel<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
+        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x),
         rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.m), rawPtr(d.devData.rho),
         rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.c11), rawPtr(d.devData.c12),
         rawPtr(d.devData.c13), rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33), nidxPool,
@@ -126,13 +122,7 @@ void computeIADGpu(size_t startIndex, size_t endIndex, Dataset& d, const cstone:
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeIADGpu(size_t, size_t, sphexa::ParticlesData<double, unsigned, cstone::GpuTag>& d,
-                            const cstone::Box<double>&);
-template void computeIADGpu(size_t, size_t, sphexa::ParticlesData<double, uint64_t, cstone::GpuTag>& d,
-                            const cstone::Box<double>&);
-template void computeIADGpu(size_t, size_t, sphexa::ParticlesData<float, unsigned, cstone::GpuTag>& d,
-                            const cstone::Box<float>&);
-template void computeIADGpu(size_t, size_t, sphexa::ParticlesData<float, uint64_t, cstone::GpuTag>& d,
-                            const cstone::Box<float>&);
+template void computeIADGpu(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,
+                            const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace sph

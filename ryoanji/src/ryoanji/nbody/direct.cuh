@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Ryoanji N-body solver
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -50,9 +34,9 @@ struct DirectConfig
 };
 
 template<class T>
-__global__ void directKernel(unsigned first, unsigned last, unsigned numSource, const T* __restrict__ x, const T* __restrict__ y,
-                             const T* __restrict__ z, const T* __restrict__ m, const T* __restrict__ h, T* p, T* ax,
-                             T* ay, T* az)
+__global__ void directKernel(unsigned first, unsigned last, unsigned numSource, Vec3<T> pbcShift,
+                             const T* __restrict__ x, const T* __restrict__ y, const T* __restrict__ z,
+                             const T* __restrict__ m, const T* __restrict__ h, T* p, T* ax, T* ay, T* az)
 {
     unsigned targetIdx = first + blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -60,7 +44,7 @@ __global__ void directKernel(unsigned first, unsigned last, unsigned numSource, 
     T       h_i   = 1.0;
     if (targetIdx < last)
     {
-        pos_i = {x[targetIdx], y[targetIdx], z[targetIdx]};
+        pos_i = Vec3<T>{x[targetIdx], y[targetIdx], z[targetIdx]} + pbcShift;
         h_i   = h[targetIdx];
     }
 
@@ -93,23 +77,33 @@ __global__ void directKernel(unsigned first, unsigned last, unsigned numSource, 
 
     if (targetIdx < last)
     {
-        p[targetIdx]  = m[targetIdx] * T(acc[0]);
-        ax[targetIdx] = T(acc[1]);
-        ay[targetIdx] = T(acc[2]);
-        az[targetIdx] = T(acc[3]);
+        p[targetIdx] += m[targetIdx] * T(acc[0]);
+        ax[targetIdx] += T(acc[1]);
+        ay[targetIdx] += T(acc[2]);
+        az[targetIdx] += T(acc[3]);
     }
 }
 
 template<class T>
-void directSum(size_t first, size_t last, size_t numBodies, const T* x, const T* y, const T* z, const T* m, const T* h,
-               T* p, T* ax, T* ay, T* az)
+void directSum(size_t first, size_t last, size_t numBodies, Vec3<T> boxL, int numShells, const T* x, const T* y,
+               const T* z, const T* m, const T* h, T* p, T* ax, T* ay, T* az)
 {
     size_t   numTargets = last - first;
     unsigned numThreads = DirectConfig::numThreads;
     unsigned numBlocks  = (numTargets - 1) / numThreads + 1;
 
-    directKernel<<<numBlocks, numThreads>>>(first, last, numBodies, x, y, z, m, h, p, ax, ay, az);
-    kernelSuccess("direct sum");
+    for (int iz = -numShells; iz <= numShells; ++iz)
+    {
+        for (int iy = -numShells; iy <= numShells; ++iy)
+        {
+            for (int ix = -numShells; ix <= numShells; ++ix)
+            {
+                auto pbcShift = Vec3<T>{ix * boxL[0], iy * boxL[1], iz * boxL[2]};
+                directKernel<<<numBlocks, numThreads>>>(first, last, numBodies, pbcShift, x, y, z, m, h, p, ax, ay, az);
+                kernelSuccess("direct sum");
+            }
+        }
+    }
 }
 
 } // namespace ryoanji

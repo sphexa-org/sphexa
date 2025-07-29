@@ -72,10 +72,10 @@ void computeIADImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone
 }
 
 template<class T, class Dataset>
-void computeIAD(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
+void computeIAD(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { computeIADGpu(startIndex, endIndex, d, box); }
-    else { computeIADImpl(startIndex, endIndex, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { computeIADGpu(groups, d, box); }
+    else { computeIADImpl(groups.firstBody, groups.lastBody, d, box); }
 }
 
 } // namespace sph

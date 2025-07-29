@@ -5,11 +5,16 @@
 #include "gtest/gtest.h"
 
 #include "cooling/cooler.hpp"
+#include "cooling/chemistry_data.hpp"
+#include "cooling/cooler_impl.hpp"
+#include "cooling/cooler_task.hpp"
 
 #include "cstone/fields/field_get.hpp"
 #include "io/ifile_io.hpp"
 
-TEST(cooling_grackle, test1a)
+#include "init/settings.hpp"
+
+TEST(cooling_grackle, testCoolParticles)
 {
     using Real = double;
 
@@ -17,7 +22,7 @@ TEST(cooling_grackle, test1a)
     constexpr Real time_units    = 1.0e12;
     constexpr Real length_units  = 1.0;
 
-    constexpr Real GCGS = 6.674e-8;
+    // constexpr Real GCGS = 6.674e-8;
 
     constexpr Real density_units_c = 1. / (time_units * time_units);
     // EXPECT_NEAR(density_units, density_units_c, 1e-26);
@@ -39,8 +44,8 @@ TEST(cooling_grackle, test1a)
     grackleOptions["cooling::UVbackground"]           = 1;
     grackleOptions["cooling::metal_cooling"]          = 1;
 
-    sphexa::BuiltinWriter attributeSetter(grackleOptions);
-    cd.loadOrStoreAttributes(&attributeSetter);
+    sphexa::BuiltinWriter extractor(grackleOptions);
+    cd.loadOrStoreAttributes(&extractor);
 
     cd.init(0, time_units);
 
@@ -49,7 +54,7 @@ TEST(cooling_grackle, test1a)
     constexpr Real mh          = 1.67262171e-24;
     constexpr Real kboltz      = 1.3806504e-16;
 
-    auto rho = std::vector<Real>{1.0};
+    auto rho = std::vector<float>{1.1, 1.0};
     /*Real temperature_units =
             mh *
             pow(cd.get_global_values().units.a_units * cd.get_global_values().units.length_units /
@@ -57,28 +62,28 @@ TEST(cooling_grackle, test1a)
 
     Real temperature_units = mh * std::pow(length_units / time_units, 2.) / kboltz;
 
-    auto u                        = std::vector<Real>{1000. / temperature_units};
-    auto HI_fraction              = std::vector<Real>{0.76};
-    auto HII_fraction             = std::vector<Real>{tiny_number};
-    auto HM_fraction              = std::vector<Real>{tiny_number};
-    auto HeI_fraction             = std::vector<Real>{0.24};
-    auto HeII_fraction            = std::vector<Real>{tiny_number};
-    auto HeIII_fraction           = std::vector<Real>{tiny_number};
-    auto H2I_fraction             = std::vector<Real>{tiny_number};
-    auto H2II_fraction            = std::vector<Real>{tiny_number};
-    auto DI_fraction              = std::vector<Real>{2.0 * 3.4e-5};
-    auto DII_fraction             = std::vector<Real>{tiny_number};
-    auto HDI_fraction             = std::vector<Real>{tiny_number};
-    auto e_fraction               = std::vector<Real>{tiny_number};
-    auto metal_fraction           = std::vector<Real>{0.01295};
-    auto volumetric_heating_rate  = std::vector<Real>{0.};
-    auto specific_heating_rate    = std::vector<Real>{0.};
-    auto RT_heating_rate          = std::vector<Real>{0.};
-    auto RT_HI_ionization_rate    = std::vector<Real>{0.};
-    auto RT_HeI_ionization_rate   = std::vector<Real>{0.};
-    auto RT_HeII_ionization_rate  = std::vector<Real>{0.};
-    auto RT_H2_dissociation_rate  = std::vector<Real>{0.};
-    auto H2_self_shielding_length = std::vector<Real>{0.};
+    auto u                        = std::vector<Real>{1000. / temperature_units, 1000. / temperature_units};
+    auto HI_fraction              = std::vector<Real>{0.76, 0.76};
+    auto HII_fraction             = std::vector<Real>{tiny_number, tiny_number};
+    auto HM_fraction              = std::vector<Real>{tiny_number, tiny_number};
+    auto HeI_fraction             = std::vector<Real>{0.24, 0.24};
+    auto HeII_fraction            = std::vector<Real>{tiny_number, tiny_number};
+    auto HeIII_fraction           = std::vector<Real>{tiny_number, tiny_number};
+    auto H2I_fraction             = std::vector<Real>{tiny_number, tiny_number};
+    auto H2II_fraction            = std::vector<Real>{tiny_number, tiny_number};
+    auto DI_fraction              = std::vector<Real>{2.0 * 3.4e-5, 2.0 * 3.4e-5};
+    auto DII_fraction             = std::vector<Real>{tiny_number, tiny_number};
+    auto HDI_fraction             = std::vector<Real>{tiny_number, tiny_number};
+    auto e_fraction               = std::vector<Real>{tiny_number, tiny_number};
+    auto metal_fraction           = std::vector<Real>{0.01295, 0.01295};
+    auto volumetric_heating_rate  = std::vector<Real>{0., 0.};
+    auto specific_heating_rate    = std::vector<Real>{0., 0.};
+    auto RT_heating_rate          = std::vector<Real>{0., 0.};
+    auto RT_HI_ionization_rate    = std::vector<Real>{0., 0.};
+    auto RT_HeI_ionization_rate   = std::vector<Real>{0., 0.};
+    auto RT_HeII_ionization_rate  = std::vector<Real>{0., 0.};
+    auto RT_H2_dissociation_rate  = std::vector<Real>{0., 0.};
+    auto H2_self_shielding_length = std::vector<Real>{0., 0.};
 
     std::cout << HI_fraction[0] << std::endl;
     std::cout << HeI_fraction[0] << std::endl;
@@ -90,13 +95,18 @@ TEST(cooling_grackle, test1a)
                  volumetric_heating_rate, specific_heating_rate, RT_heating_rate, RT_HI_ionization_rate,
                  RT_HeI_ionization_rate, RT_HeII_ionization_rate, RT_H2_dissociation_rate, H2_self_shielding_length);
 
-    cd.cool_particle(dt / time_units, rho[0], u[0], cstone::getPointers(grData, 0));
+    std::vector<Real> du(2);
+    cd.cool_particles(dt / time_units, rho.data(), u.data(), cstone::getPointers(grData, 0), du.data(), 0, 2);
 
     std::cout << HI_fraction[0] << std::endl;
+    std::cout << HI_fraction[1] << std::endl;
 
-    EXPECT_NEAR(HI_fraction[0], 0.630705, 1e-6);
-    EXPECT_NEAR(u[0], 2.95159e+35, 1e30);
+    EXPECT_NEAR(HI_fraction[0], 0.640295, 1e-6);
+    EXPECT_NEAR(HI_fraction[1], 0.630705, 1e-6);
+    u[1] = u[1] + (dt / time_units) * du[1];
+    EXPECT_NEAR(u[1], 2.95159e+35, 1e30);
 }
+
 // This test just produces a table of cooling values for different choices of rho and u
 TEST(cooling_grackle2, test2)
 {
@@ -144,7 +154,7 @@ TEST(cooling_grackle2, test2)
 
     auto cool_test_data = [&dt, &cd](Real rho_in, Real u_in)
     {
-        auto rho                      = std::vector<Real>{rho_in};
+        auto rho                      = std::vector<float>{float(rho_in)};
         auto u                        = std::vector<Real>{u_in};
         auto HI_fraction              = std::vector<Real>{0.76};
         auto HII_fraction             = std::vector<Real>{tiny_number};
@@ -174,9 +184,10 @@ TEST(cooling_grackle2, test2)
                                RT_HI_ionization_rate, RT_HeI_ionization_rate, RT_HeII_ionization_rate,
                                RT_H2_dissociation_rate, H2_self_shielding_length);
 
-        cd.cool_particle(dt, rho[0], u[0], cstone::getPointers(grData, 0));
+        std::vector<Real> du(1);
+        cd.cool_particles(dt, &rho[0], &u[0], cstone::getPointers(grData, 0), &du[0], 0, 1);
 
-        return u[0];
+        return u[0] + dt * du[0];
     };
     std::vector<Real> results(n_rho * n_u);
     std::FILE*        file = std::fopen(writePath.c_str(), "w");
@@ -191,4 +202,128 @@ TEST(cooling_grackle2, test2)
         }
     }
     std::fclose(file);
+}
+
+static bool checkVectorDifferences(const auto& vec1, const auto& vec2, const double error = 1e-6)
+{
+    size_t s = vec1.size();
+    for (size_t i = 0; i < s; i++)
+    {
+        if (std::abs(vec1[i] - vec2[i]) > error) { return false; }
+    }
+    return true;
+}
+
+struct CoolerDataTest : public ::testing::Test, cooling::Cooler<double>::Impl
+{
+    using CoolingFields = cooling::Cooler<double>::CoolingFields;
+
+    cooling::ChemistryData<double> chemistry;
+    cooling::ChemistryData<double> chemistry_copy;
+    std::vector<double>            rho, u;
+
+    inline static constexpr size_t       block_size = 100;
+    inline static constexpr size_t       data_size  = 1031;
+    const cooling::Partition<block_size> partition;
+
+    CoolerDataTest()
+        : partition(0, data_size)
+    {
+    }
+
+    //! @brief Fill some values in chemistry and rho and copy chemistry into chemistry_copy
+    void SetUp() override
+    {
+        std::apply([this](auto... f) { chemistry.setConserved(f.value...); },
+                   make_tuple(cooling::Cooler<double>::CoolingFields{}));
+
+        chemistry.resize(data_size);
+        rho.resize(data_size);
+        u.resize(data_size);
+
+        auto fill_ascending = [](auto& vec, double start, double end)
+        {
+            for (size_t i = 0; i < vec.size(); i++)
+            {
+                vec[i] = start + i * (end - start) / vec.size();
+            }
+        };
+
+        fill_ascending(get<"HI_fraction">(chemistry), 1e-3, 0.2);
+        fill_ascending(get<"HDI_fraction">(chemistry), 0.1, 1.);
+        fill_ascending(get<"RT_heating_rate">(chemistry), 1e-3, 1.);
+        fill_ascending(get<"specific_heating_rate">(chemistry), 0.8, 1.);
+        fill_ascending(rho, 1., 150.);
+        fill_ascending(u, 150., 300.);
+        chemistry_copy = chemistry;
+    }
+};
+
+//! @brief Call convertToDens on Chemistry_copy, see if rates are untouched
+TEST_F(CoolerDataTest, extractBlock)
+{
+    auto taskVecEqualConvert = [](const auto& task_vec, const auto& vec, const auto& rho, const cooling::Task task)
+    {
+        std::vector<double> species_density(task.len);
+        std::transform(vec.begin() + task.first, vec.begin() + task.last, rho.begin() + task.first,
+                       species_density.begin(), std::multiplies<>{});
+
+        return std::equal(task_vec.begin(), task_vec.begin() + task.len, species_density.begin());
+    };
+
+    for (size_t i = 0; i < partition.n_bins; i++)
+    {
+        cooling::Task task(i, partition);
+        GrackleBlock  gblock = extractBlock(
+             rho.data(), u.data(), cstone::getPointers(get<CoolingFields>(chemistry_copy), 0), task.first, task.last);
+
+        EXPECT_TRUE(std::equal(gblock.rho.begin(), gblock.rho.begin() + task.len, rho.begin() + task.first));
+        EXPECT_TRUE(std::equal(gblock.u.begin(), gblock.u.begin() + task.len, u.begin() + task.first));
+
+        auto rt_rate = util::get<"RT_heating_rate", CoolingFields>(gblock.grackleFields);
+        EXPECT_TRUE(std::equal(rt_rate.begin(), rt_rate.begin() + task.len,
+                               get<"RT_heating_rate">(chemistry).begin() + task.first));
+
+        auto sh_rate = util::get<"specific_heating_rate", CoolingFields>(gblock.grackleFields);
+        EXPECT_TRUE(std::equal(sh_rate.begin(), sh_rate.begin() + task.len,
+                               get<"specific_heating_rate">(chemistry).begin() + task.first));
+
+        EXPECT_TRUE(taskVecEqualConvert(util::get<"HI_fraction", CoolingFields>(gblock.grackleFields),
+                                        get<"HI_fraction">(chemistry), rho, task));
+        EXPECT_TRUE(taskVecEqualConvert(util::get<"HDI_fraction", CoolingFields>(gblock.grackleFields),
+                                        get<"HDI_fraction">(chemistry), rho, task));
+    }
+}
+
+//! @brief Call convertToDens on Chemistry_copy, then convert back and see if fractions are the same
+TEST_F(CoolerDataTest, storeBlock)
+{
+    for (size_t i = 0; i < partition.n_bins; i++)
+    {
+        cooling::Task b(i, partition);
+        GrackleBlock  gblock;
+
+        std::copy_n(rho.data() + b.first, b.len, gblock.rho.data());
+
+        std::copy_n(get<"RT_heating_rate">(chemistry).data() + b.first, b.len,
+                    util::get<"RT_heating_rate", CoolingFields>(gblock.grackleFields).data());
+        std::copy_n(get<"specific_heating_rate">(chemistry).data() + b.first, b.len,
+                    util::get<"specific_heating_rate", CoolingFields>(gblock.grackleFields).data());
+
+        auto* hI_frac = util::get<"HI_fraction", CoolingFields>(gblock.grackleFields).data();
+        std::copy_n(get<"HI_fraction">(chemistry).data() + b.first, b.len, hI_frac);
+        std::transform(hI_frac, hI_frac + b.len, rho.data() + b.first, hI_frac, std::multiplies<>{});
+
+        auto* hDI_frac = util::get<"HDI_fraction", CoolingFields>(gblock.grackleFields).data();
+        std::copy_n(get<"HDI_fraction">(chemistry).data() + b.first, b.len, hDI_frac);
+        std::transform(hDI_frac, hDI_frac + b.len, rho.data() + b.first, hDI_frac, std::multiplies<>{});
+
+        storeBlock(gblock, cstone::getPointers(get<CoolingFields>(chemistry_copy), 0), b.first, b.last);
+    }
+    EXPECT_TRUE(
+        checkVectorDifferences(get<"RT_heating_rate">(chemistry), get<"RT_heating_rate">(chemistry_copy), 1e-9));
+    EXPECT_TRUE(checkVectorDifferences(get<"specific_heating_rate">(chemistry),
+                                       get<"specific_heating_rate">(chemistry_copy), 1e-9));
+    EXPECT_TRUE(checkVectorDifferences(get<"HI_fraction">(chemistry), get<"HI_fraction">(chemistry_copy), 1e-9));
+    EXPECT_TRUE(checkVectorDifferences(get<"HDI_fraction">(chemistry), get<"HDI_fraction">(chemistry_copy), 1e-9));
 }

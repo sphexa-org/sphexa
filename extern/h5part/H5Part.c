@@ -1195,6 +1195,27 @@ H5PartWriteDataInt32 (
     return H5PART_SUCCESS;
 }
 
+h5part_int64_t
+H5PartWriteDataInt8 (
+    H5PartFile *f,		/*!< [in] Handle to open file */
+    const char *name,	/*!< [in] Name to associate array with */
+    const uint8_t *array	/*!< [in] Array to commit to disk */
+) {
+
+    SET_FNAME ( "H5PartWriteDataInt8" );
+
+    h5part_int64_t herr;
+
+    CHECK_FILEHANDLE ( f );
+    CHECK_WRITABLE_MODE( f );
+    CHECK_TIMEGROUP( f );
+
+    herr = _write_data ( f, name, (void*)array, H5T_NATIVE_INT8 );
+    if ( herr < 0 ) return herr;
+
+    return H5PART_SUCCESS;
+}
+
 /********************** reading and writing attribute ************************/
 
 /********************** private functions to handle attributes ***************/
@@ -3267,6 +3288,25 @@ H5PartReadDataInt32 (
     CHECK_FILEHANDLE( f );
 
     herr = _read_data ( f, name, array, H5T_NATIVE_INT32 );
+    if ( herr < 0 ) return herr;
+
+    return H5PART_SUCCESS;
+}
+
+h5part_int64_t
+H5PartReadDataInt8 (
+    H5PartFile *f,		/*!< [in] Handle to open file */
+    const char *name,	/*!< [in] Name to associate dataset with */
+    uint8_t *array	/*!< [out] Array of data */
+) {
+
+    SET_FNAME ( "H5PartReadDataInt8" );
+
+    h5part_int64_t herr;
+
+    CHECK_FILEHANDLE( f );
+
+    herr = _read_data ( f, name, array, H5T_NATIVE_INT8 );
     if ( herr < 0 ) return herr;
 
     return H5PART_SUCCESS;

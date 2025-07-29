@@ -44,7 +44,7 @@ namespace sphexa
 namespace fileutils
 {
 
-using H5PartTypes = util::TypeList<double, float, char, int, int64_t, unsigned, uint64_t>;
+using H5PartTypes = util::TypeList<double, float, char, int, int64_t>;
 
 std::string H5PartTypeToString(h5part_int64_t type)
 {
@@ -76,6 +76,12 @@ struct H5PartType<float>
 
 template<>
 struct H5PartType<char>
+{
+    operator h5part_int64_t() const noexcept { return H5PART_CHAR; } // NOLINT
+};
+
+template<>
+struct H5PartType<unsigned char>
 {
     operator h5part_int64_t() const noexcept { return H5PART_CHAR; } // NOLINT
 };
@@ -191,25 +197,25 @@ void readAttribute(ExtractType* attr, int attrSizeBuf, int attrIndex, Reader&& r
 
     auto readTypesafe = [&](auto dummyValue)
     {
-        using TypeInFile = std::decay_t<decltype(dummyValue)>;
-        if (fileutils::H5PartType<TypeInFile>{} == typeId && not breakLoop)
+        using TrialType = std::decay_t<decltype(dummyValue)>;
+        if (fileutils::H5PartType<TrialType>{} == typeId && not breakLoop)
         {
-            std::vector<TypeInFile> attrBuf(attrSizeFile);
+            std::vector<TrialType> attrBuf(attrSizeFile);
             if (readAttrib(attrName, attrBuf.data()) != H5PART_SUCCESS)
             {
                 throw std::runtime_error("Could not read attribute " + std::string(attrName) + "\n");
             }
 
-            bool bothFloating        = std::is_floating_point_v<TypeInFile> && std::is_floating_point_v<ExtractType>;
-            bool extractToCommonType = std::is_same_v<std::common_type_t<TypeInFile, ExtractType>, ExtractType>;
-            if (bothFloating || extractToCommonType) { std::copy(attrBuf.begin(), attrBuf.end(), attr); }
+            bool h5IsSame            = H5PartType<TrialType>{} == H5PartType<ExtractType>{};
+            bool bothFloating        = std::is_floating_point_v<TrialType> && std::is_floating_point_v<ExtractType>;
+            bool extractToCommonType = std::is_same_v<std::common_type_t<TrialType, ExtractType>, ExtractType>;
+            if (h5IsSame || bothFloating || extractToCommonType) { std::copy(attrBuf.begin(), attrBuf.end(), attr); }
             else
             {
                 int64_t memTypeId = fileutils::H5PartType<ExtractType>{};
                 throw std::runtime_error("Reading attribute " + std::string(attrName) +
-                                         " failed: " + "type in file is " + fileutils::H5PartTypeToString(typeId) +
-                                         ", but supplied buffer type is " + fileutils::H5PartTypeToString(memTypeId) +
-                                         "\n");
+                                         " failed: " + "type in file is " + H5PartTypeToString(typeId) +
+                                         ", but supplied buffer type is " + H5PartTypeToString(memTypeId) + "\n");
             }
             breakLoop = true;
         }
@@ -253,9 +259,14 @@ inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fi
     return H5PartReadDataFloat32(h5_file, fieldName.c_str(), field);
 }
 
-inline h5part_int64_t readH5PartField(H5PartFile* /*h5_file*/, const std::string& /*fieldName*/, char* /*field*/)
+inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, uint8_t* field)
 {
-    throw std::runtime_error("H5Part read char field not implemented");
+    return H5PartReadDataInt8(h5_file, fieldName.c_str(), field);
+}
+
+inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, char* field)
+{
+    return H5PartReadDataInt8(h5_file, fieldName.c_str(), (uint8_t*)field);
 }
 
 inline h5part_int64_t readH5PartField(H5PartFile* h5_file, const std::string& fieldName, int* field)
@@ -293,9 +304,14 @@ inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& f
     return H5PartWriteDataFloat32(h5_file, fieldName.c_str(), field);
 }
 
-inline h5part_int64_t writeH5PartField(H5PartFile* /*h5_file*/, const std::string& /*fieldName*/, const char* /*field*/)
+inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const uint8_t* field)
 {
-    throw std::runtime_error("H5Part write char field not implemented");
+    return H5PartWriteDataInt8(h5_file, fieldName.c_str(), field);
+}
+
+inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const char* field)
+{
+    return H5PartWriteDataInt8(h5_file, fieldName.c_str(), (const uint8_t*)field);
 }
 
 inline h5part_int64_t writeH5PartField(H5PartFile* h5_file, const std::string& fieldName, const int* field)

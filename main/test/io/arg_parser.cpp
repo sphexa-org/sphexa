@@ -73,6 +73,7 @@ TEST(IO, isOutputTime)
     EXPECT_FALSE(isOutputTime(9.9, 10.1, "2"));
     EXPECT_TRUE(isOutputTime(9.9, 10.1, "2.0"));
     EXPECT_FALSE(isOutputTime(10.01, 10.1, "2.0"));
+    EXPECT_FALSE(isOutputTime(0.0, 1.1e-6, "0.01"));
 }
 
 TEST(IO, isOutputStep)

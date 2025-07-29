@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -32,8 +16,9 @@
 #pragma once
 
 #include "cstone/fields/data_util.hpp"
-#include "cstone/tree/accel_switch.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/util/constexpr_string.hpp"
+#include "cstone/util/value_list.hpp"
 
 namespace cstone
 {
@@ -85,25 +70,6 @@ template<util::StructuralString... Fields, class Dataset>
 decltype(auto) get(Dataset& d)
 {
     return get<util::FieldList<Fields...>>(d);
-}
-
-/*! @brief return a reference to the named field F from a tuple
- *
- * @tparam        F
- * @tparam        Dataset    a type with a fieldNames member with the same number of fields as @p tup
- * @tparam        Tuple
- * @param[inout]  tup        a tuple, for example the fields for a single particle
- * @return                   the field F from @p tup
- */
-template<util::StructuralString F,
-         class Dataset,
-         class Tuple,
-         std::enable_if_t<std::is_same_v<void, util::void_value_t<Dataset::fieldNames.size()>>, int> = 0>
-decltype(auto) get(Tuple&& tup)
-{
-    static_assert(std::tuple_size_v<std::decay_t<Tuple>> == Dataset::fieldNames.size(),
-                  "size of tuple must be identical to number of field names");
-    return getFields<Dataset>(std::forward<Tuple>(tup), util::FieldList<F>{});
 }
 
 //! @brief return a tuple of pointers to element i of @p tup = tuple of vector-like containers

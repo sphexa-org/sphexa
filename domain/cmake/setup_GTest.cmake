@@ -18,14 +18,11 @@ if (NOT GTest_FOUND)
     if(NOT googletest_POPULATED)
         message(STATUS "Downloading GTest from github")
         # Fetch the content using previously declared details
-        FetchContent_Populate(googletest)
+        FetchContent_MakeAvailable(googletest)
 
         # Prevent overriding the parent project's compiler/linker
         # settings on Windows
         set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-
-        # Bring the populated content into the build
-        add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
     endif()
 endif()
 

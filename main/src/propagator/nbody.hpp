@@ -34,9 +34,10 @@
 #include <variant>
 
 #include "cstone/fields/field_get.hpp"
+#include "sph/groups.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/positions.hpp"
-#include "sph/timestep.hpp"
+#include "sph/ts_global.hpp"
 
 #include "ipropagator.hpp"
 #include "gravity_wrapper.hpp"
@@ -60,10 +61,12 @@ class NbodyProp final : public Propagator<DomainType, DataType>
     using MultipoleType = ryoanji::CartesianQuadrupole<Tmass>;
 
     using Acc       = typename DataType::AcceleratorType;
-    using MHolder_t = typename cstone::AccelSwitchType<Acc, MultipoleHolderCpu, MultipoleHolderGpu>::template type<
-        MultipoleType, DomainType, typename DataType::HydroData>;
+    using MHolder_t = std::conditional_t<cstone::HaveGpu<Acc>{},
+                                         MultipoleHolderGpu<MultipoleType, DomainType, typename DataType::HydroData>,
+                                         MultipoleHolderCpu<MultipoleType, DomainType, typename DataType::HydroData>>;
 
-    MHolder_t mHolder_;
+    MHolder_t      mHolder_;
+    GroupData<Acc> groups_;
 
     /*! @brief the list of conserved particles fields with values preserved between iterations
      *
@@ -108,9 +111,13 @@ public:
         auto& d = simData.hydro;
         domain.syncGrav(get<"keys">(d), get<"x">(d), get<"y">(d), get<"z">(d), get<"h">(d), get<"m">(d),
                         get<ConservedFields>(d), get<DependentFields>(d));
+        d.treeView = domain.octreeProperties();
+        timer.logStatistics("numAssigned", domain.nParticles());
+        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
+        timer.logStatistics("assignment", domain.assignmentStart());
     }
 
-    void step(DomainType& domain, DataType& simData) override
+    void computeForces(DomainType& domain, DataType& simData) override
     {
         timer.start();
         sync(domain, simData);
@@ -118,37 +125,47 @@ public:
 
         auto& d = simData.hydro;
         d.resize(domain.nParticlesWithHalos());
-        size_t first = domain.startIndex();
-        size_t last  = domain.endIndex();
+        auto first = domain.startIndex();
+        auto last  = domain.endIndex();
 
-        transferToHost(d, first, first + 1, {"m"});
-        fill(get<"m">(d), 0, first, d.m[first]);
-        fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
+        domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
+
+        computeGroups(first, last, d, domain.box(), groups_);
 
         fill(get<"ax">(d), first, last, HydroType(0));
         fill(get<"ay">(d), first, last, HydroType(0));
         fill(get<"az">(d), first, last, HydroType(0));
 
+        auto groups = mHolder_.computeSpatialGroups(d, domain);
         mHolder_.upsweep(d, domain);
         timer.step("Upsweep");
-        mHolder_.traverse(d, domain);
+        mHolder_.traverse(groups, d, domain);
 
         timer.step("Gravity");
 
         auto stats = mHolder_.readStats();
+        timer.logStatistics("sumP2P", stats[0] / timer.getLastStepTime());
+        timer.logStatistics("sumM2P", stats[2] / timer.getLastStepTime());
+    }
 
-        if (domain.startIndex() == 0 && cstone::HaveGpu<typename DataType::AcceleratorType>{})
-        {
-            size_t n = last - first;
-            std::cout << "numP2P " << stats[0] / n << " maxP2P " << stats[1] << " numM2P " << stats[2] / n << " maxM2P "
-                      << stats[3] << std::endl;
-        }
+    void integrate(DomainType& domain, DataType& simData) override
+    {
+        auto& d     = simData.hydro;
+        auto  first = domain.startIndex();
+        auto  last  = domain.endIndex();
 
         d.minDtCourant = INFINITY;
         computeTimestep(first, last, d);
         timer.step("Timestep");
-        computePositions(first, last, d, domain.box());
+        computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
         timer.step("UpdateQuantities");
+    }
+
+    void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,
+                    const cstone::Box<T>& /*box*/) override
+    {
+        Base::outputAllocatedFields(writer, first, last, simData);
+        timer.step("FileOutput");
     }
 };
 

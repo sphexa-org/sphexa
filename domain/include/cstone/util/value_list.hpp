@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -32,11 +16,15 @@
 #pragma once
 
 #include "cstone/util/constexpr_string.hpp"
+#include "cstone/util/tuple_util.hpp"
 
 namespace require_gcc_12
 {
 
-//! @brief Base template for a holder of compile-time values
+/*! @brief Generic ValueList for arbitrary compile-time constant values
+ *
+ * Supersedes FieldList (restricted to StructuralString). Not supported by GCC 11 due to internal compiler errors.
+ */
 template<auto...>
 struct ValueList
 {
@@ -124,10 +112,62 @@ struct FindIndex<V, VL<Vs...>> : detail::MatchValue<0, V, VL<Vs..., V>>
 namespace util
 {
 
-/*!**************************************
- Simplified ValueList restricted to structural strings to work around internal compiler errors on GCC 11
- This can be removed and replaced by the more general ValueList once GCC 11 support is no longer needed.
-***************************************/
+/*! @brief Simplified ValueList restricted to StructuralString
+ *
+ * This can be removed and replaced by the more general ValueList once GCC 11 support is no longer needed.
+ */
+template<StructuralString... Fields>
+struct FieldList
+{
+};
+
+template<StructuralString... F1, StructuralString... F2>
+constexpr auto operator+(FieldList<F1...>, FieldList<F2...>)
+{
+    return FieldList<F1..., F2...>{};
+}
+
+namespace detail
+{
+template<class VL1, class VL2>
+struct FuseValueListImpl
+{
+};
+
+template<StructuralString... F1, StructuralString... F2>
+struct FuseValueListImpl<FieldList<F1...>, FieldList<F2...>>
+{
+    using type = FieldList<F1..., F2...>;
+};
+} // namespace detail
+
+//! @brief Fuse (concatenate) two FieldLists
+template<class VL1, class VL2>
+using FuseValueList = typename detail::FuseValueListImpl<VL1, VL2>::type;
+
+template<class VL>
+struct FieldListSize
+{
+};
+
+template<StructuralString... Vs>
+struct FieldListSize<FieldList<Vs...>> : public std::integral_constant<std::size_t, sizeof...(Vs)>
+{
+};
+
+//! @brief convert FieldList to std::tuple
+template<StructuralString... Fields>
+constexpr auto make_tuple(FieldList<Fields...>)
+{
+    return std::make_tuple(Fields...);
+}
+
+//! @brief convert FieldList to constexpr std::array
+template<StructuralString... Fields>
+constexpr auto make_array(FieldList<Fields...>)
+{
+    return std::array{Fields.value...};
+}
 
 namespace vl_detail
 {
@@ -165,8 +205,6 @@ struct FindIndex<V, FieldList<Vs...>> : MatchField<0, V, FieldList<Vs..., V>>
 
 } // namespace vl_detail
 
-/***************************************/
-
 //! @brief Access a field of a tuple with named fields
 template<StructuralString F, class FieldNames, class Tuple>
 decltype(auto) get(Tuple&& tuple)
@@ -174,30 +212,17 @@ decltype(auto) get(Tuple&& tuple)
     return get<vl_detail::FindIndex<F, FieldNames>{}>(std::forward<Tuple>(tuple));
 }
 
-namespace vl_detail
+//! @brief Access fields of a tuple with FieldLists
+template<class FL, class FieldNames, class Tuple>
+auto get(Tuple&& tuple)
 {
+    auto get_ = []<StructuralString... Fs>(FieldList<Fs...>, Tuple && tuple) // NOLINT
+    {
+        using Seq = std::index_sequence<vl_detail::FindIndex<Fs, FieldNames>{}...>;
+        return selectTuple(std::forward<Tuple>(tuple), Seq{});
+    };
 
-template<class T, class IntSeq>
-struct MakeFieldListHelper
-{
-};
-
-template<class T, size_t... Is>
-struct MakeFieldListHelper<T, std::integer_sequence<size_t, Is...>>
-{
-    // +1 to accomodate the '\0' character
-    using type = util::FieldList<util::StructuralString<std::char_traits<char>::length(T::fieldNames[Is]) + 1>(
-        T::fieldNames[Is])...>;
-};
-
-} // namespace vl_detail
-
-//! @brief Construct a FieldList type from any type with a constexpr array<N, const char*> fieldNames member
-template<class T>
-struct MakeFieldList
-{
-    inline static constexpr int numFields = T::fieldNames.size();
-    using Fields = typename vl_detail::MakeFieldListHelper<T, std::make_index_sequence<numFields>>::type;
-};
+    return get_(FL{}, std::forward<Tuple>(tuple));
+}
 
 } // namespace util

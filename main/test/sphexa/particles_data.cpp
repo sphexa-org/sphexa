@@ -40,7 +40,7 @@ using namespace sphexa;
 
 TEST(ParticlesData, resize)
 {
-    ParticlesData<double, unsigned, cstone::CpuTag> d;
+    ParticlesData<cstone::CpuTag> d;
 
     d.setConserved("x", "y", "z");
     d.setDependent("du");
@@ -56,7 +56,7 @@ TEST(ParticlesData, resize)
 
 TEST(ParticlesData, releaseAcquire)
 {
-    ParticlesData<double, unsigned, cstone::CpuTag> d;
+    ParticlesData<cstone::CpuTag> d;
 
     d.setConserved("x", "y", "z");
     d.setDependent("du", "ax", "p");
@@ -73,7 +73,7 @@ TEST(ParticlesData, releaseAcquire)
 
 TEST(ParticlesData, releaseAcquireInt)
 {
-    ParticlesData<double, unsigned, cstone::CpuTag> d;
+    ParticlesData<cstone::CpuTag> d;
 
     d.setDependent("x");
 
@@ -94,7 +94,7 @@ TEST(ParticlesData, releaseAcquireInt)
 
 TEST(ParticlesData, releaseAcquireMultiple)
 {
-    ParticlesData<double, unsigned, cstone::CpuTag> d;
+    ParticlesData<cstone::CpuTag> d;
 
     d.setDependent("ax", "ay", "p");
 
@@ -118,7 +118,7 @@ TEST(ParticlesData, releaseAcquireMultiple)
 
 TEST(ParticlesData, aquireThrow)
 {
-    ParticlesData<double, unsigned, cstone::CpuTag> d;
+    ParticlesData<cstone::CpuTag> d;
 
     d.setConserved("x", "y", "z");
     d.setDependent("du", "ax", "p");
@@ -132,7 +132,7 @@ TEST(ParticlesData, aquireThrow)
 
 TEST(ParticlesData, conservedThrow)
 {
-    ParticlesData<double, unsigned, cstone::CpuTag> d;
+    ParticlesData<cstone::CpuTag> d;
 
     d.setConserved("x", "y", "z");
 
@@ -142,7 +142,7 @@ TEST(ParticlesData, conservedThrow)
 
 TEST(ParticlesData, typeMismatch)
 {
-    ParticlesData<double, unsigned, cstone::CpuTag> d;
+    ParticlesData<cstone::CpuTag> d;
 
     d.setDependent("ax");
     d.resize(10);
@@ -155,7 +155,7 @@ TEST(ParticlesData, typeMismatch)
 
 TEST(ParticlesData, get)
 {
-    ParticlesData<double, unsigned, cstone::CpuTag> d;
+    ParticlesData<cstone::CpuTag> d;
 
     constexpr std::array conservedFields{"x", "y", "rho"};
     std::apply([&d](auto&... f) { d.setConserved(f...); }, conservedFields);
@@ -174,7 +174,7 @@ TEST(ParticlesData, get)
 
 TEST(ParticlesData, getFieldList)
 {
-    ParticlesData<double, unsigned, cstone::CpuTag> d;
+    ParticlesData<cstone::CpuTag> d;
 
     constexpr std::array conservedFields{"x", "y", "rho"};
     std::apply([&d](auto&... f) { d.setConserved(f...); }, conservedFields);
@@ -200,7 +200,7 @@ TEST(ParticlesData, getFieldList)
 
 TEST(ParticlesData, setOutput)
 {
-    ParticlesData<double, unsigned, cstone::CpuTag> d;
+    ParticlesData<cstone::CpuTag> d;
 
     std::vector<std::string> fields{"x", "y", "rho", "SomeOtherField"};
 

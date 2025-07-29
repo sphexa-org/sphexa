@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -36,6 +20,7 @@
 #include <thrust/device_ptr.h>
 #include <thrust/scan.h>
 
+#include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/cuda/errorcheck.cuh"
 #include "cstone/primitives/math.hpp"
 #include "csarray.hpp"
@@ -101,37 +86,40 @@ template<class KeyType>
 void computeNodeCountsGpu(const KeyType* tree,
                           unsigned* counts,
                           TreeNodeIndex numNodes,
-                          const KeyType* firstKey,
-                          const KeyType* lastKey,
+                          std::span<const KeyType> keys,
                           unsigned maxCount,
                           bool useCountsAsGuess)
 {
     TreeNodeIndex popNodes[2];
 
-    findPopulatedNodes<<<1, 1>>>(tree, numNodes, firstKey, lastKey);
+    findPopulatedNodes<<<1, 1>>>(tree, numNodes, keys.data(), keys.data() + keys.size());
     checkGpuErrors(cudaMemcpyFromSymbol(popNodes, populatedNodes, 2 * sizeof(TreeNodeIndex)));
 
     checkGpuErrors(cudaMemset(counts, 0, popNodes[0] * sizeof(unsigned)));
     checkGpuErrors(cudaMemset(counts + popNodes[1], 0, (numNodes - popNodes[1]) * sizeof(unsigned)));
+
+    if (popNodes[1] <= popNodes[0]) { return; }
 
     constexpr unsigned nThreads = 256;
     if (useCountsAsGuess)
     {
         thrust::exclusive_scan(thrust::device, counts + popNodes[0], counts + popNodes[1], counts + popNodes[0]);
         updateNodeCountsKernel<<<iceil(popNodes[1] - popNodes[0], nThreads), nThreads>>>(
-            tree + popNodes[0], counts + popNodes[0], popNodes[1] - popNodes[0], firstKey, lastKey, maxCount);
+            tree + popNodes[0], counts + popNodes[0], popNodes[1] - popNodes[0], keys.data(), keys.data() + keys.size(),
+            maxCount);
     }
     else
     {
         computeNodeCountsKernel<<<iceil(popNodes[1] - popNodes[0], nThreads), nThreads>>>(
-            tree + popNodes[0], counts + popNodes[0], popNodes[1] - popNodes[0], firstKey, lastKey, maxCount);
+            tree + popNodes[0], counts + popNodes[0], popNodes[1] - popNodes[0], keys.data(), keys.data() + keys.size(),
+            maxCount);
     }
 }
 
 template void
-computeNodeCountsGpu(const unsigned*, unsigned*, TreeNodeIndex, const unsigned*, const unsigned*, unsigned, bool);
+computeNodeCountsGpu(const unsigned*, unsigned*, TreeNodeIndex, std::span<const unsigned>, unsigned, bool);
 template void
-computeNodeCountsGpu(const uint64_t*, unsigned*, TreeNodeIndex, const uint64_t*, const uint64_t*, unsigned, bool);
+computeNodeCountsGpu(const uint64_t*, unsigned*, TreeNodeIndex, std::span<const uint64_t>, unsigned, bool);
 
 //! @brief this symbol is used to keep track of octree structure changes and detect convergence
 __device__ int rebalanceChangeCounter;
@@ -226,5 +214,41 @@ bool rebalanceTreeGpu(const KeyType* tree,
 
 template bool rebalanceTreeGpu(const unsigned*, TreeNodeIndex, TreeNodeIndex, const TreeNodeIndex*, unsigned*);
 template bool rebalanceTreeGpu(const uint64_t*, TreeNodeIndex, TreeNodeIndex, const TreeNodeIndex*, uint64_t*);
+
+template<class KeyType>
+__global__ void countSfcGapsKernel(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps)
+{
+    unsigned i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i < numNodes) { nodeOps[i] = spanSfcRange(tree[i], tree[i + 1]); }
+}
+
+template<class KeyType>
+void countSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps)
+{
+    constexpr unsigned nThreads = 512;
+    countSfcGapsKernel<<<iceil(numNodes, nThreads), nThreads>>>(tree, numNodes, nodeOps);
+}
+
+template void countSfcGapsGpu(const uint32_t*, TreeNodeIndex, TreeNodeIndex*);
+template void countSfcGapsGpu(const uint64_t*, TreeNodeIndex, TreeNodeIndex*);
+
+template<class KeyType>
+__global__ void
+fillSfcGapsKernel(const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree)
+{
+    unsigned i = blockDim.x * blockIdx.x + threadIdx.x;
+    if (i < numNodes) { spanSfcRange(tree[i], tree[i + 1], newTree + nodeOps[i]); }
+    if (i == numNodes) { newTree[nodeOps[i]] = tree[numNodes]; }
+}
+
+template<class KeyType>
+void fillSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree)
+{
+    constexpr unsigned nThreads = 128;
+    fillSfcGapsKernel<<<iceil(numNodes + 1, nThreads), nThreads>>>(tree, numNodes, nodeOps, newTree);
+}
+
+template void fillSfcGapsGpu(const uint32_t*, TreeNodeIndex, const TreeNodeIndex*, uint32_t*);
+template void fillSfcGapsGpu(const uint64_t*, TreeNodeIndex, const TreeNodeIndex*, uint64_t*);
 
 } // namespace cstone

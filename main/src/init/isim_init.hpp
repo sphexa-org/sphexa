@@ -36,11 +36,12 @@
 
 #include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
+#include "sphexa/simulation_data.hpp"
+
+#include "settings.hpp"
 
 namespace sphexa
 {
-
-using InitSettings = std::map<std::string, double>;
 
 template<class Dataset>
 class ISimInitializer
@@ -54,112 +55,26 @@ public:
     virtual ~ISimInitializer() = default;
 };
 
-//! @brief Used to initialize particle dataset attributes from builtin named test-cases
-class BuiltinWriter
-{
-public:
-    using FieldType = util::Reduce<std::variant, util::Map<std::add_pointer_t, IO::Types>>;
-
-    explicit BuiltinWriter(InitSettings attrs)
-        : attributes_(std::move(attrs))
-    {
-    }
-
-    [[nodiscard]] static int rank() { return -1; }
-
-    void stepAttribute(const std::string& key, FieldType val, int64_t /*size*/)
-    {
-        std::visit([this, &key](auto arg) { *arg = attributes_.at(key); }, val);
-    };
-
-private:
-    InitSettings attributes_;
-};
-
-//! @brief Used to read the default values of dataset attributes
-class BuiltinReader
-{
-public:
-    using FieldType = util::Reduce<std::variant, util::Map<std::add_pointer_t, IO::Types>>;
-
-    explicit BuiltinReader(InitSettings& attrs)
-        : attributes_(attrs)
-    {
-    }
-
-    [[nodiscard]] static int rank() { return -1; }
-
-    void stepAttribute(const std::string& key, FieldType val, int64_t /*size*/)
-    {
-        std::visit([this, &key](auto arg) { attributes_[key] = *arg; }, val);
-    };
-
-private:
-    //! @brief reference to attributes
-    InitSettings& attributes_;
-};
-
-void writeSettings(const InitSettings& settings, const std::string& path, IFileWriter* writer)
-{
-    if (std::filesystem::exists(path))
-    {
-        throw std::runtime_error("Cannot write settings: file " + path + " already exists\n");
-    }
-
-    writer->addStep(0, 0, path);
-    for (auto it = settings.cbegin(); it != settings.cend(); ++it)
-    {
-        writer->fileAttribute(it->first, &(it->second), 1);
-    }
-    writer->closeStep();
-}
-
-//! @brief read file attributes into an associative container
-void readFileAttributes(InitSettings& settings, const std::string& settingsFile, IFileReader* reader, bool verbose)
-{
-    if (not settingsFile.empty())
-    {
-        reader->setStep(settingsFile, -1, FileMode::independent);
-
-        auto fileAttributes = reader->fileAttributes();
-        for (const auto& attr : fileAttributes)
-        {
-            int64_t sz = reader->fileAttributeSize(attr);
-            if (sz == 1)
-            {
-                settings[attr] = {};
-                reader->fileAttribute(attr, &settings[attr], sz);
-                if (reader->rank() == 0 && verbose)
-                {
-                    std::cout << "Override setting from " << settingsFile << ": " << attr << " = " << settings[attr]
-                              << std::endl;
-                }
-            }
-        }
-        reader->closeStep();
-    }
-}
-
-//! @brief build up an associative container with test case settings
 template<class Dataset>
-[[nodiscard]] InitSettings buildSettings(Dataset&& d, const InitSettings& testCaseSettings,
-                                         const std::string& settingsFile, IFileReader* reader)
+struct SimInitializers
 {
-    InitSettings settings;
-    // first layer: class member defaults in code
-    BuiltinReader extractor(settings);
-    d.hydro.loadOrStoreAttributes(&extractor);
+    using InitPtr = std::unique_ptr<ISimInitializer<Dataset>>;
 
-    // second layer: test-case specific settings
-    for (const auto& kv : testCaseSettings)
-    {
-        settings[kv.first] = kv.second;
-    }
+    static InitPtr makeEvrard(std::string glassBlock, std::string settingsFile, IFileReader* reader);
+    static InitPtr makeEvrardCooling(std::string glassBlock, std::string settingsFile, IFileReader* reader);
+    static InitPtr makeFile(std::string testCase, int initStep, IFileReader* reader);
+    static InitPtr makeFileSplit(std::string testCase, int numsplits, IFileReader* reader);
+    static InitPtr makeGreshoChan(std::string glassBlock, std::string settingsFile, IFileReader* reader);
+    static InitPtr makeKelvinHelmholtz(std::string glassBlock, std::string settingsFile, IFileReader* reader);
+    static InitPtr makeIsobaricCube(std::string glassBlock, std::string settingsFile, IFileReader* reader);
+    static InitPtr makeNoh(std::string glassBlock, std::string settingsFile, IFileReader* reader);
+    static InitPtr makeSedovGlass(std::string glassBlock, std::string settingsFile, IFileReader* reader);
+    static InitPtr makeSedovGrid();
+    static InitPtr makeTurbulence(std::string glassBlock, std::string settingsFile, IFileReader* reader);
+    static InitPtr makeWindShock(std::string glassBlock, std::string settingsFile, IFileReader* reader);
+};
 
-    // third layer: settings override by file given on commandline (highest precedence)
-    readFileAttributes(settings, settingsFile, reader, true);
-
-    return settings;
-}
+extern template struct SimInitializers<SimulationData<cstone::CpuTag>>;
+extern template struct SimInitializers<SimulationData<cstone::GpuTag>>;
 
 } // namespace sphexa

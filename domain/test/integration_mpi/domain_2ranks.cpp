@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * Cornerstone octree
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2024 CSCS, ETH Zurich
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -254,10 +238,10 @@ void particleProperty(int rank, int numRanks)
     // sync result rank 0: |---------assignment-------------------|------halos---------|
     // sync result rank 1:             |-----halos----------------|-----------assignment-------------------|
 
-    std::vector<T> massGlobal{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+    std::vector<uint8_t> massGlobal{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
 
     std::vector<T> x, y, z, h;
-    std::vector<float> mass;
+    std::vector<uint8_t> mass;
     // rank 0 gets particles with even index before the sync
     // rank 1 gets particles with uneven index before the sync
     for (std::size_t i = rank; i < xGlobal.size(); i += numRanks)
@@ -277,9 +261,9 @@ void particleProperty(int rank, int numRanks)
     // the order of particles on the node depends on the SFC algorithm
     std::sort(mass.begin() + domain.startIndex(), mass.begin() + domain.endIndex());
 
-    std::vector<float> refMass;
-    if (rank == 0) { refMass = std::vector<float>{1, 2, 3, 4, 5, 6, 0, 0, 0}; }
-    else if (rank == 1) { refMass = std::vector<float>{0, 0, 0, 0, 7, 8, 9, 10, 11, 12}; }
+    std::vector<uint8_t> refMass;
+    if (rank == 0) { refMass = std::vector<uint8_t>{1, 2, 3, 4, 5, 6, 0, 0, 0}; }
+    else if (rank == 1) { refMass = std::vector<uint8_t>{0, 0, 0, 0, 7, 8, 9, 10, 11, 12}; }
 
     EXPECT_EQ(mass.size(), refMass.size());
     for (LocalIndex i = domain.startIndex(); i < domain.endIndex(); ++i)
@@ -345,55 +329,41 @@ void multiStepSync(int rank, int numRanks)
     domain.sync(keys, x, y, z, h, std::tuple{}, std::tie(s1, s2, s3));
 
     // now a particle on rank 0 gets moved into an area of the global tree that's on rank 1
+    Vec3<T> newPart{0.811, 0.812, 0.813};
     if (rank == 0)
     {
-        x[1] = 0.811;
-        y[1] = 0.812;
-        z[1] = 0.813;
+        x[1] = newPart[0];
+        y[1] = newPart[1];
+        z[1] = newPart[2];
     }
 
     domain.sync(keys, x, y, z, h, std::tuple{}, std::tie(s1, s2, s3));
 
-    // the order of particles on the node depends on the SFC algorithm
-    std::sort(begin(x), end(x));
-    std::sort(begin(y), end(y));
-    std::sort(begin(z), end(z));
-    std::sort(begin(h), end(h));
+    // keys correspond to particles and are SFC sorted
+    std::vector<KeyType> keysChk(domain.nParticlesWithHalos());
+    computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysChk.data()), x.size(), domain.box());
+    EXPECT_EQ(keys, keysChk);
+    EXPECT_TRUE(std::is_sorted(keys.begin(), keys.end()));
 
-    if (rank == 0)
-    {
-        //                 |--------assignment--------------|-------halos-------|
-        std::vector<T> xref{0.0, 0.261, 0.281, 0.301, 0.321, 0.521, 0.541, 0.561};
-        std::vector<T> yref{0.0, 0.262, 0.282, 0.302, 0.322, 0.522, 0.542, 0.562};
-        std::vector<T> zref{0.0, 0.263, 0.283, 0.303, 0.323, 0.523, 0.543, 0.563};
-        std::vector<T> href{0.1, 0.102, 0.103, 0.104, 0.105, 0.156, 0.107, 0.108};
+    // global number of particles is unchanged
+    LocalIndex numAssigned = domain.nParticles();
+    LocalIndex numGlobal   = 0;
+    mpiAllreduce(&numAssigned, &numGlobal, 1, MPI_SUM);
+    EXPECT_EQ(numGlobal, xGlobal.size());
 
-        std::sort(begin(href), end(href));
+    // global keys are unique, each particle was only assigned to 1 rank
+    LocalIndex nP_otherRank = numGlobal - numAssigned;
+    LocalIndex offset       = (rank == 0) ? 0 : nP_otherRank;
+    std::vector<KeyType> keyGlobal(xGlobal.size());
+    std::copy(keys.begin() + domain.startIndex(), keys.begin() + domain.endIndex(), keyGlobal.begin() + offset);
+    MPI_Allreduce(MPI_IN_PLACE, keyGlobal.data(), keyGlobal.size(), MpiType<KeyType>{}, MPI_SUM, MPI_COMM_WORLD);
 
-        EXPECT_EQ(x, xref);
-        EXPECT_EQ(y, yref);
-        EXPECT_EQ(z, zref);
-        EXPECT_EQ(h, href);
-        EXPECT_EQ(domain.startIndex(), 0);
-        EXPECT_EQ(domain.endIndex(), 5);
-    }
-    if (rank == 1)
-    {
-        //                 |--------halos--------------|---------assignment----------------------------|
-        std::vector<T> xref{0.261, 0.281, 0.301, 0.321, 0.521, 0.541, 0.561, 0.761, 0.781, 0.811, 1.000};
-        std::vector<T> yref{0.262, 0.282, 0.302, 0.322, 0.522, 0.542, 0.562, 0.762, 0.781, 0.812, 1.000};
-        std::vector<T> zref{0.263, 0.283, 0.303, 0.323, 0.523, 0.543, 0.563, 0.763, 0.781, 0.813, 1.000};
-        std::vector<T> href{0.102, 0.103, 0.104, 0.105, 0.156, 0.107, 0.108, 0.109, 0.110, 0.101, 0.111};
-
-        std::sort(begin(href), end(href));
-
-        EXPECT_EQ(x, xref);
-        EXPECT_EQ(y, yref);
-        EXPECT_EQ(z, zref);
-        EXPECT_EQ(h, href);
-        EXPECT_EQ(domain.startIndex(), 4);
-        EXPECT_EQ(domain.endIndex(), 11);
-    }
+    std::vector<KeyType> keyGlobRef(xGlobal.size());
+    computeSfcKeys(xGlobal.data(), yGlobal.data(), zGlobal.data(), sfcKindPointer(keyGlobRef.data()), xGlobal.size(),
+                   domain.box());
+    keyGlobRef[1] = sfc3D<SfcKind<KeyType>>(newPart[0], newPart[1], newPart[2], domain.box());
+    sort(begin(keyGlobRef), end(keyGlobRef));
+    EXPECT_EQ(keyGlobal, keyGlobRef);
 }
 
 TEST(FocusDomain, multiStepSync)
@@ -405,10 +375,8 @@ TEST(FocusDomain, multiStepSync)
     const int thisExampleRanks = 2;
     if (numRanks != thisExampleRanks) throw std::runtime_error("this test needs 2 ranks\n");
 
-    multiStepSync<unsigned, double>(rank, numRanks);
     multiStepSync<uint64_t, double>(rank, numRanks);
     multiStepSync<unsigned, float>(rank, numRanks);
-    multiStepSync<uint64_t, float>(rank, numRanks);
 }
 
 template<class T>
@@ -548,8 +516,6 @@ TEST(FocusDomain, haloRadii)
     const int thisExampleRanks = 2;
     if (numRanks != thisExampleRanks) throw std::runtime_error("this test needs 2 ranks\n");
 
-    domainHaloRadii<unsigned, double>(rank, numRanks);
     domainHaloRadii<uint64_t, double>(rank, numRanks);
     domainHaloRadii<unsigned, float>(rank, numRanks);
-    domainHaloRadii<uint64_t, float>(rank, numRanks);
 }

@@ -29,7 +29,9 @@
  */
 
 #include <array>
-#include "mpi.h"
+#include <mpi.h>
+
+#include "cstone/primitives/mpi_wrappers.hpp"
 #include "iobservables.hpp"
 #include "io/file_utils.hpp"
 #include "grav_waves_calculations.hpp"

@@ -11,36 +11,37 @@ namespace cooling
 template<class Dataset, typename Cooler, typename Chem>
 auto coolingTimestep(size_t first, size_t last, Dataset& d, Cooler& cooler, Chem& chem)
 {
-    using T             = typename Dataset::RealType;
-    using CoolingFields = typename Cooler::CoolingFields;
+    using T               = typename Dataset::RealType;
+    using CoolingFields   = typename Cooler::CoolingFields;
+    const auto* rho       = d.rho.data();
+    const auto* u         = d.u.data();
+    const auto  chemistry = cstone::getPointers(get<CoolingFields>(chem), 0);
 
-    T minTc(INFINITY);
-#pragma omp parallel for reduction(min : minTc)
-    for (size_t i = first; i < last; i++)
-    {
-        const T cooling_time = cooler.cooling_time(d.rho[i], d.u[i], cstone::getPointers(get<CoolingFields>(chem), i));
-        minTc                = std::min(std::abs(cooler.ct_crit * cooling_time), minTc);
-    }
-    return minTc;
+    T minCt = cooler.cooling_timestep(rho, u, chemistry, first, last);
+
+    return minCt;
 }
 
 template<typename HydroData, typename ChemData, typename Cooler>
 void eos_cooling(size_t startIndex, size_t endIndex, HydroData& d, ChemData& chem, Cooler& cooler)
 {
-    using CoolingFields = typename Cooler::CoolingFields;
-    using T             = typename HydroData::RealType;
-    const auto* rho     = d.rho.data();
+    using CoolingFields   = typename Cooler::CoolingFields;
+    using T               = typename HydroData::RealType;
+    const auto* rho       = d.rho.data();
+    const auto* u         = d.u.data();
+    const auto  chemistry = cstone::getPointers(get<CoolingFields>(chem), 0);
 
     auto* p = d.p.data();
     auto* c = d.c.data();
 
+    cooler.computePressures(rho, u, chemistry, p, startIndex, endIndex);
+
+    // Write adiabatic indices into c (sound speed) first
+    cooler.computeAdiabaticIndices(rho, u, chemistry, c, startIndex, endIndex);
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
-        T pressure    = cooler.pressure(rho[i], d.u[i], cstone::getPointers(get<CoolingFields>(chem), i));
-        T gamma       = cooler.adiabatic_index(rho[i], d.u[i], cstone::getPointers(get<CoolingFields>(chem), i));
-        T sound_speed = std::sqrt(gamma * pressure / rho[i]);
-        p[i]          = pressure;
+        T sound_speed = std::sqrt(c[i] * p[i] / rho[i]);
         c[i]          = sound_speed;
     }
 }

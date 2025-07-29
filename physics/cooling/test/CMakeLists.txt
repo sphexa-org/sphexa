@@ -12,6 +12,7 @@ target_link_libraries(${testname} PRIVATE grackle)
 target_link_libraries(${testname} PRIVATE cooler)
 target_link_libraries(${testname} PRIVATE GTest::gtest_main)
 target_compile_definitions(${testname} PRIVATE PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_compile_definitions(${testname} PRIVATE CMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 add_test(NAME ${testname} COMMAND ${testname})
 
 install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/physics)

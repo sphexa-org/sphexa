@@ -55,8 +55,8 @@ public:
         std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*, FieldVector<uint64_t>*>;
 
     //! Grackle field names
-    inline static constexpr std::array fieldNames = Cooler<RealType>::fieldNames;
-    inline static constexpr size_t     numFields  = fieldNames.size();
+    inline static constexpr auto   fieldNames = make_array(typename Cooler<RealType>::CoolingFields{});
+    inline static constexpr size_t numFields  = fieldNames.size();
 
     std::array<FieldVector<T>, numFields> fields;
 
