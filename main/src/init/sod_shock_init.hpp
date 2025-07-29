@@ -84,31 +84,10 @@ void initSodShock(Dataset& d, const std::map<std::string, double>& constants, T 
     }
 }
 
-/*!
- * @brief create temporary smoothing lengths to add fixed boundary particles
- */
-template<class Dataset, class T>
-std::vector<T> temporarySmoothingLength(Dataset& d, std::map<std::string, double>& constants, T particleMass)
-{
-    T              rhoLeft  = constants.at("rho_l");
-    T              rhoRight = constants.at("rho_r");
-    size_t         ng0      = 100;
-    T              hLeft    = 0.5 * std::cbrt(3. * ng0 * particleMass / 4. / M_PI / rhoLeft);
-    T              hRight   = 0.5 * std::cbrt(3. * ng0 * particleMass / 4. / M_PI / rhoRight);
-    std::vector<T> h(d.x.size());
-
-    for (int i = 0; i < d.x.size(); ++i)
-    {
-        if (d.x[i] < 0.5) { h[i] = hLeft; }
-        else { h[i] = hRight; }
-    }
-    return h;
-}
-
 std::map<std::string, double> SodShockConstants()
 {
     return {{"P_l", 1.0},       {"P_r", 0.1},    {"rho_l", 1.0},    {"rho_r", 0.125},
-            {"gamma", 5. / 3.}, {"minDt", 1e-6}, {"minDt_m1", 1e-6}};
+            {"gamma", 5. / 3.}, {"minDt", 1e-6}, {"minDt_m1", 1e-6}, {"sod-shock", 1.}};
 }
 
 template<class Dataset>
@@ -156,9 +135,6 @@ public:
         T nPartHighDens  = d.x.size() * rhoHigh / (rhoHigh + rhoLow); // estimate from template block
         T particleMass   = highDensVolume * settings_.at("rho_l") / nPartHighDens;
 
-        auto tempH = temporarySmoothingLength(d, settings_, particleMass);
-        addFixedBoundaryLayer(Axis.x, d.x, d.y, d.z, tempH, d.x.size(), globalBox);
-
         size_t numParticlesGlobal = d.x.size();
         MPI_Allreduce(MPI_IN_PLACE, &numParticlesGlobal, 1, MpiType<size_t>{}, MPI_SUM, simData.comm);
 
@@ -175,7 +151,6 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initSodShock(d, settings_, particleMass);
-        initFixedBoundaries(d.y.data(), d.vx.data(), d.vy.data(), d.vz.data(), d.h.data(), newXMax, newXMin, d.x.size(), globalBox.fbcThickness());
 
         return globalBox;
     }
