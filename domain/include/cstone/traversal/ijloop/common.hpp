@@ -40,9 +40,15 @@ template<class Tc, class Th, class... Ts>
 inline constexpr std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...> loadParticleData(
     const Tc* x, const Tc* y, const Tc* z, const Th* h, std::tuple<const Ts*...> const& input, LocalIndex index)
 {
+#ifdef __CUDA_ARCH__
+    const Vec3<Tc> pos = {__ldg(&x[index]), __ldg(&y[index]), __ldg(&z[index])};
+    return std::tuple_cat(std::make_tuple(index, pos, __ldg(&h[index])),
+                          util::tupleMap([index](auto const* ptr) { return __ldg(&ptr[index]); }, input));
+#else
     const Vec3<Tc> pos = {x[index], y[index], z[index]};
     return std::tuple_cat(std::make_tuple(index, pos, h[index]),
                           util::tupleMap([index](auto const* ptr) { return ptr[index]; }, input));
+#endif
 }
 
 template<class... Ts>
