@@ -86,7 +86,7 @@ void initSodShock(Dataset& d, const std::map<std::string, double>& constants, T 
 
 std::map<std::string, double> SodShockConstants()
 {
-    return {{"P_l", 1.0},       {"P_r", 0.1},    {"rho_l", 1.0},    {"rho_r", 0.125},
+    return {{"P_l", 1.0},       {"P_r", 0.1},    {"rho_l", 1.0},     {"rho_r", 0.125},
             {"gamma", 5. / 3.}, {"minDt", 1e-6}, {"minDt_m1", 1e-6}, {"sod-shock", 1.}};
 }
 
@@ -126,7 +126,7 @@ public:
         cstone::Box<T> left(0, 0.5, 0, 0.125, 0, 0.125, pbc, pbc, pbc);
         cstone::Box<T> right(0.5, 1, 0, 0.125, 0, 0.125, pbc, pbc, pbc);
 
-        cstone::Box<T> globalBox(0, 1, 0, 0.125, 0, 0.125, fbc, pbc, pbc, 8);
+        cstone::Box<T> globalBox(0, 1, 0, 0.125, 0, 0.125, fbc, pbc, pbc);
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
 
         assembleCuboid<T>(keyStart, keyEnd, left, leftMulti, xBlock, yBlock, zBlock, d.x, d.y, d.z);
