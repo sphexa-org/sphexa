@@ -171,7 +171,7 @@ struct GpuFullNbListNeighborhoodImpl
         if (numBodies == 0) return;
         constexpr int numThreads = 128;
         runIjLoop<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
-            box, firstBody, lastBody, x, y, z, h, makeConstRestrict(input), output,
+            box, firstBody, lastBody, x, y, z, h, makeConst(input), output,
             std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), ngmax, rawPtr(neighbors),
             rawPtr(neighborsCount));
         checkGpuErrors(cudaGetLastError());
@@ -199,7 +199,7 @@ struct GpuFullNbListNeighborhoodImpl
             constexpr int numThreads = 128;
             runIjLoopGrouped<numThreads><<<iceil(groups.numGroups * GpuConfig::warpSize, numThreads), numThreads>>>(
                 parent.box, parent.firstBody, parent.lastBody, parent.x, parent.y, parent.z, parent.h,
-                makeConstRestrict(input), output, std::forward<Interaction>(interaction),
+                makeConst(input), output, std::forward<Interaction>(interaction),
                 std::forward<Postamble>(postamble), parent.ngmax, rawPtr(parent.neighbors),
                 rawPtr(parent.neighborsCount), groups);
             checkGpuErrors(cudaGetLastError());

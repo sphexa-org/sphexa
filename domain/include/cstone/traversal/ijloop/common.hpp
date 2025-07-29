@@ -31,9 +31,8 @@ namespace cstone::ijloop
 // === particle data handling ===
 
 template<class... Ts>
-inline constexpr std::tuple<const Ts*...> makeConstRestrict(std::tuple<Ts*...> input)
+inline constexpr std::tuple<const Ts*...> makeConst(std::tuple<Ts*...> input)
 {
-    // TODO: __restrict__
     return {input};
 }
 

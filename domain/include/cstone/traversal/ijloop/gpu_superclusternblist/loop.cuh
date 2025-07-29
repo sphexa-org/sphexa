@@ -497,7 +497,7 @@ void runIjLoop(const Box<Tc>& box,
     const unsigned numBlocks                    = iceil(numISuperclusters, numSuperclustersPerBlock);
     const unsigned sharedMem =
         numSuperclustersPerBlock *
-        runIjLoopSharedMemPerSupercluster<Config, Tc, Th, std::decay_t<decltype(makeConstRestrict(input))>,
+        runIjLoopSharedMemPerSupercluster<Config, Tc, Th, std::decay_t<decltype(makeConst(input))>,
                                           std::decay_t<Interaction>>(ncmax);
     const auto run = [&](auto usePbc)
     {

@@ -155,13 +155,13 @@ protected:
             box.boundaryZ() == BoundaryType::periodic)
         {
             runIjLoop<true><<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-                tree, box, groups, x, y, z, h, makeConstRestrict(input), output, std::forward<Interaction>(interaction),
+                tree, box, groups, x, y, z, h, makeConst(input), output, std::forward<Interaction>(interaction),
                 std::forward<Postamble>(postamble), ngmax, neighbors.get(), globalPool.get());
         }
         else
         {
             runIjLoop<false><<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-                tree, box, groups, x, y, z, h, makeConstRestrict(input), output, std::forward<Interaction>(interaction),
+                tree, box, groups, x, y, z, h, makeConst(input), output, std::forward<Interaction>(interaction),
                 std::forward<Postamble>(postamble), ngmax, neighbors.get(), globalPool.get());
         }
         checkGpuErrors(cudaGetLastError());

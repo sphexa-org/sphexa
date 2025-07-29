@@ -387,7 +387,7 @@ struct GromacsLikeNeighborhoodImpl
                 Interaction&& interaction,
                 detail::EmptyPostamble) const
     {
-        const auto constInput = makeConstRestrict(input);
+        const auto constInput = makeConst(input);
 
         const LocalIndex numBodies = lastBody - firstBody;
         util::for_each_tuple(

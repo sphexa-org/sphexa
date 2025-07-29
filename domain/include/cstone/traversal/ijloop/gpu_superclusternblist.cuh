@@ -171,25 +171,25 @@ protected:
         // for symmetric neighborhoods where the reduction returns more values than the postamble, temporary arrays have
         // to be allocated; in all other cases, this functions just returns the output data pointers
         auto [tmpOrOutput, tmpHolder] = allocateTemporaries<Config, Tc, Th>(
-            firstBody, lastBody, makeConstRestrict(input), output, std::forward<Interaction>(interaction));
+            firstBody, lastBody, makeConst(input), output, std::forward<Interaction>(interaction));
 
         if constexpr (Config::symmetric)
         {
             // in the symmetric case, the output arrays need to be initialized beforehand due to the unordered atomic
             // updates in the main loop
-            initResult<Config>(firstBody, lastBody, x, y, z, h, makeConstRestrict(input), tmpOrOutput,
+            initResult<Config>(firstBody, lastBody, x, y, z, h, makeConst(input), tmpOrOutput,
                                std::forward<Interaction>(interaction));
         }
 
-        runIjLoop<Config>(box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConstRestrict(input),
+        runIjLoop<Config>(box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConst(input),
                           tmpOrOutput, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
                           neighborData.get(), superclusterInfo, numISuperclusters, activeMasks, ncmax);
 
         if constexpr (Config::symmetric)
         {
             // the postamble has to be applied in a separate step for symmetric neighborhoods
-            applyPostamble<Config>(firstBody, lastBody, firstValidBody, x, y, z, h, makeConstRestrict(input),
-                                   makeConstRestrict(tmpOrOutput), output, std::forward<Postamble>(postamble));
+            applyPostamble<Config>(firstBody, lastBody, firstValidBody, x, y, z, h, makeConst(input),
+                                   makeConst(tmpOrOutput), output, std::forward<Postamble>(postamble));
 
             // device sync required due to possible use of allocated temporaries
             checkGpuErrors(cudaDeviceSynchronize());

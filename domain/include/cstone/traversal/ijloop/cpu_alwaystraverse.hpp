@@ -45,7 +45,7 @@ struct CpuAlwaysTraverseNeighborhoodImpl
                 Interaction&& interaction,
                 Postamble&& postamble) const
     {
-        const auto constInput = makeConstRestrict(input);
+        const auto constInput = makeConst(input);
 #pragma omp parallel
         {
             std::unique_ptr<LocalIndex[]> neighbors = std::make_unique_for_overwrite<LocalIndex[]>(ngmax);
@@ -70,7 +70,7 @@ struct CpuAlwaysTraverseNeighborhoodImpl
                     Interaction&& interaction,
                     Postamble&& postamble) const
         {
-            const auto constInput = makeConstRestrict(input);
+            const auto constInput = makeConst(input);
 #pragma omp parallel
             {
                 std::unique_ptr<LocalIndex[]> neighbors = std::make_unique_for_overwrite<LocalIndex[]>(parent.ngmax);

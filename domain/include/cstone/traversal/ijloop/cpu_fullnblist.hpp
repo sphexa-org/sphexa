@@ -47,7 +47,7 @@ struct CpuFullNbListNeighborhoodImpl
                 Interaction&& interaction,
                 Postamble&& postamble) const
     {
-        const auto constInput = makeConstRestrict(input);
+        const auto constInput = makeConst(input);
 #pragma omp parallel for simd
         for (LocalIndex i = firstBody; i < lastBody; ++i)
             jLoop(constInput, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), i);
@@ -71,7 +71,7 @@ struct CpuFullNbListNeighborhoodImpl
                     Interaction&& interaction,
                     Postamble&& postamble) const
         {
-            const auto constInput = makeConstRestrict(input);
+            const auto constInput = makeConst(input);
 #pragma omp parallel for
             for (LocalIndex g = 0; g < groups.numGroups; ++g)
 #pragma omp simd
