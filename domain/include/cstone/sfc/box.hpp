@@ -110,9 +110,9 @@ public:
                                   T ymax,
                                   T zmin,
                                   T zmax,
-                                  BoundaryType bx  = BoundaryType::open,
-                                  BoundaryType by  = BoundaryType::open,
-                                  BoundaryType bz  = BoundaryType::open)
+                                  BoundaryType bx = BoundaryType::open,
+                                  BoundaryType by = BoundaryType::open,
+                                  BoundaryType bz = BoundaryType::open)
         : limits{xmin, xmax, ymin, ymax, zmin, zmax}
         , lengths_{xmax - xmin, ymax - ymin, zmax - zmin}
         , inverseLengths_{T(1.) / (xmax - xmin), T(1.) / (ymax - ymin), T(1.) / (zmax - zmin)}
@@ -152,8 +152,6 @@ public:
     {
         ar->stepAttribute("box", limits, 6);
         ar->stepAttribute("boundaryType", (char*)boundaries, 3);
-        bool anyFbc = boundaries[0] == BoundaryType::fixed || boundaries[1] == BoundaryType::fixed ||
-                      boundaries[2] == BoundaryType::fixed;
 
         *this = Box<T>(limits[0], limits[1], limits[2], limits[3], limits[4], limits[5], boundaries[0], boundaries[1],
                        boundaries[2]);
@@ -164,9 +162,9 @@ private:
     friend constexpr bool operator==(const Box<T>& a, const Box<T>& b)
     {
         return a.limits[0] == b.limits[0] && a.limits[1] == b.limits[1] && a.limits[2] == b.limits[2] &&
-                   a.limits[3] == b.limits[3] && a.limits[4] == b.limits[4] && a.limits[5] == b.limits[5] &&
-                   a.boundaries[0] == b.boundaries[0] && a.boundaries[1] == b.boundaries[1] &&
-                   a.boundaries[2] == b.boundaries[2];
+               a.limits[3] == b.limits[3] && a.limits[4] == b.limits[4] && a.limits[5] == b.limits[5] &&
+               a.boundaries[0] == b.boundaries[0] && a.boundaries[1] == b.boundaries[1] &&
+               a.boundaries[2] == b.boundaries[2];
     }
 
     T limits[6];

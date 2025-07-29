@@ -58,6 +58,13 @@ public:
     {
     }
 
+    void activateFields(DataType& simData) override
+    {
+        Base::activateFields(simData);
+        simData.hydro.setDependent("markRamp");
+        simData.hydro.devData.setDependent("markRamp");
+    }
+
     void computeForces(DomainType& domain, DataType& simData) override
     {
         Base::computeForces(domain, simData);

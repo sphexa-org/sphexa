@@ -66,7 +66,7 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
     {
         return PropLib<DomainType, ParticleDataType>::makeTurbVeProp(output, rank, s, avClean);
     }
-    if (choice == "RT-ve")
+    if (choice == "rayleigh-taylor-ve")
     {
         return PropLib<DomainType, ParticleDataType>::makeRayleighVeProp(output, rank, s, avClean);
     }

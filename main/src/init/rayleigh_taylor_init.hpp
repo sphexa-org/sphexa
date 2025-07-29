@@ -109,10 +109,9 @@ void initRayleighTaylorFields(Dataset& d, const std::map<std::string, double>& c
 
 std::map<std::string, double> RayleighTaylorConstants()
 {
-    return {
-        {"rhoUp", 2.},        {"gamma", 1.4},        {"firstTimeStep", 1e-6},  {"y0", 0.75},         {"omega0", 0.0025},
-        {"ay0", -0.5},        {"blockSize", 0.0625}, {"xSize", 0.5},           {"ySize", 1.5},       {"zSize", 0.0625},
-        {"fbcThickness", 8.}, {"p0", 2.5},           {"gravityConstant", 0.5}, {"readPregenIC", .0}, {"RT", 1.}};
+    return {{"rhoUp", 2.},      {"gamma", 1.4},        {"firstTimeStep", 1e-6},  {"y0", 0.75},
+            {"omega0", 0.0025}, {"blockSize", 0.0625}, {"xSize", 0.5},           {"ySize", 1.5},
+            {"zSize", 0.0625},  {"p0", 2.5},           {"gravityConstant", 0.5}, {"rayleigh-taylor", 1.}};
 }
 
 template<class Dataset>
@@ -137,84 +136,64 @@ public:
         using T       = typename Dataset::RealType;
         auto& d       = simData.hydro;
 
-        if (d.propagator != "RT-ve")
+        if (d.propagator != "rayleigh-taylor-ve")
         {
-            throw std::runtime_error("ERROR: For the Rayleigh Taylor test (--init RT) the SPH propagator has to be "
-                                     "RT-ve. Please restart with '--prop RT-ve'\n");
+            throw std::runtime_error(
+                "ERROR: For the Rayleigh Taylor test (--init rayleigh-taylor) the SPH propagator has to be "
+                "RT-ve. Please restart with '--prop rayleigh-taylor-ve'\n");
         }
 
         T rhoUp = settings_.at("rhoUp");
 
-        T    blockSize    = settings_.at("blockSize");
-        T    xSize        = settings_.at("xSize");
-        T    ySize        = settings_.at("ySize");
-        T    zSize        = settings_.at("zSize");
-        T    fbcThickness = settings_.at("fbcThickness");
-        bool readPregenIC = settings_.at("readPregenIC") == 1.;
+        T blockSize = settings_.at("blockSize");
+        T xSize     = settings_.at("xSize");
+        T ySize     = settings_.at("ySize");
+        T zSize     = settings_.at("zSize");
 
         cstone::Box<T> globalBox(0, xSize, 0, ySize, 0, zSize, cstone::BoundaryType::periodic,
                                  cstone::BoundaryType::fixed, cstone::BoundaryType::periodic);
 
-        if (readPregenIC)
+        int xBlocks = xSize / blockSize;
+        int yBlocks = ySize / blockSize;
+        int zBlocks = zSize / blockSize;
+
+        size_t nBlocks    = xBlocks * yBlocks * zBlocks;
+        size_t halfBlocks = nBlocks / 2;
+
+        std::vector<T> xBlock, yBlock, zBlock;
+        readTemplateBlock(glassBlock, reader, xBlock, yBlock, zBlock);
+
+        unsigned level             = cstone::log8ceil<KeyType>(100 * numRanks);
+        auto     initialBoundaries = cstone::initialDomainSplits<KeyType>(numRanks, level);
+        KeyType  keyStart          = initialBoundaries[rank];
+        KeyType  keyEnd            = initialBoundaries[rank + 1];
+
+        int               multi1D      = std::lround(cbrtNumPart / std::cbrt(xBlock.size()));
+        cstone::Vec3<int> multiplicity = {xBlocks * multi1D, yBlocks / 2 * multi1D, multi1D};
+
+        cstone::Box<T> layer1(0, xSize, 0, ySize / 2., 0, zSize, cstone::BoundaryType::periodic,
+                              cstone::BoundaryType::periodic, cstone::BoundaryType::periodic);
+        cstone::Box<T> layer2(0, xSize, ySize / 2., ySize, 0, zSize, cstone::BoundaryType::periodic,
+                              cstone::BoundaryType::periodic, cstone::BoundaryType::periodic);
+
+        assembleCuboid<T>(keyStart, keyEnd, layer2, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
+
+        std::vector<T> xStretch, yStretch, zStretch;
+        assembleCuboid<T>(keyStart, keyEnd, layer1, multiplicity, xBlock, yBlock, zBlock, xStretch, yStretch, zStretch);
+
+        T    stretch  = std::cbrt(rhoUp);
+        auto inLayer1 = [b = layer1](T x, T y, T z)
+        { return x >= b.xmin() && x < b.xmax() && y >= b.ymin() && y < b.ymax() && z >= b.zmin() && z < b.zmax(); };
+
+        for (size_t i = 0; i < xStretch.size(); i++)
         {
-            reader->setStep(glassBlock, -1, FileMode::collective);
-            size_t blockSize = reader->numParticles();
-            d.x.resize(blockSize);
-            d.y.resize(blockSize);
-            d.z.resize(blockSize);
-
-            reader->readField("x", d.x.data());
-            reader->readField("y", d.y.data());
-            reader->readField("z", d.z.data());
-
-            reader->closeStep();
-        }
-        else
-        {
-
-            int xBlocks = xSize / blockSize;
-            int yBlocks = ySize / blockSize;
-            int zBlocks = zSize / blockSize;
-
-            size_t nBlocks    = xBlocks * yBlocks * zBlocks;
-            size_t halfBlocks = nBlocks / 2;
-
-            std::vector<T> xBlock, yBlock, zBlock;
-            readTemplateBlock(glassBlock, reader, xBlock, yBlock, zBlock);
-
-            unsigned level             = cstone::log8ceil<KeyType>(100 * numRanks);
-            auto     initialBoundaries = cstone::initialDomainSplits<KeyType>(numRanks, level);
-            KeyType  keyStart          = initialBoundaries[rank];
-            KeyType  keyEnd            = initialBoundaries[rank + 1];
-
-            int               multi1D      = std::lround(cbrtNumPart / std::cbrt(xBlock.size()));
-            cstone::Vec3<int> multiplicity = {xBlocks * multi1D, yBlocks / 2 * multi1D, multi1D};
-
-            cstone::Box<T> layer1(0, xSize, 0, ySize / 2., 0, zSize, cstone::BoundaryType::periodic,
-                                  cstone::BoundaryType::periodic, cstone::BoundaryType::periodic);
-            cstone::Box<T> layer2(0, xSize, ySize / 2., ySize, 0, zSize, cstone::BoundaryType::periodic,
-                                  cstone::BoundaryType::periodic, cstone::BoundaryType::periodic);
-
-            assembleCuboid<T>(keyStart, keyEnd, layer2, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
-
-            std::vector<T> xStretch, yStretch, zStretch;
-            assembleCuboid<T>(keyStart, keyEnd, layer1, multiplicity, xBlock, yBlock, zBlock, xStretch, yStretch,
-                              zStretch);
-
-            T    stretch  = std::cbrt(rhoUp);
-            auto inLayer1 = [b = layer1](T x, T y, T z)
-            { return x >= b.xmin() && x < b.xmax() && y >= b.ymin() && y < b.ymax() && z >= b.zmin() && z < b.zmax(); };
-
-            for (size_t i = 0; i < xStretch.size(); i++)
+            cstone::Vec3<T> X{xStretch[i], yStretch[i], zStretch[i]};
+            X *= stretch;
+            if (inLayer1(X[0], X[1], X[2]))
             {
-                cstone::Vec3<T> X{xStretch[i], yStretch[i], zStretch[i]};
-                X *= stretch;
-                if (inLayer1(X[0], X[1], X[2]))
-                {
-                    d.x.push_back(X[0]);
-                    d.y.push_back(X[1]);
-                    d.z.push_back(X[2]);
-                }
+                d.x.push_back(X[0]);
+                d.y.push_back(X[1]);
+                d.z.push_back(X[2]);
             }
         }
 
