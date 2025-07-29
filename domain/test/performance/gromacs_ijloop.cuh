@@ -27,7 +27,6 @@
 #include "cstone/reducearray.cuh"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 #include "cstone/tree/octree.hpp"
-#include "cstone/util/uninitialized.hpp"
 
 namespace cstone::ijloop
 {
