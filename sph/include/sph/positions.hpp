@@ -42,12 +42,38 @@
 
 namespace sph
 {
-
-//! @brief checks whether a particle is in the fixed boundary region in one dimension
+//! @brief checks whether a particle is close to a fixed boundary and reduces the acceleration if so
 template<class Tc, class Th>
-HOST_DEVICE_FUN bool fbcCheck(Tc coord, Th h, Tc top, Tc bottom, bool fbc)
+HOST_DEVICE_FUN void fbcAdjust(const cstone::Vec3<Tc> X, cstone::Vec3<Tc>& V_nm, cstone::Vec3<Tc>& A,
+                               const cstone::Box<Tc>& box, const Th hi)
 {
-    return fbc && (std::abs(top - coord) < Th(2) * h || std::abs(bottom - coord) < Th(2) * h);
+    constexpr Th       threshold       = 4.;
+    constexpr Th       invTHold        = 1 / threshold;
+    cstone::Vec3<bool> isBoundaryFixed = {
+        box.boundaryX() == cstone::BoundaryType::fixed,
+        box.boundaryY() == cstone::BoundaryType::fixed,
+        box.boundaryZ() == cstone::BoundaryType::fixed,
+    };
+    cstone::Vec3<Tc> boxMax = {box.xmax(), box.ymax(), box.zmax()};
+    cstone::Vec3<Tc> boxMin = {box.xmin(), box.ymin(), box.zmin()};
+
+    for (int j = 0; j < 3; ++j)
+    {
+        if (isBoundaryFixed[j])
+        {
+
+            Th relDistanceMax = std::abs(boxMax[j] - X[j]) / hi;
+            Th relDistanceMin = std::abs(boxMin[j] - X[j]) / hi;
+            Th minDistance    = relDistanceMin < relDistanceMax ? relDistanceMin : relDistanceMax;
+
+            if (minDistance < 2 * threshold)
+            {
+                Tc correction = 0.5 * (std::tanh(4 * minDistance * invTHold - 4) + 1);
+                A[j] *= correction;
+                V_nm[j] *= correction;
+            }
+        }
+    }
 }
 
 //! @brief update the energy according to Adams-Bashforth (2nd order)
@@ -74,15 +100,17 @@ HOST_DEVICE_FUN TU energyUpdate(TU u_old, double dt, double dt_m1, double du, do
  * time-reversibility:
  * positionUpdate(-dt, dt_m1, X_n+1, An, dXn, box) will back-propagate X_n+1 to X_n
  */
-template<class T>
+template<class T, class Th>
 HOST_DEVICE_FUN auto positionUpdate(double dt, double dt_m1, cstone::Vec3<T> Xn, cstone::Vec3<T> An,
-                                    cstone::Vec3<T> dXn, const cstone::Box<T>& box)
+                                    cstone::Vec3<T> dXn, const cstone::Box<T>& box, bool anyFbc, const Th hi)
 {
     auto Vnmhalf = dXn * (T(1) / dt_m1);
-    auto Vn      = Vnmhalf + T(0.5) * dt_m1 * An;
-    auto Vnp1    = Vn + An * dt;
-    auto dXnp1   = (Vn + T(0.5) * An * std::abs(dt)) * dt;
-    auto Xnp1    = cstone::putInBox(Xn + dXnp1, box);
+    if (anyFbc) { fbcAdjust(Xn, Vnmhalf, An, box, hi); }
+
+    auto Vn    = Vnmhalf + T(0.5) * dt_m1 * An;
+    auto Vnp1  = Vn + An * dt;
+    auto dXnp1 = (Vn + T(0.5) * An * std::abs(dt)) * dt;
+    auto Xnp1  = cstone::putInBox(Xn + dXnp1, box);
 
     return util::tuple<cstone::Vec3<T>, cstone::Vec3<T>, cstone::Vec3<T>>{Xnp1, Vnp1, dXnp1};
 }
@@ -99,21 +127,11 @@ void updatePositionsHost(size_t startIndex, size_t endIndex, Dataset& d, const c
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; i++)
     {
-        if (anyFBC && d.vx[i] == T(0) && d.vy[i] == T(0) && d.vz[i] == T(0))
-        {
-            if (fbcCheck(d.x[i], d.h[i], box.xmax(), box.xmin(), fbcX) ||
-                fbcCheck(d.y[i], d.h[i], box.ymax(), box.ymin(), fbcY) ||
-                fbcCheck(d.z[i], d.h[i], box.zmax(), box.zmin(), fbcZ))
-            {
-                continue;
-            }
-        }
-
         cstone::Vec3<T> A{d.ax[i], d.ay[i], d.az[i]};
         cstone::Vec3<T> X{d.x[i], d.y[i], d.z[i]};
         cstone::Vec3<T> X_m1{d.x_m1[i], d.y_m1[i], d.z_m1[i]};
         cstone::Vec3<T> V;
-        util::tie(X, V, X_m1) = positionUpdate(d.minDt, d.minDt_m1, X, A, X_m1, box);
+        util::tie(X, V, X_m1) = positionUpdate(d.minDt, d.minDt_m1, X, A, X_m1, box, anyFBC, d.h[i]);
 
         util::tie(d.x[i], d.y[i], d.z[i])          = util::tie(X[0], X[1], X[2]);
         util::tie(d.x_m1[i], d.y_m1[i], d.z_m1[i]) = util::tie(X_m1[0], X_m1[1], X_m1[2]);
