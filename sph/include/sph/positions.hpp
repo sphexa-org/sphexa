@@ -48,7 +48,7 @@ template<class Tc, class Th>
 HOST_DEVICE_FUN void fbcAdjust(const cstone::Vec3<Tc> X, cstone::Vec3<Tc>& V_nm, cstone::Vec3<Tc>& A,
                                const cstone::Box<Tc>& box, const Th& hi)
 {
-    constexpr Th       threshold       = 2.;
+    constexpr Th       threshold       = 4.;
     constexpr Th       invTHold        = 1 / threshold;
     cstone::Vec3<bool> isBoundaryFixed = {
         box.boundaryX() == cstone::BoundaryType::fixed,
@@ -62,15 +62,11 @@ HOST_DEVICE_FUN void fbcAdjust(const cstone::Vec3<Tc> X, cstone::Vec3<Tc>& V_nm,
     {
         if (isBoundaryFixed[j])
         {
-            /*legacy
-            // Adjust the velocity if integration would put the particle in the "critical" zone
-            Tc dXj            = X[j] + V[j] * dt + 0.5 * A[j] * dt * dt; */
+
             Th relDistanceMax = std::abs(boxMax[j] - X[j]) / hi;
             Th relDistanceMin = std::abs(boxMin[j] - X[j]) / hi;
             Th minDistance    = relDistanceMin < relDistanceMax ? relDistanceMin : relDistanceMax;
 
-            // if (minDistance < 2 * threshold) { V[j] *= -1 + invTHold * minDistance; }
-            // auto correction = 1 - lt::lookup(wh, minDistance * invTHold);
             if (minDistance < 2 * threshold)
             {
                 Tc correction = 0.5 * (std::tanh(4 * minDistance * invTHold - 4) + 1);
