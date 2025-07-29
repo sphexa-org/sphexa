@@ -19,6 +19,8 @@
 #include <format>
 #include <limits>
 #include <map>
+#include <numbers>
+#include <string>
 #include <tuple>
 #include <typeinfo>
 #include <vector>
@@ -42,11 +44,12 @@
 constexpr int kTableSize = 20000;
 
 template<typename T>
-constexpr inline T wharmonic_std(T v)
+constexpr inline T wharmonicStd(T v)
 {
     if (v == 0) { return 1; }
 
-    const T Pv = T(M_PI_2) * v;
+    constexpr T halfPi = std::numbers::pi_v<T> / T(2);
+    const T Pv         = halfPi * v;
     return util::fastmath::sin(Pv) * util::fastmath::rcp(Pv);
 }
 
@@ -74,7 +77,7 @@ tabulateFunction(F&& func, const double lowerSupport, const double upperSupport,
 template<class T>
 auto kernelTable()
 {
-    return tabulateFunction<T>([](T x) { return std::pow(wharmonic_std(x), 6.0); }, 0.0, 2.0, kTableSize);
+    return tabulateFunction<T>([](T x) { return std::pow(wharmonicStd(x), 6.0); }, 0.0, 2.0, kTableSize);
 }
 
 template<bool UseKernelTable, class T>
@@ -94,7 +97,7 @@ constexpr inline T table_lookup(const T* table, T v)
     }
     else
     {
-        T w  = wharmonic_std(v);
+        T w  = wharmonicStd(v);
         T w2 = w * w;
         return w2 * w2 * w2;
     }
