@@ -39,14 +39,13 @@
 
 #include "sph/sph_gpu.hpp"
 #include "sph/eos.hpp"
-#include "sph/table_lookup.hpp"
 
 namespace sph
 {
-//! @brief checks whether a particle is close to a fixed boundary and reflects the acceleration if so
+//! @brief checks whether a particle is close to a fixed boundary and reduces the acceleration if so
 template<class Tc, class Th>
 HOST_DEVICE_FUN void fbcAdjust(const cstone::Vec3<Tc> X, cstone::Vec3<Tc>& V_nm, cstone::Vec3<Tc>& A,
-                               const cstone::Box<Tc>& box, const Th& hi)
+                               const cstone::Box<Tc>& box, const Th hi)
 {
     constexpr Th       threshold       = 4.;
     constexpr Th       invTHold        = 1 / threshold;
@@ -103,7 +102,7 @@ HOST_DEVICE_FUN TU energyUpdate(TU u_old, double dt, double dt_m1, double du, do
  */
 template<class T, class Th>
 HOST_DEVICE_FUN auto positionUpdate(double dt, double dt_m1, cstone::Vec3<T> Xn, cstone::Vec3<T> An,
-                                    cstone::Vec3<T> dXn, const cstone::Box<T>& box, bool anyFbc, const Th& hi)
+                                    cstone::Vec3<T> dXn, const cstone::Box<T>& box, bool anyFbc, const Th hi)
 {
     auto Vnmhalf = dXn * (T(1) / dt_m1);
     if (anyFbc) { fbcAdjust(Xn, Vnmhalf, An, box, hi); }
@@ -140,8 +139,8 @@ void updatePositionsHost(size_t startIndex, size_t endIndex, Dataset& d, const c
     }
 }
 
-template<class Dataset, class T>
-void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
+template<class Dataset>
+void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d)
 {
     bool haveMui = !d.mui.empty();
     auto constCv = idealGasCv(d.muiConst, d.gamma);
@@ -156,8 +155,8 @@ void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone
     }
 }
 
-template<class Dataset, class T>
-void updateIntEnergyHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
+template<class Dataset>
+void updateIntEnergyHost(size_t startIndex, size_t endIndex, Dataset& d)
 {
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; i++)
@@ -213,8 +212,9 @@ void computePositions(const GroupView& grp, Dataset& d, const cstone::Box<T>& bo
     {
         updatePositionsHost(grp.firstBody, grp.lastBody, d, box);
 
-        if (!d.temp.empty()) { updateTempHost(grp.firstBody, grp.lastBody, d, box); }
-        else if (!d.u.empty()) { updateIntEnergyHost(grp.firstBody, grp.lastBody, d, box); }
+        if (!d.temp.empty()) { updateTempHost(grp.firstBody, grp.lastBody, d); }
+        else if (!d.u.empty()) { updateIntEnergyHost(grp.firstBody, grp.lastBody, d); }
     }
 }
+
 } // namespace sph

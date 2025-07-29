@@ -64,16 +64,16 @@ __global__ void driftKernel(GroupView grp, float dt, float dt_back, util::array<
     cstone::Vec3<Tc> Xnback{x[i], y[i], z[i]};
     cstone::Vec3<Tc> dXn{x_m1[i], y_m1[i], z_m1[i]};
 
-    bool noFBC = false;
+    bool FBC = false;
 
     // recover Xn, at which point An was calculated
     cstone::Vec3<Tc> Xn_recov, ignore;
     util::tie(Xn_recov, ignore, ignore) =
-        positionUpdate(-dt_back, dt_m1_rung, Xnback, An, dXn, noPbc, noFBC, Thydro(0.0));
+        positionUpdate(-dt_back, dt_m1_rung, Xnback, An, dXn, noPbc, FBC, Thydro(0.0));
 
     // drift to new point in time starting from (Xn, An, dXn)
     cstone::Vec3<Tc> Xnp1, Vnp1;
-    util::tie(Xnp1, Vnp1, ignore) = positionUpdate(dt, dt_m1_rung, Xn_recov, An, dXn, noPbc, noFBC, Thydro(0.0));
+    util::tie(Xnp1, Vnp1, ignore) = positionUpdate(dt, dt_m1_rung, Xn_recov, An, dXn, noPbc, FBC, Thydro(0.0));
 
     util::tie(x[i], y[i], z[i])    = util::tie(Xnp1[0], Xnp1[1], Xnp1[2]);
     util::tie(vx[i], vy[i], vz[i]) = util::tie(Vnp1[0], Vnp1[1], Vnp1[2]);

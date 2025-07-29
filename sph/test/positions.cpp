@@ -27,23 +27,20 @@ TEST(Integrator, timeReversal)
      */
     const Vec3<T> Xn{1, 1, 1}, dXn{0.1, 0.1, 0.1}, An{2, 2, 2};
 
-    T* placeholder = nullptr;
-
     Vec3<T> Xnp1, Vnp1, dXnp1;
-    std::tie(Xnp1, Vnp1, dXnp1) = positionUpdate(dtn, dtnm1, Xn, An, dXn, box, false, T(0), placeholder);
+    std::tie(Xnp1, Vnp1, dXnp1) = positionUpdate(dtn, dtnm1, Xn, An, dXn, box, false, T(0));
 
     // advance to an intermediate time
     Vec3<T> Xtmp, Vtmp;
-    std::tie(Xtmp, Vtmp, std::ignore) = positionUpdate(0.5 * dtn, dtnm1, Xn, An, dXn, box, false, T(0), placeholder);
+    std::tie(Xtmp, Vtmp, std::ignore) = positionUpdate(0.5 * dtn, dtnm1, Xn, An, dXn, box, false, T(0));
 
     // undo last advance to an intermediate time
     Vec3<T> Xn_re;
-    std::tie(Xn_re, std::ignore, std::ignore) =
-        positionUpdate(-0.5 * dtn, dtnm1, Xtmp, An, dXn, box, false, T(0), placeholder);
+    std::tie(Xn_re, std::ignore, std::ignore) = positionUpdate(-0.5 * dtn, dtnm1, Xtmp, An, dXn, box, false, T(0));
 
     // advance to final time
     Vec3<T> Xnp1_ts, Vnp1_ts, dXnp1_ts;
-    std::tie(Xnp1_ts, Vnp1_ts, dXnp1_ts) = positionUpdate(dtn, dtnm1, Xn_re, An, dXn, box, false, T(0), placeholder);
+    std::tie(Xnp1_ts, Vnp1_ts, dXnp1_ts) = positionUpdate(dtn, dtnm1, Xn_re, An, dXn, box, false, T(0));
 
     EXPECT_EQ(Xnp1, Xnp1_ts);
     EXPECT_EQ(Vnp1, Vnp1_ts);
