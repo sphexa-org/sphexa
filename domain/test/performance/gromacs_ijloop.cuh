@@ -294,10 +294,10 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
     const unsigned cijPackedBegin = nbSci.cjPackedBegin;
     const unsigned cijPackedEnd   = nbSci.cjPackedEnd;
 
-    using particleData_t = decltype(loadParticleData(x, y, z, h, input, 0));
+    using ParticleData = decltype(loadParticleData(x, y, z, h, input, 0));
 
-    __shared__ util::Uninitialized<particleData_t[clusterSize * numClusterPerSupercluster]> xqibBuffer;
-    particleData_t* const xqib = xqibBuffer.data();
+    extern __shared__ char xqibBuffer[];
+    ParticleData* const xqib = reinterpret_cast<ParticleData*>(xqibBuffer);
 
     constexpr bool loadUsingAllXYThreads = clusterSize == numClusterPerSupercluster;
     if (loadUsingAllXYThreads || threadIdx.y < numClusterPerSupercluster)
@@ -308,7 +308,7 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
     }
     __syncthreads();
 
-    using result_t = decltype(interaction(particleData_t{}, particleData_t{}, Vec3<Tc>(), Tc()));
+    using result_t = decltype(interaction(ParticleData{}, ParticleData{}, Vec3<Tc>(), Tc()));
 
     std::array<result_t, numClusterPerSupercluster> iResultBuf = {};
 
@@ -394,18 +394,21 @@ struct GromacsLikeNeighborhoodImpl
             [&](auto* ptr) { checkGpuErrors(cudaMemsetAsync(ptr + firstBody, 0, sizeof(decltype(*ptr)) * numBodies)); },
             output);
 
-        const dim3 blockSize     = {clusterSize, clusterSize, 1};
-        const unsigned numBlocks = sciSorted.size();
+        using ParticleData = decltype(loadParticleData(x, y, z, h, constInput, 0));
+
+        const dim3 blockSize             = {clusterSize, clusterSize, 1};
+        const unsigned numBlocks         = sciSorted.size();
+        constexpr unsigned sharedMemSize = sizeof(ParticleData) * clusterSize * numClusterPerSupercluster;
         if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
             box.boundaryZ() == BoundaryType::periodic)
         {
-            gromacsLikeNeighborhoodKernel<true><<<numBlocks, blockSize>>>(
+            gromacsLikeNeighborhoodKernel<true><<<numBlocks, blockSize, sharedMemSize>>>(
                 box, firstBody, lastBody, x, y, z, h, constInput, output, std::forward<Interaction>(interaction),
                 rawPtr(sciSorted), rawPtr(cjPacked), rawPtr(excl));
         }
         else
         {
-            gromacsLikeNeighborhoodKernel<false><<<numBlocks, blockSize>>>(
+            gromacsLikeNeighborhoodKernel<false><<<numBlocks, blockSize, sharedMemSize>>>(
                 box, firstBody, lastBody, x, y, z, h, constInput, output, std::forward<Interaction>(interaction),
                 rawPtr(sciSorted), rawPtr(cjPacked), rawPtr(excl));
         }
