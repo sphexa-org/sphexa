@@ -42,13 +42,15 @@
 
 namespace sph
 {
-//! @brief checks whether a particle is close to a fixed boundary and reduces the acceleration if so
-template<class Tc, class Th>
-HOST_DEVICE_FUN void fbcAdjust(const cstone::Vec3<Tc> X, cstone::Vec3<Tc>& V_nm, cstone::Vec3<Tc>& A,
-                               const cstone::Box<Tc>& box, const Th hi)
+//! @brief checks whether a particle is close to a fixed boundary and reduces a scalar if so
+template<class Tc, class Th, class Ts>
+HOST_DEVICE_FUN void fbcAdjustScalar(const cstone::Vec3<Tc> X, Ts& scalar, const cstone::Box<Tc>& box, const Th hi)
 {
-    constexpr Th       threshold       = 4.;
-    constexpr Th       invTHold        = 1 / threshold;
+    // half the width of the sigmoid, in smoothing lengths
+    constexpr Th width    = 2.;
+    constexpr Th invWidth = 1 / width;
+    // width of particles that are held at zero, in smoothing lengths
+    constexpr Th       offset          = 2.;
     cstone::Vec3<bool> isBoundaryFixed = {
         box.boundaryX() == cstone::BoundaryType::fixed,
         box.boundaryY() == cstone::BoundaryType::fixed,
@@ -66,9 +68,45 @@ HOST_DEVICE_FUN void fbcAdjust(const cstone::Vec3<Tc> X, cstone::Vec3<Tc>& V_nm,
             Th relDistanceMin = std::abs(boxMin[j] - X[j]) / hi;
             Th minDistance    = relDistanceMin < relDistanceMax ? relDistanceMin : relDistanceMax;
 
-            if (minDistance < 2 * threshold)
+            if (minDistance < 2 * width + offset)
             {
-                Tc correction = 0.5 * (std::tanh(4 * minDistance * invTHold - 4) + 1);
+                Tc correction = 0.5 * (std::tanh(4 * (minDistance - offset) * invWidth - 4) + 1);
+                scalar *= correction;
+            }
+        }
+    }
+}
+
+//! @brief checks whether a particle is close to a fixed boundary and reduces the acceleration if so
+template<class Tc, class Th>
+HOST_DEVICE_FUN void fbcAdjustVector(const cstone::Vec3<Tc> X, cstone::Vec3<Tc>& V_nm, cstone::Vec3<Tc>& A,
+                                     const cstone::Box<Tc>& box, const Th hi)
+{
+    // half the width of the sigmoid, in smoothing lengths
+    constexpr Th width    = 2.;
+    constexpr Th invWidth = 1 / width;
+    // width of particles that are held at zero, in smoothing lengths
+    constexpr Th       offset          = 2.;
+    cstone::Vec3<bool> isBoundaryFixed = {
+        box.boundaryX() == cstone::BoundaryType::fixed,
+        box.boundaryY() == cstone::BoundaryType::fixed,
+        box.boundaryZ() == cstone::BoundaryType::fixed,
+    };
+    cstone::Vec3<Tc> boxMax = {box.xmax(), box.ymax(), box.zmax()};
+    cstone::Vec3<Tc> boxMin = {box.xmin(), box.ymin(), box.zmin()};
+
+    for (int j = 0; j < 3; ++j)
+    {
+        if (isBoundaryFixed[j])
+        {
+
+            Th relDistanceMax = std::abs(boxMax[j] - X[j]) / hi;
+            Th relDistanceMin = std::abs(boxMin[j] - X[j]) / hi;
+            Th minDistance    = relDistanceMin < relDistanceMax ? relDistanceMin : relDistanceMax;
+
+            if (minDistance < 2 * width)
+            {
+                Tc correction = 0.5 * (std::tanh(4 * (minDistance - offset) * invWidth - 4) + 1);
                 A[j] *= correction;
                 V_nm[j] *= correction;
             }
@@ -77,12 +115,17 @@ HOST_DEVICE_FUN void fbcAdjust(const cstone::Vec3<Tc> X, cstone::Vec3<Tc>& V_nm,
 }
 
 //! @brief update the energy according to Adams-Bashforth (2nd order)
-template<class TU>
-HOST_DEVICE_FUN TU energyUpdate(TU u_old, double dt, double dt_m1, double du, double du_m1)
+template<class TU, class Th, class Tc>
+HOST_DEVICE_FUN TU energyUpdate(TU u_old, double dt, double dt_m1, double du, double du_m1, const cstone::Vec3<Tc> Xn,
+                                const cstone::Box<Tc>& box, bool anyFBC, const Th hi)
 {
-    TU u_new = u_old + du * dt + 0.5 * (du - du_m1) / dt_m1 * std::abs(dt) * dt;
+    // notice the common factor of dt: if we want to decrease updates for boundary particles with a multiplicative
+    // factor, we might as well do it on dt.
+    auto dt_modified = dt;
+    if (anyFBC) { fbcAdjustScalar(Xn, dt_modified, box, hi); }
+    TU u_new = u_old + du * dt_modified + 0.5 * (du - du_m1) / dt_m1 * std::abs(dt_modified) * dt_modified;
     // To prevent u < 0 (when cooling with GRACKLE is active)
-    if (u_new < 0.) { u_new = u_old * std::exp(u_new * dt / u_old); }
+    if (u_new < 0.) { u_new = u_old * std::exp(u_new * dt_modified / u_old); }
     return u_new;
 }
 
@@ -105,7 +148,7 @@ HOST_DEVICE_FUN auto positionUpdate(double dt, double dt_m1, cstone::Vec3<T> Xn,
                                     cstone::Vec3<T> dXn, const cstone::Box<T>& box, bool anyFbc, const Th hi)
 {
     auto Vnmhalf = dXn * (T(1) / dt_m1);
-    if (anyFbc) { fbcAdjust(Xn, Vnmhalf, An, box, hi); }
+    if (anyFbc) { fbcAdjustVector(Xn, Vnmhalf, An, box, hi); }
 
     auto Vn    = Vnmhalf + T(0.5) * dt_m1 * An;
     auto Vnp1  = Vn + An * dt;
@@ -139,9 +182,14 @@ void updatePositionsHost(size_t startIndex, size_t endIndex, Dataset& d, const c
     }
 }
 
-template<class Dataset>
-void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d)
+template<class Dataset, class T>
+void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
 {
+    bool fbcX   = (box.boundaryX() == cstone::BoundaryType::fixed);
+    bool fbcY   = (box.boundaryY() == cstone::BoundaryType::fixed);
+    bool fbcZ   = (box.boundaryZ() == cstone::BoundaryType::fixed);
+    bool anyFBC = fbcX || fbcY || fbcZ;
+
     bool haveMui = !d.mui.empty();
     auto constCv = idealGasCv(d.muiConst, d.gamma);
 
@@ -150,18 +198,26 @@ void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d)
     {
         auto cv    = haveMui ? idealGasCv(d.mui[i], d.gamma) : constCv;
         auto u_old = cv * d.temp[i];
-        d.temp[i]  = energyUpdate(u_old, d.minDt, d.minDt_m1, d.du[i], d.du_m1[i]) / cv;
+        d.temp[i] = energyUpdate(u_old, d.minDt, d.minDt_m1, d.du[i], d.du_m1[i], {d.x[i], d.y[i], d.z[i]}, box, anyFBC,
+                                 d.h[i]) /
+                    cv;
         d.du_m1[i] = d.du[i];
     }
 }
 
-template<class Dataset>
-void updateIntEnergyHost(size_t startIndex, size_t endIndex, Dataset& d)
+template<class Dataset, class T>
+void updateIntEnergyHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
 {
+    bool fbcX   = (box.boundaryX() == cstone::BoundaryType::fixed);
+    bool fbcY   = (box.boundaryY() == cstone::BoundaryType::fixed);
+    bool fbcZ   = (box.boundaryZ() == cstone::BoundaryType::fixed);
+    bool anyFBC = fbcX || fbcY || fbcZ;
+
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; i++)
     {
-        d.u[i]     = energyUpdate(d.u[i], d.minDt, d.minDt_m1, d.du[i], d.du_m1[i]);
+        d.u[i] = energyUpdate(d.u[i], d.minDt, d.minDt_m1, d.du[i], d.du_m1[i], {d.x[i], d.y[i], d.z[i]}, box, anyFBC,
+                              d.h[i]);
         d.du_m1[i] = d.du[i];
     }
 }
@@ -212,8 +268,8 @@ void computePositions(const GroupView& grp, Dataset& d, const cstone::Box<T>& bo
     {
         updatePositionsHost(grp.firstBody, grp.lastBody, d, box);
 
-        if (!d.temp.empty()) { updateTempHost(grp.firstBody, grp.lastBody, d); }
-        else if (!d.u.empty()) { updateIntEnergyHost(grp.firstBody, grp.lastBody, d); }
+        if (!d.temp.empty()) { updateTempHost(grp.firstBody, grp.lastBody, d, box); }
+        else if (!d.u.empty()) { updateIntEnergyHost(grp.firstBody, grp.lastBody, d, box); }
     }
 }
 

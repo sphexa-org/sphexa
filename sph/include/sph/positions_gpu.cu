@@ -80,14 +80,15 @@ __global__ void driftKernel(GroupView grp, float dt, float dt_back, util::array<
 
     if (temp != nullptr)
     {
-        Thydro cv      = (constCv < 0) ? idealGasCv(mui[i], gamma) : constCv;
-        auto   u_recov = energyUpdate(Tc(temp[i] * cv), -dt_back, dt_m1_rung, du[i], Tdu(du_m1[i]));
-        temp[i]        = energyUpdate(u_recov, dt, dt_m1_rung, du[i], Tdu(du_m1[i])) / cv;
+        Thydro cv = (constCv < 0) ? idealGasCv(mui[i], gamma) : constCv;
+        auto   u_recov =
+            energyUpdate(Tc(temp[i] * cv), -dt_back, dt_m1_rung, du[i], Tdu(du_m1[i]), Xnback, noPbc, FBC, Thydro(0.0));
+        temp[i] = energyUpdate(u_recov, dt, dt_m1_rung, du[i], Tdu(du_m1[i]), Xnback, noPbc, FBC, Thydro(0.0)) / cv;
     }
     else if (u != nullptr)
     {
-        auto u_recov = energyUpdate(u[i], -dt_back, dt_m1_rung, du[i], Tdu(du_m1[i]));
-        u[i]         = energyUpdate(u_recov, dt, dt_m1_rung, du[i], Tdu(du_m1[i]));
+        auto u_recov = energyUpdate(u[i], -dt_back, dt_m1_rung, du[i], Tdu(du_m1[i]), Xnback, noPbc, FBC, Thydro(0.0));
+        u[i]         = energyUpdate(u_recov, dt, dt_m1_rung, du[i], Tdu(du_m1[i]), Xnback, noPbc, FBC, Thydro(0.0));
     }
 }
 
@@ -147,12 +148,12 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
     {
         Thydro cv    = (constCv < 0) ? idealGasCv(mui[i], gamma) : constCv;
         auto   u_old = temp[i] * cv;
-        temp[i]      = energyUpdate(u_old, dt, dt_m1_rung, du[i], du_m1[i]) / cv;
+        temp[i]      = energyUpdate(u_old, dt, dt_m1_rung, du[i], du_m1[i], X, box, anyFBC, h[i]) / cv;
         du_m1[i]     = du[i];
     }
     else if (u != nullptr)
     {
-        u[i]     = energyUpdate(u[i], dt, dt_m1_rung, du[i], du_m1[i]);
+        u[i]     = energyUpdate(u[i], dt, dt_m1_rung, du[i], du_m1[i], X, box, anyFBC, h[i]);
         du_m1[i] = du[i];
     }
 }
