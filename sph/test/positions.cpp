@@ -51,12 +51,15 @@ TEST(Integrator, timeEnergyReversal)
 {
     using T = float;
 
-    T dtn = 0.1, dtnm1 = 0.2;
-    T dU = 2.0, dUm1 = 3.0;
+    T               dtn = 0.1, dtnm1 = 0.2;
+    T               dU = 2.0, dUm1 = 3.0;
+    cstone::Vec3<T> X{1, 1, 1};
+    cstone::Box<T>  box(0, 1);
+    bool            anyFBC = false;
 
-    auto Unp1 = energyUpdate(10.0, dtn, dtnm1, dU, dUm1);
+    auto Unp1 = energyUpdate(10.0, dtn, dtnm1, dU, dUm1, X, box, anyFBC, T(0));
     EXPECT_NEAR(Unp1, 10.175, 1e-7);
 
-    auto Un = energyUpdate(10.175, -dtn, dtnm1, dU, dUm1);
+    auto Un = energyUpdate(10.175, -dtn, dtnm1, dU, dUm1, X, box, anyFBC, T(0));
     EXPECT_NEAR(Un, 10.0, 1e-7);
 }
