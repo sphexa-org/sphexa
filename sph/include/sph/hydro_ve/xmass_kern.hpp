@@ -83,7 +83,7 @@ struct XmassPostamble
         T h3Inv = hInv * hInv * hInv;
 
         T xmassi = veDefinition(mi, rho0i * K * h3Inv);
-#ifdef NDBEBUG
+#ifndef NDEBUG
         if (std::isnan(xmassi))
         {
             printf("ERROR::Rho0(%zu) rho0 %f, position: (%f %f %f), h: %f\n", size_t(i), xmassi, iPos[0], iPos[1],
