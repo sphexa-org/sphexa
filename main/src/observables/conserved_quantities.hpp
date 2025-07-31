@@ -152,7 +152,7 @@ template<class SimData>
 void computeConservedQuantities(size_t startIndex, size_t endIndex, SimData& sim, MPI_Comm comm)
 {
     double               eKin, eInt;
-    double               eMag, cumulativeDivBError, localMaxDivBError;
+    double               eMag = 0.0, cumulativeDivBError = 0.0, localMaxDivBError = 0.0;
     cstone::Vec3<double> linmom, angmom;
     size_t               ncsum = 0;
 
