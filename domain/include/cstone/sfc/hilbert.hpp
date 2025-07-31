@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include <bitset>
 #include <iostream>
 
 #include "morton.hpp"
