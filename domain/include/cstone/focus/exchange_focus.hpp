@@ -166,6 +166,7 @@ void exchangeRejectedKeys(std::span<const int> peerRanks,
         {
             if (isMasked(treelet[i])) { rejectedKeys.push_back(unmaskKey(treelet[i])); }
         }
+        std::cout << "[exchangeRejectedKeys] sending rejected keys to " << peer << " size: " << rejectedKeys.size() << std::endl;
         mpiSendAsync(rejectedKeys.data(), rejectedKeys.size(), peer, keyTag, sendRequests);
         rejectedKeyBuffers.push_back(std::move(rejectedKeys));
     }
@@ -173,9 +174,11 @@ void exchangeRejectedKeys(std::span<const int> peerRanks,
     int numMessages = numPeers;
     while (numMessages--)
     {
+        std::cout << "[exchangeRejectedKeys] receiving rejected keys from " << numMessages << std::endl;
         MPI_Status status;
         MPI_Probe(MPI_ANY_SOURCE, keyTag, MPI_COMM_WORLD, &status);
         int receiveRank = status.MPI_SOURCE;
+        std::cout << "[exchangeRejectedKeys] receiving rejected keys from rank " << receiveRank << std::endl;
         TreeNodeIndex receiveSize;
         MPI_Get_count(&status, MpiType<KeyType>{}, &receiveSize);
 

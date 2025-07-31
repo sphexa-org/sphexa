@@ -98,12 +98,24 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
     auto pbc    = BoundaryType::periodic;
     bool anyPbc = box.boundaryX() == pbc || box.boundaryY() == pbc || box.boundaryZ() == pbc;
     bool usePbc = anyPbc && !insideBox(particle, {Tc(2) * hi, Tc(2) * hi, Tc(2) * hi}, box);
+    // std::cout << "[findNeighbors] usePbc = " << usePbc << std::endl;
 
     auto overlapsPbc = [particle, cellRadiusSq, centers = tree.centers, sizes = tree.sizes, &box](TreeNodeIndex idx)
-    { return norm2(minDistance(particle, centers[idx], sizes[idx], box)) < cellRadiusSq; };
+    {
+        if (sizes[idx][0] == 0 || sizes[idx][1] == 0 || sizes[idx][2] == 0) { return false; }
+        return norm2(minDistance(particle, centers[idx], sizes[idx], box)) < cellRadiusSq;
+    };
 
     auto overlaps = [particle, cellRadiusSq, centers = tree.centers, sizes = tree.sizes](TreeNodeIndex idx)
-    { return norm2(minDistance(particle, centers[idx], sizes[idx])) < cellRadiusSq; };
+    {
+        // std::cout << "[overlaps] particle[0]: " << particle[0] << " particle[1]: " << particle[1] << " particle[2]: "
+        // << particle[2]; std::cout << " centers[idx][0]: " << centers[idx][0] << " centers[idx][1]: " <<
+        // centers[idx][1] << " centers[idx][2]: " << centers[idx][2]; std::cout << " sizes[idx][0]: " << sizes[idx][0]
+        // << " sizes[idx][1]: " << sizes[idx][1] << " sizes[idx][2]: " << sizes[idx][2]; std::cout << " dist enough: "
+        // << (norm2(minDistance(particle, centers[idx], sizes[idx])) < cellRadiusSq) << std::endl;
+        if (sizes[idx][0] == 0 || sizes[idx][1] == 0 || sizes[idx][2] == 0) { return false; }
+        return norm2(minDistance(particle, centers[idx], sizes[idx])) < cellRadiusSq;
+    };
 
     auto searchBoxPbc =
         [i, particle, radiusSq, &tree, x, y, z, ngmax, neighbors, &numNeighbors, &box](TreeNodeIndex idx)
@@ -128,10 +140,15 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
         TreeNodeIndex leafIdx    = tree.internalToLeaf[idx];
         LocalIndex firstParticle = tree.layout[leafIdx];
         LocalIndex lastParticle  = tree.layout[leafIdx + 1];
-
+        // std::cout << "[searchBox] i : " << i << " leafIdx: " << leafIdx << " firstParticle: " << firstParticle << "
+        // lastParticle: " << lastParticle << std::endl;
         for (LocalIndex j = firstParticle; j < lastParticle; ++j)
         {
             if (j == i) { continue; }
+            // std::cout << "[searchBox] particle[0]: " << particle[0] << " particle[1]: " << particle[1] << "
+            // particle[2]: " << particle[2]; std::cout << " x[j]: " << x[j] << " y[j]: " << y[j] << " z[j]: " << z[j];
+            // std::cout << " distanceSq: " << distanceSq<false>(x[j], y[j], z[j], particle[0], particle[1],
+            // particle[2], box) << std::endl;
             if (distanceSq<false>(x[j], y[j], z[j], particle[0], particle[1], particle[2], box) < radiusSq)
             {
                 if (numNeighbors < ngmax) { neighbors[numNeighbors] = j; }

@@ -607,6 +607,7 @@ public:
         while (converged != numRanks_)
         {
             updateMinMac(assignment, invThetaEff);
+            std::cout << "[converge] myRank " << myRank_ << " peers: " << peers.size() << std::endl;
             converged = updateTree(peers, assignment, box);
             updateCounts(particleKeys, globalTreeLeaves, globalCounts, scratch);
             updateGeoCenters();
@@ -674,7 +675,20 @@ private:
             computeGeoCentersGpu(rawPtr(octreeAcc_.prefixes), treeData_.numNodes, rawPtr(geoCentersAcc_),
                                  rawPtr(geoSizesAcc_), box_);
         }
-        else { nodeFpCenters<KeyType>(treeData_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_); }
+        else {
+            const auto mixDBits = getBoxMixDimensionBits<RealType, KeyType, Box<RealType>>(box_);
+            if (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                mixDBits.by != maxTreeLevel<KeyType>{} ||
+                mixDBits.bz != maxTreeLevel<KeyType>{})
+            {
+                // std::cout << "Using MixD for geo centers" << std::endl;
+                nodeFpCenters<KeyType>(treeData_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_, mixDBits.bx,
+                                       mixDBits.by, mixDBits.bz);
+            } else {
+                // std::cout << "Using 3D for geo centers" << std::endl;
+                nodeFpCenters<KeyType>(treeData_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_);
+            }
+        }
     }
 
     void uploadOctree()

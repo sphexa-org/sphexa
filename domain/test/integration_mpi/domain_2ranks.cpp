@@ -295,24 +295,41 @@ TEST(FocusDomain, particleProperty)
  * then correctly updates the global tree/assignment to reflect the changed coordinates.
  */
 template<class KeyType, class T>
-void multiStepSync(int rank, int numRanks)
+void multiStepSync(int rank, int numRanks, Box<T> box = Box<T>{0, 1})
 {
     int bucketSize      = 4;
     int bucketSizeFocus = 1;
     float theta         = 1.0;
-    Domain<KeyType, T> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta);
 
-    // node boundaries     |--(0,0)----|---------(0,7)-------------|-----(7,0)----------|-------(7,7)------|
-    // indices             0    1      2      3      4      5      6      7      8      9      10     11
-    std::vector<T> xGlobal{0.0, 0.11, 0.261, 0.281, 0.301, 0.321, 0.521, 0.541, 0.561, 0.761, 0.781, 1.000};
-    std::vector<T> yGlobal{0.0, 0.12, 0.262, 0.282, 0.302, 0.322, 0.522, 0.542, 0.562, 0.762, 0.781, 1.000};
-    std::vector<T> zGlobal{0.0, 0.13, 0.263, 0.283, 0.303, 0.323, 0.523, 0.543, 0.563, 0.763, 0.781, 1.000};
-    std::vector<T> hGlobal{0.1, 0.101, 0.102, 0.103, 0.104, 0.105, 0.156, 0.107, 0.108, 0.109, 0.110, 0.111};
-    // sync result rank 0: |---------assignment-------------------|------halos---------|
-    // sync result rank 1:             |-----halos----------------|-----------assignment-------------------|
+    Domain<KeyType, T> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, box);
 
-    // particle 6 has bigger h to include particles 2 and 3
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool useMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                     mixDBits.by != maxTreeLevel<KeyType>{} ||
+                     mixDBits.bz != maxTreeLevel<KeyType>{});
 
+    std::vector<T> xGlobal, yGlobal, zGlobal, hGlobal;
+    if (useMixD)
+    {
+        // MixD-like coordinates
+        xGlobal = {0.0, 0.11, 0.261, 0.281, 0.301, 0.321, 0.521, 0.541, 0.561, 0.761, 0.781, 1.000};
+        yGlobal = {0.0, 0.001875, 0.00409375, 0.00440625, 0.00471875, 0.00503125, 0.00815625, 0.00846875, 0.00878125, 0.01190625, 0.012203125, 0.015625};
+        zGlobal = {0.0, 0.0005078125, 0.00102734375, 0.00110546875, 0.00118359375, 0.00126171875, 0.00204296875, 0.00212109375, 0.00219921875, 0.00298046875, 0.00305078125, 0.00390625};
+        hGlobal = {0.0015625, 0.001578125, 0.00159375, 0.001609375, 0.001625, 0.001640625, 0.0024375, 0.001671875, 0.0016875, 0.001703125, 0.00171875, 0.001734375};
+    }
+    else
+    {
+        // regular coordinates
+        // node boundaries     |--(0,0)----|---------(0,7)-------------|-----(7,0)----------|-------(7,7)------|
+        // indices             0    1      2      3      4      5      6      7      8      9      10     11
+        xGlobal = {0.0, 0.11, 0.261, 0.281, 0.301, 0.321, 0.521, 0.541, 0.561, 0.761, 0.781, 1.000};
+        yGlobal = {0.0, 0.12, 0.262, 0.282, 0.302, 0.322, 0.522, 0.542, 0.562, 0.762, 0.781, 1.000};
+        zGlobal = {0.0, 0.13, 0.263, 0.283, 0.303, 0.323, 0.523, 0.543, 0.563, 0.763, 0.781, 1.000};
+        hGlobal = {0.1, 0.101, 0.102, 0.103, 0.104, 0.105, 0.156, 0.107, 0.108, 0.109, 0.110, 0.111};
+        // sync result rank 0: |---------assignment-------------------|------halos---------|
+        // sync result rank 1:             |-----halos----------------|-----------assignment-------------------|
+        // particle 6 has bigger h to include particles 2 and 3
+    }
     std::vector<T> x, y, z, h;
     // rank 0 gets particles with even index before the sync
     // rank 1 gets particles with uneven index before the sync
@@ -341,7 +358,15 @@ void multiStepSync(int rank, int numRanks)
 
     // keys correspond to particles and are SFC sorted
     std::vector<KeyType> keysChk(domain.nParticlesWithHalos());
-    computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysChk.data()), x.size(), domain.box());
+    if (useMixD)
+    {
+        computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(keysChk.data()), x.size(), domain.box(),
+                           mixDBits.bx, mixDBits.by, mixDBits.bz);
+    }
+    else
+    {
+        computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysChk.data()), x.size(), domain.box());
+    }
     EXPECT_EQ(keys, keysChk);
     EXPECT_TRUE(std::is_sorted(keys.begin(), keys.end()));
 
@@ -359,9 +384,19 @@ void multiStepSync(int rank, int numRanks)
     MPI_Allreduce(MPI_IN_PLACE, keyGlobal.data(), keyGlobal.size(), MpiType<KeyType>{}, MPI_SUM, MPI_COMM_WORLD);
 
     std::vector<KeyType> keyGlobRef(xGlobal.size());
-    computeSfcKeys(xGlobal.data(), yGlobal.data(), zGlobal.data(), sfcKindPointer(keyGlobRef.data()), xGlobal.size(),
-                   domain.box());
-    keyGlobRef[1] = sfc3D<SfcKind<KeyType>>(newPart[0], newPart[1], newPart[2], domain.box());
+    if (useMixD)
+    {
+        computeSfcMixDKeys(xGlobal.data(), yGlobal.data(), zGlobal.data(), SfcMixDKindPointer(keyGlobRef.data()), xGlobal.size(),
+                           domain.box(), mixDBits.bx, mixDBits.by, mixDBits.bz);
+        keyGlobRef[1] = sfcMixD<SfcMixDKind<KeyType>>(newPart[0], newPart[1], newPart[2], domain.box(), mixDBits.bx, mixDBits.by,
+                                                      mixDBits.bz);
+    }
+    else
+    {
+        computeSfcKeys(xGlobal.data(), yGlobal.data(), zGlobal.data(), sfcKindPointer(keyGlobRef.data()), xGlobal.size(),
+                       domain.box());
+        keyGlobRef[1] = sfc3D<SfcKind<KeyType>>(newPart[0], newPart[1], newPart[2], domain.box());
+    }
     sort(begin(keyGlobRef), end(keyGlobRef));
     EXPECT_EQ(keyGlobal, keyGlobRef);
 }
@@ -377,6 +412,8 @@ TEST(FocusDomain, multiStepSync)
 
     multiStepSync<uint64_t, double>(rank, numRanks);
     multiStepSync<unsigned, float>(rank, numRanks);
+    multiStepSync<uint64_t, double>(rank, numRanks, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
+    multiStepSync<unsigned, float>(rank, numRanks, Box<float>{0, 1, 0, 0.015625, 0, 0.00390625});
 }
 
 template<class T>

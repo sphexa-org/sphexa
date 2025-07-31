@@ -25,11 +25,11 @@ addCstoneMpiTest(focus_transfer.cpp focus_transfer FocusTransfer 2)
 addCstoneMpiTest(domain_2ranks.cpp domain_2ranks GlobalDomain2Ranks 2)
 addCstoneMpiTest(domain_resize.cpp domain_resize GlobalDomainResize 2)
 
-addCstoneMpiTest(treedomain.cpp treedomain GlobalDomainTreeIntregration 12)
-addCstoneMpiTest(exchange_general.cpp exchange_general GeneralFocusExchange 12)
-addCstoneMpiTest(exchange_domain.cpp exchange_domain GlobalDomainExchange 12)
-addCstoneMpiTest(focus_tree.cpp focus_tree FocusTreeIntregration 12)
-addCstoneMpiTest(domain_nranks.cpp domain_nranks GlobalDomainNRanks 12)
+addCstoneMpiTest(treedomain.cpp treedomain GlobalDomainTreeIntregration 11)
+addCstoneMpiTest(exchange_general.cpp exchange_general GeneralFocusExchange 11)
+addCstoneMpiTest(exchange_domain.cpp exchange_domain GlobalDomainExchange 11)
+addCstoneMpiTest(focus_tree.cpp focus_tree FocusTreeIntregration 11)
+addCstoneMpiTest(domain_nranks.cpp domain_nranks GlobalDomainNRanks 11)
 
 # workaround for compiling MPI with nvcc on cray systems
 if (CMAKE_CUDA_COMPILER AND MPI_CXX_INCLUDE_PATH STREQUAL "" AND DEFINED ENV{CRAY_MPICH2_DIR} OR DEFINED ENV{CRAY_MPICH_DIR})

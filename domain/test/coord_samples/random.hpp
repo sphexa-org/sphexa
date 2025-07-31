@@ -74,13 +74,22 @@ public:
     using KeyType = KeyType_;
     using Integer = typename KeyType::ValueType;
 
-    RandomCoordinates(size_t n, Box<T> box, int seed = 42)
+    RandomCoordinates(size_t n,
+                      Box<T> box,
+                      int seed    = 42,
+                      unsigned bx = maxTreeLevel<Integer>{},
+                      unsigned by = maxTreeLevel<Integer>{},
+                      unsigned bz = maxTreeLevel<Integer>{})
         : box_(std::move(box))
         , x_(n)
         , y_(n)
         , z_(n)
         , codes_(n)
+        , bx_(bx)
+        , by_(by)
+        , bz_(bz)
     {
+        assert(bx <= maxTreeLevel<Integer>{} && by <= maxTreeLevel<Integer>{} && bz <= maxTreeLevel<Integer>{});
         // std::random_device rd;
         std::mt19937 gen(seed);
         std::uniform_real_distribution<T> disX(box_.xmin(), box_.xmax());
@@ -96,7 +105,12 @@ public:
         std::generate(begin(z_), end(z_), randZ);
 
         auto keyData = (KeyType*)(codes_.data());
-        computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box);
+
+        if constexpr (std::is_same_v<KeyType, SfcMixDKind<Integer>>)
+        {
+            computeSfcMixDKeys(x_.data(), y_.data(), z_.data(), keyData, n, box, bx, by, bz);
+        }
+        else { computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box); }
 
         std::vector<LocalIndex> sfcOrder(n);
         std::iota(begin(sfcOrder), end(sfcOrder), LocalIndex(0));
@@ -115,11 +129,13 @@ public:
     const std::vector<T>& y() const { return y_; }
     const std::vector<T>& z() const { return z_; }
     const std::vector<Integer>& particleKeys() const { return codes_; }
+    Box<T> box() const { return box_; }
 
 private:
     Box<T> box_;
     std::vector<T> x_, y_, z_;
     std::vector<Integer> codes_;
+    unsigned bx_, by_, bz_;
 };
 
 template<class T, class KeyType_>
@@ -129,12 +145,15 @@ public:
     using KeyType = KeyType_;
     using Integer = typename KeyType::ValueType;
 
-    RandomGaussianCoordinates(unsigned n, Box<T> box, int seed = 42)
+    RandomGaussianCoordinates(unsigned n, Box<T> box, int seed = 42, unsigned bx = maxTreeLevel<Integer>{}, unsigned by = maxTreeLevel<Integer>{}, unsigned bz = maxTreeLevel<Integer>{})
         : box_(std::move(box))
         , x_(n)
         , y_(n)
         , z_(n)
         , codes_(n)
+        , bx_(bx)
+        , by_(by)
+        , bz_(bz)
     {
         // std::random_device rd;
         std::mt19937 gen(seed);
@@ -157,7 +176,11 @@ public:
         std::generate(begin(z_), end(z_), randZ);
 
         auto keyData = (KeyType*)(codes_.data());
-        computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box);
+        if constexpr (std::is_same_v<KeyType, SfcMixDKind<Integer>>)
+        {
+            computeSfcMixDKeys(x_.data(), y_.data(), z_.data(), keyData, n, box, bx_, by_, bz_);
+        }
+        else { computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box); }
 
         std::vector<LocalIndex> sfcOrder(n);
         std::iota(begin(sfcOrder), end(sfcOrder), LocalIndex(0));
@@ -181,6 +204,7 @@ private:
     Box<T> box_;
     std::vector<T> x_, y_, z_;
     std::vector<Integer> codes_;
+    unsigned bx_, by_, bz_;
 };
 
 //! @brief can be used to calculate reasonable smoothing lengths for each particle

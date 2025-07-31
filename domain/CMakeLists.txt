@@ -68,3 +68,22 @@ if (BUILD_TESTING)
     add_subdirectory(test)
 endif()
 
+find_package(Python 3 COMPONENTS Interpreter Development.Module REQUIRED)
+
+# Find nanobind module
+execute_process(
+  COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+  OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_DIR)
+list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
+find_package(nanobind CONFIG REQUIRED)
+
+# Test if we have the right version.
+execute_process(
+  COMMAND "${Python_EXECUTABLE}" -m nanobind --version
+  OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_VER)
+if(${NB_VER} VERSION_LESS 2.0.0)
+  message(FATAL_ERROR "Require nanobind version greater than 2.0.0, but found ${NB_VER}")
+endif()
+
+nanobind_add_module(cornerstone python/extensions.cpp)
+target_include_directories(cornerstone PRIVATE include test)

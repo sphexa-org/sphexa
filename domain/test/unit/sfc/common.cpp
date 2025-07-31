@@ -112,8 +112,13 @@ TEST(SfcCode, log8ceil32)
 
 TEST(SfcCode, log8ceil64)
 {
+#ifdef __linux__
     EXPECT_EQ(2, log8ceil(64lu));
     EXPECT_EQ(3, log8ceil(100lu));
+#elif __APPLE__
+    EXPECT_EQ(2, log8ceil(64llu));
+    EXPECT_EQ(3, log8ceil(100llu));
+#endif
 }
 
 TEST(SfcCode, treeLevel32)
@@ -166,18 +171,32 @@ TEST(SfcCode, encodePlaceholderBit64)
 
 TEST(SfcCode, decodePrefixLength64)
 {
+#ifdef __linux__
     EXPECT_EQ(0, decodePrefixLength(1ul));
     EXPECT_EQ(3, decodePrefixLength(0b1000ul));
     EXPECT_EQ(3, decodePrefixLength(0b1010ul));
     EXPECT_EQ(9, decodePrefixLength(01635ul));
+#elif __APPLE__
+    EXPECT_EQ(0, decodePrefixLength(1ull));
+    EXPECT_EQ(3, decodePrefixLength(0b1000ull));
+    EXPECT_EQ(3, decodePrefixLength(0b1010ull));
+    EXPECT_EQ(9, decodePrefixLength(01635ull));
+#endif
 }
 
 TEST(SfcCode, decodePlaceholderbit64)
 {
+#ifdef __linux__
     EXPECT_EQ(0, decodePlaceholderBit(1ul));
     EXPECT_EQ(0, decodePlaceholderBit(0b1000ul));
     EXPECT_EQ(pad(0b010ul, 3), decodePlaceholderBit(0b1010ul));
     EXPECT_EQ(0635000000000000000000ul, decodePlaceholderBit(01635ul));
+#elif __APPLE__
+    EXPECT_EQ(0, decodePlaceholderBit(1ull));
+    EXPECT_EQ(0, decodePlaceholderBit(0b1000ull));
+    EXPECT_EQ(pad(0b010ul, 3), decodePlaceholderBit(0b1010ull));
+    EXPECT_EQ(0635000000000000000000ul, decodePlaceholderBit(01635ull));
+#endif
 }
 
 TEST(SfcCode, maskKey)
@@ -343,17 +362,37 @@ TEST(SfcCode, lastNzPlace)
     EXPECT_EQ(lastNzPlace(pad(1u, 3)), 1);
     EXPECT_EQ(lastNzPlace(nodeRange<unsigned>(0)), 0);
 
+#ifdef __linux__
     EXPECT_EQ(lastNzPlace(pad(1ul, 3)), 1);
+#elif __APPLE__
+    EXPECT_EQ(lastNzPlace(pad(1ull, 3)), 1);
+#endif
     EXPECT_EQ(lastNzPlace(nodeRange<uint64_t>(0)), 0);
 
     EXPECT_EQ(lastNzPlace(0u), maxTreeLevel<uint32_t>{});
+#ifdef __linux__
     EXPECT_EQ(lastNzPlace(0ul), maxTreeLevel<uint64_t>{});
+#elif __APPLE__
+    EXPECT_EQ(lastNzPlace(0ull), maxTreeLevel<uint64_t>{});
+#endif
     EXPECT_EQ(lastNzPlace(1u), maxTreeLevel<uint32_t>{});
+#ifdef __linux__
     EXPECT_EQ(lastNzPlace(1ul), maxTreeLevel<uint64_t>{});
+#elif __APPLE__
+    EXPECT_EQ(lastNzPlace(1ull), maxTreeLevel<uint64_t>{});
+#endif
     EXPECT_EQ(lastNzPlace(4u), maxTreeLevel<uint32_t>{});
+#ifdef __linux
     EXPECT_EQ(lastNzPlace(4ul), maxTreeLevel<uint64_t>{});
+#elif __APPLE__
+    EXPECT_EQ(lastNzPlace(4ull), maxTreeLevel<uint64_t>{});
+#endif
     EXPECT_EQ(lastNzPlace(8u), maxTreeLevel<uint32_t>{} - 1);
+#ifdef __linux__
     EXPECT_EQ(lastNzPlace(8ul), maxTreeLevel<uint64_t>{} - 1);
+#elif __APPLE__
+    EXPECT_EQ(lastNzPlace(8ull), maxTreeLevel<uint64_t>{} - 1);
+#endif
 }
 
 template<class KeyType>

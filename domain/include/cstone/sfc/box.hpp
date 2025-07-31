@@ -15,6 +15,9 @@
 
 #pragma once
 
+#include <algorithm>
+#include <array>
+#include <iostream>
 #include <cassert>
 #include <cmath>
 
@@ -315,8 +318,17 @@ using FBox = SimpleBox<T>;
  * @return           the geometrical center and the vector from the center to the box corner farthest from the origin
  */
 template<class KeyType, class T>
-constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox& ibox, const Box<T>& box)
+constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox& ibox, const Box<T>& box, const bool disableMixD = false)
 {
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool useMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                         mixDBits.by != maxTreeLevel<KeyType>{} ||
+                         mixDBits.bz != maxTreeLevel<KeyType>{}) && !disableMixD;
+    if (useMixD)
+    {
+        // std::cout << "Calling MixD centerAndSize" << std::endl;
+        return centerAndSize<KeyType>(ibox, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
+    }
     constexpr int maxCoord = 1u << maxTreeLevel<KeyType>{};
     // smallest octree cell edge length in unit cube
     constexpr T uL = T(1.) / maxCoord;
@@ -324,6 +336,30 @@ constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox
     T halfUnitLengthX = T(0.5) * uL * box.lx();
     T halfUnitLengthY = T(0.5) * uL * box.ly();
     T halfUnitLengthZ = T(0.5) * uL * box.lz();
+    Vec3<T> boxCenter = {box.xmin() + (ibox.xmax() + ibox.xmin()) * halfUnitLengthX,
+                         box.ymin() + (ibox.ymax() + ibox.ymin()) * halfUnitLengthY,
+                         box.zmin() + (ibox.zmax() + ibox.zmin()) * halfUnitLengthZ};
+    Vec3<T> boxSize   = {(ibox.xmax() - ibox.xmin()) * halfUnitLengthX, (ibox.ymax() - ibox.ymin()) * halfUnitLengthY,
+                         (ibox.zmax() - ibox.zmin()) * halfUnitLengthZ};
+
+    return {boxCenter, boxSize};
+}
+
+template<class KeyType, class T>
+constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>>
+centerAndSize(const IBox& ibox, const Box<T>& box, unsigned bx, unsigned by, unsigned bz)
+{
+    // constexpr int maxCoord = 1u << maxTreeLevel<KeyType>{};
+    // smallest octree cell edge length in unit cube
+    // constexpr T uL = T(1.) / maxCoord;
+
+    // std::cout << "ibox " << ibox.xmin() << " " << ibox.xmax() << " " << ibox.ymin() << " " << ibox.ymax() << " " <<
+    // ibox.zmin() << " " << ibox.zmax() << std::endl; std::cout << "box " << box.xmin() << " " << box.xmax() << " " <<
+    // box.ymin() << " " << box.ymax() << " " << box.zmin() << " " << box.zmax() << std::endl;
+
+    T halfUnitLengthX = T(0.5) * box.lx() / (1u << bx);
+    T halfUnitLengthY = T(0.5) * box.ly() / (1u << by);
+    T halfUnitLengthZ = T(0.5) * box.lz() / (1u << bz);
     Vec3<T> boxCenter = {box.xmin() + (ibox.xmax() + ibox.xmin()) * halfUnitLengthX,
                          box.ymin() + (ibox.ymax() + ibox.ymin()) * halfUnitLengthY,
                          box.zmin() + (ibox.zmax() + ibox.zmin()) * halfUnitLengthZ};
@@ -411,6 +447,32 @@ Box<T> limitBoxShrinking(const Box<T>& fittingBox, const Box<T>& previousBox, co
                   previousBox.boundaryX(),
                   previousBox.boundaryY(),
                   previousBox.boundaryZ()};
+}
+
+struct AxisMixDBits
+{
+    unsigned bx = 0;
+    unsigned by = 0;
+    unsigned bz = 0;
+};
+
+template <typename T, typename KeyType, typename BoxType>
+AxisMixDBits getBoxMixDimensionBits(const BoxType& box) {
+    const std::array<T, 3> boxDimensions{box.xmax() - box.xmin(), box.ymax() - box.ymin(),
+        box.zmax() - box.zmin()};
+    const auto max_dim_index = std::max_element(boxDimensions.begin(), boxDimensions.end()) - boxDimensions.begin();
+    const auto max_dim_value = boxDimensions[max_dim_index];
+    AxisMixDBits bit_limits;
+
+    for (int i = 0; i < 3; ++i) {
+        // const auto bits = boxDimensions[i] == max_dim_value ? static_cast<int>(std::ceil(std::log2(max_dim_value))) : static_cast<int>(std::ceil(std::log2(max_dim_value))) - static_cast<int>(std::ceil(std::log2(max_dim_value / boxDimensions[i])));
+        const auto bits = boxDimensions[i] == max_dim_value ? maxTreeLevel<KeyType>{} : maxTreeLevel<KeyType>{} - static_cast<int>(std::ceil(std::log2(max_dim_value / boxDimensions[i])));
+        if (i == 0) bit_limits.bx = bits;
+        else if (i == 1) bit_limits.by = bits;
+        else if (i == 2) bit_limits.bz = bits;
+    }
+    // std::cout << "[getBoxMixDimensionBits] bit_limits: " << bit_limits.bx << ", " << bit_limits.by << ", " << bit_limits.bz << std::endl;
+    return bit_limits;
 }
 
 } // namespace cstone

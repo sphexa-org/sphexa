@@ -100,7 +100,16 @@ public:
 
         // compute SFC particle keys only for particles participating in tree build
         std::span<KeyType> keyView(particleKeys + o1.start, numPart);
-        computeSfcKeys<gpu>(x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numPart, box_);
+        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box_);
+        if (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+            mixDBits.by != maxTreeLevel<KeyType>{} ||
+            mixDBits.bz != maxTreeLevel<KeyType>{})
+        {
+            computeSfcMixDKeys(x + o1.start, y + o1.start, z + o1.start, SfcMixDKindPointer(keyView.data()), numPart, box_,
+                               mixDBits.bx, mixDBits.by, mixDBits.bz);
+        } else {
+            computeSfcKeys<gpu>(x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numPart, box_);
+        }
         sequence<gpu>(o1.start, numPart, reorderFunctor.getBuf(), growthRate_);
         sortByKey<gpu>(keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_);
 
@@ -178,8 +187,17 @@ public:
         LocalIndex envelopeSize = newEnd - newStart;
         std::span<KeyType> keyView(keys + newStart, envelopeSize);
 
-        computeSfcKeys<gpu>(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv,
-                            box_);
+        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box_);
+        if (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+            mixDBits.by != maxTreeLevel<KeyType>{} ||
+            mixDBits.bz != maxTreeLevel<KeyType>{})
+        {
+            computeSfcMixDKeys<gpu>(x + recvStart, y + recvStart, z + recvStart, SfcMixDKindPointer(keys + recvStart), numRecv,
+                                box_, mixDBits.bx, mixDBits.by, mixDBits.bz);
+        } else {
+            computeSfcKeys<gpu>(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv,
+                                box_);
+        }
         sequence<gpu>(recvStart, numRecv, reorderFunctor.getBuf(), growthRate_);
         sortByKey<gpu>(keyView, std::span{reorderFunctor.getMap() + newStart, keyView.size()}, s0, s1, growthRate_);
 

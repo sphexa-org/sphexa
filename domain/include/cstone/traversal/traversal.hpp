@@ -96,6 +96,11 @@ void dualTraversal(const TreeType& octree, TreeNodeIndex a, TreeNodeIndex b, MAC
 {
     using NodePair = util::array<TreeNodeIndex, 2>;
 
+    if (octree.isEmpty(a) || octree.isEmpty(b)) {
+        std::cout << "Skip empty node pair (" << a << ", " << b << ") traversal" << std::endl;
+        return;
+    }
+
     if (octree.isLeaf(a) && octree.isLeaf(b))
     {
         if (continuation(a, b)) { p2p(a, b); }

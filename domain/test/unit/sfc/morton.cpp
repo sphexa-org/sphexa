@@ -53,7 +53,7 @@ TEST(MortonCode, idecodeMorton32)
 
 TEST(MortonCode, idecodeMorton64)
 {
-    std::size_t code = 0x7FFFFFFFFFFFFFFFlu;
+    std::uint64_t code = 0x7FFFFFFFFFFFFFFFllu;
     EXPECT_EQ((1u << 21u) - 1u, idecodeMortonX(code));
     EXPECT_EQ((1u << 21u) - 1u, idecodeMortonY(code));
     EXPECT_EQ((1u << 21u) - 1u, idecodeMortonZ(code));
@@ -61,12 +61,12 @@ TEST(MortonCode, idecodeMorton64)
     code = 0x1249249241249249;
     EXPECT_EQ((1u << 21u) - 512u - 1u, idecodeMortonZ(code));
 
-    code = 0b0111lu << (20u * 3);
+    code = 0b0111llu << (20u * 3);
     EXPECT_EQ(1u << 20u, idecodeMortonX(code));
     EXPECT_EQ(1u << 20u, idecodeMortonY(code));
     EXPECT_EQ(1u << 20u, idecodeMortonZ(code));
 
-    code = 0b0011lu << (20u * 3);
+    code = 0b0011llu << (20u * 3);
     EXPECT_EQ(0, idecodeMortonX(code));
     EXPECT_EQ(1u << 20u, idecodeMortonY(code));
     EXPECT_EQ(1u << 20u, idecodeMortonZ(code));

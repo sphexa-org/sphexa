@@ -48,10 +48,15 @@ std::vector<int> findPeersMac(int myRank,
                               const SfcAssignment<KeyType>& assignment,
                               const TreeType<KeyType>& domainTree,
                               const Box<T>& box,
-                              float invThetaEff)
+                              float invThetaEff,
+                              const bool disableMixD = false)
 {
     KeyType domainStart = assignment[myRank];
     KeyType domainEnd   = assignment[myRank + 1];
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool useMixD = !disableMixD && (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+                          mixDBits.bz != maxTreeLevel<KeyType>{});
 
     int maxCoord   = 1u << maxTreeLevel<KeyType>{};
     float roundOff = 1 + 1e-6; // ensure that peers are picked up in case of a numerical tie
@@ -59,15 +64,23 @@ std::vector<int> findPeersMac(int myRank,
     auto pbc_t     = BoundaryType::periodic;
     auto pbc       = Vec3<int>{box.boundaryX() == pbc_t, box.boundaryY() == pbc_t, box.boundaryZ() == pbc_t} * maxCoord;
 
-    auto crossFocusPairs = [domainStart, domainEnd, ellipse, pbc, &tree = domainTree](TreeNodeIndex a, TreeNodeIndex b)
+    auto crossFocusPairs = [domainStart, domainEnd, ellipse, pbc, &tree = domainTree, &mixDBits, useMixD](TreeNodeIndex a, TreeNodeIndex b)
     {
         bool aFocusOverlap = overlapTwoRanges(domainStart, domainEnd, tree.codeStart(a), tree.codeEnd(a));
         bool bInFocus      = containedIn(tree.codeStart(b), tree.codeEnd(b), domainStart, domainEnd);
         // node a has to overlap/be contained in the focus, while b must not be inside it
         if (!aFocusOverlap || bInFocus) { return false; }
 
-        IBox aBox = sfcIBox(sfcKey(tree.codeStart(a)), tree.level(a));
-        IBox bBox = sfcIBox(sfcKey(tree.codeStart(b)), tree.level(b));
+        IBox aBox = useMixD ? sfcIBox(sfcMixDKey(tree.codeStart(a)), maxTreeLevel<KeyType>{}-tree.level(a), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(tree.codeStart(a)), tree.level(a));
+        if (aBox.xmax() - aBox.xmin() == 0 && aBox.ymax() - aBox.ymin() == 0 && aBox.zmax() - aBox.zmin() == 0)
+        {
+            return false; // skip empty boxes
+        }
+        IBox bBox = useMixD ? sfcIBox(sfcMixDKey(tree.codeStart(b)), maxTreeLevel<KeyType>{}-tree.level(b), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(tree.codeStart(b)), tree.level(b));
+        if (bBox.xmax() - bBox.xmin() == 0 && bBox.ymax() - bBox.ymin() == 0 && bBox.zmax() - bBox.zmin() == 0)
+        {
+            return false; // skip empty boxes
+        }
         return !minMacMutualInt(aBox, bBox, ellipse, pbc);
     };
 
@@ -93,6 +106,12 @@ std::vector<int> findPeersMac(int myRank,
         TreeNodeIndex nodeIdx = locateNode(spanningNodeKeys[i], spanningNodeKeys[i + 1], nodeKeys, levelRange);
         dualTraversal(domainTree, nodeIdx, 0, crossFocusPairs, m2l, p2p);
     }
+    std::cout << "[findPeersMac3] myRank: " << myRank << " peer ranks: ";
+    for (int i = 0; i < int(peerRanks.size()); ++i)
+    {
+        if (peerRanks[i]) { std::cout << i << " "; }
+    }
+    std::cout << std::endl;
 
     std::vector<int> ret;
     for (int i = 0; i < int(peerRanks.size()); ++i)
@@ -109,7 +128,8 @@ std::vector<int> findPeersMacStt(int myRank,
                                  const SfcAssignment<KeyType>& assignment,
                                  const Octree<KeyType>& octree,
                                  const Box<T>& box,
-                                 float invThetaEff)
+                                 float invThetaEff,
+                                 const bool disableMixD = false)
 {
     KeyType domainStart     = assignment[myRank];
     KeyType domainEnd       = assignment[myRank + 1];
@@ -124,19 +144,32 @@ std::vector<int> findPeersMacStt(int myRank,
 
     std::vector<int> peers(assignment.numRanks());
 
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool useMixD = !disableMixD && (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+                          mixDBits.bz != maxTreeLevel<KeyType>{});
+
 #pragma omp parallel for
     for (TreeNodeIndex i = firstLeaf; i < lastLeaf; ++i)
     {
-        IBox target = sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]));
+        IBox target = useMixD ? sfcIBox(sfcMixDKey(leaves[i]), sfcMixDKey(leaves[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]));
+        if (target.xmax() - target.xmin() == 0 && target.ymax() - target.ymin() == 0 && target.zmax() - target.zmin() == 0)
+        {
+            continue; // skip empty boxes
+        }
 
-        auto violatesMac = [target, ellipse, pbc, &octree, domainStart, domainEnd](TreeNodeIndex idx)
+        auto violatesMac = [target, ellipse, pbc, &octree, domainStart, domainEnd, mixDBits, useMixD](TreeNodeIndex idx)
         {
             KeyType nodeStart = octree.codeStart(idx);
             KeyType nodeEnd   = octree.codeEnd(idx);
             // if the tree node with index idx is fully contained in the focus, we stop traversal
             if (containedIn(nodeStart, nodeEnd, domainStart, domainEnd)) { return false; }
 
-            IBox source = sfcIBox(sfcKey(nodeStart), octree.level(idx));
+            IBox source = useMixD ? sfcIBox(sfcMixDKey(nodeStart), maxTreeLevel<KeyType>{} - octree.level(idx), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(nodeStart), octree.level(idx));
+            if (source.xmax() - source.xmin() == 0 && source.ymax() - source.ymin() == 0 && source.zmax() - source.zmin() == 0)
+            {
+                return false; // skip empty boxes
+            }
             return !minMacMutualInt(target, source, ellipse, pbc);
         };
 

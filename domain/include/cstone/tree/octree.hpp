@@ -458,6 +458,16 @@ public:
      */
     inline bool isLeaf(TreeNodeIndex node) const { return childOffsets_[node] == 0; }
 
+    inline bool isEmpty(TreeNodeIndex node) const
+    {
+        return empty_[node];
+    }
+
+    inline void setEmpty(TreeNodeIndex node)
+    {
+        empty_[node] = true;
+    }
+  
     /*! @brief return child node index
      *
      * @param[in] node    node index, range [0:numInternalNodes()]
@@ -528,6 +538,7 @@ private:
         TreeNodeIndex numNodes = numLeafNodes_ + numInternalNodes_;
 
         prefixes_.resize(numNodes);
+        empty_.resize(numNodes);
         // +1 to accommodate nodeOffsets in FocusedOctreeCore::update when numNodes == 1
         childOffsets_.resize(numNodes + 1);
         parents_.resize((numNodes - 1) / 8);
@@ -549,6 +560,7 @@ private:
 
     //! @brief the SFC key and level of each node (Warren-Salmon placeholder-bit), length = numNodes
     std::vector<KeyType> prefixes_;
+    std::vector<bool> empty_;
     //! @brief the index of the first child of each node, a value of 0 indicates a leaf, length = numNodes
     std::vector<TreeNodeIndex, Alloc> childOffsets_;
     //! @brief stores the parent index for every group of 8 sibling nodes, length the (numNodes - 1) / 8

@@ -52,14 +52,21 @@ using namespace cstone;
  * 6. Repeat 3., the decomposition should now indicate that all particles stay on the
  *    node they currently are and that no rank sends any particles to other ranks.
  */
-template<class KeyType, class T>
-void globalRandomGaussian(int thisRank, int numRanks)
+template<class KeyType, class T, template<class> class sfcKeyType>
+void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
 {
     LocalIndex numParticles = 1000;
     unsigned bucketSize     = 64;
 
-    Box<T> box{-1, 1};
-    RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box, thisRank);
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool useMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+                          mixDBits.bz != maxTreeLevel<KeyType>{});
+
+    RandomCoordinates<T, sfcKeyType<KeyType>> coords =
+        useMixD
+            ? RandomCoordinates<T, sfcKeyType<KeyType>>{numParticles, box, thisRank, mixDBits.bx, mixDBits.by, mixDBits.bz}
+            : RandomCoordinates<T, sfcKeyType<KeyType>>{numParticles, box, thisRank};
 
     std::vector<KeyType> tree = makeRootNodeTree<KeyType>();
     std::vector<unsigned> counts{numRanks * unsigned(numParticles)};
@@ -96,7 +103,15 @@ void globalRandomGaussian(int thisRank, int numRanks)
     /// if the global tree build and assignment is repeated, no particles are exchanged anymore
 
     std::vector<KeyType> newCodes(x.size());
-    computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(newCodes.data()), x.size(), box);
+    if (useMixD)
+    {
+        computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(newCodes.data()), x.size(), box, mixDBits.bx,
+                           mixDBits.by, mixDBits.bz);
+    }
+    else
+    {
+        computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(newCodes.data()), x.size(), box);
+    }
 
     // received particles are not stored in SFC order after the exchange
     std::sort(begin(newCodes), end(newCodes));
@@ -132,7 +147,10 @@ TEST(GlobalTreeDomain, randomGaussian)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
 
-    globalRandomGaussian<uint64_t, double>(rank, nRanks);
-    globalRandomGaussian<unsigned, float>(rank, nRanks);
-    globalRandomGaussian<uint64_t, float>(rank, nRanks);
+    globalRandomGaussian<uint64_t, double, SfcKind>(rank, nRanks, {-1, 1});
+    globalRandomGaussian<unsigned, float, SfcKind>(rank, nRanks, {-1, 1});
+    globalRandomGaussian<uint64_t, float, SfcKind>(rank, nRanks, {-1, 1});
+    globalRandomGaussian<uint64_t, double, SfcMixDKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
+    globalRandomGaussian<unsigned, float, SfcMixDKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
+    globalRandomGaussian<uint64_t, float, SfcMixDKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
 }

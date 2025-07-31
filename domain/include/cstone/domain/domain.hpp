@@ -481,9 +481,20 @@ private:
         }
         else
         {
-            computeSfcKeys(rawPtr(x), rawPtr(y), rawPtr(z), sfcKindPointer(rawPtr(keys)), bufDesc_.start, box());
-            computeSfcKeys(rawPtr(x) + bufDesc_.end, rawPtr(y) + bufDesc_.end, rawPtr(z) + bufDesc_.end,
-                           sfcKindPointer(rawPtr(keys)) + bufDesc_.end, x.size() - bufDesc_.end, box());
+            const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box());
+            if (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                mixDBits.by != maxTreeLevel<KeyType>{} || mixDBits.bz != maxTreeLevel<KeyType>{})
+            {
+                computeSfcMixDKeys(rawPtr(x), rawPtr(y), rawPtr(z), SfcMixDKindPointer(rawPtr(keys)), bufDesc_.start, box(),
+                                mixDBits.bx, mixDBits.by, mixDBits.bz);
+                computeSfcMixDKeys(rawPtr(x) + bufDesc_.end, rawPtr(y) + bufDesc_.end, rawPtr(z) + bufDesc_.end,
+                            SfcMixDKindPointer(rawPtr(keys)) + bufDesc_.end, x.size() - bufDesc_.end, box(), mixDBits.bx,
+                            mixDBits.by, mixDBits.bz);
+            } else {
+                computeSfcKeys(rawPtr(x), rawPtr(y), rawPtr(z), sfcKindPointer(rawPtr(keys)), bufDesc_.start, box());
+                computeSfcKeys(rawPtr(x) + bufDesc_.end, rawPtr(y) + bufDesc_.end, rawPtr(z) + bufDesc_.end,
+                            sfcKindPointer(rawPtr(keys)) + bufDesc_.end, x.size() - bufDesc_.end, box());
+            }
         }
     }
 

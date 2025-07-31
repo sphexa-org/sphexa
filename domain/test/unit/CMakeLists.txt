@@ -14,6 +14,7 @@ set(UNIT_TESTS
         sfc/box.cpp
         sfc/common.cpp
         sfc/hilbert.cpp
+        sfc/mixed_hilbert.cpp
         sfc/morton.cpp
         sfc/sfc.cpp
         traversal/boxoverlap.cpp
@@ -53,3 +54,11 @@ add_test(NAME ComponentUnitsOmp COMMAND component_units_omp)
 
 install(TARGETS component_units RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/unit)
 install(TARGETS component_units_omp RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/unit)
+
+add_executable(mixed_hilbert sfc/mixed_hilbert.cpp)
+target_compile_options(mixed_hilbert PRIVATE -Wall -Wextra -Wno-unknown-pragmas)
+target_include_directories(mixed_hilbert PRIVATE ../../include)
+target_include_directories(mixed_hilbert PRIVATE ../)
+target_link_libraries(mixed_hilbert PRIVATE GTest::gtest_main)
+add_test(NAME MixedHilbert COMMAND mixed_hilbert)
+install(TARGETS mixed_hilbert RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/unit)

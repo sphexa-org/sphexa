@@ -30,10 +30,17 @@ static std::vector<int> findPeersAll2All(int myRank,
                                          const SfcAssignment<KeyType>& assignment,
                                          std::span<const KeyType> tree,
                                          const Box<T>& box,
-                                         float invThetaEff)
+                                         float invThetaEff,
+                                         const bool disableMixD = false)
 {
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool mixD = !disableMixD && (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+        mixDBits.by != maxTreeLevel<KeyType>{} ||
+        mixDBits.bz != maxTreeLevel<KeyType>{});
+
     TreeNodeIndex firstIdx = findNodeAbove(tree.data(), nNodes(tree), assignment[myRank]);
     TreeNodeIndex lastIdx  = findNodeAbove(tree.data(), nNodes(tree), assignment[myRank + 1]);
+    // std::cout << "myRank: " << myRank << ", firstIdx: " << firstIdx << ", lastIdx: " << lastIdx << std::endl;
 
     int maxCoord = 1u << maxTreeLevel<KeyType>{};
     auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invThetaEff;
@@ -43,13 +50,28 @@ static std::vector<int> findPeersAll2All(int myRank,
     std::vector<IBox> boxes(nNodes(tree));
     for (TreeNodeIndex i = 0; i < TreeNodeIndex(nNodes(tree)); ++i)
     {
-        boxes[i] = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]));
+        boxes[i] = mixD ? sfcIBox(sfcMixDKey(tree[i]), sfcMixDKey(tree[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]));
     }
 
     std::vector<int> peers(assignment.numRanks());
     for (TreeNodeIndex i = firstIdx; i < lastIdx; ++i)
-        for (TreeNodeIndex j = 0; j < TreeNodeIndex(nNodes(tree)); ++j)
+    {
+        if (mixD && (boxes[i].xmax() - boxes[i].xmin() == 0 &&
+                     boxes[i].ymax() - boxes[i].ymin() == 0 &&
+                     boxes[i].zmax() - boxes[i].zmin() == 0))
+        {
+            continue; // skip empty boxes
+        }
+        for (TreeNodeIndex j = 0; j < TreeNodeIndex(nNodes(tree)); ++j) {
+            if (mixD && (boxes[j].xmax() - boxes[j].xmin() == 0 &&
+                         boxes[j].ymax() - boxes[j].ymin() == 0 &&
+                         boxes[j].zmax() - boxes[j].zmin() == 0))
+            {
+                continue; // skip empty boxes
+            }
             if (!minMacMutualInt(boxes[i], boxes[j], ellipse, pbc)) { peers[assignment.findRank(tree[j])] = 1; }
+        }
+    }
 
     std::vector<int> ret;
     for (int i = 0; i < int(peers.size()); ++i)
@@ -59,9 +81,8 @@ static std::vector<int> findPeersAll2All(int myRank,
 }
 
 template<class KeyType>
-static void findMacPeers64grid(int rank, float theta, BoundaryType pbc, int /*refNumPeers*/)
+static void findMacPeers64grid(int rank, Box<double> box, float theta, int /*refNumPeers*/)
 {
-    Box<double> box{-1, 1, pbc};
     Octree<KeyType> octree;
     auto leaves = makeUniformNLevelTree<KeyType>(64, 1);
     octree.update(leaves.data(), nNodes(leaves));
@@ -81,33 +102,43 @@ static void findMacPeers64grid(int rank, float theta, BoundaryType pbc, int /*re
 TEST(Peers, findMacGrid64)
 {
     // just the surface
-    findMacPeers64grid<unsigned>(0, 1.1, BoundaryType::open, 7);
-    findMacPeers64grid<uint64_t>(0, 1.1, BoundaryType::open, 7);
+    findMacPeers64grid<unsigned>(0, Box<double>{-1, 1, BoundaryType::open}, 1.1, 7);
+    findMacPeers64grid<uint64_t>(0, Box<double>{-1, 1, BoundaryType::open}, 1.1, 7);
+    findMacPeers64grid<unsigned>(0, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625, BoundaryType::open}, 1.1, 7);
+    findMacPeers64grid<uint64_t>(0, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625, BoundaryType::open}, 1.1, 7);
 }
 
 TEST(Peers, findMacGrid64Narrow)
 {
-    findMacPeers64grid<unsigned>(0, 1.0, BoundaryType::open, 19);
-    findMacPeers64grid<uint64_t>(0, 1.0, BoundaryType::open, 19);
+    findMacPeers64grid<unsigned>(0, Box<double>{-1, 1, BoundaryType::open}, 1.0, 19);
+    findMacPeers64grid<uint64_t>(0, Box<double>{-1, 1, BoundaryType::open}, 1.0, 19);
+    findMacPeers64grid<unsigned>(0, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625, BoundaryType::open}, 1.0, 19);
+    findMacPeers64grid<uint64_t>(0, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625, BoundaryType::open}, 1.0, 19);
 }
 
 TEST(Peers, findMacGrid64PBC)
 {
     // just the surface + PBC, 26 six peers at the surface
-    findMacPeers64grid<unsigned>(0, 1.1, BoundaryType::periodic, 26);
-    findMacPeers64grid<uint64_t>(0, 1.1, BoundaryType::periodic, 26);
+    findMacPeers64grid<unsigned>(0, Box<double>{-1, 1, BoundaryType::periodic}, 1.1, 26);
+    findMacPeers64grid<uint64_t>(0, Box<double>{-1, 1, BoundaryType::periodic}, 1.1, 26);
+    findMacPeers64grid<unsigned>(0, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625, BoundaryType::periodic}, 1.1, 26);
+    findMacPeers64grid<uint64_t>(0, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625, BoundaryType::periodic}, 1.1, 26);
 }
 
 template<class KeyType>
-static void findPeers()
+static void findPeers(Box<double> box, const bool disableMixD = false)
 {
-    Box<double> box{-1, 1};
     int nParticles    = 100000;
     int bucketSize    = 64;
     int numRanks      = 50;
     float invThetaEff = invThetaMinToVec(0.5f);
 
-    auto particleKeys   = makeRandomGaussianKeys<KeyType>(nParticles);
+    const auto mixDBits = getBoxMixDimensionBits<double, KeyType, Box<double>>(box);
+    const bool useMixD = !disableMixD && (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+                          mixDBits.bz != maxTreeLevel<KeyType>{});
+
+    auto particleKeys   = useMixD ? RandomCoordinates<double, SfcMixDKind<KeyType>>(nParticles, box, 42, mixDBits.bx, mixDBits.by, mixDBits.bz).particleKeys() : makeRandomGaussianKeys<KeyType>(nParticles);
     auto [tree, counts] = computeOctree<KeyType>(particleKeys, bucketSize);
 
     Octree<KeyType> octree;
@@ -139,8 +170,10 @@ static void findPeers()
 
 TEST(Peers, find)
 {
-    findPeers<unsigned>();
-    findPeers<uint64_t>();
+    findPeers<unsigned>(Box<double>{-1, 1});
+    findPeers<uint64_t>(Box<double>{-1, 1});
+    findPeers<unsigned>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
+    findPeers<uint64_t>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
 }
 
 // A few harder tests to catch the FP-round-off asymmetric case

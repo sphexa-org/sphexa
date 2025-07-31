@@ -250,4 +250,20 @@ HOST_DEVICE_FUN T minDistanceSq(IBox a, IBox b, const Box<T>& box)
     return norm2(minDistance(aCenter, aSize, bCenter, bSize, box));
 }
 
+//! @brief Convenience wrapper to minDistance. This should only be used for testing.
+template<class KeyType, class T>
+HOST_DEVICE_FUN T minDistanceSq(IBox a, IBox b, const Box<T>& box, unsigned bx, unsigned by, unsigned bz)
+{
+
+    auto [aCenter, aSize] = centerAndSize<KeyType>(a, box, bx, by, bz);
+    auto [bCenter, bSize] = centerAndSize<KeyType>(b, box, bx, by, bz);
+    if ((aSize[0] == 0 && aSize[1] == 0 && aSize[2] == 0) ||
+        (bSize[0] == 0 && bSize[1] == 0 && bSize[2] == 0)) {
+        // if one of the boxes has no size, the distance is infinite
+        // this is the case for nodes that shouldn't have any particles in them
+        return std::numeric_limits<T>::max();
+    }
+    return norm2(minDistance(aCenter, aSize, bCenter, bSize, box));
+}
+
 } // namespace cstone

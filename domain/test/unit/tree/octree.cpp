@@ -21,6 +21,7 @@
 
 #include "cstone/tree/octree.hpp"
 #include "cstone/tree/cs_util.hpp"
+#include "cstone/sfc/common.hpp"
 
 using namespace cstone;
 
@@ -374,4 +375,95 @@ TEST(Upsweep, sumIrregularL3)
 {
     upsweepSumIrregularL3<unsigned>();
     upsweepSumIrregularL3<uint64_t>();
+}
+
+// function that takes as input a string which is an octal number and returns this number in decimal of type unsinged
+template<class KeyType>
+KeyType octalToDecimal(std::string octal)
+{
+    KeyType decimal = 0;
+    KeyType base    = 1;
+    int len         = octal.length();
+    for (int i = len - 1; i >= 0; i--)
+    {
+        decimal += (octal[i] - '0') * base;
+        base *= 8;
+    }
+    return decimal;
+}
+
+template<class KeyType>
+std::vector<KeyType> create_octree_from_key(KeyType key)
+{
+    const auto range_max          = std::is_same_v<KeyType, unsigned> ? octalToDecimal<KeyType>("10000000000")
+                                                                      : octalToDecimal<KeyType>("1000000000000000000000");
+    auto span_to_key_num_elements = spanSfcRange<KeyType>(0, key);
+    std::vector<KeyType> span_to_key;
+    span_to_key.resize(span_to_key_num_elements);
+    spanSfcRange<KeyType>(0, key, span_to_key.data());
+
+    auto span_from_key_num_elements = spanSfcRange<KeyType>(key, range_max);
+    std::vector<KeyType> span_from_key;
+    span_from_key.resize(span_from_key_num_elements);
+    spanSfcRange<KeyType>(key, range_max, span_from_key.data());
+
+    std::vector<KeyType> tree;
+    tree.insert(tree.end(), span_to_key.begin(), span_to_key.end());
+    tree.insert(tree.end(), span_from_key.begin(), span_from_key.end());
+    tree.push_back(range_max);
+    return tree;
+}
+
+//! @brief This creates an irregular tree based on iMixD keys
+template<class KeyType>
+static void octreeIrregularMixD()
+{
+}
+
+template<>
+void octreeIrregularMixD<unsigned>()
+{
+    unsigned mixD_key{octalToDecimal<unsigned>("1003027")}; // 0o1003027
+
+    auto tree = create_octree_from_key(mixD_key);
+
+    Octree<unsigned> fullTree;
+    fullTree.update(tree.data(), nNodes(tree));
+    EXPECT_EQ(fullTree.numTreeNodes(), 81);
+    EXPECT_EQ(fullTree.numLeafNodes(), 71);
+    EXPECT_EQ(fullTree.numInternalNodes(), 10);
+
+    EXPECT_EQ(fullTree.numTreeNodes(0), 1);
+    EXPECT_EQ(fullTree.numTreeNodes(1), 8);
+    EXPECT_EQ(fullTree.numTreeNodes(5), 8);
+    EXPECT_EQ(fullTree.numTreeNodes(9), 8);
+
+    checkConnectivity<unsigned>(fullTree);
+}
+
+template<>
+void octreeIrregularMixD<uint64_t>()
+{
+    uint64_t mixD_key{octalToDecimal<uint64_t>("1003027")}; // 0o1003027
+
+    auto tree = create_octree_from_key(mixD_key);
+
+    Octree<uint64_t> fullTree;
+    fullTree.update(tree.data(), nNodes(tree));
+    EXPECT_EQ(fullTree.numTreeNodes(), 169);
+    EXPECT_EQ(fullTree.numLeafNodes(), 148);
+    EXPECT_EQ(fullTree.numInternalNodes(), 21);
+
+    EXPECT_EQ(fullTree.numTreeNodes(0), 1);
+    EXPECT_EQ(fullTree.numTreeNodes(1), 8);
+    EXPECT_EQ(fullTree.numTreeNodes(5), 8);
+    EXPECT_EQ(fullTree.numTreeNodes(9), 8);
+
+    checkConnectivity<uint64_t>(fullTree);
+}
+
+TEST(InternalOctree, irregularMixD)
+{
+    octreeIrregularMixD<unsigned>();
+    octreeIrregularMixD<uint64_t>();
 }

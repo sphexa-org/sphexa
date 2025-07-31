@@ -41,10 +41,14 @@ HOST_DEVICE_FUN inline float invThetaMinToVec(float theta) { return 1.0f / theta
 template<class T, class KeyType>
 HOST_DEVICE_FUN Vec4<T> computeMinMacR2(KeyType prefix, float invThetaEff, const Box<T>& box)
 {
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+                          mixDBits.bz != maxTreeLevel<KeyType>{};
     KeyType nodeKey  = decodePlaceholderBit(prefix);
     int prefixLength = decodePrefixLength(prefix);
 
-    IBox cellBox              = sfcIBox(sfcKey(nodeKey), prefixLength / 3);
+    IBox cellBox              = use_mixD ? sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - (prefixLength / 3), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(nodeKey), prefixLength / 3);
     auto [geoCenter, geoSize] = centerAndSize<KeyType>(cellBox, box);
 
     T l   = T(2) * max(geoSize);
@@ -65,10 +69,25 @@ template<class T, class KeyType>
 HOST_DEVICE_FUN T computeVecMacR2(KeyType prefix, Vec3<T> expCenter, float invTheta, const Box<T>& box)
 {
     KeyType nodeKey  = decodePlaceholderBit(prefix);
-    int prefixLength = decodePrefixLength(prefix);
+    unsigned prefixLength = decodePrefixLength(prefix);
 
-    IBox cellBox              = sfcIBox(sfcKey(nodeKey), prefixLength / 3);
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+                          mixDBits.bz != maxTreeLevel<KeyType>{};
+    // std::cout << "[computeVecMacR2] use_mixD: " << use_mixD << std::endl;
+
+    // std::cout << "[computeVecMacR2] nodeKey: " << std::oct << nodeKey << std::dec << std::endl;
+    // std::cout << "[computeVecMacR2] prefixLength: " << prefixLength << std::endl;
+    // std::cout << "[computeVecMacR2] level: " << maxTreeLevel<KeyType>{} - (prefixLength / 3) << std::endl;
+
+    IBox cellBox              = use_mixD ? sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - (prefixLength / 3), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(nodeKey), prefixLength / 3);
     auto [geoCenter, geoSize] = centerAndSize<KeyType>(cellBox, box);
+    if (geoSize[0] == 0 && geoSize[1] == 0 && geoSize[2] == 0)
+    {
+        // if the cell is empty, we return a zero mac
+        return T(0);
+    }
 
     Vec3<T> dX = expCenter - geoCenter;
 
@@ -171,6 +190,7 @@ HOST_DEVICE_FUN void markMacPerBox(const Vec3<T>& targetCenter,
         Vec4<T> center = centers[idx];
         bool violatesMac =
             evaluateMacPbc(makeVec3(center), center[3], targetCenter, targetSize, box) && sourceLevel <= maxSourceLevel;
+        // std::cout << "[markMacPerBox] center: " << center[0] << ", " << center[1] << ", " << center[2] << ", " << center[3] << " targetCenter: " << targetCenter[0] << ", " << targetCenter[1] << ", " << targetCenter[2] << ", " << targetSize[0] << ", " << targetSize[1] << ", " << targetSize[2] << " violatesMac: " << violatesMac << std::endl;
         if (violatesMac && !markings[idx]) { markings[idx] = 1; }
 
         return violatesMac;
@@ -209,16 +229,27 @@ void markMacs(const KeyType* prefixes,
     KeyType focusStart = focusNodes[0];
     KeyType focusEnd   = focusNodes[numFocusNodes];
 
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+                          mixDBits.bz != maxTreeLevel<KeyType>{};
+
 #pragma omp parallel for schedule(dynamic)
     for (TreeNodeIndex i = 0; i < numFocusNodes; ++i)
     {
-        IBox target    = sfcIBox(sfcKey(focusNodes[i]), sfcKey(focusNodes[i + 1]));
+        IBox target    = use_mixD ? sfcIBox(sfcMixDKey(focusNodes[i]), sfcMixDKey(focusNodes[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(focusNodes[i]), sfcKey(focusNodes[i + 1]));
+        if (target.xmin() == target.xmax() || target.ymin() == target.ymax() || target.zmin() == target.zmax())
+        {
+            // if the target is empty, we skip it
+            continue;
+        }
         IBox targetExt = IBox(target.xmin() - 1, target.xmax() + 1, target.ymin() - 1, target.ymax() + 1,
                               target.zmin() - 1, target.zmax() + 1);
         if (containedIn(focusStart, focusEnd, targetExt)) { continue; }
 
         auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
         unsigned maxLevel               = maxTreeLevel<KeyType>{};
+
         if (limitSource) { maxLevel = std::max(int(treeLevel(focusNodes[i + 1] - focusNodes[i])) - 1, 0); }
         markMacPerBox(targetCenter, targetSize, maxLevel, prefixes, childOffsets, parents, centers, box, focusStart,
                       focusEnd, markings);

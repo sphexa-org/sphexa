@@ -105,7 +105,20 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks, bool equalize
     // box got updated if not using PBC
     box = domain.box();
     std::vector<KeyType> keysRef(x.size());
-    computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysRef.data()), x.size(), box);
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool useMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                     mixDBits.by != maxTreeLevel<KeyType>{} ||
+                     mixDBits.bz != maxTreeLevel<KeyType>{});
+    if (useMixD)
+    {
+        std::cout << "[randomGaussianDomain] MixD keys" << std::endl;
+        computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(keysRef.data()), x.size(), box, mixDBits.bx,
+                           mixDBits.by, mixDBits.bz);
+    }
+    else
+    {
+        computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysRef.data()), x.size(), box);
+    }
 
     // check that particles are SFC order sorted and the keys are in sync with the x,y,z arrays
     EXPECT_EQ(keys, keysRef);
@@ -161,6 +174,22 @@ TEST(FocusDomain, randomGaussianNeighborSum)
         Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {-1, 1});
         randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
+    {
+        Domain<unsigned, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {0, 1, 0, 0.015625, 0, 0.00390625});
+        randomGaussianDomain<unsigned, double>(domain, rank, nRanks);
+    }
+    {
+        Domain<uint64_t, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {0, 1, 0, 0.015625, 0, 0.00390625});
+        randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
+    }
+    {
+        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {0, 1, 0, 0.015625, 0, 0.00390625});
+        randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
+    }
+    {
+        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {0, 1, 0, 0.015625, 0, 0.00390625});
+        randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
+    }
 }
 
 TEST(FocusDomain, randomGaussianNeighborSumPbc)
@@ -192,22 +221,29 @@ TEST(FocusDomain, randomGaussianNeighborSumPbc)
     }
 }
 
-TEST(FocusDomain, assignmentShift)
+template<class KeyType, template<class> class sfcKeyType>
+void testAssignmentShift(const Box<double>& box)
 {
     int rank = 0, numRanks = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
 
     using Real    = double;
-    using KeyType = unsigned;
 
-    Box<Real> box(0, 1);
     LocalIndex numParticlesPerRank = 15000;
     unsigned bucketSize            = 1024;
     unsigned bucketSizeFocus       = 8;
     float theta                    = 0.5;
 
-    RandomCoordinates<Real, SfcKind<KeyType>> coordinates(numParticlesPerRank, box, rank);
+    const auto mixDBits = getBoxMixDimensionBits<Real, KeyType, Box<Real>>(box);
+    const bool useMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+                          mixDBits.bz != maxTreeLevel<KeyType>{});
+
+    RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates =
+        useMixD
+            ? RandomCoordinates<Real, sfcKeyType<KeyType>>{numParticlesPerRank, box, rank, mixDBits.bx, mixDBits.by, mixDBits.bz}
+            : RandomCoordinates<Real, sfcKeyType<KeyType>>{numParticlesPerRank, box, rank};
 
     std::vector<Real> x(coordinates.x().begin(), coordinates.x().end());
     std::vector<Real> y(coordinates.y().begin(), coordinates.y().end());
@@ -243,22 +279,35 @@ TEST(FocusDomain, assignmentShift)
     EXPECT_TRUE(std::count(property.begin(), property.end(), rank) == domain.nParticles());
 }
 
-TEST(FocusDomain, removeParticle)
+TEST(FocusDomain, assignmentShift)
+{
+    testAssignmentShift<unsigned, SfcKind>(Box<double>{0, 1});
+    testAssignmentShift<unsigned, SfcMixDKind>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
+}
+
+template<class KeyType, template<class> class sfcKeyType>
+void removeParticle(const Box<double>& box)
 {
     int rank = 0, numRanks = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
 
     using Real    = double;
-    using KeyType = unsigned;
 
-    Box<Real> box(0, 1);
     LocalIndex numParticlesPerRank = 1000;
     unsigned bucketSize            = 64;
     unsigned bucketSizeFocus       = 8;
     float theta                    = 0.5;
 
-    RandomCoordinates<Real, SfcKind<KeyType>> coordinates(numParticlesPerRank, box, rank);
+    const auto mixDBits = getBoxMixDimensionBits<Real, KeyType, Box<Real>>(box);
+    const bool useMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+                          mixDBits.bz != maxTreeLevel<KeyType>{});
+
+    RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates =
+        useMixD
+            ? RandomCoordinates<Real, sfcKeyType<KeyType>>{numParticlesPerRank, box, rank, mixDBits.bx, mixDBits.by, mixDBits.bz}
+            : RandomCoordinates<Real, sfcKeyType<KeyType>>{numParticlesPerRank, box, rank};
 
     std::vector<Real> x(coordinates.x().begin(), coordinates.x().end());
     std::vector<Real> y(coordinates.y().begin(), coordinates.y().end());
@@ -297,23 +346,36 @@ TEST(FocusDomain, removeParticle)
     }
 }
 
-TEST(FocusDomain, reapplySync)
+TEST(FocusDomain, removeParticle)
+{
+    removeParticle<unsigned, SfcKind>(Box<double>{0, 1});
+    removeParticle<unsigned, SfcMixDKind>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
+}
+
+template<class KeyType, template<class> class sfcKeyType>
+void testReapplySync(const Box<double>& box)
 {
     int rank = 0, numRanks = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
 
     using Real    = double;
-    using KeyType = unsigned;
 
-    Box<Real> box(0, 1);
     LocalIndex numParticlesPerRank = 10000;
     unsigned bucketSize            = 1024;
     unsigned bucketSizeFocus       = 8;
     float theta                    = 0.5;
 
     // Note: rank used as seed, so each rank will get different coordinates
-    RandomCoordinates<Real, SfcKind<KeyType>> coordinates(numParticlesPerRank, box, rank);
+    const auto mixDBits = getBoxMixDimensionBits<Real, KeyType, Box<Real>>(box);
+    const bool useMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                     mixDBits.by != maxTreeLevel<KeyType>{} ||
+                     mixDBits.bz != maxTreeLevel<KeyType>{});
+
+    RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates =
+        useMixD
+            ? RandomCoordinates<Real, sfcKeyType<KeyType>>{numParticlesPerRank, box, rank, mixDBits.bx, mixDBits.by, mixDBits.bz}
+            : RandomCoordinates<Real, sfcKeyType<KeyType>>{numParticlesPerRank, box, rank};
 
     std::vector<Real> x(coordinates.x().begin(), coordinates.x().end());
     std::vector<Real> y(coordinates.y().begin(), coordinates.y().end());
@@ -328,7 +390,11 @@ TEST(FocusDomain, reapplySync)
 
     // modify coordinates
     {
-        RandomCoordinates<Real, SfcKind<KeyType>> scord(domain.nParticles(), box, numRanks + rank);
+        RandomCoordinates<Real, sfcKeyType<KeyType>> scord =
+            useMixD
+                ? RandomCoordinates<Real, sfcKeyType<KeyType>>(domain.nParticles(), box, numRanks + rank, mixDBits.bx,
+                                                               mixDBits.by, mixDBits.bz)
+                : RandomCoordinates<Real, sfcKeyType<KeyType>>(domain.nParticles(), box, numRanks + rank);
         std::copy(scord.x().begin(), scord.x().end(), x.begin() + domain.startIndex());
         std::copy(scord.y().begin(), scord.y().end(), y.begin() + domain.startIndex());
         std::copy(scord.z().begin(), scord.z().end(), z.begin() + domain.startIndex());
@@ -366,4 +432,10 @@ TEST(FocusDomain, reapplySync)
         int numCommon = it - s.begin();
         EXPECT_EQ(numCommon, domain.nParticles());
     }
+}
+
+TEST(FocusDomain, reapplySync)
+{
+    testReapplySync<unsigned, SfcKind>(Box<double>{0, 1});
+    testReapplySync<unsigned, SfcMixDKind>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
 }
