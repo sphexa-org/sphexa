@@ -407,7 +407,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
         }
     }
 
-    auto activeMask = ~Config::SuperclusterParticleMask(0);
+    auto activeMask = ~(typename Config::SuperclusterParticleMask)(0);
     if constexpr (!std::is_same_v<Mask, void>) activeMask = activeMasks[iSupercluster - firstISupercluster];
 
     if constexpr (!Config::symmetric && Config::numWarpsPerInteraction > 1)
