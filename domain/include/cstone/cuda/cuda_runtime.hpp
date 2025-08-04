@@ -42,6 +42,7 @@
 #define cudaMallocManaged hipMallocManaged
 #define cudaMemAttachGlobal hipMemAttachGlobal
 #define cudaMemcpy hipMemcpy
+#define cudaMemcpyAsync hipMemcpyAsync
 #define cudaMemcpyDeviceToDevice hipMemcpyDeviceToDevice
 #define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define cudaMemcpyFromSymbol hipMemcpyFromSymbol
