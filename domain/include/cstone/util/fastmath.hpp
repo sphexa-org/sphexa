@@ -58,7 +58,7 @@ constexpr float rsqrt(float x)
     asm("rsqrt.approx.ftz.f32 %0,%0;" : "+f"(x) :);
     return x;
 #elif defined(__HIP_DEVICE_COMPILE__)
-    return __frsqrt_fn(x);
+    return __frsqrt_rn(x);
 #else
     return 1.0f / std::sqrt(x);
 #endif
