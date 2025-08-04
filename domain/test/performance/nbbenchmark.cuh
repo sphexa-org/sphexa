@@ -27,10 +27,9 @@
 #include <type_traits>
 #include <vector>
 
-#include <cuda_runtime.h>
-
 #include <thrust/universal_vector.h>
 
+#include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
