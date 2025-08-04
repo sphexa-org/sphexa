@@ -26,95 +26,59 @@
 namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail
 {
 
-struct None
+template<class... Ts>
+consteval std::array<int, sizeof...(Ts)> typeSizes(std::tuple<Ts...>)
 {
-};
-
-template<class T, class... Ts>
-consteval auto tail(util::TypeList<T, Ts...>)
-{
-    return util::TypeList<Ts...>{};
+    return {sizeof(Ts)...};
 }
 
-consteval auto tail(util::TypeList<>) { return util::TypeList<>{}; }
-
-template<class Size, class IndexedOutSizes>
-consteval auto findMatchingOutput(Size, IndexedOutSizes)
+template<std::size_t N, std::size_t M>
+consteval std::array<int, N> mapSizes(std::array<int, N> const& resultSizes, std::array<int, M> outputSizes)
 {
-    if constexpr (util::TypeListSize<IndexedOutSizes>::value == 0) { return None{}; }
-    else
+    std::array<int, N> indexMap;
+
+    for (std::size_t i = 0; i < N; ++i)
     {
-        using Head      = util::TypeListElement_t<0, IndexedOutSizes>;
-        using HeadIndex = util::TypeListElement_t<0, Head>;
-        using HeadSize  = util::TypeListElement_t<1, Head>;
-        if constexpr (std::is_same_v<Size, HeadSize>)
-            return HeadIndex{};
-        else
-            return findMatchingOutput(Size{}, tail(IndexedOutSizes{}));
-    }
-}
-
-template<class Index, class IndexedOutSizes>
-consteval auto dropByIndex(Index, IndexedOutSizes)
-{
-    if constexpr (std::is_same_v<Index, None>) { return IndexedOutSizes{}; }
-    else if constexpr (util::TypeListSize<IndexedOutSizes>::value == 0) { return util::TypeList<>{}; }
-    else
-    {
-        using Head      = util::TypeListElement_t<0, IndexedOutSizes>;
-        using HeadIndex = util::TypeListElement_t<0, Head>;
-        if constexpr (std::is_same_v<Index, HeadIndex>)
-            return tail(IndexedOutSizes{});
-        else
-            return util::FuseTwo<util::TypeList<Head>, decltype(dropByIndex(Index{}, tail(IndexedOutSizes{})))>{};
-    }
-}
-
-template<class TmpSizes, class OutSizes>
-consteval auto mapTemporarySizes(TmpSizes, OutSizes)
-{
-    if constexpr (util::TypeListSize<TmpSizes>::value == 0) { return util::TypeList<>{}; }
-    else
-    {
-        using Index       = decltype(findMatchingOutput(util::TypeListElement_t<0, TmpSizes>{}, OutSizes{}));
-        using TailIndices = decltype(mapTemporarySizes(tail(TmpSizes{}), dropByIndex(Index{}, OutSizes{})));
-        return util::FuseTwo<util::TypeList<Index>, TailIndices>{};
-    }
-}
-
-template<class T>
-using SizeOf = std::integral_constant<std::size_t, sizeof(T)>;
-
-template<class... T, std::size_t... Indices>
-consteval auto addIndices(util::TypeList<T...>, std::index_sequence<Indices...>)
-{
-    return util::TypeList<util::TypeList<std::integral_constant<std::size_t, Indices>, T>...>{};
-}
-
-template<class T>
-using AddIndices = decltype(addIndices(T{}, std::make_index_sequence<util::TypeListSize<T>::value>{}));
-
-template<class Tmp, class Out>
-using MapTemporarySizes = decltype(mapTemporarySizes(util::Map<SizeOf, Tmp>{}, AddIndices<util::Map<SizeOf, Out>>{}));
-
-template<class... Indices, class... Tmp, class Output>
-auto allocateOrMapTemporaries(const LocalIndex firstBody,
-                              const LocalIndex lastBody,
-                              util::TypeList<Indices...>,
-                              std::tuple<Tmp...>,
-                              const Output& output)
-{
-    auto allocOrMap = [&]<class Index, class T>(Index, T)
-    {
-        if constexpr (std::is_same_v<Index, None>)
+        indexMap[i] = -1;
+        for (std::size_t j = 0; j < M; ++j)
         {
-            auto holder = util::deviceAlloc<T[]>(lastBody - firstBody);
-            return std::make_tuple(holder.get() - firstBody, std::move(holder));
+            if (outputSizes[j] == resultSizes[i])
+            {
+                indexMap[i]    = j;
+                outputSizes[j] = -1;
+                break;
+            }
         }
-        else { return std::make_tuple(std::get<Index::value>(output), None{}); }
-    };
+    }
 
-    return std::make_tuple(allocOrMap(Indices{}, Tmp{})...);
+    return indexMap;
+}
+
+template<class Result, class Output>
+consteval auto mapTemporarySizes(Result, Output)
+{
+    constexpr auto indexMap = mapSizes(typeSizes(Result{}), typeSizes(Output{}));
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>)
+    {
+        return std::make_tuple(std::integral_constant<int, std::get<Is>(indexMap)>()...);
+    }(std::make_index_sequence<indexMap.size()>());
+}
+
+template<class IndexMap, class Result, class Output>
+auto allocateOrMapTemporaries(
+    const LocalIndex firstBody, const LocalIndex lastBody, IndexMap, Result, const Output& output)
+{
+    return util::tupleMap(
+        [&]<class Index, class T>(Index, T)
+        {
+            if constexpr (Index::value < 0)
+            {
+                auto holder = util::deviceAlloc<T[]>(lastBody - firstBody);
+                return std::make_tuple(holder.get() - firstBody, std::move(holder));
+            }
+            else { return std::make_tuple(std::get<Index::value>(output), nullptr); }
+        },
+        IndexMap{}, Result{});
 }
 
 /*! allocate or map temporary storage for output arrays required by the interaction kernel
@@ -149,9 +113,9 @@ auto allocateTemporaries(LocalIndex firstBody,
         using Result = decltype(unwrapModifiers(std::forward<Interaction>(interaction)(
             std::declval<ParticleData>(), std::declval<ParticleData>(), std::declval<Vec3<Tc>>(), std::declval<Tc>())));
 
-        using PtrMap = MapTemporarySizes<Result, util::TypeList<Out...>>;
+        constexpr auto ptrMap = mapTemporarySizes(Result{}, std::tuple<Out...>());
 
-        auto ptrsAndHolders = allocateOrMapTemporaries(firstBody, lastBody, PtrMap{}, Result{}, output);
+        auto ptrsAndHolders = allocateOrMapTemporaries(firstBody, lastBody, ptrMap, Result{}, output);
 
         auto ptrs = util::tupleMap([](auto const& alloc) { return std::get<0>(alloc); }, ptrsAndHolders);
         auto holders =
