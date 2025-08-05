@@ -1,6 +1,9 @@
 include:
   - local: 'ci/common.yml'
 
+variables:
+  MYUENV: "prgenv-gnu/24.11:v1"
+
 sph-build-cuda12-sm90-debug:
   stage: sphexa_build
   # needs: ['sph:base:cuda12']
