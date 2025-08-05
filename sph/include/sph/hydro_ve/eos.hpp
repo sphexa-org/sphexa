@@ -160,7 +160,7 @@ void computeIdealGasEOS(size_t startIndex, size_t endIndex, Dataset& d)
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         bool isGammaConst = d.devData.gamma.empty();
-        const auto* gamma = isGammaConst ? &d.gamma : rawPtr(d.devData.gamma);
+        const auto* gamma        = isGammaConst ? &d.gammaConst : rawPtr(d.devData.gamma);
 
         gpu::computeIdealGasEOS(startIndex, endIndex, d.muiConst, gamma, rawPtr(d.devData.temp), rawPtr(d.devData.u),
                                 rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm),

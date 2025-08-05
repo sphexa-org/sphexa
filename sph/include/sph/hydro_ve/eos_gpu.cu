@@ -54,7 +54,7 @@ __global__ void cudaComputeIdealGasEOS(size_t firstParticle, size_t lastParticle
     Tt gamma_i = isGammaConst ? *gamma : gamma[i];
 
     if (u == nullptr) { util::tie(p_i, c[i]) = idealGasEOS(temp[i], rho_i, mui, gamma_i); }
-    else { util::tie(p_i, c[i]) = idealGasEOS_u(u[i], rho_i, gamma); }
+    else { util::tie(p_i, c[i]) = idealGasEOS_u(u[i], rho_i, gamma_i); }
 
     prho[i] = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
     if (rho) { rho[i] = rho_i; }

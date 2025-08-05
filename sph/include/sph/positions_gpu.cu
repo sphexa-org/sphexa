@@ -105,7 +105,7 @@ void driftPositionsGpu(const GroupView& grp, float dt, float dt_back, util::arra
 
     if (numBlocks == 0) { return; }
     driftKernel<<<numBlocks, numThreads>>>(grp, dt, dt_back, dt_m1, x, y, z, vx, vy, vz, x_m1, y_m1, z_m1, ax, ay, az,
-                                           rung, temp, u, du, du_m1, mui, gamma, constCv);
+                                           rung, temp, u, du, du_m1, mui, gamma, constCv, isGammaConst);
 }
 
 #define DRIFT_GPU(Tc, Thydro, Tm1, Tdu)                                                                                \
@@ -177,7 +177,7 @@ void computePositionsGpu(const GroupView& grp, float dt, util::array<float, Time
 
     if (numBlocks == 0) { return; }
     computePositionsKernel<<<numBlocks, numThreads>>>(grp, dt, dt_m1, x, y, z, vx, vy, vz, x_m1, y_m1, z_m1, ax, ay, az,
-                                                      rung, temp, u, du, du_m1, h, mui, gamma, constCv, box, anyFBC);
+                                                      rung, temp, u, du, du_m1, h, mui, gamma, constCv, box, anyFBC, isGammaConst);
 }
 
 #define POS_GPU(Tc, Tv, Ta, Tdu, Tm1, Tt, Thydro)                                                                      \

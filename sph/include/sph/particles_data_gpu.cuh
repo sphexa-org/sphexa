@@ -89,7 +89,7 @@ public:
     DevVector<HydroType> divv, curlv;                        // Div(velocity), Curl(velocity)
     DevVector<HydroType> ugrav;                              // Gravitational potential
     DevVector<HydroType> ax, ay, az;                         // acceleration
-    DevVector<T>         du;                                 // energy rate of change (du/dt)
+    DevVector<RealType>         du;                                 // energy rate of change (du/dt)
     DevVector<XM1Type>   du_m1;                              // previous energy rate of change (du/dt)
     DevVector<HydroType> c11, c12, c13, c22, c23, c33;       // IAD components
     DevVector<HydroType> alpha;                              // AV coeficient

@@ -62,7 +62,7 @@ void computeIdealGasEOS_HydroStd(size_t firstParticle, size_t lastParticle, Data
     unsigned numBlocks  = cstone::iceil(lastParticle - firstParticle, numThreads);
 
     cudaComputeIdealGasEOS_HydroStd<<<numBlocks, numThreads>>>(
-        firstParticle, lastParticle, d.muiConst, d.gamma, rawPtr(d.devData.temp), rawPtr(d.devData.u),
+        firstParticle, lastParticle, d.muiConst, d.gammaConst, rawPtr(d.devData.temp), rawPtr(d.devData.u),
         rawPtr(d.devData.m), rawPtr(d.devData.rho), rawPtr(d.devData.p), rawPtr(d.devData.c));
 
     checkGpuErrors(cudaDeviceSynchronize());

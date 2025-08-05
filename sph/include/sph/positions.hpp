@@ -192,12 +192,14 @@ void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone
 
     bool haveMui = !d.mui.empty();
     auto constCv = idealGasCv(d.muiConst, d.gammaConst);
+    bool isGammaConst = d.gamma.empty();
+
 
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; i++)
     {
-        //TODO variable gamma
-        auto cv    = haveMui ? idealGasCv(d.mui[i], d.gammaConst) : constCv;
+        auto gamma_i = isGammaConst ? d.gammaConst : d.gamma[i];
+        auto cv    = haveMui ? idealGasCv(d.mui[i], gamma_i) : constCv;
         auto u_old = cv * d.temp[i];
         d.temp[i] = energyUpdate(u_old, d.minDt, d.minDt_m1, d.du[i], d.du_m1[i], {d.x[i], d.y[i], d.z[i]}, box, anyFBC,
                                  d.h[i]) /
@@ -238,16 +240,16 @@ void driftPositions(const GroupView& grp, Dataset& d, float dt_forward, float dt
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        //TODO variable gamma
         auto  constCv = d.mui.empty() ? idealGasCv(d.muiConst, d.gammaConst) : -1.0;
         auto* d_mui   = d.mui.empty() ? nullptr : rawPtr(d.devData.mui);
-
+        bool isGammaConst = d.gamma.empty();
+        const auto* gamma = isGammaConst ? &d.gammaConst : rawPtr(d.devData.gamma);
 
         driftPositionsGpu(grp, dt_forward, dt_backward, dt_prevRung, rawPtr(d.devData.x), rawPtr(d.devData.y),
                           rawPtr(d.devData.z), rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
                           rawPtr(d.devData.x_m1), rawPtr(d.devData.y_m1), rawPtr(d.devData.z_m1), rawPtr(d.devData.ax),
                           rawPtr(d.devData.ay), rawPtr(d.devData.az), rung, rawPtr(d.devData.temp), rawPtr(d.devData.u),
-                          rawPtr(d.devData.du), rawPtr(d.devData.du_m1), d_mui, d.gammaConst, constCv);
+                          rawPtr(d.devData.du), rawPtr(d.devData.du_m1), d_mui, gamma, constCv, isGammaConst);
     }
 }
 

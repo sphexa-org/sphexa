@@ -1,8 +1,8 @@
 /*
  * MIT License
  *
- * Copyright (c) 2023 CSCS, ETH Zurich
- *               2023 University of Basel
+ * Copyright (c) 2025 CSCS, ETH Zurich
+ *               2025 University of Basel
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,38 +24,46 @@
  */
 
 /*! @file
- * @brief additional fields kernel
+ * @brief A Propagator class for modern SPH with generalized volume elements, which features variable adiabatic indices
+ * per particle
  *
+ * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  * @author Lukas Schmidt
  */
 
-#include "cstone/cuda/annotation.hpp"
-#include "cstone/sfc/box.hpp"
+#pragma once
 
-namespace sph
+#include "sph/sph.hpp"
+#include "ve_hydro.hpp"
+
+namespace sphexa
 {
 
-template<size_t stride = 1, class T, class Tm>
-HOST_DEVICE_FUN void markRampJLoop(cstone::LocalIndex i, const cstone::LocalIndex* neighbors, unsigned neighborsCount,
-                                   T Atmin, T Atmax, T ramp, const T* kx, const T* xm, const Tm* m, T* markRamp)
-{
-    auto rhoi   = kx[i] * m[i] / xm[i];
-    markRamp[i] = T(0);
+using namespace sph;
+using cstone::FieldStates;
 
-    for (unsigned pj = 0; pj < neighborsCount; ++pj)
+//! @brief VE hydro propagator with artificial gravity for the Rayleigh-Taylor test case
+template<bool avClean, class DomainType, class DataType>
+class VariableGammaVeProp final : public HydroVeProp<avClean, DomainType, DataType>
+{
+    using Base = HydroVeProp<avClean, DomainType, DataType>;
+    using Base::rank_;
+    using Base::timer;
+
+    using RealType = typename DataType::RealType;
+
+public:
+    VariableGammaVeProp(std::ostream& output, size_t rank)
+        : Base(output, rank)
     {
-        cstone::LocalIndex j    = neighbors[stride * pj];
-        auto               rhoj = kx[j] * m[j] / xm[j];
-
-        T Atwood = (std::abs(rhoi - rhoj)) / (rhoi + rhoj);
-        if (Atwood > Atmax) { markRamp[i] += T(1); }
-        else if (Atwood >= Atmin)
-        {
-            T sigma_ij = ramp * (Atwood - Atmin);
-            markRamp[i] += sigma_ij;
-        }
     }
-    markRamp[i] /= neighborsCount;
-}
 
-} // namespace sph
+    void activateFields(DataType& simData) override
+    {
+        Base::activateFields(simData);
+        simData.hydro.setConserved("gamma");
+        simData.hydro.devData.setConserved("gamma");
+    }
+};
+
+} // namespace sphexa

@@ -48,7 +48,7 @@ namespace sphexa
 template<class KeyType, class T>
 void sortBySfcKey(std::vector<T>& x, std::vector<T>& y, std::vector<T>& z)
 {
-    assert(x.size() == y.size() == z.size());
+    assert(x.size() == y.size() && y.size() == z.size());
     size_t blockSize = x.size();
 
     cstone::Box<T> box(0, 1);

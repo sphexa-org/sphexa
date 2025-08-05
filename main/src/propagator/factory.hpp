@@ -43,6 +43,14 @@ template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
 propagatorFactory(const std::string& choice, bool avClean, std::ostream& output, size_t rank, const InitSettings& s)
 {
+    // settings or test-case based choices, take precedence over runtime --prop flag
+    if (s.count("triple-point-shock"))
+    {
+        return PropLib<DomainType, ParticleDataType>::makeVariableGammaVeProp(output, rank, avClean);
+    }
+
+
+    // choice from --prop
     if (choice == "ve") { return PropLib<DomainType, ParticleDataType>::makeHydroVeProp(output, rank, avClean); }
     if (choice == "ve-bdt")
     {
@@ -63,6 +71,11 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
     if (choice == "turbulence-ve")
     {
         return PropLib<DomainType, ParticleDataType>::makeTurbVeProp(output, rank, s, avClean);
+    }
+
+    if (choice == "variable-gamma-ve")
+    {
+        return PropLib<DomainType, ParticleDataType>::makeVariableGammaVeProp(output, rank,  avClean);
     }
 #ifdef SPH_EXA_HAVE_DISKS
     if (choice == "std-disk") { return PropLib<DomainType, ParticleDataType>::makeDiskProp(output, rank, s); }
