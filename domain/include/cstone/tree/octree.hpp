@@ -246,7 +246,7 @@ struct OctreeView
     NodeType* d_levelRange;
     NodeType* internalToLeaf;
     NodeType* leafToInternal;
-    KeyType*  leaves{nullptr};
+    KeyType* leaves{nullptr};
 
     std::span<NodeType> leafToInternalSpan() { return {leafToInternal + numInternalNodes, size_t(numLeafNodes)}; }
     std::span<NodeType> levelRangeSpan() { return {levelRange, maxTreeLevel<std::decay_t<KeyType>>{} + 2}; }
@@ -306,16 +306,32 @@ public:
 
     OctreeView<KeyType> data()
     {
-        return {numLeafNodes,           numInternalNodes,      numNodes,           rawPtr(prefixes),
-                rawPtr(childOffsets),   rawPtr(parents),       rawPtr(levelRange), rawPtr(d_levelRange),
-                rawPtr(internalToLeaf), rawPtr(leafToInternal), nullptr};
+        return {numLeafNodes,
+                numInternalNodes,
+                numNodes,
+                rawPtr(prefixes),
+                rawPtr(childOffsets),
+                rawPtr(parents),
+                rawPtr(levelRange),
+                rawPtr(d_levelRange),
+                rawPtr(internalToLeaf),
+                rawPtr(leafToInternal),
+                nullptr};
     }
 
     OctreeView<const KeyType> cdata() const
     {
-        return {numLeafNodes,           numInternalNodes,      numNodes,           rawPtr(prefixes),
-                rawPtr(childOffsets),   rawPtr(parents),       rawPtr(levelRange), rawPtr(d_levelRange),
-                rawPtr(internalToLeaf), rawPtr(leafToInternal), nullptr};
+        return {numLeafNodes,
+                numInternalNodes,
+                numNodes,
+                rawPtr(prefixes),
+                rawPtr(childOffsets),
+                rawPtr(parents),
+                rawPtr(levelRange),
+                rawPtr(d_levelRange),
+                rawPtr(internalToLeaf),
+                rawPtr(leafToInternal),
+                nullptr};
     }
 
     TreeNodeIndex numNodes{0};
@@ -392,16 +408,32 @@ public:
 
     OctreeView<KeyType> data()
     {
-        return {numLeafNodes_,      numInternalNodes_,      levelRange_.back(),
-                prefixes_.data(),   childOffsets_.data(),   parents_.data(),
-                levelRange_.data(), nullptr, internalToLeaf_.data(), leafToInternal_.data(), nullptr};
+        return {numLeafNodes_,
+                numInternalNodes_,
+                levelRange_.back(),
+                prefixes_.data(),
+                childOffsets_.data(),
+                parents_.data(),
+                levelRange_.data(),
+                nullptr,
+                internalToLeaf_.data(),
+                leafToInternal_.data(),
+                nullptr};
     }
 
     OctreeView<const KeyType> cdata() const
     {
-        return {numLeafNodes_,      numInternalNodes_,      levelRange_.back(),
-                prefixes_.data(),   childOffsets_.data(),   parents_.data(),
-                levelRange_.data(), nullptr, internalToLeaf_.data(), leafToInternal_.data(), nullptr};
+        return {numLeafNodes_,
+                numInternalNodes_,
+                levelRange_.back(),
+                prefixes_.data(),
+                childOffsets_.data(),
+                parents_.data(),
+                levelRange_.data(),
+                nullptr,
+                internalToLeaf_.data(),
+                leafToInternal_.data(),
+                nullptr};
     }
 
     //! @brief return a const view of the cstone leaf array

@@ -35,8 +35,8 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
         KeyType nodeKey = decodePlaceholderBit(nodePrefixes[idx]);
         int level       = decodePrefixLength(nodePrefixes[idx]) / 3;
         IBox sourceBox  = sfcIBox(sfcKey(nodeKey), level);
-        bool bOverlap = !containedIn(nodeKey, nodeKey + nodeRange<KeyType>(level), excludeStart, excludeEnd) &&
-               overlap<KeyType>(sourceBox, target);
+        bool bOverlap   = !containedIn(nodeKey, nodeKey + nodeRange<KeyType>(level), excludeStart, excludeEnd) &&
+                        overlap<KeyType>(sourceBox, target);
         if (bOverlap) { flags[idx] = 1; }
         return bOverlap;
     };

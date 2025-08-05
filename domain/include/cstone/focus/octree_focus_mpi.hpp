@@ -113,7 +113,7 @@ public:
         std::vector<KeyType> enforcedKeys;
         enforcedKeys.reserve(peers_.size() * 2);
 
-        assert(leafCounts_.size() == octreeAcc_.numLeafNodes);
+        assert(leafCountsAcc_.size() == octreeAcc_.numLeafNodes);
         focusTransfer<KeyType, useGpu>(leaves_, {leafCountsAcc_.data(), leafCountsAcc_.size()}, bucketSize_, myRank_,
                                        prevFocusStart, prevFocusEnd, focusStart, focusEnd, enforcedKeys);
         for (int peer : peers_)
@@ -340,7 +340,6 @@ public:
                 letToGlob[i] = locateNode(octreeAcc_.prefixes[idxFromGlob[i]], globalNodeKeys, globalLevelRange);
             }
             gatherScatter<TreeNodeIndex>(letToGlob, idxFromGlob, globalQuantities.data(), localQuantities.data());
-
         }
     }
 
@@ -548,8 +547,8 @@ public:
         else
         {
             layout[0] = 0;
-            std::inclusive_scan(leafCountsAcc_.begin() + firstNode, leafCountsAcc_.begin() + lastNode, layout.begin() + 1,
-                                std::plus{}, LocalIndex{0});
+            std::inclusive_scan(leafCountsAcc_.begin() + firstNode, leafCountsAcc_.begin() + lastNode,
+                                layout.begin() + 1, std::plus{}, LocalIndex{0});
             std::vector<float> haloRadii(leafCountsAcc_.size(), 0.0f);
 #pragma omp parallel for schedule(static)
             for (TreeNodeIndex i = 0; i < numNodesSearch; ++i)

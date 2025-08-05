@@ -153,9 +153,7 @@ packAllocBuffer(Vector& vec, TypeList<Ts...>, std::array<std::size_t, sizeof...(
     char* basePtr = reinterpret_cast<char*>(vec.data());
 
     auto packBuffers = [basePtr, &offsets, &numElements]<std::size_t... Is>(std::index_sequence<Is...>)
-    {
-        return std::make_tuple(std::span<Ts>{reinterpret_cast<Ts*>(basePtr + offsets[Is]), numElements[Is]}...);
-    };
+    { return std::make_tuple(std::span<Ts>{reinterpret_cast<Ts*>(basePtr + offsets[Is]), numElements[Is]}...); };
 
     return packBuffers(std::make_index_sequence<sizeof...(Ts)>{});
 }
