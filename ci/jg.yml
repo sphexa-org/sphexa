@@ -4,7 +4,8 @@ include:
 sph-build-cuda12-sm90-debug:
   stage: sphexa_build
   # needs: ['sph:base:cuda12']
-  image: $(./scripts/cscs.sh uenv_image_find)
+  #no image: $(./scripts/cscs.sh uenv_image_find)
+  image: "${MYUENV}"
   # image: prgenv-gnu/24.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
