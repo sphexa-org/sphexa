@@ -622,8 +622,9 @@ __global__ void computeActiveMasksKernel(const LocalIndex firstISupercluster,
     const LocalIndex startOffset  = groupStart - supercluster * Config::superclusterSize;
     const LocalIndex endOffset    = groupEnd - supercluster * Config::superclusterSize;
 
-    auto* activeMaskPtr   = &activeMasks[supercluster - firstISupercluster];
-    const Mask activeMask = ~(~Mask(0) << endOffset) & (~Mask(0) << startOffset);
+    auto* activeMaskPtr = &activeMasks[supercluster - firstISupercluster];
+    const Mask activeMask =
+        ~(endOffset == Config::superclusterSize ? Mask(0) : ~Mask(0) << endOffset) & (~Mask(0) << startOffset);
 
     // atomic update as multiple groups can be inside the same supercluster
     atomicOr(activeMaskPtr, activeMask);
