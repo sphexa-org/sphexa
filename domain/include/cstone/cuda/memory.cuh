@@ -103,7 +103,11 @@ struct SharedMemAllocator
             other.allocSize = 0;
         }
 
-        __device__ constexpr ~SharedMemPtr() { allocator.ptr -= allocSize; }
+        __device__ constexpr ~SharedMemPtr()
+        {
+            allocator.ptr -= allocSize;
+            allocator.size -= allocSize;
+        }
 
     private:
         friend struct SharedMemAllocator;
@@ -125,10 +129,13 @@ struct SharedMemAllocator
     __device__ SharedMemAllocator(unsigned capacityPerArea = 0, unsigned areaIndex = 0)
     {
         extern __shared__ char basePtr[];
-        ptr = basePtr + capacityPerArea * areaIndex;
-        size = 0;
+        ptr      = basePtr + capacityPerArea * areaIndex;
+        size     = 0;
         capacity = capacityPerArea;
     }
+
+    __device__ SharedMemAllocator(SharedMemAllocator const&) = delete;
+    __device__ SharedMemAllocator(SharedMemAllocator&&) = default;
 
     template<class T, std::enable_if_t<!std::is_array_v<T>, int> = 0>
     __device__ constexpr SharedMemPtr<T> alloc()
@@ -146,11 +153,11 @@ struct SharedMemAllocator
 
 private:
     template<class T>
-    __device__ constexpr std::tuple<T*, unsigned> allocImpl(unsigned size)
+    __device__ constexpr std::tuple<T*, unsigned> allocImpl(unsigned n)
     {
 
         unsigned offset    = (alignof(T) - reinterpret_cast<std::size_t>(ptr)) % alignof(T);
-        unsigned allocSize = size * sizeof(T) + offset;
+        unsigned allocSize = n * sizeof(T) + offset;
         T* allocated       = reinterpret_cast<T*>(ptr + offset);
         ptr += allocSize;
         size += allocSize;
