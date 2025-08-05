@@ -121,5 +121,10 @@ TYPED_TEST(ReduceArrayGpu, full)
     thrust::universal_vector<std::array<int, TypeParam::arraySize>> out(ref.size());
     runReduction<TypeParam::reductionSize, TypeParam::interleave><<<1, GpuConfig::warpSize>>>(rawPtr(in), rawPtr(out));
     checkGpuErrors(cudaDeviceSynchronize());
-    EXPECT_EQ(out, ref);
+#ifdef __HIP_PLATFORM_AMD__
+    // Workaround for compiler bug in HIP/ROCm 6.3
+    EXPECT_TRUE(std::equal(out.begin(), out.end(), ref.begin()));
+#else
+    EXPECT_TRUE(out, ref);
+#endif
 }
