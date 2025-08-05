@@ -125,6 +125,6 @@ TYPED_TEST(ReduceArrayGpu, full)
     // Workaround for compiler bug in HIP/ROCm 6.3
     EXPECT_TRUE(std::equal(out.begin(), out.end(), ref.begin()));
 #else
-    EXPECT_TRUE(out, ref);
+    EXPECT_EQ(out, ref);
 #endif
 }
