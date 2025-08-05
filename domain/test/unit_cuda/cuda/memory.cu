@@ -70,13 +70,17 @@ __global__ void testSharedMemAlloc(bool* failed)
 
         if (doubleData[laneIdx] != threadIdx.x)
         {
+#ifndef __HIP_PLATFORM_AMD__ // Workaround for compiler bug in HIP/ROCm 6.3
             printf("doubleData check failed\n");
+#endif
             *failed = true;
         }
         auto movedDoubleData = std::move(doubleData);
         if (movedDoubleData[laneIdx] != threadIdx.x)
         {
+#ifndef __HIP_PLATFORM_AMD__ // Workaround for compiler bug in HIP/ROCm 6.3
             printf("movedDoubleData check failed\n");
+#endif
             *failed = true;
         }
     }
@@ -85,20 +89,26 @@ __global__ void testSharedMemAlloc(bool* failed)
         auto i64Data = alloc.alloc<std::int64_t[]>(GpuConfig::warpSize);
         if (i64Data.get() != ptr)
         {
+#ifndef __HIP_PLATFORM_AMD__ // Workaround for compiler bug in HIP/ROCm 6.3
             printf("i64Data check failed\n");
+#endif
             *failed = true;
         }
         auto movedI64Data = std::move(i64Data);
         if (movedI64Data.get() != ptr)
         {
+#ifndef __HIP_PLATFORM_AMD__ // Workaround for compiler bug in HIP/ROCm 6.3
             printf("movedI64Data check failed\n");
+#endif
             *failed = true;
         }
     }
 
     if (laneIdx < 3 && charData[laneIdx] != 'a' + threadIdx.x % 5)
     {
+#ifndef __HIP_PLATFORM_AMD__ // Workaround for compiler bug in HIP/ROCm 6.3
         printf("charData check failed\n");
+#endif
         *failed = true;
     }
 }
