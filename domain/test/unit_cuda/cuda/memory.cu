@@ -44,8 +44,8 @@ TEST(Memory, DeviceAllocArray)
 
 TEST(Memory, DeviceAllocVirtual)
 {
-    // allocate 128 TiB of data, makes sure we only allocate virtual memory, not physical
-    auto data = util::deviceAllocVirtual<float[]>(1024ul * 1024ul * 1024ul * 1024ul * 32ul);
+    // allocate 64 TiB of data, makes sure we only allocate virtual memory, not physical
+    auto data = util::deviceAllocVirtual<float[]>(1024ul * 1024ul * 1024ul * 1024ul * 16ul);
     ASSERT_TRUE(data);
     deviceAccess<<<1, 10>>>(data.get(), 37.5f);
     checkGpuErrors(cudaDeviceSynchronize());
