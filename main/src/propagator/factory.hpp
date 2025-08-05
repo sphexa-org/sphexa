@@ -49,7 +49,6 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
         return PropLib<DomainType, ParticleDataType>::makeVariableGammaVeProp(output, rank, avClean);
     }
 
-
     // choice from --prop
     if (choice == "ve") { return PropLib<DomainType, ParticleDataType>::makeHydroVeProp(output, rank, avClean); }
     if (choice == "ve-bdt")
@@ -75,7 +74,7 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
 
     if (choice == "variable-gamma-ve")
     {
-        return PropLib<DomainType, ParticleDataType>::makeVariableGammaVeProp(output, rank,  avClean);
+        return PropLib<DomainType, ParticleDataType>::makeVariableGammaVeProp(output, rank, avClean);
     }
 #ifdef SPH_EXA_HAVE_DISKS
     if (choice == "std-disk") { return PropLib<DomainType, ParticleDataType>::makeDiskProp(output, rank, s); }
