@@ -1,10 +1,13 @@
 include:
   - local: 'ci/common.yml'
 
+variables:
+  MYUENV: "prgenv-gnu/25.06:rc5"
+
 sph-run-cuda12-sm90-release-1rank:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-release']
-  image: prgenv-gnu/25.06:rc5
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -30,6 +33,11 @@ sph-run-cuda12-sm90-release-1rank:
     # TODO:slow    - sbin/performance/hilbert_perf
     - sbin/unit/component_units_omp
     - sbin/unit/component_units
+    # https://github.com/grackle-project/grackle_data_files/blob/928696482fbe15d9bac4382de6134d95568f099c/input/CloudyData_UVB%3DHM2012.h5
+    - wget https://jfrog.svc.cscs.ch/artifactory/cscs-reframe-tests/sphexa/CloudyData_UVB%3DHM2012.h5
+    - mkdir -p extern/grackle/grackle_repo/grackle_data_files/input
+    - mv CloudyData_UVB=HM2012.h5 extern/grackle/grackle_repo/grackle_data_files/input/
+    - sbin/physics/cooling_tests
     # GPU tests:
     - sbin/hydro/sph_gpu_tests
     - sbin/performance/hilbert_perf_gpu
@@ -41,7 +49,7 @@ sph-run-cuda12-sm90-release-1rank:
 sph-run-cuda12-sm90-release-2ranks:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-release']
-  image: prgenv-gnu/25.06:rc5
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -68,6 +76,7 @@ sph-run-cuda12-sm90-release-2ranks:
     - sbin/ryoanji/global_upsweep_cpu
     - sbin/ryoanji/ryoanji_demo/ryoanji_demo
     - sbin/ryoanji/ryoanji_demo_mpi
+    - sbin/physics/disk_tests
     # GPU tests:
     - sbin/integration_mpi/assignment_gpu
     - sbin/integration_mpi/domain_gpu
@@ -78,7 +87,7 @@ sph-run-cuda12-sm90-release-2ranks:
 sph-run-cuda12-sm90-release-4ranks:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-release']
-  image: prgenv-gnu/25.06:rc5
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -101,7 +110,7 @@ sph-run-cuda12-sm90-release-4ranks:
 sph-run-cuda12-sm90-release-12ranks:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-release']
-  image: prgenv-gnu/25.06:rc5
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -126,7 +135,7 @@ sph-run-cuda12-sm90-release-12ranks:
 sph-run-cuda12-sm90-release-sphexa-cuda:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-release']
-  image: prgenv-gnu/25.06:rc5
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -150,7 +159,7 @@ sph-run-cuda12-sm90-release-sphexa-cuda:
 sph-run-cuda12-sm90-release-sphexa-cpu:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-release']
-  image: prgenv-gnu/25.06:rc5
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'

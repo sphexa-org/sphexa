@@ -1,10 +1,14 @@
 include:
   - local: 'ci/common.yml'
 
+variables:
+  MYUENV: "prgenv-gnu/25.06:rc5"
+  GIT_SUBMODULE_STRATEGY: "recursive"
+
 sph-build-cuda12-sm90-debug:
   stage: sphexa_build
   # needs: ['sph:base:cuda12']
-  image: prgenv-gnu/25.06:rc5
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     PERSIST_IMAGE_NAME: ${CSCS_REGISTRY_PATH}/sphexa_cuda12_debug:${CI_COMMIT_SHORT_SHA}
