@@ -184,9 +184,9 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
 //! @brief check halo discovery for sanity
 template<class KeyType>
 int checkLayout(int myRank,
-               std::span<const TreeIndexPair> focusAssignment,
-               std::span<const LocalIndex> layout,
-               std::span<const KeyType> ftree)
+                std::span<const TreeIndexPair> focusAssignment,
+                std::span<const LocalIndex> layout,
+                std::span<const KeyType> ftree)
 {
     TreeNodeIndex firstNode = focusAssignment[myRank].start();
     TreeNodeIndex lastNode  = focusAssignment[myRank].end();

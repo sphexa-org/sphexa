@@ -15,7 +15,7 @@ using namespace sph;
 
 TEST(Integrator, timeReversal)
 {
-    using T = float;
+    using T    = float;
     double dtn = 0.1, dtnm1 = 0.5;
 
     Box<float> box(-100, 100);

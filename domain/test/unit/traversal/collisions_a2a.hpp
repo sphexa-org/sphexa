@@ -56,7 +56,7 @@ findCollisionsAll2all(std::span<const KeyType> nodeKeys, const std::vector<T>& h
         T radius = haloRadii[i];
 
         auto [k1, k2] = decodePlaceholderBit2K(nodeKeys[i]);
-        IBox haloBox = makeHaloBox(k1, k2, radius, globalBox);
+        IBox haloBox  = makeHaloBox(k1, k2, radius, globalBox);
         findCollisions2All<KeyType>(nodeKeys, collisions[i], haloBox);
     }
 

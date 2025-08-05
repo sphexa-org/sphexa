@@ -146,7 +146,7 @@ TEST(DomainDecomposition, limitBoundaryShifts)
         std::span numNodesPerRank = newAssignment.numNodesPerRank();
         EXPECT_TRUE(std::equal(numNodesPerRank.begin(), numNodesPerRank.end(), refNumNodesPerRank.begin()));
 
-        std::span treeOffsets     = newAssignment.treeOffsets();
+        std::span treeOffsets = newAssignment.treeOffsets();
         EXPECT_TRUE(std::equal(treeOffsets.begin(), treeOffsets.end(), refTreeOffsets.begin()));
     }
 }

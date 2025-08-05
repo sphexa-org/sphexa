@@ -187,7 +187,7 @@ auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op, MPI_Comm comm)
 
 //! @brief adaptor to wrap compile-time size arrays into flattened arrays of the underlying type
 template<class Ts, class Td, std::enable_if_t<!std::is_arithmetic_v<Td>, int> = 0>
-auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op,  MPI_Comm comm)
+auto mpiAllreduce(const Ts* src, Td* dest, int count, MPI_Op op, MPI_Comm comm)
 {
     using ValueType    = typename Td::value_type;
     constexpr size_t N = Td{}.size();

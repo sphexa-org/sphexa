@@ -38,8 +38,8 @@ findCollidingIndices(IBox target, std::span<const KeyType> leaves, KeyType exclS
     octree.update(leaves.data(), nNodes(leaves));
 
     std::vector<uint8_t> flags(octree.numTreeNodes(), 0);
-    findCollisions(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(),
-                   target, exclStart, exclEnd, flags.data());
+    findCollisions(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(), target, exclStart,
+                   exclEnd, flags.data());
 
     std::vector<TreeNodeIndex> collisions;
     auto toLeaf = octree.toLeafOrder();
