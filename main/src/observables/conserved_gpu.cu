@@ -38,6 +38,10 @@
 
 #include "conserved_gpu.h"
 
+#include "sph/eos.hpp"
+
+#include <thrust/device_ptr.h>
+
 namespace sphexa
 {
 
@@ -68,10 +72,22 @@ struct EMom
     }
 };
 
+template<class Tm, class Tt>
+struct EInt
+{
+    HOST_DEVICE_FUN
+    double operator()(const thrust::tuple<Tm, Tt, Tt>& p)
+    {
+        return get<0>(p) * get<1>(p) * sph::idealGasCv(mui, get<2>(p));
+    }
+    double mui;
+};
+
 template<class Tc, class Tv, class Tt, class Tm>
 std::tuple<double, double, Vec3<double>, Vec3<double>>
-conservedQuantitiesGpu(double cv, const Tc* x, const Tc* y, const Tc* z, const Tv* vx, const Tv* vy, const Tv* vz,
-                       const Tt* temp, const Tt* u, const Tm* m, size_t first, size_t last)
+conservedQuantitiesGpu(double muiConst, const Tc* x, const Tc* y, const Tc* z, const Tv* vx, const Tv* vy, const Tv* vz,
+                       const Tt* temp, const Tt* u, const Tm* m, const Tt* gamma, size_t first, size_t last,
+                       bool isGammaConst)
 {
     auto it1 = thrust::make_zip_iterator(
         thrust::make_tuple(x + first, y + first, z + first, m + first, vx + first, vy + first, vz + first));
@@ -87,7 +103,23 @@ conservedQuantitiesGpu(double cv, const Tc* x, const Tc* y, const Tc* z, const T
     double eInt = 0.0;
     if (temp != nullptr)
     {
-        eInt = cv * thrust::inner_product(thrust::device, m + first, m + last, temp + first, Tt(0.0));
+
+        if (isGammaConst)
+        {
+            auto gammaIterator = thrust::make_constant_iterator(*gamma);
+            auto eIntStart =
+                thrust::make_zip_iterator(thrust::make_tuple(m + first, temp + first, gammaIterator + first));
+            auto eIntEnd = thrust::make_zip_iterator(thrust::make_tuple(m + last, temp + last, gammaIterator + last));
+            eInt         = thrust::transform_reduce(thrust::device, eIntEnd, eIntEnd, EInt<Tm, Tt>{muiConst}, eInt,
+                                                    thrust::plus<double>());
+        }
+        else
+        {
+            auto eIntStart = thrust::make_zip_iterator(thrust::make_tuple(m + first, temp + first, gamma + first));
+            auto eIntEnd   = thrust::make_zip_iterator(thrust::make_tuple(m + last, temp + last, gamma + last));
+            eInt           = thrust::transform_reduce(thrust::device, eIntStart, eIntEnd, EInt<Tm, Tt>{muiConst}, eInt,
+                                                      thrust::plus<Tt>());
+        }
     }
     else if (u != nullptr) { eInt = thrust::inner_product(thrust::device, m + first, m + last, u + first, Tt(0.0)); }
 
@@ -96,8 +128,8 @@ conservedQuantitiesGpu(double cv, const Tc* x, const Tc* y, const Tc* z, const T
 
 #define CONSERVED_Q_GPU(Tc, Tv, Tt, Tm)                                                                                \
     template std::tuple<double, double, Vec3<double>, Vec3<double>> conservedQuantitiesGpu(                            \
-        double cv, const Tc* x, const Tc* y, const Tc* z, const Tv* vx, const Tv* vy, const Tv* vz, const Tt* temp,    \
-        const Tt* u, const Tm* m, size_t, size_t)
+        double muiConst, const Tc* x, const Tc* y, const Tc* z, const Tv* vx, const Tv* vy, const Tv* vz,              \
+        const Tt* temp, const Tt* u, const Tm* m, const Tt* gamma, size_t, size_t, bool isGammaConst)
 
 CONSERVED_Q_GPU(double, double, double, double);
 CONSERVED_Q_GPU(double, double, double, float);
