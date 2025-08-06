@@ -21,6 +21,7 @@ sph-build-cuda12-sm90-debug:
     - pwd
     - git log -n1
     - git remote -v
+    - git --version
   script:
     - date
 # 
