@@ -22,7 +22,7 @@ sph-build-cuda12-sm90-debug:
     - git log -n1
     - git remote -v
     - git --version
-    - env |grep -i ref
+    - env &> eff.env
   script:
     - date
 # 
