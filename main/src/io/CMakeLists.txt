@@ -10,7 +10,7 @@ function(enableH5hut exename)
         endif()
         # necessary because the HDF5_INCLUDE_DIRS is empty on CRAY and HIP-compilation is done without the cray-wrapper
         target_include_directories(${exename} PUBLIC $ENV{HDF5_DIR}/include)
-        target_link_libraries(${exename} PRIVATE ${H5hut_LIBRARY} ${HDF5_LIBRARIES})
+        target_link_libraries(${exename} PRIVATE H5hut ${HDF5_LIBRARIES})
     endif()
 endfunction()
 
