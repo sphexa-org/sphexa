@@ -19,6 +19,8 @@ sph-build-cuda12-sm90-debug:
     SLURM_JOB_NUM_NODES: 1
   before_script:
     - pwd
+    - git log -n1
+    - git remote -v
   script:
     - date
 # 
