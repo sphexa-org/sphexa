@@ -539,8 +539,9 @@ public:
             scaleGpu(d_radii, d_radii + numLeafNodes, 2.0f * searchExtFact);
 
             if (not accumulate) { fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
-            findHalosGpu(let.prefixes, let.childOffsets, let.parents, leavesAcc_.data(), d_radii, box_, firstNode,
-                         lastNode, macsAcc_.data());
+            findHalosGpu(let.prefixes, let.childOffsets, let.parents, geoCentersAcc_.data(), geoSizesAcc_.data(),
+                         leavesAcc_.data(), d_radii, let.leafToInternalSpan().data(), box_, firstNode, lastNode,
+                         macsAcc_.data());
 
             reallocate(scratch, origSize, 1.0);
         }
@@ -560,8 +561,9 @@ public:
                 }
             }
             if (not accumulate) { std::fill(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
-            findHalos(let.prefixes, let.childOffsets, let.parents, leaves_.data(), haloRadii.data(), box_, firstNode,
-                      lastNode, macsAcc_.data());
+            findHalos(let.prefixes, let.childOffsets, let.parents, geoCentersAcc_.data(), geoSizesAcc_.data(),
+                      leaves_.data(), haloRadii.data(), let.leafToInternalSpan().data(), box_, firstNode, lastNode,
+                      macsAcc_.data());
         }
     }
 

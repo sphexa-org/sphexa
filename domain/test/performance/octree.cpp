@@ -55,36 +55,19 @@ std::tuple<std::vector<KeyType>, std::vector<unsigned>> build_tree(std::span<con
 }
 
 template<class KeyType>
-void halo_discovery(Box<double> box, const std::vector<KeyType>& tree, const std::vector<unsigned>& counts)
+void internal_tree(const std::vector<KeyType>& tree)
 {
-    std::vector<float> haloRadii(nNodes(tree), 0.01);
+    OctreeData<KeyType, CpuTag> octree;
+    octree.resize(nNodes(tree));
+    auto u0 = std::chrono::high_resolution_clock::now();
+    updateInternalTree<KeyType>(tree, octree.data());
+    auto u1 = std::chrono::high_resolution_clock::now();
+    std::cout << "first octree update: " << std::chrono::duration<double>(u1 - u0).count() << std::endl;
 
-    TreeNodeIndex lowerNode = 0;
-    TreeNodeIndex upperNode = nNodes(tree) / 4;
-    {
-        Octree<KeyType> octree;
-        auto u0 = std::chrono::high_resolution_clock::now();
-        octree.update(tree.data(), nNodes(tree));
-        auto u1 = std::chrono::high_resolution_clock::now();
-        std::cout << "first octree update: " << std::chrono::duration<double>(u1 - u0).count() << std::endl;
-
-        auto u2 = std::chrono::high_resolution_clock::now();
-        octree.update(tree.data(), nNodes(tree));
-        auto u3 = std::chrono::high_resolution_clock::now();
-        std::cout << "second octree update: " << std::chrono::duration<double>(u3 - u2).count() << std::endl;
-
-        std::vector<uint8_t> collisionFlags(octree.numTreeNodes(), 0);
-
-        OctreeView<KeyType> o = octree.data();
-        auto tp0              = std::chrono::high_resolution_clock::now();
-        findHalos(o.prefixes, o.childOffsets, o.parents, tree.data(), haloRadii.data(), box, lowerNode, upperNode,
-                  collisionFlags.data());
-        auto tp1 = std::chrono::high_resolution_clock::now();
-
-        double t2 = std::chrono::duration<double>(tp1 - tp0).count();
-        std::cout << "octree halo discovery: " << t2
-                  << " collidingNodes: " << std::accumulate(begin(collisionFlags), end(collisionFlags), 0) << std::endl;
-    }
+    auto u2 = std::chrono::high_resolution_clock::now();
+    updateInternalTree<KeyType>(tree, octree.data());
+    auto u3 = std::chrono::high_resolution_clock::now();
+    std::cout << "second octree update: " << std::chrono::duration<double>(u3 - u2).count() << std::endl;
 }
 
 int main()
@@ -99,8 +82,7 @@ int main()
 
     // tree build from random gaussian coordinates
     auto [tree, counts] = build_tree<KeyType>(randomBox.particleKeys(), bucketSize);
-    // halo discovery with tree
-    halo_discovery(box, tree, counts);
+    internal_tree(tree);
 
     auto px = plummer<double>(numParticles);
     std::vector<KeyType> pxCodes(numParticles);
