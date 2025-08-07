@@ -116,6 +116,41 @@ containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box)
     return (util::get<0>(envelope) >= codeStart) && (util::get<1>(envelope) <= codeEnd);
 }
 
+/*! @brief Check whether a coordinate box is fully contained in a SFC key range
+ *
+ * @tparam KeyType   32- or 64-bit unsigned integer
+ * @param codeStart  Morton code range start
+ * @param codeEnd    Morton code range end
+ * @param box        3D box with x,y,z integer coordinates in [0,2^maxTreeLevel<KeyType>{}-1]
+ * @return           true if the box is fully contained within the specified Morton code range
+ */
+template<class KeyType, class Tc>
+HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
+containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Vec3<Tc>& size, const Box<Tc>& box)
+{
+    auto boxMin   = center - size;
+    auto boxMax   = center + size;
+    auto dFromMin = min(boxMin - Vec3<Tc>{box.xmin(), box.ymin(), box.zmin()});
+    auto dFromMax = max(boxMax - Vec3<Tc>{box.xmax(), box.ymax(), box.zmax()});
+
+    if (dFromMin < Tc(0) || dFromMax > Tc(0))
+    {
+        // any box that wraps around a PBC boundary cannot be contained within
+        // any octree node, except the full root node
+        return codeStart == 0 && codeEnd == nodeRange<KeyType>(0);
+    }
+
+    // increase maximum by a grid-unit to ensure we round up
+    constexpr int gridDim = 1u << maxTreeLevel<KeyType>{};
+    boxMax += Vec3<Tc>{box.lx(), box.ly(), box.lz()} * (Tc(1) / gridDim);
+
+    KeyType lowCode  = iSfcKey<SfcKind<KeyType>>(boxMin[0], boxMin[1], boxMin[2]);
+    KeyType highCode = iSfcKey<SfcKind<KeyType>>(boxMax[0], boxMax[1], boxMax[2]);
+    auto envelope    = smallestCommonBox(lowCode, highCode);
+
+    return (util::get<0>(envelope) >= codeStart) && (util::get<1>(envelope) <= codeEnd);
+}
+
 /*! @brief determine whether a binary/octree node (prefix, prefixLength) is fully contained in an SFC range
  *
  * @tparam KeyType       32- or 64-bit unsigned integer

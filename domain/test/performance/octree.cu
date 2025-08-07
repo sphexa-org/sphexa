@@ -20,12 +20,12 @@
 #include <thrust/reduce.h>
 
 #include "cstone/cuda/thrust_util.cuh"
+#include "cstone/focus/source_center_gpu.h"
 #include "cstone/traversal/collisions_gpu.h"
 #include "cstone/tree/update_gpu.cuh"
 #include "cstone/tree/octree_gpu.h"
 
 #include "coord_samples/random.hpp"
-
 #include "timing.cuh"
 
 using namespace cstone;
@@ -51,13 +51,13 @@ auto benchmarkMacsCpu(const OctreeView<KeyType>& octree,
     return macs;
 }
 
-int main()
+int main(int argc, char** argv)
 {
     using KeyType = uint64_t;
     using T       = double;
     Box<T> box{-1, 1};
 
-    unsigned numParticles = 2000000;
+    unsigned numParticles = argc > 1 ? std::stoi(argv[1]) : 2000000;
     unsigned bucketSize   = 16;
 
     RandomGaussianCoordinates<T, MortonKey<KeyType>> randomBox(numParticles, box);
@@ -106,13 +106,15 @@ int main()
     // halo discovery benchmark
 
     thrust::device_vector<float> haloRadii(nNodes(tree), 0.01);
-    thrust::device_vector<uint8_t> flags(nNodes(tree), 0);
+    thrust::device_vector<uint8_t> flags(octree.numNodes, 0);
+    thrust::device_vector<Vec3<T>> nodeCenters(octree.numNodes), nodeSizes(octree.numNodes);
+    computeGeoCentersGpu(octree.prefixes.data(), octree.numNodes, rawPtr(nodeCenters), rawPtr(nodeSizes), box);
 
-    auto octreeView      = octree.data();
-    auto findHalosLambda = [octree = octreeView, &box, &tree, &haloRadii, &flags]()
+    auto od      = octree.data();
+    auto findHalosLambda = [&]()
     {
-        findHalosGpu(octree.prefixes, octree.childOffsets, octree.parents, rawPtr(tree), rawPtr(haloRadii), box, 0,
-                     octree.numLeafNodes / 4, rawPtr(flags));
+        findHalosGpu(od.prefixes, od.childOffsets, od.parents, rawPtr(nodeCenters), rawPtr(nodeSizes), rawPtr(tree),
+                     rawPtr(haloRadii), od.leafToInternalSpan().data(), box, 0, od.numLeafNodes / 4, rawPtr(flags));
     };
 
     float findTime = timeGpu(findHalosLambda);
@@ -120,17 +122,20 @@ int main()
               << " count: " << thrust::reduce(flags.begin(), flags.end(), 0) << std::endl;
 
     thrust::host_vector<KeyType> h_tree = tree;
-    Octree<KeyType> h_octreeHarness;
-    h_octreeHarness.update(h_tree.data(), nNodes(h_tree));
+    thrust::host_vector<Vec3<T>> h_nc = nodeCenters, h_ns = nodeSizes;
+    OctreeData<KeyType, CpuTag> h_octreeHarness;
+    h_octreeHarness.resize(nNodes(h_tree));
+    updateInternalTree<KeyType>({h_tree.data(), h_tree.size()}, h_octreeHarness.data());
     OctreeView<KeyType> h_octree = h_octreeHarness.data();
     {
         thrust::host_vector<float> radii = haloRadii;
-        std::vector<uint8_t> h_flags(nNodes(tree), 0);
+        std::vector<uint8_t> h_flags(octree.numNodes, 0);
 
         auto findHalosCpuLambda = [&]()
         {
-            findHalos(h_octree.prefixes, h_octree.childOffsets, h_octree.parents, h_tree.data(), radii.data(), box, 0,
-                      nNodes(tree) / 4, h_flags.data());
+            findHalos(h_octree.prefixes, h_octree.childOffsets, h_octree.parents, h_nc.data(), h_ns.data(),
+                      h_tree.data(), radii.data(), h_octree.leafToInternalSpan().data(), box, 0, nNodes(tree) / 4,
+                      h_flags.data());
         };
         float findTimeCpu = timeCpu(findHalosCpuLambda);
         std::cout << "CPU halo discovery " << findTimeCpu << " nNodes(tree): " << nNodes(h_tree)
@@ -166,9 +171,9 @@ int main()
     }
     centers = h_centers;
 
-    auto findMacsLambda = [octree = octreeView, &centers, &box, &tree, &macs, firstFocusNode, lastFocusNode]()
+    auto findMacsLambda = [od, &centers, &box, &tree, &macs, firstFocusNode, lastFocusNode]()
     {
-        markMacsGpu(octree.prefixes, octree.childOffsets, octree.parents, rawPtr(centers), box,
+        markMacsGpu(od.prefixes, od.childOffsets, od.parents, rawPtr(centers), box,
                     rawPtr(tree) + firstFocusNode, lastFocusNode - firstFocusNode, false, rawPtr(macs));
     };
 
@@ -179,5 +184,5 @@ int main()
     auto macsCpu = benchmarkMacsCpu(h_octree, h_centers.data(), box, h_tree, firstFocusNode, lastFocusNode);
 
     thrust::host_vector<uint8_t> macsGpuDl = macs;
-    std::cout << "GPU matches CPU " << std::equal(macsCpu.begin(), macsCpu.end(), macsGpuDl.begin());
+    std::cout << "GPU matches CPU " << std::equal(macsCpu.begin(), macsCpu.end(), macsGpuDl.begin()) << std::endl;
 }

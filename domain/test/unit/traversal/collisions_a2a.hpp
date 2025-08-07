@@ -31,33 +31,36 @@ namespace cstone
  * Naive implementation without tree traversal for reference
  * and testing purposes
  */
-template<class KeyType>
+template<class KeyType, class T>
 void findCollisions2All(std::span<const KeyType> nodeKeys,
-                        std::vector<TreeNodeIndex>& collisionList,
-                        const IBox& collisionBox)
+                        const Vec3<T>* nodeCenters,
+                        const Vec3<T>* nodeSizes,
+                        const Box<T>& box,
+                        Vec3<T> targetCenter,
+                        Vec3<T> targetSize,
+                        std::vector<TreeNodeIndex>& collisionList)
 {
     for (TreeNodeIndex idx = 0; idx < TreeNodeIndex(nodeKeys.size()); ++idx)
     {
-        auto [k1, k2] = decodePlaceholderBit2K(nodeKeys[idx]);
-        IBox nodeBox  = sfcIBox(sfcKey(k1), sfcKey(k2));
-        if (overlap<KeyType>(nodeBox, collisionBox)) { collisionList.push_back(idx); }
+        if (norm2(minDistance(targetCenter, targetSize, nodeCenters[idx], nodeSizes[idx], box)) == 0.0)
+        {
+            collisionList.push_back(idx);
+        }
     }
 }
 
 //! @brief all-to-all implementation of findAllCollisions
 template<class KeyType, class T>
 std::vector<std::vector<TreeNodeIndex>>
-findCollisionsAll2all(std::span<const KeyType> nodeKeys, const std::vector<T>& haloRadii, const Box<T>& globalBox)
+findCollisionsAll2all(std::span<const KeyType> nodeKeys, const Vec3<T>* tC, const Vec3<T>* tS, const Box<T>& box)
 {
-    std::vector<std::vector<TreeNodeIndex>> collisions(nodeKeys.size());
+    std::vector<Vec3<T>> nodeCenters(nodeKeys.size()), nodeSizes(nodeKeys.size());
+    nodeFpCenters<KeyType>(nodeKeys, nodeCenters.data(), nodeSizes.data(), box);
 
+    std::vector<std::vector<TreeNodeIndex>> collisions(nodeKeys.size());
     for (TreeNodeIndex i = 0; i < TreeNodeIndex(nodeKeys.size()); ++i)
     {
-        T radius = haloRadii[i];
-
-        auto [k1, k2] = decodePlaceholderBit2K(nodeKeys[i]);
-        IBox haloBox  = makeHaloBox(k1, k2, radius, globalBox);
-        findCollisions2All<KeyType>(nodeKeys, collisions[i], haloBox);
+        findCollisions2All<KeyType>(nodeKeys, nodeCenters.data(), nodeSizes.data(), box, tC[i], tS[i], collisions[i]);
     }
 
     return collisions;
