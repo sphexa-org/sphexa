@@ -118,7 +118,7 @@ void updatePositionsHost(size_t startIndex, size_t endIndex, Dataset& d, const c
                                               box.boundaryY() == cstone::BoundaryType::fixed,
                                               box.boundaryZ() == cstone::BoundaryType::fixed};
 
-    bool anyFBC = isAxisFixedBoundary[0] || isAxisFixedBoundary[1] || isAxisFixedBoundary[2];
+    bool            anyFBC = isAxisFixedBoundary[0] || isAxisFixedBoundary[1] || isAxisFixedBoundary[2];
     cstone::Vec3<T> adjustForFBC{T(1.), T(1.), T(1.)};
 
 #pragma omp parallel for schedule(static)

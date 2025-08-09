@@ -131,10 +131,9 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
 
     float dt_m1_rung = (rung != nullptr) ? dt_m1[rung[i]] : dt_m1[0];
 
-
-    cstone::Vec3<Tc>   X{x[i], y[i], z[i]};
-    bool               anyFBC = isAxisFixedBoundary[0] || isAxisFixedBoundary[1] || isAxisFixedBoundary[2];
-    cstone::Vec3<Tc>   adjustForFBC{Tc(1.), Tc(1.), Tc(1.)};
+    cstone::Vec3<Tc> X{x[i], y[i], z[i]};
+    bool             anyFBC = isAxisFixedBoundary[0] || isAxisFixedBoundary[1] || isAxisFixedBoundary[2];
+    cstone::Vec3<Tc> adjustForFBC{Tc(1.), Tc(1.), Tc(1.)};
     if (anyFBC)
     {
         for (size_t j = 0; j < 3; ++j)
@@ -186,7 +185,8 @@ void computePositionsGpu(const GroupView& grp, float dt, util::array<float, Time
 
     if (numBlocks == 0) { return; }
     computePositionsKernel<<<numBlocks, numThreads>>>(grp, dt, dt_m1, x, y, z, vx, vy, vz, x_m1, y_m1, z_m1, ax, ay, az,
-                                                      rung, temp, u, du, du_m1, h, mui, gamma, constCv, box, isAxisFixedBoundary);
+                                                      rung, temp, u, du, du_m1, h, mui, gamma, constCv, box,
+                                                      isAxisFixedBoundary);
 }
 
 #define POS_GPU(Tc, Tv, Ta, Tdu, Tm1, Tt, Thydro)                                                                      \
