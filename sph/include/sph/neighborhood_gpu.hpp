@@ -109,7 +109,7 @@ struct DeviceNeighborhoodData::Impl
                                NeighborhoodSubgroupType<cstone::ijloop::GpuFullNbListNeighborhood>,
                                NeighborhoodSubgroupType<ClusteredNeighborhood<false>>>>
                      subgroupData;
-    NeighborhoodType neighborhoodType;
+    NeighborhoodType neighborhoodType = NeighborhoodType::alwaysTraverse;
 };
 
 template<class Dataset, class T>

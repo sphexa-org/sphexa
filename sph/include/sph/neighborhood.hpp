@@ -1,6 +1,11 @@
 #pragma once
 
+#include <compare>
+#include <stdexcept>
+#include <variant>
+
 #include "cstone/traversal/groups.hpp"
+#include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
 #include "cstone/traversal/ijloop/cpu_fullnblist.hpp"
 #include "sph/types.hpp"
 
@@ -13,8 +18,6 @@ enum class NeighborhoodType
     fullNeighborList,
     clusteredNeighborList
 };
-
-using CpuNeighborhood = cstone::ijloop::CpuFullNbListNeighborhood;
 
 template<class Neighborhood>
 using NeighborhoodDataType = decltype(std::declval<Neighborhood>().build(
@@ -31,23 +34,49 @@ struct NeighborhoodData
 {
     NeighborhoodData() {}
 
-    void setType(NeighborhoodType type) {}
+    void setType(NeighborhoodType type)
+    {
+        if (type == NeighborhoodType::clusteredNeighborList)
+            throw std::invalid_argument("clustered neighbor lists are not available on CPU");
+        neighborhoodType = type;
+    }
 
     template<class Dataset, class T>
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool /* subgroups */)
     {
-        data = CpuNeighborhood{d.ngmax}.build(d.treeView, box, d.size(), groups, d.x.data(), d.y.data(), d.z.data(),
-                                              d.h.data());
+        std::variant<cstone::ijloop::CpuAlwaysTraverseNeighborhood, cstone::ijloop::CpuFullNbListNeighborhood>
+            neighborhood;
+
+        switch (neighborhoodType)
+        {
+            case NeighborhoodType::alwaysTraverse:
+                neighborhood = cstone::ijloop::CpuAlwaysTraverseNeighborhood{d.ngmax};
+                break;
+            case NeighborhoodType::fullNeighborList:
+                neighborhood = cstone::ijloop::CpuFullNbListNeighborhood{d.ngmax};
+                break;
+            case NeighborhoodType::clusteredNeighborList:
+                throw std::runtime_error("clustered neighbor lists are not available on CPU");
+                break;
+        }
+
+        std::visit(
+            [&](auto const& nb)
+            { data = nb.build(d.treeView, box, d.size(), groups, d.x.data(), d.y.data(), d.z.data(), d.h.data()); },
+            neighborhood);
     }
 
     template<class... Args>
     void ijLoop(Args&&... args) const
     {
-        data.ijLoop(std::forward<Args>(args)...);
+        std::visit([&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); }, data);
     }
 
 private:
-    NeighborhoodDataType<CpuNeighborhood> data;
+    std::variant<NeighborhoodDataType<cstone::ijloop::CpuAlwaysTraverseNeighborhood>,
+                 NeighborhoodDataType<cstone::ijloop::CpuFullNbListNeighborhood>>
+                     data;
+    NeighborhoodType neighborhoodType = NeighborhoodType::alwaysTraverse;
 };
 
 } // namespace sph
