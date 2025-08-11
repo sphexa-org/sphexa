@@ -23,6 +23,7 @@
 #include <thrust/universal_vector.h>
 
 #include "cstone/cuda/gpu_config.cuh"
+#include "cstone/cuda/thrust_util.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/reducearray.cuh"
 #include "cstone/traversal/ijloop/ijloop.hpp"

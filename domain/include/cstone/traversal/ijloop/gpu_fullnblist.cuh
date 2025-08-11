@@ -17,11 +17,9 @@
 
 #include <tuple>
 
-#include <thrust/device_vector.h>
 #include <thrust/execution_policy.h>
 
 #include "cstone/cuda/memory.cuh"
-#include "cstone/cuda/thrust_util.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/ijloop/common.hpp"
@@ -186,13 +184,13 @@ struct ScaleFunctor
 template<class Tc, class Th>
 struct GpuFullNbListNeighborhoodImpl
 {
-    Box<Tc> box;
+    Box<Tc> box = {0, 0};
     LocalIndex firstBody, lastBody;
     const Tc *x, *y, *z;
     const Th* h;
     unsigned ngmax;
-    thrust::device_vector<LocalIndex> neighbors;
-    thrust::device_vector<unsigned> neighborsCount;
+    util::UniqueDevicePtr<LocalIndex[]> neighbors;
+    util::UniqueDevicePtr<unsigned[]> neighborsCount;
 
     template<class... In, class... Out, class Interaction, class Postamble>
     void ijLoop(std::tuple<In*...> const& input,
@@ -205,15 +203,15 @@ struct GpuFullNbListNeighborhoodImpl
         constexpr int numThreads = 128;
         runIjLoop<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
             box, firstBody, lastBody, x, y, z, h, makeConst(input), output, std::forward<Interaction>(interaction),
-            std::forward<Postamble>(postamble), ngmax, rawPtr(neighbors), rawPtr(neighborsCount));
+            std::forward<Postamble>(postamble), ngmax, neighbors.get(), neighborsCount.get());
         checkGpuErrors(cudaGetLastError());
     }
 
     Statistics stats() const
     {
-        return {.numBodies = lastBody - firstBody,
-                .numBytes  = neighbors.size() * sizeof(typename decltype(neighbors)::value_type) +
-                            neighborsCount.size() * sizeof(typename decltype(neighborsCount)::value_type)};
+        const LocalIndex numBodies = lastBody - firstBody;
+        return {.numBodies = numBodies,
+                .numBytes  = sizeof(LocalIndex) * numBodies * ngmax + sizeof(unsigned) * numBodies};
     }
 
     struct Subgroup
@@ -232,7 +230,7 @@ struct GpuFullNbListNeighborhoodImpl
             runIjLoopGrouped<numThreads><<<iceil(groups.numGroups * GpuConfig::warpSize, numThreads), numThreads>>>(
                 parent.box, parent.firstBody, parent.lastBody, parent.x, parent.y, parent.z, parent.h, makeConst(input),
                 output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), parent.ngmax,
-                rawPtr(parent.neighbors), rawPtr(parent.neighborsCount), groups);
+                parent.neighbors.get(), parent.neighborsCount.get(), groups);
             checkGpuErrors(cudaGetLastError());
         }
     };
@@ -256,28 +254,21 @@ struct GpuFullNbListNeighborhood
                                                                                       const Th* h) const
     {
         using namespace gpu_full_nb_list_neighborhood_detail;
-        const LocalIndex numBodies = groups.lastBody - groups.firstBody;
-        GpuFullNbListNeighborhoodImpl<Tc, Th> nbList{box,
-                                                     groups.firstBody,
-                                                     groups.lastBody,
-                                                     x,
-                                                     y,
-                                                     z,
-                                                     h,
-                                                     ngmax,
-                                                     thrust::device_vector<LocalIndex>(ngmax * std::size_t(numBodies)),
-                                                     thrust::device_vector<unsigned>(numBodies)};
-        if (numBodies == 0) return nbList;
+        const std::size_t numBodies = groups.lastBody - groups.firstBody;
 
-        auto globalPool = util::deviceAlloc<int[]>(TravConfig::poolSize());
+        if (numBodies == 0) return {};
+
+        auto neighbors      = util::deviceAlloc<LocalIndex[]>(ngmax * numBodies);
+        auto neighborsCount = util::deviceAlloc<unsigned[]>(numBodies);
+        auto globalPool     = util::deviceAlloc<int[]>(TravConfig::poolSize());
 
         resetTraversalCounters<<<1, 1>>>();
         gpuFullNbListNeighborhoodBuild<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-            tree, box, groups, x, y, z, h, ngmax, rawPtr(nbList.neighbors), rawPtr(nbList.neighborsCount),
-            globalPool.get());
+            tree, box, groups, x, y, z, h, ngmax, neighbors.get(), neighborsCount.get(), globalPool.get());
         checkGpuErrors(cudaGetLastError());
         checkGpuErrors(cudaDeviceSynchronize());
-        return nbList;
+        return {box,   groups.firstBody,     groups.lastBody,          x, y, z, h,
+                ngmax, std::move(neighbors), std::move(neighborsCount)};
     }
 };
 
