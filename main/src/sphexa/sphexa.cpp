@@ -60,10 +60,11 @@ using AccType = cstone::CpuTag;
 namespace fs = std::filesystem;
 using namespace sphexa;
 
-bool stopConditionReached(size_t iteration, double time, const std::string& maxStepStr);
-bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float dt);
-void printHelp(char* binName, int rank);
-int  getNumLocalRanks(int);
+bool                  stopConditionReached(size_t iteration, double time, const std::string& maxStepStr);
+bool                  syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float dt);
+void                  printHelp(char* binName, int rank);
+int                   getNumLocalRanks(int);
+sph::NeighborhoodType nbTypeFromName(const std::string_view nbType);
 
 int main(int argc, char** argv)
 {
@@ -97,6 +98,7 @@ int main(int argc, char** argv)
     const std::string        pmroot       = parser.get("--pmroot", std::string("")); // /sys/cray/pm_counters
     std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
     std::string              profFile     = parser.get("-op", std::string("profile"));
+    sph::NeighborhoodType    nbChoice = nbTypeFromName(parser.get("--neighbor-search", std::string("always-traverse")));
 
     std::ofstream nullOutput("/dev/null");
     std::ostream& output = (quiet || rank) ? nullOutput : std::cout;
@@ -124,6 +126,8 @@ int main(int argc, char** argv)
     auto& d = simData.hydro;
     transferAllocatedToDevice(d, 0, d.x.size(), propagator->conservedFields());
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
+
+    d.setNeighborhoodType(nbChoice);
 
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
     bool  haveGrav = (d.g != 0.0);
@@ -226,6 +230,15 @@ bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float 
 int getNumLocalRanks(int defValue)
 {
     return getenv("SLURM_NTASKS_PER_NODE") == nullptr ? defValue : std::stoi(getenv("SLURM_NTASKS_PER_NODE"));
+}
+
+sph::NeighborhoodType nbTypeFromName(const std::string_view nbType)
+{
+    if (nbType == "always-traverse" || nbType == "t") return sph::NeighborhoodType::alwaysTraverse;
+    if (nbType == "full-neighbor-list" || nbType == "f") return sph::NeighborhoodType::fullNeighborList;
+    if (nbType == "clustered-neighbor-list" || nbType == "c") return sph::NeighborhoodType::clusteredNeighborList;
+    throw std::invalid_argument("neighbor-search argument must be one of 'always-traverse', 'full-neighbor-list', or "
+                                "'clustered-neighbor-list'");
 }
 
 void printHelp(char* name, int rank)

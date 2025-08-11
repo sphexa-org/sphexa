@@ -378,6 +378,14 @@ public:
 
     float getAllocGrowthRate() const { return allocGrowthRate_; }
 
+    void setNeighborhoodType(sph::NeighborhoodType type)
+    {
+        if constexpr (cstone::HaveGpu<AccType>{})
+            devData.neighborhood.setType(type);
+        else
+            neighborhood.setType(type);
+    }
+
 private:
     void createTables()
     {

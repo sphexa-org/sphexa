@@ -19,6 +19,8 @@ struct DeviceNeighborhoodData
     DeviceNeighborhoodData();
     ~DeviceNeighborhoodData();
 
+    void setType(NeighborhoodType type) {}
+
     template<class Dataset, class T>
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool subgroups);
 

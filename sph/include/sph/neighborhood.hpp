@@ -7,6 +7,13 @@
 namespace sph
 {
 
+enum class NeighborhoodType
+{
+    alwaysTraverse,
+    fullNeighborList,
+    clusteredNeighborList
+};
+
 using CpuNeighborhood = cstone::ijloop::CpuFullNbListNeighborhood;
 
 template<class Neighborhood>
@@ -23,6 +30,8 @@ using NeighborhoodSubgroupType =
 struct NeighborhoodData
 {
     NeighborhoodData() {}
+
+    void setType(NeighborhoodType type) {}
 
     template<class Dataset, class T>
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool /* subgroups */)
