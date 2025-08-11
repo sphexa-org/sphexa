@@ -8,6 +8,8 @@
 #include "sph/neighborhood.hpp"
 
 #if defined(__CUDACC__) || defined(__HIP__)
+#include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
+#include "cstone/traversal/ijloop/gpu_fullnblist.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
 #endif
 
@@ -19,7 +21,7 @@ struct DeviceNeighborhoodData
     DeviceNeighborhoodData();
     ~DeviceNeighborhoodData();
 
-    void setType(NeighborhoodType type) {}
+    void setType(NeighborhoodType type);
 
     template<class Dataset, class T>
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool subgroups);
@@ -44,8 +46,14 @@ struct DeviceNeighborhoodData::Impl
     {
         if (subgroups && groups.firstBody == 0 && groups.lastBody == 0)
         {
-            auto& nb = std::get<NeighborhoodDataType<ClusteredNeighborhood<false>>>(data);
-            subgroupData.emplace(nb.subgroup(groups));
+            subgroupData.reset();
+            std::visit(
+                [&]<class Neighborhood>(Neighborhood const& nb)
+                {
+                    if constexpr (!std::is_same_v<Neighborhood, NeighborhoodDataType<ClusteredNeighborhood<true>>>)
+                        subgroupData.emplace(nb.subgroup(groups));
+                },
+                data);
         }
         else
         {
@@ -54,11 +62,24 @@ struct DeviceNeighborhoodData::Impl
 
             const unsigned ncmax = std::bit_ceil(d.ngmax * 2);
 
-            std::variant<ClusteredNeighborhood<false>, ClusteredNeighborhood<true>> neighborhood;
-            if (subgroups)
-                neighborhood = ClusteredNeighborhood<false>{ncmax};
-            else
-                neighborhood = ClusteredNeighborhood<true>{ncmax};
+            std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, cstone::ijloop::GpuFullNbListNeighborhood,
+                         ClusteredNeighborhood<false>, ClusteredNeighborhood<true>>
+                neighborhood;
+            switch (neighborhoodType)
+            {
+                case NeighborhoodType::alwaysTraverse:
+                    neighborhood = cstone::ijloop::GpuAlwaysTraverseNeighborhood{d.ngmax};
+                    break;
+                case NeighborhoodType::fullNeighborList:
+                    neighborhood = cstone::ijloop::GpuFullNbListNeighborhood{d.ngmax};
+                    break;
+                case NeighborhoodType::clusteredNeighborList:
+                    if (subgroups)
+                        neighborhood = ClusteredNeighborhood<false>{ncmax};
+                    else
+                        neighborhood = ClusteredNeighborhood<true>{ncmax};
+                    break;
+            }
 
             std::visit(
                 [&](auto const& nb)
@@ -73,15 +94,22 @@ struct DeviceNeighborhoodData::Impl
     template<class... Args>
     void ijLoop(Args&&... args) const
     {
+        const auto runIjLoop = [&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); };
         if (subgroupData)
-            subgroupData.value().ijLoop(std::forward<Args>(args)...);
+            std::visit(runIjLoop, subgroupData.value());
         else
-            std::visit([&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); }, data);
+            std::visit(runIjLoop, data);
     }
 
-    std::variant<NeighborhoodDataType<ClusteredNeighborhood<false>>, NeighborhoodDataType<ClusteredNeighborhood<true>>>
-                                                                          data;
-    std::optional<NeighborhoodSubgroupType<ClusteredNeighborhood<false>>> subgroupData;
+    std::variant<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhood>,
+                 NeighborhoodDataType<cstone::ijloop::GpuFullNbListNeighborhood>,
+                 NeighborhoodDataType<ClusteredNeighborhood<false>>, NeighborhoodDataType<ClusteredNeighborhood<true>>>
+        data;
+    std::optional<std::variant<NeighborhoodSubgroupType<cstone::ijloop::GpuAlwaysTraverseNeighborhood>,
+                               NeighborhoodSubgroupType<cstone::ijloop::GpuFullNbListNeighborhood>,
+                               NeighborhoodSubgroupType<ClusteredNeighborhood<false>>>>
+                     subgroupData;
+    NeighborhoodType neighborhoodType;
 };
 
 template<class Dataset, class T>
