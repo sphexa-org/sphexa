@@ -51,8 +51,8 @@ TEST(Integrator, timeEnergyReversal)
 {
     using T = float;
 
-    T               dtn = 0.1, dtnm1 = 0.2;
-    T               dU = 2.0, dUm1 = 3.0;
+    T dtn = 0.1, dtnm1 = 0.2;
+    T dU = 2.0, dUm1 = 3.0;
 
     auto Unp1 = energyUpdate(10.0, dtn, dtnm1, dU, dUm1);
     EXPECT_NEAR(Unp1, 10.175, 1e-7);
@@ -65,15 +65,14 @@ TEST(Integrator, fixedBoundaryCorrection)
 {
 
     using T = double;
-    Box<T> box(-1.,1., BoundaryType::fixed);
+    Box<T> box(-1., 1., BoundaryType::fixed);
 
-    auto atBoundary = fbcAdjustFactor({1.,0.,0.},box,0.1, true);
+    auto atBoundary = fbcAdjustFactor({1., 0., 0.}, box, 0.1, true);
     EXPECT_NEAR(atBoundary, 0.0, 1e-5);
 
-    auto atMidPoint = fbcAdjustFactor({-0.7,0.,0.},box,0.1, true);
+    auto atMidPoint = fbcAdjustFactor({-0.7, 0., 0.}, box, 0.1, true);
     EXPECT_NEAR(atMidPoint, 0.5, 1e-7);
 
-    auto farAway = fbcAdjustFactor({0.0,0.5,0.},box,0.1, true);
+    auto farAway = fbcAdjustFactor({0.0, 0.5, 0.}, box, 0.1, true);
     EXPECT_NEAR(farAway, 1., 1e-7);
-
 }
