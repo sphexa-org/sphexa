@@ -20,6 +20,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/execution_policy.h>
 
+#include "cstone/cuda/memory.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
@@ -32,26 +33,55 @@ namespace cstone::ijloop
 namespace gpu_full_nb_list_neighborhood_detail
 {
 
-template<int MaxThreads, class Tc, class Th, class KeyType>
-__global__ __launch_bounds__(MaxThreads) void gpuFullNbListNeighborhoodBuild(
+template<class Tc, class Th, class KeyType>
+__global__ __launch_bounds__(TravConfig::numThreads) void gpuFullNbListNeighborhoodBuild(
     const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
     const Box<Tc> __grid_constant__ box,
-    const LocalIndex firstBody,
-    const LocalIndex lastBody,
+    const GroupView __grid_constant__ groups,
     const Tc* __restrict__ x,
     const Tc* __restrict__ y,
     const Tc* __restrict__ z,
     const Th* __restrict__ h,
     const unsigned ngmax,
-    LocalIndex* neighbors,
-    unsigned* neighborsCount)
+    LocalIndex* __restrict__ neighbors,
+    unsigned* __restrict__ neighborsCount,
+    int* __restrict__ globalPool)
 {
-    const LocalIndex threadId = blockDim.x * blockIdx.x + threadIdx.x;
-    const LocalIndex i        = firstBody + threadId;
-    if (i >= lastBody) return;
+    const unsigned laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
+    unsigned targetIdx     = 0;
+    assert(groups.lastBody != 0);
+    const std::size_t neighborsStride = groups.lastBody - groups.firstBody;
 
-    const std::size_t neighborsStride = lastBody - firstBody;
-    neighborsCount[threadId] = findNeighbors(i, x, y, z, h, tree, box, ngmax, neighbors + threadId, neighborsStride);
+    neighbors -= groups.firstBody;
+    neighborsCount -= groups.firstBody;
+
+    while (true)
+    {
+        if (laneIdx == 0) targetIdx = atomicAdd(&targetCounterGlob, 1);
+        targetIdx = shflSync(targetIdx, 0);
+
+        if (targetIdx >= groups.numGroups) break;
+
+        const cstone::LocalIndex bodyBegin = groups.groupStart[targetIdx];
+        const cstone::LocalIndex bodyEnd   = groups.groupEnd[targetIdx];
+
+        std::array<unsigned, TravConfig::nwt> nc = {0};
+        const auto handleInteraction             = [&](unsigned warpTarget, LocalIndex j)
+        {
+            const LocalIndex i = bodyBegin + warpTarget * GpuConfig::warpSize + laneIdx;
+            if (nc[warpTarget] < ngmax & i < bodyEnd) neighbors[i + nc[warpTarget] * neighborsStride] = j;
+            ++nc[warpTarget];
+        };
+
+        traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, handleInteraction, globalPool);
+
+#pragma unroll
+        for (unsigned warpTarget = 0; warpTarget < TravConfig::nwt; ++warpTarget)
+        {
+            const LocalIndex i = bodyBegin + warpTarget * GpuConfig::warpSize + laneIdx;
+            if (i < bodyEnd) neighborsCount[i] = nc[warpTarget];
+        }
+    }
 }
 
 template<class Tc, class Th, class Input, class Output, class Interaction, class Postamble>
@@ -71,7 +101,10 @@ __forceinline__ __device__ void jLoop(const Box<Tc>& box,
                                       const unsigned* __restrict__ neighborsCount,
                                       const LocalIndex i)
 {
-    const unsigned nbs = imin(neighborsCount[i - firstBody], ngmax);
+    neighbors -= firstBody;
+    neighborsCount -= firstBody;
+
+    const unsigned nbs = imin(neighborsCount[i], ngmax);
 
     const auto iData  = loadParticleData(x, y, z, h, std::forward<Input>(input), i);
     const bool usePbc = requiresPbcHandling(box, iData);
@@ -79,7 +112,7 @@ __forceinline__ __device__ void jLoop(const Box<Tc>& box,
     auto result = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
     for (unsigned nb = 0; nb < nbs; ++nb)
     {
-        const LocalIndex j = neighbors[i - firstBody + nb * neighborsStride];
+        const LocalIndex j = neighbors[i + nb * neighborsStride];
         const auto jData   = loadParticleData(x, y, z, h, std::forward<Input>(input), j);
 
         const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
@@ -171,9 +204,8 @@ struct GpuFullNbListNeighborhoodImpl
         if (numBodies == 0) return;
         constexpr int numThreads = 128;
         runIjLoop<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
-            box, firstBody, lastBody, x, y, z, h, makeConst(input), output,
-            std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), ngmax, rawPtr(neighbors),
-            rawPtr(neighborsCount));
+            box, firstBody, lastBody, x, y, z, h, makeConst(input), output, std::forward<Interaction>(interaction),
+            std::forward<Postamble>(postamble), ngmax, rawPtr(neighbors), rawPtr(neighborsCount));
         checkGpuErrors(cudaGetLastError());
     }
 
@@ -198,10 +230,9 @@ struct GpuFullNbListNeighborhoodImpl
             if (groups.numGroups == 0) return;
             constexpr int numThreads = 128;
             runIjLoopGrouped<numThreads><<<iceil(groups.numGroups * GpuConfig::warpSize, numThreads), numThreads>>>(
-                parent.box, parent.firstBody, parent.lastBody, parent.x, parent.y, parent.z, parent.h,
-                makeConst(input), output, std::forward<Interaction>(interaction),
-                std::forward<Postamble>(postamble), parent.ngmax, rawPtr(parent.neighbors),
-                rawPtr(parent.neighborsCount), groups);
+                parent.box, parent.firstBody, parent.lastBody, parent.x, parent.y, parent.z, parent.h, makeConst(input),
+                output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), parent.ngmax,
+                rawPtr(parent.neighbors), rawPtr(parent.neighborsCount), groups);
             checkGpuErrors(cudaGetLastError());
         }
     };
@@ -235,24 +266,15 @@ struct GpuFullNbListNeighborhood
                                                      h,
                                                      ngmax,
                                                      thrust::device_vector<LocalIndex>(ngmax * std::size_t(numBodies)),
-                                                     thrust::device_vector<int>(numBodies)};
+                                                     thrust::device_vector<unsigned>(numBodies)};
         if (numBodies == 0) return nbList;
 
-        Th const* hExt = h;
-        thrust::device_vector<Th> hExtData;
-        if (tree.searchExtFactor != 1)
-        {
-            // trick the default neighbor search to include all neighbors within searchExtFactor
-            hExtData.resize(totalBodies);
-            thrust::transform(thrust::device, h, h + totalBodies, hExtData.begin(), ScaleFunctor{tree.searchExtFactor});
-            tree.searchExtFactor = 1;
-            hExt                 = rawPtr(hExtData);
-        }
+        auto globalPool = util::deviceAlloc<int[]>(TravConfig::poolSize());
 
-        constexpr int numThreads = 128;
-        gpuFullNbListNeighborhoodBuild<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
-            tree, box, groups.firstBody, groups.lastBody, x, y, z, hExt, ngmax, rawPtr(nbList.neighbors),
-            rawPtr(nbList.neighborsCount));
+        resetTraversalCounters<<<1, 1>>>();
+        gpuFullNbListNeighborhoodBuild<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
+            tree, box, groups, x, y, z, h, ngmax, rawPtr(nbList.neighbors), rawPtr(nbList.neighborsCount),
+            globalPool.get());
         checkGpuErrors(cudaGetLastError());
         checkGpuErrors(cudaDeviceSynchronize());
         return nbList;
