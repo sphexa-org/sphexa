@@ -53,7 +53,7 @@ HOST_DEVICE_FUN Tc fbcAdjustFactor(const cstone::Vec3<Tc> X, const cstone::Box<T
         constexpr Th width    = 2.;
         constexpr Th invWidth = 1 / width;
         // width of particles that are held at zero, in smoothing lengths
-        constexpr Th       offset          = 2.;
+        constexpr Th       offset          = 1.;
         cstone::Vec3<bool> isBoundaryFixed = {
             box.boundaryX() == cstone::BoundaryType::fixed,
             box.boundaryY() == cstone::BoundaryType::fixed,
