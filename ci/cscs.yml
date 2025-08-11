@@ -3,6 +3,6 @@ include:
   # - local: 'ci/cuda12/build_base.yml'
   - local: 'ci/cuda12/build_debug_sm90.yml'
   - local: 'ci/cuda12/run_debug_sm90.yml'
-  # - local: 'ci/cuda12/build_release_sm90.yml'
-  # - local: 'ci/cuda12/run_release_sm90.yml'
+  - local: 'ci/cuda12/build_release_sm90.yml'
+  - local: 'ci/cuda12/run_release_sm90.yml'
 
