@@ -45,33 +45,32 @@ namespace sph
 
 //! @brief checks whether a particle is close to a fixed boundary and returns a modification factor if so
 template<class Tc, class Th>
-HOST_DEVICE_FUN Tc fbcAdjustFactor(const cstone::Vec3<Tc> X, const cstone::Box<Tc>& box, const Th hi, bool doCorrection)
+HOST_DEVICE_FUN cstone::Vec3<Tc> fbcAdjustFactors(const cstone::Vec3<Tc> X, const cstone::Box<Tc>& box, const Th hi)
 {
-    if (doCorrection)
-    {
-        // half the width of the sigmoid, in smoothing lengths
-        constexpr Th width    = 2.;
-        constexpr Th invWidth = 1 / width;
-        // width of particles that are held at zero, in smoothing lengths
-        constexpr Th       offset          = 1.;
-        cstone::Vec3<bool> isBoundaryFixed = {
-            box.boundaryX() == cstone::BoundaryType::fixed,
-            box.boundaryY() == cstone::BoundaryType::fixed,
-            box.boundaryZ() == cstone::BoundaryType::fixed,
-        };
-        cstone::Vec3<Tc> boxMax      = {box.xmax(), box.ymax(), box.zmax()};
-        cstone::Vec3<Tc> boxMin      = {box.xmin(), box.ymin(), box.zmin()};
-        cstone::Vec3<Tc> minDistance = min(abs(boxMax - X), abs(boxMin - X)) * (Th(1.0) / hi);
+    cstone::Vec3<Tc> factors{1., 1., 1.};
+    // half the width of the sigmoid, in smoothing lengths
+    constexpr Th width    = 2.;
+    constexpr Th invWidth = 1 / width;
+    // width of particles that are held at zero, in smoothing lengths
+    constexpr Th       offset          = 1.;
+    cstone::Vec3<bool> isBoundaryFixed = {
+        box.boundaryX() == cstone::BoundaryType::fixed,
+        box.boundaryY() == cstone::BoundaryType::fixed,
+        box.boundaryZ() == cstone::BoundaryType::fixed,
+    };
+    cstone::Vec3<Tc> boxMax      = {box.xmax(), box.ymax(), box.zmax()};
+    cstone::Vec3<Tc> boxMin      = {box.xmin(), box.ymin(), box.zmin()};
+    cstone::Vec3<Tc> minDistance = min(abs(boxMax - X), abs(boxMin - X)) * (Th(1.0) / hi);
 
-        for (int j = 0; j < 3; ++j)
+    for (int j = 0; j < 3; ++j)
+    {
+        if (isBoundaryFixed[j] && minDistance[j] < 2 * width + offset)
         {
-            if (isBoundaryFixed[j] && minDistance[j] < 2 * width + offset)
-            {
-                return Tc(0.5 * (std::tanh(4 * (minDistance[j] - offset) * invWidth - 4) + 1));
-            }
+            factors[j] = Tc(0.5 * (std::tanh(4 * (minDistance[j] - offset) * invWidth - 4) + 1));
         }
     }
-    return Tc(1.0);
+
+    return factors;
 }
 
 //! @brief update the energy according to Adams-Bashforth (2nd order)
@@ -114,11 +113,9 @@ HOST_DEVICE_FUN auto positionUpdate(double dt, double dt_m1, cstone::Vec3<T> Xn,
 template<class T, class Dataset>
 void updatePositionsHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
 {
-    cstone::Vec3<bool> isAxisFixedBoundary = {box.boundaryX() == cstone::BoundaryType::fixed,
-                                              box.boundaryY() == cstone::BoundaryType::fixed,
-                                              box.boundaryZ() == cstone::BoundaryType::fixed};
+    bool anyFBC = box.boundaryX() == cstone::BoundaryType::fixed || box.boundaryY() == cstone::BoundaryType::fixed ||
+                  box.boundaryZ() == cstone::BoundaryType::fixed;
 
-    bool            anyFBC = isAxisFixedBoundary[0] || isAxisFixedBoundary[1] || isAxisFixedBoundary[2];
     cstone::Vec3<T> adjustForFBC{T(1.), T(1.), T(1.)};
 
 #pragma omp parallel for schedule(static)
@@ -126,13 +123,7 @@ void updatePositionsHost(size_t startIndex, size_t endIndex, Dataset& d, const c
     {
         cstone::Vec3<T> X{d.x[i], d.y[i], d.z[i]};
 
-        if (anyFBC)
-        {
-            for (size_t j = 0; j < 3; ++j)
-            {
-                adjustForFBC[j] = fbcAdjustFactor(X, box, d.h[i], isAxisFixedBoundary[j]);
-            }
-        }
+        if (anyFBC) { adjustForFBC = fbcAdjustFactors(X, box, d.h[i]); }
         // To keep particles belonging to the fixed boundaries from moving, these two quantities need to be adjusted
         cstone::Vec3<T> A{d.ax[i] * adjustForFBC[0], d.ay[i] * adjustForFBC[1], d.az[i] * adjustForFBC[2]};
         cstone::Vec3<T> X_m1{d.x_m1[i] * adjustForFBC[0], d.y_m1[i] * adjustForFBC[1], d.z_m1[i] * adjustForFBC[2]};
@@ -148,10 +139,8 @@ void updatePositionsHost(size_t startIndex, size_t endIndex, Dataset& d, const c
 template<class Dataset, class T>
 void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
 {
-    bool fbcX   = (box.boundaryX() == cstone::BoundaryType::fixed);
-    bool fbcY   = (box.boundaryY() == cstone::BoundaryType::fixed);
-    bool fbcZ   = (box.boundaryZ() == cstone::BoundaryType::fixed);
-    bool anyFBC = fbcX || fbcY || fbcZ;
+    bool anyFBC = box.boundaryX() == cstone::BoundaryType::fixed || box.boundaryY() == cstone::BoundaryType::fixed ||
+                  box.boundaryZ() == cstone::BoundaryType::fixed;
 
     bool haveMui      = !d.mui.empty();
     auto constCv      = idealGasCv(d.muiConst, d.gamma);
@@ -160,11 +149,13 @@ void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; i++)
     {
-        if (anyFBC) { adjustForFBC = fbcAdjustFactor({d.x[i], d.y[i], d.z[i]}, box, d.h[i], true); }
+        if (anyFBC) { adjustForFBC = min(fbcAdjustFactors({d.x[i], d.y[i], d.z[i]}, box, d.h[i])); }
         auto cv    = haveMui ? idealGasCv(d.mui[i], d.gamma) : constCv;
         auto u_old = cv * d.temp[i];
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
-        d.temp[i]  = energyUpdate(u_old, d.minDt * adjustForFBC, d.minDt_m1, d.du[i], d.du_m1[i]) / cv;
+        // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
+        d.temp[i] =
+            energyUpdate(u_old, d.minDt * adjustForFBC, d.minDt_m1 * (1. / adjustForFBC), d.du[i], d.du_m1[i]) / cv;
         d.du_m1[i] = d.du[i];
     }
 }
@@ -172,19 +163,18 @@ void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone
 template<class Dataset, class T>
 void updateIntEnergyHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<T>& box)
 {
-    bool fbcX   = (box.boundaryX() == cstone::BoundaryType::fixed);
-    bool fbcY   = (box.boundaryY() == cstone::BoundaryType::fixed);
-    bool fbcZ   = (box.boundaryZ() == cstone::BoundaryType::fixed);
-    bool anyFBC = fbcX || fbcY || fbcZ;
+    bool anyFBC = box.boundaryX() == cstone::BoundaryType::fixed || box.boundaryY() == cstone::BoundaryType::fixed ||
+                  box.boundaryZ() == cstone::BoundaryType::fixed;
 
     auto adjustForFBC = 1.0;
 
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; i++)
     {
-        if (anyFBC) { adjustForFBC = fbcAdjustFactor({d.x[i], d.y[i], d.z[i]}, box, d.h[i], true); }
+        if (anyFBC) { adjustForFBC = min(fbcAdjustFactors({d.x[i], d.y[i], d.z[i]}, box, d.h[i])); }
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
-        d.u[i]     = energyUpdate(d.u[i], d.minDt * adjustForFBC, d.minDt_m1, d.du[i], d.du_m1[i]);
+        // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
+        d.u[i] = energyUpdate(d.u[i], d.minDt * adjustForFBC, d.minDt_m1 * (1. / adjustForFBC), d.du[i], d.du_m1[i]);
         d.du_m1[i] = d.du[i];
     }
 }
