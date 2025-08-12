@@ -149,7 +149,7 @@ public:
 
         computeGroups(first, last, d, domain.box(), groups_);
         updateSmoothingLengthIterativeAndComputeXMass(groups_.view(), d, domain.box());
-        timer.step("SmoothingLengthAndXMass");
+        timer.step("XMassWithHUpdate");
         findNeighborsSfc(groups_.view(), d, domain.box());
         timer.step("FindNeighbors");
         pmReader.step();

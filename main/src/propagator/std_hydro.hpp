@@ -141,7 +141,7 @@ public:
 
         computeGroups(first, last, d, domain.box(), groups_);
         updateSmoothingLengthIterativeAndComputeDensity(groups_.view(), d, domain.box());
-        timer.step("SmoothingLengthAndDensity");
+        timer.step("DensityWithHUpdate");
         findNeighborsSfc(groups_.view(), d, domain.box(), true);
         timer.step("FindNeighbors");
 
