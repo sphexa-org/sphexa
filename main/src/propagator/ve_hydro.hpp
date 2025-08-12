@@ -148,13 +148,12 @@ public:
         fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
 
         computeGroups(first, last, d, domain.box(), groups_);
-        updateSmoothingLengthIterative(groups_.view(), d, domain.box());
+        updateSmoothingLengthIterativeAndComputeXMass(groups_.view(), d, domain.box());
+        timer.step("SmoothingLengthAndXMass");
         findNeighborsSfc(groups_.view(), d, domain.box());
         timer.step("FindNeighbors");
         pmReader.step();
 
-        computeXMass(groups_.view(), d, domain.box());
-        timer.step("XMass");
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 

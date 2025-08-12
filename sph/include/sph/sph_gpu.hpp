@@ -84,8 +84,8 @@ extern void computePositionsGpu(const GroupView& grp, float dt, util::array<floa
 template<class Th>
 extern void updateSmoothingLengthGpu(const GroupView&, unsigned ng0, const unsigned* nc, Th* h);
 
-template<class T, class Dataset>
-extern void updateSmoothingLengthIterativeGpu(const GroupView&, Dataset& d, const cstone::Box<T>& box);
+template<class T, class Dataset, class... Args>
+extern void updateSmoothingLengthIterativeGpu(const GroupView&, Dataset& d, const cstone::Box<T>& box, Args&&... args);
 
 template<class T>
 extern void groupDivvTimestepGpu(float Krho, const GroupView&, const T* divv, float* groupDt);

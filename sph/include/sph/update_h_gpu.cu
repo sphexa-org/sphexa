@@ -34,6 +34,7 @@
 #include "sph/kernels.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/sph_gpu.hpp"
+#include "sph/update_h.hpp"
 
 namespace sph
 {
@@ -71,12 +72,13 @@ template void updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const
 
 __device__ bool nc_h_convergenceFailure = false;
 
-template<class Tc, class T, class KeyType>
-__global__ void
-updateSmoothingLengthIterativeGpuKernel(unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box,
-                                        const LocalIndex* grpStart, const LocalIndex* grpEnd, LocalIndex numGroups,
-                                        const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* x, const Tc* y,
-                                        const Tc* z, T* h, unsigned* nc, LocalIndex* nidx, TreeNodeIndex* globalPool)
+template<class Tc, class T, class KeyType, class... Args>
+__global__ void updateSmoothingLengthIterativeGpuKernel(unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box,
+                                                        const LocalIndex* grpStart, const LocalIndex* grpEnd,
+                                                        LocalIndex                              numGroups,
+                                                        const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* x,
+                                                        const Tc* y, const Tc* z, T* h, unsigned* nc, LocalIndex* nidx,
+                                                        TreeNodeIndex* globalPool, Args... args)
 {
     unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned targetIdx   = 0;
@@ -114,18 +116,24 @@ updateSmoothingLengthIterativeGpuKernel(unsigned ng0, unsigned ngmax, const csto
         if (i >= bodyEnd) continue;
 
         nc[i] = ncSph;
+
+        if constexpr (sizeof...(Args))
+            jLoop<TravConfig::targetSize>(box, x, y, z, h, i, neighborsWarp + laneIdx, std::min(ncSph - 1, ngmax),
+                                          args...);
     }
 }
 
-template<class T, class Dataset>
-void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d, const cstone::Box<T>& box)
+template<class T, class Dataset, class... Args>
+void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d, const cstone::Box<T>& box,
+                                       Args&&... args)
 {
     auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     updateSmoothingLengthIterativeGpuKernel<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
         d.ng0, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x),
-        rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.nc), nidxPool, traversalPool);
+        rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.nc), nidxPool, traversalPool,
+        std::forward<Args>(args)...);
     checkGpuErrors(cudaDeviceSynchronize());
 
     NcStats::type stats[NcStats::numStats];
@@ -145,5 +153,16 @@ void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d,
 
 template void updateSmoothingLengthIterativeGpu(const cstone::GroupView&, sphexa::ParticlesData<cstone::GpuTag>&,
                                                 const cstone::Box<SphTypes::CoordinateType>&);
+
+template void updateSmoothingLengthIterativeGpu(const cstone::GroupView&, sphexa::ParticlesData<cstone::GpuTag>&,
+                                                const cstone::Box<SphTypes::CoordinateType>&,
+                                                sph::XmassInteraction<float>&&,
+                                                sph::XmassToDensityPostamble<float, double>&&, std::tuple<float*>&,
+                                                std::tuple<float*>&);
+
+template void updateSmoothingLengthIterativeGpu(const cstone::GroupView&, sphexa::ParticlesData<cstone::GpuTag>&,
+                                                const cstone::Box<SphTypes::CoordinateType>&,
+                                                sph::XmassInteraction<float>&&, sph::XmassPostamble<float, double>&&,
+                                                std::tuple<float*>&, std::tuple<float*>&);
 
 } // namespace sph
