@@ -31,6 +31,9 @@ extern void scaleGpu(T* first, T* last, T value);
 template<class T>
 extern void incrementGpu(const T* first, const T* last, T* d_first, T value);
 
+template<class T>
+extern void addRadiiGpu(const Vec3<T>* first, const Vec3<T>* last, const float* radii, Vec3<T>* destFirst);
+
 template<class TS, class TD, class IndexType>
 extern void gatherGpu(const IndexType* ordering, size_t numElements, const TS* src, TD* buffer);
 

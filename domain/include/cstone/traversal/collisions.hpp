@@ -39,7 +39,7 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
     {
         auto [nk1, nk2] = decodePlaceholderBit2K(nodePrefixes[idx]);
         bool bOverlap   = !containedIn(nk1, nk2, excludeStart, excludeEnd) &&
-                        norm2(minDistance(nodeCenters[idx], nodeSizes[idx], targetCenter, targetSize, box)) == 0;
+                        overlap(nodeCenters[idx], nodeSizes[idx], targetCenter, targetSize, box);
         if (bOverlap) { flags[idx] = 1; }
         return bOverlap;
     };
@@ -51,12 +51,11 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
  *
  * @tparam KeyType               32- or 64-bit unsigned integer
  * @tparam Tc                    float or double
- * @tparam Th                    float or double, float is sufficient for 64-bit codes or less
  * @param[in]  prefixes          node keys in placeholder-bit format of fully linked octree
  * @param[in]  childOffsets      first child node index of each node
  * @param[in]  leaves            cornerstone array of tree leaves
- * @param[in]  interactionRadii  effective halo search radii per octree (leaf) node
- * @param[in]  leaf2int          translate leaf index to internal index
+ * @param[in]  searchCenters     effective halo search box center per octree (leaf) node
+ * @param[in]  searchSizes       effective halo search box size per octree (leaf) node
  * @param[in]  box               coordinate bounding box
  * @param[in]  firstNode         first leaf node index to consider as local
  * @param[in]  lastNode          last leaf node index to consider as local
@@ -66,15 +65,15 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
  *                               Note: does NOT reset non-colliding indices to 0, so @p collisionFlags
  *                               should be zero-initialized prior to calling this function.
  */
-template<class KeyType, class Tc, class Th>
+template<class KeyType, class Tc>
 void findHalos(const KeyType* prefixes,
                const TreeNodeIndex* childOffsets,
                const TreeNodeIndex* parents,
                const Vec3<Tc>* nodeCenters,
                const Vec3<Tc>* nodeSizes,
                const KeyType* leaves,
-               const Th* interactionRadii,
-               const TreeNodeIndex* leaf2int,
+               const Vec3<Tc>* searchCenters,
+               const Vec3<Tc>* searchSizes,
                const Box<Tc>& box,
                TreeNodeIndex firstNode,
                TreeNodeIndex lastNode,
@@ -84,18 +83,13 @@ void findHalos(const KeyType* prefixes,
     KeyType highestKey = leaves[lastNode];
 
 #pragma omp parallel for
-    for (TreeNodeIndex nodeIdx = firstNode; nodeIdx < lastNode; ++nodeIdx)
+    for (TreeNodeIndex leafIdx = firstNode; leafIdx < lastNode; ++leafIdx)
     {
-        Th radius   = interactionRadii[nodeIdx];
-        auto intIdx = leaf2int[nodeIdx];
-        Vec3<Tc> tC = nodeCenters[intIdx];
-        Vec3<Tc> tS = nodeSizes[intIdx] + Vec3<Tc>{radius, radius, radius};
-
         // if the halo box is fully inside the assigned SFC range, we skip collision detection
-        if (containedIn(lowestKey, highestKey, tC, tS, box)) { continue; }
+        if (containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box)) { continue; }
 
-        findCollisions(prefixes, childOffsets, parents, nodeCenters, nodeSizes, tC, tS, box, lowestKey, highestKey,
-                       collisionFlags);
+        findCollisions(prefixes, childOffsets, parents, nodeCenters, nodeSizes, searchCenters[leafIdx],
+                       searchSizes[leafIdx], box, lowestKey, highestKey, collisionFlags);
     }
 }
 

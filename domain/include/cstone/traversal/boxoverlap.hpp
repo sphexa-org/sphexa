@@ -144,8 +144,8 @@ containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Ve
     constexpr int gridDim = 1u << maxTreeLevel<KeyType>{};
     boxMax += Vec3<Tc>{box.lx(), box.ly(), box.lz()} * (Tc(1) / gridDim);
 
-    KeyType lowCode  = iSfcKey<SfcKind<KeyType>>(boxMin[0], boxMin[1], boxMin[2]);
-    KeyType highCode = iSfcKey<SfcKind<KeyType>>(boxMax[0], boxMax[1], boxMax[2]);
+    KeyType lowCode  = sfc3D<SfcKind<KeyType>>(boxMin[0], boxMin[1], boxMin[2], box);
+    KeyType highCode = sfc3D<SfcKind<KeyType>>(boxMax[0], boxMax[1], boxMax[2], box);
     auto envelope    = smallestCommonBox(lowCode, highCode);
 
     return (util::get<0>(envelope) >= codeStart) && (util::get<1>(envelope) <= codeEnd);
@@ -274,6 +274,20 @@ HOST_DEVICE_FUN Vec3<T> minDistance(
     dX *= T(0.5);
 
     return dX;
+}
+
+//! @brief returns true if the two cuboids a and b overlap
+template<class T>
+HOST_DEVICE_FUN bool overlap(
+    const Vec3<T>& aCenter, const Vec3<T>& aSize, const Vec3<T>& bCenter, const Vec3<T>& bSize, const Box<T>& box)
+{
+    Vec3<T> dX = bCenter - aCenter;
+    dX         = abs(applyPbc(dX, box));
+    dX -= aSize;
+    dX -= bSize;
+
+    constexpr T eps = 0;
+    return dX[0] < eps && dX[1] < eps && dX[2] < eps;
 }
 
 //! @brief Convenience wrapper to minDistance. This should only be used for testing.

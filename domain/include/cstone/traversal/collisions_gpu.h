@@ -23,7 +23,6 @@ namespace cstone
 /*! @brief mark halo nodes with flags
  *
  * @tparam KeyType               32- or 64-bit unsigned integer
- * @tparam RadiusType            float or double, float is sufficient for 64-bit codes or less
  * @tparam T                     float or double
  * @param[in]  prefixes          Warren-Salmon node keys of the octree, length = numTreeNodes
  * @param[in]  childOffsets      child offsets array, length = numTreeNodes
@@ -31,8 +30,8 @@ namespace cstone
  * @param[in]  nodeCenters       geometric center of each octree node
  * @param[in]  nodeSizes         geometric size of each octree node
  * @param[in]  leaves            cstone array of leaf node keys
- * @param[in]  interactionRadii  effective halo search radii per octree (leaf) node
- * @param[in]  leaf2int          translation map from leaf to internal indices
+ * @param[in]  searchCenters     effective halo search box center per octree (leaf) node, accessed [firstNode:lastNode]
+ * @param[in]  searchSizes       effective halo search box size per octree (leaf) node, accessed [firstNode:lastNode]
  * @param[in]  box               coordinate bounding box
  * @param[in]  firstNode         first cstone leaf node index to consider as local
  * @param[in]  lastNode          last cstone leaf node index to consider as local
@@ -42,15 +41,15 @@ namespace cstone
  *                               Note: does NOT reset non-colliding indices to 0, so @p collisionFlags
  *                               should be zero-initialized prior to calling this function.
  */
-template<class KeyType, class RadiusType, class T>
+template<class KeyType, class T>
 extern void findHalosGpu(const KeyType* prefixes,
                          const TreeNodeIndex* childOffsets,
                          const TreeNodeIndex* parents,
                          const Vec3<T>* nodeCenters,
                          const Vec3<T>* nodeSizes,
                          const KeyType* leaves,
-                         const RadiusType* interactionRadii,
-                         const TreeNodeIndex* leaf2int,
+                         const Vec3<T>* searchCenters,
+                         const Vec3<T>* searchSizes,
                          const Box<T>& box,
                          TreeNodeIndex firstNode,
                          TreeNodeIndex lastNode,
