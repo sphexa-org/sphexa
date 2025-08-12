@@ -42,15 +42,17 @@ void generalCollisionTest(OctreeView<const KeyType> octree, const std::vector<T>
     std::vector<Vec3<T>> nodeCenters(octree.numNodes), nodeSizes(octree.numNodes);
     nodeFpCenters<KeyType>({octree.prefixes, size_t(octree.numNodes)}, nodeCenters.data(), nodeSizes.data(), box);
 
-    std::vector<Vec3<T>> tC = nodeCenters, tS = nodeSizes;
-    for (size_t i = 0; i < nodeSizes.size(); ++i)
+    auto leaf2int = octree.leafToInternalSpan();
+    std::vector<Vec3<T>> tC(octree.numLeafNodes), tS(octree.numLeafNodes);
+    for (size_t i = 0; i < size_t(octree.numLeafNodes); ++i)
     {
-        nodeSizes[i] *= haloRadii[i];
+        tC[i] = nodeCenters[leaf2int[i]];
+        tS[i] = nodeSizes[leaf2int[i]] * haloRadii[i];
     }
 
     // tree traversal collision detection
     std::vector<std::vector<TreeNodeIndex>> collisions(octree.numNodes);
-    for (TreeNodeIndex i = 0; i < octree.numNodes; ++i)
+    for (TreeNodeIndex i = 0; i < octree.numLeafNodes; ++i)
     {
         std::vector<uint8_t> flags(octree.numNodes, 0);
         findCollisions(octree.prefixes, octree.childOffsets, octree.parents, nodeCenters.data(), nodeSizes.data(),
@@ -63,10 +65,10 @@ void generalCollisionTest(OctreeView<const KeyType> octree, const std::vector<T>
     }
 
     // naive all-to-all algorithm
-    auto refCollisions =
-        findCollisionsAll2all<KeyType>({octree.prefixes, size_t(octree.numNodes)}, tC.data(), tS.data(), box);
+    auto refCollisions = findCollisionsAll2all<KeyType>({octree.prefixes, size_t(octree.numNodes)}, tC.data(),
+                                                        tS.data(), octree.numLeafNodes, box);
 
-    for (TreeNodeIndex i = 0; i < octree.numNodes; ++i)
+    for (TreeNodeIndex i = 0; i < octree.numLeafNodes; ++i)
     {
         std::ranges::sort(begin(collisions[i]), end(collisions[i]));
         std::ranges::sort(begin(refCollisions[i]), end(refCollisions[i]));
@@ -98,7 +100,7 @@ public:
         auto bType = static_cast<BoundaryType>(std::get<3>(GetParam()));
         Box<T> box(0, std::get<0>(GetParam()), 0, std::get<1>(GetParam()), 0, std::get<2>(GetParam()), bType);
 
-        std::vector<T> haloRadii(octree.numNodes, 1.001);
+        std::vector<T> haloRadii(octree.numLeafNodes, 1.001);
         generalCollisionTest(octree.cdata(), haloRadii, box);
     }
 };

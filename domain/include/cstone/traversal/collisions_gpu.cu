@@ -20,15 +20,15 @@
 namespace cstone
 {
 
-template<class KeyType, class RadiusType, class T>
+template<class KeyType, class T>
 __global__ void findHalosKernel(const KeyType* nodePrefixes,
                                 const TreeNodeIndex* childOffsets,
                                 const TreeNodeIndex* parents,
                                 const Vec3<T>* nodeCenters,
                                 const Vec3<T>* nodeSizes,
                                 const KeyType* leaves,
-                                const RadiusType* interactionRadii,
-                                const TreeNodeIndex* leaf2int,
+                                const Vec3<T>* searchCenters,
+                                const Vec3<T>* searchSizes,
                                 const Box<T> box,
                                 TreeNodeIndex firstNode,
                                 TreeNodeIndex lastNode,
@@ -38,10 +38,8 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
 
     if (leafIdx < lastNode)
     {
-        RadiusType radius  = interactionRadii[leafIdx];
-        auto intIdx        = leaf2int[leafIdx];
-        Vec3<T> tC         = nodeCenters[intIdx];
-        Vec3<T> tS         = nodeSizes[intIdx] + Vec3<T>{radius, radius, radius};
+        Vec3<T> tC         = searchCenters[leafIdx];
+        Vec3<T> tS         = searchSizes[leafIdx];
         KeyType lowestKey  = leaves[firstNode];
         KeyType highestKey = leaves[lastNode];
 
@@ -54,15 +52,15 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
     }
 }
 
-template<class KeyType, class RadiusType, class T>
+template<class KeyType, class T>
 void findHalosGpu(const KeyType* prefixes,
                   const TreeNodeIndex* childOffsets,
                   const TreeNodeIndex* parents,
                   const Vec3<T>* nodeCenters,
                   const Vec3<T>* nodeSizes,
                   const KeyType* leaves,
-                  const RadiusType* interactionRadii,
-                  const TreeNodeIndex* leaf2int,
+                  const Vec3<T>* searchCenters,
+                  const Vec3<T>* searchSizes,
                   const Box<T>& box,
                   TreeNodeIndex firstNode,
                   TreeNodeIndex lastNode,
@@ -73,20 +71,19 @@ void findHalosGpu(const KeyType* prefixes,
 
     if (numBlocks == 0) { return; }
     findHalosKernel<<<numBlocks, numThreads>>>(prefixes, childOffsets, parents, nodeCenters, nodeSizes, leaves,
-                                               interactionRadii, leaf2int, box, firstNode, lastNode, collisionFlags);
+                                               searchCenters, searchSizes, box, firstNode, lastNode, collisionFlags);
 }
 
-#define FIND_HALOS_GPU(KeyType, RadiusType, T)                                                                         \
+#define FIND_HALOS_GPU(KeyType, T)                                                                                     \
     template void findHalosGpu(const KeyType* prefixes, const TreeNodeIndex* childOffsets,                             \
                                const TreeNodeIndex* parents, const Vec3<T>* nodeCenters, const Vec3<T>* nodeSizes,     \
-                               const KeyType* leaves, const RadiusType* interactionRadii,                              \
-                               const TreeNodeIndex* leaf2int, const Box<T>& box, TreeNodeIndex firstNode,              \
-                               TreeNodeIndex lastNode, uint8_t* collisionFlags)
+                               const KeyType* leaves, const Vec3<T>* searchCenters, const Vec3<T>* searchSizes,        \
+                               const Box<T>& box, TreeNodeIndex firstNode, TreeNodeIndex lastNode,                     \
+                               uint8_t* collisionFlags)
 
-FIND_HALOS_GPU(uint32_t, float, float);
-FIND_HALOS_GPU(uint32_t, float, double);
-FIND_HALOS_GPU(uint64_t, float, float);
-FIND_HALOS_GPU(uint64_t, float, double);
+FIND_HALOS_GPU(uint32_t, float);
+FIND_HALOS_GPU(uint64_t, float);
+FIND_HALOS_GPU(uint64_t, double);
 
 template<class T, class KeyType>
 __global__ void markMacsGpuKernel(const KeyType* prefixes,
@@ -147,7 +144,6 @@ void markMacsGpu(const KeyType* prefixes,
 
 MARK_MACS_GPU(uint64_t, double);
 MARK_MACS_GPU(uint64_t, float);
-MARK_MACS_GPU(unsigned, double);
 MARK_MACS_GPU(unsigned, float);
 
 } // namespace cstone

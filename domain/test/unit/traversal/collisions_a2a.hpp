@@ -51,14 +51,17 @@ void findCollisions2All(std::span<const KeyType> nodeKeys,
 
 //! @brief all-to-all implementation of findAllCollisions
 template<class KeyType, class T>
-std::vector<std::vector<TreeNodeIndex>>
-findCollisionsAll2all(std::span<const KeyType> nodeKeys, const Vec3<T>* tC, const Vec3<T>* tS, const Box<T>& box)
+std::vector<std::vector<TreeNodeIndex>> findCollisionsAll2all(std::span<const KeyType> nodeKeys,
+                                                              const Vec3<T>* tC,
+                                                              const Vec3<T>* tS,
+                                                              TreeNodeIndex numTargets,
+                                                              const Box<T>& box)
 {
     std::vector<Vec3<T>> nodeCenters(nodeKeys.size()), nodeSizes(nodeKeys.size());
     nodeFpCenters<KeyType>(nodeKeys, nodeCenters.data(), nodeSizes.data(), box);
 
-    std::vector<std::vector<TreeNodeIndex>> collisions(nodeKeys.size());
-    for (TreeNodeIndex i = 0; i < TreeNodeIndex(nodeKeys.size()); ++i)
+    std::vector<std::vector<TreeNodeIndex>> collisions(numTargets);
+    for (TreeNodeIndex i = 0; i < numTargets; ++i)
     {
         findCollisions2All<KeyType>(nodeKeys, nodeCenters.data(), nodeSizes.data(), box, tC[i], tS[i], collisions[i]);
     }

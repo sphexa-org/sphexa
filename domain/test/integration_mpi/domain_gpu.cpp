@@ -137,7 +137,7 @@ TEST(FocusDomain, removeParticle)
     MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
 
     using Real    = double;
-    using KeyType = unsigned;
+    using KeyType = uint64_t;
 
     Box<Real> box(0, 1);
     LocalIndex numParticlesPerRank = 1000;
@@ -201,7 +201,7 @@ TEST(DomainGpu, reapplySync)
     MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
 
     using Real    = double;
-    using KeyType = unsigned;
+    using KeyType = uint64_t;
 
     Box<Real> box(0, 1);
     LocalIndex numParticlesPerRank = 10000;

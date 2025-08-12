@@ -91,6 +91,26 @@ void incrementGpu(const T* first, const T* last, T* d_first, T value)
 INCREMENT_GPU(unsigned);
 INCREMENT_GPU(uint64_t);
 
+template<class T>
+struct AddRadii
+{
+    __host__ __device__ Vec3<T> operator()(Vec3<T> x, T r) const
+    {
+        if (r == T(0)) { return Vec3<T>{0, 0, 0}; }
+        else { return x + Vec3<T>{r, r, r}; }
+    }
+};
+
+template<class T>
+void addRadiiGpu(const Vec3<T>* first, const Vec3<T>* last, const float* radii, Vec3<T>* destFirst)
+{
+    thrust::transform(thrust::device, first, last, radii, destFirst, AddRadii<T>{});
+}
+
+#define ADD_RADII_GPU(T) template void addRadiiGpu(const Vec3<T>*, const Vec3<T>*, const float*, Vec3<T>*)
+ADD_RADII_GPU(float);
+ADD_RADII_GPU(double);
+
 template<class TS, class TD, class IndexType>
 __global__ void gatherGpuKernel(const IndexType* map, size_t n, const TS* source, TD* destination)
 {
@@ -113,9 +133,11 @@ template void gatherGpu(const int*, size_t, const uint8_t*, uint32_t*);
 template void gatherGpu(const int*, size_t, const int*, int*);
 template void gatherGpu(const int*, size_t, const uint32_t*, uint32_t*);
 template void gatherGpu(const int*, size_t, const uint64_t*, uint64_t*);
+template void gatherGpu(const int*, size_t, const util::array<float, 3>*, util::array<float, 3>*);
 template void gatherGpu(const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
 template void gatherGpu(const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
 template void gatherGpu(const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*);
+template void gatherGpu(const int*, size_t, const util::array<double, 3>*, util::array<double, 3>*);
 template void gatherGpu(const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
 template void gatherGpu(const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
 template void gatherGpu(const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);

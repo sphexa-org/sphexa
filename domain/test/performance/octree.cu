@@ -105,16 +105,29 @@ int main(int argc, char** argv)
 
     // halo discovery benchmark
 
-    thrust::device_vector<float> haloRadii(nNodes(tree), 0.01);
+    thrust::device_vector<float> haloRadii(octree.numLeafNodes, 0.01);
     thrust::device_vector<uint8_t> flags(octree.numNodes, 0);
     thrust::device_vector<Vec3<T>> nodeCenters(octree.numNodes), nodeSizes(octree.numNodes);
     computeGeoCentersGpu(octree.prefixes.data(), octree.numNodes, rawPtr(nodeCenters), rawPtr(nodeSizes), box);
+    thrust::host_vector<Vec3<T>> h_nc = nodeCenters, h_ns = nodeSizes;
 
-    auto od      = octree.data();
+    thrust::device_vector<Vec3<T>> searchCenters(octree.numLeafNodes), searchSizes(octree.numLeafNodes);
+    gatherGpu(leafToInternal(octree).data(), octree.numLeafNodes, rawPtr(nodeCenters), rawPtr(searchCenters));
+    gatherGpu(leafToInternal(octree).data(), octree.numLeafNodes, rawPtr(nodeSizes), rawPtr(searchSizes));
+
+    thrust::host_vector<Vec3<T>> h_searchCenters = searchCenters, h_searchSizes = searchSizes;
+    thrust::host_vector<float> h_radii = haloRadii;
+    for (int i = 0; i < octree.numLeafNodes; ++i)
+    {
+        h_searchSizes[i] += Vec3<T>{h_radii[i], h_radii[i], h_radii[i]};
+    }
+    searchSizes = h_searchSizes;
+
+    auto od              = octree.data();
     auto findHalosLambda = [&]()
     {
         findHalosGpu(od.prefixes, od.childOffsets, od.parents, rawPtr(nodeCenters), rawPtr(nodeSizes), rawPtr(tree),
-                     rawPtr(haloRadii), od.leafToInternalSpan().data(), box, 0, od.numLeafNodes / 4, rawPtr(flags));
+                     rawPtr(searchCenters), rawPtr(searchSizes), box, 0, od.numLeafNodes / 4, rawPtr(flags));
     };
 
     float findTime = timeGpu(findHalosLambda);
@@ -122,19 +135,17 @@ int main(int argc, char** argv)
               << " count: " << thrust::reduce(flags.begin(), flags.end(), 0) << std::endl;
 
     thrust::host_vector<KeyType> h_tree = tree;
-    thrust::host_vector<Vec3<T>> h_nc = nodeCenters, h_ns = nodeSizes;
     OctreeData<KeyType, CpuTag> h_octreeHarness;
     h_octreeHarness.resize(nNodes(h_tree));
     updateInternalTree<KeyType>({h_tree.data(), h_tree.size()}, h_octreeHarness.data());
     OctreeView<KeyType> h_octree = h_octreeHarness.data();
     {
-        thrust::host_vector<float> radii = haloRadii;
         std::vector<uint8_t> h_flags(octree.numNodes, 0);
 
         auto findHalosCpuLambda = [&]()
         {
             findHalos(h_octree.prefixes, h_octree.childOffsets, h_octree.parents, h_nc.data(), h_ns.data(),
-                      h_tree.data(), radii.data(), h_octree.leafToInternalSpan().data(), box, 0, nNodes(tree) / 4,
+                      h_tree.data(), h_searchCenters.data(), h_searchSizes.data(), box, 0, od.numLeafNodes / 4,
                       h_flags.data());
         };
         float findTimeCpu = timeCpu(findHalosCpuLambda);
