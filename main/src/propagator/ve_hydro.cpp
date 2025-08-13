@@ -58,18 +58,18 @@ PropLib<DomainType, ParticleDataType>::makeTurbVeProp(std::ostream& output, size
 
 template<class DomainType, class ParticleDataType>
 typename PropLib<DomainType, ParticleDataType>::PropPtr
-PropLib<DomainType, ParticleDataType>::makeRayleighVeProp(std::ostream& output, size_t rank,
-                                                          const InitSettings& settings, bool avClean)
+PropLib<DomainType, ParticleDataType>::makeExternalGravityVeProp(std::ostream& output, size_t rank,
+                                                                 const InitSettings& settings, bool avClean)
 {
     if (avClean)
     {
-        return std::make_unique<RTVeProp<true, DomainType, ParticleDataType>>(output, rank,
-                                                                              settings.at("gravityConstant"));
+        return std::make_unique<ExternalGravityVeProp<true, DomainType, ParticleDataType>>(
+            output, rank, settings.at("gravityConstant"));
     }
     else
     {
-        return std::make_unique<RTVeProp<false, DomainType, ParticleDataType>>(output, rank,
-                                                                               settings.at("gravityConstant"));
+        return std::make_unique<ExternalGravityVeProp<false, DomainType, ParticleDataType>>(
+            output, rank, settings.at("gravityConstant"));
     }
 }
 

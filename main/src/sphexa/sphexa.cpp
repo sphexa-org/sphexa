@@ -111,9 +111,7 @@ int main(int argc, char** argv)
 
     Dataset simData;
     simData.comm = MPI_COMM_WORLD;
-    auto& d = simData.hydro;
-
-    d.propagator = propChoice;
+    auto& d      = simData.hydro;
 
     Timer totalTimer(output);
     MPI_Barrier(MPI_COMM_WORLD);
@@ -123,7 +121,6 @@ int main(int argc, char** argv)
     propagator->activateFields(simData);
     propagator->load(initCond, fileReader.get());
     auto box = simInit->init(rank, numRanks, problemSize, simData, fileReader.get());
-
 
     transferAllocatedToDevice(d, 0, d.x.size(), propagator->conservedFields());
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);

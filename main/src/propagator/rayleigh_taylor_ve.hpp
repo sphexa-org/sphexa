@@ -42,7 +42,7 @@ using cstone::FieldStates;
 
 //! @brief VE hydro propagator with artificial gravity for the Rayleigh-Taylor test case
 template<bool avClean, class DomainType, class DataType>
-class RTVeProp final : public HydroVeProp<avClean, DomainType, DataType>
+class ExternalGravityVeProp final : public HydroVeProp<avClean, DomainType, DataType>
 {
     using Base = HydroVeProp<avClean, DomainType, DataType>;
     using Base::rank_;
@@ -52,7 +52,7 @@ class RTVeProp final : public HydroVeProp<avClean, DomainType, DataType>
     RealType gravityConstant;
 
 public:
-    RTVeProp(std::ostream& output, size_t rank, RealType grav)
+    ExternalGravityVeProp(std::ostream& output, size_t rank, RealType grav)
         : Base(output, rank)
         , gravityConstant(grav)
     {
