@@ -137,7 +137,7 @@ template void gatherGpu(const unsigned*, size_t, const util::array<float, 4>*, u
 template<class T, class IndexType>
 __global__ void scatterGpuKernel(const IndexType* map, size_t n, const T* source, T* destination)
 {
-    size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned tid = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (tid < n) { destination[map[tid]] = source[tid]; }
 }
