@@ -50,7 +50,7 @@ void initRayleighTaylorFields(Dataset& d, const std::map<std::string, double>& c
     T rhoDown       = 1.;
     T firstTimeStep = constants.at("firstTimeStep");
     T omega0        = constants.at("omega0");
-    T gamma         = constants.at("gamma");
+    d.gamma         = constants.at("gamma");
     T p0            = constants.at("p0");
     T y0            = constants.at("y0");
     T ymax          = constants.at("ySize");
@@ -85,9 +85,9 @@ void initRayleighTaylorFields(Dataset& d, const std::map<std::string, double>& c
         if (d.y[i] < y0)
         {
             // to initialize fixed boundary particles to sensible values
-            T y_init = std::max(d.y[i], ymin);
-            T p      = p0 - rhoDown * (y_init - y0) * g;
-            T u      = p / (rhoDown * (gamma - 1.));
+
+            T p = p0 - rhoDown * (d.y[i] - y0) * g;
+            T u = p / (rhoDown * (d.gamma - 1.));
 
             d.h[i]    = hDown;
             d.temp[i] = u / cv;
@@ -95,9 +95,8 @@ void initRayleighTaylorFields(Dataset& d, const std::map<std::string, double>& c
         else
         {
             // to initialize fixed boundary particles to sensible values
-            T y_init = std::min(d.y[i], ymax);
-            T p      = p0 - rhoUp * (y_init - y0) * g;
-            T u      = p / (rhoUp * (gamma - 1.));
+            T p = p0 - rhoUp * (d.y[i] - y0) * g;
+            T u = p / (rhoUp * (d.gamma - 1.));
 
             d.h[i]    = hUp;
             d.temp[i] = u / cv;
@@ -135,13 +134,6 @@ public:
         using KeyType = typename Dataset::KeyType;
         using T       = typename Dataset::RealType;
         auto& d       = simData.hydro;
-
-        if (d.propagator != "rayleigh-taylor-ve")
-        {
-            throw std::runtime_error(
-                "ERROR: For the Rayleigh Taylor test (--init rayleigh-taylor) the SPH propagator has to be "
-                "RT-ve. Please restart with '--prop rayleigh-taylor-ve'\n");
-        }
 
         T rhoUp = settings_.at("rhoUp");
 
