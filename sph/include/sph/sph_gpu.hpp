@@ -40,9 +40,9 @@ template<bool avClean, class Dataset>
 extern void computeMomentumEnergy(const GroupView&, float*, Dataset&, const cstone::Box<typename Dataset::RealType>&);
 
 template<class Tt, class Tm, class Th>
-extern void computeIdealGasEOS(size_t firstParticle, size_t lastParticle, Tm mui, const Tt* gamma, const Tt* temp, const Tt* u,
-                               const Tm* m, const Th* kx, const Th* xm, const Th* gradh, Th* prho, Th* c, Th* rho,
-                               Th* p, bool isGammaConst);
+extern void computeIdealGasEOS(size_t firstParticle, size_t lastParticle, Tm mui, const Tt* gamma, const Tt* temp,
+                               const Tt* u, const Tm* m, const Th* kx, const Th* xm, const Th* gradh, Th* prho, Th* c,
+                               Th* rho, Th* p, bool isGammaConst);
 
 template<class Th, class Tu>
 extern void computeIsothermalEOS(size_t first, size_t last, Th cConst, Th* c, Th* rho, Th* p, const Th* m, const Th* kx,
@@ -79,7 +79,8 @@ template<class Tc, class Tv, class Ta, class Tdu, class Tm1, class Tu, class Thy
 extern void computePositionsGpu(const GroupView& grp, float dt, util::array<float, Timestep::maxNumRungs> dt_m1, Tc* x,
                                 Tc* y, Tc* z, Tv* vx, Tv* vy, Tv* vz, Tm1* x_m1, Tm1* y_m1, Tm1* z_m1, Ta* ax, Ta* ay,
                                 Ta* az, const uint8_t* rung, Tu* temp, Tu* u, Tdu* du, Tm1* du_m1, Thydro* h,
-                                Thydro* mui, const Tc* gamma, Tc constCv, const cstone::Box<Tc>& box, bool isGammaConst);
+                                Thydro* mui, const Tc* gamma, Tc constCv, const cstone::Box<Tc>& box,
+                                bool isGammaConst);
 
 template<class Th>
 extern void updateSmoothingLengthGpu(const GroupView&, unsigned ng0, const unsigned* nc, Th* h);
