@@ -33,6 +33,7 @@
 #include <thrust/inner_product.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/transform_reduce.h>
+#include <thrust/iterator/constant_iterator.h>
 
 #include "cstone/util/tuple.hpp"
 
