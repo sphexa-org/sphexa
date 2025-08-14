@@ -67,12 +67,18 @@ TEST(Integrator, fixedBoundaryCorrection)
     using T = double;
     Box<T> box(-1., 1., BoundaryType::fixed);
 
-    auto atBoundary = fbcAdjustFactor({1., 0., 0.}, box, 0.1, true);
-    EXPECT_NEAR(atBoundary, 0.0, 1e-5);
+    auto atBoundary = fbcAdjustFactors({1., 0., 0.}, box, 0.1);
+    EXPECT_NEAR(atBoundary[0], 0.0, 1e-5);
+    EXPECT_NEAR(atBoundary[1], 1.0, 1e-7);
 
-    auto atMidPoint = fbcAdjustFactor({-0.7, 0., 0.}, box, 0.1, true);
-    EXPECT_NEAR(atMidPoint, 0.5, 1e-7);
+    auto atMidPoint = fbcAdjustFactors({-0.7, 0., 0.}, box, 0.1);
+    EXPECT_NEAR(atMidPoint[0], 0.5, 1e-7);
 
-    auto farAway = fbcAdjustFactor({0.0, 0.5, 0.}, box, 0.1, true);
-    EXPECT_NEAR(farAway, 1., 1e-7);
+    auto farAway = fbcAdjustFactors({0.0, 0.5, 0.}, box, 0.1);
+    EXPECT_NEAR(farAway[1], 1., 1e-7);
+
+    // Should not correct even though close to boundary, boundary is not fixed
+    Box<T> box2(-1., 1., BoundaryType::open);
+    auto   atBoundary2 = fbcAdjustFactors({1, 0., 0.}, box2, 0.1);
+    EXPECT_NEAR(atBoundary2[0], 1.0, 1e-7);
 }

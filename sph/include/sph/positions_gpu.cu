@@ -121,7 +121,7 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
                                        Tc* y, Tc* z, Tv* vx, Tv* vy, Tv* vz, Tm1* x_m1, Tm1* y_m1, Tm1* z_m1, Ta* ax,
                                        Ta* ay, Ta* az, const uint8_t* rung, Tt* temp, Tt* u, Tdu* du, Tm1* du_m1,
                                        Thydro* h, Thydro* mui, const Tc* gamma, Tc constCv, const cstone::Box<Tc> box,
-                                       cstone::Vec3<bool> isAxisFixedBoundary, bool isGammaConst)
+                                       bool anyFBC, bool isGammaConst)
 {
     LocalIndex laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
@@ -133,15 +133,8 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
     float dt_m1_rung = (rung != nullptr) ? dt_m1[rung[i]] : dt_m1[0];
 
     cstone::Vec3<Tc> X{x[i], y[i], z[i]};
-    bool             anyFBC = isAxisFixedBoundary[0] || isAxisFixedBoundary[1] || isAxisFixedBoundary[2];
     cstone::Vec3<Tc> adjustForFBC{Tc(1.), Tc(1.), Tc(1.)};
-    if (anyFBC)
-    {
-        for (size_t j = 0; j < 3; ++j)
-        {
-            adjustForFBC[j] = fbcAdjustFactor(X, box, h[i], isAxisFixedBoundary[j]);
-        }
-    }
+    if (anyFBC) { adjustForFBC = fbcAdjustFactors(X, box, h[i]); }
 
     // To keep particles belonging to the fixed boundaries from moving, these two quantities need to be adjusted
     cstone::Vec3<Tc> A{ax[i] * adjustForFBC[0], ay[i] * adjustForFBC[1], az[i] * adjustForFBC[2]};
@@ -153,20 +146,23 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
     util::tie(x_m1[i], y_m1[i], z_m1[i]) = util::tie(X_m1[0], X_m1[1], X_m1[2]);
     util::tie(vx[i], vy[i], vz[i])       = util::tie(V[0], V[1], V[2]);
 
-    if (anyFBC) { adjustForFBC[0] = fbcAdjustFactor(X, box, h[i], true); }
+    Tc minDistanceFactor = min(adjustForFBC);
     if (temp != nullptr)
     {
         auto gamma_i = isGammaConst ? *gamma : gamma[i];
         Thydro cv    = (constCv < 0) ? idealGasCv(mui[i], gamma_i) : constCv;
         auto   u_old = temp[i] * cv;
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
-        temp[i]  = energyUpdate(u_old, dt * adjustForFBC[0], dt_m1_rung, du[i], du_m1[i]) / cv;
+        // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
+        temp[i] =
+            energyUpdate(u_old, dt * minDistanceFactor, dt_m1_rung * (1. / minDistanceFactor), du[i], du_m1[i]) / cv;
         du_m1[i] = du[i];
     }
     else if (u != nullptr)
     {
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
-        u[i]     = energyUpdate(u[i], dt * adjustForFBC[0], dt_m1_rung, du[i], du_m1[i]);
+        // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
+        u[i]     = energyUpdate(u[i], dt * minDistanceFactor, dt_m1_rung * (1. / minDistanceFactor), du[i], du_m1[i]);
         du_m1[i] = du[i];
     }
 }
@@ -181,14 +177,13 @@ void computePositionsGpu(const GroupView& grp, float dt, util::array<float, Time
     unsigned numWarpsPerBlock = numThreads / GpuConfig::warpSize;
     unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
 
-    cstone::Vec3<bool> isAxisFixedBoundary = {box.boundaryX() == cstone::BoundaryType::fixed,
-                                              box.boundaryY() == cstone::BoundaryType::fixed,
-                                              box.boundaryZ() == cstone::BoundaryType::fixed};
+    bool anyFBC = box.boundaryX() == cstone::BoundaryType::fixed || box.boundaryY() == cstone::BoundaryType::fixed ||
+                  box.boundaryZ() == cstone::BoundaryType::fixed;
 
     if (numBlocks == 0) { return; }
     computePositionsKernel<<<numBlocks, numThreads>>>(grp, dt, dt_m1, x, y, z, vx, vy, vz, x_m1, y_m1, z_m1, ax, ay, az,
                                                       rung, temp, u, du, du_m1, h, mui, gamma, constCv, box,
-                                                      isAxisFixedBoundary, isGammaConst);
+                                                      anyFBC, isGammaConst);
 }
 
 #define POS_GPU(Tc, Tv, Ta, Tdu, Tm1, Tt, Thydro)                                                                      \
