@@ -184,8 +184,8 @@ int main(int argc, char** argv)
 
     auto findMacsLambda = [od, &centers, &box, &tree, &macs, firstFocusNode, lastFocusNode]()
     {
-        markMacsGpu(od.prefixes, od.childOffsets, od.parents, rawPtr(centers), box,
-                    rawPtr(tree) + firstFocusNode, lastFocusNode - firstFocusNode, false, rawPtr(macs));
+        markMacsGpu(od.prefixes, od.childOffsets, od.parents, rawPtr(centers), box, rawPtr(tree) + firstFocusNode,
+                    lastFocusNode - firstFocusNode, false, rawPtr(macs));
     };
 
     float macTime = timeGpu(findMacsLambda);

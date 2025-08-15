@@ -89,9 +89,9 @@ public:
     template<class KeyType, class T>
     void check()
     {
-        int numParticles = 1000;
+        int numParticles          = 1000;
         std::vector<KeyType> keys = makeRandomGaussianKeys<KeyType>(numParticles);
-        auto [tree, counts] = computeOctree<KeyType>(keys, 4);
+        auto [tree, counts]       = computeOctree<KeyType>(keys, 4);
 
         OctreeData<KeyType, CpuTag> octree;
         octree.resize(nNodes(tree));

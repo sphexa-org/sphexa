@@ -28,12 +28,6 @@ extern void fillGpu(T* first, T* last, T value);
 template<class T>
 extern void scaleGpu(T* first, T* last, T value);
 
-template<class T>
-extern void incrementGpu(const T* first, const T* last, T* d_first, T value);
-
-template<class T>
-extern void addRadiiGpu(const Vec3<T>* first, const Vec3<T>* last, const float* radii, Vec3<T>* destFirst);
-
 template<class TS, class TD, class IndexType>
 extern void gatherGpu(const IndexType* ordering, size_t numElements, const TS* src, TD* buffer);
 
@@ -61,19 +55,6 @@ extern size_t lowerBoundGpu(const T* first, const T* last, T value);
 
 template<class T, class IndexType>
 extern void lowerBoundGpu(const T* first, const T* last, const T* valueFirst, const T* valueLast, IndexType* result);
-
-/*! @brief determine maximum elements in an array divided into multiple segments
- *
- * @tparam      Tin          some type that supports comparison
- * @tparam      Tout         some type that supports comparison
- * @tparam      IndexType    32- or 64-bit unsigned integer
- * @param[in]   input        an array of length @a segments[numSegments]
- * @param[in]   segments     an array of length @a numSegments + 1 describing the segmentation of @a input
- * @param[in]   numSegments  number of segments
- * @param[out]  output       maximum in each segment, length @a numSegments
- */
-template<class Tin, class Tout, class IndexType>
-extern void segmentMax(const Tin* input, const IndexType* segments, size_t numSegments, Tout* output);
 
 template<class T1, class T2, class Tout>
 extern void sequenceMax(const T1* i1_begin, const T1* i1_end, const T2* i2, Tout* output);

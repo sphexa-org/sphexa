@@ -55,7 +55,6 @@ extern void findHalosGpu(const KeyType* prefixes,
                          TreeNodeIndex lastNode,
                          uint8_t* collisionFlags);
 
-
 template<class T, class KeyType>
 extern void markMacsGpu(const KeyType* prefixes,
                         const TreeNodeIndex* childOffsets,
