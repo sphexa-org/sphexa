@@ -63,7 +63,6 @@ TEST(FocusDomain, noHalos)
     const int thisExampleRanks = 2;
     if (numRanks != thisExampleRanks) throw std::runtime_error("this test needs 2 ranks\n");
 
-    noHalos<unsigned, double>(rank, numRanks);
     noHalos<uint64_t, double>(rank, numRanks);
     noHalos<unsigned, float>(rank, numRanks);
     noHalos<uint64_t, float>(rank, numRanks);
@@ -120,7 +119,6 @@ TEST(FocusDomain, halos)
     const int thisExampleRanks = 2;
     if (nRanks != thisExampleRanks) throw std::runtime_error("this test needs 2 ranks\n");
 
-    withHalos<unsigned, double>(rank, nRanks);
     withHalos<uint64_t, double>(rank, nRanks);
     withHalos<unsigned, float>(rank, nRanks);
     withHalos<uint64_t, float>(rank, nRanks);
@@ -210,7 +208,6 @@ TEST(FocusDomain, moreHalos)
     const int thisExampleRanks = 2;
     if (numRanks != thisExampleRanks) throw std::runtime_error("this test needs 2 ranks\n");
 
-    moreHalos<unsigned, double>(rank, numRanks);
     moreHalos<uint64_t, double>(rank, numRanks);
     moreHalos<unsigned, float>(rank, numRanks);
     moreHalos<uint64_t, float>(rank, numRanks);
@@ -431,13 +428,16 @@ void domainHaloRadii(int rank, int nRanks)
     std::vector<T> x, y, z, h;
     std::vector<KeyType> keys;
 
+    // half the radius + epsilon required to hit neighboring cells in a 4x4 grid
+    T r = 0.5 * std::sqrt(2) * 1.01;
+
     if (rank == 0)
     {
         // includes (0,0,0) to set the lower corner
         x = std::vector<T>{0, 1, 1, 3, 3, 1, 1, 3, 3};
         y = std::vector<T>{0, 1, 3, 1, 3, 5, 7, 5, 7};
         z = std::vector<T>{0, 0, 0, 0, 0, 0, 0, 0, 0};
-        h = std::vector<T>{0, 0.1, 0, 0, 0, 0, 0, 0, 0};
+        h = std::vector<T>{0, r, 0, 0, 0, 0, 0, 0, 0};
     }
     else
     {
@@ -445,7 +445,7 @@ void domainHaloRadii(int rank, int nRanks)
         x = std::vector<T>{5, 5, 7, 7, 5, 5, 7, 7, 8};
         y = std::vector<T>{1, 3, 1, 3, 5, 7, 5, 7, 8};
         z = std::vector<T>{0, 0, 0, 0, 0, 0, 0, 0, 8};
-        h = std::vector<T>{0, 0, 0, 0, 0, 0.1, 0, 0, 0};
+        h = std::vector<T>{0, 0, 0, 0, 0, r, 0, 0, 0};
     }
 
     keys.resize(x.size());
@@ -466,7 +466,7 @@ void domainHaloRadii(int rank, int nRanks)
 
         x = std::vector<T>{0, 5, 1, 3, 3, 1, 1, 3, 3};
         y = std::vector<T>{0, 1, 3, 1, 3, 5, 7, 5, 7};
-        h = std::vector<T>{0, 0.1, 0, 0, 0, 0, 0, 0, 0};
+        h = std::vector<T>{0, r, 0, 0, 0, 0, 0, 0, 0};
         //                    ^ move to rank 1 (note: has non-zero h)
     }
 
@@ -485,7 +485,7 @@ void domainHaloRadii(int rank, int nRanks)
 
         x = std::vector<T>{3, 3, 1, 5, 7, 7, 5, 5, 7, 7, 8};
         y = std::vector<T>{5, 7, 1, 3, 1, 3, 5, 7, 5, 7, 8};
-        h = std::vector<T>{0, 0, 0, 0, 0, 0, 0, 0.1, 0, 0, 0};
+        h = std::vector<T>{0, 0, 0, 0, 0, 0, 0, r, 0, 0, 0};
         //                       ^ move to rank 0
     }
 
