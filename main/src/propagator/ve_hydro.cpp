@@ -34,7 +34,7 @@
 #include "propagator.h"
 #include "turb_ve.hpp"
 #include "ve_hydro.hpp"
-#include "rayleigh_taylor_ve.hpp"
+#include "external_gravity_ve.hpp"
 
 namespace sphexa
 {
