@@ -108,7 +108,7 @@ void computeTimestep(size_t first, size_t last, Dataset& d, Ts... extraTimesteps
 
     T minDtLoc = std::min({minDtAcc, d.minDtCourant, d.minDtRho, d.maxDtIncrease * d.minDt, extraTimesteps...});
 
-    util::array<T, 4> varsIn{minDtLoc, 0, 0, -T(d.accSize())}, varsOut;
+    util::array<T, 4> varsIn{minDtLoc, 0, 0, -T(d.accSize() - last + first)}, varsOut;
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         varsIn[1] = -int(d.devData.stackUsedNc);
