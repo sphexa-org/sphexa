@@ -153,14 +153,14 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
         // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
         temp[i] =
-            energyUpdate(u_old, dt * minDistanceFactor, dt_m1_rung * (1. / minDistanceFactor), du[i], du_m1[i]) / cv;
+            energyUpdate(u_old, dt * minDistanceFactor, dt_m1_rung * (Tc(1) / minDistanceFactor), du[i], du_m1[i]) / cv;
         du_m1[i] = du[i];
     }
     else if (u != nullptr)
     {
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
         // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
-        u[i]     = energyUpdate(u[i], dt * minDistanceFactor, dt_m1_rung * (1. / minDistanceFactor), du[i], du_m1[i]);
+        u[i]     = energyUpdate(u[i], dt * minDistanceFactor, dt_m1_rung * (Tc(1) / minDistanceFactor), du[i], du_m1[i]);
         du_m1[i] = du[i];
     }
 }
