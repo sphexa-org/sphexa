@@ -119,7 +119,8 @@ template<class Tc, class Tv, class Ta, class Tdu, class Tm1, class Tt, class Thy
 __global__ void computePositionsKernel(GroupView grp, float dt, util::array<float, Timestep::maxNumRungs> dt_m1, Tc* x,
                                        Tc* y, Tc* z, Tv* vx, Tv* vy, Tv* vz, Tm1* x_m1, Tm1* y_m1, Tm1* z_m1, Ta* ax,
                                        Ta* ay, Ta* az, const uint8_t* rung, Tt* temp, Tt* u, Tdu* du, Tm1* du_m1,
-                                       Thydro* h, Thydro* mui, Tc gamma, Tc constCv, const cstone::Box<Tc> box)
+                                       Thydro* h, Thydro* mui, Tc gamma, Tc constCv, const cstone::Box<Tc> box,
+                                       bool anyFBC)
 {
     LocalIndex laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
@@ -128,24 +129,15 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
     LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
     if (i >= grp.groupEnd[warpIdx]) { return; }
 
-    bool fbcX   = (box.boundaryX() == cstone::BoundaryType::fixed);
-    bool fbcY   = (box.boundaryY() == cstone::BoundaryType::fixed);
-    bool fbcZ   = (box.boundaryZ() == cstone::BoundaryType::fixed);
-    bool anyFBC = fbcX || fbcY || fbcZ;
+    float dt_m1_rung = (rung != nullptr) ? dt_m1[rung[i]] : dt_m1[0];
 
-    if (anyFBC && vx[i] == Tv(0) && vy[i] == Tv(0) && vz[i] == Tv(0))
-    {
-        if (fbcCheck(x[i], h[i], box.xmax(), box.xmin(), fbcX) || fbcCheck(y[i], h[i], box.ymax(), box.ymin(), fbcY) ||
-            fbcCheck(z[i], h[i], box.zmax(), box.zmin(), fbcZ))
-        {
-            return;
-        }
-    }
-
-    float            dt_m1_rung = (rung != nullptr) ? dt_m1[rung[i]] : dt_m1[0];
-    cstone::Vec3<Tc> A{ax[i], ay[i], az[i]};
     cstone::Vec3<Tc> X{x[i], y[i], z[i]};
-    cstone::Vec3<Tc> X_m1{x_m1[i], y_m1[i], z_m1[i]};
+    cstone::Vec3<Tc> adjustForFBC{Tc(1.), Tc(1.), Tc(1.)};
+    if (anyFBC) { adjustForFBC = fbcAdjustFactors(X, box, h[i]); }
+
+    // To keep particles belonging to the fixed boundaries from moving, these two quantities need to be adjusted
+    cstone::Vec3<Tc> A{ax[i] * adjustForFBC[0], ay[i] * adjustForFBC[1], az[i] * adjustForFBC[2]};
+    cstone::Vec3<Tc> X_m1{x_m1[i] * adjustForFBC[0], y_m1[i] * adjustForFBC[1], z_m1[i] * adjustForFBC[2]};
     cstone::Vec3<Tc> V;
     util::tie(X, V, X_m1) = positionUpdate(dt, dt_m1_rung, X, A, X_m1, box);
 
@@ -153,16 +145,22 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
     util::tie(x_m1[i], y_m1[i], z_m1[i]) = util::tie(X_m1[0], X_m1[1], X_m1[2]);
     util::tie(vx[i], vy[i], vz[i])       = util::tie(V[0], V[1], V[2]);
 
+    Tc minDistanceFactor = min(adjustForFBC);
     if (temp != nullptr)
     {
         Thydro cv    = (constCv < 0) ? idealGasCv(mui[i], gamma) : constCv;
         auto   u_old = temp[i] * cv;
-        temp[i]      = energyUpdate(u_old, dt, dt_m1_rung, du[i], du_m1[i]) / cv;
-        du_m1[i]     = du[i];
+        // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
+        // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
+        temp[i] =
+            energyUpdate(u_old, dt * minDistanceFactor, dt_m1_rung * (Tc(1) / minDistanceFactor), du[i], du_m1[i]) / cv;
+        du_m1[i] = du[i];
     }
     else if (u != nullptr)
     {
-        u[i]     = energyUpdate(u[i], dt, dt_m1_rung, du[i], du_m1[i]);
+        // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
+        // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
+        u[i]     = energyUpdate(u[i], dt * minDistanceFactor, dt_m1_rung * (Tc(1) / minDistanceFactor), du[i], du_m1[i]);
         du_m1[i] = du[i];
     }
 }
@@ -177,9 +175,12 @@ void computePositionsGpu(const GroupView& grp, float dt, util::array<float, Time
     unsigned numWarpsPerBlock = numThreads / GpuConfig::warpSize;
     unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
 
+    bool anyFBC = box.boundaryX() == cstone::BoundaryType::fixed || box.boundaryY() == cstone::BoundaryType::fixed ||
+                  box.boundaryZ() == cstone::BoundaryType::fixed;
+
     if (numBlocks == 0) { return; }
     computePositionsKernel<<<numBlocks, numThreads>>>(grp, dt, dt_m1, x, y, z, vx, vy, vz, x_m1, y_m1, z_m1, ax, ay, az,
-                                                      rung, temp, u, du, du_m1, h, mui, gamma, constCv, box);
+                                                      rung, temp, u, du, du_m1, h, mui, gamma, constCv, box, anyFBC);
 }
 
 #define POS_GPU(Tc, Tv, Ta, Tdu, Tm1, Tt, Thydro)                                                                      \

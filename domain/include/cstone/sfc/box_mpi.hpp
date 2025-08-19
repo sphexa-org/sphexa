@@ -68,23 +68,23 @@ struct MinMax
 template<class T, class Op = MinMax<T>>
 auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, const Box<T>& previousBox = Box<T>(0, 1))
 {
-    bool pbcX = (previousBox.boundaryX() == BoundaryType::periodic);
-    bool pbcY = (previousBox.boundaryY() == BoundaryType::periodic);
-    bool pbcZ = (previousBox.boundaryZ() == BoundaryType::periodic);
+    bool keepX = previousBox.boundaryX() == BoundaryType::periodic || previousBox.boundaryX() == BoundaryType::fixed;
+    bool keepY = previousBox.boundaryY() == BoundaryType::periodic || previousBox.boundaryY() == BoundaryType::fixed;
+    bool keepZ = previousBox.boundaryZ() == BoundaryType::periodic || previousBox.boundaryZ() == BoundaryType::fixed;
 
     std::array<T, 6> extrema{previousBox.xmin(), previousBox.xmax(), previousBox.ymin(),
                              previousBox.ymax(), previousBox.zmin(), previousBox.zmax()};
     if (numElements)
     {
         std::tie(extrema[0], extrema[1]) =
-            pbcX ? std::make_tuple(previousBox.xmin(), previousBox.xmax()) : Op{}(x, x + numElements);
+            keepX ? std::make_tuple(previousBox.xmin(), previousBox.xmax()) : Op{}(x, x + numElements);
         std::tie(extrema[2], extrema[3]) =
-            pbcY ? std::make_tuple(previousBox.ymin(), previousBox.ymax()) : Op{}(y, y + numElements);
+            keepY ? std::make_tuple(previousBox.ymin(), previousBox.ymax()) : Op{}(y, y + numElements);
         std::tie(extrema[4], extrema[5]) =
-            pbcZ ? std::make_tuple(previousBox.zmin(), previousBox.zmax()) : Op{}(z, z + numElements);
+            keepZ ? std::make_tuple(previousBox.zmin(), previousBox.zmax()) : Op{}(z, z + numElements);
     }
 
-    if (!pbcX || !pbcY || !pbcZ)
+    if (!keepX || !keepY || !keepZ)
     {
         extrema[1] = -extrema[1];
         extrema[3] = -extrema[3];
