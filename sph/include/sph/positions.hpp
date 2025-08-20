@@ -153,9 +153,8 @@ void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone
         auto cv    = haveMui ? idealGasCv(d.mui[i], d.gamma) : constCv;
         auto u_old = cv * d.temp[i];
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
-        // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
-        d.temp[i] =
-            energyUpdate(u_old, d.minDt * adjustForFBC, d.minDt_m1 * (T(1) / adjustForFBC), d.du[i], d.du_m1[i]) / cv;
+        // we also apply it to dt_m1 so it applies only once to each of the updating terms
+        d.temp[i]  = energyUpdate(u_old, d.minDt * adjustForFBC, d.minDt_m1 * adjustForFBC, d.du[i], d.du_m1[i]) / cv;
         d.du_m1[i] = d.du[i];
     }
 }
@@ -173,8 +172,8 @@ void updateIntEnergyHost(size_t startIndex, size_t endIndex, Dataset& d, const c
     {
         if (anyFBC) { adjustForFBC = min(fbcAdjustFactors({d.x[i], d.y[i], d.z[i]}, box, d.h[i])); }
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
-        // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
-        d.u[i] = energyUpdate(d.u[i], d.minDt * adjustForFBC, d.minDt_m1 * (T(1) / adjustForFBC), d.du[i], d.du_m1[i]);
+        // we also apply it to dt_m1 so it applies only once to each of the updating terms
+        d.u[i]     = energyUpdate(d.u[i], d.minDt * adjustForFBC, d.minDt_m1 * adjustForFBC, d.du[i], d.du_m1[i]);
         d.du_m1[i] = d.du[i];
     }
 }
