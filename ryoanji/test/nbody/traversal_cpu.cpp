@@ -70,7 +70,7 @@ TEST(Gravity, TreeWalk)
     std::vector<SourceCenterType<T>> centers(octree.numNodes);
     computeLeafMassCenter<T, T, T>(coordinates.x(), coordinates.y(), coordinates.z(), masses, toInternal, layout.data(),
                                    centers.data());
-    upsweep(octree.levelRange, octree.childOffsets, centers.data(), CombineSourceCenter<T>{});
+    upsweep(octree.levelRange, octree.childOffsets.data(), centers.data(), CombineSourceCenter<T>{});
     setMac<T, KeyType>(octree.prefixes, centers, 1.0 / theta, box);
 
     std::vector<MultipoleType> multipoles(octree.numNodes);

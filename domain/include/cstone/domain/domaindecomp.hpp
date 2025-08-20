@@ -67,13 +67,21 @@ public:
     explicit SfcAssignment(int numRanks)
         : rankBoundaries_(numRanks + 1)
         , counts_(numRanks)
+        , numNodesPerRank_(numRanks)
+        , treeOffsets_(numRanks + 1)
     {
     }
 
     KeyType* data() { return rankBoundaries_.data(); }
     const KeyType* data() const { return rankBoundaries_.data(); }
 
-    unsigned* counts() { return counts_.data(); }
+    std::span<LocalIndex> counts() { return counts_; }
+
+    std::span<TreeNodeIndex> numNodesPerRank() { return numNodesPerRank_; }
+    std::span<const TreeNodeIndex> numNodesPerRankConst() const { return numNodesPerRank_; }
+
+    std::span<TreeNodeIndex> treeOffsets() { return treeOffsets_; }
+    std::span<const TreeNodeIndex> treeOffsetsConst() const { return treeOffsets_; }
 
     void set(int rank, KeyType a, LocalIndex count)
     {
@@ -94,15 +102,26 @@ public:
 private:
     std::vector<KeyType> rankBoundaries_;
     std::vector<LocalIndex> counts_;
+
+    //! number of assigned global tree nodes for each rank
+    std::vector<TreeNodeIndex> numNodesPerRank_;
+    //! scan of numTreeNodes
+    std::vector<TreeNodeIndex> treeOffsets_;
 };
 
 template<class KeyType>
 SfcAssignment<KeyType> makeSfcAssignment(int numRanks, const std::vector<unsigned>& counts, const KeyType* tree)
 {
     SfcAssignment<KeyType> ret(numRanks);
-    std::vector<TreeNodeIndex> nodeBins(numRanks + 1);
-    uniformBins(counts, nodeBins, {ret.counts(), size_t(numRanks)});
-    gather(std::span<const TreeNodeIndex>{nodeBins.data(), nodeBins.size()}, tree, ret.data());
+    uniformBins(counts, ret.treeOffsets(), ret.counts());
+    gather(ret.treeOffsetsConst(), tree, ret.data());
+
+    std::span numNodesPerRank = ret.numNodesPerRank();
+    std::span offsets         = ret.treeOffsets();
+    for (TreeNodeIndex i = 0; i < numRanks; ++i)
+    {
+        numNodesPerRank[i] = offsets[i + 1] - offsets[i];
+    }
 
     return ret;
 }
@@ -140,12 +159,23 @@ void limitBoundaryShifts(const SfcAssignment<KeyType> oldAssignment,
     }
     if (!triggerRecount) { return; }
 
+    std::span treeOffsets = newAssignment.treeOffsets();
+    treeOffsets.front()   = 0;
+    treeOffsets.back()    = nNodes(tree);
+
+    std::span numNodesPerRank = newAssignment.numNodesPerRank();
+    for (int rank = 1; rank < numRanks; ++rank)
+    {
+        treeOffsets[rank]         = findNodeAbove(tree.data(), nNodes(tree), newAssignment[rank]);
+        numNodesPerRank[rank - 1] = treeOffsets[rank] - treeOffsets[rank - 1];
+    }
+    numNodesPerRank[numRanks - 1] = treeOffsets.back() - treeOffsets[numRanks - 1];
+
+    std::span newCounts = newAssignment.counts();
     for (int rank = 0; rank < numRanks; ++rank)
     {
-        auto a                       = findNodeAbove(tree.data(), nNodes(tree), newAssignment[rank]);
-        auto b                       = findNodeAbove(tree.data(), nNodes(tree), newAssignment[rank + 1]);
-        std::size_t rankCount        = std::accumulate(counts.begin() + a, counts.begin() + b, std::size_t(0));
-        newAssignment.counts()[rank] = rankCount;
+        newCounts[rank] =
+            std::accumulate(counts.begin() + treeOffsets[rank], counts.begin() + treeOffsets[rank + 1], std::size_t(0));
     }
 }
 

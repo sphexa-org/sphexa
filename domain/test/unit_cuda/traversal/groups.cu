@@ -59,11 +59,14 @@ __global__ void findSplitTester(util::array<GpuConfig::ThreadMask, N>* splits)
     for (int k = 0; k < N; ++k)
     {
         T x    = T(laneIdx) + k * GpuConfig::warpSize;
-        pos[k] = Vec4<T>{x, x, x, T(0)};
+        pos[k] = Vec4<T>{x, x, x, T(N * GpuConfig::warpSize)};
     }
 
     // introduce a split at position 0
-    if (laneIdx == 0) { pos[0] = {-1, -1, -1, 0}; }
+    if (laneIdx == 0) { pos[0] = {-1, -1, -1, N * GpuConfig::warpSize}; }
+
+    // introduce a split at position 2 due to interaction radius
+    if (laneIdx == 2) { pos[0][3] = 0.99 * std::sqrt(3.); }
 
     // introduce a split at position 31
     if (laneIdx == 31)
@@ -99,8 +102,9 @@ TEST(TargetGroups, findSplits)
             splitBits |= split[k];
         }
 
-        EXPECT_EQ(splitBits.count(), 3);
+        EXPECT_EQ(splitBits.count(), 4);
         EXPECT_EQ(splitBits[0], 1);
+        EXPECT_EQ(splitBits[2], 1);
         EXPECT_EQ(splitBits[31], 1);
         EXPECT_EQ(splitBits[33], 1);
     }
@@ -223,6 +227,11 @@ TEST(TargetGroups, groupVolumes)
     thrust::sequence(x.begin(), x.end(), 0);
     thrust::sequence(y.begin(), y.end(), 0);
     thrust::sequence(z.begin(), z.end(), 0);
+    thrust::fill(h.begin(), h.end(), box.maxExtent());
+    // particle 6 in 2nd group get a smaller interaction radius, just enough to cause a split
+    h[first + groupSize + 6] = 0.99 * std::sqrt(3.) / 2;
+    // particle 7 in 2nd group's radius is just big enough not to cause a split
+    h[first + groupSize + 7] = 1.01 * std::sqrt(3.) / 2;
 
     // introduce a split by increasing distance between particles 5 and 6
     x[5] -= 0.01;
@@ -244,7 +253,7 @@ TEST(TargetGroups, groupVolumes)
             box, tolFactor, rawPtr(splitMasks), rawPtr(groupDiv), numGroups);
 
         thrust::host_vector<LocalIndex> h_groupDiv = groupDiv;
-        thrust::host_vector<LocalIndex> ref        = std::vector<LocalIndex>{2, 1};
+        thrust::host_vector<LocalIndex> ref        = std::vector<LocalIndex>{2, 2};
         EXPECT_EQ(h_groupDiv, ref);
     }
     {
@@ -259,6 +268,8 @@ TEST(TargetGroups, groupVolumes)
     }
 
     {
+        // Fixed size groups (4,68,128) get split into (4,6,68,75,128)
+        //                            because of distance ^    ^ because of interaction radius
         DeviceVector<LocalIndex> temp, groups;
 
         float tolFactor = std::sqrt(3.0) / distCrit * 1.01;
@@ -266,10 +277,7 @@ TEST(TargetGroups, groupVolumes)
                            rawPtr(d_layout), box, groupSize, tolFactor, temp, groups);
 
         std::vector<LocalIndex> h_groups = toHost(groups);
-        EXPECT_EQ(h_groups.size(), 4);
-        EXPECT_EQ(h_groups[0], 4);
-        EXPECT_EQ(h_groups[1], 6);
-        EXPECT_EQ(h_groups[2], 68);
-        EXPECT_EQ(h_groups[3], 128);
+        std::vector<LocalIndex> ref{4, 6, 68, 75, 128};
+        EXPECT_EQ(h_groups, ref);
     }
 }

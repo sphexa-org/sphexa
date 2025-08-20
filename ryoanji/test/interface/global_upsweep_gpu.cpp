@@ -74,13 +74,13 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     //! the focused octree, structure only
     auto octree = focusTree.octreeViewAcc();
 
-    std::vector<MultipoleType> multipoles(octree.numNodes);
     multipoleHolder.upsweep(rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), domain.globalTree(), domain.focusTree(),
-                            domain.layout().data(), multipoles.data());
+                            domain.layout().data());
 
     // Check the root multipole of the distributed tree
     bool passMultipole = false;
     {
+        std::vector<MultipoleType> multipoles(octree.numNodes);
         memcpyD2H(multipoleHolder.deviceMultipoles(), multipoles.size(), multipoles.data());
 
         MultipoleType globalRootMultipole = multipoles[0];
@@ -98,7 +98,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
 
         bool pass      = maxDiff < 1e-10;
         int  numPassed = pass;
-        mpiAllreduce(MPI_IN_PLACE, &numPassed, 1, MPI_SUM);
+        mpiAllreduce(MPI_IN_PLACE, &numPassed, 1, MPI_SUM, MPI_COMM_WORLD);
         if (numPassed == numRanks) { passMultipole = true; }
     }
 

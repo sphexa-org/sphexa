@@ -156,6 +156,22 @@ TEST(SfcCode, decodePlaceholderbit32)
     EXPECT_EQ(06350000000, decodePlaceholderBit(01635u));
 }
 
+TEST(SfcCode, decodePlaceholderbit2K32)
+{
+    using KeyType = uint32_t;
+    auto [k1, k2] = decodePlaceholderBit2K(0b1001u);
+    EXPECT_EQ(k1, nodeRange<KeyType>(1));
+    EXPECT_EQ(k2, 2 * nodeRange<KeyType>(1));
+}
+
+TEST(SfcCode, decodePlaceholderbit2K32_2)
+{
+    using KeyType = uint32_t;
+    auto [k1, k2] = decodePlaceholderBit2K(0100u);
+    EXPECT_EQ(k1, 0);
+    EXPECT_EQ(k2, nodeRange<KeyType>(2));
+}
+
 TEST(SfcCode, encodePlaceholderBit64)
 {
     EXPECT_EQ(1, encodePlaceholderBit(0lu, 0));

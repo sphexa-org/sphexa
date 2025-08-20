@@ -78,6 +78,7 @@ __global__ void driftKernel(GroupView grp, float dt, float dt_back, util::array<
 
     if (temp != nullptr)
     {
+        //TODO
         auto   gamma_i = isGammaConst ? *gamma : gamma[i];
         Thydro cv      = (constCv < 0) ? idealGasCv(mui[i], gamma_i) : constCv;
         auto   u_recov = energyUpdate(Tc(temp[i] * cv), -dt_back, dt_m1_rung, du[i], Tdu(du_m1[i]));
@@ -151,20 +152,20 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
     Tc minDistanceFactor = min(adjustForFBC);
     if (temp != nullptr)
     {
+        //TODO
         auto   gamma_i = isGammaConst ? *gamma : gamma[i];
         Thydro cv      = (constCv < 0) ? idealGasCv(mui[i], gamma_i) : constCv;
         auto   u_old   = temp[i] * cv;
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
-        // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
-        temp[i] =
-            energyUpdate(u_old, dt * minDistanceFactor, dt_m1_rung * (1. / minDistanceFactor), du[i], du_m1[i]) / cv;
+        // we multiply dt_m1 by that factor so it applies only once to each of the updating terms
+        temp[i]  = energyUpdate(u_old, dt * minDistanceFactor, dt_m1_rung * minDistanceFactor, du[i], du_m1[i]) / cv;
         du_m1[i] = du[i];
     }
     else if (u != nullptr)
     {
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
-        // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
-        u[i]     = energyUpdate(u[i], dt * minDistanceFactor, dt_m1_rung * (1. / minDistanceFactor), du[i], du_m1[i]);
+        // we multiply dt_m1 by that factor so it applies only once to each of the updating terms
+        u[i]     = energyUpdate(u[i], dt * minDistanceFactor, dt_m1_rung * minDistanceFactor, du[i], du_m1[i]);
         du_m1[i] = du[i];
     }
 }
