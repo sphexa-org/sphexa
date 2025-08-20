@@ -61,9 +61,8 @@ public:
         const auto& focusTree = domain.focusTree();
 
         reallocate(multipoles_, focusTree.octreeViewAcc().numNodes, 1.05);
-        ryoanji::computeGlobalMultipoles(d.x.data(), d.y.data(), d.z.data(), d.m.data(), d.x.size(),
-                                         domain.globalTree(), domain.focusTree(), domain.layout().data(),
-                                         multipoles_.data());
+        ryoanji::computeMultipoles(d.x.data(), d.y.data(), d.z.data(), d.m.data(), domain.globalTree(),
+                                   domain.focusTree(), domain.layout().data(), multipoles_.data());
     }
 
     void traverse(cstone::GroupView /*grp*/, DataType& d, const DomainType& domain)
@@ -125,9 +124,8 @@ public:
     void upsweep(const DataType& d, const DomainType& domain)
     {
         const auto& focusTree = domain.focusTree();
-        reallocate(multipoles_, focusTree.octreeViewAcc().numNodes, 1.05);
         mHolder_.upsweep(rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.m),
-                         domain.globalTree(), focusTree, domain.layout().data(), multipoles_.data());
+                         domain.globalTree(), focusTree, domain.layout().data());
     }
 
     void traverse(cstone::GroupView grp, DataType& d, const DomainType& domain)
@@ -165,11 +163,8 @@ public:
     //! @brief return numP2P, maxP2P, numM2P, maxM2P, maxStack stats
     util::array<uint64_t, 5> readStats() const { return mHolder_.readStats(); }
 
-    const MType* multipoles() const { return multipoles_.data(); }
-
 private:
     ryoanji::MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType> mHolder_;
-    std::vector<MType>                                           multipoles_;
     ryoanji::EwaldSettings                                       ewaldSettings_;
 };
 

@@ -144,18 +144,17 @@ void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone
 
     bool haveMui      = !d.mui.empty();
     auto constCv      = idealGasCv(d.muiConst, d.gamma);
-    auto adjustForFBC = 1.0;
+    auto adjustForFBC = T(1);
 
 #pragma omp parallel for schedule(static)
-    for (size_t i = startIndex; i < endIndex; i++)
+    for (std::size_t i = startIndex; i < endIndex; i++)
     {
         if (anyFBC) { adjustForFBC = min(fbcAdjustFactors({d.x[i], d.y[i], d.z[i]}, box, d.h[i])); }
         auto cv    = haveMui ? idealGasCv(d.mui[i], d.gamma) : constCv;
         auto u_old = cv * d.temp[i];
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
-        // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
-        d.temp[i] =
-            energyUpdate(u_old, d.minDt * adjustForFBC, d.minDt_m1 * (1. / adjustForFBC), d.du[i], d.du_m1[i]) / cv;
+        // we multiply dt_m1 by that factor so it applies only once to each of the updating terms
+        d.temp[i]  = energyUpdate(u_old, d.minDt * adjustForFBC, d.minDt_m1 * adjustForFBC, d.du[i], d.du_m1[i]) / cv;
         d.du_m1[i] = d.du[i];
     }
 }
@@ -166,15 +165,15 @@ void updateIntEnergyHost(size_t startIndex, size_t endIndex, Dataset& d, const c
     bool anyFBC = box.boundaryX() == cstone::BoundaryType::fixed || box.boundaryY() == cstone::BoundaryType::fixed ||
                   box.boundaryZ() == cstone::BoundaryType::fixed;
 
-    auto adjustForFBC = 1.0;
+    auto adjustForFBC = T(1);
 
 #pragma omp parallel for schedule(static)
-    for (size_t i = startIndex; i < endIndex; i++)
+    for (std::size_t i = startIndex; i < endIndex; i++)
     {
         if (anyFBC) { adjustForFBC = min(fbcAdjustFactors({d.x[i], d.y[i], d.z[i]}, box, d.h[i])); }
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
-        // we divide out dt_m1 by that factor so it applies only once to each of the updating terms
-        d.u[i] = energyUpdate(d.u[i], d.minDt * adjustForFBC, d.minDt_m1 * (1. / adjustForFBC), d.du[i], d.du_m1[i]);
+        // we multiply dt_m1 by that factor so it applies only once to each of the updating terms
+        d.u[i]     = energyUpdate(d.u[i], d.minDt * adjustForFBC, d.minDt_m1 * adjustForFBC, d.du[i], d.du_m1[i]);
         d.du_m1[i] = d.du[i];
     }
 }
