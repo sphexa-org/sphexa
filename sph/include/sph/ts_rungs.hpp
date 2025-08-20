@@ -109,7 +109,7 @@ auto computeMinTimestep(float* groupDt, LocalIndex* groupIndices, LocalIndex num
     }
 
     std::array<float, 2> minDtGlobal;
-    mpiAllreduce(minGroupDt.data(), minDtGlobal.data(), minGroupDt.size(), MPI_MIN);
+    mpiAllreduce(minGroupDt.data(), minDtGlobal.data(), minGroupDt.size(), MPI_MIN, MPI_COMM_WORLD);
     return minDtGlobal;
 }
 

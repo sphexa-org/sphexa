@@ -79,13 +79,13 @@ cmake <GIT_SOURCE_DIR>
 ```
 Compilation at sciCORE (UniBas):
 ```shell
-ml HDF5/1.14.2-gompi-2022a-zen2
-ml CMake/3.23.1-GCCcore-11.3.0
-ml CUDA/11.8.0
+ml HDF5/1.14.6-gompi-2025a
+ml CMake/3.31.3-GCCcore-14.2.0
+ml CUDA/12.8.0
 
 mkdir build
 cd build
-cmake <GIT_SOURCE_DIR>
+cmake -DCMAKE_CUDA_ARCHITECTURES="80;85;90" <GIT_SOURCE_DIR>
 ```
 CMake configuration on Daint on Alps:
 **CUDA 12.6 + GCC 13.3**:

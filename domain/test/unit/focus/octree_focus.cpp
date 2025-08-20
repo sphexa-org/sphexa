@@ -33,11 +33,10 @@ static auto computeNodeOps(const OctreeView<KeyType>& octree,
     std::vector<unsigned> counts(octree.numNodes);
 
     std::span<const TreeNodeIndex> leafToInternal(octree.leafToInternal + octree.numInternalNodes, octree.numLeafNodes);
-    std::span<const TreeNodeIndex> childOffsets{octree.childOffsets, size_t(octree.numNodes)};
     std::span<const TreeNodeIndex> levelRange(octree.levelRange, maxTreeLevel<KeyType>{} + 2);
 
     scatter(leafToInternal, leafCounts.data(), counts.data());
-    upsweep(levelRange, childOffsets, counts.data(), NodeCount<unsigned>{});
+    upsweep(levelRange, octree.childOffsets, counts.data(), NodeCount<unsigned>{});
 
     std::vector<uint8_t> macs(octree.numNodes);
     scatter(leafToInternal, csMacs.data(), macs.data());

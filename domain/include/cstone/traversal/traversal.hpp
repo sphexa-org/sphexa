@@ -75,7 +75,6 @@ HOST_DEVICE_FUN void singleTraversal(const TreeNodeIndex* childOffsets,
  * for FMM, general collision detection for halo discovery and surface detection.
  *
  *
- * @tparam KeyType         32- or 64-bit unsigned integer
  * @tparam MAC             traversal continuation criterion
  * @tparam M2L             endpoint action for nodes that passed @p MAC
  * @tparam P2P             endpoint action for leaf nodes that did not pass @p MAC
@@ -91,12 +90,15 @@ HOST_DEVICE_FUN void singleTraversal(const TreeNodeIndex* childOffsets,
  * @param p2p              Particle-2-particle, called for each pair of leaf nodes during traversal
  *                         that did not pass @p continuation
  */
-template<class TreeType, class MAC, class M2L, class P2P>
-void dualTraversal(const TreeType& octree, TreeNodeIndex a, TreeNodeIndex b, MAC&& continuation, M2L&& m2l, P2P&& p2p)
+template<class MAC, class M2L, class P2P>
+void dualTraversal(
+    const TreeNodeIndex* childOffsets, TreeNodeIndex a, TreeNodeIndex b, MAC&& continuation, M2L&& m2l, P2P&& p2p)
 {
     using NodePair = util::array<TreeNodeIndex, 2>;
 
-    if (octree.isLeaf(a) && octree.isLeaf(b))
+    auto isLeaf = [childOffsets](TreeNodeIndex idx) { return childOffsets[idx] == 0; };
+
+    if (isLeaf(a) && isLeaf(b))
     {
         if (continuation(a, b)) { p2p(a, b); }
         return;
@@ -107,11 +109,11 @@ void dualTraversal(const TreeType& octree, TreeNodeIndex a, TreeNodeIndex b, MAC
 
     int stackPos = 1;
 
-    auto interact = [&octree, &continuation, &m2l, &p2p, &stackPos](TreeNodeIndex a, TreeNodeIndex b, NodePair* stack_)
+    auto interact = [isLeaf, &continuation, &m2l, &p2p, &stackPos](TreeNodeIndex a, TreeNodeIndex b, NodePair* stack_)
     {
         if (continuation(a, b))
         {
-            if (octree.isLeaf(a) && octree.isLeaf(b)) { p2p(a, b); }
+            if (isLeaf(a) && isLeaf(b)) { p2p(a, b); }
             else
             {
                 assert(stackPos < 128);
@@ -127,20 +129,21 @@ void dualTraversal(const TreeType& octree, TreeNodeIndex a, TreeNodeIndex b, MAC
         TreeNodeIndex target = nodePair[0];
         TreeNodeIndex source = nodePair[1];
 
-        if ((octree.level(target) < octree.level(source) && !octree.isLeaf(target)) || octree.isLeaf(source))
+        // target < source means level(target) <= level(source)
+        if ((target < source && !isLeaf(target)) || isLeaf(source)) // subdivide target
         {
-            int nChildren = (octree.isLeaf(target)) ? 0 : 8;
+            int nChildren = isLeaf(target) ? 0 : 8;
             for (int octant = 0; octant < nChildren; ++octant)
             {
-                interact(octree.child(target, octant), source, stack);
+                interact(childOffsets[target] + octant, source, stack);
             }
         }
-        else
+        else // subdivide source
         {
-            int nChildren = (octree.isLeaf(source)) ? 0 : 8;
+            int nChildren = isLeaf(source) ? 0 : 8;
             for (int octant = 0; octant < nChildren; ++octant)
             {
-                interact(target, octree.child(source, octant), stack);
+                interact(target, childOffsets[source] + octant, stack);
             }
         }
     }
