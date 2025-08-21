@@ -1,0 +1,54 @@
+include:
+  - remote: 'https://gitlab.com/cscs-ci/recipes/-/raw/master/templates/v2/.ci-ext.yml'
+
+stages:
+  - sphexa_build_run_bencher
+
+# include:
+#   - local: 'ci/common.yml'
+
+variables:
+  MYUENV: "prgenv-gnu/25.07-6.3.3:v4"
+  # GIT_SUBMODULE_STRATEGY: "recursive"
+
+# sph-build-cuda12-sm90-release:
+sphexa-mi300:
+  stage: sphexa_build_run_bencher
+  image: "${MYUENV}"
+  extends: [.uenv-runner-beverin-mi300]
+  # extends: [.uenv-runner-daint-gh200]
+  variables:
+    PERSIST_IMAGE_NAME: ${CSCS_REGISTRY_PATH}/sphexa_mi300_release:${CI_COMMIT_SHORT_SHA}
+    WITH_UENV_VIEW: 'spack'  # this is not 'default' view
+    # SLURM_PARTITION: 'debug'
+    SLURM_JOB_NUM_NODES: 1
+  before_script:
+    # NOTE: error 'script config should be a string or a nested array of
+    # strings up to 10 levels deep' -> add '' around the command to execute
+    - 'echo "CI_PROJECT_URL=$CI_PROJECT_URL"'
+    - 'echo "CI_COMMIT_SHORT_SHA=$CI_COMMIT_SHORT_SHA"'
+    - 'uenv_dir=`echo $UENV_VIEW |cut -d: -f1`'
+    - 'uenv_view=`echo $UENV_VIEW |cut -d: -f3`'
+    - 'echo "UENV_VIEW=$UENV_VIEW uenv_dir=$uenv_dir uenv_view=$uenv_view"'
+    # setup spack
+    - 'git clone https://github.com/eth-cscs/uenv-spack.git uenv-spack.git'
+    - 'cd uenv-spack.git && ./bootstrap &> uenv-spack.git.log && sed -i "s-zen3-mi300-" uenv-spack && cd ..'
+    - 'export PATH=$PWD/uenv-spack.git:$PATH'
+    # us prgenv-gnu/25.07-6.3.3:v4 -v spack    ## default-llvm-amdgpu
+    - 'export SPACK_SYSTEM_CONFIG_PATH=$UENV_SPACK_CONFIG_PATH'
+    - 'echo "SPACK_SYSTEM_CONFIG_PATH=$SPACK_SYSTEM_CONFIG_PATH"'
+    - 'pwd'
+    # setup sphexa build
+    - 'uenv-spack --uarch=mi300 sphexa+spack --specs="sphexa@develop +rocm amdgpu_target=gfx942 build_type=Debug"'
+    - 'cd sphexa+spack'
+    - 'mkdir -p ./env/repo/packages/sphexa'
+    - 'cp ../ci/scripts/package.py ./env/repo/packages/sphexa/'
+    - 'ln -fs ./env/repo/packages/sphexa/package.py .'
+    - 'grep specs: ./env/spack.yaml'
+  script:
+    - ./build
+    - pwd
+    - find . -type sphexa-hip
+#  artifacts:
+#    paths:
+#      - sphexa+spack

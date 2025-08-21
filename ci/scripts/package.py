@@ -83,6 +83,7 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
             archs = spec.variants["amdgpu_target"].value
             arch_str = ";".join(archs)
             args.append(self.define("CMAKE_HIP_ARCHITECTURES", arch_str))
+            args.append('-DCMAKE_HIP_FLAGS=-I/user-environment/env/default-llvm-amdgpu/include')
 
         if spec.satisfies("+cuda"):
             args.append(self.define("CMAKE_CUDA_FLAGS", "-ccbin={0}".format(spec["mpi"].mpicxx)))
