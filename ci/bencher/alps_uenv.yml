@@ -46,9 +46,12 @@ sphexa-mi300:
     - 'ln -fs ./env/repo/packages/sphexa/package.py .'
     - 'grep specs: ./env/spack.yaml'
   script:
+    # build sphexa
     - ./build
     - pwd
-    - find . -type sphexa-hip
+    # run sphexa
+    - './view/bin/sphexa-hip --init sedov -s 10 -n 60 &> o'
+    - '../ci/scripts/bencher.sh'
 #  artifacts:
 #    paths:
 #      - sphexa+spack
