@@ -10,10 +10,11 @@ echo "{\"sphexa-hip sedov\": {\"sec/iter\": {\"value\": $sec_per_iter }}}" > $ou
 
 
 # install bencher:
-wget https://github.com/bencherdev/bencher/releases/download/v0.5.4/bencher-v0.5.4-linux-x86-64
+wget --quiet https://github.com/bencherdev/bencher/releases/download/v0.5.4/bencher-v0.5.4-linux-x86-64
 ln -fs bencher-v0.5.4-linux-x86-64 bencher
 chmod +x bencher
 ./bencher --version
+
 
 # send data to bencher:
 testbed="${out#*_}"        # remove ^bencher
