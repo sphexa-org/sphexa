@@ -49,10 +49,9 @@ sphexa-mi300:
     # build sphexa
     - ./build
     - pwd
-    - env > .env
     # run sphexa
     - './view/bin/sphexa-hip --init sedov -s 10 -n 60 &> o'
-    - '../ci/scripts/bencher.sh o'
+    - '../ci/scripts/bencher.sh $PWD/o $MYUENV'
 #  artifacts:
 #    paths:
 #      - sphexa+spack
