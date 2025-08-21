@@ -49,6 +49,7 @@ sphexa-mi300:
     - ./build
     - pwd
     - find . -type sphexa-hip
+    - echo
 #  artifacts:
 #    paths:
 #      - sphexa+spack
