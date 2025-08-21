@@ -78,11 +78,12 @@ __global__ void driftKernel(GroupView grp, float dt, float dt_back, util::array<
 
     if (temp != nullptr)
     {
-        //TODO
-        auto   gamma_i = isGammaConst ? *gamma : gamma[i];
-        Thydro cv      = (constCv < 0) ? idealGasCv(mui[i], gamma_i) : constCv;
-        auto   u_recov = energyUpdate(Tc(temp[i] * cv), -dt_back, dt_m1_rung, du[i], Tdu(du_m1[i]));
-        temp[i]        = energyUpdate(u_recov, dt, dt_m1_rung, du[i], Tdu(du_m1[i])) / cv;
+        bool   isMuiConst = !(constCv < 0.); // Just for readability
+        auto   gamma_i    = isGammaConst ? *gamma : gamma[i];
+        auto   mui_i      = isMuiConst ? *mui : mui[i];
+        Thydro cv         = isMuiConst && isGammaConst ? constCv : idealGasCv(mui_i, gamma_i);
+        auto   u_recov    = energyUpdate(Tc(temp[i] * cv), -dt_back, dt_m1_rung, du[i], Tdu(du_m1[i]));
+        temp[i]           = energyUpdate(u_recov, dt, dt_m1_rung, du[i], Tdu(du_m1[i])) / cv;
     }
     else if (u != nullptr)
     {
@@ -152,10 +153,11 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
     Tc minDistanceFactor = min(adjustForFBC);
     if (temp != nullptr)
     {
-        //TODO
-        auto   gamma_i = isGammaConst ? *gamma : gamma[i];
-        Thydro cv      = (constCv < 0) ? idealGasCv(mui[i], gamma_i) : constCv;
-        auto   u_old   = temp[i] * cv;
+        bool   isMuiConst = !(constCv < 0.); // Just for readability
+        auto   gamma_i    = isGammaConst ? *gamma : gamma[i];
+        auto   mui_i      = isMuiConst ? *mui : mui[i];
+        Thydro cv         = isMuiConst && isGammaConst ? constCv : idealGasCv(mui_i, gamma_i);
+        auto   u_old      = temp[i] * cv;
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
         // we multiply dt_m1 by that factor so it applies only once to each of the updating terms
         temp[i]  = energyUpdate(u_old, dt * minDistanceFactor, dt_m1_rung * minDistanceFactor, du[i], du_m1[i]) / cv;
