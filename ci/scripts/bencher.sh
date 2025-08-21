@@ -4,7 +4,8 @@
 # Total execution time of 2 iterations of sedov up to t = 0.000002: 0.315663s
 in=$1
 myuenv=`echo $2 |tr / - | tr : -`
-out="bencher_beverin_mi300_prgenv-gnu-25.07-6.3.3-v4.json"
+out="bencher_beverin_mi300_$myuenv.json"
+# out="bencher_beverin_mi300_prgenv-gnu-25.07-6.3.3-v4.json"
 # commit=`head -n1 $in |awk '{print $3}'`
 sec_per_iter=`grep 'Total execution time' $in |awk '{print $15/$6}' |tr -d s`
 echo "{\"sphexa-hip sedov\": {\"sec/iter\": {\"value\": $sec_per_iter }}}" > $out
@@ -30,7 +31,7 @@ echo "testbed=$testbed"
     --threshold-max-sample-size 64 \
     \
     --adapter json \
-    --file bencher=$out \
+    --file $out \
     --testbed $testbed \
     --thresholds-reset \
     --branch develop \
