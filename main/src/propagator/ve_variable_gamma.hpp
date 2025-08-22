@@ -64,6 +64,12 @@ public:
         simData.hydro.setConserved("gamma");
         simData.hydro.devData.setConserved("gamma");
     }
+    std::vector<std::string> conservedFields() const override
+    {
+        auto ret = Base::conservedFields();
+        ret.push_back("gamma");
+        return ret;
+    }
 };
 
 } // namespace sphexa
