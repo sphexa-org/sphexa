@@ -158,8 +158,8 @@ static void findPeers(Box<double> box, const bool disableMixD = false)
     {
         std::vector<int> peersOfPeerDtt = findPeersMac(peerRank, assignment, octree, box, invThetaEff);
 
-        // std::vector<int> peersOfPeerStt = findPeersMacStt(peerRank, assignment, octree, box, invThetaEff);
-        // EXPECT_EQ(peersDtt, peersStt);
+        std::vector<int> peersOfPeerStt = findPeersMacStt(peerRank, assignment, octree, box, invThetaEff);
+        EXPECT_EQ(peersDtt, peersStt);
         std::vector<int> peersOfPeerA2A = findPeersAll2All<KeyType>(peerRank, assignment, tree, box, invThetaEff);
         EXPECT_EQ(peersOfPeerDtt, peersOfPeerA2A);
 
@@ -199,7 +199,10 @@ static int compareMatrices(std::vector<std::vector<int>> ref, std::vector<std::v
         {
             np1 += ref[i][j];
             np2 += probe[i][j];
-            if (ref[i][j] and not probe[i][j]) missed++;
+            if (ref[i][j] and not probe[i][j]) {
+                missed++;
+                std::cout << "missing pair: " << i << " " << j << std::endl;
+            }
             if (probe[i][j] and not ref[i][j]) extra++;
         }
     std::cout << "numPairs " << np1 << "/" << np2 << " missed " << missed << " extra " << extra << std::endl;
@@ -226,6 +229,7 @@ auto peerMatrix(const std::vector<KeyType>& leaves,
 
     for (int i = 0; i < numRanks; ++i)
     {
+        std::cout << "[peerMatrix] i: " << i << " assignment: " << assignment[i] << " - " << assignment[i + 1] << std::endl;
         auto peers = findPeersMac(i, assignment, octree, box, invThetaEff);
         for (auto j : peers)
         {
@@ -266,9 +270,18 @@ auto vecMacMatrix(const std::vector<KeyType>& leaves,
         c4[i][0] = centers[i][0] + randCorner() * sizes[i][0];
         c4[i][1] = centers[i][1] + randCorner() * sizes[i][1];
         c4[i][2] = centers[i][2] + randCorner() * sizes[i][2];
-        c4[i][3] = 1;
+        if (std::abs(sizes[i][0]) > 1e-12 && std::abs(sizes[i][1]) > 1e-12 && std::abs(sizes[i][2]) > 1e-12)
+            c4[i][3] = 1;
+        else
+            c4[i][3] = 0;
+        // std::cout << "c4[" << i << "] = " << c4[i][0] << ", " << c4[i][1] << ", " << c4[i][2] << ", " << c4[i][3] << std::endl;
     }
     setMac<T, KeyType>(octree.nodeKeys(), c4, invTheta, box);
+    // std::cout << "c4 after setMac" << std::endl;
+    // for (size_t i = 0; i < c4.size(); ++i)
+    // {
+    //     std::cout << "c4[" << i << "] = " << c4[i][0] << ", " << c4[i][1] << ", " << c4[i][2] << ", " << c4[i][3] << std::endl;
+    // }
 
     std::vector matrix(numRanks, std::vector<int>(numRanks));
     for (int i = 0; i < numRanks; ++i)
@@ -276,17 +289,44 @@ auto vecMacMatrix(const std::vector<KeyType>& leaves,
         TreeNodeIndex iStart = findNodeAbove(leaves.data(), nNodes(leaves), assignment[i]);
         TreeNodeIndex iEnd   = findNodeAbove(leaves.data(), nNodes(leaves), assignment[i + 1]);
         std::vector<uint8_t> macs_internal(numNodes, 0);
+        // std::cout << "[vecMacMatrix] i: " << i << " iStart: " << iStart << " iEnd: " << iEnd << std::endl;
         markMacs(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(), c4.data(), box,
                  leaves.data() + iStart, iEnd - iStart, false, macs_internal.data());
 
         std::vector<uint8_t> macs(octree.numLeafNodes(), 0);
+        // std::cout << "internalOrder: ";
+        // for (size_t k = 0; k < octree.internalOrder().size(); ++k)
+        // {
+        //     std::cout << octree.internalOrder()[k] << " ";
+        // }
+        // std::cout << std::endl;
+        // std::cout << "macs_internal: ";
+        // for (size_t k = 0; k < macs_internal.size(); ++k)
+        // {
+        //     std::cout << int(macs_internal[k]) << " ";
+        // }
+        // std::cout << std::endl;
+        // std::cout << "macs.data: ";
+        // for (size_t k = 0; k < macs.size(); ++k)
+        // {
+        //     std::cout << int(macs[k]) << " ";
+        // }
+        // std::cout << std::endl;
         gather(octree.internalOrder(), macs_internal.data(), macs.data());
+        // std::cout << "macs: ";
+        // for (size_t k = 0; k < macs.size(); ++k)
+        // {
+        //     std::cout << "[" << k << "]=" << int(macs[k]) << " ";
+        // }
+        // std::cout << std::endl;
 
         for (int j = 0; j < numRanks; ++j)
         {
             TreeNodeIndex jStart = findNodeAbove(leaves.data(), nNodes(leaves), assignment[j]);
             TreeNodeIndex jEnd   = findNodeAbove(leaves.data(), nNodes(leaves), assignment[j + 1]);
+            // std::cout << "[vecMacMatrix] j: " << j << " jStart: " << jStart << " jEnd: " << jEnd << std::endl;
             matrix[i][j] = std::any_of(macs.begin() + jStart, macs.begin() + jEnd, [](auto x) { return x > 0; });
+            // std::cout << " matrix[" << i << "][" << j << "] = " << matrix[i][j] << std::endl;
         }
     }
     return matrix;
@@ -334,11 +374,11 @@ TEST(Peers, pairs_nograv)
 TEST(Peers, pairs_grav)
 {
     using KeyType = uint64_t;
-
-    std::vector<KeyType> ak     = makeAssignment<KeyType>(256);
+    
+    const int numRanks = 256;
+    std::vector<KeyType> ak     = makeAssignment<KeyType>(numRanks);
     std::vector<KeyType> leaves = computeSpanningTree<KeyType>(ak);
 
-    int numRanks = 256;
     SfcAssignment<KeyType> assignment(numRanks);
     for (int r = 0; r <= numRanks; ++r)
     {
@@ -351,8 +391,29 @@ TEST(Peers, pairs_grav)
     float invThetaIntMin = invThetaMinToVec(theta);
     auto mat_int_min     = peerMatrix(leaves, ak, box, invThetaIntMin);
 
+    // std::cout << "mat_int_min" << std::endl;
+    // for (int i = 0; i < numRanks; ++i)
+    // {
+    //     for (int j = 0; j < numRanks; ++j)
+    //     {
+    //         std::cout << mat_int_min[i][j] << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
+
     auto mat_vecmac = vecMacMatrix(leaves, ak, box, 1.0f / theta);
 
+    // std::cout << "mat_vecmac" << std::endl;
+    // for (int i = 0; i < numRanks; ++i)
+    // {
+    //     for (int j = 0; j < numRanks; ++j)
+    //     {
+    //         std::cout << mat_vecmac[i][j] << " ";
+    //     }
+    //     std::cout << std::endl;
+    // }
+
     EXPECT_TRUE(isSymmetric(mat_int_min));
+    EXPECT_TRUE(isSymmetric(mat_vecmac));
     EXPECT_EQ(compareMatrices(mat_vecmac, mat_int_min), 0);
 }

@@ -72,12 +72,16 @@ std::vector<int> findPeersMac(int myRank,
         if (!aFocusOverlap || bInFocus) { return false; }
 
         IBox aBox = useMixD ? sfcIBox(sfcMixDKey(tree.codeStart(a)), maxTreeLevel<KeyType>{}-tree.level(a), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(tree.codeStart(a)), tree.level(a));
-        if (aBox.xmax() - aBox.xmin() == 0 && aBox.ymax() - aBox.ymin() == 0 && aBox.zmax() - aBox.zmin() == 0)
+        if (std::abs(double(aBox.xmax()) - double(aBox.xmin())) < 1e-12 &&
+            std::abs(double(aBox.ymax()) - double(aBox.ymin())) < 1e-12 &&
+            std::abs(double(aBox.zmax()) - double(aBox.zmin())) < 1e-12)
         {
             return false; // skip empty boxes
         }
         IBox bBox = useMixD ? sfcIBox(sfcMixDKey(tree.codeStart(b)), maxTreeLevel<KeyType>{}-tree.level(b), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(tree.codeStart(b)), tree.level(b));
-        if (bBox.xmax() - bBox.xmin() == 0 && bBox.ymax() - bBox.ymin() == 0 && bBox.zmax() - bBox.zmin() == 0)
+        if (std::abs(double(bBox.xmax()) - double(bBox.xmin())) < 1e-12 &&
+            std::abs(double(bBox.ymax()) - double(bBox.ymin())) < 1e-12 &&
+            std::abs(double(bBox.zmax()) - double(bBox.zmin())) < 1e-12)
         {
             return false; // skip empty boxes
         }
@@ -87,10 +91,15 @@ std::vector<int> findPeersMac(int myRank,
     auto m2l = [](TreeNodeIndex, TreeNodeIndex) {};
 
     std::vector<int> peerRanks(assignment.numRanks(), 0);
-    auto p2p = [&domainTree, &assignment, &peerRanks](TreeNodeIndex /*a*/, TreeNodeIndex b)
+    auto p2p = [&domainTree, &assignment, &peerRanks](TreeNodeIndex a, TreeNodeIndex b)
     {
         int peerRank = assignment.findRank(domainTree.codeStart(b));
-        if (peerRanks[peerRank] == 0) { peerRanks[peerRank] = 1; }
+        if (peerRanks[peerRank] == 0) {
+            // std::cout << "[findPeersMac] peerRank: " << peerRank
+            //       << " TreeNodeIndex a: " << a << " codeStart(a): " << domainTree.codeStart(a)
+            //       << " TreeNodeIndex b: " << b << " codeStart(b): " << domainTree.codeStart(b) << std::endl;
+            peerRanks[peerRank] = 1;
+        }
     };
 
     std::vector<KeyType> spanningNodeKeys(spanSfcRange(domainStart, domainEnd) + 1);
@@ -104,14 +113,16 @@ std::vector<int> findPeersMac(int myRank,
     for (std::size_t i = 0; i < spanningNodeKeys.size() - 1; ++i)
     {
         TreeNodeIndex nodeIdx = locateNode(spanningNodeKeys[i], spanningNodeKeys[i + 1], nodeKeys, levelRange);
+        // std::cout << "[findPeersMac] myRank: " << myRank << " nodeIdx: " << nodeIdx
+        //           << " spanningNodeKeys: " << spanningNodeKeys[i] << ", " << spanningNodeKeys[i + 1] << std::endl;
         dualTraversal(domainTree, nodeIdx, 0, crossFocusPairs, m2l, p2p);
     }
-    std::cout << "[findPeersMac3] myRank: " << myRank << " peer ranks: ";
-    for (int i = 0; i < int(peerRanks.size()); ++i)
-    {
-        if (peerRanks[i]) { std::cout << i << " "; }
-    }
-    std::cout << std::endl;
+
+    // for (int i = 0; i < int(peerRanks.size()); ++i)
+    // {
+    //     if (peerRanks[i]) { std::cout << i << " "; }
+    // }
+    // std::cout << std::endl;
 
     std::vector<int> ret;
     for (int i = 0; i < int(peerRanks.size()); ++i)

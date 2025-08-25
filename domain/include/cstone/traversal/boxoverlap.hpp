@@ -116,6 +116,31 @@ containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box)
     return (util::get<0>(envelope) >= codeStart) && (util::get<1>(envelope) <= codeEnd);
 }
 
+template<class KeyType>
+HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
+containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box, unsigned bx, unsigned by, unsigned bz)
+{
+    // volume 0 boxes are not possible if makeHaloBox was used to generate it
+    assert(box.xmin() < box.xmax());
+    assert(box.ymin() < box.ymax());
+    assert(box.zmin() < box.zmax());
+
+    constexpr int pbcRange = 1 << maxTreeLevel<KeyType>{};
+    if (stl::min(stl::min(box.xmin(), box.ymin()), box.zmin()) < 0 ||
+        stl::max(stl::max(box.xmax(), box.ymax()), box.zmax()) > pbcRange)
+    {
+        // any box that wraps around a PBC boundary cannot be contained within
+        // any octree node, except the full root node
+        return codeStart == 0 && codeEnd == nodeRange<KeyType>(0);
+    }
+
+    KeyType lowCode  = iSfcMixDKey<SfcMixDKind<KeyType>>(box.xmin(), box.ymin(), box.zmin(), bx, by, bz);
+    KeyType highCode = iSfcMixDKey<SfcMixDKind<KeyType>>(box.xmax() - 1, box.ymax() - 1, box.zmax() - 1, bx, by, bz);
+    auto envelope    = smallestCommonBox(lowCode, highCode);
+
+    return (util::get<0>(envelope) >= codeStart) && (util::get<1>(envelope) <= codeEnd);
+}
+
 /*! @brief determine whether a binary/octree node (prefix, prefixLength) is fully contained in an SFC range
  *
  * @tparam KeyType       32- or 64-bit unsigned integer
@@ -169,14 +194,46 @@ HOST_DEVICE_FUN IBox makeHaloBox(const IBox& nodeBox, RadiusType radius, const B
                 addDelta<KeyType>(nodeBox.zmin(), -dz, pbcZ), addDelta<KeyType>(nodeBox.zmax(), dz, pbcZ));
 }
 
+template<class KeyType, class CoordinateType, class RadiusType>
+HOST_DEVICE_FUN IBox makeHaloBox(const IBox& nodeBox, RadiusType radius, const Box<CoordinateType>& box, unsigned bx, unsigned by, unsigned bz)
+{
+    int dx = toNBitIntCeil<KeyType>(radius * box.ilx(), bx);
+    int dy = toNBitIntCeil<KeyType>(radius * box.ily(), by);
+    int dz = toNBitIntCeil<KeyType>(radius * box.ilz(), bz);
+
+    bool pbcX = (box.boundaryX() == cstone::BoundaryType::periodic);
+    bool pbcY = (box.boundaryY() == cstone::BoundaryType::periodic);
+    bool pbcZ = (box.boundaryZ() == cstone::BoundaryType::periodic);
+
+    return IBox(addDelta<KeyType>(nodeBox.xmin(), -dx, pbcX), addDelta<KeyType>(nodeBox.xmax(), dx, pbcX),
+                addDelta<KeyType>(nodeBox.ymin(), -dy, pbcY), addDelta<KeyType>(nodeBox.ymax(), dy, pbcY),
+                addDelta<KeyType>(nodeBox.zmin(), -dz, pbcZ), addDelta<KeyType>(nodeBox.zmax(), dz, pbcZ));
+}
+
 //! @brief create a box with specified radius around node delineated by codeStart/End
 template<class KeyType, class CoordinateType, class RadiusType>
 HOST_DEVICE_FUN IBox makeHaloBox(KeyType codeStart, KeyType codeEnd, RadiusType radius, const Box<CoordinateType>& box)
 {
     // disallow boxes with no volume
     assert(codeEnd > codeStart);
-    IBox nodeBox = sfcIBox(sfcKey(codeStart), sfcKey(codeEnd));
-    return makeHaloBox<KeyType>(nodeBox, radius, box);
+    const auto mixDBits = getBoxMixDimensionBits<CoordinateType, KeyType, Box<CoordinateType>>(box);
+    const auto use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+                          mixDBits.bz != maxTreeLevel<KeyType>{};
+    IBox nodeBox = use_mixD ? sfcIBox(sfcMixDKey(codeStart), sfcMixDKey(codeEnd), mixDBits.bx, mixDBits.by, mixDBits.bz): sfcIBox(sfcKey(codeStart), sfcKey(codeEnd));
+    if (nodeBox.xmin() == nodeBox.xmax() ||
+        nodeBox.ymin() == nodeBox.ymax() ||
+        nodeBox.zmin() == nodeBox.zmax())
+    {
+        // zero volume boxes cannot have a halo box
+        return nodeBox;
+    }
+    // std::cout << "[makeHaloBox] nodeBox : " << nodeBox.xmin() << ", " << nodeBox.xmax() << ", "
+    //           << nodeBox.ymin() << ", " << nodeBox.ymax() << ", " << nodeBox.zmin() << ", " << nodeBox.zmax() << std::endl;
+    const auto final_halo_box = makeHaloBox<KeyType>(nodeBox, radius, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
+    // std::cout << "[makeHaloBox] final haloBox : " << final_halo_box.xmin() << ", " << final_halo_box.xmax() << ", "
+    //           << final_halo_box.ymin() << ", " << final_halo_box.ymax() << ", " << final_halo_box.zmin() << ", " << final_halo_box.zmax() << std::endl;
+    return final_halo_box;
 }
 
 //! @brief returns true if the cuboid defined by center and size is contained within the bounding box

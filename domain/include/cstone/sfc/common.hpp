@@ -75,6 +75,15 @@ HOST_DEVICE_FUN constexpr unsigned toNBitIntCeil(T x)
     return stl::min(result, (1u << nBits) - 1u);
 }
 
+template<class KeyType, class T>
+HOST_DEVICE_FUN constexpr unsigned toNBitIntCeil(T x, unsigned nBits)
+{
+    // [0,1] to [0,1023] and convert to integer (32-bit) or
+    // [0,1] to [0,2097151] and convert to integer (64-bit)
+    unsigned result = std::ceil(x * T(1u << nBits));
+    return stl::min(result, (1u << nBits) - 1u);
+}
+
 /*! @brief add (binary) zeros behind a prefix
  *
  * Allows comparisons, such as number of leading common bits (cpr)

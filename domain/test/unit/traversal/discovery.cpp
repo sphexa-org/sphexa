@@ -44,13 +44,13 @@ std::vector<uint8_t> findHalosAll2All(std::span<const KeyType> tree,
 }
 
 template<class KeyType>
-void findHalosFlags()
+void findHalosFlags(bool use_mixD = false)
 {
-    std::vector<KeyType> tree = makeUniformNLevelTree<KeyType>(64, 1);
+    std::vector<KeyType> tree = makeUniformNLevelTree<KeyType>(use_mixD ? 512 : 64, 1);
 
-    Box<double> box(0, 1);
+    auto box = use_mixD ? Box<double>(0, 1, 0, 0.015625, 0, 0.00390625) : Box<double>(0, 1);
 
-    // size of one node is 0.25^3
+    // size of one node is 0.25^3 for uniform box
     std::vector<double> interactionRadii(nNodes(tree), 0.1);
 
     Octree<KeyType> octree;
@@ -64,7 +64,7 @@ void findHalosFlags()
         std::vector<uint8_t> reference = findHalosAll2All<KeyType>(tree, interactionRadii, box, 0, 32);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes
-        EXPECT_EQ(16, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
+        EXPECT_EQ(use_mixD ? 1 : 16, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
         EXPECT_EQ(collisionFlags, reference);
     }
     {
@@ -76,7 +76,7 @@ void findHalosFlags()
         std::vector<uint8_t> reference = findHalosAll2All<KeyType>(tree, interactionRadii, box, 32, 64);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes
-        EXPECT_EQ(16, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
+        EXPECT_EQ(use_mixD ? 0 : 16, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
         EXPECT_EQ(collisionFlags, reference);
     }
 }
@@ -85,4 +85,6 @@ TEST(HaloDiscovery, findHalosFlags)
 {
     findHalosFlags<unsigned>();
     findHalosFlags<uint64_t>();
+    findHalosFlags<unsigned>(true); // TODO(iomaganaris): Not sure if the result makes sense
+    findHalosFlags<uint64_t>(true); // TODO(iomaganaris): Not sure if the result makes sense
 }

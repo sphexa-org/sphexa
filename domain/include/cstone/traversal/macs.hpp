@@ -49,6 +49,13 @@ HOST_DEVICE_FUN Vec4<T> computeMinMacR2(KeyType prefix, float invThetaEff, const
     int prefixLength = decodePrefixLength(prefix);
 
     IBox cellBox              = use_mixD ? sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - (prefixLength / 3), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(nodeKey), prefixLength / 3);
+    if (std::abs(double(cellBox.xmax()) - double(cellBox.xmin())) < 1e-12 &&
+        std::abs(double(cellBox.ymax()) - double(cellBox.ymin())) < 1e-12 &&
+        std::abs(double(cellBox.zmax()) - double(cellBox.zmin())) < 1e-12)
+    {
+        // if the cell is empty, we return a zero mac
+        return Vec4<T>{T(0), T(0), T(0), T(0)};
+    }
     auto [geoCenter, geoSize] = centerAndSize<KeyType>(cellBox, box);
 
     T l   = T(2) * max(geoSize);
@@ -82,12 +89,19 @@ HOST_DEVICE_FUN T computeVecMacR2(KeyType prefix, Vec3<T> expCenter, float invTh
     // std::cout << "[computeVecMacR2] level: " << maxTreeLevel<KeyType>{} - (prefixLength / 3) << std::endl;
 
     IBox cellBox              = use_mixD ? sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - (prefixLength / 3), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(nodeKey), prefixLength / 3);
-    auto [geoCenter, geoSize] = centerAndSize<KeyType>(cellBox, box);
-    if (geoSize[0] == 0 && geoSize[1] == 0 && geoSize[2] == 0)
+    if (std::abs(double(cellBox.xmax()) - double(cellBox.xmin())) < 1e-12 &&
+        std::abs(double(cellBox.ymax()) - double(cellBox.ymin())) < 1e-12 &&
+        std::abs(double(cellBox.zmax()) - double(cellBox.zmin())) < 1e-12)
     {
         // if the cell is empty, we return a zero mac
         return T(0);
     }
+    auto [geoCenter, geoSize] = centerAndSize<KeyType>(cellBox, box);
+    // if (geoSize[0] == 0 && geoSize[1] == 0 && geoSize[2] == 0)
+    // {
+    //     // if the cell is empty, we return a zero mac
+    //     return T(0);
+    // }
 
     Vec3<T> dX = expCenter - geoCenter;
 
@@ -180,6 +194,7 @@ HOST_DEVICE_FUN void markMacPerBox(const Vec3<T>& targetCenter,
 {
     auto checkAndMarkMac = [&](TreeNodeIndex idx)
     {
+        if (centers[idx][3] < std::numeric_limits<std::remove_reference_t<decltype(centers[idx][3])>>::epsilon()) { return false; }
         KeyType nodePrefix   = prefixes[idx];
         unsigned sourceLevel = decodePrefixLength(nodePrefix) / 3;
         KeyType nodeStart    = decodePlaceholderBit(nodePrefix);
@@ -190,7 +205,7 @@ HOST_DEVICE_FUN void markMacPerBox(const Vec3<T>& targetCenter,
         Vec4<T> center = centers[idx];
         bool violatesMac =
             evaluateMacPbc(makeVec3(center), center[3], targetCenter, targetSize, box) && sourceLevel <= maxSourceLevel;
-        // std::cout << "[markMacPerBox] center: " << center[0] << ", " << center[1] << ", " << center[2] << ", " << center[3] << " targetCenter: " << targetCenter[0] << ", " << targetCenter[1] << ", " << targetCenter[2] << ", " << targetSize[0] << ", " << targetSize[1] << ", " << targetSize[2] << " violatesMac: " << violatesMac << std::endl;
+        // std::cout << "[markMacPerBox] idx: " << idx << " center: " << center[0] << ", " << center[1] << ", " << center[2] << ", " << center[3] << " targetCenter: " << targetCenter[0] << ", " << targetCenter[1] << ", " << targetCenter[2] << ", " << targetSize[0] << ", " << targetSize[1] << ", " << targetSize[2] << " violatesMac: " << violatesMac << std::endl;
         if (violatesMac && !markings[idx]) { markings[idx] = 1; }
 
         return violatesMac;
@@ -238,16 +253,28 @@ void markMacs(const KeyType* prefixes,
     for (TreeNodeIndex i = 0; i < numFocusNodes; ++i)
     {
         IBox target    = use_mixD ? sfcIBox(sfcMixDKey(focusNodes[i]), sfcMixDKey(focusNodes[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(focusNodes[i]), sfcKey(focusNodes[i + 1]));
-        if (target.xmin() == target.xmax() || target.ymin() == target.ymax() || target.zmin() == target.zmax())
+        if (std::abs(target.xmin() - target.xmax()) < std::numeric_limits<double>::epsilon() ||
+            std::abs(target.ymin() - target.ymax()) < std::numeric_limits<double>::epsilon() ||
+            std::abs(target.zmin() - target.zmax()) < std::numeric_limits<double>::epsilon())
         {
             // if the target is empty, we skip it
+            // std::cout << "[markMacs] Skipping target i: " << i << std::endl;
             continue;
         }
+        std::cout << "[markMacs] i: " << i << " target: " << target.xmin() << ", " << target.xmax() << ", "
+                  << target.ymin() << ", " << target.ymax() << ", " << target.zmin() << ", " << target.zmax() << std::endl;
         IBox targetExt = IBox(target.xmin() - 1, target.xmax() + 1, target.ymin() - 1, target.ymax() + 1,
                               target.zmin() - 1, target.zmax() + 1);
-        if (containedIn(focusStart, focusEnd, targetExt)) { continue; }
+        if (use_mixD && containedIn(focusStart, focusEnd, targetExt, mixDBits.bx, mixDBits.by, mixDBits.bz)) { continue; }
+        if (!use_mixD && containedIn(focusStart, focusEnd, targetExt)) { continue; }
 
         auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
+        if (targetSize[0] == 0 && targetSize[1] == 0 && targetSize[2] == 0)
+        {
+            // if the target is empty, we skip it
+            // std::cout << "[markMacs] Skipping target i: " << i << " due to zero size" << std::endl;
+            continue;
+        }
         unsigned maxLevel               = maxTreeLevel<KeyType>{};
 
         if (limitSource) { maxLevel = std::max(int(treeLevel(focusNodes[i + 1] - focusNodes[i])) - 1, 0); }

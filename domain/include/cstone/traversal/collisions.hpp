@@ -42,6 +42,46 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
     singleTraversal(childOffsets, parents, overlaps, endpointAction);
 }
 
+template<class KeyType, class F>
+HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
+                                    const TreeNodeIndex* childOffsets,
+                                    const TreeNodeIndex* parents,
+                                    F&& endpointAction,
+                                    const IBox& target,
+                                    KeyType excludeStart,
+                                    KeyType excludeEnd,
+                                    unsigned bx,
+                                    unsigned by,
+                                    unsigned bz)
+{
+    auto overlaps = [excludeStart, excludeEnd, nodePrefixes, &target, &bx, &by, &bz](TreeNodeIndex idx)
+    {
+        KeyType nodeKey = decodePlaceholderBit(nodePrefixes[idx]);
+        int level       = decodePrefixLength(nodePrefixes[idx]) / 3;
+        IBox sourceBox  = sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - level, bx, by, bz);
+        if (sourceBox.xmin() == sourceBox.xmax() && sourceBox.ymin() == sourceBox.ymax() &&
+            sourceBox.zmin() == sourceBox.zmax())
+        {
+            // if the cell is empty, we return no overlap
+            return false;
+        }
+        // std::cout << "[findCollisions] idx: " << idx << " sourceBox: " << sourceBox.xmin() << ", " << sourceBox.xmax() << ", "
+        //           << sourceBox.ymin() << ", " << sourceBox.ymax() << ", " << sourceBox.zmin() << ", " << sourceBox.zmax() << std::endl;
+        // std::cout << "[findCollisions] idx: " << idx << " target:    " << target.xmin() << ", " << target.xmax() << ", "
+        //           << target.ymin() << ", " << target.ymax() << ", " << target.zmin() << ", " << target.zmax() << std::endl;
+        // std::cout << "[findCollisions] idx: " << idx << " excludeStart: " << std::oct << excludeStart
+        //       << ", excludeEnd: " << excludeEnd << std::dec << std::endl;
+        // std::cout << "[findCollisions] idx: " << idx << " nodeKey: " << std::oct << nodeKey << std::dec << ", level: " << level << std::endl;
+        // std::cout << "[findCollisions] idx: " << idx << " nodeKey + nodeRange<KeyType>(level): " << std::oct << nodeKey + nodeRange<KeyType>(level) << std::dec << std::endl;
+        // std::cout << "[findCollisions] idx: " << idx << " containedIn: " << containedIn(nodeKey, nodeKey + nodeRange<KeyType>(level), excludeStart, excludeEnd) << std::endl;
+        // std::cout << "[findCollisions] idx: " << idx << " overlap: " << overlap<KeyType>(sourceBox, target) << std::endl;
+        return !containedIn(nodeKey, nodeKey + nodeRange<KeyType>(level), excludeStart, excludeEnd) &&
+               overlap<KeyType>(sourceBox, target);
+    };
+
+    singleTraversal(childOffsets, parents, overlaps, endpointAction);
+}
+
 /*! @brief mark halo nodes with flags
  *
  * @tparam KeyType               32- or 64-bit unsigned integer
@@ -76,18 +116,41 @@ void findHalos(const KeyType* prefixes,
     KeyType lowestCode  = leaves[firstNode];
     KeyType highestCode = leaves[lastNode];
 
-    auto markCollisions = [collisionFlags, internalToLeaf](TreeNodeIndex i) { collisionFlags[internalToLeaf[i]] = 1; };
+    const auto mixDBits = getBoxMixDimensionBits<CoordinateType, KeyType, Box<CoordinateType>>(box);
+    const bool use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                    mixDBits.by != maxTreeLevel<KeyType>{} ||
+                    mixDBits.bz != maxTreeLevel<KeyType>{};
+
+    auto markCollisions = [collisionFlags, internalToLeaf](TreeNodeIndex i) { std::cout << "Found collision with TreeNodeIndex i: " << i << " internalToLeaf[i]: " << internalToLeaf[i] << std::endl; collisionFlags[internalToLeaf[i]] = 1; };
 
 #pragma omp parallel for
     for (TreeNodeIndex nodeIdx = firstNode; nodeIdx < lastNode; ++nodeIdx)
     {
         RadiusType radius = interactionRadii[nodeIdx];
         IBox haloBox      = makeHaloBox<KeyType>(leaves[nodeIdx], leaves[nodeIdx + 1], radius, box);
+        std::cout << "[findHalos] nodeIdx: " << nodeIdx << " haloBox: " << haloBox.xmin() << ", " << haloBox.xmax() << ", "
+                  << haloBox.ymin() << ", " << haloBox.ymax() << ", " << haloBox.zmin() << ", " << haloBox.zmax() << std::endl;
+        if (haloBox.xmax() - haloBox.xmin() == 0 && haloBox.ymax() - haloBox.ymin() == 0 &&
+            haloBox.zmax() - haloBox.zmin() == 0)
+        {
+            // if the halo box is empty, we skip collision detection
+            // std::cout << "[findHalos] Skipping nodeIdx: " << nodeIdx << " due to zero size" << std::endl;
+            continue;
+        }
 
         // if the halo box is fully inside the assigned SFC range, we skip collision detection
-        if (containedIn(lowestCode, highestCode, haloBox)) { continue; }
+        if (use_mixD && containedIn(lowestCode, highestCode, haloBox, mixDBits.bx, mixDBits.by, mixDBits.bz)) {
+            // std::cout << "[findHalos] Skipping nodeIdx: " << nodeIdx << " due to containedIn with mixD" << std::endl;
+            continue;
+        }
+        if (!use_mixD && containedIn(lowestCode, highestCode, haloBox)) { continue; }
 
-        findCollisions(prefixes, childOffsets, parents, markCollisions, haloBox, lowestCode, highestCode);
+        if (use_mixD)
+        {
+            findCollisions(prefixes, childOffsets, parents, markCollisions, haloBox, lowestCode, highestCode, mixDBits.bx, mixDBits.by, mixDBits.bz);
+        } else {
+            findCollisions(prefixes, childOffsets, parents, markCollisions, haloBox, lowestCode, highestCode);
+        }
     }
 }
 
