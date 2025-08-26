@@ -8,7 +8,7 @@
 #include <limits>
 #include <iostream>
 
-#include "central_force_loop.hpp"
+#include "central_potential.hpp"
 #include "cstone/tree/definitions.h"
 #include "removal_statistics.hpp"
 

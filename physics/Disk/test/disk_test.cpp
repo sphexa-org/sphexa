@@ -61,7 +61,7 @@ TEST(CentralPotentials, testNewtonian)
     double ay[2]{};
     double az[2]{};
 
-    disk::CentralForceData d{
+    disk::CentralPotentialData d{
         .x             = x,
         .y             = y,
         .z             = z,
@@ -110,7 +110,7 @@ TEST(CentralPotentials, testEinsteinPrecession)
     std::array<double, 2> ay_newton{};
     std::array<double, 2> az_newton{};
 
-    disk::CentralForceData d{
+    disk::CentralPotentialData d{
         .x             = x.data(),
         .y             = y.data(),
         .z             = z.data(),
@@ -124,7 +124,7 @@ TEST(CentralPotentials, testEinsteinPrecession)
         .c_light       = 1.,
         .star_position = {0., 0., 0.},
     };
-    disk::CentralForceData d_newton{
+    disk::CentralPotentialData d_newton{
         .x             = x.data(),
         .y             = y.data(),
         .z             = z.data(),

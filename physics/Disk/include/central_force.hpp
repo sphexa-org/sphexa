@@ -10,7 +10,7 @@
 #include "cstone/tree/definitions.h"
 #include "central_force_gpu.hpp"
 #include "get_ptr.hpp"
-#include "central_force_loop.hpp"
+#include "central_potential.hpp"
 
 namespace disk
 {
@@ -18,11 +18,11 @@ namespace disk
 template<typename Dataset, typename StarData>
 void computeCentralForceImpl(size_t first, size_t last, Dataset& d, StarData& star)
 {
-    cstone::Vec4<double>   force_local{};
-    float                  t_star{std::numeric_limits<float>::infinity()};
-    const double           inner_size2 = star.inner_size * star.inner_size;
-    const CentralForceData data{d.x.data(),  d.y.data(), d.z.data(), d.m.data(),  d.ax.data(), d.ay.data(),
-                                d.az.data(), d.g,        star.m,     inner_size2, 1.0,         star.position};
+    cstone::Vec4<double>       force_local{};
+    float                      t_star{std::numeric_limits<float>::infinity()};
+    const double               inner_size2 = star.inner_size * star.inner_size;
+    const CentralPotentialData data{d.x.data(),  d.y.data(), d.z.data(), d.m.data(),  d.ax.data(), d.ay.data(),
+                                    d.az.data(), d.g,        star.m,     inner_size2, 1.0,         star.position};
 
 #pragma omp declare reduction(add_force : cstone::Vec4<double> : omp_out = omp_out + omp_in) initializer(omp_priv = {})
 

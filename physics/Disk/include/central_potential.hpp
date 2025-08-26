@@ -20,7 +20,7 @@ enum StarPotentialType : int
 };
 
 template<typename Treal, typename Thydro, typename Tmass>
-struct CentralForceData
+struct CentralPotentialData
 {
     const Treal *        x, *y, *z;
     const Tmass*         m;
