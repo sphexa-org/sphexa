@@ -67,7 +67,9 @@ public:
     virtual void     addStep(size_t firstIndex, size_t lastIndex, std::string path) = 0;
     virtual int64_t  stepAttributeSize(const std::string& /*key*/) { return 0; }
     virtual void     stepAttribute(const std::string& key, FieldType val, int64_t size) = 0;
+    virtual void     stepAttribute(const std::string& key, const std::string& val)      = 0;
     virtual void     fileAttribute(const std::string& key, FieldType val, int64_t size) = 0;
+    virtual void     fileAttribute(const std::string& key, const std::string& val)      = 0;
     virtual void     writeField(const std::string& key, FieldType field, int col)       = 0;
     virtual uint64_t localNumParticles()                                                = 0;
     virtual uint64_t globalNumParticles()                                               = 0;
@@ -95,7 +97,9 @@ public:
     virtual int64_t                  fileAttributeSize(const std::string& key)                          = 0;
     virtual int64_t                  stepAttributeSize(const std::string& key)                          = 0;
     virtual void                     fileAttribute(const std::string& key, FieldType val, int64_t size) = 0;
+    virtual void                     fileAttribute(const std::string& key, std::string& val)            = 0;
     virtual void                     stepAttribute(const std::string& key, FieldType val, int64_t size) = 0;
+    virtual void                     stepAttribute(const std::string& key, std::string&)                = 0;
     virtual void                     readField(const std::string& key, FieldType field)                 = 0;
     virtual uint64_t                 localNumParticles()                                                = 0;
     virtual uint64_t                 globalNumParticles()                                               = 0;

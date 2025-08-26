@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "ifile_io_impl.h"
+#include "cstone/primitives/mpi_wrappers.hpp"
 
 #ifdef SPH_EXA_HAVE_H5PART
 #include "h5part_wrapper.hpp"
@@ -97,10 +98,20 @@ public:
                    val);
     }
 
+    void stepAttribute(const std::string& key, const std::string& val) override
+    {
+        H5PartWriteStepAttribString(h5File_, key.c_str(), val.c_str());
+    }
+
     void fileAttribute(const std::string& key, FieldType val, int64_t size) override
     {
         std::visit([this, &key, size](auto arg) { fileutils::writeH5PartFileAttrib(h5File_, key.c_str(), arg, size); },
                    val);
+    }
+
+    void fileAttribute(const std::string& key, const std::string& val) override
+    {
+        H5PartWriteFileAttribString(h5File_, key.c_str(), val.c_str());
     }
 
     void writeField(const std::string& key, FieldType field, int = 0) override
@@ -134,6 +145,122 @@ private:
 };
 
 std::unique_ptr<IFileWriter> makeH5PartWriter(MPI_Comm comm) { return std::make_unique<H5PartWriter>(comm); }
+
+class H5PartWriterSeq final : public IFileWriter
+{
+public:
+    using Base      = IFileWriter;
+    using FieldType = typename Base::FieldType;
+
+    explicit H5PartWriterSeq(MPI_Comm comm)
+        : comm_(comm)
+    {
+        MPI_Comm_rank(comm, &rank_);
+        MPI_Comm_size(comm, &numRanks_);
+    }
+
+    ~H5PartWriterSeq() override { closeStep(); }
+
+    [[nodiscard]] int rank() const override { return rank_; }
+    [[nodiscard]] int numRanks() const override { return numRanks_; }
+
+    std::string suffix() const override { return ".h5"; }
+
+    void addStep(size_t firstIndex, size_t lastIndex, std::string path) override
+    {
+        firstIndex_ = firstIndex;
+
+        if (!h5File_ || path != pathStep_)
+        {
+            closeStep();
+            int64_t mode = (std::filesystem::exists(path) ? H5PART_APPEND : H5PART_WRITE);
+            if (rank_ == 0) { h5File_ = H5PartOpenFile(path.c_str(), mode); }
+        }
+
+        if (lastIndex > firstIndex)
+        {
+            // create the next step
+            if (rank_ == 0)
+            {
+                h5part_int64_t numSteps = H5PartGetNumSteps(h5File_);
+                H5PartSetStep(h5File_, numSteps);
+            }
+
+            localCount_  = lastIndex - firstIndex;
+            globalCount_ = localCount_ * numRanks_;
+            // set number of particles that each rank will write
+            if (rank_ == 0) { H5PartSetNumParticles(h5File_, globalCount_); }
+        }
+        pathStep_ = path;
+    }
+
+    void stepAttribute(const std::string& key, FieldType val, int64_t size) override
+    {
+        if (rank_ == 0)
+        {
+            std::visit([this, &key, size](auto arg)
+                       { fileutils::writeH5PartStepAttrib(h5File_, key.c_str(), arg, size); }, val);
+        }
+    }
+
+    void stepAttribute(const std::string& key, const std::string& val) override
+    {
+        if (rank_ == 0) { H5PartWriteStepAttribString(h5File_, key.c_str(), val.c_str()); }
+    }
+
+    void fileAttribute(const std::string& key, FieldType val, int64_t size) override
+    {
+        if (rank_ == 0)
+        {
+            std::visit([this, &key, size](auto arg)
+                       { fileutils::writeH5PartFileAttrib(h5File_, key.c_str(), arg, size); }, val);
+        }
+    }
+
+    void fileAttribute(const std::string& key, const std::string& val) override
+    {
+        if (rank_ == 0) { H5PartWriteFileAttribString(h5File_, key.c_str(), val.c_str()); }
+    }
+
+    void writeField(const std::string& key, FieldType field, int = 0) override
+    {
+        std::visit(
+            [this, &key]<class T>(const T* arg)
+            {
+                std::vector<T> buffer(globalCount_);
+                MPI_Gather(arg + firstIndex_, localCount_, MpiType<T>{}, buffer.data(), localCount_, MpiType<T>{}, 0,
+                           comm_);
+                if (rank_ == 0) { fileutils::writeH5PartField(h5File_, key, buffer.data()); }
+            },
+            field);
+    }
+
+    uint64_t localNumParticles() override { return localCount_; }
+
+    uint64_t globalNumParticles() override { return globalCount_; }
+
+    void closeStep() override
+    {
+        if (h5File_)
+        {
+            H5PartCloseFile(h5File_);
+            h5File_ = nullptr;
+        }
+    }
+
+private:
+    int      rank_{0}, numRanks_{0};
+    MPI_Comm comm_;
+
+    size_t      firstIndex_{0};
+    uint64_t    localCount_{0};
+    uint64_t    globalCount_{0};
+    std::string pathStep_;
+
+    H5PartFile* h5File_{nullptr};
+};
+
+std::unique_ptr<IFileWriter> makeH5PartWriterSeq(MPI_Comm comm) { return std::make_unique<H5PartWriterSeq>(comm); }
 
 inline auto partitionRange(size_t R, size_t i, size_t N)
 {
@@ -251,6 +378,16 @@ public:
             val);
     }
 
+    void fileAttribute(const std::string& key, std::string& val) override
+    {
+        // auto numChars = fileAttributeSize(key);
+        // TODO: H5PartGetFileAttribInfo is broken for strings and always returns 1
+        char temp[256];
+        // TODO: stack overflow if attribute larger than 256B. Luckily this is only used to test the write version
+        H5PartReadFileAttrib(h5File_, key.c_str(), temp);
+        val = std::string(temp);
+    }
+
     void stepAttribute(const std::string& key, FieldType val, int64_t size) override
     {
         std::visit(
@@ -260,6 +397,16 @@ public:
                 fileutils::readH5PartStepAttribute(arg, size, index, h5File_);
             },
             val);
+    }
+
+    void stepAttribute(const std::string& key, std::string& val) override
+    {
+        // auto numChars = stepAttributeSize(key);
+        // TODO: H5PartGetStepAttribInfo is broken for strings and always returns 1
+        char temp[256];
+        // TODO: stack overflow if attribute larger than 256B. Luckily this is only used to test the write version
+        H5PartReadStepAttrib(h5File_, key.c_str(), temp);
+        val = std::string(temp);
     }
 
     void readField(const std::string& key, FieldType field) override
@@ -314,6 +461,7 @@ std::unique_ptr<IFileReader> makeH5PartReader(MPI_Comm comm) { return std::make_
 #else
 
 std::unique_ptr<IFileWriter> makeH5PartWriter(MPI_Comm) { return {}; }
+std::unique_ptr<IFileWriter> makeH5PartWriterSeq(MPI_Comm) { return {}; }
 std::unique_ptr<IFileReader> makeH5PartReader(MPI_Comm) { return std::make_unique<UnimplementedReader>(); }
 
 #endif
