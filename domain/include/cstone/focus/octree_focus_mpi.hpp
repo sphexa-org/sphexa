@@ -712,6 +712,7 @@ private:
             globalTreeBackingBuffer.resize(globalLeaves.size());
             memcpyD2H(globalLeaves.data(), globalLeaves.size(), globalTreeBackingBuffer.data());
             globalLeaves = std::span(globalTreeBackingBuffer);
+            downloadOctree();
         }
 
         auto extPeers =
