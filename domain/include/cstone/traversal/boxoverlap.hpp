@@ -197,10 +197,14 @@ HOST_DEVICE_FUN IBox makeHaloBox(const IBox& nodeBox, RadiusType radius, const B
 template<class KeyType, class CoordinateType, class RadiusType>
 HOST_DEVICE_FUN IBox makeHaloBox(const IBox& nodeBox, RadiusType radius, const Box<CoordinateType>& box, unsigned bx, unsigned by, unsigned bz)
 {
-    int dx = toNBitIntCeil<KeyType>(radius * box.ilx(), bx);
-    int dy = toNBitIntCeil<KeyType>(radius * box.ily(), by);
-    int dz = toNBitIntCeil<KeyType>(radius * box.ilz(), bz);
-
+    // std::cout << "ilx, ily, ilz: " << box.ilx() << ", " << box.ily() << ", " << box.ilz() << std::endl;
+    int dx = toNBitIntCeil<KeyType>(radius * box.ilx(), bx); // TODO(iomaganaris): is this reasonable?
+    int dy = toNBitIntCeil<KeyType>(radius * box.ily(), by); // TODO(iomaganaris): is this reasonable?
+    int dz = toNBitIntCeil<KeyType>(radius * box.ilz(), bz); // TODO(iomaganaris): is this reasonable?
+    // std::cout << "toNBitIntCeil dx, dy, dz: " << toNBitIntCeil<KeyType>(radius * box.ilx(), bx) << ", "
+    //           << toNBitIntCeil<KeyType>(radius * box.ily(), by) << ", "
+    //           << toNBitIntCeil<KeyType>(radius * box.ilz(), bz) << std::endl;
+    // std::cout << "dx, dy, dz: " << dx << ", " << dy << ", " << dz << std::endl;
     bool pbcX = (box.boundaryX() == cstone::BoundaryType::periodic);
     bool pbcY = (box.boundaryY() == cstone::BoundaryType::periodic);
     bool pbcZ = (box.boundaryZ() == cstone::BoundaryType::periodic);

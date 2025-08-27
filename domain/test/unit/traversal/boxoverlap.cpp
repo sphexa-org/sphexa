@@ -175,6 +175,43 @@ TEST(BoxOverlap, makeHaloBoxXYZ)
     makeHaloBoxXYZ<uint64_t>();
 }
 
+//! @brief check halo box ranges in all spatial dimensions
+template<class KeyType>
+void makeHaloBoxXYZMixD()
+{
+    Box<float> box(0, 1, 0, 0.015625, 0, 0.00390625);
+
+    const auto mixDBits = getBoxMixDimensionBits<float, KeyType, Box<float>>(box);
+    const auto expectedMixDBits = (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
+    EXPECT_EQ(mixDBits.bx, expectedMixDBits.bx);
+    EXPECT_EQ(mixDBits.by, expectedMixDBits.by);
+    EXPECT_EQ(mixDBits.bz, expectedMixDBits.bz);
+
+    int rX             = KeyType(1) << (mixDBits.by - 1);
+    int rY             = KeyType(1) << (mixDBits.by - 1);
+    int rZ             = KeyType(1) << (mixDBits.bz);
+
+    constexpr int maxCoord = 1 << maxTreeLevel<KeyType>{};
+
+    IBox nodeBox(rX, 2 * rX, rY, 2 * rY, 0, rZ);
+
+    IBox haloBox = makeHaloBox<KeyType>(nodeBox, 1.0 / maxCoord, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
+    // std::cout << "haloBox: [" << haloBox.xmin() << "," << haloBox.xmax() << "] "
+    //           << "[" << haloBox.ymin() << "," << haloBox.ymax() << "] "
+    //           << "[" << haloBox.zmin() << "," << haloBox.zmax() << "] " << std::endl;
+    IBox refBox{rX - 1, 2 * rX + 1, rY - 1, 2 * rY + 1, 0, rZ + 1};
+    // std::cout << "refBox:  [" << refBox.xmin() << "," << refBox.xmax() << "] "
+    //           << "[" << refBox.ymin() << "," << refBox.ymax() << "] "
+    //           << "[" << refBox.zmin() << "," << refBox.zmax() << "] " << std::endl;
+    EXPECT_EQ(haloBox, refBox);
+}
+
+TEST(BoxOverlap, makeHaloBoxXYZMixD)
+{
+    makeHaloBoxXYZMixD<unsigned>();
+    makeHaloBoxXYZMixD<uint64_t>();
+}
+
 //! @brief underflow check, non-periodic case
 template<class KeyType>
 void makeHaloBoxUnderflow()
@@ -196,6 +233,36 @@ TEST(BoxOverlap, makeHaloBoxUnderflow)
     makeHaloBoxUnderflow<uint64_t>();
 }
 
+//! @brief underflow check, non-periodic case
+template<class KeyType>
+void makeHaloBoxUnderflowMixD()
+{
+    constexpr int maxCoord = 1 << maxTreeLevel<KeyType>{};
+
+    Box<float> box(0, 1, 0, 0.015625, 0, 0.00390625);
+
+    const auto mixDBits = getBoxMixDimensionBits<float, KeyType, Box<float>>(box);
+    const auto expectedMixDBits = (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
+    EXPECT_EQ(mixDBits.bx, expectedMixDBits.bx);
+    EXPECT_EQ(mixDBits.by, expectedMixDBits.by);
+    EXPECT_EQ(mixDBits.bz, expectedMixDBits.bz);
+
+    int rX             = KeyType(1) << (mixDBits.by - 1);
+    int rY             = KeyType(1) << (mixDBits.by - 1);
+    int rZ             = KeyType(1) << (mixDBits.bz);
+    IBox nodeBox(0, rX, 0, rY, 0, rZ);
+
+    IBox haloBox = makeHaloBox<KeyType>(nodeBox, 0.99 / maxCoord, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
+    IBox refBox{0, rX + 1, 0, rY + 1, 0, rZ + 1};
+    EXPECT_EQ(haloBox, refBox);
+}
+
+TEST(BoxOverlap, makeHaloBoxUnderflowMixD)
+{
+    makeHaloBoxUnderflowMixD<unsigned>();
+    makeHaloBoxUnderflowMixD<uint64_t>();
+}
+
 //! @brief overflow check, non-periodic case
 template<class KeyType>
 void makeHaloBoxOverflow()
@@ -215,6 +282,36 @@ TEST(BoxOverlap, makeHaloBoxOverflow)
 {
     makeHaloBoxOverflow<unsigned>();
     makeHaloBoxOverflow<uint64_t>();
+}
+
+//! @brief overflow check, non-periodic case
+template<class KeyType>
+void makeHaloBoxOverflowMixD()
+{
+    constexpr int maxCoord = 1 << maxTreeLevel<KeyType>{};
+
+    Box<float> box(0, 1, 0, 0.015625, 0, 0.00390625);
+
+    const auto mixDBits = getBoxMixDimensionBits<float, KeyType, Box<float>>(box);
+    const auto expectedMixDBits = (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
+    EXPECT_EQ(mixDBits.bx, expectedMixDBits.bx);
+    EXPECT_EQ(mixDBits.by, expectedMixDBits.by);
+    EXPECT_EQ(mixDBits.bz, expectedMixDBits.bz);
+
+    int rX             = KeyType(1) << (mixDBits.by - 1);
+    int rY             = KeyType(1) << (mixDBits.by - 1);
+    int rZ             = KeyType(1) << (mixDBits.bz);
+    IBox nodeBox(rX, 2 * rX, rY, 2 * rY, 0, rZ);
+
+    IBox haloBox = makeHaloBox<KeyType>(nodeBox, 0.99 / maxCoord, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
+    IBox refBox{rX - 1, 2 * rX + 1, rY - 1, 2 * rY + 1, 0, rZ + 1}; // TODO(iomaganaris): Same as makeHaloBoxXYZMixD?
+    EXPECT_EQ(haloBox, refBox);
+}
+
+TEST(BoxOverlap, makeHaloBoxOverflowMixD)
+{
+    makeHaloBoxOverflowMixD<unsigned>();
+    makeHaloBoxOverflowMixD<uint64_t>();
 }
 
 //! @brief check halo box ranges with periodic boundary conditions
@@ -244,6 +341,47 @@ TEST(BoxOverlap, makeHaloBoxPbc)
 {
     makeHaloBoxPbc<unsigned>();
     makeHaloBoxPbc<uint64_t>();
+}
+
+//! @brief check halo box ranges with periodic boundary conditions
+template<class KeyType>
+void makeHaloBoxMixDPbc()
+{
+    const int r = KeyType(1) << (maxTreeLevel<KeyType>{} - 1);
+
+    Box<float> box(0, 1, 0, 0.015625, 0, 0.00390625, cstone::BoundaryType::periodic, cstone::BoundaryType::periodic,
+                  cstone::BoundaryType::periodic);
+
+    const auto mixDBits = getBoxMixDimensionBits<float, KeyType, Box<float>>(box);
+    const auto expectedMixDBits = (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
+    EXPECT_EQ(mixDBits.bx, expectedMixDBits.bx);
+    EXPECT_EQ(mixDBits.by, expectedMixDBits.by);
+    EXPECT_EQ(mixDBits.bz, expectedMixDBits.bz);
+
+    int rX             = KeyType(1) << (mixDBits.by - 1);
+    int rY             = KeyType(1) << (mixDBits.by - 1);
+    int rZ             = KeyType(1) << (mixDBits.bz);
+
+    IBox nodeBox(rX, 2 * rX, rY, 2 * rY, 0, rZ);
+
+    {
+        double radius = 0.999 / r; // TODO(iomaganaris): what is the purpose of this test case?
+        IBox haloBox  = makeHaloBox<KeyType>(nodeBox, radius, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
+        IBox refBox{rX - 2, 2 * rX + 2, rY - 2, 2 * rY + 2, -2, rZ + 2};
+        EXPECT_EQ(haloBox, refBox);
+    }
+    {
+        double radius = 1.000001 / 8; // TODO(iomaganaris): what is the purpose of this test case?
+        IBox haloBox  = makeHaloBox<KeyType>(nodeBox, radius, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
+        IBox refBox{-15 * rX - 1, 18 * rX + 1, -rY + 1, 4 * rY - 1, -rZ + 1, 2 * rZ - 1};
+        EXPECT_EQ(haloBox, refBox);
+    }
+}
+
+TEST(BoxOverlap, makeHaloBoxMixDPbc)
+{
+    makeHaloBoxMixDPbc<unsigned>();
+    makeHaloBoxMixDPbc<uint64_t>();
 }
 
 template<class I>
@@ -290,6 +428,52 @@ TEST(BoxOverlap, haloBoxContainedIn)
 {
     haloBoxContainedIn<unsigned>();
     haloBoxContainedIn<uint64_t>();
+}
+
+template<class I>
+void haloBoxContainedInMixD()
+{
+    {
+        IBox haloBox{0, 1, 0, 1, 0, 1};
+        EXPECT_TRUE(containedIn(I(0), I(1), haloBox, 10, 4, 2));
+    }
+    {
+        IBox haloBox{0, 1, 0, 1, 0, 2};
+        EXPECT_FALSE(containedIn(I(0), I(1), haloBox, 10, 4, 2));
+    }
+    {
+        IBox haloBox{0, 1, 0, 1, 0, 2};
+        EXPECT_TRUE(containedIn(I(0), I(8), haloBox, 10, 4, 2));
+    }
+    {
+        IBox haloBox{0, 1, 0, 2, 0, 2};
+        EXPECT_FALSE(containedIn(I(0), I(3), haloBox, 10, 4, 2));
+    }
+    {
+        IBox haloBox{0, 1, 0, 2, 0, 2};
+        EXPECT_TRUE(containedIn(I(0), I(8), haloBox, 10, 4, 2));
+    }
+    {
+        IBox haloBox{0, 2, 0, 2, 0, 2};
+        EXPECT_FALSE(containedIn(I(0), I(7), haloBox, 10, 4, 2));
+    }
+    {
+        IBox haloBox{0, 2, 0, 2, 0, 2};
+        EXPECT_TRUE(containedIn(I(0), I(8), haloBox, 10, 4, 2));
+    }
+
+    /// PBC
+    {
+        IBox haloBox{-1, 1, 0, 1, 0, 1};
+        EXPECT_FALSE(containedIn(I(0), I(1), haloBox, 10, 4, 2));
+    }
+}
+
+//! @brief test containment of a box within a Morton code range
+TEST(BoxOverlap, haloBoxContainedInMixD)
+{
+    haloBoxContainedInMixD<unsigned>();
+    haloBoxContainedInMixD<uint64_t>();
 }
 
 template<class KeyType>
@@ -375,6 +559,37 @@ TEST(BoxOverlap, minPointDistance)
     }
 }
 
+TEST(BoxOverlap, minPointDistanceMixD)
+{
+    using T       = double;
+    using KeyType = unsigned;
+
+    {
+        Box<T> box(0, 1.0, 0, 0.015625, 0, 0.00390625);
+        const auto mixDBits = getBoxMixDimensionBits<double, KeyType, Box<double>>(box);
+        const auto expectedMixDBits = (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
+        EXPECT_EQ(mixDBits.bx, expectedMixDBits.bx);
+        EXPECT_EQ(mixDBits.by, expectedMixDBits.by);
+        EXPECT_EQ(mixDBits.bz, expectedMixDBits.bz);
+
+        const unsigned mcX = 1u << mixDBits.bx;
+        const unsigned mcY = 1u << mixDBits.by;
+        const unsigned mcZ = 1u << mixDBits.bz;
+
+        IBox ibox(0, mcX / 2, 0, mcY / 2, 0, mcZ / 2);
+
+        T px = (mcX / 2.0 + 1) / mcX * 1.0;
+        T py = (mcY / 2.0 + 1) / mcY * 0.015625;
+        T pz = (mcZ / 2.0 + 1) / mcZ * 0.00390625;
+        Vec3<T> X{px, py, pz};
+
+        auto [center, size] = centerAndSize<KeyType>(ibox, box);
+
+        T probe = std::sqrt(norm2(minDistance(X, center, size, box)));
+        EXPECT_NEAR(std::sqrt(3) / maxCoord<KeyType>{}, probe, 1e-10);
+    }
+}
+
 TEST(BoxOverlap, minDistance)
 {
     using T = double;
@@ -395,6 +610,40 @@ TEST(BoxOverlap, minDistance)
     }
     {
         Box<T> boxPbc(0, 2, 0, 3, 0, 4, BoundaryType::periodic, BoundaryType::periodic, BoundaryType::periodic);
+
+        Vec3<T> aCenter{0.1, 0.1, 0.1};
+        Vec3<T> bCenter{1.9, 2.9, 3.9};
+
+        Vec3<T> aSize{0.1, 0.1, 0.1};
+        Vec3<T> bSize{0.1, 0.1, 0.1};
+
+        Vec3<T> dist = minDistance(aCenter, aSize, bCenter, bSize, boxPbc);
+        EXPECT_NEAR(dist[0], 0., 1e-10);
+        EXPECT_NEAR(dist[1], 0., 1e-10);
+        EXPECT_NEAR(dist[2], 0., 1e-10);
+    }
+}
+
+TEST(BoxOverlap, minDistanceMixD)
+{
+    using T = double;
+
+    {
+        Box<T> box(0, 1.0, 0, 0.015625, 0, 0.00390625);
+
+        Vec3<T> aCenter{1., 1., 1.};
+        Vec3<T> bCenter{1., 2., 3.};
+
+        Vec3<T> aSize{0.1, 0.1, 0.1};
+        Vec3<T> bSize{0.1, 0.1, 0.1};
+
+        Vec3<T> dist = minDistance(aCenter, aSize, bCenter, bSize, box);
+        EXPECT_NEAR(dist[0], 0., 1e-10);
+        EXPECT_NEAR(dist[1], 0.8, 1e-10);
+        EXPECT_NEAR(dist[2], 1.8, 1e-10);
+    }
+    {
+        Box<T> boxPbc(0, 1.0, 0, 0.015625, 0, 0.0039062, BoundaryType::periodic, BoundaryType::periodic, BoundaryType::periodic);
 
         Vec3<T> aCenter{0.1, 0.1, 0.1};
         Vec3<T> bCenter{1.9, 2.9, 3.9};
