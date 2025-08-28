@@ -97,16 +97,14 @@ __global__ void IADGpuKernel(Tc K, unsigned ngmax, cstone::Box<Tc> box, const Lo
         LocalIndex bodyEnd   = grpEnd[targetIdx];
         LocalIndex i         = bodyBegin + laneIdx;
 
-        auto ncTrue = traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool);
+        if (i >= bodyEnd) continue;
+        unsigned ncTrue =
+            findNeighbors(i, x, y, z, h, tree, box, ngmax, neighborsWarp + laneIdx, TravConfig::targetSize);
 
-        if (i >= bodyEnd) { continue; }
-        if (1 + ncTrue[0] < 100 / 4 || (ncTrue[0]) > ngmax)
-        {
-            c11[i] = c12[i] = c13[i] = c22[i] = c23[i] = c33[i] = 0.;
-        }
+        if (1 + ncTrue < 100 / 4 || (ncTrue) > ngmax) { c11[i] = c12[i] = c13[i] = c22[i] = c23[i] = c33[i] = 0.; }
         else
         {
-            unsigned ncCapped = stl::min(ncTrue[0], ngmax);
+            unsigned ncCapped = stl::min(ncTrue, ngmax);
             sph::IADJLoopSTD<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, h, m, rho,
                                                      wh, whd, c11, c12, c13, c22, c23, c33);
         }
