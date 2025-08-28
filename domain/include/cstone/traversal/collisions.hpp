@@ -121,15 +121,15 @@ void findHalos(const KeyType* prefixes,
                     mixDBits.by != maxTreeLevel<KeyType>{} ||
                     mixDBits.bz != maxTreeLevel<KeyType>{};
 
-    auto markCollisions = [collisionFlags, internalToLeaf](TreeNodeIndex i) { std::cout << "Found collision with TreeNodeIndex i: " << i << " internalToLeaf[i]: " << internalToLeaf[i] << std::endl; collisionFlags[internalToLeaf[i]] = 1; };
+    auto markCollisions = [collisionFlags, internalToLeaf](TreeNodeIndex i) { /*std::cout << "Found collision with TreeNodeIndex i: " << i << " internalToLeaf[i]: " << internalToLeaf[i] << std::endl;*/ collisionFlags[internalToLeaf[i]] = 1; };
 
 #pragma omp parallel for
     for (TreeNodeIndex nodeIdx = firstNode; nodeIdx < lastNode; ++nodeIdx)
     {
         RadiusType radius = interactionRadii[nodeIdx];
         IBox haloBox      = makeHaloBox<KeyType>(leaves[nodeIdx], leaves[nodeIdx + 1], radius, box);
-        std::cout << "[findHalos] nodeIdx: " << nodeIdx << " haloBox: " << haloBox.xmin() << ", " << haloBox.xmax() << ", "
-                  << haloBox.ymin() << ", " << haloBox.ymax() << ", " << haloBox.zmin() << ", " << haloBox.zmax() << std::endl;
+        // std::cout << "[findHalos] nodeIdx: " << nodeIdx << " haloBox: " << haloBox.xmin() << ", " << haloBox.xmax() << ", "
+        //           << haloBox.ymin() << ", " << haloBox.ymax() << ", " << haloBox.zmin() << ", " << haloBox.zmax() << std::endl;
         if (haloBox.xmax() - haloBox.xmin() == 0 && haloBox.ymax() - haloBox.ymin() == 0 &&
             haloBox.zmax() - haloBox.zmin() == 0)
         {
