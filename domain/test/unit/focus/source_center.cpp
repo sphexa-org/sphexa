@@ -55,15 +55,22 @@ TEST(FocusedOctree, sourceCenter)
     }
 }
 
-template<class KeyType>
-static void computeSourceCenter()
+template<class KeyType, template<class> class sfcKeyType>
+static void computeSourceCenter(Box<double> box)
 {
     using T                 = double;
     LocalIndex numParticles = 20000;
-    Box<T> box{-1, 1};
     unsigned csBucketSize = 16;
 
-    RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box);
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    bool useMixD        = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                   mixDBits.by != maxTreeLevel<KeyType>{} ||
+                   mixDBits.bz != maxTreeLevel<KeyType>{});
+
+    RandomGaussianCoordinates<T, sfcKeyType<KeyType>> coords =
+        useMixD
+            ? RandomGaussianCoordinates<T, sfcKeyType<KeyType>>{numParticles, box, 42, mixDBits.bx, mixDBits.by, mixDBits.bz}
+            : RandomGaussianCoordinates<T, sfcKeyType<KeyType>>{numParticles, box, 42};
 
     auto [csTree, csCounts] = computeOctree<KeyType>(coords.particleKeys(), csBucketSize);
     OctreeData<KeyType, CpuTag> octree;
@@ -92,8 +99,10 @@ static void computeSourceCenter()
 
 TEST(FocusedOctree, sourceCenterUpsweep)
 {
-    computeSourceCenter<unsigned>();
-    computeSourceCenter<uint64_t>();
+    computeSourceCenter<unsigned, SfcKind>(Box<double>(-1,1));
+    computeSourceCenter<uint64_t, SfcKind>(Box<double>(-1,1));
+    computeSourceCenter<unsigned, SfcMixDKind>(Box<double>(0, 1, 0, 0.015625, 0, 0.00390625));
+    computeSourceCenter<uint64_t, SfcMixDKind>(Box<double>(0, 1, 0, 0.015625, 0, 0.00390625));
 }
 
 } // namespace cstone
