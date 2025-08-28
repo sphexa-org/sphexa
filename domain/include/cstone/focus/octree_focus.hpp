@@ -363,6 +363,8 @@ public:
         {
             //! set centers to geometric centers for min dist Mac
             centers_[i] = computeMinMacR2(tree_.prefixes[i], invThetaEff, box);
+            // std::cout << "[FocusedOctree] i: " << i << " key: " << std::oct << tree_.prefixes[i] << std::dec << " center: [" << centers_[i][0]
+            //           << "," << centers_[i][1] << "," << centers_[i][2] << "] r2: " << centers_[i][3] << "\n";
         }
 
         macs_.resize(tree_.numNodes);
@@ -371,14 +373,37 @@ public:
         TreeNodeIndex fEnd   = findNodeAbove(rawPtr(leaves_), nNodes(leaves_), focusEnd);
         markMacs(tree_.prefixes.data(), tree_.childOffsets.data(), tree_.parents.data(), centers_.data(), box,
                  rawPtr(leaves_) + fStart, fEnd - fStart, false, macs_.data());
+        // std::cout << "[FocusedOctree] macs: ";
+        // for (size_t i = 0; i < macs_.size(); ++i)
+        // {
+        //     if (macs_[i] != 0)
+        //     {
+        //         std::cout << i << ":" << int(macs_[i]) << " ";
+        //     }
+        // }
+        // std::cout << "\n";
 
         leafCounts_.resize(nNodes(leaves_));
         computeNodeCounts<KeyType>(leaves_.data(), leafCounts_.data(), nNodes(leaves_), particleKeys,
                                    std::numeric_limits<unsigned>::max(), true);
+        // unsigned totalCount = 0;
+        // for (TreeNodeIndex i = 0; i < tree_.numLeafNodes; ++i)
+        // {
+        //     std::cout << "[FocusedOctree] leaf i: " << i << " key: " << std::oct << tree_.prefixes[tree_.internalToLeaf[i]] << std::dec
+        //           << " count: " << leafCounts_[i] << "\n";
+        //     totalCount += leafCounts_[i];
+        // }
+        // std::cout << "[FocusedOctree] total leaf count: " << totalCount << "\n";
 
         counts_.resize(tree_.numNodes);
         scatter(leafToInternal(tree_), leafCounts_.data(), counts_.data());
         upsweep(tree_.levelRange, tree_.childOffsets, counts_.data(), NodeCount<unsigned>{});
+        // unsigned totalNodeCount = 0;
+        // for (size_t i = 0; i < counts_.size(); ++i)
+        // {
+        //     totalNodeCount += counts_[i];
+        // }
+        // std::cout << "[FocusedOctree] total node count: " << totalNodeCount << "\n";
 
         return converged;
     }

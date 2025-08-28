@@ -17,6 +17,8 @@
 
 #include "cstone/focus/octree_focus.hpp"
 #include "cstone/tree/cs_util.hpp"
+#include "coord_samples/random.hpp"
+#include "cstone/sfc/hilbert.hpp"
 
 namespace cstone
 {
@@ -313,6 +315,7 @@ std::vector<TreeNodeIndex> octantNodeCount(std::span<const KeyType> tree)
     {
         auto range = nodeRange<KeyType>(1);
         counts.push_back(numNodesInRange(tree, octant * range, octant * range + range));
+        // std::cout << "octant " << octant << " range [" << std::oct << octant * range << ", " << octant * range + range << std::dec << "] count " << counts.back() << "\n";
     }
 
     std::sort(begin(counts), end(counts));
@@ -410,6 +413,137 @@ TEST(FocusedOctree, compute)
     computeEssentialTree<uint64_t>();
 }
 
+template<class KeyType>
+static void computeEssentialTreeMixD()
+{
+    Box<double> box{0, 1, 0, 0.015625, 0, 0.00390625};
+    const auto mixDBits = getBoxMixDimensionBits<double, KeyType, Box<double>>(box);
+    int nParticles        = 200000;
+    unsigned csBucketSize = 16;
+
+    auto coords = RandomCoordinates<double, SfcMixDKind<KeyType>>(nParticles, box, 42, mixDBits.bx, mixDBits.by, mixDBits.bz);
+    auto keys = coords.particleKeys();
+
+    auto [csTree, csCounts] = computeOctree<KeyType>(keys, csBucketSize);
+    Octree<KeyType> globalTree;
+    globalTree.update(csTree.data(), nNodes(csTree));
+
+    // KeyType total_particles{};
+
+    // std::cout << "Cornerstone tree has " << nNodes(csTree) << " nodes.\n";
+    // std::cout << "Global tree has " << globalTree.numLeafNodes() << " leaf nodes.\n";
+    // std::cout << "csTree and csCounts:\n";
+    // for (size_t i = 0; i < csTree.size(); ++i)
+    // {
+    //     std::cout << std::oct << csTree[i] << std::dec << " (" << csCounts[i] << ") ";
+    //     if (!isValidHilbertMixDKey<KeyType>(csTree[i], mixDBits.bx, mixDBits.by, mixDBits.bz) && csCounts[i] != 0) {
+    //         std::cout << " csTree[" << i << "] is not a valid key!\n";
+    //     }
+    //     total_particles += csCounts[i];
+    // }
+    // std::cout << std::endl;
+
+    // std::cout << "Total particles in csCounts: " << total_particles << "\n";
+
+    // std::cout << "Global tree first key: " << std::oct << csTree.front() << std::dec << "\n";
+    // std::cout << "Global tree last key: " << std::oct << csTree.back() << std::dec << "\n";
+
+    unsigned bucketSize = 16;
+    float theta         = 0.9;
+    FocusedOctreeSingleNode<KeyType> tree(bucketSize, theta);
+
+    // sorted reference tree node counts in each (except focus) octant at the 1st division level
+    std::vector<TreeNodeIndex> refCounts{
+        1, 1, 1, 1, 1, 1,
+        std::is_same<KeyType, unsigned>::value ? 372 : 225
+        // /*378 or 231*/
+    };
+
+    KeyType focusStart = 1;
+    KeyType focusEnd   = pad(KeyType(1), 3);
+
+    tree.update(box, keys, focusStart, focusEnd, {});
+    // The focus boundaries have to be contained in the tree, even after just one update step.
+    // This example here is the worst-case scenario with a focus boundary at the highest possible
+    // octree subdivision level. Key-0 is always present, so the node with Key-1 is always at index 1, if present.
+    EXPECT_EQ(tree.treeLeaves()[1], focusStart);
+    // std::cout << "After first update, tree has " << tree.treeLeaves().size() << " nodes.\n";
+    // std::cout << "Tree leaves counts:\n";
+    // int totalLeafCount = 0;
+    // for (size_t i = 0; i < tree.treeLeaves().size(); ++i)
+    // {
+    //     std::cout << "Leaf " << std::oct << tree.treeLeaves()[i] << std::dec << ": " << tree.leafCounts()[i] << std::endl;
+    //     totalLeafCount += tree.leafCounts()[i];
+    // }
+    // std::cout << "Total leaf count: " << totalLeafCount << std::endl;
+
+    // update until converged
+    while (!tree.update(box, keys, focusStart, focusEnd, {})) {}
+
+    {
+        // std::cout << "After convergence, tree has " << tree.treeLeaves().size() << " nodes.\n";
+        // int totalLeafCount = 0;
+        // for (size_t i = 0; i < tree.treeLeaves().size(); ++i)
+        // {
+        //     std::cout << "Leaf " << std::oct << tree.treeLeaves()[i] << std::dec << ": " << tree.leafCounts()[i] << std::endl;
+        //     totalLeafCount += tree.leafCounts()[i];
+        // }
+        // std::cout << "Total leaf count: " << totalLeafCount << std::endl;
+
+        // the first node in the cornerstone tree that starts at or above focusStart
+        TreeNodeIndex firstCstoneNode = findNodeAbove(csTree.data(), csTree.size(), focusStart);
+        TreeNodeIndex matchingFocusNode =
+            findNodeAbove(tree.treeLeaves().data(), tree.treeLeaves().size(), csTree[firstCstoneNode]);
+        // in the focus area (the first octant) the essential tree and the csTree are identical
+        TreeNodeIndex lastFocusNode = findNodeAbove(tree.treeLeaves().data(), tree.treeLeaves().size(), focusEnd);
+
+        EXPECT_TRUE(matchingFocusNode >= 1 && matchingFocusNode < lastFocusNode);
+
+        // We have: focusTree[matchingFocusNode] == csTree[firstCstoneNode]
+        // therefore all nodes past matchingFocusNode until lastFocusNode should match those in the csTree
+        EXPECT_TRUE(std::equal(tree.treeLeaves().begin() + matchingFocusNode, tree.treeLeaves().begin() + lastFocusNode,
+                               begin(csTree) + firstCstoneNode));
+
+        // From 0 to matchingFocusNode, the focusTree should be identical to the spanningTree
+        std::vector<KeyType> spanningKeys{0, focusStart, nodeRange<KeyType>(0)};
+        auto spanningTree = computeSpanningTree<KeyType>(spanningKeys);
+        auto a            = tree.treeLeaves().first(matchingFocusNode);
+        EXPECT_TRUE(std::equal(a.begin(), a.end(), spanningTree.data()));
+
+        auto nodeCounts = octantNodeCount<KeyType>(tree.treeLeaves());
+        EXPECT_EQ(nodeCounts, refCounts);
+    }
+
+    focusStart = pad(KeyType(7), 3);
+    focusEnd   = nodeRange<KeyType>(0) - 1;
+    // std::cout << "Focusing on octant 7, range [" << std::oct << focusStart << ", " << focusEnd << std::dec << "]\n";
+    while (!tree.update(box, keys, focusStart, focusEnd, {})) {}
+
+    {
+        auto nodeCounts = octantNodeCount<KeyType>(tree.treeLeaves());
+        EXPECT_EQ(nodeCounts, std::vector<TreeNodeIndex>(7, 1)); // Last octant doesn't include valid keys so it's empty
+    }
+
+    focusStart = 0; // slight variation; start from zero instead of 1
+    focusEnd   = pad(KeyType(1), 3);
+    while (!tree.update(box, keys, focusStart, focusEnd, {})) {}
+
+    {
+        TreeNodeIndex lastFocusNode = findNodeAbove(tree.treeLeaves().data(), tree.treeLeaves().size(), focusEnd);
+        // tree now focused again on first octant
+        EXPECT_TRUE(std::equal(begin(csTree), begin(csTree) + lastFocusNode, tree.treeLeaves().begin()));
+
+        auto nodeCounts = octantNodeCount<KeyType>(tree.treeLeaves());
+        EXPECT_EQ(nodeCounts, refCounts);
+    }
+}
+
+TEST(FocusedOctree, computeMixD)
+{
+    computeEssentialTreeMixD<unsigned>();
+    computeEssentialTreeMixD<uint64_t>();
+}
+
 class MacRefinement : public testing::Test
 {
 protected:
@@ -453,9 +587,39 @@ TEST_F(MacRefinement, fullSurface)
     EXPECT_EQ(nNodes(leaves), 64 + 7 + 3 * numNodesFace + 3 * numNodesEdge + numNodesVertex);
 }
 
+TEST_F(MacRefinement, fullSurfaceMixD)
+{
+    Box<T> box(0, 1, 0, 0.015625, 0, 0.00390625);
+    float invTheta = sqrt(3) / 2 + 1e-6;
+
+    KeyType focusStart = 0;
+    KeyType focusEnd   = decodePlaceholderBit(KeyType(011));
+    while (!macRefine(octree, leaves, centers, macs, focusEnd, focusEnd, focusStart, focusEnd, invTheta, box)) {}
+
+    // int numNodesVertex = 7 + 8;      // TODO(iomaganaris): not sure what those mean
+    // int numNodesEdge   = 6 + 2 * 8;
+    // int numNodesFace   = 4 + 4 * 8;
+    EXPECT_EQ(nNodes(leaves), 92);
+}
+
 TEST_F(MacRefinement, noSurface)
 {
     Box<T> box(0, 1);
+    float invTheta              = sqrt(3) / 2 + 1e-6;
+    TreeNodeIndex numNodesStart = octree.numLeafNodes;
+
+    KeyType oldFStart  = decodePlaceholderBit(KeyType(0101));
+    KeyType oldFEnd    = decodePlaceholderBit(KeyType(011));
+    KeyType focusStart = 0;
+    KeyType focusEnd   = decodePlaceholderBit(KeyType(011));
+    while (!macRefine(octree, leaves, centers, macs, oldFStart, oldFEnd, focusStart, focusEnd, invTheta, box)) {}
+
+    EXPECT_EQ(nNodes(leaves), numNodesStart);
+}
+
+TEST_F(MacRefinement, noSurfaceMixD)
+{
+    Box<T> box(0, 1, 0, 0.015625, 0, 0.00390625);
     float invTheta              = sqrt(3) / 2 + 1e-6;
     TreeNodeIndex numNodesStart = octree.numLeafNodes;
 
@@ -481,6 +645,21 @@ TEST_F(MacRefinement, partialSurface)
     while (!macRefine(octree, leaves, centers, macs, oldFStart, oldFEnd, focusStart, focusEnd, invTheta, box)) {}
 
     EXPECT_EQ(nNodes(leaves), numNodesStart + 5 * 7);
+}
+
+TEST_F(MacRefinement, partialSurfaceMixD)
+{
+    Box<T> box(0, 1, 0, 0.015625, 0, 0.00390625);
+    float invTheta              = sqrt(3) / 2 + 1e-6;
+    TreeNodeIndex numNodesStart = octree.numLeafNodes;
+
+    KeyType oldFStart  = 0;                                     // TODO(iomaganaris): probably those need to be set properly but I don't know what surface means atm
+    KeyType oldFEnd    = decodePlaceholderBit(KeyType(0107));
+    KeyType focusStart = 0;
+    KeyType focusEnd   = decodePlaceholderBit(KeyType(011));
+    while (!macRefine(octree, leaves, centers, macs, oldFStart, oldFEnd, focusStart, focusEnd, invTheta, box)) {}
+
+    EXPECT_EQ(nNodes(leaves), numNodesStart);
 }
 
 } // namespace cstone

@@ -49,9 +49,9 @@ HOST_DEVICE_FUN Vec4<T> computeMinMacR2(KeyType prefix, float invThetaEff, const
     int prefixLength = decodePrefixLength(prefix);
 
     IBox cellBox              = use_mixD ? sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - (prefixLength / 3), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(nodeKey), prefixLength / 3);
-    if (std::abs(double(cellBox.xmax()) - double(cellBox.xmin())) < 1e-12 &&
-        std::abs(double(cellBox.ymax()) - double(cellBox.ymin())) < 1e-12 &&
-        std::abs(double(cellBox.zmax()) - double(cellBox.zmin())) < 1e-12)
+    if (cellBox.xmax() == cellBox.xmin() &&
+        cellBox.ymax() == cellBox.ymin() &&
+        cellBox.zmax() == cellBox.zmin())
     {
         // if the cell is empty, we return a zero mac
         return Vec4<T>{T(0), T(0), T(0), T(0)};
@@ -253,16 +253,16 @@ void markMacs(const KeyType* prefixes,
     for (TreeNodeIndex i = 0; i < numFocusNodes; ++i)
     {
         IBox target    = use_mixD ? sfcIBox(sfcMixDKey(focusNodes[i]), sfcMixDKey(focusNodes[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(focusNodes[i]), sfcKey(focusNodes[i + 1]));
-        if (std::abs(target.xmin() - target.xmax()) < std::numeric_limits<double>::epsilon() ||
-            std::abs(target.ymin() - target.ymax()) < std::numeric_limits<double>::epsilon() ||
-            std::abs(target.zmin() - target.zmax()) < std::numeric_limits<double>::epsilon())
+        if (target.xmin() == target.xmax() ||
+            target.ymin() == target.ymax() ||
+            target.zmin() == target.zmax())
         {
             // if the target is empty, we skip it
             // std::cout << "[markMacs] Skipping target i: " << i << std::endl;
             continue;
         }
-        std::cout << "[markMacs] i: " << i << " target: " << target.xmin() << ", " << target.xmax() << ", "
-                  << target.ymin() << ", " << target.ymax() << ", " << target.zmin() << ", " << target.zmax() << std::endl;
+        // std::cout << "[markMacs] i: " << i << " target: " << target.xmin() << ", " << target.xmax() << ", "
+        //           << target.ymin() << ", " << target.ymax() << ", " << target.zmin() << ", " << target.zmax() << std::endl;
         IBox targetExt = IBox(target.xmin() - 1, target.xmax() + 1, target.ymin() - 1, target.ymax() + 1,
                               target.zmin() - 1, target.zmax() + 1);
         if (use_mixD && containedIn(focusStart, focusEnd, targetExt, mixDBits.bx, mixDBits.by, mixDBits.bz)) { continue; }
