@@ -34,12 +34,13 @@ __device__ void markForRemovalAndAdd(RemovalStatistics& statistics, size_t i, Tk
     statistics.count       = 1;
 }
 
-template<unsigned numThreads, typename T1, typename Th, typename Tkeys, typename T2, typename Tm, typename Tv>
+template<unsigned numThreads, typename T1, typename Th, typename Tkeys, typename T2, typename Tm, typename Tv,
+         typename Tn>
 __global__ void computeAccretionConditionKernel(size_t first, size_t last, const T1* x, const T1* y, const T1* z,
                                                 const Th* h, Tkeys* keys, const Tm* m, const Tv* vx, const Tv* vy,
-                                                const Tv* vz, const cstone::Vec3<T2> star_position, T2 star_size2,
-                                                T2 removal_limit_h, RemovalStatistics* device_accreted,
-                                                RemovalStatistics* device_removed)
+                                                const Tv* vz, const Tn* nc, const cstone::Vec3<T2> star_position,
+                                                T2 star_size2, T2 removal_limit_h, unsigned ng0, unsigned ngmax,
+                                                RemovalStatistics* device_accreted, RemovalStatistics* device_removed)
 {
     cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -57,7 +58,10 @@ __global__ void computeAccretionConditionKernel(size_t first, size_t last, const
         const double dist2 = dx * dx + dy * dy + dz * dz;
 
         if (dist2 < star_size2) { markForRemovalAndAdd(accreted, i, keys, m, vx, vy, vz); }
-        else if (h[i] > removal_limit_h) { markForRemovalAndAdd(removed, i, keys, m, vx, vy, vz); }
+        else if (h[i] > removal_limit_h || (nc[i] < ng0 / 4 || (nc[i] - 1) > ngmax))
+        {
+            markForRemovalAndAdd(removed, i, keys, m, vx, vy, vz);
+        }
     }
 
     typedef cub::BlockReduce<RemovalStatistics, numThreads> BlockReduce;
@@ -72,10 +76,10 @@ __global__ void computeAccretionConditionKernel(size_t first, size_t last, const
     if (threadIdx.x == 0) { atomicAddRS(device_removed, block_removed); }
 }
 
-template<typename Treal, typename Thydro, typename Tkeys, typename Tmass>
+template<typename Treal, typename Thydro, typename Tkeys, typename Tmass, typename Tn>
 void computeAccretionConditionGPU(size_t first, size_t last, const Treal* x, const Treal* y, const Treal* z,
                                   const Thydro* h, Tkeys* keys, const Tmass* m, const Thydro* vx, const Thydro* vy,
-                                  const Thydro* vz, StarData& star)
+                                  const Thydro* vz, const Tn* nc, StarData& star, unsigned ng0, unsigned ngmax)
 {
     cstone::LocalIndex numParticles = last - first;
     constexpr unsigned numThreads   = 256;
@@ -84,34 +88,40 @@ void computeAccretionConditionGPU(size_t first, size_t last, const Treal* x, con
     star.accreted_local = {};
     star.removed_local  = {};
 
-    RemovalStatistics *accreted_device, *removed_device;
-    checkGpuErrors(cudaMalloc(reinterpret_cast<void**>(&accreted_device), sizeof *accreted_device));
-    checkGpuErrors(cudaMalloc(reinterpret_cast<void**>(&removed_device), sizeof *removed_device));
-    checkGpuErrors(
-        cudaMemcpy(accreted_device, &star.accreted_local, sizeof star.accreted_local, cudaMemcpyHostToDevice));
-    checkGpuErrors(cudaMemcpy(removed_device, &star.removed_local, sizeof star.removed_local, cudaMemcpyHostToDevice));
+    if (last > first)
+    {
+        RemovalStatistics *accreted_device, *removed_device;
+        checkGpuErrors(cudaMalloc(reinterpret_cast<void**>(&accreted_device), sizeof *accreted_device));
+        checkGpuErrors(cudaMalloc(reinterpret_cast<void**>(&removed_device), sizeof *removed_device));
+        checkGpuErrors(
+            cudaMemcpy(accreted_device, &star.accreted_local, sizeof star.accreted_local, cudaMemcpyHostToDevice));
+        checkGpuErrors(
+            cudaMemcpy(removed_device, &star.removed_local, sizeof star.removed_local, cudaMemcpyHostToDevice));
 
-    computeAccretionConditionKernel<numThreads><<<numBlocks, numThreads>>>(
-        first, last, x, y, z, h, keys, m, vx, vy, vz, star.position, star.inner_size * star.inner_size,
-        star.removal_limit_h, accreted_device, removed_device);
+        computeAccretionConditionKernel<numThreads><<<numBlocks, numThreads>>>(
+            first, last, x, y, z, h, keys, m, vx, vy, vz, nc, star.position, star.inner_size * star.inner_size,
+            star.removal_limit_h, ng0, ngmax, accreted_device, removed_device);
 
-    checkGpuErrors(cudaDeviceSynchronize());
-    checkGpuErrors(cudaGetLastError());
+        checkGpuErrors(cudaDeviceSynchronize());
+        checkGpuErrors(cudaGetLastError());
 
-    checkGpuErrors(
-        cudaMemcpy(&star.accreted_local, accreted_device, sizeof star.accreted_local, cudaMemcpyDeviceToHost));
-    checkGpuErrors(cudaMemcpy(&star.removed_local, removed_device, sizeof star.removed_local, cudaMemcpyDeviceToHost));
-    checkGpuErrors(cudaFree(accreted_device));
-    checkGpuErrors(cudaFree(removed_device));
+        checkGpuErrors(
+            cudaMemcpy(&star.accreted_local, accreted_device, sizeof star.accreted_local, cudaMemcpyDeviceToHost));
+        checkGpuErrors(
+            cudaMemcpy(&star.removed_local, removed_device, sizeof star.removed_local, cudaMemcpyDeviceToHost));
+        checkGpuErrors(cudaFree(accreted_device));
+        checkGpuErrors(cudaFree(removed_device));
+    }
 }
 
-#define COMPUTE_ACCRETION_CONDITION_GPU(Treal, Thydro, Tkeys, Tmass)                                                   \
+#define COMPUTE_ACCRETION_CONDITION_GPU(Treal, Thydro, Tkeys, Tmass, Tn)                                               \
     template void computeAccretionConditionGPU(size_t first, size_t last, const Treal* x, const Treal* y,              \
                                                const Treal* z, const Thydro* h, Tkeys* keys, const Tmass* m,           \
-                                               const Thydro* vx, const Thydro* vy, const Thydro* vz, StarData& star);
+                                               const Thydro* vx, const Thydro* vy, const Thydro* vz, const Tn* nc,     \
+                                               StarData& star, unsigned ng0, unsigned ngmax);
 
-COMPUTE_ACCRETION_CONDITION_GPU(double, double, size_t, double);
-COMPUTE_ACCRETION_CONDITION_GPU(double, float, size_t, double);
-COMPUTE_ACCRETION_CONDITION_GPU(double, float, size_t, float);
+COMPUTE_ACCRETION_CONDITION_GPU(double, double, size_t, double, unsigned);
+COMPUTE_ACCRETION_CONDITION_GPU(double, float, size_t, double, unsigned);
+COMPUTE_ACCRETION_CONDITION_GPU(double, float, size_t, float, unsigned);
 
 } // namespace disk

@@ -75,5 +75,4 @@ HOST_DEVICE_FUN inline void IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone
     c23[i] = (tau13 * tau12 - tau11 * tau23) * factor;
     c33[i] = (tau11 * tau22 - tau12 * tau12) * factor;
 }
-
 } // namespace sph

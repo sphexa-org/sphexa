@@ -79,15 +79,25 @@ __global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, c
         auto ncTrue = traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool);
 
         if (i >= bodyEnd) continue;
+        if ((1 + ncTrue[0] >= 100 / 4) && ((ncTrue[0]) <= ngmax))
+        {
+            unsigned ncCapped = stl::min(ncTrue[0], ngmax);
+            T        maxvsignal;
 
-        unsigned ncCapped = stl::min(ncTrue[0], ngmax);
-        T        maxvsignal;
+            momentumAndEnergyJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, vx,
+                                                           vy, vz, h, m, rho, p, c, c11, c12, c13, c22, c23, c33, wh,
+                                                           whd, grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal);
 
-        momentumAndEnergyJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, vx, vy,
-                                                       vz, h, m, rho, p, c, c11, c12, c13, c22, c23, c33, wh, whd,
-                                                       grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal);
-
-        dt_i = stl::min(dt_i, tsKCourant(maxvsignal, h[i], c[i], Kcour));
+            dt_i = stl::min(dt_i, tsKCourant(maxvsignal, h[i], c[i], Kcour));
+        }
+        else
+        {
+            du[i]       = 0.;
+            grad_P_x[i] = 0.;
+            grad_P_y[i] = 0.;
+            grad_P_z[i] = 0.;
+            //            maxvsignal = 0.;
+        }
     }
 
     typedef cub::BlockReduce<T, TravConfig::numThreads> BlockReduce;
@@ -127,4 +137,35 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
 
 template void computeMomentumEnergyStdGpu(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
                                           const cstone::Box<SphTypes::CoordinateType>&);
+
+template<typename Thydro, typename T>
+__global__ void relaxSystemKernel(size_t first, size_t last, Thydro* ax, Thydro* ay, Thydro* az, Thydro* vx, Thydro* vy,
+                                  Thydro* vz, T relaxationTimescale)
+{
+    cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= last) { return; }
+
+    ax[i] -= vx[i] / relaxationTimescale;
+    ay[i] -= vy[i] / relaxationTimescale;
+    az[i] -= vz[i] / relaxationTimescale;
+}
+
+template<typename Thydro, typename T>
+void relaxSystemGPU(size_t first, size_t last, Thydro* ax, Thydro* ay, Thydro* az, Thydro* vx, Thydro* vy, Thydro* vz,
+                    T relaxationTimescale)
+{
+    cstone::LocalIndex numParticles = last - first;
+    unsigned           numThreads   = 256;
+    unsigned           numBlocks    = (numParticles + numThreads - 1) / numThreads;
+
+    relaxSystemKernel<<<numBlocks, numThreads>>>(first, last, ax, ay, az, vx, vy, vz, relaxationTimescale);
+    checkGpuErrors(cudaDeviceSynchronize());
+}
+
+#define RELAX_SYSTEM_GPU(Thydro, T)                                                                                    \
+    template void relaxSystemGPU(size_t first, size_t last, Thydro* ax, Thydro* ay, Thydro* az, Thydro* vx,            \
+                                 Thydro* vy, Thydro* vz, T relaxationTimescale);
+RELAX_SYSTEM_GPU(float, double);
+RELAX_SYSTEM_GPU(double, double);
+
 } // namespace sph

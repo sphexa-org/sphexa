@@ -31,7 +31,6 @@ __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Da
     cstone::LocalIndex   i = first + blockDim.x * blockIdx.x + threadIdx.x;
     cstone::Vec4<double> force{};
     float                t_star{INFINITY};
-
     if (i >= last) { force = {0., 0., 0., 0.}; }
     else
     {

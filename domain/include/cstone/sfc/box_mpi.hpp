@@ -95,12 +95,15 @@ auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, const
         extrema[5] = -extrema[5];
     }
 
+    // maximal length of all sides to make bounding box cubic
+    T max_side = std::max({extrema[1] - extrema[0], extrema[3] - extrema[2], extrema[5] - extrema[4]});
+
     return Box<T>{extrema[0],
-                  extrema[1],
+                  keepX ? extrema[1] : std::max(extrema[1], extrema[0] + max_side),
                   extrema[2],
-                  extrema[3],
+                  keepY ? extrema[3] : std::max(extrema[3], extrema[2] + max_side),
                   extrema[4],
-                  extrema[5],
+                  keepZ ? extrema[5] : std::max(extrema[5], extrema[4] + max_side),
                   previousBox.boundaryX(),
                   previousBox.boundaryY(),
                   previousBox.boundaryZ()};
