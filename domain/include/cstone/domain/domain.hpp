@@ -244,7 +244,7 @@ public:
             }
         }
 
-        int fail = 0;
+        int fail = 0, maxRep = 10;
         do
         {
             focusTree_.updateMacs(global_.assignment(), centerDriftTol_ / theta_, true);
@@ -264,10 +264,9 @@ public:
 
             if (fail)
             {
-                centerDriftTol_ += 0.05;
-                if (myRank_ == 0) { std::cout << "Increased centerDriftTol to " << centerDriftTol_ << std::endl; }
+                if (myRank_ == 0) { std::cout << "LET refine, mode=" << fail << std::endl; }
             }
-        } while (fail);
+        } while (fail && maxRep--);
 
         // diagnostics(keyView.size());
 

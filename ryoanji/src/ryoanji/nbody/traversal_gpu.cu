@@ -42,7 +42,7 @@ using cstone::warpMin;
 struct TravConfig
 {
     //! @brief size of global workspace memory per warp, must be a power of 2
-    static constexpr int memPerWarp = 512 * GpuConfig::warpSize;
+    static constexpr int memPerWarp = 2048 * GpuConfig::warpSize;
     static_assert((memPerWarp & (memPerWarp - 1)) == 0);
 
     //! @brief number of threads per block for the traversal kernel

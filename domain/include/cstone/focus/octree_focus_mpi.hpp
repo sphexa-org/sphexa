@@ -580,7 +580,7 @@ public:
                                   leafToInternal(octreeAcc_), assignment_[myRank_], useGpu ? layoutAcc : layout);
         if constexpr (useGpu) { memcpyD2H(layoutAcc.data(), layoutAcc.size(), layout.data()); }
 
-        return checkLayout(myRank_, assignment_, layout, treeLeaves());
+        return checkLayout(myRank_, assignment_, layout, treeLeaves(), 512 * bucketSize_);
     }
 
     //! @brief update until converged with a simple min-distance MAC
