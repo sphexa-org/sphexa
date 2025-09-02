@@ -1,60 +1,43 @@
 include:
   - local: 'ci/common.yml'
 
+variables:
+  MYUENV: "prgenv-gnu/25.06:rc5"
+  # GIT_SUBMODULE_STRATEGY: "recursive"
+
 sph-build-cuda12-sm90-debug:
   stage: sphexa_build
-  # needs: ['sph:base:cuda12']
-  image: prgenv-gnu/24.11:v1
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     PERSIST_IMAGE_NAME: ${CSCS_REGISTRY_PATH}/sphexa_cuda12_debug:${CI_COMMIT_SHORT_SHA}
-    WITH_UENV_VIEW: 'default'
+    WITH_UENV_VIEW: 'spack'  # this is not 'default' view
     # SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
   before_script:
-    - pwd
-    - cmake --version
-    - mpicxx --version
-    - nvcc --version
-    - echo "OUT / PERSIST_IMAGE_NAME = ${PERSIST_IMAGE_NAME}"
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
-    - echo "SPH_INSTALLDIR = ${SPH_INSTALLDIR}"
-    - mkdir -p ${SPH_INSTALLDIR}
     # NOTE: error 'script config should be a string or a nested array of
-    # strings up to 10 levels deep' -> do not use ":", use '' instead
+    # strings up to 10 levels deep' -> add '' around the command to execute
+    - echo "CI_PROJECT_URL=$CI_PROJECT_URL"
+    - echo "CI_COMMIT_SHORT_SHA=$CI_COMMIT_SHORT_SHA"
     - 'uenv_dir=`echo $UENV_VIEW |cut -d: -f1`'
     - 'uenv_view=`echo $UENV_VIEW |cut -d: -f3`'
     - echo "UENV_VIEW=$UENV_VIEW uenv_dir=$uenv_dir uenv_view=$uenv_view"
-    - 'export CPATH=$uenv_dir/env/$uenv_view/include:$CPATH'
-    - echo "CPATH=$CPATH"
+    # setup spack
+    - git clone https://github.com/eth-cscs/uenv-spack.git uenv-spack.git
+    - 'cd uenv-spack.git && ./bootstrap &> uenv-spack.git.log && cd ..'
+    - 'export PATH=$PWD/uenv-spack.git:$PATH'
+    - 'export SPACK_SYSTEM_CONFIG_PATH=$UENV_SPACK_CONFIG_PATH'
+    - echo "SPACK_SYSTEM_CONFIG_PATH=$SPACK_SYSTEM_CONFIG_PATH"
+    - pwd
+    - 'uenv-spack --uarch=gh200 sphexa+spack --specs="sphexa@$CI_COMMIT_SHORT_SHA +disks +cuda cuda_arch=90 build_type=Debug"'
   script:
-    # build h5hut
-    # TODO: use spack
-    # - git clone --depth=1 https://gitlab.psi.ch/H5hut/src.git h5hut.git
-    - git clone --depth=1 https://github.com/eth-cscs/h5hut h5hut.git
-    - cd h5hut.git
-    - git log -n1
-    - ./autogen.sh > h5_1.log 2>&1
-    - ./configure --with-hdf5=/user-environment/env/default/
-      --enable-large-indices
-      --enable-parallel --with-mpi
-      --prefix=${SPH_INSTALLDIR} > h5_2.log 2>&1
-    - make -j 96 > h5_3.log 2>&1
-    - make install > h5_4.log 2>&1
+    - cd sphexa+spack
+    - mkdir -p ./env/repo/packages/sphexa
+    - 'sed -e "s/ci_fake_version/$CI_COMMIT_SHORT_SHA/" -e "s/ci_sha/$CI_COMMIT_SHA/" -e "s!ci_git!$CI_PROJECT_URL.git!" ../ci/scripts/package.py > env/repo/packages/sphexa/package.py'
+    - ln -fs ./env/repo/packages/sphexa/package.py .
+    - 'grep specs: ./env/spack.yaml'
+    - ./build
     - cd ..
-    # cmake -S
-    - CC=mpicc CXX=mpicxx cmake -S . -B build
-      -DCMAKE_CUDA_ARCHITECTURES=90
-      -DCMAKE_BUILD_TYPE=Debug
-      -DCMAKE_CUDA_FLAGS=-ccbin=mpicxx
-      -DSPH_EXA_WITH_H5HUT=ON
-      -DSPH_EXA_HDF5_PARALLEL_MODE=independent
-      -DH5hut_INCLUDE_DIR=${SPH_INSTALLDIR}/include
-      -DH5hut_LIBRARY=${SPH_INSTALLDIR}/lib/libH5hut.so
-    # cmake --build
-    - date
-    - cmake --build build -j 96
-    - date
-    # cmake --install
-    - cmake --install build --prefix=${SPH_INSTALLDIR}
-    - chmod -R a+rX ${SPH_INSTALLDIR}
+  artifacts:
+    paths:
+      - sphexa+spack
