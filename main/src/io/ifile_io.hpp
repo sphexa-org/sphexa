@@ -133,7 +133,9 @@ public:
         return {};
     }
     void     fileAttribute(const std::string&, FieldType, int64_t) override { throwError(); }
+    void     fileAttribute(const std::string&, std::string&) override { throwError(); }
     void     stepAttribute(const std::string&, FieldType, int64_t) override { throwError(); }
+    void     stepAttribute(const std::string&, std::string&) override { throwError(); }
     void     readField(const std::string&, FieldType) override { throwError(); }
     uint64_t localNumParticles() override
     {
