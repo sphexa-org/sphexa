@@ -64,14 +64,21 @@ bool updateOctreeGlobal(std::span<const KeyType> keys,
 template<class KeyType>
 bool updateOctreeGlobal(std::span<const KeyType> keys,
                         unsigned bucketSize,
-                        Octree<KeyType>& tree,
+                        OctreeData<KeyType, CpuTag>& tree,
+                        std::vector<KeyType>& leaves,
                         std::vector<unsigned>& counts)
 {
     unsigned maxCount = std::numeric_limits<unsigned>::max();
-    bool converged    = tree.rebalance(bucketSize, counts);
+    bool converged =
+        rebalanceDecision(leaves.data(), counts.data(), nNodes(leaves), bucketSize, tree.childOffsets.data());
+    rebalanceTree(leaves, tree.prefixes, tree.childOffsets.data());
+    swap(leaves, tree.prefixes);
 
-    counts.resize(tree.numLeafNodes());
-    computeNodeCounts(tree.treeLeaves().data(), counts.data(), tree.numLeafNodes(), keys, maxCount, true);
+    tree.resize(nNodes(leaves));
+    updateInternalTree<KeyType>(leaves, tree.data());
+
+    counts.resize(tree.numLeafNodes);
+    computeNodeCounts(leaves.data(), counts.data(), tree.numLeafNodes, keys, maxCount, true);
 
     std::vector<unsigned> counts_reduced(counts.size());
     MPI_Allreduce(counts.data(), counts_reduced.data(), counts.size(), MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);

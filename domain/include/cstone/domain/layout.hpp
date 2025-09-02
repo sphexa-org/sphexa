@@ -142,24 +142,31 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
 
 /*! @brief calculate the location (offset) of each focus tree leaf node in the particle arrays
  *
- * @param[in]  focusLeafCounts   node counts of the focus leaves, size N
- * @param[in]  haloFlags         flag for each node, with a non-zero value if present as halo node, size N
+ * @param[in]  focusLeafCounts   node counts of the focus leaves, size numLeafNodes
+ * @param[in]  flags             flag for each node, with a non-zero value if present as halo node, size numNodes
  * @param[in]  idx               first and last focus leaf idx of the assigned nodes on the executing rank
- * @param[out] layout            length N+1. The first element is zero, the last element is
+ * @param[out] layout            size numLeafNodes + 1. The first element is zero, the last element is
  *                               equal to the sum of all present (assigned+halo) node counts.
  */
 template<bool useGpu>
 void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
-                       std::span<const uint8_t> haloFlags,
+                       std::span<const uint8_t> flags,
+                       std::span<const TreeNodeIndex> leafToInternal,
                        TreeIndexPair idx,
                        std::span<LocalIndex> layout)
 {
     if constexpr (useGpu)
     {
         memcpyD2D(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start());
-        selectCopyGpu(focusLeafCounts.data(), idx.start(), haloFlags.data(), layout.data());
-        selectCopyGpu(focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(),
-                      haloFlags.data() + idx.end(), layout.data() + idx.end());
+
+        gatherGpu(leafToInternal.data(), idx.start(), flags.data(), layout.data());
+        selectCopyGpu(focusLeafCounts.data(), idx.start(), layout.data(), layout.data());
+
+        gatherGpu(leafToInternal.data() + idx.end(), leafToInternal.size() - idx.end(), flags.data(),
+                  layout.data() + idx.end());
+        selectCopyGpu(focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(), layout.data() + idx.end(),
+                      layout.data() + idx.end());
+
         exclusiveScanGpu(layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0});
     }
     else
@@ -167,7 +174,7 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
 #pragma omp parallel for
         for (TreeNodeIndex i = 0; i < TreeNodeIndex(focusLeafCounts.size()); ++i)
         {
-            bool haveParticles = (idx.start() <= i && i < idx.end()) || haloFlags[i];
+            bool haveParticles = (idx.start() <= i && i < idx.end()) || flags[leafToInternal[i]];
             layout[i]          = -int(haveParticles) & focusLeafCounts[i];
         }
         std::exclusive_scan(layout.begin(), layout.end(), layout.begin(), LocalIndex{0});
@@ -177,9 +184,9 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
 //! @brief check halo discovery for sanity
 template<class KeyType>
 int checkLayout(int myRank,
-               std::span<const TreeIndexPair> focusAssignment,
-               std::span<const LocalIndex> layout,
-               std::span<const KeyType> ftree)
+                std::span<const TreeIndexPair> focusAssignment,
+                std::span<const LocalIndex> layout,
+                std::span<const KeyType> ftree)
 {
     TreeNodeIndex firstNode = focusAssignment[myRank].start();
     TreeNodeIndex lastNode  = focusAssignment[myRank].end();

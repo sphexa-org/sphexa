@@ -74,8 +74,10 @@ public:
     {
         if (key == "iteration") { iterationStep_ = *std::get<const uint64_t*>(val); }
     }
+    void stepAttribute(const std::string& key, const std::string& val) override {}
 
     void fileAttribute(const std::string& key, FieldType val, int64_t /*size*/) override {}
+    void fileAttribute(const std::string& key, const std::string& val) override {}
 
     void writeField(const std::string& /*key*/, FieldType field, int col) override
     {

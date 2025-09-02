@@ -215,13 +215,14 @@ void syncTreelets(std::span<const int> peers,
     }
 }
 
-template<class KeyType>
+template<class KeyType, class Vector>
 void syncTreeletsGpu(std::span<const int> peers,
                      std::span<const IndexPair<TreeNodeIndex>> assignment,
                      std::span<const KeyType> leaves,
                      OctreeData<KeyType, GpuTag>& octreeAcc,
                      DeviceVector<KeyType>& leavesAcc,
-                     std::vector<std::vector<KeyType>>& treelets)
+                     std::vector<std::vector<KeyType>>& treelets,
+                     Vector& scratch)
 {
     exchangeTreelets<KeyType>(peers, assignment, leaves, treelets);
     checkTreelets<KeyType>(peers, leaves, treelets);
@@ -246,7 +247,17 @@ void syncTreeletsGpu(std::span<const int> peers,
         swap(newLeaves, leavesAcc);
 
         octreeAcc.resize(nNodes(leavesAcc));
-        buildOctreeGpu(rawPtr(leavesAcc), octreeAcc.data());
+
+        size_t newNumNodes        = octreeAcc.numNodes;
+        size_t spaceForLevelRange = sizeof(TreeNodeIndex) * (maxTreeLevel<KeyType>{} + 2);
+        size_t cubTmpSize = std::max(sortByKeyTempStorage<KeyType, TreeNodeIndex>(newNumNodes), spaceForLevelRange);
+
+        auto originalSize               = scratch.size();
+        auto [keyBuf, valueBuf, cubTmp] = util::packAllocBuffer(scratch, util::TypeList<KeyType, TreeNodeIndex, char>{},
+                                                                {newNumNodes, newNumNodes, cubTmpSize}, 128);
+
+        buildOctreeGpu(rawPtr(leavesAcc), octreeAcc.data(), keyBuf, valueBuf, cubTmp);
+        scratch.resize(originalSize);
     }
 }
 
@@ -280,7 +291,7 @@ void indexTreelets(std::span<const int> peerRanks,
         for (int i = 0; i < numNodes; ++i)
         {
             tlIdx[i] = locateNode(treelet[i], treelet[i + 1], nodeKeys.data(), levelRange.data());
-            assert(tlIdx[i] < nodeKeys.size());
+            assert(tlIdx[i] < TreeNodeIndex(nodeKeys.size()));
         }
     }
 }
@@ -360,7 +371,7 @@ void exchangeTreeletGeneral(std::span<const int> peerRanks,
  * tree resolution inside its focus of any rank: if rank a has focus SFC range F, then no other rank can have
  * tree cells in F that don't exist in rank a's focus tree.
  */
-template<class KeyType>
+template<class KeyType, bool useGpu = false>
 void focusTransfer(std::span<const KeyType> cstree,
                    std::span<const unsigned> counts,
                    unsigned bucketSize,
@@ -376,6 +387,17 @@ void focusTransfer(std::span<const KeyType> cstree,
     std::vector<MPI_Request> sendRequests;
     std::vector<std::vector<KeyType>> sendBuffers;
 
+    auto toHost = [](std::span<const unsigned> srcCounts)
+    {
+        if constexpr (useGpu)
+        {
+            std::vector<unsigned> hostCounts(srcCounts.size());
+            memcpyD2H(srcCounts.data(), srcCounts.size(), hostCounts.data());
+            return hostCounts;
+        }
+        else { return srcCounts; }
+    };
+
     if (oldFocusStart < newFocusStart)
     {
         // current rank lost range [oldFocusStart : newFocusStart] to rank below
@@ -383,8 +405,8 @@ void focusTransfer(std::span<const KeyType> cstree,
         TreeNodeIndex end   = findNodeAbove(cstree.data(), cstree.size(), newFocusStart);
 
         size_t numNodes = end - start;
-        auto treelet    = updateTreelet(std::span<const KeyType>(cstree.data() + start, numNodes + 1),
-                                        std::span<const unsigned>(counts.data() + start, numNodes), bucketSize);
+        auto c          = toHost(counts.subspan(start, numNodes));
+        auto treelet    = updateTreelet(cstree.subspan(start, numNodes + 1), c, bucketSize);
 
         mpiSendAsync(treelet.data(), int(treelet.size() - 1), myRank - 1, ownerTag, sendRequests);
         sendBuffers.push_back(std::move(treelet));
@@ -397,8 +419,8 @@ void focusTransfer(std::span<const KeyType> cstree,
         TreeNodeIndex end   = findNodeAbove(cstree.data(), cstree.size(), oldFocusEnd);
 
         size_t numNodes = end - start;
-        auto treelet    = updateTreelet(std::span{cstree.data() + start, numNodes + 1},
-                                        std::span{counts.data() + start, numNodes}, bucketSize);
+        auto c          = toHost(counts.subspan(start, numNodes));
+        auto treelet    = updateTreelet(cstree.subspan(start, numNodes + 1), c, bucketSize);
 
         mpiSendAsync(treelet.data(), int(treelet.size() - 1), myRank + 1, ownerTag, sendRequests);
         sendBuffers.push_back(std::move(treelet));

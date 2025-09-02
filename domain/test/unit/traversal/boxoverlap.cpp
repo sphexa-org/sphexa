@@ -333,6 +333,21 @@ TEST(BoxOverlap, excludeRangeContainedIn)
     excludeRangeContainedIn<uint64_t>();
 }
 
+TEST(BoxOverlap, containedInFP)
+{
+    using T       = double;
+    using KeyType = uint64_t;
+
+    Box<T> box(0, 1);
+
+    Vec3<T> center{0.375, 0.375, 0.375}, size{0.335, 0.335, 0.335};
+
+    KeyType exclStart = 0;
+    KeyType exclEnd   = 060000000000000000000;
+
+    EXPECT_FALSE(containedIn(exclStart, exclEnd, center, size, box));
+}
+
 TEST(BoxOverlap, insideBox)
 {
     using T = double;

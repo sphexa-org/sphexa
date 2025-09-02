@@ -176,11 +176,6 @@ int main(int argc, char** argv)
             fileWriter->closeStep();
             isOutputTriggered = false;
         }
-        if (isOutputStep(d.iteration, profFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, profFreqStr) ||
-            isWallClockReached)
-        {
-            if (profEnabled) { propagator->writeMetrics(fileWriter.get(), profFile); }
-        }
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
 
@@ -188,6 +183,13 @@ int main(int argc, char** argv)
 
         propagator->integrate(domain, simData);
         propagator->printIterationTimings(domain, simData);
+
+        if (isOutputStep(d.iteration, profFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, profFreqStr) ||
+            isWallClockReached)
+        {
+            auto fileWriterSeq = fileWriterFactory(ascii, MPI_COMM_WORLD, true);
+            if (profEnabled) { propagator->writeMetrics(fileWriterSeq.get(), profFile); }
+        }
     }
     totalTimer.step("Total execution time of " + std::to_string(d.iteration - startIteration) + " iterations of " +
                     initCond + " up to t = " + std::to_string(d.ttot));
@@ -217,7 +219,7 @@ bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float 
     if (totalTimeElapsed + dt > wallClockLimit)
     {
         int isLimitReachedAny = totalTimeElapsed > wallClockLimit;
-        mpiAllreduce(MPI_IN_PLACE, &isLimitReachedAny, 1, MPI_SUM);
+        mpiAllreduce(MPI_IN_PLACE, &isLimitReachedAny, 1, MPI_SUM, MPI_COMM_WORLD);
         return isLimitReachedAny;
     }
     return false;

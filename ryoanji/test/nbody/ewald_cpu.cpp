@@ -172,7 +172,7 @@ makeTestTree(Coords& coordinates, cstone::Box<T> box, float mass_scale, float th
     std::vector<SourceCenterType<T>> centers(octree.numNodes);
     computeLeafMassCenter<T, T, T>(coordinates.x(), coordinates.y(), coordinates.z(), masses, toInternal, layout.data(),
                                    centers.data());
-    upsweep(octree.levelRange, octree.childOffsets, centers.data(), CombineSourceCenter<T>{});
+    upsweep(octree.levelRange, octree.childOffsets.data(), centers.data(), CombineSourceCenter<T>{});
 
     std::vector<MultipoleType> multipoles(octree.numNodes);
     computeLeafMultipoles(x, y, z, masses.data(), toInternal, layout.data(), centers.data(), multipoles.data());

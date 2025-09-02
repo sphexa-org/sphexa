@@ -155,7 +155,7 @@ static void markMacVector()
     std::vector<SourceCenterType<T>> centers(octree.numNodes);
     computeLeafMassCenter<T, T, T>(coords.x(), coords.y(), coords.z(), masses, toInternal, layout.data(),
                                    centers.data());
-    upsweep(octree.levelRange, octree.childOffsets, centers.data(), CombineSourceCenter<T>{});
+    upsweep(octree.levelRange, octree.childOffsets.data(), centers.data(), CombineSourceCenter<T>{});
     setMac<T, KeyType>(octree.prefixes, centers, 1.0 / theta, box);
 
     std::vector<uint8_t> markings(octree.numNodes, 0);
