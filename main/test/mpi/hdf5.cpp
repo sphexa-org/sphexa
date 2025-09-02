@@ -40,6 +40,60 @@
 
 using namespace sphexa;
 
+TEST(HDF5IO, fileAttribute)
+{
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    std::string testfile = "file_attributes.h5";
+    if (rank == 0 && std::filesystem::exists(testfile)) { std::filesystem::remove(testfile); }
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    {
+        auto writer = makeH5PartWriter(MPI_COMM_WORLD);
+        // we need to actually create a valid file/handle, so a dummy step write
+        writer->addStep(0, 10, testfile);
+
+        double float64Attr = 0.5;
+        writer->fileAttribute("float64Attr", &float64Attr, 1);
+        int64_t int64Attr = 42;
+        writer->fileAttribute("int64Attr", &int64Attr, 1);
+        uint64_t uint64Attr = uint64_t(2) << 40;
+        writer->fileAttribute("uint64Attr", &uint64Attr, 1);
+        char int8Attr = 1;
+        writer->fileAttribute("int8Attr", &int8Attr, 1);
+        std::string myString("abcd");
+        writer->fileAttribute("strAttr", myString);
+    }
+    {
+        auto        reader = makeH5PartReader(MPI_COMM_WORLD);
+        double      float64Attr;
+        int64_t     int64Attr;
+        uint64_t    uint64Attr;
+        char        int8Attr;
+        std::string strAttr;
+        // we need to actually create a valid file/handle, so a dummy step set
+        reader->setStep(testfile, 0, FileMode::collective);
+        reader->fileAttribute("float64Attr", &float64Attr, 1);
+        reader->fileAttribute("int64Attr", &int64Attr, 1);
+        reader->fileAttribute("uint64Attr", &uint64Attr, 1);
+        reader->fileAttribute("int8Attr", &int8Attr, 1);
+        reader->fileAttribute("strAttr", strAttr);
+
+        // providing a wrong type should produce a runtime exception, HDF5 does not do conversions for attributes
+        int ttotInt;
+        EXPECT_THROW(reader->fileAttribute("float64Attr", &ttotInt, 1), std::runtime_error);
+
+        EXPECT_EQ(float64Attr, 0.5);
+        EXPECT_EQ(int64Attr, 42);
+        EXPECT_EQ(uint64Attr, uint64_t(2) << 40);
+        EXPECT_EQ(int8Attr, 1);
+        EXPECT_EQ(strAttr, std::string("abcd"));
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+}
+
 TEST(HDF5IO, stepAttribute)
 {
     int rank;

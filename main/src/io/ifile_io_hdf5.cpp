@@ -102,7 +102,7 @@ public:
 
     void stepAttribute(const std::string& key, const std::string& val) override
     {
-        H5PartWriteStepAttribString(h5File_, key.c_str(), val.c_str());
+        H5WriteStepAttribString(h5File_, key.c_str(), val.c_str());
     }
 
     void fileAttribute(const std::string& key, FieldType val, int64_t size) override
@@ -116,7 +116,7 @@ public:
 
     void fileAttribute(const std::string& key, const std::string& val) override
     {
-        H5PartWriteFileAttribString(h5File_, key.c_str(), val.c_str());
+        H5WriteFileAttribString(h5File_, key.c_str(), val.c_str());
     }
 
     void writeField(const std::string& key, FieldType field, int = 0) override
@@ -179,8 +179,7 @@ public:
         if (!h5File_ || path != pathStep_)
         {
             closeStep();
-            int64_t mode = (std::filesystem::exists(path) ? H5PART_APPEND : H5PART_WRITE);
-            if (rank_ == 0) { h5File_ = H5PartOpenFile(path.c_str(), mode); }
+            if (rank_ == 0) { h5File_ = fileutils::openH5Part(path, H5_O_RDWR, comm_); }
         }
 
         if (lastIndex > firstIndex)
@@ -188,8 +187,8 @@ public:
             // create the next step
             if (rank_ == 0)
             {
-                h5part_int64_t numSteps = H5PartGetNumSteps(h5File_);
-                H5PartSetStep(h5File_, numSteps);
+                h5_int64_t numSteps = H5GetNumSteps(h5File_);
+                H5SetStep(h5File_, numSteps);
             }
 
             localCount_  = lastIndex - firstIndex;
@@ -204,28 +203,28 @@ public:
     {
         if (rank_ == 0)
         {
-            std::visit([this, &key, size](auto arg)
-                       { fileutils::writeH5PartStepAttrib(h5File_, key.c_str(), arg, size); }, val);
+            std::visit([this, &key, size](auto arg) { fileutils::H5WriteStepAttribT(h5File_, key.c_str(), arg, size); },
+                       val);
         }
     }
 
     void stepAttribute(const std::string& key, const std::string& val) override
     {
-        if (rank_ == 0) { H5PartWriteStepAttribString(h5File_, key.c_str(), val.c_str()); }
+        if (rank_ == 0) { H5WriteStepAttribString(h5File_, key.c_str(), val.c_str()); }
     }
 
     void fileAttribute(const std::string& key, FieldType val, int64_t size) override
     {
         if (rank_ == 0)
         {
-            std::visit([this, &key, size](auto arg)
-                       { fileutils::writeH5PartFileAttrib(h5File_, key.c_str(), arg, size); }, val);
+            std::visit([this, &key, size](auto arg) { fileutils::H5WriteFileAttribT(h5File_, key.c_str(), arg, size); },
+                       val);
         }
     }
 
     void fileAttribute(const std::string& key, const std::string& val) override
     {
-        if (rank_ == 0) { H5PartWriteFileAttribString(h5File_, key.c_str(), val.c_str()); }
+        if (rank_ == 0) { H5WriteFileAttribString(h5File_, key.c_str(), val.c_str()); }
     }
 
     void writeField(const std::string& key, FieldType field, int = 0) override
@@ -236,7 +235,7 @@ public:
                 std::vector<T> buffer(globalCount_);
                 MPI_Gather(arg + firstIndex_, localCount_, MpiType<T>{}, buffer.data(), localCount_, MpiType<T>{}, 0,
                            comm_);
-                if (rank_ == 0) { fileutils::writeH5PartField(h5File_, key, buffer.data()); }
+                if (rank_ == 0) { fileutils::H5PartWriteDataT(h5File_, key.c_str(), buffer.data()); }
             },
             field);
     }
@@ -249,8 +248,8 @@ public:
     {
         if (h5File_)
         {
-            H5PartCloseFile(h5File_);
-            h5File_ = nullptr;
+            H5CloseFile(h5File_);
+            h5File_ = 0;
         }
     }
 
@@ -263,7 +262,7 @@ private:
     uint64_t    globalCount_{0};
     std::string pathStep_;
 
-    H5PartFile* h5File_{nullptr};
+    h5_file_t h5File_{0};
 };
 
 std::unique_ptr<IFileWriter> makeH5PartWriterSeq(MPI_Comm comm) { return std::make_unique<H5PartWriterSeq>(comm); }
@@ -388,12 +387,9 @@ public:
 
     void fileAttribute(const std::string& key, std::string& val) override
     {
-        // auto numChars = fileAttributeSize(key);
-        // TODO: H5PartGetFileAttribInfo is broken for strings and always returns 1
-        char temp[256];
-        // TODO: stack overflow if attribute larger than 256B. Luckily this is only used to test the write version
-        H5PartReadFileAttrib(h5File_, key.c_str(), temp);
-        val = std::string(temp);
+        auto numChars = fileAttributeSize(key);
+        val.resize(numChars - 1);
+        H5ReadFileAttribString(h5File_, key.c_str(), val.data());
     }
 
     void stepAttribute(const std::string& key, FieldType val, int64_t size) override
@@ -409,12 +405,9 @@ public:
 
     void stepAttribute(const std::string& key, std::string& val) override
     {
-        // auto numChars = stepAttributeSize(key);
-        // TODO: H5PartGetStepAttribInfo is broken for strings and always returns 1
-        char temp[256];
-        // TODO: stack overflow if attribute larger than 256B. Luckily this is only used to test the write version
-        H5PartReadStepAttrib(h5File_, key.c_str(), temp);
-        val = std::string(temp);
+        auto numChars = stepAttributeSize(key);
+        val.resize(numChars - 1);
+        H5ReadStepAttribString(h5File_, key.c_str(), val.data());
     }
 
     void readField(const std::string& key, FieldType field) override
