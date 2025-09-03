@@ -89,7 +89,7 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
             ncSph =
                 1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
 
-            if (ncIt == ncMaxIteration) { nc_h_convergenceFailure = true; }
+//            if (ncIt == ncMaxIteration) { nc_h_convergenceFailure = true; }
         }
 
         if (i >= bodyEnd) continue;
