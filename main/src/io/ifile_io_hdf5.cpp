@@ -159,13 +159,18 @@ public:
     using FieldType = typename Base::FieldType;
 
     explicit H5PartWriterSeq(MPI_Comm comm)
-        : comm_(comm)
     {
         MPI_Comm_rank(comm, &rank_);
         MPI_Comm_size(comm, &numRanks_);
+        // replace communicator with a new communicator just for rank 0
+        MPI_Comm_split(comm, rank_ == 0 ? 0 : 1, rank_, &comm_);
     }
 
-    ~H5PartWriterSeq() override { closeStep(); }
+    ~H5PartWriterSeq() override
+    {
+        closeStep();
+        MPI_Comm_free(&comm_);
+    }
 
     [[nodiscard]] int rank() const override { return rank_; }
     [[nodiscard]] int numRanks() const override { return numRanks_; }
