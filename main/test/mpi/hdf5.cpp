@@ -178,7 +178,7 @@ TEST(HDF5IO, fields)
 
         writer->writeField("x", xWithHalos.data(), 0);
         writer->writeField("nc", ncWithHalos.data(), 0);
-
+        // EXPECT_EQ(writer->globalNumParticles(), 10 * numRanks);
         writer->closeStep();
     }
     {
@@ -224,6 +224,42 @@ TEST(HDF5IO, particleData)
         data.ngmax        = 1000;
         data.kernelChoice = sph::SphKernelType::sinc_n1_sinc_n2;
         auto writer       = makeH5PartWriter(MPI_COMM_WORLD);
+        writer->addStep(0, 1, testfile);
+        data.loadOrStoreAttributes(writer.get());
+        writer->closeStep();
+    }
+    {
+        Dataset data;
+        auto    reader = makeH5PartReader(MPI_COMM_WORLD);
+        reader->setStep(testfile, 0, FileMode::collective);
+        data.loadOrStoreAttributes(reader.get());
+        EXPECT_EQ(data.iteration, 42);
+        EXPECT_EQ(data.ttot, 3.14159);
+        EXPECT_EQ(data.ngmax, 1000);
+        EXPECT_EQ(data.kernelChoice, sph::SphKernelType::sinc_n1_sinc_n2);
+        reader->closeStep();
+    }
+}
+
+TEST(HDF5IO, particleDataSeq)
+{
+    int rank, numRanks;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
+
+    std::string testfile = "pdata.h5";
+    if (rank == 0 && std::filesystem::exists(testfile)) { std::filesystem::remove(testfile); }
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    using Dataset = sphexa::ParticlesData<cstone::CpuTag>;
+
+    {
+        Dataset data;
+        data.iteration    = 42;
+        data.ttot         = 3.14159;
+        data.ngmax        = 1000;
+        data.kernelChoice = sph::SphKernelType::sinc_n1_sinc_n2;
+        auto writer       = makeH5PartWriterSeq(MPI_COMM_WORLD);
         writer->addStep(0, 1, testfile);
         data.loadOrStoreAttributes(writer.get());
         writer->closeStep();

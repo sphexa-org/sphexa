@@ -160,8 +160,9 @@ public:
 
     explicit H5PartWriterSeq(MPI_Comm comm)
     {
-        MPI_Comm_rank(comm, &rank_);
-        MPI_Comm_size(comm, &numRanks_);
+        comm_all_ = comm;
+        MPI_Comm_rank(comm_all_, &rank_);
+        MPI_Comm_size(comm_all_, &numRanks_);
         // replace communicator with a new communicator just for rank 0
         MPI_Comm_split(comm, rank_ == 0 ? 0 : 1, rank_, &comm_);
     }
@@ -239,7 +240,7 @@ public:
             {
                 std::vector<T> buffer(globalCount_);
                 MPI_Gather(arg + firstIndex_, localCount_, MpiType<T>{}, buffer.data(), localCount_, MpiType<T>{}, 0,
-                           comm_);
+                           comm_all_);
                 if (rank_ == 0) { fileutils::H5PartWriteDataT(h5File_, key.c_str(), buffer.data()); }
             },
             field);
@@ -260,7 +261,8 @@ public:
 
 private:
     int      rank_{0}, numRanks_{0};
-    MPI_Comm comm_;
+    MPI_Comm comm_{MPI_COMM_NULL};
+    MPI_Comm comm_all_{MPI_COMM_NULL};
 
     size_t      firstIndex_{0};
     uint64_t    localCount_{0};
