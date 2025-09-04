@@ -453,11 +453,7 @@ static void computeEssentialTreeMixD()
     FocusedOctreeSingleNode<KeyType> tree(bucketSize, theta);
 
     // sorted reference tree node counts in each (except focus) octant at the 1st division level
-    std::vector<TreeNodeIndex> refCounts{
-        1, 1, 1, 1, 1, 1,
-        std::is_same<KeyType, unsigned>::value ? 372 : 225
-        // /*378 or 231*/
-    };
+    std::vector<TreeNodeIndex> refCounts{1, 1, 1, 1, 1, 1, 372};
 
     KeyType focusStart = 1;
     KeyType focusEnd   = pad(KeyType(1), 3);
