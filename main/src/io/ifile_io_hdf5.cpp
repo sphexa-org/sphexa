@@ -87,7 +87,10 @@ public:
             localCount_ = lastIndex - firstIndex;
             // set number of particles that each rank will write
             H5PartSetNumParticles(h5File_, localCount_);
-            globalCount_ = H5PartGetNumParticles(h5File_);
+
+            // H5hut reports the numParticles in the view, ot the total, so sum ourselves
+            globalCount_ = lastIndex - firstIndex;
+            MPI_Allreduce(MPI_IN_PLACE, &globalCount_, 1, MPI_UINT64_T, MPI_SUM, comm_);
         }
         pathStep_ = path;
     }
