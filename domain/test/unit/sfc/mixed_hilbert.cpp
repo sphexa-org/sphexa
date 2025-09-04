@@ -169,3 +169,19 @@ TEST(MixedHilbertEncoding, InversionTestMixD)
     inversionTestMixD<unsigned>();
     inversionTestMixD<uint64_t>();
 }
+
+TEST(MixedHilbertDecoding, SpecialCases)
+{
+    {
+        auto [px, py, pz] = decodeHilbertMixD<uint64_t>(281474976710656, 21, 21, 17); // 10000000000000000 octal
+        EXPECT_EQ(px, 0);
+        EXPECT_EQ(py, 0);
+        EXPECT_EQ(pz, 65536);
+    }
+    {
+        auto [px, py, pz] = decodeHilbertMixD<uint64_t>(562949953421312, 21, 21, 17); // 20000000000000000 octal
+        EXPECT_EQ(px, 0);
+        EXPECT_EQ(py, 65536);
+        EXPECT_EQ(pz, 65536);
+    }
+}
