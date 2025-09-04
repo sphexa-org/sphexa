@@ -42,8 +42,9 @@ using namespace sphexa;
 
 TEST(HDF5IO, fileAttribute)
 {
-    int rank;
+    int rank, numRanks;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
 
     std::string testfile = "file_attributes.h5";
     if (rank == 0 && std::filesystem::exists(testfile)) { std::filesystem::remove(testfile); }
@@ -64,6 +65,7 @@ TEST(HDF5IO, fileAttribute)
         writer->fileAttribute("int8Attr", &int8Attr, 1);
         std::string myString("abcd");
         writer->fileAttribute("strAttr", myString);
+        EXPECT_EQ(writer->globalNumParticles(), 10 * numRanks);
     }
     {
         auto        reader = makeH5PartReader(MPI_COMM_WORLD);
@@ -96,8 +98,9 @@ TEST(HDF5IO, fileAttribute)
 
 TEST(HDF5IO, stepAttribute)
 {
-    int rank;
+    int rank, numRanks;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
 
     std::string testfile = "step_attributes.h5";
     if (rank == 0 && std::filesystem::exists(testfile)) { std::filesystem::remove(testfile); }
@@ -117,6 +120,7 @@ TEST(HDF5IO, stepAttribute)
         writer->stepAttribute("int8Attr", &int8Attr, 1);
         std::string myString("abcd");
         writer->stepAttribute("strAttr", myString);
+        EXPECT_EQ(writer->globalNumParticles(), 10 * numRanks);
         writer->closeStep();
     }
     {
@@ -178,7 +182,7 @@ TEST(HDF5IO, fields)
 
         writer->writeField("x", xWithHalos.data(), 0);
         writer->writeField("nc", ncWithHalos.data(), 0);
-        // EXPECT_EQ(writer->globalNumParticles(), 10 * numRanks);
+        EXPECT_EQ(writer->globalNumParticles(), 10 * numRanks);
         writer->closeStep();
     }
     {
@@ -226,6 +230,7 @@ TEST(HDF5IO, particleData)
         auto writer       = makeH5PartWriter(MPI_COMM_WORLD);
         writer->addStep(0, 1, testfile);
         data.loadOrStoreAttributes(writer.get());
+        EXPECT_EQ(writer->globalNumParticles(), 1 * numRanks);
         writer->closeStep();
     }
     {
@@ -262,6 +267,7 @@ TEST(HDF5IO, particleDataSeq)
         auto writer       = makeH5PartWriterSeq(MPI_COMM_WORLD);
         writer->addStep(0, 1, testfile);
         data.loadOrStoreAttributes(writer.get());
+        EXPECT_EQ(writer->globalNumParticles(), 1 * numRanks);
         writer->closeStep();
     }
     {
@@ -296,6 +302,7 @@ TEST(HDF5IO, box)
         auto writer = makeH5PartWriter(MPI_COMM_WORLD);
         writer->addStep(0, 1, testfile);
         box.loadOrStore(writer.get());
+        EXPECT_EQ(writer->globalNumParticles(), 1 * numRanks);
         writer->closeStep();
     }
     {
@@ -356,6 +363,7 @@ TEST(HDF5IO, turbulenceData)
         auto writer = makeH5PartWriter(MPI_COMM_WORLD);
         writer->addStep(0, 1, testfile);
         data.loadOrStore(writer.get());
+        EXPECT_EQ(writer->globalNumParticles(), 1 * numRanks);
         writer->closeStep();
     }
     {
