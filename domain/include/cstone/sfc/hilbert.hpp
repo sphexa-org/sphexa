@@ -313,6 +313,7 @@ decodeHilbertMixD(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
     std::array<int, 3> permutation{0, 1, 2};
     std::sort(permutation.begin(), permutation.end(), [&bits](int i, int j) { return bits[i] > bits[j]; });
     std::sort(bits.begin(), bits.end(), std::greater<unsigned>{});
+    // std::cout << "bits: " << bits[0] << " " << bits[1] << " " << bits[2] << std::endl;
 
     std::array<KeyType, 3> coordinates{0, 0, 0};
 
@@ -337,18 +338,23 @@ decodeHilbertMixD(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
             const auto processes_coordinate_bit_index = bits[1] - 1 - i;
             key_2D |= ((key >> (3 * processes_coordinate_bit_index)) & 3) << (2 * processes_2D_key_bit_index);
         }
+        // std::cout << "key_2D (octal): " << std::oct << key_2D << std::dec << std::endl;
         const auto pair_2D = decodeHilbert2D<KeyType>(key_2D, bits[1] - bits[2]);
         coordinates[0] |= (get<0>(pair_2D) & ((1u << n) - 1)) << bits[2];
         coordinates[1] |= (get<1>(pair_2D) & ((1u << n) - 1)) << bits[2];
-        key &= (1u << (3 * bits[2])) - 1;
+        // std::cout << "key_3D before mask_2D (octal): " << std::bitset<64>(key) << std::endl;
+        // std::cout << "mask_2D: " << std::bitset<64>((1u << (3 * bits[2])) - 1) << std::endl;
+        key &= (static_cast<KeyType>(1) << (3 * bits[2])) - 1;
     }
+
+    // std::cout << "key_3D (octal): " << std::oct << key << std::dec << std::endl;
 
     const auto pair_3D = decodeHilbert<KeyType>(key);
     coordinates[0] |= get<0>(pair_3D);
     coordinates[1] |= get<1>(pair_3D);
     coordinates[2] |= get<2>(pair_3D);
 
-    std::array<unsigned, 3> return_coordinates{0, 0, 0};
+    std::array<KeyType, 3> return_coordinates{0, 0, 0};
     return_coordinates[permutation[0]] = coordinates[0];
     return_coordinates[permutation[1]] = coordinates[1];
     return_coordinates[permutation[2]] = coordinates[2];
@@ -507,7 +513,22 @@ HOST_DEVICE_FUN IBox hilbertMixDIBox(KeyType keyStart, unsigned level, unsigned 
     unsigned maskY       = ~(cubeLengthY - 1);
     unsigned maskZ       = ~(cubeLengthZ - 1);
     auto [ix, iy, iz]    = decodeHilbertMixD<KeyType>(keyStart, bx, by, bz);
-
+    // auto octalToDecimal = [](unsigned long long octal) -> unsigned long long
+    // {
+    //     return std::stoull(std::to_string(octal), nullptr, 8);
+    // };
+    // if (keyStart >= octalToDecimal(10000000000000000) && keyStart <= octalToDecimal(100000000000000000))
+    // {
+    //     std::cout << "[DEBUG] cubeLengthX: " << cubeLengthX
+    //               << " cubeLengthY: " << cubeLengthY
+    //               << " cubeLengthZ: " << cubeLengthZ << std::endl;
+    //     std::cout << "[DEBUG] maskX: " << std::oct << maskX
+    //               << " maskY: " << maskY
+    //               << " maskZ: " << maskZ << std::dec << std::endl;
+    //     std::cout << "[DEBUG] ix: " << std::oct << ix
+    //               << " iy: " << iy
+    //               << " iz: " << iz << std::dec << std::endl;
+    // }
     // std::cout << "cubeLengthX: " << cubeLengthX << " cubeLengthY: " << cubeLengthY << " cubeLengthZ: " << cubeLengthZ << std::endl;
     // std::cout << "cubeLength: " << cubeLength << std::endl;
     // std::cout << "mask: " << std::bitset<32>(mask) << std::endl;

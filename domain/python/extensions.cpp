@@ -8,88 +8,90 @@
 #include "cstone/sfc/hilbert.hpp"
 #include "coord_samples/random.hpp"
 
-constexpr unsigned iHilbert_wrapper(int px, int py, int pz, int order = cstone::maxTreeLevel<unsigned>{}) noexcept
+
+using KeyType = uint64_t;
+
+constexpr KeyType iHilbert_wrapper(int px, int py, int pz, int order = cstone::maxTreeLevel<KeyType>{}) noexcept
 {
-    return cstone::iHilbert<unsigned>(static_cast<unsigned>(px), static_cast<unsigned>(py), static_cast<unsigned>(pz),
-                                      static_cast<unsigned>(order));
+    return cstone::iHilbert<KeyType>(static_cast<KeyType>(px), static_cast<KeyType>(py), static_cast<KeyType>(pz),
+                                      static_cast<KeyType>(order));
 };
 
 constexpr util::tuple<int, int, int> decodeHilbert_wrapper(int key,
-                                                           int order = cstone::maxTreeLevel<unsigned>{}) noexcept
+                                                           int order = cstone::maxTreeLevel<KeyType>{}) noexcept
 {
-    return cstone::decodeHilbert<unsigned>(static_cast<unsigned>(key), static_cast<unsigned>(order));
+    return cstone::decodeHilbert<KeyType>(static_cast<KeyType>(key), static_cast<KeyType>(order));
 };
 
-constexpr unsigned iHilbertMixD_wrapper(int px, int py, int pz, int bx, int by, int bz) noexcept
+constexpr KeyType iHilbertMixD_wrapper(int px, int py, int pz, int bx, int by, int bz) noexcept
 {
-    return cstone::iHilbertMixD<unsigned>(static_cast<unsigned>(px), static_cast<unsigned>(py),
-                                          static_cast<unsigned>(pz), static_cast<unsigned>(bx),
+    return cstone::iHilbertMixD<KeyType>(static_cast<KeyType>(px), static_cast<KeyType>(py),
+                                          static_cast<KeyType>(pz), static_cast<unsigned>(bx),
                                           static_cast<unsigned>(by), static_cast<unsigned>(bz));
 }
 
-constexpr util::tuple<int, int, int> decodeHilbertMixD_wrapper(int key, int bx, int by, int bz) noexcept
+constexpr util::tuple<KeyType, KeyType, KeyType> decodeHilbertMixD_wrapper(KeyType key, int bx, int by, int bz) noexcept
 {
-    return cstone::decodeHilbertMixD<unsigned>(static_cast<unsigned>(key), static_cast<unsigned>(bx),
+    return cstone::decodeHilbertMixD<KeyType>(static_cast<KeyType>(key), static_cast<unsigned>(bx),
                                                static_cast<unsigned>(by), static_cast<unsigned>(bz));
 };
 
-std::pair<unsigned, std::vector<unsigned>> spanSfcRange(int x, int y)
+std::pair<KeyType, std::vector<KeyType>> spanSfcRange(int x, int y)
 {
-    const auto output_size = cstone::spanSfcRange(static_cast<unsigned>(x), static_cast<unsigned>(y), nullptr);
-    auto output            = std::make_pair<unsigned, std::vector<unsigned>>(0, std::vector<unsigned>(output_size));
-    output.first = cstone::spanSfcRange(static_cast<unsigned>(x), static_cast<unsigned>(y), output.second.data());
+    const auto output_size = cstone::spanSfcRange(static_cast<KeyType>(x), static_cast<KeyType>(y), nullptr);
+    auto output            = std::make_pair<KeyType, std::vector<KeyType>>(0, std::vector<KeyType>(output_size));
+    output.first = cstone::spanSfcRange(static_cast<KeyType>(x), static_cast<KeyType>(y), output.second.data());
     return output;
 }
 
-std::pair<unsigned, std::vector<unsigned>> spanSfcRangeMixD(int x, int y, int bx, int by, int bz)
+std::pair<KeyType, std::vector<KeyType>> spanSfcRangeMixD(int x, int y, int bx, int by, int bz)
 {
     const auto output_size =
-        cstone::spanSfcRangeMixD(static_cast<unsigned>(x), static_cast<unsigned>(y), nullptr, bx, by, bz);
-    auto output = std::make_pair<unsigned, std::vector<unsigned>>(0, std::vector<unsigned>(output_size));
+        cstone::spanSfcRangeMixD(static_cast<KeyType>(x), static_cast<KeyType>(y), nullptr, bx, by, bz);
+    auto output = std::make_pair<KeyType, std::vector<KeyType>>(0, std::vector<KeyType>(output_size));
     output.first =
-        cstone::spanSfcRangeMixD(static_cast<unsigned>(x), static_cast<unsigned>(y), output.second.data(), bx, by, bz);
+        cstone::spanSfcRangeMixD(static_cast<KeyType>(x), static_cast<KeyType>(y), output.second.data(), bx, by, bz);
     return output;
 }
 
-cstone::IBox hilbertIBox_wrapper(int keyStart, int level) noexcept
+cstone::IBox hilbertIBox_wrapper(KeyType keyStart, int level) noexcept
 {
-    return cstone::hilbertIBox<unsigned>(static_cast<unsigned>(keyStart), static_cast<unsigned>(level));
+    return cstone::hilbertIBox<KeyType>(keyStart, static_cast<unsigned>(level));
 }
 
-cstone::IBox hilbertIBoxKeys_wrapper(int keyStart, unsigned keyEnd) noexcept
+cstone::IBox hilbertIBoxKeys_wrapper(KeyType keyStart, unsigned keyEnd) noexcept
 {
-    return cstone::hilbertIBoxKeys<unsigned>(static_cast<unsigned>(keyStart), static_cast<unsigned>(keyEnd));
+    return cstone::hilbertIBoxKeys<KeyType>(keyStart, static_cast<KeyType>(keyEnd));
 }
 
-cstone::IBox hilbertMixDIBox_wrapper(int keyStart, int level, int bx, int by, int bz) noexcept
+cstone::IBox hilbertMixDIBox_wrapper(KeyType keyStart, int level, int bx, int by, int bz) noexcept
 {
-    return cstone::hilbertMixDIBox<unsigned>(static_cast<unsigned>(keyStart), static_cast<unsigned>(level),
+    return cstone::hilbertMixDIBox<KeyType>(keyStart, static_cast<unsigned>(level),
                                              static_cast<unsigned>(bx), static_cast<unsigned>(by),
                                              static_cast<unsigned>(bz));
 }
 
-cstone::IBox hilbertMixDIBoxKeys_wrapper(int keyStart, int keyEnd, int bx, int by, int bz) noexcept
+cstone::IBox hilbertMixDIBoxKeys_wrapper(KeyType keyStart, KeyType keyEnd, int bx, int by, int bz) noexcept
 {
-    return cstone::hilbertMixDIBoxKeys<unsigned>(static_cast<unsigned>(keyStart), static_cast<unsigned>(keyEnd),
+    return cstone::hilbertMixDIBoxKeys<KeyType>(keyStart, keyEnd,
                                                  static_cast<unsigned>(bx), static_cast<unsigned>(by),
                                                  static_cast<unsigned>(bz));
 }
 
 std::tuple<std::tuple<double, double, double, double, double, double>,
-           std::vector<unsigned>,
+           std::vector<KeyType>,
            std::vector<double>,
            std::vector<double>,
            std::vector<double>>
 randomCoordinates(int n,
                   int seed = 42,
-                  int bx   = cstone::maxTreeLevel<unsigned>{},
-                  int by   = cstone::maxTreeLevel<unsigned>{},
-                  int bz   = cstone::maxTreeLevel<unsigned>{})
+                  int bx   = cstone::maxTreeLevel<KeyType>{},
+                  int by   = cstone::maxTreeLevel<KeyType>{},
+                  int bz   = cstone::maxTreeLevel<KeyType>{})
 {
-    auto random_coords = cstone::RandomCoordinates<double, cstone::SfcKind<unsigned>>(
+    auto random_coords = cstone::RandomCoordinates<double, cstone::SfcKind<KeyType>>(
         static_cast<size_t>(n),
-        cstone::Box<double>{0, static_cast<double>((1u << (bx * 3)) - 1), 0, static_cast<double>((1u << (by * 3)) - 1),
-                            0, static_cast<double>((1u << (bz * 3)) - 1)},
+        cstone::Box<double>{0, 1, 0, 1, 0, 0.0625},
         seed);
     return std::make_tuple(std::make_tuple(random_coords.box().xmin(), random_coords.box().xmax(),
                                            random_coords.box().ymin(), random_coords.box().ymax(),
@@ -98,20 +100,19 @@ randomCoordinates(int n,
 }
 
 std::tuple<std::tuple<double, double, double, double, double, double>,
-           std::vector<unsigned>,
+           std::vector<KeyType>,
            std::vector<double>,
            std::vector<double>,
            std::vector<double>>
 randomCoordinatesMixD(int n,
                       int seed = 42,
-                      int bx   = cstone::maxTreeLevel<unsigned>{},
-                      int by   = cstone::maxTreeLevel<unsigned>{},
-                      int bz   = cstone::maxTreeLevel<unsigned>{})
+                      int bx   = cstone::maxTreeLevel<KeyType>{},
+                      int by   = cstone::maxTreeLevel<KeyType>{},
+                      int bz   = cstone::maxTreeLevel<KeyType>{})
 {
-    auto random_coords = cstone::RandomCoordinates<double, cstone::SfcMixDKind<unsigned>>(
+    auto random_coords = cstone::RandomCoordinates<double, cstone::SfcMixDKind<KeyType>>(
         static_cast<size_t>(n),
-        cstone::Box<double>{0, static_cast<double>((1u << (bx * 3)) - 1), 0, static_cast<double>((1u << (by * 3)) - 1),
-                            0, static_cast<double>((1u << (bz * 3)) - 1)},
+        cstone::Box<double>{0, 1, 0, 1, 0, 0.0625},
         seed, bx, by, bz);
     return std::make_tuple(std::make_tuple(random_coords.box().xmin(), random_coords.box().xmax(),
                                            random_coords.box().ymin(), random_coords.box().ymax(),

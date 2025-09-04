@@ -64,6 +64,7 @@ public:
         nodeCounts_ = std::vector<unsigned>(nNodes(init), bucketSize_ - 1);
 
         if constexpr (gpu) { reallocate(numRanks_ + 1, 1.0, d_boundaryKeys_, d_boundaryIndices_); }
+        std::cout << "[GlobalAssignment] rank " << myRank_ << " initialized with bucketSize_ " << bucketSize_ << std::endl;
     }
 
     /*! @brief Update the global tree
@@ -97,14 +98,19 @@ public:
         auto fittingBox = makeGlobalBox<T, Op>(x + o1.start, y + o1.start, z + o1.start, numPart, box_);
         if (firstCall_) { box_ = fittingBox; }
         else { box_ = limitBoxShrinking(fittingBox, box_); }
+        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " box: [" << box_.xmin() << ", " << box_.ymin() << ", " << box_.zmin()
+                  << "] - [" << box_.xmax() << ", " << box_.ymax() << ", " << box_.zmax() << "]" << std::endl;
 
         // compute SFC particle keys only for particles participating in tree build
         std::span<KeyType> keyView(particleKeys + o1.start, numPart);
         const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box_);
-        if (mixDBits.bx != maxTreeLevel<KeyType>{} ||
-            mixDBits.by != maxTreeLevel<KeyType>{} ||
-            mixDBits.bz != maxTreeLevel<KeyType>{})
+        const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                              mixDBits.by != maxTreeLevel<KeyType>{} ||
+                              mixDBits.bz != maxTreeLevel<KeyType>{});
+        if (useMixD)
         {
+            std::cout << "GlobalAssignment called with MixD dimensions: " << mixDBits.bx << " " << mixDBits.by << " "
+                      << mixDBits.bz << std::endl;
             computeSfcMixDKeys(x + o1.start, y + o1.start, z + o1.start, SfcMixDKindPointer(keyView.data()), numPart, box_,
                                mixDBits.bx, mixDBits.by, mixDBits.bz);
         } else {
@@ -112,19 +118,145 @@ public:
         }
         sequence<gpu>(o1.start, numPart, reorderFunctor.getBuf(), growthRate_);
         sortByKey<gpu>(keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_);
+        std::cout << "[GlobalAssignment][assign] before updateOctreeGlobal" << std::endl;
+        std::cout << "rank " << myRank_ << " global tree has " << tree_.treeLeaves().size() << " leaves." << std::endl;
+        std::cout << "Leaf keys and node counts:\n";
+        for (size_t i = 0; i < tree_.treeLeaves().size(); ++i)
+        {
+            // std::cout << std::oct << tree_.treeLeaves()[i] << std::dec << ": " << nodeCounts_[i] << std::endl;
+            if (!isValidHilbertMixDKey<KeyType>(tree_.treeLeaves()[i], mixDBits.bx, mixDBits.by, mixDBits.bz) && nodeCounts_[i] != 0)
+            {
+                std::cout << "Warning: Leaf key " << std::oct << tree_.treeLeaves()[i] << std::dec
+                          << " is not a valid mixdsdf key but has nonzero count: " << nodeCounts_[i] << std::endl;
+            }
+            // const auto corresponding_ibox = useMixD ? sfcIBox(sfcMixDKey<KeyType>(tree_.codeStart(tree_.toInternal(i))), maxTreeLevel<KeyType>{} - tree_.level(tree_.toInternal(i)), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey<KeyType>(tree_.treeLeaves()[i]), tree_.level(tree_.toInternal(i)));
+            // const auto [geoCenter, geoSize] = centerAndSize<KeyType>(corresponding_ibox, box_);
+            // std::cout << "Key: " << std::oct << tree_.treeLeaves()[i] << std::dec
+            //           << " | Level: " << tree_.level(tree_.toInternal(i))
+            //           << " | Box: ["
+            //           << corresponding_ibox.xmin() << ", " << corresponding_ibox.ymin() << ", " << corresponding_ibox.zmin()
+            //           << "] - ["
+            //           << corresponding_ibox.xmax() << ", " << corresponding_ibox.ymax() << ", " << corresponding_ibox.zmax()
+            //           << "] | Center: ["
+            //           << geoCenter[0] << ", " << geoCenter[1] << ", " << geoCenter[2]
+            //           << "] | Size: ["
+            //           << 2 * geoSize[0] << ", " << 2 * geoSize[1] << ", " << 2 * geoSize[2]
+            //           << "]" << std::endl;
+        }
+        std::cout << std::endl;
+
+        std::cout << "[GlobalAssignment][assign] calling updateOctreeGlobal with bucketSize_: " << bucketSize_ << std::endl;
 
         updateOctreeGlobal<gpu, KeyType>(keyView, bucketSize_, tree_, d_csTree_, nodeCounts_, d_nodeCounts_);
+        // std::cout << "Non-zero node counts:\n";
+        // for (size_t i = 0; i < nodeCounts_.size(); ++i)
+        // {
+        //     if (nodeCounts_[i] != 0)
+        //     {
+        //         std::cout << "Index " << i << ": " << nodeCounts_[i] << std::endl;
+        //     }
+        // }
+        // std::cout << std::endl;
+
+        std::cout << "[GlobalAssignment][assign] after updateOctreeGlobal" << std::endl;
+        std::cout << "firstCall_: " << firstCall_ << std::endl;
         if (firstCall_)
         {
             firstCall_ = false;
             while (
                 !updateOctreeGlobal<gpu, KeyType>(keyView, bucketSize_, tree_, d_csTree_, nodeCounts_, d_nodeCounts_))
                 ;
+            // std::cout << "Non-zero node counts:\n";
+            // for (size_t i = 0; i < nodeCounts_.size(); ++i)
+            // {
+            //     if (nodeCounts_[i] != 0)
+            //     {
+            //         std::cout << "Index " << i << ": " << nodeCounts_[i] << std::endl;
+            //     }
+            // }
+            // std::cout << std::endl;
         }
+        // std::cout << "Leaf keys and node counts:\n";
+        // for (size_t i = 0; i < tree_.treeLeaves().size(); ++i)
+        // {
+        //     // std::cout << std::oct << tree_.treeLeaves()[i] << std::dec << ": " << nodeCounts_[i] << std::endl;
+        //     if (!isValidHilbertMixDKey<KeyType>(tree_.treeLeaves()[i], mixDBits.bx, mixDBits.by, mixDBits.bz) && nodeCounts_[i] != 0)
+        //     {
+        //         std::cout << "Warning: Leaf key " << std::oct << tree_.treeLeaves()[i] << std::dec
+        //                   << " is not a valid mixdsdf key but has nonzero count: " << nodeCounts_[i] << std::endl;
+        //     }
+        //     const auto corresponding_ibox = useMixD ? sfcIBox(sfcMixDKey<KeyType>(tree_.codeStart(tree_.toInternal(i))), maxTreeLevel<KeyType>{} - tree_.level(tree_.toInternal(i)), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey<KeyType>(tree_.treeLeaves()[i]), tree_.level(tree_.toInternal(i)));
+        //     const auto [geoCenter, geoSize] = centerAndSize<KeyType>(corresponding_ibox, box_);
+        //     std::cout << "Key: " << std::oct << tree_.treeLeaves()[i] << std::dec
+        //               << " | Level: " << tree_.level(tree_.toInternal(i))
+        //               << " | N particles: " << nodeCounts_[i]
+        //               << " | Box: ["
+        //               << corresponding_ibox.xmin() << ", " << corresponding_ibox.ymin() << ", " << corresponding_ibox.zmin()
+        //               << "] - ["
+        //               << corresponding_ibox.xmax() << ", " << corresponding_ibox.ymax() << ", " << corresponding_ibox.zmax()
+        //               << "] | Center: ["
+        //               << geoCenter[0] << ", " << geoCenter[1] << ", " << geoCenter[2]
+        //               << "] | Size: ["
+        //               << 2 * geoSize[0] << ", " << 2 * geoSize[1] << ", " << 2 * geoSize[2]
+        //               << "]" << std::endl;
+        // }
+        // std::cout << std::endl;
 
         auto newAssignment = makeSfcAssignment(numRanks_, nodeCounts_, tree_.treeLeaves().data());
         limitBoundaryShifts<KeyType>(assignment_, newAssignment, tree_.treeLeaves(), nodeCounts_);
         assignment_ = std::move(newAssignment);
+        std::cout << "[GlobalAssignment][assign] after updateOctreeGlobal" << std::endl;
+        std::cout << "rank " << myRank_ << " global tree has " << tree_.treeLeaves().size() << " leaves." << std::endl;
+        // std::cout << "Leaf keys and node counts:\n";
+        // for (size_t i = 0; i < tree_.treeLeaves().size(); ++i)
+        // {
+        //     // std::cout << std::oct << tree_.treeLeaves()[i] << std::dec << ": " << nodeCounts_[i] << std::endl;
+        //     if (!isValidHilbertMixDKey<KeyType>(tree_.treeLeaves()[i], mixDBits.bx, mixDBits.by, mixDBits.bz) && nodeCounts_[i] != 0)
+        //     {
+        //         std::cout << "Warning: Leaf key " << std::oct << tree_.treeLeaves()[i] << std::dec
+        //                   << " is not a valid mixdsdf key but has nonzero count: " << nodeCounts_[i] << std::endl;
+        //     }
+        //     const auto corresponding_ibox = useMixD ? sfcIBox(sfcMixDKey<KeyType>(tree_.codeStart(tree_.toInternal(i))), maxTreeLevel<KeyType>{} - tree_.level(tree_.toInternal(i)), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey<KeyType>(tree_.treeLeaves()[i]), tree_.level(tree_.toInternal(i)));
+        //     const auto [geoCenter, geoSize] = centerAndSize<KeyType>(corresponding_ibox, box_);
+        //     std::cout << "Key: " << std::oct << tree_.treeLeaves()[i] << std::dec
+        //               << " | Level: " << tree_.level(tree_.toInternal(i))
+        //               << " | Box: ["
+        //               << corresponding_ibox.xmin() << ", " << corresponding_ibox.ymin() << ", " << corresponding_ibox.zmin()
+        //               << "] - ["
+        //               << corresponding_ibox.xmax() << ", " << corresponding_ibox.ymax() << ", " << corresponding_ibox.zmax()
+        //               << "] | Center: ["
+        //               << geoCenter[0] << ", " << geoCenter[1] << ", " << geoCenter[2]
+        //               << "] | Size: ["
+        //               << 2 * geoSize[0] << ", " << 2 * geoSize[1] << ", " << 2 * geoSize[2]
+        //               << "]" << std::endl;
+        // }
+        // std::cout << std::endl;
+        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " global octree has " << tree_.nodeKeys().size()
+                  << " nodes, " << tree_.numLeafNodes() << " leaves and " << tree_.numTreeNodes() << " total nodes." << std::endl;
+        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " nodeCounts_.size(): " << nodeCounts_.size() << std::endl;
+        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Leaf keys and node counts:\n";
+        auto minIt = std::min_element(tree_.leafToInternal().begin(), tree_.leafToInternal().end());
+        auto maxIt = std::max_element(tree_.leafToInternal().begin(), tree_.leafToInternal().end());
+        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Min value of tree_.leafToInternal: " << *minIt << std::endl;
+        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Max value of tree_.leafToInternal: " << *maxIt << std::endl;
+        size_t zeroCount = 0, nonZeroCount = 0;
+        unsigned minCount = std::numeric_limits<unsigned>::max();
+        unsigned maxCount = 0;
+
+        for (size_t i = 0; i < tree_.numLeafNodes(); ++i)
+        {
+            unsigned count = nodeCounts_[i];
+            if (count == 0) ++zeroCount;
+            else ++nonZeroCount;
+            if (count < minCount) minCount = count;
+            if (count > maxCount) maxCount = count;
+            // std::cout << "Key: " << std::oct << tree_.prefixes[tree_.leafToInternal[i]] << std::dec
+            //       << " | N particles: " << count << std::endl;
+        }
+        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Leaves with zero count: " << zeroCount << std::endl;
+        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Leaves with non-zero count: " << nonZeroCount << std::endl;
+        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Minimum nodeCount_: " << minCount << std::endl;
+        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Maximum nodeCount_: " << maxCount << std::endl;
 
         if constexpr (gpu)
         {

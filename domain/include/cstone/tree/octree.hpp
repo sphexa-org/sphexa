@@ -441,6 +441,7 @@ public:
     }
     //! @brief converts  an internal index into a cornerstone index
     std::span<const TreeNodeIndex> toLeafOrder() const { return {internalToLeaf_.data(), size_t(numTreeNodes())}; }
+    const auto& leafToInternal() const { return leafToInternal_; }
 
     //! @brief total number of nodes in the tree
     inline TreeNodeIndex numTreeNodes() const { return levelRange_.back(); }

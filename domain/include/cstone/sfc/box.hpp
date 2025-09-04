@@ -329,6 +329,11 @@ constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox
         // std::cout << "Calling MixD centerAndSize" << std::endl;
         return centerAndSize<KeyType>(ibox, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
+    std::cout << "Calling regular centerAndSize" << std::endl;
+    if (!disableMixD)
+    {
+        throw std::runtime_error("Warning: Using regular centerAndSize in a MixD box");
+    }
     constexpr int maxCoord = 1u << maxTreeLevel<KeyType>{};
     // smallest octree cell edge length in unit cube
     constexpr T uL = T(1.) / maxCoord;
@@ -378,9 +383,9 @@ centerAndSize(const IBox& ibox, const Box<T>& box, unsigned bx, unsigned by, uns
  * @return           the floating point box
  */
 template<class KeyType, class T>
-constexpr HOST_DEVICE_FUN FBox<T> createFpBox(const IBox& ibox, const Box<T>& box)
+constexpr HOST_DEVICE_FUN FBox<T> createFpBox(const IBox& ibox, const Box<T>& box, const bool disableMixD = false)
 {
-    auto [center, size] = centerAndSize<KeyType>(ibox, box);
+    auto [center, size] = centerAndSize<KeyType>(ibox, box, disableMixD);
 
     auto Xmin = center - size;
     auto Xmax = center + size;

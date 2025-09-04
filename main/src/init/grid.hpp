@@ -271,15 +271,26 @@ void assembleCuboid(KeyType keyStart, KeyType keyEnd, const cstone::Box<T>& glob
 
     std::vector<std::tuple<cstone::FBox<T>, int, int, int>> tasks;
 
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, cstone::Box<T>>(globalBox);
+    const bool useMixD = false && (mixDBits.bx != cstone::maxTreeLevel<KeyType>{} ||
+                         mixDBits.by != cstone::maxTreeLevel<KeyType>{} ||
+                         mixDBits.bz != cstone::maxTreeLevel<KeyType>{}) ;
+    if (useMixD)
+    {
+        std::cout << "assembleCuboid called with MixD dimensions: " << mixDBits.bx << " " << mixDBits.by << " "
+                  << mixDBits.bz << std::endl;
+    }
+
     // extract the volume of each cell from the virtual global glass block grid
     for (size_t i = 0; i < cstone::nNodes(cells); ++i)
     {
-        auto iBox      = cstone::sfcIBox(cstone::sfcKey(cells[i]), cstone::sfcKey(cells[i + 1]));
-        auto selectBox = cstone::createFpBox<KeyType>(iBox, globalBox);
+        auto iBox      = useMixD ? cstone::sfcIBox(cstone::sfcMixDKey(cells[i]), cstone::sfcMixDKey(cells[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz) : cstone::sfcIBox(cstone::sfcKey(cells[i]), cstone::sfcKey(cells[i + 1]));
+        if (iBox.xmin() == iBox.xmax() || iBox.ymin() == iBox.ymax() || iBox.zmin() == iBox.zmax()) continue;
+        auto selectBox = cstone::createFpBox<KeyType>(iBox, globalBox, true);
 
         // determine which building blocks in the glass block grid the current selectBox intersects with
         auto [lowerIdx, upperIdx] =
-            gridIntersection(cstone::createFpBox<KeyType>(iBox, cstone::Box<T>(0, 1)), multiplicity);
+            gridIntersection(cstone::createFpBox<KeyType>(iBox, cstone::Box<T>(0, 1), true), multiplicity);
         for (int ix = lowerIdx[0]; ix < upperIdx[0]; ++ix)
             for (int iy = lowerIdx[1]; iy < upperIdx[1]; ++iy)
                 for (int iz = lowerIdx[2]; iz < upperIdx[2]; ++iz)

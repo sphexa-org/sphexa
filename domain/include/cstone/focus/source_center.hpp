@@ -142,6 +142,8 @@ void nodeFpCenters(std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>*
         IBox nodeBox;
         if (isMixD)
         {
+            // std::cout << "[nodeFpCentersMixD] startKey: " << std::oct << startKey << std::dec
+            //           << " level: " << level << std::endl;
             nodeBox = sfcIBox(sfcMixDKey<KeyType>(startKey),
                               maxTreeLevel<KeyType>{} - level,
                               mixDBits.bx,
@@ -150,9 +152,22 @@ void nodeFpCenters(std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>*
         }
         else
         {
+            // std::cout << "[nodeFpCenters] startKey: " << std::oct << startKey << std::dec
+            //           << " level: " << level << std::endl;
             nodeBox = sfcIBox(sfcKey(startKey), level);
         }
-        util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box, disableMixD);
+        // std::cout << "[nodeFpCenters] prefix: " << std::oct << prefix << " startKey:  " << startKey << std::dec << " level: " << level << " box: ["
+        //           << nodeBox.xmin() << ", " << nodeBox.ymin() << ", " << nodeBox.zmin() << "] - ["
+        //           << nodeBox.xmax() << ", " << nodeBox.ymax() << ", " << nodeBox.zmax() << "]" << std::endl;
+        if (nodeBox.xmin() == nodeBox.xmax() || nodeBox.ymin() == nodeBox.ymax() || nodeBox.zmin() == nodeBox.zmax())
+        {
+            centers[i] = {0, 0, 0};
+            sizes[i] = {0, 0, 0};
+        }
+        else
+        {
+            util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box, disableMixD);
+        }
         // std::cout << "[nodeFpCenters3D] Center: " << centers[i][0] << ", " << centers[i][1] << ", " << centers[i][2]
         //           << " Size: " << sizes[i][0] << ", " << sizes[i][1] << ", " << sizes[i][2] << std::endl;
     }

@@ -225,16 +225,16 @@ HOST_DEVICE_FUN IBox makeHaloBox(KeyType codeStart, KeyType codeEnd, RadiusType 
                           mixDBits.by != maxTreeLevel<KeyType>{} ||
                           mixDBits.bz != maxTreeLevel<KeyType>{};
     IBox nodeBox = use_mixD ? sfcIBox(sfcMixDKey(codeStart), sfcMixDKey(codeEnd), mixDBits.bx, mixDBits.by, mixDBits.bz): sfcIBox(sfcKey(codeStart), sfcKey(codeEnd));
-    if (nodeBox.xmin() == nodeBox.xmax() ||
+    if (use_mixD && (nodeBox.xmin() == nodeBox.xmax() ||
         nodeBox.ymin() == nodeBox.ymax() ||
-        nodeBox.zmin() == nodeBox.zmax())
+        nodeBox.zmin() == nodeBox.zmax()))
     {
         // zero volume boxes cannot have a halo box
         return nodeBox;
     }
     // std::cout << "[makeHaloBox] nodeBox : " << nodeBox.xmin() << ", " << nodeBox.xmax() << ", "
     //           << nodeBox.ymin() << ", " << nodeBox.ymax() << ", " << nodeBox.zmin() << ", " << nodeBox.zmax() << std::endl;
-    const auto final_halo_box = makeHaloBox<KeyType>(nodeBox, radius, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
+    const auto final_halo_box = use_mixD ? makeHaloBox<KeyType>(nodeBox, radius, box, mixDBits.bx, mixDBits.by, mixDBits.bz) : makeHaloBox<KeyType>(nodeBox, radius, box);
     // std::cout << "[makeHaloBox] final haloBox : " << final_halo_box.xmin() << ", " << final_halo_box.xmax() << ", "
     //           << final_halo_box.ymin() << ", " << final_halo_box.ymax() << ", " << final_halo_box.zmin() << ", " << final_halo_box.zmax() << std::endl;
     return final_halo_box;
@@ -306,6 +306,13 @@ HOST_DEVICE_FUN Vec3<T> minDistance(
 template<class KeyType, class T>
 HOST_DEVICE_FUN T minDistanceSq(IBox a, IBox b, const Box<T>& box)
 {
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    if (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+        mixDBits.by != maxTreeLevel<KeyType>{} ||
+        mixDBits.bz != maxTreeLevel<KeyType>{})
+    {
+        return minDistanceSq<KeyType>(a, b, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
+    }
     auto [aCenter, aSize] = centerAndSize<KeyType>(a, box);
     auto [bCenter, bSize] = centerAndSize<KeyType>(b, box);
     return norm2(minDistance(aCenter, aSize, bCenter, bSize, box));

@@ -70,9 +70,11 @@ public:
         , numRanks_(nRanks)
         , bucketSizeFocus_(bucketSizeFocus)
         , theta_(theta)
-        , focusTree_(rank, numRanks_, bucketSizeFocus_)
+        , focusTree_(rank, numRanks_, bucketSizeFocus_, box)
         , global_(rank, nRanks, bucketSize, box)
     {
+        std::cout << "[Domain] rank " << myRank_ << " initializing Domain with bucketSize " << bucketSize
+                  << " bucketSizeFocus " << bucketSizeFocus_ << std::endl;
         if (bucketSize < bucketSizeFocus_)
         {
             throw std::runtime_error("The bucket size of the global tree must not be smaller than the bucket size"
@@ -183,6 +185,7 @@ public:
                      util::reverse(scratch));
 
         std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), 1.0 / theta_);
+        std::cout << "[Domain][sync] rank " << myRank_ << " found " << peers.size() << " peers." << std::endl;
         float invThetaEff      = invThetaMinMac(theta_);
 
         if (firstCall_)
@@ -190,12 +193,12 @@ public:
             focusTree_.converge(box(), keyView, peers, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
                                 invThetaEff, std::get<0>(scratch));
         }
-        focusTree_.updateMinMac(global_.assignment(), invThetaEff);
+        focusTree_.updateMinMac(global_.assignment(), invThetaEff, box());
         focusTree_.updateTree(peers, global_.assignment(), box());
         focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
 
         reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
-        focusTree_.discoverHalos({rawPtr(layoutAcc_), layoutAcc_.size()}, rawPtr(h), haloSearchExt_, get<0>(scratch));
+        focusTree_.discoverHalos({rawPtr(layoutAcc_), layoutAcc_.size()}, rawPtr(h), haloSearchExt_, get<0>(scratch), box());
         focusTree_.computeLayout(layout_);
         halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), peers, layout_);
 

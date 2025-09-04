@@ -79,6 +79,38 @@ public:
         updateInternalTree<KeyType>(leaves_, treeData_.data());
     }
 
+    FocusedOctree(int myRank, int numRanks, unsigned bucketSize, const Box<RealType>& box)
+        : myRank_(myRank)
+        , numRanks_(numRanks)
+        , bucketSize_(bucketSize)
+        , treelets_(numRanks_)
+        , counts_{bucketSize + 1}
+        , macs_{1}
+        , centers_(1)
+        , globAssignment_(numRanks + 1)
+        , box_(box)
+    {
+        if constexpr (HaveGpu<Accelerator>{})
+        {
+            std::vector<KeyType> init{0, nodeRange<KeyType>(0)};
+            reallocate(leavesAcc_, init.size(), 1.0);
+            memcpyH2D(init.data(), init.size(), rawPtr(leavesAcc_));
+            octreeAcc_.resize(nNodes(leavesAcc_));
+            buildOctreeGpu(rawPtr(leavesAcc_), octreeAcc_.data());
+
+            reallocate(countsAcc_, counts_.size(), 1.0);
+            memcpyH2D(counts_.data(), counts_.size(), rawPtr(countsAcc_));
+
+            reallocate(macsAcc_, macs_.size(), 1.0);
+            reallocate(geoCentersAcc_, centers_.size(), 1.0);
+            reallocate(centersAcc_, centers_.size(), 1.0);
+        }
+
+        leaves_ = std::vector<KeyType>{0, nodeRange<KeyType>(0)};
+        treeData_.resize(nNodes(leaves_));
+        updateInternalTree<KeyType>(leaves_, treeData_.data());
+    }
+
     /*! @brief Update the tree structure according to previously calculated criteria (MAC and particle counts)
      *
      * @param[in] peerRanks        list of ranks with nodes that fail the MAC in the SFC part assigned to @p myRank
@@ -164,7 +196,7 @@ public:
         prevFocusStart   = focusStart;
         prevFocusEnd     = focusEnd;
         rebalanceStatus_ = invalid;
-        updateGeoCenters();
+        updateGeoCenters(box);
         return converged;
     }
 
@@ -460,6 +492,29 @@ public:
         updateMacs(assignment, invThetaEff);
     }
 
+    void updateMinMac(const SfcAssignment<KeyType>& assignment, float invThetaEff, const Box<RealType>& box)
+    {
+        if constexpr (HaveGpu<Accelerator>{})
+        {
+            reallocate(centersAcc_, octreeAcc_.numNodes, allocGrowthRate_);
+            moveCenters(rawPtr(geoCentersAcc_), octreeAcc_.numNodes, rawPtr(centersAcc_));
+        }
+        else
+        {
+            centers_.resize(treeData_.numNodes);
+            const KeyType* nodeKeys = treeData_.prefixes.data();
+
+#pragma omp parallel for schedule(static)
+            for (TreeNodeIndex i = 0; i < treeData_.numNodes; ++i)
+            {
+                //! set centers to geometric centers for min dist Mac
+                centers_[i] = computeMinMacR2(nodeKeys[i], invThetaEff, box);
+            }
+        }
+
+        updateMacs(assignment, invThetaEff, box);
+    }
+
     //! @brief Compute MAC acceptance radius of each cell based on @p invTheta and previously computed expansion centers
     void setMacRadius(float invTheta)
     {
@@ -468,6 +523,15 @@ public:
             setMacGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box_);
         }
         else { setMac<RealType, KeyType>(treeData_.prefixes, centers_, invTheta, box_); }
+    }
+
+    void setMacRadius(float invTheta, const Box<RealType>& box)
+    {
+        if constexpr (HaveGpu<Accelerator>{})
+        {
+            setMacGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box_);
+        }
+        else { setMac<RealType, KeyType>(treeData_.prefixes, centers_, invTheta, box); }
     }
 
     /*! @brief Update the MAC criteria based on given expansion centers and effective inverse theta
@@ -515,6 +579,36 @@ public:
         rebalanceStatus_ |= macCriterion;
     }
 
+    void updateMacs(const SfcAssignment<KeyType>& assignment, float invTheta, const Box<RealType>& box)
+    {
+        setMacRadius(invTheta, box);
+        macs_.resize(treeData_.numNodes);
+
+        // need to find again assignment start and end indices in focus tree because assignment might have changed
+        TreeNodeIndex fAssignStart = findNodeAbove(rawPtr(leaves_), nNodes(leaves_), assignment[myRank_]);
+        TreeNodeIndex fAssignEnd   = findNodeAbove(rawPtr(leaves_), nNodes(leaves_), assignment[myRank_ + 1]);
+
+        if constexpr (HaveGpu<Accelerator>{})
+        {
+            reallocate(macsAcc_, octreeAcc_.numNodes, allocGrowthRate_);
+            fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0));
+            markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(octreeAcc_.parents),
+                        rawPtr(centersAcc_), box_, rawPtr(leavesAcc_) + fAssignStart, fAssignEnd - fAssignStart, false,
+                        rawPtr(macsAcc_));
+
+            memcpyD2H(rawPtr(macsAcc_), macsAcc_.size(), macs_.data());
+        }
+        else
+        {
+            std::fill(rawPtr(macs_), rawPtr(macs_) + macs_.size(), uint8_t(0));
+            markMacs(rawPtr(treeData_.prefixes), rawPtr(treeData_.childOffsets), rawPtr(treeData_.parents),
+                     rawPtr(centers_), box, rawPtr(leaves_) + fAssignStart, fAssignEnd - fAssignStart, false,
+                     rawPtr(macs_));
+        }
+
+        rebalanceStatus_ |= macCriterion;
+    }
+
     /*! @brief Discover which cells outside myRank's assignment are halos
      *
      * @param[-]  layout           temporary storage for node count scan
@@ -523,7 +617,7 @@ public:
      * @param[-]  scratch          host or device buffer for temporary use
      */
     template<class Th, class Vector>
-    void discoverHalos(std::span<LocalIndex> layout, const Th* h, float searchExtFact, Vector& scratch)
+    void discoverHalos(std::span<LocalIndex> layout, const Th* h, float searchExtFact, Vector& scratch, const Box<RealType>& box = Box<RealType>(0, 1))
     {
         TreeNodeIndex firstNode      = assignment_[myRank_].start();
         TreeNodeIndex lastNode       = assignment_[myRank_].end();
@@ -571,7 +665,7 @@ public:
             }
             std::fill(begin(haloFlags_), end(haloFlags_), 0);
             findHalos(let.prefixes, let.childOffsets, let.parents, let.internalToLeaf, leaves_.data(), haloRadii.data(),
-                      box_, firstNode, lastNode, haloFlags_.data());
+                      box, firstNode, lastNode, haloFlags_.data());
         }
     }
 
@@ -606,11 +700,13 @@ public:
         int converged = 0;
         while (converged != numRanks_)
         {
-            updateMinMac(assignment, invThetaEff);
+            std::cout << "[converge] myRank " << myRank_ << " box: [" << box.xmin() << "," << box.xmax() << "] x [" << box.ymin()
+                      << "," << box.ymax() << "] x [" << box.zmin() << "," << box.zmax() << "]" << std::endl;
+            updateMinMac(assignment, invThetaEff, box);
             // std::cout << "[converge] myRank " << myRank_ << " peers: " << peers.size() << std::endl;
             converged = updateTree(peers, assignment, box);
             updateCounts(particleKeys, globalTreeLeaves, globalCounts, scratch);
-            updateGeoCenters();
+            updateGeoCenters(box);
             MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
         }
     }
@@ -667,6 +763,8 @@ private:
     //! @brief compute geometrical center and size of each tree cell in terms of x,y,z coordinates
     void updateGeoCenters()
     {
+        std::cout << "[updateGeoCenters] myRank " << myRank_ << " box: [" << box_.xmin() << "," << box_.xmax() << "] x ["
+                  << box_.ymin() << "," << box_.ymax() << "] x [" << box_.zmin() << "," << box_.zmax() << "]" << std::endl;
         reallocate(geoCentersAcc_, treeData_.numNodes, allocGrowthRate_);
         reallocate(geoSizesAcc_, treeData_.numNodes, allocGrowthRate_);
 
@@ -676,21 +774,48 @@ private:
                                  rawPtr(geoSizesAcc_), box_);
         }
         else {
-            const auto mixDBits = getBoxMixDimensionBits<RealType, KeyType, Box<RealType>>(box_);
-            if (mixDBits.bx != maxTreeLevel<KeyType>{} ||
-                mixDBits.by != maxTreeLevel<KeyType>{} ||
-                mixDBits.bz != maxTreeLevel<KeyType>{})
-            {
-                // std::cout << "Using MixD for geo centers" << std::endl;
-                nodeFpCenters<KeyType>(treeData_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_, mixDBits.bx,
-                                       mixDBits.by, mixDBits.bz);
-            } else {
+            // const auto mixDBits = getBoxMixDimensionBits<RealType, KeyType, Box<RealType>>(box_);
+            // if (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+            //     mixDBits.by != maxTreeLevel<KeyType>{} ||
+            //     mixDBits.bz != maxTreeLevel<KeyType>{})
+            // {
+            //     // std::cout << "Using MixD for geo centers" << std::endl;
+            //     nodeFpCenters<KeyType>(treeData_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_, mixDBits.bx,
+            //                            mixDBits.by, mixDBits.bz);
+            // } else {
                 // std::cout << "Using 3D for geo centers" << std::endl;
                 nodeFpCenters<KeyType>(treeData_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_);
-            }
+            // }
         }
     }
+    //! @brief compute geometrical center and size of each tree cell in terms of x,y,z coordinates
+    void updateGeoCenters(const Box<RealType>& box)
+    {
+        std::cout << "[updateGeoCenters] myRank " << myRank_ << " box: [" << box.xmin() << "," << box.xmax() << "] x ["
+                  << box.ymin() << "," << box.ymax() << "] x [" << box.zmin() << "," << box.zmax() << "]" << std::endl;
+        reallocate(geoCentersAcc_, treeData_.numNodes, allocGrowthRate_);
+        reallocate(geoSizesAcc_, treeData_.numNodes, allocGrowthRate_);
 
+        if constexpr (HaveGpu<Accelerator>{})
+        {
+            computeGeoCentersGpu(rawPtr(octreeAcc_.prefixes), treeData_.numNodes, rawPtr(geoCentersAcc_),
+                                 rawPtr(geoSizesAcc_), box_);
+        }
+        else {
+            // const auto mixDBits = getBoxMixDimensionBits<RealType, KeyType, Box<RealType>>(box_);
+            // if (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+            //     mixDBits.by != maxTreeLevel<KeyType>{} ||
+            //     mixDBits.bz != maxTreeLevel<KeyType>{})
+            // {
+            //     // std::cout << "Using MixD for geo centers" << std::endl;
+            //     nodeFpCenters<KeyType>(treeData_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_, mixDBits.bx,
+            //                            mixDBits.by, mixDBits.bz);
+            // } else {
+                // std::cout << "Using 3D for geo centers" << std::endl;
+                nodeFpCenters<KeyType>(treeData_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box);
+            // }
+        }
+    }
     void uploadOctree()
     {
         if constexpr (HaveGpu<Accelerator>{})

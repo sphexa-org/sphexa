@@ -176,6 +176,11 @@ public:
 
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
         assembleCuboid<T>(keyStart, keyEnd, globalBox, surroundingMulti, xBlock, yBlock, zBlock, d.x, d.y, d.z);
+        std::cout << "Rank " << rank << " assembled " << d.x.size() << " particles surrounding the blob" << std::endl;
+        for (size_t i = 0; i < d.x.size(); ++i)
+        {
+            std::cout << "Particle " << i << ": x=" << d.x[i] << ", y=" << d.y[i] << ", z=" << d.z[i] << std::endl;
+        }
 
         auto cutSphereOut = [r, rSphere](auto x, auto y, auto z)
         {
@@ -191,6 +196,10 @@ public:
         std::vector<T>    xBlob, yBlob, zBlob;
         cstone::Box<T>    boxS(r - blobMultiplier * rSphere, r + blobMultiplier * rSphere);
         assembleCuboid<T>(keyStart, keyEnd, boxS, blobMulti, xBlock, yBlock, zBlock, xBlob, yBlob, zBlob);
+        for (size_t i = 0; i < xBlob.size(); ++i)
+        {
+            std::cout << "Blob Particle " << i << ": x=" << xBlob[i] << ", y=" << yBlob[i] << ", z=" << zBlob[i] << std::endl;
+        }
         auto keepSphere = [r, rSphere](auto x, auto y, auto z)
         {
             using T_ = decltype(x);
