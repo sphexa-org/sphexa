@@ -329,11 +329,11 @@ constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox
         // std::cout << "Calling MixD centerAndSize" << std::endl;
         return centerAndSize<KeyType>(ibox, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
-    std::cout << "Calling regular centerAndSize" << std::endl;
-    if (!disableMixD)
-    {
-        throw std::runtime_error("Warning: Using regular centerAndSize in a MixD box");
-    }
+    // std::cout << "Calling regular centerAndSize" << std::endl;
+    // if (!disableMixD)
+    // {
+    //     throw std::runtime_error("Warning: Using regular centerAndSize in a MixD box");
+    // }
     constexpr int maxCoord = 1u << maxTreeLevel<KeyType>{};
     // smallest octree cell edge length in unit cube
     constexpr T uL = T(1.) / maxCoord;

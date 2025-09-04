@@ -118,8 +118,8 @@ public:
         }
         sequence<gpu>(o1.start, numPart, reorderFunctor.getBuf(), growthRate_);
         sortByKey<gpu>(keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_);
-        std::cout << "[GlobalAssignment][assign] before updateOctreeGlobal" << std::endl;
-        std::cout << "rank " << myRank_ << " global tree has " << tree_.treeLeaves().size() << " leaves." << std::endl;
+        // std::cout << "[GlobalAssignment][assign] before updateOctreeGlobal" << std::endl;
+        // std::cout << "rank " << myRank_ << " global tree has " << tree_.treeLeaves().size() << " leaves." << std::endl;
         std::cout << "Leaf keys and node counts:\n";
         for (size_t i = 0; i < tree_.treeLeaves().size(); ++i)
         {
@@ -145,7 +145,7 @@ public:
         }
         std::cout << std::endl;
 
-        std::cout << "[GlobalAssignment][assign] calling updateOctreeGlobal with bucketSize_: " << bucketSize_ << std::endl;
+        // std::cout << "[GlobalAssignment][assign] calling updateOctreeGlobal with bucketSize_: " << bucketSize_ << std::endl;
 
         updateOctreeGlobal<gpu, KeyType>(keyView, bucketSize_, tree_, d_csTree_, nodeCounts_, d_nodeCounts_);
         // std::cout << "Non-zero node counts:\n";
@@ -158,8 +158,8 @@ public:
         // }
         // std::cout << std::endl;
 
-        std::cout << "[GlobalAssignment][assign] after updateOctreeGlobal" << std::endl;
-        std::cout << "firstCall_: " << firstCall_ << std::endl;
+        // std::cout << "[GlobalAssignment][assign] after updateOctreeGlobal" << std::endl;
+        // std::cout << "firstCall_: " << firstCall_ << std::endl;
         if (firstCall_)
         {
             firstCall_ = false;
@@ -205,8 +205,8 @@ public:
         auto newAssignment = makeSfcAssignment(numRanks_, nodeCounts_, tree_.treeLeaves().data());
         limitBoundaryShifts<KeyType>(assignment_, newAssignment, tree_.treeLeaves(), nodeCounts_);
         assignment_ = std::move(newAssignment);
-        std::cout << "[GlobalAssignment][assign] after updateOctreeGlobal" << std::endl;
-        std::cout << "rank " << myRank_ << " global tree has " << tree_.treeLeaves().size() << " leaves." << std::endl;
+        // std::cout << "[GlobalAssignment][assign] after updateOctreeGlobal" << std::endl;
+        // std::cout << "rank " << myRank_ << " global tree has " << tree_.treeLeaves().size() << " leaves." << std::endl;
         // std::cout << "Leaf keys and node counts:\n";
         // for (size_t i = 0; i < tree_.treeLeaves().size(); ++i)
         // {
@@ -231,32 +231,32 @@ public:
         //               << "]" << std::endl;
         // }
         // std::cout << std::endl;
-        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " global octree has " << tree_.nodeKeys().size()
-                  << " nodes, " << tree_.numLeafNodes() << " leaves and " << tree_.numTreeNodes() << " total nodes." << std::endl;
-        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " nodeCounts_.size(): " << nodeCounts_.size() << std::endl;
-        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Leaf keys and node counts:\n";
-        auto minIt = std::min_element(tree_.leafToInternal().begin(), tree_.leafToInternal().end());
-        auto maxIt = std::max_element(tree_.leafToInternal().begin(), tree_.leafToInternal().end());
-        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Min value of tree_.leafToInternal: " << *minIt << std::endl;
-        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Max value of tree_.leafToInternal: " << *maxIt << std::endl;
-        size_t zeroCount = 0, nonZeroCount = 0;
-        unsigned minCount = std::numeric_limits<unsigned>::max();
-        unsigned maxCount = 0;
+        // std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " global octree has " << tree_.nodeKeys().size()
+        //           << " nodes, " << tree_.numLeafNodes() << " leaves and " << tree_.numTreeNodes() << " total nodes." << std::endl;
+        // std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " nodeCounts_.size(): " << nodeCounts_.size() << std::endl;
+        // std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Leaf keys and node counts:\n";
+        // auto minIt = std::min_element(tree_.leafToInternal().begin(), tree_.leafToInternal().end());
+        // auto maxIt = std::max_element(tree_.leafToInternal().begin(), tree_.leafToInternal().end());
+        // std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Min value of tree_.leafToInternal: " << *minIt << std::endl;
+        // std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Max value of tree_.leafToInternal: " << *maxIt << std::endl;
+        // size_t zeroCount = 0, nonZeroCount = 0;
+        // unsigned minCount = std::numeric_limits<unsigned>::max();
+        // unsigned maxCount = 0;
 
-        for (size_t i = 0; i < tree_.numLeafNodes(); ++i)
-        {
-            unsigned count = nodeCounts_[i];
-            if (count == 0) ++zeroCount;
-            else ++nonZeroCount;
-            if (count < minCount) minCount = count;
-            if (count > maxCount) maxCount = count;
-            // std::cout << "Key: " << std::oct << tree_.prefixes[tree_.leafToInternal[i]] << std::dec
-            //       << " | N particles: " << count << std::endl;
-        }
-        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Leaves with zero count: " << zeroCount << std::endl;
-        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Leaves with non-zero count: " << nonZeroCount << std::endl;
-        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Minimum nodeCount_: " << minCount << std::endl;
-        std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Maximum nodeCount_: " << maxCount << std::endl;
+        // for (size_t i = 0; i < tree_.numLeafNodes(); ++i)
+        // {
+        //     unsigned count = nodeCounts_[i];
+        //     if (count == 0) ++zeroCount;
+        //     else ++nonZeroCount;
+        //     if (count < minCount) minCount = count;
+        //     if (count > maxCount) maxCount = count;
+        //     // std::cout << "Key: " << std::oct << tree_.prefixes[tree_.leafToInternal[i]] << std::dec
+        //     //       << " | N particles: " << count << std::endl;
+        // }
+        // std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Leaves with zero count: " << zeroCount << std::endl;
+        // std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Leaves with non-zero count: " << nonZeroCount << std::endl;
+        // std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Minimum nodeCount_: " << minCount << std::endl;
+        // std::cout << "[GlobalAssignment][assign] rank " << myRank_ << " Maximum nodeCount_: " << maxCount << std::endl;
 
         if constexpr (gpu)
         {

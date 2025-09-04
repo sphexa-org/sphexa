@@ -70,7 +70,7 @@ public:
         , numRanks_(nRanks)
         , bucketSizeFocus_(bucketSizeFocus)
         , theta_(theta)
-        , focusTree_(rank, numRanks_, bucketSizeFocus_, box)
+        , focusTree_(rank, numRanks_, bucketSizeFocus_)
         , global_(rank, nRanks, bucketSize, box)
     {
         std::cout << "[Domain] rank " << myRank_ << " initializing Domain with bucketSize " << bucketSize
@@ -193,7 +193,7 @@ public:
             focusTree_.converge(box(), keyView, peers, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
                                 invThetaEff, std::get<0>(scratch));
         }
-        focusTree_.updateMinMac(global_.assignment(), invThetaEff, box());
+        focusTree_.updateMinMac(global_.assignment(), invThetaEff);
         focusTree_.updateTree(peers, global_.assignment(), box());
         focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
 
