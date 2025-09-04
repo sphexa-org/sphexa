@@ -147,7 +147,9 @@ protected:
                                  d.outputFieldIndices.begin();
                     transferToHost(d, first, last, {d.fieldNames[fidx]});
                     std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
+                               { writeField(writer, key, field->data(), c); },
+                               fieldPointers[fidx]);
+                    deallocateField(d, fidx);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }

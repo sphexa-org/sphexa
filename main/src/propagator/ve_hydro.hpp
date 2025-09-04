@@ -144,9 +144,7 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        transferToHost(d, first, first + 1, {"m"});
-        fill(get<"m">(d), 0, first, d.m[first]);
-        fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
+        fillMassHalos(get<"m">(d), first, last);
 
         findNeighborsSfc(first, last, d, domain.box());
         computeGroups(first, last, d, domain.box(), groups_);
@@ -227,11 +225,10 @@ public:
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,
                     const cstone::Box<T>& box) override
     {
-        auto& d = simData.hydro;
-        d.resize(d.accSize());
-        auto fieldPointers = d.data();
-        auto indicesDone   = d.outputFieldIndices;
-        auto namesDone     = d.outputFieldNames;
+        auto& d             = simData.hydro;
+        auto  fieldPointers = d.data();
+        auto  indicesDone   = d.outputFieldIndices;
+        auto  namesDone     = d.outputFieldNames;
 
         auto output = [&]()
         {
@@ -244,7 +241,9 @@ public:
                                  d.outputFieldIndices.begin();
                     transferToHost(d, first, last, {d.fieldNames[fidx]});
                     std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
+                               { writeField(writer, key, field->data(), c); },
+                               fieldPointers[fidx]);
+                    deallocateField(d, fidx);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }

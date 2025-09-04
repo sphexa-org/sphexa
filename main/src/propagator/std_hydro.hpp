@@ -133,13 +133,12 @@ public:
         timer.logStatistics("assignment", domain.assignmentStart());
 
         auto& d = simData.hydro;
-        d.resize(domain.nParticlesWithHalos());
+        d.resizeAcc(domain.nParticlesWithHalos());
+        resizeNeighbors(d, domain.nParticles() * d.ngmax);
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
-
-        resizeNeighbors(d, domain.nParticles() * d.ngmax);
         findNeighborsSfc(first, last, d, domain.box());
         computeGroups(first, last, d, domain.box(), groups_);
         timer.step("FindNeighbors");
