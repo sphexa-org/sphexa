@@ -67,13 +67,11 @@ struct AbsDivide
 template<typename Treal>
 double duTimestepGPU(size_t first, size_t last, const Treal* u, const Treal* du)
 {
-    cstone::LocalIndex numParticles = last - first;
-
     using Tu  = std::decay_t<decltype(*u)>;
     using Tdu = std::decay_t<decltype(*du)>;
 
-    auto begin = thrust::make_zip_iterator(u, du);
-    auto end   = thrust::make_zip_iterator(u + numParticles, du + numParticles);
+    auto begin = thrust::make_zip_iterator(u + first, du + first);
+    auto end   = thrust::make_zip_iterator(u + last, du + last);
 
     double init = INFINITY;
 
