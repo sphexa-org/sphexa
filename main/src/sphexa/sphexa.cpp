@@ -136,7 +136,7 @@ int main(int argc, char** argv)
     uint64_t bucketSizeFocus = 64;
     // ~100 global nodes per rank to decompose the domain with +-1% accuracy
     uint64_t bucketSize = std::max(bucketSizeFocus, d.numParticlesGlobal / (100 * numRanks));
-    std::cout << "[SPHEXA] bucketSize: " << bucketSize << " bucketSizeFocus: " << bucketSizeFocus << std::endl;
+    // std::cout << "[SPHEXA] bucketSize: " << bucketSize << " bucketSizeFocus: " << bucketSizeFocus << std::endl;
     Domain   domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, box);
     domain.setGrowthAllocRate(simData.hydro.getAllocGrowthRate());
 
@@ -151,7 +151,7 @@ int main(int argc, char** argv)
 
     for (bool keepRunning = true; keepRunning; d.iteration++)
     {
-        std::cout << "Starting iteration" << std::endl;
+        // std::cout << "Starting iteration" << std::endl;
         propagator->computeForces(domain, simData);
         box = domain.box();
 

@@ -64,7 +64,7 @@ void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector&
     using AccVectorKT  = std::conditional_t<gpu, cstone::DeviceVector<KeyType>, std::vector<KeyType>>;
 
     size_t                    bucketSize = std::max(64lu, numParticlesGlobal / (100 * numRanks));
-    std::cout << "[syncCoords] rank " << rank << " bucketSize: " << bucketSize << std::endl;
+    // std::cout << "[syncCoords] rank " << rank << " bucketSize: " << bucketSize << std::endl;
     cstone::BufferDescription o1{0, cstone::LocalIndex(x.size()), cstone::LocalIndex(x.size())};
 
     cstone::GlobalAssignment<KeyType, T, AccType> distributor(rank, numRanks, bucketSize, globalBox);

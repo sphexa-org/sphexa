@@ -73,8 +73,8 @@ public:
         , focusTree_(rank, numRanks_, bucketSizeFocus_)
         , global_(rank, nRanks, bucketSize, box)
     {
-        std::cout << "[Domain] rank " << myRank_ << " initializing Domain with bucketSize " << bucketSize
-                  << " bucketSizeFocus " << bucketSizeFocus_ << std::endl;
+        // std::cout << "[Domain] rank " << myRank_ << " initializing Domain with bucketSize " << bucketSize
+        //           << " bucketSizeFocus " << bucketSizeFocus_ << std::endl;
         if (bucketSize < bucketSizeFocus_)
         {
             throw std::runtime_error("The bucket size of the global tree must not be smaller than the bucket size"
@@ -185,7 +185,7 @@ public:
                      util::reverse(scratch));
 
         std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), 1.0 / theta_);
-        std::cout << "[Domain][sync] rank " << myRank_ << " found " << peers.size() << " peers." << std::endl;
+        // std::cout << "[Domain][sync] rank " << myRank_ << " found " << peers.size() << " peers." << std::endl;
         float invThetaEff      = invThetaMinMac(theta_);
 
         if (firstCall_)

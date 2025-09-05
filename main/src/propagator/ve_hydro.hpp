@@ -117,28 +117,28 @@ public:
         auto& d = simData.hydro;
         if (d.g != 0.0)
         {
-            std::cout << "[sync] Starting gravity sync\n";
+            // std::cout << "[sync] Starting gravity sync\n";
             domain.syncGrav(get<"keys">(d), get<"x">(d), get<"y">(d), get<"z">(d), get<"h">(d), get<"m">(d),
                             get<ConservedFields>(d), get<DependentFields>(d));
         }
         else
         {
-            std::cout << "[sync] Starting hydro sync\n";
+            // std::cout << "[sync] Starting hydro sync\n";
             domain.sync(get<"keys">(d), get<"x">(d), get<"y">(d), get<"z">(d), get<"h">(d),
                         std::tuple_cat(std::tie(get<"m">(d)), get<ConservedFields>(d)), get<DependentFields>(d));
         }
         d.treeView = domain.octreeProperties();
         timer.logStatistics("numParticles", domain.nParticles());
-        std::cout << "[sync] Domain synchronized, numParticles " << domain.nParticles() << std::endl;
+        // std::cout << "[sync] Domain synchronized, numParticles " << domain.nParticles() << std::endl;
         timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
-        std::cout << "[sync] Domain synchronized, numHalos " << domain.nParticlesWithHalos() - domain.nParticles() << std::endl;
+        // std::cout << "[sync] Domain synchronized, numHalos " << domain.nParticlesWithHalos() - domain.nParticles() << std::endl;
         timer.logStatistics("assignment", domain.assignmentStart());
-        std::cout << "[sync] Domain synchronized, assignmentStart " << domain.assignmentStart() << std::endl;
+        // std::cout << "[sync] Domain synchronized, assignmentStart " << domain.assignmentStart() << std::endl;
     }
 
     void computeForces(DomainType& domain, DataType& simData) override
     {
-        std::cout << "[computeForces] Starting computeForces\n";
+        // std::cout << "[computeForces] Starting computeForces\n";
         timer.start();
         pmReader.start();
         sync(domain, simData);
@@ -154,9 +154,9 @@ public:
         fill(get<"m">(d), 0, first, d.m[first]);
         fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
 
-        std::cout << "[computeForces] findNeighborsSfc start" << std::endl;
+        // std::cout << "[computeForces] findNeighborsSfc start" << std::endl;
         findNeighborsSfc(first, last, d, domain.box());
-        std::cout << "[computeForces] findNeighborsSfc done" << std::endl;
+        // std::cout << "[computeForces] findNeighborsSfc done" << std::endl;
         computeGroups(first, last, d, domain.box(), groups_);
         timer.step("FindNeighbors");
         pmReader.step();

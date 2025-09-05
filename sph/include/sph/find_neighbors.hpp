@@ -60,11 +60,11 @@ void findNeighborsSfc(size_t startIndex, size_t endIndex, Dataset& d, const csto
 
     if (d.ng0 > d.ngmax) { throw std::runtime_error("ng0 should be smaller than ngmax\n"); }
 
-    std::cout << "[findNeighborsSfc] Finding neighbors for particles in index range [" << startIndex << ", " << endIndex
-              << ")" << std::endl;
+    // std::cout << "[findNeighborsSfc] Finding neighbors for particles in index range [" << startIndex << ", " << endIndex
+    //           << ")" << std::endl;
 
-    std::cout << "[findNeighborsSfc] box: (" << box.xmin() << ", " << box.xmax() << ") x (" << box.ymin() << ", " << box.ymax()
-              << ") x (" << box.zmin() << ", " << box.zmax() << ")" << std::endl;
+    // std::cout << "[findNeighborsSfc] box: (" << box.xmin() << ", " << box.xmax() << ") x (" << box.ymin() << ", " << box.ymax()
+    //           << ") x (" << box.zmin() << ", " << box.zmax() << ")" << std::endl;
     
     for (size_t i = 0; i < d.treeView.numLeafNodes; ++i)
     {
