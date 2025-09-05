@@ -57,14 +57,23 @@ public:
         , bucketSize_(bucketSize)
         , box_(box)
     {
-        unsigned level            = log8ceil<KeyType>(100 * nRanks);
-        auto initialBoundaries    = initialDomainSplits<KeyType>(nRanks, level);
-        std::vector<KeyType> init = computeSpanningTree<KeyType>(initialBoundaries);
-        tree_.update(init.data(), nNodes(init));
-        nodeCounts_ = std::vector<unsigned>(nNodes(init), bucketSize_ - 1);
+        unsigned level         = log8ceil<KeyType>(100 * nRanks);
+        auto initialBoundaries = initialDomainSplits<KeyType>(nRanks, level);
+        leaves_                = computeSpanningTree<KeyType>(initialBoundaries);
+        nodeCounts_            = std::vector<unsigned>(nNodes(leaves_), bucketSize_ - 1);
+        tree_.resize(nNodes(leaves_));
 
-        if constexpr (gpu) { reallocate(numRanks_ + 1, 1.0, d_boundaryKeys_, d_boundaryIndices_); }
-        // std::cout << "[GlobalAssignment] rank " << myRank_ << " initialized with bucketSize_ " << bucketSize_ << std::endl;
+        if constexpr (gpu)
+        {
+            reallocate(numRanks_ + 1, 1.0, d_boundaryKeys_, d_boundaryIndices_);
+            d_csTree_     = leaves_;
+            d_nodeCounts_ = nodeCounts_;
+            buildOctreeGpu(d_csTree_.data(), tree_.data());
+
+            hostTree_.resize(nNodes(leaves_));
+            updateInternalTree<KeyType>(leaves_, hostTree_.data());
+        }
+        else { updateInternalTree<KeyType>(leaves_, tree_.data()); }
     }
 
     /*! @brief Update the global tree
@@ -147,7 +156,7 @@ public:
 
         // std::cout << "[GlobalAssignment][assign] calling updateOctreeGlobal with bucketSize_: " << bucketSize_ << std::endl;
 
-        updateOctreeGlobal<gpu, KeyType>(keyView, bucketSize_, tree_, d_csTree_, nodeCounts_, d_nodeCounts_);
+        updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_, d_nodeCounts_);
         // std::cout << "Non-zero node counts:\n";
         // for (size_t i = 0; i < nodeCounts_.size(); ++i)
         // {
@@ -163,8 +172,8 @@ public:
         if (firstCall_)
         {
             firstCall_ = false;
-            while (
-                !updateOctreeGlobal<gpu, KeyType>(keyView, bucketSize_, tree_, d_csTree_, nodeCounts_, d_nodeCounts_))
+            while (!updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
+                                                d_nodeCounts_))
                 ;
             // std::cout << "Non-zero node counts:\n";
             // for (size_t i = 0; i < nodeCounts_.size(); ++i)
@@ -202,8 +211,16 @@ public:
         // }
         // std::cout << std::endl;
 
-        auto newAssignment = makeSfcAssignment(numRanks_, nodeCounts_, tree_.treeLeaves().data());
-        limitBoundaryShifts<KeyType>(assignment_, newAssignment, tree_.treeLeaves(), nodeCounts_);
+        if constexpr (gpu)
+        {
+            hostTree_.resize(tree_.numLeafNodes);
+            memcpyD2H(tree_.prefixes.data(), tree_.prefixes.size(), hostTree_.prefixes.data());
+            memcpyD2H(tree_.childOffsets.data(), tree_.childOffsets.size(), hostTree_.childOffsets.data());
+            std::copy_n(tree_.levelRange.data(), tree_.levelRange.size(), hostTree_.levelRange.data());
+        }
+
+        auto newAssignment = makeSfcAssignment(numRanks_, nodeCounts_, leaves_.data());
+        limitBoundaryShifts<KeyType>(assignment_, newAssignment, leaves_, nodeCounts_);
         assignment_ = std::move(newAssignment);
         // std::cout << "[GlobalAssignment][assign] after updateOctreeGlobal" << std::endl;
         // std::cout << "rank " << myRank_ << " global tree has " << tree_.treeLeaves().size() << " leaves." << std::endl;
@@ -351,7 +368,7 @@ public:
     std::span<const KeyType> treeLeaves() const
     {
         if (gpu) { return {rawPtr(d_csTree_), d_csTree_.size()}; }
-        else { return tree_.treeLeaves(); }
+        else { return leaves_; }
     }
 
     //! @brief read only visibility of the global octree leaf counts to the outside
@@ -361,8 +378,28 @@ public:
         else { return nodeCounts_; }
     }
 
-    //! @brief the octree, including the internal part
-    const Octree<KeyType>& octree() const { return tree_; }
+    /*! @brief the octree, internal part and leaves
+     *
+     * All data is on the host, except treeData.leaves which is on the GPU if gpu == true
+     */
+    OctreeView<const KeyType> octree() const
+    {
+        auto treeData   = tree_.cdata();
+        treeData.leaves = treeLeaves().data();
+        return treeData;
+    }
+
+    OctreeView<const KeyType> octreeHost() const
+    {
+        if constexpr (gpu)
+        {
+            auto treeData   = hostTree_.cdata();
+            treeData.leaves = leaves_.data();
+            return treeData;
+        }
+        else { return octree(); }
+    }
+
     //! @brief the global coordinate bounding box
     const Box<T>& box() const { return box_; }
     //! @brief return the space filling curve rank assignment of the last call to @a assign()
@@ -402,7 +439,9 @@ private:
     AccVector<unsigned> d_nodeCounts_;
 
     //! @brief the fully linked octree
-    Octree<KeyType> tree_;
+    OctreeData<KeyType, Accelerator> tree_;
+    OctreeData<KeyType, CpuTag> hostTree_;
+    std::vector<KeyType> leaves_;
     AccVector<KeyType> d_csTree_;
 
     bool firstCall_{true};

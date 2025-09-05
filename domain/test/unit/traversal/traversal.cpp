@@ -218,7 +218,7 @@ void dualTraversalAllPairs()
     auto m2l = [](TreeNodeIndex, TreeNodeIndex) {};
     auto p2p = [&pairs](TreeNodeIndex a, TreeNodeIndex b) { pairs.push_back({a, b}); };
 
-    dualTraversal(fullTree, 0, 0, allPairs, m2l, p2p);
+    dualTraversal(fullTree.childOffsets().data(), fullTree.empty().data(), 0, 0, allPairs, m2l, p2p);
 
     std::sort(begin(pairs), end(pairs));
     auto uit = std::unique(begin(pairs), end(pairs));
@@ -265,7 +265,7 @@ void dualTraversalNeighbors()
 
     auto m2l = [](TreeNodeIndex, TreeNodeIndex) {};
 
-    dualTraversal(octree, 0, 0, crossFocusSurfacePairs, m2l, p2p);
+    dualTraversal(octree.childOffsets().data(), octree.empty().data(), 0, 0, crossFocusSurfacePairs, m2l, p2p);
 
     EXPECT_EQ(pairs.size(), 61);
     std::sort(begin(pairs), end(pairs));
@@ -353,7 +353,7 @@ void dualTraversalNeighborsMixD()
         }
     };
 
-    dualTraversal(octree, 0, 0, crossFocusSurfacePairs, m2l, p2p);
+    dualTraversal(octree.childOffsets().data(), octree.empty().data(), 0, 0, crossFocusSurfacePairs, m2l, p2p);
 
     EXPECT_EQ(peer_pairs.size(), 1);
     std::sort(begin(peer_pairs), end(peer_pairs));

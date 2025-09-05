@@ -31,15 +31,21 @@ namespace cstone
  * Naive implementation without tree traversal for reference
  * and testing purposes
  */
-template<class KeyType>
-void findCollisions2All(std::span<const KeyType> tree,
-                        std::vector<TreeNodeIndex>& collisionList,
-                        const IBox& collisionBox)
+template<class KeyType, class T>
+void findCollisions2All(std::span<const KeyType> nodeKeys,
+                        const Vec3<T>* nodeCenters,
+                        const Vec3<T>* nodeSizes,
+                        const Box<T>& box,
+                        Vec3<T> targetCenter,
+                        Vec3<T> targetSize,
+                        std::vector<TreeNodeIndex>& collisionList)
 {
-    for (TreeNodeIndex idx = 0; idx < TreeNodeIndex(nNodes(tree)); ++idx)
+    for (TreeNodeIndex idx = 0; idx < TreeNodeIndex(nodeKeys.size()); ++idx)
     {
-        IBox nodeBox = sfcIBox(sfcKey(tree[idx]), sfcKey(tree[idx + 1]));
-        if (overlap<KeyType>(nodeBox, collisionBox)) { collisionList.push_back(idx); }
+        if (norm2(minDistance(targetCenter, targetSize, nodeCenters[idx], nodeSizes[idx], box)) == 0.0)
+        {
+            collisionList.push_back(idx);
+        }
     }
 }
 
@@ -65,34 +71,19 @@ void findCollisions2All(std::span<const KeyType> tree,
 
 //! @brief all-to-all implementation of findAllCollisions
 template<class KeyType, class T>
-std::vector<std::vector<TreeNodeIndex>>
-findCollisionsAll2all(std::span<const KeyType> tree, const std::vector<T>& haloRadii, const Box<T>& globalBox)
+std::vector<std::vector<TreeNodeIndex>> findCollisionsAll2all(std::span<const KeyType> nodeKeys,
+                                                              const Vec3<T>* tC,
+                                                              const Vec3<T>* tS,
+                                                              TreeNodeIndex numTargets,
+                                                              const Box<T>& box)
 {
-    std::vector<std::vector<TreeNodeIndex>> collisions(tree.size() - 1);
+    std::vector<Vec3<T>> nodeCenters(nodeKeys.size()), nodeSizes(nodeKeys.size());
+    nodeFpCenters<KeyType>(nodeKeys, nodeCenters.data(), nodeSizes.data(), box);
 
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(globalBox);
-    const bool use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} ||
-                    mixDBits.by != maxTreeLevel<KeyType>{} ||
-                    mixDBits.bz != maxTreeLevel<KeyType>{};
-
-    for (TreeNodeIndex leafIdx = 0; leafIdx < TreeNodeIndex(nNodes(tree)); ++leafIdx)
+    std::vector<std::vector<TreeNodeIndex>> collisions(numTargets);
+    for (TreeNodeIndex i = 0; i < numTargets; ++i)
     {
-        T radius = haloRadii[leafIdx];
-
-        IBox haloBox = makeHaloBox(tree[leafIdx], tree[leafIdx + 1], radius, globalBox);
-        if (haloBox.xmax() - haloBox.xmin() == 0 && haloBox.ymax() - haloBox.ymin() == 0 &&
-            haloBox.zmax() - haloBox.zmin() == 0)
-        {
-            // if the halo box is empty, we skip it
-            // std::cout << "[findCollisionsAll2all] Skipping leafIdx: " << leafIdx << " due to zero size" << std::endl;
-            continue;
-        }
-        if (use_mixD)
-        {
-            findCollisions2All<KeyType>(tree, collisions[leafIdx], haloBox, mixDBits.bx, mixDBits.by, mixDBits.bz);
-        } else {
-            findCollisions2All<KeyType>(tree, collisions[leafIdx], haloBox);
-        }
+        findCollisions2All<KeyType>(nodeKeys, nodeCenters.data(), nodeSizes.data(), box, tC[i], tS[i], collisions[i]);
     }
 
     return collisions;

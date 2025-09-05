@@ -37,10 +37,14 @@
 namespace sphexa
 {
 
-std::unique_ptr<IFileWriter> fileWriterFactory(bool ascii, MPI_Comm comm)
+std::unique_ptr<IFileWriter> fileWriterFactory(bool ascii, MPI_Comm comm, bool sequential = false)
 {
     if (ascii) { return makeAsciiWriter(comm); }
-    else { return makeH5PartWriter(comm); }
+    else
+    {
+        if (sequential) { return makeH5PartWriterSeq(comm); }
+        else { return makeH5PartWriter(comm); }
+    }
 }
 
 std::unique_ptr<IFileReader> fileReaderFactory(bool /*ascii*/, MPI_Comm comm) { return makeH5PartReader(comm); }

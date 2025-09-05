@@ -43,10 +43,10 @@ namespace cstone
  * Except for @p myRank, this function acts on data that is identical on all MPI ranks and
  * doesn't need to do any communication.
  */
-template<class T, template<class> class TreeType, class KeyType>
+template<class T, class KeyType>
 std::vector<int> findPeersMac(int myRank,
                               const SfcAssignment<KeyType>& assignment,
-                              const TreeType<KeyType>& domainTree,
+                              OctreeView<const KeyType> domainTree,
                               const Box<T>& box,
                               float invThetaEff,
                               const bool disableMixD = false)
@@ -66,22 +66,24 @@ std::vector<int> findPeersMac(int myRank,
 
     auto crossFocusPairs = [domainStart, domainEnd, ellipse, pbc, &tree = domainTree, &mixDBits, useMixD](TreeNodeIndex a, TreeNodeIndex b)
     {
-        bool aFocusOverlap = overlapTwoRanges(domainStart, domainEnd, tree.codeStart(a), tree.codeEnd(a));
-        bool bInFocus      = containedIn(tree.codeStart(b), tree.codeEnd(b), domainStart, domainEnd);
+        auto [ka1, ka2]    = decodePlaceholderBit2K(tree.prefixes[a]);
+        auto [kb1, kb2]    = decodePlaceholderBit2K(tree.prefixes[b]);
+        bool aFocusOverlap = overlapTwoRanges(domainStart, domainEnd, ka1, ka2);
+        bool bInFocus      = containedIn(kb1, kb2, domainStart, domainEnd);
         // node a has to overlap/be contained in the focus, while b must not be inside it
         if (!aFocusOverlap || bInFocus) { return false; }
 
-        IBox aBox = useMixD ? sfcIBox(sfcMixDKey(tree.codeStart(a)), maxTreeLevel<KeyType>{}-tree.level(a), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(tree.codeStart(a)), tree.level(a));
-        if (std::abs(double(aBox.xmax()) - double(aBox.xmin())) < 1e-12 &&
-            std::abs(double(aBox.ymax()) - double(aBox.ymin())) < 1e-12 &&
-            std::abs(double(aBox.zmax()) - double(aBox.zmin())) < 1e-12)
+        IBox aBox = useMixD ? sfcIBox(sfcMixDKey(ka1), maxTreeLevel<KeyType>{}-treeLevel(ka2 - ka1), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1));
+        if (aBox.xmax() == aBox.xmin() &&
+            aBox.ymax() == aBox.ymin() &&
+            aBox.zmax() == aBox.zmin())
         {
             return false; // skip empty boxes
         }
-        IBox bBox = useMixD ? sfcIBox(sfcMixDKey(tree.codeStart(b)), maxTreeLevel<KeyType>{}-tree.level(b), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(tree.codeStart(b)), tree.level(b));
-        if (std::abs(double(bBox.xmax()) - double(bBox.xmin())) < 1e-12 &&
-            std::abs(double(bBox.ymax()) - double(bBox.ymin())) < 1e-12 &&
-            std::abs(double(bBox.zmax()) - double(bBox.zmin())) < 1e-12)
+        IBox bBox = useMixD ? sfcIBox(sfcMixDKey(kb1), maxTreeLevel<KeyType>{}-treeLevel(kb2 - kb1), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1));
+        if (bBox.xmax() == bBox.xmin() &&
+            bBox.ymax() == bBox.ymin() &&
+            bBox.zmax() == bBox.zmin())
         {
             return false; // skip empty boxes
         }
@@ -93,29 +95,20 @@ std::vector<int> findPeersMac(int myRank,
     std::vector<int> peerRanks(assignment.numRanks(), 0);
     auto p2p = [&domainTree, &assignment, &peerRanks](TreeNodeIndex a, TreeNodeIndex b)
     {
-        int peerRank = assignment.findRank(domainTree.codeStart(b));
-        if (peerRanks[peerRank] == 0) {
-            // std::cout << "[findPeersMac] peerRank: " << peerRank
-            //       << " TreeNodeIndex a: " << a << " codeStart(a): " << domainTree.codeStart(a)
-            //       << " TreeNodeIndex b: " << b << " codeStart(b): " << domainTree.codeStart(b) << std::endl;
-            peerRanks[peerRank] = 1;
-        }
+        int peerRank = assignment.findRank(decodePlaceholderBit(domainTree.prefixes[b]));
+        if (peerRanks[peerRank] == 0) { peerRanks[peerRank] = 1; }
     };
 
     std::vector<KeyType> spanningNodeKeys(spanSfcRange(domainStart, domainEnd) + 1);
     spanSfcRange(domainStart, domainEnd, spanningNodeKeys.data());
     spanningNodeKeys.back() = domainEnd;
 
-    const KeyType* nodeKeys         = domainTree.nodeKeys().data();
-    const TreeNodeIndex* levelRange = domainTree.levelRange().data();
-
 #pragma omp parallel for schedule(dynamic)
     for (std::size_t i = 0; i < spanningNodeKeys.size() - 1; ++i)
     {
-        TreeNodeIndex nodeIdx = locateNode(spanningNodeKeys[i], spanningNodeKeys[i + 1], nodeKeys, levelRange);
-        // std::cout << "[findPeersMac] myRank: " << myRank << " nodeIdx: " << nodeIdx
-        //           << " spanningNodeKeys: " << spanningNodeKeys[i] << ", " << spanningNodeKeys[i + 1] << std::endl;
-        dualTraversal(domainTree, nodeIdx, 0, crossFocusPairs, m2l, p2p);
+        TreeNodeIndex nodeIdx =
+            locateNode(spanningNodeKeys[i], spanningNodeKeys[i + 1], domainTree.prefixes, domainTree.levelRange);
+        dualTraversal(domainTree.childOffsets, domainTree.empty, nodeIdx, 0, crossFocusPairs, m2l, p2p);
     }
 
     // for (int i = 0; i < int(peerRanks.size()); ++i)

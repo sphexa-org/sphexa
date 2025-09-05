@@ -63,8 +63,11 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
 
     auto [tree, counts] = computeOctree<KeyType>(coords.particleKeys(), bucketSize);
 
-    Octree<KeyType> domainTree;
-    domainTree.update(tree.data(), nNodes(tree));
+    OctreeData<KeyType, CpuTag> domainTree_;
+    domainTree_.resize(nNodes(tree));
+    updateInternalTree<KeyType>(tree, domainTree_.data());
+    auto domainTree   = domainTree_.cdata();
+    domainTree.leaves = tree.data();
 
     auto assignment = makeSfcAssignment(numRanks, counts, tree.data());
 
@@ -160,8 +163,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
         std::cout << std::endl;
     }
 
-    upsweep({octree.levelRange, maxTreeLevel<KeyType>{} + 2}, {octree.childOffsets, size_t(octree.numNodes)},
-            testCounts.data(), NodeCount<unsigned>{});
+    upsweep(octree.levelRangeSpan(), octree.childOffsets, testCounts.data(), NodeCount<unsigned>{});
 
     // if (thisRank == print_rank) {
         std::cout << "[GeneralFocusExchange] rank " << thisRank << " testCounts after upsweep: ";
@@ -190,12 +192,11 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
         std::cout << std::endl;
     }
 
-    upsweep({octree.levelRange, maxTreeLevel<KeyType>{} + 2}, {octree.childOffsets, size_t(octree.numNodes)},
-            testCounts.data(), NodeCount<unsigned>{});
+    upsweep(octree.levelRangeSpan(), octree.childOffsets, testCounts.data(), NodeCount<unsigned>{});
 
     auto upsweepFunction = [](auto levelRange, auto childOffsets, auto M)
     { upsweep(levelRange, childOffsets, M, NodeCount<unsigned>{}); };
-    globalFocusExchange<unsigned>(domainTree, focusTree, testCounts, upsweepFunction);
+    focusTree.globalExchange(domainTree, std::span(testCounts), std::span<unsigned>{}, scratch, upsweepFunction);
 
     if (thisRank == print_rank) {
         // no difference here for rank 1
@@ -210,8 +211,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
         std::cout << std::endl;
     }
 
-    upsweep({octree.levelRange, maxTreeLevel<KeyType>{} + 2}, {octree.childOffsets, size_t(octree.numNodes)},
-            testCounts.data(), NodeCount<unsigned>{});
+   upsweep(octree.levelRangeSpan(), octree.childOffsets, testCounts.data(), NodeCount<unsigned>{});
 
     if (thisRank == print_rank) {
         std::cout << "[GeneralFocusExchange] rank " << thisRank << " testCounts after final upsweep: ";
@@ -298,8 +298,11 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>
 
     auto [tree, counts] = computeOctree(std::span(coords.particleKeys()), bucketSize);
 
-    Octree<KeyType> domainTree;
-    domainTree.update(tree.data(), nNodes(tree));
+    OctreeData<KeyType, CpuTag> domainTree_;
+    domainTree_.resize(nNodes(tree));
+    updateInternalTree<KeyType>(tree, domainTree_.data());
+    auto domainTree   = domainTree_.cdata();
+    domainTree.leaves = tree.data();
 
     auto assignment = makeSfcAssignment(numRanks, counts, tree.data());
 
@@ -338,7 +341,7 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>
 
     auto octree = focusTree.octreeViewAcc();
 
-    focusTree.updateCenters(x.data(), y.data(), z.data(), m.data(), domainTree, box);
+    focusTree.updateCenters(x.data(), y.data(), z.data(), m.data(), domainTree);
     auto sourceCenter = focusTree.expansionCentersAcc();
 
     constexpr T tol = std::is_same_v<T, double> ? 1e-10 : 1e-4;

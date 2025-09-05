@@ -112,9 +112,6 @@ public:
         domain.syncGrav(get<"keys">(d), get<"x">(d), get<"y">(d), get<"z">(d), get<"h">(d), get<"m">(d),
                         get<ConservedFields>(d), get<DependentFields>(d));
         d.treeView = domain.octreeProperties();
-        timer.logStatistics("numAssigned", domain.nParticles());
-        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
-        timer.logStatistics("assignment", domain.assignmentStart());
     }
 
     void computeForces(DomainType& domain, DataType& simData) override
@@ -122,6 +119,9 @@ public:
         timer.start();
         sync(domain, simData);
         timer.step("domain::sync");
+        timer.logStatistics("numAssigned", domain.nParticles());
+        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
+        timer.logStatistics("assignment", domain.assignmentStart());
 
         auto& d = simData.hydro;
         d.resize(domain.nParticlesWithHalos());

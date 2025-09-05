@@ -61,19 +61,23 @@ TEST(HDF5IO, stepAttribute)
         writer->stepAttribute("uint64Attr", &uint64Attr, 1);
         char int8Attr = 1;
         writer->stepAttribute("int8Attr", &int8Attr, 1);
+        std::string myString("abcd");
+        writer->stepAttribute("strAttr", myString);
         writer->closeStep();
     }
     {
-        auto     reader = makeH5PartReader(MPI_COMM_WORLD);
-        double   float64Attr;
-        int64_t  int64Attr;
-        uint64_t uint64Attr;
-        char     int8Attr;
+        auto        reader = makeH5PartReader(MPI_COMM_WORLD);
+        double      float64Attr;
+        int64_t     int64Attr;
+        uint64_t    uint64Attr;
+        char        int8Attr;
+        std::string strAttr;
         reader->setStep(testfile, 0, FileMode::collective);
         reader->stepAttribute("float64Attr", &float64Attr, 1);
         reader->stepAttribute("int64Attr", &int64Attr, 1);
         reader->stepAttribute("uint64Attr", &uint64Attr, 1);
         reader->stepAttribute("int8Attr", &int8Attr, 1);
+        reader->stepAttribute("strAttr", strAttr);
 
         // providing a wrong type should produce a runtime exception, HDF5 does not do conversions for attributes
         int ttotInt;
@@ -83,6 +87,7 @@ TEST(HDF5IO, stepAttribute)
         EXPECT_EQ(int64Attr, 42);
         EXPECT_EQ(uint64Attr, uint64_t(2) << 40);
         EXPECT_EQ(int8Attr, 1);
+        EXPECT_EQ(strAttr, std::string("abcd"));
         reader->closeStep();
     }
 

@@ -87,7 +87,7 @@ static void computeSourceCenter(Box<double> box)
     auto toInternal = leafToInternal(octree);
     computeLeafMassCenter<T, T, T>(coords.x(), coords.y(), coords.z(), masses, toInternal, layout.data(),
                                    centers.data());
-    upsweep(octree.levelRange, octree.childOffsets, centers.data(), CombineSourceCenter<T>{});
+    upsweep(octree.levelRange, octree.childOffsets.data(), centers.data(), CombineSourceCenter<T>{});
 
     util::array<T, 4> refRootCenter =
         massCenter<T>(coords.x().data(), coords.y().data(), coords.z().data(), masses.data(), 0, numParticles);

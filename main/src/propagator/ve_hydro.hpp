@@ -128,11 +128,8 @@ public:
                         std::tuple_cat(std::tie(get<"m">(d)), get<ConservedFields>(d)), get<DependentFields>(d));
         }
         d.treeView = domain.octreeProperties();
-        timer.logStatistics("numParticles", domain.nParticles());
         // std::cout << "[sync] Domain synchronized, numParticles " << domain.nParticles() << std::endl;
-        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
         // std::cout << "[sync] Domain synchronized, numHalos " << domain.nParticlesWithHalos() - domain.nParticles() << std::endl;
-        timer.logStatistics("assignment", domain.assignmentStart());
         // std::cout << "[sync] Domain synchronized, assignmentStart " << domain.assignmentStart() << std::endl;
     }
 
@@ -143,6 +140,9 @@ public:
         pmReader.start();
         sync(domain, simData);
         timer.step("domain::sync");
+        timer.logStatistics("numParticles", domain.nParticles());
+        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
+        timer.logStatistics("assignment", domain.assignmentStart());
 
         auto& d = simData.hydro;
         d.resizeAcc(domain.nParticlesWithHalos());

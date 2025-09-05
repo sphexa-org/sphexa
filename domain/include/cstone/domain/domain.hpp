@@ -180,11 +180,11 @@ public:
 
         auto [exchangeStart, keyView] =
             distribute(sorter, particleKeys, x, y, z, std::tuple_cat(std::tie(h), particleProperties), scratch);
-        // h is already reordered here for use in halo discovery
-        gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0, std::tie(h),
-                     util::reverse(scratch));
+        // x,y,z,h is already reordered here for use in halo discovery
+        gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
+                     std::tie(x, y, z, h), util::reverse(scratch));
 
-        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), 1.0 / theta_);
+        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octreeHost(), box(), 1.0 / theta_);
         // std::cout << "[Domain][sync] rank " << myRank_ << " found " << peers.size() << " peers." << std::endl;
         float invThetaEff      = invThetaMinMac(theta_);
 
@@ -193,17 +193,17 @@ public:
             focusTree_.converge(box(), keyView, peers, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
                                 invThetaEff, std::get<0>(scratch));
         }
-        focusTree_.updateMinMac(global_.assignment(), invThetaEff);
-        focusTree_.updateTree(peers, global_.assignment(), box());
+        focusTree_.updateMinMac(global_.assignment(), invThetaEff, true);
+        focusTree_.updateTree(peers, global_.assignment(), box(), std::get<0>(scratch));
         focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
 
         reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
-        focusTree_.discoverHalos({rawPtr(layoutAcc_), layoutAcc_.size()}, rawPtr(h), haloSearchExt_, get<0>(scratch), box());
-        focusTree_.computeLayout(layout_);
+        focusTree_.discoverHalos(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), {rawPtr(layoutAcc_), layoutAcc_.size()},
+                                 haloSearchExt_, get<0>(scratch), false);
+        focusTree_.computeLayout({rawPtr(layoutAcc_), layoutAcc_.size()}, layout_);
         halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), peers, layout_);
 
-        updateLayout(sorter, keyView, particleKeys, std::tie(h), std::tuple_cat(std::tie(x, y, z), particleProperties),
-                     scratch);
+        updateLayout(sorter, keyView, particleKeys, std::tie(x, y, z, h), particleProperties, scratch);
         setupHalos(particleKeys, x, y, z, h, scratch);
         firstCall_ = false;
     }
@@ -230,22 +230,22 @@ public:
                      std::tie(x, y, z, h, m), util::reverse(scratch));
 
         float invThetaEff      = invThetaMinToVec(theta_);
-        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octree(), box(), invThetaEff);
+        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octreeHost(), box(), invThetaEff);
 
         if (firstCall_)
         {
             // first rough convergence to avoid computing expansion centers of large nodes with a lot of particles
             focusTree_.converge(box(), keyView, peers, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
                                 1.0, std::get<0>(scratch));
-            focusTree_.updateMinMac(global_.assignment(), 1.0);
+            focusTree_.updateMinMac(global_.assignment(), 1.0, false);
             int converged = 0, reps = 0;
             while (converged != numRanks_ || reps < 2)
             {
-                converged = focusTree_.updateTree(peers, global_.assignment(), box());
+                converged = focusTree_.updateTree(peers, global_.assignment(), box(), std::get<0>(scratch));
                 focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
                 focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(),
                                          std::get<0>(scratch), std::get<1>(scratch));
-                focusTree_.updateMacs(global_.assignment(), 1.0 / theta_);
+                focusTree_.updateMacs(global_.assignment(), 1.0 / theta_, false);
                 MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
                 reps++;
             }
@@ -254,18 +254,17 @@ public:
         int fail = 0;
         do
         {
-            focusTree_.updateMacs(global_.assignment(), centerDriftTol_ / theta_);
-            focusTree_.updateTree(peers, global_.assignment(), box());
+            focusTree_.updateMacs(global_.assignment(), centerDriftTol_ / theta_, false);
+            focusTree_.updateTree(peers, global_.assignment(), box(), std::get<0>(scratch));
             focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
             focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(), std::get<0>(scratch),
                                      std::get<1>(scratch));
-            focusTree_.updateMacs(global_.assignment(), 1.0 / theta_);
+            focusTree_.updateMacs(global_.assignment(), 1.0 / theta_, false);
 
             reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
-            focusTree_.discoverHalos({rawPtr(layoutAcc_), layoutAcc_.size()}, rawPtr(h), haloSearchExt_,
-                                     get<0>(scratch));
-            focusTree_.addMacs();
-            fail = focusTree_.computeLayout(layout_);
+            focusTree_.discoverHalos(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h),
+                                     {rawPtr(layoutAcc_), layoutAcc_.size()}, haloSearchExt_, get<0>(scratch), true);
+            fail = focusTree_.computeLayout({rawPtr(layoutAcc_), layoutAcc_.size()}, layout_);
             MPI_Allreduce(MPI_IN_PLACE, &fail, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
             halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), peers, layout_);
@@ -343,8 +342,8 @@ public:
     [[nodiscard]] LocalIndex nParticles() const { return endIndex() - startIndex(); }
     //! @brief return number of locally assigned particles plus number of halos
     [[nodiscard]] LocalIndex nParticlesWithHalos() const { return bufDesc_.size; }
-    //! @brief read only visibility of the global octree leaves to the outside
-    const Octree<KeyType>& globalTree() const { return global_.octree(); }
+    //! @brief read only visibility of the global octree in traversible layout
+    OctreeView<const KeyType> globalTree() const { return global_.octree(); }
     //! @brief read only visibility of the focused octree
     const FocusedOctree<KeyType, T, Accelerator>& focusTree() const { return focusTree_; }
     //! @brief the index of the first locally assigned cell in focusTree()
