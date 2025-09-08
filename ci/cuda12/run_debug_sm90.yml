@@ -98,7 +98,7 @@ sph-run-cuda12-sm90-debug-4ranks:
     - $PATH2/ryoanji/global_forces_gpu
     - $PATH2/ryoanji/global_upsweep_gpu
     - date
- 
+
 sph-run-cuda12-sm90-debug-12ranks:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-debug']
