@@ -170,6 +170,26 @@ protected:
         output(first, last, simData.chem, writer);
     }
 
+    void logDomainStats(const DomainType& domain, ParticleDataType& simData)
+    {
+        timer.logStatistics("numParticles", domain.nParticles());
+        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
+        timer.logStatistics("assignment", domain.assignmentStart());
+
+        auto hostMem = simData.hydro.memStats();
+        timer.logStatistics("hostMemSizeBytes", hostMem[1]);
+        timer.logStatistics("hostCapSizeBytes", hostMem[2]);
+
+        using AccType = ParticleDataType::AcceleratorType;
+        if constexpr (cstone::HaveGpu<AccType>{})
+        {
+            auto devMem = simData.hydro.devData.memStats();
+            timer.logStatistics("devMemSizeBytes", devMem[1]);
+            timer.logStatistics("devCapSizeBytes", devMem[2]);
+            timer.logStatistics("devFreeSizeBytes", devMem[3]);
+        }
+    }
+
     std::ostream& out;
     Timer         timer;
     PmReader      pmReader;

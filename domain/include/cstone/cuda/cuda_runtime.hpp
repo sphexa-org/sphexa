@@ -47,6 +47,7 @@
 #define cudaMemcpyFromSymbol hipMemcpyFromSymbol
 #define cudaMemcpyHostToDevice hipMemcpyHostToDevice
 #define cudaMemcpyToSymbol hipMemcpyToSymbol
+#define cudaMemGetInfo hipMemGetInfo
 #define cudaMemoryTypeDevice hipMemoryTypeDevice
 #define cudaMemoryTypeManaged hipMemoryTypeManaged
 #define cudaMemset hipMemset

@@ -367,7 +367,6 @@ public:
         }
 
         std::size_t free{0}, total{0};
-        // cudaMemGetInfo(&free, &total);
         return {size(), sumOfSize, sumOfCap, free, total};
     }
 

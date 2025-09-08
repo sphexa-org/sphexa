@@ -134,9 +134,7 @@ public:
         pmReader.start();
         sync(domain, simData);
         timer.step("domain::sync");
-        timer.logStatistics("numParticles", domain.nParticles());
-        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
-        timer.logStatistics("assignment", domain.assignmentStart());
+        Base::logDomainStats(domain, simData);
 
         auto& d = simData.hydro;
         d.resizeAcc(domain.nParticlesWithHalos());
