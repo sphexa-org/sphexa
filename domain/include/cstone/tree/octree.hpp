@@ -70,7 +70,6 @@ HOST_DEVICE_FUN constexpr TreeNodeIndex binaryKeyWeight(KeyType key, unsigned le
  * @param[in]  leaves            cornerstone SFC keys, length numLeafNodes + 1
  * @param[in]  numInternalNodes  number of internal octree nodes
  * @param[in]  numLeafNodes      total number of nodes
- * @param[in]  binaryToOct       translation map from binary to octree nodes
  * @param[out] prefixes          output octree SFC keys, length @p numInternalNodes + numLeafNodes
  *                               NOTE: keys are prefixed with Warren-Salmon placeholder bits!
  * @param[out] internalToLeaf    iota 0,1,2,3,... sequence for later use, length same as @p prefixes
@@ -196,33 +195,6 @@ void buildOctreeCpu(const KeyType* cstoneTree,
     linkTreeCpu(prefixes, numInternalNodes, leafToInternal, levelRange, childOffsets, parents);
 }
 
-//! @brief locate with @p nodeKey given in Warren-Salmon placeholder-bit format
-template<class KeyType>
-HOST_DEVICE_FUN TreeNodeIndex locateNode(KeyType nodeKey, const KeyType* prefixes, const TreeNodeIndex* levelRange)
-{
-    TreeNodeIndex numNodes = levelRange[maxTreeLevel<KeyType>{} + 1];
-    unsigned level         = decodePrefixLength(nodeKey) / 3;
-    auto it                = stl::lower_bound(prefixes + levelRange[level], prefixes + levelRange[level + 1], nodeKey);
-    if (it != prefixes + numNodes && *it == nodeKey) { return it - prefixes; }
-    else { return numNodes; }
-}
-
-/*! @brief finds the index of the node with SFC key range [startKey:endKey]
- *
- * @param startKey   lower SFC key
- * @param endKey     upper SFC key
- * @return           The index i of the node that satisfies codeStart(i) == startKey
- *                   and codeEnd(i) == endKey, or numTreeNodes() if no such node exists.
- */
-template<class KeyType>
-HOST_DEVICE_FUN TreeNodeIndex
-locateNode(KeyType startKey, KeyType endKey, const KeyType* prefixes, const TreeNodeIndex* levelRange)
-{
-    //! prefixLength is 3 * treeLevel(endKey - startKey)
-    unsigned prefixLength = countLeadingZeros(endKey - startKey - 1) - unusedBits<KeyType>{};
-    return locateNode(encodePlaceholderBit(startKey, prefixLength), prefixes, levelRange);
-}
-
 //! @brief return the smallest node that contains @p nodeKey
 template<class KeyType>
 HOST_DEVICE_FUN TreeNodeIndex containingNode(KeyType nodeKey,
@@ -271,8 +243,15 @@ struct OctreeView
     NodeType* childOffsets;
     NodeType* parents;
     NodeType* levelRange;
+    NodeType* d_levelRange;
     NodeType* internalToLeaf;
     NodeType* leafToInternal;
+    KeyType* leaves{nullptr};
+
+    std::span<NodeType> leafToInternalSpan() { return {leafToInternal + numInternalNodes, size_t(numLeafNodes)}; }
+    std::span<NodeType> levelRangeSpan() { return {levelRange, maxTreeLevel<std::decay_t<KeyType>>{} + 2}; }
+    std::span<NodeType> childOffsetsSpan() { return {childOffsets, numNodes}; }
+    std::span<KeyType> leafSpan() { return {leaves, size_t(numLeafNodes + 1)}; }
 };
 
 //! @brief Octree data and properties needed for neighbor search traversal
@@ -322,21 +301,37 @@ public:
         reallocateDestructive(parents, parentSize, 1.01);
 
         //+1 due to level 0 and +1 due to the upper bound for the last level
-        reallocateDestructive(levelRange, maxTreeLevel<KeyType>{} + 2, 1.01);
+        reallocate(maxTreeLevel<KeyType>{} + 2, 1.0, levelRange, d_levelRange);
     }
 
     OctreeView<KeyType> data()
     {
-        return {numLeafNodes,       numInternalNodes,       numNodes,
-                rawPtr(prefixes),   rawPtr(childOffsets),   rawPtr(parents),
-                rawPtr(levelRange), rawPtr(internalToLeaf), rawPtr(leafToInternal)};
+        return {numLeafNodes,
+                numInternalNodes,
+                numNodes,
+                rawPtr(prefixes),
+                rawPtr(childOffsets),
+                rawPtr(parents),
+                rawPtr(levelRange),
+                rawPtr(d_levelRange),
+                rawPtr(internalToLeaf),
+                rawPtr(leafToInternal),
+                nullptr};
     }
 
-    OctreeView<const KeyType> data() const
+    OctreeView<const KeyType> cdata() const
     {
-        return {numLeafNodes,       numInternalNodes,       numNodes,
-                rawPtr(prefixes),   rawPtr(childOffsets),   rawPtr(parents),
-                rawPtr(levelRange), rawPtr(internalToLeaf), rawPtr(leafToInternal)};
+        return {numLeafNodes,
+                numInternalNodes,
+                numNodes,
+                rawPtr(prefixes),
+                rawPtr(childOffsets),
+                rawPtr(parents),
+                rawPtr(levelRange),
+                rawPtr(d_levelRange),
+                rawPtr(internalToLeaf),
+                rawPtr(leafToInternal),
+                nullptr};
     }
 
     TreeNodeIndex numNodes{0};
@@ -350,7 +345,8 @@ public:
     //! @brief stores the parent index for every group of 8 sibling nodes, length the (numNodes - 1) / 8
     AccVector<TreeNodeIndex> parents;
     //! @brief store the first node index of every tree level, length = maxTreeLevel + 2
-    AccVector<TreeNodeIndex> levelRange;
+    std::vector<TreeNodeIndex> levelRange;
+    AccVector<TreeNodeIndex> d_levelRange;
 
     //! @brief maps internal to leaf (cstone) order
     AccVector<TreeNodeIndex> internalToLeaf;
@@ -364,6 +360,7 @@ void updateInternalTree(std::span<const KeyType> leaves, OctreeView<KeyType> o)
     assert(size_t(o.numLeafNodes) == nNodes(leaves));
     buildOctreeCpu(leaves.data(), o.numLeafNodes, o.numInternalNodes, o.prefixes, o.childOffsets, o.parents,
                    o.levelRange, o.internalToLeaf, o.leafToInternal);
+    std::copy(o.levelRangeSpan().begin(), o.levelRangeSpan().end(), o.d_levelRange);
 }
 
 template<class KeyType, class Accelerator>
@@ -411,16 +408,32 @@ public:
 
     OctreeView<KeyType> data()
     {
-        return {numLeafNodes_,      numInternalNodes_,      levelRange_.back(),
-                prefixes_.data(),   childOffsets_.data(),   parents_.data(),
-                levelRange_.data(), internalToLeaf_.data(), leafToInternal_.data()};
+        return {numLeafNodes_,
+                numInternalNodes_,
+                levelRange_.back(),
+                prefixes_.data(),
+                childOffsets_.data(),
+                parents_.data(),
+                levelRange_.data(),
+                nullptr,
+                internalToLeaf_.data(),
+                leafToInternal_.data(),
+                nullptr};
     }
 
-    OctreeView<const KeyType> data() const
+    OctreeView<const KeyType> cdata() const
     {
-        return {numLeafNodes_,      numInternalNodes_,      levelRange_.back(),
-                prefixes_.data(),   childOffsets_.data(),   parents_.data(),
-                levelRange_.data(), internalToLeaf_.data(), leafToInternal_.data()};
+        return {numLeafNodes_,
+                numInternalNodes_,
+                levelRange_.back(),
+                prefixes_.data(),
+                childOffsets_.data(),
+                parents_.data(),
+                levelRange_.data(),
+                nullptr,
+                internalToLeaf_.data(),
+                leafToInternal_.data(),
+                nullptr};
     }
 
     //! @brief return a const view of the cstone leaf array
@@ -566,7 +579,7 @@ private:
 
 template<class T, class CombinationFunction>
 void upsweep(std::span<const TreeNodeIndex> levelOffset,
-             std::span<const TreeNodeIndex> childOffsets,
+             const TreeNodeIndex* childOffsets,
              T* quantities,
              CombinationFunction&& combinationFunction)
 {

@@ -56,8 +56,11 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
 
     auto [tree, counts] = computeOctree<KeyType>(coords.particleKeys(), bucketSize);
 
-    Octree<KeyType> domainTree;
-    domainTree.update(tree.data(), nNodes(tree));
+    OctreeData<KeyType, CpuTag> domainTree_;
+    domainTree_.resize(nNodes(tree));
+    updateInternalTree<KeyType>(tree, domainTree_.data());
+    auto domainTree   = domainTree_.cdata();
+    domainTree.leaves = tree.data();
 
     auto assignment = makeSfcAssignment(numRanks, counts, tree.data());
 
@@ -102,18 +105,16 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
         }
     }
 
-    upsweep({octree.levelRange, maxTreeLevel<KeyType>{} + 2}, {octree.childOffsets, size_t(octree.numNodes)},
-            testCounts.data(), NodeCount<unsigned>{});
+    upsweep(octree.levelRangeSpan(), octree.childOffsets, testCounts.data(), NodeCount<unsigned>{});
 
     std::vector<int> scratch;
     focusTree.template peerExchange<unsigned>(testCounts, static_cast<int>(P2pTags::focusPeerCounts) + 2, scratch);
 
     auto upsweepFunction = [](auto levelRange, auto childOffsets, auto M)
     { upsweep(levelRange, childOffsets, M, NodeCount<unsigned>{}); };
-    globalFocusExchange<unsigned>(domainTree, focusTree, testCounts, upsweepFunction);
+    focusTree.globalExchange(domainTree, std::span(testCounts), std::span<unsigned>{}, scratch, upsweepFunction);
 
-    upsweep({octree.levelRange, maxTreeLevel<KeyType>{} + 2}, {octree.childOffsets, size_t(octree.numNodes)},
-            testCounts.data(), NodeCount<unsigned>{});
+    upsweep(octree.levelRangeSpan(), octree.childOffsets, testCounts.data(), NodeCount<unsigned>{});
 
     {
         for (size_t i = 0; i < testCounts.size(); ++i)
@@ -163,8 +164,11 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks)
 
     auto [tree, counts] = computeOctree(std::span(coords.particleKeys()), bucketSize);
 
-    Octree<KeyType> domainTree;
-    domainTree.update(tree.data(), nNodes(tree));
+    OctreeData<KeyType, CpuTag> domainTree_;
+    domainTree_.resize(nNodes(tree));
+    updateInternalTree<KeyType>(tree, domainTree_.data());
+    auto domainTree   = domainTree_.cdata();
+    domainTree.leaves = tree.data();
 
     auto assignment = makeSfcAssignment(numRanks, counts, tree.data());
 
@@ -195,7 +199,7 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks)
 
     auto octree = focusTree.octreeViewAcc();
 
-    focusTree.updateCenters(x.data(), y.data(), z.data(), m.data(), domainTree, box);
+    focusTree.updateCenters(x.data(), y.data(), z.data(), m.data(), domainTree);
     auto sourceCenter = focusTree.expansionCentersAcc();
 
     constexpr T tol = std::is_same_v<T, double> ? 1e-10 : 1e-4;

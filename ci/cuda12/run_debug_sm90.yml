@@ -1,10 +1,15 @@
 include:
   - local: 'ci/common.yml'
 
+variables:
+  MYUENV: "prgenv-gnu/25.06:rc5"
+  PATH1: "sphexa+spack/view/bin"
+  PATH2: "sphexa+spack/view/sbin"
+
 sph-run-cuda12-sm90-debug-1rank:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-debug']
-  image: prgenv-gnu/24.11:v1
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -13,34 +18,38 @@ sph-run-cuda12-sm90-debug-1rank:
     SLURM_NTASKS: 1
   before_script:
     - pwd
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
-    - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
+    - $PATH1/sphexa --help
     - date
   script:
-    - cd $SPH_INSTALLDIR
-    - sbin/coord_samples/coordinate_test
-    - sbin/hydro/turbulence_tests
-    - ln -fs sbin/hydro/example_data.txt .
-    - sbin/hydro/sph_tests
-    - sbin/performance/octree_perf
-    - sbin/performance/peers_perf
-    - sbin/ryoanji/cpu_unit_tests/ryoanji_cpu_unit_tests
-    - sbin/ryoanji/unit_tests/ryoanji_unit_tests
-    # TODO:slow    - sbin/performance/hilbert_perf
-    - sbin/unit/component_units_omp
-    - sbin/unit/component_units
+    - $PATH2/coord_samples/coordinate_test
+    - $PATH2/hydro/turbulence_tests
+    - ln -fs $PATH2/hydro/example_data.txt .
+    - $PATH2/hydro/sph_tests
+    - $PATH2/performance/octree_perf
+    - $PATH2/performance/peers_perf
+    - $PATH2/ryoanji/cpu_unit_tests/ryoanji_cpu_unit_tests
+    - $PATH2/ryoanji/unit_tests/ryoanji_unit_tests
+    # NOTE:slow    - $PATH2/performance/hilbert_perf
+    - $PATH2/unit/component_units_omp
+    - $PATH2/unit/component_units
+    # --- grackle
+    # https://github.com/grackle-project/grackle_data_files/blob/928696482fbe15d9bac4382de6134d95568f099c/input/CloudyData_UVB%3DHM2012.h5
+    # - wget https://jfrog.svc.cscs.ch/artifactory/cscs-reframe-tests/sphexa/CloudyData_UVB%3DHM2012.h5
+    # - mkdir -p extern/grackle/grackle_repo/grackle_data_files/input
+    # - mv CloudyData_UVB=HM2012.h5 extern/grackle/grackle_repo/grackle_data_files/input/
+    # - $PATH2/physics/cooling_tests
     # GPU tests:
-    - sbin/hydro/sph_gpu_tests
-    - sbin/performance/hilbert_perf_gpu
-    - sbin/performance/neighbors_test_gpu
-    - sbin/performance/octree_perf_gpu
-    - sbin/unit_cuda/component_units_cuda
+    - $PATH2/hydro/sph_gpu_tests
+    - $PATH2/performance/hilbert_perf_gpu
+    - $PATH2/performance/neighbors_test_gpu
+    - $PATH2/performance/octree_perf_gpu
+    - $PATH2/unit_cuda/component_units_cuda
     - date
 
 sph-run-cuda12-sm90-debug-2ranks:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-debug']
-  image: prgenv-gnu/24.11:v1
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -49,34 +58,32 @@ sph-run-cuda12-sm90-debug-2ranks:
     SLURM_NTASKS: 2
   before_script:
     - pwd
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
-    - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - date
   script:
-    - cd $SPH_INSTALLDIR
-    - sbin/integration_mpi/box_mpi
-    - sbin/integration_mpi/domain_2ranks
-    - sbin/integration_mpi/domain_resize
-    - sbin/integration_mpi/exchange_focus
-    - sbin/integration_mpi/exchange_halos
-    - sbin/integration_mpi/exchange_keys
-    - sbin/integration_mpi/focus_transfer
-    - sbin/integration_mpi/globaloctree
-    - sbin/integration_mpi/hdf5io
-    - sbin/ryoanji/global_upsweep_cpu
-    - sbin/ryoanji/ryoanji_demo/ryoanji_demo
-    - sbin/ryoanji/ryoanji_demo_mpi
+    - $PATH2/integration_mpi/box_mpi
+    - $PATH2/integration_mpi/domain_2ranks
+    - $PATH2/integration_mpi/domain_resize
+    - $PATH2/integration_mpi/exchange_focus
+    - $PATH2/integration_mpi/exchange_halos
+    - $PATH2/integration_mpi/exchange_keys
+    - $PATH2/integration_mpi/focus_transfer
+    - $PATH2/integration_mpi/globaloctree
+    - $PATH2/integration_mpi/hdf5io
+    - $PATH2/ryoanji/global_upsweep_cpu
+    - $PATH2/ryoanji/ryoanji_demo/ryoanji_demo
+    - $PATH2/ryoanji/ryoanji_demo_mpi
+    - $PATH2/physics/disk_tests
     # GPU tests:
-    - sbin/integration_mpi/assignment_gpu
-    - sbin/integration_mpi/domain_gpu
-    - sbin/integration_mpi/exchange_domain_gpu
-    - sbin/integration_mpi/exchange_halos_gpu
+    - $PATH2/integration_mpi/assignment_gpu
+    - $PATH2/integration_mpi/domain_gpu
+    - $PATH2/integration_mpi/exchange_domain_gpu
+    - $PATH2/integration_mpi/exchange_halos_gpu
     - date
 
 sph-run-cuda12-sm90-debug-4ranks:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-debug']
-  image: prgenv-gnu/24.11:v1
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -85,20 +92,17 @@ sph-run-cuda12-sm90-debug-4ranks:
     SLURM_NTASKS: 4
   before_script:
     - pwd
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
-    - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - date
   script:
-    - cd $SPH_INSTALLDIR
-    - sbin/integration_mpi/exchange_general_gpu # was -n5
-    - sbin/ryoanji/global_forces_gpu
-    - sbin/ryoanji/global_upsweep_gpu
+    - $PATH2/integration_mpi/exchange_general_gpu # was -n5
+    - $PATH2/ryoanji/global_forces_gpu
+    - $PATH2/ryoanji/global_upsweep_gpu
     - date
- 
+
 sph-run-cuda12-sm90-debug-12ranks:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-debug']
-  image: prgenv-gnu/24.11:v1
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -107,22 +111,19 @@ sph-run-cuda12-sm90-debug-12ranks:
     SLURM_NTASKS: 12
   before_script:
     - pwd
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
-    - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - date
   script:
-    - cd $SPH_INSTALLDIR
-    - sbin/integration_mpi/exchange_domain
-    - sbin/integration_mpi/exchange_general
-    - sbin/integration_mpi/focus_tree
-    - sbin/integration_mpi/treedomain
-    - sbin/integration_mpi/domain_nranks
+    - $PATH2/integration_mpi/exchange_domain
+    - $PATH2/integration_mpi/exchange_general
+    - $PATH2/integration_mpi/focus_tree
+    - $PATH2/integration_mpi/treedomain
+    - $PATH2/integration_mpi/domain_nranks
     - date
 
 sph-run-cuda12-sm90-debug-sphexa-cuda:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-debug']
-  image: prgenv-gnu/24.11:v1
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -132,20 +133,17 @@ sph-run-cuda12-sm90-debug-sphexa-cuda:
     SLURM_CPUS_PER_TASK: 71
   before_script:
     - pwd
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
-    - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - export OMP_NUM_THREADS=64
     - date
   script:
-    - cd $SPH_INSTALLDIR
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
-    - bin/sphexa-cuda --glass ./50c.h5 --init sedov --G 1.0 -n 100 -s 10
+    - $PATH1/sphexa-cuda --glass ./50c.h5 --init sedov --G 1.0 -n 100 -s 10
     - date
 
 sph-run-cuda12-sm90-debug-sphexa-cpu:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-debug']
-  image: prgenv-gnu/24.11:v1
+  image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -155,12 +153,9 @@ sph-run-cuda12-sm90-debug-sphexa-cpu:
     SLURM_CPUS_PER_TASK: 71
   before_script:
     - pwd
-    - export SPH_INSTALLDIR=${SCRATCH}/ci/daint/debug/${CI_COMMIT_SHORT_SHA}
-    - echo "Debug with cd ${SPH_INSTALLDIR}; uenv start --view=${WITH_UENV_VIEW} ${UENV_MOUNT_LIST}"
     - export OMP_NUM_THREADS=64
     - date
   script:
-    - cd $SPH_INSTALLDIR
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
-    - bin/sphexa --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 4
+    - $PATH1/sphexa --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 4
     - date

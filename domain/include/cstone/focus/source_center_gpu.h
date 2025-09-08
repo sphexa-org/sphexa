@@ -21,6 +21,32 @@
 namespace cstone
 {
 
+/*! @brief compute coordinate bounding boxes around particle interaction spheres
+ * @tparam       Tc        float or double
+ * @tparam       Th        float or double
+ * @param[in]    x         local x particle coordinates
+ * @param[in]    y         local y particle coordinates
+ * @param[in]    z         local z particle coordinates
+ * @param[in]    h         local particle smoothing lengths
+ * @param[in]    layout    first particle index into x,y,z,h buffer for each leaf-cell, size = numLeafNodes
+ * @param[in]    first     index of first leaf cell in @p layout to compute bounding box
+ * @param[in]    last      index of last leaf cell in @p layout to compute bounding box
+ * @param[in]    scale     scaling factor to compute interaction radius from smoothing length
+ * @param[inout] centers   bounding box center per leaf cell, size = numLeafNodes, initialized to geometric cell center
+ * @param[out]   sizes     bounding box size per leaf cell, size = numLeafNodes
+ */
+template<class Tc, class Th>
+extern void computeBoundingBoxGpu(const Tc* x,
+                                  const Tc* y,
+                                  const Tc* z,
+                                  const Th* h,
+                                  const LocalIndex* layout,
+                                  TreeNodeIndex first,
+                                  TreeNodeIndex last,
+                                  Th scale,
+                                  Vec3<Tc>* centers,
+                                  Vec3<Tc>* sizes);
+
 /*! @brief compute mass centers of leaf cells
  *
  * @param[in]  x                particle x coordinates

@@ -183,6 +183,7 @@ public:
         t0 = std::chrono::high_resolution_clock::now();
         transferToDevice(d, 0, d.x.size(), {"x", "y", "z"});
         syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, get<"x">(d), get<"y">(d), get<"z">(d), globalBox);
+        syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, get<"x">(d), get<"y">(d), get<"z">(d), globalBox);
         transferToHost(d, 0, get<"x">(d).size(), {"x", "y", "z"});
         t1 = std::chrono::high_resolution_clock::now();
         if (rank == 0) std::cout << "earlySync " << std::chrono::duration<float>(t1 - t0).count() << std::endl;

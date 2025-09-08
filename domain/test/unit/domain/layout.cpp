@@ -101,7 +101,6 @@ TEST(Layout, extractMarkedElements)
     }
 }
 
-
 TEST(Layout, gatherArrays)
 {
     std::vector<LocalIndex> ordering{2, 1, 3, 4};

@@ -61,8 +61,8 @@ void groupAccTimestep(const GroupView& grp, float* groupDt, const Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        groupAccTimestepGpu(d.etaAcc * std::sqrt(d.eps), grp, rawPtr(d.devData.ax), rawPtr(d.devData.ay),
-                            rawPtr(d.devData.az), groupDt);
+        groupAccTimestepGpu(d.etaAcc, grp, rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az),
+                            rawPtr(d.devData.h), groupDt);
     }
 }
 
@@ -109,7 +109,7 @@ auto computeMinTimestep(float* groupDt, LocalIndex* groupIndices, LocalIndex num
     }
 
     std::array<float, 2> minDtGlobal;
-    mpiAllreduce(minGroupDt.data(), minDtGlobal.data(), minGroupDt.size(), MPI_MIN);
+    mpiAllreduce(minGroupDt.data(), minDtGlobal.data(), minGroupDt.size(), MPI_MIN, MPI_COMM_WORLD);
     return minDtGlobal;
 }
 

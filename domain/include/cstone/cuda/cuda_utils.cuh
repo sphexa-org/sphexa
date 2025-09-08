@@ -30,19 +30,19 @@ struct IsDeviceVector<cstone::DeviceVector<T>> : public std::true_type
 };
 
 template<class T>
-void memcpyH2D(const T* src, size_t n, T* dest)
+void memcpyH2D(const T* src, std::size_t n, T* dest)
 {
     checkGpuErrors(cudaMemcpy(dest, src, sizeof(T) * n, cudaMemcpyHostToDevice));
 }
 
 template<class T>
-void memcpyD2H(const T* src, size_t n, T* dest)
+void memcpyD2H(const T* src, std::size_t n, T* dest)
 {
     checkGpuErrors(cudaMemcpy(dest, src, sizeof(T) * n, cudaMemcpyDeviceToHost));
 }
 
 template<class T>
-void memcpyD2D(const T* src, size_t n, T* dest)
+void memcpyD2D(const T* src, std::size_t n, T* dest)
 {
     checkGpuErrors(cudaMemcpy(dest, src, sizeof(T) * n, cudaMemcpyDeviceToDevice));
 }

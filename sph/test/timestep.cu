@@ -43,19 +43,21 @@ TEST(TimestepGpu, Acc)
     thrust::device_vector<LocalIndex> groups = std::vector<int>{10, 20, 40};
     GroupView                         grpView{10, 40, 2, rawPtr(groups), rawPtr(groups) + 1};
 
-    thrust::device_vector<T> ax(40), ay(40), az(40);
+    thrust::device_vector<T> ax(40), ay(40), az(40), h(40);
 
     thrust::sequence(ax.begin(), ax.end(), 100);
     thrust::sequence(ay.begin(), ay.end(), 200);
     thrust::sequence(az.begin(), az.end(), 300);
+    thrust::fill(h.begin() + groups[0], h.begin() + groups[1], 1.0);
+    thrust::fill(h.begin() + groups[1], h.begin() + groups[2], 2.0);
 
     thrust::device_vector<float> groupDt(groups.size() - 1, 1e10f);
 
     float etaAcc = 0.2;
-    groupAccTimestepGpu(etaAcc, grpView, rawPtr(ax), rawPtr(ay), rawPtr(az), rawPtr(groupDt));
+    groupAccTimestepGpu(etaAcc, grpView, rawPtr(ax), rawPtr(ay), rawPtr(az), rawPtr(h), rawPtr(groupDt));
 
     thrust::host_vector<float> probe = groupDt;
 
-    EXPECT_NEAR(probe[0], etaAcc / std::sqrt(std::sqrt(norm2(Vec3<T>{100 + 19, 200 + 19, 300 + 19}))), 1e-9);
-    EXPECT_NEAR(probe[1], etaAcc / std::sqrt(std::sqrt(norm2(Vec3<T>{100 + 39, 200 + 39, 300 + 39}))), 1e-9);
+    EXPECT_NEAR(probe[0], etaAcc * std::sqrt((1.0) / std::sqrt(norm2(Vec3<T>{100 + 19, 200 + 19, 300 + 19}))), 1e-8);
+    EXPECT_NEAR(probe[1], etaAcc * std::sqrt((2.0) / std::sqrt(norm2(Vec3<T>{100 + 39, 200 + 39, 300 + 39}))), 1e-8);
 }

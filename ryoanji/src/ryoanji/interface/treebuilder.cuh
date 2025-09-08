@@ -91,7 +91,6 @@ public:
         cstone::fillGpu(rawPtr(d_layout_), rawPtr(d_layout_) + 1, LocalIndex(0));
         cstone::inclusiveScanGpu(rawPtr(d_counts_), rawPtr(d_counts_) + d_counts_.size(), rawPtr(d_layout_) + 1);
 
-        levelRange_host_ = toHost(octreeGpuData_.levelRange);
         return octreeGpuData_.numInternalNodes + octreeGpuData_.numLeafNodes;
     }
 
@@ -104,7 +103,7 @@ public:
     }
     const TreeNodeIndex* internalToLeaf() const { return rawPtr(octreeGpuData_.internalToLeaf); }
     //! @brief return host-resident octree level cell ranges
-    const TreeNodeIndex* levelRange() const { return levelRange_host_.data(); }
+    const TreeNodeIndex* levelRange() const { return octreeGpuData_.levelRange.data(); }
 
     TreeNodeIndex numLeafNodes() const { return octreeGpuData_.numLeafNodes; }
     unsigned      maxTreeLevel() const { return cstone::maxTreeLevel<KeyType>{}; }
@@ -120,8 +119,6 @@ private:
 
     cstone::OctreeData<KeyType, cstone::GpuTag> octreeGpuData_;
     thrust::device_vector<cstone::LocalIndex>   d_layout_;
-
-    std::vector<TreeNodeIndex> levelRange_host_;
 };
 
 } // namespace ryoanji

@@ -103,9 +103,7 @@ TEST(Grids, assembleCuboid)
 
     cstone::Vec3<int> multiplicity = {1, 3, 4};
 
-    std::vector<T> xb{0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
-    std::vector<T> yb{0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
-    std::vector<T> zb{0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
+    std::vector<T> xb{0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9}, yb = xb, zb = xb;
 
     // 3 SFC segments: 0-k1 k1-k2 k2-nodeRange(0)
     KeyType k1 = 01234567012;
@@ -184,6 +182,36 @@ TEST(Grids, assembleCuboid)
     {
         EXPECT_EQ(keys[i], keys2[i]);
     }
+}
+
+TEST(Grids, assembleCuboidAdditive)
+{
+    using T       = double;
+    using KeyType = unsigned;
+    cstone::Box<T> box{-1, 1};
+
+    cstone::Vec3<int> multiplicity = {1, 3, 4};
+
+    std::vector<T> xb{0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9}, yb = xb, zb = xb;
+
+    // 3 SFC segments: 0-k1 k1-k2 k2-nodeRange(0)
+    KeyType k1 = 01234567012;
+    KeyType k2 = 05123456701;
+
+    std::vector<T> x, y, z;
+    assembleCuboid<T>(KeyType(0), k1, box, multiplicity, xb, yb, zb, x, y, z);
+    assembleCuboid<T>(k1, k2, box, multiplicity, xb, yb, zb, x, y, z);
+    assembleCuboid<T>(k2, cstone::nodeRange<KeyType>(0), box, multiplicity, xb, yb, zb, x, y, z);
+
+    std::vector<T> xRef, yRef, zRef;
+    assembleCuboid<T>(KeyType(0), cstone::nodeRange<KeyType>(0), box, multiplicity, xb, yb, zb, xRef, yRef, zRef);
+
+    [](auto&&... vecs)
+    { std::initializer_list<int>{(std::sort(vecs.begin(), vecs.end()), 0)...}; }(x, y, z, xRef, yRef, zRef);
+
+    EXPECT_EQ(x, xRef);
+    EXPECT_EQ(y, yRef);
+    EXPECT_EQ(z, zRef);
 }
 
 TEST(IsobaricCube, pyramidStretch)

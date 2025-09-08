@@ -40,10 +40,67 @@
 
 using namespace sphexa;
 
+TEST(HDF5IO, fileAttribute)
+{
+    int rank, numRanks;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
+
+    std::string testfile = "file_attributes.h5";
+    if (rank == 0 && std::filesystem::exists(testfile)) { std::filesystem::remove(testfile); }
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    {
+        auto writer = makeH5PartWriter(MPI_COMM_WORLD);
+        // we need to actually create a valid file/handle, so a dummy step write
+        writer->addStep(0, 10, testfile);
+
+        double float64Attr = 0.5;
+        writer->fileAttribute("float64Attr", &float64Attr, 1);
+        int64_t int64Attr = 42;
+        writer->fileAttribute("int64Attr", &int64Attr, 1);
+        uint64_t uint64Attr = uint64_t(2) << 40;
+        writer->fileAttribute("uint64Attr", &uint64Attr, 1);
+        char int8Attr = 1;
+        writer->fileAttribute("int8Attr", &int8Attr, 1);
+        std::string myString("abcd");
+        writer->fileAttribute("strAttr", myString);
+        EXPECT_EQ(writer->globalNumParticles(), 10 * numRanks);
+    }
+    {
+        auto        reader = makeH5PartReader(MPI_COMM_WORLD);
+        double      float64Attr;
+        int64_t     int64Attr;
+        uint64_t    uint64Attr;
+        char        int8Attr;
+        std::string strAttr;
+        // we need to actually create a valid file/handle, so a dummy step set
+        reader->setStep(testfile, 0, FileMode::collective);
+        reader->fileAttribute("float64Attr", &float64Attr, 1);
+        reader->fileAttribute("int64Attr", &int64Attr, 1);
+        reader->fileAttribute("uint64Attr", &uint64Attr, 1);
+        reader->fileAttribute("int8Attr", &int8Attr, 1);
+        reader->fileAttribute("strAttr", strAttr);
+
+        // providing a wrong type should produce a runtime exception, HDF5 does not do conversions for attributes
+        int ttotInt;
+        EXPECT_THROW(reader->fileAttribute("float64Attr", &ttotInt, 1), std::runtime_error);
+
+        EXPECT_EQ(float64Attr, 0.5);
+        EXPECT_EQ(int64Attr, 42);
+        EXPECT_EQ(uint64Attr, uint64_t(2) << 40);
+        EXPECT_EQ(int8Attr, 1);
+        EXPECT_EQ(strAttr, std::string("abcd"));
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+}
+
 TEST(HDF5IO, stepAttribute)
 {
-    int rank;
+    int rank, numRanks;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
 
     std::string testfile = "step_attributes.h5";
     if (rank == 0 && std::filesystem::exists(testfile)) { std::filesystem::remove(testfile); }
@@ -61,19 +118,24 @@ TEST(HDF5IO, stepAttribute)
         writer->stepAttribute("uint64Attr", &uint64Attr, 1);
         char int8Attr = 1;
         writer->stepAttribute("int8Attr", &int8Attr, 1);
+        std::string myString("abcd");
+        writer->stepAttribute("strAttr", myString);
+        EXPECT_EQ(writer->globalNumParticles(), 10 * numRanks);
         writer->closeStep();
     }
     {
-        auto     reader = makeH5PartReader(MPI_COMM_WORLD);
-        double   float64Attr;
-        int64_t  int64Attr;
-        uint64_t uint64Attr;
-        char     int8Attr;
+        auto        reader = makeH5PartReader(MPI_COMM_WORLD);
+        double      float64Attr;
+        int64_t     int64Attr;
+        uint64_t    uint64Attr;
+        char        int8Attr;
+        std::string strAttr;
         reader->setStep(testfile, 0, FileMode::collective);
         reader->stepAttribute("float64Attr", &float64Attr, 1);
         reader->stepAttribute("int64Attr", &int64Attr, 1);
         reader->stepAttribute("uint64Attr", &uint64Attr, 1);
         reader->stepAttribute("int8Attr", &int8Attr, 1);
+        reader->stepAttribute("strAttr", strAttr);
 
         // providing a wrong type should produce a runtime exception, HDF5 does not do conversions for attributes
         int ttotInt;
@@ -83,6 +145,7 @@ TEST(HDF5IO, stepAttribute)
         EXPECT_EQ(int64Attr, 42);
         EXPECT_EQ(uint64Attr, uint64_t(2) << 40);
         EXPECT_EQ(int8Attr, 1);
+        EXPECT_EQ(strAttr, std::string("abcd"));
         reader->closeStep();
     }
 
@@ -119,7 +182,7 @@ TEST(HDF5IO, fields)
 
         writer->writeField("x", xWithHalos.data(), 0);
         writer->writeField("nc", ncWithHalos.data(), 0);
-
+        EXPECT_EQ(writer->globalNumParticles(), 10 * numRanks);
         writer->closeStep();
     }
     {
@@ -167,6 +230,44 @@ TEST(HDF5IO, particleData)
         auto writer       = makeH5PartWriter(MPI_COMM_WORLD);
         writer->addStep(0, 1, testfile);
         data.loadOrStoreAttributes(writer.get());
+        EXPECT_EQ(writer->globalNumParticles(), 1 * numRanks);
+        writer->closeStep();
+    }
+    {
+        Dataset data;
+        auto    reader = makeH5PartReader(MPI_COMM_WORLD);
+        reader->setStep(testfile, 0, FileMode::collective);
+        data.loadOrStoreAttributes(reader.get());
+        EXPECT_EQ(data.iteration, 42);
+        EXPECT_EQ(data.ttot, 3.14159);
+        EXPECT_EQ(data.ngmax, 1000);
+        EXPECT_EQ(data.kernelChoice, sph::SphKernelType::sinc_n1_sinc_n2);
+        reader->closeStep();
+    }
+}
+
+TEST(HDF5IO, particleDataSeq)
+{
+    int rank, numRanks;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
+
+    std::string testfile = "pdata.h5";
+    if (rank == 0 && std::filesystem::exists(testfile)) { std::filesystem::remove(testfile); }
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    using Dataset = sphexa::ParticlesData<cstone::CpuTag>;
+
+    {
+        Dataset data;
+        data.iteration    = 42;
+        data.ttot         = 3.14159;
+        data.ngmax        = 1000;
+        data.kernelChoice = sph::SphKernelType::sinc_n1_sinc_n2;
+        auto writer       = makeH5PartWriterSeq(MPI_COMM_WORLD);
+        writer->addStep(0, 1, testfile);
+        data.loadOrStoreAttributes(writer.get());
+        EXPECT_EQ(writer->globalNumParticles(), 1 * numRanks);
         writer->closeStep();
     }
     {
@@ -201,6 +302,7 @@ TEST(HDF5IO, box)
         auto writer = makeH5PartWriter(MPI_COMM_WORLD);
         writer->addStep(0, 1, testfile);
         box.loadOrStore(writer.get());
+        EXPECT_EQ(writer->globalNumParticles(), 1 * numRanks);
         writer->closeStep();
     }
     {
@@ -261,6 +363,7 @@ TEST(HDF5IO, turbulenceData)
         auto writer = makeH5PartWriter(MPI_COMM_WORLD);
         writer->addStep(0, 1, testfile);
         data.loadOrStore(writer.get());
+        EXPECT_EQ(writer->globalNumParticles(), 1 * numRanks);
         writer->closeStep();
     }
     {
