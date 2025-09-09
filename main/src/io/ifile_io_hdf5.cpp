@@ -180,7 +180,7 @@ public:
         MPI_Comm_free(&comm_);
     }
 
-    void addStep(size_t firstIndex, size_t lastIndex, std::string path) override
+    void addStep(size_t firstIndex, size_t lastIndex, std::string path, bool settingsWriting = false) override
     {
         firstIndex_ = firstIndex;
         if (!h5File_ || path != pathStep_)
@@ -189,7 +189,7 @@ public:
             if (rank_ == 0) { h5File_ = fileutils::openH5Part(path, H5_O_RDWR, comm_); }
         }
 
-        if (lastIndex > firstIndex)
+        if (lastIndex >= firstIndex && !settingsWriting)
         {
             // create the next step
             if (rank_ == 0)
