@@ -40,7 +40,7 @@ template<class KeyType, class T>
 void generalCollisionTest(OctreeView<const KeyType> octree, const std::vector<T>& haloRadii, const Box<T>& box)
 {
     std::vector<Vec3<T>> nodeCenters(octree.numNodes), nodeSizes(octree.numNodes);
-    nodeFpCenters<KeyType>({octree.prefixes, size_t(octree.numNodes)}, nodeCenters.data(), nodeSizes.data(), box, false);
+    nodeFpCenters<KeyType>({octree.prefixes, size_t(octree.numNodes)}, nodeCenters.data(), nodeSizes.data(), box);
 
     auto leaf2int = octree.leafToInternalSpan();
     std::vector<Vec3<T>> tC(octree.numLeafNodes), tS(octree.numLeafNodes);
@@ -90,15 +90,18 @@ public:
     void check()
     {
         int numParticles          = 1000;
-        std::vector<KeyType> keys = makeRandomGaussianKeys<KeyType>(numParticles);
+        auto bType = static_cast<BoundaryType>(std::get<3>(GetParam()));
+        Box<T> box(0, std::get<0>(GetParam()), 0, std::get<1>(GetParam()), 0, std::get<2>(GetParam()), bType);
+
+        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+        bool useMixD    = (mixDBits.bx < maxTreeLevel<KeyType>{} || mixDBits.by < maxTreeLevel<KeyType>{} ||
+                            mixDBits.bz < maxTreeLevel<KeyType>{});
+        std::vector<KeyType> keys = makeRandomGaussianKeys<KeyType>(numParticles, 42, useMixD, mixDBits.bx, mixDBits.by, mixDBits.bz);
         auto [tree, counts]       = computeOctree<KeyType>(keys, 4);
 
         OctreeData<KeyType, CpuTag> octree;
         octree.resize(nNodes(tree));
         updateInternalTree<KeyType>(tree, octree.data());
-
-        auto bType = static_cast<BoundaryType>(std::get<3>(GetParam()));
-        Box<T> box(0, std::get<0>(GetParam()), 0, std::get<1>(GetParam()), 0, std::get<2>(GetParam()), bType);
 
         std::vector<T> haloRadii(octree.numLeafNodes, 1.001);
         generalCollisionTest(octree.cdata(), haloRadii, box);
@@ -108,7 +111,7 @@ public:
 TEST_P(CollisionTests, uint32f) { check<unsigned, float>(); }
 TEST_P(CollisionTests, uint64d) { check<uint64_t, double>(); }
 
-std::vector<std::array<int, 4>> boxLimits{{1, 2, 2, 0}, {2, 1, 2, 0}, {2, 2, 1, 0},
-                                          {1, 2, 2, 1}, {2, 1, 2, 1}, {2, 2, 1, 1}};
+std::vector<std::array<int, 4>> boxLimits{{2, 2, 2, 0}, {1, 2, 2, 0}, {2, 1, 2, 0}, {2, 2, 1, 0},
+                                          {2, 2, 2, 1}, {1, 2, 2, 1}, {2, 1, 2, 1}, {2, 2, 1, 1}};
 
 INSTANTIATE_TEST_SUITE_P(CollisionTests, CollisionTests, testing::ValuesIn(boxLimits));

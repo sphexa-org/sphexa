@@ -43,17 +43,17 @@ std::vector<Integer> makeRandomUniformKeys(size_t numKeys, int seed = 42)
 }
 
 template<class Integer>
-std::vector<Integer> makeRandomGaussianKeys(size_t numKeys, int seed = 42)
+std::vector<Integer> makeRandomGaussianKeys(size_t numKeys, int seed = 42, bool useMixD = false, unsigned bx = maxTreeLevel<Integer>{}, unsigned by = maxTreeLevel<Integer>{}, unsigned bz = maxTreeLevel<Integer>{})
 {
     Integer maxCoord = nodeRange<Integer>(0) - 1;
     std::mt19937 gen(seed);
     std::normal_distribution<double> distribution(double(maxCoord) / 2, double(maxCoord) / 5);
 
-    auto randInt = [&distribution, &gen, maxCoord]()
+    auto randInt = [&distribution, &gen, maxCoord, &useMixD, &bx, &by, &bz]()
     {
         double x = distribution(gen);
         // we can't cut down x to maxCoord in case it's too big, otherwise there will be too many keys in the last cell
-        while (x < 0.0 || x > maxCoord)
+        while (x < 0.0 || x > maxCoord || (useMixD && !isValidHilbertMixDKey<Integer>(Integer(x), bx, by, bz)))
         {
             x = distribution(gen);
         }

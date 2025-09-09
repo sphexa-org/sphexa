@@ -84,8 +84,8 @@ void findHalosFlags(bool use_mixD = false)
                                                                    octree.numLeafNodes, box, tree[0], tree[32]);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes (+5 internal nodes)
-        EXPECT_EQ(use_mixD ? 1 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
-        EXPECT_EQ(use_mixD ? 1 : 21, std::accumulate(reference.begin(), reference.end(), 0));
+        EXPECT_EQ(use_mixD ? 5 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
+        EXPECT_EQ(use_mixD ? 5 : 21, std::accumulate(reference.begin(), reference.end(), 0));
         EXPECT_EQ(collisionFlags, reference);
     }
     {
@@ -97,7 +97,7 @@ void findHalosFlags(bool use_mixD = false)
                                                                    octree.numLeafNodes, box, tree[32], tree[64]);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes
-        EXPECT_EQ(use_mixD ? 0 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
+        EXPECT_EQ(use_mixD ? 4 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
         EXPECT_EQ(collisionFlags, reference);
     }
 }

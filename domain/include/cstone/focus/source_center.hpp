@@ -146,16 +146,20 @@ void setMac(std::span<const KeyType> nodeKeys,
 template<class KeyType, class T>
 void nodeFpCenters(std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box, const bool disableMixD = false)
 {
+        const auto mixDBits        = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+        const bool isMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
+                        mixDBits.by != maxTreeLevel<KeyType>{} ||
+                        mixDBits.bz != maxTreeLevel<KeyType>{}) && !disableMixD;
+        // std::cout << "[nodeFpCenters] box: [" << box.xmin() << ", " << box.ymin() << ", " << box.zmin() << "] - ["
+        //           << box.xmax() << ", " << box.ymax() << ", " << box.zmax() << "]" << std::endl;
+        // std::cout << "[nodeFpCenters] mixDBits: " << mixDBits.bx << ", " << mixDBits.by << ", " << mixDBits.bz << " isMixD: " << isMixD << std::endl;
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < prefixes.size(); ++i)
     {
         KeyType prefix                  = prefixes[i];
         KeyType startKey                = decodePlaceholderBit(prefix);
         unsigned level                  = decodePrefixLength(prefix) / 3;
-        const auto mixDBits        = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-        const bool isMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
-                        mixDBits.by != maxTreeLevel<KeyType>{} ||
-                        mixDBits.bz != maxTreeLevel<KeyType>{}) && !disableMixD;
+
         IBox nodeBox;
         if (isMixD)
         {
@@ -180,9 +184,11 @@ void nodeFpCenters(std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>*
         {
             centers[i] = {0, 0, 0};
             sizes[i] = {0, 0, 0};
+            // std::cout << "[nodeFpCenters] Empty node detected!" << std::endl;
         }
         else
         {
+            // std::cout << "[nodeFpCenters] Non-empty node" << std::endl;
             util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box, disableMixD);
         }
         // std::cout << "[nodeFpCenters3D] Center: " << centers[i][0] << ", " << centers[i][1] << ", " << centers[i][2]

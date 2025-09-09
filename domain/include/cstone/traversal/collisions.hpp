@@ -35,12 +35,31 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
                                     KeyType excludeEnd,
                                     uint8_t* flags)
 {
+    if (targetSize[0] == 0 && targetSize[1] == 0 && targetSize[2] == 0)
+    {
+        // if the target is empty, we return no overlap
+        // std::cout << "[findCollisions] empty target -> no overlap" << std::endl;
+    }
     auto overlaps = [&](TreeNodeIndex idx)
     {
         auto [nk1, nk2] = decodePlaceholderBit2K(nodePrefixes[idx]);
+        // std::cout << "[findCollisions] idx: " << idx << " nodeKey: " << std::oct << nk1 << ", " << nk2 << std::dec << std::endl;
+        // std::cout << "[findCollisions] idx: " << idx << " nodeCenters: " << nodeCenters[idx][0] << ", " << nodeCenters[idx][1] << ", " << nodeCenters[idx][2] << std::endl;
+        // std::cout << "[findCollisions] idx: " << idx << " nodeSizes: " << nodeSizes[idx][0] << ", " << nodeSizes[idx][1] << ", " << nodeSizes[idx][2] << std::endl;
+        // std::cout << "[findCollisions] idx: " << idx << " targetCenter: " << targetCenter[0] << ", " << targetCenter[1] << ", " << targetCenter[2] << std::endl;
+        // std::cout << "[findCollisions] idx: " << idx << " targetSize: " << targetSize[0] << ", " << targetSize[1] << ", " << targetSize[2] << std::endl;
+        // std::cout << "[findCollisions] idx: " << idx << " !containedIn(nk1, nk2, excludeStart, excludeEnd): " << !containedIn(nk1, nk2, excludeStart, excludeEnd) << std::endl;
+        // std::cout << "[findCollisions] idx: " << idx << " overlap: " << overlap(nodeCenters[idx], nodeSizes[idx], targetCenter, targetSize, box) << std::endl;
+        if (nodeSizes[idx][0] == 0 && nodeSizes[idx][1] == 0 && nodeSizes[idx][2] == 0)
+        {
+            // if the cell is empty, we return no overlap
+            // std::cout << "[findCollisions] idx: " << idx << " empty cell -> no overlap" << std::endl;
+            return false;
+        }
+
         bool bOverlap   = !containedIn(nk1, nk2, excludeStart, excludeEnd) &&
                         overlap(nodeCenters[idx], nodeSizes[idx], targetCenter, targetSize, box);
-        if (bOverlap) { flags[idx] = 1; }
+        if (bOverlap) { /*std::cout << "idx " << idx << " overlaps with box (" << targetCenter[0] << ", " << targetCenter[1] << ", " << targetCenter[2] << ")" << std::endl;*/ flags[idx] = 1; }
         return bOverlap;
     };
 
