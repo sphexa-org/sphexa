@@ -120,7 +120,7 @@ public:
         {
             // std::cout << "GlobalAssignment called with MixD dimensions: " << mixDBits.bx << " " << mixDBits.by << " "
             //           << mixDBits.bz << std::endl;
-            computeSfcMixDKeys(x + o1.start, y + o1.start, z + o1.start, SfcMixDKindPointer(keyView.data()), numPart, box_,
+            computeSfcMixDKeys<gpu>(x + o1.start, y + o1.start, z + o1.start, SfcMixDKindPointer(keyView.data()), numPart, box_,
                                mixDBits.bx, mixDBits.by, mixDBits.bz);
         } else {
             computeSfcKeys<gpu>(x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numPart, box_);
