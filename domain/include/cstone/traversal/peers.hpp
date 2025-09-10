@@ -73,14 +73,14 @@ std::vector<int> findPeersMac(int myRank,
         // node a has to overlap/be contained in the focus, while b must not be inside it
         if (!aFocusOverlap || bInFocus) { return false; }
 
-        IBox aBox = useMixD ? sfcIBox(sfcMixDKey(ka1), maxTreeLevel<KeyType>{}-treeLevel(ka2 - ka1), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1));
+        IBox aBox = useMixD ? sfcIBox(sfcMixDKey(ka1), maxTreeLevel<KeyType>{}-treeLevel(ka1), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1));
         if (aBox.xmax() == aBox.xmin() &&
             aBox.ymax() == aBox.ymin() &&
             aBox.zmax() == aBox.zmin())
         {
             return false; // skip empty boxes
         }
-        IBox bBox = useMixD ? sfcIBox(sfcMixDKey(kb1), maxTreeLevel<KeyType>{}-treeLevel(kb2 - kb1), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1));
+        IBox bBox = useMixD ? sfcIBox(sfcMixDKey(kb1), maxTreeLevel<KeyType>{}-treeLevel(kb1), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1));
         if (bBox.xmax() == bBox.xmin() &&
             bBox.ymax() == bBox.ymin() &&
             bBox.zmax() == bBox.zmin())

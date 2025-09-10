@@ -25,6 +25,7 @@
  */
 
 #include "gtest/gtest.h"
+#include <fstream>
 
 #include "coord_samples/random.hpp"
 #include "cstone/domain/domain.hpp"
@@ -72,6 +73,12 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks, bool equalize
     std::vector<T> yGlobal(numParticles);
     std::vector<T> zGlobal(numParticles);
     initCoordinates(xGlobal, yGlobal, zGlobal, box);
+    // std::ofstream coordFile("coords_rank_" + std::to_string(rank) + ".txt");
+    // for (size_t i = 0; i < xGlobal.size(); ++i)
+    // {
+    //     coordFile << xGlobal[i] << " " << yGlobal[i] << " " << zGlobal[i] << std::endl;
+    // }
+    // coordFile.close();
 
     std::vector<T> hGlobal(numParticles, 0.1);
 
@@ -86,6 +93,8 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks, bool equalize
 
     LocalIndex firstExtract = rank * numParticles / nRanks;
     LocalIndex lastExtract  = (rank + 1) * numParticles / nRanks;
+    // std::cout << "[randomGaussianDomain] rank " << rank << " extracting particles " << firstExtract << " - " << lastExtract
+    //           << std::endl;
 
     std::vector<T> x{xGlobal.begin() + firstExtract, xGlobal.begin() + lastExtract};
     std::vector<T> y{yGlobal.begin() + firstExtract, yGlobal.begin() + lastExtract};
@@ -97,6 +106,8 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks, bool equalize
     domain.sync(keys, x, y, z, h, std::tuple{}, std::tie(s1, s2, s3));
 
     LocalIndex localCount    = domain.endIndex() - domain.startIndex();
+    // std::cout << "[randomGaussianDomain] rank " << rank << " has " << localCount << " particles after domain distribution."
+    //           << std::endl;
     LocalIndex localCountSum = localCount;
     // int extractedCount = x.size();
     MPI_Allreduce(MPI_IN_PLACE, &localCountSum, 1, MpiType<int>{}, MPI_SUM, MPI_COMM_WORLD);
@@ -111,7 +122,7 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks, bool equalize
                      mixDBits.bz != maxTreeLevel<KeyType>{});
     if (useMixD)
     {
-        std::cout << "[randomGaussianDomain] MixD keys" << std::endl;
+        // std::cout << "[randomGaussianDomain] MixD keys" << std::endl;
         computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(keysRef.data()), x.size(), box, mixDBits.bx,
                            mixDBits.by, mixDBits.bz);
     }
@@ -122,6 +133,21 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks, bool equalize
 
     // check that particles are SFC order sorted and the keys are in sync with the x,y,z arrays
     EXPECT_EQ(keys, keysRef);
+    // std::ofstream outFile("keys_rank_" + std::to_string(rank) + ".txt");
+    // for (size_t i = 0; i < localCount; ++i)
+    // {
+    //     // Write keys of each rank to a separate file
+    //     outFile << "Key[" << i << "] = " << std::oct << keys[i] << std::dec
+    //         << ", x = " << x[i]
+    //         << ", y = " << y[i]
+    //         << ", z = " << z[i]
+    //         << std::endl;
+    //     if (i > 0 && keys[i] < keys[i - 1])
+    //     {
+    //         std::cout << "Rank " << rank << " - Unsorted key at index " << i << ": " << keys[i] << std::endl;
+    //     }
+    // }
+    // outFile.close();
     EXPECT_TRUE(std::is_sorted(begin(keysRef), end(keysRef)));
 
     int ngmax = 300;
@@ -217,6 +243,22 @@ TEST(FocusDomain, randomGaussianNeighborSumPbc)
     }
     {
         Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {-1, 1, periodic});
+        randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
+    }
+    {
+        Domain<unsigned, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
+        randomGaussianDomain<unsigned, double>(domain, rank, nRanks);
+    }
+    {
+        Domain<uint64_t, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
+        randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
+    }
+    {
+        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
+        randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
+    }
+    {
+        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
         randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
 }

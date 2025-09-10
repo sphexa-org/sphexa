@@ -168,7 +168,7 @@ iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, un
             key |= ((key_2D >> (2 * processes_2D_key_bit_index)) & 3) << (3 * processes_coordinate_bit_index);
         }
         // remove n bits from sorted_coordinates[0] and sorted_coordinates[1]
-        const KeyType mask = (1u << bits[2]) - 1;
+        const KeyType mask = (static_cast<KeyType>(1) << bits[2]) - 1;
         sorted_coordinates[0] &= mask;
         sorted_coordinates[1] &= mask;
         bits[0] -= n;

@@ -343,7 +343,8 @@ void multiStepSync(int rank, int numRanks, Box<T> box = Box<T>{0, 1})
     domain.sync(keys, x, y, z, h, std::tuple{}, std::tie(s1, s2, s3));
 
     // now a particle on rank 0 gets moved into an area of the global tree that's on rank 1
-    Vec3<T> newPart{0.811, 0.812, 0.813};
+    // TODO(iomaganaris): validate that for MixD the particle actually moves ranks
+    auto newPart = useMixD ? Vec3<T>{0.811, 0.015625, 0.00171875} : Vec3<T>{0.811, 0.812, 0.813};
     if (rank == 0)
     {
         x[1] = newPart[0];

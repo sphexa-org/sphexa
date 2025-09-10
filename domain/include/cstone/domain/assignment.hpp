@@ -14,7 +14,7 @@
  */
 
 #pragma once
-
+#include <fstream>
 #include "cstone/cuda/device_vector.h"
 #include "cstone/domain/domaindecomp.hpp"
 #include "cstone/domain/domaindecomp_mpi.hpp"
@@ -123,6 +123,7 @@ public:
             computeSfcMixDKeys<gpu>(x + o1.start, y + o1.start, z + o1.start, SfcMixDKindPointer(keyView.data()), numPart, box_,
                                mixDBits.bx, mixDBits.by, mixDBits.bz);
         } else {
+            // std::cout << "GlobalAssignment called with 3D keys" << std::endl;
             computeSfcKeys<gpu>(x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numPart, box_);
         }
         sequence<gpu>(o1.start, numPart, reorderFunctor.getBuf(), growthRate_);
@@ -130,18 +131,23 @@ public:
         // std::cout << "[GlobalAssignment][assign] before updateOctreeGlobal" << std::endl;
         // std::cout << "rank " << myRank_ << " global tree has " << tree_.treeLeaves().size() << " leaves." << std::endl;
         // std::cout << "Leaf keys and node counts:\n";
-        // for (size_t i = 0; i < tree_.treeLeaves().size(); ++i)
+        // for (size_t i = 0; i < tree_.numLeafNodes; ++i)
         // {
         //     // std::cout << std::oct << tree_.treeLeaves()[i] << std::dec << ": " << nodeCounts_[i] << std::endl;
-        //     if (!isValidHilbertMixDKey<KeyType>(tree_.treeLeaves()[i], mixDBits.bx, mixDBits.by, mixDBits.bz) && nodeCounts_[i] != 0)
+        //     const auto prefix = tree_.prefixes[tree_.leafToInternal[i]];
+        //     const auto startKey = decodePlaceholderBit(prefix);
+        //     const auto level = decodePrefixLength(prefix) / 3;
+        //     if (!isValidHilbertMixDKey<KeyType>(prefix, mixDBits.bx, mixDBits.by, mixDBits.bz) && nodeCounts_[i] != 0)
         //     {
-        //         std::cout << "Warning: Leaf key " << std::oct << tree_.treeLeaves()[i] << std::dec
-        //                   << " is not a valid mixdsdf key but has nonzero count: " << nodeCounts_[i] << std::endl;
+        //         std::cout << "Warning: Leaf key " << std::oct << tree_.prefixes[tree_.leafToInternal[i]] << std::dec
+        //                   << " is not a valid mixdsdf key but has nonzero count: " << nodeCounts_[i] << " before tree update" << std::endl;
         //     }
-        //     // const auto corresponding_ibox = useMixD ? sfcIBox(sfcMixDKey<KeyType>(tree_.codeStart(tree_.toInternal(i))), maxTreeLevel<KeyType>{} - tree_.level(tree_.toInternal(i)), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey<KeyType>(tree_.treeLeaves()[i]), tree_.level(tree_.toInternal(i)));
+
+        //     // const auto corresponding_ibox = useMixD ? sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey<KeyType>(startKey), level);
         //     // const auto [geoCenter, geoSize] = centerAndSize<KeyType>(corresponding_ibox, box_);
-        //     // std::cout << "Key: " << std::oct << tree_.treeLeaves()[i] << std::dec
-        //     //           << " | Level: " << tree_.level(tree_.toInternal(i))
+        //     // std::cout << "Prefix: " << std::oct << prefix << std::dec
+        //     //           << " | StartKey: " << std::oct << startKey << std::dec
+        //     //           << " | Level: " << level
         //     //           << " | Box: ["
         //     //           << corresponding_ibox.xmin() << ", " << corresponding_ibox.ymin() << ", " << corresponding_ibox.zmin()
         //     //           << "] - ["
@@ -185,20 +191,23 @@ public:
             // }
             // std::cout << std::endl;
         }
-        // std::cout << "Leaf keys and node counts:\n";
-        // for (size_t i = 0; i < tree_.treeLeaves().size(); ++i)
+        // for (size_t i = 0; i < tree_.numLeafNodes; ++i)
         // {
         //     // std::cout << std::oct << tree_.treeLeaves()[i] << std::dec << ": " << nodeCounts_[i] << std::endl;
-        //     if (!isValidHilbertMixDKey<KeyType>(tree_.treeLeaves()[i], mixDBits.bx, mixDBits.by, mixDBits.bz) && nodeCounts_[i] != 0)
+        //     const auto prefix = tree_.prefixes[tree_.leafToInternal[i]];
+        //     const auto startKey = decodePlaceholderBit(prefix);
+        //     const auto level = decodePrefixLength(prefix) / 3;
+        //     if (!isValidHilbertMixDKey<KeyType>(prefix, mixDBits.bx, mixDBits.by, mixDBits.bz) && nodeCounts_[i] != 0)
         //     {
-        //         std::cout << "Warning: Leaf key " << std::oct << tree_.treeLeaves()[i] << std::dec
-        //                   << " is not a valid mixdsdf key but has nonzero count: " << nodeCounts_[i] << std::endl;
+        //         std::cout << "Warning: Leaf key " << std::oct << tree_.prefixes[tree_.leafToInternal[i]] << std::dec
+        //                   << " is not a valid mixdsdf key but has nonzero count: " << nodeCounts_[i] << " before tree update" << std::endl;
         //     }
-        //     const auto corresponding_ibox = useMixD ? sfcIBox(sfcMixDKey<KeyType>(tree_.codeStart(tree_.toInternal(i))), maxTreeLevel<KeyType>{} - tree_.level(tree_.toInternal(i)), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey<KeyType>(tree_.treeLeaves()[i]), tree_.level(tree_.toInternal(i)));
+
+        //     const auto corresponding_ibox = useMixD ? sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey<KeyType>(startKey), level);
         //     const auto [geoCenter, geoSize] = centerAndSize<KeyType>(corresponding_ibox, box_);
-        //     std::cout << "Key: " << std::oct << tree_.treeLeaves()[i] << std::dec
-        //               << " | Level: " << tree_.level(tree_.toInternal(i))
-        //               << " | N particles: " << nodeCounts_[i]
+        //     std::cout << "Prefix: " << std::oct << prefix << std::dec
+        //               << " | StartKey: " << std::oct << startKey << std::dec
+        //               << " | Level: " << level
         //               << " | Box: ["
         //               << corresponding_ibox.xmin() << ", " << corresponding_ibox.ymin() << ", " << corresponding_ibox.zmin()
         //               << "] - ["
@@ -209,7 +218,6 @@ public:
         //               << 2 * geoSize[0] << ", " << 2 * geoSize[1] << ", " << 2 * geoSize[2]
         //               << "]" << std::endl;
         // }
-        // std::cout << std::endl;
 
         if constexpr (gpu)
         {
@@ -341,14 +349,48 @@ public:
             mixDBits.by != maxTreeLevel<KeyType>{} ||
             mixDBits.bz != maxTreeLevel<KeyType>{})
         {
+            // std::cout << "GlobalAssignment::distribute called with MixD dimensions: " << mixDBits.bx << " " << mixDBits.by << " "
+                    //   << mixDBits.bz << std::endl;
             computeSfcMixDKeys<gpu>(x + recvStart, y + recvStart, z + recvStart, SfcMixDKindPointer(keys + recvStart), numRecv,
                                 box_, mixDBits.bx, mixDBits.by, mixDBits.bz);
         } else {
+            // std::cout << "GlobalAssignment::distribute called with 3D keys" << std::endl;
             computeSfcKeys<gpu>(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv,
                                 box_);
         }
+        // std::cout << "[GlobalAssignment][distribute] rank " << myRank_ << " after exchange has "
+        //           << (newEnd - newStart) << " assigned particles." << std::endl;
+        // Print assigned particle keys to a file
+        // std::ofstream keyFile("assigned_particle_keys_rank" + std::to_string(myRank_) + ".txt");
+        // if (keyFile.is_open())
+        // {
+        //     keyFile << "[GlobalAssignment][distribute] Assigned particle keys:" << std::endl;
+        //     for (size_t i = 0; i < keyView.size(); ++i)
+        //     {
+        //     keyFile << std::oct << keyView[i] << std::dec << std::endl;
+        //     }
+        //     keyFile.close();
+        // }
+        // else
+        // {
+        //     std::cerr << "Error: Unable to open file assigned_particle_keys.txt for writing." << std::endl;
+        // }
         sequence<gpu>(recvStart, numRecv, reorderFunctor.getBuf(), growthRate_);
         sortByKey<gpu>(keyView, std::span{reorderFunctor.getMap() + newStart, keyView.size()}, s0, s1, growthRate_);
+        // std::ofstream sortedKeyFile("sorted_particle_keys_rank" + std::to_string(myRank_) + ".txt");
+        // if (sortedKeyFile.is_open())
+        // {
+        //     sortedKeyFile << "[GlobalAssignment][distribute] Sorted particle keys:" << std::endl;
+        //     for (size_t i = 0; i < keyView.size(); ++i)
+        //     {
+        //         sortedKeyFile << std::oct << keyView[i] << std::dec << std::endl;
+        //     }
+        //     sortedKeyFile.close();
+        // }
+        // else
+        // {
+        //     std::cerr << "Error: Unable to open file sorted_particle_keys_rank" << myRank_ << ".txt for writing." << std::endl;
+        // }
 
         return std::make_tuple(newStart, keyView.subspan(numSendDown(), numAssigned()));
     }

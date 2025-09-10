@@ -433,6 +433,8 @@ public:
         }
         else
         {
+            // std::cout << "[UpdateMinMac] box_: (" << box_.xmin() << "," << box_.ymin() << "," << box_.zmin() << ") - ("
+            //           << box_.xmax() << "," << box_.ymax() << "," << box_.zmax() << ")" << std::endl;
             centersAcc_.resize(octreeAcc_.numNodes);
             const KeyType* nodeKeys = octreeAcc_.prefixes.data();
 
@@ -539,6 +541,7 @@ public:
         auto [searchCenters, searchSizes] = util::packAllocBuffer(
             scratch, util::TypeList<Vec3<RealType>, Vec3<RealType>>{}, {numLeafNodes, numLeafNodes}, 128);
         gatherAcc<useGpu>(let.leafToInternalSpan(), geoCentersAcc_.data(), searchCenters.data());
+        // gatherAcc<useGpu>(let.leafToInternalSpan(), geoSizesAcc_.data(), searchSizes.data());
         if constexpr (HaveGpu<Accelerator>{})
         {
             fillGpu(layout.data() + firstNode, layout.data() + firstNode + 1, LocalIndex{0});
@@ -564,6 +567,12 @@ public:
             for (std::size_t i = 0; i < numNodesSearch; ++i)
             {
                 auto leafIdx                                           = firstNode + i;
+                // if (searchSizes[leafIdx][0] <= 0 || searchSizes[leafIdx][1] <= 0 || searchSizes[leafIdx][2] <= 0)
+                // {
+                //     // empty cell, skip
+                //     continue;
+                // }
+                // TODO(iomaganaris): what if leafIdx is empty?
                 std::tie(searchCenters[leafIdx], searchSizes[leafIdx]) = computeBoundingBox(
                     x, y, z, h, layout[i], layout[i + 1], Th(2 * searchExtFact), searchCenters[leafIdx]);
             }

@@ -39,6 +39,7 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
     {
         // if the target is empty, we return no overlap
         // std::cout << "[findCollisions] empty target -> no overlap" << std::endl;
+        return;
     }
     auto overlaps = [&](TreeNodeIndex idx)
     {
@@ -151,6 +152,12 @@ void findHalos(const KeyType* prefixes,
 #pragma omp parallel for
     for (TreeNodeIndex leafIdx = firstNode; leafIdx < lastNode; ++leafIdx)
     {
+        if (searchSizes[leafIdx][0] == 0 && searchSizes[leafIdx][1] == 0 && searchSizes[leafIdx][2] == 0)
+        {
+            // if the target is empty, we skip it
+            // std::cout << "[findHalos] Skipping leafIdx: " << leafIdx << std::endl;
+            continue;
+        }
         // if the halo box is fully inside the assigned SFC range, we skip collision detection
         if (use_mixD && containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box, mixDBits.bx, mixDBits.by, mixDBits.bz)) { continue; }
         if (!use_mixD && containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box)) { continue; }
