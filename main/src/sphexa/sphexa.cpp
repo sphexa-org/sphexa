@@ -183,10 +183,12 @@ int main(int argc, char** argv)
             isOutputTriggered = false;
         }
 
-        isSubsetOutputTriggered = isOutputStep(d.iteration, writeFreqStrSubset) ||
-                                  isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStrSubset) ||
-                                  isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtraSubset) ||
-                                  (isWallClockReached && writeEnabledSubset) || isSubsetOutputTriggered;
+        isSubsetOutputTriggered =
+            (isOutputStep(d.iteration, writeFreqStrSubset) ||
+            isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStrSubset) ||
+            isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtraSubset) ||
+            (isWallClockReached && writeEnabledSubset) || isSubsetOutputTriggered) &&
+            d.iteration > startIteration;
 
         if (isSubsetOutputTriggered)
         {
