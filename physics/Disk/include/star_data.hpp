@@ -17,6 +17,9 @@ namespace disk
 
 struct StarData
 {
+    //! @brief Activate read / write attributes
+    bool active{false};
+
     //! @brief The type of the potential to use when computing the gravitational forces involving the central star
     StarPotentialType potentialType{StarPotentialType::newtonian};
 
@@ -49,6 +52,12 @@ struct StarData
 
     //! @brief Limit the timestep depending on changes in the internal energy. delta_t = K_u * u / du
     double K_u{std::numeric_limits<double>::infinity()};
+
+    template<typename Archive>
+    void loadOrStoreIfActive(Archive* ar)
+    {
+        if (active) { loadOrStoreAttributes(ar); }
+    }
 
     template<typename Archive>
     void loadOrStoreAttributes(Archive* ar)
