@@ -14,6 +14,7 @@
 #include "buffer_reduce_concepts.hpp"
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/util/array.hpp"
+#include "cstone/util/tuple_util.hpp"
 
 namespace disk
 {
@@ -40,7 +41,7 @@ requires(std::tuple_size_v<std::decay_t<buffer_type>> ==
             i_buffer++;
         }
     };
-    for_each_tuple([&](auto&& res) { access_buffer(std::forward<decltype(res)>(res)); }, args_tuple);
+    util::for_each_tuple([&](auto&& res) { access_buffer(std::forward<decltype(res)>(res)); }, args_tuple);
 }
 
 template<bufferable_types... T>

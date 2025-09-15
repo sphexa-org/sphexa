@@ -102,7 +102,7 @@ void firstOrderCurve()
                 }
                 {
                     KeyType hilbertKey     = iHilbert<KeyType>(L1Range * xi + L1Range - 1, L1Range * yi + L1Range - 1,
-                                                           L1Range * zi + L1Range - 1);
+                                                               L1Range * zi + L1Range - 1);
                     unsigned hilbertOctant = octalDigit(hilbertKey, 1);
                     EXPECT_EQ(mortonOctant, hilbertToMorton[hilbertOctant]);
                 }

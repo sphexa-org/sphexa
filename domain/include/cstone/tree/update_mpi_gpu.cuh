@@ -18,10 +18,12 @@
 #include <mpi.h>
 #include <span>
 
-#include "cstone/primitives/mpi_wrappers.hpp"
+#include "cstone/primitives/mpi_cuda.cuh"
 #include "cstone/tree/csarray_gpu.h"
+#include "cstone/tree/octree_gpu.h"
 #include "cstone/tree/octree.hpp"
 #include "cstone/tree/update_mpi.hpp"
+#include "cstone/util/pack_buffers.hpp"
 
 namespace cstone
 {
@@ -39,45 +41,58 @@ namespace cstone
 template<class KeyType, class DevKeyVec, class DevCountVec>
 bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
                            unsigned bucketSize,
-                           Octree<KeyType>& tree,
+                           OctreeData<KeyType, GpuTag>& tree,
+                           std::vector<KeyType>& leaves,
                            DevKeyVec& d_csTree,
                            std::vector<unsigned>& counts,
-                           DevCountVec& d_counts)
+                           DevCountVec& d_countsBuf)
 {
     unsigned maxCount = std::numeric_limits<unsigned>::max();
-    bool converged    = tree.rebalance(bucketSize, counts);
+    auto newNumNodes =
+        computeNodeOpsGpu(d_csTree.data(), nNodes(d_csTree), d_countsBuf.data(), bucketSize, tree.childOffsets.data());
+    reallocate(tree.prefixes, newNumNodes + 1, 1.01);
+    bool converged = rebalanceTreeGpu(d_csTree.data(), nNodes(d_csTree), newNumNodes, tree.childOffsets.data(),
+                                      tree.prefixes.data());
+    swap(d_csTree, tree.prefixes);
 
-    counts.resize(tree.numLeafNodes());
-    reallocate(d_csTree, tree.numLeafNodes() + 1, 1.01);
-    reallocate(d_counts, tree.numLeafNodes(), 1.01);
+    tree.resize(newNumNodes);
+    buildOctreeGpu(d_csTree.data(), tree.data());
 
-    memcpyH2D(tree.treeLeaves().data(), d_csTree.size(), d_csTree.data());
-    computeNodeCountsGpu(rawPtr(d_csTree), rawPtr(d_counts), tree.numLeafNodes(), keys, maxCount, true);
+    counts.resize(tree.numLeafNodes);
+    reallocate(leaves, tree.numLeafNodes + 1, 1.01);
+    memcpyD2H(d_csTree.data(), d_csTree.size(), leaves.data());
+
+    size_t numLeafNodes = tree.numLeafNodes;
+    auto [d_counts, d_countsRed] =
+        util::packAllocBuffer(d_countsBuf, util::TypeList<unsigned, unsigned>{}, {numLeafNodes, numLeafNodes}, 128);
+
+    computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys, maxCount, true);
+
+    syncGpu();
+    mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, MPI_COMM_WORLD);
+    sequenceMax(d_counts.data(), d_counts.data() + d_counts.size(), d_countsRed.data(), d_counts.data());
+
+    reallocate(counts, numLeafNodes, 1.01);
     memcpyD2H(d_counts.data(), d_counts.size(), counts.data());
-
-    std::vector<unsigned> counts_reduced(counts.size());
-    MPI_Allreduce(counts.data(), counts_reduced.data(), counts.size(), MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
-
-#pragma omp parallel for schedule(static)
-    for (size_t i = 0; i < counts.size(); ++i)
-    {
-        counts[i] = std::max(counts[i], counts_reduced[i]);
-    }
-    memcpyH2D(counts.data(), counts.size(), rawPtr(d_counts));
+    d_countsBuf.resize(numLeafNodes);
 
     return converged;
 }
 
-template<bool useGpu, class KeyType, class DevKeyVec, class DevCountVec>
+template<class KeyType, class Accelerator, class DevKeyVec, class DevCountVec>
 bool updateOctreeGlobal(std::span<const KeyType> keys,
                         unsigned bucketSize,
-                        Octree<KeyType>& tree,
+                        OctreeData<KeyType, Accelerator>& tree,
+                        std::vector<KeyType>& leaves,
                         DevKeyVec& d_csTree,
                         std::vector<unsigned>& counts,
                         DevCountVec& d_counts)
 {
-    if constexpr (useGpu) { return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, counts, d_counts); }
-    else { return updateOctreeGlobal(keys, bucketSize, tree, counts); }
+    if constexpr (HaveGpu<Accelerator>{})
+    {
+        return updateOctreeGlobalGpu(keys, bucketSize, tree, leaves, d_csTree, counts, d_counts);
+    }
+    else { return updateOctreeGlobal(keys, bucketSize, tree, leaves, counts); }
 }
 
 } // namespace cstone

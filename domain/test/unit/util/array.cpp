@@ -194,7 +194,7 @@ TEST(Array, reduction)
 
     util::array<size_t, 3> sum{0ul, 0ul, 0ul};
 
-#pragma omp declare reduction(+ : array <size_t, 3> : omp_out += omp_in) initializer(omp_priv(omp_orig))
+#pragma omp declare reduction(+ : array<size_t, 3> : omp_out += omp_in) initializer(omp_priv(omp_orig))
 
 #pragma omp parallel for reduction(+ : sum)
     for (size_t i = 0; i < numElements; ++i)

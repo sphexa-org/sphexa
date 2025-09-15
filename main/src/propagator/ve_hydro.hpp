@@ -126,9 +126,6 @@ public:
                         std::tuple_cat(std::tie(get<"m">(d)), get<ConservedFields>(d)), get<DependentFields>(d));
         }
         d.treeView = domain.octreeProperties();
-        timer.logStatistics("numParticles", domain.nParticles());
-        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
-        timer.logStatistics("assignment", domain.assignmentStart());
     }
 
     void computeForces(DomainType& domain, DataType& simData) override
@@ -137,6 +134,9 @@ public:
         pmReader.start();
         sync(domain, simData);
         timer.step("domain::sync");
+        timer.logStatistics("numParticles", domain.nParticles());
+        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
+        timer.logStatistics("assignment", domain.assignmentStart());
 
         auto& d = simData.hydro;
         d.resizeAcc(domain.nParticlesWithHalos());

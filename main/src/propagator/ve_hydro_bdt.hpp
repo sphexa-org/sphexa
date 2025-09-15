@@ -217,10 +217,6 @@ public:
 
         if (activeRung(timestep_.substep, timestep_.numRungs) == 0) { fullSync(domain, simData); }
         else { partialSync(domain, simData); }
-
-        timer.logStatistics("numParticles", domain.nParticles());
-        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
-        timer.logStatistics("assignment", domain.assignmentStart());
     }
 
     bool isSynced() override { return activeRung(timestep_.substep, timestep_.numRungs) == 0; }
@@ -231,6 +227,9 @@ public:
         pmReader.start();
         sync(domain, simData);
         timer.step("domain::sync");
+        timer.logStatistics("numParticles", domain.nParticles());
+        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
+        timer.logStatistics("assignment", domain.assignmentStart());
 
         auto&  d     = simData.hydro;
         size_t first = domain.startIndex();

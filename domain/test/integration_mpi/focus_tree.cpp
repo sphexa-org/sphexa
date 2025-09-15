@@ -62,7 +62,7 @@ void globalRandomGaussian(int thisRank, int numRanks)
 
     /*******************************/
 
-    auto peers = findPeersMac(thisRank, assignment, domainTree, box, invThetaEff);
+    auto peers = findPeersMac(thisRank, assignment, domainTree.cdata(), box, invThetaEff);
 
     // peer boundaries are required to be present in the focus tree at all times
     std::vector<KeyType> peerBoundaries;
@@ -111,13 +111,13 @@ void globalRandomGaussian(int thisRank, int numRanks)
     int converged = 0;
     while (converged != numRanks)
     {
-        converged = focusTree.updateTree(peers, assignment, box);
+        converged = focusTree.updateTree(peers, assignment, box, scratch);
         focusTree.updateCounts(particleKeys, tree, counts, scratch);
-        focusTree.updateMinMac(assignment, invThetaEff);
+        focusTree.updateMinMac(assignment, invThetaEff, false);
         MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
         // particle counts must always be valid, whatever state of convergence
-        auto focusCounts      = focusTree.leafCounts();
+        auto focusCounts      = focusTree.leafCountsAcc();
         LocalIndex totalCount = std::accumulate(focusCounts.begin(), focusCounts.end(), LocalIndex(0));
         EXPECT_EQ(totalCount, numParticles * numRanks);
 
@@ -132,7 +132,7 @@ void globalRandomGaussian(int thisRank, int numRanks)
     // the locally built reference tree should be identical to the tree built with distributed particles
     EXPECT_TRUE(std::equal(focusTree.treeLeaves().begin(), focusTree.treeLeaves().end(),
                            referenceFocusTree.treeLeaves().begin()));
-    EXPECT_TRUE(std::equal(focusTree.leafCounts().begin(), focusTree.leafCounts().end(),
+    EXPECT_TRUE(std::equal(focusTree.leafCountsAcc().begin(), focusTree.leafCountsAcc().end(),
                            referenceFocusTree.leafCounts().begin()));
 }
 
