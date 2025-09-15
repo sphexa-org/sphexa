@@ -339,8 +339,6 @@ public:
                 std::visit([size, gr = allocGrowthRate_](auto* arg) { reallocate(*arg, size, gr); }, data_[i]);
             }
         }
-
-        devData.resize(size, allocGrowthRate_);
     }
 
     size_t size()
@@ -354,6 +352,22 @@ public:
             }
         }
         return 0;
+    }
+
+    util::array<std::size_t, 5> memStats()
+    {
+        auto        data_ = data();
+        std::size_t sumOfSize{0}, sumOfCap{0};
+        for (size_t i = 0; i < data_.size(); ++i)
+        {
+            sumOfSize +=
+                std::visit([]<class V>(V* arg) { return sizeof(typename V::value_type) * arg->size(); }, data_[i]);
+            sumOfCap +=
+                std::visit([]<class V>(V* arg) { return sizeof(typename V::value_type) * arg->capacity(); }, data_[i]);
+        }
+
+        std::size_t free{0}, total{0};
+        return {size(), sumOfSize, sumOfCap, free, total};
     }
 
     //! @brief resize GPU arrays if in use, CPU arrays otherwise
@@ -413,13 +427,18 @@ void acquire(Dataset& d, const Fs&... fs)
     d.devData.acquire(fs...);
 }
 
+template<class DataType, std::enable_if_t<not cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
+void deallocateField(DataType&, int)
+{
+}
+
 template<class Dataset, std::enable_if_t<not cstone::HaveGpu<typename Dataset::AcceleratorType>{}, int> = 0>
 void transferToDevice(Dataset&, size_t, size_t, const std::vector<std::string>&)
 {
 }
 
 template<class Dataset, std::enable_if_t<not cstone::HaveGpu<typename Dataset::AcceleratorType>{}, int> = 0>
-void transferAllocatedToDevice(Dataset&, size_t, size_t, const std::vector<std::string>&)
+void migrateToDevice(Dataset&, size_t, size_t)
 {
 }
 
@@ -432,6 +451,18 @@ template<class Vector, class T, std::enable_if_t<not IsDeviceVector<Vector>{}, i
 void fill(Vector& v, size_t first, size_t last, T value)
 {
     std::fill(v.data() + first, v.data() + last, value);
+}
+
+template<class Vector>
+void fillMassHalos(Vector& m, std::size_t first, std::size_t last)
+{
+    using T = std::decay_t<Vector>::value_type;
+    T mass;
+    if constexpr (IsDeviceVector<Vector>{}) { memcpyD2H(m.data() + first, 1, &mass); }
+    else { mass = m[first]; }
+
+    fill(m, 0, first, mass);
+    fill(m, last, m.size(), mass);
 }
 
 } // namespace sphexa
