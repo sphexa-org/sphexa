@@ -32,8 +32,7 @@
 #include "sph/neighborhood_gpu.hpp"
 #include "sph/sph_gpu.hpp"
 #include "sph/particles_data.hpp"
-#include "sph/hydro_ve/iad_kern.hpp"
-#include "sph/hydro_ve/divv_curlv_kern.hpp"
+#include "sph/hydro_ve/iad_divv_curlv_kern.hpp"
 
 namespace sph
 {
@@ -43,17 +42,13 @@ namespace gpu
 template<class Dataset>
 void computeIadDivvCurlv(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    // TODO: the following two loops could theoretically be merged into one with two reductions!
-    IADIjLoop(d.devData.neighborhood, d.K, rawPtr(d.devData.xm), rawPtr(d.devData.kx), rawPtr(d.devData.wh),
-              rawPtr(d.devData.c11), rawPtr(d.devData.c12), rawPtr(d.devData.c13), rawPtr(d.devData.c22),
-              rawPtr(d.devData.c23), rawPtr(d.devData.c33));
-    divVCurlVIjLoop(d.devData.neighborhood, d.K, rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
-                    rawPtr(d.devData.xm), rawPtr(d.devData.kx), rawPtr(d.devData.c11), rawPtr(d.devData.c12),
-                    rawPtr(d.devData.c13), rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33),
-                    rawPtr(d.devData.wh), rawPtr(d.devData.divv),
-                    d.curlv.size() == d.x.size() ? rawPtr(d.devData.curlv) : nullptr, rawPtr(d.devData.dV11),
-                    rawPtr(d.devData.dV12), rawPtr(d.devData.dV13), rawPtr(d.devData.dV22), rawPtr(d.devData.dV23),
-                    rawPtr(d.devData.dV33), d.devData.dV11.size() == d.devData.x.size());
+    iadDivVCurlVIjLoop(d.devData.neighborhood, d.K, rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
+                       rawPtr(d.devData.xm), rawPtr(d.devData.kx), rawPtr(d.devData.c11), rawPtr(d.devData.c12),
+                       rawPtr(d.devData.c13), rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33),
+                       rawPtr(d.devData.wh), rawPtr(d.devData.divv),
+                       d.curlv.size() == d.x.size() ? rawPtr(d.devData.curlv) : nullptr, rawPtr(d.devData.dV11),
+                       rawPtr(d.devData.dV12), rawPtr(d.devData.dV13), rawPtr(d.devData.dV22), rawPtr(d.devData.dV23),
+                       rawPtr(d.devData.dV33), d.devData.dV11.size() == d.devData.x.size());
 
     checkGpuErrors(cudaDeviceSynchronize());
 }
