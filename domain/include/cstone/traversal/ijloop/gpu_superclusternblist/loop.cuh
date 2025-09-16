@@ -18,7 +18,7 @@
 // if 1, a bank-conflict reducing shared memory layout is used which might increase register count
 // and required load/store instructions and thus not necessarily improve performance
 #ifndef CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
-#define CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS 0
+#define CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS 1
 #endif
 
 #include <array>
