@@ -144,12 +144,13 @@ public:
         fillMassHalos(get<"m">(d), first, last);
 
         computeGroups(first, last, d, domain.box(), groups_);
-        updateSmoothingLengthIterativeAndComputeXMass(groups_.view(), d, domain.box());
-        timer.step("XMassWithHUpdate");
+        updateSmoothingLengthIterative(groups_.view(), d, domain.box());
         findNeighborsSfc(groups_.view(), d, domain.box());
         timer.step("FindNeighbors");
         pmReader.step();
 
+        computeXMass(groups_.view(), d, domain.box());
+        timer.step("XMass");
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 

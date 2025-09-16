@@ -137,11 +137,12 @@ public:
 
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
         computeGroups(first, last, d, domain.box(), groups_);
-        updateSmoothingLengthIterativeAndComputeDensity(groups_.view(), d, domain.box());
-        timer.step("DensityWithHUpdate");
+        updateSmoothingLengthIterative(groups_.view(), d, domain.box());
         findNeighborsSfc(groups_.view(), d, domain.box(), true);
         timer.step("FindNeighbors");
 
+        computeDensity(groups_.view(), d, domain.box());
+        timer.step("Density");
         computeEOS_HydroStd(first, last, d);
         timer.step("EquationOfState");
 
