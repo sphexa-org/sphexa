@@ -64,12 +64,18 @@ struct DivVCurlVInteraction
         T v1 = dist * hiInv;
         T Wi = lt::lookup(wh, v1);
 
-        cstone::Vec3<T> termA;
-        termA[0] = -(c11i * rx + c12i * ry + c13i * rz) * Wi;
-        termA[1] = -(c12i * rx + c22i * ry + c23i * rz) * Wi;
-        termA[2] = -(c13i * rx + c23i * ry + c33i * rz) * Wi;
-
-        return std::make_tuple((vx_ji * xmj) * termA, (vy_ji * xmj) * termA, (vz_ji * xmj) * termA);
+        const T dVxiXFactor = (vx_ji * xmj) * (-rx * Wi);
+        const T dVxiYFactor = (vx_ji * xmj) * (-ry * Wi);
+        const T dVxiZFactor = (vx_ji * xmj) * (-rz * Wi);
+        const T dVyiXFactor = (vy_ji * xmj) * (-rx * Wi);
+        const T dVyiYFactor = (vy_ji * xmj) * (-ry * Wi);
+        const T dVyiZFactor = (vy_ji * xmj) * (-rz * Wi);
+        const T dVziXFactor = (vz_ji * xmj) * (-rx * Wi);
+        const T dVziYFactor = (vz_ji * xmj) * (-ry * Wi);
+        const T dVziZFactor = (vz_ji * xmj) * (-rz * Wi);
+        return std::make_tuple(dVxiXFactor, dVxiYFactor, dVxiZFactor, //
+                               dVyiXFactor, dVyiYFactor, dVyiZFactor, //
+                               dVziXFactor, dVziYFactor, dVziZFactor);
     }
 };
 
@@ -82,7 +88,17 @@ struct DivVCurlVPostamble
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
         auto const [i, iPos, hi, vxi, vyi, vzi, xmi, kxi, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
-        const auto [dVxi, dVyi, dVzi]                                                         = result;
+        auto const [dVxiXFactor, dVxiYFactor, dVxiZFactor, dVyiXFactor, dVyiYFactor, dVyiZFactor, dVziXFactor,
+                    dVziYFactor, dVziZFactor]                                                 = result;
+        const cstone::Vec3<T> dVxi = {c11i * dVxiXFactor + c12i * dVxiYFactor + c13i * dVxiZFactor,
+                                      c12i * dVxiXFactor + c22i * dVxiYFactor + c23i * dVxiZFactor,
+                                      c13i * dVxiXFactor + c23i * dVxiYFactor + c33i * dVxiZFactor};
+        const cstone::Vec3<T> dVyi = {c11i * dVyiXFactor + c12i * dVyiYFactor + c13i * dVyiZFactor,
+                                      c12i * dVyiXFactor + c22i * dVyiYFactor + c23i * dVyiZFactor,
+                                      c13i * dVyiXFactor + c23i * dVyiYFactor + c33i * dVyiZFactor};
+        const cstone::Vec3<T> dVzi = {c11i * dVziXFactor + c12i * dVziYFactor + c13i * dVziZFactor,
+                                      c12i * dVziXFactor + c22i * dVziYFactor + c23i * dVziZFactor,
+                                      c13i * dVziXFactor + c23i * dVziYFactor + c33i * dVziZFactor};
 
         T hiInv  = T(1) / hi;
         T hiInv3 = hiInv * hiInv * hiInv;
