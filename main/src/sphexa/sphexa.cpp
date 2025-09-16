@@ -125,7 +125,7 @@ int main(int argc, char** argv)
     auto box = simInit->init(rank, numRanks, problemSize, simData, fileReader.get());
 
     auto& d = simData.hydro;
-    transferAllocatedToDevice(d, 0, d.x.size(), propagator->conservedFields());
+    migrateToDevice(d, 0, d.x.size());
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
 
     d.setNeighborhoodType(nbChoice);

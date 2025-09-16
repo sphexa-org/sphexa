@@ -128,17 +128,14 @@ public:
 
         sync(domain, simData);
         timer.step("domain::sync");
-        timer.logStatistics("numAssigned", domain.nParticles());
-        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
-        timer.logStatistics("assignment", domain.assignmentStart());
+        Base::logDomainStats(domain, simData);
 
         auto& d = simData.hydro;
-        d.resize(domain.nParticlesWithHalos());
+        d.resizeAcc(domain.nParticlesWithHalos());
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
-
         computeGroups(first, last, d, domain.box(), groups_);
         updateSmoothingLengthIterativeAndComputeDensity(groups_.view(), d, domain.box());
         timer.step("DensityWithHUpdate");
