@@ -4,6 +4,6 @@ target_include_directories(sedov_solution PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE
 if(CMAKE_OSX_SYSROOT)
     target_link_libraries(sedov_solution io stdc++)
 else()
-     target_link_libraries(sedov_solution io stdc++fs)
+     target_link_libraries(sedov_solution io)
 endif()
 install(TARGETS sedov_solution RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
