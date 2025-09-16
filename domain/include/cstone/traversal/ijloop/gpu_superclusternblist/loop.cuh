@@ -373,7 +373,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
             Result jResult = {};
 
             warpMask >>= iClusterOffset;
-#pragma unroll
+#pragma clang loop unroll(enable)
             for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
             {
                 const unsigned i = iSupercluster * Config::superclusterSize + c * Config::iSize + threadIdx.x;
@@ -416,14 +416,14 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
             sharedAllocator.alloc<decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(Result())))>();
         auto outputBufferPtrs = util::tupleMap([](auto& array) { return array.data(); }, *outputBuffers);
         auto init             = unwrapModifiers(Result{});
-#pragma unroll
+#pragma clang loop unroll(enable)
         for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
              offset += Config::iThreads * Config::jSize)
             storeParticleData(outputBufferPtrs, offset, init);
 
         __syncthreads();
 
-#pragma unroll
+#pragma clang loop unroll(enable)
         for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
         {
             const unsigned offset = c * Config::iSize + threadIdx.x;
@@ -436,7 +436,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
         __syncthreads();
 
         const unsigned base = iSupercluster * Config::superclusterSize;
-#pragma unroll
+#pragma clang loop unroll(enable)
         for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
              offset += Config::iThreads * Config::jSize)
         {
@@ -452,7 +452,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     }
     else
     {
-#pragma unroll
+#pragma clang loop unroll(enable)
         for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
         {
             const unsigned offset = c * Config::iSize + threadIdx.x;
