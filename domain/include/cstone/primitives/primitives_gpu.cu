@@ -434,4 +434,34 @@ void selectCopyGpu(const TS* src, LocalIndex n, const S* selectFlags, TD* dest)
 template void selectCopyGpu(const int*, LocalIndex, const unsigned*, unsigned*);
 template void selectCopyGpu(const unsigned*, LocalIndex, const unsigned*, unsigned*);
 
+__device__ int d_numNan;
+
+template<class T>
+__global__ void scanNanKernel(const T* data, std::size_t n)
+{
+    std::size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid < n)
+    {
+        if (std::isnan(data[tid])) { atomicAdd(&d_numNan, 1); }
+    }
+}
+
+template<class T>
+int scanNanGpu(const T* data, std::size_t n)
+{
+    unsigned numThreads = 256;
+    unsigned numBlocks  = (n + numThreads - 1) / numThreads;
+
+    int numNan = 0;
+    checkGpuErrors(cudaMemcpyToSymbol(GPU_SYMBOL(d_numNan), &numNan, sizeof(int)));
+    scanNanKernel<<<numBlocks, numThreads>>>(data, n);
+    checkGpuErrors(cudaMemcpyFromSymbol(&numNan, GPU_SYMBOL(d_numNan), sizeof(int)));
+    return numNan;
+}
+
+#define SCAN_NAN_GPU(T) template int scanNanGpu(const T*, std::size_t n)
+
+SCAN_NAN_GPU(double);
+SCAN_NAN_GPU(float);
+
 } // namespace cstone

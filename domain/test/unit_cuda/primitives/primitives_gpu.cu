@@ -38,3 +38,11 @@ TEST(PrimitivesGpu, MinMax)
     EXPECT_EQ(std::get<0>(minMax), 1.);
     EXPECT_EQ(std::get<1>(minMax), 10.);
 }
+
+TEST(PrimitivesGpu, ScanNan)
+{
+    using thrust::raw_pointer_cast;
+    thrust::device_vector<double> v = std::vector<double>{1., 2., 3., NAN, 5., 6., 7., NAN, 9., 10.};
+    int numNan                      = scanNanGpu(raw_pointer_cast(v.data()), v.size());
+    EXPECT_EQ(numNan, 2);
+}

@@ -103,4 +103,7 @@ extern size_t countGpu(const ValueType* first, const ValueType* last, ValueType 
 template<class TS, class TD, class S>
 extern void selectCopyGpu(const TS* src, LocalIndex n, const S* selectFlags, TD* dest);
 
+template<class T>
+extern int scanNanGpu(const T*, std::size_t);
+
 } // namespace cstone
