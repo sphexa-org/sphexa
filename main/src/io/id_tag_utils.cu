@@ -64,7 +64,8 @@ namespace sphexa
  * @param[in]  last             last (excluded) id index
  * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
  */
-void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t last, std::vector<IdType>& taggedIdsIndexes)
+//void findTaggedIdsGPU(const cstone::DeviceVector<IdType>& ids, size_t first, size_t last, std::vector<IdType>& taggedIdsIndexes)
+void findTaggedIdsGPU(std::span<const IdType> ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes)
 {
     const auto devIdSize = last - first;
     thrust::device_vector<IdType> devMask(devIdSize);
@@ -122,7 +123,8 @@ struct IsMaskedGPU
  * @param[in]  last             last (excluded) id index
  * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
  */
-void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t last, std::vector<IdType>& taggedIdsIndexes)
+//void findTaggedIdsGPU(const cstone::DeviceVector<IdType>& ids, size_t first, size_t last, std::vector<IdType>& taggedIdsIndexes)
+void findTaggedIdsGPU(std::span<const IdType> ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes);
 {
 
     // Count number of tagged ids
