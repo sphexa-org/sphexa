@@ -71,7 +71,7 @@ void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t
     thrust::device_vector<IdType> devScanResult(devIdSize);
 
     // Generate mask
-    thrust::transform(ids.data() + first, ids.data() + last, devMask.begin(), MaskFunctor{});
+    thrust::transform(ids.data() + first, ids.data() + last, devMask.begin(), IsMasked{});
 
     // Run scan
     thrust::exclusive_scan(devMask.begin(), devMask.end(), devScanResult.begin());
@@ -101,17 +101,17 @@ void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t
 #else
 
 // TODO: move to hpp in case of unification with CPU version
-struct IsTaggedIdsFunctor
+struct IsMaskedGPU
 {
     const IdType* ids_ptr;
 
     __host__ __device__
-    IsTaggedIdsFunctor(const IdType* ids_ptr_) : ids_ptr(ids_ptr_) {}
+    IsMaskedGPU(const IdType* ids_ptr_) : ids_ptr(ids_ptr_) {}
 
     __device__
     bool operator()(size_t idx) const
     {
-        return MaskFunctor{}(ids_ptr[idx]);
+        return IsMasked{}(ids_ptr[idx]);
     }
 };
 
@@ -126,15 +126,15 @@ void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t
 {
 
     // Count number of tagged ids
-    IsTaggedIdsFunctor isTaggedFunctor(ids.data());
+    IsMaskedGPU isMasked(ids.data());
     auto begin = thrust::make_counting_iterator<size_t>(first);
     auto end   = thrust::make_counting_iterator<size_t>(last);
-    const size_t nTaggedIds = thrust::count_if(thrust::device, begin, end, isTaggedFunctor);
+    const size_t nTaggedIds = thrust::count_if(thrust::device, begin, end, isMasked);
 
     // Save indexes of tagged ids
     thrust::device_vector<IdType> deviceTaggedIdsIndexes(last - first);
     deviceTaggedIdsIndexes.resize(nTaggedIds);
-    thrust::copy_if(thrust::device, begin, end, deviceTaggedIdsIndexes.begin(), isTaggedFunctor);
+    thrust::copy_if(thrust::device, begin, end, deviceTaggedIdsIndexes.begin(), isMasked);
 
     // Copy indices of tagged ids to host vector
     taggedIdsIndexes.clear();

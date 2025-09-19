@@ -117,8 +117,7 @@ void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorT
 #pragma omp parallel for schedule(static)
     for (LocalIndex index = 0; index < numIds; ++index)
     {
-        // rename to IsMasked?
-        flags[index] = MaskFunctor{}(ids[index + first]);
+        flags[index] = IsMasked{}(ids[index + first]);
     }
 
     std::exclusive_scan(flags.begin(), flags.end(), flagsScan.begin(), LocalIndex(0));
@@ -154,7 +153,7 @@ void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorT
         #pragma omp for nowait
         for (IdType index = first; index<last; ++index)
         {
-            if (MaskFunctor{}(ids[index]))
+            if (IsMasked{}(ids[index]))
                 tmpTaggedIdsIndexes.push_back(index);
         }
         #pragma omp critical
