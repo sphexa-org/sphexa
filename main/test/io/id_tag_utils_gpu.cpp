@@ -33,6 +33,8 @@
 
 #include "gtest/gtest.h"
 #include "io/id_tag_utils.hpp"
+
+// TODO: can be .cu unit, using only thrust data structures, e.g. thrust::device_vector
  
 //TODO: create tagged id list, it will be used in multiple tests
 TEST(IO, taggedIdIdentificationGpu)

@@ -120,6 +120,7 @@ TEST(IO, tagIdInSphere)
 
 }
 
+// TODO use separate TESTs
 TEST(IO, taggedIdIdentification)
 {
     uint64_t first;

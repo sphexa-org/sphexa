@@ -34,7 +34,11 @@
 
 #include <vector>
 
+// not needed
 #include "cstone/cuda/device_vector.h"
+/*
+ Remove the headers, template functions, and instantiate for IdType = uint64_t, LocalIndex = uint32_t
+*/
 #include "cstone/tree/definitions.h"
 #include "sph/particles_data.hpp"
 #include "sph/types.hpp"
@@ -55,10 +59,7 @@ constexpr IdType msbMask = static_cast<IdType>(1) << (sizeof(IdType)*8 - 1);
  */
 struct MaskFunctor
 {
-#if defined(__CUDACC__) || defined(__HIPCC__)
-    __device__
-#endif
-    IdType operator()(IdType id) const
+    HOST_DEVICE_FUN IdType operator()(IdType id) const
     {
         return (id & msbMask) != 0;
     }
@@ -71,6 +72,8 @@ struct MaskFunctor
  * @param[in]  last         last (excluded) id index
  * @param[out] taggedIdsIndexes  vector of indexes of tagged ids
  */
+// template<class IdType, class LocalIndex>
+// extern void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes)
 void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes);
 
 /*! @brief Tagged id (in first:last range) identification, GPU version
@@ -104,6 +107,7 @@ void tagIdsInList(cstone::DeviceVector<IdType>& ids, size_t first, size_t last, 
 // Id tagging types selection
 /*! @brief Id tagging spherical volume definition
  */
+// TODO: selection spheres can be stored as cstone::Vec4<Tc>
 struct IdSelectionSphere
 {
     cstone::Vec3<CoordinateType> center;
@@ -124,6 +128,7 @@ using IdSelectionList = IdVectorType;
  * @param[in]  last              last (excluded) id index
  * @param[in]  selSphereData     spherical volume definition
  */
+// TODO: all vectors can be spans or const-spans
 void tagIdsInSphere(IdVectorType& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
     const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
 
