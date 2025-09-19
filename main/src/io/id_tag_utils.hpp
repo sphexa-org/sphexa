@@ -94,15 +94,6 @@ void findTaggedIds(const cstone::DeviceVector<IdType>& ids, size_t first, size_t
  */
 void tagIdsInList(IdVectorType& ids, size_t first, size_t last, const IdVectorType& selectedIds);
 
-/*! @brief Id tagging (in first:last range) from list, GPU version
- *
- * @param[out] ids               id list
- * @param[in]  first             first id index // TODO number of elements and pass iterator?
- * @param[in]  last              last (excluded) id index
- * @param[in]  selectedIds       indexes to be tagged
- */
-void tagIdsInList(cstone::DeviceVector<IdType>& ids, size_t first, size_t last, const IdVectorType& selectedIds);
-
 
 // Id tagging types selection
 /*! @brief Id tagging spherical volume definition
@@ -130,19 +121,6 @@ using IdSelectionList = IdVectorType;
  */
 // TODO: all vectors can be spans or const-spans
 void tagIdsInSphere(IdVectorType& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
-    const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
-
-/*! @brief Id tagging (in first:last range) in spherical volume, GPU version
- *
- * @param[out] ids               ordered id list
- * @param[in]  x                 x coordinates
- * @param[in]  y                 y coordinates
- * @param[in]  z                 z coordinates
- * @param[in]  first             first id index // TODO number of elements and pass iterator?
- * @param[in]  last              last (excluded) id index
- * @param[in]  selSphereData     spherical volume definition
- */
-void tagIdsInSphere(cstone::DeviceVector<IdType>& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
     const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
 
 }

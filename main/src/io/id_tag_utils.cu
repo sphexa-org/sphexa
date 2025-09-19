@@ -50,35 +50,6 @@
 namespace sphexa
 {
 
-/*! @brief Id tagging (in first:last range) from list
- *
- * @param[out] ids          ordered id list
- * @param[in]  first        first id index // TODO number of elements and pass iterator?
- * @param[in]  last         last (excluded) id index
- * @param[in]  selectedIds  vindexes to be tagged
- */
-void tagIdsInList(cstone::DeviceVector<IdType>& ids, size_t first, size_t last, const std::vector<IdType>& selectedIds) 
-{
-    throw std::runtime_error("Not implemented yet");
-}
-
-
-/*! @brief Id tagging (in first:last range) in spherical volume, GPU version
- *
- * @param[out] ids               ordered id list
- * @param[in]  x                 x coordinates
- * @param[in]  y                 y coordinates
- * @param[in]  z                 z coordinates
- * @param[in]  first             first id index // TODO number of elements and pass iterator?
- * @param[in]  last              last (excluded) id index
- * @param[in]  selSphereData     spherical volume definition
- */
-void tagIdsInSphere(cstone::DeviceVector<IdType>& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
-    const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData)
-{
-    throw std::runtime_error("Not implemented yet");
-}
-
 // TODO: the following two functions provides two different implementations of the tagged id identification.
 // The first one uses a prefix scan + scatter based algorithm, while the second one just uses a copy_if step:
 // according to some performace tests, namely the turbulence case of SPH-RUN with 1000^3
