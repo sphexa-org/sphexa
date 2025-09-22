@@ -52,8 +52,6 @@ class Propagator
 
 public:
 
-    using ParticleIndexVectorType = decltype(ParticleDataType::HydroData::id);
-
     Propagator(std::ostream& output, int rank)
         : out(output)
         , timer(output)
@@ -86,9 +84,9 @@ public:
         timer.step("SelectedParticlesFileOutput");
 
         // Find the selected particles positions in dataset
-        ParticleIndexVectorType selectedParticlesIndexes;
+        std::vector<LocalIndex> selectedParticlesIndexes;
         if constexpr (cstone::HaveGpu<typename ParticleDataType::AcceleratorType>{}) {
-            findTaggedIds(simData.hydro.devData.id, first, last, selectedParticlesIndexes);
+            findTaggedIdsGPU(simData.hydro.devData.id, first, last, selectedParticlesIndexes);
         }
         else {
             findTaggedIds(simData.hydro.id, first, last, selectedParticlesIndexes);
@@ -196,7 +194,7 @@ protected:
     }
 
     template<class Dataset>//, std::enable_if_t<not cstone::HaveGpu<typename Dataset::AcceleratorType>{}, int> = 0>
-    void outputSubset(IFileWriter* writer, const ParticleIndexVectorType& selectedParticlesIndexes, Dataset& data) 
+    void outputSubset(IFileWriter* writer, const std::vector<LocalIndex>& selectedParticlesIndexes, Dataset& data) 
     {
         auto indicesDone   = data.subsetOutputFieldIndices;
         auto namesDone     = data.subsetOutputFieldNames;

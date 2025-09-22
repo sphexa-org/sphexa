@@ -47,7 +47,7 @@ namespace sphexa
  * @param[in]  last         last (excluded) id index
  * @param[in]  selectedIds  indexes to be tagged
  */
-void tagIdsInList(std::span<IdType> ids, size_t first, size_t last, std::span<const IdType> selectedIds)
+void tagIdsInList(std::span<IdType> ids, LocalIndex first, LocalIndex last, std::span<const IdType> selectedIds)
 {
     const auto idListBeginIt = ids.begin()+first;
     const auto idListEndIt = ids.begin()+last;
@@ -72,10 +72,8 @@ void tagIdsInList(std::span<IdType> ids, size_t first, size_t last, std::span<co
  * @param[in]  last               last (excluded) id index
  * @param[in]  selSphereData      spherical volume definition
  */
-// void tagIdsInSphere(IdVectorType& ids, const std::vector<CoordinateType>& x, const std::vector<CoordinateType>& y,
-//     const std::vector<CoordinateType>& z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData)
 void tagIdsInSphere(std::span<IdType> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
-    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData)
+    std::span<const CoordinateType> z, LocalIndex firstIndex, LocalIndex lastIndex, const IdSelectionSphere& selSphereData)
 {
     const auto squareRadius = selSphereData.radius*selSphereData.radius;
 #pragma omp parallel for schedule(static)
@@ -109,8 +107,7 @@ void tagIdsInSphere(std::span<IdType> ids, std::span<const CoordinateType> x, st
 template<class IdType, class LocalIndex>
 void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes)
  */
-void findTaggedIds(std::span<const IdType> ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes)
-//void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes)
+void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes)
 {
     using LocalIndex = uint32_t;
     const IdType numIds = last - first;
@@ -143,7 +140,7 @@ void findTaggedIds(std::span<const IdType> ids, size_t first, size_t last, IdVec
  * @param[in]  last             last (excluded) id index
  * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
  */
-void findTaggedIds(const IdVectorType& ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes)
+void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes)
 {
     const IdType hostIdSize = last - first;
     taggedIdsIndexes.clear();

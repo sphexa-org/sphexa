@@ -85,7 +85,7 @@ protected:
                 initStep, particlesData.id);
             }
             else {
-                initSubsets(IdVectorType{IdType(std::get<ScalarValue>(idSelectionList->second.getValue()))},
+                initSubsets(std::vector<IdType>{IdType(std::get<ScalarValue>(idSelectionList->second.getValue()))},
                 initStep, particlesData.id);
             }
         }
@@ -104,7 +104,7 @@ protected:
     * @param[out] ids              id list from hydro data
     */
     void initSubsets(const IdSelectionSphere& selSphereData, int initStep, const std::vector<CoordinateType>& x,
-        const std::vector<CoordinateType>& y, const std::vector<CoordinateType>& z, IdVectorType& ids) const
+        const std::vector<CoordinateType>& y, const std::vector<CoordinateType>& z, std::vector<IdType>& ids) const
     {
         tagIdsInSphere(ids, x, y, z, 0, ids.size(), selSphereData);
 
@@ -117,7 +117,7 @@ protected:
     * @param[in]  initStep       time step at which selection is done
     * @param[out] ids            id list from hydro data
     */
-    void initSubsets(const IdVectorType& selectedIds, int initStep, IdVectorType& ids) const
+    void initSubsets(const std::vector<IdType>& selectedIds, int initStep, std::vector<IdType>& ids) const
     {
         tagIdsInList(ids, 0, ids.size(), selectedIds);
 

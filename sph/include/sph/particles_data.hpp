@@ -479,7 +479,7 @@ void transferToHost(Dataset&, size_t, size_t, const std::vector<std::string>&)
 
 // TODO: passing the entire data is not needed (except for CPU/GPU switching?)
 template<class DataType, std::enable_if_t<not cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
-void createSubsetFieldsBuffer(DataType& data, const std::vector<uint64_t>& subsetIndexes, int fieldIdx, sph::BufferFieldVariant& subsetField)
+void createSubsetFieldsBuffer(DataType& data, const std::vector<uint32_t>& subsetIndexes, int fieldIdx, sph::BufferFieldVariant& subsetField)
 {
     auto createBuffer = [subsetIndexes, &subsetField](const auto* field){
 

@@ -32,24 +32,23 @@
 
 #pragma once
 
-#include <vector>
+#include <numeric>
 #include <span>
+#include <vector>
 
-// not needed
+// // not needed
 #include "cstone/cuda/device_vector.h"
 /*
  Remove the headers, template functions, and instantiate for IdType = uint64_t, LocalIndex = uint32_t
 */
 #include "cstone/tree/definitions.h"
-#include "sph/particles_data.hpp"
 #include "sph/types.hpp"
-#include "ifile_io.hpp"
 
 namespace sphexa
 {
 
-using IdType = uint64_t;//decltype(std::declval<ParticlesData<cstone::CpuTag>>().id)::value_type;// TODO: retrieve type from ParticlesData?
-using IdVectorType = std::vector<IdType>;//decltype(std::declval<ParticlesData<cstone::CpuTag>>().id);
+using IdType = uint64_t;
+using LocalIndex = uint32_t;
 using CoordinateType = sph::SphTypes::CoordinateType;
 
 /*! @brief Tagging mask definition (most significant bit flip)
@@ -73,9 +72,16 @@ struct IsMasked
  * @param[in]  last         last (excluded) id index
  * @param[out] taggedIdsIndexes  vector of indexes of tagged ids
  */
-// template<class IdType, class LocalIndex>
-// extern void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes)
-void findTaggedIds(std::span<const IdType> ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes);
+void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes);
+//
+// template<class IdTypeP, class LocalIndexP>
+// void findTaggedIds(std::span<const IdTypeP> ids, LocalIndexP first, LocalIndexP last, std::vector<LocalIndexP>& taggedIdsIndexes);
+//extern template void findTaggedIds(std::span<const uint64_t> ids, uint32_t first, uint32_t last, std::vector<uint32_t>& taggedIdsIndexes));
+//void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes);
+
+
+
+// void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes);
 
 /*! @brief Tagged id (in first:last range) identification, GPU version
  *
@@ -84,7 +90,7 @@ void findTaggedIds(std::span<const IdType> ids, size_t first, size_t last, IdVec
  * @param[in]  last         last (excluded) id index
  * @param[out] taggedIdsIndexes  vector of indexes of tagged ids
  */
-void findTaggedIdsGPU(const cstone::DeviceVector<IdType>& ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes);
+void findTaggedIdsGPU(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes);
 
 /*! @brief Id tagging (in first:last range) from list, CPU version
  *
@@ -93,7 +99,7 @@ void findTaggedIdsGPU(const cstone::DeviceVector<IdType>& ids, size_t first, siz
  * @param[in]  last              last (excluded) id index
  * @param[in]  selectedIds       indexes to be tagged
  */
-void tagIdsInList(std::span<IdType> ids, size_t first, size_t last, std::span<const IdType> selectedIds);
+void tagIdsInList(std::span<IdType> ids, LocalIndex first, LocalIndex last, std::span<const IdType> selectedIds);
 
 
 // Id tagging types selection
@@ -107,7 +113,7 @@ struct IdSelectionSphere
 };
 /*! @brief Id tagging list definition
  */
-using IdSelectionList = IdVectorType;
+using IdSelectionList = std::vector<IdType>;
 
 
 /*! @brief Id tagging (in first:last range) in spherical volume, CPU version
@@ -121,6 +127,6 @@ using IdSelectionList = IdVectorType;
  * @param[in]  selSphereData     spherical volume definition
  */
 void tagIdsInSphere(std::span<IdType> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
-    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
+    std::span<const CoordinateType> z, LocalIndex firstIndex, LocalIndex lastIndex, const IdSelectionSphere& selSphereData);
 
 }
