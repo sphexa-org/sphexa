@@ -64,8 +64,7 @@ namespace sphexa
  * @param[in]  last             last (excluded) id index
  * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
  */
-//void findTaggedIdsGPU(const cstone::DeviceVector<IdType>& ids, size_t first, size_t last, std::vector<IdType>& taggedIdsIndexes)
-void findTaggedIdsGPU(std::span<const IdType> ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes)
+void findTaggedIdsGPU(std::span<const IdType> ids, size_t first, size_t last, std::vector<LocalIndex>& taggedIdsIndexes)
 {
     const auto devIdSize = last - first;
     thrust::device_vector<IdType> devMask(devIdSize);
@@ -110,7 +109,7 @@ struct IsMaskedGPU
     IsMaskedGPU(const IdType* ids_ptr_) : ids_ptr(ids_ptr_) {}
 
     __device__
-    bool operator()(size_t idx) const
+    bool operator()(LocalIndex idx) const
     {
         return IsMasked{}(ids_ptr[idx]);
     }
@@ -123,14 +122,13 @@ struct IsMaskedGPU
  * @param[in]  last             last (excluded) id index
  * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
  */
-//void findTaggedIdsGPU(const cstone::DeviceVector<IdType>& ids, size_t first, size_t last, std::vector<IdType>& taggedIdsIndexes)
-void findTaggedIdsGPU(std::span<const IdType> ids, size_t first, size_t last, IdVectorType& taggedIdsIndexes);
+void findTaggedIdsGPU(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes)
 {
 
     // Count number of tagged ids
     IsMaskedGPU isMasked(ids.data());
-    auto begin = thrust::make_counting_iterator<size_t>(first);
-    auto end   = thrust::make_counting_iterator<size_t>(last);
+    auto begin = thrust::make_counting_iterator<LocalIndex>(first);
+    auto end   = thrust::make_counting_iterator<LocalIndex>(last);
     const size_t nTaggedIds = thrust::count_if(thrust::device, begin, end, isMasked);
 
     // Save indexes of tagged ids
