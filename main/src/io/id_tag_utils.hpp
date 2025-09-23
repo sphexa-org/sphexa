@@ -36,8 +36,6 @@
 #include <span>
 #include <vector>
 
-// // not needed
-#include "cstone/cuda/device_vector.h"
 /*
  Remove the headers, template functions, and instantiate for IdType = uint64_t, LocalIndex = uint32_t
 */
