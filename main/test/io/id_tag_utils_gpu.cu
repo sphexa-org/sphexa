@@ -36,7 +36,6 @@
 #include "gtest/gtest.h"
 #include "io/id_tag_utils.hpp"
 
-// TODO: can be .cu unit, using only thrust data structures, e.g. thrust::device_vector
 //TODO: some code duplication is present
 //TODO: check if we are using the right types (LocalIndex, IdType)
 std::vector<sphexa::IdType> makeIds(size_t n) {
