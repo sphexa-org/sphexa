@@ -164,18 +164,18 @@ TEST(IO, taggedIdIdentification)
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
         ids[idPos] = ids[idPos] | sphexa::msbMask;
     });
+
     sphexa::findTaggedIds(ids, 0, ids.size(), taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRef);
-
 }
 
 TEST(IO, taggedIdIdentificationWithRange)
 {
     std::vector<uint64_t> ids = makeIds(100);
     std::vector<sphexa::LocalIndex> taggedIdPos;
-
     uint64_t first = 3;
     uint64_t last = 10;
+
     std::vector<sphexa::LocalIndex> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
         ids[idPos] = ids[idPos] | sphexa::msbMask;
@@ -184,18 +184,18 @@ TEST(IO, taggedIdIdentificationWithRange)
     std::copy_if(taggedIdPosRef.begin(), taggedIdPosRef.end(), std::back_inserter(taggedIdPosRefRange), [first, last](auto idPos){
         return idPos >= first && idPos < last;
     });
+
     sphexa::findTaggedIds(ids, first, last, taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRefRange);
-
 }
 
 TEST(IO, taggedIdIdentificationWithRangeStart)
 {
     std::vector<uint64_t> ids = makeIds(100);
     std::vector<sphexa::LocalIndex> taggedIdPos;
-
     uint64_t first = 0;
     uint64_t last = 3;
+
     std::vector<sphexa::LocalIndex> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
         ids[idPos] = ids[idPos] | sphexa::msbMask;
@@ -204,18 +204,18 @@ TEST(IO, taggedIdIdentificationWithRangeStart)
     std::copy_if(taggedIdPosRef.begin(), taggedIdPosRef.end(), std::back_inserter(taggedIdPosRefRange), [first, last](auto idPos){
         return idPos >= first && idPos < last;
     });
+
     sphexa::findTaggedIds(ids, first, last, taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRefRange);
-
 }
 
 TEST(IO, taggedIdIdentificationWithRangeEnd)
 {
     std::vector<uint64_t> ids = makeIds(100);
     std::vector<sphexa::LocalIndex> taggedIdPos;
-
     uint64_t first = 97;
     uint64_t last = 100;
+
     std::vector<sphexa::LocalIndex> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
         ids[idPos] = ids[idPos] | sphexa::msbMask;
@@ -224,9 +224,9 @@ TEST(IO, taggedIdIdentificationWithRangeEnd)
     std::copy_if(taggedIdPosRef.begin(), taggedIdPosRef.end(), std::back_inserter(taggedIdPosRefRange), [first, last](auto idPos){
         return idPos >= first && idPos < last;
     });
+
     sphexa::findTaggedIds(ids, first, last, taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRefRange);
-
 }
 
 TEST(IO, taggedIdIdentificationSingleStart)
