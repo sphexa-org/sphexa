@@ -38,8 +38,8 @@
 
 //TODO: some code duplication is present
 //TODO: check if we are using the right types (LocalIndex, IdType)
-std::vector<uint64_t> makeIds(size_t n) {
-    std::vector<uint64_t> ids(n);
+std::vector<sphexa::IdType> makeIds(size_t n) {
+    std::vector<sphexa::IdType> ids(n);
     std::iota(ids.begin(), ids.end(), 0);
     return ids;
 }
@@ -71,9 +71,9 @@ void makeParticleDistribution(std::vector<sphexa::CoordinateType>& x,
 
 TEST(IO, tagIdInList)
 {
-    std::vector<uint64_t> ids = makeIds(100);
-    std::vector<uint64_t> selectedIds{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
-    std::vector<uint64_t> tagIdsRef = ids;
+    std::vector<sphexa::IdType> ids = makeIds(100);
+    std::vector<sphexa::IdType> selectedIds{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
+    std::vector<sphexa::IdType> tagIdsRef = ids;
     tagIdsRef[0] = 9223372036854775808ULL;
     tagIdsRef[1] = 9223372036854775809ULL;
     tagIdsRef[2] = 9223372036854775810ULL;
@@ -94,11 +94,11 @@ TEST(IO, tagIdInList)
 
 TEST(IO, tagIdInListWithRange)
 {
-    const uint64_t first = 3;
-    const uint64_t last = 10;
-    std::vector<uint64_t> ids = makeIds(100);
-    std::vector<uint64_t> selectedIds{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
-    std::vector<uint64_t> tagIdsRef = ids;
+    sphexa::LocalIndex first = 3;
+    sphexa::LocalIndex last = 10;
+    std::vector<sphexa::IdType> ids = makeIds(100);
+    std::vector<sphexa::IdType> selectedIds{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
+    std::vector<sphexa::IdType> tagIdsRef = ids;
     tagIdsRef[3] = 9223372036854775811ULL;
     tagIdsRef[6] = 9223372036854775814ULL;
 
@@ -108,7 +108,7 @@ TEST(IO, tagIdInListWithRange)
 
 TEST(IO, tagIdInSphere)
 {
-    std::vector<uint64_t> ids = makeIds(1000);
+    std::vector<sphexa::IdType> ids = makeIds(1000);
 
     // Particle distribution creation
     std::vector<sphexa::CoordinateType> x, y, z;
@@ -131,9 +131,9 @@ TEST(IO, tagIdInSphere)
 
 TEST(IO, tagIdInSphereWithRange)
 {
-    const uint64_t first = 400;
-    const uint64_t last = 500;
-    std::vector<uint64_t> ids = makeIds(1000);
+    sphexa::LocalIndex first = 400;
+    sphexa::LocalIndex last = 500;
+    std::vector<sphexa::IdType> ids = makeIds(1000);
 
     // Particle distribution creation
     std::vector<sphexa::CoordinateType> x, y, z;
@@ -157,7 +157,7 @@ TEST(IO, tagIdInSphereWithRange)
 
 TEST(IO, taggedIdIdentification)
 {
-    std::vector<uint64_t> ids = makeIds(100);
+    std::vector<sphexa::IdType> ids = makeIds(100);
     std::vector<sphexa::LocalIndex> taggedIdPos;
 
     std::vector<sphexa::LocalIndex> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
@@ -171,10 +171,10 @@ TEST(IO, taggedIdIdentification)
 
 TEST(IO, taggedIdIdentificationWithRange)
 {
-    std::vector<uint64_t> ids = makeIds(100);
+    std::vector<sphexa::IdType> ids = makeIds(100);
     std::vector<sphexa::LocalIndex> taggedIdPos;
-    uint64_t first = 3;
-    uint64_t last = 10;
+    sphexa::LocalIndex first = 3;
+    sphexa::LocalIndex last = 10;
 
     std::vector<sphexa::LocalIndex> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
@@ -191,10 +191,10 @@ TEST(IO, taggedIdIdentificationWithRange)
 
 TEST(IO, taggedIdIdentificationWithRangeStart)
 {
-    std::vector<uint64_t> ids = makeIds(100);
+    std::vector<sphexa::IdType> ids = makeIds(100);
     std::vector<sphexa::LocalIndex> taggedIdPos;
-    uint64_t first = 0;
-    uint64_t last = 3;
+    sphexa::LocalIndex first = 0;
+    sphexa::LocalIndex last = 3;
 
     std::vector<sphexa::LocalIndex> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
@@ -211,10 +211,10 @@ TEST(IO, taggedIdIdentificationWithRangeStart)
 
 TEST(IO, taggedIdIdentificationWithRangeEnd)
 {
-    std::vector<uint64_t> ids = makeIds(100);
+    std::vector<sphexa::IdType> ids = makeIds(100);
     std::vector<sphexa::LocalIndex> taggedIdPos;
-    uint64_t first = 97;
-    uint64_t last = 100;
+    sphexa::LocalIndex first = 97;
+    sphexa::LocalIndex last = 100;
 
     std::vector<sphexa::LocalIndex> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
@@ -231,7 +231,7 @@ TEST(IO, taggedIdIdentificationWithRangeEnd)
 
 TEST(IO, taggedIdIdentificationSingleStart)
 {
-    std::vector<uint64_t> ids = makeIds(100);
+    std::vector<sphexa::IdType> ids = makeIds(100);
     std::vector<sphexa::LocalIndex> taggedIdPos;
 
     std::vector<sphexa::LocalIndex> taggedIdPosRef = {0};
@@ -243,7 +243,7 @@ TEST(IO, taggedIdIdentificationSingleStart)
 
 TEST(IO, taggedIdIdentificationSingleEnd)
 {
-    std::vector<uint64_t> ids = makeIds(100);
+    std::vector<sphexa::IdType> ids = makeIds(100);
     std::vector<sphexa::LocalIndex> taggedIdPos;
 
     std::vector<sphexa::LocalIndex> taggedIdPosRef = {99};
