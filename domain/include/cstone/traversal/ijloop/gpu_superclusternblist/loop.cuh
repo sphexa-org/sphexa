@@ -415,10 +415,9 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                 const unsigned i = iSupercluster * Config::superclusterSize + c * Config::iSize + threadIdx.x;
                 if ((warpMask >> c) & (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j)))
                 {
-                    bool jRequired = i != j;
+                    const bool jRequired = i != j;
                     const auto [iData, iRadiusSq] =
                         getIData(iSuperclusterData, c * Config::iSize + threadIdx.x, i - firstValidBody);
-                    if (!jRequired) jRequired = (i < firstBody) | (i >= lastBody);
                     assert(std::get<0>(iData) == i - firstValidBody);
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
                     bool iClose, jClose;
@@ -427,7 +426,10 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                         iClose = distSq < iRadiusSq;
                         jClose = Config::symmetric && (distSq < jRadiusSq & jRequired);
                     }
-                    else { iClose = jClose = distSq < jRadiusSq; }
+                    else {
+                        iClose = distSq < jRadiusSq;
+                        jClose = Config::symmetric && (iClose & jRequired);
+                    }
                     if (iClose | jClose)
                     {
                         const auto ijInteraction = interaction(iData, jData, ijPosDiff, distSq);
