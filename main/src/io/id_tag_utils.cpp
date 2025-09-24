@@ -47,7 +47,7 @@ namespace sphexa
  * @param[in]  last         last (excluded) id index
  * @param[in]  selectedIds  indexes to be tagged
  */
-void tagIdsInList(std::span<IdType> ids, LocalIndex first, LocalIndex last, std::span<const IdType> selectedIds)
+void tagIdsInList(std::span<IdType> ids, size_t first, size_t last, std::span<const IdType> selectedIds)
 {
     const auto idListBeginIt = ids.begin()+first;
     const auto idListEndIt = ids.begin()+last;
@@ -73,7 +73,7 @@ void tagIdsInList(std::span<IdType> ids, LocalIndex first, LocalIndex last, std:
  * @param[in]  selSphereData      spherical volume definition
  */
 void tagIdsInSphere(std::span<IdType> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
-    std::span<const CoordinateType> z, LocalIndex firstIndex, LocalIndex lastIndex, const IdSelectionSphere& selSphereData)
+    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData)
 {
     const auto squareRadius = selSphereData.radius*selSphereData.radius;
 #pragma omp parallel for schedule(static)
@@ -103,19 +103,15 @@ void tagIdsInSphere(std::span<IdType> ids, std::span<const CoordinateType> x, st
  * @param[in]  last             last (excluded) id index
  * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
  */
-/*
-template<class IdType, class LocalIndex>
-void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes)
- */
-void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes)
+template<class IdTypeP, class LocalIndexP>
+void findTaggedIds(std::span<const IdTypeP> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
 {
-    using LocalIndex = uint32_t;
-    const IdType numIds = last - first;
+    const auto numIds = last - first;
     std::vector<uint8_t> flags(numIds);
-    std::vector<LocalIndex> flagsScan(numIds);
+    std::vector<LocalIndexP> flagsScan(numIds);
 
 #pragma omp parallel for schedule(static)
-    for (LocalIndex index = 0; index < numIds; ++index)
+    for (LocalIndexP index = 0; index < numIds; ++index)
     {
         flags[index] = IsMasked{}(ids[index + first]);
     }
@@ -124,14 +120,12 @@ void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex las
     taggedIdsIndexes.resize(flagsScan.back() + flags.back());
 
 #pragma omp parallel for
-    for (LocalIndex i = 0; i < numIds; i++)
+    for (LocalIndexP i = 0; i < numIds; i++)
     {
         if (flags[i]) { taggedIdsIndexes[flagsScan[i]] = i + first; }
     }
 }
 
-// template void findTaggedIds(std::span<const uint64_t> ids, uint32_t first, uint32_t last, std::vector<uint32_t>&
-// taggedIdsIndexes));
 #else
 /*! @brief Tagged id identification
  *
@@ -140,18 +134,19 @@ void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex las
  * @param[in]  last             last (excluded) id index
  * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
  */
-void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes)
+template<class IdTypeP, class LocalIndexP>
+void findTaggedIds(std::span<const IdTypeP> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
 {
-    const IdType hostIdSize = last - first;
+    const auto hostIdSize = last - first;
     taggedIdsIndexes.clear();
     taggedIdsIndexes.reserve(hostIdSize);
 
     #pragma omp parallel
     {
-        IdVectorType tmpTaggedIdsIndexes;
+        std::vector<LocalIndexP> tmpTaggedIdsIndexes;
 //        tmpTaggedIdsIndexes.reserve(hostIdSize); // TODO: without a better estimate of the size, this is not efficient
         #pragma omp for nowait
-        for (IdType index = first; index<last; ++index)
+        for (LocalIndexP index = first; index<last; ++index)
         {
             if (IsMasked{}(ids[index]))
                 tmpTaggedIdsIndexes.push_back(index);
@@ -162,5 +157,7 @@ void findTaggedIds(std::span<const IdType> ids, LocalIndex first, LocalIndex las
     std::sort(taggedIdsIndexes.begin(), taggedIdsIndexes.end());
 }
 #endif
+
+template void findTaggedIds<IdType, LocalIndex>(std::span<const IdType> ids, size_t first, size_t last, std::vector<LocalIndex>& taggedIdsIndexes);
 
 }

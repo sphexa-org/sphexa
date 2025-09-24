@@ -122,13 +122,14 @@ struct IsMaskedGPU
  * @param[in]  last             last (excluded) id index
  * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
  */
-void findTaggedIdsGPU(std::span<const IdType> ids, LocalIndex first, LocalIndex last, std::vector<LocalIndex>& taggedIdsIndexes)
+template<class IdTypeP, class LocalIndexP>
+void findTaggedIdsGPU(std::span<const IdTypeP> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
 {
 
     // Count number of tagged ids
     IsMaskedGPU isMasked(ids.data());
-    auto begin = thrust::make_counting_iterator<LocalIndex>(first);
-    auto end   = thrust::make_counting_iterator<LocalIndex>(last);
+    auto begin = thrust::make_counting_iterator<IdType>(first);
+    auto end   = thrust::make_counting_iterator<IdType>(last);
     const size_t nTaggedIds = thrust::count_if(thrust::device, begin, end, isMasked);
 
     // Save indexes of tagged ids
@@ -144,5 +145,8 @@ void findTaggedIdsGPU(std::span<const IdType> ids, LocalIndex first, LocalIndex 
     return;
 
 }
+
+template void findTaggedIdsGPU<IdType, LocalIndex>(std::span<const IdType> ids, size_t first, size_t last, std::vector<LocalIndex>& taggedIdsIndexes);
+
 #endif
 }
