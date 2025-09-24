@@ -47,7 +47,8 @@ namespace sphexa
  * @param[in]  last         last (excluded) id index
  * @param[in]  selectedIds  indexes to be tagged
  */
-void tagIdsInList(std::span<IdType> ids, size_t first, size_t last, std::span<const IdType> selectedIds)
+template<class IdTypeP>
+void tagIdsInList(std::span<IdTypeP> ids, size_t first, size_t last, std::span<const IdTypeP> selectedIds)
 {
     const auto idListBeginIt = ids.begin()+first;
     const auto idListEndIt = ids.begin()+last;
@@ -60,6 +61,8 @@ void tagIdsInList(std::span<IdType> ids, size_t first, size_t last, std::span<co
         }
     });
 }
+template void tagIdsInList<IdType>(std::span<IdType> ids, size_t first, size_t last, std::span<const IdType> selectedIds);
+
 
 // TODO: should we save here the list of tagged ids without tag?
 /*! @brief Id tagging (in first:last range) in spherical volume, CPU version
@@ -72,7 +75,8 @@ void tagIdsInList(std::span<IdType> ids, size_t first, size_t last, std::span<co
  * @param[in]  last               last (excluded) id index
  * @param[in]  selSphereData      spherical volume definition
  */
-void tagIdsInSphere(std::span<IdType> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
+template<class IdTypeP>
+void tagIdsInSphere(std::span<IdTypeP> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
     std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData)
 {
     const auto squareRadius = selSphereData.radius*selSphereData.radius;
@@ -85,6 +89,8 @@ void tagIdsInSphere(std::span<IdType> ids, std::span<const CoordinateType> x, st
         }
     }
 }
+template void tagIdsInSphere<IdType>(std::span<IdType> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
+    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
 
 // TODO: the following two functions provides two different implementations of the tagged id identification.
 // The first one uses a prefix scan + scatter based algorithm, similar to the corresponding GPU case

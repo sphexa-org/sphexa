@@ -106,7 +106,7 @@ protected:
     void initSubsets(const IdSelectionSphere& selSphereData, int initStep, const std::vector<CoordinateType>& x,
         const std::vector<CoordinateType>& y, const std::vector<CoordinateType>& z, std::vector<IdType>& ids) const
     {
-        tagIdsInSphere(ids, x, y, z, 0, ids.size(), selSphereData);
+        tagIdsInSphere(std::span<IdType>(ids), x, y, z, 0, ids.size(), selSphereData);
 
         idSubsets_["id_selection_sphere"] = IdSelectionSettings{selSphereData, initStep};
     }
@@ -119,7 +119,7 @@ protected:
     */
     void initSubsets(const std::vector<IdType>& selectedIds, int initStep, std::vector<IdType>& ids) const
     {
-        tagIdsInList(ids, 0, ids.size(), selectedIds);
+        tagIdsInList(std::span<IdType>(ids), 0, ids.size(), std::span<const IdType>(selectedIds));
 
         idSubsets_["id_selection_list"] = IdSelectionSettings{selectedIds, initStep};
     }

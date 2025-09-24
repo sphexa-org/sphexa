@@ -88,7 +88,7 @@ TEST(IO, tagIdInList)
     tagIdsRef[95] = 9223372036854775903ULL;
     tagIdsRef[99] = 9223372036854775907ULL;
 
-    sphexa::tagIdsInList(ids, 0, ids.size(), selectedIds);
+    sphexa::tagIdsInList(std::span<sphexa::IdType>(ids), 0, ids.size(), std::span<const sphexa::IdType>(selectedIds));
     EXPECT_EQ(ids, tagIdsRef);
 }
 
@@ -102,7 +102,7 @@ TEST(IO, tagIdInListWithRange)
     tagIdsRef[3] = 9223372036854775811ULL;
     tagIdsRef[6] = 9223372036854775814ULL;
 
-    sphexa::tagIdsInList(ids, first, last, selectedIds);
+    sphexa::tagIdsInList(std::span<sphexa::IdType>(ids), first, last, std::span<const sphexa::IdType>(selectedIds));
     EXPECT_EQ(ids, tagIdsRef);
 }
 
@@ -123,7 +123,7 @@ TEST(IO, tagIdInSphere)
 
     std::vector<sphexa::LocalIndex> taggedIdxRef{444, 445, 454, 455, 544, 545, 554, 555};
     std::vector<sphexa::LocalIndex> taggedIdx;
-    sphexa::tagIdsInSphere(ids, x, y, z, 0, ids.size(), selSphereData);
+    sphexa::tagIdsInSphere(std::span<sphexa::IdType>(ids), x, y, z, 0, ids.size(), selSphereData);
     sphexa::findTaggedIds(std::span<const sphexa::IdType>(ids), 0, ids.size(), taggedIdx);
     EXPECT_EQ(taggedIdx, taggedIdxRef);
 
@@ -149,7 +149,7 @@ TEST(IO, tagIdInSphereWithRange)
 
     std::vector<sphexa::LocalIndex> taggedIdxRef = {444, 445, 454, 455};
     std::vector<sphexa::LocalIndex> taggedIdx;
-    sphexa::tagIdsInSphere(ids, x, y, z, first, last, selSphereData);
+    sphexa::tagIdsInSphere(std::span<sphexa::IdType>(ids), x, y, z, first, last, selSphereData);
     sphexa::findTaggedIds(std::span<const sphexa::IdType>(ids), 0, ids.size(), taggedIdx);
     EXPECT_EQ(taggedIdx, taggedIdxRef);
 

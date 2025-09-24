@@ -89,8 +89,9 @@ extern template void findTaggedIdsGPU<IdType, LocalIndex>(std::span<const IdType
  * @param[in]  last              last (excluded) id index
  * @param[in]  selectedIds       indexes to be tagged
  */
-void tagIdsInList(std::span<IdType> ids, size_t first, size_t last, std::span<const IdType> selectedIds);
-
+template<class IdTypeP>
+void tagIdsInList(std::span<IdTypeP> ids, size_t first, size_t last, std::span<const IdTypeP> selectedIds);
+extern template void tagIdsInList<IdType>(std::span<IdType> ids, size_t first, size_t last, std::span<const IdType> selectedIds);
 
 // Id tagging types selection
 /*! @brief Id tagging spherical volume definition
@@ -116,7 +117,9 @@ using IdSelectionList = std::vector<IdType>;
  * @param[in]  last              last (excluded) id index
  * @param[in]  selSphereData     spherical volume definition
  */
-void tagIdsInSphere(std::span<IdType> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
+template<class IdTypeP>
+void tagIdsInSphere(std::span<IdTypeP> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
     std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
-
+extern template void tagIdsInSphere<IdType>(std::span<IdType> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
+    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
 }
