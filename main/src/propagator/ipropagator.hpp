@@ -86,10 +86,10 @@ public:
         // Find the selected particles positions in dataset
         std::vector<LocalIndex> selectedParticlesIndexes;
         if constexpr (cstone::HaveGpu<typename ParticleDataType::AcceleratorType>{}) {
-            findTaggedIdsGPU(std::span{simData.hydro.devData.id.data(), simData.hydro.devData.id.size()}, first, last, selectedParticlesIndexes);
+            findTaggedIdsGPU(std::span<const uint64_t>(simData.hydro.devData.id.data(), simData.hydro.devData.id.size()), first, last, selectedParticlesIndexes);
         }
         else {
-            findTaggedIds(simData.hydro.id, first, last, selectedParticlesIndexes);
+            findTaggedIds(std::span<const uint64_t>(simData.hydro.id), first, last, selectedParticlesIndexes);
         }
         writer->addStep(0, selectedParticlesIndexes.size(), selParticlesOutFile);
         simData.hydro.loadOrStoreAttributes(writer);
