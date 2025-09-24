@@ -175,14 +175,29 @@ consteval std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...
     return {};
 }
 
-template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
-inline constexpr std::tuple<Vec3<Tc>, Th, Th, Ts...> loadParticleDataWithRadiusSq(
+template<class Tc, class ThP, class... Ts>
+inline constexpr auto loadParticleDataWithRadiusSq(
     const Tc* x, const Tc* y, const Tc* z, const ThP h, std::tuple<const Ts*...> const& input, LocalIndex index)
 {
-    const Vec3<Tc> pos = {x[index], y[index], z[index]};
-    const Th hi        = loadAtIndexIfPtr(h, index);
-    return std::tuple_cat(std::make_tuple(pos, hi, Th(4) * hi * hi),
-                          util::tupleMap([index](auto const* ptr) { return ptr[index]; }, input));
+    const auto iPos   = std::make_tuple(x[index], y[index], z[index]);
+    const auto iInput = util::tupleMap([index](auto const* ptr) { return ptr[index]; }, input);
+    if constexpr (std::is_pointer_v<ThP>)
+    {
+        const auto hi = loadAtIndexIfPtr(h, index);
+        return std::tuple_cat(std::move(iPos), std::make_tuple(hi, 4 * hi * hi), std::move(iInput));
+    }
+    else { return std::tuple_cat(std::move(iPos), std::move(iInput)); }
+}
+
+template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
+inline constexpr auto dummyParticleDataWithRadiusSq(
+    const Tc*, const Tc*, const Tc*, const ThP, std::tuple<const Ts*...> const&, LocalIndex index)
+{
+    constexpr Tc nan = std::numeric_limits<Tc>::quiet_NaN();
+    if constexpr (std::is_pointer_v<ThP>)
+        return std::make_tuple(nan, nan, nan, Th(0), Th(0), Ts{}...);
+    else
+        return std::make_tuple(nan, nan, nan, Ts{}...);
 }
 
 /*! compute the amount of shared memory required per supercluster for the ij-loop kernel
@@ -209,25 +224,34 @@ constexpr unsigned runIjLoopSharedMemPerSupercluster(unsigned ncmax)
     return iSuperclusterDataSize + nbDataSize + outputBuffersSize;
 }
 
-template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
-inline constexpr std::tuple<Vec3<Tc>, Th, Th, Ts...> dummyParticleDataWithRadiusSq(
-    const Tc*, const Tc*, const Tc*, const ThP, std::tuple<const Ts*...> const&, LocalIndex index)
+template<class ThP, class Tc, class... Ts>
+inline constexpr auto splitParticleDataWithRadiusSq(std::tuple<Tc, Tc, Tc, Ts...> const& particleDataWithRadiusSq,
+                                                    const LocalIndex index,
+                                                    const ThP h)
 {
-    constexpr Vec3<Tc> pos = {std::numeric_limits<Tc>::quiet_NaN(), std::numeric_limits<Tc>::quiet_NaN(),
-                              std::numeric_limits<Tc>::quiet_NaN()};
-    return std::make_tuple(pos, Th(0), Th(0), Ts{}...);
-}
+    using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
 
-template<class Tc, class Th, class... Ts>
-inline constexpr std::tuple<std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...>, Th>
-splitParticleDataWithRadiusSq(std::tuple<Vec3<Tc>, Th, Th, Ts...> const& particleData, const LocalIndex index)
-{
-    return [&]<std::size_t... Is>(std::index_sequence<Is...>)
+    const Vec3<Tc> iPos = {std::get<0>(particleDataWithRadiusSq), std::get<1>(particleDataWithRadiusSq),
+                           std::get<2>(particleDataWithRadiusSq)};
+    Th hi, radiusSq;
+    if constexpr (std::is_pointer_v<ThP>)
     {
-        return std::make_tuple(std::make_tuple(index, std::get<0>(particleData), std::get<1>(particleData),
-                                               std::get<Is + 3>(particleData)...),
-                               std::get<2>(particleData));
-    }(std::index_sequence_for<Ts...>());
+        hi       = std::get<3>(particleDataWithRadiusSq);
+        radiusSq = std::get<4>(particleDataWithRadiusSq);
+    }
+    else
+    {
+        hi       = h;
+        radiusSq = Th(4) * h * h;
+    }
+
+    constexpr std::size_t skip = std::is_pointer_v<ThP> ? 2 : 0;
+    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>)
+    {
+        return std::make_tuple(index, iPos, hi, std::get<Is + 3 + skip>(particleDataWithRadiusSq)...);
+    }(std::make_index_sequence<sizeof...(Ts) - skip>());
+
+    return std::make_tuple(iData, radiusSq);
 }
 
 template<class Config, class ParticleData, class Tc, class ThP, class Input>
@@ -269,16 +293,16 @@ __device__ __forceinline__ auto loadSuperclusterIParticleData(util::SharedMemAll
     return iSuperclusterData;
 }
 
-template<class ISuperclusterData>
+template<class ISuperclusterData, class ThP>
 __device__ __forceinline__ auto
-getIData(ISuperclusterData const& iSuperclusterData, const unsigned offset, const unsigned index)
+getIData(ISuperclusterData const& iSuperclusterData, const unsigned offset, const unsigned index, const ThP h)
 {
 #if CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
     auto iDataWithRadiusSq = util::tupleMap([&](auto const& array) { return array[offset]; }, *iSuperclusterData);
 #else
     auto iDataWithRadiusSq = iSuperclusterData[offset];
 #endif
-    return splitParticleDataWithRadiusSq(iDataWithRadiusSq, index);
+    return splitParticleDataWithRadiusSq(iDataWithRadiusSq, index, h);
 }
 
 template<class Config>
@@ -417,7 +441,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                 {
                     const bool jRequired = i != j;
                     const auto [iData, iRadiusSq] =
-                        getIData(iSuperclusterData, c * Config::iSize + threadIdx.x, i - firstValidBody);
+                        getIData(iSuperclusterData, c * Config::iSize + threadIdx.x, i - firstValidBody, h);
                     assert(std::get<0>(iData) == i - firstValidBody);
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
                     bool iClose, jClose;
@@ -426,7 +450,8 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                         iClose = distSq < iRadiusSq;
                         jClose = Config::symmetric && (distSq < jRadiusSq & jRequired);
                     }
-                    else {
+                    else
+                    {
                         iClose = distSq < jRadiusSq;
                         jClose = Config::symmetric && (iClose & jRequired);
                     }
@@ -472,7 +497,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
         {
             const unsigned offset = c * Config::iSize + threadIdx.x;
             const unsigned i      = iSupercluster * Config::superclusterSize + offset;
-            const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody));
+            const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
             storeTupleISum<Config>(iResults[c / iClustersPerWarp], outputBufferPtrs, c * Config::iSize + threadIdx.x,
                                    true, detail::EmptyPostamble{}, iData);
         }
@@ -488,7 +513,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
             const bool active = (activeMask >> offset) & 1;
             if (i >= firstBody & i < lastBody & active)
             {
-                const auto iData   = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody));
+                const auto iData   = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
                 const auto iResult = util::tupleMap([&](auto const* ptr) { return ptr[offset]; }, outputBufferPtrs);
                 storeParticleData(output, i, postamble(iData, unwrapModifiers(iResult)));
             }
@@ -502,7 +527,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
             const unsigned offset = c * Config::iSize + threadIdx.x;
             const auto i          = iSupercluster * Config::superclusterSize + offset;
             const bool active     = (activeMask >> (c * Config::iSize + threadIdx.x)) & 1;
-            const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody));
+            const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
             storeTupleISum<Config>(iResults[c / iClustersPerWarp], output, i, i >= firstBody & i < lastBody & active,
                                    postamble, iData);
         }
