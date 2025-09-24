@@ -77,13 +77,13 @@ namespace cstone::ijloop
 namespace gpu_supercluster_nb_list_neighborhood_detail
 {
 
-template<class Config, class Tc, class Th>
+template<class Config, class Tc, class ThP>
 struct GpuSuperclusterNbListNeighborhoodImpl
 {
     Box<Tc> box               = {0, 0};
     LocalIndex firstValidBody = 0, totalBodies = 0, firstBody = 0, lastBody = 0;
     const Tc *x = nullptr, *y = nullptr, *z = nullptr;
-    const Th* h = nullptr;
+    ThP h;
     util::UniqueDevicePtr<std::uint32_t[]> neighborData;
     util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo;
     unsigned ncmax       = 0;
@@ -170,7 +170,7 @@ protected:
 
         // for symmetric neighborhoods where the reduction returns more values than the postamble, temporary arrays have
         // to be allocated; in all other cases, this functions just returns the output data pointers
-        auto [tmpOrOutput, tmpHolder] = allocateTemporaries<Config, Tc, Th>(
+        auto [tmpOrOutput, tmpHolder] = allocateTemporaries<Config, Tc, ThP>(
             firstBody, lastBody, makeConst(input), output, std::forward<Interaction>(interaction));
 
         if constexpr (Config::symmetric)
@@ -262,8 +262,8 @@ struct GpuSuperclusterNbListNeighborhood
     unsigned ncmax;
     std::size_t upperBoundBytesPerParticle = 128;
 
-    template<class Tc, class KeyType, class Th>
-    gpu_supercluster_nb_list_neighborhood_detail::GpuSuperclusterNbListNeighborhoodImpl<Config, Tc, Th>
+    template<class Tc, class KeyType, class ThP>
+    gpu_supercluster_nb_list_neighborhood_detail::GpuSuperclusterNbListNeighborhoodImpl<Config, Tc, ThP>
     build(const OctreeNsView<Tc, KeyType>& tree,
           const Box<Tc>& box,
           LocalIndex totalBodies,
@@ -271,7 +271,7 @@ struct GpuSuperclusterNbListNeighborhood
           const Tc* x,
           const Tc* y,
           const Tc* z,
-          const Th* h) const
+          ThP h) const
     {
         using namespace gpu_supercluster_nb_list_neighborhood_detail;
 
@@ -292,7 +292,7 @@ struct GpuSuperclusterNbListNeighborhood
         x -= firstValidBody;
         y -= firstValidBody;
         z -= firstValidBody;
-        h -= firstValidBody;
+        if constexpr (std::is_pointer_v<ThP>) h -= firstValidBody;
 
         const LocalIndex firstISupercluster = superclusterIndex<Config>(groups.firstBody);
         const LocalIndex lastISupercluster  = superclusterIndex<Config>(groups.lastBody - 1) + 1;
@@ -310,14 +310,23 @@ struct GpuSuperclusterNbListNeighborhood
 
         // temporary data arrays, only used during build
         auto jClusterBboxes = computeJClusterBboxes<Config>(firstValidBody, totalBodies, x, y, z, h);
-        auto nodeRMax       = computeNodeRMax<Config>(tree, h + firstValidBody);
         auto superclusterSplitMasks =
             computeSuperclusterSplitMasks<Config>(firstValidBody, groups, firstISupercluster, numISuperclusters);
+
+        using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
+        util::UniqueDevicePtr<Th[]> nodeRMax;
+        ThP nodeRMaxData;
+        if constexpr (std::is_pointer_v<ThP>)
+        {
+            nodeRMax     = computeNodeRMax<Config>(tree, h + firstValidBody);
+            nodeRMaxData = nodeRMax.get();
+        }
+        else { nodeRMaxData = h; }
 
         // main build with octree traversal
         std::size_t neighborDataSize =
             buildNbList<Config>(tree, box, totalBodies, groups, x, y, z, h, firstValidBody, numISuperclusters,
-                                jClusterBboxes.get(), nodeRMax.get(), ncmax, superclusterSplitMasks.get(),
+                                jClusterBboxes.get(), nodeRMaxData, ncmax, superclusterSplitMasks.get(),
                                 neighborData.get(), neighborDataVirtualSize, superclusterInfo.get());
 
         // sort supercluster array by descending neighbor count for load balancing (schedule large work packages first)

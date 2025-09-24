@@ -28,7 +28,7 @@ namespace cstone::ijloop
 namespace gpu_always_traverse_neighborhood_detail
 {
 
-template<bool UsePbc, class Tc, class Th, class KeyType, class In, class Out, class Interaction, class Postamble>
+template<bool UsePbc, class Tc, class ThP, class KeyType, class In, class Out, class Interaction, class Postamble>
 __global__
 __launch_bounds__(TravConfig::numThreads) void runIjLoop(const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
                                                          const Box<Tc> __grid_constant__ box,
@@ -36,7 +36,7 @@ __launch_bounds__(TravConfig::numThreads) void runIjLoop(const OctreeNsView<Tc, 
                                                          const Tc* __restrict__ x,
                                                          const Tc* __restrict__ y,
                                                          const Tc* __restrict__ z,
-                                                         const Th* __restrict__ h,
+                                                         const ThP h,
                                                          const In __grid_constant__ input,
                                                          const Out __grid_constant__ output,
                                                          const Interaction interaction,
@@ -89,14 +89,14 @@ __launch_bounds__(TravConfig::numThreads) void runIjLoop(const OctreeNsView<Tc, 
     }
 }
 
-template<class Tc, class KeyType, class Th>
+template<class Tc, class KeyType, class ThP>
 struct GpuAlwaysTraverseNeighborhoodImpl
 {
     OctreeNsView<Tc, KeyType> tree;
     Box<Tc> box = {0, 0};
     GroupView groups;
     const Tc *x, *y, *z;
-    const Th* h;
+    ThP h;
     unsigned ngmax;
     util::UniqueDevicePtr<LocalIndex[]> neighbors;
     util::UniqueDevicePtr<int[]> globalPool;
@@ -173,8 +173,8 @@ struct GpuAlwaysTraverseNeighborhood
 {
     unsigned ngmax;
 
-    template<class Tc, class KeyType, class Th>
-    gpu_always_traverse_neighborhood_detail::GpuAlwaysTraverseNeighborhoodImpl<Tc, KeyType, Th>
+    template<class Tc, class KeyType, class ThP>
+    gpu_always_traverse_neighborhood_detail::GpuAlwaysTraverseNeighborhoodImpl<Tc, KeyType, ThP>
     build(const OctreeNsView<Tc, KeyType>& tree,
           const Box<Tc>& box,
           const LocalIndex /* totalBodies */,
@@ -182,7 +182,7 @@ struct GpuAlwaysTraverseNeighborhood
           const Tc* x,
           const Tc* y,
           const Tc* z,
-          const Th* h) const
+          ThP h) const
     {
         using namespace gpu_always_traverse_neighborhood_detail;
         return {
@@ -194,7 +194,7 @@ struct GpuAlwaysTraverseNeighborhood
             z,
             h,
             ngmax,
-            util::deviceAlloc<LocalIndex[]>(GpuAlwaysTraverseNeighborhoodImpl<Tc, KeyType, Th>::neighborsSize(ngmax)),
+            util::deviceAlloc<LocalIndex[]>(GpuAlwaysTraverseNeighborhoodImpl<Tc, KeyType, ThP>::neighborsSize(ngmax)),
             util::deviceAlloc<int[]>(TravConfig::poolSize())};
     }
 };

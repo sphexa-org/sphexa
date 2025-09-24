@@ -30,7 +30,7 @@ namespace cstone::ijloop
 namespace cpu_full_nb_list_neighborhood_detail
 {
 
-template<class Tc, class KeyType, class Th>
+template<class Tc, class KeyType, class ThP>
 struct CpuFullNbListNeighborhoodImpl
 {
     OctreeNsView<Tc, KeyType> tree;
@@ -38,7 +38,7 @@ struct CpuFullNbListNeighborhoodImpl
     LocalIndex firstBody, lastBody;
     std::unique_ptr<LocalIndex[]> neighborsCount, neighbors;
     const Tc *x, *y, *z;
-    const Th* h;
+    ThP h;
     unsigned ngmax;
 
     template<class... In, class... Out, class Interaction, class Postamble>
@@ -112,8 +112,8 @@ struct CpuFullNbListNeighborhood
 {
     unsigned ngmax;
 
-    template<class Tc, class KeyType, class Th>
-    cpu_full_nb_list_neighborhood_detail::CpuFullNbListNeighborhoodImpl<Tc, KeyType, Th>
+    template<class Tc, class KeyType, class ThP>
+    cpu_full_nb_list_neighborhood_detail::CpuFullNbListNeighborhoodImpl<Tc, KeyType, ThP>
     build(OctreeNsView<Tc, KeyType> tree,
           const Box<Tc>& box,
           const LocalIndex totalBodies,
@@ -121,13 +121,13 @@ struct CpuFullNbListNeighborhood
           const Tc* const x,
           const Tc* const y,
           const Tc* const z,
-          const Th* const h) const
+          const ThP h) const
     {
         using namespace cpu_full_nb_list_neighborhood_detail;
 
         const LocalIndex numBodies = groups.lastBody - groups.firstBody;
 
-        CpuFullNbListNeighborhoodImpl<Tc, KeyType, Th> nbList{
+        CpuFullNbListNeighborhoodImpl<Tc, KeyType, ThP> nbList{
             tree,
             box,
             groups.firstBody,
@@ -140,16 +140,21 @@ struct CpuFullNbListNeighborhood
             h,
             ngmax};
 
-        Th const* hExt = h;
+        using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
+        ThP hExt = h;
         std::unique_ptr<Th[]> hExtData;
         if (tree.searchExtFactor != 1)
         {
-            hExtData = std::make_unique_for_overwrite<Th[]>(totalBodies);
+            if constexpr (std::is_pointer_v<ThP>)
+            {
+                hExtData = std::make_unique_for_overwrite<Th[]>(totalBodies);
 #pragma omp parallel for
-            for (LocalIndex i = 0; i < numBodies; ++i)
-                hExtData[i] = h[i] * tree.searchExtFactor;
-            tree.searchExtFactor = 1;
-            hExt                 = hExtData.get();
+                for (LocalIndex i = 0; i < numBodies; ++i)
+                    hExtData[i] = h[i] * tree.searchExtFactor;
+                tree.searchExtFactor = 1;
+                hExt                 = hExtData.get();
+            }
+            else { hExt = h * tree.searchExtFactor; }
         }
 
 #pragma omp parallel for

@@ -175,12 +175,12 @@ consteval std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...
     return {};
 }
 
-template<class Tc, class Th, class... Ts>
+template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
 inline constexpr std::tuple<Vec3<Tc>, Th, Th, Ts...> loadParticleDataWithRadiusSq(
-    const Tc* x, const Tc* y, const Tc* z, const Th* h, std::tuple<const Ts*...> const& input, LocalIndex index)
+    const Tc* x, const Tc* y, const Tc* z, const ThP h, std::tuple<const Ts*...> const& input, LocalIndex index)
 {
     const Vec3<Tc> pos = {x[index], y[index], z[index]};
-    const Th hi        = h[index];
+    const Th hi        = loadAtIndexIfPtr(h, index);
     return std::tuple_cat(std::make_tuple(pos, hi, Th(4) * hi * hi),
                           util::tupleMap([index](auto const* ptr) { return ptr[index]; }, input));
 }
@@ -190,11 +190,11 @@ inline constexpr std::tuple<Vec3<Tc>, Th, Th, Ts...> loadParticleDataWithRadiusS
  * @param[in] ncmax maximum number of neighbor clusters for any supercluster
  * @return          total shared memory required per supercluster, in bytes
  */
-template<class Config, class Tc, class Th, class In, class Interaction>
+template<class Config, class Tc, class ThP, class In, class Interaction>
 constexpr unsigned runIjLoopSharedMemPerSupercluster(unsigned ncmax)
 {
-    using ParticleData             = decltype(loadParticleData((Tc*)0, (Tc*)0, (Tc*)0, (Th*)0, In{}, 0));
-    using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq((Tc*)0, (Tc*)0, (Tc*)0, (Th*)0, In{}, 0));
+    using ParticleData             = decltype(loadParticleData((Tc*)0, (Tc*)0, (Tc*)0, (ThP)0, In{}, 0));
+    using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq((Tc*)0, (Tc*)0, (Tc*)0, (ThP)0, In{}, 0));
     using Result =
         std::decay_t<decltype(std::declval<Interaction>()(ParticleData(), ParticleData(), Vec3<Tc>(), Tc(0)))>;
 
@@ -209,9 +209,9 @@ constexpr unsigned runIjLoopSharedMemPerSupercluster(unsigned ncmax)
     return iSuperclusterDataSize + nbDataSize + outputBuffersSize;
 }
 
-template<class Tc, class Th, class... Ts>
+template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
 inline constexpr std::tuple<Vec3<Tc>, Th, Th, Ts...> dummyParticleDataWithRadiusSq(
-    const Tc*, const Tc*, const Tc*, const Th*, std::tuple<const Ts*...> const&, LocalIndex index)
+    const Tc*, const Tc*, const Tc*, const ThP, std::tuple<const Ts*...> const&, LocalIndex index)
 {
     constexpr Vec3<Tc> pos = {std::numeric_limits<Tc>::quiet_NaN(), std::numeric_limits<Tc>::quiet_NaN(),
                               std::numeric_limits<Tc>::quiet_NaN()};
@@ -230,7 +230,7 @@ splitParticleDataWithRadiusSq(std::tuple<Vec3<Tc>, Th, Th, Ts...> const& particl
     }(std::index_sequence_for<Ts...>());
 }
 
-template<class Config, class ParticleData, class Tc, class Th, class Input>
+template<class Config, class ParticleData, class Tc, class ThP, class Input>
 __device__ __forceinline__ auto loadSuperclusterIParticleData(util::SharedMemAllocator& sharedAllocator,
                                                               const LocalIndex firstValidBody,
                                                               const LocalIndex totalBodies,
@@ -238,7 +238,7 @@ __device__ __forceinline__ auto loadSuperclusterIParticleData(util::SharedMemAll
                                                               const Tc* const __restrict__ x,
                                                               const Tc* const __restrict__ y,
                                                               const Tc* const __restrict__ z,
-                                                              const Th* const __restrict__ h,
+                                                              const ThP h,
                                                               Input const& input)
 
 {
@@ -321,7 +321,7 @@ template<class Config,
          unsigned NumSuperclustersPerBlock,
          bool UsePbc,
          class Tc,
-         class Th,
+         class ThP,
          class In,
          class Out,
          class Interaction,
@@ -336,7 +336,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     const Tc* const __restrict__ x,
     const Tc* const __restrict__ y,
     const Tc* const __restrict__ z,
-    const Th* const __restrict__ h,
+    const ThP h,
     const In __grid_constant__ input,
     const Out __grid_constant__ output,
     const Interaction interaction,
@@ -354,6 +354,8 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     assert(blockDim.x == Config::iThreads);
     assert(blockDim.y == Config::jSize);
     assert(blockDim.z == NumSuperclustersPerBlock);
+
+    using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
 
     constexpr unsigned iClustersPerWarp = Config::iThreads / Config::iSize;
 
@@ -373,7 +375,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq(x, y, z, h, input, firstBody));
     using Result = std::decay_t<decltype(interaction(ParticleData(), ParticleData(), Vec3<Tc>(), Tc(0)))>;
 
-    util::SharedMemAllocator sharedAllocator(runIjLoopSharedMemPerSupercluster<Config, Tc, Th, In, Interaction>(ncmax),
+    util::SharedMemAllocator sharedAllocator(runIjLoopSharedMemPerSupercluster<Config, Tc, ThP, In, Interaction>(ncmax),
                                              threadIdx.z);
 
     const auto iSuperclusterData = loadSuperclusterIParticleData<Config, ParticleDataWithRadiusSq>(
@@ -402,7 +404,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
             auto jData                   = (nb < iSuperclusterNeighborsCount & j >= firstValidBody & j < totalBodies)
                                                ? loadParticleData(x, y, z, h, input, j)
                                                : dummyParticleData(x, y, z, h, input, j);
-            const auto jRadiusSq         = radiusSq(jData);
+            const Th jRadiusSq           = radiusSq(jData);
             std::get<0>(jData) -= firstValidBody;
             Result jResult = {};
 
@@ -419,8 +421,13 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                     if (!jRequired) jRequired = (i < firstBody) | (i >= lastBody);
                     assert(std::get<0>(iData) == i - firstValidBody);
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
-                    const bool iClose              = distSq < iRadiusSq;
-                    const bool jClose              = Config::symmetric && (distSq < jRadiusSq & jRequired);
+                    bool iClose, jClose;
+                    if constexpr (std::is_pointer_v<ThP>)
+                    {
+                        iClose = distSq < iRadiusSq;
+                        jClose = Config::symmetric && (distSq < jRadiusSq & jRequired);
+                    }
+                    else { iClose = jClose = distSq < jRadiusSq; }
                     if (iClose | jClose)
                     {
                         const auto ijInteraction = interaction(iData, jData, ijPosDiff, distSq);
@@ -502,7 +509,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 
 template<class Config,
          class Tc,
-         class Th,
+         class ThP,
          class Input,
          class Output,
          class Interaction,
@@ -516,7 +523,7 @@ void runIjLoop(const Box<Tc>& box,
                const Tc* const x,
                const Tc* const y,
                const Tc* const z,
-               const Th* const h,
+               const ThP h,
                Input&& input,
                Output&& output,
                Interaction&& interaction,
@@ -532,7 +539,7 @@ void runIjLoop(const Box<Tc>& box,
     const unsigned numBlocks                    = iceil(numISuperclusters, numSuperclustersPerBlock);
     const unsigned sharedMem =
         numSuperclustersPerBlock *
-        runIjLoopSharedMemPerSupercluster<Config, Tc, Th, std::decay_t<decltype(makeConst(input))>,
+        runIjLoopSharedMemPerSupercluster<Config, Tc, ThP, std::decay_t<decltype(makeConst(input))>,
                                           std::decay_t<Interaction>>(ncmax);
     const auto run = [&](auto usePbc)
     {
@@ -550,13 +557,13 @@ void runIjLoop(const Box<Tc>& box,
         run(std::false_type());
 }
 
-template<class Tc, class Th, class In, class Out, class Interaction>
+template<class Tc, class ThP, class In, class Out, class Interaction>
 __global__ void initResultKernel(const LocalIndex firstBody,
                                  const LocalIndex lastBody,
                                  const Tc* __restrict__ x,
                                  const Tc* __restrict__ y,
                                  const Tc* __restrict__ z,
-                                 const Th* __restrict__ h,
+                                 const ThP h,
                                  const In __grid_constant__ input,
                                  const Out __grid_constant__ output,
                                  Interaction interaction)
@@ -569,13 +576,13 @@ __global__ void initResultKernel(const LocalIndex firstBody,
     storeParticleData(output, i, unwrapModifiers(Result{}));
 }
 
-template<class Config, class Tc, class Th, class Input, class Output, class Interaction>
+template<class Config, class Tc, class ThP, class Input, class Output, class Interaction>
 void initResult(const LocalIndex firstBody,
                 const LocalIndex lastBody,
                 const Tc* x,
                 const Tc* y,
                 const Tc* z,
-                const Th* h,
+                const ThP h,
                 Input&& input,
                 Output&& output,
                 Interaction&& interaction)
@@ -589,14 +596,14 @@ void initResult(const LocalIndex firstBody,
     checkGpuErrors(cudaGetLastError());
 }
 
-template<class Tc, class Th, class In, class Tmp, class Out, class Postamble>
+template<class Tc, class ThP, class In, class Tmp, class Out, class Postamble>
 __global__ void applyPostambleKernel(const LocalIndex firstBody,
                                      const LocalIndex lastBody,
                                      const LocalIndex firstValidBody,
                                      const Tc* __restrict__ x,
                                      const Tc* __restrict__ y,
                                      const Tc* __restrict__ z,
-                                     const Th* __restrict__ h,
+                                     const ThP h,
                                      const In __grid_constant__ input,
                                      const Tmp __grid_constant__ tmp,
                                      const Out __grid_constant__ output,
@@ -611,14 +618,14 @@ __global__ void applyPostambleKernel(const LocalIndex firstBody,
     storeParticleData(output, i, postamble(iData, result));
 }
 
-template<class Config, class Tc, class Th, class Input, class Tmp, class Output, class Postamble>
+template<class Config, class Tc, class ThP, class Input, class Tmp, class Output, class Postamble>
 void applyPostamble(const LocalIndex firstBody,
                     const LocalIndex lastBody,
                     const LocalIndex firstValidBody,
                     const Tc* x,
                     const Tc* y,
                     const Tc* z,
-                    const Th* h,
+                    const ThP h,
                     Input&& input,
                     Tmp&& tmp,
                     Output&& output,

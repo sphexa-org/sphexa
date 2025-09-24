@@ -31,7 +31,7 @@ namespace cstone::ijloop
 namespace gpu_full_nb_list_neighborhood_detail
 {
 
-template<class Tc, class Th, class KeyType>
+template<class Tc, class ThP, class KeyType>
 __global__ __launch_bounds__(TravConfig::numThreads) void gpuFullNbListNeighborhoodBuild(
     const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
     const Box<Tc> __grid_constant__ box,
@@ -39,7 +39,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void gpuFullNbListNeighborh
     const Tc* __restrict__ x,
     const Tc* __restrict__ y,
     const Tc* __restrict__ z,
-    const Th* __restrict__ h,
+    const ThP h,
     const unsigned ngmax,
     LocalIndex* __restrict__ neighbors,
     unsigned* __restrict__ neighborsCount,
@@ -82,14 +82,14 @@ __global__ __launch_bounds__(TravConfig::numThreads) void gpuFullNbListNeighborh
     }
 }
 
-template<class Tc, class Th, class Input, class Output, class Interaction, class Postamble>
+template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble>
 __forceinline__ __device__ void jLoop(const Box<Tc>& box,
                                       const LocalIndex firstBody,
                                       const std::size_t neighborsStride,
                                       const Tc* __restrict__ x,
                                       const Tc* __restrict__ y,
                                       const Tc* __restrict__ z,
-                                      const Th* __restrict__ h,
+                                      const ThP h,
                                       Input&& input,
                                       Output&& output,
                                       Interaction&& interaction,
@@ -121,14 +121,14 @@ __forceinline__ __device__ void jLoop(const Box<Tc>& box,
     storeParticleData(std::forward<Output>(output), i, postamble(iData, unwrapModifiers(result)));
 }
 
-template<int MaxThreads, class Tc, class Th, class In, class Out, class Interaction, class Postamble>
+template<int MaxThreads, class Tc, class ThP, class In, class Out, class Interaction, class Postamble>
 __global__ __launch_bounds__(MaxThreads) void runIjLoop(const Box<Tc> __grid_constant__ box,
                                                         const LocalIndex firstBody,
                                                         const LocalIndex lastBody,
                                                         const Tc* __restrict__ x,
                                                         const Tc* __restrict__ y,
                                                         const Tc* __restrict__ z,
-                                                        const Th* __restrict__ h,
+                                                        const ThP h,
                                                         const In __grid_constant__ input,
                                                         const Out __grid_constant__ output,
                                                         const Interaction interaction,
@@ -144,14 +144,14 @@ __global__ __launch_bounds__(MaxThreads) void runIjLoop(const Box<Tc> __grid_con
           neighborsCount, i);
 }
 
-template<int MaxThreads, class Tc, class Th, class In, class Out, class Interaction, class Postamble>
+template<int MaxThreads, class Tc, class ThP, class In, class Out, class Interaction, class Postamble>
 __global__ __launch_bounds__(MaxThreads) void runIjLoopGrouped(const Box<Tc> __grid_constant__ box,
                                                                const LocalIndex firstBody,
                                                                const LocalIndex lastBody,
                                                                const Tc* __restrict__ x,
                                                                const Tc* __restrict__ y,
                                                                const Tc* __restrict__ z,
-                                                               const Th* __restrict__ h,
+                                                               const ThP h,
                                                                const In __grid_constant__ input,
                                                                const Out __grid_constant__ output,
                                                                const Interaction interaction,
@@ -181,13 +181,13 @@ struct ScaleFunctor
     constexpr T operator()(T x) const { return x * factor; }
 };
 
-template<class Tc, class Th>
+template<class Tc, class ThP>
 struct GpuFullNbListNeighborhoodImpl
 {
     Box<Tc> box = {0, 0};
     LocalIndex firstBody, lastBody;
     const Tc *x, *y, *z;
-    const Th* h;
+    ThP h;
     unsigned ngmax;
     util::UniqueDevicePtr<LocalIndex[]> neighbors;
     util::UniqueDevicePtr<unsigned[]> neighborsCount;
@@ -243,15 +243,15 @@ struct GpuFullNbListNeighborhood
 {
     unsigned ngmax;
 
-    template<class Tc, class KeyType, class Th>
-    gpu_full_nb_list_neighborhood_detail::GpuFullNbListNeighborhoodImpl<Tc, Th> build(OctreeNsView<Tc, KeyType> tree,
-                                                                                      const Box<Tc>& box,
-                                                                                      const LocalIndex totalBodies,
-                                                                                      const GroupView& groups,
-                                                                                      const Tc* x,
-                                                                                      const Tc* y,
-                                                                                      const Tc* z,
-                                                                                      const Th* h) const
+    template<class Tc, class KeyType, class ThP>
+    gpu_full_nb_list_neighborhood_detail::GpuFullNbListNeighborhoodImpl<Tc, ThP> build(OctreeNsView<Tc, KeyType> tree,
+                                                                                       const Box<Tc>& box,
+                                                                                       const LocalIndex totalBodies,
+                                                                                       const GroupView& groups,
+                                                                                       const Tc* x,
+                                                                                       const Tc* y,
+                                                                                       const Tc* z,
+                                                                                       const ThP h) const
     {
         using namespace gpu_full_nb_list_neighborhood_detail;
         const std::size_t numBodies = groups.lastBody - groups.firstBody;

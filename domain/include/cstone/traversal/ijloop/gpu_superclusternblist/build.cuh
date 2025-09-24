@@ -160,13 +160,13 @@ computeSuperclusterSplitMasks(const LocalIndex firstValidBody,
  * @param[out] bboxSizes      j-cluster bounding box sizes
  * @param[out] rMax           max. particle radius (2 * h) in each j-cluster, computed iff Config::symmetric
  */
-template<class Config, class Tc, class Th>
+template<class Config, class Tc, class ThP>
 __global__ void computeJClusterBboxesKernel(const LocalIndex firstValidBody,
                                             const LocalIndex totalBodies,
                                             const Tc* const __restrict__ x,
                                             const Tc* const __restrict__ y,
                                             const Tc* const __restrict__ z,
-                                            const Th* const __restrict__ h,
+                                            const ThP h,
                                             JClusterBbox<Config, Tc>* const __restrict__ bboxes)
 {
     static_assert(GpuConfig::warpSize % Config::jSize == 0);
@@ -230,8 +230,13 @@ __global__ void computeJClusterBboxesKernel(const LocalIndex firstValidBody,
 
     if constexpr (Config::symmetric)
     {
-        const Th hi = h[std::max(std::min(i, totalBodies - 1), firstValidBody)];
-        Th rMax     = 2 * hi;
+        using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
+        Th hi;
+        if constexpr (std::is_pointer_v<ThP>)
+            hi = h[std::max(std::min(i, totalBodies - 1), firstValidBody)];
+        else
+            hi = h;
+        Th rMax = 2 * hi;
 
 #pragma unroll
         for (unsigned offset = Config::jSize / 2; offset >= 1; offset /= 2)
@@ -241,13 +246,13 @@ __global__ void computeJClusterBboxesKernel(const LocalIndex firstValidBody,
     }
 }
 
-template<class Config, class Tc, class Th>
+template<class Config, class Tc, class ThP>
 util::UniqueDevicePtr<JClusterBbox<Config, Tc>[]> computeJClusterBboxes(const LocalIndex firstValidBody,
                                                                         const LocalIndex totalBodies,
                                                                         const Tc* const __restrict__ x,
                                                                         const Tc* const __restrict__ y,
                                                                         const Tc* const __restrict__ z,
-                                                                        const Th* const __restrict__ h)
+                                                                        const ThP h)
 {
     const LocalIndex numJClusters = jClusterIndex<Config>(totalBodies - 1) + 1;
     auto jClusterBboxes           = util::deviceAlloc<JClusterBbox<Config, Tc>[]>(numJClusters);
@@ -344,7 +349,7 @@ sortCandidates(util::SharedMemAllocator& sharedAllocator, std::uint32_t* candida
  * @param[inout] jClusters       array of candidate indices to be pruned, pruning happens in-place
  * @param[inout] numCandidates   number of neighbor clusters
  */
-template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th>
+template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class ThP>
 __device__ __forceinline__ void pruneCandidates(util::SharedMemAllocator& sharedAllocator,
                                                 const Box<Tc>& box,
                                                 const LocalIndex firstValidBody,
@@ -352,8 +357,8 @@ __device__ __forceinline__ void pruneCandidates(util::SharedMemAllocator& shared
                                                 const Tc* const __restrict__ x,
                                                 const Tc* const __restrict__ y,
                                                 const Tc* const __restrict__ z,
-                                                const Th* const __restrict__ h,
-                                                const Th searchExtFactor,
+                                                const ThP h,
+                                                const std::remove_cvref_t<std::remove_pointer_t<ThP>> searchExtFactor,
                                                 const unsigned iSupercluster,
                                                 std::uint32_t* __restrict__ jClusters,
                                                 unsigned& numCandidates)
@@ -362,10 +367,11 @@ __device__ __forceinline__ void pruneCandidates(util::SharedMemAllocator& shared
     assert(blockDim.x * blockDim.y == GpuConfig::warpSize);
     assert(blockDim.z == NumSuperclustersPerBlock);
 
+    using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
     auto xis = sharedAllocator.alloc<Tc[]>(Config::superclusterSize);
     auto yis = sharedAllocator.alloc<Tc[]>(Config::superclusterSize);
     auto zis = sharedAllocator.alloc<Tc[]>(Config::superclusterSize);
-    auto his = sharedAllocator.alloc<Th[]>(Config::superclusterSize);
+    auto his = sharedAllocator.alloc<Th[]>(std::is_pointer_v<ThP> ? Config::superclusterSize : 0);
 
     for (unsigned n = laneIdx; n < Config::superclusterSize; n += GpuConfig::warpSize)
     {
@@ -374,7 +380,7 @@ __device__ __forceinline__ void pruneCandidates(util::SharedMemAllocator& shared
         xis[n] = x[i];
         yis[n] = y[i];
         zis[n] = z[i];
-        his[n] = h[i];
+        if constexpr (std::is_pointer_v<ThP>) his[n] = h[i];
     }
 
     syncWarp();
@@ -400,7 +406,7 @@ __device__ __forceinline__ void pruneCandidates(util::SharedMemAllocator& shared
             const Tc xj                  = x[jClamped];
             const Tc yj                  = y[jClamped];
             const Tc zj                  = z[jClamped];
-            const Th hj                  = h[jClamped];
+            const Th hj                  = loadAtIndexIfPtr(h, jClamped);
 
             for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
             {
@@ -409,13 +415,17 @@ __device__ __forceinline__ void pruneCandidates(util::SharedMemAllocator& shared
                 const unsigned i  = iSupercluster * Config::superclusterSize + si;
                 if (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j))
                 {
-                    const Tc xi       = xis[si];
-                    const Tc yi       = yis[si];
-                    const Tc zi       = zis[si];
-                    const Th hi       = his[si];
-                    Tc xij            = xi - xj;
-                    Tc yij            = yi - yj;
-                    Tc zij            = zi - zj;
+                    const Tc xi = xis[si];
+                    const Tc yi = yis[si];
+                    const Tc zi = zis[si];
+                    Th hi;
+                    if constexpr (std::is_pointer_v<ThP>)
+                        hi = his[si];
+                    else
+                        hi = h;
+                    Tc xij = xi - xj;
+                    Tc yij = yi - yj;
+                    Tc zij = zi - zj;
                     if constexpr (UsePbc)
                     {
                         xij -= (box.boundaryX() == BoundaryType::periodic) * box.lx() * std::rint(xij * box.ilx());
@@ -481,7 +491,7 @@ constexpr __forceinline__ bool includeNbSymmetric(unsigned i, unsigned j, unsign
  * @param[inout] numCandidates       number of candidate cluster indices
  * @param[in]    ncmax               max. number of neighbor clusters (upper bound for numCandidates)
  */
-template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th, class KeyType>
+template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class ThP, class KeyType>
 __device__ __forceinline__ void
 collectJClusterCandidates(util::SharedMemAllocator& sharedAllocator,
                           const OctreeNsView<Tc, KeyType>& tree,
@@ -495,9 +505,9 @@ collectJClusterCandidates(util::SharedMemAllocator& sharedAllocator,
                           const Tc* const __restrict__ x,
                           const Tc* const __restrict__ y,
                           const Tc* const __restrict__ z,
-                          const Th* const __restrict__ h,
+                          const ThP h,
                           const JClusterBbox<Config, Tc>* const __restrict__ jClusterBboxes,
-                          const Th* const __restrict__ nodeRMax,
+                          const ThP nodeRMax,
                           int* __restrict__ globalPool,
                           unsigned* candidates,
                           unsigned& numCandidates,
@@ -506,6 +516,8 @@ collectJClusterCandidates(util::SharedMemAllocator& sharedAllocator,
     const unsigned laneIdx = laneIndex();
     assert(blockDim.x * blockDim.y == GpuConfig::warpSize);
     assert(blockDim.z == NumSuperclustersPerBlock);
+
+    using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
 
     Vec3<Tc> bbMin = {std::numeric_limits<Tc>::max(), std::numeric_limits<Tc>::max(), std::numeric_limits<Tc>::max()};
     Vec3<Tc> bbMax = {std::numeric_limits<Tc>::lowest(), std::numeric_limits<Tc>::lowest(),
@@ -516,14 +528,14 @@ collectJClusterCandidates(util::SharedMemAllocator& sharedAllocator,
     for (unsigned i = firstGroupParticle + laneIdx; i < lastGroupParticle; i += GpuConfig::warpSize)
     {
         const Vec3<Tc> iPos = {x[i], y[i], z[i]};
-        const Tc hBound     = Config::symmetric ? Tc(0) : h[i];
+        const Tc hBound     = Config::symmetric ? Tc(0) : loadAtIndexIfPtr(h, i);
 #pragma unroll
         for (unsigned d = 0; d < 3; ++d)
         {
             bbMin[d] = std::min(bbMin[d], iPos[d] - 2 * hBound);
             bbMax[d] = std::max(bbMax[d], iPos[d] + 2 * hBound);
         }
-        if constexpr (Config::symmetric) groupRMax = std::max(groupRMax, Tc(2) * h[i]);
+        if constexpr (Config::symmetric) groupRMax = std::max(groupRMax, Tc(2) * loadAtIndexIfPtr(h, i));
     }
 #pragma unroll
     for (unsigned d = 0; d < 3; ++d)
@@ -631,7 +643,7 @@ collectJClusterCandidates(util::SharedMemAllocator& sharedAllocator,
 
         const Vec3<Tc> curSrcCenter = centers[sourceQueue]; // Current source cell center
         const Vec3<Tc> curSrcSize   = sizes[sourceQueue];   // Current source cell center
-        const Tc curSrcRMax         = Config::symmetric ? nodeRMax[sourceQueue] : Th(0);
+        const Tc curSrcRMax         = Config::symmetric ? loadAtIndexIfPtr(nodeRMax, sourceQueue) : Th(0);
         const int childBegin        = childOffsets[sourceQueue]; // First child cell
         const bool isNode           = childBegin;
         const bool isClose          = overlaps(curSrcCenter, curSrcSize, curSrcRMax);
@@ -731,30 +743,32 @@ collectJClusterCandidates(util::SharedMemAllocator& sharedAllocator,
  * @param[in]    numCandidates   number of neighbor cluster candidates
  * @param[out]   numJClusters    number of neighbor clusters
  */
-template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th>
-__device__ __forceinline__ void pruneCandidatesAndComputeMasks(util::SharedMemAllocator& sharedAllocator,
-                                                               const Box<Tc>& box,
-                                                               const LocalIndex firstValidBody,
-                                                               const LocalIndex totalBodies,
-                                                               const Tc* const __restrict__ x,
-                                                               const Tc* const __restrict__ y,
-                                                               const Tc* const __restrict__ z,
-                                                               const Th* const __restrict__ h,
-                                                               const Th searchExtFactor,
-                                                               const unsigned iSupercluster,
-                                                               std::uint32_t* __restrict__ jClusters,
-                                                               std::uint32_t* __restrict__ masks,
-                                                               const unsigned numCandidates,
-                                                               unsigned& numJClusters)
+template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class ThP>
+__device__ __forceinline__ void
+pruneCandidatesAndComputeMasks(util::SharedMemAllocator& sharedAllocator,
+                               const Box<Tc>& box,
+                               const LocalIndex firstValidBody,
+                               const LocalIndex totalBodies,
+                               const Tc* const __restrict__ x,
+                               const Tc* const __restrict__ y,
+                               const Tc* const __restrict__ z,
+                               const ThP h,
+                               const std::remove_cvref_t<std::remove_pointer_t<ThP>> searchExtFactor,
+                               const unsigned iSupercluster,
+                               std::uint32_t* __restrict__ jClusters,
+                               std::uint32_t* __restrict__ masks,
+                               const unsigned numCandidates,
+                               unsigned& numJClusters)
 {
     const unsigned laneIdx = laneIndex();
     assert(blockDim.x * blockDim.y == GpuConfig::warpSize);
     assert(blockDim.z == NumSuperclustersPerBlock);
 
+    using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
     auto xis = sharedAllocator.alloc<Tc[]>(Config::superclusterSize);
     auto yis = sharedAllocator.alloc<Tc[]>(Config::superclusterSize);
     auto zis = sharedAllocator.alloc<Tc[]>(Config::superclusterSize);
-    auto his = sharedAllocator.alloc<Th[]>(Config::superclusterSize);
+    auto his = sharedAllocator.alloc<Th[]>(std::is_pointer_v<ThP> ? Config::superclusterSize : 0);
 
     for (unsigned n = laneIdx; n < Config::superclusterSize; n += GpuConfig::warpSize)
     {
@@ -763,7 +777,7 @@ __device__ __forceinline__ void pruneCandidatesAndComputeMasks(util::SharedMemAl
         xis[n] = x[i];
         yis[n] = y[i];
         zis[n] = z[i];
-        his[n] = h[i];
+        if constexpr (std::is_pointer_v<ThP>) his[n] = h[i];
     }
 
     const unsigned maxMasksSize = masksSize<Config>(numCandidates);
@@ -794,22 +808,26 @@ __device__ __forceinline__ void pruneCandidatesAndComputeMasks(util::SharedMemAl
                 const Tc xj = x[j];
                 const Tc yj = y[j];
                 const Tc zj = z[j];
-                const Th hj = h[j];
+                const Th hj = loadAtIndexIfPtr(h, j);
 
                 for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
                 {
                     const unsigned ci = c + iClusterOffset;
                     const unsigned si = ci * Config::iSize + threadIdx.x % Config::iSize;
-                    const unsigned i = iSupercluster * Config::superclusterSize + si;
+                    const unsigned i  = iSupercluster * Config::superclusterSize + si;
                     if (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j))
                     {
-                        const Tc xi       = xis[si];
-                        const Tc yi       = yis[si];
-                        const Tc zi       = zis[si];
-                        const Th hi       = his[si];
-                        Tc xij            = xi - xj;
-                        Tc yij            = yi - yj;
-                        Tc zij            = zi - zj;
+                        const Tc xi = xis[si];
+                        const Tc yi = yis[si];
+                        const Tc zi = zis[si];
+                        Th hi;
+                        if constexpr (std::is_pointer_v<ThP>)
+                            hi = his[si];
+                        else
+                            hi = h;
+                        Tc xij = xi - xj;
+                        Tc yij = yi - yj;
+                        Tc zij = zi - zj;
                         if constexpr (UsePbc)
                         {
                             xij -= (box.boundaryX() == BoundaryType::periodic) * box.lx() * std::rint(xij * box.ilx());
@@ -908,7 +926,7 @@ __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& shar
  *
  * @param[in] ncmax maximum number of neighbor clusters
  */
-template<class Config, class Tc, class Th>
+template<class Config, class Tc, class ThP>
 constexpr unsigned buildNbListSharedMemPerSupercluster(const unsigned ncmax)
 {
     // storage requirements for uncompressed neighbor indices
@@ -924,7 +942,8 @@ constexpr unsigned buildNbListSharedMemPerSupercluster(const unsigned ncmax)
     constexpr unsigned xisSize = Config::superclusterSize * sizeof(Tc);
     constexpr unsigned yisSize = Config::superclusterSize * sizeof(Tc);
     constexpr unsigned zisSize = Config::superclusterSize * sizeof(Tc);
-    constexpr unsigned hisSize = Config::superclusterSize * sizeof(Th);
+    using Th                   = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
+    constexpr unsigned hisSize = std::is_pointer_v<ThP> ? Config::superclusterSize * sizeof(Th) : 0;
 
     // storage requirements for tree traversal
     constexpr unsigned sharedPoolSize = GpuConfig::warpSize * sizeof(int);
@@ -963,7 +982,7 @@ constexpr unsigned buildNbListSharedMemPerSupercluster(const unsigned ncmax)
  * @param[inout] globalBuildData        global build data used to 'allocate' global memory regions per supercluster in a
  * pre-allocated array
  */
-template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class Th, class KeyType>
+template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class ThP, class KeyType>
 __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void buildNbListKernel(
     const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
     const Box<Tc> __grid_constant__ box,
@@ -974,9 +993,9 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
     const Tc* const __restrict__ x,
     const Tc* const __restrict__ y,
     const Tc* const __restrict__ z,
-    const Th* const __restrict__ h,
+    const ThP h,
     const JClusterBbox<Config, Tc>* const __restrict__ jClusterBboxes,
-    const Th* const __restrict__ nodeRMax,
+    const ThP nodeRMax,
     const unsigned ncmax,
     const typename Config::SuperclusterParticleMask* const __restrict__ superclusterSplitMasks,
     std::uint32_t* const __restrict__ neighborData,
@@ -991,7 +1010,9 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
     assert(blockDim.y == GpuConfig::warpSize / Config::iThreads);
     assert(blockDim.z == NumSuperclustersPerBlock);
 
-    util::SharedMemAllocator sharedAllocator(buildNbListSharedMemPerSupercluster<Config, Tc, Th>(ncmax), threadIdx.z);
+    using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
+
+    util::SharedMemAllocator sharedAllocator(buildNbListSharedMemPerSupercluster<Config, Tc, ThP>(ncmax), threadIdx.z);
 
     auto jClusters = sharedAllocator.alloc<std::uint32_t[]>(ncmax);
 
@@ -1046,7 +1067,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
     }
 }
 
-template<class Config, class Tc, class Th, class KeyType>
+template<class Config, class Tc, class ThP, class KeyType>
 std::size_t buildNbList(const OctreeNsView<Tc, KeyType>& tree,
                         const Box<Tc>& box,
                         const LocalIndex totalBodies,
@@ -1054,11 +1075,11 @@ std::size_t buildNbList(const OctreeNsView<Tc, KeyType>& tree,
                         const Tc* const x,
                         const Tc* const y,
                         const Tc* const z,
-                        const Th* const h,
+                        const ThP h,
                         const LocalIndex firstValidBody,
                         const LocalIndex numISuperclusters,
                         const JClusterBbox<Config, Tc>* const jClusterBboxes,
-                        const Th* const nodeRMax,
+                        const ThP nodeRMax,
                         const unsigned ncmax,
                         const typename Config::SuperclusterParticleMask* const superclusterSplitMasks,
                         std::uint32_t* const neighborData,
@@ -1072,7 +1093,7 @@ std::size_t buildNbList(const OctreeNsView<Tc, KeyType>& tree,
     const dim3 blockSize = {Config::iThreads, Config::jSize / Config::numWarpsPerInteraction, numSuperclustersPerBlock};
     const unsigned numBlocks = std::min(GpuConfig::smCount * (TravConfig::numWarpsPerSm / numSuperclustersPerBlock),
                                         (numISuperclusters + numSuperclustersPerBlock - 1) / numSuperclustersPerBlock);
-    const unsigned sharedMem = numSuperclustersPerBlock * buildNbListSharedMemPerSupercluster<Config, Tc, Th>(ncmax);
+    const unsigned sharedMem = numSuperclustersPerBlock * buildNbListSharedMemPerSupercluster<Config, Tc, ThP>(ncmax);
 
     auto globalPool = util::deviceAlloc<int[]>(TravConfig::memPerWarp * numSuperclustersPerBlock * numBlocks);
 

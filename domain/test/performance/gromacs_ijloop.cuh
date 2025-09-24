@@ -95,14 +95,14 @@ struct CjData
     unsigned imask;
 };
 
-template<class Tc, class Th, class KeyType>
+template<class Tc, class ThP, class KeyType>
 std::map<unsigned, std::array<CjData, clusterPairSplit>>
 clusterNeighborsOfSuperCluster(OctreeNsView<Tc, KeyType> const& tree,
                                Box<Tc> const& box,
                                const Tc* x,
                                const Tc* y,
                                const Tc* z,
-                               const Th* h,
+                               const ThP h,
                                const unsigned lastBody,
                                const unsigned ngmax,
                                LocalIndex* neighbors,
@@ -268,7 +268,7 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<T0*, T*...> const& ptrs, c
     }
 }
 
-template<bool UsePbc, class Tc, class Th, class In, class Out, class Interaction>
+template<bool UsePbc, class Tc, class ThP, class In, class Out, class Interaction>
 __global__
 __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(const Box<Tc> box,
                                                                                const LocalIndex firstBody,
@@ -276,7 +276,7 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
                                                                                const Tc* __restrict__ x,
                                                                                const Tc* __restrict__ y,
                                                                                const Tc* __restrict__ z,
-                                                                               const Th* __restrict__ h,
+                                                                               const ThP h,
                                                                                const In __grid_constant__ input,
                                                                                const Out __grid_constant__ output,
                                                                                const Interaction interaction,
@@ -341,7 +341,7 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
                             {
                                 const auto iData               = xqib[i * clusterSize + threadIdx.x];
                                 const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
-                                const Th iRadiusSq             = radiusSq(iData);
+                                const auto iRadiusSq           = radiusSq(iData);
                                 const Tc intBit                = (wexcl & maskJi) ? Tc(1) : Tc(0);
                                 if ((distSq < iRadiusSq) * intBit)
                                 {
@@ -370,7 +370,7 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
     }
 }
 
-template<class Tc, class Th>
+template<class Tc, class ThP>
 struct GromacsLikeNeighborhoodImpl
 {
     thrust::universal_vector<Sci> sciSorted;
@@ -379,7 +379,7 @@ struct GromacsLikeNeighborhoodImpl
     Box<Tc> box;
     LocalIndex firstBody, lastBody;
     const Tc *x, *y, *z;
-    const Th* h;
+    const ThP h;
 
     template<class... In, class... Out, class Interaction>
     void ijLoop(std::tuple<In*...> const& input,
@@ -430,31 +430,31 @@ struct GromacsLikeNeighborhood
 {
     unsigned ngmax;
 
-    template<class Tc, class KeyType, class Th>
-    gromacs_like_neighborhood_detail::GromacsLikeNeighborhoodImpl<Tc, Th> build(OctreeNsView<Tc, KeyType> tree,
-                                                                                const Box<Tc>& box,
-                                                                                const LocalIndex totalBodies,
-                                                                                const GroupView& groups,
-                                                                                const Tc* x,
-                                                                                const Tc* y,
-                                                                                const Tc* z,
-                                                                                const Th* h) const
+    template<class Tc, class KeyType, class ThP>
+    gromacs_like_neighborhood_detail::GromacsLikeNeighborhoodImpl<Tc, ThP> build(OctreeNsView<Tc, KeyType> tree,
+                                                                                 const Box<Tc>& box,
+                                                                                 const LocalIndex totalBodies,
+                                                                                 const GroupView& groups,
+                                                                                 const Tc* x,
+                                                                                 const Tc* y,
+                                                                                 const Tc* z,
+                                                                                 const ThP h) const
     {
         using namespace gromacs_like_neighborhood_detail;
 
         assert(groups.firstBody == 0 && totalBodies == groups.lastBody);
         const unsigned numSuperclusters = iceil(groups.lastBody, superClusterSize);
 
-        GromacsLikeNeighborhoodImpl<Tc, Th> nbList{thrust::universal_vector<Sci>(numSuperclusters),
-                                                   thrust::universal_vector<CjPacked>(0),
-                                                   thrust::universal_vector<Excl>(1),
-                                                   box,
-                                                   groups.firstBody,
-                                                   groups.lastBody,
-                                                   x,
-                                                   y,
-                                                   z,
-                                                   h};
+        GromacsLikeNeighborhoodImpl<Tc, ThP> nbList{thrust::universal_vector<Sci>(numSuperclusters),
+                                                    thrust::universal_vector<CjPacked>(0),
+                                                    thrust::universal_vector<Excl>(1),
+                                                    box,
+                                                    groups.firstBody,
+                                                    groups.lastBody,
+                                                    x,
+                                                    y,
+                                                    z,
+                                                    h};
         nbList.cjPacked.reserve(numSuperclusters);
         nbList.excl.front().pair.fill(0xffffffffu);
 
@@ -481,12 +481,21 @@ struct GromacsLikeNeighborhood
             }
         };
 
-        std::vector<Th> hExt(totalBodies);
-        // trick the default neighbor search to include all neighbors within searchExtFactor
+        using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
+        std::vector<Th> hExt;
+        ThP hExtData;
+
+        if constexpr (std::is_pointer_v<ThP>)
+        {
+            hExt.resize(totalBodies);
+            hExtData = hExt.data();
+            // trick the default neighbor search to include all neighbors within searchExtFactor
 #pragma omp parallel for
-        for (unsigned i = 0; i < totalBodies; ++i)
-            hExt[i] = h[i] * tree.searchExtFactor;
-        tree.searchExtFactor = 1;
+            for (unsigned i = 0; i < totalBodies; ++i)
+                hExt[i] = h[i] * tree.searchExtFactor;
+            tree.searchExtFactor = 1;
+        }
+        else { hExtData = h * tree.searchExtFactor; }
 
 #pragma omp parallel
         {
@@ -495,7 +504,7 @@ struct GromacsLikeNeighborhood
             for (unsigned sci = 0; sci < numSuperclusters; ++sci)
             {
                 const auto superClusterNeighbors = clusterNeighborsOfSuperCluster(
-                    tree, box, x, y, z, hExt.data(), groups.lastBody, ngmax, neighbors.data(), sci);
+                    tree, box, x, y, z, hExtData, groups.lastBody, ngmax, neighbors.data(), sci);
 
                 const unsigned ncjPacked = iceil(superClusterNeighbors.size(), jGroupSize);
                 unsigned cjPackedBegin, cjPackedEnd;

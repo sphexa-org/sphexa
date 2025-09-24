@@ -96,7 +96,7 @@ auto allocateOrMapTemporaries(
  * @return std::tuple of a tuple of temporary pointers and a data holder, which releases all allocated data as soon as
  * it is destructed
  */
-template<class Config, class Tc, class Th, class Input, class... Out, class Interaction>
+template<class Config, class Tc, class ThP, class Input, class... Out, class Interaction>
 auto allocateTemporaries(LocalIndex firstBody,
                          LocalIndex lastBody,
                          Input const&,
@@ -109,7 +109,7 @@ auto allocateTemporaries(LocalIndex firstBody,
         // more values or data types of different sizes than the final output of the postamble
         using ParticleData =
             decltype(loadParticleData(std::declval<Tc*>(), std::declval<Tc*>(), std::declval<Tc*>(),
-                                      std::declval<Th*>(), std::declval<Input>(), std::declval<LocalIndex>()));
+                                      std::declval<ThP>(), std::declval<Input>(), std::declval<LocalIndex>()));
         using Result = decltype(unwrapModifiers(std::forward<Interaction>(interaction)(
             std::declval<ParticleData>(), std::declval<ParticleData>(), std::declval<Vec3<Tc>>(), std::declval<Tc>())));
 

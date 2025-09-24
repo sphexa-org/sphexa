@@ -166,7 +166,7 @@ __device__ __forceinline__ bool tightOverlap(int laneIdx,
  * Constant input pointers are additionally marked __restrict__ to indicate to the compiler that loads
  * can be routed through the read-only/texture cache.
  */
-template<bool UsePbc, class InteractionHandler, class Tc, class Th, class KeyType>
+template<bool UsePbc, class InteractionHandler, class Tc, class ThP, class KeyType>
 __device__ uint2 traverseWarp(const InteractionHandler& handleInteraction,
                               const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i,
                               const Vec3<Tc> targetCenter,
@@ -174,7 +174,7 @@ __device__ uint2 traverseWarp(const InteractionHandler& handleInteraction,
                               const Tc* __restrict__ x,
                               const Tc* __restrict__ y,
                               const Tc* __restrict__ z,
-                              const Th* __restrict__ /*h*/,
+                              const ThP /*h*/,
                               const OctreeNsView<Tc, KeyType>& tree,
                               int initNodeIdx,
                               const Box<Tc>& box,
@@ -336,21 +336,26 @@ static __global__ void resetTraversalCounters()
     targetCounterGlob = 0;
 }
 
-template<class Tc, class Th, class Index>
+template<class Tc, class ThP, class Index>
 __device__ __forceinline__ util::array<Vec4<Tc>, TravConfig::nwt> loadTarget(Index bodyBegin,
                                                                              Index bodyEnd,
                                                                              unsigned lane,
                                                                              const Tc* __restrict__ x,
                                                                              const Tc* __restrict__ y,
                                                                              const Tc* __restrict__ z,
-                                                                             const Th* __restrict__ h)
+                                                                             const ThP h)
 {
     util::array<Vec4<Tc>, TravConfig::nwt> pos_i;
 #pragma unroll
     for (int i = 0; i < TravConfig::nwt; i++)
     {
         Index bodyIdx = imin(bodyBegin + i * GpuConfig::warpSize + lane, bodyEnd - 1);
-        pos_i[i]      = {x[bodyIdx], y[bodyIdx], z[bodyIdx], Tc(2) * h[bodyIdx]};
+        Tc hi;
+        if constexpr (std::is_pointer_v<ThP>)
+            hi = h[bodyIdx];
+        else
+            hi = h;
+        pos_i[i] = {x[bodyIdx], y[bodyIdx], z[bodyIdx], Tc(2) * hi};
     }
     return pos_i;
 }
@@ -400,13 +405,13 @@ warpBbox(const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i)
  *
  * Note: Number of handled particles (bodyEnd - bodyBegin) should be GpuConfig::warpSize * TravConfig::nwt or smaller
  */
-template<class Tc, class Th, class KeyType>
+template<class Tc, class ThP, class KeyType>
 __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::LocalIndex bodyBegin,
                                                                     cstone::LocalIndex bodyEnd,
                                                                     const Tc* __restrict__ x,
                                                                     const Tc* __restrict__ y,
                                                                     const Tc* __restrict__ z,
-                                                                    const Th* __restrict__ h,
+                                                                    const ThP h,
                                                                     const OctreeNsView<Tc, KeyType>& tree,
                                                                     const Box<Tc>& box,
                                                                     cstone::LocalIndex* warpNidx,
@@ -441,13 +446,13 @@ __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::Loca
  *
  * Note: Number of handled particles (bodyEnd - bodyBegin) should be GpuConfig::warpSize * TravConfig::nwt or smaller
  */
-template<class Tc, class Th, class KeyType, class InteractionHandler>
+template<class Tc, class ThP, class KeyType, class InteractionHandler>
 __device__ void traverseNeighbors(cstone::LocalIndex bodyBegin,
                                   cstone::LocalIndex bodyEnd,
                                   const Tc* __restrict__ x,
                                   const Tc* __restrict__ y,
                                   const Tc* __restrict__ z,
-                                  const Th* __restrict__ h,
+                                  const ThP h,
                                   const OctreeNsView<Tc, KeyType>& tree,
                                   const Box<Tc>& box,
                                   const InteractionHandler& handleInteraction,

@@ -36,19 +36,31 @@ inline constexpr std::tuple<const Ts*...> makeConst(std::tuple<Ts*...> input)
     return {input};
 }
 
-template<class Tc, class Th, class... Ts>
+template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
 inline constexpr std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...> loadParticleData(
-    const Tc* x, const Tc* y, const Tc* z, const Th* h, std::tuple<const Ts*...> const& input, LocalIndex index)
+    const Tc* x, const Tc* y, const Tc* z, const ThP h, std::tuple<const Ts*...> const& input, LocalIndex index)
 {
 #ifdef __CUDA_ARCH__
-    const Vec3<Tc> pos = {__ldg(&x[index]), __ldg(&y[index]), __ldg(&z[index])};
-    return std::tuple_cat(std::make_tuple(index, pos, __ldg(&h[index])),
-                          util::tupleMap([index](auto const* ptr) { return __ldg(&ptr[index]); }, input));
+    auto load = [index](auto const* ptr) { return __ldg(&ptr[index]); };
 #else
-    const Vec3<Tc> pos = {x[index], y[index], z[index]};
-    return std::tuple_cat(std::make_tuple(index, pos, h[index]),
-                          util::tupleMap([index](auto const* ptr) { return ptr[index]; }, input));
+    auto load = [index](auto const* ptr) { return ptr[index]; };
 #endif
+    const Vec3<Tc> pos = {load(x), load(y), load(z)};
+    Th hi;
+    if constexpr (std::is_pointer_v<ThP>)
+        hi = load(h);
+    else
+        hi = h;
+    return std::tuple_cat(std::make_tuple(index, pos, hi), util::tupleMap(load, input));
+}
+
+template<class T>
+inline constexpr std::remove_cvref_t<std::remove_pointer_t<T>> loadAtIndexIfPtr(T ptrOrConstant, LocalIndex index)
+{
+    if constexpr (std::is_pointer_v<T>)
+        return ptrOrConstant[index];
+    else
+        return ptrOrConstant;
 }
 
 template<class... Ts>
@@ -58,9 +70,9 @@ storeParticleData(std::tuple<Ts*...> const& output, LocalIndex index, std::tuple
     util::for_each_tuple([index](auto* ptr, auto const& v) { ptr[index] = v; }, output, value);
 }
 
-template<class Tc, class Th, class... Ts>
+template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
 inline constexpr std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...>
-dummyParticleData(const Tc*, const Tc*, const Tc*, const Th*, std::tuple<const Ts*...> const&, LocalIndex index)
+dummyParticleData(const Tc*, const Tc*, const Tc*, const ThP, std::tuple<const Ts*...> const&, LocalIndex index)
 {
     constexpr Vec3<Tc> pos = {std::numeric_limits<Tc>::quiet_NaN(), std::numeric_limits<Tc>::quiet_NaN(),
                               std::numeric_limits<Tc>::quiet_NaN()};

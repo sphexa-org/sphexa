@@ -29,14 +29,14 @@ namespace cstone::ijloop
 
 namespace cpu_always_traverse_neighborhood_detail
 {
-template<class Tc, class KeyType, class Th>
+template<class Tc, class KeyType, class ThP>
 struct CpuAlwaysTraverseNeighborhoodImpl
 {
     OctreeNsView<Tc, KeyType> tree;
     Box<Tc> box = {0, 0};
     LocalIndex firstBody, lastBody;
     const Tc *x, *y, *z;
-    const Th* h;
+    ThP h;
     unsigned ngmax;
 
     template<class... In, class... Out, class Interaction, class Postamble>
@@ -120,8 +120,8 @@ struct CpuAlwaysTraverseNeighborhood
 {
     unsigned ngmax;
 
-    template<class Tc, class KeyType, class Th>
-    cpu_always_traverse_neighborhood_detail::CpuAlwaysTraverseNeighborhoodImpl<Tc, KeyType, Th>
+    template<class Tc, class KeyType, class ThP>
+    cpu_always_traverse_neighborhood_detail::CpuAlwaysTraverseNeighborhoodImpl<Tc, KeyType, ThP>
     build(const OctreeNsView<Tc, KeyType>& tree,
           const Box<Tc>& box,
           const LocalIndex /* totalBodies */,
@@ -129,7 +129,7 @@ struct CpuAlwaysTraverseNeighborhood
           const Tc* const x,
           const Tc* const y,
           const Tc* const z,
-          const Th* const h) const
+          const ThP h) const
     {
         return {tree, box, groups.firstBody, groups.lastBody, x, y, z, h, ngmax};
     }

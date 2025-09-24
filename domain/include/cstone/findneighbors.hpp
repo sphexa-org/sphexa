@@ -74,22 +74,27 @@ HOST_DEVICE_FUN constexpr T distanceSq(T x1, T y1, T z1, T x2, T y2, T z2, const
  * @param[out] neighbors       output to store the neighbors
  * @return                     neighbor count of particle @p i, does not include self-reference; min return val is 0.
  */
-template<class Tc, class Th, class KeyType>
+template<class Tc, class ThP, class KeyType>
 HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
                                        const Tc* x,
                                        const Tc* y,
                                        const Tc* z,
-                                       const Th* h,
+                                       const ThP h,
                                        const OctreeNsView<Tc, KeyType>& tree,
                                        const Box<Tc>& box,
                                        unsigned ngmax,
                                        LocalIndex* neighbors,
                                        unsigned long neighborsStride = 1)
 {
-    auto xi = x[i];
-    auto yi = y[i];
-    auto zi = z[i];
-    auto hi = h[i];
+    using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
+    Tc xi    = x[i];
+    Tc yi    = y[i];
+    Tc zi    = z[i];
+    Th hi;
+    if constexpr (std::is_pointer_v<ThP>)
+        hi = h[i];
+    else
+        hi = h;
 
     auto radiusSq     = Th(4.0) * hi * hi;
     auto cellRadiusSq = radiusSq * tree.searchExtFactor * tree.searchExtFactor;
@@ -148,15 +153,15 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
     return numNeighbors;
 }
 
-template<class T, class KeyType>
-void findNeighbors(const T* x,
-                   const T* y,
-                   const T* z,
-                   const T* h,
+template<class Tc, class ThP, class KeyType>
+void findNeighbors(const Tc* x,
+                   const Tc* y,
+                   const Tc* z,
+                   const ThP h,
                    LocalIndex firstId,
                    LocalIndex lastId,
-                   const Box<T>& box,
-                   const OctreeNsView<T, KeyType>& treeView,
+                   const Box<Tc>& box,
+                   const OctreeNsView<Tc, KeyType>& treeView,
                    unsigned ngmax,
                    LocalIndex* neighbors,
                    unsigned* neighborsCount)
