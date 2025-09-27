@@ -113,7 +113,7 @@ template<class IdTypeP, class LocalIndexP>
 void findTaggedIds(std::span<const IdTypeP> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
 {
     const auto numIds = last - first;
-    std::vector<uint8_t> flags(numIds);
+    std::vector<uint8_t> flags(numIds, 0);
     std::vector<LocalIndexP> flagsScan(numIds);
 
 #pragma omp parallel for schedule(static)
