@@ -687,6 +687,7 @@ public:
 
     std::span<const Vec3<RealType>> geoCentersAcc() const { return {rawPtr(geoCentersAcc_), geoCentersAcc_.size()}; }
     std::span<const Vec3<RealType>> geoSizesAcc() const { return {rawPtr(geoSizesAcc_), geoSizesAcc_.size()}; }
+    std::span<const uint8_t> flags() const { return {rawPtr(macsAcc_), macsAcc_.size()}; }
 
 private:
     //! @brief compute geometrical center and size of each tree cell in terms of x,y,z coordinates
