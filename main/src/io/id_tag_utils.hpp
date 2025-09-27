@@ -54,9 +54,9 @@ constexpr IdType msbMask = static_cast<IdType>(1) << (sizeof(IdType)*8 - 1);
  */
 struct IsMasked
 {
-    HOST_DEVICE_FUN IdType operator()(IdType id) const
+    HOST_DEVICE_FUN uint8_t operator()(IdType id) const
     {
-        return (id & msbMask) != 0;
+        return ((id & msbMask) != 0) ? 1 : 0;
     }
 };
 
