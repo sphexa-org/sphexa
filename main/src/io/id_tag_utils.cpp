@@ -92,14 +92,6 @@ void tagIdsInSphere(std::span<IdTypeP> ids, std::span<const CoordinateType> x, s
 template void tagIdsInSphere<IdType>(std::span<IdType> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
     std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
 
-// TODO: the following two functions provides two different implementations of the tagged id identification.
-// The first one uses a prefix scan + scatter based algorithm, similar to the corresponding GPU case
-// while the second one just uses a copy_if step, again as in the corresponding GPU case.
-// According to some performace tests, namely the turbulence case of SPH-RUN with 1000^3
-// particles and a synthetic data case with 1B ids and 10% tagged ids (see find_tagged_ids_test.cpp),
-// the second one is ~30x (synthetic data) faster and 0.1x (turbulence) slower than the first one with 64 threads.
-// To put the above performance numbers into perspective, for 1000^3 particles and a 10% tagged ids, the identication
-// in the slow case takes around 0.05s.
 #if 1
 
 /*! @brief Tagged id identification
