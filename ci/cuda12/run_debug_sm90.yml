@@ -3,8 +3,6 @@ include:
 
 variables:
   MYUENV: "prgenv-gnu/25.06:rc5"
-  PATH1: "sphexa+spack/view/bin"
-  PATH2: "sphexa+spack/view/sbin"
 
 sph-run-cuda12-sm90-debug-1rank:
   stage: sphexa_run
@@ -18,8 +16,10 @@ sph-run-cuda12-sm90-debug-1rank:
     SLURM_NTASKS: 1
   before_script:
     - pwd
-    - $PATH1/sphexa --help
     - date
+    - 'export PATH1=`find sphexa+spack/store/ -name sbin |grep sphexa |sed "s-/sbin-/bin-"`'
+    - 'export PATH2=`find sphexa+spack/store/ -name sbin |grep sphexa`'
+    - $PATH1/sphexa --help
   script:
     - $PATH2/coord_samples/coordinate_test
     - $PATH2/hydro/turbulence_tests
@@ -59,6 +59,8 @@ sph-run-cuda12-sm90-debug-2ranks:
   before_script:
     - pwd
     - date
+    - 'export PATH1=`find sphexa+spack/store/ -name sbin |grep sphexa |sed "s-/sbin-/bin-"`'
+    - 'export PATH2=`find sphexa+spack/store/ -name sbin |grep sphexa`'
   script:
     - $PATH2/integration_mpi/box_mpi
     - $PATH2/integration_mpi/domain_2ranks
@@ -93,6 +95,8 @@ sph-run-cuda12-sm90-debug-4ranks:
   before_script:
     - pwd
     - date
+    - 'export PATH1=`find sphexa+spack/store/ -name sbin |grep sphexa |sed "s-/sbin-/bin-"`'
+    - 'export PATH2=`find sphexa+spack/store/ -name sbin |grep sphexa`'
   script:
     - $PATH2/integration_mpi/exchange_general_gpu # was -n5
     - $PATH2/ryoanji/global_forces_gpu
@@ -112,6 +116,8 @@ sph-run-cuda12-sm90-debug-12ranks:
   before_script:
     - pwd
     - date
+    - 'export PATH1=`find sphexa+spack/store/ -name sbin |grep sphexa |sed "s-/sbin-/bin-"`'
+    - 'export PATH2=`find sphexa+spack/store/ -name sbin |grep sphexa`'
   script:
     - $PATH2/integration_mpi/exchange_domain
     - $PATH2/integration_mpi/exchange_general
@@ -133,8 +139,10 @@ sph-run-cuda12-sm90-debug-sphexa-cuda:
     SLURM_CPUS_PER_TASK: 71
   before_script:
     - pwd
-    - export OMP_NUM_THREADS=64
     - date
+    - export OMP_NUM_THREADS=64
+    - 'export PATH1=`find sphexa+spack/store/ -name sbin |grep sphexa |sed "s-/sbin-/bin-"`'
+    - 'export PATH2=`find sphexa+spack/store/ -name sbin |grep sphexa`'
   script:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
     - $PATH1/sphexa-cuda --glass ./50c.h5 --init sedov --G 1.0 -n 100 -s 10
@@ -153,8 +161,10 @@ sph-run-cuda12-sm90-debug-sphexa-cpu:
     SLURM_CPUS_PER_TASK: 71
   before_script:
     - pwd
-    - export OMP_NUM_THREADS=64
     - date
+    - export OMP_NUM_THREADS=64
+    - 'export PATH1=`find sphexa+spack/store/ -name sbin |grep sphexa |sed "s-/sbin-/bin-"`'
+    - 'export PATH2=`find sphexa+spack/store/ -name sbin |grep sphexa`'
   script:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
     - $PATH1/sphexa --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 4
