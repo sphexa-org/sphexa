@@ -3,6 +3,7 @@ set(UNIT_TESTS
         init/grid.cpp
         io/arg_parser.cpp
         io/h5part_wrapper.cpp
+        io/id_tag_utils.cpp
         observables/gravitational_waves.cpp
         sphexa/particles_data.cpp
         test_main.cpp)
@@ -22,13 +23,14 @@ if (CMAKE_CUDA_COMPILER AND SPH_EXA_WITH_H5HUT)
     set(testname frontend_units_cuda)
     add_executable(${testname}
             cuda/gpu_particles_data.cpp
+            io/id_tag_utils_gpu.cu
             test_main.cpp)
     target_include_directories(${testname} PRIVATE
                                ${COOLING_DIR}
                                ${SPH_DIR}
                                ${CSTONE_DIR}
                                ${PROJECT_SOURCE_DIR}/main/src)
-    target_link_libraries(${testname} PUBLIC cstone_gpu sph_gpu OpenMP::OpenMP_CXX CUDA::cudart GTest::gtest_main)
+    target_link_libraries(${testname} PUBLIC cstone_gpu io_gpu sph_gpu OpenMP::OpenMP_CXX CUDA::cudart GTest::gtest_main)
     add_test(NAME FrontendUnitsCuda COMMAND ${exename})
     unset(testname)
 endif ()
