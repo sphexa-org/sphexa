@@ -2,7 +2,7 @@ include:
   - local: 'ci/common.yml'
 
 variables:
-  MYUENV: "prgenv-gnu/25.06:rc5"
+  MYUENV: "prgenv-gnu/25.6:v2"
 
 sph-run-cuda12-sm90-release-1rank:
   stage: sphexa_run
@@ -14,8 +14,8 @@ sph-run-cuda12-sm90-release-1rank:
     # SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 1
-    TEST_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/bin'
-    APP_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/sbin'
+    TEST_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/sbin'
+    APP_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/bin'
   before_script:
     - pwd
     - date
