@@ -42,6 +42,7 @@
 #include "sedov_init.hpp"
 #include "turbulence_init.hpp"
 #include "wind_shock_init.hpp"
+#include "star_relaxation_init.hpp"
 #ifdef SPH_EXA_HAVE_GRACKLE
 #include "evrard_cooling_init.hpp"
 #endif
@@ -126,6 +127,13 @@ template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeSedovGrid()
 {
     return std::make_unique<SedovGrid<Dataset>>();
+}
+
+template<class Dataset>
+std::unique_ptr<ISimInitializer<Dataset>>
+SimInitializers<Dataset>::makeStarRelaxation(std::string ICFile, std::string settingsFile, IFileReader* reader)
+{
+    return std::make_unique<StarRelaxation<Dataset>>(ICFile, settingsFile, reader);
 }
 
 template<class Dataset>

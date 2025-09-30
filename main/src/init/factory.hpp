@@ -92,6 +92,11 @@ std::unique_ptr<ISimInitializer<Dataset>> initializerFactory(std::string testCas
         if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for evrard-cooling\n"); }
         return SimInitializers<Dataset>::makeEvrardCooling(glassBlock, settingsFile, reader);
     }
+    if (testNamedBase == "star-relaxation")
+    {
+        if (glassBlock.empty()) { throw std::runtime_error("need a valid IC File for star-relaxation\n"); }
+        return SimInitializers<Dataset>::makeStarRelaxation(glassBlock, settingsFile, reader);
+    }
     if (std::filesystem::exists(strBeforeSign(testCase, ":")))
     {
         return SimInitializers<Dataset>::makeFile(strBeforeSign(testCase, ":"), numberAfterSign(testCase, ":"), reader);

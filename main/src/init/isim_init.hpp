@@ -70,6 +70,7 @@ struct SimInitializers
     static InitPtr makeNoh(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeSedovGlass(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeSedovGrid();
+    static InitPtr makeStarRelaxation(std::string ICFile, std::string settingsFile, IFileReader* reader);
     static InitPtr makeTurbulence(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeWindShock(std::string glassBlock, std::string settingsFile, IFileReader* reader);
 };
