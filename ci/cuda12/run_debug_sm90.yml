@@ -3,6 +3,8 @@ include:
 
 variables:
   MYUENV: "prgenv-gnu/25.6:v2"
+  TEST_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/sbin'
+  APP_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/bin'
 
 sph-run-cuda12-sm90-debug-1rank:
   stage: sphexa_run
@@ -14,13 +16,9 @@ sph-run-cuda12-sm90-debug-1rank:
     # SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 1
-    TEST_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/sbin'
-    APP_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/bin'
   before_script:
     - pwd
     - date
-    #- 'export TEST_INSTALL_DIR=`find sphexa+spack/store/ -name sbin |grep sphexa`'
-    #- 'export APP_INSTALL_DIR=`echo $TEST_INSTALL_DIR |sed "s-/sbin-/bin-"`'
     - $APP_INSTALL_DIR/sphexa --help
   script:
     - $TEST_INSTALL_DIR/coord_samples/coordinate_test
@@ -61,8 +59,6 @@ sph-run-cuda12-sm90-debug-2ranks:
   before_script:
     - pwd
     - date
-    #- 'export TEST_INSTALL_DIR=`find sphexa+spack/store/ -name sbin |grep sphexa`'
-    #- 'export APP_INSTALL_DIR=`echo $TEST_INSTALL_DIR |sed "s-/sbin-/bin-"`'
   script:
     - $TEST_INSTALL_DIR/integration_mpi/box_mpi
     - $TEST_INSTALL_DIR/integration_mpi/domain_2ranks
@@ -97,8 +93,6 @@ sph-run-cuda12-sm90-debug-4ranks:
   before_script:
     - pwd
     - date
-    #- 'export TEST_INSTALL_DIR=`find sphexa+spack/store/ -name sbin |grep sphexa`'
-    #- 'export APP_INSTALL_DIR=`echo $TEST_INSTALL_DIR |sed "s-/sbin-/bin-"`'
   script:
     - $TEST_INSTALL_DIR/integration_mpi/exchange_general_gpu # was -n5
     - $TEST_INSTALL_DIR/ryoanji/global_forces_gpu
@@ -118,8 +112,6 @@ sph-run-cuda12-sm90-debug-12ranks:
   before_script:
     - pwd
     - date
-    #- 'export TEST_INSTALL_DIR=`find sphexa+spack/store/ -name sbin |grep sphexa`'
-    #- 'export APP_INSTALL_DIR=`echo $TEST_INSTALL_DIR |sed "s-/sbin-/bin-"`'
   script:
     - $TEST_INSTALL_DIR/integration_mpi/exchange_domain
     - $TEST_INSTALL_DIR/integration_mpi/exchange_general
@@ -143,8 +135,6 @@ sph-run-cuda12-sm90-debug-sphexa-cuda:
     - pwd
     - date
     - export OMP_NUM_THREADS=64
-    #- 'export TEST_INSTALL_DIR=`find sphexa+spack/store/ -name sbin |grep sphexa`'
-    #- 'export APP_INSTALL_DIR=`echo $TEST_INSTALL_DIR |sed "s-/sbin-/bin-"`'
   script:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
     - $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init sedov --G 1.0 -n 100 -s 10
@@ -165,8 +155,6 @@ sph-run-cuda12-sm90-debug-sphexa-cpu:
     - pwd
     - date
     - export OMP_NUM_THREADS=64
-    #- 'export TEST_INSTALL_DIR=`find sphexa+spack/store/ -name sbin |grep sphexa`'
-    #- 'export APP_INSTALL_DIR=`echo $TEST_INSTALL_DIR |sed "s-/sbin-/bin-"`'
   script:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
     - $APP_INSTALL_DIR/sphexa --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 4
