@@ -61,25 +61,73 @@ void makeParticleDistribution(std::vector<sphexa::CoordinateType>& x,
     }
 }
 
+TEST(IO, applyTaggingMaskZero)
+{
+    sphexa::IdType id = 0;
+    sphexa::IdType groupId = 0;
+    sphexa::IdType idRef = 18014398509481984ULL;
+    sphexa::applyTaggingMask(groupId, id);
+    EXPECT_EQ(id, idRef);
+}
+
+TEST(IO, applyTaggingMaskMaxGroup)
+{
+    sphexa::IdType id = 1;
+    sphexa::IdType groupId = sphexa::supGroupId - 1;
+    sphexa::IdType idRef = 18428729675200069633ULL;
+    sphexa::applyTaggingMask(groupId, id);
+    EXPECT_EQ(id, idRef);
+}
+
+TEST(IO, applyTaggingMaskMaxId)
+{
+    sphexa::IdType id = (sphexa::IdType(1) << (sizeof(sphexa::IdType)*8 - sphexa::taggingMaskSize)) - 1;
+    sphexa::IdType groupId = 0;
+    sphexa::IdType idRef = 36028797018963967;
+    sphexa::applyTaggingMask(groupId, id);
+    EXPECT_EQ(id, idRef);
+}
+
+TEST(IO, applyTaggingMaskMaxIdMaxGroup)
+{
+    sphexa::IdType id = (sphexa::IdType(1) << (sizeof(sphexa::IdType)*8 - sphexa::taggingMaskSize)) - 1;
+    sphexa::IdType groupId = sphexa::supGroupId - 1;
+    sphexa::IdType idRef = 18446744073709551615ULL;
+    sphexa::applyTaggingMask(groupId, id);
+    EXPECT_EQ(id, idRef);
+}
+
+TEST(IO, applyTaggingMaskTwice)
+{
+    sphexa::IdType id = 0;
+    sphexa::IdType groupId = 0;
+    sphexa::IdType idRef = 36028797018963968ULL;
+    sphexa::applyTaggingMask(groupId, id);
+    groupId = 1;
+    sphexa::applyTaggingMask(groupId, id);
+    EXPECT_EQ(id, idRef);
+}
+
+
 TEST(IO, tagIdInList)
 {
     std::vector<sphexa::IdType> ids(100);
     std::iota(ids.begin(), ids.end(), 0);
     std::vector<sphexa::IdType> selectedIds{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::vector<sphexa::IdType> tagIdsRef = ids;
-    tagIdsRef[0] = 9223372036854775808ULL;
-    tagIdsRef[1] = 9223372036854775809ULL;
-    tagIdsRef[2] = 9223372036854775810ULL;
-    tagIdsRef[3] = 9223372036854775811ULL;
-    tagIdsRef[6] = 9223372036854775814ULL;
-    tagIdsRef[11] = 9223372036854775819ULL;
-    tagIdsRef[13] = 9223372036854775821ULL;
-    tagIdsRef[23] = 9223372036854775831ULL;
-    tagIdsRef[71] = 9223372036854775879ULL;
-    tagIdsRef[83] = 9223372036854775891ULL;
-    tagIdsRef[91] = 9223372036854775899ULL;
-    tagIdsRef[95] = 9223372036854775903ULL;
-    tagIdsRef[99] = 9223372036854775907ULL;
+    tagIdsRef[0] = 18014398509481984ULL;
+    tagIdsRef[1] = 18014398509481985ULL;
+    tagIdsRef[2] = 18014398509481986ULL;
+    tagIdsRef[3] = 18014398509481987ULL;
+    tagIdsRef[6] = 18014398509481990ULL;
+    tagIdsRef[11] = 18014398509481995ULL;
+    tagIdsRef[13] = 18014398509481997ULL;
+    tagIdsRef[23] = 18014398509482007ULL;
+    tagIdsRef[71] = 18014398509482055ULL;
+    tagIdsRef[83] = 18014398509482067ULL;
+    tagIdsRef[91] = 18014398509482075ULL;
+    tagIdsRef[95] = 18014398509482079ULL;
+    tagIdsRef[99] = 18014398509482083ULL;
 
     sphexa::tagIdsInList(std::span<sphexa::IdType>(ids), 0, ids.size(), std::span<const sphexa::IdType>(selectedIds));
     EXPECT_EQ(ids, tagIdsRef);
@@ -91,12 +139,13 @@ TEST(IO, tagIdInListWithRange)
     sphexa::LocalIndex last = 10;
     std::vector<sphexa::IdType> ids(100);
     std::iota(ids.begin(), ids.end(), 0);
+    sphexa::IdType groupId = 1;
     std::vector<sphexa::IdType> selectedIds{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::vector<sphexa::IdType> tagIdsRef = ids;
-    tagIdsRef[3] = 9223372036854775811ULL;
-    tagIdsRef[6] = 9223372036854775814ULL;
+    tagIdsRef[3] = 36028797018963971ULL;
+    tagIdsRef[6] = 36028797018963974ULL;
 
-    sphexa::tagIdsInList(std::span<sphexa::IdType>(ids), first, last, std::span<const sphexa::IdType>(selectedIds));
+    sphexa::tagIdsInList(std::span<sphexa::IdType>(ids), first, last, std::span<const sphexa::IdType>(selectedIds), groupId);
     EXPECT_EQ(ids, tagIdsRef);
 }
 
@@ -104,30 +153,32 @@ TEST(IO, tagIdInSphere)
 {
     std::vector<sphexa::IdType> ids(1000);
     std::iota(ids.begin(), ids.end(), 0);
+    std::vector<sphexa::IdType> tagIdsRef = ids;
 
     // Particle distribution creation
     std::vector<sphexa::CoordinateType> x, y, z;
     makeParticleDistribution(x, y, z, 1000);
 
     // Selection sphere definition
-    sphexa::IdSelectionSphere selSphereData;
-    selSphereData.radius = 0.25;
-    selSphereData.center[0] = 0.0;
-    selSphereData.center[1] = 0.0;
-    selSphereData.center[2] = 0.0;
+    sphexa::IdSelectionSphere selSphereData{0.0, 0.0, 0.0, 0.25};
 
-    std::vector<sphexa::LocalIndex> taggedIdxRef{444, 445, 454, 455, 544, 545, 554, 555};
-    std::vector<sphexa::LocalIndex> taggedIdx;
+    tagIdsRef[444]=18014398509482428ULL;
+    tagIdsRef[445]=18014398509482429ULL;
+    tagIdsRef[454]=18014398509482438ULL;
+    tagIdsRef[455]=18014398509482439ULL;
+    tagIdsRef[544]=18014398509482528ULL;
+    tagIdsRef[545]=18014398509482529ULL;
+    tagIdsRef[554]=18014398509482538ULL;
+    tagIdsRef[555]=18014398509482539ULL;
     sphexa::tagIdsInSphere(std::span<sphexa::IdType>(ids), x, y, z, 0, ids.size(), selSphereData);
-    sphexa::findTaggedIds(std::span<const sphexa::IdType>(ids), 0, ids.size(), taggedIdx);
-    EXPECT_EQ(taggedIdx, taggedIdxRef);
-
+    EXPECT_EQ(ids, tagIdsRef);
 }
 
 TEST(IO, tagIdInSphereWithRange)
 {
     std::vector<sphexa::IdType> ids(1000);
     std::iota(ids.begin(), ids.end(), 0);
+    std::vector<sphexa::IdType> tagIdsRef = ids;
     sphexa::LocalIndex first = 400;
     sphexa::LocalIndex last = 500;
 
@@ -136,19 +187,14 @@ TEST(IO, tagIdInSphereWithRange)
     makeParticleDistribution(x, y, z, 1000);
 
     // Selection sphere definition
-    sphexa::IdSelectionSphere selSphereData;
-    selSphereData.radius = 0.25;
-    selSphereData.center[0] = 0.0;
-    selSphereData.center[1] = 0.0;
-    selSphereData.center[2] = 0.0;
+    sphexa::IdSelectionSphere selSphereData{0.0, 0.0, 0.0, 0.25};
 
-
-    std::vector<sphexa::LocalIndex> taggedIdxRef = {444, 445, 454, 455};
-    std::vector<sphexa::LocalIndex> taggedIdx;
+    tagIdsRef[444]=18014398509482428ULL;
+    tagIdsRef[445]=18014398509482429ULL;
+    tagIdsRef[454]=18014398509482438ULL;
+    tagIdsRef[455]=18014398509482439ULL;
     sphexa::tagIdsInSphere(std::span<sphexa::IdType>(ids), x, y, z, first, last, selSphereData);
-    sphexa::findTaggedIds(std::span<const sphexa::IdType>(ids), 0, ids.size(), taggedIdx);
-    EXPECT_EQ(taggedIdx, taggedIdxRef);
-
+    EXPECT_EQ(ids, tagIdsRef);
 }
 
 TEST(IO, taggedIdIdentification)
@@ -159,7 +205,7 @@ TEST(IO, taggedIdIdentification)
 
     std::vector<sphexa::LocalIndex> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
-        ids[idPos] = ids[idPos] | sphexa::msbMask;
+        sphexa::applyTaggingMask(0, ids[idPos]);
     });
 
     sphexa::findTaggedIds(std::span<const sphexa::IdType>(ids), 0, ids.size(), taggedIdPos);
@@ -176,7 +222,7 @@ TEST(IO, taggedIdIdentificationWithRange)
 
     std::vector<sphexa::LocalIndex> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
-        ids[idPos] = ids[idPos] | sphexa::msbMask;
+        sphexa::applyTaggingMask(1, ids[idPos]);
     });
     std::vector<sphexa::LocalIndex> taggedIdPosRefRange;
     std::copy_if(taggedIdPosRef.begin(), taggedIdPosRef.end(), std::back_inserter(taggedIdPosRefRange), [first, last](auto idPos){
@@ -197,7 +243,7 @@ TEST(IO, taggedIdIdentificationWithRangeStart)
 
     std::vector<sphexa::LocalIndex> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
-        ids[idPos] = ids[idPos] | sphexa::msbMask;
+        sphexa::applyTaggingMask(2, ids[idPos]);
     });
     std::vector<sphexa::LocalIndex> taggedIdPosRefRange;
     std::copy_if(taggedIdPosRef.begin(), taggedIdPosRef.end(), std::back_inserter(taggedIdPosRefRange), [first, last](auto idPos){
@@ -218,7 +264,7 @@ TEST(IO, taggedIdIdentificationWithRangeEnd)
 
     std::vector<sphexa::LocalIndex> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
-        ids[idPos] = ids[idPos] | sphexa::msbMask;
+        sphexa::applyTaggingMask(3, ids[idPos]);
     });
     std::vector<sphexa::LocalIndex> taggedIdPosRefRange;
     std::copy_if(taggedIdPosRef.begin(), taggedIdPosRef.end(), std::back_inserter(taggedIdPosRefRange), [first, last](auto idPos){
@@ -236,7 +282,7 @@ TEST(IO, taggedIdIdentificationSingleStart)
     std::vector<sphexa::LocalIndex> taggedIdPos;
 
     std::vector<sphexa::LocalIndex> taggedIdPosRef = {0};
-    ids[0] = ids[0] | sphexa::msbMask;
+    sphexa::applyTaggingMask(4, ids[0]);
 
     sphexa::findTaggedIds(std::span<const sphexa::IdType>(ids), 0, ids.size(), taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRef);
@@ -249,7 +295,7 @@ TEST(IO, taggedIdIdentificationSingleEnd)
     std::vector<sphexa::LocalIndex> taggedIdPos;
 
     std::vector<sphexa::LocalIndex> taggedIdPosRef = {99};
-    ids[99] = ids[99] | sphexa::msbMask;
+    sphexa::applyTaggingMask(5, ids[99]);
 
     sphexa::findTaggedIds(std::span<const sphexa::IdType>(ids), 0, ids.size(), taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRef);
