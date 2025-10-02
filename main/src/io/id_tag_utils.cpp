@@ -40,15 +40,17 @@
 namespace sphexa
 {
 
-void applyTaggingMask(uint64_t groupId, uint64_t& id)
+uint64_t applyTaggingMask(uint64_t groupId, uint64_t id)
 {
     if (groupId >= maxNumGroupIds)
         throw std::runtime_error("Tagging group id larger than max value (" + std::to_string(maxNumGroupIds) + ")\n");
 
     // Clear previous tagging bits if any
-    id &= ~taggingCheckMask;
+    uint64_t taggedId = id & ~taggingCheckMask;
 
-    id |= ((groupId+1) << taggingMaskStartingBit);
+    taggedId |= ((groupId+1) << taggingMaskStartingBit);
+
+    return taggedId;
 }
 
 void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last, std::span<const IdSelectionList> selectedIdsLists)
@@ -64,7 +66,7 @@ void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last, std::span<
             auto lower = std::lower_bound(idListBeginIt+lastFound, idListEndIt, selectedIds);
             if(lower != idListEndIt && *lower == selectedIds) {
                 lastFound = lower - idListBeginIt + 1;
-                applyTaggingMask(groupId, *lower);
+                *lower = applyTaggingMask(groupId, *lower);
             }
         });
         groupId++;
@@ -83,7 +85,7 @@ void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, 
             cstone::Vec3<CoordinateType> currentPosition{x[particleIndex], y[particleIndex], z[particleIndex]};
             auto squaredDistance = util::norm2(currentPosition - sphereCenter);
             if(squaredDistance < squareRadius) {
-                applyTaggingMask(groupId, ids[particleIndex]);
+                ids[particleIndex] = applyTaggingMask(groupId, ids[particleIndex]);
             }
         }
         groupId++;

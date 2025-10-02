@@ -66,7 +66,7 @@ TEST(IO, applyTaggingMaskZero)
     uint64_t id = 0;
     uint64_t groupId = 0;
     uint64_t idRef = 18014398509481984ULL;
-    sphexa::applyTaggingMask(groupId, id);
+    id = sphexa::applyTaggingMask(groupId, id);
     EXPECT_EQ(id, idRef);
 }
 
@@ -75,7 +75,7 @@ TEST(IO, applyTaggingMaskMaxGroup)
     uint64_t id = 1;
     uint64_t groupId = sphexa::maxNumGroupIds - 1;
     uint64_t idRef = 18428729675200069633ULL;
-    sphexa::applyTaggingMask(groupId, id);
+    id = sphexa::applyTaggingMask(groupId, id);
     EXPECT_EQ(id, idRef);
 }
 
@@ -84,7 +84,7 @@ TEST(IO, applyTaggingMaskMaxId)
     uint64_t id = (uint64_t(1) << (sizeof(uint64_t)*8 - sphexa::tagNumBits)) - 1;
     uint64_t groupId = 0;
     uint64_t idRef = 36028797018963967;
-    sphexa::applyTaggingMask(groupId, id);
+    id = sphexa::applyTaggingMask(groupId, id);
     EXPECT_EQ(id, idRef);
 }
 
@@ -93,7 +93,7 @@ TEST(IO, applyTaggingMaskMaxIdMaxGroup)
     uint64_t id = (uint64_t(1) << (sizeof(uint64_t)*8 - sphexa::tagNumBits)) - 1;
     uint64_t groupId = sphexa::maxNumGroupIds - 1;
     uint64_t idRef = 18446744073709551615ULL;
-    sphexa::applyTaggingMask(groupId, id);
+    id = sphexa::applyTaggingMask(groupId, id);
     EXPECT_EQ(id, idRef);
 }
 
@@ -102,9 +102,9 @@ TEST(IO, applyTaggingMaskTwice)
     uint64_t id = 0;
     uint64_t groupId = 0;
     uint64_t idRef = 36028797018963968ULL;
-    sphexa::applyTaggingMask(groupId, id);
+    id = sphexa::applyTaggingMask(groupId, id);
     groupId = 1;
-    sphexa::applyTaggingMask(groupId, id);
+    id = sphexa::applyTaggingMask(groupId, id);
     EXPECT_EQ(id, idRef);
 }
 
@@ -209,7 +209,7 @@ TEST(IO, taggedIdIdentification)
 
     std::vector<uint32_t> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
-        sphexa::applyTaggingMask(0, ids[idPos]);
+        ids[idPos] = sphexa::applyTaggingMask(0, ids[idPos]);
     });
 
     sphexa::findTaggedIds(std::span<const uint64_t>(ids), 0, ids.size(), taggedIdPos);
@@ -226,7 +226,7 @@ TEST(IO, taggedIdIdentificationWithRange)
 
     std::vector<uint32_t> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
-        sphexa::applyTaggingMask(1, ids[idPos]);
+        ids[idPos] = sphexa::applyTaggingMask(1, ids[idPos]);
     });
     std::vector<uint32_t> taggedIdPosRefRange;
     std::copy_if(taggedIdPosRef.begin(), taggedIdPosRef.end(), std::back_inserter(taggedIdPosRefRange), [first, last](auto idPos){
@@ -247,7 +247,7 @@ TEST(IO, taggedIdIdentificationWithRangeStart)
 
     std::vector<uint32_t> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
-        sphexa::applyTaggingMask(2, ids[idPos]);
+        ids[idPos] = sphexa::applyTaggingMask(2, ids[idPos]);
     });
     std::vector<uint32_t> taggedIdPosRefRange;
     std::copy_if(taggedIdPosRef.begin(), taggedIdPosRef.end(), std::back_inserter(taggedIdPosRefRange), [first, last](auto idPos){
@@ -268,7 +268,7 @@ TEST(IO, taggedIdIdentificationWithRangeEnd)
 
     std::vector<uint32_t> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
-        sphexa::applyTaggingMask(3, ids[idPos]);
+        ids[idPos] = sphexa::applyTaggingMask(3, ids[idPos]);
     });
     std::vector<uint32_t> taggedIdPosRefRange;
     std::copy_if(taggedIdPosRef.begin(), taggedIdPosRef.end(), std::back_inserter(taggedIdPosRefRange), [first, last](auto idPos){
@@ -286,7 +286,7 @@ TEST(IO, taggedIdIdentificationSingleStart)
     std::vector<uint32_t> taggedIdPos;
 
     std::vector<uint32_t> taggedIdPosRef = {0};
-    sphexa::applyTaggingMask(4, ids[0]);
+    ids[0] = sphexa::applyTaggingMask(4, ids[0]);
 
     sphexa::findTaggedIds(std::span<const uint64_t>(ids), 0, ids.size(), taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRef);
@@ -299,7 +299,7 @@ TEST(IO, taggedIdIdentificationSingleEnd)
     std::vector<uint32_t> taggedIdPos;
 
     std::vector<uint32_t> taggedIdPosRef = {99};
-    sphexa::applyTaggingMask(5, ids[99]);
+    ids[99] = sphexa::applyTaggingMask(5, ids[99]);
 
     sphexa::findTaggedIds(std::span<const uint64_t>(ids), 0, ids.size(), taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRef);

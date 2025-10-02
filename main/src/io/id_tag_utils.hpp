@@ -73,9 +73,10 @@ struct IsMasked
 /*! @brief Application of tagging mask to a given id
  *
  * @param[in]  groupId      selection group id (must be < maxNumGroupIds)
- * @param[out] id           input id with tagging mask applied
+ * @param[in] id            input id
+ * @return                  tagged id
  */
-void applyTaggingMask(uint64_t groupId, uint64_t& id);
+uint64_t applyTaggingMask(uint64_t groupId, uint64_t id);
 
 /*! @brief Tagged id (in first:last range) identification, CPU version
  *

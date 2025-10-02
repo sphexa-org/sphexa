@@ -44,7 +44,7 @@ TEST(IO, taggedIdIdentificationGPU)
 
     std::vector<uint32_t> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
-        sphexa::applyTaggingMask(0, ids[idPos]);
+        ids[idPos] = sphexa::applyTaggingMask(0, ids[idPos]);
     });
     thrust::device_vector<uint64_t> idsDev(ids);
 
@@ -66,7 +66,7 @@ TEST(IO, taggedIdIdentificationWithRangeGPU)
         return idPos >= first && idPos < last;
     });
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
-        sphexa::applyTaggingMask(1, ids[idPos]);
+        ids[idPos] = sphexa::applyTaggingMask(1, ids[idPos]);
     });
     thrust::device_vector<uint64_t> idsDev(ids);
 
@@ -88,7 +88,7 @@ TEST(IO, taggedIdIdentificationWithRangeStartGPU)
         return idPos >= first && idPos < last;
     });
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
-        sphexa::applyTaggingMask(2, ids[idPos]);
+        ids[idPos] = sphexa::applyTaggingMask(2, ids[idPos]);
     });
     thrust::device_vector<uint64_t> idsDev(ids);
 
@@ -110,7 +110,7 @@ TEST(IO, taggedIdIdentificationWithRangeEndGPU)
         return idPos >= first && idPos < last;
     });
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
-        sphexa::applyTaggingMask(3, ids[idPos]);
+        ids[idPos] = sphexa::applyTaggingMask(3, ids[idPos]);
     });
     thrust::device_vector<uint64_t> idsDev(ids);
 
@@ -125,7 +125,7 @@ TEST(IO, taggedIdIdentificationSingleStartGPU)
     std::vector<uint32_t> taggedIdPos;
 
     std::vector<uint32_t> taggedIdPosRef{0};
-    sphexa::applyTaggingMask(4, ids[0]);
+    ids[0] = sphexa::applyTaggingMask(4, ids[0]);
     thrust::device_vector<uint64_t> idsDev(ids);
 
     sphexa::findTaggedIdsGPU(std::span<const uint64_t>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), 0, idsDev.size(), taggedIdPos);
@@ -139,7 +139,7 @@ TEST(IO, taggedIdIdentificationSingleEndGPU)
     std::vector<uint32_t> taggedIdPos;
 
     std::vector<uint32_t> taggedIdPosRef{99};
-    sphexa::applyTaggingMask(5, ids[99]);
+    ids[99] = sphexa::applyTaggingMask(5, ids[99]);
     thrust::device_vector<uint64_t> idsDev(ids);
 
     sphexa::findTaggedIdsGPU(std::span<const uint64_t>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), 0, idsDev.size(), taggedIdPos);
