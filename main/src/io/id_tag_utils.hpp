@@ -46,9 +46,20 @@ using IdType = uint64_t;
 using LocalIndex = uint32_t;
 using CoordinateType = sph::SphTypes::CoordinateType;
 
-/*! @brief Tagging mask definition (most significant bit flip)
+/*! @brief Number of bits used for tagging information storage
  */
-constexpr IdType msbMask = static_cast<IdType>(1) << (sizeof(IdType)*8 - 1);
+constexpr IdType taggingMaskSize = 10;
+
+/*! @brief Given the taggingMaskSize, this is the maximum selection group id value plus one
+ */
+constexpr IdType supGroupId = (1 << taggingMaskSize) - 1;
+
+/*! @brief First tagging bit position
+ */
+constexpr IdType taggingMaskStartingBit = sizeof(IdType)*8 - taggingMaskSize;
+
+constexpr IdType taggingCheckMask = supGroupId << taggingMaskStartingBit;
+
 
 /*! @brief Tagged id identification condition functor
  */
@@ -56,9 +67,16 @@ struct IsMasked
 {
     HOST_DEVICE_FUN uint8_t operator()(IdType id) const
     {
-        return ((id & msbMask) != 0) ? 1 : 0;
+        return (id & taggingCheckMask) != 0;
     }
 };
+
+/*! @brief Application of tagging mask to a given id
+ *
+ * @param[in]  groupId      selection group id (must be < supGroupId)
+ * @param[out] id           input id with tagging mask applied
+ */
+void applyTaggingMask(IdType groupId, IdType& id);
 
 /*! @brief Tagged id (in first:last range) identification, CPU version
  *
@@ -82,30 +100,28 @@ template<class IdTypeP, class LocalIndexP>
 void findTaggedIdsGPU(std::span<const IdTypeP> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes);
 extern template void findTaggedIdsGPU<IdType, LocalIndex>(std::span<const IdType> ids, size_t first, size_t last, std::vector<LocalIndex>& taggedIdsIndexes);
 
+
+/*! @brief Id tagging spherical volume definition
+ * (center[0:2], radius)
+ */
+using IdSelectionSphere = cstone::Vec4<CoordinateType>;
+
+/*! @brief Id tagging list definition
+ */
+using IdSelectionList = std::vector<IdType>;
+
 /*! @brief Id tagging (in first:last range) from list, CPU version
  *
  * @param[out] ids               id list
  * @param[in]  first             first id index // TODO number of elements and pass iterator?
  * @param[in]  last              last (excluded) id index
  * @param[in]  selectedIds       indexes to be tagged
+ * @param[in]  groupId           selection group id
  */
 template<class IdTypeP>
-void tagIdsInList(std::span<IdTypeP> ids, size_t first, size_t last, std::span<const IdTypeP> selectedIds);
-extern template void tagIdsInList<IdType>(std::span<IdType> ids, size_t first, size_t last, std::span<const IdType> selectedIds);
-
-// Id tagging types selection
-/*! @brief Id tagging spherical volume definition
- */
-// TODO: selection spheres can be stored as cstone::Vec4<Tc>
-struct IdSelectionSphere
-{
-    cstone::Vec3<CoordinateType> center;
-    CoordinateType radius;
-};
-/*! @brief Id tagging list definition
- */
-using IdSelectionList = std::vector<IdType>;
-
+void tagIdsInList(std::span<IdTypeP> ids, size_t first, size_t last, std::span<const IdTypeP> selectedIds, const LocalIndex groupId = 0);
+extern template void tagIdsInList<IdType>(std::span<IdType> ids, size_t first, size_t last, std::span<const IdType> selectedIds,
+    const LocalIndex groupId);
 
 /*! @brief Id tagging (in first:last range) in spherical volume, CPU version
  *
@@ -116,10 +132,13 @@ using IdSelectionList = std::vector<IdType>;
  * @param[in]  first             first id index // TODO number of elements and pass iterator?
  * @param[in]  last              last (excluded) id index
  * @param[in]  selSphereData     spherical volume definition
+ * @param[in]  groupId           selection group id
  */
 template<class IdTypeP>
 void tagIdsInSphere(std::span<IdTypeP> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
-    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
+    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, IdSelectionSphere selSphereData,
+    const LocalIndex groupId = 0);
 extern template void tagIdsInSphere<IdType>(std::span<IdType> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
-    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, const IdSelectionSphere& selSphereData);
+    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, IdSelectionSphere selSphereData,
+    const LocalIndex groupId);
 }
