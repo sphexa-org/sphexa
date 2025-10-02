@@ -62,13 +62,6 @@ struct IsMaskedGPU
 };
 
 // TODO: this implementation is 3x faster than the one below
-/*! @brief Tagged id identification
- *
- * @param[in]  ids              ordered id list
- * @param[in]  first            first id index // TODO number of elements and pass iterator?
- * @param[in]  last             last (excluded) id index
- * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
- */
 template<class IdTypeP, class LocalIndexP>
 void findTaggedIdsGPU(std::span<const IdTypeP> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
 {
@@ -93,13 +86,6 @@ void findTaggedIdsGPU(std::span<const IdTypeP> ids, size_t first, size_t last, s
 
 #else
 
-/*! @brief Tagged id identification
- *
- * @param[in]  ids              ordered id list
- * @param[in]  first            first id index // TODO number of elements and pass iterator?
- * @param[in]  last             last (excluded) id index
- * @param[out] taggedIdsIndexes vector of indexes (positions wrt of provided ids list)
- */
 template<class IdTypeP, class LocalIndexP>
 void findTaggedIdsGPU(std::span<const IdTypeP> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
 {
