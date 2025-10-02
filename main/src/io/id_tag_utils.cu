@@ -45,47 +45,6 @@
 namespace sphexa
 {
 
-// TODO: to be removed, used to select between two implementations
-#if 0
-
-struct IsMaskedGPU
-{
-    const IdType* ids_ptr;
-
-    IsMaskedGPU(const IdType* ids_ptr_) : ids_ptr(ids_ptr_) {}
-
-    HOST_DEVICE_FUN
-    uint8_t operator()(LocalIndex idx) const
-    {
-       return IsMasked{}(ids_ptr[idx]);
-    }
-};
-
-// TODO: this implementation is 3x faster than the one below
-template<class IdTypeP, class LocalIndexP>
-void findTaggedIdsGPU(std::span<const IdTypeP> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
-{
-
-    // Count number of tagged ids
-    IsMaskedGPU isMasked(ids.data());
-    auto begin = thrust::make_counting_iterator<IdType>(first);
-    auto end   = thrust::make_counting_iterator<IdType>(last);
-    const size_t nTaggedIds = thrust::count_if(thrust::device, begin, end, isMasked);
-
-    // Save indexes of tagged ids
-    thrust::device_vector<IdType> deviceTaggedIdsIndexes(nTaggedIds);
-    thrust::copy_if(thrust::device, begin, end, deviceTaggedIdsIndexes.begin(), isMasked);
-
-    // Copy indices of tagged ids to host vector
-    taggedIdsIndexes.resize(nTaggedIds);
-    thrust::copy(deviceTaggedIdsIndexes.begin(), deviceTaggedIdsIndexes.end(), taggedIdsIndexes.begin());
-
-    return;
-
-}
-
-#else
-
 template<class IdTypeP, class LocalIndexP>
 void findTaggedIdsGPU(std::span<const IdTypeP> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
 {
@@ -106,8 +65,6 @@ void findTaggedIdsGPU(std::span<const IdTypeP> ids, size_t first, size_t last, s
     thrust::copy(taggedIdsIndexesDev.begin(), taggedIdsIndexesDev.end(), taggedIdsIndexes.begin());
 
 }
-
-#endif
 
 template void findTaggedIdsGPU<IdType, LocalIndex>(std::span<const IdType> ids, size_t first, size_t last, std::vector<LocalIndex>& taggedIdsIndexes);
 

@@ -33,7 +33,6 @@
 #include <omp.h>
 
 #include <algorithm>
-//#include <execution>
 #include <iostream>
 
 #include "id_tag_utils.hpp"
@@ -95,7 +94,6 @@ template void tagIdsInSphere<IdType>(std::span<IdType> ids, std::span<const Coor
     std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, IdSelectionSphere selSphereData,
     const LocalIndex groupId);
 
-#if 1
 
 template<class IdTypeP, class LocalIndexP>
 void findTaggedIds(std::span<const IdTypeP> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
@@ -119,32 +117,6 @@ void findTaggedIds(std::span<const IdTypeP> ids, size_t first, size_t last, std:
         if (flags[i]) { taggedIdsIndexes[flagsScan[i]] = i + first; }
     }
 }
-
-#else
-
-template<class IdTypeP, class LocalIndexP>
-void findTaggedIds(std::span<const IdTypeP> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
-{
-    const auto hostIdSize = last - first;
-    taggedIdsIndexes.clear();
-    taggedIdsIndexes.reserve(hostIdSize);
-
-    #pragma omp parallel
-    {
-        std::vector<LocalIndexP> tmpTaggedIdsIndexes;
-//        tmpTaggedIdsIndexes.reserve(hostIdSize); // TODO: without a better estimate of the size, this is not efficient
-        #pragma omp for nowait
-        for (LocalIndexP index = first; index<last; ++index)
-        {
-            if (IsMasked{}(ids[index]))
-                tmpTaggedIdsIndexes.push_back(index);
-        }
-        #pragma omp critical
-        taggedIdsIndexes.insert(taggedIdsIndexes.end(), tmpTaggedIdsIndexes.begin(), tmpTaggedIdsIndexes.end());
-    }
-    std::sort(taggedIdsIndexes.begin(), taggedIdsIndexes.end());
-}
-#endif
 
 template void findTaggedIds<IdType, LocalIndex>(std::span<const IdType> ids, size_t first, size_t last, std::vector<LocalIndex>& taggedIdsIndexes);
 
