@@ -38,27 +38,27 @@
 
 TEST(IO, taggedIdIdentificationGPU)
 {
-    std::vector<sphexa::IdType> ids(100);
+    std::vector<uint64_t> ids(100);
     std::iota(ids.begin(), ids.end(), 0);
-    std::vector<sphexa::LocalIndex> taggedIdPos;
+    std::vector<uint32_t> taggedIdPos;
 
-    std::vector<sphexa::LocalIndex> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
+    std::vector<uint32_t> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
         sphexa::applyTaggingMask(0, ids[idPos]);
     });
-    thrust::device_vector<sphexa::IdType> idsDev(ids);
+    thrust::device_vector<uint64_t> idsDev(ids);
 
-    sphexa::findTaggedIdsGPU(std::span<const sphexa::IdType>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), 0, idsDev.size(), taggedIdPos);
+    sphexa::findTaggedIdsGPU(std::span<const uint64_t>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), 0, idsDev.size(), taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRef);
 }
 
 TEST(IO, taggedIdIdentificationWithRangeGPU)
 {
-    std::vector<sphexa::IdType> ids(100);
+    std::vector<uint64_t> ids(100);
     std::iota(ids.begin(), ids.end(), 0);
-    std::vector<sphexa::LocalIndex> taggedIdPos;
-    sphexa::LocalIndex first = 3;
-    sphexa::LocalIndex last = 10;
+    std::vector<uint32_t> taggedIdPos;
+    uint32_t first = 3;
+    uint32_t last = 10;
 
     std::vector<uint32_t> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::vector<uint32_t> taggedIdPosRefRange;
@@ -68,19 +68,19 @@ TEST(IO, taggedIdIdentificationWithRangeGPU)
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
         sphexa::applyTaggingMask(1, ids[idPos]);
     });
-    thrust::device_vector<sphexa::IdType> idsDev(ids);
+    thrust::device_vector<uint64_t> idsDev(ids);
 
-    sphexa::findTaggedIdsGPU(std::span<const sphexa::IdType>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), first, last, taggedIdPos);
+    sphexa::findTaggedIdsGPU(std::span<const uint64_t>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), first, last, taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRefRange);
 }
 
 TEST(IO, taggedIdIdentificationWithRangeStartGPU)
 {
-    std::vector<sphexa::IdType> ids(100);
+    std::vector<uint64_t> ids(100);
     std::iota(ids.begin(), ids.end(), 0);
-    std::vector<sphexa::LocalIndex> taggedIdPos;
-    sphexa::LocalIndex first = 0;
-    sphexa::LocalIndex last = 3;
+    std::vector<uint32_t> taggedIdPos;
+    uint32_t first = 0;
+    uint32_t last = 3;
 
     std::vector<uint32_t> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::vector<uint32_t> taggedIdPosRefRange;
@@ -90,19 +90,19 @@ TEST(IO, taggedIdIdentificationWithRangeStartGPU)
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
         sphexa::applyTaggingMask(2, ids[idPos]);
     });
-    thrust::device_vector<sphexa::IdType> idsDev(ids);
+    thrust::device_vector<uint64_t> idsDev(ids);
 
-    sphexa::findTaggedIdsGPU(std::span<const sphexa::IdType>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), first, last, taggedIdPos);
+    sphexa::findTaggedIdsGPU(std::span<const uint64_t>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), first, last, taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRefRange);
 }
 
 TEST(IO, taggedIdIdentificationWithRangeEndGPU)
 {
-    std::vector<sphexa::IdType> ids(100);
+    std::vector<uint64_t> ids(100);
     std::iota(ids.begin(), ids.end(), 0);
-    std::vector<sphexa::LocalIndex> taggedIdPos;
-    sphexa::LocalIndex first = 97;
-    sphexa::LocalIndex last = 100;
+    std::vector<uint32_t> taggedIdPos;
+    uint32_t first = 97;
+    uint32_t last = 100;
 
     std::vector<uint32_t> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::vector<uint32_t> taggedIdPosRefRange;
@@ -112,36 +112,36 @@ TEST(IO, taggedIdIdentificationWithRangeEndGPU)
     std::for_each(taggedIdPosRef.begin(), taggedIdPosRef.end(), [&ids = ids](auto idPos){
         sphexa::applyTaggingMask(3, ids[idPos]);
     });
-    thrust::device_vector<sphexa::IdType> idsDev(ids);
+    thrust::device_vector<uint64_t> idsDev(ids);
 
-    sphexa::findTaggedIdsGPU(std::span<const sphexa::IdType>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), first, last, taggedIdPos);
+    sphexa::findTaggedIdsGPU(std::span<const uint64_t>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), first, last, taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRefRange);
 }
 
 TEST(IO, taggedIdIdentificationSingleStartGPU)
 {
-    std::vector<sphexa::IdType> ids(100);
+    std::vector<uint64_t> ids(100);
     std::iota(ids.begin(), ids.end(), 0);
-    std::vector<sphexa::LocalIndex> taggedIdPos;
+    std::vector<uint32_t> taggedIdPos;
 
     std::vector<uint32_t> taggedIdPosRef{0};
     sphexa::applyTaggingMask(4, ids[0]);
-    thrust::device_vector<sphexa::IdType> idsDev(ids);
+    thrust::device_vector<uint64_t> idsDev(ids);
 
-    sphexa::findTaggedIdsGPU(std::span<const sphexa::IdType>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), 0, idsDev.size(), taggedIdPos);
+    sphexa::findTaggedIdsGPU(std::span<const uint64_t>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), 0, idsDev.size(), taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRef);
 }
 
 TEST(IO, taggedIdIdentificationSingleEndGPU)
 {
-    std::vector<sphexa::IdType> ids(100);
+    std::vector<uint64_t> ids(100);
     std::iota(ids.begin(), ids.end(), 0);
-    std::vector<sphexa::LocalIndex> taggedIdPos;
+    std::vector<uint32_t> taggedIdPos;
 
     std::vector<uint32_t> taggedIdPosRef{99};
     sphexa::applyTaggingMask(5, ids[99]);
-    thrust::device_vector<sphexa::IdType> idsDev(ids);
+    thrust::device_vector<uint64_t> idsDev(ids);
 
-    sphexa::findTaggedIdsGPU(std::span<const sphexa::IdType>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), 0, idsDev.size(), taggedIdPos);
+    sphexa::findTaggedIdsGPU(std::span<const uint64_t>(thrust::raw_pointer_cast(idsDev.data()), idsDev.size()), 0, idsDev.size(), taggedIdPos);
     EXPECT_EQ(taggedIdPos, taggedIdPosRef);
 }

@@ -51,34 +51,42 @@ void applyTaggingMask(uint64_t groupId, uint64_t& id)
     id |= ((groupId+1) << taggingMaskStartingBit);
 }
 
-void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last, std::span<const uint64_t> selectedIds,
-    const uint32_t groupId)
+void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last, std::span<const IdSelectionList> selectedIdsLists)
 {
     const auto idListBeginIt = ids.begin()+first;
     const auto idListEndIt = ids.begin()+last;
-    auto lastFound = 0;
-    std::for_each(selectedIds.begin(), selectedIds.end(), [idListBeginIt, idListEndIt, &lastFound, groupId](auto selectedIds){
-        auto lower = std::lower_bound(idListBeginIt+lastFound, idListEndIt, selectedIds);
-        if(lower != idListEndIt && *lower == selectedIds) {
-            lastFound = lower - idListBeginIt + 1;
-            applyTaggingMask(groupId, *lower);
-        }
-    });
+    uint64_t groupId = 0; // TODO: how do we decide the starting groupId?
+    for(const auto& idsList : selectedIdsLists) {
+        if (groupId >= maxNumGroupIds)
+            throw std::runtime_error("Tagging group id larger than max value (" + std::to_string(maxNumGroupIds) + ")\n");
+        auto lastFound = 0;
+        std::for_each(idsList.begin(), idsList.end(), [idListBeginIt, idListEndIt, &lastFound, groupId](auto selectedIds){
+            auto lower = std::lower_bound(idListBeginIt+lastFound, idListEndIt, selectedIds);
+            if(lower != idListEndIt && *lower == selectedIds) {
+                lastFound = lower - idListBeginIt + 1;
+                applyTaggingMask(groupId, *lower);
+            }
+        });
+        groupId++;
+    }
 }
 
 void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
-    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, IdSelectionSphere selSphereData,
-    const uint32_t groupId)
+    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, std::span<const IdSelectionSphere> selSphereData)
 {
-    const auto squareRadius = selSphereData[3]*selSphereData[3];
-    const auto sphereCenter = util::makeVec3(selSphereData);
+    uint64_t groupId = 0; // TODO: how do we decide the starting groupId?
+    for(const auto& sphere : selSphereData) {
+        const auto squareRadius = sphere[3]*sphere[3];
+        const auto sphereCenter = util::makeVec3(sphere);
 #pragma omp parallel for schedule(static)
-    for(auto particleIndex = firstIndex; particleIndex < lastIndex; particleIndex++){
-        cstone::Vec3<CoordinateType> currentPosition{x[particleIndex], y[particleIndex], z[particleIndex]};
-        auto squaredDistance = util::norm2(currentPosition - sphereCenter);
-        if(squaredDistance < squareRadius) {
-            applyTaggingMask(groupId, ids[particleIndex]);
+        for(auto particleIndex = firstIndex; particleIndex < lastIndex; particleIndex++){
+            cstone::Vec3<CoordinateType> currentPosition{x[particleIndex], y[particleIndex], z[particleIndex]};
+            auto squaredDistance = util::norm2(currentPosition - sphereCenter);
+            if(squaredDistance < squareRadius) {
+                applyTaggingMask(groupId, ids[particleIndex]);
+            }
         }
+        groupId++;
     }
 }
 
