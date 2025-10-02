@@ -45,8 +45,8 @@
 namespace sphexa
 {
 
-template<class IdTypeP, class LocalIndexP>
-void findTaggedIdsGPU(std::span<const IdTypeP> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
+template<class LocalIndexP>
+void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
 {
 
     const auto numIds = last - first;
@@ -66,6 +66,6 @@ void findTaggedIdsGPU(std::span<const IdTypeP> ids, size_t first, size_t last, s
 
 }
 
-template void findTaggedIdsGPU<IdType, LocalIndex>(std::span<const IdType> ids, size_t first, size_t last, std::vector<LocalIndex>& taggedIdsIndexes);
+template void findTaggedIdsGPU<uint32_t>(std::span<const uint64_t> ids, size_t first, size_t last, std::vector<uint32_t>& taggedIdsIndexes);
 
 }

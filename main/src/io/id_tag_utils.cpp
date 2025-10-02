@@ -40,24 +40,19 @@
 namespace sphexa
 {
 
-void applyTaggingMask(IdType groupId, IdType& id)
+void applyTaggingMask(uint64_t groupId, uint64_t& id)
 {
-    if (groupId >= supGroupId)
-        throw std::runtime_error("Tagging group id larger than max value (" + std::to_string(supGroupId) + ")\n");
+    if (groupId >= maxNumGroupIds)
+        throw std::runtime_error("Tagging group id larger than max value (" + std::to_string(maxNumGroupIds) + ")\n");
 
-    // Clear previous tagging if present
-    if(IsMasked{}(id)) {
-        id &= ~taggingCheckMask;
-        std::cout << "Warning: applying tagging mask to already tagged id " << id << "\n";
-    }
+    // Clear previous tagging bits if any
+    id &= ~taggingCheckMask;
 
-    // Apply new tagging information
     id |= ((groupId+1) << taggingMaskStartingBit);
 }
 
-template<class IdTypeP>
-void tagIdsInList(std::span<IdTypeP> ids, size_t first, size_t last, std::span<const IdTypeP> selectedIds,
-    const LocalIndex groupId)
+void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last, std::span<const uint64_t> selectedIds,
+    const uint32_t groupId)
 {
     const auto idListBeginIt = ids.begin()+first;
     const auto idListEndIt = ids.begin()+last;
@@ -70,14 +65,10 @@ void tagIdsInList(std::span<IdTypeP> ids, size_t first, size_t last, std::span<c
         }
     });
 }
-template void tagIdsInList<IdType>(std::span<IdType> ids, size_t first, size_t last, std::span<const IdType> selectedIds,
-    const LocalIndex groupId);
 
-
-template<class IdTypeP>
-void tagIdsInSphere(std::span<IdTypeP> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
+void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
     std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, IdSelectionSphere selSphereData,
-    const LocalIndex groupId)
+    const uint32_t groupId)
 {
     const auto squareRadius = selSphereData[3]*selSphereData[3];
     const auto sphereCenter = util::makeVec3(selSphereData);
@@ -90,13 +81,9 @@ void tagIdsInSphere(std::span<IdTypeP> ids, std::span<const CoordinateType> x, s
         }
     }
 }
-template void tagIdsInSphere<IdType>(std::span<IdType> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
-    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, IdSelectionSphere selSphereData,
-    const LocalIndex groupId);
 
-
-template<class IdTypeP, class LocalIndexP>
-void findTaggedIds(std::span<const IdTypeP> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
+template<class LocalIndexP>
+void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
 {
     const auto numIds = last - first;
     std::vector<uint8_t> flags(numIds, 0);
@@ -108,7 +95,7 @@ void findTaggedIds(std::span<const IdTypeP> ids, size_t first, size_t last, std:
         flags[index] = IsMasked{}(ids[index + first]);
     }
 
-    std::exclusive_scan(flags.begin(), flags.end(), flagsScan.begin(), LocalIndex(0));
+    std::exclusive_scan(flags.begin(), flags.end(), flagsScan.begin(), uint32_t(0));
     taggedIdsIndexes.resize(flagsScan.back() + flags.back());
 
 #pragma omp parallel for
@@ -118,6 +105,6 @@ void findTaggedIds(std::span<const IdTypeP> ids, size_t first, size_t last, std:
     }
 }
 
-template void findTaggedIds<IdType, LocalIndex>(std::span<const IdType> ids, size_t first, size_t last, std::vector<LocalIndex>& taggedIdsIndexes);
+template void findTaggedIds<uint32_t>(std::span<const uint64_t> ids, size_t first, size_t last, std::vector<uint32_t>& taggedIdsIndexes);
 
 }
