@@ -35,7 +35,6 @@
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/groups.hpp"
-#include "cstone/traversal/groups_gpu.cuh"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/tuple_util.hpp"
 
@@ -173,9 +172,9 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
 
     // split particles into consecutive groups
     constexpr unsigned groupSize = TravConfig::targetSize;
-    DeviceVector<LocalIndex> temp, groups;
-    computeGroupSplits(0, n, rawPtr(dX), rawPtr(dY), rawPtr(dZ), rawPtr(dH), dNsView.leaves, dNsView.numLeafNodes,
-                       dNsView.layout, box, groupSize, 8, temp, groups);
+    thrust::universal_vector<LocalIndex> groups((n + groupSize - 1) / groupSize + 1);
+    for (unsigned i = 0; i < groups.size(); ++i)
+        groups[i] = std::min(groupSize * i, n);
     const GroupView dGroupView{.firstBody  = 0,
                                .lastBody   = n,
                                .numGroups  = unsigned(groups.size() - 1),
