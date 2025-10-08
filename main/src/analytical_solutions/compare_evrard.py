@@ -26,23 +26,23 @@ simulations.
 
 References Evrard solution:
 
-- "Beyond N-body: 3D cosmological gas dynamics", August E. Evrard. 
+- "Beyond N-body: 3D cosmological gas dynamics", August E. Evrard.
     MNRAS 235 (1988), p. 911-934.
     3.3 Self-gravitationg collapse of a cold gas sphere (p 922)
-    
+
 - "On the capabilities and limits of smoothed particle hydrodynamics",
     M. Steinmetz & E. Muller. A&A 268 (1993), p. 391-410.
     3.3 Adiabatic spherical collapse of an initially isothermal gas cloud (p 405)
 
 
-This routine produces 1d solutions for the evrard collapse: 
+This routine produces 1d solutions for the evrard collapse:
 
     rho = pow(rho, -omega), in spherical geometry(3D)
 
     Normalized units:
 
-        Time           (timeNorm)  :  pow(M_PI * M_PI / 8., 0.5) 
-                                    * pow(R, 1.5) 
+        Time           (timeNorm)  :  pow(M_PI * M_PI / 8., 0.5)
+                                    * pow(R, 1.5)
                                     * pow(Mt, -0.5)
 
         Density         (rhoNorm) : (3. * Mt) / (4. * M_PI * pow(R, 3.))
@@ -50,7 +50,7 @@ This routine produces 1d solutions for the evrard collapse:
         Velocity        (velNorm) : pow(uNorm, 0.5)
         Pressure        (pNorm)   : rhoNorm * uNorm
 
-    Initial density and internal energy distribution: 
+    Initial density and internal energy distribution:
 
         gamma  = 5./3.
         u0     = 0.05
@@ -79,9 +79,9 @@ import matplotlib.pyplot as plt
 import sys
 
 """ Time where the outputs with be compare with the solution """
-t1         = 0.77
-t2         = 1.29
-t3         = 2.58
+t1 = 0.77
+t2 = 1.29
+t3 = 2.58
 tSolutions = [t1, t2, t3]
 
 """ Evrard density solution at t1,t2,t3 """
@@ -317,10 +317,10 @@ def computeRadiiAndVr(h5File, step):
     vx = loadH5Field(h5File, "vx", step)
     vy = loadH5Field(h5File, "vy", step)
     vz = loadH5Field(h5File, "vz", step)
-    radii = np.sqrt(x ** 2 + y ** 2 + z ** 2) 
+    radii = np.sqrt(x ** 2 + y ** 2 + z ** 2)
     vr = (vx*x + vy*y + vz*z) / radii
     print("Calculated Radii and RadialVelocity in %s particles" % len(x))
-    return radii,vr 
+    return radii, vr
 
 
 def computeL1Error(xSim, ySim, xSol, ySol):
@@ -335,10 +335,13 @@ def plotRadialProfile(props, xSim, ySim, xSol, ySol):
 
     if props["yLogScale"] == "true":
         plt.yscale('log')
-            
+
     plt.scatter(xSim, ySim, s=0.1, label="Simulation, L1 = %3f" % props["L1"], color="C0")
-    plt.plot(xSol, ySol, label="Solution, t = %.3f" % props["tApprox"], color="C1")
-    
+    plt.plot(xSol,
+             ySol,
+             label="Solution, t = %.3f" % props["tApprox"],
+             color="C1")
+
     plt.xlabel("r")
     plt.ylabel(props["ylabel"])
     plt.draw()
@@ -353,7 +356,7 @@ def createDensityPlot(h5File, hdf5_step, tApprox, tReal, step, radii, rhoNorm, r
 
     L1 = computeL1Error(radii, rho, rhoSolX, rhoSolY)
     print("Density L1 error", L1)
-        
+
     props = {"ylabel": "rho", "title": "Density", "fname": "evrard_density_%4f.png" % tReal, "tApprox": tApprox, "tReal": tReal, "step": step, "xLogScale": "true", "yLogScale": "true", "L1": L1}
     plotRadialProfile(props, radii, rho, rhoSolX, rhoSolY)
 
@@ -363,7 +366,7 @@ def createPressurePlot(h5File, hdf5_step, tApprox, tReal, step, radii, pNorm, pS
 
     L1 = computeL1Error(radii, p, pSolX, pSolY)
     print("Pressure L1 error", L1)
-    
+
     props = {"ylabel": "p", "title": "Pressure", "fname": "evrard_pressure_%4f.png" % tReal, "tApprox": tApprox, "tReal": tReal, "step": step, "xLogScale": "true", "yLogScale": "true", "L1": L1}
     plotRadialProfile(props, radii, p, pSolX, pSolY)
 
@@ -373,7 +376,7 @@ def createVelocityPlot(h5File, vr, tApprox, tReal, step, radii, vNorm, velSolX, 
 
     L1 = computeL1Error(radii, vrPlot, velSolX, velSolY)
     print("Velocity L1 error", L1)
-    
+
     props = {"ylabel": "vel", "title": "Velocity", "fname": "evrard_velocity_%4f.png" % tReal, "tApprox": tApprox, "tReal": tReal, "step": step, "xLogScale": "true", "yLogScale": "false", "L1": L1}
     plotRadialProfile(props, radii, vrPlot, velSolX, velSolY)
 
@@ -393,37 +396,37 @@ if __name__ == "__main__":
 
     # Get attributes from 'evrard_init.hpp'
     attrs = h5File.attrs
-    G  = attrs["G"]
-    R  = attrs["r"]
-    Mt = attrs["mTotal"]
-    
+    G = attrs["gravConstant"][0]
+    R = attrs["r"][0]
+    Mt = attrs["mTotal"][0]
+
     # Normalization variables: Steinmetz & Muller (1993)
-    tNorm   = ((R ** 3.) / G * Mt) ** 0.5
+    tNorm = ((R ** 3.) / G * Mt) ** 0.5
     rhoNorm = (3. * Mt) / (4. * math.pi * (R ** 3.))
-    uNorm   = G * Mt / R
-    vNorm   = uNorm ** 0.5
-    pNorm   = rhoNorm * uNorm
+    uNorm = G * Mt / R
+    vNorm = uNorm ** 0.5
+    pNorm = rhoNorm * uNorm
 
     # Select Solution in function of the time
     if time == t1:
         rhoSolX, rhoSolY = Evrard_Density_t1[:, 0],  Evrard_Density_t1[:, 1]
-        pSolX,   pSolY   = Evrard_Pressure_t1[:, 0], Evrard_Pressure_t1[:, 1]
+        pSolX, pSolY = Evrard_Pressure_t1[:, 0], Evrard_Pressure_t1[:, 1]
         velSolX, velSolY = Evrard_Velocity_t1[:, 0], Evrard_Velocity_t1[:, 1]
     elif time == t2:
         rhoSolX, rhoSolY = Evrard_Density_t2[:, 0],  Evrard_Density_t2[:, 1]
-        pSolX,   pSolY   = Evrard_Pressure_t2[:, 0], Evrard_Pressure_t2[:, 1]
+        pSolX, pSolY = Evrard_Pressure_t2[:, 0], Evrard_Pressure_t2[:, 1]
         velSolX, velSolY = Evrard_Velocity_t2[:, 0], Evrard_Velocity_t2[:, 1]
     elif time == t3:
         rhoSolX, rhoSolY = Evrard_Density_t3[:, 0],  Evrard_Density_t3[:, 1]
-        pSolX,   pSolY   = Evrard_Pressure_t3[:, 0], Evrard_Pressure_t3[:, 1]
+        pSolX, pSolY = Evrard_Pressure_t3[:, 0], Evrard_Pressure_t3[:, 1]
         velSolX, velSolY = Evrard_Velocity_t3[:, 0], Evrard_Velocity_t3[:, 1]
     else:
         print("No valid input time for the solution")
         sys.exit(1)
-        
+
     # simulation time of each step that was written to file
     timesteps = loadTimesteps(h5File)
-    
+
     # the actual iteration number of each step that was written
     stepNumbers = loadStepNumbers(h5File)
 
@@ -435,16 +438,16 @@ if __name__ == "__main__":
     print("The closest timestep to the specified solution time of t/t*=%s is step=%s at tReal=%s, where t*=%s" % (time, step, tReal, tNorm))
 
     hdf5_step = np.searchsorted(stepNumbers, step)
-    
+
     # Calulate Radius and RadialVelocity
     radii = None
     vr = None
     try:
-        radii,vr = computeRadiiAndVr(h5File, hdf5_step)
+        radii, vr = computeRadiiAndVr(h5File, hdf5_step)
     except KeyError:
         print("Could not load radii, input file does not contain all fields \"x, y, z, vx, vy, vz\"")
         sys.exit(1)
-        
+
     try:
         createDensityPlot(h5File, hdf5_step, tApprox, tReal, step, radii, rhoNorm, rhoSolX, rhoSolY)
     except KeyError:
