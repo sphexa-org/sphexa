@@ -180,7 +180,6 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
                                .numGroups  = unsigned(groups.size() - 1),
                                .groupStart = rawPtr(groups),
                                .groupEnd   = rawPtr(groups) + 1};
-    printf("Number of groups: %u (unsplit: %u)\n", dGroupView.numGroups, (n + groupSize - 1) / groupSize);
 
     // build neighborhood, measure CPU time
     using Clock     = std::chrono::high_resolution_clock;
