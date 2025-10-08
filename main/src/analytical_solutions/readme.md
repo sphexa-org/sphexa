@@ -22,11 +22,14 @@ python3 ./compare_evrard.py -t 0.77 dump_evrard.h5
 ## gresho_chan
 
 ```
-rm -f 
-./sphexa-cuda ...
+rm -f dump_gresho-chan.h5
+./sphexa-cuda --glass 40c.h5 --init gresho-chan -n 40 -s 20 -w 10 -f x,y,z,vx,vy,vz,rho,p,temp,h --quiet
+# Total execution time of 20 iterations of gresho-chan up to t = 0.000006: 4.37082s
 
 python3 ./compare_gresho_chan.py --help
-python3 ./compare_gresho_chan.py ...
+python3 ./compare_gresho_chan.py -t 0.000006 -r1 0.2 dump_gresho-chan.h5
+# greshochan_colourmap_0.000.png
+# greshochan_velocity_0.000.png
 ```
 
 ## noh
