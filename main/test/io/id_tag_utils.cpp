@@ -30,6 +30,7 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include <algorithm>
 #include <numeric>
 #include <vector>
 

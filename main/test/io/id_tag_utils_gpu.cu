@@ -29,6 +29,8 @@
  * @author Christopher Bignamini <christopher.bignamini@gmail.com>
  */
 
+#include <algorithm>
+#include <numeric>
 #include <vector>
 
 #include <thrust/device_vector.h>
