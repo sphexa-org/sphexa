@@ -37,7 +37,6 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
     variant("gpu_aware_mpi", default=True, description="GPU aware MPI")
 
     variant("ascent", default=False, description="Enable Ascent in situ visualization")
-    variant("catalyst", default=False, description="Enable Catalyst in situ visualization")
 
     depends_on("cmake@3.22:", type="build")
 
@@ -48,7 +47,6 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
     depends_on("hipcub", when="+rocm")
     depends_on("hdf5 +mpi", when="+hdf5")
     depends_on("ascent", when="+ascent")
-    depends_on("catalyst", when="+catalyst")
 
     # Build MPI with GPU support when GPU aware MPI is requested.
     # For cray-mpich, the user is responsible to configure it for GPU aware MPI.
@@ -81,7 +79,6 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
             self.define_from_variant("RYOANJI_WITH_HIP", "rocm"),
             self.define_from_variant("CSTONE_WITH_HIP", "rocm"),
             self.define_from_variant("SPH_EXA_WITH_ASCENT", "ascent"),
-            self.define_from_variant("SPH_EXA_WITH_CATALYST", "catalyst"),
         ]
         args.append('-DCMAKE_C_COMPILER=mpicc')
         args.append('-DCMAKE_CXX_COMPILER=mpicxx')
