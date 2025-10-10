@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(sphexa CXX C)
+project(sphexa CXX C CUDA)
 set(CMAKE_CXX_STANDARD 20)
 
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -DNDEBUG")
@@ -98,7 +98,7 @@ set_property(CACHE INSITU PROPERTY STRINGS None Catalyst Ascent)
 if(INSITU STREQUAL "Catalyst")
     find_package(catalyst REQUIRED PATHS "$ENV{EBROOTPARAVIEW}/lib/cmake/paraview-5.10")
 elseif(INSITU STREQUAL "Ascent")
-	find_package(Ascent REQUIRED PATHS "$ENV{EBROOTASCENT}/lib/cmake/ascent")
+	find_package(Ascent REQUIRED)
 endif()
 
 option(SPH_EXA_WITH_GRACKLE "Enable radiative cooling with GRACKLE" OFF)

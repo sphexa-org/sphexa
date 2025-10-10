@@ -25,27 +25,38 @@ module load ParaView/5.10.1-CrayGNU-21.09-EGL
   make -j
 ```
 
-## build with ASCENT on Piz Daint
+## build with ASCENT on Alps Daint
 
-- prgenv:
+- uenv:
+
 ```
-  module load daint-gpu CMake cray-hdf5-parallel Ascent cudatoolkit/11.2.0_3.39-2.1__gf93aa1c
+uenv start -v default insitu_ascent/0.9.5:v1
+```
+
+- ascent actions:
+
+```
+vim main/src/ascent_adaptor.h
 ```
 
 - build:
 
 ```
-  mkdir buildAscentDaint
-  cd buildAscentDaint
-  cmake -S .. \
-    -DHDF5_INCLUDE_DIR=$HDF5_DIR/include \
-    -DBUILD_ANALYTICAL:BOOL=OFF \
-    -DBUILD_TESTING:BOOL=OFF \
-    -DSPH_EXA_WITH_H5HUT:BOOL=OFF \
-    -DCMAKE_CXX_COMPILER=CC \
-    -DINSITU=Ascent
+git clone https://github.com/sphexa-org/sphexa sphexa.git
 
-  make -j
+cmake \
+-S sphexa.git \
+-B build \
+-DCMAKE_BUILD_TYPE=Debug \
+-DCMAKE_CUDA_ARCHITECTURES=90 \
+-DCMAKE_CUDA_HOST_COMPILER=/user-tools/env/default/bin/g++ \
+-DCMAKE_CUDA_FLAGS=-ccbin=mpicxx \
+-DCSTONE_WITH_GPU_AWARE_MPI=ON \
+-DSPH_EXA_WITH_H5HUT=ON \
+-DINSITU=Ascent \
+-DAscent_DIR=/user-tools/env/default
+
+cmake --build build+debug -t sphexa-cuda -j
 ```
 
 </p>

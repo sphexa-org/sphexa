@@ -8,7 +8,7 @@ function(enableInSituViz exename)
                 SPH_EXA_USE_CATALYST2)
         target_link_libraries(${exename} PRIVATE catalyst::catalyst)
     elseif (INSITU STREQUAL "Ascent")
-        target_include_directories(${exename} PRIVATE ..)
+        target_include_directories(${exename} PRIVATE .. ${ASCENT_INCLUDE_DIRS})
         target_compile_definitions(${exename}
                 PRIVATE
                 SPH_EXA_USE_ASCENT)

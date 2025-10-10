@@ -31,14 +31,14 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     bool dump_data_todisk = false;
     if(dump_data_todisk == false)
     {
-    conduit::Node queries;
-    queries["q1/params/expression"] = "field('kx') * field('m') / field('xm')";
-    queries["q1/params/name"] = "density";
-    
-    conduit::Node &add_queries = clip_actions.append();
-    add_queries["action"] = "add_queries";
-    add_queries["queries"] = queries;
-    
+    // TODO: ASCENT+OCCA
+    // conduit::Node queries;
+    // queries["q1/params/expression"] = "field('kx') * field('m') / field('xm')";
+    // queries["q1/params/name"] = "density";
+    // conduit::Node &add_queries = clip_actions.append();
+    // add_queries["action"] = "add_queries";
+    // add_queries["queries"] = queries;
+
     conduit::Node pipelines;
     pipelines["pl_threshold_thin_clip_z/f1/type"] = "threshold";
     conduit::Node &params1 = pipelines["pl_threshold_thin_clip_z/f1/params"];
@@ -52,8 +52,9 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     params2["max_value"] = 0.12575;
 
     conduit::Node scenes;
-    scenes["s1/plots/p1/type"]         = "pseudocolor";
-    scenes["s1/plots/p1/field"] = "density";
+    scenes["s1/plots/p1/type"] = "pseudocolor";
+    scenes["s1/plots/p1/field"] = "p";
+    // scenes["s1/plots/p1/field"] = "density";
     scenes["s1/plots/p1/pipeline"] = "pl_threshold_thin_clip_z";
     scenes["s1/plots/p1/min_value"] = 1;
     scenes["s1/plots/p1/max_value"] = 10;
@@ -61,8 +62,9 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     scenes["s1/plots/p1/color_table/annotation"] = "false";
     scenes["s1/plots/p1/points/radius"] = 0.001;
     
-    scenes["s1/plots/p2/type"]         = "pseudocolor";
-    scenes["s1/plots/p2/field"] = "density";
+    scenes["s1/plots/p2/type"] = "pseudocolor";
+    scenes["s1/plots/p2/field"] = "p";
+    // scenes["s1/plots/p2/field"] = "density";
     scenes["s1/plots/p2/pipeline"] = "pl_threshold_thin_clip_y";
     scenes["s1/plots/p2/min_value"] = 1;
     scenes["s1/plots/p2/max_value"] = 10;
@@ -70,7 +72,8 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     scenes["s1/plots/p2/color_table/annotation"] = "true";
     scenes["s1/plots/p2/points/radius"] = 0.001;
     
-    scenes["s1/renders/r1/image_prefix"] = "datasets/density.%05d";
+    scenes["s1/renders/r1/image_prefix"] = "datasets/pressure.%05d";
+    // scenes["s1/renders/r1/image_prefix"] = "datasets/density.%05d";
     scenes["s1/renders/r1/image_width"] = 1920;
     scenes["s1/renders/r1/image_height"] = 1080;
 
