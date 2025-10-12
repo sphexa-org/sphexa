@@ -28,6 +28,18 @@
 namespace cstone
 {
 
+inline void summax(void* inP, void* inoutP, int* len, MPI_Datatype*)
+{
+    auto* in    = reinterpret_cast<unsigned*>(inP);
+    auto* inout = reinterpret_cast<unsigned*>(inoutP);
+    for (int i = 0; i < *len; ++i)
+    {
+        auto a   = in[i];
+        auto b   = inout[i];
+        inout[i] = std::max(a + b, std::max(a, b));
+    }
+}
+
 /*! @brief global update step of an octree, including regeneration of the internal node structure
  *
  * @tparam        KeyType     unsigned 32- or 64-bit integer
@@ -69,7 +81,10 @@ bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
     computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys, maxCount, false);
 
     syncGpu();
-    mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, MPI_COMM_WORLD);
+    MPI_Op limitSum;
+    MPI_Op_create(&summax, true, &limitSum);
+    mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), limitSum, MPI_COMM_WORLD);
+    MPI_Op_free(&limitSum);
     sequenceMax(d_counts.data(), d_counts.data() + d_counts.size(), d_countsRed.data(), d_counts.data());
 
     reallocate(counts, numLeafNodes, 1.01);
