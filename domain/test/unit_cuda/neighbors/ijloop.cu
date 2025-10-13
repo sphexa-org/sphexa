@@ -133,19 +133,24 @@ struct IjLoopTest : testing::Test
         constexpr unsigned groupSize = TravConfig::targetSize;
         const unsigned unsplitGroups = (lastBody - firstBody + groupSize - 1) / groupSize;
         groups.clear();
-        for (unsigned i = 0; i < unsplitGroups; ++i) {
+        for (unsigned i = 0; i < unsplitGroups; ++i)
+        {
             assert(firstBody + i * groupSize < lastBody);
             groups.push_back(firstBody + i * groupSize);
-            if (i == unsplitGroups / 2) {
+            if (i == unsplitGroups / 2)
+            {
                 // we just split a "random" group into as-small-as-possible subgroups
-                for (unsigned j = 16; j < groupSize; ++j) {
+                for (unsigned j = 16; j < groupSize; ++j)
+                {
                     groups.push_back(firstBody + i * groupSize + j);
                 }
-            } else {
+            }
+            else
+            {
                 // also split some other groups
-                for (unsigned j : {3u, 5u, 7u}) {
-                    if (i == unsplitGroups / j)
-                        groups.push_back(firstBody + i * groupSize + j);
+                for (unsigned j : {3u, 5u, 7u})
+                {
+                    if (i == unsplitGroups / j) groups.push_back(firstBody + i * groupSize + j);
                 }
             }
         }
