@@ -396,10 +396,10 @@ if __name__ == "__main__":
 
     # Get attributes from 'evrard_init.hpp'
     attrs = h5File.attrs
-    G = attrs["gravConstant"][0]
-    R = attrs["r"][0]
-    Mt = attrs["mTotal"][0]
-
+    G  = attrs["gravConstant"]
+    R  = attrs["r"]
+    Mt = attrs["mTotal"]
+    
     # Normalization variables: Steinmetz & Muller (1993)
     tNorm = ((R ** 3.) / G * Mt) ** 0.5
     rhoNorm = (3. * Mt) / (4. * math.pi * (R ** 3.))
