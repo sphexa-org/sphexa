@@ -32,7 +32,6 @@
 
 #pragma once
 
-#include <numeric>
 #include <span>
 #include <vector>
 
@@ -48,26 +47,22 @@ using CoordinateType = sph::SphTypes::CoordinateType;
  */
 constexpr uint64_t tagNumBits = 10;
 
-/*! @brief Given tagNumBits, the maximum number of groups we can address is 2^tagNumBits - 1. 
+/*! @brief Given tagNumBits, the maximum number of groups we can address is 2^tagNumBits - 1.
  * We subtract one, because groupId=0 corresponds to an unmasked particle ID
  */
 constexpr uint64_t maxNumGroupIds = (1 << tagNumBits) - 1;
 
 /*! @brief First tagging bit position
  */
-constexpr uint64_t taggingMaskStartingBit = sizeof(uint64_t)*8 - tagNumBits;
+constexpr uint64_t taggingMaskStartingBit = sizeof(uint64_t) * 8 - tagNumBits;
 
 constexpr uint64_t taggingCheckMask = maxNumGroupIds << taggingMaskStartingBit;
-
 
 /*! @brief Tagged id identification condition functor
  */
 struct IsMasked
 {
-    HOST_DEVICE_FUN uint8_t operator()(uint64_t id) const
-    {
-        return (id & taggingCheckMask) != 0;
-    }
+    HOST_DEVICE_FUN uint8_t operator()(uint64_t id) const { return (id & taggingCheckMask) != 0; }
 };
 
 /*! @brief Application of tagging mask to a given id
@@ -86,7 +81,8 @@ uint64_t applyTaggingMask(uint64_t groupId, uint64_t id);
  * @param[out] taggedIdsIndexes  vector of indexes of tagged ids
  */
 template<class LocalIndexP>
-extern void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes);
+extern void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last,
+                          std::vector<LocalIndexP>& taggedIdsIndexes);
 
 /*! @brief Tagged id (in first:last range) identification, GPU version
  *
@@ -96,7 +92,8 @@ extern void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t la
  * @param[out] taggedIdsIndexes  vector of indexes of tagged ids
  */
 template<class LocalIndexP>
-extern void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes);
+extern void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last,
+                             std::vector<LocalIndexP>& taggedIdsIndexes);
 
 /*! @brief Id tagging spherical volume definition
  * (center[0:2], radius)
@@ -112,7 +109,8 @@ using IdSelectionList = std::vector<uint64_t>;
  * @param[in]  last              last (excluded) id index
  * @param[in]  selectedIdsLists  lists of indexes to be tagged
  */
-void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last, std::span<const IdSelectionList> selectedIdsLists);
+void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last,
+                  std::span<const IdSelectionList> selectedIdsLists);
 
 /*! @brief Id tagging (in first:last range) in spherical volume, CPU version
  *
@@ -125,5 +123,6 @@ void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last, std::span<
  * @param[in]  selSphereData     set of spherical volume definitions
  */
 void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
-    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex, std::span<const IdSelectionSphere> selSphereData);
-}
+                    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex,
+                    std::span<const IdSelectionSphere> selSphereData);
+} // namespace sphexa

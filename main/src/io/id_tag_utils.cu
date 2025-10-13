@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 
- /*! @file
+/*! @file
  * @brief  CPU/GPU Particle ID tag utilities, GPU implementation
  *
  * @author Christopher Bignamini <christopher.bignamini@gmail.com>
@@ -46,10 +46,11 @@ namespace sphexa
 {
 
 template<class LocalIndexP>
-void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
+void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last,
+                      std::vector<LocalIndexP>& taggedIdsIndexes)
 {
 
-    const auto numIds = last - first;
+    const auto                     numIds = last - first;
     thrust::device_vector<uint8_t> flags(numIds, 0);
 
     IsMasked isMasked;
@@ -60,12 +61,13 @@ void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last, 
     taggedIdsIndexes.resize(flagsScan.back() + flags.back());
 
     thrust::device_vector<LocalIndexP> taggedIdsIndexesDev(taggedIdsIndexes.size());
-    thrust::scatter_if(thrust::device, thrust::make_counting_iterator(first), thrust::make_counting_iterator(first + numIds),
-            flagsScan.begin(), flags.begin(), taggedIdsIndexesDev.begin());
+    thrust::scatter_if(thrust::device, thrust::make_counting_iterator(first),
+                       thrust::make_counting_iterator(first + numIds), flagsScan.begin(), flags.begin(),
+                       taggedIdsIndexesDev.begin());
     thrust::copy(taggedIdsIndexesDev.begin(), taggedIdsIndexesDev.end(), taggedIdsIndexes.begin());
-
 }
 
-template void findTaggedIdsGPU<uint32_t>(std::span<const uint64_t> ids, size_t first, size_t last, std::vector<uint32_t>& taggedIdsIndexes);
+template void findTaggedIdsGPU<uint32_t>(std::span<const uint64_t> ids, size_t first, size_t last,
+                                         std::vector<uint32_t>& taggedIdsIndexes);
 
-}
+} // namespace sphexa
