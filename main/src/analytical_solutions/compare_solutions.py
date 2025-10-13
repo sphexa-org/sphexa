@@ -73,6 +73,7 @@ def determineTimestep(time, timesteps):
     """ Return the timestep with simulation time closest to the specified time """
     return np.argmin(np.abs(timesteps - time))
 
+
 def computeRadii(h5File, step):
     """ Load XYZ coordinates and compute their radii """
     x = loadH5Field(h5File, "x", step)
@@ -147,8 +148,7 @@ if __name__ == "__main__":
         # output time specified instead of step, locate closest output step
         stepIndex = determineTimestep(args.time, timesteps)
         step = stepNumbers[stepIndex]
-        print("The closest timestep to the specified time of %s is step %s at t=%s" % (
-        args.time, step, timesteps[stepIndex]))
+        print(f"The closest timestep to the specified time of {args.time} is step {step} at t={timesteps[stepIndex]}")
 
     hdf5_step = np.searchsorted(stepNumbers, step)
     time = timesteps[hdf5_step]
