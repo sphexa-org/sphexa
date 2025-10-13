@@ -21,7 +21,6 @@
 
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
-#include "cstone/traversal/groups_gpu.cuh"
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
 #include "cstone/traversal/ijloop/cpu_fullnblist.hpp"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
@@ -132,11 +131,25 @@ struct IjLoopTest : testing::Test
         levelRange     = octree.levelRange;
 
         constexpr unsigned groupSize = TravConfig::targetSize;
-        DeviceVector<LocalIndex> temp, dGroups;
-        computeGroupSplits(firstBody, lastBody, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(leaves),
-                           numLeafNodes, rawPtr(layout), box, groupSize, 7, temp, dGroups);
-        groups.resize(dGroups.size());
-        thrust::copy_n(dGroups.data(), dGroups.size(), groups.data());
+        const unsigned unsplitGroups = (lastBody - firstBody + groupSize - 1) / groupSize;
+        groups.clear();
+        for (unsigned i = 0; i < unsplitGroups; ++i) {
+            assert(firstBody + i * groupSize < lastBody);
+            groups.push_back(firstBody + i * groupSize);
+            if (i == unsplitGroups / 2) {
+                // we just split a "random" group into as-small-as-possible subgroups
+                for (unsigned j = 16; j < groupSize; ++j) {
+                    groups.push_back(firstBody + i * groupSize + j);
+                }
+            } else {
+                // also split some other groups
+                for (unsigned j : {3u, 5u, 7u}) {
+                    if (i == unsplitGroups / j)
+                        groups.push_back(firstBody + i * groupSize + j);
+                }
+            }
+        }
+        groups.push_back(lastBody);
 
         if (!groups.empty())
         {
