@@ -81,7 +81,7 @@ uint64_t applyTaggingMask(uint64_t groupId, uint64_t id);
  * @param[out] taggedIdsIndexes  vector of indexes of tagged ids
  */
 template<class LocalIndexP>
-extern void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last,
+extern void findTaggedIds(std::span<const uint64_t> ids, std::size_t first, std::size_t last,
                           std::vector<LocalIndexP>& taggedIdsIndexes);
 
 /*! @brief Tagged id (in first:last range) identification, GPU version
@@ -89,10 +89,10 @@ extern void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t la
  * @param[in]  ids          ordered id list
  * @param[in]  first        first id index // TODO number of elements and pass iterator?
  * @param[in]  last         last (excluded) id index
- * @param[out] taggedIdsIndexes  vector of indexes of tagged ids
+ * @param[out] taggedIdsIndexes  vector with indices of tagged ids
  */
 template<class LocalIndexP>
-extern void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last,
+extern void findTaggedIdsGPU(std::span<const uint64_t> ids, std::size_t first, std::size_t last,
                              std::vector<LocalIndexP>& taggedIdsIndexes);
 
 /*! @brief Id tagging spherical volume definition
@@ -109,7 +109,7 @@ using IdSelectionList = std::vector<uint64_t>;
  * @param[in]  last              last (excluded) id index
  * @param[in]  selectedIdsLists  lists of indexes to be tagged
  */
-void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last,
+void tagIdsInList(std::span<uint64_t> ids, std::size_t first, std::size_t last,
                   std::span<const IdSelectionList> selectedIdsLists);
 
 /*! @brief Id tagging (in first:last range) in spherical volume, CPU version
@@ -118,11 +118,11 @@ void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last,
  * @param[in]  x                 x coordinates
  * @param[in]  y                 y coordinates
  * @param[in]  z                 z coordinates
- * @param[in]  first             first id index // TODO number of elements and pass iterator?
- * @param[in]  last              last (excluded) id index
+ * @param[in]  firstIndex        first id index // TODO number of elements and pass iterator?
+ * @param[in]  lastIndex         last (excluded) id index
  * @param[in]  selSphereData     set of spherical volume definitions
  */
 void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
-                    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex,
+                    std::span<const CoordinateType> z, std::size_t firstIndex, std::size_t lastIndex,
                     std::span<const IdSelectionSphere> selSphereData);
 } // namespace sphexa

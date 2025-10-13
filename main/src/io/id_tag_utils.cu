@@ -46,7 +46,7 @@ namespace sphexa
 {
 
 template<class LocalIndexP>
-void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last,
+void findTaggedIdsGPU(std::span<const uint64_t> ids, std::size_t first, std::size_t last,
                       std::vector<LocalIndexP>& taggedIdsIndexes)
 {
 
@@ -57,7 +57,7 @@ void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last,
     thrust::transform(thrust::device, ids.data() + first, ids.data() + last, flags.begin(), isMasked);
 
     thrust::device_vector<LocalIndexP> flagsScan(numIds);
-    thrust::exclusive_scan(flags.begin(), flags.end(), flagsScan.begin(), 0, thrust::plus<LocalIndexP>());
+    thrust::exclusive_scan(flags.begin(), flags.end(), flagsScan.begin(), LocalIndexP(0), thrust::plus<LocalIndexP>());
     taggedIdsIndexes.resize(flagsScan.back() + flags.back());
 
     thrust::device_vector<LocalIndexP> taggedIdsIndexesDev(taggedIdsIndexes.size());
@@ -67,7 +67,9 @@ void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last,
     thrust::copy(taggedIdsIndexesDev.begin(), taggedIdsIndexesDev.end(), taggedIdsIndexes.begin());
 }
 
-template void findTaggedIdsGPU<uint32_t>(std::span<const uint64_t> ids, size_t first, size_t last,
-                                         std::vector<uint32_t>& taggedIdsIndexes);
+template void findTaggedIdsGPU(std::span<const uint64_t> ids, std::size_t first, std::size_t last,
+                               std::vector<uint32_t>& taggedIdsIndexes);
+template void findTaggedIdsGPU(std::span<const uint64_t> ids, std::size_t first, std::size_t last,
+                               std::vector<uint64_t>& taggedIdsIndexes);
 
 } // namespace sphexa

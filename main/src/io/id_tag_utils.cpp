@@ -54,7 +54,8 @@ uint64_t applyTaggingMask(uint64_t groupId, uint64_t id)
     return taggedId;
 }
 
-void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last, std::span<const IdSelectionList> selectedIdsLists)
+void tagIdsInList(std::span<uint64_t> ids, std::size_t first, std::size_t last,
+                  std::span<const IdSelectionList> selectedIdsLists)
 {
     const auto idListBeginIt = ids.begin() + first;
     const auto idListEndIt   = ids.begin() + last;
@@ -80,7 +81,7 @@ void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last, std::span<
 }
 
 void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
-                    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex,
+                    std::span<const CoordinateType> z, std::size_t firstIndex, std::size_t lastIndex,
                     std::span<const IdSelectionSphere> selSphereData)
 {
     uint64_t groupId = 0; // TODO: how do we decide the starting groupId?
@@ -100,7 +101,8 @@ void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, 
 }
 
 template<class LocalIndexP>
-void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last, std::vector<LocalIndexP>& taggedIdsIndexes)
+void findTaggedIds(std::span<const uint64_t> ids, std::size_t first, std::size_t last,
+                   std::vector<LocalIndexP>& taggedIdsIndexes)
 {
     const auto               numIds = last - first;
     std::vector<uint8_t>     flags(numIds, 0);
@@ -122,7 +124,9 @@ void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last, std
     }
 }
 
-template void findTaggedIds<uint32_t>(std::span<const uint64_t> ids, size_t first, size_t last,
-                                      std::vector<uint32_t>& taggedIdsIndexes);
+template void findTaggedIds(std::span<const uint64_t> ids, std::size_t first, std::size_t last,
+                            std::vector<uint32_t>& taggedIdsIndexes);
+template void findTaggedIds(std::span<const uint64_t> ids, std::size_t first, std::size_t last,
+                            std::vector<uint64_t>& taggedIdsIndexes);
 
 } // namespace sphexa

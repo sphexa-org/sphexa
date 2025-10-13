@@ -38,7 +38,7 @@
 #include "io/id_tag_utils.hpp"
 
 void makeParticleDistribution(std::vector<sphexa::CoordinateType>& x, std::vector<sphexa::CoordinateType>& y,
-                              std::vector<sphexa::CoordinateType>& z, size_t numParticles)
+                              std::vector<sphexa::CoordinateType>& z, std::size_t numParticles)
 {
     x.resize(numParticles);
     y.resize(numParticles);
