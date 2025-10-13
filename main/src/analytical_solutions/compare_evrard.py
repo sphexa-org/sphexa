@@ -393,7 +393,7 @@ if __name__ == "__main__":
 
     # Get attributes from 'evrard_init.hpp'
     attrs = h5File.attrs
-    G  = attrs["G"]
+    G  = attrs["gravConstant"]
     R  = attrs["r"]
     Mt = attrs["mTotal"]
     
