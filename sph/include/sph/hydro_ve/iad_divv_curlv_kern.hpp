@@ -97,7 +97,6 @@ void iadDivVCurlVIjLoop(const Neighborhood& neighborhood, Tc K, const T* vx, con
                         T* dV11, T* dV12, T* dV13, T* dV22, T* dV23, T* dV33, bool doGradV)
 {
     const auto input = std::make_tuple(vx, vy, vz, xm, kx);
-    // TODO: check symmetry
     if (curlv && doGradV)
     {
         const auto output =
