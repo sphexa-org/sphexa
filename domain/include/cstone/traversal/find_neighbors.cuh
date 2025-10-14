@@ -153,7 +153,7 @@ __device__ __forceinline__ bool tightOverlap(int laneIdx,
  * @param[in]  pos_i             target x,y,z,4h^2, TravConfig::nwt per lane
  * @param[in]  targetCenter      geometrical target center
  * @param[in]  targetSize        geometrical target bounding box size
- * @param[in]  x,y,z,h           source bodies as referenced by tree cells
+ * @param[in]  x,y,z             source bodies as referenced by tree cells
  * @param[in]  tree              octree data view
  * @param[in]  initNodeIdx       traversal will be started with all children of the parent of @p initNodeIdx
  * @param[in]  box               global coordinate bounding box
@@ -166,7 +166,7 @@ __device__ __forceinline__ bool tightOverlap(int laneIdx,
  * Constant input pointers are additionally marked __restrict__ to indicate to the compiler that loads
  * can be routed through the read-only/texture cache.
  */
-template<bool UsePbc, class InteractionHandler, class Tc, class ThP, class KeyType>
+template<bool UsePbc, class InteractionHandler, class Tc, class KeyType>
 __device__ uint2 traverseWarp(const InteractionHandler& handleInteraction,
                               const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i,
                               const Vec3<Tc> targetCenter,
@@ -174,7 +174,6 @@ __device__ uint2 traverseWarp(const InteractionHandler& handleInteraction,
                               const Tc* __restrict__ x,
                               const Tc* __restrict__ y,
                               const Tc* __restrict__ z,
-                              const ThP /*h*/,
                               const OctreeNsView<Tc, KeyType>& tree,
                               int initNodeIdx,
                               const Box<Tc>& box,
@@ -492,12 +491,12 @@ __device__ void traverseNeighbors(cstone::LocalIndex bodyBegin,
     uint2 warpStats;
     if (usePbc)
     {
-        warpStats = traverseWarp<true>(handleInteraction, pos_i, targetCenter, targetSize, x, y, z, h, tree, initNode,
-                                       box, tempQueue, cellQueue);
+        warpStats = traverseWarp<true>(handleInteraction, pos_i, targetCenter, targetSize, x, y, z, tree, initNode, box,
+                                       tempQueue, cellQueue);
     }
     else
     {
-        warpStats = traverseWarp<false>(handleInteraction, pos_i, targetCenter, targetSize, x, y, z, h, tree, initNode,
+        warpStats = traverseWarp<false>(handleInteraction, pos_i, targetCenter, targetSize, x, y, z, tree, initNode,
                                         box, tempQueue, cellQueue);
     }
     unsigned numP2P   = warpStats.x;
