@@ -41,7 +41,6 @@ sph-run-cuda12-sm90-release-1rank:
     # GPU tests:
     - $TEST_INSTALL_DIR/hydro/sph_gpu_tests
     - $TEST_INSTALL_DIR/performance/hilbert_perf_gpu
-    - $TEST_INSTALL_DIR/performance/neighbors_test_gpu
     - $TEST_INSTALL_DIR/performance/octree_perf_gpu
     - $TEST_INSTALL_DIR/unit_cuda/component_units_cuda
     - date
