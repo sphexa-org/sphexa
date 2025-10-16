@@ -64,7 +64,6 @@ void tagIdsInList(std::span<uint64_t> ids, std::size_t firstIndex, std::size_t l
     for (auto i = firstIndex; i < lastIndex; i++)
     {
         // Since ids may be already tagged we need to unmask them in the search
-        // Warning: race conditions can be generated here if selectedIds contains duplicates
         auto it = std::find(selectedIds.begin(), selectedIds.end(), ids[i] & ~taggingCheckMask);
         if (it != selectedIds.end())
         {
