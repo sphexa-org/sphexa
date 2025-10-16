@@ -35,7 +35,6 @@
 #include <span>
 #include <vector>
 
-#include "cstone/cuda/device_vector.h"
 #include "cstone/tree/definitions.h"
 #include "sph/types.hpp"
 
@@ -92,9 +91,9 @@ extern void findTaggedIds(std::span<const uint64_t> ids, std::size_t firstIndex,
  * @param[in]  lastIndex         last (excluded) id index
  * @param[out] taggedIdsIndexes  vector with indices of tagged ids
  */
-template<class LocalIndexP>
+template<class LocalIndexP, template<class> class DeviceVector>
 extern void findTaggedIdsGPU(std::span<const uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
-                             cstone::DeviceVector<LocalIndexP>& taggedIdsIndexes);
+                             DeviceVector<LocalIndexP>& taggedIdsIndexes);
 
 /*! @brief Id tagging spherical volume definition
  * (center[0:2], radius)

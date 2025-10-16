@@ -40,14 +40,15 @@
 #include <thrust/scatter.h>
 #include <thrust/transform.h>
 
+#include "cstone/cuda/device_vector.h"
 #include "id_tag_utils.hpp"
 
 namespace sphexa
 {
 
-template<class LocalIndexP>
-void findTaggedIdsGPU(std::span<const uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
-                      cstone::DeviceVector<LocalIndexP>& taggedIdsIndexes)
+template<class LocalIndexP, template<class> class DeviceVector>
+extern void findTaggedIdsGPU(std::span<const uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
+                             DeviceVector<LocalIndexP>& taggedIdsIndexes)
 {
 
     const auto                     numIds = lastIndex - firstIndex;
