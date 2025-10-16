@@ -77,7 +77,7 @@ uint64_t applyTaggingMask(uint64_t groupId, uint64_t id);
 /*! @brief Tagged id (in first:last range) identification, CPU version
  *
  * @param[in]  ids          ordered id list
- * @param[in]  first        first id index // TODO number of elements and pass iterator?
+ * @param[in]  first        first id index
  * @param[in]  last         last (excluded) id index
  * @param[out] taggedIdsIndexes  vector of indexes of tagged ids
  */
@@ -88,7 +88,7 @@ extern void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t la
 /*! @brief Tagged id (in first:last range) identification, GPU version
  *
  * @param[in]  ids          ordered id list
- * @param[in]  first        first id index // TODO number of elements and pass iterator?
+ * @param[in]  first        first id index
  * @param[in]  last         last (excluded) id index
  * @param[out] taggedIdsIndexes  vector with indices of tagged ids
  */
@@ -104,7 +104,7 @@ using IdSelectionSphere = cstone::Vec4<CoordinateType>;
 /*! @brief Id tagging (in first:last range) from list
  *
  * @param[out] ids               id list
- * @param[in]  first             first id index // TODO number of elements and pass iterator?
+ * @param[in]  first             first id index
  * @param[in]  last              last (excluded) id index
  * @param[in]  selectedIdsList   ids to be tagged (no duplications allowed)
  * @param[in]  selectedIdsGroups group id for each selected id
@@ -119,7 +119,7 @@ void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last,
  * @param[in]  x                 x coordinates
  * @param[in]  y                 y coordinates
  * @param[in]  z                 z coordinates
- * @param[in]  firstIndex        first id index // TODO number of elements and pass iterator?
+ * @param[in]  firstIndex        first id index
  * @param[in]  lastIndex         last (excluded) id index
  * @param[in]  selSphereData     set of spherical volume definitions
  * @param[in]  sphereGroupIds    group id for each spherical volume definition
