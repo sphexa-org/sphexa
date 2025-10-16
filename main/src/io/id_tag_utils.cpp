@@ -54,41 +54,40 @@ uint64_t applyTaggingMask(uint64_t groupId, uint64_t id)
     return taggedId;
 }
 
-void tagIdsInList(std::span<uint64_t> ids, std::size_t first, std::size_t last,
-                  std::span<const IdSelectionList> selectedIdsLists)
+void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last,
+                  std::span<const uint64_t> selectedIds, std::span<const unsigned> selectedIdsGroups)
 {
-    const auto idListBeginIt = ids.begin() + first;
-    const auto idListEndIt   = ids.begin() + last;
-    uint64_t   groupId       = 0; // TODO: how do we decide the starting groupId?
-    for (const auto& idsList : selectedIdsLists)
+    if (selectedIds.size() != selectedIdsGroups.size())
+        throw std::runtime_error("Number of selected ids and number of group ids must be the same\n");
+
+#pragma omp parallel for schedule(static)
+    for (auto i = first; i < last; i++)
     {
-        if (groupId >= maxNumGroupIds)
-            throw std::runtime_error("Tagging group id larger than max value (" + std::to_string(maxNumGroupIds) +
-                                     ")\n");
-        auto lastFound = 0;
-        std::for_each(idsList.begin(), idsList.end(),
-                      [idListBeginIt, idListEndIt, &lastFound, groupId](auto selectedIds)
-                      {
-                          auto lower = std::lower_bound(idListBeginIt + lastFound, idListEndIt, selectedIds);
-                          if (lower != idListEndIt && *lower == selectedIds)
-                          {
-                              lastFound = lower - idListBeginIt + 1;
-                              *lower    = applyTaggingMask(groupId, *lower);
-                          }
-                      });
-        groupId++;
+        // Since ids may be already tagged we need to unmask them in the search
+        // Warning: race conditions can be generated here if selectedIds contains duplicates
+        auto it = std::find(selectedIds.begin(), selectedIds.end(), ids[i] & ~taggingCheckMask);
+        if (it != selectedIds.end())
+        {
+            auto index = it - selectedIds.begin();
+            ids[i]    = applyTaggingMask(selectedIdsGroups[index], ids[i]);
+        }
     }
 }
 
 void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
-                    std::span<const CoordinateType> z, std::size_t firstIndex, std::size_t lastIndex,
-                    std::span<const IdSelectionSphere> selSphereData)
+                    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex,
+                    std::span<const IdSelectionSphere> selSphereData, std::span<const unsigned> sphereGroupIds)
 {
-    uint64_t groupId = 0; // TODO: how do we decide the starting groupId?
+
+    if (selSphereData.size() != sphereGroupIds.size())
+        throw std::runtime_error("Number of spherical volumes and number of group ids must be the same\n");\
+
+    uint64_t groupIndex = 0;
     for (const auto& sphere : selSphereData)
     {
         const auto squareRadius = sphere[3] * sphere[3];
         const auto sphereCenter = util::makeVec3(sphere);
+        const unsigned groupId = sphereGroupIds[groupIndex];
 #pragma omp parallel for schedule(static)
         for (auto particleIndex = firstIndex; particleIndex < lastIndex; particleIndex++)
         {
@@ -96,12 +95,13 @@ void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, 
             auto                         squaredDistance = util::norm2(currentPosition - sphereCenter);
             if (squaredDistance < squareRadius) { ids[particleIndex] = applyTaggingMask(groupId, ids[particleIndex]); }
         }
-        groupId++;
+        groupIndex++;
     }
+
 }
 
 template<class LocalIndexP>
-void findTaggedIds(std::span<const uint64_t> ids, std::size_t first, std::size_t last,
+void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last,
                    std::vector<LocalIndexP>& taggedIdsIndexes)
 {
     const auto               numIds = last - first;
@@ -124,9 +124,9 @@ void findTaggedIds(std::span<const uint64_t> ids, std::size_t first, std::size_t
     }
 }
 
-template void findTaggedIds(std::span<const uint64_t> ids, std::size_t first, std::size_t last,
+template void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last,
                             std::vector<uint32_t>& taggedIdsIndexes);
-template void findTaggedIds(std::span<const uint64_t> ids, std::size_t first, std::size_t last,
+template void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last,
                             std::vector<uint64_t>& taggedIdsIndexes);
 
 } // namespace sphexa

@@ -35,6 +35,7 @@
 #include <span>
 #include <vector>
 
+#include "cstone/cuda/device_vector.h"
 #include "cstone/tree/definitions.h"
 #include "sph/types.hpp"
 
@@ -81,7 +82,7 @@ uint64_t applyTaggingMask(uint64_t groupId, uint64_t id);
  * @param[out] taggedIdsIndexes  vector of indexes of tagged ids
  */
 template<class LocalIndexP>
-extern void findTaggedIds(std::span<const uint64_t> ids, std::size_t first, std::size_t last,
+extern void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last,
                           std::vector<LocalIndexP>& taggedIdsIndexes);
 
 /*! @brief Tagged id (in first:last range) identification, GPU version
@@ -92,27 +93,27 @@ extern void findTaggedIds(std::span<const uint64_t> ids, std::size_t first, std:
  * @param[out] taggedIdsIndexes  vector with indices of tagged ids
  */
 template<class LocalIndexP>
-extern void findTaggedIdsGPU(std::span<const uint64_t> ids, std::size_t first, std::size_t last,
-                             std::vector<LocalIndexP>& taggedIdsIndexes);
+extern void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last,
+                             cstone::DeviceVector<LocalIndexP>& taggedIdsIndexes);
 
 /*! @brief Id tagging spherical volume definition
  * (center[0:2], radius)
  */
 using IdSelectionSphere = cstone::Vec4<CoordinateType>;
 
-using IdSelectionList = std::vector<uint64_t>;
-
-/*! @brief Id tagging (in first:last range) from list, CPU version
+/*! @brief Id tagging (in first:last range) from list
  *
  * @param[out] ids               id list
  * @param[in]  first             first id index // TODO number of elements and pass iterator?
  * @param[in]  last              last (excluded) id index
- * @param[in]  selectedIdsLists  lists of indexes to be tagged
+ * @param[in]  selectedIdsList   ids to be tagged (no duplications allowed)
+ * @param[in]  selectedIdsGroups group id for each selected id
  */
-void tagIdsInList(std::span<uint64_t> ids, std::size_t first, std::size_t last,
-                  std::span<const IdSelectionList> selectedIdsLists);
+void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last,
+                  std::span<const uint64_t> selectedIds, std::span<const unsigned> selectedIdsGroups);
 
-/*! @brief Id tagging (in first:last range) in spherical volume, CPU version
+
+/*! @brief Id tagging (in first:last range) in spherical volume
  *
  * @param[out] ids               id list
  * @param[in]  x                 x coordinates
@@ -121,8 +122,9 @@ void tagIdsInList(std::span<uint64_t> ids, std::size_t first, std::size_t last,
  * @param[in]  firstIndex        first id index // TODO number of elements and pass iterator?
  * @param[in]  lastIndex         last (excluded) id index
  * @param[in]  selSphereData     set of spherical volume definitions
+ * @param[in]  sphereGroupIds    group id for each spherical volume definition
  */
 void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
-                    std::span<const CoordinateType> z, std::size_t firstIndex, std::size_t lastIndex,
-                    std::span<const IdSelectionSphere> selSphereData);
+                    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex,
+                    std::span<const IdSelectionSphere> selSphereData, std::span<const unsigned> sphereGroupIds);
 } // namespace sphexa
