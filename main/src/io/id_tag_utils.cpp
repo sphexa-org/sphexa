@@ -69,7 +69,7 @@ void tagIdsInList(std::span<uint64_t> ids, std::size_t firstIndex, std::size_t l
         if (it != selectedIds.end())
         {
             auto index = it - selectedIds.begin();
-            ids[i]    = applyTaggingMask(selectedIdsGroups[index], ids[i]);
+            ids[i]     = applyTaggingMask(selectedIdsGroups[index], ids[i]);
         }
     }
 }
@@ -80,14 +80,14 @@ void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, 
 {
 
     if (selSphereData.size() != sphereGroupIds.size())
-        throw std::runtime_error("Number of spherical volumes and number of group ids must be the same\n");\
+        throw std::runtime_error("Number of spherical volumes and number of group ids must be the same\n");
 
     uint64_t groupIndex = 0;
     for (const auto& sphere : selSphereData)
     {
-        const auto squareRadius = sphere[3] * sphere[3];
-        const auto sphereCenter = util::makeVec3(sphere);
-        const unsigned groupId = sphereGroupIds[groupIndex];
+        const auto     squareRadius = sphere[3] * sphere[3];
+        const auto     sphereCenter = util::makeVec3(sphere);
+        const unsigned groupId      = sphereGroupIds[groupIndex];
 #pragma omp parallel for schedule(static)
         for (auto particleIndex = firstIndex; particleIndex < lastIndex; particleIndex++)
         {
@@ -97,7 +97,6 @@ void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, 
         }
         groupIndex++;
     }
-
 }
 
 template<class LocalIndexP>

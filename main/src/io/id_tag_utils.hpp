@@ -112,7 +112,6 @@ using IdSelectionSphere = cstone::Vec4<CoordinateType>;
 void tagIdsInList(std::span<uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
                   std::span<const uint64_t> selectedIds, std::span<const unsigned> selectedIdsGroups);
 
-
 /*! @brief Id tagging (in first:last range) in spherical volume
  *
  * @param[out] ids               id list
