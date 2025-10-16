@@ -54,14 +54,14 @@ uint64_t applyTaggingMask(uint64_t groupId, uint64_t id)
     return taggedId;
 }
 
-void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last,
+void tagIdsInList(std::span<uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
                   std::span<const uint64_t> selectedIds, std::span<const unsigned> selectedIdsGroups)
 {
     if (selectedIds.size() != selectedIdsGroups.size())
         throw std::runtime_error("Number of selected ids and number of group ids must be the same\n");
 
 #pragma omp parallel for schedule(static)
-    for (auto i = first; i < last; i++)
+    for (auto i = firstIndex; i < lastIndex; i++)
     {
         // Since ids may be already tagged we need to unmask them in the search
         // Warning: race conditions can be generated here if selectedIds contains duplicates
@@ -75,7 +75,7 @@ void tagIdsInList(std::span<uint64_t> ids, size_t first, size_t last,
 }
 
 void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
-                    std::span<const CoordinateType> z, size_t firstIndex, size_t lastIndex,
+                    std::span<const CoordinateType> z, std::size_t firstIndex, std::size_t lastIndex,
                     std::span<const IdSelectionSphere> selSphereData, std::span<const unsigned> sphereGroupIds)
 {
 
@@ -101,17 +101,17 @@ void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, 
 }
 
 template<class LocalIndexP>
-void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last,
+void findTaggedIds(std::span<const uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
                    std::vector<LocalIndexP>& taggedIdsIndexes)
 {
-    const auto               numIds = last - first;
+    const auto               numIds = lastIndex - firstIndex;
     std::vector<uint8_t>     flags(numIds, 0);
     std::vector<LocalIndexP> flagsScan(numIds);
 
 #pragma omp parallel for schedule(static)
     for (LocalIndexP index = 0; index < numIds; ++index)
     {
-        flags[index] = IsMasked{}(ids[index + first]);
+        flags[index] = IsMasked{}(ids[index + firstIndex]);
     }
 
     std::exclusive_scan(flags.begin(), flags.end(), flagsScan.begin(), uint32_t(0));
@@ -120,13 +120,13 @@ void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last,
 #pragma omp parallel for
     for (LocalIndexP i = 0; i < numIds; i++)
     {
-        if (flags[i]) { taggedIdsIndexes[flagsScan[i]] = i + first; }
+        if (flags[i]) { taggedIdsIndexes[flagsScan[i]] = i + firstIndex; }
     }
 }
 
-template void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last,
+template void findTaggedIds(std::span<const uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
                             std::vector<uint32_t>& taggedIdsIndexes);
-template void findTaggedIds(std::span<const uint64_t> ids, size_t first, size_t last,
+template void findTaggedIds(std::span<const uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
                             std::vector<uint64_t>& taggedIdsIndexes);
 
 } // namespace sphexa

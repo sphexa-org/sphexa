@@ -46,28 +46,28 @@ namespace sphexa
 {
 
 template<class LocalIndexP>
-void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last,
+void findTaggedIdsGPU(std::span<const uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
                       cstone::DeviceVector<LocalIndexP>& taggedIdsIndexes)
 {
 
-    const auto                     numIds = last - first;
+    const auto                     numIds = lastIndex - firstIndex;
     thrust::device_vector<uint8_t> flags(numIds, 0);
 
     IsMasked isMasked;
-    thrust::transform(thrust::device, ids.data() + first, ids.data() + last, flags.begin(), isMasked);
+    thrust::transform(thrust::device, ids.data() + firstIndex, ids.data() + lastIndex, flags.begin(), isMasked);
 
     thrust::device_vector<LocalIndexP> flagsScan(numIds);
     thrust::exclusive_scan(flags.begin(), flags.end(), flagsScan.begin(), LocalIndexP(0), thrust::plus<LocalIndexP>());
     taggedIdsIndexes.resize(flagsScan.back() + flags.back());
 
-    thrust::scatter_if(thrust::device, thrust::make_counting_iterator(first),
-                       thrust::make_counting_iterator(first + numIds), flagsScan.begin(), flags.begin(),
+    thrust::scatter_if(thrust::device, thrust::make_counting_iterator(firstIndex),
+                       thrust::make_counting_iterator(firstIndex + numIds), flagsScan.begin(), flags.begin(),
                        taggedIdsIndexes.data());
 }
 
-template void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last,
+template void findTaggedIdsGPU(std::span<const uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
                                cstone::DeviceVector<uint32_t>& taggedIdsIndexes);
-template void findTaggedIdsGPU(std::span<const uint64_t> ids, size_t first, size_t last,
+template void findTaggedIdsGPU(std::span<const uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
                                cstone::DeviceVector<uint64_t>& taggedIdsIndexes);
 
 } // namespace sphexa
