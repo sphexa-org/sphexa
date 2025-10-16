@@ -114,7 +114,8 @@ TEST(IO, tagIdInList)
 {
     std::vector<uint64_t> ids(100);
     std::iota(ids.begin(), ids.end(), 0);
-    sphexa::IdSelectionList selectedIds{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
+    std::vector<uint64_t>   selectedIds{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
+    std::vector<unsigned>   selectedIdsGroups(selectedIds.size(), 0);
     std::vector<uint64_t>   tagIdsRef = ids;
     tagIdsRef[0]                      = 18014398509481984ULL;
     tagIdsRef[1]                      = 18014398509481985ULL;
@@ -130,10 +131,38 @@ TEST(IO, tagIdInList)
     tagIdsRef[95]                     = 18014398509482079ULL;
     tagIdsRef[99]                     = 18014398509482083ULL;
 
-    std::vector<sphexa::IdSelectionList> selectedIdsLists{selectedIds};
+    sphexa::tagIdsInList(std::span<uint64_t>(ids), 0, ids.size(),
+                         std::span<const uint64_t>(selectedIds),
+                         std::span<const unsigned>(selectedIdsGroups));
+
+    EXPECT_EQ(ids, tagIdsRef);
+}
+
+TEST(IO, tagIdInListMultipleGroups)
+{
+    std::vector<uint64_t> ids(100);
+    std::iota(ids.begin(), ids.end(), 0);
+    std::vector<uint64_t>   selectedIds{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
+    std::vector<unsigned>   selectedIdsGroups{0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2};
+    std::vector<uint64_t>   tagIdsRef = ids;
+    tagIdsRef[0]                      = 18014398509481984ULL;
+    tagIdsRef[1]                      = 18014398509481985ULL;
+    tagIdsRef[2]                      = 18014398509481986ULL;
+    tagIdsRef[3]                      = 18014398509481987ULL;
+    tagIdsRef[6]                      = 36028797018963974ULL;
+    tagIdsRef[11]                     = 36028797018963979ULL;
+    tagIdsRef[13]                     = 36028797018963981ULL;
+    tagIdsRef[23]                     = 36028797018963991ULL;
+    tagIdsRef[71]                     = 54043195528446023ULL;
+    tagIdsRef[83]                     = 54043195528446035ULL;
+    tagIdsRef[91]                     = 54043195528446043ULL;
+    tagIdsRef[95]                     = 54043195528446047ULL;
+    tagIdsRef[99]                     = 54043195528446051ULL;
 
     sphexa::tagIdsInList(std::span<uint64_t>(ids), 0, ids.size(),
-                         std::span<const sphexa::IdSelectionList>(selectedIdsLists));
+                         std::span<const uint64_t>(selectedIds),
+                         std::span<const unsigned>(selectedIdsGroups));
+
     EXPECT_EQ(ids, tagIdsRef);
 }
 
@@ -143,17 +172,44 @@ TEST(IO, tagIdInListWithRange)
     uint32_t              last  = 10;
     std::vector<uint64_t> ids(100);
     std::iota(ids.begin(), ids.end(), 0);
-    sphexa::IdSelectionList selectedIds{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
+    std::vector<uint64_t> selectedIds{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
+    std::vector<unsigned> selectedIdsGroups(selectedIds.size(), 0);
     std::vector<uint64_t>   tagIdsRef = ids;
     tagIdsRef[3]                      = 18014398509481987ULL;
     tagIdsRef[6]                      = 18014398509481990ULL;
 
-    std::vector<sphexa::IdSelectionList> selectedIdsLists{selectedIds};
 
     sphexa::tagIdsInList(std::span<uint64_t>(ids), first, last,
-                         std::span<const sphexa::IdSelectionList>(selectedIdsLists));
+                         std::span<const uint64_t>(selectedIds),
+                         std::span<const unsigned>(selectedIdsGroups));
     EXPECT_EQ(ids, tagIdsRef);
 }
+
+TEST(IO, tagIdInListWithRangeMultipleGroups)
+{
+    uint32_t              first = 3;
+    uint32_t              last  = 94;
+    std::vector<uint64_t> ids(100);
+    std::iota(ids.begin(), ids.end(), 0);
+    std::vector<uint64_t> selectedIds{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
+    std::vector<unsigned> selectedIdsGroups{0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2};
+    std::vector<uint64_t>   tagIdsRef = ids;
+    tagIdsRef[3]                      = 18014398509481987ULL;
+    tagIdsRef[6]                      = 36028797018963974ULL;
+    tagIdsRef[11]                     = 36028797018963979ULL;
+    tagIdsRef[13]                     = 36028797018963981ULL;
+    tagIdsRef[23]                     = 36028797018963991ULL;
+    tagIdsRef[71]                     = 54043195528446023ULL;
+    tagIdsRef[83]                     = 54043195528446035ULL;
+    tagIdsRef[91]                     = 54043195528446043ULL;
+
+    sphexa::tagIdsInList(std::span<uint64_t>(ids), first, last,
+                         std::span<const uint64_t>(selectedIds),
+                         std::span<const unsigned>(selectedIdsGroups));
+
+    EXPECT_EQ(ids, tagIdsRef);
+}
+
 
 TEST(IO, tagIdInSphere)
 {
@@ -178,7 +234,8 @@ TEST(IO, tagIdInSphere)
     tagIdsRef[554] = 18014398509482538ULL;
     tagIdsRef[555] = 18014398509482539ULL;
     sphexa::tagIdsInSphere(std::span<uint64_t>(ids), x, y, z, 0, ids.size(),
-                           std::span<const sphexa::IdSelectionSphere>(selSphereDataVec));
+                           std::span<const sphexa::IdSelectionSphere>(selSphereDataVec),
+                           std::span<const unsigned>(std::vector<unsigned>{0}));
     EXPECT_EQ(ids, tagIdsRef);
 }
 
@@ -203,7 +260,40 @@ TEST(IO, tagIdInSphereWithRange)
     tagIdsRef[454] = 18014398509482438ULL;
     tagIdsRef[455] = 18014398509482439ULL;
     sphexa::tagIdsInSphere(std::span<uint64_t>(ids), x, y, z, first, last,
-                           std::span<const sphexa::IdSelectionSphere>(selSphereDataVec));
+                           std::span<const sphexa::IdSelectionSphere>(selSphereDataVec),
+                           std::span<const unsigned>(std::vector<unsigned>{0}));
+    EXPECT_EQ(ids, tagIdsRef);
+}
+
+TEST(IO, tagIdInMultipleSpheres)
+{
+    std::vector<uint64_t> ids(1000);
+    std::iota(ids.begin(), ids.end(), 0);
+    std::vector<uint64_t> tagIdsRef = ids;
+
+    // Particle distribution creation
+    std::vector<sphexa::CoordinateType> x, y, z;
+    makeParticleDistribution(x, y, z, 1000);
+
+    // Selection spheres definition: second sphere overlaps with first one
+    std::vector<sphexa::IdSelectionSphere> selSphereDataVec{sphexa::IdSelectionSphere{0.0, 0.0, 0.0, 0.25},
+                                                            sphexa::IdSelectionSphere{0.1, 0.1, 0.1, 0.25}};
+
+    tagIdsRef[444] = 18014398509482428ULL;
+    tagIdsRef[445] = 18014398509482429ULL;
+    tagIdsRef[454] = 18014398509482438ULL;
+    tagIdsRef[455] = 36028797018964423ULL;
+    tagIdsRef[544] = 18014398509482528ULL;
+    tagIdsRef[545] = 36028797018964513ULL;
+    tagIdsRef[554] = 36028797018964522ULL;
+    tagIdsRef[555] = 36028797018964523ULL;
+    tagIdsRef[556] = 36028797018964524ULL;
+    tagIdsRef[565] = 36028797018964533ULL;
+    tagIdsRef[655] = 36028797018964623ULL;
+
+    sphexa::tagIdsInSphere(std::span<uint64_t>(ids), x, y, z, 0, ids.size(),
+                           std::span<const sphexa::IdSelectionSphere>(selSphereDataVec),
+                           std::span<const unsigned>(std::vector<unsigned>{0, 1}));
     EXPECT_EQ(ids, tagIdsRef);
 }
 
