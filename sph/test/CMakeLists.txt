@@ -29,7 +29,7 @@ add_custom_command(TARGET ${testname} PRE_BUILD
     COMMAND ${CMAKE_COMMAND} -E create_symlink
     ${PROJECT_SOURCE_DIR}/include/sph/helm_table.dat $<TARGET_FILE_DIR:${testname}>/helm_table.dat)
 
-set(UNIT_TESTS_GPU timestep.cu)
+set(UNIT_TESTS_GPU timestep.cu test_helm_eos.cu)
 
 if(CMAKE_HIP_COMPILER)
     set_source_files_properties(${UNIT_TESTS_GPU} PROPERTIES LANGUAGE HIP)
@@ -40,7 +40,7 @@ if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     add_executable(${testname} ${UNIT_TESTS_GPU})
 
     target_include_directories(${testname} PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE_DIR}/include)
-    target_link_libraries(${testname} PRIVATE sph_gpu GTest::gtest_main)
+    target_link_libraries(${testname} PRIVATE sph_gpu GTest::gtest_main helmEOS)
     add_test(NAME ${testname} COMMAND ${testname})
 
     install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/hydro)

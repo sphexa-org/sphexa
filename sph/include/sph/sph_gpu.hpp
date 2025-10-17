@@ -18,7 +18,7 @@ extern void computeIADGpu(const GroupView&, Dataset& d, const cstone::Box<typena
 template<class Dataset>
 extern void computeMomentumEnergyStdGpu(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
 
-namespace cuda
+namespace gpu
 {
 
 template<class Dataset>
@@ -57,6 +57,14 @@ extern void computePolytropicEOS(size_t firstParticle, size_t lastParticle, Tt p
                                  Th* rho, Th* p, const Th* m, const Th* kx, const Th* xm, const Th* gradh, Th* prho,
                                  Tt* temp, Th* c);
 
+
+template<class Tt, class Tm, class Thydro>
+extern void computeHelmholtzEOS(size_t firstParticle, size_t lastParticle, const Thydro* kx, const Thydro* xm, const Tm* m,
+                                const Tt* temp, const Tt* abar, const Tt* zbar, const Thydro* gradh, Thydro* prho, Thydro* c,
+                                Thydro* cv, Tt* u);
+
+extern void freeDeviceHelmholtzEOSTables();
+
 template<class Dataset>
 extern void computeIdealGasEOS_HydroStd(size_t firstParticle, size_t lastParticle, Dataset& d);
 
@@ -66,7 +74,7 @@ extern void computeIsothermalEOS_HydroStd(size_t firstParticle, size_t lastParti
 template<typename Dataset>
 extern void computePolytropicEOS_HydroStd(size_t firstParticle, size_t lastParticle, Dataset& d);
 
-} // namespace cuda
+} // namespace gpu
 
 template<class Tc, class Thydro, class Tm1, class Tdu>
 extern void driftPositionsGpu(const GroupView& grp, float dt, float dt_back,

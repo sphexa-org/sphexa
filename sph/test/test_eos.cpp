@@ -46,7 +46,7 @@ TEST(EOSTests, helmholtzEOS_test)
 
     for (int i = 0; i < input_size; ++i)
     {
-        std::tie(c[i], p[i], cv[i], u[i]) = helmEOS.helmholtzEOS(temp_in[i], rho_in[i], abar, zbar);
+        helmEOS.helmholtzEOS(temp_in[i], rho_in[i], abar, zbar, &c[i], &p[i], &cv[i], &u[i]);
     }
 
     for (int i = 0; i < input_size; ++i)
