@@ -104,6 +104,7 @@ public:
     DevVector<uint64_t>  id;                                 // unique particle id
     DevVector<RealType>  abar;                               // the average atomic mass
     DevVector<RealType>  zbar;                               // the average atomic number
+    DevVector<RealType>  li3;                                // lithium abundance
 
     //! @brief SPH interpolation kernel lookup tables
     DevVector<HydroType> wh, whd;
@@ -120,7 +121,7 @@ public:
         "x",        "y",   "z",    "x_m1", "y_m1",  "z_m1", "vx",   "vy",   "vz",   "rho",   "u",     "p",     "prho",
         "tdpdTrho", "h",   "m",    "c",    "ugrav", "ax",   "ay",   "az",   "du",   "du_m1", "c11",   "c12",   "c13",
         "c22",      "c23", "c33",  "mue",  "mui",   "temp", "cv",   "xm",   "kx",   "divv",  "curlv", "alpha", "gradh",
-        "keys",     "nc",  "dV11", "dV12", "dV13",  "dV22", "dV23", "dV33", "rung", "id",    "abar",  "zbar"};
+        "keys",     "nc",  "dV11", "dV12", "dV13",  "dV22", "dV23", "dV33", "rung", "id",    "abar",  "zbar",  "li3"};
 
     /*! @brief return a tuple of field references
      *
@@ -130,7 +131,7 @@ public:
     {
         auto ret = std::tie(x, y, z, x_m1, y_m1, z_m1, vx, vy, vz, rho, u, p, prho, tdpdTrho, h, m, c, ugrav, ax, ay,
                             az, du, du_m1, c11, c12, c13, c22, c23, c33, mue, mui, temp, cv, xm, kx, divv, curlv, alpha,
-                            gradh, keys, nc, dV11, dV12, dV13, dV22, dV23, dV33, rung, id, abar, zbar);
+                            gradh, keys, nc, dV11, dV12, dV13, dV22, dV23, dV33, rung, id, abar, zbar, li3);
 
         static_assert(std::tuple_size_v<decltype(ret)> == fieldNames.size());
         return ret;

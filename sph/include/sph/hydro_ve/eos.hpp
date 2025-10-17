@@ -160,11 +160,17 @@ void computeHelmholtzEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     const auto* temp = d.temp.data();
     const auto* abar = d.abar.data();
     const auto* zbar = d.zbar.data();
+    const auto* gradh = d.gradh.data();
 
-    auto* p  = d.p.data();
+    auto* prho = d.prho.data();
     auto* c  = d.c.data();
     auto* cv = d.cv.data();
     auto* u  = d.u.data();
+
+    bool storeRho = (d.rho.size() == d.m.size());
+    bool storeP   = (d.p.size() == d.m.size());
+    bool storeCv = (d.cv.size() == d.m.size());
+    bool storeU   = (d.u.size() == d.m.size());
 
     Helmholtz_EOS& helmEOS = sph::Helmholtz_EOS::instance();
 
@@ -172,7 +178,14 @@ void computeHelmholtzEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
         auto rho                          = kx[i] * m[i] / xm[i];
-        std::tie(c[i], p[i], cv[i], u[i]) = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i]);
+        // std::tie(c[i], p[i], cv[i], u[i]) = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i]);
+        auto [ci, pi, cvi] = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i], &ci, &pi, &cvi, &ui);
+        prho[i]       = pi / (kx[i] * m[i] * m[i] * gradh[i]);
+        c[i]          = ci;
+        if (storeRho) { d.rho[i] = rho; }
+        if (storeP) { d.p[i] = pi; }
+        if (storeCv) { d.cv[i] = cvi; }
+        if (storeU) { d.u[i] = ui; }
     }
 }
 
@@ -219,7 +232,9 @@ void computeHelmholtzEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        // TBD!
+        cuda::computeHelmholtzEOS(startIndex, endIndex, rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.m),
+                                rawPtr(d.devData.temp), rawPtr(d.devData.abar), rawPtr(d.devData.zbar), rawPtr(d.devData.gradh),
+                                rawPtr(d.devData.prho), rawPtr(d.devData.c), rawPtr(d.devData.cv), rawPtr(d.devData.u));
     }
     else { computeHelmholtzEOS_Impl(startIndex, endIndex, d); }
 }
