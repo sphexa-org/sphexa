@@ -75,26 +75,25 @@ void tagIdsInList(std::span<uint64_t> ids, std::size_t firstIndex, std::size_t l
 
 void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
                     std::span<const CoordinateType> z, std::size_t firstIndex, std::size_t lastIndex,
-                    std::span<const IdSelectionSphere> selSphereData, std::span<const unsigned> sphereGroupIds)
+                    std::span<const IdSelectionSphere> selSpheres, std::span<const unsigned> sphereGroupIds)
 {
 
-    if (selSphereData.size() != sphereGroupIds.size())
+    if (selSpheres.size() != sphereGroupIds.size())
         throw std::runtime_error("Number of spherical volumes and number of group ids must be the same\n");
 
-    uint64_t groupIndex = 0;
-    for (const auto& sphere : selSphereData)
-    {
-        const auto     squareRadius = sphere[3] * sphere[3];
-        const auto     sphereCenter = util::makeVec3(sphere);
-        const unsigned groupId      = sphereGroupIds[groupIndex];
 #pragma omp parallel for schedule(static)
-        for (auto particleIndex = firstIndex; particleIndex < lastIndex; particleIndex++)
+    for (auto particleIndex = firstIndex; particleIndex < lastIndex; particleIndex++)
+    {
+        cstone::Vec3<CoordinateType> currentPosition{x[particleIndex], y[particleIndex], z[particleIndex]};
+        for (unsigned groupIndex = 0; groupIndex < selSpheres.size(); ++groupIndex)
         {
-            cstone::Vec3<CoordinateType> currentPosition{x[particleIndex], y[particleIndex], z[particleIndex]};
-            auto                         squaredDistance = util::norm2(currentPosition - sphereCenter);
+            const auto     sphere          = selSpheres[groupIndex];
+            const auto     squareRadius    = sphere[3] * sphere[3];
+            const auto     sphereCenter    = util::makeVec3(sphere);
+            const unsigned groupId         = sphereGroupIds[groupIndex];
+            auto           squaredDistance = util::norm2(currentPosition - sphereCenter);
             if (squaredDistance < squareRadius) { ids[particleIndex] = applyTaggingMask(groupId, ids[particleIndex]); }
         }
-        groupIndex++;
     }
 }
 

@@ -102,11 +102,11 @@ using IdSelectionSphere = cstone::Vec4<CoordinateType>;
 
 /*! @brief Id tagging (in first:last range) from list
  *
- * @param[out] ids               id list
- * @param[in]  firstIndex        first id index
- * @param[in]  lastIndex         last (excluded) id index
- * @param[in]  selectedIdsList   ids to be tagged (no duplications allowed)
- * @param[in]  selectedIdsGroups group id for each selected id
+ * @param[inout] ids               id list
+ * @param[in]    firstIndex        first id index
+ * @param[in]    lastIndex         last (excluded) id index
+ * @param[in]    selectedIds       ids to be tagged (no duplications allowed)
+ * @param[in]    selectedIdsGroups group id for each selected id
  */
 void tagIdsInList(std::span<uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
                   std::span<const uint64_t> selectedIds, std::span<const unsigned> selectedIdsGroups);
