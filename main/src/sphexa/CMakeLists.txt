@@ -13,8 +13,13 @@ function(enableInSituViz exename)
                 PRIVATE
                 SPH_EXA_USE_ASCENT)
         target_link_libraries(${exename} PRIVATE ascent::ascent_mpi)
+        # if(CMAKE_CUDA_COMPILER)
+        set_property(TARGET ${exename} PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+        set_property(TARGET ${exename} PROPERTY CUDA_ARCHITECTURES "90")
+        # endif()
     endif ()
 endfunction()
+
 
 set(exename sphexa)
 add_executable(${exename} sphexa.cpp)

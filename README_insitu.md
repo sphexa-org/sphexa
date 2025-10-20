@@ -30,7 +30,22 @@ module load ParaView/5.10.1-CrayGNU-21.09-EGL
 - uenv:
 
 ```
-uenv start -v default insitu_ascent/0.9.5:v1
+# with occa:
+uenv start -v modules /capstor/scratch/cscs/piccinal/ascent/ascent-0.9.5-gcc13-cuda1281-debug.sqfs
+
+module load ascent/0.9.5-5tvprek
+module load cmake/3.31.8-ujwjqf3
+module load cray-mpich/8.1.32-fvq4yfa
+module load cuda/12.8.1-fel3gie
+module load gcc/13.4.0-yrhdyox
+module load hdf5/1.14.6-q54kcdk
+module load libfabric/1.22.0-sw5dkak
+mpicxx --version
+nvcc --version
+/user-tools/linux-neoverse_v2/occa-2.0-njn4lhntisqwyitu6gc6wfqrpfam6khg/bin/occa env |grep ": 1"
+
+# without occa:
+#   uenv start -v default insitu_ascent/0.9.5:v1
 ```
 
 - ascent actions:
@@ -44,19 +59,44 @@ vim main/src/ascent_adaptor.h
 ```
 git clone https://github.com/sphexa-org/sphexa sphexa.git
 
+CC=mpicc CXX=mpicxx \
 cmake \
 -S sphexa.git \
 -B build \
 -DCMAKE_BUILD_TYPE=Debug \
 -DCMAKE_CUDA_ARCHITECTURES=90 \
--DCMAKE_CUDA_HOST_COMPILER=/user-tools/env/default/bin/g++ \
--DCMAKE_CUDA_FLAGS=-ccbin=mpicxx \
+-DCMAKE_CUDA_FLAGS="-arch=sm_90 -I/user-tools/linux-neoverse_v2/cray-mpich-8.1.32-fvq4yfa3huddvitx32ezaxd3rwbwqww2/include" \
+-DCMAKE_CUDA_HOST_COMPILER=g++ \
 -DCSTONE_WITH_GPU_AWARE_MPI=ON \
 -DSPH_EXA_WITH_H5HUT=ON \
+-DBUILD_TESTING=OFF \
+-DBUILD_ANALYTICAL=OFF \
+-DSPH_EXA_WITH_HIP=OFF \
+-DSPH_EXA_WITH_GRACKLE=OFF \
+-DSPH_EXA_WITH_DISKS=OFF \
 -DINSITU=Ascent \
--DAscent_DIR=/user-tools/env/default
+-DAscent_DIR=/user-tools/linux-neoverse_v2/ascent-0.9.5-5tvprek3v4ttm22u6huvwqqekdfu3h3v/
 
-cmake --build build+debug -t sphexa-cuda -j
+cmake --build build -t sphexa-cuda -j
+```
+
+- test:
+
+```
+OMP_NUM_THREADS=64 \
+srun -n4 --ntasks-per-node=4 -t5 \ 
+./cuda_visible_devices.sh \
+./build/main/src/sphexa/sphexa-cuda --init sedov -s 2 -n 300
+# -> datasets/density.0000*.png
+```
+
+- warning: ascent outputs will be empty when the number of particles per gpu is too small:
+
+```
+AscentInitialize
+...
+s1/p1 pseudocolor plot yielded no data, i.e., no cells remains
+s1/p2 pseudocolor plot yielded no data, i.e., no cells remains
 ```
 
 </p>
