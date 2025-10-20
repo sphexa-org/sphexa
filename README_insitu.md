@@ -31,7 +31,9 @@ module load ParaView/5.10.1-CrayGNU-21.09-EGL
 
 ```
 # with occa:
-uenv start -v modules /capstor/scratch/cscs/piccinal/ascent/ascent-0.9.5-gcc13-cuda1281-debug.sqfs
+uenv image pull build::insitu_ascent/0.9.5:2109123735
+uenv start -v modules build::insitu_ascent/0.9.5:2109123735
+# uenv start -v modules /capstor/scratch/cscs/piccinal/ascent/ascent-0.9.5-gcc13-cuda1281-debug.sqfs
 
 module load ascent/0.9.5-5tvprek
 module load cmake/3.31.8-ujwjqf3
