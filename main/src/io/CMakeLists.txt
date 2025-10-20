@@ -14,7 +14,14 @@ function(enableH5hut exename)
     endif()
 endfunction()
 
-add_library(io ifile_io_ascii.cpp ifile_io_hdf5.cpp arg_parser.cpp)
-target_include_directories(io PRIVATE ${CSTONE_DIR} ${MPI_CXX_INCLUDE_PATH})
+add_library(io id_tag_utils.cpp ifile_io_ascii.cpp ifile_io_hdf5.cpp arg_parser.cpp)
+target_include_directories(io PRIVATE ${CSTONE_DIR} ${SPH_EXA_INCLUDE_DIRS} ${MPI_CXX_INCLUDE_PATH})
 target_link_libraries(io PRIVATE ${MPI_CXX_LIBRARIES})
+
+if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
+    add_library(io_gpu OBJECT id_tag_utils.cu)
+    target_include_directories(io_gpu PRIVATE ${SPH_EXA_INCLUDE_DIRS})
+    target_link_libraries(io_gpu PRIVATE CUDA::cudart)
+endif()
+
 enableH5hut(io)
