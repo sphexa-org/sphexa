@@ -141,7 +141,24 @@ int main(int argc, char** argv)
     domain.setGrowthAllocRate(simData.hydro.getAllocGrowthRate());
 
     propagator->sync(domain, simData);
-    if (rank == 0) std::cout << "Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
+    // std::cout << "Rank " << rank << ": Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
+    // size_t nLocalParticles = d.x.size();
+    // size_t totalLocalParticles = 0;
+    // MPI_Allreduce(&nLocalParticles, &totalLocalParticles, 1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
+
+    // if (rank == 0)
+    // {
+    //     if (totalLocalParticles != d.numParticlesGlobal)
+    //     {
+    //         std::cerr << "Error: total nLocalParticles (" << totalLocalParticles
+    //                   << ") does not match numParticlesGlobal (" << d.numParticlesGlobal << ")\n";
+    //         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
+    //     }
+    //     else
+    //     {
+    //         std::cout << "Total nLocalParticles matches numParticlesGlobal: " << totalLocalParticles << std::endl;
+    //     }
+    // }
 
     viz::init_catalyst(argc, argv);
     viz::init_ascent(d, domain.startIndex());

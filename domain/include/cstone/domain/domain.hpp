@@ -180,12 +180,28 @@ public:
 
         auto [exchangeStart, keyView] =
             distribute(sorter, particleKeys, x, y, z, std::tuple_cat(std::tie(h), particleProperties), scratch);
+        std::cout << "[Domain][sync] rank " << myRank_ << " exchangeStart: " << exchangeStart << " keyView size: " << keyView.size()
+                  << std::endl;
+        // Print keyView start and end when keyView is a span
+        // if (!keyView.empty())
+        // {
+        //     std::cout << "[Domain][sync] rank " << myRank_ << " keyView start: " << std::oct << keyView.front()
+        //           << " end: " << keyView.back() << std::dec << std::endl;
+        // }
+        // else
+        // {
+        //     std::cout << "[Domain][sync] rank " << myRank_ << " keyView is empty" << std::endl;
+        // }
         // x,y,z,h is already reordered here for use in halo discovery
         gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
-                     std::tie(x, y, z, h), util::reverse(scratch));
+                 std::tie(x, y, z, h), util::reverse(scratch));
 
         std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octreeHost(), box(), 1.0 / theta_);
-        // std::cout << "[Domain][sync] rank " << myRank_ << " found " << peers.size() << " peers." << std::endl;
+        std::cout << "[Domain][sync] rank " << myRank_ << " found " << peers.size() << " peers" << std::endl;
+        std::cout << "[Domain][sync] rank " << myRank_ << " peers: ";
+        for (int p : peers)
+            std::cout << p << " ";
+        std::cout << std::endl;
         float invThetaEff      = invThetaMinMac(theta_);
 
         if (firstCall_)
@@ -196,6 +212,7 @@ public:
         focusTree_.updateMinMac(global_.assignment(), invThetaEff, true);
         focusTree_.updateTree(peers, global_.assignment(), box(), std::get<0>(scratch));
         focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
+        // focusTree_.print_tree_key_and_counts();
 
         reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
         focusTree_.discoverHalos(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), {rawPtr(layoutAcc_), layoutAcc_.size()},
@@ -589,7 +606,7 @@ private:
             if (i == myRank_)
             {
                 std::cout << "rank " << i << " " << assignedSize << " " << layout_.back()
-                          << " focus h/true/peers/loc/tot: " << numFlags << "/" << numFocusTruePeer << "/"
+                          << " focus h/true/peers/loc: " << numFlags << "/" << numFocusTruePeer << "/"
                           << numFocusPeers << "/" << focusAssignment[myRank_].count() << "/"
                           << focusTree_.haloFlags().size() << " peers: [" << peers.size() << "] ";
                 if (numRanks_ <= 32)

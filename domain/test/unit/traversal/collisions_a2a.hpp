@@ -40,7 +40,8 @@ void findCollisions2All(std::span<const KeyType> nodeKeys,
                         Vec3<T> targetSize,
                         std::vector<TreeNodeIndex>& collisionList)
 {
-    if (targetSize[0] == 0 && targetSize[1] == 0 && targetSize[2] == 0)
+    constexpr T epsilon = std::numeric_limits<T>::epsilon();
+    if (std::abs(targetSize[0]) < epsilon && std::abs(targetSize[1]) < epsilon && std::abs(targetSize[2]) < epsilon)
     {
         // if the target is empty, we return no overlap
         // std::cout << "[findCollisions2All] empty target -> no overlap" << std::endl;

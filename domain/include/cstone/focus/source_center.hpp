@@ -27,18 +27,42 @@ using SourceCenterType = util::array<T, 4>;
 
 template<class Tc, class Th>
 HOST_DEVICE_FUN util::tuple<Vec3<Tc>, Vec3<Tc>> computeBoundingBox(
-    const Tc* x, const Tc* y, const Tc* z, const Th* h, LocalIndex first, LocalIndex last, Th scale, Vec3<Tc> init)
+    const Tc* x, const Tc* y, const Tc* z, const Th* h, LocalIndex first, LocalIndex last, Th scale, Vec3<Tc> init, Tc scale_bx = 1., Tc scale_by = 1., Tc scale_bz = 1.)
 {
+    Tc xmin = std::numeric_limits<Tc>::max();
+    Tc ymin = std::numeric_limits<Tc>::max();
+    Tc zmin = std::numeric_limits<Tc>::max();
+    Tc xmax = std::numeric_limits<Tc>::lowest();
+    Tc ymax = std::numeric_limits<Tc>::lowest();
+    Tc zmax = std::numeric_limits<Tc>::lowest();
+
+    if (first == last)
+    {
+        return {Vec3<Tc>{0, 0, 0}, Vec3<Tc>{0, 0, 0}};
+    }
+
     Vec3<Tc> commonMin = init, commonMax = init;
     for (LocalIndex i = first; i < last; ++i)
     {
-        auto r = h[i] * scale;
+        if (x[i] < xmin) xmin = x[i];
+        if (y[i] < ymin) ymin = y[i];
+        if (z[i] < zmin) zmin = z[i];
+        if (x[i] > xmax) xmax = x[i];
+        if (y[i] > ymax) ymax = y[i];
+        if (z[i] > zmax) zmax = z[i];
+        auto rX = h[i] * scale * scale_bx;
+        auto rY = h[i] * scale * scale_by;
+        auto rZ = h[i] * scale * scale_bz;
         Vec3<Tc> p{x[i], y[i], z[i]};
-        commonMin = min(commonMin, Vec3<Tc>{p[0] - r, p[1] - r, p[2] - r});
-        commonMax = max(commonMax, Vec3<Tc>{p[0] + r, p[1] + r, p[2] + r});
+        // std::cout << "computeBoundingBox: i: " << i << " p: " << p[0] << ", " << p[1] << ", " << p[2] << " rX: " << rX << " rY: " << rY << " rZ: " << rZ << std::endl;
+        commonMin = min(commonMin, Vec3<Tc>{p[0] - rX, p[1] - rY, p[2] - rZ});
+        commonMax = max(commonMax, Vec3<Tc>{p[0] + rX, p[1] + rY, p[2] + rZ});
     }
     auto center = (commonMax + commonMin) * Tc(0.5);
     auto size   = (commonMax - commonMin) * Tc(0.5);
+    // std::cout << "Bounding box for particles " << first << " - " << last << " with dimensions inbetween [" << xmin << ", " << ymin << ", " << zmin
+    //           << "] and [" << xmax << ", " << ymax << ", " << zmax << "] is [" << center[0] - size[0] << ", " << center[1] - size[1] << ", " << center[2] - size[2] << "] - ["
+    //           << center[0] + size[0] << ", " << center[1] + size[1] << ", " << center[2] + size[2] << "]" << std::endl;
     return {center, size};
 }
 

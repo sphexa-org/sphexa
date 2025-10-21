@@ -157,7 +157,7 @@ containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Ve
     auto boxMax   = center + size;
     auto dFromMin = min(boxMin - Vec3<Tc>{box.xmin(), box.ymin(), box.zmin()});
     auto dFromMax = max(boxMax - Vec3<Tc>{box.xmax(), box.ymax(), box.zmax()});
-
+    // throw std::runtime_error("containedIn: non-mixD case not implemented");
     if (dFromMin < Tc(0) || dFromMax > Tc(0))
     {
         // any box that wraps around a PBC boundary cannot be contained within
@@ -189,16 +189,24 @@ containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Ve
     {
         // any box that wraps around a PBC boundary cannot be contained within
         // any octree node, except the full root node
+        // std::cout << "containedIn: boxMin: " << boxMin[0] << ", " << boxMin[1] << ", " << boxMin[2] << " boxMax: " << boxMax[0] << ", " << boxMax[1] << ", " << boxMax[2] << " dMin: " << dFromMin << " dMax: " << dFromMax << std::endl;
         return codeStart == 0 && codeEnd == nodeRange<KeyType>(0);
     }
 
+    const auto mixDBits = getBoxMixDimensionBits<Tc, KeyType, Box<Tc>>(box);
+
     // increase maximum by a grid-unit to ensure we round up
     constexpr int gridDim = 1u << maxTreeLevel<KeyType>{};
-    boxMax += Vec3<Tc>{box.lx(), box.ly(), box.lz()} * (Tc(1) / gridDim);
+    const auto gridUnitX = box.lx() * (Tc(1) / (1u << mixDBits.bx));
+    const auto gridUnitY = box.ly() * (Tc(1) / (1u << mixDBits.by));
+    const auto gridUnitZ = box.lz() * (Tc(1) / (1u << mixDBits.bz));
+    boxMax += Vec3<Tc>{gridUnitX, gridUnitY, gridUnitZ};
 
     KeyType lowCode  = iSfcMixDKey<SfcMixDKind<KeyType>>(boxMin[0], boxMin[1], boxMin[2], bx, by, bz);
     KeyType highCode = iSfcMixDKey<SfcMixDKind<KeyType>>(boxMax[0], boxMax[1], boxMax[2], bx, by, bz);
     auto envelope    = smallestCommonBox(lowCode, highCode);
+    // std::cout << "containedIn: lowCode, highCode: " << lowCode << ", " << highCode << std::endl;
+    // std::cout << "containedIn: envelope: " << util::get<0>(envelope) << ", " << util::get<1>(envelope) << std::endl;
 
     return (util::get<0>(envelope) >= codeStart) && (util::get<1>(envelope) <= codeEnd);
 }

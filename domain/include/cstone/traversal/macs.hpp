@@ -194,7 +194,7 @@ HOST_DEVICE_FUN void markMacPerBox(const Vec3<T>& targetCenter,
 {
     auto checkAndMarkMac = [&](TreeNodeIndex idx)
     {
-        if (centers[idx][3] < std::numeric_limits<std::remove_reference_t<decltype(centers[idx][3])>>::epsilon()) { return false; }
+        if (centers[idx][3] <= std::numeric_limits<std::remove_reference_t<decltype(centers[idx][3])>>::epsilon()) { return false; }
         KeyType nodePrefix   = prefixes[idx];
         unsigned sourceLevel = decodePrefixLength(nodePrefix) / 3;
         KeyType nodeStart    = decodePlaceholderBit(nodePrefix);
@@ -269,7 +269,8 @@ void markMacs(const KeyType* prefixes,
         if (!use_mixD && containedIn(focusStart, focusEnd, targetExt)) { continue; }
 
         auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
-        if (targetSize[0] == 0 && targetSize[1] == 0 && targetSize[2] == 0)
+        constexpr T epsilon = std::numeric_limits<T>::epsilon();
+        if (std::abs(targetSize[0]) <= epsilon && std::abs(targetSize[1]) <= epsilon && std::abs(targetSize[2]) <= epsilon)
         {
             // if the target is empty, we skip it
             // std::cout << "[markMacs] Skipping target i: " << i << " due to zero size" << std::endl;

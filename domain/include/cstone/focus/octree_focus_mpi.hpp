@@ -255,6 +255,17 @@ public:
         rebalanceStatus_ |= countsCriterion;
     }
 
+    void print_tree_key_and_counts() const
+    {
+        std::cout << "Rank: " << myRank_ << " Tree with " << octreeAcc_.numLeafNodes << " leaves and "
+                  << octreeAcc_.numInternalNodes << " internal nodes\n";
+        std::cout << "Key\tCounts\n";
+        for (TreeNodeIndex i = 0; i < octreeAcc_.numLeafNodes; ++i)
+        {
+            std::cout << leaves_[i] << "\t" << leafCountsAcc_[i] << "\n";
+        }
+    }
+
     template<class T, class DevVec>
     void peerExchange(std::span<T> q, int tag, DevVec& s) const
     {
@@ -529,6 +540,8 @@ public:
         TreeNodeIndex lastNode     = assignment_[myRank_].end();
         auto let                   = octreeViewAcc();
         std::size_t numNodesSearch = lastNode - firstNode;
+        std::cout << "[discoverHalos] rank " << myRank_ << " searching halos in " << numNodesSearch
+                  << " nodes, leafs: " << let.numLeafNodes << " total nodes: " << let.numNodes << "\n";
         std::size_t numLeafNodes   = let.numLeafNodes;
 
         if (accumulate && TreeNodeIndex(macsAcc_.size()) != let.numNodes)
@@ -560,6 +573,10 @@ public:
             layout[0] = 0;
             std::inclusive_scan(leafCountsAcc_.begin() + firstNode, leafCountsAcc_.begin() + lastNode,
                                 layout.begin() + 1, std::plus{}, LocalIndex{0});
+            const auto mixDBits = getBoxMixDimensionBits<RealType, KeyType, Box<RealType>>(box_);
+            const RealType scale_bx = 1.; //RealType(1) / (static_cast<KeyType>(1) << (maxTreeLevel<KeyType>{} - mixDBits.bx));
+            const RealType scale_by = 1.; //RealType(1) / (static_cast<KeyType>(1) << (maxTreeLevel<KeyType>{} - mixDBits.by));
+            const RealType scale_bz = 1.; //RealType(1) / (static_cast<KeyType>(1) << (maxTreeLevel<KeyType>{} - mixDBits.bz));
 #if (defined(__clang__) && (__clang_major__ >= 19)) || \
     (defined(__apple_build_version__) && (__apple_build_version__ >= 19000000)) // block OpenMP for clang < 19 because of "error: capturing a structured binding is not yet supported in OpenMP"
 #pragma omp parallel for schedule(static)
@@ -574,12 +591,18 @@ public:
                 // }
                 // TODO(iomaganaris): what if leafIdx is empty?
                 std::tie(searchCenters[leafIdx], searchSizes[leafIdx]) = computeBoundingBox(
-                    x, y, z, h, layout[i], layout[i + 1], Th(2 * searchExtFact), searchCenters[leafIdx]);
+                    x, y, z, h, layout[i], layout[i + 1], Th(2 * searchExtFact), searchCenters[leafIdx], scale_bx, scale_by, scale_bz);
             }
             if (not accumulate) { std::fill(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
+            std::cout << "[discoverHalos] rank " << myRank_ << " geoSizesAcc_.size(): " << geoSizesAcc_.size()
+                      << " searchSizes.size(): " << searchSizes.size() << "\n";
+            uint64_t nonZeroMacs = std::count_if(macsAcc_.begin(), macsAcc_.end(), [](uint8_t v) { return v != 0; });
+            std::cout << "[discoverHalos] rank " << myRank_ << " non-zero macsAcc_ before findHalos: " << nonZeroMacs << "\n";
             findHalos(let.prefixes, let.childOffsets, let.parents, geoCentersAcc_.data(), geoSizesAcc_.data(),
                       leaves_.data(), searchCenters.data(), searchSizes.data(), box_, firstNode, lastNode,
                       macsAcc_.data());
+            nonZeroMacs = std::count_if(macsAcc_.begin(), macsAcc_.end(), [](uint8_t v) { return v != 0; });
+            std::cout << "[discoverHalos] rank " << myRank_ << " non-zero macsAcc_ after findHalos: " << nonZeroMacs << "\n";
         }
         reallocate(scratch, origSize, 1.0);
     }
@@ -616,6 +639,7 @@ public:
             updateGeoCenters();
             MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
         }
+        std::cout << "[converge] myRank " << myRank_ << " peers: " << peers.size() << std::endl;
     }
 
     /*! @brief exchange data of non-peer (beyond focus) tree cells
