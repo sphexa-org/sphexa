@@ -286,11 +286,6 @@ public:
         }
         timer.step("FileOutput");
     }
-
-    void readHelmEOSTable(const std::string path) override
-    {
-        Helmholtz_EOS::init(path);
-    }
 };
 
 } // namespace sphexa
