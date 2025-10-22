@@ -2,9 +2,9 @@ include:
   - local: 'ci/common.yml'
 
 variables:
-  MYUENV: "prgenv-gnu/25.06:rc5"
-  PATH1: "sphexa+spack/view/bin"
-  PATH2: "sphexa+spack/view/sbin"
+  MYUENV: "prgenv-gnu/25.6:v2"
+  TEST_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/sbin'
+  APP_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/bin'
 
 sph-run-cuda12-sm90-release-1rank:
   stage: sphexa_run
@@ -18,32 +18,32 @@ sph-run-cuda12-sm90-release-1rank:
     SLURM_NTASKS: 1
   before_script:
     - pwd
-    - $PATH1/sphexa --help
     - date
+    - $APP_INSTALL_DIR/sphexa --help
   script:
-    - $PATH2/coord_samples/coordinate_test
-    - $PATH2/hydro/turbulence_tests
-    - ln -fs $PATH2/hydro/example_data.txt .
-    - $PATH2/hydro/sph_tests
-    - $PATH2/performance/octree_perf
-    - $PATH2/performance/peers_perf
-    - $PATH2/ryoanji/cpu_unit_tests/ryoanji_cpu_unit_tests
-    - $PATH2/ryoanji/unit_tests/ryoanji_unit_tests
-    # TODO:    - $PATH2/performance/hilbert_perf
-    - $PATH2/unit/component_units_omp
-    - $PATH2/unit/component_units
+    - $TEST_INSTALL_DIR/coord_samples/coordinate_test
+    - $TEST_INSTALL_DIR/hydro/turbulence_tests
+    - ln -fs $TEST_INSTALL_DIR/hydro/example_data.txt .
+    - $TEST_INSTALL_DIR/hydro/sph_tests
+    - $TEST_INSTALL_DIR/performance/octree_perf
+    - $TEST_INSTALL_DIR/performance/peers_perf
+    - $TEST_INSTALL_DIR/ryoanji/cpu_unit_tests/ryoanji_cpu_unit_tests
+    - $TEST_INSTALL_DIR/ryoanji/unit_tests/ryoanji_unit_tests
+    # NOTE:slow    - $TEST_INSTALL_DIR/performance/hilbert_perf
+    - $TEST_INSTALL_DIR/unit/component_units_omp
+    - $TEST_INSTALL_DIR/unit/component_units
     # --- grackle
     # https://github.com/grackle-project/grackle_data_files/blob/928696482fbe15d9bac4382de6134d95568f099c/input/CloudyData_UVB%3DHM2012.h5
     # - wget https://jfrog.svc.cscs.ch/artifactory/cscs-reframe-tests/sphexa/CloudyData_UVB%3DHM2012.h5
     # - mkdir -p extern/grackle/grackle_repo/grackle_data_files/input
     # - mv CloudyData_UVB=HM2012.h5 extern/grackle/grackle_repo/grackle_data_files/input/
-    # - $PATH2/physics/cooling_tests
+    # - $TEST_INSTALL_DIR/physics/cooling_tests
     # GPU tests:
-    - $PATH2/hydro/sph_gpu_tests
-    - $PATH2/performance/hilbert_perf_gpu
-    - $PATH2/performance/neighbors_test_gpu
-    - $PATH2/performance/octree_perf_gpu
-    - $PATH2/unit_cuda/component_units_cuda
+    - $TEST_INSTALL_DIR/hydro/sph_gpu_tests
+    - $TEST_INSTALL_DIR/performance/hilbert_perf_gpu
+    - $TEST_INSTALL_DIR/performance/neighbors_test_gpu
+    - $TEST_INSTALL_DIR/performance/octree_perf_gpu
+    - $TEST_INSTALL_DIR/unit_cuda/component_units_cuda
     - date
 
 sph-run-cuda12-sm90-release-2ranks:
@@ -60,24 +60,24 @@ sph-run-cuda12-sm90-release-2ranks:
     - pwd
     - date
   script:
-    - $PATH2/integration_mpi/box_mpi
-    - $PATH2/integration_mpi/domain_2ranks
-    - $PATH2/integration_mpi/domain_resize
-    - $PATH2/integration_mpi/exchange_focus
-    - $PATH2/integration_mpi/exchange_halos
-    - $PATH2/integration_mpi/exchange_keys
-    - $PATH2/integration_mpi/focus_transfer
-    - $PATH2/integration_mpi/globaloctree
-    - $PATH2/integration_mpi/hdf5io
-    - $PATH2/ryoanji/global_upsweep_cpu
-    - $PATH2/ryoanji/ryoanji_demo/ryoanji_demo
-    - $PATH2/ryoanji/ryoanji_demo_mpi
-    - $PATH2/physics/disk_tests
+    - $TEST_INSTALL_DIR/integration_mpi/box_mpi
+    - $TEST_INSTALL_DIR/integration_mpi/domain_2ranks
+    - $TEST_INSTALL_DIR/integration_mpi/domain_resize
+    - $TEST_INSTALL_DIR/integration_mpi/exchange_focus
+    - $TEST_INSTALL_DIR/integration_mpi/exchange_halos
+    - $TEST_INSTALL_DIR/integration_mpi/exchange_keys
+    - $TEST_INSTALL_DIR/integration_mpi/focus_transfer
+    - $TEST_INSTALL_DIR/integration_mpi/globaloctree
+    - $TEST_INSTALL_DIR/integration_mpi/hdf5io
+    - $TEST_INSTALL_DIR/ryoanji/global_upsweep_cpu
+    - $TEST_INSTALL_DIR/ryoanji/ryoanji_demo/ryoanji_demo
+    - $TEST_INSTALL_DIR/ryoanji/ryoanji_demo_mpi
+    - $TEST_INSTALL_DIR/physics/disk_tests
     # GPU tests:
-    - $PATH2/integration_mpi/assignment_gpu
-    - $PATH2/integration_mpi/domain_gpu
-    - $PATH2/integration_mpi/exchange_domain_gpu
-    - $PATH2/integration_mpi/exchange_halos_gpu
+    - $TEST_INSTALL_DIR/integration_mpi/assignment_gpu
+    - $TEST_INSTALL_DIR/integration_mpi/domain_gpu
+    - $TEST_INSTALL_DIR/integration_mpi/exchange_domain_gpu
+    - $TEST_INSTALL_DIR/integration_mpi/exchange_halos_gpu
     - date
 
 sph-run-cuda12-sm90-release-4ranks:
@@ -94,11 +94,11 @@ sph-run-cuda12-sm90-release-4ranks:
     - pwd
     - date
   script:
-    - $PATH2/integration_mpi/exchange_general_gpu # was -n5
-    - $PATH2/ryoanji/global_forces_gpu
-    - $PATH2/ryoanji/global_upsweep_gpu
+    - $TEST_INSTALL_DIR/integration_mpi/exchange_general_gpu # was -n5
+    - $TEST_INSTALL_DIR/ryoanji/global_forces_gpu
+    - $TEST_INSTALL_DIR/ryoanji/global_upsweep_gpu
     - date
- 
+
 sph-run-cuda12-sm90-release-12ranks:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-release']
@@ -113,11 +113,11 @@ sph-run-cuda12-sm90-release-12ranks:
     - pwd
     - date
   script:
-    - $PATH2/integration_mpi/exchange_domain
-    - $PATH2/integration_mpi/exchange_general
-    - $PATH2/integration_mpi/focus_tree
-    - $PATH2/integration_mpi/treedomain
-    - $PATH2/integration_mpi/domain_nranks
+    - $TEST_INSTALL_DIR/integration_mpi/exchange_domain
+    - $TEST_INSTALL_DIR/integration_mpi/exchange_general
+    - $TEST_INSTALL_DIR/integration_mpi/focus_tree
+    - $TEST_INSTALL_DIR/integration_mpi/treedomain
+    - $TEST_INSTALL_DIR/integration_mpi/domain_nranks
     - date
 
 sph-run-cuda12-sm90-release-sphexa-cuda:
@@ -133,11 +133,11 @@ sph-run-cuda12-sm90-release-sphexa-cuda:
     SLURM_CPUS_PER_TASK: 71
   before_script:
     - pwd
-    - export OMP_NUM_THREADS=64
     - date
+    - export OMP_NUM_THREADS=64
   script:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
-    - $PATH1/sphexa-cuda --glass ./50c.h5 --init sedov --G 1.0 -n 100 -s 10
+    - $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init sedov --G 1.0 -n 100 -s 10
     - date
 
 sph-run-cuda12-sm90-release-sphexa-cpu:
@@ -153,9 +153,9 @@ sph-run-cuda12-sm90-release-sphexa-cpu:
     SLURM_CPUS_PER_TASK: 71
   before_script:
     - pwd
-    - export OMP_NUM_THREADS=64
     - date
+    - export OMP_NUM_THREADS=64
   script:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
-    - $PATH1/sphexa --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 4
+    - $APP_INSTALL_DIR/sphexa --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 4
     - date

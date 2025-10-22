@@ -158,10 +158,7 @@ struct CombinedUpdate
 
         auto status = ResolutionStatus::converged;
 
-        DeviceVector<KeyType> d_mandatoryKeys;
-        reallocate(d_mandatoryKeys, mandatoryKeys.size(), 1.0);
-        memcpyH2D(mandatoryKeys.data(), mandatoryKeys.size(), rawPtr(d_mandatoryKeys));
-        status         = enforceKeysGpu(rawPtr(d_mandatoryKeys), d_mandatoryKeys.size(), rawPtr(tree.prefixes),
+        status         = enforceKeysGpu(mandatoryKeys.data(), mandatoryKeys.size(), rawPtr(tree.prefixes),
                                         rawPtr(tree.childOffsets), rawPtr(tree.parents), nodeOpsAll.data());
         bool converged = protectAncestorsGpu(rawPtr(tree.prefixes), rawPtr(tree.parents), nodeOpsAll.data(), numNodes);
 
@@ -189,7 +186,7 @@ struct CombinedUpdate
         if (status == ResolutionStatus::failed)
         {
             converged = false;
-            injectKeysGpu(leaves, {d_mandatoryKeys.data(), d_mandatoryKeys.size()}, tree.prefixes, tree.childOffsets,
+            injectKeysGpu(leaves, {mandatoryKeys.data(), mandatoryKeys.size()}, tree.prefixes, tree.childOffsets,
                           tree.internalToLeaf);
         }
 
