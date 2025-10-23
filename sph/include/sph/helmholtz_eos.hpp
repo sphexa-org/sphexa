@@ -971,7 +971,7 @@ public:
         *p     = pres;
         *u     = ener;
 
-        // return util::tuple<T, T, T>{c, p, cv};
+        return dpdT;
     }
 
     // Convenience host wrapper preserving old API

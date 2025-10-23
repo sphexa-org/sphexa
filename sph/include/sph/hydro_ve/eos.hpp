@@ -154,38 +154,42 @@ void computePolytropicEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
 template<typename Dataset>
 void computeHelmholtzEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
 {
-    const auto* kx   = d.kx.data();
-    const auto* xm   = d.xm.data();
-    const auto* m    = d.m.data();
-    const auto* temp = d.temp.data();
-    const auto* abar = d.abar.data();
-    const auto* zbar = d.zbar.data();
+    const auto* kx    = d.kx.data();
+    const auto* xm    = d.xm.data();
+    const auto* m     = d.m.data();
+    const auto* temp  = d.temp.data();
+    const auto* abar  = d.abar.data();
+    const auto* zbar  = d.zbar.data();
     const auto* gradh = d.gradh.data();
 
-    auto* prho = d.prho.data();
-    auto* c  = d.c.data();
-    auto* cv = d.cv.data();
-    auto* u  = d.u.data();
+    auto* prho     = d.prho.data();
+    auto* c        = d.c.data();
+    auto* cv       = d.cv.data();
+    auto* tdpdTrho = d.tdpdTrho.data();
+    auto* u        = d.u.data();
 
-    bool storeRho = (d.rho.size() == d.m.size());
-    bool storeP   = (d.p.size() == d.m.size());
-    bool storeCv = (d.cv.size() == d.m.size());
-    bool storeU   = (d.u.size() == d.m.size());
+    bool storeRho      = (d.rho.size() == d.m.size());
+    bool storeP        = (d.p.size() == d.m.size());
+    bool storeCv       = (d.cv.size() == d.m.size());
+    bool storeTdpdTrho = (d.tdpdTrho.size() == d.m.size());
 
     Helmholtz_EOS& helmEOS = sph::Helmholtz_EOS::instance();
 
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
-        auto rho                          = kx[i] * m[i] / xm[i];
-        // std::tie(c[i], p[i], cv[i], u[i]) = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i]);
-        auto [ci, pi, cvi] = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i], &ci, &pi, &cvi, &ui);
-        prho[i]       = pi / (kx[i] * m[i] * m[i] * gradh[i]);
-        c[i]          = ci;
+        auto rho = kx[i] * m[i] / xm[i];
+        auto pi  = prho[i] / rho;
+        // get dpdt instead of u and calculate tdpdtrho = temp * dp/dT * prho
+        auto dpdt = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i], &c[i], &pi, &cv[i], &u[i]);
+
+        prho[i] = pi / (kx[i] * m[i] * m[i] * gradh[i]);
+        // c[i]    = ci;
         if (storeRho) { d.rho[i] = rho; }
-        if (storeP) { d.p[i] = pi; }
-        if (storeCv) { d.cv[i] = cvi; }
-        if (storeU) { d.u[i] = ui; }
+        if (storeTdpdTrho) { tdpdTrho[i] = temp[i] * dpdt * prho[i]; }
+        // if (storeP) { d.p[i] = pi; }
+        // if (storeCv) { d.cv[i] = cvi; }
+        // if (storeU) { d.u[i] = ui; }
     }
 }
 
@@ -199,7 +203,10 @@ void computeIdealGasEOS(size_t startIndex, size_t endIndex, Dataset& d)
                                  rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.c),
                                  rawPtr(d.devData.rho), rawPtr(d.devData.p));
     }
-    else { computeIdealGasEOS_Impl(startIndex, endIndex, d); }
+    else
+    {
+        computeIdealGasEOS_Impl(startIndex, endIndex, d);
+    }
 }
 
 template<class Dataset>
@@ -211,7 +218,10 @@ void computeIsothermalEOS(size_t startIndex, size_t endIndex, Dataset& d)
                                    rawPtr(d.devData.p), rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
                                    rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.temp));
     }
-    else { computeIsothermalEOS_Impl(startIndex, endIndex, d); }
+    else
+    {
+        computeIsothermalEOS_Impl(startIndex, endIndex, d);
+    }
 }
 
 template<class Dataset>
@@ -224,7 +234,10 @@ void computePolytropicEOS(size_t startIndex, size_t endIndex, Dataset& d)
                                    rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.temp),
                                    rawPtr(d.devData.c));
     }
-    else { computePolytropicEOS_Impl(startIndex, endIndex, d); }
+    else
+    {
+        computePolytropicEOS_Impl(startIndex, endIndex, d);
+    }
 }
 
 template<class Dataset>
@@ -233,10 +246,14 @@ void computeHelmholtzEOS(size_t startIndex, size_t endIndex, Dataset& d)
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         cuda::computeHelmholtzEOS(startIndex, endIndex, rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.m),
-                                rawPtr(d.devData.temp), rawPtr(d.devData.abar), rawPtr(d.devData.zbar), rawPtr(d.devData.gradh),
-                                rawPtr(d.devData.prho), rawPtr(d.devData.c), rawPtr(d.devData.cv), rawPtr(d.devData.u));
+                                  rawPtr(d.devData.temp), rawPtr(d.devData.abar), rawPtr(d.devData.zbar),
+                                  rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.c),
+                                  rawPtr(d.devData.cv), rawPtr(d.devData.u));
     }
-    else { computeHelmholtzEOS_Impl(startIndex, endIndex, d); }
+    else
+    {
+        computeHelmholtzEOS_Impl(startIndex, endIndex, d);
+    }
 }
 
 template<class Dataset>
