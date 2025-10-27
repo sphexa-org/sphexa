@@ -96,23 +96,65 @@ void readFileAttributes(InitSettings& settings, const std::string& settingsFile,
         auto fileAttributes = reader->fileAttributes();
         for (const auto& attr : fileAttributes)
         {
-            int64_t sz = reader->fileAttributeSize(attr);
-            if (sz == 1)
+            bool settingRecognized = settings.count(attr);
+
+            // Check if this is a string attribute
+            if (reader->isFileAttributeString(attr))
             {
-                bool settingRecognized = settings.count(attr);
-                settings[attr]         = {};
-                reader->fileAttribute(attr, &settings[attr], sz);
+                std::string strValue;
+                reader->fileAttribute(attr, strValue);
+
+                // Convert the comma-separated string to VectorValue with encoded string flag
+                settings[attr] = Param(stringToVectorValue(strValue), true);
+
                 if (reader->rank() == 0 && verbose)
                 {
                     if (settingRecognized)
                     {
-                        std::cout << "Override setting from " << settingsFile << ": " << attr << " = " << settings[attr]
-                                  << std::endl;
+                        std::cout << "Override setting from " << settingsFile << ": " << attr << " = "
+                            << strValue << std::endl;
                     }
                     else
                     {
-                        std::cout << "Setting from " << settingsFile << ": " << attr << " = " << settings[attr]
-                                  << " not recognized " << std::endl;
+                        std::cout << "Setting from " << settingsFile << ": " << attr << " = "
+                            << strValue << " not recognized " << std::endl;
+                    }
+                }
+            }
+            else
+            {
+                // Numeric attribute
+                int64_t sz = reader->fileAttributeSize(attr);
+
+                if(sz == 1) {
+                    settings[attr] = Param(ScalarValue{});
+                } else {
+                    settings[attr] = Param(VectorValue(sz), false);
+                }
+
+                reader->fileAttribute(attr, settings[attr].data(), sz);
+
+                if (reader->rank() == 0 && verbose)
+                {
+                    if (settingRecognized)
+                    {
+                        if (sz == 1) {
+                            std::cout << "Override setting from " << settingsFile << ": " << attr << " = "
+                                << settings[attr] << std::endl;
+                        }
+                        else {
+                            std::cout << "Override setting from " << settingsFile << ": " << attr << std::endl;
+                        }
+                    }
+                    else
+                    {
+                        if (sz == 1) {
+                            std::cout << "Setting from " << settingsFile << ": " << attr << " = "
+                                << settings[attr] << " not recognized " << std::endl;
+                        }
+                        else {
+                            std::cout << "Setting from " << settingsFile << ": " << attr << " not recognized " << std::endl;
+                        }
                     }
                 }
             }
