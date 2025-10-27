@@ -36,6 +36,7 @@
 
 #include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
+#include "io/id_tag_setup.hpp"
 #include "sphexa/simulation_data.hpp"
 
 #include "settings.hpp"
@@ -53,6 +54,23 @@ public:
     virtual const InitSettings& constants() const = 0;
 
     virtual ~ISimInitializer() = default;
+
+protected:
+     // TODO: Base::initSubsets(settings_, &d);// I have to pass a ref to the entire dataset because I could need the coordinates, if selection is geometrical
+     /*! @brief Id tagging
+     *
+     * @param[in]  settings    settings for id tagging
+     * @param[in]  printLog    activate logging
+     * @param[out] d           time step at which selection is done
+     */
+     void initSubsets(InitSettings& settings, bool printLog, Dataset::HydroData& particlesData, int initStep = 0) const
+     {
+        // Preliminary check on subset settings consistency
+        idTaggingSetupInit(settings);
+
+        // TODO: tagging calls goes here
+
+     };
 };
 
 template<class Dataset>
