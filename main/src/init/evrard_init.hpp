@@ -45,14 +45,14 @@
 namespace sphexa
 {
 
-std::map<std::string, double> evrardConstants()
+InitSettings evrardConstants()
 {
     return {{"gravConstant", 1.}, {"r", 1.},          {"mTotal", 1.}, {"gamma", 5. / 3.}, {"u0", 0.05},
             {"minDt", 1e-4},      {"minDt_m1", 1e-4}, {"mui", 10},    {"ng0", 100},       {"ngmax", 150}};
 }
 
 template<class Dataset>
-void initEvrardFields(Dataset& d, const std::map<std::string, double>& constants)
+void initEvrardFields(Dataset& d, const InitSettings& constants)
 {
     using T = typename Dataset::RealType;
 
@@ -136,6 +136,7 @@ std::tuple<KeyType, KeyType> estimateEvrardSfcPartition(size_t cbrtNumPart, cons
 template<class Dataset>
 class EvrardGlassSphere : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
 
@@ -192,6 +193,10 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initEvrardFields(d, settings_);
+
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical.
+        // This is not ideal but alternatively I would need to have settings_ as a member of the base class
+        Base::initSubsets(settings_, rank == 0, d);
 
         return globalBox;
     }
