@@ -57,7 +57,7 @@ InitSettings WindShockConstants()
 }
 
 template<class Dataset>
-void initWindShockFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
+void initWindShockFields(Dataset& d, const InitSettings& constants, double massPart)
 {
     using T = typename Dataset::RealType;
 
@@ -137,6 +137,7 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
 template<class Dataset>
 class WindShockGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
 
@@ -226,6 +227,9 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initWindShockFields(d, settings_, massPart);
+
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical
+        Base::initSubsets(settings_, rank == 0, d);
 
         return globalBox;
     }

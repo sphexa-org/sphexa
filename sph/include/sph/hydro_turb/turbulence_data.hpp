@@ -39,6 +39,8 @@
 #include "cstone/cuda/cuda_utils.hpp"
 #include "cstone/primitives/primitives_acc.hpp"
 
+#include "init/settings.hpp"
+
 #include "sph/hydro_turb/create_modes.hpp"
 
 namespace sph
@@ -52,7 +54,7 @@ class TurbulenceData
 public:
     using RealType = T;
 
-    TurbulenceData(const std::map<std::string, double>& constants, bool verbose)
+    TurbulenceData(const sphexa::InitSettings& constants, bool verbose)
         : solWeight(constants.at("solWeight"))
         , gen(size_t(constants.at("rngSeed")))
     {
@@ -146,7 +148,7 @@ private:
      *
      * Also fills the phases with a random gaussian distribution, which  will be overwritten when loading from file.
      */
-    void initModes(const std::map<std::string, double>& constants, bool verbose)
+    void initModes(const sphexa::InitSettings& constants, bool verbose)
     {
         double eps         = constants.at("epsilon");
         size_t stMaxModes  = size_t(constants.at("stMaxModes"));

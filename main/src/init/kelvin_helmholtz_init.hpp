@@ -52,7 +52,7 @@ InitSettings KelvinHelmholtzConstants()
 }
 
 template<class T, class Dataset>
-void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& constants, T massPart)
+void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T massPart)
 {
     T rhoInt = constants.at("rhoInt");
     T rhoExt = constants.at("rhoExt");
@@ -126,6 +126,7 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
 template<class Dataset>
 class KelvinHelmholtzGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
 
@@ -205,6 +206,9 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initKelvinHelmholtzFields(d, settings_, particleMass);
+
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical.
+        Base::initSubsets(settings_, rank == 0, d);
 
         return globalBox;
     }

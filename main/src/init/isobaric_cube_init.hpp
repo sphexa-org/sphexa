@@ -65,7 +65,7 @@ InitSettings IsobaricCubeConstants()
 }
 
 template<class Dataset>
-void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
+void initIsobaricCubeFields(Dataset& d, const InitSettings& constants, double massPart)
 {
     using T = typename Dataset::RealType;
 
@@ -163,6 +163,7 @@ void compressCenterCube(std::span<T> x, std::span<T> y, std::span<T> z, T rInt, 
 template<class Dataset>
 class IsobaricCubeGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
 
@@ -217,10 +218,13 @@ public:
 
         initIsobaricCubeFields(d, settings_, massPart);
 
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical
+        Base::initSubsets(settings_, rank == 0, d);
+
         return globalBox;
     }
 
-    const std::map<std::string, double>& constants() const override { return settings_; }
+    const InitSettings& constants() const override { return settings_; }
 };
 
 } // namespace sphexa

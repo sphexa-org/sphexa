@@ -46,7 +46,7 @@ namespace sphexa
 {
 
 template<class Dataset>
-void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
+void initSedovFields(Dataset& d, const InitSettings& constants)
 {
     using T = typename Dataset::RealType;
 
@@ -138,6 +138,7 @@ public:
 template<class Dataset>
 class SedovGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
 
@@ -185,6 +186,9 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initSedovFields(d, settings_);
+
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical.
+        Base::initSubsets(settings_, rank == 0, d);
 
         return globalBox;
     }

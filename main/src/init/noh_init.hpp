@@ -43,7 +43,7 @@
 namespace sphexa
 {
 
-std::map<std::string, double> nohConstants()
+InitSettings nohConstants()
 {
     return {{"r0", 0},
             {"r1", 0.5},
@@ -64,7 +64,7 @@ std::map<std::string, double> nohConstants()
 }
 
 template<class Dataset>
-void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
+void initNohFields(Dataset& d, const InitSettings& constants)
 {
     using T = typename Dataset::RealType;
 
@@ -105,6 +105,7 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
 template<class Dataset>
 class NohGlassSphere : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
 
@@ -147,6 +148,9 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initNohFields(d, settings_);
+
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical
+        Base::initSubsets(settings_, rank == 0, d);
 
         return globalBox;
     }

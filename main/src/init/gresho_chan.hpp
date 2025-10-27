@@ -51,7 +51,7 @@ double twoDimRadius(T x, T y)
 }
 
 template<class Dataset, class T>
-void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& settings, T mPart)
+void initGreshoChanFields(Dataset& d, const InitSettings& settings, T mPart)
 {
     double ng0 = settings.at("ng0");
     double rho = settings.at("rho");
@@ -118,6 +118,7 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
 template<class Dataset>
 class GreshoChan : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
     std::string          glassBlock;
     mutable InitSettings settings_;
 
@@ -160,6 +161,9 @@ public:
 
         T massPart = globalBox.lx() * globalBox.ly() * globalBox.lz() * settings_.at("rho") / d.numParticlesGlobal;
         initGreshoChanFields(d, settings_, massPart);
+
+        // TODO: I have to pass a ref to the entire dataset because I possibly need the coordinates, if selection is geometrical.
+        Base::initSubsets(settings_, rank == 0, d);
 
         return globalBox;
     }
