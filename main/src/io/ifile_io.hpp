@@ -96,6 +96,7 @@ public:
     virtual std::vector<std::string> stepAttributes()                                                   = 0;
     virtual int64_t                  fileAttributeSize(const std::string& key)                          = 0;
     virtual int64_t                  stepAttributeSize(const std::string& key)                          = 0;
+    virtual bool                     isFileAttributeString(const std::string& key)                      = 0;
     virtual void                     fileAttribute(const std::string& key, FieldType val, int64_t size) = 0;
     virtual void                     fileAttribute(const std::string& key, std::string& val)            = 0;
     virtual void                     stepAttribute(const std::string& key, FieldType val, int64_t size) = 0;
@@ -131,6 +132,11 @@ public:
     {
         throwError();
         return {};
+    }
+    bool isFileAttributeString(const std::string&) override
+    {
+        throwError();
+        return false;
     }
     void     fileAttribute(const std::string&, FieldType, int64_t) override { throwError(); }
     void     fileAttribute(const std::string&, std::string&) override { throwError(); }
