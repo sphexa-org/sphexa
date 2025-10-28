@@ -344,6 +344,16 @@ public:
         return attrSize;
     }
 
+    bool isFileAttributeString(const std::string& key) override
+    {
+        int64_t   attrIndex = fileAttributeIndex(key);
+        h5_size_t attrSize;
+        int64_t   typeId;
+        char      dummy[256];
+        H5GetFileAttribInfo(h5File_, attrIndex, dummy, 256, &typeId, &attrSize);
+        return typeId == H5_STRING_T;
+    }
+
     int64_t stepAttributeSize(const std::string& key) override
     {
         int64_t   attrIndex = stepAttributeIndex(key);
@@ -368,8 +378,9 @@ public:
     void fileAttribute(const std::string& key, std::string& val) override
     {
         auto numChars = fileAttributeSize(key);
-        val.resize(numChars - 1);
+        val.resize(numChars + 1, '\0');
         H5ReadFileAttribString(h5File_, key.c_str(), val.data());
+        val.erase(std::find(val.begin(), val.end(), '\0'), val.end());
     }
 
     void stepAttribute(const std::string& key, FieldType val, int64_t size) override
