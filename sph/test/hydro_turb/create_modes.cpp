@@ -3,9 +3,11 @@
 
 #include "gtest/gtest.h"
 
+#include "init/settings.hpp"
+
 #include "sph/hydro_turb/create_modes.hpp"
 
-std::map<std::string, double> TurbulenceConstants()
+sphexa::InitSettings TurbulenceConstants()
 {
     return {{"solWeight", 0.5},        {"stMaxModes", 100000}, {"Lbox", 1.0},       {"stEnergyPrefac", 5.0e-3},
             {"stMachVelocity", 0.3e0}, {"epsilon", 1e-15},     {"rngSeed", 251299}, {"stSpectForm", 1},
