@@ -6,7 +6,6 @@
 
 namespace sphexa
 {
-
     void idTaggingSetupInit(InitSettings& settings)
     {
         std::cout << "Initializing id tagging setup" << std::endl;
@@ -152,4 +151,50 @@ namespace sphexa
             }
         }        
     };
-} 
+
+    // TODO: remove not needed debug logging
+    bool idTaggingOutputParameterRetrieval(const InitSettings& settings, const std::string initCond, const std::string outputFileSuffix, 
+                                           std::string& outFileSubset, std::string& writeFreqStrSubset, std::vector<std::string>& outputFieldsSubset,
+                                           std::vector<std::string>& writeExtraSubset)
+    {
+        const bool writeEnabledSubset = settings.count("w_subset") && *settings.at("w_subset").data() > 0.;
+
+        if(writeEnabledSubset) {
+            if(settings.count("o_subset")) {
+                std::cout<<"is o_subset scalar "<<settings.at("o_subset").isScalar()<<std::endl;
+                std::cout<<"is o_subset vector "<<settings.at("o_subset").isVector()<<std::endl;
+                outFileSubset = settings.at("o_subset").toStrings()[0];
+            }
+            else {
+                std::cout<<"o_subset not provided, using default naming convention"<<std::endl;
+                outFileSubset =  "dump_subset_" + initCond;
+            }
+            outFileSubset += outputFileSuffix;
+            std::cout<<"Subset output file: " << outFileSubset << std::endl;
+            std::cout<<std::endl;
+            if(settings.count("f_subset")) {
+                std::cout<<"is f_subset scalar "<<settings.at("f_subset").isScalar()<<std::endl;
+                std::cout<<"is f_subset vector "<<settings.at("f_subset").isVector()<<std::endl;
+                outputFieldsSubset = settings.at("f_subset").toStrings();
+                for(const auto& field : outputFieldsSubset) {
+                    std::cout << "Subset output field: " << field << std::endl;
+                }
+                std::cout<<std::endl;
+            }
+            writeFreqStrSubset = settings.at("w_subset").toStrings()[0];
+            std::cout<<"Subset write frequency: " << writeFreqStrSubset << std::endl;
+            std::cout<<std::endl;
+
+            if(settings.count("wextra_subset")) {
+                std::cout<<"is wextra_subset scalar "<<settings.at("wextra_subset").isScalar()<<std::endl;
+                std::cout<<"is wextra_subset vector "<<settings.at("wextra_subset").isVector()<<std::endl;
+                writeExtraSubset = settings.at("wextra_subset").toStrings();
+                for(const auto& freq : writeExtraSubset) {
+                    std::cout << "Subset extra output freq: " << freq << std::endl;
+                }
+                std::cout<<std::endl;
+            }
+        }
+        return writeEnabledSubset;
+    };
+}

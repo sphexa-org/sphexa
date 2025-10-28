@@ -46,4 +46,21 @@ namespace sphexa
      */
     // TODO: Only pass the relevant subset of settings?
     void idTaggingSetupInit(InitSettings& settings);
-} 
+
+    /*! @brief Id tagging output handling parameter retrieval (from input parameter file)
+     *
+     * @param[in]  settings               settings for id tagging
+     * @param[in]  initCond               initial condition (used for default output file name)
+     * @param[in]  outputFileSuffix       suffix to append to output file name
+     * @param[out] outFileSubset          output file name for id tagging subset
+     * @param[out] outputFieldsSubset     output fields for id tagging subset
+     * @param[out] writeFreqStrSubset     write frequency (iterations or time) for id tagging subset
+     * @param[out] writeExtraSubset       list of steps (integers) or ~times (floating point) for extra writes
+     *
+     * @return true if id tagging output is requested, false otherwise
+     */
+    // TODO: Only pass the relevant subset of settings?
+    bool idTaggingOutputParameterRetrieval(const InitSettings& settings, const std::string initCond, const std::string outputFileSuffix, 
+                                           std::string& outFileSubset, std::string& writeFreqStrSubset, std::vector<std::string>& outputFieldsSubset,
+                                           std::vector<std::string>& writeExtraSubset);
+}
