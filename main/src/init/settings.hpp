@@ -146,11 +146,11 @@ public:
         if(isEncodedString)
         {
             std::string current;
-            const double COMMA_CODE = 44.0;
+            const double comma_ascii_code = 44.0;
 
             for (double code : std::get<VectorValue>(value))
             {
-                if (code == COMMA_CODE)
+                if (code == comma_ascii_code)
                 {
                     // Found a separator, save current string
                     if (!current.empty())
@@ -212,6 +212,36 @@ inline ScalarValue min(const Param& param) {
         return *std::min_element(vec.begin(), vec.end());
     }
 }
+
+/*! @brief Convert comma-separated string to VectorValue
+ *
+ * @param[in] input  String to be encoded (e.g., "x,y,rho" or "output_filename")
+ *
+ * @return VectorValue containing character codes as doubles (including commas)
+ *
+ * Examples:
+ *   std::string fields = "x,y,z";
+ *   VectorValue codes = stringToVectorValue(fields);  // {120.0, 44.0, 121.0, 44.0, 122.0}
+ *
+ *   std::string fields = "abc,def";
+ *   VectorValue codes = stringToVectorValue(fields);  // {97.0, 98.0, 99.0, 44.0, 100.0, 101.0, 102.0}
+ *
+ *   std::string single = "xyz";
+ *   VectorValue codes = stringToVectorValue(single);  // {120.0, 121.0, 122.0} (no comma separator)
+ */
+inline VectorValue stringToVectorValue(const std::string& input)
+{
+    VectorValue result;
+    result.reserve(input.size());
+
+    // Encode all characters including commas
+    std::for_each(input.begin(), input.end(), [&](char ch) {
+        result.push_back(static_cast<double>(static_cast<unsigned char>(ch)));
+    });
+
+    return result;
+}
+
 
 //! @brief write @p InitSettings as file attributes of a new file @p path
 inline void writeSettings(const InitSettings& settings, const std::string& path, IFileWriter* writer)
