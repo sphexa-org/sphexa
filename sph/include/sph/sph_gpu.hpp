@@ -61,7 +61,7 @@ extern void computePolytropicEOS(size_t firstParticle, size_t lastParticle, Tt p
 template<class Tt, class Tm, class Thydro>
 extern void computeHelmholtzEOS(size_t firstParticle, size_t lastParticle, const Thydro* kx, const Thydro* xm, const Tm* m,
                                 const Tt* temp, const Tt* abar, const Tt* zbar, const Thydro* gradh, Thydro* prho, Thydro* c,
-                                Thydro* tdpdtrho);
+                                Thydro* cv, Thydro* tdpdTrho);
 
 extern void freeDeviceHelmholtzEOSTables();
 

@@ -248,7 +248,7 @@ void computeHelmholtzEOS(size_t startIndex, size_t endIndex, Dataset& d)
         cuda::computeHelmholtzEOS(startIndex, endIndex, rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.m),
                                   rawPtr(d.devData.temp), rawPtr(d.devData.abar), rawPtr(d.devData.zbar),
                                   rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.c),
-                                  rawPtr(d.devData.tdpdTrho));
+                                  rawPtr(d.devData.cv), rawPtr(d.devData.tdpdTrho));
     }
     else
     {

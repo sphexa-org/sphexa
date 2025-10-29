@@ -125,12 +125,12 @@ template<class Tt, class Tm, class Thydro>
 __global__ void cudaComputeHelmholtzEOS(size_t firstParticle, size_t lastParticle, HelmholtzTableView tv,
                                         const Thydro* kx, const Thydro* xm, const Tm* m, const Tt* temp, const Tt* abar,
                                         const Tt* zbar, const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* cv,
-                                        Tt* tdpdtrho)
+                                        Thydro* tdpdtrho)
 {
     unsigned i = firstParticle + blockDim.x * blockIdx.x + threadIdx.x;
     if (i >= lastParticle) return;
 
-    Thydro p_i, c_i, cv_i;
+    Thydro p_i, c_i;
     Tt     u_i;
     Thydro rho_i = kx[i] * m[i] / xm[i];
 
@@ -147,7 +147,7 @@ __global__ void cudaComputeHelmholtzEOS(size_t firstParticle, size_t lastParticl
 template<class Tt, class Tm, class Thydro>
 void computeHelmholtzEOS(size_t firstParticle, size_t lastParticle, const Thydro* kx, const Thydro* xm, const Tm* m,
                          const Tt* temp, const Tt* abar, const Tt* zbar, const Thydro* gradh, Thydro* prho, Thydro* c,
-                         Thydro* cv, Tt* tdpdtrho)
+                         Thydro* cv, Thydro* tdpdtrho)
 {
     if (firstParticle == lastParticle) { return; }
     unsigned numThreads = 256;
@@ -204,7 +204,7 @@ void freeDeviceHelmholtzEOSTables()
 #define COMPUTE_HELMHOLTZ_EOS(Ttemp, Tm, Thydro)                                                                       \
     template void computeHelmholtzEOS(size_t firstParticle, size_t lastParticle, const Thydro* kx, const Thydro* xm,   \
                                       const Tm* m, const Ttemp* temp, const Ttemp* abar, const Ttemp* zbar,            \
-                                      const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* cv, Ttemp* tdpdtrho)
+                                      const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* cv, Thydro* tdpdtrho)
 
 COMPUTE_HELMHOLTZ_EOS(double, double, double);
 COMPUTE_HELMHOLTZ_EOS(double, float, double);
