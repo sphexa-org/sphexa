@@ -421,7 +421,7 @@ public:
      *
      */
     template<typename T1, typename T2>
-    static HOST_DEVICE_FUN auto helmholtzEOS(const HelmholtzTableView& tv, const T1 temp, const T2 rho, T1 abar, T1 zbar, T2* c, T2* p, T2* cv, T1* u)
+    static HOST_DEVICE_FUN auto helmholtzEOS(const HelmholtzTableView& tv, const T1 temp, const T2 rho, T1 abar, T1 zbar, T2* c, T2* p)
     {
         using T = std::common_type_t<T1, T2>;
         // coefficients
@@ -949,13 +949,13 @@ public:
         zzi    = rho / pres;
         T chit = temp / pres * dpresdt;
         T chid = dpresdd * zzi;
-        *cv     = rhoerdt;
-        x      = zz * chit / (temp * *cv);
+        T cvi     = rhoerdt;
+        x      = zz * chit / (temp * cvi);
         // T gam3  = x + 1.;
         T gam1 = chit * x + chid;
         // T nabad = x / gam1;
         // T gam2  = 1. / (1. - nabad);
-        cp = *cv * gam1 / chid;
+        cp = cvi * gam1 / chid;
         z  = 1. + (ener + clight * clight) * zzi;
         *c  = clight * std::sqrt(gam1 / z);
 
@@ -969,16 +969,16 @@ public:
         dpdT  = dpresdt;
         dudYe = degasdz * abar;
         *p     = pres;
-        *u     = ener;
+        // *u     = ener;
 
-        return dpdT;
+        return util::tuple<T,T>{dpdT, cvi};
     }
 
     // Convenience host wrapper preserving old API
     template<typename T1, typename T2>
-    inline auto helmholtzEOS(const T1 temp, const T2 rho, T1 abar, T1 zbar, T2* c, T2* p, T2* cv, T1* u)
+    inline auto helmholtzEOS(const T1 temp, const T2 rho, T1 abar, T1 zbar, T2* c, T2* p)
     {
-        return helmholtzEOS(hostTableView(), temp, rho, abar, zbar, c, p, cv, u);
+        return helmholtzEOS(hostTableView(), temp, rho, abar, zbar, c, p);
     }
 };
 

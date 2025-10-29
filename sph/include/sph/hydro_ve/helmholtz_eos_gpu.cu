@@ -134,7 +134,7 @@ __global__ void cudaComputeHelmholtzEOS(size_t firstParticle, size_t lastParticl
     Tt     u_i;
     Thydro rho_i = kx[i] * m[i] / xm[i];
 
-    auto dpdT = Helmholtz_EOS::helmholtzEOS(tv, temp[i], rho_i, abar[i], zbar[i], &c_i, &p_i, &cv_i, &u_i);
+    auto [dpdT, cv_i] = Helmholtz_EOS::helmholtzEOS(tv, temp[i], rho_i, abar[i], zbar[i], &c_i, &p_i);
 
     prho[i] = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
     c[i]    = c_i;
@@ -147,14 +147,14 @@ __global__ void cudaComputeHelmholtzEOS(size_t firstParticle, size_t lastParticl
 template<class Tt, class Tm, class Thydro>
 void computeHelmholtzEOS(size_t firstParticle, size_t lastParticle, const Thydro* kx, const Thydro* xm, const Tm* m,
                          const Tt* temp, const Tt* abar, const Tt* zbar, const Thydro* gradh, Thydro* prho, Thydro* c,
-                         Thydro* cv, Tt* u)
+                         Thydro* cv, Tt* tdpdtrho)
 {
     if (firstParticle == lastParticle) { return; }
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(lastParticle - firstParticle, numThreads);
     auto     tv         = getDeviceTableView();
     cudaComputeHelmholtzEOS<<<numBlocks, numThreads>>>(firstParticle, lastParticle, tv, kx, xm, m, temp, abar, zbar,
-                                                       gradh, prho, c, cv, u);
+                                                       gradh, prho, c, cv, tdpdtrho);
 
     checkGpuErrors(cudaDeviceSynchronize());
 }
@@ -204,7 +204,7 @@ void freeDeviceHelmholtzEOSTables()
 #define COMPUTE_HELMHOLTZ_EOS(Ttemp, Tm, Thydro)                                                                       \
     template void computeHelmholtzEOS(size_t firstParticle, size_t lastParticle, const Thydro* kx, const Thydro* xm,   \
                                       const Tm* m, const Ttemp* temp, const Ttemp* abar, const Ttemp* zbar,            \
-                                      const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* cv, Ttemp* u)
+                                      const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* cv, Ttemp* tdpdtrho)
 
 COMPUTE_HELMHOLTZ_EOS(double, double, double);
 COMPUTE_HELMHOLTZ_EOS(double, float, double);

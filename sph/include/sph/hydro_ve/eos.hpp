@@ -181,14 +181,14 @@ void computeHelmholtzEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
         auto rho = kx[i] * m[i] / xm[i];
         auto pi  = prho[i] / rho;
         // get dpdt instead of u and calculate tdpdtrho = temp * dp/dT * prho
-        auto dpdt = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i], &c[i], &pi, &cv[i], &u[i]);
+        auto [dpdt, cvi] = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i], &c[i], &pi);
 
         prho[i] = pi / (kx[i] * m[i] * m[i] * gradh[i]);
         // c[i]    = ci;
         if (storeRho) { d.rho[i] = rho; }
         if (storeTdpdTrho) { tdpdTrho[i] = temp[i] * dpdt * prho[i]; }
         // if (storeP) { d.p[i] = pi; }
-        // if (storeCv) { d.cv[i] = cvi; }
+        if (storeCv) { d.cv[i] = cvi; }
         // if (storeU) { d.u[i] = ui; }
     }
 }
@@ -248,7 +248,7 @@ void computeHelmholtzEOS(size_t startIndex, size_t endIndex, Dataset& d)
         cuda::computeHelmholtzEOS(startIndex, endIndex, rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.m),
                                   rawPtr(d.devData.temp), rawPtr(d.devData.abar), rawPtr(d.devData.zbar),
                                   rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.c),
-                                  rawPtr(d.devData.cv), rawPtr(d.devData.u));
+                                  rawPtr(d.devData.tdpdTrho));
     }
     else
     {
