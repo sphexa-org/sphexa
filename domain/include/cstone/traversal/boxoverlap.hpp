@@ -125,9 +125,11 @@ containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box, unsigned bx, un
     assert(box.ymin() < box.ymax());
     assert(box.zmin() < box.zmax());
 
-    constexpr int pbcRange = 1 << maxTreeLevel<KeyType>{};
+    const int pbcRangeX = 1 << bx;
+    const int pbcRangeY = 1 << by;
+    const int pbcRangeZ = 1 << bz;
     if (stl::min(stl::min(box.xmin(), box.ymin()), box.zmin()) < 0 ||
-        stl::max(stl::max(box.xmax(), box.ymax()), box.zmax()) > pbcRange)
+        box.xmax() > pbcRangeX || box.ymax() > pbcRangeY || box.zmax() > pbcRangeZ)
     {
         // any box that wraps around a PBC boundary cannot be contained within
         // any octree node, except the full root node
