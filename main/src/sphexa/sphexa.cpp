@@ -192,17 +192,19 @@ int main(int argc, char** argv)
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
 
-        isSubsetOutputTriggered =
-            (isOutputStep(d.iteration, writeFreqStrSubset) ||
-             isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStrSubset) ||
-             isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtraSubset) ||
-             (isWallClockReached && writeEnabledSubset) || isSubsetOutputTriggered) &&
-             d.iteration > startIteration;
-
-        if (isSubsetOutputTriggered)
+        if(writeEnabledSubset)
         {
-//            propagator->saveSubsetFields(fileWriter.get(), outFileSubset, domain.startIndex(), domain.endIndex(), simData);
-            isSubsetOutputTriggered = false;
+            isSubsetOutputTriggered =
+                (isOutputStep(d.iteration, writeFreqStrSubset) ||
+                isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStrSubset) ||
+                isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtraSubset) ||
+                (isWallClockReached && writeEnabledSubset) || isSubsetOutputTriggered) &&
+                d.iteration > startIteration;
+            if (isSubsetOutputTriggered)
+            {
+    //            propagator->saveSubsetFields(fileWriter.get(), outFileSubset, domain.startIndex(), domain.endIndex(), simData);
+                isSubsetOutputTriggered = false;
+            }
         }
 
         viz::execute(d, domain.startIndex(), domain.endIndex());
