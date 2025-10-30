@@ -257,7 +257,7 @@ inline void writeSettings(const InitSettings& settings, const std::string& path,
         if(it->second.isScalar() && !it->second.isString())
             writer->fileAttribute(it->first, it->second.data(), 1);
         else
-            std::cout<<"Warning Skipping writing non-scalar setting: "<<it->first<<std::endl;
+            std::cout<<"WARNING: skipping writing non-scalar setting: "<<it->first<<std::endl;
     }
     writer->closeStep();
 }
