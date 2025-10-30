@@ -179,15 +179,15 @@ void computeHelmholtzEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
         auto rho = kx[i] * m[i] / xm[i];
-        auto pi  = prho[i] / rho;
+        double p = 0.0;
         // get dpdt instead of u and calculate tdpdtrho = temp * dp/dT * prho
-        auto [dpdt, cvi] = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i], &c[i], &pi);
+        auto [dpdt, cvi] = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i], &c[i], &p);
 
-        prho[i] = pi / (kx[i] * m[i] * m[i] * gradh[i]);
+        prho[i] = p / (kx[i] * m[i] * m[i] * gradh[i]);
         // c[i]    = ci;
+
         if (storeRho) { d.rho[i] = rho; }
         if (storeTdpdTrho) { tdpdTrho[i] = temp[i] * dpdt * prho[i]; }
-        // if (storeP) { d.p[i] = pi; }
         if (storeCv) { d.cv[i] = cvi; }
         // if (storeU) { d.u[i] = ui; }
     }

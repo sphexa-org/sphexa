@@ -130,9 +130,9 @@ void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d)
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; i++)
     {
-        auto cv    = haveMui ? idealGasCv(d.mui[i], d.gamma) : constCv;
-        auto u_old = cv * d.temp[i];
-        d.temp[i]  = energyUpdate(u_old, d.minDt, d.minDt_m1, d.du[i], d.du_m1[i]) / cv;
+        auto cvi   = !d.cv.empty() ? d.cv[i] : (haveMui ? idealGasCv(d.mui[i], d.gamma) : constCv);
+        auto u_old = cvi * d.temp[i];
+        d.temp[i]  = energyUpdate(u_old, d.minDt, d.minDt_m1, d.du[i], d.du_m1[i]) / cvi;
         d.du_m1[i] = d.du[i];
     }
 }
@@ -170,7 +170,7 @@ void driftPositions(const GroupView& grp, Dataset& d, float dt_forward, float dt
                           rawPtr(d.devData.z), rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
                           rawPtr(d.devData.x_m1), rawPtr(d.devData.y_m1), rawPtr(d.devData.z_m1), rawPtr(d.devData.ax),
                           rawPtr(d.devData.ay), rawPtr(d.devData.az), rung, rawPtr(d.devData.temp), rawPtr(d.devData.u),
-                          rawPtr(d.devData.du), rawPtr(d.devData.du_m1), d_mui, d.gamma, constCv);
+                          rawPtr(d.devData.du), rawPtr(d.devData.du_m1), rawPtr(d.devData.cv), d_mui, d.gamma, constCv);
     }
 }
 
@@ -187,7 +187,7 @@ void computePositions(const GroupView& grp, Dataset& d, const cstone::Box<T>& bo
                             rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz), rawPtr(d.devData.x_m1),
                             rawPtr(d.devData.y_m1), rawPtr(d.devData.z_m1), rawPtr(d.devData.ax), rawPtr(d.devData.ay),
                             rawPtr(d.devData.az), rung, rawPtr(d.devData.temp), rawPtr(d.devData.u),
-                            rawPtr(d.devData.du), rawPtr(d.devData.du_m1), rawPtr(d.devData.h), d_mui, d.gamma, constCv,
+                            rawPtr(d.devData.du), rawPtr(d.devData.du_m1), rawPtr(d.devData.h), rawPtr(d.devData.cv), d_mui, d.gamma, constCv,
                             box);
     }
     else
