@@ -161,8 +161,6 @@ namespace sphexa
 
         if(writeEnabledSubset) {
             if(settings.count("o_subset")) {
-                std::cout<<"is o_subset scalar "<<settings.at("o_subset").isScalar()<<std::endl;
-                std::cout<<"is o_subset vector "<<settings.at("o_subset").isVector()<<std::endl;
                 outFileSubset = settings.at("o_subset").toStrings()[0];
             }
             else {
@@ -171,28 +169,24 @@ namespace sphexa
             }
             outFileSubset += outputFileSuffix;
             std::cout<<"Subset output file: " << outFileSubset << std::endl;
-            std::cout<<std::endl;
             if(settings.count("f_subset")) {
-                std::cout<<"is f_subset scalar "<<settings.at("f_subset").isScalar()<<std::endl;
-                std::cout<<"is f_subset vector "<<settings.at("f_subset").isVector()<<std::endl;
                 outputFieldsSubset = settings.at("f_subset").toStrings();
-                for(const auto& field : outputFieldsSubset) {
-                    std::cout << "Subset output field: " << field << std::endl;
+                std::cout << "Subset output fields: ";
+                for(auto field = 0; field < outputFieldsSubset.size()-1; ++field) {
+                    std::cout << outputFieldsSubset[field] <<", ";
                 }
-                std::cout<<std::endl;
+                std::cout << outputFieldsSubset.back() << std::endl;
             }
             writeFreqStrSubset = settings.at("w_subset").toStrings()[0];
             std::cout<<"Subset write frequency: " << writeFreqStrSubset << std::endl;
-            std::cout<<std::endl;
 
             if(settings.count("wextra_subset")) {
-                std::cout<<"is wextra_subset scalar "<<settings.at("wextra_subset").isScalar()<<std::endl;
-                std::cout<<"is wextra_subset vector "<<settings.at("wextra_subset").isVector()<<std::endl;
                 writeExtraSubset = settings.at("wextra_subset").toStrings();
-                for(const auto& freq : writeExtraSubset) {
-                    std::cout << "Subset extra output freq: " << freq << std::endl;
+                std::cout << "Subset extra output freq: ";
+                for(auto field = 0; field < writeExtraSubset.size()-1; ++field) {
+                    std::cout << writeExtraSubset[field] <<", ";
                 }
-                std::cout<<std::endl;
+                std::cout << writeExtraSubset.back() << std::endl;
             }
         }
         return writeEnabledSubset;
