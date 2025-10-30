@@ -157,9 +157,17 @@ namespace sphexa
                                            std::string& outFileSubset, std::string& writeFreqStrSubset, std::vector<std::string>& outputFieldsSubset,
                                            std::vector<std::string>& writeExtraSubset)
     {
-        const bool writeEnabledSubset = settings.count("w_subset") && *settings.at("w_subset").data() > 0.;
+
+        outFileSubset.clear();
+        writeFreqStrSubset = std::string("0");
+        outputFieldsSubset.clear();
+        writeExtraSubset.clear();
+
+        const bool writeEnabledSubset = (settings.count("w_subset") && *settings.at("w_subset").data() > 0.) ||
+            settings.count("wextra_subset");
 
         if(writeEnabledSubset) {
+
             if(settings.count("o_subset")) {
                 outFileSubset = settings.at("o_subset").toStrings()[0];
             }
@@ -169,6 +177,7 @@ namespace sphexa
             }
             outFileSubset += outputFileSuffix;
             std::cout<<"Subset output file: " << outFileSubset << std::endl;
+
             if(settings.count("f_subset")) {
                 outputFieldsSubset = settings.at("f_subset").toStrings();
                 std::cout << "Subset output fields: ";
@@ -177,8 +186,14 @@ namespace sphexa
                 }
                 std::cout << outputFieldsSubset.back() << std::endl;
             }
-            writeFreqStrSubset = settings.at("w_subset").toStrings()[0];
-            std::cout<<"Subset write frequency: " << writeFreqStrSubset << std::endl;
+            else {
+                std::cout<<"WARNING: f_subset not provided, all fields will be printed for the tagged id subsets."<<std::endl;
+            }
+
+            if(settings.count("w_subset")) {
+                writeFreqStrSubset = settings.at("w_subset").toStrings()[0];
+                std::cout<<"Subset write frequency: " << writeFreqStrSubset << std::endl;
+            }
 
             if(settings.count("wextra_subset")) {
                 writeExtraSubset = settings.at("wextra_subset").toStrings();
