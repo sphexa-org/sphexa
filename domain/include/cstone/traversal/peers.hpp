@@ -48,110 +48,53 @@ std::vector<int> findPeersMac(int myRank,
                               const SfcAssignment<KeyType>& assignment,
                               OctreeView<const KeyType> domainTree,
                               const Box<T>& box,
-                              float invThetaEff,
-                              const bool disableMixD = false)
+                              float invThetaEff)
 {
-    KeyType domainStart = assignment[myRank];
-    KeyType domainEnd   = assignment[myRank + 1];
-    std::cout << "[findPeersMac] myRank: " << myRank << " domainStart: " << std::oct << domainStart << " domainEnd: " << domainEnd
-              << std::dec << std::endl;
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const auto maxMixDBits = std::max({mixDBits.bx, mixDBits.by, mixDBits.bz});
-    const auto minMixDBits = std::min({mixDBits.bx, mixDBits.by, mixDBits.bz});
-    const bool useMixD = !disableMixD && (mixDBits.bx != maxTreeLevel<KeyType>{} ||
-                          mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{});
+    const KeyType domainStart = assignment[myRank];
+    const KeyType domainEnd   = assignment[myRank + 1];
+    const auto mixDBits       = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const auto maxMixDBits    = std::max({mixDBits.bx, mixDBits.by, mixDBits.bz});
+    const auto minMixDBits    = std::min({mixDBits.bx, mixDBits.by, mixDBits.bz});
+    const bool useMixD        = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                         mixDBits.bz != maxTreeLevel<KeyType>{};
 
-    int maxCoord   = 1u << maxTreeLevel<KeyType>{};
-    float roundOff = 1 + 1e-6; // ensure that peers are picked up in case of a numerical tie
-    auto ellipse   = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invThetaEff * roundOff;
-    // auto ellipse = Vec3<T>{
-    //     static_cast<T>(1 << mixDBits.bx),
-    //     static_cast<T>(1 << mixDBits.by),
-    //     static_cast<T>(1 << mixDBits.bz)
-    // } * static_cast<T>(1 << maxTreeLevel<KeyType>{}) * static_cast<T>(invThetaEff) * static_cast<T>(roundOff);
-    // TODO(iomaganaris): ellipse calculation probably needs fixing according to the the level of the tree because the boxes have different lengths
-    // auto ellipse   = Vec3<T>{
-    //     box.ilx() * T(1 << (maxTreeLevel<KeyType>{} - mixDBits.bx)),
-    //     box.ily() * T(1 << (maxTreeLevel<KeyType>{} - mixDBits.by)),
-    //     box.ilz() * T(1 << (maxTreeLevel<KeyType>{} - mixDBits.bz))
-    // } * box.maxExtent() * invThetaEff * roundOff;
-    auto pbc_t     = BoundaryType::periodic;
-    // std::cout << "[findPeersMac] is periodic in x: " << (box.boundaryX() == pbc_t) << " y: " << (box.boundaryY() == pbc_t)
-    //           << " z: " << (box.boundaryZ() == pbc_t) << std::endl;
-    auto pbc       = useMixD ? Vec3<int>{static_cast<int>((box.boundaryX() == pbc_t) * (1u << mixDBits.bx)),
-                                         static_cast<int>((box.boundaryY() == pbc_t) * (1u << mixDBits.by)),
-                                         static_cast<int>((box.boundaryZ() == pbc_t) * (1u << mixDBits.bz))}
-                             : Vec3<int>{static_cast<int>(box.boundaryX() == pbc_t),
-                                         static_cast<int>(box.boundaryY() == pbc_t),
-                                         static_cast<int>(box.boundaryZ() == pbc_t)} * maxCoord;
+    constexpr float roundOff  = 1 + 1e-6; // ensure that peers are picked up in case of a numerical tie
+    const Vec3<int> maxCoords = {(1 << mixDBits.bx), (1 << mixDBits.by), (1 << mixDBits.bz)};
+    const Vec3<T> gridStep    = {box.lx() / maxCoords[0], box.ly() / maxCoords[1], box.lz() / maxCoords[2]};
+    const T maxGridStep       = *std::max_element(gridStep.begin(), gridStep.end());
+    const auto ellipse = Vec3<T>{maxGridStep / gridStep[0], maxGridStep / gridStep[1], maxGridStep / gridStep[2]} *
+                         invThetaEff * roundOff;
+    constexpr auto pbc_t = BoundaryType::periodic;
+    const Vec3<int> pbc  = {(box.boundaryX() == pbc_t) * maxCoords[0], (box.boundaryY() == pbc_t) * maxCoords[1],
+                            (box.boundaryZ() == pbc_t) * maxCoords[2]};
 
-    auto crossFocusPairs = [domainStart, domainEnd, ellipse, pbc, &tree = domainTree, &mixDBits, useMixD, &box, &invThetaEff, myRank](TreeNodeIndex a, TreeNodeIndex b)
+    auto crossFocusPairs = [&](TreeNodeIndex a, TreeNodeIndex b)
     {
-        auto [ka1, ka2]    = decodePlaceholderBit2K(tree.prefixes[a]);
-        auto [kb1, kb2]    = decodePlaceholderBit2K(tree.prefixes[b]);
+        auto [ka1, ka2]    = decodePlaceholderBit2K(domainTree.prefixes[a]);
+        auto [kb1, kb2]    = decodePlaceholderBit2K(domainTree.prefixes[b]);
         bool aFocusOverlap = overlapTwoRanges(domainStart, domainEnd, ka1, ka2);
         bool bInFocus      = containedIn(kb1, kb2, domainStart, domainEnd);
         // node a has to overlap/be contained in the focus, while b must not be inside it
         if (!aFocusOverlap || bInFocus) { return false; }
 
-        IBox aBox = useMixD ? sfcIBox(sfcMixDKey(ka1), maxTreeLevel<KeyType>{}-treeLevel(ka2 - ka1), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1));
-        if (aBox.xmax() == aBox.xmin() &&
-            aBox.ymax() == aBox.ymin() &&
-            aBox.zmax() == aBox.zmin())
+        IBox aBox = useMixD ? sfcIBox(sfcMixDKey(ka1), maxTreeLevel<KeyType>{} - treeLevel(ka2 - ka1), mixDBits.bx,
+                                      mixDBits.by, mixDBits.bz)
+                            : sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1));
+        if (aBox.xmax() == 0 && aBox.xmin() == 0 && aBox.ymax() == 0 && aBox.ymin() == 0 && aBox.zmax() == 0 &&
+            aBox.zmin() == 0)
         {
             return false; // skip empty boxes
         }
-        IBox bBox = useMixD ? sfcIBox(sfcMixDKey(kb1), maxTreeLevel<KeyType>{}-treeLevel(kb2 - kb1), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1));
-        if (bBox.xmax() == bBox.xmin() &&
-            bBox.ymax() == bBox.ymin() &&
-            bBox.zmax() == bBox.zmin())
+        IBox bBox = useMixD ? sfcIBox(sfcMixDKey(kb1), maxTreeLevel<KeyType>{} - treeLevel(kb2 - kb1), mixDBits.bx,
+                                      mixDBits.by, mixDBits.bz)
+                            : sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1));
+        if (bBox.xmax() == 0 && bBox.xmin() == 0 && bBox.ymax() == 0 && bBox.ymin() == 0 && bBox.zmax() == 0 &&
+            bBox.zmin() == 0)
         {
             return false; // skip empty boxes
         }
-        auto [aSourceCenter, aSourceSize] = centerAndSize<KeyType>(aBox, box);
-        T a_size = std::sqrt(4 * aSourceSize[0] * aSourceSize[0] +
-                     4 * aSourceSize[1] * aSourceSize[1] +
-                     4 * aSourceSize[2] * aSourceSize[2]);
-        T lA   = T(2) * a_size;
-        // T lA   = T(2) * max(aSourceSize);
-        // T lA   = a_size;
-        T macA = lA * invThetaEff;
-        T mac2a = macA * macA;
-        auto [bTargetCenter, bTargetSize] = centerAndSize<KeyType>(bBox, box);
-        T b_size = std::sqrt(4 * bTargetSize[0] * bTargetSize[0] +
-                     4 * bTargetSize[1] * bTargetSize[1] +
-                     4 * bTargetSize[2] * bTargetSize[2]);
-        T lB   = T(2) * b_size;
-        // T lB   = T(2) * max(bTargetSize);
-        // T lB   = b_size;
-        T macB = lB * invThetaEff;
-        T mac2b = macB * macB;
-        bool violatesMacA = evaluateMacPbc(aSourceCenter, mac2a, bTargetCenter, bTargetSize, box);
-        bool violatesMacB = evaluateMacPbc(bTargetCenter, mac2b, aSourceCenter, aSourceSize, box);
-        // if (violatesMacA != violatesMacB)
-        // {
-        //     // std::cout << "[findPeersMac] myRank: " << myRank << " Box A: [" << aBox.xmin() << "," << aBox.xmax() << "] x [" << aBox.ymin() << "," << aBox.ymax() << "] x ["
-        //     //           << aBox.zmin() << "," << aBox.zmax() << "] Box B: [" << bBox.xmin() << "," << bBox.xmax() << "] x [" << bBox.ymin() << "," << bBox.ymax() << "] x ["
-        //     //           << bBox.zmin() << "," << bBox.zmax() << "] Center A: " << aSourceCenter[0] << " " << aSourceCenter[1] << " " << aSourceCenter[2] << " size: " << aSourceSize[0] << " " << aSourceSize[1]
-        //     //           << " " << aSourceSize[2] << " mac: " << macA << " Center B: " << bTargetCenter[0] << " " << bTargetCenter[1] << " " << bTargetCenter[2] << " size: " << bTargetSize[0] << " " << bTargetSize[1]
-        //     //           << " " << bTargetSize[2] << " mac: " << macB;
-        //     // throw std::runtime_error("Mac is not symmetric");
-        //     // std::cout << " Mac is not symmetric" << std::endl;
-        // }
-        // if ((violatesMacA && minMacMutualInt(aBox, bBox, ellipse, pbc)) || (!violatesMacA && !minMacMutualInt(aBox, bBox, ellipse, pbc))) {
-        //     // std::cout << "[findPeersMac] myRank: " << myRank << " Box A: [" << aBox.xmin() << "," << aBox.xmax() << "] x [" << aBox.ymin() << "," << aBox.ymax() << "] x ["
-        //     //           << aBox.zmin() << "," << aBox.zmax() << "]" << std::endl;
-        //     // std::cout << "[findPeersMac] myRank: " << myRank << " Box B: [" << bBox.xmin() << "," << bBox.xmax() << "] x [" << bBox.ymin() << "," << bBox.ymax() << "] x ["
-        //     //           << bBox.zmin() << "," << bBox.zmax() << "]" << std::endl;
-        //     // std::cout << "[findPeersMac] myRank: " << myRank << " Center A: " << aSourceCenter[0] << " " << aSourceCenter[1] << " " << aSourceCenter[2] << " size: " << aSourceSize[0] << " " << aSourceSize[1]
-        //     //           << " " << aSourceSize[2] << " mac: " << macA << std::endl;
-        //     // std::cout << "[findPeersMac] myRank: " << myRank << " Center B: " << bTargetCenter[0] << " " << bTargetCenter[1] << " " << bTargetCenter[2] << " size: " << bTargetSize[0] << " " << bTargetSize[1]
-        //     //           << " " << bTargetSize[2] << " mac: " << macB << std::endl;
-        //     throw std::runtime_error("Logic error in findPeersMac");
-        // }
 
-        return !minMacMutualInt(aBox, bBox, ellipse, pbc); // Return value must be false for m2l and true for p2p
+        return !minMacMutualInt(aBox, bBox, ellipse, pbc);
     };
 
     auto m2l = [](TreeNodeIndex, TreeNodeIndex) {};
@@ -175,12 +118,6 @@ std::vector<int> findPeersMac(int myRank,
         dualTraversal(domainTree.childOffsets, domainTree.empty, nodeIdx, 0, crossFocusPairs, m2l, p2p);
     }
 
-    // for (int i = 0; i < int(peerRanks.size()); ++i)
-    // {
-    //     if (peerRanks[i]) { std::cout << i << " "; }
-    // }
-    // std::cout << std::endl;
-
     std::vector<int> ret;
     for (int i = 0; i < int(peerRanks.size()); ++i)
     {
@@ -196,8 +133,7 @@ std::vector<int> findPeersMacStt(int myRank,
                                  const SfcAssignment<KeyType>& assignment,
                                  const Octree<KeyType>& octree,
                                  const Box<T>& box,
-                                 float invThetaEff,
-                                 const bool disableMixD = false)
+                                 float invThetaEff)
 {
     KeyType domainStart     = assignment[myRank];
     KeyType domainEnd       = assignment[myRank + 1];
@@ -205,23 +141,29 @@ std::vector<int> findPeersMacStt(int myRank,
     TreeNodeIndex firstLeaf = findNodeAbove(leaves, octree.numLeafNodes(), domainStart);
     TreeNodeIndex lastLeaf  = findNodeAbove(leaves, octree.numLeafNodes(), domainEnd);
 
-    int maxCoord = 1u << maxTreeLevel<KeyType>{};
-    auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invThetaEff;
-    auto pbc_t   = BoundaryType::periodic;
-    auto pbc     = Vec3<int>{box.boundaryX() == pbc_t, box.boundaryY() == pbc_t, box.boundaryZ() == pbc_t} * maxCoord;
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                         mixDBits.bz != maxTreeLevel<KeyType>{};
+
+    const Vec3<int> maxCoords = {(1 << mixDBits.bx), (1 << mixDBits.by), (1 << mixDBits.bz)};
+    const Vec3<T> gridStep    = {box.lx() / maxCoords[0], box.ly() / maxCoords[1], box.lz() / maxCoords[2]};
+    const T maxGridStep       = *std::max_element(gridStep.begin(), gridStep.end());
+    const auto ellipse =
+        Vec3<T>{maxGridStep / gridStep[0], maxGridStep / gridStep[1], maxGridStep / gridStep[2]} * invThetaEff;
+    constexpr auto pbc_t = BoundaryType::periodic;
+    const Vec3<int> pbc  = {(box.boundaryX() == pbc_t) * maxCoords[0], (box.boundaryY() == pbc_t) * maxCoords[1],
+                            (box.boundaryZ() == pbc_t) * maxCoords[2]};
 
     std::vector<int> peers(assignment.numRanks());
-
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD = !disableMixD && (mixDBits.bx != maxTreeLevel<KeyType>{} ||
-                          mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{});
 
 #pragma omp parallel for
     for (TreeNodeIndex i = firstLeaf; i < lastLeaf; ++i)
     {
-        IBox target = useMixD ? sfcIBox(sfcMixDKey(leaves[i]), sfcMixDKey(leaves[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]));
-        if (target.xmax() - target.xmin() == 0 && target.ymax() - target.ymin() == 0 && target.zmax() - target.zmin() == 0)
+        IBox target =
+            useMixD ? sfcIBox(sfcMixDKey(leaves[i]), sfcMixDKey(leaves[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz)
+                    : sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]));
+        if (target.xmax() - target.xmin() == 0 && target.ymax() - target.ymin() == 0 &&
+            target.zmax() - target.zmin() == 0)
         {
             continue; // skip empty boxes
         }
@@ -233,8 +175,11 @@ std::vector<int> findPeersMacStt(int myRank,
             // if the tree node with index idx is fully contained in the focus, we stop traversal
             if (containedIn(nodeStart, nodeEnd, domainStart, domainEnd)) { return false; }
 
-            IBox source = useMixD ? sfcIBox(sfcMixDKey(nodeStart), maxTreeLevel<KeyType>{} - octree.level(idx), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(nodeStart), octree.level(idx));
-            if (source.xmax() - source.xmin() == 0 && source.ymax() - source.ymin() == 0 && source.zmax() - source.zmin() == 0)
+            IBox source = useMixD ? sfcIBox(sfcMixDKey(nodeStart), maxTreeLevel<KeyType>{} - octree.level(idx),
+                                            mixDBits.bx, mixDBits.by, mixDBits.bz)
+                                  : sfcIBox(sfcKey(nodeStart), octree.level(idx));
+            if (source.xmax() == 0 && source.xmin() == 0 && source.ymax() == 0 && source.ymin() == 0 &&
+                source.zmax() == 0 && source.zmin() == 0)
             {
                 return false; // skip empty boxes
             }
