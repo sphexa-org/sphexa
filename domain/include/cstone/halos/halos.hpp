@@ -63,13 +63,6 @@ public:
                          std::span<const LocalIndex> layout)
     {
         outgoingHaloIndices_ = exchangeRequestKeys<KeyType>(leaves, assignment, peers, layout);
-        std::cout << "[Halos][exchangeRequests] rank " << myRank_ << " will send "
-                  << outgoingHaloIndices_.totalCount() << " halos to " << peers.size() << " peers."
-                  << std::endl;
-        std::cout << "[Halos][exchangeRequests] rank " << myRank_ << " will send to peers: ";
-        for (int p : peers)
-            std::cout << p << " ";
-        std::cout << std::endl;
 
         incomingHaloIndices_.resize(assignment.size());
         std::fill(incomingHaloIndices_.begin(), incomingHaloIndices_.end(), RecvList::value_type{0, 0});
