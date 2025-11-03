@@ -29,10 +29,7 @@ template<class Tc, class Th>
 HOST_DEVICE_FUN util::tuple<Vec3<Tc>, Vec3<Tc>> computeBoundingBox(
     const Tc* x, const Tc* y, const Tc* z, const Th* h, LocalIndex first, LocalIndex last, Th scale, Vec3<Tc> init)
 {
-    if (first == last)
-    {
-        return {Vec3<Tc>{0, 0, 0}, Vec3<Tc>{0, 0, 0}};
-    }
+    if (first == last) { return {Vec3<Tc>{0, 0, 0}, Vec3<Tc>{0, 0, 0}}; }
 
     Vec3<Tc> commonMin = init, commonMax = init;
     for (LocalIndex i = first; i < last; ++i)
