@@ -156,7 +156,7 @@ void neighborCheckMixD(const Coordinates& coords, T radius, const Box<T>& box, u
     }
     std::cout << "number_of_non_zero_leaves = " << number_of_non_zero_leaves << std::endl;
     std::vector<Vec3<T>> centers(octree.numNodes), sizes(octree.numNodes);
-    nodeFpCenters<KeyType>(nodeKeys, centers.data(), sizes.data(), box, bx, by, bz);
+    nodeFpCenters<KeyType>(nodeKeys, centers.data(), sizes.data(), box);
 
     OctreeNsView<T, KeyType> nsView{octree.numLeafNodes,
                                     octree.prefixes.data(),
