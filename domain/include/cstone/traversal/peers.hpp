@@ -53,8 +53,6 @@ std::vector<int> findPeersMac(int myRank,
     const KeyType domainStart = assignment[myRank];
     const KeyType domainEnd   = assignment[myRank + 1];
     const auto mixDBits       = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const auto maxMixDBits    = std::max({mixDBits.bx, mixDBits.by, mixDBits.bz});
-    const auto minMixDBits    = std::min({mixDBits.bx, mixDBits.by, mixDBits.bz});
     const bool useMixD        = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                          mixDBits.bz != maxTreeLevel<KeyType>{};
 
