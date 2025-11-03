@@ -40,8 +40,7 @@ void findCollisions2All(std::span<const KeyType> nodeKeys,
                         Vec3<T> targetSize,
                         std::vector<TreeNodeIndex>& collisionList)
 {
-    constexpr T epsilon = std::numeric_limits<T>::epsilon();
-    if (std::abs(targetSize[0]) < epsilon && std::abs(targetSize[1]) < epsilon && std::abs(targetSize[2]) < epsilon)
+    if (targetSize[0] == 0 && targetSize[1] == 0 && targetSize[2] == 0)
     {
         // if the target is empty, we return no overlap
         // std::cout << "[findCollisions2All] empty target -> no overlap" << std::endl;
@@ -59,26 +58,6 @@ void findCollisions2All(std::span<const KeyType> nodeKeys,
         {
             collisionList.push_back(idx);
         }
-    }
-}
-
-template<class KeyType>
-void findCollisions2All(std::span<const KeyType> tree,
-                        std::vector<TreeNodeIndex>& collisionList,
-                        const IBox& collisionBox,
-                        unsigned bx, unsigned by, unsigned bz)
-{
-    for (TreeNodeIndex idx = 0; idx < TreeNodeIndex(nNodes(tree)); ++idx)
-    {
-        IBox nodeBox = sfcIBox(sfcMixDKey(tree[idx]), sfcMixDKey(tree[idx + 1]), bx, by, bz);
-        if (nodeBox.xmax() - nodeBox.xmin() == 0 && nodeBox.ymax() - nodeBox.ymin() == 0 &&
-            nodeBox.zmax() - nodeBox.zmin() == 0)
-        {
-            // if the node is empty, we skip it
-            // std::cout << "[findCollisions2All] Skipping idx: " << idx << " due to zero size" << std::endl;
-            continue;
-        }
-        if (overlap<KeyType>(nodeBox, collisionBox)) { collisionList.push_back(idx); }
     }
 }
 
