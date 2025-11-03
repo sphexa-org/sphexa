@@ -16,7 +16,6 @@
 #pragma once
 
 #include <cmath>
-#include <fstream>
 
 #include "cstone/focus/source_center.hpp"
 #include "cstone/sfc/sfc.hpp"
@@ -93,57 +92,24 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
 
     auto radiusSq     = Th(4.0) * hi * hi;
     auto cellRadiusSq = radiusSq * tree.searchExtFactor * tree.searchExtFactor;
-    // std::cout << "[findNeighbors] i: " << i << " (" << xi << ", " << yi << ", " << zi << ") h: " << hi
-    //           << " radiusSq: " << radiusSq << " cellRadiusSq: " << cellRadiusSq << std::endl;
     Vec3<Tc> particle{xi, yi, zi};
     unsigned numNeighbors = 0;
 
     auto pbc    = BoundaryType::periodic;
     bool anyPbc = box.boundaryX() == pbc || box.boundaryY() == pbc || box.boundaryZ() == pbc;
     bool usePbc = anyPbc && !insideBox(particle, {Tc(2) * hi, Tc(2) * hi, Tc(2) * hi}, box);
-    // std::cout << "[findNeighbors] usePbc = " << usePbc << std::endl;
 
     auto overlapsPbc = [particle, cellRadiusSq, centers = tree.centers, sizes = tree.sizes, &box](TreeNodeIndex idx)
     {
-        // if (sizes[idx][0] <= std::numeric_limits<std::decay_t<decltype(sizes[idx][0])>>::epsilon() ||
-        //     sizes[idx][1] <= std::numeric_limits<std::decay_t<decltype(sizes[idx][1])>>::epsilon() ||
-        //     sizes[idx][2] <= std::numeric_limits<std::decay_t<decltype(sizes[idx][2])>>::epsilon())
-        // {
-        //     return false;
-        // }
-        // std::cout << "[overlapsPbc] particle[0]: " << particle[0] << " particle[1]: " << particle[1] << " particle[2]: "
-        //           << particle[2];
-        // std::cout << " centers[" << idx << "][0]: " << centers[idx][0] << " centers[" << idx << "][1]: " << centers[idx][1] << " centers[" << idx << "][2]: "
-        //           << centers[idx][2];
-        // std::cout << " sizes[" << idx << "][0]: " << sizes[idx][0] << " sizes[" << idx << "][1]: " << sizes[idx][1] << " sizes[" << idx << "][2]: "
-        //           << sizes[idx][2];
-        // std::cout << " dist enough: " << (norm2(minDistance(particle, centers[idx], sizes[idx], box)) < cellRadiusSq) << std::endl;
+        if (sizes[idx][0] == 0 && sizes[idx][1] == 0 && sizes[idx][2] == 0)
+            return false;
         return norm2(minDistance(particle, centers[idx], sizes[idx], box)) < cellRadiusSq;
     };
 
     auto overlaps = [particle, cellRadiusSq, centers = tree.centers, sizes = tree.sizes](TreeNodeIndex idx)
     {
-        // std::cout << "[overlaps] particle[0]: " << particle[0] << " particle[1]: " << particle[1] << " particle[2]: "
-        // << particle[2]; std::cout << " centers[idx][0]: " << centers[idx][0] << " centers[idx][1]: " <<
-        // centers[idx][1] << " centers[idx][2]: " << centers[idx][2]; std::cout << " sizes[idx][0]: " << sizes[idx][0]
-        // << " sizes[idx][1]: " << sizes[idx][1] << " sizes[idx][2]: " << sizes[idx][2]; std::cout << " dist enough: "
-        // << (norm2(minDistance(particle, centers[idx], sizes[idx])) < cellRadiusSq) << std::endl;
-        if (sizes[idx][0] <= std::numeric_limits<std::decay_t<decltype(sizes[idx][0])>>::epsilon() ||
-            sizes[idx][1] <= std::numeric_limits<std::decay_t<decltype(sizes[idx][1])>>::epsilon() ||
-            sizes[idx][2] <= std::numeric_limits<std::decay_t<decltype(sizes[idx][2])>>::epsilon())
-        {
+        if (sizes[idx][0] == 0 && sizes[idx][1] == 0 && sizes[idx][2] == 0)
             return false;
-        }
-        if (norm2(minDistance(particle, centers[idx], sizes[idx])) < cellRadiusSq) {
-            // std::cout << "[overlaps] particle[0]: " << particle[0] << " particle[1]: " << particle[1] << " particle[2]: "
-            //         << particle[2];
-            // std::cout << " centers[" << idx << "][0]: " << centers[idx][0] << " centers[" << idx << "][1]: " << centers[idx][1] << " centers[" << idx << "][2]: "
-            //         << centers[idx][2];
-            // std::cout << " sizes[" << idx << "][0]: " << sizes[idx][0] << " sizes[" << idx << "][1]: " << sizes[idx][1] << " sizes[" << idx << "][2]: "
-            //         << sizes[idx][2];
-            // std::cout << " norm2(dist): " << norm2(minDistance(particle, centers[idx], sizes[idx])) << " cellRadiusSq: " << cellRadiusSq << std::endl;
-            // std::cout << "[overlaps] particle: (" << particle[0] << ", " << particle[1] << ", " << particle[2] << ") cellRadiusSq: " << cellRadiusSq << std::endl;
-        }
         return norm2(minDistance(particle, centers[idx], sizes[idx])) < cellRadiusSq;
     };
 
@@ -153,13 +119,10 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
         TreeNodeIndex leafIdx    = tree.internalToLeaf[idx];
         LocalIndex firstParticle = tree.layout[leafIdx];
         LocalIndex lastParticle  = tree.layout[leafIdx + 1];
-        // std::cout << "[searchBoxPbc] i : " << i << " leafIdx: " << leafIdx << " firstParticle: " << firstParticle << " lastParticle: " << lastParticle << std::endl;
 
         for (LocalIndex j = firstParticle; j < lastParticle; ++j)
         {
             if (j == i) { continue; }
-            // std::cout << "[searchBox] particle[0]: " << particle[0] << " particle[1]: " << particle[1] << " particle[2]: " << particle[2]; std::cout << " x[j]: " << x[j] << " y[j]: " << y[j] << " z[j]: " << z[j];
-            // std::cout << " distanceSq: " << distanceSq<true>(x[j], y[j], z[j], particle[0], particle[1], particle[2], box) << std::endl;
             if (distanceSq<true>(x[j], y[j], z[j], particle[0], particle[1], particle[2], box) < radiusSq)
             {
                 if (numNeighbors < ngmax) { neighbors[numNeighbors] = j; }
@@ -173,30 +136,20 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
         TreeNodeIndex leafIdx    = tree.internalToLeaf[idx];
         LocalIndex firstParticle = tree.layout[leafIdx];
         LocalIndex lastParticle  = tree.layout[leafIdx + 1];
-        // std::cout << "[searchBox] i : " << i << " leafIdx: " << leafIdx << " firstParticle: " << firstParticle << " lastParticle: " << lastParticle << std::endl;
+
         for (LocalIndex j = firstParticle; j < lastParticle; ++j)
         {
             if (j == i) { continue; }
-            // std::cout << "[searchBox] particle[0]: " << particle[0] << " particle[1]: " << particle[1] << " particle[2]: " << particle[2]; std::cout << " x[j]: " << x[j] << " y[j]: " << y[j] << " z[j]: " << z[j];
-            // std::cout << " distanceSq: " << distanceSq<false>(x[j], y[j], z[j], particle[0], particle[1], particle[2], box) << std::endl;
             if (distanceSq<false>(x[j], y[j], z[j], particle[0], particle[1], particle[2], box) < radiusSq)
             {
                 if (numNeighbors < ngmax) { neighbors[numNeighbors] = j; }
                 numNeighbors++;
-                // std::ofstream outFile("neighbors.txt", std::ios_base::app);
-                // if (outFile.is_open())
-                // {
-                //     outFile << "Particle " << i << " (" << particle[0] << ", " << particle[1] << ", " << particle[2] << ")"
-                //             << " neighbor: " << j << " (" << x[j] << ", " << y[j] << ", " << z[j] << ")\n";
-                // }
             }
         }
     };
 
     if (usePbc) { singleTraversal(tree.childOffsets, tree.parents, overlapsPbc, searchBoxPbc); }
     else { singleTraversal(tree.childOffsets, tree.parents, overlaps, searchBox); }
-
-    std::cout << "[findNeighbors] i: " << i << " (" << xi << ", " << yi << ", " << zi << ") found total " << numNeighbors << " neighbors" << std::endl;
 
     return numNeighbors;
 }
@@ -221,8 +174,6 @@ void findNeighbors(const T* x,
     {
         LocalIndex id     = i + firstId;
         neighborsCount[i] = findNeighbors(id, x, y, z, h, treeView, box, ngmax, neighbors + i * ngmax);
-        // std::cout << "[findNeighbors] id: " << id << " (" << x[id] << ", " << y[id] << ", " << z[id] << ")"
-        //       << " found " << neighborsCount[i] << " neighbors" << std::endl;
     }
 }
 
