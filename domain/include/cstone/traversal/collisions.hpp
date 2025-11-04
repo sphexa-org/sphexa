@@ -100,7 +100,6 @@ void findHalos(const KeyType* prefixes,
 #pragma omp parallel for
     for (TreeNodeIndex leafIdx = firstNode; leafIdx < lastNode; ++leafIdx)
     {
-        constexpr Tc epsilon = std::numeric_limits<Tc>::epsilon();
         if (searchSizes[leafIdx][0] == 0 && searchSizes[leafIdx][1] == 0 && searchSizes[leafIdx][2] == 0)
         {
             // if the target is empty, we skip it

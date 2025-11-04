@@ -28,8 +28,7 @@ static std::vector<int> findPeersAll2All(int myRank,
                                          const SfcAssignment<KeyType>& assignment,
                                          std::span<const KeyType> tree,
                                          const Box<T>& box,
-                                         float invThetaEff,
-                                         const bool disableMixD = false)
+                                         float invThetaEff)
 {
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool mixD     = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||

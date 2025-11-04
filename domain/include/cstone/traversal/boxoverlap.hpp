@@ -202,7 +202,6 @@ HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool> containedIn(
     const auto mixDBits = getBoxMixDimensionBits<Tc, KeyType, Box<Tc>>(box);
 
     // increase maximum by a grid-unit to ensure we round up
-    constexpr int gridDim = 1u << maxTreeLevel<KeyType>{};
     const auto gridUnitX  = box.lx() * (Tc(1) / (1u << mixDBits.bx));
     const auto gridUnitY  = box.ly() * (Tc(1) / (1u << mixDBits.by));
     const auto gridUnitZ  = box.lz() * (Tc(1) / (1u << mixDBits.bz));
