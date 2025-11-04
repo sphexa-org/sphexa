@@ -465,22 +465,6 @@ HOST_DEVICE_FUN bool isValidHilbertMixDKey(KeyType key, unsigned bx, unsigned by
 template<class KeyType>
 HOST_DEVICE_FUN IBox hilbertMixDIBox(KeyType keyStart, unsigned level, unsigned bx, unsigned by, unsigned bz) noexcept
 {
-    // if constexpr (std::is_same_v<KeyType, unsigned>)
-    // {
-    //     std::cout << "[hilbertMixDIBox] KeyType is unsigned" << std::endl;
-    // } else if constexpr (std::is_same_v<KeyType, unsigned long>)
-    // {
-    //     std::cout << "[hilbertMixDIBox] KeyType is unsigned long" << std::endl;
-    // } else if constexpr (std::is_same_v<KeyType, unsigned long long>)
-    // {
-    //     std::cout << "[hilbertMixDIBox] KeyType is unsigned long long" << std::endl;
-    // } else
-    // {
-    //     static_assert(std::is_same_v<KeyType, unsigned>, "KeyType must be unsigned");
-    // }
-    // std::cout << "[hilbertMixDIBox] keyStart (octal): " << std::oct << keyStart << std::dec << std::endl;
-    // std::cout << "[hilbertMixDIBox] level: " << level << std::endl;
-    // std::cout << "[hilbertMixDIBox] bx: " << bx << " by: " << by << " bz: " << bz << std::endl;
     assert(level <= maxTreeLevel<KeyType>{});
     auto is_valid_key = isValidHilbertMixDKey(keyStart, bx, by, bz);
     if (!is_valid_key)
