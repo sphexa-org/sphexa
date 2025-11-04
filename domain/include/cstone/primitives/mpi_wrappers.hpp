@@ -82,12 +82,6 @@ struct MpiType<long>
 };
 
 template<>
-struct MpiType<long long>
-{
-    operator MPI_Datatype() const noexcept { return MPI_LONG_LONG; }
-};
-
-template<>
 struct MpiType<unsigned long>
 {
     operator MPI_Datatype() const noexcept { return MPI_UNSIGNED_LONG; }
