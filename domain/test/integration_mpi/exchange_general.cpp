@@ -54,14 +54,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
     // identical data on all ranks
 
     // common pool of coordinates, identical on all ranks
-    RandomCoordinates<T, sfcKeyType<KeyType>> coords =
-        useMixD ? RandomCoordinates<T, sfcKeyType<KeyType>>{numRanks * numParticles,
-                                                            box,
-                                                            42,
-                                                            mixDBits.bx,
-                                                            mixDBits.by,
-                                                            mixDBits.bz}
-                : RandomCoordinates<T, sfcKeyType<KeyType>>{numRanks * numParticles, box};
+    RandomCoordinates<T, sfcKeyType<KeyType>> coords{numRanks * numParticles, box};
 
     auto [tree, counts] = computeOctree<KeyType>(coords.particleKeys(), bucketSize);
 
@@ -179,14 +172,7 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>
     /* identical data on all ranks */
 
     // common pool of coordinates, identical on all ranks
-    RandomGaussianCoordinates<T, sfcKeyType<KeyType>> coords =
-        useMixD ? RandomGaussianCoordinates<T, sfcKeyType<KeyType>>{numRanks * numParticles,
-                                                                    box,
-                                                                    42,
-                                                                    mixDBits.bx,
-                                                                    mixDBits.by,
-                                                                    mixDBits.bz}
-                : RandomGaussianCoordinates<T, sfcKeyType<KeyType>>{numRanks * numParticles, box};
+    RandomGaussianCoordinates<T, sfcKeyType<KeyType>> coords{numRanks * numParticles, box};
 
     std::vector<T> globalMasses(numRanks * numParticles, 1.0 / (numRanks * numParticles));
 

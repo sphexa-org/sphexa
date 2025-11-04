@@ -414,13 +414,11 @@ template<class KeyType>
 static void computeEssentialTreeMixD()
 {
     Box<double> box{0, 1, 0, 0.015625, 0, 0.00390625};
-    const auto mixDBits   = getBoxMixDimensionBits<double, KeyType, Box<double>>(box);
     int nParticles        = 200000;
     unsigned csBucketSize = 16;
 
-    auto coords =
-        RandomCoordinates<double, SfcMixDKind<KeyType>>(nParticles, box, 42, mixDBits.bx, mixDBits.by, mixDBits.bz);
-    auto keys = coords.particleKeys();
+    auto coords = RandomCoordinates<double, SfcMixDKind<KeyType>>(nParticles, box);
+    auto keys   = coords.particleKeys();
 
     auto [csTree, csCounts] = computeOctree<KeyType>(keys, csBucketSize);
     Octree<KeyType> globalTree;

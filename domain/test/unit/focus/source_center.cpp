@@ -62,14 +62,7 @@ static void computeSourceCenter(Box<double> box)
     LocalIndex numParticles = 20000;
     unsigned csBucketSize   = 16;
 
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    bool useMixD        = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                    mixDBits.bz != maxTreeLevel<KeyType>{});
-
-    RandomGaussianCoordinates<T, sfcKeyType<KeyType>> coords =
-        useMixD ? RandomGaussianCoordinates<T, sfcKeyType<KeyType>>{numParticles, box,         42,
-                                                                    mixDBits.bx,  mixDBits.by, mixDBits.bz}
-                : RandomGaussianCoordinates<T, sfcKeyType<KeyType>>{numParticles, box, 42};
+    RandomGaussianCoordinates<T, sfcKeyType<KeyType>> coords{numParticles, box};
 
     auto [csTree, csCounts] = computeOctree<KeyType>(coords.particleKeys(), csBucketSize);
     OctreeData<KeyType, CpuTag> octree;

@@ -101,10 +101,7 @@ public:
         cstone::BoundaryType usePbc  = std::get<3>(GetParam());
         Box<double> box{limits[0], limits[1], limits[2], limits[3], limits[4], limits[5], usePbc, usePbc, usePbc};
 
-        const auto mixDBits = getBoxMixDimensionBits<double, KeyType, Box<double>>(box);
-        auto coords         = disableMixD
-                                  ? CoordinateKind<double, KeyType>(nParticles, box)
-                                  : CoordinateKind<double, KeyType>(nParticles, box, 42, mixDBits.bx, mixDBits.by, mixDBits.bz);
+        auto coords = CoordinateKind<double, KeyType>(nParticles, box);
 
         neighborCheck(coords, radius, box, disableMixD);
     }
@@ -122,11 +119,8 @@ public:
         cstone::BoundaryType usePbc = std::get<2>(GetParam());
         Box<double> box{limits[0], limits[1], limits[2], limits[3], limits[4], limits[5], usePbc, usePbc, usePbc};
 
-        const auto mixDBits = getBoxMixDimensionBits<double, KeyTypeMixD, Box<double>>(box);
-
-        const CoordinateKind<double, KeyType3D> coords3D(nParticles, box, 42);
-        const CoordinateKind<double, KeyTypeMixD> coordsMixD(nParticles, box, 42, mixDBits.bx, mixDBits.by,
-                                                             mixDBits.bz);
+        const CoordinateKind<double, KeyType3D> coords3D(nParticles, box);
+        const CoordinateKind<double, KeyTypeMixD> coordsMixD(nParticles, box);
 
         unsigned bucketSize       = 64;
         auto [csTree3D, counts3D] = computeOctree<typename KeyType3D::ValueType>(coords3D.particleKeys(), bucketSize);

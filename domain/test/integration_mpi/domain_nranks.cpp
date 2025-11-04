@@ -258,10 +258,7 @@ void testAssignmentShift(const Box<double>& box)
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                           mixDBits.bz != maxTreeLevel<KeyType>{});
 
-    RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates =
-        useMixD ? RandomCoordinates<Real, sfcKeyType<KeyType>>{numParticlesPerRank, box,         rank,
-                                                               mixDBits.bx,         mixDBits.by, mixDBits.bz}
-                : RandomCoordinates<Real, sfcKeyType<KeyType>>{numParticlesPerRank, box, rank};
+    RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, rank};
 
     std::vector<Real> x(coordinates.x().begin(), coordinates.x().end());
     std::vector<Real> y(coordinates.y().begin(), coordinates.y().end());
@@ -321,10 +318,7 @@ void removeParticle(const Box<double>& box)
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                           mixDBits.bz != maxTreeLevel<KeyType>{});
 
-    RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates =
-        useMixD ? RandomCoordinates<Real, sfcKeyType<KeyType>>{numParticlesPerRank, box,         rank,
-                                                               mixDBits.bx,         mixDBits.by, mixDBits.bz}
-                : RandomCoordinates<Real, sfcKeyType<KeyType>>{numParticlesPerRank, box, rank};
+    RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, rank};
 
     std::vector<Real> x(coordinates.x().begin(), coordinates.x().end());
     std::vector<Real> y(coordinates.y().begin(), coordinates.y().end());
@@ -388,10 +382,7 @@ void testReapplySync(const Box<double>& box)
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                           mixDBits.bz != maxTreeLevel<KeyType>{});
 
-    RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates =
-        useMixD ? RandomCoordinates<Real, sfcKeyType<KeyType>>{numParticlesPerRank, box,         rank,
-                                                               mixDBits.bx,         mixDBits.by, mixDBits.bz}
-                : RandomCoordinates<Real, sfcKeyType<KeyType>>{numParticlesPerRank, box, rank};
+    RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, rank};
 
     std::vector<Real> x(coordinates.x().begin(), coordinates.x().end());
     std::vector<Real> y(coordinates.y().begin(), coordinates.y().end());
@@ -406,10 +397,7 @@ void testReapplySync(const Box<double>& box)
 
     // modify coordinates
     {
-        RandomCoordinates<Real, sfcKeyType<KeyType>> scord =
-            useMixD ? RandomCoordinates<Real, sfcKeyType<KeyType>>(domain.nParticles(), box, numRanks + rank,
-                                                                   mixDBits.bx, mixDBits.by, mixDBits.bz)
-                    : RandomCoordinates<Real, sfcKeyType<KeyType>>(domain.nParticles(), box, numRanks + rank);
+        RandomCoordinates<Real, sfcKeyType<KeyType>> scord{domain.nParticles(), box, numRanks + rank};
         std::copy(scord.x().begin(), scord.x().end(), x.begin() + domain.startIndex());
         std::copy(scord.y().begin(), scord.y().end(), y.begin() + domain.startIndex());
         std::copy(scord.z().begin(), scord.z().end(), z.begin() + domain.startIndex());

@@ -132,14 +132,7 @@ static void findPeers(Box<double> box)
     int numRanks      = 50;
     float invThetaEff = invThetaMinToVec(0.5f);
 
-    const auto mixDBits = getBoxMixDimensionBits<double, KeyType, Box<double>>(box);
-    const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{});
-
-    auto particleKeys   = useMixD ? RandomCoordinates<double, SfcMixDKind<KeyType>>(nParticles, box, 42, mixDBits.bx,
-                                                                                    mixDBits.by, mixDBits.bz)
-                                      .particleKeys()
-                                  : makeRandomGaussianKeys<KeyType>(nParticles);
+    auto particleKeys   = RandomCoordinates<double, SfcMixDKind<KeyType>>(nParticles, box).particleKeys();
     auto [tree, counts] = computeOctree<KeyType>(particleKeys, bucketSize);
 
     Octree<KeyType> octree;

@@ -62,10 +62,7 @@ void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                           mixDBits.bz != maxTreeLevel<KeyType>{});
 
-    RandomCoordinates<T, sfcKeyType<KeyType>> coords =
-        useMixD ? RandomCoordinates<T, sfcKeyType<KeyType>>{numParticles, box,         thisRank,
-                                                            mixDBits.bx,  mixDBits.by, mixDBits.bz}
-                : RandomCoordinates<T, sfcKeyType<KeyType>>{numParticles, box, thisRank};
+    RandomCoordinates<T, sfcKeyType<KeyType>> coords{numParticles, box, thisRank};
 
     std::vector<KeyType> tree = makeRootNodeTree<KeyType>();
     std::vector<unsigned> counts{numRanks * unsigned(numParticles)};
