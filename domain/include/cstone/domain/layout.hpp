@@ -209,7 +209,8 @@ int checkLayout(int myRank,
                 if (!peerFound)
                 {
                     std::cout << "Assignment rank " << myRank << " " << std::oct << ftree[firstNode] << " - "
-                              << ftree[lastNode] << std::dec << " Failed node " << i << " " << std::oct << ftree[i] << " - " << ftree[i + 1] << std::dec
+                              << ftree[lastNode] << std::dec << std::endl;
+                    std::cout << "Failed node " << i << " " << std::oct << ftree[i] << " - " << ftree[i + 1] << std::dec
                               << std::endl;
                     ret = 1;
                 }
