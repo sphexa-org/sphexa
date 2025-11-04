@@ -50,8 +50,9 @@ std::vector<int> findPeersMac(int myRank,
                               const Box<T>& box,
                               float invThetaEff)
 {
-    const KeyType domainStart = assignment[myRank];
-    const KeyType domainEnd   = assignment[myRank + 1];
+    KeyType domainStart = assignment[myRank];
+    KeyType domainEnd   = assignment[myRank + 1];
+
     const auto mixDBits       = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD        = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                          mixDBits.bz != maxTreeLevel<KeyType>{};
@@ -98,7 +99,7 @@ std::vector<int> findPeersMac(int myRank,
     auto m2l = [](TreeNodeIndex, TreeNodeIndex) {};
 
     std::vector<int> peerRanks(assignment.numRanks(), 0);
-    auto p2p = [&domainTree, &assignment, &peerRanks](TreeNodeIndex a, TreeNodeIndex b)
+    auto p2p = [&domainTree, &assignment, &peerRanks](TreeNodeIndex /*a*/, TreeNodeIndex b)
     {
         int peerRank = assignment.findRank(decodePlaceholderBit(domainTree.prefixes[b]));
         if (peerRanks[peerRank] == 0) { peerRanks[peerRank] = 1; }
