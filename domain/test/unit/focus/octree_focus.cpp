@@ -414,11 +414,12 @@ template<class KeyType>
 static void computeEssentialTreeMixD()
 {
     Box<double> box{0, 1, 0, 0.015625, 0, 0.00390625};
-    const auto mixDBits = getBoxMixDimensionBits<double, KeyType, Box<double>>(box);
+    const auto mixDBits   = getBoxMixDimensionBits<double, KeyType, Box<double>>(box);
     int nParticles        = 200000;
     unsigned csBucketSize = 16;
 
-    auto coords = RandomCoordinates<double, SfcMixDKind<KeyType>>(nParticles, box, 42, mixDBits.bx, mixDBits.by, mixDBits.bz);
+    auto coords =
+        RandomCoordinates<double, SfcMixDKind<KeyType>>(nParticles, box, 42, mixDBits.bx, mixDBits.by, mixDBits.bz);
     auto keys = coords.particleKeys();
 
     auto [csTree, csCounts] = computeOctree<KeyType>(keys, csBucketSize);
@@ -608,7 +609,8 @@ TEST_F(MacRefinement, partialSurfaceMixD)
     float invTheta              = sqrt(3) / 2 + 1e-6;
     TreeNodeIndex numNodesStart = octree.numLeafNodes;
 
-    KeyType oldFStart  = 0;                                     // TODO(iomaganaris): probably those need to be set properly but I don't know what surface means atm
+    KeyType oldFStart =
+        0; // TODO(iomaganaris): probably those need to be set properly but I don't know what surface means atm
     KeyType oldFEnd    = decodePlaceholderBit(KeyType(0107));
     KeyType focusStart = 0;
     KeyType focusEnd   = decodePlaceholderBit(KeyType(011));

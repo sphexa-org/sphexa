@@ -182,14 +182,15 @@ void makeHaloBoxXYZMixD()
     Box<float> box(0, 1, 0, 0.015625, 0, 0.00390625);
 
     const auto mixDBits = getBoxMixDimensionBits<float, KeyType, Box<float>>(box);
-    const auto expectedMixDBits = (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
+    const auto expectedMixDBits =
+        (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
     EXPECT_EQ(mixDBits.bx, expectedMixDBits.bx);
     EXPECT_EQ(mixDBits.by, expectedMixDBits.by);
     EXPECT_EQ(mixDBits.bz, expectedMixDBits.bz);
 
-    int rX             = KeyType(1) << (mixDBits.by - 1);
-    int rY             = KeyType(1) << (mixDBits.by - 1);
-    int rZ             = KeyType(1) << (mixDBits.bz);
+    int rX = KeyType(1) << (mixDBits.by - 1);
+    int rY = KeyType(1) << (mixDBits.by - 1);
+    int rZ = KeyType(1) << (mixDBits.bz);
 
     constexpr int maxCoord = 1 << maxTreeLevel<KeyType>{};
 
@@ -236,14 +237,15 @@ void makeHaloBoxUnderflowMixD()
     Box<float> box(0, 1, 0, 0.015625, 0, 0.00390625);
 
     const auto mixDBits = getBoxMixDimensionBits<float, KeyType, Box<float>>(box);
-    const auto expectedMixDBits = (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
+    const auto expectedMixDBits =
+        (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
     EXPECT_EQ(mixDBits.bx, expectedMixDBits.bx);
     EXPECT_EQ(mixDBits.by, expectedMixDBits.by);
     EXPECT_EQ(mixDBits.bz, expectedMixDBits.bz);
 
-    int rX             = KeyType(1) << (mixDBits.by - 1);
-    int rY             = KeyType(1) << (mixDBits.by - 1);
-    int rZ             = KeyType(1) << (mixDBits.bz);
+    int rX = KeyType(1) << (mixDBits.by - 1);
+    int rY = KeyType(1) << (mixDBits.by - 1);
+    int rZ = KeyType(1) << (mixDBits.bz);
     IBox nodeBox(0, rX, 0, rY, 0, rZ);
 
     IBox haloBox = makeHaloBox<KeyType>(nodeBox, 0.99 / maxCoord, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
@@ -287,14 +289,15 @@ void makeHaloBoxOverflowMixD()
     Box<float> box(0, 1, 0, 0.015625, 0, 0.00390625);
 
     const auto mixDBits = getBoxMixDimensionBits<float, KeyType, Box<float>>(box);
-    const auto expectedMixDBits = (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
+    const auto expectedMixDBits =
+        (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
     EXPECT_EQ(mixDBits.bx, expectedMixDBits.bx);
     EXPECT_EQ(mixDBits.by, expectedMixDBits.by);
     EXPECT_EQ(mixDBits.bz, expectedMixDBits.bz);
 
-    int rX             = KeyType(1) << (mixDBits.by - 1);
-    int rY             = KeyType(1) << (mixDBits.by - 1);
-    int rZ             = KeyType(1) << (mixDBits.bz);
+    int rX = KeyType(1) << (mixDBits.by - 1);
+    int rY = KeyType(1) << (mixDBits.by - 1);
+    int rZ = KeyType(1) << (mixDBits.bz);
     IBox nodeBox(rX, 2 * rX, rY, 2 * rY, 0, rZ);
 
     IBox haloBox = makeHaloBox<KeyType>(nodeBox, 0.99 / maxCoord, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
@@ -344,17 +347,18 @@ void makeHaloBoxMixDPbc()
     const int r = KeyType(1) << (maxTreeLevel<KeyType>{} - 1);
 
     Box<float> box(0, 1, 0, 0.015625, 0, 0.00390625, cstone::BoundaryType::periodic, cstone::BoundaryType::periodic,
-                  cstone::BoundaryType::periodic);
+                   cstone::BoundaryType::periodic);
 
     const auto mixDBits = getBoxMixDimensionBits<float, KeyType, Box<float>>(box);
-    const auto expectedMixDBits = (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
+    const auto expectedMixDBits =
+        (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
     EXPECT_EQ(mixDBits.bx, expectedMixDBits.bx);
     EXPECT_EQ(mixDBits.by, expectedMixDBits.by);
     EXPECT_EQ(mixDBits.bz, expectedMixDBits.bz);
 
-    int rX             = KeyType(1) << (mixDBits.by - 1);
-    int rY             = KeyType(1) << (mixDBits.by - 1);
-    int rZ             = KeyType(1) << (mixDBits.bz);
+    int rX = KeyType(1) << (mixDBits.by - 1);
+    int rY = KeyType(1) << (mixDBits.by - 1);
+    int rZ = KeyType(1) << (mixDBits.bz);
 
     IBox nodeBox(rX, 2 * rX, rY, 2 * rY, 0, rZ);
 
@@ -576,7 +580,8 @@ TEST(BoxOverlap, minPointDistanceMixD)
     {
         Box<T> box(0, 1.0, 0, 0.015625, 0, 0.00390625);
         const auto mixDBits = getBoxMixDimensionBits<double, KeyType, Box<double>>(box);
-        const auto expectedMixDBits = (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
+        const auto expectedMixDBits =
+            (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
         EXPECT_EQ(mixDBits.bx, expectedMixDBits.bx);
         EXPECT_EQ(mixDBits.by, expectedMixDBits.by);
         EXPECT_EQ(mixDBits.bz, expectedMixDBits.bz);
@@ -652,7 +657,8 @@ TEST(BoxOverlap, minDistanceMixD)
         EXPECT_NEAR(dist[2], 1.8, 1e-10);
     }
     {
-        Box<T> boxPbc(0, 1.0, 0, 0.015625, 0, 0.0039062, BoundaryType::periodic, BoundaryType::periodic, BoundaryType::periodic);
+        Box<T> boxPbc(0, 1.0, 0, 0.015625, 0, 0.0039062, BoundaryType::periodic, BoundaryType::periodic,
+                      BoundaryType::periodic);
 
         Vec3<T> aCenter{0.1, 0.1, 0.1};
         Vec3<T> bCenter{1.9, 2.9, 3.9};

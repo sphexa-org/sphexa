@@ -234,7 +234,7 @@ inline TreeNodeIndex maxDepth(const TreeNodeIndex* levelOffsets, TreeNodeIndex l
 template<class KeyType>
 struct OctreeView
 {
-    using NodeType = std::conditional_t<std::is_const_v<KeyType>, const TreeNodeIndex, TreeNodeIndex>;
+    using NodeType  = std::conditional_t<std::is_const_v<KeyType>, const TreeNodeIndex, TreeNodeIndex>;
     using EmptyType = std::conditional_t<std::is_const_v<KeyType>, const uint8_t, uint8_t>;
     TreeNodeIndex numLeafNodes;
     TreeNodeIndex numInternalNodes;
@@ -481,17 +481,11 @@ public:
 
     inline std::vector<uint8_t>& empty() { return empty_; }
     inline const std::vector<uint8_t>& empty() const { return empty_; }
-    
-    inline uint8_t isEmpty(TreeNodeIndex node) const
-    {
-        return empty_[node];
-    }
 
-    inline void setEmpty(TreeNodeIndex node)
-    {
-        empty_[node] = static_cast<uint8_t>(true);
-    }
-  
+    inline uint8_t isEmpty(TreeNodeIndex node) const { return empty_[node]; }
+
+    inline void setEmpty(TreeNodeIndex node) { empty_[node] = static_cast<uint8_t>(true); }
+
     /*! @brief return child node index
      *
      * @param[in] node    node index, range [0:numInternalNodes()]

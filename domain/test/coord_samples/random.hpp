@@ -43,7 +43,12 @@ std::vector<Integer> makeRandomUniformKeys(size_t numKeys, int seed = 42)
 }
 
 template<class Integer>
-std::vector<Integer> makeRandomGaussianKeys(size_t numKeys, int seed = 42, bool useMixD = false, unsigned bx = maxTreeLevel<Integer>{}, unsigned by = maxTreeLevel<Integer>{}, unsigned bz = maxTreeLevel<Integer>{})
+std::vector<Integer> makeRandomGaussianKeys(size_t numKeys,
+                                            int seed     = 42,
+                                            bool useMixD = false,
+                                            unsigned bx  = maxTreeLevel<Integer>{},
+                                            unsigned by  = maxTreeLevel<Integer>{},
+                                            unsigned bz  = maxTreeLevel<Integer>{})
 {
     Integer maxCoord = nodeRange<Integer>(0) - 1;
     std::mt19937 gen(seed);
@@ -145,7 +150,12 @@ public:
     using KeyType = KeyType_;
     using Integer = typename KeyType::ValueType;
 
-    RandomGaussianCoordinates(unsigned n, Box<T> box, int seed = 42, unsigned bx = maxTreeLevel<Integer>{}, unsigned by = maxTreeLevel<Integer>{}, unsigned bz = maxTreeLevel<Integer>{})
+    RandomGaussianCoordinates(unsigned n,
+                              Box<T> box,
+                              int seed    = 42,
+                              unsigned bx = maxTreeLevel<Integer>{},
+                              unsigned by = maxTreeLevel<Integer>{},
+                              unsigned bz = maxTreeLevel<Integer>{})
         : box_(std::move(box))
         , x_(n)
         , y_(n)

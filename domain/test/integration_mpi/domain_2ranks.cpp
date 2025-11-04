@@ -301,18 +301,20 @@ void multiStepSync(int rank, int numRanks, Box<T> box = Box<T>{0, 1})
     Domain<KeyType, T> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, box);
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
-                     mixDBits.by != maxTreeLevel<KeyType>{} ||
-                     mixDBits.bz != maxTreeLevel<KeyType>{});
+    const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                          mixDBits.bz != maxTreeLevel<KeyType>{});
 
     std::vector<T> xGlobal, yGlobal, zGlobal, hGlobal;
     if (useMixD)
     {
         // MixD-like coordinates
         xGlobal = {0.0, 0.11, 0.261, 0.281, 0.301, 0.321, 0.521, 0.541, 0.561, 0.761, 0.781, 1.000};
-        yGlobal = {0.0, 0.001875, 0.00409375, 0.00440625, 0.00471875, 0.00503125, 0.00815625, 0.00846875, 0.00878125, 0.01190625, 0.012203125, 0.015625};
-        zGlobal = {0.0, 0.0005078125, 0.00102734375, 0.00110546875, 0.00118359375, 0.00126171875, 0.00204296875, 0.00212109375, 0.00219921875, 0.00298046875, 0.00305078125, 0.00390625};
-        hGlobal = {0.0015625, 0.001578125, 0.00159375, 0.001609375, 0.001625, 0.001640625, 0.0024375, 0.001671875, 0.0016875, 0.001703125, 0.00171875, 0.001734375};
+        yGlobal = {0.0,        0.001875,   0.00409375, 0.00440625, 0.00471875,  0.00503125,
+                   0.00815625, 0.00846875, 0.00878125, 0.01190625, 0.012203125, 0.015625};
+        zGlobal = {0.0,           0.0005078125,  0.00102734375, 0.00110546875, 0.00118359375, 0.00126171875,
+                   0.00204296875, 0.00212109375, 0.00219921875, 0.00298046875, 0.00305078125, 0.00390625};
+        hGlobal = {0.0015625, 0.001578125, 0.00159375, 0.001609375, 0.001625,   0.001640625,
+                   0.0024375, 0.001671875, 0.0016875,  0.001703125, 0.00171875, 0.001734375};
     }
     else
     {
@@ -361,10 +363,7 @@ void multiStepSync(int rank, int numRanks, Box<T> box = Box<T>{0, 1})
         computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(keysChk.data()), x.size(), domain.box(),
                            mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
-    else
-    {
-        computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysChk.data()), x.size(), domain.box());
-    }
+    else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysChk.data()), x.size(), domain.box()); }
     EXPECT_EQ(keys, keysChk);
     EXPECT_TRUE(std::is_sorted(keys.begin(), keys.end()));
 
@@ -384,15 +383,15 @@ void multiStepSync(int rank, int numRanks, Box<T> box = Box<T>{0, 1})
     std::vector<KeyType> keyGlobRef(xGlobal.size());
     if (useMixD)
     {
-        computeSfcMixDKeys(xGlobal.data(), yGlobal.data(), zGlobal.data(), SfcMixDKindPointer(keyGlobRef.data()), xGlobal.size(),
-                           domain.box(), mixDBits.bx, mixDBits.by, mixDBits.bz);
-        keyGlobRef[1] = sfcMixD<SfcMixDKind<KeyType>>(newPart[0], newPart[1], newPart[2], domain.box(), mixDBits.bx, mixDBits.by,
-                                                      mixDBits.bz);
+        computeSfcMixDKeys(xGlobal.data(), yGlobal.data(), zGlobal.data(), SfcMixDKindPointer(keyGlobRef.data()),
+                           xGlobal.size(), domain.box(), mixDBits.bx, mixDBits.by, mixDBits.bz);
+        keyGlobRef[1] = sfcMixD<SfcMixDKind<KeyType>>(newPart[0], newPart[1], newPart[2], domain.box(), mixDBits.bx,
+                                                      mixDBits.by, mixDBits.bz);
     }
     else
     {
-        computeSfcKeys(xGlobal.data(), yGlobal.data(), zGlobal.data(), sfcKindPointer(keyGlobRef.data()), xGlobal.size(),
-                       domain.box());
+        computeSfcKeys(xGlobal.data(), yGlobal.data(), zGlobal.data(), sfcKindPointer(keyGlobRef.data()),
+                       xGlobal.size(), domain.box());
         keyGlobRef[1] = sfc3D<SfcKind<KeyType>>(newPart[0], newPart[1], newPart[2], domain.box());
     }
     sort(begin(keyGlobRef), end(keyGlobRef));

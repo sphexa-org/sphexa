@@ -47,8 +47,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
     float invThetaEff             = invThetaMinMac(theta);
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
-                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+    const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                           mixDBits.bz != maxTreeLevel<KeyType>{});
 
     // ******************************
@@ -56,10 +55,13 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
 
     // common pool of coordinates, identical on all ranks
     RandomCoordinates<T, sfcKeyType<KeyType>> coords =
-        useMixD
-            ? RandomCoordinates<T, sfcKeyType<KeyType>>{numRanks * numParticles, box, 42, mixDBits.bx, mixDBits.by,
-                                                              mixDBits.bz}
-            : RandomCoordinates<T, sfcKeyType<KeyType>>{numRanks * numParticles, box};
+        useMixD ? RandomCoordinates<T, sfcKeyType<KeyType>>{numRanks * numParticles,
+                                                            box,
+                                                            42,
+                                                            mixDBits.bx,
+                                                            mixDBits.by,
+                                                            mixDBits.bz}
+                : RandomCoordinates<T, sfcKeyType<KeyType>>{numRanks * numParticles, box};
 
     auto [tree, counts] = computeOctree<KeyType>(coords.particleKeys(), bucketSize);
 
@@ -95,10 +97,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
         computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(particleKeys.data()), x.size(), box,
                            mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
-    else
-    {
-        computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box);
-    }
+    else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box); }
 
     FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal);
     focusTree.converge(box, particleKeys, peers, assignment, tree, counts, invThetaEff);
@@ -129,7 +128,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
     { upsweep(levelRange, childOffsets, M, NodeCount<unsigned>{}); };
     focusTree.globalExchange(domainTree, std::span(testCounts), std::span<unsigned>{}, scratch, upsweepFunction);
 
-   upsweep(octree.levelRangeSpan(), octree.childOffsets, testCounts.data(), NodeCount<unsigned>{});
+    upsweep(octree.levelRangeSpan(), octree.childOffsets, testCounts.data(), NodeCount<unsigned>{});
 
     {
         for (size_t i = 0; i < testCounts.size(); ++i)
@@ -173,8 +172,7 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>
     float invThetaEff             = invThetaMinMac(theta);
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType>(box);
-    const bool useMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
-                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+    const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                           mixDBits.bz != maxTreeLevel<KeyType>{});
 
     /*******************************/
@@ -182,9 +180,13 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>
 
     // common pool of coordinates, identical on all ranks
     RandomGaussianCoordinates<T, sfcKeyType<KeyType>> coords =
-        useMixD
-            ? RandomGaussianCoordinates<T, sfcKeyType<KeyType>>{numRanks * numParticles, box, 42, mixDBits.bx, mixDBits.by, mixDBits.bz}
-            : RandomGaussianCoordinates<T, sfcKeyType<KeyType>>{numRanks * numParticles, box};
+        useMixD ? RandomGaussianCoordinates<T, sfcKeyType<KeyType>>{numRanks * numParticles,
+                                                                    box,
+                                                                    42,
+                                                                    mixDBits.bx,
+                                                                    mixDBits.by,
+                                                                    mixDBits.bz}
+                : RandomGaussianCoordinates<T, sfcKeyType<KeyType>>{numRanks * numParticles, box};
 
     std::vector<T> globalMasses(numRanks * numParticles, 1.0 / (numRanks * numParticles));
 
@@ -223,10 +225,7 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>
         computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(particleKeys.data()), x.size(), box,
                            mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
-    else
-    {
-        computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box);
-    }
+    else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box); }
 
     FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal);
     focusTree.converge(box, particleKeys, peers, assignment, tree, counts, invThetaEff);

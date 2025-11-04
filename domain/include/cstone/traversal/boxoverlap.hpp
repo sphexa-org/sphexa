@@ -128,8 +128,8 @@ containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box, unsigned bx, un
     const int pbcRangeX = 1 << bx;
     const int pbcRangeY = 1 << by;
     const int pbcRangeZ = 1 << bz;
-    if (stl::min(stl::min(box.xmin(), box.ymin()), box.zmin()) < 0 ||
-        box.xmax() > pbcRangeX || box.ymax() > pbcRangeY || box.zmax() > pbcRangeZ)
+    if (stl::min(stl::min(box.xmin(), box.ymin()), box.zmin()) < 0 || box.xmax() > pbcRangeX ||
+        box.ymax() > pbcRangeY || box.zmax() > pbcRangeZ)
     {
         // any box that wraps around a PBC boundary cannot be contained within
         // any octree node, except the full root node
@@ -178,8 +178,14 @@ containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Ve
 }
 
 template<class KeyType, class Tc>
-HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
-containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Vec3<Tc>& size, const Box<Tc>& box, unsigned bx, unsigned by, unsigned bz)
+HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool> containedIn(KeyType codeStart,
+                                                                                KeyType codeEnd,
+                                                                                const Vec3<Tc>& center,
+                                                                                const Vec3<Tc>& size,
+                                                                                const Box<Tc>& box,
+                                                                                unsigned bx,
+                                                                                unsigned by,
+                                                                                unsigned bz)
 {
     auto boxMin   = center - size;
     auto boxMax   = center + size;
@@ -197,9 +203,9 @@ containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Ve
 
     // increase maximum by a grid-unit to ensure we round up
     constexpr int gridDim = 1u << maxTreeLevel<KeyType>{};
-    const auto gridUnitX = box.lx() * (Tc(1) / (1u << mixDBits.bx));
-    const auto gridUnitY = box.ly() * (Tc(1) / (1u << mixDBits.by));
-    const auto gridUnitZ = box.lz() * (Tc(1) / (1u << mixDBits.bz));
+    const auto gridUnitX  = box.lx() * (Tc(1) / (1u << mixDBits.bx));
+    const auto gridUnitY  = box.ly() * (Tc(1) / (1u << mixDBits.by));
+    const auto gridUnitZ  = box.lz() * (Tc(1) / (1u << mixDBits.bz));
     boxMax += Vec3<Tc>{gridUnitX, gridUnitY, gridUnitZ};
 
     KeyType lowCode  = iSfcMixDKey<SfcMixDKind<KeyType>>(boxMin[0], boxMin[1], boxMin[2], bx, by, bz);
@@ -263,11 +269,12 @@ HOST_DEVICE_FUN IBox makeHaloBox(const IBox& nodeBox, RadiusType radius, const B
 }
 
 template<class KeyType, class CoordinateType, class RadiusType>
-HOST_DEVICE_FUN IBox makeHaloBox(const IBox& nodeBox, RadiusType radius, const Box<CoordinateType>& box, unsigned bx, unsigned by, unsigned bz)
+HOST_DEVICE_FUN IBox makeHaloBox(
+    const IBox& nodeBox, RadiusType radius, const Box<CoordinateType>& box, unsigned bx, unsigned by, unsigned bz)
 {
-    int dx = toNBitIntCeil<KeyType>(radius * box.ilx(), bx); // TODO(iomaganaris): is this reasonable?
-    int dy = toNBitIntCeil<KeyType>(radius * box.ily(), by); // TODO(iomaganaris): is this reasonable?
-    int dz = toNBitIntCeil<KeyType>(radius * box.ilz(), bz); // TODO(iomaganaris): is this reasonable?
+    int dx    = toNBitIntCeil<KeyType>(radius * box.ilx(), bx); // TODO(iomaganaris): is this reasonable?
+    int dy    = toNBitIntCeil<KeyType>(radius * box.ily(), by); // TODO(iomaganaris): is this reasonable?
+    int dz    = toNBitIntCeil<KeyType>(radius * box.ilz(), bz); // TODO(iomaganaris): is this reasonable?
     bool pbcX = (box.boundaryX() == cstone::BoundaryType::periodic);
     bool pbcY = (box.boundaryY() == cstone::BoundaryType::periodic);
     bool pbcZ = (box.boundaryZ() == cstone::BoundaryType::periodic);
@@ -284,18 +291,19 @@ HOST_DEVICE_FUN IBox makeHaloBox(KeyType codeStart, KeyType codeEnd, RadiusType 
     // disallow boxes with no volume
     assert(codeEnd > codeStart);
     const auto mixDBits = getBoxMixDimensionBits<CoordinateType, KeyType, Box<CoordinateType>>(box);
-    const auto use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} ||
-                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+    const auto use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                           mixDBits.bz != maxTreeLevel<KeyType>{};
-    IBox nodeBox = use_mixD ? sfcIBox(sfcMixDKey(codeStart), sfcMixDKey(codeEnd), mixDBits.bx, mixDBits.by, mixDBits.bz): sfcIBox(sfcKey(codeStart), sfcKey(codeEnd));
-    if (use_mixD && (nodeBox.xmin() == nodeBox.xmax() ||
-        nodeBox.ymin() == nodeBox.ymax() ||
-        nodeBox.zmin() == nodeBox.zmax()))
+    IBox nodeBox = use_mixD ? sfcIBox(sfcMixDKey(codeStart), sfcMixDKey(codeEnd), mixDBits.bx, mixDBits.by, mixDBits.bz)
+                            : sfcIBox(sfcKey(codeStart), sfcKey(codeEnd));
+    if (use_mixD &&
+        (nodeBox.xmin() == nodeBox.xmax() || nodeBox.ymin() == nodeBox.ymax() || nodeBox.zmin() == nodeBox.zmax()))
     {
         // zero volume boxes cannot have a halo box
         return nodeBox;
     }
-    const auto final_halo_box = use_mixD ? makeHaloBox<KeyType>(nodeBox, radius, box, mixDBits.bx, mixDBits.by, mixDBits.bz) : makeHaloBox<KeyType>(nodeBox, radius, box);
+    const auto final_halo_box = use_mixD
+                                    ? makeHaloBox<KeyType>(nodeBox, radius, box, mixDBits.bx, mixDBits.by, mixDBits.bz)
+                                    : makeHaloBox<KeyType>(nodeBox, radius, box);
     return final_halo_box;
 }
 
@@ -380,8 +388,7 @@ template<class KeyType, class T>
 HOST_DEVICE_FUN T minDistanceSq(IBox a, IBox b, const Box<T>& box)
 {
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    if (mixDBits.bx != maxTreeLevel<KeyType>{} ||
-        mixDBits.by != maxTreeLevel<KeyType>{} ||
+    if (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
         mixDBits.bz != maxTreeLevel<KeyType>{})
     {
         return minDistanceSq<KeyType>(a, b, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
@@ -398,8 +405,8 @@ HOST_DEVICE_FUN T minDistanceSq(IBox a, IBox b, const Box<T>& box, unsigned bx, 
 
     auto [aCenter, aSize] = centerAndSize<KeyType>(a, box, bx, by, bz);
     auto [bCenter, bSize] = centerAndSize<KeyType>(b, box, bx, by, bz);
-    if ((aSize[0] == 0 && aSize[1] == 0 && aSize[2] == 0) ||
-        (bSize[0] == 0 && bSize[1] == 0 && bSize[2] == 0)) {
+    if ((aSize[0] == 0 && aSize[1] == 0 && aSize[2] == 0) || (bSize[0] == 0 && bSize[1] == 0 && bSize[2] == 0))
+    {
         // if one of the boxes has no size, the distance is infinite
         // this is the case for nodes that shouldn't have any particles in them
         return std::numeric_limits<T>::max();

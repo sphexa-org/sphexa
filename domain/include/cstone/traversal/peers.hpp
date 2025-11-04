@@ -53,8 +53,8 @@ std::vector<int> findPeersMac(int myRank,
     KeyType domainStart = assignment[myRank];
     KeyType domainEnd   = assignment[myRank + 1];
 
-    const auto mixDBits       = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD        = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                          mixDBits.bz != maxTreeLevel<KeyType>{};
 
     constexpr float roundOff  = 1 + 1e-6; // ensure that peers are picked up in case of a numerical tie

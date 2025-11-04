@@ -101,15 +101,13 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
 
     auto overlapsPbc = [particle, cellRadiusSq, centers = tree.centers, sizes = tree.sizes, &box](TreeNodeIndex idx)
     {
-        if (sizes[idx][0] == 0 && sizes[idx][1] == 0 && sizes[idx][2] == 0)
-            return false;
+        if (sizes[idx][0] == 0 && sizes[idx][1] == 0 && sizes[idx][2] == 0) return false;
         return norm2(minDistance(particle, centers[idx], sizes[idx], box)) < cellRadiusSq;
     };
 
     auto overlaps = [particle, cellRadiusSq, centers = tree.centers, sizes = tree.sizes](TreeNodeIndex idx)
     {
-        if (sizes[idx][0] == 0 && sizes[idx][1] == 0 && sizes[idx][2] == 0)
-            return false;
+        if (sizes[idx][0] == 0 && sizes[idx][1] == 0 && sizes[idx][2] == 0) return false;
         return norm2(minDistance(particle, centers[idx], sizes[idx])) < cellRadiusSq;
     };
 

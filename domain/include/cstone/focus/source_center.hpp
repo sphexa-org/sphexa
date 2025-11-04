@@ -169,10 +169,7 @@ void nodeFpCenters(
             centers[i] = {0, 0, 0};
             sizes[i]   = {0, 0, 0};
         }
-        else
-        {
-            util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box, disableMixD);
-        }
+        else { util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box, disableMixD); }
     }
 }
 

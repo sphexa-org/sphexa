@@ -77,16 +77,17 @@ void sortBySfcKey(std::vector<T>& x, std::vector<T>& y, std::vector<T>& z, cston
     size_t blockSize = x.size();
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, cstone::Box<T>>(globalBox);
-    const bool useMixD = (mixDBits.bx != cstone::maxTreeLevel<KeyType>{} ||
-                         mixDBits.by != cstone::maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != cstone::maxTreeLevel<KeyType>{});
+    const bool useMixD =
+        (mixDBits.bx != cstone::maxTreeLevel<KeyType>{} || mixDBits.by != cstone::maxTreeLevel<KeyType>{} ||
+         mixDBits.bz != cstone::maxTreeLevel<KeyType>{});
 
     std::vector<KeyType> keys(blockSize);
-    if (useMixD) {
-        computeSfcMixDKeys(x.data(), y.data(), z.data(), cstone::SfcMixDKindPointer(keys.data()), blockSize, globalBox, mixDBits.bx, mixDBits.by, mixDBits.bz);
-    } else {
-        computeSfcKeys(x.data(), y.data(), z.data(), cstone::sfcKindPointer(keys.data()), blockSize, globalBox);
+    if (useMixD)
+    {
+        computeSfcMixDKeys(x.data(), y.data(), z.data(), cstone::SfcMixDKindPointer(keys.data()), blockSize, globalBox,
+                           mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
+    else { computeSfcKeys(x.data(), y.data(), z.data(), cstone::sfcKindPointer(keys.data()), blockSize, globalBox); }
 
     std::vector<cstone::LocalIndex> sfcOrder(blockSize);
     std::iota(begin(sfcOrder), end(sfcOrder), cstone::LocalIndex(0));

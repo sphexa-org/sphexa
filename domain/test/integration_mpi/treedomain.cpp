@@ -59,14 +59,13 @@ void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
     unsigned bucketSize     = 64;
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} ||
-                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+    const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                           mixDBits.bz != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<T, sfcKeyType<KeyType>> coords =
-        useMixD
-            ? RandomCoordinates<T, sfcKeyType<KeyType>>{numParticles, box, thisRank, mixDBits.bx, mixDBits.by, mixDBits.bz}
-            : RandomCoordinates<T, sfcKeyType<KeyType>>{numParticles, box, thisRank};
+        useMixD ? RandomCoordinates<T, sfcKeyType<KeyType>>{numParticles, box,         thisRank,
+                                                            mixDBits.bx,  mixDBits.by, mixDBits.bz}
+                : RandomCoordinates<T, sfcKeyType<KeyType>>{numParticles, box, thisRank};
 
     std::vector<KeyType> tree = makeRootNodeTree<KeyType>();
     std::vector<unsigned> counts{numRanks * unsigned(numParticles)};
@@ -105,13 +104,10 @@ void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
     std::vector<KeyType> newCodes(x.size());
     if (useMixD)
     {
-        computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(newCodes.data()), x.size(), box, mixDBits.bx,
-                           mixDBits.by, mixDBits.bz);
+        computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(newCodes.data()), x.size(), box,
+                           mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
-    else
-    {
-        computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(newCodes.data()), x.size(), box);
-    }
+    else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(newCodes.data()), x.size(), box); }
 
     // received particles are not stored in SFC order after the exchange
     std::sort(begin(newCodes), end(newCodes));

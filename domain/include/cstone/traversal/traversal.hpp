@@ -91,18 +91,20 @@ HOST_DEVICE_FUN void singleTraversal(const TreeNodeIndex* childOffsets,
  *                         that did not pass @p continuation
  */
 template<class MAC, class M2L, class P2P>
-void dualTraversal(
-    const TreeNodeIndex* childOffsets, const uint8_t* empty, TreeNodeIndex a, TreeNodeIndex b, MAC&& continuation, M2L&& m2l, P2P&& p2p)
+void dualTraversal(const TreeNodeIndex* childOffsets,
+                   const uint8_t* empty,
+                   TreeNodeIndex a,
+                   TreeNodeIndex b,
+                   MAC&& continuation,
+                   M2L&& m2l,
+                   P2P&& p2p)
 {
     using NodePair = util::array<TreeNodeIndex, 2>;
 
-    auto isLeaf = [childOffsets](TreeNodeIndex idx) { return childOffsets[idx] == 0; };
+    auto isLeaf  = [childOffsets](TreeNodeIndex idx) { return childOffsets[idx] == 0; };
     auto isEmpty = [empty](TreeNodeIndex idx) { return empty[idx]; };
 
-    if (isEmpty(a) || isEmpty(b))
-    {
-        return;
-    }
+    if (isEmpty(a) || isEmpty(b)) { return; }
 
     if (isLeaf(a) && isLeaf(b))
     {

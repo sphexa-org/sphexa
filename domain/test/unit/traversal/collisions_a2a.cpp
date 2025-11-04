@@ -89,15 +89,16 @@ public:
     template<class KeyType, class T>
     void check()
     {
-        int numParticles          = 1000;
-        auto bType = static_cast<BoundaryType>(std::get<3>(GetParam()));
+        int numParticles = 1000;
+        auto bType       = static_cast<BoundaryType>(std::get<3>(GetParam()));
         Box<T> box(0, std::get<0>(GetParam()), 0, std::get<1>(GetParam()), 0, std::get<2>(GetParam()), bType);
 
         const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-        bool useMixD    = (mixDBits.bx < maxTreeLevel<KeyType>{} || mixDBits.by < maxTreeLevel<KeyType>{} ||
-                            mixDBits.bz < maxTreeLevel<KeyType>{});
-        std::vector<KeyType> keys = makeRandomGaussianKeys<KeyType>(numParticles, 42, useMixD, mixDBits.bx, mixDBits.by, mixDBits.bz);
-        auto [tree, counts]       = computeOctree<KeyType>(keys, 4);
+        bool useMixD        = (mixDBits.bx < maxTreeLevel<KeyType>{} || mixDBits.by < maxTreeLevel<KeyType>{} ||
+                        mixDBits.bz < maxTreeLevel<KeyType>{});
+        std::vector<KeyType> keys =
+            makeRandomGaussianKeys<KeyType>(numParticles, 42, useMixD, mixDBits.bx, mixDBits.by, mixDBits.bz);
+        auto [tree, counts] = computeOctree<KeyType>(keys, 4);
 
         OctreeData<KeyType, CpuTag> octree;
         octree.resize(nNodes(tree));

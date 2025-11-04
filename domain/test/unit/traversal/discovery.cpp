@@ -52,7 +52,7 @@ std::vector<uint8_t> findHalosAll2All(std::span<const KeyType> nodeKeys,
 template<class KeyType>
 void findHalosFlags(bool use_mixD = false)
 {
-    using T = double;
+    using T  = double;
     auto box = use_mixD ? Box<double>(0, 1, 0, 0.015625, 0, 0.00390625) : Box<double>(0, 1);
 
     std::vector<KeyType> tree = makeUniformNLevelTree<KeyType>(use_mixD ? 512 : 64, 1);

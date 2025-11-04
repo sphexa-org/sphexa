@@ -108,14 +108,15 @@ static std::vector<uint8_t> markVecMacAll2All(const KeyType* leaves,
     std::vector<uint8_t> markings(prefixes.size(), 0);
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} ||
-                          mixDBits.by != maxTreeLevel<KeyType>{} ||
+    const bool use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                           mixDBits.bz != maxTreeLevel<KeyType>{};
 
     // loop over target cells
     for (TreeNodeIndex i = firstLeaf; i < lastLeaf; ++i)
     {
-        IBox targetBox                  = use_mixD ? sfcIBox(sfcMixDKey(leaves[i]), sfcMixDKey(leaves[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz) : sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]));
+        IBox targetBox =
+            use_mixD ? sfcIBox(sfcMixDKey(leaves[i]), sfcMixDKey(leaves[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz)
+                     : sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]));
         auto [targetCenter, targetSize] = centerAndSize<KeyType>(targetBox, box);
 
         // loop over source cells
@@ -164,8 +165,8 @@ static void markMacVector(Box<double> box)
 
     std::vector<uint8_t> markings(octree.numNodes, 0);
 
-    TreeNodeIndex focusIdxStart = 0; // TODO(iomaganaris): Does this make sense?
-    TreeNodeIndex focusIdxEnd   = octree.numLeafNodes-1; // TODO(iomaganaris): Does this make sense?
+    TreeNodeIndex focusIdxStart = 0;                       // TODO(iomaganaris): Does this make sense?
+    TreeNodeIndex focusIdxEnd   = octree.numLeafNodes - 1; // TODO(iomaganaris): Does this make sense?
 
     markMacs(octree.prefixes.data(), octree.childOffsets.data(), octree.parents.data(), centers.data(), box,
              leaves.data() + focusIdxStart, focusIdxEnd - focusIdxStart, false, markings.data());
@@ -184,7 +185,8 @@ TEST(Macs, markMacVector)
     markMacVector<uint64_t>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
 }
 
-void limitSource4x4(Box<double> box, std::vector<uint8_t> macRef, unsigned numMacsRef) {
+void limitSource4x4(Box<double> box, std::vector<uint8_t> macRef, unsigned numMacsRef)
+{
     using KeyType = uint64_t;
     using T       = double;
 
@@ -214,7 +216,8 @@ void limitSource4x4(Box<double> box, std::vector<uint8_t> macRef, unsigned numMa
 TEST(Macs, limitSource4x4)
 {
     limitSource4x4(Box<double>{0, 1}, std::vector<uint8_t>{1, 0, 0, 0, 0, 1, 1, 1, 1}, 5 + 16);
-    limitSource4x4(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625}, std::vector<uint8_t>{1, 0}, 1); // TODO(iomaganaris): Need to fix this case
+    limitSource4x4(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625}, std::vector<uint8_t>{1, 0},
+                   1); // TODO(iomaganaris): Need to fix this case
 }
 
 } // namespace cstone

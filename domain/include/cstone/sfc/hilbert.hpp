@@ -131,7 +131,7 @@ iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, un
     std::sort(permutation.begin(), permutation.end(), [&bits](int i, int j) { return bits[i] > bits[j]; });
     std::array<KeyType, 3> coordinates{px, py, pz};
     std::array<KeyType, 3> sorted_coordinates{coordinates[permutation[0]], coordinates[permutation[1]],
-                                               coordinates[permutation[2]]};
+                                              coordinates[permutation[2]]};
     std::sort(bits.begin(), bits.end(), std::greater<unsigned>{});
 
     if (bits[0] > bits[1]) // 1 dim has more bits than the other 2 dims, add 1D levels
@@ -321,7 +321,8 @@ decodeHilbertMixD(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
         for (int i{0}; i < n; ++i)
         {
             const auto processes_coordinate_bit_index = bits[0] - 1 - i;
-            coordinates[0] |= ((key >> (3 * processes_coordinate_bit_index)) & static_cast<KeyType>(1)) << processes_coordinate_bit_index;
+            coordinates[0] |= ((key >> (3 * processes_coordinate_bit_index)) & static_cast<KeyType>(1))
+                              << processes_coordinate_bit_index;
         }
         key &= (static_cast<KeyType>(1) << (3 * bits[1])) - 1;
     }
@@ -438,23 +439,16 @@ HOST_DEVICE_FUN bool isValidHilbertMixDKey(KeyType key, unsigned bx, unsigned by
     std::sort(bits.begin(), bits.end());
     for (unsigned i{1}; i <= maxTreeLevel<KeyType>(); ++i)
     {
-        const auto shifted_key = key >> (3 * (i - 1));
+        const auto shifted_key                   = key >> (3 * (i - 1));
         const auto last_key_digit_of_shifted_key = shifted_key & 7u;
-        if (i <= bits[0])
-        {
-            continue;
-        }
+        if (i <= bits[0]) { continue; }
         else if (i <= bits[1])
         {
-            if (last_key_digit_of_shifted_key > 3u) {
-                return false;
-            }
+            if (last_key_digit_of_shifted_key > 3u) { return false; }
         }
         else if (i <= bits[2])
         {
-            if (last_key_digit_of_shifted_key > 1u) {
-                return false;
-            }
+            if (last_key_digit_of_shifted_key > 1u) { return false; }
         }
     }
     return true;
