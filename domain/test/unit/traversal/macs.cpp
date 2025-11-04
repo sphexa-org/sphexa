@@ -108,15 +108,15 @@ static std::vector<uint8_t> markVecMacAll2All(const KeyType* leaves,
     std::vector<uint8_t> markings(prefixes.size(), 0);
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{};
+    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                         mixDBits.bz != maxTreeLevel<KeyType>{};
 
     // loop over target cells
     for (TreeNodeIndex i = firstLeaf; i < lastLeaf; ++i)
     {
         IBox targetBox =
-            use_mixD ? sfcIBox(sfcMixDKey(leaves[i]), sfcMixDKey(leaves[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz)
-                     : sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]));
+            useMixD ? sfcIBox(sfcMixDKey(leaves[i]), sfcMixDKey(leaves[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz)
+                    : sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]));
         auto [targetCenter, targetSize] = centerAndSize<KeyType>(targetBox, box);
 
         // loop over source cells

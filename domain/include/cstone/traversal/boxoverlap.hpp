@@ -202,9 +202,9 @@ HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool> containedIn(
     const auto mixDBits = getBoxMixDimensionBits<Tc, KeyType, Box<Tc>>(box);
 
     // increase maximum by a grid-unit to ensure we round up
-    const auto gridUnitX  = box.lx() * (Tc(1) / (1u << mixDBits.bx));
-    const auto gridUnitY  = box.ly() * (Tc(1) / (1u << mixDBits.by));
-    const auto gridUnitZ  = box.lz() * (Tc(1) / (1u << mixDBits.bz));
+    const auto gridUnitX = box.lx() * (Tc(1) / (1u << mixDBits.bx));
+    const auto gridUnitY = box.ly() * (Tc(1) / (1u << mixDBits.by));
+    const auto gridUnitZ = box.lz() * (Tc(1) / (1u << mixDBits.bz));
     boxMax += Vec3<Tc>{gridUnitX, gridUnitY, gridUnitZ};
 
     KeyType lowCode  = iSfcMixDKey<SfcMixDKind<KeyType>>(boxMin[0], boxMin[1], boxMin[2], bx, by, bz);
@@ -290,20 +290,20 @@ HOST_DEVICE_FUN IBox makeHaloBox(KeyType codeStart, KeyType codeEnd, RadiusType 
     // disallow boxes with no volume
     assert(codeEnd > codeStart);
     const auto mixDBits = getBoxMixDimensionBits<CoordinateType, KeyType, Box<CoordinateType>>(box);
-    const auto use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{};
-    IBox nodeBox = use_mixD ? sfcIBox(sfcMixDKey(codeStart), sfcMixDKey(codeEnd), mixDBits.bx, mixDBits.by, mixDBits.bz)
-                            : sfcIBox(sfcKey(codeStart), sfcKey(codeEnd));
-    if (use_mixD &&
+    const auto useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                         mixDBits.bz != maxTreeLevel<KeyType>{};
+    IBox nodeBox = useMixD ? sfcIBox(sfcMixDKey(codeStart), sfcMixDKey(codeEnd), mixDBits.bx, mixDBits.by, mixDBits.bz)
+                           : sfcIBox(sfcKey(codeStart), sfcKey(codeEnd));
+    if (useMixD &&
         (nodeBox.xmin() == nodeBox.xmax() || nodeBox.ymin() == nodeBox.ymax() || nodeBox.zmin() == nodeBox.zmax()))
     {
         // zero volume boxes cannot have a halo box
         return nodeBox;
     }
-    const auto final_halo_box = use_mixD
-                                    ? makeHaloBox<KeyType>(nodeBox, radius, box, mixDBits.bx, mixDBits.by, mixDBits.bz)
-                                    : makeHaloBox<KeyType>(nodeBox, radius, box);
-    return final_halo_box;
+    const auto finalHaloBox = useMixD
+                                  ? makeHaloBox<KeyType>(nodeBox, radius, box, mixDBits.bx, mixDBits.by, mixDBits.bz)
+                                  : makeHaloBox<KeyType>(nodeBox, radius, box);
+    return finalHaloBox;
 }
 
 //! @brief returns true if the cuboid defined by center and size is contained within the bounding box

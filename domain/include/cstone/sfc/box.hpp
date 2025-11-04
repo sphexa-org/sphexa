@@ -448,24 +448,25 @@ template<typename T, typename KeyType, typename BoxType>
 AxisMixDBits getBoxMixDimensionBits(const BoxType& box)
 {
     const std::array<T, 3> boxDimensions{box.xmax() - box.xmin(), box.ymax() - box.ymin(), box.zmax() - box.zmin()};
-    const auto max_dim_index = std::max_element(boxDimensions.begin(), boxDimensions.end()) - boxDimensions.begin();
-    const auto max_dim_value = boxDimensions[max_dim_index];
-    AxisMixDBits bit_limits;
+    const auto maxDimIndex = std::max_element(boxDimensions.begin(), boxDimensions.end()) - boxDimensions.begin();
+    const auto maxDimValue = boxDimensions[maxDimIndex];
+    AxisMixDBits bitLimits;
+    // return {maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}};
 
     for (int i = 0; i < 3; ++i)
     {
         const auto bits =
-            boxDimensions[i] == max_dim_value
+            boxDimensions[i] == maxDimValue
                 ? maxTreeLevel<KeyType>{}
-                : maxTreeLevel<KeyType>{} - static_cast<int>(std::ceil(std::log2(max_dim_value / boxDimensions[i])));
+                : maxTreeLevel<KeyType>{} - static_cast<int>(std::ceil(std::log2(maxDimValue / boxDimensions[i])));
         if (i == 0)
-            bit_limits.bx = bits;
+            bitLimits.bx = bits;
         else if (i == 1)
-            bit_limits.by = bits;
+            bitLimits.by = bits;
         else if (i == 2)
-            bit_limits.bz = bits;
+            bitLimits.bz = bits;
     }
-    return bit_limits;
+    return bitLimits;
 }
 
 } // namespace cstone

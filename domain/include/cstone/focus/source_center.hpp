@@ -189,27 +189,27 @@ std::pair<Vec3<T>, Vec3<T>> getCenterSizeMixDTree(TreeType tree, const TreeNodeI
 template<class KeyType, class T>
 util::tuple<Vec3<T>, Vec3<T>> getCenterSizeMixD(const KeyType& prefix, const Box<T>& box)
 {
-    KeyType startKey            = decodePlaceholderBit(prefix);
-    unsigned level              = decodePrefixLength(prefix) / 3;
-    unsigned level_key          = octalDigit(startKey, level);
-    const auto level_from_right = maxTreeLevel<KeyType>{} - level + 1;
-    const auto mixDBits         = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    unsigned sorted[3]          = {mixDBits.bx, mixDBits.by, mixDBits.bz};
+    KeyType startKey          = decodePlaceholderBit(prefix);
+    unsigned level            = decodePrefixLength(prefix) / 3;
+    unsigned levelKey         = octalDigit(startKey, level);
+    const auto levelFromRight = maxTreeLevel<KeyType>{} - level + 1;
+    const auto mixDBits       = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    unsigned sorted[3]        = {mixDBits.bx, mixDBits.by, mixDBits.bz};
     std::sort(std::begin(sorted), std::end(sorted));
-    auto nodeBox = sfcIBox(sfcMixDKey<KeyType>(startKey), level_from_right - 1, mixDBits.bx, mixDBits.by, mixDBits.bz);
+    auto nodeBox = sfcIBox(sfcMixDKey<KeyType>(startKey), levelFromRight - 1, mixDBits.bx, mixDBits.by, mixDBits.bz);
     Vec3<T> center, size;
     util::tie(center, size) = centerAndSize<KeyType>(nodeBox, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
-    if (level_from_right > sorted[2] && level_key > 0)
+    if (levelFromRight > sorted[2] && levelKey > 0)
     {
         center = {0, 0, 0};
         size   = {0, 0, 0};
     }
-    else if (level_from_right <= sorted[2] && level_from_right > sorted[1] && level_key > 1)
+    else if (levelFromRight <= sorted[2] && levelFromRight > sorted[1] && levelKey > 1)
     {
         center = {0, 0, 0};
         size   = {0, 0, 0};
     }
-    else if (level_from_right <= sorted[1] && level_from_right > sorted[0] && level_key > 3)
+    else if (levelFromRight <= sorted[1] && levelFromRight > sorted[0] && levelKey > 3)
     {
         center = {0, 0, 0};
         size   = {0, 0, 0};

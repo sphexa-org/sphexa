@@ -130,8 +130,8 @@ iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, un
     std::array<int, 3> permutation{0, 1, 2};
     std::sort(permutation.begin(), permutation.end(), [&bits](int i, int j) { return bits[i] > bits[j]; });
     std::array<KeyType, 3> coordinates{px, py, pz};
-    std::array<KeyType, 3> sorted_coordinates{coordinates[permutation[0]], coordinates[permutation[1]],
-                                              coordinates[permutation[2]]};
+    std::array<KeyType, 3> sortedCoordinates{coordinates[permutation[0]], coordinates[permutation[1]],
+                                             coordinates[permutation[2]]};
     std::sort(bits.begin(), bits.end(), std::greater<unsigned>{});
 
     if (bits[0] > bits[1]) // 1 dim has more bits than the other 2 dims, add 1D levels
@@ -140,12 +140,12 @@ iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, un
         // add n 1D levels and add to key (trivial)
         for (int i{0}; i < n; ++i)
         {
-            const auto processes_bit_index = bits[0] - i - 1;
-            key |= ((sorted_coordinates[0] >> processes_bit_index) & 1) << (3 * processes_bit_index);
+            const auto processesBitIndex = bits[0] - i - 1;
+            key |= ((sortedCoordinates[0] >> processesBitIndex) & 1) << (3 * processesBitIndex);
             // IM: Should it be 00? for x, 0?0 for y and ?00 for z?
         }
         const KeyType mask = (static_cast<KeyType>(1) << bits[1]) - 1;
-        sorted_coordinates[0] &= mask;
+        sortedCoordinates[0] &= mask;
         bits[0] -= n;
         // now we have bits[0] == bits[1]
     }
@@ -155,21 +155,20 @@ iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, un
         const int n = bits[1] - bits[2];
         // encode n 2D levels with 2D-Hilbert and add it to the key
         // 2D key needs to be computed only for n bits
-        const KeyType key_2D =
-            iHilbert2D<KeyType>(sorted_coordinates[0] >> bits[2], sorted_coordinates[1] >> bits[2], n);
+        const KeyType key2D = iHilbert2D<KeyType>(sortedCoordinates[0] >> bits[2], sortedCoordinates[1] >> bits[2], n);
         // IM: Check if we want to the 2D key together or break it from 2 bits per level to 3 bits per level
-        // key |= key_2D << (3 * bits[2]);
+        // key |= key2D << (3 * bits[2]);
         // or below
         for (int i{0}; i < n; ++i)
         {
-            const auto processes_2D_key_bit_index     = n - 1 - i;
-            const auto processes_coordinate_bit_index = bits[1] - 1 - i;
-            key |= ((key_2D >> (2 * processes_2D_key_bit_index)) & 3) << (3 * processes_coordinate_bit_index);
+            const auto processes2DKeyBitIndex      = n - 1 - i;
+            const auto processesCoordinateBitIndex = bits[1] - 1 - i;
+            key |= ((key2D >> (2 * processes2DKeyBitIndex)) & 3) << (3 * processesCoordinateBitIndex);
         }
-        // remove n bits from sorted_coordinates[0] and sorted_coordinates[1]
+        // remove n bits from sortedCoordinates[0] and sortedCoordinates[1]
         const KeyType mask = (static_cast<KeyType>(1) << bits[2]) - 1;
-        sorted_coordinates[0] &= mask;
-        sorted_coordinates[1] &= mask;
+        sortedCoordinates[0] &= mask;
+        sortedCoordinates[1] &= mask;
         bits[0] -= n;
         bits[1] -= n;
         // now we have bits[0] == bits[1] == bits[2]
@@ -177,12 +176,12 @@ iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, un
 
     // Assert that the 3D coordinates of the 2 largest dimensions are smaller than the allowed range of the min
     // dimension to ensure that the first 3 * (bits[0] - bits[2]) bits are 0
-    assert(sorted_coordinates[0] < (1u << bits[2]));
-    assert(sorted_coordinates[1] < (1u << bits[2]));
+    assert(sortedCoordinates[0] < (1u << bits[2]));
+    assert(sortedCoordinates[1] < (1u << bits[2]));
 
     // encode remaining bits[0] == min(bx,by,bz) 3D levels or octal digits with 3D-Hilbert and add to key
-    const KeyType key_3D = iHilbert<KeyType>(sorted_coordinates[0], sorted_coordinates[1], sorted_coordinates[2]);
-    key |= key_3D;
+    const KeyType key3D = iHilbert<KeyType>(sortedCoordinates[0], sortedCoordinates[1], sortedCoordinates[2]);
+    key |= key3D;
     // Example for (bx,by,bz) = (10,9,7): 1D,2D,2D,3D*7
 
     return key;
@@ -320,40 +319,40 @@ decodeHilbertMixD(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
         const int n = bits[0] - bits[1];
         for (int i{0}; i < n; ++i)
         {
-            const auto processes_coordinate_bit_index = bits[0] - 1 - i;
-            coordinates[0] |= ((key >> (3 * processes_coordinate_bit_index)) & static_cast<KeyType>(1))
-                              << processes_coordinate_bit_index;
+            const auto processesCoordinateBitIndex = bits[0] - 1 - i;
+            coordinates[0] |= ((key >> (3 * processesCoordinateBitIndex)) & static_cast<KeyType>(1))
+                              << processesCoordinateBitIndex;
         }
         key &= (static_cast<KeyType>(1) << (3 * bits[1])) - 1;
     }
     if (bits[1] > bits[2]) // 2 dims have more bits than the 3rd, add 2D levels
     {
         const int n = bits[1] - bits[2];
-        // const auto key_2D  = key >> (3 * bits[2]);
-        KeyType key_2D{};
+        // const auto key2D  = key >> (3 * bits[2]);
+        KeyType key2D{};
         for (int i{}; i < n; ++i)
         {
-            const auto processes_2D_key_bit_index     = n - 1 - i;
-            const auto processes_coordinate_bit_index = bits[1] - 1 - i;
-            key_2D |= ((key >> (3 * processes_coordinate_bit_index)) & 3) << (2 * processes_2D_key_bit_index);
+            const auto processes2DKeyBitIndex      = n - 1 - i;
+            const auto processesCoordinateBitIndex = bits[1] - 1 - i;
+            key2D |= ((key >> (3 * processesCoordinateBitIndex)) & 3) << (2 * processes2DKeyBitIndex);
         }
-        const auto pair_2D = decodeHilbert2D<KeyType>(key_2D, bits[1] - bits[2]);
-        coordinates[0] |= (get<0>(pair_2D) & ((1u << n) - 1)) << bits[2];
-        coordinates[1] |= (get<1>(pair_2D) & ((1u << n) - 1)) << bits[2];
+        const auto pair2D = decodeHilbert2D<KeyType>(key2D, bits[1] - bits[2]);
+        coordinates[0] |= (get<0>(pair2D) & ((1u << n) - 1)) << bits[2];
+        coordinates[1] |= (get<1>(pair2D) & ((1u << n) - 1)) << bits[2];
         key &= (static_cast<KeyType>(1) << (3 * bits[2])) - 1;
     }
 
-    const auto pair_3D = decodeHilbert<KeyType>(key);
-    coordinates[0] |= get<0>(pair_3D);
-    coordinates[1] |= get<1>(pair_3D);
-    coordinates[2] |= get<2>(pair_3D);
+    const auto pair3D = decodeHilbert<KeyType>(key);
+    coordinates[0] |= get<0>(pair3D);
+    coordinates[1] |= get<1>(pair3D);
+    coordinates[2] |= get<2>(pair3D);
 
-    std::array<KeyType, 3> return_coordinates{0, 0, 0};
-    return_coordinates[permutation[0]] = coordinates[0];
-    return_coordinates[permutation[1]] = coordinates[1];
-    return_coordinates[permutation[2]] = coordinates[2];
+    std::array<KeyType, 3> returnCoordinates{0, 0, 0};
+    returnCoordinates[permutation[0]] = coordinates[0];
+    returnCoordinates[permutation[1]] = coordinates[1];
+    returnCoordinates[permutation[2]] = coordinates[2];
 
-    return {return_coordinates[0], return_coordinates[1], return_coordinates[2]};
+    return {returnCoordinates[0], returnCoordinates[1], returnCoordinates[2]};
 }
 
 //! @brief inverse function of iHilbert 32 bit only up to oder 16 but works at constant time.
@@ -439,16 +438,16 @@ HOST_DEVICE_FUN bool isValidHilbertMixDKey(KeyType key, unsigned bx, unsigned by
     std::sort(bits.begin(), bits.end());
     for (unsigned i{1}; i <= maxTreeLevel<KeyType>(); ++i)
     {
-        const auto shifted_key                   = key >> (3 * (i - 1));
-        const auto last_key_digit_of_shifted_key = shifted_key & 7u;
+        const auto shiftedKey               = key >> (3 * (i - 1));
+        const auto lastKeyDigitOfShiftedKey = shiftedKey & 7u;
         if (i <= bits[0]) { continue; }
         else if (i <= bits[1])
         {
-            if (last_key_digit_of_shifted_key > 3u) { return false; }
+            if (lastKeyDigitOfShiftedKey > 3u) { return false; }
         }
         else if (i <= bits[2])
         {
-            if (last_key_digit_of_shifted_key > 1u) { return false; }
+            if (lastKeyDigitOfShiftedKey > 1u) { return false; }
         }
     }
     return true;
@@ -466,8 +465,8 @@ template<class KeyType>
 HOST_DEVICE_FUN IBox hilbertMixDIBox(KeyType keyStart, unsigned level, unsigned bx, unsigned by, unsigned bz) noexcept
 {
     assert(level <= maxTreeLevel<KeyType>{});
-    auto is_valid_key = isValidHilbertMixDKey(keyStart, bx, by, bz);
-    if (!is_valid_key)
+    auto isValidKey = isValidHilbertMixDKey(keyStart, bx, by, bz);
+    if (!isValidKey)
     {
         return IBox(0, 0, 0, 0, 0, 0); // return empty box
     }

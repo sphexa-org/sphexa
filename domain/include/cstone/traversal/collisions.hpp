@@ -94,8 +94,8 @@ void findHalos(const KeyType* prefixes,
     KeyType highestKey = leaves[lastNode];
 
     const auto mixDBits = getBoxMixDimensionBits<Tc, KeyType, Box<Tc>>(box);
-    const bool use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{};
+    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                         mixDBits.bz != maxTreeLevel<KeyType>{};
 
 #pragma omp parallel for
     for (TreeNodeIndex leafIdx = firstNode; leafIdx < lastNode; ++leafIdx)
@@ -105,12 +105,12 @@ void findHalos(const KeyType* prefixes,
             // if the target is empty, we skip it
             continue;
         }
-        if (use_mixD && containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box,
-                                    mixDBits.bx, mixDBits.by, mixDBits.bz))
+        if (useMixD && containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box,
+                                   mixDBits.bx, mixDBits.by, mixDBits.bz))
         {
             continue;
         }
-        if (!use_mixD && containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box))
+        if (!useMixD && containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box))
         {
             continue;
         }

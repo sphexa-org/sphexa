@@ -50,12 +50,12 @@ std::vector<uint8_t> findHalosAll2All(std::span<const KeyType> nodeKeys,
 }
 
 template<class KeyType>
-void findHalosFlags(bool use_mixD = false)
+void findHalosFlags(bool useMixD = false)
 {
     using T  = double;
-    auto box = use_mixD ? Box<double>(0, 1, 0, 0.015625, 0, 0.00390625) : Box<double>(0, 1);
+    auto box = useMixD ? Box<double>(0, 1, 0, 0.015625, 0, 0.00390625) : Box<double>(0, 1);
 
-    std::vector<KeyType> tree = makeUniformNLevelTree<KeyType>(use_mixD ? 512 : 64, 1);
+    std::vector<KeyType> tree = makeUniformNLevelTree<KeyType>(useMixD ? 512 : 64, 1);
     OctreeData<KeyType, CpuTag> octree;
     octree.resize(nNodes(tree));
     updateInternalTree<KeyType>(tree, octree.data());
@@ -84,8 +84,8 @@ void findHalosFlags(bool use_mixD = false)
                                                                    octree.numLeafNodes, box, tree[0], tree[32]);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes (+5 internal nodes)
-        EXPECT_EQ(use_mixD ? 5 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
-        EXPECT_EQ(use_mixD ? 5 : 21, std::accumulate(reference.begin(), reference.end(), 0));
+        EXPECT_EQ(useMixD ? 5 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
+        EXPECT_EQ(useMixD ? 5 : 21, std::accumulate(reference.begin(), reference.end(), 0));
         EXPECT_EQ(collisionFlags, reference);
     }
     {
@@ -97,7 +97,7 @@ void findHalosFlags(bool use_mixD = false)
                                                                    octree.numLeafNodes, box, tree[32], tree[64]);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes
-        EXPECT_EQ(use_mixD ? 4 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
+        EXPECT_EQ(useMixD ? 4 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
         EXPECT_EQ(collisionFlags, reference);
     }
 }

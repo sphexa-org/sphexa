@@ -42,14 +42,14 @@ template<class T, class KeyType>
 HOST_DEVICE_FUN Vec4<T> computeMinMacR2(KeyType prefix, float invThetaEff, const Box<T>& box)
 {
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{};
+    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                         mixDBits.bz != maxTreeLevel<KeyType>{};
     KeyType nodeKey  = decodePlaceholderBit(prefix);
     int prefixLength = decodePrefixLength(prefix);
 
-    IBox cellBox = use_mixD ? sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - (prefixLength / 3), mixDBits.bx,
-                                      mixDBits.by, mixDBits.bz)
-                            : sfcIBox(sfcKey(nodeKey), prefixLength / 3);
+    IBox cellBox = useMixD ? sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - (prefixLength / 3), mixDBits.bx,
+                                     mixDBits.by, mixDBits.bz)
+                           : sfcIBox(sfcKey(nodeKey), prefixLength / 3);
     if (cellBox.xmax() == 0 && cellBox.xmin() == 0 && cellBox.ymax() == 0 && cellBox.ymin() == 0 &&
         cellBox.zmax() == 0 && cellBox.zmin() == 0)
     {
@@ -79,12 +79,12 @@ HOST_DEVICE_FUN T computeVecMacR2(KeyType prefix, Vec3<T> expCenter, float invTh
     int prefixLength = decodePrefixLength(prefix);
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{};
+    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                         mixDBits.bz != maxTreeLevel<KeyType>{};
 
-    IBox cellBox = use_mixD ? sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - (prefixLength / 3), mixDBits.bx,
-                                      mixDBits.by, mixDBits.bz)
-                            : sfcIBox(sfcKey(nodeKey), prefixLength / 3);
+    IBox cellBox = useMixD ? sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - (prefixLength / 3), mixDBits.bx,
+                                     mixDBits.by, mixDBits.bz)
+                           : sfcIBox(sfcKey(nodeKey), prefixLength / 3);
     if (cellBox.xmax() == 0 && cellBox.xmin() == 0 && cellBox.ymax() == 0 && cellBox.ymin() == 0 &&
         cellBox.zmax() == 0 && cellBox.zmin() == 0)
     {
@@ -234,15 +234,15 @@ void markMacs(const KeyType* prefixes,
     KeyType focusEnd   = focusNodes[numFocusNodes];
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool use_mixD = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{};
+    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                         mixDBits.bz != maxTreeLevel<KeyType>{};
 
 #pragma omp parallel for schedule(dynamic)
     for (TreeNodeIndex i = 0; i < numFocusNodes; ++i)
     {
-        IBox target = use_mixD ? sfcIBox(sfcMixDKey(focusNodes[i]), sfcMixDKey(focusNodes[i + 1]), mixDBits.bx,
-                                         mixDBits.by, mixDBits.bz)
-                               : sfcIBox(sfcKey(focusNodes[i]), sfcKey(focusNodes[i + 1]));
+        IBox target = useMixD ? sfcIBox(sfcMixDKey(focusNodes[i]), sfcMixDKey(focusNodes[i + 1]), mixDBits.bx,
+                                        mixDBits.by, mixDBits.bz)
+                              : sfcIBox(sfcKey(focusNodes[i]), sfcKey(focusNodes[i + 1]));
         if (target.xmin() == 0 && target.xmax() == 0 && target.ymin() == 0 && target.ymax() == 0 &&
             target.zmin() == 0 && target.zmax() == 0)
         {
@@ -250,11 +250,11 @@ void markMacs(const KeyType* prefixes,
         }
         IBox targetExt = IBox(target.xmin() - 1, target.xmax() + 1, target.ymin() - 1, target.ymax() + 1,
                               target.zmin() - 1, target.zmax() + 1);
-        if (use_mixD && containedIn(focusStart, focusEnd, targetExt, mixDBits.bx, mixDBits.by, mixDBits.bz))
+        if (useMixD && containedIn(focusStart, focusEnd, targetExt, mixDBits.bx, mixDBits.by, mixDBits.bz))
         {
             continue;
         }
-        if (!use_mixD && containedIn(focusStart, focusEnd, targetExt)) { continue; }
+        if (!useMixD && containedIn(focusStart, focusEnd, targetExt)) { continue; }
 
         auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
         assert(targetSize[0] != 0 && targetSize[1] != 0 && targetSize[2] != 0);

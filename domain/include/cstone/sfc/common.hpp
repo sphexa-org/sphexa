@@ -432,17 +432,17 @@ HOST_DEVICE_FUN constexpr KeyType octalPower(int pos)
 template<class KeyType>
 HOST_DEVICE_FUN constexpr KeyType increaseKey(KeyType key, int pos, unsigned b0, unsigned b1, unsigned b2)
 {
-    const auto pos_from_left = maxTreeLevel<KeyType>{} - pos;
+    const auto posFromLeft = maxTreeLevel<KeyType>{} - pos;
     unsigned max{};
-    if (pos_from_left + 1 > b0) { return key; }
-    else if (pos_from_left + 1 > b1) { max = 1; }
-    else if (pos_from_left + 1 > b2) { max = 3; }
+    if (posFromLeft + 1 > b0) { return key; }
+    else if (posFromLeft + 1 > b1) { max = 1; }
+    else if (posFromLeft + 1 > b2) { max = 3; }
     else { max = 7; }
-    auto octal_digit = octalDigit(key, pos);
-    if (octal_digit + 1 <= max) { key += octalPower<KeyType>(pos); }
+    auto digit = octalDigit(key, pos);
+    if (digit + 1 <= max) { key += octalPower<KeyType>(pos); }
     else
     {
-        key &= ~(7 << 3 * pos_from_left);
+        key &= ~(7 << 3 * posFromLeft);
         key = increaseKey(key, pos - 1, b0, b1, b2);
     }
     return key;
