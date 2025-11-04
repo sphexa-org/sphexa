@@ -101,7 +101,6 @@ void dualTraversal(
 
     if (isEmpty(a) || isEmpty(b))
     {
-        // std::cout << "Skip empty node pair (" << a << ", " << b << ") traversal" << std::endl;
         return;
     }
 

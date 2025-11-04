@@ -25,7 +25,6 @@
  */
 
 #include "gtest/gtest.h"
-#include <fstream>
 
 #include "coord_samples/random.hpp"
 #include "cstone/domain/domain.hpp"

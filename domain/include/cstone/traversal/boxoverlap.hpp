@@ -159,7 +159,6 @@ containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Ve
     auto boxMax   = center + size;
     auto dFromMin = min(boxMin - Vec3<Tc>{box.xmin(), box.ymin(), box.zmin()});
     auto dFromMax = max(boxMax - Vec3<Tc>{box.xmax(), box.ymax(), box.zmax()});
-    // throw std::runtime_error("containedIn: non-mixD case not implemented");
     if (dFromMin < Tc(0) || dFromMax > Tc(0))
     {
         // any box that wraps around a PBC boundary cannot be contained within
@@ -191,7 +190,6 @@ containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Ve
     {
         // any box that wraps around a PBC boundary cannot be contained within
         // any octree node, except the full root node
-        // std::cout << "containedIn: boxMin: " << boxMin[0] << ", " << boxMin[1] << ", " << boxMin[2] << " boxMax: " << boxMax[0] << ", " << boxMax[1] << ", " << boxMax[2] << " dMin: " << dFromMin << " dMax: " << dFromMax << std::endl;
         return codeStart == 0 && codeEnd == nodeRange<KeyType>(0);
     }
 
@@ -207,8 +205,6 @@ containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Ve
     KeyType lowCode  = iSfcMixDKey<SfcMixDKind<KeyType>>(boxMin[0], boxMin[1], boxMin[2], bx, by, bz);
     KeyType highCode = iSfcMixDKey<SfcMixDKind<KeyType>>(boxMax[0], boxMax[1], boxMax[2], bx, by, bz);
     auto envelope    = smallestCommonBox(lowCode, highCode);
-    // std::cout << "containedIn: lowCode, highCode: " << lowCode << ", " << highCode << std::endl;
-    // std::cout << "containedIn: envelope: " << util::get<0>(envelope) << ", " << util::get<1>(envelope) << std::endl;
 
     return (util::get<0>(envelope) >= codeStart) && (util::get<1>(envelope) <= codeEnd);
 }
@@ -269,14 +265,9 @@ HOST_DEVICE_FUN IBox makeHaloBox(const IBox& nodeBox, RadiusType radius, const B
 template<class KeyType, class CoordinateType, class RadiusType>
 HOST_DEVICE_FUN IBox makeHaloBox(const IBox& nodeBox, RadiusType radius, const Box<CoordinateType>& box, unsigned bx, unsigned by, unsigned bz)
 {
-    // std::cout << "ilx, ily, ilz: " << box.ilx() << ", " << box.ily() << ", " << box.ilz() << std::endl;
     int dx = toNBitIntCeil<KeyType>(radius * box.ilx(), bx); // TODO(iomaganaris): is this reasonable?
     int dy = toNBitIntCeil<KeyType>(radius * box.ily(), by); // TODO(iomaganaris): is this reasonable?
     int dz = toNBitIntCeil<KeyType>(radius * box.ilz(), bz); // TODO(iomaganaris): is this reasonable?
-    // std::cout << "toNBitIntCeil dx, dy, dz: " << toNBitIntCeil<KeyType>(radius * box.ilx(), bx) << ", "
-    //           << toNBitIntCeil<KeyType>(radius * box.ily(), by) << ", "
-    //           << toNBitIntCeil<KeyType>(radius * box.ilz(), bz) << std::endl;
-    // std::cout << "dx, dy, dz: " << dx << ", " << dy << ", " << dz << std::endl;
     bool pbcX = (box.boundaryX() == cstone::BoundaryType::periodic);
     bool pbcY = (box.boundaryY() == cstone::BoundaryType::periodic);
     bool pbcZ = (box.boundaryZ() == cstone::BoundaryType::periodic);
@@ -304,11 +295,7 @@ HOST_DEVICE_FUN IBox makeHaloBox(KeyType codeStart, KeyType codeEnd, RadiusType 
         // zero volume boxes cannot have a halo box
         return nodeBox;
     }
-    // std::cout << "[makeHaloBox] nodeBox : " << nodeBox.xmin() << ", " << nodeBox.xmax() << ", "
-    //           << nodeBox.ymin() << ", " << nodeBox.ymax() << ", " << nodeBox.zmin() << ", " << nodeBox.zmax() << std::endl;
     const auto final_halo_box = use_mixD ? makeHaloBox<KeyType>(nodeBox, radius, box, mixDBits.bx, mixDBits.by, mixDBits.bz) : makeHaloBox<KeyType>(nodeBox, radius, box);
-    // std::cout << "[makeHaloBox] final haloBox : " << final_halo_box.xmin() << ", " << final_halo_box.xmax() << ", "
-    //           << final_halo_box.ymin() << ", " << final_halo_box.ymax() << ", " << final_halo_box.zmin() << ", " << final_halo_box.zmax() << std::endl;
     return final_halo_box;
 }
 

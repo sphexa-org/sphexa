@@ -470,8 +470,6 @@ HOST_DEVICE_FUN constexpr KeyType increaseKey(KeyType key, int pos, unsigned b0,
  *  This convention is chosen such that the positional value coincides with the corresponding octree
  *  subdivision level.
  */
-// finds distance between 2 SFC keys (to be used together with hilbertIBox to plot the boxes in between the 2 keys in
-// the real world)
 template<class KeyType, class Store>
 HOST_DEVICE_FUN std::enable_if_t<std::is_same_v<Store, std::nullptr_t> || std::is_same_v<Store, KeyType*>, int>
 spanSfcRange(KeyType a, KeyType b, [[maybe_unused]] Store output)

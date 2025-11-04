@@ -196,13 +196,7 @@ void makeHaloBoxXYZMixD()
     IBox nodeBox(rX, 2 * rX, rY, 2 * rY, 0, rZ);
 
     IBox haloBox = makeHaloBox<KeyType>(nodeBox, 1.0 / maxCoord, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
-    // std::cout << "haloBox: [" << haloBox.xmin() << "," << haloBox.xmax() << "] "
-    //           << "[" << haloBox.ymin() << "," << haloBox.ymax() << "] "
-    //           << "[" << haloBox.zmin() << "," << haloBox.zmax() << "] " << std::endl;
     IBox refBox{rX - 1, 2 * rX + 1, rY - 1, 2 * rY + 1, 0, rZ + 1};
-    // std::cout << "refBox:  [" << refBox.xmin() << "," << refBox.xmax() << "] "
-    //           << "[" << refBox.ymin() << "," << refBox.ymax() << "] "
-    //           << "[" << refBox.zmin() << "," << refBox.zmax() << "] " << std::endl;
     EXPECT_EQ(haloBox, refBox);
 }
 

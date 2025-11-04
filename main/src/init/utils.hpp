@@ -81,11 +81,6 @@ void sortBySfcKey(std::vector<T>& x, std::vector<T>& y, std::vector<T>& z, cston
                          mixDBits.by != cstone::maxTreeLevel<KeyType>{} ||
                          mixDBits.bz != cstone::maxTreeLevel<KeyType>{});
 
-    if (useMixD)
-    {
-        std::cerr << "[sortBySfcKey] Using mixed dimension bits for SFC key computation\n";
-    }
-
     std::vector<KeyType> keys(blockSize);
     if (useMixD) {
         computeSfcMixDKeys(x.data(), y.data(), z.data(), cstone::SfcMixDKindPointer(keys.data()), blockSize, globalBox, mixDBits.bx, mixDBits.by, mixDBits.bz);

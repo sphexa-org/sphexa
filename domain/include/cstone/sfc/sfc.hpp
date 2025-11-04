@@ -408,8 +408,6 @@ void computeSfcKeys(const T* x, const T* y, const T* z, KeyType* particleKeys, s
     for (std::size_t i = 0; i < n; ++i)
     {
         if (particleKeys[i] != removeKey<KeyType>::value) { particleKeys[i] = sfc3D<KeyType>(x[i], y[i], z[i], box); }
-        // std::cout << "[computeSfcKeys] particleKeys[" << i << "] = " << std::oct << particleKeys[i] << std::dec <<
-        // std::endl;
     }
 }
 
@@ -438,8 +436,6 @@ void computeSfcMixDKeys(const T* x,
                         unsigned by,
                         unsigned bz)
 {
-    // std::cout << "[computeSfcMixDKeys] box = " << box.xmin() << " " << box.xmax() << " " << box.ymin() << " " << box.ymax() << " "
-    //           << box.zmin() << " " << box.zmax() << std::endl;
 #pragma omp parallel for schedule(static)
     for (std::size_t i = 0; i < n; ++i)
     {
@@ -447,8 +443,6 @@ void computeSfcMixDKeys(const T* x,
         {
             particleKeys[i] = sfcMixD<KeyType>(x[i], y[i], z[i], box, bx, by, bz);
         }
-        // std::cout << "[computeSfcMixDKeys] particleKeys[" << i << "] = " << std::oct << particleKeys[i] << std::dec
-        // << std::endl;
     }
 }
 

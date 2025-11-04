@@ -40,7 +40,6 @@
 #include <numeric>
 #include <span>
 #include <vector>
-#include <span>
 #include <tuple>
 
 #include "cstone/sfc/common.hpp"

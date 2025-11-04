@@ -128,7 +128,6 @@ static std::vector<uint8_t> markVecMacAll2All(const KeyType* leaves,
 
             Vec4<T> center   = centers[j];
             bool violatesMac = evaluateMacPbc(makeVec3(center), center[3], targetCenter, targetSize, box);
-            // std::cout << "[markVecMacAll2All] center: " << center[0] << ", " << center[1] << ", " << center[2] << ", " << center[3] << " targetCenter: " << targetCenter[0] << ", " << targetCenter[1] << ", " << targetCenter[2] << ", " << targetSize[0] << ", " << targetSize[1] << ", " << targetSize[2] << " violatesMac: " << violatesMac << std::endl;
             if (violatesMac) { markings[j] = 1; }
         }
     }

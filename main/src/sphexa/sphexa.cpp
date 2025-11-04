@@ -136,29 +136,11 @@ int main(int argc, char** argv)
     uint64_t bucketSizeFocus = 64;
     // ~100 global nodes per rank to decompose the domain with +-1% accuracy
     uint64_t bucketSize = std::max(bucketSizeFocus, d.numParticlesGlobal / (100 * numRanks));
-    // std::cout << "[SPHEXA] bucketSize: " << bucketSize << " bucketSizeFocus: " << bucketSizeFocus << std::endl;
     Domain   domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, box);
     domain.setGrowthAllocRate(simData.hydro.getAllocGrowthRate());
 
     propagator->sync(domain, simData);
-    // std::cout << "Rank " << rank << ": Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
-    // size_t nLocalParticles = d.x.size();
-    // size_t totalLocalParticles = 0;
-    // MPI_Allreduce(&nLocalParticles, &totalLocalParticles, 1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
-
-    // if (rank == 0)
-    // {
-    //     if (totalLocalParticles != d.numParticlesGlobal)
-    //     {
-    //         std::cerr << "Error: total nLocalParticles (" << totalLocalParticles
-    //                   << ") does not match numParticlesGlobal (" << d.numParticlesGlobal << ")\n";
-    //         MPI_Abort(MPI_COMM_WORLD, EXIT_FAILURE);
-    //     }
-    //     else
-    //     {
-    //         std::cout << "Total nLocalParticles matches numParticlesGlobal: " << totalLocalParticles << std::endl;
-    //     }
-    // }
+    if (rank == 0) std::cout << "Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
 
     viz::init_catalyst(argc, argv);
     viz::init_ascent(d, domain.startIndex());
@@ -168,7 +150,6 @@ int main(int argc, char** argv)
 
     for (bool keepRunning = true; keepRunning; d.iteration++)
     {
-        // std::cout << "Starting iteration" << std::endl;
         propagator->computeForces(domain, simData);
         box = domain.box();
 

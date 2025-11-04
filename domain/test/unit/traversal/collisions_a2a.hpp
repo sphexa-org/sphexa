@@ -43,7 +43,6 @@ void findCollisions2All(std::span<const KeyType> nodeKeys,
     if (targetSize[0] == 0 && targetSize[1] == 0 && targetSize[2] == 0)
     {
         // if the target is empty, we return no overlap
-        // std::cout << "[findCollisions2All] empty target -> no overlap" << std::endl;
         return;
     }
     for (TreeNodeIndex idx = 0; idx < TreeNodeIndex(nodeKeys.size()); ++idx)
@@ -51,7 +50,6 @@ void findCollisions2All(std::span<const KeyType> nodeKeys,
         if (nodeSizes[idx][0] == 0 && nodeSizes[idx][1] == 0 && nodeSizes[idx][2] == 0)
         {
             // if the cell is empty, we return no overlap
-            // std::cout << "[findCollisions2All] Skipping idx: " << idx << " due to zero size" << std::endl;
             continue;
         }
         if (norm2(minDistance(targetCenter, targetSize, nodeCenters[idx], nodeSizes[idx], box)) == 0.0)

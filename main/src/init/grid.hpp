@@ -275,11 +275,6 @@ void assembleCuboid(KeyType keyStart, KeyType keyEnd, const cstone::Box<T>& glob
     const bool useMixD  = mixDBits.bx != cstone::maxTreeLevel<KeyType>{} ||
                          mixDBits.by != cstone::maxTreeLevel<KeyType>{} ||
                          mixDBits.bz != cstone::maxTreeLevel<KeyType>{};
-    if (useMixD)
-    {
-        std::cout << "assembleCuboid called with MixD dimensions: " << mixDBits.bx << " " << mixDBits.by << " "
-                  << mixDBits.bz << std::endl;
-    }
 
     // extract the volume of each cell from the virtual global glass block grid
     for (size_t i = 0; i < cstone::nNodes(cells); ++i)

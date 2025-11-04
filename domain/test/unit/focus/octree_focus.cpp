@@ -18,7 +18,6 @@
 #include "cstone/focus/octree_focus.hpp"
 #include "cstone/tree/cs_util.hpp"
 #include "coord_samples/random.hpp"
-#include "cstone/sfc/hilbert.hpp"
 
 namespace cstone
 {
@@ -314,7 +313,6 @@ std::vector<TreeNodeIndex> octantNodeCount(std::span<const KeyType> tree)
     {
         auto range = nodeRange<KeyType>(1);
         counts.push_back(numNodesInRange(tree, octant * range, octant * range + range));
-        // std::cout << "octant " << octant << " range [" << std::oct << octant * range << ", " << octant * range + range << std::dec << "] count " << counts.back() << "\n";
     }
 
     std::sort(begin(counts), end(counts));
@@ -427,26 +425,6 @@ static void computeEssentialTreeMixD()
     Octree<KeyType> globalTree;
     globalTree.update(csTree.data(), nNodes(csTree));
 
-    // KeyType total_particles{};
-
-    // std::cout << "Cornerstone tree has " << nNodes(csTree) << " nodes.\n";
-    // std::cout << "Global tree has " << globalTree.numLeafNodes() << " leaf nodes.\n";
-    // std::cout << "csTree and csCounts:\n";
-    // for (size_t i = 0; i < csTree.size(); ++i)
-    // {
-    //     std::cout << std::oct << csTree[i] << std::dec << " (" << csCounts[i] << ") ";
-    //     if (!isValidHilbertMixDKey<KeyType>(csTree[i], mixDBits.bx, mixDBits.by, mixDBits.bz) && csCounts[i] != 0) {
-    //         std::cout << " csTree[" << i << "] is not a valid key!\n";
-    //     }
-    //     total_particles += csCounts[i];
-    // }
-    // std::cout << std::endl;
-
-    // std::cout << "Total particles in csCounts: " << total_particles << "\n";
-
-    // std::cout << "Global tree first key: " << std::oct << csTree.front() << std::dec << "\n";
-    // std::cout << "Global tree last key: " << std::oct << csTree.back() << std::dec << "\n";
-
     unsigned bucketSize = 16;
     float theta         = 0.9;
     FocusedOctreeSingleNode<KeyType> tree(bucketSize, theta);
@@ -462,29 +440,11 @@ static void computeEssentialTreeMixD()
     // This example here is the worst-case scenario with a focus boundary at the highest possible
     // octree subdivision level. Key-0 is always present, so the node with Key-1 is always at index 1, if present.
     EXPECT_EQ(tree.treeLeaves()[1], focusStart);
-    // std::cout << "After first update, tree has " << tree.treeLeaves().size() << " nodes.\n";
-    // std::cout << "Tree leaves counts:\n";
-    // int totalLeafCount = 0;
-    // for (size_t i = 0; i < tree.treeLeaves().size(); ++i)
-    // {
-    //     std::cout << "Leaf " << std::oct << tree.treeLeaves()[i] << std::dec << ": " << tree.leafCounts()[i] << std::endl;
-    //     totalLeafCount += tree.leafCounts()[i];
-    // }
-    // std::cout << "Total leaf count: " << totalLeafCount << std::endl;
 
     // update until converged
     while (!tree.update(box, keys, focusStart, focusEnd, {})) {}
 
     {
-        // std::cout << "After convergence, tree has " << tree.treeLeaves().size() << " nodes.\n";
-        // int totalLeafCount = 0;
-        // for (size_t i = 0; i < tree.treeLeaves().size(); ++i)
-        // {
-        //     std::cout << "Leaf " << std::oct << tree.treeLeaves()[i] << std::dec << ": " << tree.leafCounts()[i] << std::endl;
-        //     totalLeafCount += tree.leafCounts()[i];
-        // }
-        // std::cout << "Total leaf count: " << totalLeafCount << std::endl;
-
         // the first node in the cornerstone tree that starts at or above focusStart
         TreeNodeIndex firstCstoneNode = findNodeAbove(csTree.data(), csTree.size(), focusStart);
         TreeNodeIndex matchingFocusNode =

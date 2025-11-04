@@ -151,7 +151,6 @@ public:
 
         cstone::Box<T> globalBox(0, 1, 0, 1, 0, 0.0625, pbc, pbc, pbc);
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
-        // std::cout << "rank " << rank << " keyStart " << keyStart << " keyEnd " << keyEnd << std::endl;
 
         int               multi1D    = std::lround(cbrtNumPart / std::cbrt(xBlock.size()));
         cstone::Vec3<int> innerMulti = {16 * multi1D, 8 * multi1D, multi1D};
@@ -163,10 +162,6 @@ public:
 
         std::vector<T> x, y, z;
         assembleCuboid<T>(keyStart, keyEnd, layer1, outerMulti, xBlock, yBlock, zBlock, x, y, z);
-        // for (size_t i = 0; i < x.size(); ++i)
-        // {
-        //     std::cout << "Layer1 Particle " << i << ": x=" << x[i] << ", y=" << y[i] << ", z=" << z[i] << std::endl;
-        // }
 
         T stretch = std::cbrt(settings_.at("rhoInt") / settings_.at("rhoExt"));
         T topEdge = layer3.ymax();
@@ -194,17 +189,10 @@ public:
         }
 
         assembleCuboid<T>(keyStart, keyEnd, layer2, innerMulti, xBlock, yBlock, zBlock, d.x, d.y, d.z);
-        // for (size_t i = 0; i < d.x.size(); ++i)
-        // {
-        //     std::cout << "Layer2 Particle " << i << ": x=" << d.x[i] << ", y=" << d.y[i] << ", z=" << d.z[i] << std::endl;
-        // }
 
         size_t numParticlesGlobal = d.x.size();
         MPI_Allreduce(MPI_IN_PLACE, &numParticlesGlobal, 1, MpiType<size_t>{}, MPI_SUM, simData.comm);
-        // std::cout << "rank " << rank << " has " << d.x.size() << " particles before syncCoords, total number of particles "
-        //           << numParticlesGlobal << std::endl;
         syncCoords<KeyType>(rank, numRanks, d.numParticlesGlobal, d.x, d.y, d.z, globalBox);
-        // std::cout << "rank " << rank << " has " << d.x.size() << " particles after syncCoords" << std::endl;
 
         size_t npartInner   = innerMulti[0] * innerMulti[1] * innerMulti[2] * xBlock.size();
         T      volumeHD     = 0.5 * globalBox.lx() * globalBox.ly() * globalBox.lz();

@@ -313,10 +313,6 @@ void dualTraversalNeighborsMixD()
         {
             continue;
         }
-        std::cout << "Box[" << i << "] = ("
-                  << box.xmin() << ", " << box.xmax() << ", "
-                  << box.ymin() << ", " << box.ymax() << ", "
-                  << box.zmin() << ", " << box.zmax() << ")" << std::endl;
     }
 
     KeyType focusStart = octree.codeStart(octree.toInternal(0));
@@ -331,11 +327,6 @@ void dualTraversalNeighborsMixD()
         IBox aBox = sfcIBox(sfcMixDKey(tree.codeStart(a)), maxTreeLevel<KeyType>() - tree.level(a), mixDBits.bx, mixDBits.by, mixDBits.bz);
         IBox bBox = sfcIBox(sfcMixDKey(tree.codeStart(b)), maxTreeLevel<KeyType>() - tree.level(b), mixDBits.bx, mixDBits.by, mixDBits.bz);
         const auto distance{minDistanceSq<KeyType>(aBox, bBox, box, mixDBits.bx, mixDBits.by, mixDBits.bz)};
-        std::cout << "Comparing aBox: (" << aBox.xmin() << ", " << aBox.xmax() << "), ("
-                  << aBox.ymin() << ", " << aBox.ymax() << "), (" << aBox.zmin() << ", " << aBox.zmax() << ") "
-                  << "with bBox: (" << bBox.xmin() << ", " << bBox.xmax() << "), ("
-                  << bBox.ymin() << ", " << bBox.ymax() << "), (" << bBox.zmin() << ", " << bBox.zmax() << ") "
-                  << " distance: " << distance << std::endl;
         return std::abs(distance) < 1e-6;
     };
 
