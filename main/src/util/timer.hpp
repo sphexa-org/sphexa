@@ -2,6 +2,8 @@
 
 #include <chrono>
 #include <map>
+#include <unistd.h>
+#include <limits.h>
 
 #if defined(USE_PROFILING_NVTX) || defined(USE_PROFILING_SCOREP)
 
@@ -110,6 +112,14 @@ public:
             };
             std::visit(writeField, item.second);
         }
+
+        char hostname[HOST_NAME_MAX];
+        gethostname(hostname, HOST_NAME_MAX);
+        ar->addStep(0, HOST_NAME_MAX, outFile + ar->suffix());
+        ar->stepAttribute("name", "hostnames");
+        ar->stepAttribute("numRanks", &numRanks, 1);
+        ar->writeField("hostnames", hostname, HOST_NAME_MAX);
+        ar->closeStep();
 
         numStartCalled = 0;
     }
