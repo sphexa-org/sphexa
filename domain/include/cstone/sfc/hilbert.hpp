@@ -141,7 +141,7 @@ iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, un
         for (int i{0}; i < n; ++i)
         {
             const auto processesBitIndex = bits[0] - i - 1;
-            key |= ((sortedCoordinates[0] >> processesBitIndex) & 1) << (3 * processesBitIndex);
+            key |= static_cast<KeyType>(static_cast<KeyType>(sortedCoordinates[0] >> processesBitIndex) & 1) << (3 * processesBitIndex);
             // IM: Should it be 00? for x, 0?0 for y and ?00 for z?
         }
         const KeyType mask = (static_cast<KeyType>(1) << bits[1]) - 1;
@@ -163,7 +163,7 @@ iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, un
         {
             const auto processes2DKeyBitIndex      = n - 1 - i;
             const auto processesCoordinateBitIndex = bits[1] - 1 - i;
-            key |= ((key2D >> (2 * processes2DKeyBitIndex)) & 3) << (3 * processesCoordinateBitIndex);
+            key |= static_cast<KeyType>(static_cast<KeyType>(key2D >> (2 * processes2DKeyBitIndex)) & 3) << (3 * processesCoordinateBitIndex);
         }
         // remove n bits from sortedCoordinates[0] and sortedCoordinates[1]
         const KeyType mask = (static_cast<KeyType>(1) << bits[2]) - 1;
@@ -176,8 +176,8 @@ iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, un
 
     // Assert that the 3D coordinates of the 2 largest dimensions are smaller than the allowed range of the min
     // dimension to ensure that the first 3 * (bits[0] - bits[2]) bits are 0
-    assert(sortedCoordinates[0] < (1u << bits[2]));
-    assert(sortedCoordinates[1] < (1u << bits[2]));
+    assert(sortedCoordinates[0] < (static_cast<KeyType>(1) << bits[2]));
+    assert(sortedCoordinates[1] < (static_cast<KeyType>(1) << bits[2]));
 
     // encode remaining bits[0] == min(bx,by,bz) 3D levels or octal digits with 3D-Hilbert and add to key
     const KeyType key3D = iHilbert<KeyType>(sortedCoordinates[0], sortedCoordinates[1], sortedCoordinates[2]);
@@ -320,7 +320,7 @@ decodeHilbertMixD(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
         for (int i{0}; i < n; ++i)
         {
             const auto processesCoordinateBitIndex = bits[0] - 1 - i;
-            coordinates[0] |= ((key >> (3 * processesCoordinateBitIndex)) & static_cast<KeyType>(1))
+            coordinates[0] |= static_cast<KeyType>(static_cast<KeyType>(key >> (3 * processesCoordinateBitIndex)) & static_cast<KeyType>(1))
                               << processesCoordinateBitIndex;
         }
         key &= (static_cast<KeyType>(1) << (3 * bits[1])) - 1;
@@ -334,11 +334,11 @@ decodeHilbertMixD(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
         {
             const auto processes2DKeyBitIndex      = n - 1 - i;
             const auto processesCoordinateBitIndex = bits[1] - 1 - i;
-            key2D |= ((key >> (3 * processesCoordinateBitIndex)) & 3) << (2 * processes2DKeyBitIndex);
+            key2D |= static_cast<KeyType>(static_cast<KeyType>(key >> (3 * processesCoordinateBitIndex)) & 3) << (2 * processes2DKeyBitIndex);
         }
         const auto pair2D = decodeHilbert2D<KeyType>(key2D, bits[1] - bits[2]);
-        coordinates[0] |= (get<0>(pair2D) & ((1u << n) - 1)) << bits[2];
-        coordinates[1] |= (get<1>(pair2D) & ((1u << n) - 1)) << bits[2];
+        coordinates[0] |= (get<0>(pair2D) & ((static_cast<KeyType>(1) << n) - 1)) << bits[2];
+        coordinates[1] |= (get<1>(pair2D) & ((static_cast<KeyType>(1) << n) - 1)) << bits[2];
         key &= (static_cast<KeyType>(1) << (3 * bits[2])) - 1;
     }
 
@@ -438,8 +438,8 @@ HOST_DEVICE_FUN bool isValidHilbertMixDKey(KeyType key, unsigned bx, unsigned by
     std::sort(bits.begin(), bits.end());
     for (unsigned i{1}; i <= maxTreeLevel<KeyType>(); ++i)
     {
-        const auto shiftedKey               = key >> (3 * (i - 1));
-        const auto lastKeyDigitOfShiftedKey = shiftedKey & 7u;
+        const KeyType shiftedKey               = key >> (3 * (i - 1));
+        const KeyType lastKeyDigitOfShiftedKey = shiftedKey & 7u;
         if (i <= bits[0]) { continue; }
         else if (i <= bits[1])
         {
