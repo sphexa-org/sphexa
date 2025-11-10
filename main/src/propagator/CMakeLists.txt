@@ -19,7 +19,7 @@ target_link_libraries(propagator PRIVATE ${MPI_CXX_LIBRARIES} util OpenMP::OpenM
 enableDiskPhysics(propagator FALSE)
 enableGrackle(propagator)
 
-if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
+if ((CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER) AND (SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP))
     add_library(propagator_gpu ${PROP_SOURCES})
     target_compile_definitions(propagator_gpu PRIVATE USE_CUDA)
     target_include_directories(propagator_gpu PRIVATE ${PROJECT_SOURCE_DIR}/main/src ${COOLING_DIR} ${CSTONE_DIR}
@@ -29,11 +29,11 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     enableGrackle(propagator_gpu)
 endif ()
 
-if (CMAKE_CUDA_COMPILER)
+if (CMAKE_CUDA_COMPILER AND SPH_EXA_WITH_CUDA)
     target_link_libraries(propagator_gpu PRIVATE CUDA::cudart)
 endif ()
 
-if (CMAKE_HIP_COMPILER)
+if (CMAKE_HIP_COMPILER AND SPH_EXA_WITH_HIP)
     target_link_libraries(propagator_gpu PRIVATE hip::host)
     target_compile_definitions(propagator_gpu PRIVATE THRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)
     set_target_properties(propagator_gpu PROPERTIES LINKER_LANGUAGE CXX)

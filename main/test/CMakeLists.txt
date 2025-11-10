@@ -19,7 +19,7 @@ if (SPH_EXA_WITH_H5HUT)
     add_test(NAME FrontendUnits COMMAND ${exename})
 endif ()
 
-if (CMAKE_CUDA_COMPILER AND SPH_EXA_WITH_H5HUT)
+if (CMAKE_CUDA_COMPILER AND SPH_EXA_WITH_H5HUT AND SPH_EXA_WITH_CUDA)
     set(testname frontend_units_cuda)
     add_executable(${testname}
             cuda/gpu_particles_data.cpp

@@ -4,11 +4,11 @@ include(ryoanji_add_test)
 
 set(RYOANJI_TEST_INCLUDE_DIRS ${CSTONE_DIR} ${CSTONE_TEST_DIR} ${PROJECT_SOURCE_DIR}/src)
 
-if (CMAKE_HIP_COMPILER)
+if (CMAKE_HIP_COMPILER AND SPH_EXA_WITH_HIP)
     set_source_files_properties(demo.cu PROPERTIES LANGUAGE HIP)
 endif()
 
-if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
+if ((CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER) AND (SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP))
     add_executable(ryoanji_demo demo.cu)
     target_link_libraries(ryoanji_demo PUBLIC ryoanji_kernels cstone_gpu)
     set_target_properties(ryoanji_demo PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
@@ -18,20 +18,20 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
 endif ()
 
 # multi-rank demonstrator
-if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
+if ((CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER) AND (SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP))
     set(testname ryoanji_demo_mpi)
     add_executable(${testname} demo_mpi.cpp)
     target_include_directories(${testname} PRIVATE ${RYOANJI_TEST_INCLUDE_DIRS})
 
     target_link_libraries(${testname} PRIVATE cstone_gpu ryoanji)
 
-    if (CMAKE_HIP_COMPILER)
+    if (CMAKE_HIP_COMPILER AND SPH_EXA_WITH_HIP)
         target_link_libraries(${testname} PRIVATE hip::host)
         target_compile_definitions(${testname} PRIVATE THRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)
         set_target_properties(${testname} PROPERTIES LINKER_LANGUAGE CXX)
     endif ()
 
-    if (CMAKE_CUDA_COMPILER)
+    if (CMAKE_CUDA_COMPILER AND SPH_EXA_WITH_CUDA)
         target_link_libraries(${testname} PRIVATE CUDA::cudart)
     endif ()
     target_compile_options(${testname} PRIVATE -Wno-unknown-pragmas)
@@ -54,12 +54,12 @@ target_link_libraries(${testname} PRIVATE GTest::gtest_main OpenMP::OpenMP_CXX)
 add_test(NAME ${testname} COMMAND ryoanji_cpu_unit_tests)
 install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji/cpu_unit_tests)
 
-if (CMAKE_HIP_COMPILER)
+if (CMAKE_HIP_COMPILER AND SPH_EXA_WITH_HIP)
     set_source_files_properties(nbody/direct.cu nbody/warpscan.cu PROPERTIES LANGUAGE HIP)
 endif()
 
 # GPU unit test suite
-if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
+if ((CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER) AND (SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP))
     set(testname ryoanji_unit_tests)
     add_executable(${testname}
             nbody/ewald.cu
@@ -67,7 +67,7 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
             test_main.cpp)
     target_include_directories(${testname} PRIVATE ${PROJECT_SOURCE_DIR}/src)
     target_link_libraries(${testname} PUBLIC OpenMP::OpenMP_CXX ryoanji GTest::gtest_main)
-    if (CMAKE_HIP_COMPILER)
+    if (CMAKE_HIP_COMPILER AND SPH_EXA_WITH_HIP)
         set_target_properties(${testname} PROPERTIES LINKER_LANGUAGE CXX)
     endif ()
 
