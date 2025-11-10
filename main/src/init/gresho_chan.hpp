@@ -59,11 +59,11 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     double hInit         = 0.5 * std::cbrt(3. * ng0 * mPart / 4. / M_PI / rho);
     double firstTimeStep = settings.at("minDt");
 
-    d.gamma    = settings.at("gamma");
+    d.gammaConst    = settings.at("gamma");
     d.minDt    = firstTimeStep;
     d.minDt_m1 = firstTimeStep;
 
-    auto   cv = sph::idealGasCv(d.muiConst, d.gamma);
+    auto   cv = sph::idealGasCv(d.muiConst, d.gammaConst);
     double R1 = settings.at("R1");
     double v0 = settings.at("v0");
     double P0 = settings.at("P0");
@@ -103,7 +103,7 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
             vi = 0.0;
         }
 
-        auto ui = pi / ((d.gamma - 1.) * rho);
+        auto ui = pi / ((d.gammaConst - 1.) * rho);
         if (d.u.empty()) { d.temp[i] = ui / cv; }
         else { d.u[i] = ui; }
         d.vx[i] = -1.0 * vi * std::sin(theta);

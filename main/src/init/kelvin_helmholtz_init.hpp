@@ -79,7 +79,7 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
 
     generateParticleIDs(d.id);
 
-    auto  cv     = sph::idealGasCv(d.muiConst, gamma);
+    auto  cv     = sph::idealGasCv(T(d.muiConst), gamma);
     auto* u_or_t = d.u.empty() ? d.temp.data() : d.u.data();
 
 #pragma omp parallel for schedule(static)

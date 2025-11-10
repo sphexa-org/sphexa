@@ -73,7 +73,7 @@ void initEvrardFields(Dataset& d, const std::map<std::string, double>& constants
 
     generateParticleIDs(d.id);
 
-    auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
+    auto cv    = sph::idealGasCv(d.muiConst, d.gammaConst);
     auto temp0 = constants.at("u0") / cv;
     std::fill(d.temp.begin(), d.temp.end(), temp0);
     std::fill(d.u.begin(), d.u.end(), constants.at("u0"));

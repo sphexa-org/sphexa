@@ -34,6 +34,7 @@
 #include "propagator.h"
 #include "turb_ve.hpp"
 #include "ve_hydro.hpp"
+#include "ve_variable_gamma.hpp"
 
 namespace sphexa
 {
@@ -53,6 +54,14 @@ PropLib<DomainType, ParticleDataType>::makeTurbVeProp(std::ostream& output, size
 {
     if (avClean) { return std::make_unique<TurbVeProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
     else { return std::make_unique<TurbVeProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
+}
+
+template<class DomainType, class ParticleDataType>
+std::unique_ptr<Propagator<DomainType, ParticleDataType>>
+PropLib<DomainType, ParticleDataType>::makeVariableGammaVeProp(std::ostream& output, size_t rank, bool avClean)
+{
+    if (avClean) { return std::make_unique<VariableGammaVeProp<true, DomainType, ParticleDataType>>(output, rank); }
+    else { return std::make_unique<VariableGammaVeProp<false, DomainType, ParticleDataType>>(output, rank); }
 }
 
 #ifdef USE_CUDA

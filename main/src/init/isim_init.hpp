@@ -33,6 +33,7 @@
 
 #include <filesystem>
 #include <map>
+#include <string>
 
 #include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
@@ -72,6 +73,7 @@ struct SimInitializers
     static InitPtr makeSedovGrid();
     static InitPtr makeTurbulence(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeWindShock(std::string glassBlock, std::string settingsFile, IFileReader* reader);
+    static InitPtr makeTriplePointShock(std::string glassBlock, std::string settingsFile, IFileReader* reader);
 };
 
 extern template struct SimInitializers<SimulationData<cstone::CpuTag>>;

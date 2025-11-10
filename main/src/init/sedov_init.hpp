@@ -75,7 +75,7 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
 
     generateParticleIDs(d.id);
 
-    auto cv = sph::idealGasCv(d.muiConst, d.gamma);
+    auto cv = sph::idealGasCv(d.muiConst, d.gammaConst);
 
     // If temperature is not allocated, we can still use this initializer for just the coordinates
     if (d.temp.empty() && d.u.empty()) { return; }
