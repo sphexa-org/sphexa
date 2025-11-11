@@ -87,13 +87,13 @@ void ryoanjiTest(int thisRank, int numRanks, size_t numParticlesGlobal)
     auto t0 = std::chrono::high_resolution_clock::now();
     // compute accelerations for locally owned particles based on globally valid multipoles and
     // halo particles are in [0:domain.startIndex()] and in [domain.endIndex():domain.nParticlesWithHalos()]
-    float totalPotential = multipoleHolder.compute(grp, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), rawPtr(d_h),
+    double totalPotential = multipoleHolder.compute(grp, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), rawPtr(d_h),
                                                    G, 0, box, nullptr, rawPtr(d_ax), rawPtr(d_ay), rawPtr(d_az));
 
     auto t1 = std::chrono::high_resolution_clock::now();
     auto dt = std::chrono::duration<double>(t1 - t0).count();
 
-    float totalPotentialGlobal;
+    double totalPotentialGlobal;
     mpiAllreduce(&totalPotential, &totalPotentialGlobal, 1, MPI_SUM);
 
     auto [numP2P, maxP2P, numM2P, maxM2P, maxStack] = multipoleHolder.readStats();

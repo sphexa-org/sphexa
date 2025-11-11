@@ -107,7 +107,7 @@ public:
         }
     }
 
-    float compute(GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m, const Th* h, Tc G, int numShells,
+    double compute(GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m, const Th* h, Tc G, int numShells,
                   const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az)
     {
         reallocate(traversalStack_, stackSize(grp.numGroups), 1.01);
@@ -116,7 +116,7 @@ public:
                         ay, az, (int*)rawPtr(traversalStack_));
     }
 
-    float compute(GroupView grp, const Tc* xt, const Tc* yt, const Tc* zt, const Tm* mt, const Th* ht, const Tc* xs,
+    double compute(GroupView grp, const Tc* xt, const Tc* yt, const Tc* zt, const Tm* mt, const Th* ht, const Tc* xs,
                   const Tc* ys, const Tc* zs, const Tm* ms, const Th* hs, Tc G, int numShells,
                   const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az)
     {
@@ -180,7 +180,7 @@ void MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::upsweep(
 }
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
-float MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::compute(GroupView grp, const Tc* x, const Tc* y, const Tc* z,
+double MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::compute(GroupView grp, const Tc* x, const Tc* y, const Tc* z,
                                                                    const Tm* m, const Th* h, Tc G, int numShells,
                                                                    const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax,
                                                                    Ta* ay, Ta* az)
@@ -189,7 +189,7 @@ float MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::compute(GroupView grp
 }
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
-float MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::compute(GroupView grp, const Tc* xt, const Tc* yt,
+double MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::compute(GroupView grp, const Tc* xt, const Tc* yt,
                                                                    const Tc* zt, const Tm* mt, const Th* ht,
                                                                    const Tc* xs, const Tc* ys, const Tc* zs,
                                                                    const Tm* ms, const Th* hs, Tc G, int numShells,

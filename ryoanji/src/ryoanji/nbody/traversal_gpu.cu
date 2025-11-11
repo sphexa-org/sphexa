@@ -357,7 +357,7 @@ struct BhStats
 };
 static __device__ BhStats::type bhStats[BhStats::numStats];
 
-__device__ float        totalPotentialGlob = 0;
+__device__ double        totalPotentialGlob = 0;
 __device__ unsigned int targetCounterGlob  = 0;
 
 __global__ void resetTraversalCounters()
@@ -510,7 +510,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
 
         const int bodyIdxLane = bodyBegin + laneIdx;
 
-        float warpPotential = 0;
+        double warpPotential = 0;
         for (int i = 0; i < TravConfig::nwt; i++)
         {
             const int bodyIdx = bodyIdxLane + i * GpuConfig::warpSize;
@@ -566,8 +566,8 @@ double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restri
     traverseKernel<<<numBlocks, TravConfig::numThreads>>>(grp, initNodeIdx, xt, yt, zt, mt, ht, xs, ys, zs, ms, hs,
                                                           childOffsets, internalToLeaf, layout, sourceCenter,
                                                           multipoles, G, numShells, boxL, p, ax, ay, az, gmPool);
-    float totalPotential;
-    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
+    double totalPotential;
+    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(double)));
     return 0.5 * Tc(G) * totalPotential;
 }
 
