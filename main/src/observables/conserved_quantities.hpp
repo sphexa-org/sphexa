@@ -65,7 +65,7 @@ auto localConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d)
     double sharedCv = sph::idealGasCv(d.muiConst, d.gamma);
     bool   haveMui  = !d.mui.empty();
 
-#pragma omp declare reduction(+ : util::array <double, 3> : omp_out += omp_in) initializer(omp_priv(omp_orig))
+#pragma omp declare reduction(+ : util::array<double, 3> : omp_out += omp_in) initializer(omp_priv(omp_orig))
 
     double eKin = 0.0;
 #pragma omp parallel for reduction(+ : eKin, linmom, angmom)
@@ -93,17 +93,27 @@ auto localConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d)
     }
     else if (!d.temp.empty())
     {
-
-#pragma omp parallel for reduction(+ : eInt)
-        for (size_t i = startIndex; i < endIndex; i++)
+        if (!d.cv.empty())
         {
-            auto cv = haveMui ? sph::idealGasCv(d.mui[i], d.gamma) : sharedCv;
-            auto mi = m[i];
-            eInt += cv * temp[i] * mi;
+#pragma omp parallel for reduction(+ : eInt)
+            for (size_t i = startIndex; i < endIndex; i++)
+            {
+                auto mi = m[i];
+                eInt += d.cv[i] * temp[i] * mi;
+            }
         }
-    }
+        else
+        {
+#pragma omp         parallel for reduction(+ : eInt)
+            for (size_t i = startIndex; i < endIndex; i++)
+            {
+                auto mi = m[i];
+                eInt += sharedCv * temp[i] * mi;
+            }
+                }
+            }
 
-    return std::make_tuple(0.5 * eKin, eInt, linmom, angmom);
+            return std::make_tuple(0.5 * eKin, eInt, linmom, angmom);
 }
 
 /*! @brief Computation of globally conserved quantities
@@ -130,7 +140,7 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
         std::tie(eKin, eInt, linmom, angmom) = conservedQuantitiesGpu(
             sph::idealGasCv(d.muiConst, d.gamma), rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
             rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz), rawPtr(d.devData.temp),
-            rawPtr(d.devData.u), rawPtr(d.devData.m), startIndex, endIndex);
+            rawPtr(d.devData.u), rawPtr(d.devData.cv), rawPtr(d.devData.m), startIndex, endIndex);
     }
     else
     {

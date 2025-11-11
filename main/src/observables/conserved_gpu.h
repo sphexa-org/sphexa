@@ -40,7 +40,7 @@ namespace sphexa
 
 /*! @brief compute conserved energies and momenta on the GPU
  *
- * @param[in] cv         heat capacity
+ * @param[in] cvIdealGas ideal gas heat capacity
  * @param[in] x          x-coordinates
  * @param[in] y          y-coordinates
  * @param[in] z          z-coordinates
@@ -49,6 +49,7 @@ namespace sphexa
  * @param[in] vz         z-velocities
  * @param[in] temp       temperatures, can be nullptr
  * @param[in] u          internal energies, can be nullptr
+ * @param[in] cv         specific heat capacities, can be nullptr
  * @param[in] m          masses
  * @param[in] first      first particle index to include in the sum
  * @param[in] last       last particle index to include in the sum
@@ -56,7 +57,7 @@ namespace sphexa
  */
 template<class Tc, class Tv, class Tt, class Tm>
 extern std::tuple<double, double, cstone::Vec3<double>, cstone::Vec3<double>>
-conservedQuantitiesGpu(double cv, const Tc* x, const Tc* y, const Tc* z, const Tv* vx, const Tv* vy, const Tv* vz,
-                       const Tt* temp, const Tt* u, const Tm* m, size_t first, size_t last);
+conservedQuantitiesGpu(double cvIdealGas, const Tc* x, const Tc* y, const Tc* z, const Tv* vx, const Tv* vy,
+                       const Tv* vz, const Tt* temp, const Tt* u, const Tt* cv, const Tm* m, size_t first, size_t last);
 
 } // namespace sphexa
