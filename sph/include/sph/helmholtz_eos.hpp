@@ -18,16 +18,16 @@ namespace sph
 namespace
 {
 // Table size and constants (internal linkage)
-constexpr int         IMAX            = 541;
-constexpr int         JMAX            = 201;
-constexpr double      tlo             = 3.;
-constexpr double      thi             = 13.;
-constexpr double      tstp            = (thi - tlo) / (JMAX - 1);
-constexpr double      tstpi           = 1. / tstp;
-constexpr double      dlo             = -12.;
-constexpr double      dhi             = 15.;
-constexpr double      dstp            = (dhi - dlo) / (IMAX - 1);
-constexpr double      dstpi           = 1. / dstp;
+constexpr int    IMAX  = 541;
+constexpr int    JMAX  = 201;
+constexpr double tlo   = 3.;
+constexpr double thi   = 13.;
+constexpr double tstp  = (thi - tlo) / (JMAX - 1);
+constexpr double tstpi = 1. / tstp;
+constexpr double dlo   = -12.;
+constexpr double dhi   = 15.;
+constexpr double dstp  = (dhi - dlo) / (IMAX - 1);
+constexpr double dstpi = 1. / dstp;
 
 // Physical constants and parameters
 constexpr double g       = 6.6742867e-8;
@@ -83,30 +83,30 @@ public:
     double dt2i_sav[JMAX - 1] = {0};
     double dt3i_sav[JMAX - 1] = {0};
 
-    double f[IMAX*JMAX]     = {0};
-    double fd[IMAX*JMAX]    = {0};
-    double ft[IMAX*JMAX]    = {0};
-    double fdd[IMAX*JMAX]   = {0};
-    double ftt[IMAX*JMAX]   = {0};
-    double fdt[IMAX*JMAX]   = {0};
-    double fddt[IMAX*JMAX]  = {0};
-    double fdtt[IMAX*JMAX]  = {0};
-    double fddtt[IMAX*JMAX] = {0};
+    double f[IMAX * JMAX]     = {0};
+    double fd[IMAX * JMAX]    = {0};
+    double ft[IMAX * JMAX]    = {0};
+    double fdd[IMAX * JMAX]   = {0};
+    double ftt[IMAX * JMAX]   = {0};
+    double fdt[IMAX * JMAX]   = {0};
+    double fddt[IMAX * JMAX]  = {0};
+    double fdtt[IMAX * JMAX]  = {0};
+    double fddtt[IMAX * JMAX] = {0};
 
-    double dpdf[IMAX*JMAX]   = {0};
-    double dpdfd[IMAX*JMAX]  = {0};
-    double dpdft[IMAX*JMAX]  = {0};
-    double dpdfdt[IMAX*JMAX] = {0};
+    double dpdf[IMAX * JMAX]   = {0};
+    double dpdfd[IMAX * JMAX]  = {0};
+    double dpdft[IMAX * JMAX]  = {0};
+    double dpdfdt[IMAX * JMAX] = {0};
 
-    double ef[IMAX*JMAX]   = {0};
-    double efd[IMAX*JMAX]  = {0};
-    double eft[IMAX*JMAX]  = {0};
-    double efdt[IMAX*JMAX] = {0};
+    double ef[IMAX * JMAX]   = {0};
+    double efd[IMAX * JMAX]  = {0};
+    double eft[IMAX * JMAX]  = {0};
+    double efdt[IMAX * JMAX] = {0};
 
-    double xf[IMAX*JMAX]   = {0};
-    double xfd[IMAX*JMAX]  = {0};
-    double xft[IMAX*JMAX]  = {0};
-    double xfdt[IMAX*JMAX] = {0};
+    double xf[IMAX * JMAX]   = {0};
+    double xfd[IMAX * JMAX]  = {0};
+    double xft[IMAX * JMAX]  = {0};
+    double xfdt[IMAX * JMAX] = {0};
 
     HelmholtzTableManager() = default;
 
@@ -131,22 +131,23 @@ public:
             t_[j]       = std::pow(10.0, tsav);
             for (int i = 0; i < IMAX; ++i)
             {
-                file >> f[i*JMAX+j] >> fd[i*JMAX+j] >> ft[i*JMAX+j] >> fdd[i*JMAX+j] >> ftt[i*JMAX+j] >> fdt[i*JMAX+j] >> fddt[i*JMAX+j] >>
-                    fdtt[i*JMAX+j] >> fddtt[i*JMAX+j];
+                file >> f[i * JMAX + j] >> fd[i * JMAX + j] >> ft[i * JMAX + j] >> fdd[i * JMAX + j] >>
+                    ftt[i * JMAX + j] >> fdt[i * JMAX + j] >> fddt[i * JMAX + j] >> fdtt[i * JMAX + j] >>
+                    fddtt[i * JMAX + j];
             }
         }
         // read the pressure derivative with rhosity table
         for (int j = 0; j < JMAX; ++j)
             for (int i = 0; i < IMAX; ++i)
-                file >> dpdf[i*JMAX+j] >> dpdfd[i*JMAX+j] >> dpdft[i*JMAX+j] >> dpdfdt[i*JMAX+j];
+                file >> dpdf[i * JMAX + j] >> dpdfd[i * JMAX + j] >> dpdft[i * JMAX + j] >> dpdfdt[i * JMAX + j];
         // read the electron chemical potential table
         for (int j = 0; j < JMAX; ++j)
             for (int i = 0; i < IMAX; ++i)
-                file >> ef[i*JMAX+j] >> efd[i*JMAX+j] >> eft[i*JMAX+j] >> efdt[i*JMAX+j];
+                file >> ef[i * JMAX + j] >> efd[i * JMAX + j] >> eft[i * JMAX + j] >> efdt[i * JMAX + j];
         // read the number rhosity table
         for (int j = 0; j < JMAX; ++j)
             for (int i = 0; i < IMAX; ++i)
-                file >> xf[i*JMAX+j] >> xfd[i*JMAX+j] >> xft[i*JMAX+j] >> xfdt[i*JMAX+j];
+                file >> xf[i * JMAX + j] >> xfd[i * JMAX + j] >> xft[i * JMAX + j] >> xfdt[i * JMAX + j];
 
         // construct the temperature and rhosity deltas and their inverses
         for (int j = 0; j < JMAX - 1; ++j)
@@ -184,45 +185,45 @@ public:
 struct HelmholtzTableView
 {
     // grid axes and deltas
-    const double* d;           // [IMAX]
-    const double* dd_sav;      // [IMAX-1]
-    const double* dd2_sav;     // [IMAX-1]
-    const double* ddi_sav;     // [IMAX-1]
-    const double* dd2i_sav;    // [IMAX-1]
-    const double* dd3i_sav;    // [IMAX-1]
+    const double* d;        // [IMAX]
+    const double* dd_sav;   // [IMAX-1]
+    const double* dd2_sav;  // [IMAX-1]
+    const double* ddi_sav;  // [IMAX-1]
+    const double* dd2i_sav; // [IMAX-1]
+    const double* dd3i_sav; // [IMAX-1]
 
-    const double* t;           // [JMAX]
-    const double* dt_sav;      // [JMAX-1]
-    const double* dt2_sav;     // [JMAX-1]
-    const double* dti_sav;     // [JMAX-1]
-    const double* dt2i_sav;    // [JMAX-1]
-    const double* dt3i_sav;    // [JMAX-1]
+    const double* t;        // [JMAX]
+    const double* dt_sav;   // [JMAX-1]
+    const double* dt2_sav;  // [JMAX-1]
+    const double* dti_sav;  // [JMAX-1]
+    const double* dt2i_sav; // [JMAX-1]
+    const double* dt3i_sav; // [JMAX-1]
 
     // tables
-    const double* f;           // [IMAX*JMAX]
-    const double* fd;          // [IMAX*JMAX]
-    const double* ft;          // [IMAX*JMAX]
-    const double* fdd;         // [IMAX*JMAX]
-    const double* ftt;         // [IMAX*JMAX]
-    const double* fdt;         // [IMAX*JMAX]
-    const double* fddt;        // [IMAX*JMAX]
-    const double* fdtt;        // [IMAX*JMAX]
-    const double* fddtt;       // [IMAX*JMAX]
+    const double* f;     // [IMAX*JMAX]
+    const double* fd;    // [IMAX*JMAX]
+    const double* ft;    // [IMAX*JMAX]
+    const double* fdd;   // [IMAX*JMAX]
+    const double* ftt;   // [IMAX*JMAX]
+    const double* fdt;   // [IMAX*JMAX]
+    const double* fddt;  // [IMAX*JMAX]
+    const double* fdtt;  // [IMAX*JMAX]
+    const double* fddtt; // [IMAX*JMAX]
 
-    const double* dpdf;        // [IMAX*JMAX]
-    const double* dpdfd;       // [IMAX*JMAX]
-    const double* dpdft;       // [IMAX*JMAX]
-    const double* dpdfdt;      // [IMAX*JMAX]
+    const double* dpdf;   // [IMAX*JMAX]
+    const double* dpdfd;  // [IMAX*JMAX]
+    const double* dpdft;  // [IMAX*JMAX]
+    const double* dpdfdt; // [IMAX*JMAX]
 
-    const double* ef;          // [IMAX*JMAX]
-    const double* efd;         // [IMAX*JMAX]
-    const double* eft;         // [IMAX*JMAX]
-    const double* efdt;        // [IMAX*JMAX]
+    const double* ef;   // [IMAX*JMAX]
+    const double* efd;  // [IMAX*JMAX]
+    const double* eft;  // [IMAX*JMAX]
+    const double* efdt; // [IMAX*JMAX]
 
-    const double* xf;          // [IMAX*JMAX]
-    const double* xfd;         // [IMAX*JMAX]
-    const double* xft;         // [IMAX*JMAX]
-    const double* xfdt;        // [IMAX*JMAX]
+    const double* xf;   // [IMAX*JMAX]
+    const double* xfd;  // [IMAX*JMAX]
+    const double* xft;  // [IMAX*JMAX]
+    const double* xfdt; // [IMAX*JMAX]
 };
 
 class Helmholtz_EOS
@@ -245,9 +246,9 @@ private:
         const double ye  = stl::max<double>(1e-16, zbar / abar);
         const double din = ye * rho;
         jat              = int((std::log10(temp) - tlo) * tstpi);
-        jat              = stl::max<int>(1, stl::min<int>(jat, JMAX - 2));
+        jat              = stl::max<int>(0, stl::min<int>(jat, JMAX - 2));
         iat              = int((std::log10(din) - dlo) * dstpi);
-        iat              = stl::max<int>(1, stl::min<int>(iat, IMAX - 2));
+        iat              = stl::max<int>(0, stl::min<int>(iat, IMAX - 2));
     }
     // quintic hermite polynomial statement functions
     // psi0 and its derivatives
@@ -359,12 +360,11 @@ private:
     static Helmholtz_EOS* instance_;
 
 public:
-
-    Helmholtz_EOS(const Helmholtz_EOS&) = delete;
+    Helmholtz_EOS(const Helmholtz_EOS&)            = delete;
     Helmholtz_EOS& operator=(const Helmholtz_EOS&) = delete;
 
     // Call this ONCE before instance()
-    static void init(const std::string& path);
+    static void           init(const std::string& path);
     static Helmholtz_EOS& instance();
 
     // Host-side view of the tables
@@ -411,7 +411,7 @@ public:
         v.xfdt = tableManager_->xfdt;
         return v;
     }
-    
+
     /*! @brief Helmholtz EOS for a given temperature and density
      *
      * @param abar_ mean atomic weight
@@ -421,7 +421,8 @@ public:
      *
      */
     template<typename T1, typename T2>
-    static HOST_DEVICE_FUN auto helmholtzEOS(const HelmholtzTableView& tv, const T1 temp, const T2 rho, T1 abar, T1 zbar, T2* c, T2* p)
+    static HOST_DEVICE_FUN auto helmholtz_EOS(const HelmholtzTableView& tv, const T1 temp, const T2 rho, T1 abar,
+                                              T1 zbar, T2* c, T2* p)
     {
         using T = std::common_type_t<T1, T2>;
         // coefficients
@@ -504,42 +505,42 @@ public:
         // T xnem = xni * zbar; // unused
 
         // move table values into coefficient table
-        fi[0]  = tv.f[(iat + 0)*JMAX + jat + 0];
-        fi[1]  = tv.f[(iat + 1)*JMAX + jat + 0];
-        fi[2]  = tv.f[(iat + 0)*JMAX + jat + 1];
-        fi[3]  = tv.f[(iat + 1)*JMAX + jat + 1];
-        fi[4]  = tv.ft[(iat + 0)*JMAX + jat + 0];
-        fi[5]  = tv.ft[(iat + 1)*JMAX + jat + 0];
-        fi[6]  = tv.ft[(iat + 0)*JMAX + jat + 1];
-        fi[7]  = tv.ft[(iat + 1)*JMAX + jat + 1];
-        fi[8]  = tv.ftt[(iat + 0)*JMAX + jat + 0];
-        fi[9]  = tv.ftt[(iat + 1)*JMAX + jat + 0];
-        fi[10] = tv.ftt[(iat + 0)*JMAX + jat + 1];
-        fi[11] = tv.ftt[(iat + 1)*JMAX + jat + 1];
-        fi[12] = tv.fd[(iat + 0)*JMAX + jat + 0];
-        fi[13] = tv.fd[(iat + 1)*JMAX + jat + 0];
-        fi[14] = tv.fd[(iat + 0)*JMAX + jat + 1];
-        fi[15] = tv.fd[(iat + 1)*JMAX + jat + 1];
-        fi[16] = tv.fdd[(iat + 0)*JMAX + jat + 0];
-        fi[17] = tv.fdd[(iat + 1)*JMAX + jat + 0];
-        fi[18] = tv.fdd[(iat + 0)*JMAX + jat + 1];
-        fi[19] = tv.fdd[(iat + 1)*JMAX + jat + 1];
-        fi[20] = tv.fdt[(iat + 0)*JMAX + jat + 0];
-        fi[21] = tv.fdt[(iat + 1)*JMAX + jat + 0];
-        fi[22] = tv.fdt[(iat + 0)*JMAX + jat + 1];
-        fi[23] = tv.fdt[(iat + 1)*JMAX + jat + 1];
-        fi[24] = tv.fddt[(iat + 0)*JMAX + jat + 0];
-        fi[25] = tv.fddt[(iat + 1)*JMAX + jat + 0];
-        fi[26] = tv.fddt[(iat + 0)*JMAX + jat + 1];
-        fi[27] = tv.fddt[(iat + 1)*JMAX + jat + 1];
-        fi[28] = tv.fdtt[(iat + 0)*JMAX + jat + 0];
-        fi[29] = tv.fdtt[(iat + 1)*JMAX + jat + 0];
-        fi[30] = tv.fdtt[(iat + 0)*JMAX + jat + 1];
-        fi[31] = tv.fdtt[(iat + 1)*JMAX + jat + 1];
-        fi[32] = tv.fddtt[(iat + 0)*JMAX + jat + 0];
-        fi[33] = tv.fddtt[(iat + 1)*JMAX + jat + 0];
-        fi[34] = tv.fddtt[(iat + 0)*JMAX + jat + 1];
-        fi[35] = tv.fddtt[(iat + 1)*JMAX + jat + 1];
+        fi[0]  = tv.f[(iat + 0) * JMAX + jat + 0];
+        fi[1]  = tv.f[(iat + 1) * JMAX + jat + 0];
+        fi[2]  = tv.f[(iat + 0) * JMAX + jat + 1];
+        fi[3]  = tv.f[(iat + 1) * JMAX + jat + 1];
+        fi[4]  = tv.ft[(iat + 0) * JMAX + jat + 0];
+        fi[5]  = tv.ft[(iat + 1) * JMAX + jat + 0];
+        fi[6]  = tv.ft[(iat + 0) * JMAX + jat + 1];
+        fi[7]  = tv.ft[(iat + 1) * JMAX + jat + 1];
+        fi[8]  = tv.ftt[(iat + 0) * JMAX + jat + 0];
+        fi[9]  = tv.ftt[(iat + 1) * JMAX + jat + 0];
+        fi[10] = tv.ftt[(iat + 0) * JMAX + jat + 1];
+        fi[11] = tv.ftt[(iat + 1) * JMAX + jat + 1];
+        fi[12] = tv.fd[(iat + 0) * JMAX + jat + 0];
+        fi[13] = tv.fd[(iat + 1) * JMAX + jat + 0];
+        fi[14] = tv.fd[(iat + 0) * JMAX + jat + 1];
+        fi[15] = tv.fd[(iat + 1) * JMAX + jat + 1];
+        fi[16] = tv.fdd[(iat + 0) * JMAX + jat + 0];
+        fi[17] = tv.fdd[(iat + 1) * JMAX + jat + 0];
+        fi[18] = tv.fdd[(iat + 0) * JMAX + jat + 1];
+        fi[19] = tv.fdd[(iat + 1) * JMAX + jat + 1];
+        fi[20] = tv.fdt[(iat + 0) * JMAX + jat + 0];
+        fi[21] = tv.fdt[(iat + 1) * JMAX + jat + 0];
+        fi[22] = tv.fdt[(iat + 0) * JMAX + jat + 1];
+        fi[23] = tv.fdt[(iat + 1) * JMAX + jat + 1];
+        fi[24] = tv.fddt[(iat + 0) * JMAX + jat + 0];
+        fi[25] = tv.fddt[(iat + 1) * JMAX + jat + 0];
+        fi[26] = tv.fddt[(iat + 0) * JMAX + jat + 1];
+        fi[27] = tv.fddt[(iat + 1) * JMAX + jat + 1];
+        fi[28] = tv.fdtt[(iat + 0) * JMAX + jat + 0];
+        fi[29] = tv.fdtt[(iat + 1) * JMAX + jat + 0];
+        fi[30] = tv.fdtt[(iat + 0) * JMAX + jat + 1];
+        fi[31] = tv.fdtt[(iat + 1) * JMAX + jat + 1];
+        fi[32] = tv.fddtt[(iat + 0) * JMAX + jat + 0];
+        fi[33] = tv.fddtt[(iat + 1) * JMAX + jat + 0];
+        fi[34] = tv.fddtt[(iat + 0) * JMAX + jat + 1];
+        fi[35] = tv.fddtt[(iat + 1) * JMAX + jat + 1];
 
         // various differences (checked and updated with djat,diat)
         int djat = stl::min(JMAX - 2, jat);
@@ -647,43 +648,43 @@ public:
         dsi1md = xdpsi1(mxd);
 
         // move table values into coefficient table
-        fi[0]  = tv.dpdf[(iat + 0)*JMAX + jat + 0];
-        fi[1]  = tv.dpdf[(iat + 1)*JMAX + jat + 0];
-        fi[2]  = tv.dpdf[(iat + 0)*JMAX + jat + 1];
-        fi[3]  = tv.dpdf[(iat + 1)*JMAX + jat + 1];
-        fi[4]  = tv.dpdft[(iat + 0)*JMAX + jat + 0];
-        fi[5]  = tv.dpdft[(iat + 1)*JMAX + jat + 0];
-        fi[6]  = tv.dpdft[(iat + 0)*JMAX + jat + 1];
-        fi[7]  = tv.dpdft[(iat + 1)*JMAX + jat + 1];
-        fi[8]  = tv.dpdfd[(iat + 0)*JMAX + jat + 0];
-        fi[9]  = tv.dpdfd[(iat + 1)*JMAX + jat + 0];
-        fi[10] = tv.dpdfd[(iat + 0)*JMAX + jat + 1];
-        fi[11] = tv.dpdfd[(iat + 1)*JMAX + jat + 1];
-        fi[12] = tv.dpdfdt[(iat + 0)*JMAX + jat + 0];
-        fi[13] = tv.dpdfdt[(iat + 1)*JMAX + jat + 0];
-        fi[14] = tv.dpdfdt[(iat + 0)*JMAX + jat + 1];
-        fi[15] = tv.dpdfdt[(iat + 1)*JMAX + jat + 1];
+        fi[0]  = tv.dpdf[(iat + 0) * JMAX + jat + 0];
+        fi[1]  = tv.dpdf[(iat + 1) * JMAX + jat + 0];
+        fi[2]  = tv.dpdf[(iat + 0) * JMAX + jat + 1];
+        fi[3]  = tv.dpdf[(iat + 1) * JMAX + jat + 1];
+        fi[4]  = tv.dpdft[(iat + 0) * JMAX + jat + 0];
+        fi[5]  = tv.dpdft[(iat + 1) * JMAX + jat + 0];
+        fi[6]  = tv.dpdft[(iat + 0) * JMAX + jat + 1];
+        fi[7]  = tv.dpdft[(iat + 1) * JMAX + jat + 1];
+        fi[8]  = tv.dpdfd[(iat + 0) * JMAX + jat + 0];
+        fi[9]  = tv.dpdfd[(iat + 1) * JMAX + jat + 0];
+        fi[10] = tv.dpdfd[(iat + 0) * JMAX + jat + 1];
+        fi[11] = tv.dpdfd[(iat + 1) * JMAX + jat + 1];
+        fi[12] = tv.dpdfdt[(iat + 0) * JMAX + jat + 0];
+        fi[13] = tv.dpdfdt[(iat + 1) * JMAX + jat + 0];
+        fi[14] = tv.dpdfdt[(iat + 0) * JMAX + jat + 1];
+        fi[15] = tv.dpdfdt[(iat + 1) * JMAX + jat + 1];
 
         T dpepdd = h3(fi, si0t, si1t, si0mt, si1mt, si0d, si1d, si0md, si1md);
         dpepdd   = stl::max<T>(ye * dpepdd, (T)1.e-30);
 
         // move table values into coefficient table
-        fi[0]  = tv.ef[(iat + 0)*JMAX + jat + 0];
-        fi[1]  = tv.ef[(iat + 1)*JMAX + jat + 0];
-        fi[2]  = tv.ef[(iat + 0)*JMAX + jat + 1];
-        fi[3]  = tv.ef[(iat + 1)*JMAX + jat + 1];
-        fi[4]  = tv.eft[(iat + 0)*JMAX + jat + 0];
-        fi[5]  = tv.eft[(iat + 1)*JMAX + jat + 0];
-        fi[6]  = tv.eft[(iat + 0)*JMAX + jat + 1];
-        fi[7]  = tv.eft[(iat + 1)*JMAX + jat + 1];
-        fi[8]  = tv.efd[(iat + 0)*JMAX + jat + 0];
-        fi[9]  = tv.efd[(iat + 1)*JMAX + jat + 0];
-        fi[10] = tv.efd[(iat + 0)*JMAX + jat + 1];
-        fi[11] = tv.efd[(iat + 1)*JMAX + jat + 1];
-        fi[12] = tv.efdt[(iat + 0)*JMAX + jat + 0];
-        fi[13] = tv.efdt[(iat + 1)*JMAX + jat + 0];
-        fi[14] = tv.efdt[(iat + 0)*JMAX + jat + 1];
-        fi[15] = tv.efdt[(iat + 1)*JMAX + jat + 1];
+        fi[0]  = tv.ef[(iat + 0) * JMAX + jat + 0];
+        fi[1]  = tv.ef[(iat + 1) * JMAX + jat + 0];
+        fi[2]  = tv.ef[(iat + 0) * JMAX + jat + 1];
+        fi[3]  = tv.ef[(iat + 1) * JMAX + jat + 1];
+        fi[4]  = tv.eft[(iat + 0) * JMAX + jat + 0];
+        fi[5]  = tv.eft[(iat + 1) * JMAX + jat + 0];
+        fi[6]  = tv.eft[(iat + 0) * JMAX + jat + 1];
+        fi[7]  = tv.eft[(iat + 1) * JMAX + jat + 1];
+        fi[8]  = tv.efd[(iat + 0) * JMAX + jat + 0];
+        fi[9]  = tv.efd[(iat + 1) * JMAX + jat + 0];
+        fi[10] = tv.efd[(iat + 0) * JMAX + jat + 1];
+        fi[11] = tv.efd[(iat + 1) * JMAX + jat + 1];
+        fi[12] = tv.efdt[(iat + 0) * JMAX + jat + 0];
+        fi[13] = tv.efdt[(iat + 1) * JMAX + jat + 0];
+        fi[14] = tv.efdt[(iat + 0) * JMAX + jat + 1];
+        fi[15] = tv.efdt[(iat + 1) * JMAX + jat + 1];
 
         // electron chemical potential etaele (unused)
         // T etaele = h3(fi, si0t, si1t, si0mt, si1mt, si0d, si1d, si0md, si1md);
@@ -700,22 +701,22 @@ public:
         // T detadz = x * rho * ytot1;
 
         // move table values into coefficient table
-        fi[0]  = tv.xf[(iat + 0)*JMAX + jat + 0];
-        fi[1]  = tv.xf[(iat + 1)*JMAX + jat + 0];
-        fi[2]  = tv.xf[(iat + 0)*JMAX + jat + 1];
-        fi[3]  = tv.xf[(iat + 1)*JMAX + jat + 1];
-        fi[4]  = tv.xft[(iat + 0)*JMAX + jat + 0];
-        fi[5]  = tv.xft[(iat + 1)*JMAX + jat + 0];
-        fi[6]  = tv.xft[(iat + 0)*JMAX + jat + 1];
-        fi[7]  = tv.xft[(iat + 1)*JMAX + jat + 1];
-        fi[8]  = tv.xfd[(iat + 0)*JMAX + jat + 0];
-        fi[9]  = tv.xfd[(iat + 1)*JMAX + jat + 0];
-        fi[10] = tv.xfd[(iat + 0)*JMAX + jat + 1];
-        fi[11] = tv.xfd[(iat + 1)*JMAX + jat + 1];
-        fi[12] = tv.xfdt[(iat + 0)*JMAX + jat + 0];
-        fi[13] = tv.xfdt[(iat + 1)*JMAX + jat + 0];
-        fi[14] = tv.xfdt[(iat + 0)*JMAX + jat + 1];
-        fi[15] = tv.xfdt[(iat + 1)*JMAX + jat + 1];
+        fi[0]  = tv.xf[(iat + 0) * JMAX + jat + 0];
+        fi[1]  = tv.xf[(iat + 1) * JMAX + jat + 0];
+        fi[2]  = tv.xf[(iat + 0) * JMAX + jat + 1];
+        fi[3]  = tv.xf[(iat + 1) * JMAX + jat + 1];
+        fi[4]  = tv.xft[(iat + 0) * JMAX + jat + 0];
+        fi[5]  = tv.xft[(iat + 1) * JMAX + jat + 0];
+        fi[6]  = tv.xft[(iat + 0) * JMAX + jat + 1];
+        fi[7]  = tv.xft[(iat + 1) * JMAX + jat + 1];
+        fi[8]  = tv.xfd[(iat + 0) * JMAX + jat + 0];
+        fi[9]  = tv.xfd[(iat + 1) * JMAX + jat + 0];
+        fi[10] = tv.xfd[(iat + 0) * JMAX + jat + 1];
+        fi[11] = tv.xfd[(iat + 1) * JMAX + jat + 1];
+        fi[12] = tv.xfdt[(iat + 0) * JMAX + jat + 0];
+        fi[13] = tv.xfdt[(iat + 1) * JMAX + jat + 0];
+        fi[14] = tv.xfdt[(iat + 0) * JMAX + jat + 1];
+        fi[15] = tv.xfdt[(iat + 1) * JMAX + jat + 1];
 
         // electron + positron number densities (unused)
         // T xnefer = h3(fi, si0t, si1t, si0mt, si1mt, si0d, si1d, si0md, si1md);
@@ -923,7 +924,7 @@ public:
         // the specific heat at constant pressure (c&g 9.98)
         // and relativistic formula for the sound speed (c&g 14.29)
 
-        T cp, dpdT;//, u;
+        T cp, dpdT; //, u;
 
         T dse, dpe, dsp;
         T cv_gas, cp_gas, c_gas;
@@ -949,7 +950,7 @@ public:
         zzi    = rho / pres;
         T chit = temp / pres * dpresdt;
         T chid = dpresdd * zzi;
-        T cvi     = rhoerdt;
+        T cvi  = rhoerdt;
         x      = zz * chit / (temp * cvi);
         // T gam3  = x + 1.;
         T gam1 = chit * x + chid;
@@ -957,7 +958,7 @@ public:
         // T gam2  = 1. / (1. - nabad);
         cp = cvi * gam1 / chid;
         z  = 1. + (ener + clight * clight) * zzi;
-        *c  = clight * std::sqrt(gam1 / z);
+        *c = clight * std::sqrt(gam1 / z);
 
         // maxwell relations; each is zero if the consistency is perfect
         x   = rho * rho;
@@ -968,17 +969,17 @@ public:
         // Needed output
         dpdT  = dpresdt;
         dudYe = degasdz * abar;
-        *p     = pres;
+        *p    = pres;
         // *u     = ener;
 
-        return util::tuple<T,T>{dpdT, cvi};
+        return util::tuple<T, T>{dpdT, cvi};
     }
 
     // Convenience host wrapper preserving old API
     template<typename T1, typename T2>
     inline auto helmholtzEOS(const T1 temp, const T2 rho, T1 abar, T1 zbar, T2* c, T2* p)
     {
-        return helmholtzEOS(hostTableView(), temp, rho, abar, zbar, c, p);
+        return helmholtz_EOS(hostTableView(), temp, rho, abar, zbar, c, p);
     }
 };
 
