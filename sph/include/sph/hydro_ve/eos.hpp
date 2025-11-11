@@ -167,6 +167,7 @@ void computeHelmholtzEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     auto* cv       = d.cv.data();
     auto* tdpdTrho = d.tdpdTrho.data();
     auto* u        = d.u.data();
+	auto* p = d.p.data();
 
     bool storeRho      = (d.rho.size() == d.m.size());
     bool storeP        = (d.p.size() == d.m.size());
@@ -179,17 +180,15 @@ void computeHelmholtzEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     for (size_t i = startIndex; i < endIndex; ++i)
     {
         auto rho = kx[i] * m[i] / xm[i];
-        double p = 0.0;
+        //double p = 0.0;
         // get dpdt instead of u and calculate tdpdtrho = temp * dp/dT * prho
-        auto [dpdt, cvi] = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i], &c[i], &p);
+        auto [dpdt, cvi] = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i], &c[i], &p[i]);
 
-        prho[i] = p / (kx[i] * m[i] * m[i] * gradh[i]);
-        // c[i]    = ci;
+        prho[i] = p[i] / (kx[i] * m[i] * m[i] * gradh[i]);
 
         if (storeRho) { d.rho[i] = rho; }
         if (storeTdpdTrho) { tdpdTrho[i] = temp[i] * dpdt * prho[i]; }
         if (storeCv) { d.cv[i] = cvi; }
-        // if (storeU) { d.u[i] = ui; }
     }
 }
 

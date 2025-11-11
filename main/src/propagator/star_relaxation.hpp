@@ -72,7 +72,7 @@ protected:
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ =
-        FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33", "xm", "kx", "nc", "cv", "tdpdTrho">;
+        FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33", "xm", "kx", "nc", "cv", "tdpdTrho", "p">;
 
     //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
@@ -248,10 +248,10 @@ public:
 
         // second output pass: write temporary quantities produced by the EOS
         release(d, "c11", "c12", "c13");
-        acquire(d, "rho", "p", "gradh");
+        acquire(d, "rho", "gradh");
         computeEOS(first, last, d);
         output();
-        release(d, "rho", "p", "gradh");
+        release(d, "rho", "gradh");
         acquire(d, "c11", "c12", "c13");
 
         // third output pass: recover temporary curlv and divv quantities

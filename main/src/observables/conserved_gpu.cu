@@ -68,6 +68,22 @@ struct EMom
     }
 };
 
+/*! @brief Functor to compute internal energy contribution for one particle
+ *
+ * @tparam Tm   type of mass
+ * @tparam Tt   type of temperature/cv
+ */
+template<class Tm, class Tt>
+struct ComputeInternalEnergy
+{
+    const Tm* m;
+    const Tt* cv;
+    const Tt* temp;
+    size_t    first;
+
+    __device__ double operator()(size_t i) const { return m[i + first] * cv[i + first] * temp[i + first]; }
+};
+
 template<class Tc, class Tv, class Tt, class Tm>
 std::tuple<double, double, Vec3<double>, Vec3<double>>
 conservedQuantitiesGpu(double cvIdealGas, const Tc* x, const Tc* y, const Tc* z, const Tv* vx, const Tv* vy,
@@ -90,9 +106,10 @@ conservedQuantitiesGpu(double cvIdealGas, const Tc* x, const Tc* y, const Tc* z,
         if (cv != nullptr)
         {
             // elementwise product: eInt = sum_i( m[i] * cv[i] * temp[i] )
-            eInt = thrust::transform_reduce(
-                thrust::device, m + first, m + last, [cv, temp, first] __device__(const auto& mi, size_t idx)
-                { return mi * cv[idx + first] * temp[idx + first]; }, 0.0, thrust::plus<double>());
+            auto n = last - first;
+            eInt   = thrust::transform_reduce(
+                thrust::device, thrust::make_counting_iterator<size_t>(0), thrust::make_counting_iterator<size_t>(n),
+                ComputeInternalEnergy<Tm, Tt>{m, cv, temp, first}, 0.0, thrust::plus<double>());
         }
         else { eInt = cvIdealGas * thrust::inner_product(thrust::device, m + first, m + last, temp + first, Tt(0.0)); }
     }
@@ -112,3 +129,4 @@ CONSERVED_Q_GPU(double, float, double, float);
 CONSERVED_Q_GPU(float, float, float, float);
 
 } // namespace sphexa
+

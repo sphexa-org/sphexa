@@ -134,7 +134,7 @@ __global__ void cudaComputeHelmholtzEOS(size_t firstParticle, size_t lastParticl
     Tt     u_i;
     Thydro rho_i = kx[i] * m[i] / xm[i];
 
-    auto [dpdT, cv_i] = Helmholtz_EOS::helmholtzEOS(tv, temp[i], rho_i, abar[i], zbar[i], &c_i, &p_i);
+    auto [dpdT, cv_i] = Helmholtz_EOS::helmholtz_EOS(tv, temp[i], rho_i, abar[i], zbar[i], &c_i, &p_i);
 
     prho[i] = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
     c[i]    = c_i;
