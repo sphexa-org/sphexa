@@ -70,6 +70,9 @@ if ((CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER) AND (SPH_EXA_WITH_CUDA OR SPH_EX
     if (CMAKE_HIP_COMPILER AND SPH_EXA_WITH_HIP)
         set_target_properties(${testname} PROPERTIES LINKER_LANGUAGE CXX)
     endif ()
+    if (CMAKE_CUDA_COMPILER AND SPH_EXA_WITH_CUDA)
+        target_compile_options(${testname} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>)
+    endif ()
 
     add_test(NAME ${testname} COMMAND ${testname})
     install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji/unit_tests)
