@@ -445,7 +445,7 @@ struct AxisMixDBits
 };
 
 template<typename T, typename KeyType, typename BoxType>
-AxisMixDBits getBoxMixDimensionBits(const BoxType& box)
+HOST_DEVICE_FUN AxisMixDBits getBoxMixDimensionBits(const BoxType& box)
 {
     const std::array<T, 3> boxDimensions{box.xmax() - box.xmin(), box.ymax() - box.ymin(), box.zmax() - box.zmin()};
     const auto maxDimIndex = std::max_element(boxDimensions.begin(), boxDimensions.end()) - boxDimensions.begin();
