@@ -125,13 +125,12 @@ template<class Tt, class Tm, class Thydro>
 __global__ void cudaComputeHelmholtzEOS(size_t firstParticle, size_t lastParticle, HelmholtzTableView tv,
                                         const Thydro* kx, const Thydro* xm, const Tm* m, const Tt* temp, const Tt* abar,
                                         const Tt* zbar, const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* cv,
-                                        Thydro* tdpdtrho)
+                                        Thydro* tdpdtrho, Thydro* rho, Thydro* p)
 {
     unsigned i = firstParticle + blockDim.x * blockIdx.x + threadIdx.x;
     if (i >= lastParticle) return;
 
     Thydro p_i, c_i;
-    Tt     u_i;
     Thydro rho_i = kx[i] * m[i] / xm[i];
 
     auto [dpdT, cv_i] = Helmholtz_EOS::helmholtz_EOS(tv, temp[i], rho_i, abar[i], zbar[i], &c_i, &p_i);
@@ -139,23 +138,22 @@ __global__ void cudaComputeHelmholtzEOS(size_t firstParticle, size_t lastParticl
     prho[i] = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
     c[i]    = c_i;
     if (tdpdtrho) { tdpdtrho[i] = temp[i] * dpdT / (kx[i] * m[i] * m[i] * gradh[i]); }
+    if (rho) { rho[i] = rho_i; }
     if (p) { p[i] = p_i; }
     if (cv) { cv[i] = cv_i; }
-    // if (u) { u[i] = u_i; }
-    if (rho) { rho[i] = rho_i; }
 }
 
 template<class Tt, class Tm, class Thydro>
 void computeHelmholtzEOS(size_t firstParticle, size_t lastParticle, const Thydro* kx, const Thydro* xm, const Tm* m,
                          const Tt* temp, const Tt* abar, const Tt* zbar, const Thydro* gradh, Thydro* prho, Thydro* c,
-                         Thydro* cv, Thydro* tdpdtrho)
+                         Thydro* cv, Thydro* tdpdtrho, Thydro* rho, Thydro* p)
 {
     if (firstParticle == lastParticle) { return; }
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(lastParticle - firstParticle, numThreads);
     auto     tv         = getDeviceTableView();
     cudaComputeHelmholtzEOS<<<numBlocks, numThreads>>>(firstParticle, lastParticle, tv, kx, xm, m, temp, abar, zbar,
-                                                       gradh, prho, c, cv, tdpdtrho);
+                                                       gradh, prho, c, cv, tdpdtrho, rho, p);
 
     checkGpuErrors(cudaDeviceSynchronize());
 }
