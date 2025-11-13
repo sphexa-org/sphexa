@@ -10,9 +10,8 @@ def read_data_from_file(filename):
     return np.array(parsed)
 
 # File names (adjust paths if needed)
-mixDConstants = '/capstor/scratch/cscs/ioannmag/CORNERSTONE/sphexa/build_cpu/constants_windshock_r4_c71_d100_50_n50_cpu.txt'
-developConstants = '/capstor/scratch/cscs/ioannmag/CORNERSTONE/sphexa-develop/build_cpu/constants_windshock_r4_c71_d100_50_n50_cpu.txt'
-
+mixDConstants = '/capstor/scratch/cscs/ioannmag/CORNERSTONE/sphexa/build_cpu/constants_kelvin_r4_c71_s200_n50_cpu.txt'
+developConstants = '/capstor/scratch/cscs/ioannmag/CORNERSTONE/sphexa-develop/build_cpu/constants_kelvin_r4_c71_s200_n50_cpu.txt'
 base1 = os.path.basename(mixDConstants)
 base2 = os.path.basename(developConstants)
 if base1 != base2:
@@ -46,8 +45,8 @@ developData = read_data_from_file(developConstants)
 
 # Extract relevant columns
 x = mixDData[:, 0]
-y1 = mixDData[:, -2]
-y2 = developData[:, -2]
+y1 = mixDData[:, -1]
+y2 = developData[:, -1]
 
 # Compute absolute and relative differences
 abs_diff = np.abs(y1 - y2)
@@ -75,13 +74,13 @@ plt.figure(figsize=(8, 5))
 plt.plot(x, y1, label='MixD')
 plt.plot(x, y2, label='develop')
 plt.xlabel('Iteration step')
-plt.ylabel('Surviving Fraction')
-plt.title('Surviving Fraction per iteration step (139719 particles)')
+plt.ylabel('Growth-rate')
+plt.title('Growth-rate per iteration step (24M particles)')
 # plt.xticks(x)
 plt.grid(True)
 plt.legend(title=summary_label, loc='upper right', fontsize='small')
 plt.tight_layout()
 plt.show()
-output_file = 'surviving_fraction_comparison.png'
+output_file = 'growth_rate_comparison.png'
 plt.savefig(output_file, dpi=300, bbox_inches='tight')
 print(f'Saved figure to {output_file}')
