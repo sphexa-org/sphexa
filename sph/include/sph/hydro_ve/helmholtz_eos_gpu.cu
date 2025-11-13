@@ -138,10 +138,11 @@ __global__ void cudaComputeHelmholtzEOS(size_t firstParticle, size_t lastParticl
 
     prho[i] = p_i / (kx[i] * m[i] * m[i] * gradh[i]);
     c[i]    = c_i;
-    if (tdpdtrho) { tdpdtrho[i] = temp[i] * dpdT * prho[i]; }
-    // if (p) { p[i] = p_i; }
+    if (tdpdtrho) { tdpdtrho[i] = temp[i] * dpdT / (kx[i] * m[i] * m[i] * gradh[i]); }
+    if (p) { p[i] = p_i; }
     if (cv) { cv[i] = cv_i; }
     // if (u) { u[i] = u_i; }
+    if (rho) { rho[i] = rho_i; }
 }
 
 template<class Tt, class Tm, class Thydro>
