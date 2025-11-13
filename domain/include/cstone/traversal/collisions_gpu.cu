@@ -94,7 +94,9 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
                                   const KeyType* focusNodes,
                                   TreeNodeIndex numFocusNodes,
                                   bool limitSource,
-                                  uint8_t* markings)
+                                  uint8_t* markings,
+                                  bool useMixD,
+                                  const AxisMixDBits mixDBits)
 {
     unsigned tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -103,10 +105,18 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
     KeyType focusStart = focusNodes[0];
     KeyType focusEnd   = focusNodes[numFocusNodes];
 
-    IBox target    = sfcIBox(sfcKey(focusNodes[tid]), sfcKey(focusNodes[tid + 1]));
+    IBox target    =  useMixD ? sfcIBox(sfcMixDKey(focusNodes[tid]), sfcMixDKey(focusNodes[tid + 1]), mixDBits.bx,
+                                        mixDBits.by, mixDBits.bz)
+                              : sfcIBox(sfcKey(focusNodes[tid]), sfcKey(focusNodes[tid + 1]));
+    if (target.xmin() == 0 && target.xmax() == 0 && target.ymin() == 0 && target.ymax() == 0 &&
+        target.zmin() == 0 && target.zmax() == 0)
+    {
+        return;
+    }
     IBox targetExt = IBox(target.xmin() - 1, target.xmax() + 1, target.ymin() - 1, target.ymax() + 1, target.zmin() - 1,
                           target.zmax() + 1);
-    if (containedIn(focusStart, focusEnd, targetExt)) { return; }
+    if (useMixD && containedIn(focusStart, focusEnd, targetExt, mixDBits.bx, mixDBits.by, mixDBits.bz)) { return; }
+    if (!useMixD && containedIn(focusStart, focusEnd, targetExt)) { return; }
 
     auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
     unsigned maxLevel               = maxTreeLevel<KeyType>{};
@@ -129,10 +139,14 @@ void markMacsGpu(const KeyType* prefixes,
     constexpr unsigned numThreads = 128;
     unsigned numBlocks            = iceil(numFocusNodes, numThreads);
 
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                         mixDBits.bz != maxTreeLevel<KeyType>{};
+
     if (numFocusNodes)
     {
         markMacsGpuKernel<<<numBlocks, numThreads>>>(prefixes, childOffsets, parents, centers, box, focusNodes,
-                                                     numFocusNodes, limitSource, markings);
+                                                     numFocusNodes, limitSource, markings, useMixD, mixDBits);
     }
 }
 

@@ -149,7 +149,7 @@ template void upsweepCentersGpu(int, const TreeNodeIndex*, const TreeNodeIndex*,
 
 template<class KeyType, class T>
 __global__ void computeGeoCentersKernel(
-    const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T> box)
+    const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T> box, bool useMixD, const AxisMixDBits mixDBits)
 {
     unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numNodes) { return; }
@@ -157,8 +157,16 @@ __global__ void computeGeoCentersKernel(
     KeyType prefix                  = prefixes[i];
     KeyType startKey                = decodePlaceholderBit(prefix);
     unsigned level                  = decodePrefixLength(prefix) / 3;
-    auto nodeBox                    = sfcIBox(sfcKey(startKey), level);
-    util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box);
+    auto nodeBox                    = useMixD ? sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx,
+                                                        mixDBits.by, mixDBits.bz)
+                                              : sfcIBox(sfcKey(startKey), level);
+    if (nodeBox.xmin() == 0 && nodeBox.xmax() == 0 && nodeBox.ymin() == 0 && nodeBox.ymax() == 0 &&
+        nodeBox.zmin() == 0 && nodeBox.zmax() == 0)
+    {
+        centers[i] = {0, 0, 0};
+        sizes[i]   = {0, 0, 0};
+    }
+    else { util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box); }
 }
 
 template<class KeyType, class T>
@@ -167,7 +175,10 @@ void computeGeoCentersGpu(
 {
     unsigned numThreads = 256;
     unsigned numBlocks  = iceil(numNodes, numThreads);
-    computeGeoCentersKernel<<<numBlocks, numThreads>>>(prefixes, numNodes, centers, sizes, box);
+    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                           mixDBits.bz != maxTreeLevel<KeyType>{});
+    computeGeoCentersKernel<<<numBlocks, numThreads>>>(prefixes, numNodes, centers, sizes, box, useMixD, mixDBits);
 }
 
 #define GEO_CENTERS_GPU(KeyType, T)                                                                                    \
