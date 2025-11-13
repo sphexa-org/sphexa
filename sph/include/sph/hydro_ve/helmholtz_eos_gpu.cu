@@ -203,7 +203,8 @@ void freeDeviceHelmholtzEOSTables()
 #define COMPUTE_HELMHOLTZ_EOS(Ttemp, Tm, Thydro)                                                                       \
     template void computeHelmholtzEOS(size_t firstParticle, size_t lastParticle, const Thydro* kx, const Thydro* xm,   \
                                       const Tm* m, const Ttemp* temp, const Ttemp* abar, const Ttemp* zbar,            \
-                                      const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* cv, Thydro* tdpdtrho)
+                                      const Thydro* gradh, Thydro* prho, Thydro* c, Thydro* cv, Thydro* tdpdtrho,      \
+                                      Thydro* rho, Thydro* p)
 
 COMPUTE_HELMHOLTZ_EOS(double, double, double);
 COMPUTE_HELMHOLTZ_EOS(double, float, double);
