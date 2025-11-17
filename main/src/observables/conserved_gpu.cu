@@ -33,8 +33,7 @@
 #include <thrust/inner_product.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/transform_reduce.h>
-
-#include "cstone/util/tuple.hpp"
+#include <thrust/tuple.h>
 
 #include "conserved_gpu.h"
 
@@ -43,6 +42,25 @@ namespace sphexa
 
 using cstone::Vec3;
 using thrust::get;
+
+template<class Tuple>
+struct TuplePlusImpl
+{
+    template<std::size_t... Is>
+    HOST_DEVICE_FUN Tuple operator()(const Tuple& a, const Tuple& b, std::index_sequence<Is...>)
+    {
+        return Tuple((get<Is>(a) + get<Is>(b))...);
+    }
+};
+
+template<class Tuple>
+struct TuplePlus
+{
+    HOST_DEVICE_FUN Tuple operator()(const Tuple& a, const Tuple& b)
+    {
+        return TuplePlusImpl<Tuple>{}(a, b, std::make_index_sequence<thrust::tuple_size<Tuple>::value>{});
+    }
+};
 
 /*! @brief Functor to compute kinetic and internal energy and linear and angular momentum
  *
@@ -59,7 +77,7 @@ struct EMom
      * @return    Tuple<kinetic energy, internal energy, linear momentum, angular momentum>
      */
     HOST_DEVICE_FUN
-    util::tuple<double, Vec3<double>, Vec3<double>> operator()(const util::tuple<Tc, Tc, Tc, Tm, Tv, Tv, Tv>& p)
+    thrust::tuple<double, Vec3<double>, Vec3<double>> operator()(const thrust::tuple<Tc, Tc, Tc, Tm, Tv, Tv, Tv>& p)
     {
         Vec3<double> X{get<0>(p), get<1>(p), get<2>(p)};
         Vec3<double> V{get<4>(p), get<5>(p), get<6>(p)};
@@ -78,11 +96,12 @@ conservedQuantitiesGpu(double cv, const Tc* x, const Tc* y, const Tc* z, const T
     auto it2 = thrust::make_zip_iterator(
         thrust::make_tuple(x + last, y + last, z + last, m + last, vx + last, vy + last, vz + last));
 
-    auto plus = util::TuplePlus<thrust::tuple<double, Vec3<double>, Vec3<double>>>{};
-    auto init = util::tuple<double, Vec3<double>, Vec3<double>>(0.0, Vec3<double>{0, 0, 0}, Vec3<double>{0, 0, 0});
+    auto plus = TuplePlus<thrust::tuple<double, Vec3<double>, Vec3<double>>>{};
+    auto init = thrust::tuple<double, Vec3<double>, Vec3<double>>(0.0, Vec3<double>{0, 0, 0}, Vec3<double>{0, 0, 0});
 
     //! apply EMom to each particle and reduce results into a single sum
-    auto [eKin, linMom, angMom] = thrust::transform_reduce(thrust::device, it1, it2, EMom<Tc, Tm, Tv>{}, init, plus);
+    auto ret = thrust::transform_reduce(thrust::device, it1, it2, EMom<Tc, Tm, Tv>{}, init, plus);
+    auto [eKin, linMom, angMom] = std::make_tuple(get<0>(ret), get<1>(ret), get<2>(ret));
 
     double eInt = 0.0;
     if (temp != nullptr)

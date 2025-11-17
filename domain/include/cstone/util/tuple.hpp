@@ -48,8 +48,14 @@ HOST_DEVICE_FUN constexpr tuple<Ts&...> tie(Ts&... args) noexcept
     return impl::tuple<Ts&...>(args...);
 }
 
+} // namespace util
+
 // Thrust tuples in CUDA are now cuda::std tuples for which structured bindings have been added in CUDA 12.4
+// These are needed for std::tuple_size_v in TuplePlus below
+//#if defined(__CUDACC__) and (CUDART_VERSION < 12040) or defined(__HIPCC__)
 #if defined(__CUDACC__) and (CUDART_VERSION < 12040)
+namespace std
+{
 template<size_t N, class... Ts>
 struct tuple_element<N, thrust::tuple<Ts...>>
 {
@@ -61,34 +67,6 @@ struct tuple_size<thrust::tuple<Ts...>>
 {
     static const int value = thrust::tuple_size<thrust::tuple<Ts...>>::value;
 };
+} // namespace std
 #endif
 
-} // namespace util
-
-namespace util
-{
-
-template<class Tuple>
-struct TuplePlusImpl
-{
-    template<std::size_t... Is>
-    HOST_DEVICE_FUN Tuple operator()(const Tuple& a, const Tuple& b, std::index_sequence<Is...>)
-    {
-        return Tuple((util::get<Is>(a) + util::get<Is>(b))...);
-    }
-};
-
-/*! @brief generic tuple addition functor that works for both thrust and std tuples
- *
- * @tparam Tuple   the kind of tuple to be added, e.g. thrust::tuple<int, double>
- */
-template<class Tuple>
-struct TuplePlus
-{
-    HOST_DEVICE_FUN Tuple operator()(const Tuple& a, const Tuple& b)
-    {
-        return TuplePlusImpl<Tuple>{}(a, b, std::make_index_sequence<std::tuple_size_v<Tuple>>{});
-    }
-};
-
-} // namespace util

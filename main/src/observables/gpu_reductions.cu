@@ -33,11 +33,29 @@
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/transform_reduce.h>
 
-#include "cstone/util/tuple.hpp"
 #include "gpu_reductions.h"
 
 namespace sphexa
 {
+
+template<class Tuple>
+struct TuplePlusImpl
+{
+    template<std::size_t... Is>
+    HOST_DEVICE_FUN Tuple operator()(const Tuple& a, const Tuple& b, std::index_sequence<Is...>)
+    {
+        return Tuple((get<Is>(a) + get<Is>(b))...);
+    }
+};
+
+template<class Tuple>
+struct TuplePlus
+{
+    HOST_DEVICE_FUN Tuple operator()(const Tuple& a, const Tuple& b)
+    {
+        return TuplePlusImpl<Tuple>{}(a, b, std::make_index_sequence<thrust::tuple_size<Tuple>::value>{});
+    }
+};
 
 using cstone::Box;
 using cstone::Vec3;
@@ -50,8 +68,13 @@ struct GrowthRate
     HOST_DEVICE_FUN
     thrust::tuple<double, double, double> operator()(const thrust::tuple<Tc, Tc, Tv, T, T>& p)
     {
-        auto [xi, yi, vyi, xmi, kxi] = p;
-        auto voli                    = xmi / kxi;
+        auto xi  = get<0>(p);
+        auto yi  = get<1>(p);
+        auto vyi = get<2>(p);
+        auto xmi = get<3>(p);
+        auto kxi = get<4>(p);
+
+        auto voli = xmi / kxi;
         Tc   aux;
 
         if (yi < ybox * Tc(0.5)) { aux = std::exp(-4.0 * M_PI * std::abs(yi - 0.25)); }
@@ -76,7 +99,7 @@ std::tuple<double, double, double> gpuGrowthRate(const Tc* x, const Tc* y, const
     auto it2 = thrust::make_zip_iterator(
         thrust::make_tuple(x + endIndex, y + endIndex, vy + endIndex, xm + endIndex, kx + endIndex));
 
-    auto plus = util::TuplePlus<thrust::tuple<double, double, double>>{};
+    auto plus = TuplePlus<thrust::tuple<double, double, double>>{};
     auto init = thrust::make_tuple(0.0, 0.0, 0.0);
 
     auto result = thrust::transform_reduce(thrust::device, it1, it2, GrowthRate<Tc, T, Tv>{box.ly()}, init, plus);
