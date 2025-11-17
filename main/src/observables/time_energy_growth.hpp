@@ -85,7 +85,7 @@ T computeKHGrowthRate(size_t startIndex, size_t endIndex, Dataset& d, const csto
 {
     std::array<double, 3> localSum; // contains sumsi, sumci, sumdi
 
-    if (d.kx.empty())
+    if (not d.isAllocated("kx"))
     {
         throw std::runtime_error("kx was empty. KHGrowthRate only supported with volume elements (--prop ve)\n");
     }
