@@ -172,15 +172,13 @@ namespace sphexa
                 outFileSubset = settings.at("o_subset").toStrings()[0];
             }
             else {
-                std::cout<<"o_subset not provided, using default naming convention"<<std::endl;
+                std::cout<<"WARNING: o_subset not provided, using default naming convention"<<std::endl;
                 outFileSubset =  "dump_subset_" + initCond;
             }
             outFileSubset += outputFileSuffix;
-            std::cout<<"Subset output file: " << outFileSubset << std::endl;
 
             if(settings.count("f_subset")) {
                 outputFieldsSubset = settings.at("f_subset").toStrings();
-                std::cout << "Subset output fields: ";
                 for(auto field = 0; field < outputFieldsSubset.size()-1; ++field) {
                     std::cout << outputFieldsSubset[field] <<", ";
                 }
@@ -192,16 +190,10 @@ namespace sphexa
 
             if(settings.count("w_subset")) {
                 writeFreqStrSubset = settings.at("w_subset").toStrings()[0];
-                std::cout<<"Subset write frequency: " << writeFreqStrSubset << std::endl;
             }
 
             if(settings.count("wextra_subset")) {
                 writeExtraSubset = settings.at("wextra_subset").toStrings();
-                std::cout << "Subset extra output freq: ";
-                for(auto field = 0; field < writeExtraSubset.size()-1; ++field) {
-                    std::cout << writeExtraSubset[field] <<", ";
-                }
-                std::cout << writeExtraSubset.back() << std::endl;
             }
         }
         return writeEnabledSubset;
