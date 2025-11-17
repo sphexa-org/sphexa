@@ -139,7 +139,7 @@ public:
         if (isScalar()) {
             // TODO: find a better way to handle this case
             std::cout<<"Warning: converting scalar Param to string vector of size 1"<<std::endl;
-            return std::vector<std::string>{std::to_string(std::get<ScalarValue>(value))};
+            return std::vector<std::string>{std::format("{:.15g}", std::get<ScalarValue>(value))};
         }
 
         std::vector<std::string> result;
@@ -177,7 +177,7 @@ public:
             // This is a numeric vector, convert to strings
             for (double value : std::get<VectorValue>(value))
             {
-                result.push_back(std::to_string(value));
+                result.push_back(std::format("{:.15g}", value));
             }
         }
         return result;
