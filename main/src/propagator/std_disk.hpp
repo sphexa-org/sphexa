@@ -43,6 +43,8 @@ public:
     DiskProp(std::ostream& output, size_t rank, const InitSettings& settings)
         : Base(output, rank)
     {
+        BuiltinWriter attributeWriter(settings);
+        star.loadOrStoreAttributes(&attributeWriter);
     }
 
     void load(const std::string& initCond, IFileReader* reader) override

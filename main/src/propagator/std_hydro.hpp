@@ -128,18 +128,15 @@ public:
 
         sync(domain, simData);
         timer.step("domain::sync");
-        timer.logStatistics("numAssigned", domain.nParticles());
-        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
-        timer.logStatistics("assignment", domain.assignmentStart());
+        Base::logDomainStats(domain, simData);
 
         auto& d = simData.hydro;
-        d.resize(domain.nParticlesWithHalos());
+        d.resizeAcc(domain.nParticlesWithHalos());
+        resizeNeighbors(d, domain.nParticles() * d.ngmax);
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
-
-        resizeNeighbors(d, domain.nParticles() * d.ngmax);
         findNeighborsSfc(first, last, d, domain.box());
         computeGroups(first, last, d, domain.box(), groups_);
         timer.step("FindNeighbors");
