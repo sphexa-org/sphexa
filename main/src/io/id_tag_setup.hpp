@@ -43,9 +43,10 @@ namespace sphexa
     /*! @brief Id tagging setup checks and defaults assignment
      *
      * @param[inout]  settings    settings for id tagging
+     * @param[in]     printSetup  flag to enable printing of setup summary
      */
     // TODO: Only pass the relevant subset of settings?
-    void idTaggingSetupInit(InitSettings& settings);
+    void idTaggingSetupInit(InitSettings& settings, bool printSetup = false);
 
     /*! @brief Id tagging output handling parameter retrieval (from input parameter file)
      *
@@ -60,6 +61,7 @@ namespace sphexa
      * @return true if id tagging output is requested, false otherwise
      */
     // TODO: Only pass the relevant subset of settings?
+    // TODO: remove warning logging?
     bool idTaggingOutputParameterRetrieval(const InitSettings& settings, const std::string initCond, const std::string outputFileSuffix, 
                                            std::string& outFileSubset, std::string& writeFreqStrSubset, std::vector<std::string>& outputFieldsSubset,
                                            std::vector<std::string>& writeExtraSubset);

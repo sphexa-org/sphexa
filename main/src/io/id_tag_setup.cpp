@@ -6,10 +6,8 @@
 
 namespace sphexa
 {
-    void idTaggingSetupInit(InitSettings& settings)
+    void idTaggingSetupInit(InitSettings& settings, bool printSetup)
     {
-        std::cout << "Initializing id tagging setup" << std::endl;
-
         // Check id tagging output options
         // If output is not provided or not positive, skip tagging setup
         if(!settings.count("w_subset") || *settings.at("w_subset").data() <= 0.) return;
@@ -129,33 +127,36 @@ namespace sphexa
             std::cout<<"WARNING: list group ids not provided, assigning default value = "<<defaultListId<<std::endl;
         }
 
-        if(idSphereSelectionRequested || idListSelectionRequested)
+        if(printSetup)
         {
-            std::cout<<"Id tagging settings:"<<std::endl;
-            if(settings.count("id_selection_spheres"))
+            if(idSphereSelectionRequested || idListSelectionRequested)
             {
-                std::cout<<" - Spherical selection:"<<std::endl;
-                for(unsigned int i=0; i<settings.at("id_selection_spheres").size()/4; ++i)
+                std::cout<<"Id tagging settings:"<<std::endl;
+                if(settings.count("id_selection_spheres"))
                 {
-                    std::cout<<"   Sphere "<<i<<": center=("
-                             <<settings.at("id_selection_spheres").data()[4*i + 0]<<", "
-                             <<settings.at("id_selection_spheres").data()[4*i + 1]<<", "
-                             <<settings.at("id_selection_spheres").data()[4*i + 2]<<"), radius="
-                             <<settings.at("id_selection_spheres").data()[4*i + 3]<<", group id="
-                             <<settings.at("id_selection_spheres_group_ids").data()[i]<<std::endl;
+                    std::cout<<" - Spherical selection:"<<std::endl;
+                    for(unsigned int i=0; i<settings.at("id_selection_spheres").size()/4; ++i)
+                    {
+                        std::cout<<"   Sphere "<<i<<": center=("
+                                <<settings.at("id_selection_spheres").data()[4*i + 0]<<", "
+                                <<settings.at("id_selection_spheres").data()[4*i + 1]<<", "
+                                <<settings.at("id_selection_spheres").data()[4*i + 2]<<"), radius="
+                                <<settings.at("id_selection_spheres").data()[4*i + 3]<<", group id="
+                                <<settings.at("id_selection_spheres_group_ids").data()[i]<<std::endl;
+                    }
+                }
+                if(settings.count("id_selection_list"))
+                {
+                    std::cout<<" - List selection with:"<<std::endl;
+                    std::cout<<"   Id list: "<<static_cast<uint64_t>(settings.at("id_selection_list").data()[0])<<", "
+                        <<static_cast<uint64_t>(settings.at("id_selection_list").data()[1])<<",..."
+                        <<static_cast<uint64_t>(settings.at("id_selection_list").data()[settings.at("id_selection_list").size()-1])<<std::endl;
+                    std::cout<<"   Group ids: "<<static_cast<uint64_t>(settings.at("id_selection_list_group_ids").data()[0])<<", "
+                        <<static_cast<uint64_t>(settings.at("id_selection_list_group_ids").data()[1])<<",..."
+                        <<static_cast<uint64_t>(settings.at("id_selection_list_group_ids").data()[settings.at("id_selection_list_group_ids").size()-1])<<std::endl;
                 }
             }
-            if(settings.count("id_selection_list"))
-            {
-                std::cout<<" - List selection with:"<<std::endl;
-                std::cout<<"   Id list: "<<static_cast<uint64_t>(settings.at("id_selection_list").data()[0])<<", "
-                    <<static_cast<uint64_t>(settings.at("id_selection_list").data()[1])<<",..."
-                    <<static_cast<uint64_t>(settings.at("id_selection_list").data()[settings.at("id_selection_list").size()-1])<<std::endl;
-                std::cout<<"   Group ids: "<<static_cast<uint64_t>(settings.at("id_selection_list_group_ids").data()[0])<<", "
-                    <<static_cast<uint64_t>(settings.at("id_selection_list_group_ids").data()[1])<<",..."
-                    <<static_cast<uint64_t>(settings.at("id_selection_list_group_ids").data()[settings.at("id_selection_list_group_ids").size()-1])<<std::endl;
-            }
-        }        
+        }
     };
 
     // TODO: remove not needed debug logging
