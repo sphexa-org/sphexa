@@ -87,11 +87,11 @@ TEST(IO, idTaggingInitDefaultListIds)
     settings["id_selection_list"] = sphexa::VectorValue{0, 1, 2, 3};
     sphexa::idTaggingSetupInit(settings);
 
-    EXPECT_EQ(settings.at("id_selection_spheres_group_ids").size(), settings["id_selection_list"].size());
-    EXPECT_EQ(settings.at("id_selection_spheres_group_ids").data()[0],0);
-    EXPECT_EQ(settings.at("id_selection_spheres_group_ids").data()[1],0);
-    EXPECT_EQ(settings.at("id_selection_spheres_group_ids").data()[2],0);
-    EXPECT_EQ(settings.at("id_selection_spheres_group_ids").data()[3],0);
+    EXPECT_EQ(settings.at("id_selection_list_group_ids").size(), settings["id_selection_list"].size());
+    EXPECT_EQ(settings.at("id_selection_list_group_ids").data()[0],0);
+    EXPECT_EQ(settings.at("id_selection_list_group_ids").data()[1],0);
+    EXPECT_EQ(settings.at("id_selection_list_group_ids").data()[2],0);
+    EXPECT_EQ(settings.at("id_selection_list_group_ids").data()[3],0);
 }
 
 TEST(IO, idTaggingInitListDuplicateIdThrow)
@@ -138,8 +138,8 @@ TEST(IO, idTaggingInitListSpheresIdDefault)
     settings["id_selection_list_group_ids"] = sphexa::VectorValue{1, 2, 3, 4};
     sphexa::idTaggingSetupInit(settings);
     EXPECT_EQ(settings.at("id_selection_spheres_group_ids").size(), settings["id_selection_spheres"].size()/4);
-    EXPECT_EQ(settings.at("id_selection_list_group_ids").data()[0],5);
-    EXPECT_EQ(settings.at("id_selection_list_group_ids").data()[1],6);
+    EXPECT_EQ(settings.at("id_selection_spheres_group_ids").data()[0],5);
+    EXPECT_EQ(settings.at("id_selection_spheres_group_ids").data()[1],6);
 }
 
 TEST(IO, idTaggingInactive)
