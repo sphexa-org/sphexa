@@ -56,17 +56,19 @@ public:
     virtual ~ISimInitializer() = default;
 
 protected:
-     // TODO: Base::initSubsets(settings_, &d);// I have to pass a ref to the entire dataset because I could need the coordinates, if selection is geometrical
-     /*! @brief Id tagging
+
+     /*! @brief Id tagging initialization and execution
      *
-     * @param[in]  settings    settings for id tagging
-     * @param[in]  printLog    activate logging
-     * @param[out] d           time step at which selection is done
+     * @param[inout]  settings       settings for id tagging
+     * @param[in]     printLog       activate logging
+     * @param[inout]  particlesData  particle data to perform selection on
+     * @param[in]     initStep       time step at which selection is done
      */
+     // TODO: Base::initSubsets(settings_, &d);// I have to pass a ref to the entire dataset because I could need the coordinates, if selection is geometrical
      void initSubsets(InitSettings& settings, bool printLog, Dataset::HydroData& particlesData, int initStep = 0) const
      {
         // Preliminary check on subset settings consistency
-        idTaggingSetupInit(settings);
+        idTaggingSetupInit(settings, printLog);
 
         // TODO: tagging calls goes here
 
