@@ -43,8 +43,8 @@ developData = read_data_from_file(developConstants)
 
 # Extract relevant columns
 x = mixDData[:, 0]
-y1 = mixDData[:, -2 if TEST == 'wind_shock' else -1]
-y2 = developData[:, -2 if TEST == 'wind_shock' else -1]
+y1 = mixDData[:, -2 if TEST == 'windshock' else -1]
+y2 = developData[:, -2 if TEST == 'windshock' else -1]
 
 # Compute absolute and relative differences
 abs_diff = np.abs(y1 - y2)
