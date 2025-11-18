@@ -61,7 +61,7 @@ bool has_nan(const util::array<double, N>& a) noexcept
 //! Returns times, values
 template<typename F, size_t N>
 auto integrate_to_zero(F&& func, const util::array<double, N>& y_0, double t_0, double t_end,
-                       double min_step_size = 1e-3, double maximal_error = 0.01)
+                       double max_step_size = 1e-3, double maximal_error = 0.01)
 {
     const double target_error = 0.5 * maximal_error;
 
@@ -82,7 +82,7 @@ auto integrate_to_zero(F&& func, const util::array<double, N>& y_0, double t_0, 
     size_t it_count = 0;
     while (t.back() < t_end && !close_to_zero(y.back()[0]))
     {
-        delta_t                          = std::min(min_step_size, std::min(delta_t, t_end - t.back()));
+        delta_t                          = std::min(max_step_size, std::min(delta_t, t_end - t.back()));
         const auto [t_new, y_new, error] = integrate_step(func, t[i], delta_t, y[i]);
 
         double new_delta_t = delta_t * new_step_size_factor(error, target_error);
