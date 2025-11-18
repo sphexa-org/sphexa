@@ -10,7 +10,13 @@ if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     endif()
     message(STATUS "MPI include is " ${MPI_CXX_INCLUDE_PATH})
 
-    add_library(ryoanji ewald.cu multipole_holder.cu)
-    target_include_directories(ryoanji PUBLIC ${PROJECT_SOURCE_DIR}/src ${CSTONE_DIR} ${MPI_CXX_INCLUDE_PATH})
-    target_link_libraries(ryoanji PUBLIC cstone_gpu ryoanji_kernels ${MPI_CXX_LIBRARIES})
+    # intermdiate object to prevent --hip-link from hipcub to propagate to the final link line
+    add_library(ryoanji_obj OBJECT ewald.cu multipole_holder.cu)
+    target_include_directories(ryoanji_obj PUBLIC ${PROJECT_SOURCE_DIR}/src ${CSTONE_DIR} ${MPI_CXX_INCLUDE_PATH})
+    add_library(ryoanji $<TARGET_OBJECTS:ryoanji_obj> $<TARGET_OBJECTS:ryoanji_kernels>)
+    target_link_libraries(ryoanji PUBLIC cstone_gpu ${MPI_CXX_LIBRARIES})
 endif()
+
+if (CMAKE_HIP_COMPILER)
+    target_link_libraries(ryoanji_obj PRIVATE hip::hipcub)
+endif ()
