@@ -173,6 +173,8 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
+        relaxSystem(first, last, d);
+
         computeTimestep(first, last, d);
         timer.step("Timestep");
         computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
