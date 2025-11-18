@@ -85,7 +85,7 @@ ml CUDA/12.8.0
 
 mkdir build
 cd build
-cmake -DCMAKE_CUDA_ARCHITECTURES="80;85;90" <GIT_SOURCE_DIR>
+cmake -DCMAKE_CUDA_ARCHITECTURES="80;90" <GIT_SOURCE_DIR>
 ```
 CMake configuration on Daint on Alps:
 **CUDA 12.6 + GCC 13.3**:
