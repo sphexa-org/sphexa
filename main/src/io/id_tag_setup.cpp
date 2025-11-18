@@ -22,6 +22,12 @@ namespace sphexa
         // Check if spherical selection is requested
         if(idSphereSelectionRequested)
         {
+
+            if(settings.at("id_selection_spheres").size() % 4 != 0)
+            {
+                throw std::runtime_error("Invalid sphere selection settings: each sphere must be defined by 4 values (x,y,z,radius).");
+            }
+
             // Check if sphere ids are provided
             if(settings.count("id_selection_spheres_group_ids"))
             {
