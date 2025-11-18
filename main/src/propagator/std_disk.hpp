@@ -37,17 +37,27 @@ protected:
 
     using T = typename DataType::RealType;
 
+    disk::StarData star;
+
 public:
     DiskProp(std::ostream& output, size_t rank, const InitSettings& settings)
         : Base(output, rank)
     {
     }
 
-    void activateFields(DataType& simData) override
+    void load(const std::string& initCond, IFileReader* reader) override
     {
-        simData.star.active = true;
-        Base::activateFields(simData);
+        const std::string path = removeModifiers(initCond);
+        if (std::filesystem::exists(path))
+        {
+            int snapshotIndex = numberAfterSign(initCond, ":");
+            reader->setStep(path, snapshotIndex, FileMode::independent);
+            star.loadOrStoreAttributes(reader);
+            reader->closeStep();
+        }
     }
+
+    void save(IFileWriter* writer) override { star.loadOrStoreAttributes(writer); }
 
     void computeForces(DomainType& domain, DataType& simData) override
     {
@@ -57,10 +67,10 @@ public:
         const size_t first = domain.startIndex();
         const size_t last  = domain.endIndex();
 
-        disk::betaCooling(first, last, d, simData.star);
+        disk::betaCooling(first, last, d, star);
         timer.step("betaCooling");
 
-        disk::computeCentralForce(first, last, d, simData.star);
+        disk::computeCentralForce(first, last, d, star);
         timer.step("computeCentralForce");
     }
 
@@ -69,7 +79,6 @@ public:
         const size_t first = domain.startIndex();
         const size_t last  = domain.endIndex();
         auto&        d     = simData.hydro;
-        auto&        star  = simData.star;
 
         disk::duTimestep(first, last, d, star);
         timer.step("duTimestep");
@@ -96,12 +105,6 @@ public:
             std::printf("star mass: %lf\n", star.m);
             std::printf("additional pot. erg.: %lf\n", star.potential);
         }
-    }
-    void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,
-                    const cstone::Box<T>& box) override
-    {
-        Base::saveFields(writer, first, last, simData, box);
-        simData.star.loadOrStoreAttributes(writer);
     }
 };
 
