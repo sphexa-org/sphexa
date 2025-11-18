@@ -18,7 +18,9 @@
 #include <tuple>
 #include "cstone/cuda/annotation.hpp"
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) and (CUDART_VERSION < 12040)
+#include <thrust/tuple.h>
+#elif defined(__CUDACC__)
 #include <cuda/std/tuple>
 #endif
 
@@ -39,7 +41,7 @@ using tuple = impl::tuple<Ts...>;
 template<std::size_t N, class T>
 HOST_DEVICE_FUN constexpr auto get(T&& tup) noexcept
 {
-    return impl::get<N>(tup);
+    return impl::get<N>(std::forward<T>(tup));
 }
 
 template<class... Ts>
@@ -51,8 +53,6 @@ HOST_DEVICE_FUN constexpr tuple<Ts&...> tie(Ts&... args) noexcept
 } // namespace util
 
 // Thrust tuples in CUDA are now cuda::std tuples for which structured bindings have been added in CUDA 12.4
-// These are needed for std::tuple_size_v in TuplePlus below
-//#if defined(__CUDACC__) and (CUDART_VERSION < 12040) or defined(__HIPCC__)
 #if defined(__CUDACC__) and (CUDART_VERSION < 12040)
 namespace std
 {
