@@ -22,11 +22,6 @@ namespace sphexa
 
 std::map<std::string, double> polytropeConstants()
 {
-    //    constexpr double r            = 4.72108762739756E-01;
-    //    constexpr double mTotal       = 1e-6;
-    //    constexpr double gravConstant = 1.0;
-    //    const double     t_relax      = std::sqrt(r * r * r / (gravConstant * mTotal)) / 3.;
-
     return {{"gravConstant", 1.0},
             {"polytrope::r", 4.72108762739756E-01},
             {"polytrope::mTotal", 1e-6},

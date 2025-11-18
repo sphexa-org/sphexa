@@ -18,6 +18,10 @@ extern void computeIADGpu(const GroupView&, Dataset& d, const cstone::Box<typena
 template<class Dataset>
 extern void computeMomentumEnergyStdGpu(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
 
+template<typename Thydro, typename T>
+extern void relaxSystemGPU(size_t first, size_t last, Thydro* ax, Thydro* ay, Thydro* az, Thydro* vx, Thydro* vy,
+                           Thydro* vz, T relaxationTimescale);
+
 namespace gpu
 {
 
