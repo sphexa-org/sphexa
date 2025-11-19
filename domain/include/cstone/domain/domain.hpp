@@ -535,14 +535,20 @@ private:
     {
         auto focusAssignment = focusTree_.assignment();
         auto focusTree       = focusTree_.treeLeaves();
+        auto flags           = focusTree_.flags();
         auto globalTree      = global_.treeLeaves();
 
         std::vector<KeyType> globalTreeBackingBuffer;
+        std::vector<uint8_t> flagsBackingBuffer;
         if constexpr (cstone::HaveGpu<Accelerator>{})
         {
             globalTreeBackingBuffer.resize(globalTree.size());
             memcpyD2H(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data());
             globalTree = std::span(globalTreeBackingBuffer);
+
+            flagsBackingBuffer.resize(flags.size());
+            memcpyD2H(flags.data(), flags.size(), flagsBackingBuffer.data());
+            flags = std::span(flagsBackingBuffer);
         }
 
         TreeNodeIndex numFocusPeers    = 0;
@@ -565,7 +571,7 @@ private:
             }
         }
 
-        int numFlags = std::count(focusTree_.haloFlags().begin(), focusTree_.haloFlags().end(), 1);
+        int numFlags = std::count_if(flags.begin(), flags.end(), [](auto x) { return x > 0; });
         auto fPeerFlags =
             focusPeers<KeyType>({global_.assignment().data(), size_t(numRanks_ + 1)}, myRank_, globalTree, focusTree);
         std::vector<int> fPeers;
@@ -582,7 +588,7 @@ private:
                 std::cout << "rank " << i << " " << assignedSize << " " << layout_.back()
                           << " focus h/true/peers/loc/tot: " << numFlags << "/" << numFocusTruePeer << "/"
                           << numFocusPeers << "/" << focusAssignment[myRank_].count() << "/"
-                          << focusTree_.haloFlags().size() << " peers: [" << std::max(hPeers.size(), fPeers.size())
+                          << flags.size() << " peers: [" << std::max(hPeers.size(), fPeers.size())
                           << "] ";
                 if (numRanks_ <= 64)
                 {
