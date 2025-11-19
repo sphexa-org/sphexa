@@ -69,6 +69,9 @@ The code requires a **C++20 compiler** for both the CPU and GPU parts.
 * CUDA 12 and later
 * ROCm 6 and later. ROCm 5 compiles, but has bugs preventing the reliable use of GPU-aware-MPI
 
+#### Check your GPU compute capability
+In you need to specify the compute capability of your GPUs, you can look them up here: [https://developer.nvidia.com/cuda-gpus](https://developer.nvidia.com/cuda-gpus)
+
 #### Compilation
 
 Minimal CMake configuration:
