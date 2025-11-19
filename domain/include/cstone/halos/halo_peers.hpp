@@ -11,21 +11,11 @@
 #include <span>
 
 #include "cstone/domain/index_ranges.hpp"
+#include "cstone/focus/peer_flags.hpp"
 #include "cstone/tree/definitions.h"
 
 namespace cstone
 {
-namespace detail
-{
-inline void compactPeers(std::span<const int> flags, std::vector<int>& peers)
-{
-    peers.clear();
-    for (int rank = 0; rank < int(flags.size()); ++rank)
-    {
-        if (flags[rank]) { peers.push_back(rank); };
-    }
-}
-} // namespace detail
 
 inline std::vector<int>
 haloPeers(int myRank, std::span<const LocalIndex> layout, std::span<const TreeIndexPair> fAssignment)
@@ -41,20 +31,20 @@ haloPeers(int myRank, std::span<const LocalIndex> layout, std::span<const TreeIn
         TreeNodeIndex focEnd   = fAssignment[rank].end();
         if (focEnd < focStart) { focEnd = focStart; }
 
-        peerFlags[rank] = layout[focEnd] > layout[focStart];
+        bool isHalo = layout[focEnd] > layout[focStart];
+        if (isHalo) { peerFlags[rank] |= static_cast<int>(PeerMask::halo); }
     }
     return peerFlags;
 }
 
-inline void exchangePeers(std::span<const int> exteriorPeerFlags,
-                   std::vector<int>& exteriorPeers,
-                   std::vector<int>& interiorPeers)
+inline void
+exchangePeers(std::span<const int> exteriorPeerFlags, std::vector<int>& exteriorPeers, std::vector<int>& interiorPeers)
 {
     std::vector<int> interiorPeerFlags(exteriorPeerFlags.size(), 0);
     MPI_Alltoall(exteriorPeerFlags.data(), 1, MPI_INT, interiorPeerFlags.data(), 1, MPI_INT, MPI_COMM_WORLD);
 
-    detail::compactPeers(exteriorPeerFlags, exteriorPeers);
-    detail::compactPeers(interiorPeerFlags, interiorPeers);
+    peerFlagsToList(exteriorPeerFlags, exteriorPeers, PeerMask::halo);
+    peerFlagsToList(interiorPeerFlags, interiorPeers, PeerMask::halo);
 }
 
 } // namespace cstone

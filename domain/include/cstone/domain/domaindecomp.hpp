@@ -184,15 +184,9 @@ void limitBoundaryShifts(const SfcAssignment<KeyType> oldAssignment,
  * @tparam     KeyType         32- or 64-bit unsigned integer
  * @param[in]  assignment      domain assignment
  * @param[in]  focusTree       focus tree leaves
- * @param[in]  peerRanks       list of peer ranks
- * @param[in]  myRank          executing rank ID
  * @param[out] focusAssignment assignment with the same SFC key ranges per
  *                             peer rank as the domain @p assignment,
  *                             but with indices valid w.r.t @p focusTree
- *
- * The focus assignment is implemented as a plain vector; since only
- * the ranges of peer ranks (and not all ranks) are set, the requirements
- * of SpaceCurveAssignment are not met and its findRank() function would not work.
  */
 template<class KeyType>
 void translateAssignment(const SfcAssignment<KeyType>& assignment,

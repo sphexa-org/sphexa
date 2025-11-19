@@ -566,11 +566,14 @@ private:
         }
 
         int numFlags = std::count(focusTree_.haloFlags().begin(), focusTree_.haloFlags().end(), 1);
-        auto fPeers  = oneSidedPeers<KeyType>({global_.assignment().data(), size_t(numRanks_ + 1)}, numRanks_, myRank_,
-                                             globalTree, focusTree);
+        auto fPeerFlags =
+            focusPeers<KeyType>({global_.assignment().data(), size_t(numRanks_ + 1)}, myRank_, globalTree, focusTree);
+        std::vector<int> fPeers;
+        peerFlagsToList(fPeerFlags, fPeers, PeerMask::focus);
+
         auto hPeerFlags = haloPeers(myRank_, layout_, focusTree_.assignment());
         std::vector<int> hPeers;
-        detail::compactPeers(hPeerFlags, hPeers);
+        peerFlagsToList(hPeerFlags, hPeers, PeerMask::halo);
 
         for (int i = 0; i < numRanks_; ++i)
         {

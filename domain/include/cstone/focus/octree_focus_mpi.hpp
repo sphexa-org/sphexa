@@ -16,6 +16,7 @@
 #pragma once
 
 #include <iostream>
+#include <ranges>
 #include <numeric>
 
 #include "cstone/cuda/cuda_utils.hpp"
@@ -23,15 +24,22 @@
 #include "cstone/domain/layout.hpp"
 #include "cstone/focus/exchange_focus.hpp"
 #include "cstone/focus/octree_focus.hpp"
+#include "cstone/focus/peer_flags.hpp"
 #include "cstone/focus/source_center.hpp"
 #include "cstone/focus/source_center_gpu.h"
 #include "cstone/primitives/primitives_gpu.h"
 #include "cstone/traversal/collisions_gpu.h"
 
-#include <ranges>
-
 namespace cstone
 {
+
+inline std::vector<int> exchangePeers(std::span<const int> extPeers, MPI_Comm comm)
+{
+    int numRanks = extPeers.size();
+    std::vector<int> intPeers(numRanks, 0);
+    MPI_Alltoall(extPeers.data(), 1, MPI_INT, intPeers.data(), 1, MPI_INT, comm);
+    return intPeers;
+}
 
 //! @brief A fully traversable octree with a local focus
 template<class KeyType, class RealType, class Accelerator = CpuTag>
@@ -145,7 +153,13 @@ public:
                                  focusEnd, invThetaRefine, box))
                 ;
         }
-        findPeers(assignment, globalLeaves);
+
+        auto extPeers =
+            focusPeersAcc<useGpu, KeyType>({assignment.data(), size_t(numRanks_ + 1)}, myRank_, globalLeaves, leaves_);
+        auto intPeers = exchangePeers(extPeers, MPI_COMM_WORLD);
+        peerFlagsToList(extPeers, recvPeers_, PeerMask::focus);
+        peerFlagsToList(intPeers, sendPeers_, PeerMask::focus);
+
         translateAssignment<KeyType>(assignment, leaves_, assignment_);
         extractPeerRanges(recvPeers_, myRank_, assignment_, peerRanges_);
 
@@ -702,31 +716,6 @@ private:
                                  rawPtr(geoSizesAcc_), box_);
         }
         else { nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_); }
-    }
-
-    void findPeers(const SfcAssignment<KeyType>& assignment, std::span<const KeyType> globalLeaves)
-    {
-        std::vector<KeyType> globalTreeBackingBuffer;
-        if constexpr (cstone::HaveGpu<Accelerator>{})
-        {
-            globalTreeBackingBuffer.resize(globalLeaves.size());
-            memcpyD2H(globalLeaves.data(), globalLeaves.size(), globalTreeBackingBuffer.data());
-            globalLeaves = std::span(globalTreeBackingBuffer);
-            downloadOctree();
-        }
-
-        auto extPeers =
-            focusPeers<KeyType>({assignment.data(), size_t(numRanks_ + 1)}, numRanks_, myRank_, globalLeaves, leaves_);
-        std::vector<int> intPeers(numRanks_, 0);
-        MPI_Alltoall(extPeers.data(), 1, MPI_INT, intPeers.data(), 1, MPI_INT, MPI_COMM_WORLD);
-
-        sendPeers_.clear();
-        recvPeers_.clear();
-        for (int rank = 0; rank < numRanks_; ++rank)
-        {
-            if (extPeers[rank]) { recvPeers_.push_back(rank); }
-            if (intPeers[rank]) { sendPeers_.push_back(rank); }
-        }
     }
 
     void downloadOctree()
