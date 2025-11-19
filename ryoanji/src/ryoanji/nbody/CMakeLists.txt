@@ -3,6 +3,6 @@ if(CMAKE_HIP_COMPILER)
 endif()
 
 if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
-    add_library(ryoanji_kernels traversal_gpu.cu upsweep_gpu.cu)
+    add_library(ryoanji_kernels OBJECT traversal_gpu.cu upsweep_gpu.cu)
     target_include_directories(ryoanji_kernels PUBLIC ${PROJECT_SOURCE_DIR}/src ${CSTONE_DIR})
 endif()
