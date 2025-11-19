@@ -49,6 +49,11 @@ if(CSTONE_WITH_CUDA)
     endif()
 endif()
 
+# interface target with just the THRUST and CUB includes, as linking those targets adds
+# --hip-link --offload-arch, which doesn't work if a) we have to use GCC (mpicxx) for linking
+# and b) we can't put HIP objects into a static archive when compiling GTest runners
+add_library(cstone_thrust_incl INTERFACE)
+
 if(CSTONE_WITH_HIP)
     check_language(HIP)
     if(CMAKE_HIP_COMPILER)
@@ -56,11 +61,6 @@ if(CSTONE_WITH_HIP)
         find_package(hip)
         find_package(rocthrust REQUIRED)
         find_package(hipcub REQUIRED)
-
-        # interface target with just the THRUST and CUB includes, as linking those targets adds
-        # --hip-link --offload-arch, which doesn't work if a) we have to use GCC (mpicxx) for linking
-        # and b) we can't put HIP objects into a static archive when compiling GTest runners
-        add_library(cstone_thrust_incl INTERFACE)
         get_property(rocthrust_include TARGET roc::rocthrust PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
         get_property(hipcub_include TARGET hip::hipcub PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
         get_property(rocprim_include TARGET roc::rocprim PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
