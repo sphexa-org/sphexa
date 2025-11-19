@@ -38,35 +38,25 @@
 namespace sphexa
 {
 
-template<class Tuple>
-struct TuplePlusImpl
-{
-    template<std::size_t... Is>
-    HOST_DEVICE_FUN Tuple operator()(const Tuple& a, const Tuple& b, std::index_sequence<Is...>)
-    {
-        return Tuple((get<Is>(a) + get<Is>(b))...);
-    }
-};
-
-template<class Tuple>
-struct TuplePlus
-{
-    HOST_DEVICE_FUN Tuple operator()(const Tuple& a, const Tuple& b)
-    {
-        return TuplePlusImpl<Tuple>{}(a, b, std::make_index_sequence<thrust::tuple_size<Tuple>::value>{});
-    }
-};
-
 using cstone::Box;
 using cstone::Vec3;
 using thrust::get;
+
+struct TuplePlus
+{
+    using type = thrust::tuple<double, double, double>;
+    HOST_DEVICE_FUN type operator()(const type& a, const type& b) const
+    {
+        return type(get<0>(a) + get<0>(b), get<1>(a) + get<1>(b), get<2>(a) + get<2>(b));
+    }
+};
 
 //!@brief functor for Kelvin-Helmholtz growth rate
 template<class Tc, class Tv, class T>
 struct GrowthRate
 {
     HOST_DEVICE_FUN
-    thrust::tuple<double, double, double> operator()(const thrust::tuple<Tc, Tc, Tv, T, T>& p)
+    TuplePlus::type operator()(const thrust::tuple<Tc, Tc, Tv, T, T>& p)
     {
         auto xi  = get<0>(p);
         auto yi  = get<1>(p);
@@ -83,7 +73,7 @@ struct GrowthRate
         Tc ci = vyi * voli * std::cos(4.0 * M_PI * xi) * aux;
         Tc di = voli * aux;
 
-        return thrust::make_tuple(si, ci, di);
+        return {si, ci, di};
     }
 
     Tc ybox;
@@ -99,10 +89,8 @@ std::tuple<double, double, double> gpuGrowthRate(const Tc* x, const Tc* y, const
     auto it2 = thrust::make_zip_iterator(
         thrust::make_tuple(x + endIndex, y + endIndex, vy + endIndex, xm + endIndex, kx + endIndex));
 
-    auto plus = TuplePlus<thrust::tuple<double, double, double>>{};
-    auto init = thrust::make_tuple(0.0, 0.0, 0.0);
-
-    auto result = thrust::transform_reduce(thrust::device, it1, it2, GrowthRate<Tc, T, Tv>{box.ly()}, init, plus);
+    auto result = thrust::transform_reduce(thrust::device, it1, it2, GrowthRate<Tc, T, Tv>{box.ly()}, TuplePlus::type{},
+                                           TuplePlus{});
 
     return {get<0>(result), get<1>(result), get<2>(result)};
 }
