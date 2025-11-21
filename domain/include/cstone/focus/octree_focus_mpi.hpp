@@ -154,13 +154,12 @@ public:
                 ;
         }
 
+        translateAssignment<KeyType>(assignment, leaves_, assignment_);
         auto extPeers =
-            focusPeersAcc<useGpu, KeyType>({assignment.data(), size_t(numRanks_ + 1)}, myRank_, globalLeaves, leaves_);
+            focusPeersAcc<useGpu, KeyType>(globDispl_, assignment_, myRank_, globalLeaves, leaves_);
         auto intPeers = exchangePeers(extPeers, MPI_COMM_WORLD);
         peerFlagsToList(extPeers, recvPeers_, PeerMask::focus);
         peerFlagsToList(intPeers, sendPeers_, PeerMask::focus);
-
-        translateAssignment<KeyType>(assignment, leaves_, assignment_);
         extractPeerRanges(recvPeers_, myRank_, assignment_, peerRanges_);
 
         if constexpr (HaveGpu<Accelerator>{})

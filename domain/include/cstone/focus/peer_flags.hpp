@@ -30,23 +30,23 @@ enum class PeerMask : int
 
 //! @brief Return a list of ranks (peers) which contain nodes in @p focusTree that don't exist in @p globalTree
 template<class KeyType>
-std::vector<int> focusPeers(std::span<const KeyType> boundaries,
+std::vector<int> focusPeers(std::span<const TreeNodeIndex> globalOffsets,
+                            std::span<const TreeIndexPair> focusOffsets,
                             int myRank,
                             std::span<const KeyType> globalTree,
                             std::span<const KeyType> focusTree)
 {
-    int numRanks = static_cast<int>(boundaries.size()) - 1;
+    int numRanks = static_cast<int>(globalOffsets.size()) - 1;
     std::vector<int> peerFlags(numRanks, 0);
 #pragma omp parallel for
     for (int rank = 0; rank < numRanks; ++rank)
     {
         if (rank == myRank) { continue; }
-        auto globStart = std::lower_bound(globalTree.begin(), globalTree.end(), boundaries[rank]);
-        auto globEnd   = std::lower_bound(globalTree.begin(), globalTree.end(), boundaries[rank + 1]);
+        auto globStart = globalTree.begin() + globalOffsets[rank];
+        auto globEnd   = globalTree.begin() + globalOffsets[rank + 1];
 
-        auto focStart = std::lower_bound(focusTree.begin(), focusTree.end(), boundaries[rank]);
-        auto focEnd   = std::upper_bound(focusTree.begin(), focusTree.end(), boundaries[rank + 1]) - 1;
-        if (focEnd < focStart) { focEnd = focStart; }
+        auto focStart = focusTree.begin() + focusOffsets[rank].start();
+        auto focEnd   = focusTree.begin() + focusOffsets[rank].end();
 
         bool isPeer = false;
         if (focEnd - focStart > globEnd - globStart) { isPeer = true; }
@@ -65,7 +65,8 @@ std::vector<int> focusPeers(std::span<const KeyType> boundaries,
  * @return            see focusPeers
  */
 template<bool useGpu, class KeyType>
-std::vector<int> focusPeersAcc(std::span<const KeyType> boundaries,
+std::vector<int> focusPeersAcc(std::span<const TreeNodeIndex> globalOffsets,
+                               std::span<const TreeIndexPair> focusOffsets,
                                int myRank,
                                std::span<const KeyType> globalTree,
                                std::span<const KeyType> focusTree)
@@ -78,7 +79,7 @@ std::vector<int> focusPeersAcc(std::span<const KeyType> boundaries,
         memcpyD2H(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data());
         globalTreeActive = std::span(globalTreeBackingBuffer);
     }
-    return focusPeers<KeyType>(boundaries, myRank, globalTreeActive, focusTree);
+    return focusPeers<KeyType>(globalOffsets, focusOffsets, myRank, globalTreeActive, focusTree);
 }
 
 inline void peerFlagsToList(std::span<const int> peerFlags, std::vector<int>& peersList, PeerMask mask)
