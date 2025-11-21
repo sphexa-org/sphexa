@@ -135,7 +135,7 @@ private:
     using SupportedTypes   = util::TypeList<float, double, uint32_t, uint64_t, int32_t, int64_t>;
     using SupportedVariant = util::Reduce<std::variant, util::Map<std::vector, SupportedTypes>>;
 
-    std::map<std::string, SupportedVariant> perfStats;
+    std::map<std::string, SuppitortedVariant> perfStats;
 };
 
 } // namespace sphexa
