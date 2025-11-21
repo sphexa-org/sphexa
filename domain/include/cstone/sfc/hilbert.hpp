@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "cstone/util/tuple.hpp"
 #include "morton.hpp"
 
 namespace cstone

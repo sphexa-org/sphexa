@@ -2,17 +2,11 @@ include(cstone_add_performance_test)
 
 cstone_add_performance_test(octree.cpp octree_perf)
 cstone_add_performance_test(peers.cpp peers_perf)
+cstone_add_performance_test(hilbert.cpp hilbert_perf)
 
-#if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
-if(CMAKE_CUDA_COMPILER) # disabled for HIP
-    # uses the OpenMP implementation of thrust::sort_by_key
-    cstone_add_performance_test(hilbert.cpp hilbert_perf)
-    if (CMAKE_CUDA_COMPILER)
-        target_link_libraries(hilbert_perf PRIVATE CUDA::cudart)
-    else ()
-        #set_source_files_properties(hilbert.cpp PROPERTIES LANGUAGE HIP)
-        target_link_libraries(hilbert_perf PRIVATE OpenMP::OpenMP_CXX hip::host)
-    endif ()
+if(CMAKE_CUDA_COMPILER)
+    # link to cudart to get thrust includes
+    target_link_libraries(hilbert_perf PRIVATE CUDA::cudart)
 endif ()
 
 if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
