@@ -53,9 +53,7 @@ template<class KeyType, class DevKeyVec, class DevCountVec>
 bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
                            unsigned bucketSize,
                            OctreeData<KeyType, GpuTag>& tree,
-                           std::vector<KeyType>& leaves,
                            DevKeyVec& d_csTree,
-                           std::vector<unsigned>& counts,
                            DevCountVec& d_countsBuf,
                            bool firstCall)
 {
@@ -69,10 +67,6 @@ bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
 
     tree.resize(newNumNodes);
     buildOctreeGpu(d_csTree.data(), tree.data());
-
-    counts.resize(tree.numLeafNodes);
-    reallocate(leaves, tree.numLeafNodes + 1, 1.01);
-    memcpyD2H(d_csTree.data(), d_csTree.size(), leaves.data());
 
     size_t numLeafNodes = tree.numLeafNodes;
     auto [d_counts, d_countsRed] =
@@ -90,9 +84,6 @@ bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
     }
     else { mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, MPI_COMM_WORLD); }
     sequenceMax(d_counts.data(), d_counts.data() + d_counts.size(), d_countsRed.data(), d_counts.data());
-
-    reallocate(counts, numLeafNodes, 1.01);
-    memcpyD2H(d_counts.data(), d_counts.size(), counts.data());
     d_countsBuf.resize(numLeafNodes);
 
     return converged;
@@ -110,7 +101,7 @@ bool updateOctreeGlobal(std::span<const KeyType> keys,
 {
     if constexpr (HaveGpu<Accelerator>{})
     {
-        return updateOctreeGlobalGpu(keys, bucketSize, tree, leaves, d_csTree, counts, d_counts, firstCall);
+        return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, d_counts, firstCall);
     }
     else { return updateOctreeGlobal(keys, bucketSize, tree, leaves, counts); }
 }
