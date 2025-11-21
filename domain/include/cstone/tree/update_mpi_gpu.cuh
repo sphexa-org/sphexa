@@ -47,7 +47,6 @@ inline void summax(void* inP, void* inoutP, int* len, MPI_Datatype*)
  * @param[in]     bucketSize  max number of particles per leaf
  * @param[inout]  tree        a fully linked octree
  * @param[inout]  counts      leaf node particle counts
- * @param[in]     numRanks    number of MPI ranks
  * @return                    true if tree was not changed
  */
 template<class KeyType, class DevKeyVec, class DevCountVec>
@@ -57,7 +56,8 @@ bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
                            std::vector<KeyType>& leaves,
                            DevKeyVec& d_csTree,
                            std::vector<unsigned>& counts,
-                           DevCountVec& d_countsBuf)
+                           DevCountVec& d_countsBuf,
+                           bool firstCall)
 {
     unsigned maxCount = std::numeric_limits<unsigned>::max();
     auto newNumNodes =
@@ -81,10 +81,14 @@ bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
     computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys, maxCount, true);
 
     syncGpu();
-    MPI_Op limitSum;
-    MPI_Op_create(&summax, true, &limitSum);
-    mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), limitSum, MPI_COMM_WORLD);
-    MPI_Op_free(&limitSum);
+    if (firstCall)
+    {
+        MPI_Op limitSum;
+        MPI_Op_create(&summax, true, &limitSum);
+        mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), limitSum, MPI_COMM_WORLD);
+        MPI_Op_free(&limitSum);
+    }
+    else { mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, MPI_COMM_WORLD); }
     sequenceMax(d_counts.data(), d_counts.data() + d_counts.size(), d_countsRed.data(), d_counts.data());
 
     reallocate(counts, numLeafNodes, 1.01);
@@ -101,11 +105,12 @@ bool updateOctreeGlobal(std::span<const KeyType> keys,
                         std::vector<KeyType>& leaves,
                         DevKeyVec& d_csTree,
                         std::vector<unsigned>& counts,
-                        DevCountVec& d_counts)
+                        DevCountVec& d_counts,
+                        bool firstCall)
 {
     if constexpr (HaveGpu<Accelerator>{})
     {
-        return updateOctreeGlobalGpu(keys, bucketSize, tree, leaves, d_csTree, counts, d_counts);
+        return updateOctreeGlobalGpu(keys, bucketSize, tree, leaves, d_csTree, counts, d_counts, firstCall);
     }
     else { return updateOctreeGlobal(keys, bucketSize, tree, leaves, counts); }
 }
