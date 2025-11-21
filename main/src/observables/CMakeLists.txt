@@ -12,7 +12,7 @@ if(CMAKE_CUDA_COMPILER)
 endif()
 
 if(CMAKE_HIP_COMPILER)
-    target_link_libraries(obs_gpu PUBLIC hip::host)
+    target_link_libraries(obs_gpu PRIVATE roc::rocthrust hip::hipcub)
 endif()
 
 add_library(observables observables.cpp)
@@ -34,6 +34,5 @@ endif()
 
 if (CMAKE_HIP_COMPILER)
     target_link_libraries(observables_gpu PUBLIC hip::host)
-    target_compile_definitions(observables_gpu PRIVATE THRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)
     set_target_properties(observables_gpu PROPERTIES LINKER_LANGUAGE CXX)
 endif ()

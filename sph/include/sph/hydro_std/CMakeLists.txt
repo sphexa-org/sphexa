@@ -8,3 +8,7 @@ if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     target_compile_definitions(hydro_std_gpu PRIVATE USE_CUDA)
 endif()
 
+if (CMAKE_HIP_COMPILER)
+    target_link_libraries(hydro_std_gpu PRIVATE roc::rocthrust hip::hipcub)
+endif ()
+

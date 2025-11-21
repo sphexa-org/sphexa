@@ -372,7 +372,7 @@ __device__ __forceinline__ util::array<Vec4<Tc>, TravConfig::nwt> loadTarget(Ind
 
 //! @brief determine the bounding box around all particles-2h spheres in the warp
 template<class Tc>
-__device__ __forceinline__ thrust::tuple<Vec3<Tc>, Vec3<Tc>>
+__device__ __forceinline__ util::tuple<Vec3<Tc>, Vec3<Tc>>
 warpBbox(const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i)
 {
     Tc r0 = pos_i[0][3];
@@ -394,7 +394,7 @@ warpBbox(const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i)
     Vec3<Tc> targetCenter = (Xmax + Xmin) * Tc(0.5);
     Vec3<Tc> targetSize   = (Xmax - Xmin) * Tc(0.5);
 
-    return thrust::make_tuple(targetCenter, targetSize);
+    return {targetCenter, targetSize};
 }
 
 /*! @brief Find neighbors of a group of given particles, does not count self reference: min return value is 0

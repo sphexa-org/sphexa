@@ -33,8 +33,7 @@
 #include <thrust/inner_product.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/transform_reduce.h>
-
-#include "cstone/util/tuple.hpp"
+#include <thrust/tuple.h>
 
 #include "conserved_gpu.h"
 
@@ -43,6 +42,15 @@ namespace sphexa
 
 using cstone::Vec3;
 using thrust::get;
+
+struct TuplePlus
+{
+    using type = thrust::tuple<double, Vec3<double>, Vec3<double>>;
+    HOST_DEVICE_FUN type operator()(const type& a, const type& b) const
+    {
+        return type(get<0>(a) + get<0>(b), get<1>(a) + get<1>(b), get<2>(a) + get<2>(b));
+    }
+};
 
 /*! @brief Functor to compute kinetic and internal energy and linear and angular momentum
  *
@@ -58,13 +66,12 @@ struct EMom
      * @param p   Tuple<x,y,z,m,vx,vy,vz,temp> with data for one particle
      * @return    Tuple<kinetic energy, internal energy, linear momentum, angular momentum>
      */
-    HOST_DEVICE_FUN
-    thrust::tuple<double, Vec3<double>, Vec3<double>> operator()(const thrust::tuple<Tc, Tc, Tc, Tm, Tv, Tv, Tv>& p)
+    HOST_DEVICE_FUN TuplePlus::type operator()(const thrust::tuple<Tc, Tc, Tc, Tm, Tv, Tv, Tv>& p)
     {
         Vec3<double> X{get<0>(p), get<1>(p), get<2>(p)};
         Vec3<double> V{get<4>(p), get<5>(p), get<6>(p)};
         Tm           m = get<3>(p);
-        return thrust::make_tuple(m * norm2(V), double(m) * V, double(m) * cross(X, V));
+        return {m * norm2(V), double(m) * V, double(m) * cross(X, V)};
     }
 };
 
@@ -78,11 +85,9 @@ conservedQuantitiesGpu(double cv, const Tc* x, const Tc* y, const Tc* z, const T
     auto it2 = thrust::make_zip_iterator(
         thrust::make_tuple(x + last, y + last, z + last, m + last, vx + last, vy + last, vz + last));
 
-    auto plus = util::TuplePlus<thrust::tuple<double, Vec3<double>, Vec3<double>>>{};
-    auto init = thrust::make_tuple(0.0, Vec3<double>{0, 0, 0}, Vec3<double>{0, 0, 0});
-
     //! apply EMom to each particle and reduce results into a single sum
-    auto [eKin, linMom, angMom] = thrust::transform_reduce(thrust::device, it1, it2, EMom<Tc, Tm, Tv>{}, init, plus);
+    auto ret = thrust::transform_reduce(thrust::device, it1, it2, EMom<Tc, Tm, Tv>{}, TuplePlus::type{}, TuplePlus{});
+    auto [eKin, linMom, angMom] = std::make_tuple(get<0>(ret), get<1>(ret), get<2>(ret));
 
     double eInt = 0.0;
     if (temp != nullptr)

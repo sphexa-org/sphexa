@@ -10,12 +10,16 @@ endif()
 
 if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     add_executable(ryoanji_demo demo.cu)
-    target_link_libraries(ryoanji_demo PUBLIC ryoanji_kernels cstone_gpu)
+    target_link_libraries(ryoanji_demo PRIVATE ryoanji_kernels cstone_gpu)
     set_target_properties(ryoanji_demo PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
     target_include_directories(ryoanji_demo PRIVATE ${RYOANJI_TEST_INCLUDE_DIRS})
     # set_source_files_properties(demo.cu PROPERTIES COMPILE_FLAGS "-Xptxas -v")
     install(TARGETS ryoanji_demo RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji/ryoanji_demo)
 endif ()
+
+if (CMAKE_HIP_COMPILER)
+    target_link_libraries(ryoanji_demo PUBLIC roc::rocthrust hip::hipcub)
+endif()
 
 # multi-rank demonstrator
 if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
@@ -27,7 +31,6 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
 
     if (CMAKE_HIP_COMPILER)
         target_link_libraries(${testname} PRIVATE hip::host)
-        target_compile_definitions(${testname} PRIVATE THRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)
         set_target_properties(${testname} PROPERTIES LINKER_LANGUAGE CXX)
     endif ()
 
@@ -66,7 +69,7 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
             nbody/direct.cu
             test_main.cpp)
     target_include_directories(${testname} PRIVATE ${PROJECT_SOURCE_DIR}/src)
-    target_link_libraries(${testname} PUBLIC OpenMP::OpenMP_CXX ryoanji GTest::gtest_main)
+    target_link_libraries(${testname} PRIVATE cstone_thrust_incl OpenMP::OpenMP_CXX ryoanji GTest::gtest_main)
     if (CMAKE_HIP_COMPILER)
         set_target_properties(${testname} PROPERTIES LINKER_LANGUAGE CXX)
     endif ()
