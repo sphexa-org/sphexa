@@ -216,7 +216,8 @@ public:
         computeTimestep(first, last, d);
         timer.step("Timestep");
         computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
-        updateSmoothingLength(groups_.view(), d);
+        bool haveUnconvergedParticles = updateSmoothingLength(groups_.view(), d);
+        if (haveUnconvergedParticles) { throw std::runtime_error("Neighbor search did not converge\n"); }
         timer.step("UpdateQuantities");
     }
 
