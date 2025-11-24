@@ -40,6 +40,8 @@ if(CSTONE_WITH_CUDA)
     if(CMAKE_CUDA_COMPILER)
         enable_language(CUDA)
         find_package(CUDAToolkit)
+        # Thrust and CUB are part of CUDAToolkit
+        set(CSTONE_THRUST_LIBS "")
         set(CMAKE_CUDA_STANDARD 20)
     else()
         message(STATUS "No CUDA support")
@@ -47,11 +49,26 @@ if(CSTONE_WITH_CUDA)
     endif()
 endif()
 
+# interface target with just the THRUST and CUB includes, as linking those targets adds
+# --hip-link --offload-arch, which doesn't work if a) we have to use GCC (mpicxx) for linking
+# and b) we can't put HIP objects into a static archive when compiling GTest runners
+add_library(cstone_thrust_incl INTERFACE)
+
 if(CSTONE_WITH_HIP)
     check_language(HIP)
     if(CMAKE_HIP_COMPILER)
         enable_language(HIP)
         find_package(hip)
+        find_package(rocthrust REQUIRED)
+        find_package(hipcub REQUIRED)
+        get_property(rocthrust_include TARGET roc::rocthrust PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+        get_property(hipcub_include TARGET hip::hipcub PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+        get_property(rocprim_include TARGET roc::rocprim PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+        target_include_directories(cstone_thrust_incl INTERFACE
+            ${rocthrust_include} ${hipcub_include} ${rocprim_include})
+
+        set(CSTONE_THRUST_LIBS roc::rocthrust hip::hipcub)
+
         set(CMAKE_HIP_STANDARD 20)
     else()
         message(STATUS "No HIP support")

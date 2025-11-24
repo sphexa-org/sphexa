@@ -33,6 +33,7 @@
 
 #include "sph/kernels.hpp"
 #include "sph/particles_data.hpp"
+#include "sph/particles_data_gpu.cuh"
 #include "sph/sph_gpu.hpp"
 
 namespace sph

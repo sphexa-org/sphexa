@@ -1,4 +1,5 @@
 #include "sph/find_neighbors_gpu.hpp"
+#include "sph/particles_data_gpu.cuh"
 
 namespace sph
 {
