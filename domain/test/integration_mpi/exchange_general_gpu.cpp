@@ -101,8 +101,6 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
 
     // *******************************
 
-    // auto peers = findPeersMac(thisRank, assignment, domainTree, box, invThetaEff);
-
     KeyType focusStart = assignment[thisRank];
     KeyType focusEnd   = assignment[thisRank + 1];
 

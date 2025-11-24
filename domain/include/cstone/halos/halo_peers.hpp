@@ -29,7 +29,6 @@ haloPeers(int myRank, std::span<const LocalIndex> layout, std::span<const TreeIn
 
         TreeNodeIndex focStart = fAssignment[rank].start();
         TreeNodeIndex focEnd   = fAssignment[rank].end();
-        if (focEnd < focStart) { focEnd = focStart; }
 
         bool isHalo = layout[focEnd] > layout[focStart];
         if (isHalo) { peerFlags[rank] |= static_cast<int>(PeerMask::halo); }
