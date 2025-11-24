@@ -232,13 +232,15 @@ __device__ uint2 traverseWarp(unsigned* nc_i,
         const bool isSource = sourceIdx < numSources; // Source index is within bounds
         if (!isSource) { sourceQueue = 0; }
 
-        const Vec3<Tc> curSrcCenter = centers[sourceQueue];      // Current source cell center
-        const Vec3<Tc> curSrcSize   = sizes[sourceQueue];        // Current source cell center
-        const int childBegin        = childOffsets[sourceQueue]; // First child cell
-        const bool isNode           = childBegin;
-        const bool isClose          = cellOverlap<UsePbc>(curSrcCenter, curSrcSize, targetCenter, targetSize, box);
-        const bool isDirect         = isClose && !isNode && isSource;
-        const int leafIdx           = (isDirect) ? internalToLeaf[sourceQueue] : 0; // the cstone leaf index
+        const Vec3<Tc> curSrcCenter = centers[sourceQueue]; // Current source cell center
+        const Vec3<Tc> curSrcSize   = sizes[sourceQueue];   // Current source cell center
+        const bool isEmpty =
+            curSrcSize[0] == 0 && curSrcSize[1] == 0 && curSrcSize[2] == 0; // Check for empty nodes in mixD trees
+        const int childBegin = childOffsets[sourceQueue];                   // First child cell
+        const bool isNode    = childBegin;
+        const bool isClose   = !isEmpty && cellOverlap<UsePbc>(curSrcCenter, curSrcSize, targetCenter, targetSize, box);
+        const bool isDirect  = isClose && !isNode && isSource;
+        const int leafIdx    = (isDirect) ? internalToLeaf[sourceQueue] : 0; // the cstone leaf index
 
         // Split
         const bool isSplit     = isNode && isClose && isSource;                   // Source cell must be split
