@@ -33,12 +33,12 @@
 namespace cstone
 {
 
-inline std::vector<int> exchangePeers(std::span<const int> extPeers, MPI_Comm comm)
+inline std::vector<int> exchangePeers(std::span<const int> exteriorPeers, MPI_Comm comm)
 {
-    int numRanks = extPeers.size();
-    std::vector<int> intPeers(numRanks, 0);
-    MPI_Alltoall(extPeers.data(), 1, MPI_INT, intPeers.data(), 1, MPI_INT, comm);
-    return intPeers;
+    int numRanks = exteriorPeers.size();
+    std::vector<int> interiorPeers(numRanks, 0);
+    MPI_Alltoall(exteriorPeers.data(), 1, MPI_INT, interiorPeers.data(), 1, MPI_INT, comm);
+    return interiorPeers;
 }
 
 //! @brief A fully traversable octree with a local focus
@@ -155,29 +155,28 @@ public:
         }
 
         translateAssignment<KeyType>(assignment, leaves_, assignment_);
-        auto extPeers =
-            focusPeersAcc<useGpu, KeyType>(globDispl_, assignment_, myRank_, globalLeaves, leaves_);
+        auto extPeers = focusPeersAcc<useGpu, KeyType>(globDispl_, assignment_, myRank_, globalLeaves, leaves_);
         auto intPeers = exchangePeers(extPeers, MPI_COMM_WORLD);
-        peerFlagsToList(extPeers, recvPeers_, PeerMask::focus);
-        peerFlagsToList(intPeers, sendPeers_, PeerMask::focus);
-        extractPeerRanges(recvPeers_, myRank_, assignment_, peerRanges_);
+        peerFlagsToList(extPeers, exteriorPeers_, PeerMask::focus);
+        peerFlagsToList(intPeers, interiorPeers_, PeerMask::focus);
+        extractPeerRanges(exteriorPeers_, myRank_, assignment_, peerRanges_);
 
         if constexpr (HaveGpu<Accelerator>{})
         {
-            syncTreeletsGpu<KeyType>(recvPeers_, sendPeers_, assignment_, leaves_, octreeAcc_, leavesAcc_, treelets_,
-                                     scratch);
+            syncTreeletsGpu<KeyType>(exteriorPeers_, interiorPeers_, assignment_, leaves_, octreeAcc_, leavesAcc_,
+                                     treelets_, scratch);
             downloadOctree();
         }
         else
         {
-            syncTreelets(recvPeers_, sendPeers_, assignment_, octreeAcc_, leaves_, treelets_);
+            syncTreelets(exteriorPeers_, interiorPeers_, assignment_, octreeAcc_, leaves_, treelets_);
             hostPrefixes_ = octreeAcc_.prefixes;
         }
 
-        indexTreelets<KeyType>(sendPeers_, hostPrefixes_, octreeAcc_.levelRange, treelets_, treeletIdx_);
+        indexTreelets<KeyType>(interiorPeers_, hostPrefixes_, octreeAcc_.levelRange, treelets_, treeletIdx_);
 
         translateAssignment<KeyType>(assignment, leaves_, assignment_);
-        extractPeerRanges(recvPeers_, myRank_, assignment_, peerRanges_);
+        extractPeerRanges(exteriorPeers_, myRank_, assignment_, peerRanges_);
         std::copy_n(assignment.numNodesPerRankConst().begin(), numRanks_, globNumNodes_.begin());
         std::copy_n(assignment.treeOffsetsConst().begin(), numRanks_ + 1, globDispl_.begin());
         copy(treeletIdx_, treeletIdxAcc_);
@@ -273,7 +272,7 @@ public:
     template<class T, class DevVec>
     void peerExchange(std::span<T> q, int tag, DevVec& s) const
     {
-        exchangeTreeletGeneral<T>(sendPeers_, recvPeers_, treeletIdxAcc_.view(), assignment_,
+        exchangeTreeletGeneral<T>(interiorPeers_, exteriorPeers_, treeletIdxAcc_.view(), assignment_,
                                   leafToInternal(octreeAcc_), q, tag, s);
     }
 
@@ -755,8 +754,15 @@ private:
     //! @brief box from last call to updateTree()
     Box<RealType> box_{0, 1};
 
-    //! @brief list of peer ranks from last call to updateTree()
-    std::vector<int> sendPeers_, recvPeers_;
+    /*! exterior <-> interior relationship:
+     * - if a is an exterior peer of b,
+     *     - then b is an interior peer of a
+     *     - b may also be an exterior peer of a, but does not have to be
+     */
+    //! @brief list of ranks that own non-local cells in our(myRank_) LET which do not appear in the global tree
+    std::vector<int> exteriorPeers_;
+    //! @brief list of ranks that have non-local cells in their LET that fall into our subdomain
+    std::vector<int> interiorPeers_;
     //! @brief the tree structures that the peers have for the domain of the executing rank (myRank_)
     std::vector<std::vector<KeyType>> treelets_;
     ConcatVector<TreeNodeIndex> treeletIdx_;

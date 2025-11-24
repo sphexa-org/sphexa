@@ -61,14 +61,14 @@ public:
                           std::span<const TreeIndexPair> assignment,
                           std::span<const LocalIndex> layout)
     {
-        auto extPeerFlags = haloPeers(myRank_, layout, assignment);
-        exchangePeers(extPeerFlags, extPeers_, intPeers_);
+        auto exteriorPeerFlags = haloPeers(myRank_, layout, assignment);
+        exchangePeers(exteriorPeerFlags, exteriorPeers_, interiorPeers_);
 
-        outgoingHaloIndices_ = exchangeRequestKeys<KeyType>(leaves, assignment, extPeers_, intPeers_, layout);
+        outgoingHaloIndices_ = exchangeRequestKeys<KeyType>(leaves, assignment, exteriorPeers_, interiorPeers_, layout);
 
         incomingHaloIndices_.resize(assignment.size());
         std::fill(incomingHaloIndices_.begin(), incomingHaloIndices_.end(), RecvList::value_type{0, 0});
-        for (int peer : extPeers_)
+        for (int peer : exteriorPeers_)
         {
             incomingHaloIndices_[peer] = {layout[assignment[peer].start()], layout[assignment[peer].end()]};
         }
@@ -109,7 +109,7 @@ private:
     RecvList incomingHaloIndices_;
     SendList outgoingHaloIndices_;
 
-    std::vector<int> extPeers_, intPeers_;
+    std::vector<int> exteriorPeers_, interiorPeers_;
 
     /*! @brief Counter for halo exchange calls
      * Multiple client calls to domain::exchangeHalos() during a time-step
