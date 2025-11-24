@@ -58,11 +58,12 @@ std::vector<int> focusPeers(std::span<const TreeNodeIndex> globalOffsets,
 
 /*! @brief Compute list of external peers, i.e. peers from which @p myRank will request data
  *
- * @param boundaries  SFC start key of each rank/subdomain
+ * @param globalOffsets  rank assignment of index ranges in the global tree
+ * @param focusOffsets   rank assignment of index ranges in the focus tree (LET)
  * @param myRank
- * @param globalTree  SFC leaves of global tree, on GPU if @p useGpu == true
- * @param focusTree   SFC leaves of the focus tree, on host
- * @return            see focusPeers
+ * @param globalTree     SFC leaves of global tree, on GPU if @p useGpu == true
+ * @param focusTree      SFC leaves of the focus tree, on host
+ * @return               see focusPeers
  */
 template<bool useGpu, class KeyType>
 std::vector<int> focusPeersAcc(std::span<const TreeNodeIndex> globalOffsets,
@@ -71,15 +72,15 @@ std::vector<int> focusPeersAcc(std::span<const TreeNodeIndex> globalOffsets,
                                std::span<const KeyType> globalTree,
                                std::span<const KeyType> focusTree)
 {
-    auto globalTreeActive = globalTree;
     if constexpr (useGpu)
     {
         std::vector<KeyType> globalTreeBackingBuffer;
         globalTreeBackingBuffer.resize(globalTree.size());
         memcpyD2H(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data());
-        globalTreeActive = std::span(globalTreeBackingBuffer);
+        auto globalTreeHost = std::span(globalTreeBackingBuffer);
+        return focusPeers<KeyType>(globalOffsets, focusOffsets, myRank, globalTreeHost, focusTree);
     }
-    return focusPeers<KeyType>(globalOffsets, focusOffsets, myRank, globalTreeActive, focusTree);
+    return focusPeers<KeyType>(globalOffsets, focusOffsets, myRank, globalTree, focusTree);
 }
 
 inline void peerFlagsToList(std::span<const int> peerFlags, std::vector<int>& peersList, PeerMask mask)
