@@ -1,3 +1,5 @@
+#include <cmath>
+#include <format>
 #include <iostream>
 #include <numeric>
 #include <stdexcept>
@@ -176,7 +178,7 @@ namespace sphexa
         if(writeEnabledSubset) {
 
             if(settings.count("o_subset")) {
-                outFileSubset = settings.at("o_subset").toStrings()[0];
+                outFileSubset = static_cast<StringValue>(settings.at("o_subset"));
             }
             else {
                 std::cout<<"WARNING: o_subset not provided, using default naming convention"<<std::endl;
@@ -185,22 +187,42 @@ namespace sphexa
             outFileSubset += outputFileSuffix;
 
             if(settings.count("f_subset")) {
-                outputFieldsSubset = settings.at("f_subset").toStrings();
-                for(auto field = 0; field < outputFieldsSubset.size()-1; ++field) {
-                    std::cout << outputFieldsSubset[field] <<", ";
+                // outputFieldsSubset = settings.at("f_subset").toStrings();
+                // std::vector<std::string> result;
+                for (auto part : static_cast<StringValue>(settings.at("f_subset")) | std::views::split(',')) {
+                    outputFieldsSubset.emplace_back(part.begin(), part.end());
                 }
-                std::cout << outputFieldsSubset.back() << std::endl;
             }
             else {
                 std::cout<<"WARNING: f_subset not provided, all fields will be printed for the tagged id subsets."<<std::endl;
             }
 
             if(settings.count("w_subset")) {
-                writeFreqStrSubset = settings.at("w_subset").toStrings()[0];
+                std::cout << "Write frequency subset: " << std::endl;
+                if(settings.at("w_subset").isScalar()) {
+                    // If integer, format without decimal point
+                    if (std::floor(settings.at("w_subset")) == settings.at("w_subset")) {
+                        writeFreqStrSubset = std::format("{}", static_cast<int>(settings.at("w_subset")));
+                    }
+                    else {
+                        // TODO: is there a way to avoid dereferencing and data()?
+                        writeFreqStrSubset = std::format("{:.15g}", *settings.at("w_subset").data());
+                    }
+                }
+                else {
+                    throw std::runtime_error("w_subset parameter must be a scalar value");
+                }
             }
 
             if(settings.count("wextra_subset")) {
-                writeExtraSubset = settings.at("wextra_subset").toStrings();
+                for(auto val : settings.at("wextra_subset")) {
+                    if(std::floor(val) == val) {
+                        writeExtraSubset.push_back(std::format("{}", static_cast<int>(val)));
+                    }
+                    else {
+                        writeExtraSubset.push_back(std::format("{:.15g}", val));
+                    }
+                }
             }
         }
         return writeEnabledSubset;

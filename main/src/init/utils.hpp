@@ -105,7 +105,8 @@ void readFileAttributes(InitSettings& settings, const std::string& settingsFile,
                 reader->fileAttribute(attr, strValue);
 
                 // Convert the comma-separated string to VectorValue with encoded string flag
-                settings[attr] = Param(stringToVectorValue(strValue), true);
+                // settings[attr] = Param(stringToVectorValue(strValue), true);
+                settings[attr] = Param(strValue);
 
                 if (reader->rank() == 0 && verbose)
                 {
@@ -129,7 +130,7 @@ void readFileAttributes(InitSettings& settings, const std::string& settingsFile,
                 if(sz == 1) {
                     settings[attr] = Param(ScalarValue{});
                 } else {
-                    settings[attr] = Param(VectorValue(sz), false);
+                    settings[attr] = Param(VectorValue(sz));
                 }
 
                 reader->fileAttribute(attr, settings[attr].data(), sz);

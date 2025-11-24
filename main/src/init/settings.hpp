@@ -34,6 +34,7 @@
 
 #include <filesystem>
 #include <map>
+#include <ranges>
 #include <string>
 #include <variant>
 #include <vector>
@@ -45,36 +46,42 @@ namespace sphexa
 
 using ScalarValue = double;
 using VectorValue = std::vector<double>;
+using StringValue = std::string;
 
-//! @brief Wrapper for scalar-type and vector-type parameters
+//! @brief Wrapper for scalar-type, vector-type, and string-type parameters
 struct Param {
 
-    std::variant<ScalarValue, VectorValue> value;
-    bool isEncodedString = false; //! @brief Flag to indicate if VectorValue contains encoded string data
+    std::variant<ScalarValue, VectorValue, StringValue> value;
 
 public:
 
-    Param(void) : value(ScalarValue{}), isEncodedString(false) {}
+    Param(void) : value(ScalarValue{}) {}
 
     // Conversion of all arithmetic types to ScalarValue
     // TODO: needed for the cases in the original code where an integer or enum is assigned to a Param
     template <typename T, typename = std::enable_if_t<std::is_arithmetic_v<T> || std::is_enum_v<T>>>
-    Param(T v) : value(static_cast<ScalarValue>(v)), isEncodedString(false) {}
+    Param(T v) : value(static_cast<ScalarValue>(v)) {}
 
-    Param(const VectorValue& v, bool isEncoded = false) : value(v), isEncodedString(isEncoded) {}
-    Param(VectorValue&& v, bool isEncoded = false) : value(std::move(v)), isEncodedString(isEncoded) {}
+    Param(const VectorValue& v) : value(v) {}
+    Param(VectorValue&& v) : value(std::move(v)) {}
+
+    Param(const StringValue& v) : value(v) {}
+    Param(StringValue&& v) : value(std::move(v)) {}
 
     // Conversion of all arithmetic types to ScalarValue
     template <typename T, typename = std::enable_if_t<std::is_arithmetic_v<T> || std::is_enum_v<T>>>
-    Param& operator=(T v) { value = static_cast<ScalarValue>(v); isEncodedString = false; return *this; }
+    Param& operator=(T v) { value = static_cast<ScalarValue>(v); return *this; }
 
-    Param& operator=(const VectorValue& v) { value = v; isEncodedString = false; return *this; }
-    Param& operator=(VectorValue&& v) { value = std::move(v); isEncodedString = false; return *this; }
+    Param& operator=(const VectorValue& v) { value = v; return *this; }
+    Param& operator=(VectorValue&& v) { value = std::move(v); return *this; }
+
+    Param& operator=(const StringValue& v) { value = v; return *this; }
+    Param& operator=(StringValue&& v) { value = std::move(v); return *this; }
 
     // Check stored type
     bool isScalar() const { return std::holds_alternative<ScalarValue>(value); }
     bool isVector() const { return std::holds_alternative<VectorValue>(value); }
-    bool isString() const { return isEncodedString && isVector(); }
+    bool isString() const { return std::holds_alternative<StringValue>(value); }
 
     // Implilcit conversion to ScalarValue
     // This allows: T r = constants.at("r"), needed to keep backward compatibility with existing code
@@ -93,96 +100,96 @@ public:
         return std::get<VectorValue>(value);
     }
 
+    operator StringValue() const {
+        if (!isString()) {
+            throw std::runtime_error("Parameter is not a string value");
+        }
+        return std::get<StringValue>(value);
+    }
+
     const auto* data() const {
         if (isScalar()) {
             return &std::get<ScalarValue>(value);
-        } else {
+        }
+        else if (isVector()) {
             return std::get<VectorValue>(value).data();
+        }
+        else {
+            throw std::runtime_error("Cannot get data pointer of string parameter");
         }
     }
 
     auto* data() {
         if (isScalar()) {
             return &std::get<ScalarValue>(value);
-        } else {
+        }
+        else if (isVector()) {
             return std::get<VectorValue>(value).data();
+        }
+        else {
+            throw std::runtime_error("Cannot get data pointer of string parameter");
         }
     }
 
     auto begin() {
         if (isScalar()) {
             throw std::runtime_error("Cannot get begin iterator of scalar parameter");
-        } else {
+        }
+        else if (isVector()) {
             return std::get<VectorValue>(value).begin();
+        }
+        else {
+            throw std::runtime_error("Cannot get begin iterator of string parameter");
         }
     }
 
     auto end() {
         if (isScalar()) {
             throw std::runtime_error("Cannot get end iterator of scalar parameter");
-        } else {
+        }
+        else if (isVector()) {
             return std::get<VectorValue>(value).end();
+        }
+        else {
+            throw std::runtime_error("Cannot get end iterator of string parameter");
+        }
+    }
+
+    auto begin() const {
+        if (isScalar()) {
+            throw std::runtime_error("Cannot get const begin iterator of scalar parameter");
+        }
+        else if (isVector()) {
+            return std::get<VectorValue>(value).begin();
+        }
+        else {
+            throw std::runtime_error("Cannot get const begin iterator of string parameter");
+        }
+    }
+
+    auto end() const {
+        if (isScalar()) {
+            throw std::runtime_error("Cannot get const end iterator of scalar parameter");
+        }
+        else if (isVector()) {
+            return std::get<VectorValue>(value).end();
+        }
+        else {
+            throw std::runtime_error("Cannot get const end iterator of string parameter");
         }
     }
 
     size_t size() const {
         if (isScalar()) {
             return 1;
-        } else {
-            // TODO: in case of an encoded string, shold we exlcude the commas from the size?
+        }
+        else if (isVector()) {
             return std::get<VectorValue>(value).size();
         }
+        else {
+            return std::get<StringValue>(value).size();
+        }
     }
-
-    std::vector<std::string> toStrings() const
-    {
-        if (isScalar()) {
-            // TODO: find a better way to handle this case
-            std::cout<<"Warning: converting scalar Param to string vector of size 1"<<std::endl;
-            return std::vector<std::string>{std::format("{:.15g}", std::get<ScalarValue>(value))};
-        }
-
-        std::vector<std::string> result;
-        if(isEncodedString)
-        {
-            std::string current;
-            const double comma_ascii_code = 44.0;
-
-            for (double code : std::get<VectorValue>(value))
-            {
-                if (code == comma_ascii_code)
-                {
-                    // Found a separator, save current string
-                    if (!current.empty())
-                    {
-                        result.push_back(current);
-                        current.clear();
-                    }
-                }
-                else
-                {
-                    char ch = static_cast<char>(static_cast<int>(code));
-                    current += ch;
-                }
-            }
-
-            // Add the last string
-            if (!current.empty())
-            {
-                result.push_back(current);
-            }
-        }
-        else
-        {
-            // This is a numeric vector, convert to strings
-            for (double value : std::get<VectorValue>(value))
-            {
-                result.push_back(std::format("{:.15g}", value));
-            }
-        }
-        return result;
-    }
-
 };
 
 using InitSettings = std::map<std::string, Param>;
@@ -191,12 +198,16 @@ using InitSettings = std::map<std::string, Param>;
 inline ScalarValue max(const Param& param) {
     if (param.isScalar()) {
         return std::get<ScalarValue>(param.value);
-    } else {
+    }
+    else if (param.isVector()) {
         const auto& vec = std::get<VectorValue>(param.value);
         if (vec.empty()) {
             throw std::runtime_error("Cannot get max of empty vector parameter");
         }
         return *std::max_element(vec.begin(), vec.end());
+    }
+    else {
+        throw std::runtime_error("Cannot get max of string parameter");
     }
 }
 
@@ -204,44 +215,18 @@ inline ScalarValue max(const Param& param) {
 inline ScalarValue min(const Param& param) {
     if (param.isScalar()) {
         return std::get<ScalarValue>(param.value);
-    } else {
+    }
+    else if (param.isVector()) {
         const auto& vec = std::get<VectorValue>(param.value);
         if (vec.empty()) {
             throw std::runtime_error("Cannot get min of empty vector parameter");
         }
         return *std::min_element(vec.begin(), vec.end());
     }
+    else {
+        throw std::runtime_error("Cannot get min of string parameter");
+    }
 }
-
-/*! @brief Convert comma-separated string to VectorValue
- *
- * @param[in] input  String to be encoded (e.g., "x,y,rho" or "output_filename")
- *
- * @return VectorValue containing character codes as doubles (including commas)
- *
- * Examples:
- *   std::string fields = "x,y,z";
- *   VectorValue codes = stringToVectorValue(fields);  // {120.0, 44.0, 121.0, 44.0, 122.0}
- *
- *   std::string fields = "abc,def";
- *   VectorValue codes = stringToVectorValue(fields);  // {97.0, 98.0, 99.0, 44.0, 100.0, 101.0, 102.0}
- *
- *   std::string single = "xyz";
- *   VectorValue codes = stringToVectorValue(single);  // {120.0, 121.0, 122.0} (no comma separator)
- */
-inline VectorValue stringToVectorValue(const std::string& input)
-{
-    VectorValue result;
-    result.reserve(input.size());
-
-    // Encode all characters including commas
-    std::for_each(input.begin(), input.end(), [&](char ch) {
-        result.push_back(static_cast<double>(static_cast<unsigned char>(ch)));
-    });
-
-    return result;
-}
-
 
 //! @brief write @p InitSettings as file attributes of a new file @p path
 inline void writeSettings(const InitSettings& settings, const std::string& path, IFileWriter* writer)

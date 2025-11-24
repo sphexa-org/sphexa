@@ -208,7 +208,7 @@ TEST(IO, idTaggingOutputFileNaming)
 {
     sphexa::InitSettings settings;
     settings["w_subset"] = 10;
-    settings["o_subset"] = sphexa::Param(sphexa::stringToVectorValue("subset_output_file"), true);
+    settings["o_subset"] = std::string("subset_output_file");
     const std::string initCond = "dummy_cond";
     const std::string outputFileSuffix = ".dummy_suffix";
     std::string outFileSubset;
@@ -243,7 +243,7 @@ TEST(IO, idTaggingFieldsRetrieval)
 {
     sphexa::InitSettings settings;
     settings["w_subset"] = 10;
-    settings["f_subset"] = sphexa::Param(sphexa::stringToVectorValue("x,y,z,rho"), true);
+    settings["f_subset"] = std::string("x,y,z,rho");
     const std::string initCond = "dummy_cond";
     const std::string outputFileSuffix = ".dummy_suffix";
     std::string outFileSubset;
