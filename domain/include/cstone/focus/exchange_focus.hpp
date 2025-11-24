@@ -331,7 +331,7 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
     {
         gatherAcc<useGpu, TreeNodeIndex>(treeletIdx[interiorPeers[i]], quantities.data(), sendBuffers[i].data());
         if constexpr (useGpu) { syncGpu(); }
-        assert(sendBuffers[i].size() == treeletIdx[intPeers[i]].size());
+        assert(sendBuffers[i].size() == treeletIdx[interiorPeers[i]].size());
         mpiSendAsyncAcc<useGpu>(sendBuffers[i].data(), treeletIdx[interiorPeers[i]].size(), interiorPeers[i], commTag,
                                 sendRequests, staging);
     }
