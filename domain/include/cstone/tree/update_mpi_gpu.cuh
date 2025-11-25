@@ -28,7 +28,8 @@
 namespace cstone
 {
 
-inline void summax(void* inP, void* inoutP, int* len, MPI_Datatype*)
+//! @brief sum reduction like MPI_SUM, but cap maximum values before they overflow
+inline void sumCapped(void* inP, void* inoutP, int* len, MPI_Datatype*)
 {
     auto* in    = reinterpret_cast<unsigned*>(inP);
     auto* inout = reinterpret_cast<unsigned*>(inoutP);
@@ -36,18 +37,20 @@ inline void summax(void* inP, void* inoutP, int* len, MPI_Datatype*)
     {
         auto a   = in[i];
         auto b   = inout[i];
-        inout[i] = std::max(a + b, std::max(a, b));
+        inout[i] = a + b >= std::max(a, b) ? a + b : std::numeric_limits<unsigned>::max();
     }
 }
 
 /*! @brief global update step of an octree, including regeneration of the internal node structure
  *
  * @tparam        KeyType     unsigned 32- or 64-bit integer
- * @param[in]     keys    first particle key, on device
+ * @param[in]     keys        first particle key, on device
  * @param[in]     bucketSize  max number of particles per leaf
- * @param[inout]  tree        a fully linked octree
- * @param[inout]  counts      leaf node particle counts
- * @return                    true if tree was not changed
+ * @param[out]    tree        output fully linked octree built on top of updated leaves
+ * @param[inout]  d_csTree    leaf nodes
+ * @param[out]    d_countsBuf leaf node particle counts
+ * @param[in]     expectOverflows  use sum-reduction that guards against integer overflow if true
+ * @return                         true if tree was not changed
  */
 template<class KeyType, class DevKeyVec, class DevCountVec>
 bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
@@ -55,7 +58,7 @@ bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
                            OctreeData<KeyType, GpuTag>& tree,
                            DevKeyVec& d_csTree,
                            DevCountVec& d_countsBuf,
-                           bool firstCall)
+                           bool expectOverflows)
 {
     unsigned maxCount = std::numeric_limits<unsigned>::max();
     auto newNumNodes =
@@ -75,10 +78,10 @@ bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
     computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys, maxCount, true);
 
     syncGpu();
-    if (firstCall)
+    if (expectOverflows)
     {
         MPI_Op limitSum;
-        MPI_Op_create(&summax, true, &limitSum);
+        MPI_Op_create(&sumCapped, true, &limitSum);
         mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), limitSum, MPI_COMM_WORLD);
         MPI_Op_free(&limitSum);
     }
