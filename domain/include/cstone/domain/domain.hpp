@@ -472,18 +472,30 @@ private:
     {
         exchangeHalos(std::tie(x, y, z, h), std::get<0>(scratch), std::get<1>(scratch));
 
+        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box());
+        const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                             mixDBits.bz != maxTreeLevel<KeyType>{};
         // compute SFC keys of received halo particles
         if constexpr (IsDeviceVector<KeyVec>{})
         {
-            computeSfcKeysGpu(rawPtr(x), rawPtr(y), rawPtr(z), sfcKindPointer(rawPtr(keys)), bufDesc_.start, box());
-            computeSfcKeysGpu(rawPtr(x) + bufDesc_.end, rawPtr(y) + bufDesc_.end, rawPtr(z) + bufDesc_.end,
-                              sfcKindPointer(rawPtr(keys)) + bufDesc_.end, x.size() - bufDesc_.end, box());
+            if (useMixD)
+            {
+                computeSfcMixDKeysGpu(rawPtr(x), rawPtr(y), rawPtr(z), SfcMixDKindPointer(rawPtr(keys)), bufDesc_.start,
+                                      box(), mixDBits.bx, mixDBits.by, mixDBits.bz);
+                computeSfcMixDKeysGpu(rawPtr(x) + bufDesc_.end, rawPtr(y) + bufDesc_.end, rawPtr(z) + bufDesc_.end,
+                                      SfcMixDKindPointer(rawPtr(keys)) + bufDesc_.end, x.size() - bufDesc_.end, box(),
+                                      mixDBits.bx, mixDBits.by, mixDBits.bz);
+            }
+            else
+            {
+                computeSfcKeysGpu(rawPtr(x), rawPtr(y), rawPtr(z), sfcKindPointer(rawPtr(keys)), bufDesc_.start, box());
+                computeSfcKeysGpu(rawPtr(x) + bufDesc_.end, rawPtr(y) + bufDesc_.end, rawPtr(z) + bufDesc_.end,
+                                  sfcKindPointer(rawPtr(keys)) + bufDesc_.end, x.size() - bufDesc_.end, box());
+            }
         }
         else
         {
-            const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box());
-            if (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                mixDBits.bz != maxTreeLevel<KeyType>{})
+            if (useMixD)
             {
                 computeSfcMixDKeys(rawPtr(x), rawPtr(y), rawPtr(z), SfcMixDKindPointer(rawPtr(keys)), bufDesc_.start,
                                    box(), mixDBits.bx, mixDBits.by, mixDBits.bz);
