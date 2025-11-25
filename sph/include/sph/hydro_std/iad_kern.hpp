@@ -67,6 +67,7 @@ HOST_DEVICE_FUN inline void IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone
     // Note normalization factor: cij have units of 1/tau because det is proportional to tau^3 so we have to
     // divide by K/h^3.
     T factor = normalization * (hi * hi * hi) / (det * K);
+    if (std::isnan(factor) && neighborsCount == 0) { factor = T(0); }
 
     c11[i] = (tau22 * tau33 - tau23 * tau23) * factor;
     c12[i] = (tau13 * tau23 - tau33 * tau12) * factor;
