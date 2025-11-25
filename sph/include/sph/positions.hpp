@@ -54,7 +54,7 @@ HOST_DEVICE_FUN bool fbcCheck(Tc coord, Th h, Tc top, Tc bottom, bool fbc)
 template<class TU>
 HOST_DEVICE_FUN TU energyUpdate(TU u_old, double dt, double dt_m1, double du, double du_m1)
 {
-    TU u_new = u_old + du * dt + 0.5 * (du - du_m1) / dt_m1 * std::abs(dt) * dt;
+    TU u_new = u_old + du * dt + 0.5 * (du - du_m1) / dt_m1 * dt * dt;
     // To prevent u < 0 (when cooling with GRACKLE is active)
     if (u_new < 0.) { u_new = u_old * std::exp(u_new * dt / u_old); }
     return u_new;
@@ -187,8 +187,8 @@ void computePositions(const GroupView& grp, Dataset& d, const cstone::Box<T>& bo
                             rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz), rawPtr(d.devData.x_m1),
                             rawPtr(d.devData.y_m1), rawPtr(d.devData.z_m1), rawPtr(d.devData.ax), rawPtr(d.devData.ay),
                             rawPtr(d.devData.az), rung, rawPtr(d.devData.temp), rawPtr(d.devData.u),
-                            rawPtr(d.devData.du), rawPtr(d.devData.du_m1), rawPtr(d.devData.h), rawPtr(d.devData.cv), d_mui, d.gamma, constCv,
-                            box);
+                            rawPtr(d.devData.du), rawPtr(d.devData.du_m1), rawPtr(d.devData.h), rawPtr(d.devData.cv),
+                            d_mui, d.gamma, constCv, box);
     }
     else
     {

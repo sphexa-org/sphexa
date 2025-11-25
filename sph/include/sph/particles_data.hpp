@@ -225,7 +225,7 @@ public:
     FieldVector<RealType>  u;                                  // Internal Energy
     FieldVector<HydroType> p;                                  // Pressure
     FieldVector<HydroType> prho;                               // p / (kx * m^2 * gradh)
-    FieldVector<HydroType> tdpdTrho;                           // temp * dp/dT * prho
+    FieldVector<HydroType> tdpdTrho;                           // temp * dp/dT / (kx * m^2 * gradh)
     FieldVector<HydroType> h;                                  // Smoothing Length
     FieldVector<Tmass>     m;                                  // Mass
     FieldVector<HydroType> c;                                  // Speed of sound
