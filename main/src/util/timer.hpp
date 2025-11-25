@@ -144,7 +144,7 @@ private:
     using SupportedTypes   = IO::Types;
     using SupportedVariant = util::Reduce<std::variant, util::Map<std::vector, SupportedTypes>>;
 
-    std::map<std::string, SuppitortedVariant> perfStats;
+    std::map<std::string, SupportedVariant> perfStats;
 };
 
 } // namespace sphexa
