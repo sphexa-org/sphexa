@@ -34,6 +34,8 @@
 #include "cstone/traversal/ijloop/upsweep.cuh"
 #include "cstone/tree/octree.hpp"
 
+#define CSTONE_SUPERCLUSTER_STACKLESS_TRAVERSAL 0
+
 namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail
 {
 
@@ -519,6 +521,173 @@ collectJClusterCandidates(util::SharedMemAllocator& sharedAllocator,
 
     using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
 
+#if CSTONE_SUPERCLUSTER_STACKLESS_TRAVERSAL
+    const unsigned firstISupercluster = superclusterIndex<Config>(firstBody);
+    const unsigned lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
+    const unsigned iSupercluster      = superclusterIndex<Config>(firstGroupParticle);
+    const unsigned numJClusters       = jClusterIndex<Config>(totalBodies - 1) + 1;
+
+    assert(firstGroupParticle < lastGroupParticle);
+
+    const LocalIndex i  = std::min(firstGroupParticle + laneIdx, lastGroupParticle - 1);
+    const Vec3<Tc> iPos = {x[i], y[i], z[i]};
+    const Th iRadius    = 2 * loadAtIndexIfPtr(h, i) * tree.searchExtFactor;
+    const Th iRadiusSq  = iRadius * iRadius;
+
+    const auto overlapsInternalNode = [&](TreeNodeIndex idx)
+    {
+        const Vec3<Tc> srcCenter = tree.centers[idx];
+        Vec3<Tc> srcSize         = tree.sizes[idx];
+        Th maxRadiusSq           = iRadiusSq;
+        if constexpr (Config::symmetric)
+        {
+            const Th srcRadius = Config::symmetric ? loadAtIndexIfPtr(nodeRMax, idx) * tree.searchExtFactor : Th(0);
+            maxRadiusSq        = std::max(maxRadiusSq, srcRadius * srcRadius);
+        }
+        bool overlaps;
+        if constexpr (UsePbc) { overlaps = norm2(minDistance(iPos, srcCenter, srcSize, box)) < maxRadiusSq; }
+        else { overlaps = norm2(minDistance(iPos, srcCenter, srcSize)) < maxRadiusSq; }
+        return anySync(overlaps);
+    };
+
+    const auto overlapsLeafNode = [&](TreeNodeIndex idx)
+    {
+        const TreeNodeIndex leafIdx    = tree.internalToLeaf[idx];
+        const LocalIndex firstJCluster = jClusterIndex<Config>(tree.layout[leafIdx] + firstValidBody);
+        const LocalIndex lastJCluster  = tree.layout[leafIdx + 1] == tree.layout[leafIdx]
+                                             ? 0
+                                             : jClusterIndex<Config>(tree.layout[leafIdx + 1] + firstValidBody - 1) + 1;
+        for (LocalIndex jCluster = firstJCluster; jCluster < lastJCluster; ++jCluster)
+        {
+            const LocalIndex jSupercluster = superclusterIndex<Config>(jCluster * Config::jSize);
+            if (!Config::symmetric ||
+                includeNbSymmetric(iSupercluster, jSupercluster, firstISupercluster, lastISupercluster))
+            {
+                bool overlaps = false;
+#pragma unroll
+                for (LocalIndex jClusterParticle = 0; jClusterParticle < Config::jSize; ++jClusterParticle)
+                {
+                    const LocalIndex j =
+                        std::clamp(jCluster * Config::jSize + jClusterParticle, firstValidBody, totalBodies - 1);
+                    const Vec3<Tc> jPos = {x[j], y[j], z[j]};
+                    Th maxRadiusSq      = iRadiusSq;
+                    if constexpr (Config::symmetric)
+                    {
+                        const Th jRadius   = 2 * loadAtIndexIfPtr(h, j) * tree.searchExtFactor;
+                        const Th jRadiusSq = jRadius * jRadius;
+                        maxRadiusSq        = std::max(maxRadiusSq, jRadiusSq);
+                    }
+                    overlaps |=
+                        distanceSq<UsePbc>(jPos[0], jPos[1], jPos[2], iPos[0], iPos[1], iPos[2], box) < maxRadiusSq;
+                }
+                if (anySync(overlaps))
+                {
+                    if (numCandidates >= ncmax)
+                    {
+                        sortCandidates<NumSuperclustersPerBlock>(sharedAllocator, candidates, numCandidates);
+                        pruneCandidates<Config, NumSuperclustersPerBlock, UsePbc>(
+                            sharedAllocator, box, firstValidBody, totalBodies, x, y, z, h, (Th)tree.searchExtFactor,
+                            iSupercluster, candidates, numCandidates);
+                    }
+                    if (laneIdx == 0 && numCandidates < ncmax) candidates[numCandidates] = jCluster;
+                    ++numCandidates;
+                }
+            }
+        }
+    };
+
+    singleTraversal(tree.childOffsets, tree.parents, overlapsInternalNode, overlapsLeafNode);
+
+    /*const auto overlaps = [&](TreeNodeIndex idx)
+    {
+        const Vec3<Tc> srcCenter = tree.centers[idx];
+        Vec3<Tc> srcSize         = tree.sizes[idx];
+        const Tc srcRMax         = Config::symmetric ? loadAtIndexIfPtr(nodeRMax, idx) : Th(0);
+        if constexpr (Config::symmetric)
+        {
+            Tc rMaxBound = std::max(groupRMax, srcRMax * tree.searchExtFactor);
+            for (unsigned d = 0; d < 3; ++d)
+                srcSize[d] += rMaxBound;
+        }
+        return cellOverlap<UsePbc>(srcCenter, srcSize, groupCenter, groupSize, box);
+    };
+
+    LocalIndex jClusterQueue   = ~0u;
+    unsigned jClusterQueueSize = 0;
+
+    const auto workOnQueue = [&]
+    {
+        assert(jClusterQueueSize > 0);
+        bool isNeighbor = laneIdx < jClusterQueueSize & jClusterQueue < numJClusters;
+        if (isNeighbor)
+        {
+            isNeighbor = !Config::symmetric;
+            if constexpr (Config::symmetric)
+            {
+                const LocalIndex jSupercluster = superclusterIndex<Config>(jClusterQueue * Config::jSize);
+                isNeighbor |= includeNbSymmetric(iSupercluster, jSupercluster, firstISupercluster, lastISupercluster);
+            }
+
+            if (isNeighbor)
+            {
+                auto bbox = jClusterBboxes[jClusterQueue];
+                if constexpr (Config::symmetric)
+                {
+                    const Tc rMaxBound = std::max(groupRMax, bbox.rMax * tree.searchExtFactor);
+                    for (unsigned d = 0; d < 3; ++d)
+                        bbox.size[d] += rMaxBound;
+                }
+                isNeighbor &= cellOverlap<UsePbc>(bbox.center, bbox.size, groupCenter, groupSize, box);
+            }
+        }
+
+        const unsigned nbIndex    = exclusiveScanBool(isNeighbor);
+        unsigned newNumCandidates = shflSync(numCandidates + nbIndex + isNeighbor, GpuConfig::warpSize - 1);
+        if (newNumCandidates >= ncmax)
+        {
+            sortCandidates<NumSuperclustersPerBlock>(sharedAllocator, candidates, numCandidates);
+            pruneCandidates<Config, NumSuperclustersPerBlock, UsePbc>(sharedAllocator, box, firstValidBody, totalBodies,
+                                                                      x, y, z, h, (Th)tree.searchExtFactor,
+                                                                      iSupercluster, candidates, numCandidates);
+            newNumCandidates = shflSync(numCandidates + nbIndex + isNeighbor, GpuConfig::warpSize - 1);
+        }
+        if (isNeighbor & (numCandidates + nbIndex < ncmax)) candidates[numCandidates + nbIndex] = jClusterQueue;
+
+        numCandidates     = newNumCandidates;
+        jClusterQueueSize = 0;
+    };
+
+    const auto overlapsLeaf = [&](TreeNodeIndex idx)
+    {
+        const TreeNodeIndex leafIdx   = tree.internalToLeaf[idx];
+        LocalIndex firstJCluster      = jClusterIndex<Config>(tree.layout[leafIdx] + firstValidBody);
+        const LocalIndex lastJCluster = tree.layout[leafIdx + 1] == tree.layout[leafIdx]
+                                            ? 0
+                                            : jClusterIndex<Config>(tree.layout[leafIdx + 1] + firstValidBody - 1) + 1;
+        if (jClusterQueueSize != 0)
+        {
+            const LocalIndex currentJCluster = firstJCluster + laneIdx - jClusterQueueSize;
+            const bool pushLane              = laneIdx >= jClusterQueueSize & currentJCluster < lastJCluster;
+            if (pushLane) jClusterQueue = currentJCluster;
+            const auto pushedLanes = reduceBool(pushLane);
+            jClusterQueueSize += pushedLanes;
+            if (jClusterQueueSize == GpuConfig::warpSize) workOnQueue();
+            firstJCluster += pushedLanes;
+        }
+
+        for (LocalIndex startJCluster = firstJCluster; startJCluster < lastJCluster;
+             startJCluster += GpuConfig::warpSize)
+        {
+            assert(jClusterQueueSize == 0);
+            jClusterQueue     = startJCluster + laneIdx;
+            jClusterQueueSize = std::min(lastJCluster - startJCluster, LocalIndex(GpuConfig::warpSize));
+            if (jClusterQueueSize == GpuConfig::warpSize) workOnQueue();
+        }
+    };
+
+    singleTraversal(tree.childOffsets, tree.parents, overlaps, overlapsLeaf);
+    if (jClusterQueueSize > 0) workOnQueue();*/
+#else
     Vec3<Tc> bbMin = {std::numeric_limits<Tc>::max(), std::numeric_limits<Tc>::max(), std::numeric_limits<Tc>::max()};
     Vec3<Tc> bbMax = {std::numeric_limits<Tc>::lowest(), std::numeric_limits<Tc>::lowest(),
                       std::numeric_limits<Tc>::lowest()};
@@ -723,6 +892,7 @@ collectJClusterCandidates(util::SharedMemAllocator& sharedAllocator,
 
     if (jClusterFillLevel > 0) // If there are leftover direct bodies
         checkOverlap(jClusterQueue, jClusterFillLevel);
+#endif
 }
 
 /*! filter neighbor cluster candidates based on particle-particle distance checks, remove double entries, and compute
