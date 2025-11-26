@@ -35,8 +35,7 @@
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/device_vector.h"
 #include "cstone/fields/field_states.hpp"
-#include "cstone/primitives/primitives_gpu.h"
-#include "cstone/primitives/accel_switch.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/util/reallocate.hpp"
 
@@ -66,7 +65,7 @@ public:
         cudaStream_t stream;
     };
 
-    struct neighbors_stream d_stream[NST];
+    neighbors_stream d_stream[NST];
 
     /*! @brief Particle fields
      *
@@ -188,6 +187,23 @@ public:
         return 0;
     }
 
+    util::array<std::size_t, 5> memStats()
+    {
+        auto        data_ = data();
+        std::size_t sumOfSize{0}, sumOfCap{0};
+        for (size_t i = 0; i < data_.size(); ++i)
+        {
+            sumOfSize +=
+                std::visit([]<class V>(V* arg) { return sizeof(typename V::value_type) * arg->size(); }, data_[i]);
+            sumOfCap +=
+                std::visit([]<class V>(V* arg) { return sizeof(typename V::value_type) * arg->capacity(); }, data_[i]);
+        }
+
+        std::size_t free{0}, total{0};
+        cudaMemGetInfo(&free, &total);
+        return {size(), sumOfSize, sumOfCap, free, total};
+    }
+
     DeviceParticlesData()
     {
         for (int i = 0; i < NST; ++i)
@@ -224,8 +240,7 @@ void transferToDevice(DataType& d, size_t first, size_t last, const std::vector<
         using Type2 = std::decay_t<decltype(*deviceField)>;
         if constexpr (std::is_same_v<typename Type1::value_type, typename Type2::value_type>)
         {
-            assert(hostField->size() > 0);
-            assert(deviceField->size() > 0);
+            if (hostField->size()) { deviceField->resize(hostField->size()); }
             size_t transferSize = (last - first) * sizeof(typename Type1::value_type);
             checkGpuErrors(cudaMemcpy(rawPtr(*deviceField) + first, hostField->data() + first, transferSize,
                                       cudaMemcpyHostToDevice));
@@ -241,13 +256,32 @@ void transferToDevice(DataType& d, size_t first, size_t last, const std::vector<
     }
 }
 
-//! @brief transfer all specified fields allocated on both host and device to the device
 template<class DataType, std::enable_if_t<cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
-void transferAllocatedToDevice(DataType& d, size_t first, size_t last, const std::vector<std::string>& fields)
+void deallocateField(DataType& d, int fieldIdx)
 {
-    for (const auto& field : fields)
+    auto dataFields = d.data();
+    auto deallocate = [](auto* field)
     {
-        if (d.isAllocated(field) && d.devData.isAllocated(field)) { transferToDevice(d, first, last, {field}); }
+        using Type = std::decay_t<decltype(*field)>;
+        Type empty;
+        field->swap(empty);
+    };
+
+    std::visit(deallocate, dataFields[fieldIdx]);
+}
+
+//! @brief transfer all fields in use to the device
+template<class DataType, std::enable_if_t<cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
+void migrateToDevice(DataType& d, size_t first, size_t last)
+{
+    auto hostData = d.data();
+    for (int fieldIdx = 0; fieldIdx < hostData.size(); ++fieldIdx)
+    {
+        if (d.isAllocated(fieldIdx) && d.devData.isAllocated(fieldIdx))
+        {
+            transferToDevice(d, first, last, {DataType::fieldNames[fieldIdx]});
+            deallocateField(d, fieldIdx);
+        }
     }
 }
 
@@ -263,8 +297,7 @@ void transferToHost(DataType& d, size_t first, size_t last, const std::vector<st
         using Type2 = std::decay_t<decltype(*deviceField)>;
         if constexpr (std::is_same_v<typename Type1::value_type, typename Type2::value_type>)
         {
-            assert(hostField->size() > 0);
-            assert(deviceField->size() > 0);
+            hostField->resize(deviceField->size());
             size_t transferSize = (last - first) * sizeof(typename Type1::value_type);
             checkGpuErrors(cudaMemcpy(hostField->data() + first, rawPtr(*deviceField) + first, transferSize,
                                       cudaMemcpyDeviceToHost));

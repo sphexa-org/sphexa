@@ -3,7 +3,7 @@ set(UNIT_TESTS chemistry_data.cpp cooling.cpp)
 set(testname cooling_tests)
 add_executable(${testname} ${UNIT_TESTS})
 target_compile_options(${testname} PRIVATE -Wall -Wextra)
-target_compile_definitions(${testname} PUBLIC SPH_EXA_HAVE_H5PART)
+target_compile_definitions(${testname} PUBLIC SPH_EXA_HAVE_H5HUT)
 
 
 target_include_directories(${testname} PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE_DIR}/include ${MAIN_APP_DIR})

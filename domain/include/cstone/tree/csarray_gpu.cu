@@ -98,6 +98,8 @@ void computeNodeCountsGpu(const KeyType* tree,
     checkGpuErrors(cudaMemset(counts, 0, popNodes[0] * sizeof(unsigned)));
     checkGpuErrors(cudaMemset(counts + popNodes[1], 0, (numNodes - popNodes[1]) * sizeof(unsigned)));
 
+    if (popNodes[1] <= popNodes[0]) { return; }
+
     constexpr unsigned nThreads = 256;
     if (useCountsAsGuess)
     {

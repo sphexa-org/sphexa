@@ -32,6 +32,7 @@
 #pragma once
 
 #include "cstone/domain/assignment.hpp"
+#include "cstone/domain/layout.hpp"
 
 namespace sphexa
 {
@@ -58,26 +59,29 @@ template<class KeyType, class T, class Vector>
 void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector& x, Vector& y, Vector& z,
                 const cstone::Box<T>& globalBox)
 {
+    constexpr bool gpu = IsDeviceVector<Vector>{};
+    using AccType      = std::conditional_t<gpu, cstone::GpuTag, cstone::CpuTag>;
+    using AccVectorKT  = std::conditional_t<gpu, cstone::DeviceVector<KeyType>, std::vector<KeyType>>;
+
     size_t                    bucketSize = std::max(64lu, numParticlesGlobal / (100 * numRanks));
-    cstone::BufferDescription bufDesc{0, cstone::LocalIndex(x.size()), cstone::LocalIndex(x.size())};
+    cstone::BufferDescription o1{0, cstone::LocalIndex(x.size()), cstone::LocalIndex(x.size())};
 
-    cstone::GlobalAssignment<KeyType, T> distributor(rank, numRanks, bucketSize, globalBox);
+    cstone::GlobalAssignment<KeyType, T, AccType> distributor(rank, numRanks, bucketSize, globalBox);
 
-    std::vector<unsigned>                                        orderScratch;
-    cstone::SfcSorter<cstone::LocalIndex, std::vector<unsigned>> sorter(orderScratch);
+    Vector            scratch1, scratch2, orderScratch;
+    cstone::SfcSorter sorter(orderScratch);
 
-    std::vector<T>       scratch1, scratch2;
-    std::vector<KeyType> particleKeys(x.size());
-    cstone::LocalIndex   newNParticlesAssigned =
-        distributor.assign(bufDesc, sorter, scratch1, scratch2, particleKeys.data(), x.data(), y.data(), z.data());
+    AccVectorKT        particleKeys(x.size());
+    cstone::LocalIndex newNParticlesAssigned =
+        distributor.assign(o1, sorter, scratch1, scratch2, particleKeys.data(), x.data(), y.data(), z.data());
     auto exchangeSize = std::max(cstone::LocalIndex(x.size()), newNParticlesAssigned);
     reallocate(exchangeSize, 1.01, particleKeys, x, y, z);
-    auto [exchangeStart, keyView] = distributor.distribute({bufDesc.start, bufDesc.end, exchangeSize}, sorter, scratch1,
-                                                           scratch2, particleKeys.data(), x.data(), y.data(), z.data());
+    auto [exchangeStart, keyView] = distributor.distribute({o1.start, o1.end, exchangeSize}, sorter, scratch1, scratch2,
+                                                           particleKeys.data(), x.data(), y.data(), z.data());
 
     scratch1.resize(x.size());
-    cstone::gatherArrays(sorter.gatherFunc(), sorter.getMap() + distributor.numSendDown(), distributor.numAssigned(),
-                         exchangeStart, 0, std::tie(x, y, z), std::tie(scratch1));
+    cstone::gatherArrays({sorter.getMap() + distributor.postExchangeStart(o1), distributor.numAssigned()}, 0,
+                         std::tie(x, y, z), std::tie(scratch1));
     x.resize(keyView.size());
     y.resize(keyView.size());
     z.resize(keyView.size());

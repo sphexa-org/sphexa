@@ -39,7 +39,7 @@
 
 namespace sph
 {
-namespace cuda
+namespace gpu
 {
 
 template<class Tt, class Tm, class Thydro>
@@ -124,5 +124,5 @@ void computePolytropicEOS_HydroStd(size_t first, size_t last, Dataset& d)
 
 template void computePolytropicEOS_HydroStd(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>&);
 
-} // namespace cuda
+} // namespace gpu
 } // namespace sph

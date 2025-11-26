@@ -41,12 +41,14 @@ class to_string_t
 public:
     // The lambda calculates what the string length of N will be, so that `buf`
     // fits to the number perfectly.
-    char_type buf[([]() constexpr noexcept {
-        unsigned int len = N > 0 ? 1 : 2;
-        for (auto n = N; n; len++, n /= base)
-            ;
-        return len;
-    }())] = {};
+    char_type buf[(
+        []() constexpr noexcept
+        {
+            unsigned int len = N > 0 ? 1 : 2;
+            for (auto n = N; n; len++, n /= base)
+                ;
+            return len;
+        }())] = {};
 
     //! Constructs the object, filling `buf` with the string representation of N.
     constexpr to_string_t() noexcept

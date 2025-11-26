@@ -109,7 +109,7 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d, con
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        cuda::computeMomentumEnergy<avClean>(grp, groupDt, d, box);
+        gpu::computeMomentumEnergy<avClean>(grp, groupDt, d, box);
     }
     else { computeMomentumEnergyImpl<avClean>(grp.firstBody, grp.lastBody, d, box); }
 }

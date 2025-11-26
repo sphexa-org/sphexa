@@ -74,6 +74,7 @@ void neighborCheck(const Coordinates& coords, T radius, const Box<T>& box)
     OctreeNsView<T, KeyType> nsView{octree.numLeafNodes,
                                     octree.prefixes.data(),
                                     octree.childOffsets.data(),
+                                    octree.parents.data(),
                                     octree.internalToLeaf.data(),
                                     octree.levelRange.data(),
                                     nullptr,

@@ -93,3 +93,49 @@ auto mpiRecvSyncAcc(T* data, int count, int rank, int tag, MPI_Status* status)
     if constexpr (useGpu) { mpiRecvGpuDirect(data, count, rank, tag, status); }
     else { mpiRecvSync(data, count, rank, tag, status); }
 }
+
+template<class T>
+auto mpiAllreduceGpuDirect(const T* src, T* dest, size_t count, MPI_Op op, MPI_Comm comm)
+{
+    if constexpr (!useGpuDirect)
+    {
+        std::vector<T> srcBuf(count), destBuf(count);
+        memcpyD2H(src, count, srcBuf.data());
+        mpiAllreduce(srcBuf.data(), destBuf.data(), count, op, comm);
+        memcpyH2D(destBuf.data(), count, dest);
+    }
+    else { mpiAllreduce(src, dest, count, op, comm); }
+}
+
+//! @brief adaptor to wrap compile-time size arrays into flattened arrays of the underlying type
+template<bool useGpu, class Ts, class Td>
+auto mpiAllgathervGpuDirect(const Ts* src, int sendCount, Td* dest, const int* counts, const int* displ, MPI_Comm comm)
+{
+    if constexpr (useGpu && !useGpuDirect)
+    {
+        int numRanks;
+        MPI_Comm_size(comm, &numRanks);
+        std::size_t numElements = displ[numRanks - 1] + counts[numRanks - 1];
+
+        Ts* srcUse = reinterpret_cast<Ts*>(MPI_IN_PLACE);
+        std::vector<char> srcStage;
+        if constexpr (not std::is_same_v<Ts, void>)
+        {
+            if (src != MPI_IN_PLACE)
+            {
+                srcStage.resize(sizeof(Ts) * numElements);
+                srcUse = reinterpret_cast<Ts*>(srcStage.data());
+                memcpyD2H(src, numElements, srcUse);
+            }
+        }
+
+        std::vector<Td> destStage(numElements);
+        if (src == MPI_IN_PLACE) { memcpyD2H(dest, numElements, destStage.data()); }
+        mpiAllgatherv(srcUse, sendCount, destStage.data(), counts, displ, comm);
+        memcpyH2D(destStage.data(), destStage.size(), dest);
+    }
+    else
+    {
+        mpiAllgatherv(src, sendCount, dest, counts, displ, comm);
+    }
+}

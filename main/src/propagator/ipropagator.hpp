@@ -35,7 +35,6 @@
 #include <variant>
 
 #include "cstone/sfc/box.hpp"
-#include "cstone/primitives/accel_switch.hpp"
 #include "io/ifile_io.hpp"
 #include "sph/particles_data.hpp"
 #include "util/pm_reader.hpp"
@@ -74,13 +73,13 @@ public:
     virtual void integrate(DomainType& domain, ParticleDataType& d) = 0;
 
     //! @brief save particle data fields to file
-    virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&){};
+    virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&) {}
 
     //! @brief save internal state to file
-    virtual void save(IFileWriter*){};
+    virtual void save(IFileWriter*) {}
 
     //! @brief load internal state from file
-    virtual void load(const std::string& path, IFileReader*){};
+    virtual void load(const std::string& path, IFileReader*) {}
 
     //! @brief whether conserved quantities are time-synchronized (when completing a full time-step hierarchy)
     virtual bool isSynced() { return true; }
@@ -107,9 +106,9 @@ public:
         const auto& d   = simData.hydro;
         const auto& box = domain.box();
 
-        auto nodeCount          = domain.globalTree().numLeafNodes();
+        auto nodeCount          = domain.globalTree().numLeafNodes;
         auto particleCount      = domain.nParticles();
-        auto haloCount          = domain.nParticlesWithHalos() - domain.nParticles();
+        auto haloCount          = d.maxHalos;
         auto totalNeighbors     = d.totalNeighbors;
         auto totalParticleCount = d.numParticlesGlobal;
 
@@ -150,8 +149,8 @@ protected:
                                  d.outputFieldIndices.begin();
                     transferToHost(d, first, last, {d.fieldNames[fidx]});
                     std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writer->writeField(key, field->data(), c); },
-                               fieldPointers[fidx]);
+                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
+                    deallocateField(d, fidx);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
@@ -170,6 +169,26 @@ protected:
 
         output(first, last, simData.hydro, writer);
         output(first, last, simData.chem, writer);
+    }
+
+    void logDomainStats(const DomainType& domain, ParticleDataType& simData)
+    {
+        timer.logStatistics("numParticles", domain.nParticles());
+        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
+        timer.logStatistics("assignment", domain.assignmentStart());
+
+        auto hostMem = simData.hydro.memStats();
+        timer.logStatistics("hostMemSizeBytes", hostMem[1]);
+        timer.logStatistics("hostCapSizeBytes", hostMem[2]);
+
+        using AccType = ParticleDataType::AcceleratorType;
+        if constexpr (cstone::HaveGpu<AccType>{})
+        {
+            auto devMem = simData.hydro.devData.memStats();
+            timer.logStatistics("devMemSizeBytes", devMem[1]);
+            timer.logStatistics("devCapSizeBytes", devMem[2]);
+            timer.logStatistics("devFreeSizeBytes", devMem[3]);
+        }
     }
 
     std::ostream& out;

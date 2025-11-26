@@ -38,28 +38,3 @@ TEST(PrimitivesGpu, MinMax)
     EXPECT_EQ(std::get<0>(minMax), 1.);
     EXPECT_EQ(std::get<1>(minMax), 10.);
 }
-
-TEST(PrimitivesGpu, segmentMax)
-{
-    unsigned numElements = 1000;
-    thrust::device_vector<double> v(numElements);
-
-    thrust::sequence(v.begin(), v.end(), 0);
-
-    unsigned numSegments = 120;
-    std::vector<unsigned> h_segments(numSegments + 1, numElements / numSegments);
-    h_segments[numSegments - 1] += numElements % numSegments;
-    std::exclusive_scan(h_segments.begin(), h_segments.end(), h_segments.begin(), 0);
-
-    thrust::device_vector<unsigned> segments = h_segments;
-    thrust::device_vector<double> output(numSegments);
-
-    segmentMax(rawPtr(v), rawPtr(segments), numSegments, rawPtr(output));
-
-    thrust::host_vector<double> h_output = output;
-
-    for (unsigned i = 0; i < numSegments; ++i)
-    {
-        EXPECT_EQ(h_segments[i + 1] - 1, h_output[i]);
-    }
-}

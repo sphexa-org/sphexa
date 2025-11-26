@@ -38,7 +38,7 @@
 
 namespace sph
 {
-namespace cuda
+namespace gpu
 {
 
 template<class Tt, class Tm, class Thydro>
@@ -158,5 +158,5 @@ COMPUTE_POLYTROPIC_EOS(double, double);
 COMPUTE_POLYTROPIC_EOS(float, double);
 COMPUTE_POLYTROPIC_EOS(float, float);
 
-} // namespace cuda
+} // namespace gpu
 } // namespace sph

@@ -61,10 +61,9 @@ void compareAgainstCpu(const std::vector<KeyType>& tree)
 
     EXPECT_EQ(gpuTree.levelRange.size(), cpuTree.levelRange().size());
     EXPECT_EQ(gpuTree.levelRange.size(), maxTreeLevel<KeyType>{} + 2);
-    std::vector<TreeNodeIndex> h_levelRange = toHost(gpuTree.levelRange);
     for (unsigned level = 0; level < gpuTree.levelRange.size(); ++level)
     {
-        EXPECT_EQ(h_levelRange[level], cpuTree.levelRange()[level]);
+        EXPECT_EQ(gpuTree.levelRange[level], cpuTree.levelRange()[level]);
     }
 }
 

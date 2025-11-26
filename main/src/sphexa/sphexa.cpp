@@ -79,24 +79,25 @@ int main(int argc, char** argv)
     using Dataset = SimulationData<AccType>;
     using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, AccType>;
 
-    const std::string        initCond     = parser.get("--init");
-    const size_t             problemSize  = parser.get("-n", 50);
-    const std::string        glassBlock   = parser.get("--glass");
-    const std::string        propChoice   = parser.get("--prop", std::string("ve"));
-    const std::string        maxStepStr   = parser.get("-s", std::string("200"));
-    std::vector<std::string> writeExtra   = parser.getCommaList("--wextra");
-    std::vector<std::string> outputFields = parser.getCommaList("-f");
-    const bool               ascii        = parser.exists("--ascii");
-    const bool               quiet        = parser.exists("--quiet");
-    const bool               avClean      = parser.exists("--avclean");
-    const int                simDuration  = parser.get("--duration", std::numeric_limits<int>::max());
-    const std::string        writeFreqStr = parser.get("-w", std::string("0"));
-    const bool               writeEnabled = writeFreqStr != "0" || !writeExtra.empty();
-    const std::string        profFreqStr  = parser.get("--profile", maxStepStr);
-    const bool               profEnabled  = parser.exists("--profile");
+    const std::string        initCond      = parser.get("--init");
+    const size_t             problemSize   = parser.get("-n", 50);
+    const std::string        glassBlock    = parser.get("--glass");
+    const std::string        propChoice    = parser.get("--prop", std::string("ve"));
+    const std::string        maxStepStr    = parser.get("-s", std::string("200"));
+    std::vector<std::string> writeExtra    = parser.getCommaList("--wextra");
+    std::vector<std::string> outputFields  = parser.getCommaList("-f");
+    const bool               ascii         = parser.exists("--ascii");
+    const bool               quiet         = parser.exists("--quiet");
+    const bool               avClean       = parser.exists("--avclean");
+    const int                simDuration   = parser.get("--duration", std::numeric_limits<int>::max());
+    const std::string        writeFreqStr  = parser.get("-w", std::string("0"));
+    const bool               writeEnabled  = writeFreqStr != "0" || !writeExtra.empty();
+    const std::string        profFreqStr   = parser.get("--profile", maxStepStr);
+    const bool               profEnabled   = parser.exists("--profile") || writeEnabled;
     const std::string        helmTablePath = parser.get("--helmTablePath", std::string(""));
-    const std::string        pmroot       = parser.get("--pmroot", std::string("/sys/cray/pm_counters"));
-    std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
+    const std::string        pmroot        = parser.get("--pmroot", std::string("")); // /sys/cray/pm_counters
+    std::string              outFile       = parser.get("-o", "dump_" + removeModifiers(initCond));
+    std::string              profFile      = parser.get("-op", std::string("profile"));
 
     std::ofstream nullOutput("/dev/null");
     std::ostream& output = (quiet || rank) ? nullOutput : std::cout;
@@ -115,18 +116,14 @@ int main(int argc, char** argv)
     Timer totalTimer(output);
     MPI_Barrier(MPI_COMM_WORLD);
     totalTimer.start();
-    
-    // EOS choice should be set before the necessary fields are activated
-    simData.hydro.eosChoice = helmTablePath.empty() ? sph::EosType::idealGas : sph::EosType::helmholtz;
-    if (simData.hydro.eosChoice == sph::EosType::helmholtz) { propagator->readHelmEOSTable(helmTablePath); }
 
-    propagator->addCounters(profEnabled ? pmroot : "", getNumLocalRanks(numRanks));
+    propagator->addCounters(pmroot, getNumLocalRanks(numRanks));
     propagator->activateFields(simData);
     propagator->load(initCond, fileReader.get());
     auto box = simInit->init(rank, numRanks, problemSize, simData, fileReader.get());
 
     auto& d = simData.hydro;
-    transferAllocatedToDevice(d, 0, d.x.size(), propagator->conservedFields());
+    migrateToDevice(d, 0, d.x.size());
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
 
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
@@ -164,10 +161,11 @@ int main(int argc, char** argv)
 
         bool isWallClockReached = syncedWallClockElapsed(totalTimer.elapsed(), simDuration, propagator->stepElapsed());
 
-        isOutputTriggered = isOutputStep(d.iteration, writeFreqStr) ||
-                            isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStr) ||
-                            isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtra) ||
-                            (isWallClockReached && writeEnabled) || isOutputTriggered;
+        isOutputTriggered =
+            (isOutputStep(d.iteration, writeFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStr) ||
+             isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtra) ||
+             (isWallClockReached && writeEnabled) || isOutputTriggered) &&
+            d.iteration > startIteration;
 
         if (isOutputTriggered && propagator->isSynced())
         {
@@ -179,11 +177,6 @@ int main(int argc, char** argv)
             fileWriter->closeStep();
             isOutputTriggered = false;
         }
-        if (isOutputStep(d.iteration, profFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, profFreqStr) ||
-            isWallClockReached)
-        {
-            if (profEnabled) { propagator->writeMetrics(fileWriter.get(), "profile"); }
-        }
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
 
@@ -191,6 +184,13 @@ int main(int argc, char** argv)
 
         propagator->integrate(domain, simData);
         propagator->printIterationTimings(domain, simData);
+
+        if (isOutputStep(d.iteration, profFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, profFreqStr) ||
+            isWallClockReached)
+        {
+            auto fileWriterSeq = fileWriterFactory(ascii, MPI_COMM_WORLD, true);
+            if (profEnabled) { propagator->writeMetrics(fileWriterSeq.get(), profFile); }
+        }
     }
     totalTimer.step("Total execution time of " + std::to_string(d.iteration - startIteration) + " iterations of " +
                     initCond + " up to t = " + std::to_string(d.ttot));
@@ -220,7 +220,7 @@ bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float 
     if (totalTimeElapsed + dt > wallClockLimit)
     {
         int isLimitReachedAny = totalTimeElapsed > wallClockLimit;
-        mpiAllreduce(MPI_IN_PLACE, &isLimitReachedAny, 1, MPI_SUM);
+        mpiAllreduce(MPI_IN_PLACE, &isLimitReachedAny, 1, MPI_SUM, MPI_COMM_WORLD);
         return isLimitReachedAny;
     }
     return false;
@@ -251,7 +251,7 @@ void printHelp(char* name, int rank)
         printf("\t--prop STRING \t Choice of SPH propagator [default: modern SPH]. For standard SPH, use \"std\" \n\n");
 
         printf("\t-s NUM \t\t int(NUM):  Number of iterations (time-steps) [200],\n\
-                \t real(NUM): Time   of simulation (time-model)\n\n");
+                \t real(NUM): Time of simulation (time-model)\n\n");
 
         printf("\t--wextra LIST \t Comma-separated list of steps (integers) or ~times (floating point)\n"
                "\t\t\t at which to trigger file output\n"
@@ -269,11 +269,19 @@ void printHelp(char* name, int rank)
         printf("\t--ascii \t Dump file in ASCII format [binary HDF5 by default]\n\n");
 
         printf("\t--outDir PATH \t Path to directory where output will be saved [./].\n\
-                    \t Note that directory must exist and be provided with ending slash,\n\
-                    \t e.g: --outDir /home/user/folderToSaveOutputFiles/\n\n");
+                \t Note that directory must exist and be provided with ending slash,\n\
+                \t e.g: --outDir /home/user/folderToSaveOutputFiles/\n\n");
 
         printf("\t--quiet \t Don't print anything to stdout\n\n");
 
         printf("\t--duration \t Maximum wall-clock run time of the simulation in seconds.[MAX_INT]\n\n");
+
+        printf("\t--profile \t\t Enable profiling output,\n\
+                \t Profiling is enabled by default if file output is enabled.\n\n");
+
+        printf("\t--profileFreq NUM \t\t [default]: the profiling data is outputted at the end of the simulation,\n\
+                \t NUM<=0:    Disable profiling output,\n\
+                \t int(NUM):  Dump profiling data every NUM iteration steps,\n\
+                \t real(NUM): Dump profiling data every NUM seconds of simulation (not wall-clock) time \n\n");
     }
 }

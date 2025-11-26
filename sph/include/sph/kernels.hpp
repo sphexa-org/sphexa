@@ -71,12 +71,12 @@ template<typename T>
 HOST_DEVICE_FUN inline T artificial_viscosity(T alpha_i, T alpha_j, T c_i, T c_j, T w_ij)
 {
     // alpha is const for now, but will be different for each particle when using viscosity switching
-    constexpr T beta = 2.0;
+    constexpr T beta = T(2.0);
 
-    T viscosity_ij = 0.0;
-    if (w_ij < 0.0)
+    T viscosity_ij = T(0.0);
+    if (w_ij < T(0.0))
     {
-        T vij_signal = (alpha_i + alpha_j) / 4.0 * (c_i + c_j) - beta * w_ij;
+        T vij_signal = (alpha_i + alpha_j) * T(0.25) * (c_i + c_j) - beta * w_ij;
         viscosity_ij = -vij_signal * w_ij;
     }
 

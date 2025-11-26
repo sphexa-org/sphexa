@@ -49,10 +49,19 @@ void restoreDataset(IFileReader* reader, Dataset& d)
     {
         if (d.isConserved(i))
         {
-            if (reader->rank() == 0) { std::cout << "restoring " << d.fieldNames[i] << std::endl; }
+            if (reader->rank() == 0) { std::cout << "restoring " << d.fieldNames[i]; }
+            auto t0 = std::chrono::high_resolution_clock::now();
             std::visit([reader, key = d.fieldNames[i]](auto field)
-                       { reader->readField(Dataset::prefix + key, field->data()); },
-                       fieldPointers[i]);
+                       { reader->readField(Dataset::prefix + key, field->data()); }, fieldPointers[i]);
+            auto  t1       = std::chrono::high_resolution_clock::now();
+            int   typeSize = std::visit([](auto field) { return sizeof(*field->data()); }, fieldPointers[i]);
+            float readTime = std::chrono::duration<float>(t1 - t0).count();
+            if (reader->rank() == 0)
+            {
+                float sizeGB = float(typeSize) * reader->globalNumParticles() / 1024 / 1024 / 1024;
+                std::cout << ", " << sizeGB << " GB in " << readTime << " s, " << sizeGB / readTime << " GB/s"
+                          << std::endl;
+            }
         }
     }
 }

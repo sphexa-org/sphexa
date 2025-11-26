@@ -50,7 +50,7 @@ protected:
     OctreeData<KeyType, GpuTag> octree;
     OctreeView<KeyType> ov;
     DeviceVector<SourceCenterType<T>> centers;
-    DeviceVector<char> macs;
+    DeviceVector<uint8_t> macs;
 };
 
 TEST_F(MacRefinementGpu, fullSurface)

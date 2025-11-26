@@ -25,6 +25,23 @@ namespace cstone
 template<class T>
 using SourceCenterType = util::array<T, 4>;
 
+template<class Tc, class Th>
+HOST_DEVICE_FUN util::tuple<Vec3<Tc>, Vec3<Tc>> computeBoundingBox(
+    const Tc* x, const Tc* y, const Tc* z, const Th* h, LocalIndex first, LocalIndex last, Th scale, Vec3<Tc> init)
+{
+    Vec3<Tc> commonMin = init, commonMax = init;
+    for (LocalIndex i = first; i < last; ++i)
+    {
+        auto r = h[i] * scale;
+        Vec3<Tc> p{x[i], y[i], z[i]};
+        commonMin = min(commonMin, Vec3<Tc>{p[0] - r, p[1] - r, p[2] - r});
+        commonMax = max(commonMax, Vec3<Tc>{p[0] + r, p[1] + r, p[2] + r});
+    }
+    auto center = (commonMax + commonMin) * Tc(0.5);
+    auto size   = (commonMax - commonMin) * Tc(0.5);
+    return {center, size};
+}
+
 //! @brief add a single body contribution to a mass center
 template<class T>
 HOST_DEVICE_FUN void addBody(SourceCenterType<T>& center, const SourceCenterType<T>& source)

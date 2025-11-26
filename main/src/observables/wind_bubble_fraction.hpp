@@ -120,10 +120,10 @@ public:
         auto& d = simData.hydro;
         computeConservedQuantities(firstIndex, lastIndex, d, simData.comm);
 
-        if (d.kx.empty())
+        if (not d.isAllocated("kx"))
         {
             throw std::runtime_error(
-                "kx was empty. Wind Shock surviving fraction is only supported with volume elements (--prop ve)\n");
+                "kx was empty. Wind Shock surviving fraction is only supported with volume elements propagators\n");
         }
 
         T    tempWind   = uWind * sph::idealGasCv(d.muiConst, d.gamma);

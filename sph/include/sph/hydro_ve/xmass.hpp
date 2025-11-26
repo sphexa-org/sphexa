@@ -69,7 +69,7 @@ void computeXMassImpl(size_t startIndex, size_t endIndex, Dataset& d, const csto
 template<typename Tc, class Dataset>
 void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { cuda::computeXMass(grp, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeXMass(grp, d, box); }
     else { computeXMassImpl(grp.firstBody, grp.lastBody, d, box); }
 }
 

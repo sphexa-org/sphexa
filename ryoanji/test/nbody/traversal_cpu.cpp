@@ -70,7 +70,7 @@ TEST(Gravity, TreeWalk)
     std::vector<SourceCenterType<T>> centers(octree.numNodes);
     computeLeafMassCenter<T, T, T>(coordinates.x(), coordinates.y(), coordinates.z(), masses, toInternal, layout.data(),
                                    centers.data());
-    upsweep(octree.levelRange, octree.childOffsets, centers.data(), CombineSourceCenter<T>{});
+    upsweep(octree.levelRange, octree.childOffsets.data(), centers.data(), CombineSourceCenter<T>{});
     setMac<T, KeyType>(octree.prefixes, centers, 1.0 / theta, box);
 
     std::vector<MultipoleType> multipoles(octree.numNodes);
@@ -86,9 +86,9 @@ TEST(Gravity, TreeWalk)
 
     auto t0       = std::chrono::high_resolution_clock::now();
     T    egravTot = 0;
-    computeGravity(octree.childOffsets.data(), octree.internalToLeaf.data(), centers.data(), multipoles.data(),
-                   layout.data(), 0, octree.numLeafNodes, x, y, z, h.data(), masses.data(), box, G, (T*)nullptr,
-                   ax.data(), ay.data(), az.data(), &egravTot, numShells);
+    computeGravity(octree.childOffsets.data(), octree.parents.data(), octree.internalToLeaf.data(), centers.data(),
+                   multipoles.data(), layout.data(), 0, octree.numLeafNodes, x, y, z, h.data(), masses.data(), box, G,
+                   (T*)nullptr, ax.data(), ay.data(), az.data(), &egravTot, numShells);
     auto   t1      = std::chrono::high_resolution_clock::now();
     double elapsed = std::chrono::duration<double>(t1 - t0).count();
 

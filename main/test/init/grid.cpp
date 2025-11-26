@@ -103,9 +103,7 @@ TEST(Grids, assembleCuboid)
 
     cstone::Vec3<int> multiplicity = {1, 3, 4};
 
-    std::vector<T> xb{0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
-    std::vector<T> yb{0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
-    std::vector<T> zb{0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
+    std::vector<T> xb{0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9}, yb = xb, zb = xb;
 
     // 3 SFC segments: 0-k1 k1-k2 k2-nodeRange(0)
     KeyType k1 = 01234567012;
@@ -163,7 +161,13 @@ TEST(Grids, assembleCuboid)
                 auto selectBox = cstone::FBox<T>(box.xmin() + i * frag[0], box.xmin() + (i + 1) * frag[0],
                                                  box.ymin() + j * frag[1], box.ymin() + (j + 1) * frag[1],
                                                  box.zmin() + k * frag[2], box.zmin() + (k + 1) * frag[2]);
-                extractBlock<T>(selectBox, box, {i, j, k}, multiplicity, xb, yb, zb, X, Y, Z);
+                auto np        = countSelection<T>(selectBox, box, {i, j, k}, multiplicity, xb, yb, zb);
+                X.resize(X.size() + np);
+                Y.resize(Y.size() + np);
+                Z.resize(Z.size() + np);
+                extractBlock<T>(selectBox, box, {i, j, k}, multiplicity, xb, yb, zb,
+                                std::span(X).subspan(X.size() - np), std::span(Y).subspan(Y.size() - np),
+                                std::span(Z).subspan(Z.size() - np));
             }
         }
     }
@@ -178,6 +182,36 @@ TEST(Grids, assembleCuboid)
     {
         EXPECT_EQ(keys[i], keys2[i]);
     }
+}
+
+TEST(Grids, assembleCuboidAdditive)
+{
+    using T       = double;
+    using KeyType = unsigned;
+    cstone::Box<T> box{-1, 1};
+
+    cstone::Vec3<int> multiplicity = {1, 3, 4};
+
+    std::vector<T> xb{0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9}, yb = xb, zb = xb;
+
+    // 3 SFC segments: 0-k1 k1-k2 k2-nodeRange(0)
+    KeyType k1 = 01234567012;
+    KeyType k2 = 05123456701;
+
+    std::vector<T> x, y, z;
+    assembleCuboid<T>(KeyType(0), k1, box, multiplicity, xb, yb, zb, x, y, z);
+    assembleCuboid<T>(k1, k2, box, multiplicity, xb, yb, zb, x, y, z);
+    assembleCuboid<T>(k2, cstone::nodeRange<KeyType>(0), box, multiplicity, xb, yb, zb, x, y, z);
+
+    std::vector<T> xRef, yRef, zRef;
+    assembleCuboid<T>(KeyType(0), cstone::nodeRange<KeyType>(0), box, multiplicity, xb, yb, zb, xRef, yRef, zRef);
+
+    [](auto&&... vecs)
+    { std::initializer_list<int>{(std::sort(vecs.begin(), vecs.end()), 0)...}; }(x, y, z, xRef, yRef, zRef);
+
+    EXPECT_EQ(x, xRef);
+    EXPECT_EQ(y, yRef);
+    EXPECT_EQ(z, zRef);
 }
 
 TEST(IsobaricCube, pyramidStretch)

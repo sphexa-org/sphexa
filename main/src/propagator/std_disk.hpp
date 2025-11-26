@@ -85,7 +85,7 @@ public:
         disk::duTimestep(first, last, d, star);
         timer.step("duTimestep");
 
-        computeTimestep(first, last, d, star.t_du);
+        computeTimestep(first, last, d, star.t_du, d.etaAcc * star.t_star);
         timer.step("Timestep");
 
         computePositions(Base::groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});

@@ -65,6 +65,7 @@ public:
 
     void addCounters(const std::string& pmRoot, int numRanksPerNode)
     {
+        if (not std::filesystem::exists(pmRoot)) { return; }
         numRanksPerNode_ = numRanksPerNode;
         // energy per compute node, only the first rank per node reads the node energy counter
         {

@@ -50,38 +50,42 @@ template void groupDivvTimestepGpu(float, const GroupView& grp, const double*, f
 
 template<class T>
 __global__ void groupAccKernel(float etaAcc, const LocalIndex* grpStart, const LocalIndex* grpEnd, LocalIndex numGroups,
-                               const T* ax, const T* ay, const T* az, float* groupDt)
+                               const T* ax, const T* ay, const T* az, const T* h, float* groupDt)
 {
     LocalIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (tid < numGroups)
     {
-        float maxAcc = 0;
+        float minH2_A2 = INFINITY;
 
         LocalIndex segStart = grpStart[tid];
         LocalIndex segEnd   = grpEnd[tid];
 
         for (LocalIndex i = segStart; i < segEnd; ++i)
         {
-            maxAcc = max(maxAcc, norm2(cstone::Vec3<T>{ax[i], ay[i], az[i]}));
+            minH2_A2 = min(minH2_A2, h[i] * h[i] / norm2(cstone::Vec3<T>{ax[i], ay[i], az[i]}));
         }
 
-        groupDt[tid] = min(groupDt[tid], etaAcc / std::sqrt(std::sqrt(maxAcc)));
+        groupDt[tid] = min(groupDt[tid], etaAcc * std::sqrt(std::sqrt(minH2_A2)));
     }
 }
 
 template<class T>
-void groupAccTimestepGpu(float etaAcc, const GroupView& grp, const T* ax, const T* ay, const T* az, float* groupDt)
+void groupAccTimestepGpu(float etaAcc, const GroupView& grp, const T* ax, const T* ay, const T* az, const T* h,
+                         float* groupDt)
 {
     int numThreads = 256;
     int numBlocks  = cstone::iceil(grp.numGroups, numThreads);
 
     if (numBlocks == 0) { return; }
-    groupAccKernel<<<numBlocks, numThreads>>>(etaAcc, grp.groupStart, grp.groupEnd, grp.numGroups, ax, ay, az, groupDt);
+    groupAccKernel<<<numBlocks, numThreads>>>(etaAcc, grp.groupStart, grp.groupEnd, grp.numGroups, ax, ay, az, h,
+                                              groupDt);
 }
 
-template void groupAccTimestepGpu(float, const GroupView&, const double*, const double*, const double*, float*);
-template void groupAccTimestepGpu(float, const GroupView&, const float*, const float*, const float*, float*);
+template void groupAccTimestepGpu(float, const GroupView&, const double*, const double*, const double*, const double*,
+                                  float*);
+template void groupAccTimestepGpu(float, const GroupView&, const float*, const float*, const float*, const float*,
+                                  float*);
 
 __global__ void storeRungKernel(const GroupView grp, uint8_t rung, uint8_t* particleRungs)
 {

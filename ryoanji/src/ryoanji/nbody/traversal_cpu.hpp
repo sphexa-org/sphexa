@@ -66,9 +66,9 @@ auto computeCenterAndSize(const util::array<Vec4<T>, N>& target)
  */
 template<class MType, class T1, class Th, class Tm, size_t N>
 void computeGravityGroup(const util::array<Vec4<T1>, N>& target, const TreeNodeIndex* childOffsets,
-                         const TreeNodeIndex* internalToLeaf, const cstone::SourceCenterType<T1>* centers,
-                         MType* multipoles, const LocalIndex* layout, const T1* x, const T1* y, const T1* z,
-                         const Th* h, const Tm* m, Vec4<T1>* acc)
+                         const TreeNodeIndex* parents, const TreeNodeIndex* internalToLeaf,
+                         const cstone::SourceCenterType<T1>* centers, MType* multipoles, const LocalIndex* layout,
+                         const T1* x, const T1* y, const T1* z, const Th* h, const Tm* m, Vec4<T1>* acc)
 {
     Vec3<T1> targetCenter, targetSize;
     std::tie(targetCenter, targetSize) = computeCenterAndSize(target);
@@ -134,7 +134,7 @@ void computeGravityGroup(const util::array<Vec4<T1>, N>& target, const TreeNodeI
         }
     };
 
-    cstone::singleTraversal(childOffsets, descendOrM2P, leafP2P);
+    cstone::singleTraversal(childOffsets, parents, descendOrM2P, leafP2P);
 }
 
 /*! @brief repeats computeGravityGroup for all leaf node indices specified
@@ -143,6 +143,7 @@ void computeGravityGroup(const util::array<Vec4<T1>, N>& target, const TreeNodeI
  *
  * @tparam       MType           Multipole type including expansion order, e.g. spherical or cartesian
  * @param[in]    childOffsets    child node index of each node
+ * @param[in]    parents         parent of each node i, stored at index (i-1)/8
  * @param[in]    internalToLeaf  map to convert an octree node index into a cstone leaf index
  * @param[in]    macSpheres      (x,y,z,mac^2) expansion center for each tree cell
  * @param[in]    multipoles      array of length @p octree.numTreeNodes() with the multipole moments for all nodes
@@ -166,11 +167,12 @@ void computeGravityGroup(const util::array<Vec4<T1>, N>& target, const TreeNodeI
  * @param[in]    numShells       number of periodic images to include per dimension
  */
 template<class MType, class T1, class T2, class Tm>
-void computeGravity(const TreeNodeIndex* childOffsets, const TreeNodeIndex* internalToLeaf,
-                    const cstone::SourceCenterType<T1>* macSpheres, const MType* multipoles, const LocalIndex* layout,
-                    TreeNodeIndex firstLeafIndex, TreeNodeIndex lastLeafIndex, const T1* x, const T1* y, const T1* z,
-                    const T2* h, const Tm* m, const cstone::Box<T1>& box, float G, T2* ugrav, T2* ax, T2* ay, T2* az,
-                    T1* ugravTot, int numShells = 0)
+void computeGravity(const TreeNodeIndex* childOffsets, const TreeNodeIndex* parents,
+                    const TreeNodeIndex* internalToLeaf, const cstone::SourceCenterType<T1>* macSpheres,
+                    const MType* multipoles, const LocalIndex* layout, TreeNodeIndex firstLeafIndex,
+                    TreeNodeIndex lastLeafIndex, const T1* x, const T1* y, const T1* z, const T2* h, const Tm* m,
+                    const cstone::Box<T1>& box, float G, T2* ugrav, T2* ax, T2* ay, T2* az, T1* ugravTot,
+                    int numShells = 0)
 {
     constexpr LocalIndex groupSize   = 16;
     LocalIndex           firstTarget = layout[firstLeafIndex];
@@ -204,8 +206,8 @@ void computeGravity(const TreeNodeIndex* childOffsets, const TreeNodeIndex* inte
                         t_ -= pbcShift;
                     }
 
-                    computeGravityGroup(targetsShifted, childOffsets, internalToLeaf, macSpheres, multipoles, layout, x,
-                                        y, z, h, m, potAndAcc.data());
+                    computeGravityGroup(targetsShifted, childOffsets, parents, internalToLeaf, macSpheres, multipoles,
+                                        layout, x, y, z, h, m, potAndAcc.data());
                 }
             }
         }

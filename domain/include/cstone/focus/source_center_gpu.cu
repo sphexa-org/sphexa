@@ -20,6 +20,54 @@
 namespace cstone
 {
 
+template<class Tc, class Th>
+__global__ void computeBoundingBoxKernel(const Tc* x,
+                                         const Tc* y,
+                                         const Tc* z,
+                                         const Th* h,
+                                         const LocalIndex* layout,
+                                         TreeNodeIndex first,
+                                         TreeNodeIndex last,
+                                         Th scale,
+                                         Vec3<Tc>* searchCenters,
+                                         Vec3<Tc>* searchSizes)
+{
+    TreeNodeIndex i = first + blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= last) { return; }
+
+    Vec3<Tc> init                               = searchCenters[i];
+    util::tie(searchCenters[i], searchSizes[i]) = computeBoundingBox(x, y, z, h, layout[i], layout[i + 1], scale, init);
+}
+
+template<class Tc, class Th>
+void computeBoundingBoxGpu(const Tc* x,
+                           const Tc* y,
+                           const Tc* z,
+                           const Th* h,
+                           const LocalIndex* layout,
+                           TreeNodeIndex first,
+                           TreeNodeIndex last,
+                           Th scale,
+                           Vec3<Tc>* searchCenters,
+                           Vec3<Tc>* searchSizes)
+{
+    unsigned numThreads = 256;
+    unsigned numBlocks  = iceil(last - first, numThreads);
+
+    if (numBlocks == 0) { return; }
+    computeBoundingBoxKernel<<<numBlocks, numThreads>>>(x, y, z, h, layout, first, last, scale, searchCenters,
+                                                        searchSizes);
+}
+
+#define COMPUTE_BOUNDING_BOX_GPU(Tc, Th)                                                                               \
+    template void computeBoundingBoxGpu(const Tc* x, const Tc* y, const Tc* z, const Th* h, const LocalIndex* layout,  \
+                                        TreeNodeIndex first, TreeNodeIndex last, Th scale, Vec3<Tc>* searchCenters,    \
+                                        Vec3<Tc>* searchSizes);
+
+COMPUTE_BOUNDING_BOX_GPU(double, double);
+COMPUTE_BOUNDING_BOX_GPU(double, float);
+COMPUTE_BOUNDING_BOX_GPU(float, float);
+
 template<class Tc, class Tm, class Tf>
 __global__ void computeLeafSourceCenterKernel(const Tc* x,
                                               const Tc* y,
@@ -50,6 +98,7 @@ void computeLeafSourceCenterGpu(const Tc* x,
     unsigned numThreads = 256;
     unsigned numBlocks  = iceil(numLeaves, numThreads);
 
+    if (numBlocks == 0) { return; }
     computeLeafSourceCenterKernel<<<numBlocks, numThreads>>>(x, y, z, m, leafToInternal, numLeaves, layout, centers);
 }
 

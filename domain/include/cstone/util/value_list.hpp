@@ -216,7 +216,7 @@ decltype(auto) get(Tuple&& tuple)
 template<class FL, class FieldNames, class Tuple>
 auto get(Tuple&& tuple)
 {
-    auto get_ = []<StructuralString... Fs>(FieldList<Fs...>, Tuple && tuple) // NOLINT
+    auto get_ = []<StructuralString... Fs>(FieldList<Fs...>, Tuple&& tuple) // NOLINT
     {
         using Seq = std::index_sequence<vl_detail::FindIndex<Fs, FieldNames>{}...>;
         return selectTuple(std::forward<Tuple>(tuple), Seq{});

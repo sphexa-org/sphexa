@@ -31,7 +31,7 @@
 
 #pragma once
 
-#include "cstone/primitives/accel_switch.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 
 template<class T>
 class pinned_allocator;
@@ -41,7 +41,7 @@ namespace sphexa
 
 //! @brief std::allocator on the CPU, pinned_allocator on the GPU
 template<class Accelerator, class T>
-using PinnedAlloc_t = typename cstone::AccelSwitchType<Accelerator, std::allocator, pinned_allocator>::template type<T>;
+using PinnedAlloc_t = std::conditional_t<cstone::HaveGpu<Accelerator>{}, pinned_allocator<T>, std::allocator<T>>;
 
 //! @brief stub for use in CPU code
 struct DeviceDataFacade
@@ -81,6 +81,6 @@ class DeviceParticlesData;
 
 //! @brief Just a facade on the CPU, DeviceParticlesData on the GPU
 template<class Accelerator>
-using DeviceData_t = typename cstone::AccelSwitchTypeSimple<Accelerator, DeviceDataFacade, DeviceParticlesData>::type;
+using DeviceData_t = std::conditional_t<cstone::HaveGpu<Accelerator>{}, DeviceParticlesData, DeviceDataFacade>;
 
 } // namespace sphexa

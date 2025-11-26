@@ -59,8 +59,9 @@ protected:
     using MultipoleType = ryoanji::CartesianQuadrupole<Tmass>;
 
     using Acc       = typename DataType::AcceleratorType;
-    using MHolder_t = typename cstone::AccelSwitchType<Acc, MultipoleHolderCpu, MultipoleHolderGpu>::template type<
-        MultipoleType, DomainType, typename DataType::HydroData>;
+    using MHolder_t = std::conditional_t<cstone::HaveGpu<Acc>{},
+                                         MultipoleHolderGpu<MultipoleType, DomainType, typename DataType::HydroData>,
+                                         MultipoleHolderCpu<MultipoleType, DomainType, typename DataType::HydroData>>;
 
     MHolder_t      mHolder_;
     GroupData<Acc> groups_;
@@ -139,6 +140,7 @@ public:
         pmReader.start();
         sync(domain, simData);
         timer.step("domain::sync");
+        Base::logDomainStats(domain, simData);
 
         auto& d = simData.hydro;
         d.resizeAcc(domain.nParticlesWithHalos());
@@ -146,9 +148,7 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        transferToHost(d, first, first + 1, {"m"});
-        fill(get<"m">(d), 0, first, d.m[first]);
-        fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
+        fillMassHalos(get<"m">(d), first, last);
 
         findNeighborsSfc(first, last, d, domain.box());
         computeGroups(first, last, d, domain.box(), groups_);
@@ -206,6 +206,10 @@ public:
             mHolder_.traverse(groups, d, domain);
             timer.step("Gravity");
             pmReader.step();
+
+            auto stats = mHolder_.readStats();
+            timer.logStatistics("sumP2P", stats[0] / timer.getLastStepTime());
+            timer.logStatistics("sumM2P", stats[2] / timer.getLastStepTime());
         }
     }
 
@@ -225,11 +229,10 @@ public:
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,
                     const cstone::Box<T>& box) override
     {
-        auto& d = simData.hydro;
-        d.resize(d.accSize());
-        auto fieldPointers = d.data();
-        auto indicesDone   = d.outputFieldIndices;
-        auto namesDone     = d.outputFieldNames;
+        auto& d             = simData.hydro;
+        auto  fieldPointers = d.data();
+        auto  indicesDone   = d.outputFieldIndices;
+        auto  namesDone     = d.outputFieldNames;
 
         auto output = [&]()
         {
@@ -242,8 +245,8 @@ public:
                                  d.outputFieldIndices.begin();
                     transferToHost(d, first, last, {d.fieldNames[fidx]});
                     std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writer->writeField(key, field->data(), c); },
-                               fieldPointers[fidx]);
+                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
+                    deallocateField(d, fidx);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }

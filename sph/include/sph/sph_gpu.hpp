@@ -18,7 +18,7 @@ extern void computeIADGpu(const GroupView&, Dataset& d, const cstone::Box<typena
 template<class Dataset>
 extern void computeMomentumEnergyStdGpu(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
 
-namespace cuda
+namespace gpu
 {
 
 template<class Dataset>
@@ -73,7 +73,7 @@ extern void computeIsothermalEOS_HydroStd(size_t firstParticle, size_t lastParti
 template<typename Dataset>
 extern void computePolytropicEOS_HydroStd(size_t firstParticle, size_t lastParticle, Dataset& d);
 
-} // namespace cuda
+} // namespace gpu
 
 template<class Tc, class Thydro, class Tm1, class Tdu>
 extern void driftPositionsGpu(const GroupView& grp, float dt, float dt_back,
@@ -95,7 +95,8 @@ template<class T>
 extern void groupDivvTimestepGpu(float Krho, const GroupView&, const T* divv, float* groupDt);
 
 template<class T>
-extern void groupAccTimestepGpu(float etaAcc, const GroupView&, const T* ax, const T* ay, const T* az, float* groupDt);
+extern void groupAccTimestepGpu(float etaAcc, const GroupView&, const T* ax, const T* ay, const T* az, const T* h,
+                                float* groupDt);
 
 void storeRungGpu(const GroupView& grp, uint8_t rung, uint8_t* particleRungs);
 

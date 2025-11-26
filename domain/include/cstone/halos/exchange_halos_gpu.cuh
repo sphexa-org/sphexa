@@ -39,13 +39,14 @@ void haloExchangeGpu(int epoch,
                      DevVec2& receiveScratchBuffer,
                      Arrays... arrays)
 {
-    constexpr int alignment     = 8;
+    using TransferType          = uint64_t;
+    constexpr int alignment     = sizeof(TransferType);
     using IndexType             = SendManifest::IndexType;
     const float allocGrowthRate = 1.05;
 
     int haloExchangeTag = static_cast<int>(P2pTags::haloExchange) + epoch;
     std::vector<MPI_Request> sendRequests;
-    std::vector<std::vector<char, util::DefaultInitAdaptor<char>>> sendBuffers;
+    std::vector<std::vector<TransferType, util::DefaultInitAdaptor<TransferType>>> sendBuffers;
 
     const size_t oldSendSize = reallocateBytes(
         sendScratchBuffer, computeTotalSendBytes<alignment>(outgoingHalos, -1, 0, arrays...), allocGrowthRate);
@@ -55,7 +56,7 @@ void haloExchangeGpu(int epoch,
     checkGpuErrors(cudaMalloc((void**)&d_range, 2 * numRanges * sizeof(IndexType)));
     IndexType* d_rangeScan = d_range + numRanges;
 
-    char* sendPtr = reinterpret_cast<char*>(rawPtr(sendScratchBuffer));
+    auto* sendPtr = reinterpret_cast<TransferType*>(rawPtr(sendScratchBuffer));
     for (std::size_t destinationRank = 0; destinationRank < outgoingHalos.size(); ++destinationRank)
     {
         const auto& outHalos = outgoingHalos[destinationRank];
@@ -73,9 +74,9 @@ void haloExchangeGpu(int epoch,
         for_each_tuple(gatherArray, util::packBufferPtrs<alignment>(sendPtr, sendCount, arrays...));
         checkGpuErrors(cudaDeviceSynchronize());
 
-        size_t numBytesSend = util::computeByteOffsets(sendCount, alignment, arrays...).back();
-        mpiSendGpuDirect(sendPtr, numBytesSend, int(destinationRank), haloExchangeTag, sendRequests, sendBuffers);
-        sendPtr += numBytesSend;
+        size_t numElementsSend = util::computeByteOffsets(sendCount, alignment, arrays...).back() / alignment;
+        mpiSendGpuDirect(sendPtr, numElementsSend, int(destinationRank), haloExchangeTag, sendRequests, sendBuffers);
+        sendPtr += numElementsSend;
     }
 
     int numMessages           = 0;
@@ -88,12 +89,12 @@ void haloExchangeGpu(int epoch,
     size_t maxReceiveBytes = util::computeByteOffsets(maxReceiveSize, alignment, arrays...).back();
 
     const size_t oldRecvSize = reallocateBytes(receiveScratchBuffer, maxReceiveBytes, allocGrowthRate);
-    char* receiveBuffer      = reinterpret_cast<char*>(rawPtr(receiveScratchBuffer));
+    auto* receiveBuffer      = reinterpret_cast<TransferType*>(rawPtr(receiveScratchBuffer));
 
     while (numMessages--)
     {
         MPI_Status status;
-        mpiRecvGpuDirect(receiveBuffer, maxReceiveBytes, MPI_ANY_SOURCE, haloExchangeTag, &status);
+        mpiRecvGpuDirect(receiveBuffer, maxReceiveBytes / alignment, MPI_ANY_SOURCE, haloExchangeTag, &status);
         int receiveRank         = status.MPI_SOURCE;
         const auto& inHalos     = incomingHalos[receiveRank];
         LocalIndex receiveCount = inHalos.count();

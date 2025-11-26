@@ -17,7 +17,6 @@ set(UNIT_TESTS
         sfc/morton.cpp
         sfc/sfc.cpp
         traversal/boxoverlap.cpp
-        traversal/collisions.cpp
         traversal/collisions_a2a.cpp
         traversal/discovery.cpp
         traversal/macs.cpp

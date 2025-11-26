@@ -61,8 +61,9 @@ class NbodyProp final : public Propagator<DomainType, DataType>
     using MultipoleType = ryoanji::CartesianQuadrupole<Tmass>;
 
     using Acc       = typename DataType::AcceleratorType;
-    using MHolder_t = typename cstone::AccelSwitchType<Acc, MultipoleHolderCpu, MultipoleHolderGpu>::template type<
-        MultipoleType, DomainType, typename DataType::HydroData>;
+    using MHolder_t = std::conditional_t<cstone::HaveGpu<Acc>{},
+                                         MultipoleHolderGpu<MultipoleType, DomainType, typename DataType::HydroData>,
+                                         MultipoleHolderCpu<MultipoleType, DomainType, typename DataType::HydroData>>;
 
     MHolder_t      mHolder_;
     GroupData<Acc> groups_;
@@ -110,6 +111,7 @@ public:
         auto& d = simData.hydro;
         domain.syncGrav(get<"keys">(d), get<"x">(d), get<"y">(d), get<"z">(d), get<"h">(d), get<"m">(d),
                         get<ConservedFields>(d), get<DependentFields>(d));
+        d.treeView = domain.octreeProperties();
     }
 
     void computeForces(DomainType& domain, DataType& simData) override
@@ -117,16 +119,18 @@ public:
         timer.start();
         sync(domain, simData);
         timer.step("domain::sync");
+        timer.logStatistics("numAssigned", domain.nParticles());
+        timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
+        timer.logStatistics("assignment", domain.assignmentStart());
 
         auto& d = simData.hydro;
         d.resize(domain.nParticlesWithHalos());
         auto first = domain.startIndex();
         auto last  = domain.endIndex();
-        computeGroups(first, last, d, domain.box(), groups_);
 
-        transferToHost(d, first, first + 1, {"m"});
-        fill(get<"m">(d), 0, first, d.m[first]);
-        fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
+        domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
+
+        computeGroups(first, last, d, domain.box(), groups_);
 
         fill(get<"ax">(d), first, last, HydroType(0));
         fill(get<"ay">(d), first, last, HydroType(0));
@@ -140,13 +144,8 @@ public:
         timer.step("Gravity");
 
         auto stats = mHolder_.readStats();
-
-        if (domain.startIndex() == 0 && cstone::HaveGpu<typename DataType::AcceleratorType>{})
-        {
-            size_t n = last - first;
-            std::cout << "numP2P " << stats[0] / n << " maxP2P " << stats[1] << " numM2P " << stats[2] / n << " maxM2P "
-                      << stats[3] << std::endl;
-        }
+        timer.logStatistics("sumP2P", stats[0] / timer.getLastStepTime());
+        timer.logStatistics("sumM2P", stats[2] / timer.getLastStepTime());
     }
 
     void integrate(DomainType& domain, DataType& simData) override

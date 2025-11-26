@@ -32,8 +32,6 @@
 
 #pragma once
 
-#include <variant>
-
 #include "cstone/fields/field_get.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/sph.hpp"
@@ -52,6 +50,7 @@ class HydroProp : public Propagator<DomainType, DataType>
 {
 protected:
     using Base = Propagator<DomainType, DataType>;
+    using Base::pmReader;
     using Base::timer;
 
     using T             = typename DataType::RealType;
@@ -60,8 +59,9 @@ protected:
     using MultipoleType = ryoanji::CartesianQuadrupole<Tmass>;
 
     using Acc       = typename DataType::AcceleratorType;
-    using MHolder_t = typename cstone::AccelSwitchType<Acc, MultipoleHolderCpu, MultipoleHolderGpu>::template type<
-        MultipoleType, DomainType, typename DataType::HydroData>;
+    using MHolder_t = std::conditional_t<cstone::HaveGpu<Acc>{},
+                                         MultipoleHolderGpu<MultipoleType, DomainType, typename DataType::HydroData>,
+                                         MultipoleHolderCpu<MultipoleType, DomainType, typename DataType::HydroData>>;
 
     MHolder_t      mHolder_;
     GroupData<Acc> groups_;
@@ -124,18 +124,19 @@ public:
     void computeForces(DomainType& domain, DataType& simData) override
     {
         timer.start();
+        pmReader.start();
 
         sync(domain, simData);
         timer.step("domain::sync");
+        Base::logDomainStats(domain, simData);
 
         auto& d = simData.hydro;
-        d.resize(domain.nParticlesWithHalos());
+        d.resizeAcc(domain.nParticlesWithHalos());
+        resizeNeighbors(d, domain.nParticles() * d.ngmax);
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
-
-        resizeNeighbors(d, domain.nParticles() * d.ngmax);
         findNeighborsSfc(first, last, d, domain.box());
         computeGroups(first, last, d, domain.box(), groups_);
         timer.step("FindNeighbors");
@@ -164,6 +165,10 @@ public:
             timer.step("Upsweep");
             mHolder_.traverse(groups, d, domain);
             timer.step("Gravity");
+
+            auto stats = mHolder_.readStats();
+            timer.logStatistics("sumP2P", stats[0] / timer.getLastStepTime());
+            timer.logStatistics("sumM2P", stats[2] / timer.getLastStepTime());
         }
     }
 
