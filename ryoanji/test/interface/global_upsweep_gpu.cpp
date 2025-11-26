@@ -34,7 +34,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     const LocalIndex numParticles    = 1000 * numRanks;
     unsigned         bucketSize      = 64;
     unsigned         bucketSizeLocal = 16;
-    float            theta           = 10.0;
+    float            theta           = 1.0;
 
     cstone::Box<T> box{-1, 1};
 

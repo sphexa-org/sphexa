@@ -16,6 +16,7 @@
 #include "gtest/gtest.h"
 
 #include "cstone/focus/octree_focus.hpp"
+#include "cstone/focus/peer_flags.hpp"
 #include "cstone/tree/cs_util.hpp"
 
 namespace cstone
@@ -480,6 +481,27 @@ TEST_F(MacRefinement, partialSurface)
     while (!macRefine(octree, leaves, centers, macs, oldFStart, oldFEnd, focusStart, focusEnd, invTheta, box)) {}
 
     EXPECT_EQ(nNodes(leaves), numNodesStart + 5 * 7);
+}
+
+TEST(FocusedOctree, extractFocusPeers)
+{
+    using KeyType = uint64_t;
+
+    // clang-format off
+    //            rank                       0     1       2                   3           4
+    std::vector<KeyType>          globalTree{0,    10, 20, 30, 40, 50,     60, 70, 80, 90, 100,      200};
+    std::vector<TreeNodeIndex> globalOffsets{0,    1,      3,                  7,          10,        11};
+    std::vector<KeyType> boundaries         {0,    10,     30,                 70,         100,      200};
+    std::vector<KeyType> focusTree          {0,                40, 50, 55, 60, 70, 75, 90,      150, 200};
+    std::vector<TreeIndexPair> focusOffsets {{0,0},{0,0},  {1,7},              {7,9},       {10,11}};
+    // clang-format on
+
+    auto flags = focusPeers<KeyType>(globalOffsets, focusOffsets, 3, globalTree, focusTree);
+    std::vector<int> probe;
+    peerFlagsToList(flags, probe, PeerMask::focus);
+
+    std::vector<int> ref{2, 4};
+    EXPECT_EQ(probe, ref);
 }
 
 } // namespace cstone
