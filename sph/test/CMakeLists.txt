@@ -35,7 +35,7 @@ if(CMAKE_HIP_COMPILER)
     set_source_files_properties(${UNIT_TESTS_GPU} PROPERTIES LANGUAGE HIP)
 endif()
 
-if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
+if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     set(testname sph_gpu_tests)
     add_executable(${testname} ${UNIT_TESTS_GPU})
 
@@ -46,3 +46,8 @@ if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/hydro)
     install(FILES ${PROJECT_SOURCE_DIR}/test/example_data.txt DESTINATION ${CMAKE_INSTALL_SBINDIR}/hydro)
 endif()
+
+if (CMAKE_HIP_COMPILER)
+    set_target_properties(${testname} PROPERTIES LINKER_LANGUAGE CXX)
+    target_link_libraries(${testname} PRIVATE cstone_thrust_incl)
+endif ()

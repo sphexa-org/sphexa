@@ -20,6 +20,7 @@
 #include "cstone/domain/exchange_keys.hpp"
 #include "cstone/domain/index_ranges.hpp"
 #include "cstone/halos/exchange_halos.hpp"
+#include "cstone/halos/halo_peers.hpp"
 #ifdef USE_CUDA
 #include "cstone/halos/exchange_halos_gpu.cuh"
 #endif
@@ -48,7 +49,6 @@ public:
      *
      * @param[in]  leaves      (focus) tree leaves
      * @param[in]  assignment  assignment of @p leaves to ranks
-     * @param[in]  peers       list of peer ranks
      * @param[out] layout      Particle offsets for each node in @p leaves w.r.t to the final particle buffers,
      *                         including the halos, length = counts.size() + 1. The last element contains
      *                         the total number of locally present particles, i.e. assigned + halos.
@@ -57,21 +57,21 @@ public:
      *                         and the corresponding layout range has length zero.
      * @return                 0 if all halo cells have been matched with a peer rank, 1 otherwise
      */
-    int exchangeRequests(std::span<const KeyType> leaves,
-                         std::span<const TreeIndexPair> assignment,
-                         std::span<const int> peers,
-                         std::span<const LocalIndex> layout)
+    void exchangeRequests(std::span<const KeyType> leaves,
+                          std::span<const TreeIndexPair> assignment,
+                          std::span<const LocalIndex> layout)
     {
-        outgoingHaloIndices_ = exchangeRequestKeys<KeyType>(leaves, assignment, peers, layout);
+        auto exteriorPeerFlags = haloPeers(myRank_, layout, assignment);
+        exchangePeers(exteriorPeerFlags, exteriorPeers_, interiorPeers_);
+
+        outgoingHaloIndices_ = exchangeRequestKeys<KeyType>(leaves, assignment, exteriorPeers_, interiorPeers_, layout);
 
         incomingHaloIndices_.resize(assignment.size());
         std::fill(incomingHaloIndices_.begin(), incomingHaloIndices_.end(), RecvList::value_type{0, 0});
-        for (int peer : peers)
+        for (int peer : exteriorPeers_)
         {
             incomingHaloIndices_[peer] = {layout[assignment[peer].start()], layout[assignment[peer].end()]};
         }
-
-        return 0;
     }
 
     /*! @brief repeat the halo exchange pattern from the previous sync operation for a different set of arrays
@@ -108,6 +108,8 @@ private:
 
     RecvList incomingHaloIndices_;
     SendList outgoingHaloIndices_;
+
+    std::vector<int> exteriorPeers_, interiorPeers_;
 
     /*! @brief Counter for halo exchange calls
      * Multiple client calls to domain::exchangeHalos() during a time-step

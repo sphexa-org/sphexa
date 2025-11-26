@@ -54,7 +54,7 @@ void uniformBins(const std::vector<IndexType>& counts, std::span<TreeNodeIndex> 
     binCounts.back() = countScan.back() - countScan[bins[numBins - 1]];
 }
 
-//! @brief Stores which parts of the SFC belong to which rank. Each rank as an identical copy
+//! @brief Stores which parts of the SFC belong to which rank. Each rank has an identical copy
 template<class KeyType>
 class SfcAssignment
 {
@@ -184,39 +184,39 @@ void limitBoundaryShifts(const SfcAssignment<KeyType> oldAssignment,
  * @tparam     KeyType         32- or 64-bit unsigned integer
  * @param[in]  assignment      domain assignment
  * @param[in]  focusTree       focus tree leaves
- * @param[in]  peerRanks       list of peer ranks
- * @param[in]  myRank          executing rank ID
  * @param[out] focusAssignment assignment with the same SFC key ranges per
  *                             peer rank as the domain @p assignment,
  *                             but with indices valid w.r.t @p focusTree
- *
- * The focus assignment is implemented as a plain vector; since only
- * the ranges of peer ranks (and not all ranks) are set, the requirements
- * of SpaceCurveAssignment are not met and its findRank() function would not work.
  */
 template<class KeyType>
 void translateAssignment(const SfcAssignment<KeyType>& assignment,
                          std::span<const KeyType> focusTree,
-                         std::span<const int> peerRanks,
-                         int myRank,
                          std::vector<TreeIndexPair>& focusAssignment)
 {
-    focusAssignment.resize(assignment.numRanks());
+    int numRanks = assignment.numRanks();
+    focusAssignment.resize(numRanks);
     std::fill(focusAssignment.begin(), focusAssignment.end(), TreeIndexPair(0, 0));
-    for (int peer : peerRanks)
+#pragma omp parallel for schedule(static)
+    for (int rank = 0; rank < numRanks; ++rank)
     {
         // Note: start-end range is narrowed down if no exact match is found.
-        // the discarded part will not participate in peer/halo exchanges
-        TreeNodeIndex startIndex = findNodeAbove(focusTree.data(), focusTree.size(), assignment[peer]);
-        TreeNodeIndex endIndex   = findNodeBelow(focusTree.data(), focusTree.size(), assignment[peer + 1]);
+        TreeNodeIndex startIndex = findNodeAbove(focusTree.data(), focusTree.size(), assignment[rank]);
+        TreeNodeIndex endIndex   = findNodeBelow(focusTree.data(), focusTree.size(), assignment[rank + 1]);
 
         if (endIndex < startIndex) { endIndex = startIndex; }
-        focusAssignment[peer] = TreeIndexPair(startIndex, endIndex);
+        focusAssignment[rank] = TreeIndexPair(startIndex, endIndex);
     }
+}
 
-    TreeNodeIndex newStartIndex = findNodeAbove(focusTree.data(), focusTree.size(), assignment[myRank]);
-    TreeNodeIndex newEndIndex   = findNodeBelow(focusTree.data(), focusTree.size(), assignment[myRank + 1]);
-    focusAssignment[myRank]     = TreeIndexPair(newStartIndex, newEndIndex);
+inline void extractPeerRanges(std::span<const int> peers,
+                              int myRank,
+                              std::span<const TreeIndexPair> focusAssignment,
+                              std::vector<TreeIndexPair>& peerRanges)
+{
+    peerRanges.resize(peers.size() + 1);
+    gather<int>(peers, focusAssignment.data(), peerRanges.data());
+    peerRanges.back() = focusAssignment[myRank];
+    std::sort(peerRanges.begin(), peerRanges.end());
 }
 
 /*! @brief Based on global assignment, create the list of local particle index ranges to send to each rank

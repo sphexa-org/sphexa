@@ -88,8 +88,8 @@ extern void computePositionsGpu(const GroupView& grp, float dt, util::array<floa
                                 Ta* az, const uint8_t* rung, Tu* temp, Tu* u, Tdu* du, Tm1* du_m1, Thydro* h,
                                 Thydro* cv, Thydro* mui, Tc gamma, Tc constCv, const cstone::Box<Tc>& box);
 
-template<class Th>
-extern void updateSmoothingLengthGpu(const GroupView&, unsigned ng0, const unsigned* nc, Th* h);
+template<class Th, class KeyType>
+extern bool updateSmoothingLengthGpu(const GroupView&, unsigned ng0, const unsigned* nc, Th* h, KeyType* keys);
 
 template<class T>
 extern void groupDivvTimestepGpu(float Krho, const GroupView&, const T* divv, float* groupDt);

@@ -36,8 +36,10 @@ namespace sph
 {
 using cstone::LocalIndex;
 
-template<class Th>
-__global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, const unsigned* nc, Th* h)
+__device__ bool nc_h_convergenceFailure = false;
+
+template<class Th, class KeyType>
+__global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, const unsigned* nc, Th* h, KeyType* keys)
 {
     LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
@@ -46,20 +48,29 @@ __global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, cons
     LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
     if (i >= grp.groupEnd[warpIdx]) { return; }
 
+    if (h[i] == 0)
+    {
+        keys[i] = cstone::removeKey<KeyType>{};
+        nc_h_convergenceFailure = true;
+    }
     h[i] = updateH(ng0, nc[i], h[i]);
 }
 
-template<class Th>
-void updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, Th* h)
+template<class Th, class KeyType>
+bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, Th* h, KeyType* keys)
 {
     unsigned numThreads       = 256;
     unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
     unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
-    if (numBlocks == 0) { return; }
-    updateSmoothingLengthGpuKernel<<<numBlocks, numThreads>>>(grp, ng0, nc, h);
+    if (numBlocks == 0) { return false; }
+    updateSmoothingLengthGpuKernel<<<numBlocks, numThreads>>>(grp, ng0, nc, h, keys);
+
+    bool convergenceFailure;
+    checkGpuErrors(cudaMemcpyFromSymbol(&convergenceFailure, GPU_SYMBOL(nc_h_convergenceFailure), sizeof(bool)));
+    return convergenceFailure;
 }
 
-template void updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, float* h);
-template void updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, double* h);
+template bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, float* h, uint64_t*);
+template bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, double* h, uint64_t*);
 
 } // namespace sph

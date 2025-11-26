@@ -5,4 +5,6 @@ endif()
 if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     add_library(gather_halos_obj OBJECT gather_halos_gpu.cu)
     target_include_directories(gather_halos_obj PRIVATE ${PROJECT_SOURCE_DIR}/include)
+    target_link_libraries(gather_halos_obj PRIVATE ${CSTONE_THRUST_LIBS})
 endif()
+

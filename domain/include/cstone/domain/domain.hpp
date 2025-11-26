@@ -182,23 +182,21 @@ public:
         gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
                      std::tie(x, y, z, h), util::reverse(scratch));
 
-        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octreeHost(), box(), 1.0 / theta_);
-        float invThetaEff      = invThetaMinMac(theta_);
-
+        float invThetaEff = invThetaMinMac(theta_);
         if (firstCall_)
         {
-            focusTree_.converge(box(), keyView, peers, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
+            focusTree_.converge(box(), keyView, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
                                 invThetaEff, std::get<0>(scratch));
         }
         focusTree_.updateMinMac(global_.assignment(), invThetaEff, true);
-        focusTree_.updateTree(peers, global_.assignment(), global_.treeLeaves(), box(), std::get<0>(scratch));
+        focusTree_.updateTree(global_.assignment(), global_.treeLeaves(), box(), std::get<0>(scratch));
         focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
 
         reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
         focusTree_.discoverHalos(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), {rawPtr(layoutAcc_), layoutAcc_.size()},
                                  haloSearchExt_, get<0>(scratch), false);
         focusTree_.computeLayout({rawPtr(layoutAcc_), layoutAcc_.size()}, layout_);
-        halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), peers, layout_);
+        halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), layout_);
 
         updateLayout(sorter, keyView, particleKeys, std::tie(x, y, z, h), particleProperties, scratch);
         setupHalos(particleKeys, x, y, z, h, scratch);
@@ -226,20 +224,17 @@ public:
         gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
                      std::tie(x, y, z, h, m), util::reverse(scratch));
 
-        float invThetaEff      = invThetaMinToVec(theta_);
-        std::vector<int> peers = findPeersMac(myRank_, global_.assignment(), global_.octreeHost(), box(), invThetaEff);
-
         if (firstCall_)
         {
             // first rough convergence to avoid computing expansion centers of large nodes with a lot of particles
-            focusTree_.converge(box(), keyView, peers, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
+            focusTree_.converge(box(), keyView, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
                                 1.0, std::get<0>(scratch));
             focusTree_.updateMinMac(global_.assignment(), 1.0, false);
             int converged = 0, reps = 0;
             while (converged != numRanks_ || reps < 2)
             {
-                converged = focusTree_.updateTree(peers, global_.assignment(), global_.treeLeaves(), box(),
-                                                  std::get<0>(scratch));
+                converged =
+                    focusTree_.updateTree(global_.assignment(), global_.treeLeaves(), box(), std::get<0>(scratch));
                 focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
                 focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(),
                                          std::get<0>(scratch), std::get<1>(scratch));
@@ -252,8 +247,8 @@ public:
         int fail = 0;
         do
         {
-            focusTree_.updateMacs(global_.assignment(), centerDriftTol_ / theta_, false);
-            focusTree_.updateTree(peers, global_.assignment(), global_.treeLeaves(), box(), std::get<0>(scratch));
+            focusTree_.updateMacs(global_.assignment(), centerDriftTol_ / theta_, true);
+            focusTree_.updateTree(global_.assignment(), global_.treeLeaves(), box(), std::get<0>(scratch));
             focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
             focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(), std::get<0>(scratch),
                                      std::get<1>(scratch));
@@ -265,7 +260,7 @@ public:
             fail = focusTree_.computeLayout({rawPtr(layoutAcc_), layoutAcc_.size()}, layout_);
             MPI_Allreduce(MPI_IN_PLACE, &fail, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
-            halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), peers, layout_);
+            halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), layout_);
 
             if (fail)
             {
@@ -274,7 +269,7 @@ public:
             }
         } while (fail);
 
-        // diagnostics(keyView.size(), peers);
+        // diagnostics(keyView.size());
 
         updateLayout(sorter, keyView, particleKeys, std::tie(x, y, z, h, m), particleProperties, scratch);
         setupHalos(particleKeys, x, y, z, h, scratch);
@@ -536,18 +531,24 @@ private:
         bufDesc_     = newBufDesc;
     }
 
-    void diagnostics(size_t assignedSize, std::span<int> peers)
+    void diagnostics(size_t assignedSize)
     {
         auto focusAssignment = focusTree_.assignment();
         auto focusTree       = focusTree_.treeLeaves();
+        auto flags           = focusTree_.flags();
         auto globalTree      = global_.treeLeaves();
 
         std::vector<KeyType> globalTreeBackingBuffer;
+        std::vector<uint8_t> flagsBackingBuffer;
         if constexpr (cstone::HaveGpu<Accelerator>{})
         {
             globalTreeBackingBuffer.resize(globalTree.size());
             memcpyD2H(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data());
             globalTree = std::span(globalTreeBackingBuffer);
+
+            flagsBackingBuffer.resize(flags.size());
+            memcpyD2H(flags.data(), flags.size(), flagsBackingBuffer.data());
+            flags = std::span(flagsBackingBuffer);
         }
 
         TreeNodeIndex numFocusPeers    = 0;
@@ -570,7 +571,16 @@ private:
             }
         }
 
-        int numFlags = std::count(focusTree_.haloFlags().begin(), focusTree_.haloFlags().end(), 1);
+        int numFlags = std::count_if(flags.begin(), flags.end(), [](auto x) { return x > 0; });
+        auto fPeerFlags =
+            focusPeers<KeyType>({global_.assignment().data(), size_t(numRanks_ + 1)}, myRank_, globalTree, focusTree);
+        std::vector<int> fPeers;
+        peerFlagsToList(fPeerFlags, fPeers, PeerMask::focus);
+
+        auto hPeerFlags = haloPeers(myRank_, layout_, focusTree_.assignment());
+        std::vector<int> hPeers;
+        peerFlagsToList(hPeerFlags, hPeers, PeerMask::halo);
+
         for (int i = 0; i < numRanks_; ++i)
         {
             if (i == myRank_)
@@ -578,12 +588,20 @@ private:
                 std::cout << "rank " << i << " " << assignedSize << " " << layout_.back()
                           << " focus h/true/peers/loc/tot: " << numFlags << "/" << numFocusTruePeer << "/"
                           << numFocusPeers << "/" << focusAssignment[myRank_].count() << "/"
-                          << focusTree_.haloFlags().size() << " peers: [" << peers.size() << "] ";
-                if (numRanks_ <= 32)
+                          << flags.size() << " peers: [" << std::max(hPeers.size(), fPeers.size())
+                          << "] ";
+                if (numRanks_ <= 64)
                 {
-                    for (auto r : peers)
+                    for (auto r : fPeers)
                     {
-                        std::cout << r << " ";
+                        bool isHalo = std::count(hPeers.begin(), hPeers.end(), r) == 1;
+                        if (isHalo) { std::cout << r << " "; }
+                        else { std::cout << "*" << r << " "; }
+                    }
+                    for (auto r : hPeers)
+                    {
+                        bool isFocus = std::count(fPeers.begin(), fPeers.end(), r) == 1;
+                        if (not isFocus) { std::cout << "^" << r << " "; }
                     }
                 }
                 std::cout << std::endl;

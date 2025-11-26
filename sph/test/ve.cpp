@@ -208,6 +208,22 @@ TEST_F(SphKernelTests, MomentumEnergy)
         EXPECT_NEAR(du, 7.1838438980436924e12, 3.1e5);
         EXPECT_NEAR(maxvsignal, 26490876.319252387, 1e-6);
     }
+    { // test zero neighbors
+        auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
+
+        momentumAndEnergyJLoop<false>(0, K, box(), neighbors.data(), 0, x.data(), y.data(), z.data(), vx.data(),
+                                      vy.data(), vz.data(), h.data(), m.data(), prho.data(), (const T*)nullptr,
+                                      c.data(), c11.data(), c12.data(), c13.data(), c22.data(), c23.data(), c33.data(),
+                                      Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(), alpha.data(), dV11.data(),
+                                      dV12.data(), dV13.data(), dV22.data(), dV23.data(), dV33.data(), &grad_Px,
+                                      &grad_Py, &grad_Pz, &du, &maxvsignal);
+
+        EXPECT_EQ(grad_Px, 0.0);
+        EXPECT_EQ(grad_Py, 0.0);
+        EXPECT_EQ(grad_Pz, 0.0);
+        EXPECT_EQ(du, 0.0);
+        EXPECT_EQ(maxvsignal, 0.0);
+    }
 }
 
 TEST_F(SphKernelTests, VeDefGradh)

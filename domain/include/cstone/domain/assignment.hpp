@@ -69,9 +69,6 @@ public:
             d_csTree_     = leaves_;
             d_nodeCounts_ = nodeCounts_;
             buildOctreeGpu(d_csTree_.data(), tree_.data());
-
-            hostTree_.resize(nNodes(leaves_));
-            updateInternalTree<KeyType>(leaves_, hostTree_.data());
         }
         else { updateInternalTree<KeyType>(leaves_, tree_.data()); }
     }
@@ -114,21 +111,21 @@ public:
         sequence<gpu>(o1.start, numPart, reorderFunctor.getBuf(), growthRate_);
         sortByKey<gpu>(keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_);
 
-        updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_, d_nodeCounts_);
+        updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_, d_nodeCounts_, false);
         if (firstCall_)
         {
             firstCall_ = false;
             while (!updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
-                                                d_nodeCounts_))
+                                                d_nodeCounts_, true))
                 ;
         }
 
         if constexpr (gpu)
         {
-            hostTree_.resize(tree_.numLeafNodes);
-            memcpyD2H(tree_.prefixes.data(), tree_.prefixes.size(), hostTree_.prefixes.data());
-            memcpyD2H(tree_.childOffsets.data(), tree_.childOffsets.size(), hostTree_.childOffsets.data());
-            std::copy_n(tree_.levelRange.data(), tree_.levelRange.size(), hostTree_.levelRange.data());
+            reallocate(leaves_, d_csTree_.size(), growthRate_);
+            reallocate(nodeCounts_, d_nodeCounts_.size(), growthRate_);
+            memcpyD2H(d_csTree_.data(), d_csTree_.size(), leaves_.data());
+            memcpyD2H(d_nodeCounts_.data(), d_nodeCounts_.size(), nodeCounts_.data());
         }
 
         auto newAssignment = makeSfcAssignment(numRanks_, nodeCounts_, leaves_.data());
@@ -229,26 +226,12 @@ public:
         else { return nodeCounts_; }
     }
 
-    /*! @brief the octree, internal part and leaves
-     *
-     * All data is on the host, except treeData.leaves which is on the GPU if gpu == true
-     */
+    //! @brief the octree, internal part and leaves. All data is on the GPU, when gpu == true
     OctreeView<const KeyType> octree() const
     {
         auto treeData   = tree_.cdata();
         treeData.leaves = treeLeaves().data();
         return treeData;
-    }
-
-    OctreeView<const KeyType> octreeHost() const
-    {
-        if constexpr (gpu)
-        {
-            auto treeData   = hostTree_.cdata();
-            treeData.leaves = leaves_.data();
-            return treeData;
-        }
-        else { return octree(); }
     }
 
     //! @brief the global coordinate bounding box
@@ -291,7 +274,6 @@ private:
 
     //! @brief the fully linked octree
     OctreeData<KeyType, Accelerator> tree_;
-    OctreeData<KeyType, CpuTag> hostTree_;
     std::vector<KeyType> leaves_;
     AccVector<KeyType> d_csTree_;
 

@@ -64,20 +64,12 @@ void globalRandomGaussian(int thisRank, int numRanks)
 
     auto peers = findPeersMac(thisRank, assignment, domainTree.cdata(), box, invThetaEff);
 
-    // peer boundaries are required to be present in the focus tree at all times
-    std::vector<KeyType> peerBoundaries;
-    for (auto peer : peers)
-    {
-        peerBoundaries.push_back(assignment[peer]);
-        peerBoundaries.push_back(assignment[peer + 1]);
-    }
-
     KeyType focusStart = assignment[thisRank];
     KeyType focusEnd   = assignment[thisRank + 1];
 
     // build the reference focus tree from the common pool of coordinates, focused on the executing rank
     FocusedOctreeSingleNode<KeyType> referenceFocusTree(bucketSizeLocal, theta);
-    while (!referenceFocusTree.update(box, coords.particleKeys(), focusStart, focusEnd, peerBoundaries))
+    while (!referenceFocusTree.update(box, coords.particleKeys(), focusStart, focusEnd, {}))
         ;
 
     /*******************************/
@@ -111,7 +103,7 @@ void globalRandomGaussian(int thisRank, int numRanks)
     int converged = 0;
     while (converged != numRanks)
     {
-        converged = focusTree.updateTree(peers, assignment, domainTree.treeLeaves(), box, scratch);
+        converged = focusTree.updateTree(assignment, domainTree.treeLeaves(), box, scratch);
         focusTree.updateCounts(particleKeys, tree, counts, scratch);
         focusTree.updateMinMac(assignment, invThetaEff, false);
         MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
@@ -121,11 +113,12 @@ void globalRandomGaussian(int thisRank, int numRanks)
         LocalIndex totalCount = std::accumulate(focusCounts.begin(), focusCounts.end(), LocalIndex(0));
         EXPECT_EQ(totalCount, numParticles * numRanks);
 
-        // peer boundaries must always be resolved at any convergence state
-        for (auto key : peerBoundaries)
+        // focus boundaries must always be resolved at any convergence state
         {
-            LocalIndex idx = findNodeAbove(focusTree.treeLeaves().data(), focusTree.treeLeaves().size(), key);
-            EXPECT_EQ(key, focusTree.treeLeaves()[idx]);
+            LocalIndex idx = findNodeAbove(focusTree.treeLeaves().data(), focusTree.treeLeaves().size(), focusStart);
+            EXPECT_EQ(focusStart, focusTree.treeLeaves()[idx]);
+            idx = findNodeAbove(focusTree.treeLeaves().data(), focusTree.treeLeaves().size(), focusEnd);
+            EXPECT_EQ(focusEnd, focusTree.treeLeaves()[idx]);
         }
     }
 
