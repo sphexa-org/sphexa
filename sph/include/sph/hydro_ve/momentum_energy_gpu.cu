@@ -40,7 +40,7 @@
 
 namespace sph
 {
-namespace gpu
+namespace cuda
 {
 
 using cstone::GpuConfig;
@@ -96,7 +96,7 @@ __global__ void momentumEnergyGpu(Tc K, Tc Kcour, T Atmin, T Atmax, T ramp, unsi
         auto dt_lane = (i < bodyEnd) ? tsKCourant(maxvsignal, h[i], c[i], Kcour) : INFINITY;
         if (groupDt != nullptr)
         {
-            auto min_dt_group = cstone::warpMin(dt_lane);
+            float min_dt_group = cstone::warpMin(dt_lane);
             if ((threadIdx.x & (GpuConfig::warpSize - 1)) == 0)
             {
                 groupDt[targetIdx] = stl::min(groupDt[targetIdx], min_dt_group);
@@ -150,5 +150,5 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
 MOM_ENERGY(true);
 MOM_ENERGY(false);
 
-} // namespace gpu
+} // namespace cuda
 } // namespace sph

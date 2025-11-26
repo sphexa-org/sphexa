@@ -154,7 +154,7 @@ void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone
         auto u_old = cvi * d.temp[i];
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
         // we multiply dt_m1 by that factor so it applies only once to each of the updating terms
-        d.temp[i]  = energyUpdate(u_old, d.minDt * adjustForFBC, d.minDt_m1 * adjustForFBC, d.du[i], d.du_m1[i]) / cv;
+        d.temp[i]  = energyUpdate(u_old, d.minDt * adjustForFBC, d.minDt_m1 * adjustForFBC, d.du[i], d.du_m1[i]) / cvi;
         d.du_m1[i] = d.du[i];
     }
 }

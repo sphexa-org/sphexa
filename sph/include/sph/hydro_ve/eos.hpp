@@ -196,7 +196,7 @@ void computeIdealGasEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        gpu::computeIdealGasEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.devData.temp), rawPtr(d.devData.u),
+        cuda::computeIdealGasEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.devData.temp), rawPtr(d.devData.u),
                                 rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
                                 rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.c),
                                 rawPtr(d.devData.rho), rawPtr(d.devData.p));
@@ -209,7 +209,7 @@ void computeIsothermalEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        gpu::computeIsothermalEOS(startIndex, endIndex, d.soundSpeedConst, rawPtr(d.devData.c), rawPtr(d.devData.rho),
+        cuda::computeIsothermalEOS(startIndex, endIndex, d.soundSpeedConst, rawPtr(d.devData.c), rawPtr(d.devData.rho),
                                   rawPtr(d.devData.p), rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
                                   rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.temp));
     }
@@ -221,7 +221,7 @@ void computePolytropicEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        gpu::computePolytropicEOS(startIndex, endIndex, d.polytropic_const, d.polytropic_index, rawPtr(d.devData.rho),
+        cuda::computePolytropicEOS(startIndex, endIndex, d.polytropic_const, d.polytropic_index, rawPtr(d.devData.rho),
                                   rawPtr(d.devData.p), rawPtr(d.devData.m), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
                                   rawPtr(d.devData.gradh), rawPtr(d.devData.prho), rawPtr(d.devData.temp),
                                   rawPtr(d.devData.c));
