@@ -117,6 +117,10 @@ int main(int argc, char** argv)
     MPI_Barrier(MPI_COMM_WORLD);
     totalTimer.start();
 
+    // EOS choice should be set before the necessary fields are activated
+    simData.hydro.eosChoice = helmTablePath.empty() ? sph::EosType::idealGas : sph::EosType::helmholtz;
+    if (simData.hydro.eosChoice == sph::EosType::helmholtz) { propagator->readHelmEOSTable(helmTablePath); }
+
     propagator->addCounters(pmroot, getNumLocalRanks(numRanks));
     propagator->activateFields(simData);
     propagator->load(initCond, fileReader.get());
