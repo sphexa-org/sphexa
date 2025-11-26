@@ -369,7 +369,11 @@ public:
             }
         }
 
-        updateSmoothingLength(activeRungs_, d);
+        bool haveUnconvergedParticles = updateSmoothingLength(activeRungs_, d);
+        if (haveUnconvergedParticles && not d.removeUnconvergedParticles)
+        {
+            throw std::runtime_error("Neighbor search did not converge\n");
+        }
 
         timestep_.substep++;
         timestep_.elapsedDt += timestep_.nextDt;
