@@ -1,0 +1,82 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2025 CSCS, ETH Zurich, University of Basel, University of Zurich
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+/*! @file
+ * @brief Id tagging setup utilities
+ *
+ * @author Christopher Bignamini <christopher.bignamini@gmail.com>
+ */
+
+#pragma once
+
+#include <vector>
+
+#include "ifile_io.hpp"
+#include "id_tag_utils.hpp"
+
+namespace sphexa
+{
+    // /*! @brief Id tagging setup checks and default groups assignment
+    //  *
+    //  * @param[inout]  selSpheres        sphere selection data
+    //  * @param[inout]  sphereGroupIds  group ids for sphere selections
+    //  * @param[inout]  selList           list selection data
+    //  * @param[inout]  selListGroupIds    group ids for list selections
+    //  * @param[in]     printLog        flag to enable printing of setup summary
+    //  */
+    void idTaggingSetupCheck(std::vector<IdSelectionSphere>& selSpheres, std::vector<unsigned int>& sphereGroupIds, 
+                             std::vector<uint64_t>& selList, std::vector<unsigned int>& selListGroupIds, bool printLog);
+
+    // /*! @brief Id tagging groups assignment
+    //  *
+    //  * @param[in]     selSpheresNum     number of spheres
+    //  * @param[inout]  sphere_group_ids  group ids for sphere selections
+    //  * @param[in]     selListSize       id selection list size
+    //  * @param[inout]  list_group_ids    group ids for list selections
+    //  */
+    void idTaggingGroupsInit(unsigned int selSpheresNum, std::vector<unsigned int>& sphereGroupIds,
+                             unsigned int selListSize, std::vector<unsigned int>& selListGroupIds);
+
+
+    /*! @brief Id tagging output handling parameter retrieval (from input parameter file)
+     *
+     * @param[in]  settingsFile           settings file path
+     * @param[in]  reader                 parameter file reader
+     * @param[in]  initCond               initial condition (used for default output file name)
+     * @param[in]  outputFileSuffix       suffix to append to output file name
+     * @param[out] outFileSubset          output file name for id tagging subset
+     * @param[out] outputFieldsSubset     output fields for id tagging subset
+     * @param[out] writeFreqStrSubset     write frequency (iterations or time) for id tagging subset
+     * @param[out] writeExtraSubset       list of steps (integers) or ~times (floating point) for extra writes
+     *
+     * @return true if id tagging output is requested, false otherwise
+     */
+    // TODO: remove warning logging?
+    bool readFileTaggingOutputAttributes(const std::string& settingsFile, IFileReader* reader,
+                                         const std::string initCond, const std::string outputFileSuffix, 
+                                         std::string& outFileSubset, std::string& writeFreqStrSubset, 
+                                         std::vector<std::string>& outputFieldsSubset,
+                                         std::vector<std::string>& writeExtraSubset);
+
+}
