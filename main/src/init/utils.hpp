@@ -37,7 +37,9 @@
 #include <vector>
 
 #include "cstone/primitives/gather.hpp"
+#include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/sfc/sfc.hpp"
+#include "io/id_tag_utils.hpp"
 #include "io/ifile_io.hpp"
 #include "init/settings.hpp"
 
@@ -87,7 +89,7 @@ void readTemplateBlock(const std::string& block, IFileReader* reader, Vector& x,
 }
 
 //! @brief read file attributes into an associative container
-void readFileAttributes(InitSettings& settings, const std::string& settingsFile, IFileReader* reader, bool verbose)
+inline void readFileAttributes(InitSettings& settings, const std::string& settingsFile, IFileReader* reader, bool verbose)
 {
     if (not settingsFile.empty())
     {
@@ -121,8 +123,62 @@ void readFileAttributes(InitSettings& settings, const std::string& settingsFile,
     }
 }
 
+//! @brief read tagging related file attributes
+inline void readFileTaggingAttributes(const std::string& settingsFile, IFileReader* reader,
+                                      std::vector<IdSelectionSphere>& selSpheres, std::vector<unsigned int>& sphereGroupIds,
+                                      std::vector<uint64_t>& selList, std::vector<unsigned int>& selListGroupIds)
+{
+    selSpheres.clear();
+    sphereGroupIds.clear();
+    selList.clear();
+    selListGroupIds.clear();
+
+    if (not settingsFile.empty())
+    {
+        reader->setStep(settingsFile, -1, FileMode::independent);
+
+        auto fileAttributes = reader->fileAttributes();
+
+        // Read sphere selection data
+        if(std::ranges::find(fileAttributes, std::string("id_selection_spheres")) != fileAttributes.end())
+        {
+            auto attr_size = reader->fileAttributeSize("id_selection_spheres");
+            selSpheres.resize(attr_size/4);// TODO: add safety extra element
+            // TODO: this is potentially dangerous, is there a way to check if utils::array has the assumed memory layout?
+            // TODO: I'd like to keep all setup consistency check in a separate function but I think this is the right place to
+            // check if the attribute size is multiple of 4. I could assign a default value to selSpheres here to identify
+            // uninitialized data in the check function but I'm not sure if this is better.
+            std::cout<<"WARNING: reading id_selection_spheres attribute, make sure that IdSelectionSphere has the expected memory layout!"<<std::endl;
+            reader->fileAttribute("id_selection_spheres", selSpheres.data()->data(), attr_size);
+        }
+        if(std::ranges::find(fileAttributes, std::string("id_selection_spheres_group_ids")) != fileAttributes.end())
+        {
+            auto attr_size = reader->fileAttributeSize("id_selection_spheres_group_ids");
+            sphereGroupIds.resize(attr_size);
+            reader->fileAttribute(std::string("id_selection_spheres_group_ids"), sphereGroupIds.data(), attr_size);
+        }
+
+        // Read list selection data
+        if(std::ranges::find(fileAttributes, std::string("id_selection_list")) != fileAttributes.end())
+        {
+            auto attr_size = reader->fileAttributeSize("id_selection_list");
+            selList.resize(attr_size);
+            reader->fileAttribute(std::string("id_selection_list"), selList.data(), attr_size);
+        }
+        if(std::ranges::find(fileAttributes, std::string("id_selection_list_group_ids")) != fileAttributes.end())
+        {
+            auto attr_size = reader->fileAttributeSize("id_selection_list_group_ids");
+            selListGroupIds.resize(attr_size);
+            reader->fileAttribute(std::string("id_selection_list_group_ids"), selListGroupIds.data(), attr_size);
+        }
+
+        reader->closeStep();
+    }
+}
+
+
 //! @brief generate particle IDs at the beginning of the simulation initialization
-void generateParticleIDs(std::span<uint64_t> id)
+inline void generateParticleIDs(std::span<uint64_t> id)
 {
     int rank = 0, numRanks = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
