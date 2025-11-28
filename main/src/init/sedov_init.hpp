@@ -138,12 +138,16 @@ public:
 template<class Dataset>
 class SedovGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     std::string          glassBlock;
+    std::string          settingsFile; // TODO: move to base class
     mutable InitSettings settings_;
 
 public:
     SedovGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , settingsFile(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, sedovConstants(), settingsFile, reader);
@@ -185,6 +189,8 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initSedovFields(d, settings_);
+
+        Base::runTagging(reader, settingsFile, rank == 0, d);
 
         return globalBox;
     }
