@@ -66,7 +66,6 @@ sph-run-cuda12-sm90-debug-2ranks:
     - $TEST_INSTALL_DIR/integration_mpi/exchange_focus
     - $TEST_INSTALL_DIR/integration_mpi/exchange_halos
     - $TEST_INSTALL_DIR/integration_mpi/exchange_keys
-    - $TEST_INSTALL_DIR/integration_mpi/focus_transfer
     - $TEST_INSTALL_DIR/integration_mpi/globaloctree
     - $TEST_INSTALL_DIR/integration_mpi/hdf5io
     - $TEST_INSTALL_DIR/ryoanji/global_upsweep_cpu

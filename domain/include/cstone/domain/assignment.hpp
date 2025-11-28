@@ -128,9 +128,7 @@ public:
             memcpyD2H(d_nodeCounts_.data(), d_nodeCounts_.size(), nodeCounts_.data());
         }
 
-        auto newAssignment = makeSfcAssignment(numRanks_, nodeCounts_, leaves_.data());
-        limitBoundaryShifts<KeyType>(assignment_, newAssignment, leaves_, nodeCounts_);
-        assignment_ = std::move(newAssignment);
+        assignment_ = makeSfcAssignment(numRanks_, nodeCounts_, leaves_.data());
 
         if constexpr (gpu)
         {
