@@ -12,6 +12,7 @@ sph-run-cuda12-sm90-release-1rank:
   image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
+    SLURM_TIMELIMIT: '01:00:00'
     WITH_UENV_VIEW: 'default'
     # SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
