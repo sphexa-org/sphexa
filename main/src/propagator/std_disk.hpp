@@ -26,7 +26,23 @@ namespace sphexa
 {
 
 using namespace sph;
-using util::FieldList;
+
+template<class DomainType, class DataType>
+class HydroPropRelax : public HydroProp<DomainType, DataType>
+{
+public:
+    HydroPropRelax(std::ostream& output, size_t rank, const InitSettings& settings)
+        : HydroProp<DomainType, DataType>(output, rank)
+    {
+        BuiltinWriter attributeWriter(settings);
+    }
+
+    void computeForces(DomainType& domain, DataType& simData) override
+    {
+        HydroProp<DomainType, DataType>::computeForces(domain, simData);
+        relaxSystem(domain.startIndex(), domain.endIndex(), simData.hydro);
+    }
+};
 
 template<class DomainType, class DataType>
 class DiskProp : public HydroProp<DomainType, DataType>
