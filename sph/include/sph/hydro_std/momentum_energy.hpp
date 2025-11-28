@@ -101,28 +101,28 @@ void computeMomentumEnergySTD(const GroupView& groups, Dataset& d, const cstone:
 }
 
 template<typename Dataset>
-void relaxSystemImpl(size_t first, size_t last, Dataset& d)
+void relaxSystemImpl(size_t first, size_t last, Dataset& d, double relaxationTimescale)
 {
     using T = std::decay_t<decltype(d.vx[0])>;
 #pragma omp parallel for
     for (size_t i = first; i < last; i++)
     {
-        d.ax[i] -= d.vx[i] / d.relaxationTimescale;
-        d.ay[i] -= d.vy[i] / d.relaxationTimescale;
-        d.az[i] -= d.vz[i] / d.relaxationTimescale;
+        d.ax[i] -= d.vx[i] / relaxationTimescale;
+        d.ay[i] -= d.vy[i] / relaxationTimescale;
+        d.az[i] -= d.vz[i] / relaxationTimescale;
     }
 }
 
 template<typename Dataset>
-void relaxSystem(size_t startIndex, size_t endIndex, Dataset& d)
+void relaxSystem(size_t startIndex, size_t endIndex, Dataset& d, double relaxationTimescale)
 {
-    if (d.relaxationTimescale <= 0.) return;
+    if (relaxationTimescale <= 0.) return;
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         relaxSystemGPU(startIndex, endIndex, rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az),
-                       rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz), d.relaxationTimescale);
+                       rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz), relaxationTimescale);
     }
-    else { relaxSystemImpl(startIndex, endIndex, d); }
+    else { relaxSystemImpl(startIndex, endIndex, d, relaxationTimescale); }
 }
 
 } // namespace sph

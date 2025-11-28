@@ -30,18 +30,45 @@ using namespace sph;
 template<class DomainType, class DataType>
 class HydroPropRelax : public HydroProp<DomainType, DataType>
 {
+    struct Params
+    {
+        double relaxationTimescale{0};
+
+        template<class Archive>
+        void loadOrStoreAttributes(Archive* ar)
+        {
+            ar->stepAttribute("relaxationTimescale", &relaxationTimescale, 1);
+        }
+    };
+    Params params_;
+
 public:
     HydroPropRelax(std::ostream& output, size_t rank, const InitSettings& settings)
         : HydroProp<DomainType, DataType>(output, rank)
     {
         BuiltinWriter attributeWriter(settings);
+        params_.loadOrStoreAttributes(&attributeWriter);
     }
 
     void computeForces(DomainType& domain, DataType& simData) override
     {
         HydroProp<DomainType, DataType>::computeForces(domain, simData);
-        relaxSystem(domain.startIndex(), domain.endIndex(), simData.hydro);
+        relaxSystem(domain.startIndex(), domain.endIndex(), simData.hydro, params_.relaxationTimescale);
     }
+
+    void load(const std::string& initCond, IFileReader* reader) override
+    {
+        const std::string path = removeModifiers(initCond);
+        if (std::filesystem::exists(path))
+        {
+            int snapshotIndex = numberAfterSign(initCond, ":");
+            reader->setStep(path, snapshotIndex, FileMode::independent);
+            params_.loadOrStoreAttributes(reader);
+            reader->closeStep();
+        }
+    }
+
+    void save(IFileWriter* writer) override { params_.loadOrStoreAttributes(writer); }
 };
 
 template<class DomainType, class DataType>

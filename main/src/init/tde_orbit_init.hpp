@@ -131,14 +131,12 @@ public:
     {
         BuiltinWriter attributeSetter(settings_);
         simData.hydro.loadOrStoreAttributes(&attributeSetter);
-        //        simData.star.loadOrStoreAttributes(&attributeSetter);
 
         reader->setStep(h5_fname, initStep, FileMode::collective);
         auto box = restoreData(reader, simData);
         reader->closeStep();
 
         // hydro settings that have to be overriden
-        simData.hydro.relaxationTimescale = 0.;
         simData.hydro.iteration           = 0;
         simData.hydro.ttot                = 0.0;
         simData.hydro.minDt               = 1e-9;
