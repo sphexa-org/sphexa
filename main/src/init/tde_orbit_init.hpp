@@ -8,6 +8,7 @@
 #include "file_init.hpp"
 #include "settings.hpp"
 #include "utils.hpp"
+#include "star_data.hpp"
 
 namespace sphexa
 {

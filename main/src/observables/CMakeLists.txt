@@ -24,7 +24,7 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     add_library(observables_gpu $<TARGET_OBJECTS:obs_gpu> observables.cpp)
     target_compile_definitions(observables_gpu PRIVATE USE_CUDA)
     target_include_directories(observables_gpu PRIVATE ${PROJECT_SOURCE_DIR}/main/src ${COOLING_DIR} ${CSTONE_DIR}
-            ${SPH_DIR} ${MPI_CXX_INCLUDE_PATH} ${DISK_DIR})
+            ${SPH_DIR} ${MPI_CXX_INCLUDE_PATH})
     target_link_libraries(observables_gpu PRIVATE ${MPI_CXX_LIBRARIES} OpenMP::OpenMP_CXX)
 endif()
 
