@@ -109,6 +109,18 @@ int main(int argc, char** argv)
     auto propagator  = propagatorFactory<Domain, Dataset>(propChoice, avClean, output, rank, simInit->constants());
     auto observables = observablesFactory<Dataset>(simInit->constants(), constantsFile);
 
+    // ! @brief check if id tagging is requested (tagging setup check is done in simInit initialization)
+    std::string outFileSubset;
+    std::string writeFreqStrSubset;
+    std::vector<std::string> outputFieldsSubset;
+    std::vector<std::string> writeExtraSubset;
+    const bool writeEnabledSubset = readFileTaggingOutputAttributes(strAfterSign(initCond, ":"), fileReader.get(),
+                                                                    removeModifiers(initCond), fileWriter->suffix(),
+                                                                    outFileSubset, writeFreqStrSubset,
+                                                                    outputFieldsSubset,
+                                                                    writeExtraSubset);
+
+
     Dataset simData;
     simData.comm = MPI_COMM_WORLD;
 
@@ -124,6 +136,7 @@ int main(int argc, char** argv)
     auto& d = simData.hydro;
     migrateToDevice(d, 0, d.x.size());
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
+//    if (writeEnabledSubset) { simData.setSubsetOutputFields(outputFieldsSubset.empty() ? propagator->conservedFields() : outputFieldsSubset); }
 
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
     bool  haveGrav = (d.g != 0.0);
@@ -131,6 +144,7 @@ int main(int argc, char** argv)
 
     if (!parser.exists("-o")) { outFile += fileWriter->suffix(); }
     if (writeEnabled) { writeSettings(simInit->constants(), outFile, fileWriter.get()); }
+//    if (writeEnabledSubset) { writeSettings(simInit->subsets(), outFileSubset, fileWriter.get()); }
     if (rank == 0) { std::cout << "Data generated for " << d.numParticlesGlobal << " global particles\n"; }
 
     uint64_t bucketSizeFocus = 64;
@@ -147,6 +161,7 @@ int main(int argc, char** argv)
 
     size_t startIteration    = d.iteration;
     bool   isOutputTriggered = false;
+    bool   isSubsetOutputTriggered = false;
 
     for (bool keepRunning = true; keepRunning; d.iteration++)
     {
@@ -178,6 +193,21 @@ int main(int argc, char** argv)
         }
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
+
+        if(writeEnabledSubset)
+        {
+            isSubsetOutputTriggered =
+                (isOutputStep(d.iteration, writeFreqStrSubset) ||
+                isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStrSubset) ||
+                isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtraSubset) ||
+                (isWallClockReached && writeEnabledSubset) || isSubsetOutputTriggered) &&
+                d.iteration > startIteration;
+            if (isSubsetOutputTriggered)
+            {
+    //            propagator->saveSubsetFields(fileWriter.get(), outFileSubset, domain.startIndex(), domain.endIndex(), simData);
+                isSubsetOutputTriggered = false;
+            }
+        }
 
         viz::execute(d, domain.startIndex(), domain.endIndex());
 
