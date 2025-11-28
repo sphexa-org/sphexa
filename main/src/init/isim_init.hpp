@@ -36,8 +36,11 @@
 
 #include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
+#include "io/id_tag_utils.hpp"
+#include "io/id_tag_setup.hpp"
 #include "sphexa/simulation_data.hpp"
 
+#include "utils.hpp"
 #include "settings.hpp"
 
 namespace sphexa
@@ -51,6 +54,48 @@ public:
                                                          IFileReader*) const = 0;
 
     virtual const InitSettings& constants() const = 0;
+
+     /*! @brief Id tagging initialization and execution
+     *
+     * @param[in]     reader         parameter file reader
+     * @param[in]     settingsFile   settings file path
+     * @param[in]     printLog       activate logging
+     * @param[inout]  particlesData  particle data to perform selection on
+     * @param[in]     initStep       time step at which selection is done
+     */
+     // TODO: I have to pass a ref to the entire dataset because I could need the coordinates, if selection is geometrical
+     void runTagging(IFileReader* reader, std::string settingsFile, bool printLog, Dataset::HydroData& particlesData, int initStep = 0) const
+     {
+        if (not settingsFile.empty())
+        {
+            std::vector<IdSelectionSphere> selSpheres;
+            std::vector<unsigned int> sphereGroupIds;
+            std::vector<uint64_t> selList;
+            std::vector<unsigned int> selListGroupIds;
+            readFileTaggingAttributes(settingsFile, reader, selSpheres, sphereGroupIds, selList, selListGroupIds);
+
+            idTaggingSetupCheck(selSpheres, sphereGroupIds, selList, selListGroupIds, printLog);
+
+            if(selList.size() > 0)
+            {
+                if (printLog)
+                {
+                    std::cout<<"Tagging particles in id list"<<initStep<<std::endl;
+                }
+                tagIdsInList(particlesData.id, 0, particlesData.id.size(), selList, selListGroupIds);
+            }
+
+            if(selSpheres.size() > 0)
+            {
+                if (printLog)
+                {
+                    std::cout<<"Tagging particles in spheres"<<initStep<<std::endl;
+                }
+                tagIdsInSphere(particlesData.id, particlesData.x, particlesData.y, particlesData.z,
+                    0, particlesData.id.size(), selSpheres, sphereGroupIds);
+            }
+        }
+     };
 
     virtual ~ISimInitializer() = default;
 };
