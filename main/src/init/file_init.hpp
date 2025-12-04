@@ -53,6 +53,7 @@ void restoreDataset(IFileReader* reader, Dataset& d)
             auto t0 = std::chrono::high_resolution_clock::now();
             std::visit([reader, key = d.fieldNames[i]](auto field)
                        { reader->readField(Dataset::prefix + key, field->data()); }, fieldPointers[i]);
+            MPI_Barrier(MPI_COMM_WORLD);
             auto  t1       = std::chrono::high_resolution_clock::now();
             int   typeSize = std::visit([](auto field) { return sizeof(*field->data()); }, fieldPointers[i]);
             float readTime = std::chrono::duration<float>(t1 - t0).count();

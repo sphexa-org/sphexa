@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "cstone/util/tuple.hpp"
 #include "kernel.hpp"
 
 namespace ryoanji

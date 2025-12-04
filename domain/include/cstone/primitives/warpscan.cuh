@@ -58,8 +58,6 @@ __device__ __forceinline__ void syncWarp()
 {
 #if defined(__CUDACC__)
     __syncwarp();
-#elif defined(__HIP_PLATFORM_AMD__)
-    __builtin_amdgcn_fence(__ATOMIC_ACQ_REL, "agent");
 #endif
 }
 

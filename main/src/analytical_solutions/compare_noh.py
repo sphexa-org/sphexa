@@ -25,7 +25,7 @@ Command line utility for compare analytical solutions of some SPH-EXA test
 simulations.
 
 Reference Noh solution:
-- "Errors for Calculations of Strong Shocks Using an Artificial Viscosity and 
+- "Errors for Calculations of Strong Shocks Using an Artificial Viscosity and
    an Artificial Heat Flux", W.F. Noh. JCP 72 (1987), 78-120
 
 Usage examples:

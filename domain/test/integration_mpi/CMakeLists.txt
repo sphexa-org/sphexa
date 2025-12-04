@@ -21,7 +21,6 @@ addCstoneMpiTest(exchange_halos.cpp exchange_halos GlobalHaloExchange 2)
 addCstoneMpiTest(box_mpi.cpp box_mpi GlobalBox 2)
 addCstoneMpiTest(exchange_focus.cpp exchange_focus GlobalFocusExchange 2)
 addCstoneMpiTest(exchange_keys.cpp exchange_keys GlobalKeyExchange 2)
-addCstoneMpiTest(focus_transfer.cpp focus_transfer FocusTransfer 2)
 addCstoneMpiTest(domain_2ranks.cpp domain_2ranks GlobalDomain2Ranks 2)
 addCstoneMpiTest(domain_resize.cpp domain_resize GlobalDomainResize 2)
 

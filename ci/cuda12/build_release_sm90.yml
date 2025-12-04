@@ -10,6 +10,7 @@ sph-build-cuda12-sm90-release:
   image: "${MYUENV}"
   extends: [.uenv-runner-daint-gh200]
   variables:
+    SLURM_TIMELIMIT: '01:00:00'
     PERSIST_IMAGE_NAME: ${CSCS_REGISTRY_PATH}/sphexa_cuda12_release:${CI_COMMIT_SHORT_SHA}
     WITH_UENV_VIEW: 'spack'  # this is not 'default' view
     # SLURM_PARTITION: 'debug'

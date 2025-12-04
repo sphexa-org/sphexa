@@ -16,6 +16,7 @@
 #include "gtest/gtest.h"
 
 #include "cstone/focus/octree_focus.hpp"
+#include "cstone/focus/peer_flags.hpp"
 #include "cstone/tree/cs_util.hpp"
 
 namespace cstone
@@ -437,49 +438,25 @@ protected:
     std::vector<uint8_t> macs;
 };
 
-TEST_F(MacRefinement, fullSurface)
+TEST(FocusedOctree, extractFocusPeers)
 {
-    Box<T> box(0, 1);
-    float invTheta = sqrt(3) / 2 + 1e-6;
+    using KeyType = uint64_t;
 
-    KeyType focusStart = 0;
-    KeyType focusEnd   = decodePlaceholderBit(KeyType(011));
-    while (!macRefine(octree, leaves, centers, macs, focusEnd, focusEnd, focusStart, focusEnd, invTheta, box)) {}
+    // clang-format off
+    //            rank                       0     1       2                   3           4
+    std::vector<KeyType>          globalTree{0,    10, 20, 30, 40, 50,     60, 70, 80, 90, 100,      200};
+    std::vector<TreeNodeIndex> globalOffsets{0,    1,      3,                  7,          10,        11};
+    std::vector<KeyType> boundaries         {0,    10,     30,                 70,         100,      200};
+    std::vector<KeyType> focusTree          {0,                40, 50, 55, 60, 70, 75, 90,      150, 200};
+    std::vector<TreeIndexPair> focusOffsets {{0,0},{0,0},  {1,7},              {7,9},       {10,11}};
+    // clang-format on
 
-    int numNodesVertex = 7 + 8;
-    int numNodesEdge   = 6 + 2 * 8;
-    int numNodesFace   = 4 + 4 * 8;
-    EXPECT_EQ(nNodes(leaves), 64 + 7 + 3 * numNodesFace + 3 * numNodesEdge + numNodesVertex);
-}
+    auto flags = focusPeers<KeyType>(globalOffsets, focusOffsets, 3, globalTree, focusTree);
+    std::vector<int> probe;
+    peerFlagsToList(flags, probe, PeerMask::focus);
 
-TEST_F(MacRefinement, noSurface)
-{
-    Box<T> box(0, 1);
-    float invTheta              = sqrt(3) / 2 + 1e-6;
-    TreeNodeIndex numNodesStart = octree.numLeafNodes;
-
-    KeyType oldFStart  = decodePlaceholderBit(KeyType(0101));
-    KeyType oldFEnd    = decodePlaceholderBit(KeyType(011));
-    KeyType focusStart = 0;
-    KeyType focusEnd   = decodePlaceholderBit(KeyType(011));
-    while (!macRefine(octree, leaves, centers, macs, oldFStart, oldFEnd, focusStart, focusEnd, invTheta, box)) {}
-
-    EXPECT_EQ(nNodes(leaves), numNodesStart);
-}
-
-TEST_F(MacRefinement, partialSurface)
-{
-    Box<T> box(0, 1);
-    float invTheta              = sqrt(3) / 2 + 1e-6;
-    TreeNodeIndex numNodesStart = octree.numLeafNodes;
-
-    KeyType oldFStart  = 0;
-    KeyType oldFEnd    = decodePlaceholderBit(KeyType(0107));
-    KeyType focusStart = 0;
-    KeyType focusEnd   = decodePlaceholderBit(KeyType(011));
-    while (!macRefine(octree, leaves, centers, macs, oldFStart, oldFEnd, focusStart, focusEnd, invTheta, box)) {}
-
-    EXPECT_EQ(nNodes(leaves), numNodesStart + 5 * 7);
+    std::vector<int> ref{2, 4};
+    EXPECT_EQ(probe, ref);
 }
 
 } // namespace cstone

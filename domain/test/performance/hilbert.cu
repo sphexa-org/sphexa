@@ -49,7 +49,7 @@ template<class KeyType>
 __global__ void decodeSfcKeysKernel(const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, size_t numKeys)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < numKeys) { thrust::tie(x[tid], y[tid], z[tid]) = decodeSfc(keys[tid]); }
+    if (tid < numKeys) { util::tie(x[tid], y[tid], z[tid]) = decodeSfc(keys[tid]); }
 }
 
 template<class KeyType>

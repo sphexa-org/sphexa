@@ -61,9 +61,12 @@ HOST_DEVICE_FUN int mergeCountAndMacOp(TreeNodeIndex nodeIdx,
     KeyType nodeStart = decodePlaceholderBit(nodeKey);
     bool isLeaf       = childOffsets[nodeIdx] == 0;
     bool inFocus      = (nodeStart >= focusStart && nodeStart < focusEnd);
-    if (isLeaf && level < maxTreeLevel<KeyType>{} && counts[nodeIdx] > bucketSize && (macs[nodeIdx] || inFocus))
+    if (isLeaf && (macs[nodeIdx] || inFocus))
     {
-        return 8; // split
+        if (level + 3 < maxTreeLevel<KeyType>{} && counts[nodeIdx] > 4096 * bucketSize) { return 4096; }
+        if (level + 2 < maxTreeLevel<KeyType>{} && counts[nodeIdx] > 512 * bucketSize) { return 512; }
+        if (level + 1 < maxTreeLevel<KeyType>{} && counts[nodeIdx] > 64 * bucketSize) { return 64; }
+        if (level < maxTreeLevel<KeyType>{} && counts[nodeIdx] > bucketSize) { return 8; }
     }
 
     return 1; // default: do nothing
