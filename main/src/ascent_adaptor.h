@@ -36,13 +36,6 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
   // verify we can continue
   if(conduit::utils::is_file(trigger_file))
     {
-<<<<<<< HEAD
-    // expression requires occa:
-    conduit::Node queries;
-    queries["q1/params/expression"] = "field('kx') * field('m') / field('xm')";
-    queries["q1/params/name"] = "density";
-    conduit::Node &add_queries = clip_actions.append();
-=======
     std::cout << "using an existing actions file "<< trigger_file<<std::endl;
     }
   else
@@ -53,7 +46,6 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     queries["q1/params/expression"] = "field('kx') * field('m') / field('xm')";
     queries["q1/params/name"] = "density";
     conduit::Node &add_queries = trigger_actions.append();
->>>>>>> develop
     add_queries["action"] = "add_queries";
     add_queries["queries"] = queries;
 
@@ -84,14 +76,8 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     scenes["s1/plots/p1/color_table/name"] = "Yellow - Gray - Blue";
     scenes["s1/plots/p1/color_table/annotation"] = "false";
     scenes["s1/plots/p1/points/radius"] = 0.001;
-<<<<<<< HEAD
-    
-    scenes["s1/plots/p2/type"] = "pseudocolor";
-    // scenes["s1/plots/p2/field"] = "p";
-=======
 
     scenes["s1/plots/p2/type"]         = "pseudocolor";
->>>>>>> develop
     scenes["s1/plots/p2/field"] = "density";
     scenes["s1/plots/p2/pipeline"] = "pl_threshold_thin_clip_y";
     scenes["s1/plots/p2/min_value"] = 1;
@@ -99,14 +85,8 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     scenes["s1/plots/p2/color_table/name"] = "Yellow - Gray - Blue";
     scenes["s1/plots/p2/color_table/annotation"] = "true";
     scenes["s1/plots/p2/points/radius"] = 0.001;
-<<<<<<< HEAD
-    
-    // scenes["s1/renders/r1/image_prefix"] = "datasets/pressure.%05d";
-    scenes["s1/renders/r1/image_prefix"] = "datasets/density.%05d";
-=======
 
     scenes["s1/renders/r1/image_prefix"] = output_path + "density.%05d";
->>>>>>> develop
     scenes["s1/renders/r1/image_width"] = 1920;
     scenes["s1/renders/r1/image_height"] = 1080;
 
