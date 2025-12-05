@@ -186,7 +186,8 @@ template<class KeyType>
 int checkLayout(int myRank,
                 std::span<const TreeIndexPair> focusAssignment,
                 std::span<const LocalIndex> layout,
-                std::span<const KeyType> ftree)
+                std::span<const KeyType> ftree,
+                unsigned maxParticles)
 {
     TreeNodeIndex firstNode = focusAssignment[myRank].start();
     TreeNodeIndex lastNode  = focusAssignment[myRank].end();
@@ -208,13 +209,10 @@ int checkLayout(int myRank,
                 }
                 if (!peerFound)
                 {
-                    std::cout << "Assignment rank " << myRank << " " << std::oct << ftree[firstNode] << " - "
-                              << ftree[lastNode] << std::dec << std::endl;
-                    std::cout << "Failed node " << i << " " << std::oct << ftree[i] << " - " << ftree[i + 1] << std::dec
-                              << std::endl;
                     ret = 1;
                 }
             }
+            if (layout[i + 1] - layout[i] > maxParticles) { ret = -1; }
         }
     }
     return ret;

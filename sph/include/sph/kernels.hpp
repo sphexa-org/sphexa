@@ -8,11 +8,12 @@ namespace sph
 
 //! @brief compute time-step based on the signal velocity
 template<class T1, class T2, class T3>
-HOST_DEVICE_FUN inline auto tsKCourant(T1 maxvsignal, T2 h, T3 c, float Kcour)
+HOST_DEVICE_FUN auto tsKCourant(T1 maxvsignal, T2 h, T3 c, float Kcour)
 {
     using T = std::common_type_t<T1, T2, T3>;
     T v     = maxvsignal > T(0) ? maxvsignal : c;
-    return T(Kcour * h / v);
+    // h == 0 signals neighbor search didn't converge, particle will be removed
+    return h > T2(0) ? T(Kcour * h / v) : INFINITY;
 }
 
 /*! @brief estimate updated smoothing length to bring the neighbor count closer to ng0
