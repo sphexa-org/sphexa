@@ -140,8 +140,8 @@ class SedovGlass : public ISimInitializer<Dataset>
 {
     using Base = ISimInitializer<Dataset>;
 
-    std::string          glassBlock;
-    std::string          settingsFile; // TODO: move to base class
+    std::string          glassBlock; // TODO: move to base class?
+    std::string          settingsFile; // TODO: move to base class? Alternatively, pass to init() method
     mutable InitSettings settings_;
 
 public:
