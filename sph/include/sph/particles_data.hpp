@@ -321,6 +321,26 @@ public:
         outFields.erase(std::remove_if(outFields.begin(), outFields.end(), hasField), outFields.end());
     }
 
+    /*! @brief mark subset fields file output
+     *
+     * @param outFields  list of subset field names
+     *
+     * Selected fields that match existing names contained in @a fieldNames will be removed from the argument
+     * @p field names.
+     */
+    // TODO: refactor to avoid code duplication with setOutputFields
+    void setSubsetOutputFields(std::vector<std::string>& outputFieldsSubset)
+    {
+        auto hasField = [](const std::string& field)
+        { return cstone::getFieldIndex(field, fieldNames) < fieldNames.size(); };
+
+        std::copy_if(outputFieldsSubset.begin(), outputFieldsSubset.end(), std::back_inserter(subsetOutputFieldNames), hasField);
+        subsetOutputFieldIndices = cstone::fieldStringsToInt(subsetOutputFieldNames, fieldNames);
+        std::for_each(subsetOutputFieldNames.begin(), subsetOutputFieldNames.end(), [](auto& f) { f = prefix + f; });
+
+        outputFieldsSubset.erase(std::remove_if(outputFieldsSubset.begin(), outputFieldsSubset.end(), hasField), outputFieldsSubset.end());
+    }
+
     void resize(size_t size)
     {
         auto data_ = data();
@@ -390,7 +410,9 @@ public:
 
     //! @brief particle fields selected for file output
     std::vector<int>         outputFieldIndices;
+    std::vector<int>         subsetOutputFieldIndices;
     std::vector<std::string> outputFieldNames;
+    std::vector<std::string> subsetOutputFieldNames;
 
     float getAllocGrowthRate() const { return allocGrowthRate_; }
 
