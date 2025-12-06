@@ -98,6 +98,8 @@ inline void readFileAttributes(InitSettings& settings, const std::string& settin
         auto fileAttributes = reader->fileAttributes();
         for (const auto& attr : fileAttributes)
         {
+            if (std::ranges::find(taggingParameters, attr) != taggingParameters.end()) continue;
+
             int64_t sz = reader->fileAttributeSize(attr);
             if (sz == 1)
             {
