@@ -37,6 +37,19 @@
 
 namespace sphexa
 {
+    /*! @brief List of supported id tagging parameters in the settings file
+     */
+    inline constexpr std::array<std::string_view, 8> taggingParameters = {
+        "o_subset",
+        "w_subset",
+        "wextra_subset",
+        "f_subset",
+        "id_selection_spheres",
+        "id_selection_spheres_group_ids",
+        "id_selection_list",
+        "id_selection_list_group_ids"
+    };
+
     // /*! @brief Id tagging setup checks and default groups assignment
     //  *
     //  * @param[inout]  selSpheres        sphere selection data
