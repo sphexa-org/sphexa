@@ -127,6 +127,7 @@ namespace sphexa
                 if(selList.size() > 0)
                 {
                     std::cout<<" - List selection with:"<<std::endl;
+                    // TODO: find better way to log data here
                     std::cout<<"   Id list: "<<selList[0]<<" - "<<selList[selList.size()-1]<<std::endl;
                     std::cout<<"   Group ids: "<<selListGroupIds[0]<<" - "<<selListGroupIds[selListGroupIds.size()-1]<<std::endl;
                 }
@@ -159,7 +160,18 @@ namespace sphexa
                 auto attr_size = reader->fileAttributeSize("w_subset");
                 if(attr_size != 1) // TODO: should I move this check to anoter place?
                     throw std::runtime_error("Invalid id tagging output settings: write frequency must be a single value.");
-                reader->fileAttribute("w_subset", writeFreqStrSubset);
+                double writeFreqValue;
+                reader->fileAttribute("w_subset", &writeFreqValue, attr_size);
+                if(std::floor(writeFreqValue) == writeFreqValue)
+                {
+                    // TODO: is there already something to format numbers from string in the codebase?
+                    // TODO: check for negative values
+                    writeFreqStrSubset = std::format("{}", static_cast<int>(writeFreqValue));
+                }
+                else
+                {
+                    writeFreqStrSubset = std::format("{:.15g}", writeFreqValue);
+                }
             }
 
             if(std::ranges::find(fileAttributes, std::string("wextra_subset")) != fileAttributes.end())
@@ -188,6 +200,7 @@ namespace sphexa
 
                 if(std::ranges::find(fileAttributes, std::string("o_subset")) != fileAttributes.end())
                 {
+                    // TODO: add check on attribute type/size
                     reader->fileAttribute("o_subset", outFileSubset);
                 }
                 else
@@ -214,73 +227,4 @@ namespace sphexa
         }
         return writeEnabledSubset;
     }
-
-
-    
-    // // TODO: remove not needed debug logging
-    // bool idTaggingOutputParameterRetrieval(const InitSettings& settings, const std::string initCond, const std::string outputFileSuffix, 
-    //                                        std::string& outFileSubset, std::string& writeFreqStrSubset, std::vector<std::string>& outputFieldsSubset,
-    //                                        std::vector<std::string>& writeExtraSubset)
-    // {
-
-    //     outFileSubset.clear();
-    //     writeFreqStrSubset = std::string("0");
-    //     outputFieldsSubset.clear();
-    //     writeExtraSubset.clear();
-
-    //     const bool writeEnabledSubset = (settings.count("w_subset") && *settings.at("w_subset").data() > 0.) ||
-    //         settings.count("wextra_subset");
-
-    //     if(writeEnabledSubset) {
-
-    //         if(settings.count("o_subset")) {
-    //             outFileSubset = static_cast<StringValue>(settings.at("o_subset"));
-    //         }
-    //         else {
-    //             std::cout<<"WARNING: o_subset not provided, using default naming convention"<<std::endl;
-    //             outFileSubset =  "dump_subset_" + initCond;
-    //         }
-    //         outFileSubset += outputFileSuffix;
-
-    //         if(settings.count("f_subset")) {
-    //             // outputFieldsSubset = settings.at("f_subset").toStrings();
-    //             // std::vector<std::string> result;
-    //             for (auto part : static_cast<StringValue>(settings.at("f_subset")) | std::views::split(',')) {
-    //                 outputFieldsSubset.emplace_back(part.begin(), part.end());
-    //             }
-    //         }
-    //         else {
-    //             std::cout<<"WARNING: f_subset not provided, all fields will be printed for the tagged id subsets."<<std::endl;
-    //         }
-
-    //         if(settings.count("w_subset")) {
-    //             std::cout << "Write frequency subset: " << std::endl;
-    //             if(settings.at("w_subset").isScalar()) {
-    //                 // If integer, format without decimal point
-    //                 if (std::floor(settings.at("w_subset")) == settings.at("w_subset")) {
-    //                     writeFreqStrSubset = std::format("{}", static_cast<int>(settings.at("w_subset")));
-    //                 }
-    //                 else {
-    //                     // TODO: is there a way to avoid dereferencing and data()?
-    //                     writeFreqStrSubset = std::format("{:.15g}", *settings.at("w_subset").data());
-    //                 }
-    //             }
-    //             else {
-    //                 throw std::runtime_error("w_subset parameter must be a scalar value");
-    //             }
-    //         }
-
-    //         if(settings.count("wextra_subset")) {
-    //             for(auto val : settings.at("wextra_subset")) {
-    //                 if(std::floor(val) == val) {
-    //                     writeExtraSubset.push_back(std::format("{}", static_cast<int>(val)));
-    //                 }
-    //                 else {
-    //                     writeExtraSubset.push_back(std::format("{:.15g}", val));
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     return writeEnabledSubset;
-    // };
 }
