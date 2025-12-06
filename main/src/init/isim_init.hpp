@@ -80,7 +80,7 @@ public:
             {
                 if (printLog)
                 {
-                    std::cout<<"Tagging particles in id list"<<initStep<<std::endl;
+                    std::cout<<"Tagging particles in id lists"<<std::endl;
                 }
                 tagIdsInList(particlesData.id, 0, particlesData.id.size(), selList, selListGroupIds);
             }
@@ -89,7 +89,7 @@ public:
             {
                 if (printLog)
                 {
-                    std::cout<<"Tagging particles in spheres"<<initStep<<std::endl;
+                    std::cout<<"Tagging particles in spheres"<<std::endl;
                 }
                 tagIdsInSphere(particlesData.id, particlesData.x, particlesData.y, particlesData.z,
                     0, particlesData.id.size(), selSpheres, sphereGroupIds);
