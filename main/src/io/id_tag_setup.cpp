@@ -1,8 +1,6 @@
-// #include <cmath>
 #include <iostream>
 #include <ranges>
 #include <numeric>
-// #include <stdexcept>
 
 #include "io/id_tag_setup.hpp"
 
