@@ -50,12 +50,21 @@ template<class Dataset>
 class ISimInitializer
 {
 public:
+
+    ISimInitializer(std::string settingsFile)
+        : settingsFile_(std::move(settingsFile))
+    {
+    }
+
     virtual cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t, Dataset& d,
                                                          IFileReader*) const = 0;
 
     virtual const InitSettings& constants() const = 0;
 
-     /*! @brief Id tagging initialization and execution
+    virtual ~ISimInitializer() = default;
+
+protected:
+    /*! @brief Id tagging initialization and execution
      *
      * @param[in]     reader         parameter file reader
      * @param[in]     settingsFile   settings file path
@@ -97,7 +106,7 @@ public:
         }
      };
 
-    virtual ~ISimInitializer() = default;
+    std::string settingsFile_;
 };
 
 template<class Dataset>
@@ -107,14 +116,14 @@ struct SimInitializers
 
     static InitPtr makeEvrard(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeEvrardCooling(std::string glassBlock, std::string settingsFile, IFileReader* reader);
-    static InitPtr makeFile(std::string testCase, int initStep, IFileReader* reader);
-    static InitPtr makeFileSplit(std::string testCase, int numsplits, IFileReader* reader);
+    // static InitPtr makeFile(std::string testCase, int initStep, IFileReader* reader);
+    // static InitPtr makeFileSplit(std::string testCase, int numsplits, IFileReader* reader);
     static InitPtr makeGreshoChan(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeKelvinHelmholtz(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeIsobaricCube(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeNoh(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeSedovGlass(std::string glassBlock, std::string settingsFile, IFileReader* reader);
-    static InitPtr makeSedovGrid();
+    static InitPtr makeSedovGrid(std::string settingsFile);
     static InitPtr makeTurbulence(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeWindShock(std::string glassBlock, std::string settingsFile, IFileReader* reader);
 };
