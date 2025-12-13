@@ -71,19 +71,19 @@ SimInitializers<Dataset>::makeEvrardCooling(std::string /*glass*/, std::string /
 }
 #endif
 
-template<class Dataset>
-std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFile(std::string testCase, int initStep,
-                                                                             IFileReader* reader)
-{
-    return std::make_unique<FileInit<Dataset>>(testCase, initStep, reader);
-}
+// template<class Dataset>
+// std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFile(std::string testCase, int initStep,
+//                                                                              IFileReader* reader)
+// {
+//     return std::make_unique<FileInit<Dataset>>(testCase, initStep, reader);
+// }
 
-template<class Dataset>
-std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFileSplit(std::string testCase, int numSplits,
-                                                                                  IFileReader* reader)
-{
-    return std::make_unique<FileSplitInit<Dataset>>(testCase, numSplits, reader);
-}
+// template<class Dataset>
+// std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFileSplit(std::string testCase, int numSplits,
+//                                                                                   IFileReader* reader)
+// {
+//     return std::make_unique<FileSplitInit<Dataset>>(testCase, numSplits, reader);
+// }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
@@ -121,9 +121,9 @@ SimInitializers<Dataset>::makeSedovGlass(std::string glassBlock, std::string set
 }
 
 template<class Dataset>
-std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeSedovGrid()
+std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeSedovGrid(std::string settingsFile)
 {
-    return std::make_unique<SedovGrid<Dataset>>();
+    return std::make_unique<SedovGrid<Dataset>>(settingsFile);
 }
 
 template<class Dataset>
