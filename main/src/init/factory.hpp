@@ -49,7 +49,7 @@ std::unique_ptr<ISimInitializer<Dataset>> initializerFactory(std::string testCas
 
     if (testNamedBase == "sedov")
     {
-        if (glassBlock.empty()) { return SimInitializers<Dataset>::makeSedovGrid(); }
+        if (glassBlock.empty()) { return SimInitializers<Dataset>::makeSedovGrid(settingsFile); }
         else { return SimInitializers<Dataset>::makeSedovGlass(glassBlock, settingsFile, reader); }
     }
     if (testNamedBase == "noh")
@@ -92,15 +92,15 @@ std::unique_ptr<ISimInitializer<Dataset>> initializerFactory(std::string testCas
         if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for evrard-cooling\n"); }
         return SimInitializers<Dataset>::makeEvrardCooling(glassBlock, settingsFile, reader);
     }
-    if (std::filesystem::exists(strBeforeSign(testCase, ":")))
-    {
-        return SimInitializers<Dataset>::makeFile(strBeforeSign(testCase, ":"), numberAfterSign(testCase, ":"), reader);
-    }
-    if (std::filesystem::exists(strBeforeSign(testCase, ",")))
-    {
-        return SimInitializers<Dataset>::makeFileSplit(strBeforeSign(testCase, ","), numberAfterSign(testCase, ","),
-                                                       reader);
-    }
+    // if (std::filesystem::exists(strBeforeSign(testCase, ":")))
+    // {
+    //     return SimInitializers<Dataset>::makeFile(strBeforeSign(testCase, ":"), numberAfterSign(testCase, ":"), reader);
+    // }
+    // if (std::filesystem::exists(strBeforeSign(testCase, ",")))
+    // {
+    //     return SimInitializers<Dataset>::makeFileSplit(strBeforeSign(testCase, ","), numberAfterSign(testCase, ","),
+    //                                                    reader);
+    // }
 
     auto msg = "supplied value of --init " + (testCase.empty() ? "[empty string]" : "(\"" + testCase + "\")") +
                " is not a usable file or supported test case\n";
