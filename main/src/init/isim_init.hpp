@@ -85,24 +85,24 @@ protected:
 
             idTaggingSetupCheck(selSpheres, sphereGroupIds, selList, selListGroupIds, printLog);
 
-            if(selList.size() > 0)
-            {
-                if (printLog)
-                {
-                    std::cout<<"Tagging particles in id lists"<<std::endl;
-                }
-                tagIdsInList(particlesData.id, 0, particlesData.id.size(), selList, selListGroupIds);
-            }
+            // if(selList.size() > 0)
+            // {
+            //     if (printLog)
+            //     {
+            //         std::cout<<"Tagging particles in id lists"<<std::endl;
+            //     }
+            //     tagIdsInList(particlesData.id, 0, particlesData.id.size(), selList, selListGroupIds);
+            // }
 
-            if(selSpheres.size() > 0)
-            {
-                if (printLog)
-                {
-                    std::cout<<"Tagging particles in spheres"<<std::endl;
-                }
-                tagIdsInSphere(particlesData.id, particlesData.x, particlesData.y, particlesData.z,
-                    0, particlesData.id.size(), selSpheres, sphereGroupIds);
-            }
+            // if(selSpheres.size() > 0)
+            // {
+            //     if (printLog)
+            //     {
+            //         std::cout<<"Tagging particles in spheres"<<std::endl;
+            //     }
+            //     tagIdsInSphere(particlesData.id, particlesData.x, particlesData.y, particlesData.z,
+            //         0, particlesData.id.size(), selSpheres, sphereGroupIds);
+            // }
         }
      };
 
