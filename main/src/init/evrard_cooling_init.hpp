@@ -69,6 +69,7 @@ class EvrardGlassSphereCooling : public EvrardGlassSphere<Dataset>
 public:
     EvrardGlassSphereCooling(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : EvrardGlassSphere<Dataset>(initBlock, settingsFile, reader)
+        , Base(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, evrardCoolingConstants(), settingsFile, reader);
@@ -81,6 +82,9 @@ public:
         auto box = Base::init(rank, numRanks, cbrtNumPart, simData, reader);
         std::fill(simData.hydro.u.begin(), simData.hydro.u.end(), settings_.at("u0"));
         cooling::initChemistryData(simData.chem, simData.hydro.x.size());
+
+        Base::runTagging(reader, Base::settingsFile_, rank == 0, simData.hydro);
+
         return box;
     }
 

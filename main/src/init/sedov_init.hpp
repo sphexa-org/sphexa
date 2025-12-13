@@ -97,17 +97,20 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
 template<class Dataset>
 class SedovGrid : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     mutable InitSettings settings_;
 
 public:
-    SedovGrid()
+    SedovGrid(std::string settingsFile)
+        : ISimInitializer<Dataset>(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, sedovConstants(), {}, nullptr);
     }
 
     cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cubeSide, Dataset& simData,
-                                                 IFileReader*) const override
+                                                 IFileReader* reader) const override
     {
         auto& d                   = simData.hydro;
         using KeyType             = typename Dataset::KeyType;
@@ -129,6 +132,8 @@ public:
 
         initSedovFields(d, settings_);
 
+        Base::runTagging(reader, Base::settingsFile_, rank == 0, d);
+
         return globalBox;
     }
 
@@ -141,13 +146,12 @@ class SedovGlass : public ISimInitializer<Dataset>
     using Base = ISimInitializer<Dataset>;
 
     std::string          glassBlock; // TODO: move to base class?
-    std::string          settingsFile; // TODO: Will be moved to base class when tagging will be enabled for all simulations. Alternatively, pass to init() method
     mutable InitSettings settings_;
 
 public:
     SedovGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
-        , settingsFile(settingsFile)
+        , Base(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, sedovConstants(), settingsFile, reader);
@@ -190,7 +194,7 @@ public:
 
         initSedovFields(d, settings_);
 
-        Base::runTagging(reader, settingsFile, rank == 0, d);
+        Base::runTagging(reader, Base::settingsFile_, rank == 0, d);
 
         return globalBox;
     }

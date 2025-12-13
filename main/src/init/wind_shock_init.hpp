@@ -137,12 +137,15 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
 template<class Dataset>
 class WindShockGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     std::string          glassBlock;
     mutable InitSettings settings_;
 
 public:
     WindShockGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , Base(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, WindShockConstants(), settingsFile, reader);
@@ -226,6 +229,8 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initWindShockFields(d, settings_, massPart);
+
+        Base::runTagging(reader, Base::settingsFile_, rank == 0, d);
 
         return globalBox;
     }

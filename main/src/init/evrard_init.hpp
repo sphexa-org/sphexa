@@ -136,12 +136,15 @@ std::tuple<KeyType, KeyType> estimateEvrardSfcPartition(size_t cbrtNumPart, cons
 template<class Dataset>
 class EvrardGlassSphere : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     std::string          glassBlock;
     mutable InitSettings settings_;
 
 public:
     explicit EvrardGlassSphere(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , Base(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, evrardConstants(), settingsFile, reader);
@@ -192,6 +195,8 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initEvrardFields(d, settings_);
+
+        Base::runTagging(reader, Base::settingsFile_, rank == 0, d);
 
         return globalBox;
     }
