@@ -141,7 +141,7 @@ class SedovGlass : public ISimInitializer<Dataset>
     using Base = ISimInitializer<Dataset>;
 
     std::string          glassBlock; // TODO: move to base class?
-    std::string          settingsFile; // TODO: move to base class? Alternatively, pass to init() method
+    std::string          settingsFile; // TODO: Will be moved to base class when tagging will be enabled for all simulations. Alternatively, pass to init() method
     mutable InitSettings settings_;
 
 public:
