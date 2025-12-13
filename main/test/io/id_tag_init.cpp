@@ -34,10 +34,6 @@
 #include "io/id_tag_setup.hpp"
 #include "io/ifile_io.hpp"
 
-    void idTaggingGroupsInit(unsigned int selSpheresNum, std::vector<unsigned int>& sphereGroupIds,
-                             unsigned int selListSize, std::vector<unsigned int>& selListGroupIds);
-
-
 TEST(IO, idTaggingGroupsInitDefaultSphereIds)
 {
     unsigned int selSpheresNum = 2;
@@ -111,10 +107,10 @@ TEST(IO, idTaggingGroupsInitDefaultMixIds)
     EXPECT_EQ(selListGroupIds[2], 2);
 }
 
-TEST(IO, idTaggingInitSphereDefinitionSizeThrow)
-{
-    // EXPECT_THROW(sphexa::idTaggingSetupCheck, std::runtime_error);
-}
+// TEST(IO, idTaggingInitSphereDefinitionSizeThrow)
+// {
+//     // TODO: test that an exeption is thrown when sphere data definition size is incorrect
+// }
 
 TEST(IO, idTaggingInitSphereNegativeRadiusThrow)
 {
