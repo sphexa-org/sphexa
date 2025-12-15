@@ -50,6 +50,20 @@ namespace sphexa
         "id_selection_list_group_ids"
     };
 
+    /*! @brief Id tagging output parameters
+     */
+    struct IdTaggingOutputSetup
+    {
+        // Tagged id output file name
+        std::string outFile;
+        // Write frequency (iterations or time)
+        std::string writeFreqStr;
+        // Output fields
+        std::vector<std::string> outputFields;
+        // Extra writes steps/times
+        std::vector<std::string> writeExtra;
+    };
+
     // /*! @brief Id tagging setup checks and default groups assignment
     //  *
     //  * @param[inout]  selSpheres        sphere selection data
@@ -72,24 +86,17 @@ namespace sphexa
                              unsigned int selListSize, std::vector<unsigned int>& selListGroupIds);
 
 
-    /*! @brief Id tagging output handling parameter retrieval (from input parameter file)
+    /*! @brief Id tagging output handling parameter retrieval
      *
-     * @param[in]  settingsFile           settings file path
+     * @param[in]  initCond               initial condition
      * @param[in]  reader                 parameter file reader
-     * @param[in]  initCond               initial condition (used for default output file name)
      * @param[in]  outputFileSuffix       suffix to append to output file name
-     * @param[out] outFileSubset          output file name for id tagging subset
-     * @param[out] outputFieldsSubset     output fields for id tagging subset
-     * @param[out] writeFreqStrSubset     write frequency (iterations or time) for id tagging subset
-     * @param[out] writeExtraSubset       list of steps (integers) or ~times (floating point) for extra writes
+     * @param[out] taggingOutputSetup     id tagging output setup
      *
      * @return true if id tagging output is requested, false otherwise
      */
     // TODO: remove warning logging?
-    bool readFileTaggingOutputAttributes(const std::string& settingsFile, IFileReader* reader,
-                                         const std::string initCond, const std::string outputFileSuffix, 
-                                         std::string& outFileSubset, std::string& writeFreqStrSubset, 
-                                         std::vector<std::string>& outputFieldsSubset,
-                                         std::vector<std::string>& writeExtraSubset);
+    bool readFileTaggingOutputAttributes(const std::string& initCond, IFileReader* reader,
+                                         const std::string& outputFileSuffix, IdTaggingOutputSetup& taggingOutputSetup);
 
 }

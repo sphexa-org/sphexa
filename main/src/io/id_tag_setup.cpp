@@ -1,8 +1,10 @@
+#include <filesystem>
 #include <iostream>
 #include <ranges>
 #include <numeric>
 
-#include "io/id_tag_setup.hpp"
+#include "arg_parser.hpp"
+#include "id_tag_setup.hpp"
 
 namespace sphexa
 {
@@ -133,21 +135,30 @@ namespace sphexa
         }
     }
 
-    bool readFileTaggingOutputAttributes(const std::string& settingsFile, IFileReader* reader,
-                                         const std::string initCond, const std::string outputFileSuffix, 
-                                         std::string& outFileSubset, std::string& writeFreqStrSubset, 
-                                         std::vector<std::string>& outputFieldsSubset,
-                                         std::vector<std::string>& writeExtraSubset)
+    bool readFileTaggingOutputAttributes(const std::string& initCond, IFileReader* reader,
+                                         const std::string& outputFileSuffix, IdTaggingOutputSetup& taggingOutputSetup)
     {   
-
         bool writeEnabledSubset = false;
+
+        // Determine tagging parameter file path (parameter file or restart file)
+        std::string settingsFile{};
+        if(std::filesystem::exists(strBeforeSign(initCond, ":")))
+        {
+            // Restart file provided
+            settingsFile = strBeforeSign(initCond, ":");
+        }
+        else if(std::filesystem::exists(strAfterSign(initCond, ":")))
+        {
+            // Parameter file provided
+            settingsFile = strAfterSign(initCond, ":");
+        }
 
         if (not settingsFile.empty())
         {
-            outFileSubset.clear();
-            writeFreqStrSubset = std::string("0");
-            outputFieldsSubset.clear();
-            writeExtraSubset.clear();
+            taggingOutputSetup.outFile.clear();
+            taggingOutputSetup.writeFreqStr = std::string("0");
+            taggingOutputSetup.outputFields.clear();
+            taggingOutputSetup.writeExtra.clear();
 
             reader->setStep(settingsFile, -1, FileMode::independent);
 
@@ -164,11 +175,11 @@ namespace sphexa
                 {
                     // TODO: is there already something to format numbers from string in the codebase?
                     // TODO: check for negative values
-                    writeFreqStrSubset = std::format("{}", static_cast<int>(writeFreqValue));
+                    taggingOutputSetup.writeFreqStr = std::format("{}", static_cast<int>(writeFreqValue));
                 }
                 else
                 {
-                    writeFreqStrSubset = std::format("{:.15g}", writeFreqValue);
+                    taggingOutputSetup.writeFreqStr = std::format("{:.15g}", writeFreqValue);
                 }
             }
 
@@ -177,43 +188,43 @@ namespace sphexa
                 auto attr_size = reader->fileAttributeSize("wextra_subset");
                 std::vector<double> writeExtraSubsetTemp(attr_size);
                 reader->fileAttribute("wextra_subset", writeExtraSubsetTemp.data(), attr_size);
-                writeExtraSubset.resize(attr_size);
+                taggingOutputSetup.writeExtra.resize(attr_size);
                 for(unsigned int i=0; i<attr_size; ++i)
                 {
                     if(std::floor(writeExtraSubsetTemp[i]) == writeExtraSubsetTemp[i])
                     {
-                        writeExtraSubset[i] = std::format("{}", static_cast<int>(writeExtraSubsetTemp[i]));
+                        taggingOutputSetup.writeExtra[i] = std::format("{}", static_cast<int>(writeExtraSubsetTemp[i]));
                     }
                     else
                     {
-                        writeExtraSubset[i] = std::format("{:.15g}", writeExtraSubsetTemp[i]);
+                        taggingOutputSetup.writeExtra[i] = std::format("{:.15g}", writeExtraSubsetTemp[i]);
                     }
                 }
                 // TODO: add checks on writeExtraSubset values
             }
 
-            if(std::stod(writeFreqStrSubset) > 0.0 || writeExtraSubset.size() > 0)
+            if(std::stod(taggingOutputSetup.writeFreqStr) > 0.0 || taggingOutputSetup.writeExtra.size() > 0)
             {
                 writeEnabledSubset = true;
 
                 if(std::ranges::find(fileAttributes, std::string("o_subset")) != fileAttributes.end())
                 {
                     // TODO: add check on attribute type/size
-                    reader->fileAttribute("o_subset", outFileSubset);
+                    reader->fileAttribute("o_subset", taggingOutputSetup.outFile);
                 }
                 else
                 {
                     std::cout<<"WARNING: o_subset not provided, using default naming convention"<<std::endl;
-                    outFileSubset =  "dump_subset_" + initCond;
+                    taggingOutputSetup.outFile =  "dump_subset_" + removeModifiers(initCond);
                 }
-                outFileSubset += outputFileSuffix;
+                taggingOutputSetup.outFile += outputFileSuffix;
 
                 if(std::ranges::find(fileAttributes, std::string("f_subset")) != fileAttributes.end())
                 {
                     std::string outputFieldsStrSubset;
                     reader->fileAttribute("f_subset", outputFieldsStrSubset);
                     for (auto part : outputFieldsStrSubset | std::views::split(',')) {
-                        outputFieldsSubset.emplace_back(part.begin(), part.end());
+                        taggingOutputSetup.outputFields.emplace_back(part.begin(), part.end());
                     }
                 }
                 else
