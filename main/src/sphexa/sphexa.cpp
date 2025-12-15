@@ -110,17 +110,9 @@ int main(int argc, char** argv)
     auto observables = observablesFactory<Dataset>(simInit->constants(), constantsFile);
 
     // ! @brief check if id tagging is requested (tagging setup check is done in simInit initialization)
-    std::string outFileSubset;
-    std::string writeFreqStrSubset;
-    std::vector<std::string> outputFieldsSubset;
-    std::vector<std::string> writeExtraSubset;
-    const bool writeEnabledSubset = readFileTaggingOutputAttributes(strAfterSign(initCond, ":"), fileReader.get(),
-                                                                    removeModifiers(initCond), fileWriter->suffix(),
-                                                                    outFileSubset, writeFreqStrSubset,
-                                                                    outputFieldsSubset,
-                                                                    writeExtraSubset);
-
-
+    IdTaggingOutputSetup taggingOutputSetup;
+    const bool writeEnabledSubset = readFileTaggingOutputAttributes(initCond, fileReader.get(), fileWriter->suffix(),
+                                                                    taggingOutputSetup);
     Dataset simData;
     simData.comm = MPI_COMM_WORLD;
 
@@ -144,7 +136,7 @@ int main(int argc, char** argv)
 
     if (!parser.exists("-o")) { outFile += fileWriter->suffix(); }
     if (writeEnabled) { writeSettings(simInit->constants(), outFile, fileWriter.get()); }
-//    if (writeEnabledSubset) { writeSettings(simInit->subsets(), outFileSubset, fileWriter.get()); }
+//    if (writeEnabledSubset) { writeTaggingSettings(simInit->taggingSetup(), taggingOutputSetup, outFileSubset, fileWriter.get()); }
     if (rank == 0) { std::cout << "Data generated for " << d.numParticlesGlobal << " global particles\n"; }
 
     uint64_t bucketSizeFocus = 64;
@@ -197,9 +189,9 @@ int main(int argc, char** argv)
         if(writeEnabledSubset)
         {
             isSubsetOutputTriggered =
-                (isOutputStep(d.iteration, writeFreqStrSubset) ||
-                isOutputTime(d.ttot - d.minDt, d.ttot, writeFreqStrSubset) ||
-                isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, writeExtraSubset) ||
+                (isOutputStep(d.iteration, taggingOutputSetup.writeFreqStr) ||
+                isOutputTime(d.ttot - d.minDt, d.ttot, taggingOutputSetup.writeFreqStr) ||
+                isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, taggingOutputSetup.writeExtra) ||
                 (isWallClockReached && writeEnabledSubset) || isSubsetOutputTriggered) &&
                 d.iteration > startIteration;
             if (isSubsetOutputTriggered)
