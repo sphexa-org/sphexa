@@ -84,25 +84,27 @@ auto restoreData(IFileReader* reader, SimulationData& simData)
 template<class Dataset>
 class FileInit : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     InitSettings settings_;
-    std::string  h5_fname;
     int          initStep = -1;
 
 public:
     explicit FileInit(const std::string& fname, int initStep_, IFileReader* reader)
-        : h5_fname(fname)
-        , initStep(initStep_)
+        : initStep(initStep_)
+        , Base(fname)
     {
         // Read file attributes and put them in settings_ such that they propagate to the new output after a restart
-        readFileAttributes(settings_, h5_fname, reader, false);
+        readFileAttributes(settings_, Base::settingsFile_, reader, false);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int /*rank*/, int numRanks, size_t /*n*/, Dataset& simData,
+    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t /*n*/, Dataset& simData,
                                                  IFileReader* reader) const override
     {
-        reader->setStep(h5_fname, initStep, FileMode::collective);
+        reader->setStep(Base::settingsFile_, initStep, FileMode::collective);
         auto box = restoreData(reader, simData);
         reader->closeStep();
+        Base::runTagging(reader, Base::settingsFile_, rank == 0, simData.hydro);
         return box;
     }
 
