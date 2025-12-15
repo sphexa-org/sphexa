@@ -71,12 +71,12 @@ SimInitializers<Dataset>::makeEvrardCooling(std::string /*glass*/, std::string /
 }
 #endif
 
-// template<class Dataset>
-// std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFile(std::string testCase, int initStep,
-//                                                                              IFileReader* reader)
-// {
-//     return std::make_unique<FileInit<Dataset>>(testCase, initStep, reader);
-// }
+template<class Dataset>
+std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFile(std::string testCase, int initStep,
+                                                                             IFileReader* reader)
+{
+    return std::make_unique<FileInit<Dataset>>(testCase, initStep, reader);
+}
 
 // template<class Dataset>
 // std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFileSplit(std::string testCase, int numSplits,
