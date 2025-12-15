@@ -116,7 +116,7 @@ struct SimInitializers
 
     static InitPtr makeEvrard(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeEvrardCooling(std::string glassBlock, std::string settingsFile, IFileReader* reader);
-    // static InitPtr makeFile(std::string testCase, int initStep, IFileReader* reader);
+    static InitPtr makeFile(std::string testCase, int initStep, IFileReader* reader);
     // static InitPtr makeFileSplit(std::string testCase, int numsplits, IFileReader* reader);
     static InitPtr makeGreshoChan(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeKelvinHelmholtz(std::string glassBlock, std::string settingsFile, IFileReader* reader);
