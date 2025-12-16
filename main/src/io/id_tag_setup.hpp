@@ -63,6 +63,16 @@ namespace sphexa
         // Extra writes steps/times
         std::vector<std::string> writeExtra;
     };
+    
+    /*! @brief Id tagging setup parameters
+     */
+    struct IdTaggingSetup
+    {
+        std::vector<IdSelectionSphere> selSpheres;
+        std::vector<unsigned int> sphereGroupIds;
+        std::vector<uint64_t> selList;
+        std::vector<unsigned int> selListGroupIds;
+    };
 
     // /*! @brief Id tagging setup checks and default groups assignment
     //  *

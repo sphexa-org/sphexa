@@ -63,6 +63,8 @@ public:
 
     virtual ~ISimInitializer() = default;
 
+    const IdTaggingSetup& taggingSetup() const { return taggingSetup_; }
+
 protected:
     /*! @brief Id tagging initialization and execution
      *
@@ -72,41 +74,48 @@ protected:
      * @param[inout]  particlesData  particle data to perform selection on
      * @param[in]     initStep       time step at which selection is done
      */
-     // TODO: I have to pass a ref to the entire dataset because I could need the coordinates, if selection is geometrical
-     void runTagging(IFileReader* reader, std::string settingsFile, bool printLog, Dataset::HydroData& particlesData, int initStep = 0) const
-     {
+    // TODO: I have to pass a ref to the entire dataset because I could need the coordinates, if selection is geometrical
+    void runTagging(IFileReader* reader, std::string settingsFile, bool printLog, Dataset::HydroData& particlesData) const
+    {
+        taggingSetup_.selSpheres.clear();
+        taggingSetup_.sphereGroupIds.clear();
+        taggingSetup_.selList.clear();
+        taggingSetup_.selListGroupIds.clear();
+
         if (not settingsFile.empty())
         {
-            std::vector<IdSelectionSphere> selSpheres;
-            std::vector<unsigned int> sphereGroupIds;
-            std::vector<uint64_t> selList;
-            std::vector<unsigned int> selListGroupIds;
-            readFileTaggingAttributes(settingsFile, reader, selSpheres, sphereGroupIds, selList, selListGroupIds);
+            readFileTaggingAttributes(settingsFile, reader, taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds, 
+                taggingSetup_.selList, taggingSetup_.selListGroupIds);
+            std::cout<<"Tagging setup read from file: "<<settingsFile<<std::endl;
+            std::cout<<" - Number of id selection spheres: "<<taggingSetup_.selSpheres.size()<<std::endl;
+            idTaggingSetupCheck(taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds, taggingSetup_.selList, 
+                taggingSetup_.selListGroupIds, printLog);
 
-            idTaggingSetupCheck(selSpheres, sphereGroupIds, selList, selListGroupIds, printLog);
+            if(taggingSetup_.selList.size() > 0)
+            {
+                if (printLog)
+                {
+                    std::cout<<"Tagging particles in id lists"<<std::endl;
+                }
+                tagIdsInList(particlesData.id, 0, particlesData.id.size(), taggingSetup_.selList, taggingSetup_.selListGroupIds);
+            }
 
-            // if(selList.size() > 0)
-            // {
-            //     if (printLog)
-            //     {
-            //         std::cout<<"Tagging particles in id lists"<<std::endl;
-            //     }
-            //     tagIdsInList(particlesData.id, 0, particlesData.id.size(), selList, selListGroupIds);
-            // }
-
-            // if(selSpheres.size() > 0)
-            // {
-            //     if (printLog)
-            //     {
-            //         std::cout<<"Tagging particles in spheres"<<std::endl;
-            //     }
-            //     tagIdsInSphere(particlesData.id, particlesData.x, particlesData.y, particlesData.z,
-            //         0, particlesData.id.size(), selSpheres, sphereGroupIds);
-            // }
+            if(taggingSetup_.selSpheres.size() > 0)
+            {
+                if (printLog)
+                {
+                    std::cout<<"Tagging particles in spheres"<<std::endl;
+                }
+                tagIdsInSphere(particlesData.id, particlesData.x, particlesData.y, particlesData.z,
+                    0, particlesData.id.size(), taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds);
+            }
         }
-     };
+    };
 
+    // May be empty, if no settings file is provided (e.g., restart from dump)
     std::string settingsFile_;
+    mutable IdTaggingSetup taggingSetup_;
+
 };
 
 template<class Dataset>

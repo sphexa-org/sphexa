@@ -1,7 +1,7 @@
 #include <filesystem>
 #include <iostream>
-#include <ranges>
 #include <numeric>
+#include <ranges>
 
 #include "arg_parser.hpp"
 #include "id_tag_setup.hpp"
