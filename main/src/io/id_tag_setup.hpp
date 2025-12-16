@@ -39,7 +39,7 @@ namespace sphexa
 {
     /*! @brief List of supported id tagging parameters in the settings file
      */
-    inline constexpr std::array<std::string_view, 8> taggingParameters = {
+    inline constexpr std::array<std::string_view, 8> taggingAttributes = {
         "o_subset",
         "w_subset",
         "wextra_subset",

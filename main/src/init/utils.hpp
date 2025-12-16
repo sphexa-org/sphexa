@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include <filesystem>
 #include <numeric>
 #include <span>
 #include <string>
@@ -99,7 +100,7 @@ inline void readFileAttributes(InitSettings& settings, const std::string& settin
         for (const auto& attr : fileAttributes)
         {
             // skip tagging related attributes
-            if (std::ranges::find(taggingParameters, attr) != taggingParameters.end()) continue;
+            if (std::ranges::find(taggingAttributes, attr) != taggingAttributes.end()) continue;
 
             int64_t sz = reader->fileAttributeSize(attr);
             if (sz == 1)
@@ -135,13 +136,15 @@ inline void readFileTaggingAttributes(const std::string& settingsFile, IFileRead
     sphereGroupIds.clear();
     selList.clear();
     selListGroupIds.clear();
-
-    if (not settingsFile.empty())
+    if (std::filesystem::exists(settingsFile) && not settingsFile.empty())
     {
         reader->setStep(settingsFile, -1, FileMode::independent);
 
         auto fileAttributes = reader->fileAttributes();
-
+        for(auto const& attr : fileAttributes)
+        {   
+            std::cout<<"File attribute found: "<<attr<<std::endl;
+        }
         // Read sphere selection data
         if(std::ranges::find(fileAttributes, std::string("id_selection_spheres")) != fileAttributes.end())
         {
