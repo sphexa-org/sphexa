@@ -48,11 +48,11 @@ struct IADDivVCurlVInteraction
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, const cstone::Vec3<Tc>& r_ij,
                               const T r2) const
     {
-        auto const [i, iPos, hi, vxi, vyi, vzi, xmi, kxi] = iData;
-        auto const [j, jPos, hj, vxj, vyj, vzj, xmj, kxj] = jData;
+        auto const [i, iPos, hi, vxi, vyi, vzi, xmi, kxi, nci] = iData;
+        auto const [j, jPos, hj, vxj, vyj, vzj, xmj, kxj, ncj] = jData;
 
-        auto iadIData  = std::make_tuple(i, iPos, hi, xmi, kxi);
-        auto iadJData  = std::make_tuple(j, jPos, hj, xmj, kxj);
+        auto iadIData  = std::make_tuple(i, iPos, hi, xmi, kxi, nci);
+        auto iadJData  = std::make_tuple(j, jPos, hj, xmj, kxj, ncj);
         auto iadResult = IADInteraction<T>{wh}(iadIData, iadJData, r_ij, r2);
 
         // c11i ... c33i are only read in postamble, so we can pass dummy values here
@@ -75,12 +75,12 @@ struct IADDivVCurlVPostamble
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
-        auto const [i, iPos, hi, vxi, vyi, vzi, xmi, kxi]         = iData;
+        auto const [i, iPos, hi, vxi, vyi, vzi, xmi, kxi, nci]    = iData;
         auto [tau11, tau12, tau13, tau22, tau23, tau33, dVxiXFactor, dVxiYFactor, dVxiZFactor, dVyiXFactor, dVyiYFactor,
               dVyiZFactor, dVziXFactor, dVziYFactor, dVziZFactor] = result;
 
         auto const [c11i, c12i, c13i, c22i, c23i, c33i] = IADPostamble<T, Tc>{K}(
-            std::make_tuple(i, iPos, hi, xmi, kxi), std::make_tuple(tau11, tau12, tau13, tau22, tau23, tau33));
+            std::make_tuple(i, iPos, hi, xmi, kxi, nci), std::make_tuple(tau11, tau12, tau13, tau22, tau23, tau33));
 
         auto const divVCurlVResult = DivVCurlVPostamble<DoCurlV, DoGradV, T, Tc>{K}(
             std::make_tuple(i, iPos, hi, vxi, vyi, vzi, xmi, kxi, c11i, c12i, c13i, c22i, c23i, c33i),
@@ -93,10 +93,10 @@ struct IADDivVCurlVPostamble
 
 template<class Neighborhood, class Tc, class T>
 void iadDivVCurlVIjLoop(const Neighborhood& neighborhood, Tc K, const T* vx, const T* vy, const T* vz, const T* xm,
-                        const T* kx, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, const T* wh, T* divv, T* curlv,
-                        T* dV11, T* dV12, T* dV13, T* dV22, T* dV23, T* dV33, bool doGradV)
+                        const T* kx, const unsigned* nc, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, const T* wh,
+                        T* divv, T* curlv, T* dV11, T* dV12, T* dV13, T* dV22, T* dV23, T* dV33, bool doGradV)
 {
-    const auto input = std::make_tuple(vx, vy, vz, xm, kx);
+    const auto input = std::make_tuple(vx, vy, vz, xm, kx, nc);
     if (curlv && doGradV)
     {
         const auto output =

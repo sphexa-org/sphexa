@@ -237,12 +237,12 @@ template<size_t stride = 1, class Tc, class T>
 HOST_DEVICE_FUN inline void IADJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
                                      const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
                                      const Tc* y, const Tc* z, const T* h, const T* wh, const T* /*whd*/, const T* xm,
-                                     const T* kx, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33)
+                                     const T* kx, const unsigned* nc, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33)
 {
     IADInteraction      interaction{wh};
     IADPostamble<T, Tc> postamble{K};
 
-    const auto input  = std::make_tuple(xm, kx);
+    const auto input  = std::make_tuple(xm, kx, nc);
     const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33);
 
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
@@ -268,11 +268,12 @@ HOST_DEVICE_FUN inline void IADJLoop(cstone::LocalIndex i, Tc K, const cstone::B
 TEST_F(SphKernelTests, IAD)
 {
     // fill with invalid initial value to make sure that the kernel overwrites it instead of add to it
-    std::vector<T> iad(6, -1);
+    std::vector<T>        iad(6, -1);
+    std::vector<unsigned> nc(x.size(), neighborsCount + 1);
 
     // compute the 6 tensor components for particle 0
     IADJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), wh.data(),
-             whd.data(), xm.data(), kx.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5]);
+             whd.data(), xm.data(), kx.data(), nc.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5]);
 
     EXPECT_NEAR(iad[0], 1.9296619855715329e-18, 1e-10);
     EXPECT_NEAR(iad[1], -1.7838691836843698e-20, 1e-10);
@@ -350,8 +351,8 @@ TEST_F(SphKernelTests, MomentumEnergy)
                         dvzdx.data(), dvzdy.data(), dvzdz.data()},
                        {dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(), dV33.data()}, npart);
 
-    std::vector<unsigned> nc(x.size(), neighborsCount + 1);
     { // test with AV cleaning
+        std::vector<unsigned> nc(x.size(), neighborsCount + 1);
         auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
         momentumAndEnergyJLoop<true>(0, K, box(), neighbors.data(), neighborsCount, nc.data(), x.data(), y.data(),
@@ -368,6 +369,7 @@ TEST_F(SphKernelTests, MomentumEnergy)
         EXPECT_NEAR(maxvsignal, 26490876.319252387, 1e-6);
     }
     { // test without AV cleaning
+        std::vector<unsigned> nc(x.size(), neighborsCount + 1);
         auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
         momentumAndEnergyJLoop<false>(0, K, box(), neighbors.data(), neighborsCount, nc.data(), x.data(), y.data(),
@@ -382,6 +384,23 @@ TEST_F(SphKernelTests, MomentumEnergy)
         EXPECT_NEAR(grad_Pz, -1730426.827721074, 0.042);
         EXPECT_NEAR(du, 7.1838438980436924e12, 3.1e5);
         EXPECT_NEAR(maxvsignal, 26490876.319252387, 1e-6);
+    }
+    { // test zero neighbors
+        std::vector<unsigned> nc(x.size(), 1);
+        auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
+
+        momentumAndEnergyJLoop<false>(0, K, box(), neighbors.data(), 0, nc.data(), x.data(), y.data(), z.data(),
+                                      vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
+                                      (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
+                                      c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
+                                      alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
+                                      dV33.data(), &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
+
+        EXPECT_EQ(grad_Px, 0.0);
+        EXPECT_EQ(grad_Py, 0.0);
+        EXPECT_EQ(grad_Pz, 0.0);
+        EXPECT_EQ(du, 0.0);
+        EXPECT_EQ(maxvsignal, 0.0);
     }
 }
 

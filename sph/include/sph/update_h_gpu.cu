@@ -44,8 +44,10 @@ using cstone::NcStats;
 using cstone::TravConfig;
 using cstone::TreeNodeIndex;
 
-template<class Th>
-__global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, const unsigned* nc, Th* h)
+__device__ bool nc_h_convergenceFailure = false;
+
+template<class Th, class KeyType>
+__global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, const unsigned* nc, Th* h, KeyType* keys)
 {
     LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
@@ -54,23 +56,30 @@ __global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, cons
     LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
     if (i >= grp.groupEnd[warpIdx]) { return; }
 
+    if (h[i] == 0)
+    {
+        keys[i] = cstone::removeKey<KeyType>{};
+        nc_h_convergenceFailure = true;
+    }
     h[i] = updateH(ng0, nc[i], h[i]);
 }
 
-template<class Th>
-void updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, Th* h)
+template<class Th, class KeyType>
+bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, Th* h, KeyType* keys)
 {
     unsigned numThreads       = 256;
     unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
     unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
-    if (numBlocks == 0) { return; }
-    updateSmoothingLengthGpuKernel<<<numBlocks, numThreads>>>(grp, ng0, nc, h);
+    if (numBlocks == 0) { return false; }
+    updateSmoothingLengthGpuKernel<<<numBlocks, numThreads>>>(grp, ng0, nc, h, keys);
+
+    bool convergenceFailure;
+    checkGpuErrors(cudaMemcpyFromSymbol(&convergenceFailure, GPU_SYMBOL(nc_h_convergenceFailure), sizeof(bool)));
+    return convergenceFailure;
 }
 
-template void updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, float* h);
-template void updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, double* h);
-
-__device__ bool nc_h_convergenceFailure = false;
+template bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, float* h, uint64_t*);
+template bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, double* h, uint64_t*);
 
 template<class Tc, class T, class KeyType>
 __global__ void
@@ -109,7 +118,11 @@ updateSmoothingLengthIterativeGpuKernel(unsigned ng0, unsigned ngmax, const csto
             ncSph =
                 1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
 
-            if (ncIt == ncMaxIteration) { nc_h_convergenceFailure = true; }
+            bool ncFail = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
+            if (ncIt == ncMaxIteration && ncFail) {
+                h[i] = T(0);
+                ncSph = 1;
+            }
         }
 
         if (i >= bodyEnd) continue;
@@ -132,16 +145,12 @@ void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d,
     NcStats::type stats[NcStats::numStats];
     checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(cstone::ncStats), NcStats::numStats * sizeof(NcStats::type)));
 
-    bool convergenceFailure;
-    checkGpuErrors(cudaMemcpyFromSymbol(&convergenceFailure, GPU_SYMBOL(nc_h_convergenceFailure), sizeof(bool)));
-
     NcStats::type maxP2P   = stats[cstone::NcStats::maxP2P];
     NcStats::type maxStack = stats[cstone::NcStats::maxStack];
 
     d.devData.stackUsedNc = maxStack;
 
     if (maxP2P == 0xFFFFFFFF) { throw std::runtime_error("GPU traversal stack exhausted in neighbor search\n"); }
-    if (convergenceFailure) { throw std::runtime_error("coupled nc/h-updated failed to converge"); }
 }
 
 template void updateSmoothingLengthIterativeGpu(const cstone::GroupView&, sphexa::ParticlesData<cstone::GpuTag>&,

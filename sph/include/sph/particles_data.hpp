@@ -94,6 +94,9 @@ public:
     //! @brief default maximum number of neighbors per particle before additional h-adjustment will be triggered
     unsigned ngmax{150};
 
+    //! @brief whether to remove unconverged particles when the smoothing length update failed
+    int removeUnconvergedParticles{false};
+
     RealType ttot{0.0}, etot{0.0}, ecin{0.0}, eint{0.0}, egrav{0.0};
     RealType linmom{0.0}, angmom{0.0};
 
@@ -180,6 +183,7 @@ public:
         ar->stepAttribute("numParticlesGlobal", &numParticlesGlobal, 1);
         optionalIO("ng0", &ng0, 1);
         optionalIO("ngmax", &ngmax, 1);
+        optionalIO("removeUnconvergedParticles", &removeUnconvergedParticles, 1);
         ar->stepAttribute("time", &ttot, 1);
         ar->stepAttribute("minDt", &minDt, 1);
         ar->stepAttribute("minDt_m1", &minDt_m1, 1);

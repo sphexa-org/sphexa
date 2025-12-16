@@ -47,8 +47,8 @@ struct IADInteraction
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
                               T r2) const
     {
-        const auto [i, iPos, hi, xmi, kxi] = iData;
-        const auto [j, jPos, hj, xmj, kxj] = jData;
+        const auto [i, iPos, hi, xmi, kxi, nci] = iData;
+        const auto [j, jPos, hj, xmj, kxj, ncj] = jData;
 
         T rx = r_ij[0];
         T ry = r_ij[1];
@@ -58,6 +58,7 @@ struct IADInteraction
 
         T dist = std::sqrt(r2);
 
+        // calculate the v as ratio between the distance and the smoothing length
         T vloc = dist * hiInv;
         T w    = lt::lookup(wh, vloc);
 
@@ -80,7 +81,7 @@ struct IADPostamble
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
-        const auto [i, iPos, hi, mi, roi]               = iData;
+        const auto [i, iPos, hi, mi, roi, nci]          = iData;
         auto [tau11, tau12, tau13, tau22, tau23, tau33] = result;
 
         auto getExp    = [](T val) { return (val == T(0) ? 0 : std::ilogb(val)); };
@@ -101,6 +102,7 @@ struct IADPostamble
         // Note normalization factor: cij have units of 1/tau because det is proportional to tau^3 so we have to
         // divide by K/h^3.
         T factor = normalization * (hi * hi * hi) / (det * K);
+        if (std::isnan(factor) && nci <= 1) { factor = T(0); }
 
         return std::make_tuple(                       //
             (tau22 * tau33 - tau23 * tau23) * factor, //
@@ -111,13 +113,5 @@ struct IADPostamble
             (tau11 * tau22 - tau12 * tau12) * factor);
     }
 };
-
-template<class Neighborhood, class Tc, class T>
-void IADIjLoop(Neighborhood const& neighborhood, Tc K, const T* xm, const T* kx, const T* wh, T* c11, T* c12, T* c13,
-               T* c22, T* c23, T* c33)
-{
-    neighborhood.ijLoop(std::make_tuple(xm, kx), std::make_tuple(c11, c12, c13, c22, c23, c33), IADInteraction<T>{wh},
-                        IADPostamble<T, Tc>{K});
-}
 
 } // namespace sph

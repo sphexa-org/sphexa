@@ -98,15 +98,15 @@ protected:
 };
 
 template<size_t stride = 1, class Tc, class Tm, class T>
-HOST_DEVICE_FUN inline void IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
-                                        const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
-                                        const Tc* y, const Tc* z, const T* h, const Tm* m, const T* rho, const T* wh,
-                                        const T* /*whd*/, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33)
+HOST_DEVICE_FUN inline void
+IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
+            unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* h, const Tm* m, const T* rho,
+            const unsigned* nc, const T* wh, const T* /*whd*/, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33)
 {
     IADInteractionSTD      interaction{wh};
     IADPostambleSTD<T, Tc> postamble{K};
 
-    const auto input  = std::make_tuple(m, rho);
+    const auto input  = std::make_tuple(m, rho, nc);
     const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33);
 
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
@@ -131,10 +131,11 @@ HOST_DEVICE_FUN inline void IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone
 
 TEST_F(SphKernelTestsStd, IAD)
 {
-    std::vector<T> iad(6, -1);
+    std::vector<T>        iad(6, -1);
+    std::vector<unsigned> nc(x.size(), neighborsCount + 1);
 
     IADJLoopSTD(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), m.data(),
-                rho.data(), wh.data(), whd.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5]);
+                rho.data(), nc.data(), wh.data(), whd.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5]);
 
     EXPECT_NEAR(iad[0], 0.68826690779384281, 1e-8);
     EXPECT_NEAR(iad[1], -0.12963692768970825, 1e-8);
@@ -192,4 +193,20 @@ TEST_F(SphKernelTestsStd, MomentumEnergy)
     EXPECT_NEAR(grad_Pz, 15.596554152643426, 2.15e-7);
     EXPECT_NEAR(du, -0.40541191600274296, 1e-8);
     EXPECT_NEAR(maxvsignal, 1.4112466828564341, 1e-10);
+}
+
+TEST_F(SphKernelTestsStd, MomentumEnergyZero)
+{
+    auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
+
+    momentumAndEnergyJLoop(0, K, box(), neighbors.data(), 0, x.data(), y.data(), z.data(), vx.data(), vy.data(),
+                           vz.data(), h.data(), m.data(), rho.data(), p.data(), c.data(), c11.data(), c12.data(),
+                           c13.data(), c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), &grad_Px, &grad_Py,
+                           &grad_Pz, &du, &maxvsignal);
+
+    EXPECT_EQ(grad_Px, 0.0);
+    EXPECT_EQ(grad_Py, 0.0);
+    EXPECT_EQ(grad_Pz, 0.0);
+    EXPECT_EQ(du, 0.0);
+    EXPECT_EQ(maxvsignal, 0.0);
 }

@@ -43,6 +43,35 @@
 namespace sph
 {
 
+using cstone::LocalIndex;
+
+/*! @brief Mark particles with NaN acceleration for removal by setting neighbor counts to 0
+ * @param[in]    grp   active particle groups
+ * @param[inout] ax    x particle acceleration
+ * @param[inout] ay
+ * @param[inout] az
+ * @param[inout] h     smoothing lengths
+ */
+template<class Ta, class Tu, class Th>
+__global__ void markNaN(GroupView grp, Ta* ax, Ta* ay, Ta* az, Tu* du, Th* h)
+{
+    LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
+    LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
+    if (warpIdx >= grp.numGroups) { return; }
+
+    LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
+    if (i >= grp.groupEnd[warpIdx]) { return; }
+
+    if (std::isnan(ax[i]) || std::isnan(ay[i]) || std::isnan(az[i]) || std::isnan(du[i]))
+    {
+        ax[i] = Ta(0);
+        ay[i] = Ta(0);
+        az[i] = Ta(0);
+        du[i] = Tu(0);
+        h[i]  = 0;
+    }
+}
+
 template<class Dataset>
 void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
@@ -52,6 +81,17 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
                             rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33), rawPtr(d.devData.wh),
                             rawPtr(d.devData.du), rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az),
                             rawPtr(d.devData.dtCourant));
+
+    {
+        unsigned numThreads       = 256;
+        unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
+        unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+        if (numBlocks > 0)
+        {
+            markNaN<<<numBlocks, numThreads>>>(grp, rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az),
+                                               rawPtr(d.devData.du), rawPtr(d.devData.h));
+        }
+    }
 
     using DtCourantType = typename std::decay_t<decltype(d.devData.dtCourant)>::value_type;
     auto minDt          = thrust::reduce(thrust::device, rawPtr(d.devData.dtCourant) + grp.firstBody,

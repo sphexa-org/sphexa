@@ -44,10 +44,10 @@ void computeIadDivvCurlv(const GroupView& grp, Dataset& d, const cstone::Box<Tc>
     else
     {
         iadDivVCurlVIjLoop(d.neighborhood, d.K, d.vx.data(), d.vy.data(), d.vz.data(), d.xm.data(), d.kx.data(),
-                           d.c11.data(), d.c12.data(), d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data(),
-                           d.wh.data(), d.divv.data(), d.curlv.size() == d.x.size() ? d.curlv.data() : nullptr,
-                           d.dV11.data(), d.dV12.data(), d.dV13.data(), d.dV22.data(), d.dV23.data(), d.dV33.data(),
-                           d.dV11.size() == d.x.size());
+                           d.nc.data(), d.c11.data(), d.c12.data(), d.c13.data(), d.c22.data(), d.c23.data(),
+                           d.c33.data(), d.wh.data(), d.divv.data(),
+                           d.curlv.size() == d.x.size() ? d.curlv.data() : nullptr, d.dV11.data(), d.dV12.data(),
+                           d.dV13.data(), d.dV22.data(), d.dV23.data(), d.dV33.data(), d.dV11.size() == d.x.size());
     }
 }
 
