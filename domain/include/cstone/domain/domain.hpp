@@ -227,8 +227,8 @@ public:
         if (firstCall_)
         {
             // first rough convergence to avoid computing expansion centers of large nodes with a lot of particles
-            focusTree_.converge(box(), keyView, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
-                                1.0, std::get<0>(scratch));
+            focusTree_.converge(box(), keyView, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(), 1.0,
+                                std::get<0>(scratch));
             focusTree_.updateMinMac(global_.assignment(), 1.0, false);
             int converged = 0, reps = 0;
             while (converged != numRanks_ || reps < 2)
@@ -588,16 +588,18 @@ private:
             {
                 std::cout << "rank " << i << " " << assignedSize << " " << layout_.back()
                           << " focus h/true/peers/loc/tot: " << numFlags << "/" << numFocusTruePeer << "/"
-                          << numFocusPeers << "/" << focusAssignment[myRank_].count() << "/"
-                          << flags.size() << " peers: [" << std::max(hPeers.size(), fPeers.size())
-                          << "] ";
+                          << numFocusPeers << "/" << focusAssignment[myRank_].count() << "/" << flags.size()
+                          << " peers: [" << std::max(hPeers.size(), fPeers.size()) << "] ";
                 if (numRanks_ <= 64)
                 {
                     for (auto r : fPeers)
                     {
                         bool isHalo = std::count(hPeers.begin(), hPeers.end(), r) == 1;
                         if (isHalo) { std::cout << r << " "; }
-                        else { std::cout << "*" << r << " "; }
+                        else
+                        {
+                            std::cout << "*" << r << " ";
+                        }
                     }
                     for (auto r : hPeers)
                     {

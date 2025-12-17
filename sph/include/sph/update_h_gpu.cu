@@ -58,7 +58,7 @@ __global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, cons
 
     if (h[i] == 0)
     {
-        keys[i] = cstone::removeKey<KeyType>{};
+        keys[i]                 = cstone::removeKey<KeyType>{};
         nc_h_convergenceFailure = true;
     }
     h[i] = updateH(ng0, nc[i], h[i]);
@@ -119,8 +119,9 @@ updateSmoothingLengthIterativeGpuKernel(unsigned ng0, unsigned ngmax, const csto
                 1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
 
             bool ncFail = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
-            if (ncIt == ncMaxIteration && ncFail) {
-                h[i] = T(0);
+            if (ncIt == ncMaxIteration && ncFail)
+            {
+                h[i]  = T(0);
                 ncSph = 1;
             }
         }
