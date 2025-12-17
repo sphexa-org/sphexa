@@ -69,7 +69,7 @@ protected:
     MHolder_t mHolder_;
 
     //! @brief groups sorted by ascending SFC keys
-    GroupData<Acc>        groups_;
+    GroupData<Acc>                       groups_;
     typename Base::AccVector<float>      groupDt_;
     typename Base::AccVector<LocalIndex> groupIndices_;
 
@@ -107,7 +107,10 @@ protected:
     static int activeRung(int substep, int numRungs)
     {
         if (substep == 0 || substep >= (1 << (numRungs - 1))) { return 0; }
-        else { return cstone::butterfly(substep); }
+        else
+        {
+            return cstone::butterfly(substep);
+        }
     }
 
 public:
@@ -215,7 +218,10 @@ public:
         domain.setHaloFactor(1.0 + float(timestep_.numRungs) / 40);
 
         if (activeRung(timestep_.substep, timestep_.numRungs) == 0) { fullSync(domain, simData); }
-        else { partialSync(domain, simData); }
+        else
+        {
+            partialSync(domain, simData);
+        }
     }
 
     bool isSynced() override { return activeRung(timestep_.substep, timestep_.numRungs) == 0; }
@@ -267,7 +273,10 @@ public:
             domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "alpha">(d), get<"keys">(d),
                                  haloRecvScratch);
         }
-        else { domain.exchangeHalos(std::tie(get<"alpha">(d)), get<"keys">(d), haloRecvScratch); }
+        else
+        {
+            domain.exchangeHalos(std::tie(get<"alpha">(d)), get<"keys">(d), haloRecvScratch);
+        }
         timer.step("mpi::synchronizeHalos");
 
         computeMomentumEnergy<avClean>(activeRungs_, rawPtr(groupDt_), d, domain.box());
@@ -395,7 +404,6 @@ public:
 
         auto output = [&]()
         {
-
             typename Base::AccVector<char> scratch;
 
             for (int i = int(indicesDone.size()) - 1; i >= 0; --i)

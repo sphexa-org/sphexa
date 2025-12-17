@@ -47,7 +47,10 @@ PropLib<DomainType, ParticleDataType>::makeHydroVeBdtProp(std::ostream& output, 
     {
         return std::make_unique<HydroVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings);
     }
-    else { return std::make_unique<HydroVeBdtProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
+    else
+    {
+        return std::make_unique<HydroVeBdtProp<false, DomainType, ParticleDataType>>(output, rank, settings);
+    }
 }
 
 template<class DomainType, class ParticleDataType>
@@ -56,7 +59,10 @@ PropLib<DomainType, ParticleDataType>::makeTurbVeBdtProp(std::ostream& output, s
                                                          const InitSettings& settings, bool avClean)
 {
     if (avClean) { return std::make_unique<TurbVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
-    else { return std::make_unique<TurbVeBdtProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
+    else
+    {
+        return std::make_unique<TurbVeBdtProp<false, DomainType, ParticleDataType>>(output, rank, settings);
+    }
 }
 
 #ifdef USE_CUDA

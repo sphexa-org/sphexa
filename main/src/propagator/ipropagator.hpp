@@ -47,8 +47,8 @@ namespace sphexa
 template<class DomainType, class ParticleDataType>
 class Propagator
 {
-    using Acc       = typename ParticleDataType::AcceleratorType;
-    using T = typename ParticleDataType::RealType;
+    using Acc = typename ParticleDataType::AcceleratorType;
+    using T   = typename ParticleDataType::RealType;
 
 public:
     Propagator(std::ostream& output, int rank)
@@ -132,19 +132,19 @@ public:
     }
 
 protected:
-
     template<class VType>
     using AccVector = std::conditional_t<cstone::HaveGpu<Acc>{}, cstone::DeviceVector<VType>, std::vector<VType>>;
 
     template<class FieldVariant, class Vector>
-    static void outputField(IFileWriter* writer, size_t first, size_t last, FieldVariant fieldPointer, const std::string& key, int column, Vector& scratch)
+    static void outputField(IFileWriter* writer, size_t first, size_t last, FieldVariant fieldPointer,
+                            const std::string& key, int column, Vector& scratch)
     {
         if (first >= last) { return; }
         std::visit(
             [writer, first, last, key, column, &scratch](auto* fieldPtr)
             {
-                using ValueType = std::remove_pointer_t<decltype(fieldPtr)>::value_type;
-                auto packedScratch  = util::packAllocBuffer<ValueType>(scratch, std::vector<size_t>{last - first}, 1);
+                using ValueType    = std::remove_pointer_t<decltype(fieldPtr)>::value_type;
+                auto packedScratch = util::packAllocBuffer<ValueType>(scratch, std::vector<size_t>{last - first}, 1);
                 if constexpr (IsDeviceVector<Vector>{})
                 {
                     memcpyD2H(fieldPtr->data() + first, last - first, packedScratch.data()->data());

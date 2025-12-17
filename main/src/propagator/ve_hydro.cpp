@@ -43,7 +43,10 @@ std::unique_ptr<Propagator<DomainType, ParticleDataType>>
 PropLib<DomainType, ParticleDataType>::makeHydroVeProp(std::ostream& output, size_t rank, bool avClean)
 {
     if (avClean) { return std::make_unique<HydroVeProp<true, DomainType, ParticleDataType>>(output, rank); }
-    else { return std::make_unique<HydroVeProp<false, DomainType, ParticleDataType>>(output, rank); }
+    else
+    {
+        return std::make_unique<HydroVeProp<false, DomainType, ParticleDataType>>(output, rank);
+    }
 }
 
 template<class DomainType, class ParticleDataType>
@@ -52,7 +55,10 @@ PropLib<DomainType, ParticleDataType>::makeTurbVeProp(std::ostream& output, size
                                                       bool avClean)
 {
     if (avClean) { return std::make_unique<TurbVeProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
-    else { return std::make_unique<TurbVeProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
+    else
+    {
+        return std::make_unique<TurbVeProp<false, DomainType, ParticleDataType>>(output, rank, settings);
+    }
 }
 
 #ifdef USE_CUDA
