@@ -65,15 +65,13 @@ protected:
     using MHolder_t = std::conditional_t<cstone::HaveGpu<Acc>{},
                                          MultipoleHolderGpu<MultipoleType, DomainType, typename DataType::HydroData>,
                                          MultipoleHolderCpu<MultipoleType, DomainType, typename DataType::HydroData>>;
-    template<class VType>
-    using AccVector = std::conditional_t<cstone::HaveGpu<Acc>{}, cstone::DeviceVector<VType>, std::vector<VType>>;
 
     MHolder_t mHolder_;
 
     //! @brief groups sorted by ascending SFC keys
     GroupData<Acc>        groups_;
-    AccVector<float>      groupDt_;
-    AccVector<LocalIndex> groupIndices_;
+    typename Base::AccVector<float>      groupDt_;
+    typename Base::AccVector<LocalIndex> groupIndices_;
 
     //! @brief groups sorted by ascending time-step
     GroupData<Acc>                               tsGroups_;
@@ -86,7 +84,7 @@ protected:
     int safetySteps{0};
 
     //! @brief no dependent fields can be temporarily reused as scratch space for halo exchanges
-    AccVector<LocalIndex> haloRecvScratch;
+    typename Base::AccVector<LocalIndex> haloRecvScratch;
 
     /*! @brief the list of conserved particles fields with values preserved between iterations
      *
@@ -397,6 +395,9 @@ public:
 
         auto output = [&]()
         {
+
+            typename Base::AccVector<char> scratch;
+
             for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
             {
                 int fidx = indicesDone[i];
@@ -404,10 +405,7 @@ public:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    transferToHost(d, first, last, {d.fieldNames[fidx]});
-                    std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
-                    deallocateField(d, fidx);
+                    Base::outputField(writer, first, last, fieldPointers[fidx], namesDone[i], column, scratch);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }

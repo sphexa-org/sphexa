@@ -234,6 +234,8 @@ public:
 
         auto output = [&]()
         {
+            typename Base::AccVector<char> scratch;
+
             for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
             {
                 int fidx = indicesDone[i];
@@ -241,10 +243,7 @@ public:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    transferToHost(d, first, last, {d.fieldNames[fidx]});
-                    std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
-                    deallocateField(d, fidx);
+                    Base::outputField(writer, first, last, fieldPointers[fidx], namesDone[i], column, scratch);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }

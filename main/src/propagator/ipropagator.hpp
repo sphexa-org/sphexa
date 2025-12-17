@@ -35,6 +35,7 @@
 #include <variant>
 
 #include "cstone/sfc/box.hpp"
+#include "cstone/cuda/cuda_utils.hpp"
 #include "io/ifile_io.hpp"
 #include "sph/particles_data.hpp"
 #include "util/pm_reader.hpp"
@@ -46,6 +47,7 @@ namespace sphexa
 template<class DomainType, class ParticleDataType>
 class Propagator
 {
+    using Acc       = typename ParticleDataType::AcceleratorType;
     using T = typename ParticleDataType::RealType;
 
 public:
@@ -130,6 +132,32 @@ public:
     }
 
 protected:
+
+    template<class VType>
+    using AccVector = std::conditional_t<cstone::HaveGpu<Acc>{}, cstone::DeviceVector<VType>, std::vector<VType>>;
+
+    template<class FieldVariant, class Vector>
+    static void outputField(IFileWriter* writer, size_t first, size_t last, FieldVariant fieldPointer, const std::string& key, int column, Vector& scratch)
+    {
+        if (first >= last) { return; }
+        std::visit(
+            [writer, first, last, key, column, &scratch](auto* fieldPtr)
+            {
+                using ValueType = std::remove_pointer_t<decltype(fieldPtr)>::value_type;
+                auto packedScratch  = util::packAllocBuffer<ValueType>(scratch, std::vector<size_t>{last - first}, 1);
+                if constexpr (IsDeviceVector<Vector>{})
+                {
+                    memcpyD2H(fieldPtr->data() + first, last - first, packedScratch.data()->data());
+                }
+                else
+                {
+                    std::copy(fieldPtr->data() + first, fieldPtr->data() + last, packedScratch.data()->data());
+                }
+                writeField(writer, key, packedScratch.data()->data(), column);
+            },
+            fieldPointer);
+    }
+
     static void outputAllocatedFields(IFileWriter* writer, size_t first, size_t last, ParticleDataType& simData)
     {
         auto output = [](size_t first, size_t last, auto& d, IFileWriter* writer)
@@ -138,6 +166,8 @@ protected:
             auto indicesDone   = d.outputFieldIndices;
             auto namesDone     = d.outputFieldNames;
 
+            AccVector<char> scratch;
+
             for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
             {
                 int fidx = indicesDone[i];
@@ -145,10 +175,7 @@ protected:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    transferToHost(d, first, last, {d.fieldNames[fidx]});
-                    std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
-                    deallocateField(d, fidx);
+                    outputField(writer, first, last, fieldPointers[fidx], namesDone[i], column, scratch);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
