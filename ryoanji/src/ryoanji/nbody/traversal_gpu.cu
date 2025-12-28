@@ -563,6 +563,7 @@ double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restri
     numBlocks            = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
 
     resetTraversalCounters<<<1, 1>>>();
+    if (numBlocks > 0)
     traverseKernel<<<numBlocks, TravConfig::numThreads>>>(grp, initNodeIdx, xt, yt, zt, mt, ht, xs, ys, zs, ms, hs,
                                                           childOffsets, internalToLeaf, layout, sourceCenter,
                                                           multipoles, G, numShells, boxL, p, ax, ay, az, gmPool);
