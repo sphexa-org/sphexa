@@ -132,28 +132,35 @@ public:
     }
 
 protected:
+
     template<class VType>
     using AccVector = std::conditional_t<cstone::HaveGpu<Acc>{}, cstone::DeviceVector<VType>, std::vector<VType>>;
 
-    template<class FieldVariant, class Vector>
+    template<class FieldVariant, class Vector, class HostScratchType>
     static void outputField(IFileWriter* writer, size_t first, size_t last, FieldVariant fieldPointer,
-                            const std::string& key, int column, Vector& scratch)
+                            const std::string& key, int column, Vector& scratch, std::vector<HostScratchType>& hostScratch)
     {
         if (first >= last) { return; }
         std::visit(
-            [writer, first, last, key, column, &scratch](auto* fieldPtr)
+            [writer, first, last, key, column, &scratch, &hostScratch](auto* fieldPtr)
             {
                 using ValueType    = std::remove_pointer_t<decltype(fieldPtr)>::value_type;
-                auto packedScratch = util::packAllocBuffer<ValueType>(scratch, std::vector<size_t>{last - first}, 1);
+                ValueType* hostPtr = nullptr;
                 if constexpr (IsDeviceVector<Vector>{})
                 {
-                    memcpyD2H(fieldPtr->data() + first, last - first, packedScratch.data()->data());
+                    auto hostPackedScratch =
+                        util::packAllocBuffer<ValueType>(hostScratch, std::vector<size_t>{fieldPtr->size()}, 1);
+                    memcpyD2H(fieldPtr->data() + first, last - first, hostPackedScratch.data()->data() + first);
+                    hostPtr = hostPackedScratch.data()->data();
                 }
                 else
                 {
-                    std::copy(fieldPtr->data() + first, fieldPtr->data() + last, packedScratch.data()->data());
+                    auto hostPackedScratch =
+                        util::packAllocBuffer<ValueType>(scratch, std::vector<size_t>{fieldPtr->size()}, 1);
+                    std::copy(fieldPtr->data() + first, fieldPtr->data() + last, hostPackedScratch.data()->data() + first);
+                    hostPtr = hostPackedScratch.data()->data();
                 }
-                writeField(writer, key, packedScratch.data()->data(), column);
+                writeField(writer, key, hostPtr, column);
             },
             fieldPointer);
     }
@@ -167,6 +174,7 @@ protected:
             auto namesDone     = d.outputFieldNames;
 
             AccVector<char> scratch;
+            std::vector<char> hostScratch;
 
             for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
             {
@@ -175,7 +183,7 @@ protected:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    outputField(writer, first, last, fieldPointers[fidx], namesDone[i], column, scratch);
+                    outputField(writer, first, last, fieldPointers[fidx], namesDone[i], column, scratch, hostScratch);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
