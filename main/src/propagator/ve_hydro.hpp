@@ -238,6 +238,7 @@ public:
         auto output = [&]()
         {
             typename Base::AccVector<char> scratch;
+            std::vector<char> hostScratch;
 
             for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
             {
@@ -246,7 +247,7 @@ public:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    Base::outputField(writer, first, last, fieldPointers[fidx], namesDone[i], column, scratch);
+                    Base::outputField(writer, first, last, fieldPointers[fidx], namesDone[i], column, scratch, hostScratch);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
