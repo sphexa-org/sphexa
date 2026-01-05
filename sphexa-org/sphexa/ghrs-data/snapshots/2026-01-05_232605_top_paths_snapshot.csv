@@ -1,0 +1,11 @@
+url_path,views_total,views_unique
+/sphexa-org/sphexa,56,34
+/sphexa-org/sphexa/tree/develop/main,9,4
+/sphexa-org/sphexa/pulls,8,3
+/sphexa-org/sphexa/blob/develop/domain/include/cstone/traversal/find_neighbors.cuh,6,1
+/sphexa-org/sphexa/tree/develop/main/src,5,3
+/sphexa-org/sphexa/blob/develop/main/src/propagator/ipropagator.hpp,5,1
+/sphexa-org/sphexa/pull/559,5,1
+/sphexa-org/sphexa/blob/v0.2/include/DistributedDomain.hpp,4,2
+/sphexa-org/sphexa/tree/develop,4,2
+/sphexa-org/sphexa/tree/develop/sph/include/sph,4,2
