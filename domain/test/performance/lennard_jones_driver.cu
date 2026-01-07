@@ -63,11 +63,15 @@ void benchmarkMain()
 {
     using namespace cstone;
 
-    constexpr unsigned ngmax = 320;
+    T scale3 = 1.0;
+    if (const char* scaleStr = std::getenv("CSTONE_NEIGHBOR_TEST_SCALE")) scale3 = std::atof(scaleStr);
+    const T scale = std::cbrt(scale3);
 
-    constexpr unsigned nx           = 100;
-    constexpr T h                   = 1.75;
-    constexpr float searchExtFactor = 1.9 / h;
+    const unsigned ngmax = 320 * scale3;
+
+    constexpr unsigned nx       = 100;
+    const T h                   = 1.75 * scale;
+    const float searchExtFactor = 1.9 * scale / h;
 
     FaceCenteredCubicCoordinates<Tc, StrongKeyType> coords(nx, nx, nx, {0, 1.6795962 * nx, BoundaryType::open});
 
@@ -93,14 +97,16 @@ void benchmarkMain()
 
     using BaseSuperclusterNb =
         ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<64>;
-    runBenchmark("SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withoutCompression{512});
-    runBenchmark("COMPRESSED SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withCompression{512});
+    const unsigned ncmax = std::clamp((ngmax + 31u) / 32u * 32u, 256u, 2048u);
+    runBenchmark("SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withoutCompression{ncmax});
+    runBenchmark("COMPRESSED SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withCompression{ncmax});
 
     using SymmetricSuperclusterNb = BaseSuperclusterNb::withSymmetry;
-    runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{256});
-    runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{256});
+    const unsigned ncmaxSymmetric = std::clamp((ngmax + 31u) / 32u * 16u, 256u, 2048u);
+    runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{ncmaxSymmetric});
+    runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{ncmaxSymmetric});
 
-    saveCsv(std::format("lennard_jones_results_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), times);
+    saveCsv(std::format("lennard_jones_results_{}_{}_{}.csv", typeid(Tc).name(), typeid(T).name(), scale3), times);
 }
 
 int main()
