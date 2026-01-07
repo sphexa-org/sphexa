@@ -46,15 +46,15 @@ template<class Tc,
          class Interaction,
          class... InputTs,
          class... OutputTs>
-std::vector<double> benchmarkNeighborhood(const Coords& coords,
-                                          const Neighborhood& neighborhood,
-                                          const T hVal,
-                                          const float searchExtFactor,
-                                          unsigned ngmax,
-                                          const Interaction& interaction,
-                                          const std::tuple<InputTs...>& inputValues,
-                                          const std::tuple<OutputTs...>& initialOutputValues,
-                                          bool validate = true)
+std::tuple<std::vector<double>, float> benchmarkNeighborhood(const Coords& coords,
+                                                             const Neighborhood& neighborhood,
+                                                             const T hVal,
+                                                             const float searchExtFactor,
+                                                             unsigned ngmax,
+                                                             const Interaction& interaction,
+                                                             const std::tuple<InputTs...>& inputValues,
+                                                             const std::tuple<OutputTs...>& initialOutputValues,
+                                                             bool validate = true)
 {
     using namespace cstone;
     using KeyType = typename StrongKeyType::ValueType;
@@ -190,9 +190,10 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
     auto buildEnd = Clock::now();
     printf("Neighborhood build time (CPU time): %7.6f s\n",
            std::chrono::duration<double>(buildEnd - buildStart).count());
-    const ijloop::Statistics stats = neighborhoodGPU.stats();
+    const ijloop::Statistics stats  = neighborhoodGPU.stats();
+    const float numBytesPerParticle = static_cast<float>(stats.numBytes / double(stats.numBodies));
     printf("Memory usage of neighborhood data: %.2f MB (%.1f B/particle)\n", stats.numBytes / 1.0e6,
-           stats.numBytes / double(stats.numBodies));
+           numBytesPerParticle);
 
     // prefetch vectors to device memory, required on some AMD hardware/software for reasonable performance
     int device;
@@ -295,5 +296,5 @@ std::vector<double> benchmarkNeighborhood(const Coords& coords,
         if (numFails) printf("TOTAL FAILS: %lu\n", numFails);
     }
 
-    return times;
+    return {times, numBytesPerParticle};
 }

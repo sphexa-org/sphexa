@@ -81,13 +81,16 @@ void benchmarkMain()
         std::numeric_limits<T>::quiet_NaN(), std::numeric_limits<T>::quiet_NaN(), std::numeric_limits<T>::quiet_NaN());
 
     std::map<std::string, std::vector<double>> times;
+    std::map<std::string, std::vector<float>> bytesPerParticle;
 
     const auto runBenchmark = [&](const char* name, auto const& neighborhood)
     {
         printf("--- %s ---\n", name);
-        times[name] =
+        auto [benchmarkTimes, benchmarkBytesPerParticle] =
             benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, searchExtFactor, ngmax, kernelFun,
                                                         inputValues, initialOutputValues, std::is_same_v<T, double>);
+        times[name]            = benchmarkTimes;
+        bytesPerParticle[name] = {benchmarkBytesPerParticle};
         printf("\n");
     };
 
@@ -107,6 +110,8 @@ void benchmarkMain()
     runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{ncmaxSymmetric});
 
     saveCsv(std::format("lennard_jones_results_{}_{}_{}.csv", typeid(Tc).name(), typeid(T).name(), scale3), times);
+    saveCsv(std::format("lennard_jones_bytespp_{}_{}_{}.csv", typeid(Tc).name(), typeid(T).name(), scale3),
+            bytesPerParticle);
 }
 
 int main()
