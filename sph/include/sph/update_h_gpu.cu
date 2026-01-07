@@ -48,9 +48,9 @@ __global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, cons
     LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
     if (i >= grp.groupEnd[warpIdx]) { return; }
 
-    if (h[i] == 0)
+    if (nc[i] <= 1)
     {
-        keys[i] = cstone::removeKey<KeyType>{};
+        keys[i]                 = cstone::removeKey<KeyType>{};
         nc_h_convergenceFailure = true;
     }
     h[i] = updateH(ng0, nc[i], h[i]);
