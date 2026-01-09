@@ -34,50 +34,25 @@
 
 using namespace cstone;
 
-/*! @brief random gaussian coordinate init
- *
- * We're not using the coordinates from coord_samples, because we don't
- * want them sorted in Morton order.
- */
-template<class T>
-void initCoordinates(std::vector<T>& x, std::vector<T>& y, std::vector<T>& z, Box<T>& box, int rank)
-{
-    // std::random_device rd;
-    std::mt19937 gen(rank);
-    // random gaussian distribution at the center
-    std::normal_distribution<T> disX((box.xmax() + box.xmin()) / 2, (box.xmax() - box.xmin()) / 5);
-    std::normal_distribution<T> disY((box.ymax() + box.ymin()) / 2, (box.ymax() - box.ymin()) / 5);
-    std::normal_distribution<T> disZ((box.zmax() + box.zmin()) / 2, (box.zmax() - box.zmin()) / 5);
-
-    auto randX = [cmin = box.xmin(), cmax = box.xmax(), &disX, &gen]()
-    { return std::max(std::min(disX(gen), cmax), cmin); };
-    auto randY = [cmin = box.ymin(), cmax = box.ymax(), &disY, &gen]()
-    { return std::max(std::min(disY(gen), cmax), cmin); };
-    auto randZ = [cmin = box.zmin(), cmax = box.zmax(), &disZ, &gen]()
-    { return std::max(std::min(disZ(gen), cmax), cmin); };
-
-    std::generate(begin(x), end(x), randX);
-    std::generate(begin(y), end(y), randY);
-    std::generate(begin(z), end(z), randZ);
-}
-
 template<class KeyType, class T>
 void randomGaussianAssignment(int rank, int numRanks)
 {
     LocalIndex numParticles = 1000;
     Box<T> box(0, 1);
-    int bucketSize      = 20;
+    int bucketSize      = 60;
     int bucketSizeFocus = 10;
 
-    // Note: NOT sorted in SFC order
+    RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box, 5, rank);
+    coords.adjustH(10, 20);
+    coords.shuffle(); // destroy SFC order
+
     std::vector<KeyType> keys(numParticles);
-    std::vector<T> x(numParticles);
-    std::vector<T> y(numParticles);
-    std::vector<T> z(numParticles);
-    std::vector<T> h(numParticles, 0.0000001);
+    std::vector<T> x = coords.x();
+    std::vector<T> y = coords.y();
+    std::vector<T> z = coords.z();
+    std::vector<T> h = coords.h();
     std::vector<T> m(numParticles, 1.0 / (numParticles * numRanks));
     std::vector<uint8_t> rungs(numParticles, rank);
-    initCoordinates(x, y, z, box, rank);
 
     DeviceVector<KeyType> d_keys;
     reallocate(d_keys, numParticles, 1.0);
@@ -105,20 +80,21 @@ void randomGaussianAssignment(int rank, int numRanks)
     EXPECT_EQ(domainCpu.nParticlesWithHalos(), domainGpu.nParticlesWithHalos());
     EXPECT_EQ(domainCpu.globalTree().numNodes, domainGpu.globalTree().numNodes);
     EXPECT_EQ(d_x.size(), x.size());
+    EXPECT_EQ(std::ranges::count(x, 0.0), 0);
+    EXPECT_EQ(std::ranges::count(y, 0.0), 0);
+    EXPECT_EQ(std::ranges::count(z, 0.0), 0);
 
-    {
-        std::vector<KeyType> dl = toHost(d_keys);
-        EXPECT_TRUE(std::equal(dl.begin(), dl.end(), keys.begin()));
-    }
-    {
-        std::vector<T> dl = toHost(d_x);
-        EXPECT_TRUE(std::equal(dl.begin(), dl.end(), x.begin()));
-    }
-    {
-        std::vector<uint8_t> rung_dl = toHost(d_rungs);
-        EXPECT_TRUE(std::equal(rung_dl.begin() + domainGpu.startIndex(), rung_dl.begin() + domainGpu.endIndex(),
-                               rungs.begin() + domainGpu.startIndex()));
-    }
+    std::vector<KeyType> dkeys = toHost(d_keys);
+    EXPECT_TRUE(std::equal(dkeys.begin(), dkeys.end(), keys.begin()));
+
+    std::vector<T> dx = toHost(d_x), dy = toHost(d_y), dz = toHost(d_z);
+    EXPECT_TRUE(std::equal(dx.begin(), dx.end(), x.begin()));
+    EXPECT_TRUE(std::equal(dy.begin(), dy.end(), y.begin()));
+    EXPECT_TRUE(std::equal(dz.begin(), dz.end(), z.begin()));
+
+    std::vector<uint8_t> rung_dl = toHost(d_rungs);
+    EXPECT_TRUE(std::equal(rung_dl.begin() + domainGpu.startIndex(), rung_dl.begin() + domainGpu.endIndex(),
+                           rungs.begin() + domainGpu.startIndex()));
 }
 
 TEST(DomainGpu, matchTreeCpu)

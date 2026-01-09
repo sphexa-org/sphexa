@@ -33,33 +33,6 @@
 
 using namespace cstone;
 
-/*! @brief random gaussian coordinate init
- *
- * We're not using the coordinates from coord_samples, because we don't
- * want them sorted in Morton order.
- */
-template<class T>
-void initCoordinates(std::vector<T>& x, std::vector<T>& y, std::vector<T>& z, Box<T>& box)
-{
-    // std::random_device rd;
-    std::mt19937 gen(42);
-    // random gaussian distribution at the center
-    std::normal_distribution<T> disX((box.xmax() + box.xmin()) / 2, (box.xmax() - box.xmin()) / 5);
-    std::normal_distribution<T> disY((box.ymax() + box.ymin()) / 2, (box.ymax() - box.ymin()) / 5);
-    std::normal_distribution<T> disZ((box.zmax() + box.zmin()) / 2, (box.zmax() - box.zmin()) / 5);
-
-    auto randX = [cmin = box.xmin(), cmax = box.xmax(), &disX, &gen]()
-    { return std::max(std::min(disX(gen), cmax), cmin); };
-    auto randY = [cmin = box.ymin(), cmax = box.ymax(), &disY, &gen]()
-    { return std::max(std::min(disY(gen), cmax), cmin); };
-    auto randZ = [cmin = box.zmin(), cmax = box.zmax(), &disZ, &gen]()
-    { return std::max(std::min(disZ(gen), cmax), cmin); };
-
-    std::generate(begin(x), end(x), randX);
-    std::generate(begin(y), end(y), randY);
-    std::generate(begin(z), end(z), randZ);
-}
-
 template<class KeyType, class T, class DomainType>
 void randomGaussianDomain(DomainType domain, int rank, int nRanks, bool equalizeH = false)
 {
@@ -67,30 +40,17 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks, bool equalize
     Box<T> box              = domain.box();
 
     // numParticles identical coordinates on each rank
-    // Note: NOT sorted in morton order
-    std::vector<T> xGlobal(numParticles);
-    std::vector<T> yGlobal(numParticles);
-    std::vector<T> zGlobal(numParticles);
-    initCoordinates(xGlobal, yGlobal, zGlobal, box);
-
-    std::vector<T> hGlobal(numParticles, 0.1);
-
-    if (!equalizeH)
-    {
-        for (std::size_t i = 0; i < hGlobal.size(); ++i)
-        {
-            // tuned such that the particles far from the center have a bigger radius to compensate for lower density
-            hGlobal[i] = 0.05 + 0.2 * (xGlobal[i] * xGlobal[i] + yGlobal[i] * yGlobal[i] + zGlobal[i] * zGlobal[i]);
-        }
-    }
+    RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box, 5);
+    coords.adjustH(10, 20);
+    coords.shuffle(); // destroy SFC order
 
     LocalIndex firstExtract = rank * numParticles / nRanks;
     LocalIndex lastExtract  = (rank + 1) * numParticles / nRanks;
 
-    std::vector<T> x{xGlobal.begin() + firstExtract, xGlobal.begin() + lastExtract};
-    std::vector<T> y{yGlobal.begin() + firstExtract, yGlobal.begin() + lastExtract};
-    std::vector<T> z{zGlobal.begin() + firstExtract, zGlobal.begin() + lastExtract};
-    std::vector<T> h{hGlobal.begin() + firstExtract, hGlobal.begin() + lastExtract};
+    std::vector<T> x{coords.x().begin() + firstExtract, coords.x().begin() + lastExtract};
+    std::vector<T> y{coords.y().begin() + firstExtract, coords.y().begin() + lastExtract};
+    std::vector<T> z{coords.z().begin() + firstExtract, coords.z().begin() + lastExtract};
+    std::vector<T> h{coords.h().begin() + firstExtract, coords.h().begin() + lastExtract};
 
     std::vector<KeyType> keys(x.size());
     std::vector<T> s1, s2, s3;
@@ -125,7 +85,7 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks, bool equalize
         // calculate reference neighbor sum from the full arrays
         std::vector<cstone::LocalIndex> neighborsRef(numParticles * ngmax);
         std::vector<unsigned> neighborsCountRef(numParticles);
-        all2allNeighbors(xGlobal.data(), yGlobal.data(), zGlobal.data(), hGlobal.data(), numParticles,
+        all2allNeighbors(coords.x().data(), coords.y().data(), coords.z().data(), coords.h().data(), numParticles,
                          neighborsRef.data(), neighborsCountRef.data(), ngmax, box);
 
         int neighborSumRef = std::accumulate(begin(neighborsCountRef), end(neighborsCountRef), 0);
