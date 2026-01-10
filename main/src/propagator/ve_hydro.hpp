@@ -228,7 +228,7 @@ public:
                     const cstone::Box<T>& box) override
     {
         auto& d             = simData.hydro;
-        auto  fieldPointers = d.data();
+        auto  fieldPointers = dataAcc(d);
         auto  indicesDone   = d.outputFieldIndices;
         auto  namesDone     = d.outputFieldNames;
 
@@ -241,10 +241,13 @@ public:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    transferToHost(d, first, last, {d.fieldNames[fidx]});
-                    std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
-                    deallocateField(d, fidx);
+                    std::visit(
+                        [writer, c = column, key = namesDone[i]](auto field)
+                        {
+                            auto&& tmp = toHost(*field);
+                            writeField(writer, key, tmp.data(), c);
+                        },
+                        fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
