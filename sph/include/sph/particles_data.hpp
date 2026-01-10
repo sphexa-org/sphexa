@@ -408,6 +408,13 @@ private:
     float allocGrowthRate_{1.05};
 };
 
+template<class DataType>
+auto dataAcc(DataType& d)
+{
+    if constexpr (cstone::HaveGpu<typename DataType::AcceleratorType>{}) { return d.devData.data(); }
+    else { return d.data(); }
+}
+
 //! @brief resizes the neighbors list, only used in the CPU version
 template<class Dataset>
 void resizeNeighbors(Dataset& d, size_t size)
