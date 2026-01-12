@@ -80,17 +80,17 @@ void benchmarkMain()
     constexpr auto initialOutputValues = std::tuple(
         std::numeric_limits<T>::quiet_NaN(), std::numeric_limits<T>::quiet_NaN(), std::numeric_limits<T>::quiet_NaN());
 
-    std::map<std::string, std::vector<double>> times;
-    std::map<std::string, std::vector<float>> bytesPerParticle;
+    std::map<std::string, std::vector<float>> times, buildTimes, bytesPerParticle;
 
     const auto runBenchmark = [&](const char* name, auto const& neighborhood)
     {
         printf("--- %s ---\n", name);
-        auto [benchmarkTimes, benchmarkBytesPerParticle] =
+        const auto result =
             benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, searchExtFactor, ngmax, kernelFun,
                                                         inputValues, initialOutputValues, std::is_same_v<T, double>);
-        times[name]            = benchmarkTimes;
-        bytesPerParticle[name] = {benchmarkBytesPerParticle};
+        times[name]            = std::move(result.runTimes);
+        buildTimes[name]       = {result.buildTime};
+        bytesPerParticle[name] = {result.numBytesPerParticle};
         printf("\n");
     };
 
@@ -110,6 +110,8 @@ void benchmarkMain()
     runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{ncmaxSymmetric});
 
     saveCsv(std::format("lennard_jones_results_{}_{}_{}.csv", typeid(Tc).name(), typeid(T).name(), scale3), times);
+    saveCsv(std::format("lennard_jones_buildtime_{}_{}_{}.csv", typeid(Tc).name(), typeid(T).name(), scale3),
+            buildTimes);
     saveCsv(std::format("lennard_jones_bytespp_{}_{}_{}.csv", typeid(Tc).name(), typeid(T).name(), scale3),
             bytesPerParticle);
 }

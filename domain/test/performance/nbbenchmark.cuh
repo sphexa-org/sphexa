@@ -38,6 +38,13 @@
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/tuple_util.hpp"
 
+struct NeighborhoodBenchmarkResults
+{
+    std::vector<float> runTimes;
+    float buildTime;
+    float numBytesPerParticle;
+};
+
 template<class Tc,
          class T,
          class StrongKeyType,
@@ -46,15 +53,15 @@ template<class Tc,
          class Interaction,
          class... InputTs,
          class... OutputTs>
-std::tuple<std::vector<double>, float> benchmarkNeighborhood(const Coords& coords,
-                                                             const Neighborhood& neighborhood,
-                                                             const T hVal,
-                                                             const float searchExtFactor,
-                                                             unsigned ngmax,
-                                                             const Interaction& interaction,
-                                                             const std::tuple<InputTs...>& inputValues,
-                                                             const std::tuple<OutputTs...>& initialOutputValues,
-                                                             bool validate = true)
+NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
+                                                   const Neighborhood& neighborhood,
+                                                   const T hVal,
+                                                   const float searchExtFactor,
+                                                   unsigned ngmax,
+                                                   const Interaction& interaction,
+                                                   const std::tuple<InputTs...>& inputValues,
+                                                   const std::tuple<OutputTs...>& initialOutputValues,
+                                                   bool validate = true)
 {
     using namespace cstone;
     using KeyType = typename StrongKeyType::ValueType;
@@ -187,9 +194,9 @@ std::tuple<std::vector<double>, float> benchmarkNeighborhood(const Coords& coord
     const auto neighborhoodGPU =
         neighborhood.build(dNsView, box, n, dGroupView, rawPtr(dX), rawPtr(dY), rawPtr(dZ), hVal);
     checkGpuErrors(cudaDeviceSynchronize());
-    auto buildEnd = Clock::now();
-    printf("Neighborhood build time (CPU time): %7.6f s\n",
-           std::chrono::duration<double>(buildEnd - buildStart).count());
+    auto buildEnd         = Clock::now();
+    const float buildTime = std::chrono::duration<float>(buildEnd - buildStart).count();
+    printf("Neighborhood build time (CPU time): %7.6f s\n", buildTime);
     const ijloop::Statistics stats  = neighborhoodGPU.stats();
     const float numBytesPerParticle = static_cast<float>(stats.numBytes / double(stats.numBodies));
     printf("Memory usage of neighborhood data: %.2f MB (%.1f B/particle)\n", stats.numBytes / 1.0e6,
@@ -205,7 +212,7 @@ std::tuple<std::vector<double>, float> benchmarkNeighborhood(const Coords& coord
     util::for_each_tuple(prefetchToDevice, dOutputs);
 
     // run the actual interaction kernel and measure time with GPU timers
-    std::vector<double> times(101);
+    std::vector<float> times(101);
     std::vector<cudaEvent_t> events(times.size() + 1);
     for (auto& event : events)
         checkGpuErrors(cudaEventCreate(&event));
@@ -296,5 +303,5 @@ std::tuple<std::vector<double>, float> benchmarkNeighborhood(const Coords& coord
         if (numFails) printf("TOTAL FAILS: %lu\n", numFails);
     }
 
-    return {times, numBytesPerParticle};
+    return {times, buildTime, numBytesPerParticle};
 }

@@ -138,16 +138,16 @@ void benchmarkMain()
     const auto inputValues         = std::tuple(T(1));
     const auto initialOutputValues = std::tuple(std::numeric_limits<T>::quiet_NaN());
 
-    std::map<std::string, std::vector<double>> times;
-    std::map<std::string, std::vector<float>> bytesPerParticle;
+    std::map<std::string, std::vector<float>> times, buildTimes, bytesPerParticle;
 
     const auto runBenchmark = [&](const char* name, auto const& neighborhood)
     {
         printf("--- %s ---\n", name);
-        auto [benchmarkTimes, benchmarkBytesPerParticle] = benchmarkNeighborhood<Tc, T, StrongKeyType>(
-            coords, neighborhood, h, 1, ngmax, kernelFun, inputValues, initialOutputValues);
-        times[name]            = benchmarkTimes;
-        bytesPerParticle[name] = {benchmarkBytesPerParticle};
+        const auto result = benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, 1, ngmax, kernelFun,
+                                                                        inputValues, initialOutputValues);
+        times[name]       = std::move(result.runTimes);
+        buildTimes[name]  = {result.buildTime};
+        bytesPerParticle[name] = {result.numBytesPerParticle};
         printf("\n");
     };
 
@@ -165,6 +165,7 @@ void benchmarkMain()
     runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{512});
 
     saveCsv(std::format("sph_density_results_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), times);
+    saveCsv(std::format("sph_density_buildtime_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), buildTimes);
     saveCsv(std::format("sph_density_bytespp_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), bytesPerParticle);
 }
 
