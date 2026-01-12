@@ -57,16 +57,6 @@ class DeviceParticlesData : public cstone::FieldStates<DeviceParticlesData>
     using Tmass     = sph::SphTypes::Tmass;
 
 public:
-    // number of CUDA streams to use
-    static constexpr int NST = 2;
-
-    struct neighbors_stream
-    {
-        cudaStream_t stream;
-    };
-
-    neighbors_stream d_stream[NST];
-
     /*! @brief Particle fields
      *
      * The length of these arrays equals the local number of particles including halos
@@ -201,27 +191,11 @@ public:
         return {size(), sumOfSize, sumOfCap, free, total};
     }
 
-    DeviceParticlesData()
-    {
-        for (int i = 0; i < NST; ++i)
-        {
-            checkGpuErrors(cudaStreamCreate(&d_stream[i].stream));
-        }
-    }
-
     void uploadTables(const std::array<HydroType, ::sph::lt::kTableSize>& whTable,
                       const std::array<HydroType, ::sph::lt::kTableSize>& whdTable)
     {
         wh  = DevVector<HydroType>(whTable.begin(), whTable.end());
         whd = DevVector<HydroType>(whdTable.begin(), whdTable.end());
-    }
-
-    ~DeviceParticlesData()
-    {
-        for (int i = 0; i < NST; ++i)
-        {
-            checkGpuErrors(cudaStreamDestroy(d_stream[i].stream));
-        }
     }
 };
 
