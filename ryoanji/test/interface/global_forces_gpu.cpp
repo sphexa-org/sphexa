@@ -38,16 +38,16 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     float            theta           = 0.5;
     T                G               = 1.0;
 
-    cstone::Box<T> box{-1, 1};
+    // Fixed boundary to prevent the domain from computing a tightly fitting box, because domain.sync would then
+    // change the relative SFC order of the local particles w.r.t to the global reference set.
+    cstone::Box<T> box(-1, 1, cstone::BoundaryType::fixed);
     // setting numShells to non-zero won't match the direct sum reference because it only includes the replica shells,
     // but not the Ewald corrections, whereas the Barnes-Hut implementation contains both
     int numShells = 0;
 
     // common pool of coordinates, identical on all ranks
     cstone::RandomGaussianCoordinates<T, cstone::SfcKind<KeyType>> coords(numParticles, box);
-
-    std::vector<T> globalH(numParticles, 0.1);
-    adjustSmoothingLength<KeyType>(globalH.size(), 5, 10, coords.x(), coords.y(), coords.z(), globalH, box);
+    coords.adjustH(5, 10);
 
     std::vector<T> globalMasses(numParticles, 1.0 / numParticles);
 
@@ -59,7 +59,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     std::vector<T>       x(coords.x().begin() + firstIndex, coords.x().begin() + lastIndex);
     std::vector<T>       y(coords.y().begin() + firstIndex, coords.y().begin() + lastIndex);
     std::vector<T>       z(coords.z().begin() + firstIndex, coords.z().begin() + lastIndex);
-    std::vector<T>       h(globalH.begin() + firstIndex, globalH.begin() + lastIndex);
+    std::vector<T>       h(coords.h().begin() + firstIndex, coords.h().begin() + lastIndex);
     std::vector<T>       m(globalMasses.begin() + firstIndex, globalMasses.begin() + lastIndex);
     std::vector<KeyType> h_keys(x.size());
 
@@ -132,7 +132,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
 
         cstone::DeviceVector<T> d_xref = coords.x(), d_yref = coords.y(), d_zref = coords.z();
         cstone::DeviceVector<T> d_mref = globalMasses;
-        cstone::DeviceVector<T> d_href = globalH;
+        cstone::DeviceVector<T> d_href = coords.h();
 
         cstone::DeviceVector<T> d_potref(numParticles, 0);
         cstone::DeviceVector<T> d_axref(numParticles, 0), d_ayref(numParticles, 0), d_azref(numParticles, 0);

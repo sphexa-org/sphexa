@@ -141,31 +141,6 @@ public:
     {
     }
 
-    void sfcSort(int hOffset = 10)
-    {
-        std::size_t n = x_.size();
-        auto keyData  = (KeyType*)(codes_.data());
-        computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_);
-
-        std::vector<LocalIndex> sfcOrder(n);
-        std::iota(begin(sfcOrder), end(sfcOrder), LocalIndex(0));
-        sort_by_key(begin(codes_), end(codes_), begin(sfcOrder));
-
-        std::vector<T> temp(x_.size());
-        gatherArrays(sfcOrder, 0, std::tie(x_, y_, z_), std::tie(temp));
-
-        for (std::size_t i = 0; i < n; ++i)
-        {
-            std::size_t j = i > hOffset ? i - hOffset : std::min(n, i + hOffset);
-
-            Vec3<T> pi{x_[i], y_[i], z_[i]};
-            Vec3<T> pj{x_[j], y_[j], z_[j]};
-
-            h_[i] = 0.5001 * std::sqrt(norm2(pi - pj));
-        }
-        isSfcOrdered_ = true;
-    }
-
     void adjustH(unsigned ng0, unsigned ngmax)
     {
         if (not isSfcOrdered_) throw std::runtime_error("adjustH can only be called with SFC ordered particles\n");
@@ -192,6 +167,37 @@ public:
     const std::vector<Integer>& particleKeys() const { return codes_; }
 
 protected:
+    void sfcSort()
+    {
+        std::size_t n = x_.size();
+        auto keyData  = (KeyType*)(codes_.data());
+        computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_);
+
+        std::vector<LocalIndex> sfcOrder(n);
+        std::iota(begin(sfcOrder), end(sfcOrder), LocalIndex(0));
+        sort_by_key(begin(codes_), end(codes_), begin(sfcOrder));
+
+        std::vector<T> temp(x_.size());
+        gatherArrays(sfcOrder, 0, std::tie(x_, y_, z_, h_), std::tie(temp));
+        isSfcOrdered_ = true;
+    }
+
+    void estimateH(std::size_t hOffset)
+    {
+        if (not isSfcOrdered_) throw std::runtime_error("estimateH can only be called with SFC ordered particles\n");
+        std::size_t n = x_.size();
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            std::size_t j = i > hOffset ? i - hOffset : std::min(n, i + hOffset);
+
+            Vec3<T> pi{x_[i], y_[i], z_[i]};
+            Vec3<T> pj{x_[j], y_[j], z_[j]};
+
+            // avoid exact 0.5, because this will lead to lots of borderline particle pairs with dist == searchRadius
+            h_[i] = 0.5001 * std::sqrt(norm2(pi - pj));
+        }
+    }
+
     bool isSfcOrdered_{false};
     Box<T> box_;
     std::vector<T> x_, y_, z_, h_;
@@ -204,7 +210,7 @@ class RandomCoordinates : public RandomCoordinatesBase<T, KeyType_>
 public:
     using Base = RandomCoordinatesBase<T, KeyType_>;
 
-    RandomCoordinates(size_t n, Box<T> box, int hOffset = 5, int seed = 42)
+    RandomCoordinates(std::size_t n, Box<T> box, std::size_t hOffset = 5, int seed = 42)
         : Base(n, box)
     {
         std::mt19937 gen(seed);
@@ -217,10 +223,11 @@ public:
         auto randZ = [&disZ, &gen]() { return disZ(gen); };
 
         std::ranges::generate(Base::x_, randX);
-        std::ranges::generate(Base::y_, randX);
-        std::ranges::generate(Base::z_, randX);
+        std::ranges::generate(Base::y_, randY);
+        std::ranges::generate(Base::z_, randZ);
 
-        Base::sfcSort(hOffset);
+        Base::sfcSort();
+        Base::estimateH(hOffset);
     }
 };
 
@@ -230,7 +237,7 @@ class RandomGaussianCoordinates : public RandomCoordinatesBase<T, KeyType_>
 public:
     using Base = RandomCoordinatesBase<T, KeyType_>;
 
-    RandomGaussianCoordinates(size_t n, Box<T> box, int hOffset = 5, int seed = 42)
+    RandomGaussianCoordinates(std::size_t n, Box<T> box, std::size_t hOffset = 5, int seed = 42)
         : Base(n, box)
     {
         std::mt19937 gen(seed);
@@ -255,7 +262,8 @@ public:
         std::ranges::generate(Base::y_, makeDist(disY, box.ymin(), box.ymax()));
         std::ranges::generate(Base::z_, makeDist(disZ, box.zmin(), box.zmax()));
 
-        Base::sfcSort(hOffset);
+        Base::sfcSort();
+        Base::estimateH(hOffset);
     }
 };
 

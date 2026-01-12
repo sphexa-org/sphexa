@@ -204,10 +204,7 @@ public:
 
             halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), layout_);
 
-            if (fail)
-            {
-                if (myRank_ == 0) { std::cout << "LET refine, mode=" << fail << std::endl; }
-            }
+            if (fail && myRank_ == 0) { std::cout << "LET refine, mode=" << fail << std::endl; }
         } while (fail && maxRep--);
 
         updateLayout(sorter, keyView, particleKeys, std::tie(x, y, z, h), particleProperties, scratch);
@@ -274,10 +271,7 @@ public:
 
             halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), layout_);
 
-            if (fail)
-            {
-                if (myRank_ == 0) { std::cout << "LET refine, mode=" << fail << std::endl; }
-            }
+            if (fail && myRank_ == 0) { std::cout << "LET refine, mode=" << fail << std::endl; }
         } while (fail && maxRep--);
 
         // diagnostics(keyView.size());
