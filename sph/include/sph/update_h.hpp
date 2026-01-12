@@ -20,7 +20,7 @@ bool updateSmoothingLengthCpu(size_t startIndex, size_t endIndex, unsigned ng0, 
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; i++)
     {
-        if (h[i] == 0)
+        if (nc[i] <= 1)
         {
             keys[i]     = cstone::removeKey<KeyType>{};
             keysRemoved = true;
@@ -80,11 +80,7 @@ void updateSmoothingLengthIterativeCpu(const Tc* x, const Tc* y, const Tc* z, T*
 
             nc[id] = ncSph;
 
-            if (iteration == maxIteration && (ngmin > ncSph || (ncSph - 1) > ngmax))
-            {
-                h[i]  = T(0);
-                nc[i] = 1;
-            }
+            if (iteration == maxIteration && (ngmin > ncSph || (ncSph - 1) > ngmax)) { nc[i] = 1; }
         }
     }
 }

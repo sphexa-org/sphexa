@@ -179,6 +179,11 @@ struct MomentumAndEnergyPostamble
         a_visc_energy                                                                = stl::max(T(0), a_visc_energy);
         T eCoeff                                                                     = UseTdpdTrho ? tdpdTrhoi : prhoi;
         T dui = K * (eCoeff * energy + T(0.5) * a_visc_energy); // factor of 2 already removed from 2P/rho
+        if (nci <= 1)
+        {
+            dui        = 0;
+            momentum_x = momentum_y = momentum_z = 0;
+        }
 
         // grad_P_xyz is stored as the acceleration,s accel = -grad_P / rho
         return std::make_tuple(Tc(dui), T(-K * momentum_x), T(-K * momentum_y), T(-K * momentum_z), maxvsignal);
