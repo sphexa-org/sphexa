@@ -124,7 +124,7 @@ public:
             << domain.focusTree().depth();
         if constexpr (cstone::HaveGpu<typename ParticleDataType::AcceleratorType>{})
         {
-            out << ", maxStackNc " << d.devData.stackUsedNc << ", maxStackGravity " << d.devData.stackUsedGravity;
+            out << ", maxStackNc " << d.stackUsedNc << ", maxStackGravity " << d.stackUsedGravity;
         }
         out << "\n=== Total time for iteration(" << d.iteration << ") " << timer.sumOfSteps() << "s\n\n";
     }
@@ -185,7 +185,7 @@ protected:
         using AccType = ParticleDataType::AcceleratorType;
         if constexpr (cstone::HaveGpu<AccType>{})
         {
-            auto devMem = simData.hydro.devData.memStats();
+            auto devMem = simData.hydro.memStats();
             timer.logStatistics("devMemSizeBytes", devMem[1]);
             timer.logStatistics("devCapSizeBytes", devMem[2]);
             timer.logStatistics("devFreeSizeBytes", devMem[3]);

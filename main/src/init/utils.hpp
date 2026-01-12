@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "cstone/primitives/gather.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/sfc.hpp"
 #include "io/ifile_io.hpp"
 #include "init/settings.hpp"
@@ -122,6 +123,7 @@ void readFileAttributes(InitSettings& settings, const std::string& settingsFile,
 }
 
 //! @brief generate particle IDs at the beginning of the simulation initialization
+template<bool gpu>
 void generateParticleIDs(std::span<uint64_t> id)
 {
     int rank = 0, numRanks = 0;
@@ -137,7 +139,7 @@ void generateParticleIDs(std::span<uint64_t> id)
 
     std::exclusive_scan(ranksLocalParticles.begin(), ranksLocalParticles.end(), ranksLocalParticles.begin(),
                         uint64_t(0));
-    std::iota(id.begin(), id.end(), ranksLocalParticles[rank]);
+    cstone::sequenceAcc<gpu>(id.data(), id.data() + id.size(), ranksLocalParticles[rank]);
 }
 
 //! @brief Used to read the default values of dataset attributes

@@ -90,6 +90,14 @@ public:
         [[maybe_unused]] std::initializer_list<int> list{(acquireOne(data_, fields), 0)...};
     }
 
+    template<class Fields>
+    int showState(const Fields& field)
+    {
+        size_t fieldIdx =
+            std::find(DataType::fieldNames.begin(), DataType::fieldNames.end(), field) - DataType::fieldNames.begin();
+        return static_cast<int>(fieldStates_[fieldIdx]);
+    }
+
 private:
     /*! @brief private constructor to ensure that only class X that is derived from FieldStates<X> can instantiate
      *
@@ -125,7 +133,7 @@ private:
         if (fieldStates_[idx] != State::dependent)
         {
             throw std::runtime_error("The following field could not be released due to wrong state: " +
-                                     std::string(DataType::fieldNames[idx]));
+                                     std::string(DataType::fieldNames[idx]) + " (" + std::to_string(static_cast<int>(fieldStates_[idx])) + ")");
         }
 
         fieldStates_[idx] = State::released;

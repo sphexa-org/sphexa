@@ -39,12 +39,13 @@ struct HaveGpu : public std::integral_constant<int, std::is_same_v<AccType, GpuT
 {
 };
 
-template<bool useGpu, class T>
-void fill(T* first, T* last, T value)
+template<bool useGpu, class Iterator, class T2>
+void fill(Iterator first, Iterator last, T2 value)
 {
+    using T1 = decltype(*first);
     if (last <= first) { return; }
 
-    if constexpr (useGpu) { fillGpu(first, last, value); }
+    if constexpr (useGpu) { fillGpu(first, last, T1(value)); }
     else { std::fill(first, last, value); }
 }
 
@@ -89,11 +90,19 @@ void sortByKeyGpu(
     reallocate(valueBuf, s2, 1.0);
 }
 
+template<bool useGpu, class T1, class T2>
+void sequenceAcc(T1* first, T1* last, T2 value)
+{
+    if constexpr (useGpu) { sequenceGpu(first, last - first, T1(value)); }
+    else { std::iota(first, last, value); }
+}
+
 template<bool useGpu, class BufferType>
 void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate)
 {
     reallocateBytes(buffer, sizeof(LocalIndex) * (first + n), growthRate);
     auto* seq = reinterpret_cast<LocalIndex*>(buffer.data());
+    // Todo use sequenceAcc from here
     if constexpr (useGpu) { sequenceGpu(seq + first, n, first); }
     else { std::iota(seq + first, seq + first + n, first); }
 }

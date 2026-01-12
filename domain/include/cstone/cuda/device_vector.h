@@ -49,6 +49,12 @@ public:
     T* data();
     const T* data() const;
 
+    T* begin();
+    const T* cbegin() const;
+
+    T* end();
+    const T* cend() const;
+
     void resize(std::size_t size);
 
     void reserve(std::size_t size);

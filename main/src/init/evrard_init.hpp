@@ -33,6 +33,7 @@
 
 #include <map>
 
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/box.hpp"
 #include "cstone/tree/continuum.hpp"
 #include "sph/eos.hpp"
@@ -54,29 +55,30 @@ std::map<std::string, double> evrardConstants()
 template<class Dataset>
 void initEvrardFields(Dataset& d, const std::map<std::string, double>& constants)
 {
+    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
     using T = typename Dataset::RealType;
 
     double mPart = constants.at("mTotal") / d.numParticlesGlobal;
 
-    std::fill(d.m.begin(), d.m.end(), mPart);
-    std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
-    std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
+    cstone::fill<gpu>(d.m.begin(), d.m.end(), mPart);
+    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
+    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
+    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
 
-    std::fill(d.vx.begin(), d.vx.end(), 0.0);
-    std::fill(d.vy.begin(), d.vy.end(), 0.0);
-    std::fill(d.vz.begin(), d.vz.end(), 0.0);
+    cstone::fill<gpu>(d.vx.begin(), d.vx.end(), 0.0);
+    cstone::fill<gpu>(d.vy.begin(), d.vy.end(), 0.0);
+    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
 
-    std::fill(d.x_m1.begin(), d.x_m1.end(), 0.0);
-    std::fill(d.y_m1.begin(), d.y_m1.end(), 0.0);
-    std::fill(d.z_m1.begin(), d.z_m1.end(), 0.0);
+    cstone::fill<gpu>(d.x_m1.begin(), d.x_m1.end(), 0.0);
+    cstone::fill<gpu>(d.y_m1.begin(), d.y_m1.end(), 0.0);
+    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
 
-    generateParticleIDs(d.id);
+    generateParticleIDs<gpu>(d.id);
 
     auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
     auto temp0 = constants.at("u0") / cv;
-    std::fill(d.temp.begin(), d.temp.end(), temp0);
-    std::fill(d.u.begin(), d.u.end(), constants.at("u0"));
+    cstone::fill<gpu>(d.temp.begin(), d.temp.end(), temp0);
+    cstone::fill<gpu>(d.u.begin(), d.u.end(), constants.at("u0"));
 
     T totalVolume = 4 * M_PI / 3 * std::pow(constants.at("r"), 3);
     // before the contraction with sqrt(r), the sphere has a constant particle concentration of Ntot / Vtot
@@ -84,13 +86,22 @@ void initEvrardFields(Dataset& d, const std::map<std::string, double>& constants
     // c(r) = 2/3 * 1/r * Ntot / Vtot
     T c0 = 2. / 3. * d.numParticlesGlobal / totalVolume;
 
+    auto x = toHost(d.x);
+    auto y = toHost(d.y);
+    auto z = toHost(d.z);
+    auto h = toHost(d.h);
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
-        T radius        = std::sqrt((d.x[i] * d.x[i]) + (d.y[i] * d.y[i]) + (d.z[i] * d.z[i]));
+        T radius        = std::sqrt(x[i] * x[i] + y[i] * y[i] + z[i] * z[i]);
         T concentration = c0 / radius;
-        d.h[i]          = std::cbrt(3 / (4 * M_PI) * d.ng0 / concentration) * 0.5;
+        h[i]            = std::cbrt(3 / (4 * M_PI) * d.ng0 / concentration) * 0.5;
     }
+
+    d.x = std::move(x);
+    d.y = std::move(y);
+    d.z = std::move(z);
+    d.h = std::move(h);
 }
 
 template<class Vector>
@@ -166,22 +177,24 @@ public:
 
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
 
-        auto t0 = std::chrono::high_resolution_clock::now();
-        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
-        cutSphere(r, d.x, d.y, d.z);
+        std::vector<T> x, y, z;
+        auto           t0 = std::chrono::high_resolution_clock::now();
+        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, x, y, z);
+        cutSphere(r, x, y, z);
         auto t1 = std::chrono::high_resolution_clock::now();
         if (rank == 0) std::cout << "assembly " << std::chrono::duration<float>(t1 - t0).count() << std::endl;
 
-        size_t numParticlesGlobal = d.x.size();
+        size_t numParticlesGlobal = x.size();
         MPI_Allreduce(MPI_IN_PLACE, &numParticlesGlobal, 1, MpiType<size_t>{}, MPI_SUM, simData.comm);
 
-        contractRhoProfile(d.x, d.y, d.z);
+        contractRhoProfile(x, y, z);
 
         t0 = std::chrono::high_resolution_clock::now();
-        transferToDevice(d, 0, d.x.size(), {"x", "y", "z"});
-        syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, get<"x">(d), get<"y">(d), get<"z">(d), globalBox);
-        syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, get<"x">(d), get<"y">(d), get<"z">(d), globalBox);
-        transferToHost(d, 0, get<"x">(d).size(), {"x", "y", "z"});
+        d.x = x; // uploads to GPU if active
+        d.y = y;
+        d.z = z;
+        syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, d.x, d.y, d.z, globalBox);
+        syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, d.x, d.y, d.z, globalBox);
         t1 = std::chrono::high_resolution_clock::now();
         if (rank == 0) std::cout << "earlySync " << std::chrono::duration<float>(t1 - t0).count() << std::endl;
 
