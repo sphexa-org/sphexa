@@ -123,10 +123,10 @@ public:
         std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
         std::apply([&simData](auto... f) { simData.chem.setConserved(f.value...); }, make_tuple(CoolingFields{}));
 
-        d.devData.setConserved("x", "y", "z", "h", "m");
-        d.devData.setDependent("keys");
-        std::apply([&d](auto... f) { d.devData.setConserved(f.value...); }, make_tuple(ConservedFields{}));
-        std::apply([&d](auto... f) { d.devData.setDependent(f.value...); }, make_tuple(DependentFields{}));
+        d.setConserved("x", "y", "z", "h", "m");
+        d.setDependent("keys");
+        std::apply([&d](auto... f) { d.setConserved(f.value...); }, make_tuple(ConservedFields{}));
+        std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
     }
 
     void sync(DomainType& domain, DataType& simData) override

@@ -89,20 +89,20 @@ iadDivvCurlvGpu(Tc K, unsigned ngmax, const cstone::Box<Tc> box, const LocalInde
 template<class Dataset>
 void computeIadDivvCurlv(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
 
-    bool  doGradV = d.devData.x.size() == d.devData.dV11.size();
-    auto* d_curlv = (d.devData.x.size() == d.devData.curlv.size()) ? rawPtr(d.devData.curlv) : nullptr;
+    bool  doGradV = d.x.size() == d.dV11.size();
+    auto* d_curlv = (d.x.size() == d.curlv.size()) ? rawPtr(d.curlv) : nullptr;
 
     iadDivvCurlvGpu<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x),
-        rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
-        rawPtr(d.devData.h), rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.xm), rawPtr(d.devData.kx),
-        rawPtr(d.devData.c11), rawPtr(d.devData.c12), rawPtr(d.devData.c13), rawPtr(d.devData.c22),
-        rawPtr(d.devData.c23), rawPtr(d.devData.c33), rawPtr(d.devData.divv), d_curlv, rawPtr(d.devData.dV11),
-        rawPtr(d.devData.dV12), rawPtr(d.devData.dV13), rawPtr(d.devData.dV22), rawPtr(d.devData.dV23),
-        rawPtr(d.devData.dV33), nidxPool, traversalPool, doGradV);
+        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.x),
+        rawPtr(d.y), rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz),
+        rawPtr(d.h), rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.xm), rawPtr(d.kx),
+        rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22),
+        rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.divv), d_curlv, rawPtr(d.dV11),
+        rawPtr(d.dV12), rawPtr(d.dV13), rawPtr(d.dV22), rawPtr(d.dV23),
+        rawPtr(d.dV33), nidxPool, traversalPool, doGradV);
     checkGpuErrors(cudaDeviceSynchronize());
 }
 

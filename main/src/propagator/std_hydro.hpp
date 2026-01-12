@@ -98,11 +98,6 @@ public:
         d.setDependent("keys");
         std::apply([&d](auto... f) { d.setConserved(f.value...); }, make_tuple(ConservedFields{}));
         std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
-
-        d.devData.setConserved("x", "y", "z", "h", "m");
-        d.devData.setDependent("keys");
-        std::apply([&d](auto... f) { d.devData.setConserved(f.value...); }, make_tuple(ConservedFields{}));
-        std::apply([&d](auto... f) { d.devData.setDependent(f.value...); }, make_tuple(DependentFields{}));
     }
 
     void sync(DomainType& domain, DataType& simData) override
@@ -131,7 +126,7 @@ public:
         Base::logDomainStats(domain, simData);
 
         auto& d = simData.hydro;
-        d.resizeAcc(domain.nParticlesWithHalos());
+        d.resize(domain.nParticlesWithHalos());
         resizeNeighbors(d, domain.nParticles() * d.ngmax);
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
