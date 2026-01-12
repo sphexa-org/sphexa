@@ -82,10 +82,8 @@ __global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, c
 
         if (ncTrue[0] >= 25 && ncTrue[0] <= ngmax)
         {
-            unsigned ncCapped = stl::min(ncTrue[0], ngmax);
-            T        maxvsignal;
-
-            momentumAndEnergyJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, vx,
+            T maxvsignal;
+            momentumAndEnergyJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncTrue[0], x, y, z, vx,
                                                            vy, vz, h, m, rho, p, c, c11, c12, c13, c22, c23, c33, wh,
                                                            whd, grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal);
 
