@@ -164,7 +164,7 @@ public:
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,
                     const cstone::Box<T>& /*box*/) override
     {
-        Base::outputAllocatedFields(writer, first, last, simData);
+        Base::outputAllocatedFields(writer, simData);
         timer.step("FileOutput");
     }
 };

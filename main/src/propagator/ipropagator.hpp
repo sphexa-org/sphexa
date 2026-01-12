@@ -130,9 +130,9 @@ public:
     }
 
 protected:
-    static void outputAllocatedFields(IFileWriter* writer, size_t first, size_t last, ParticleDataType& simData)
+    static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData)
     {
-        auto output = [](size_t first, size_t last, auto& d, IFileWriter* writer)
+        auto output = [](auto& d, IFileWriter* writer)
         {
             auto fieldPointers = d.data();
             auto indicesDone   = d.outputFieldIndices;
@@ -145,10 +145,13 @@ protected:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    transferToHost(d, first, last, {d.fieldNames[fidx]});
-                    std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
-                    deallocateField(d, fidx);
+                    std::visit(
+                        [writer, c = column, key = namesDone[i]](auto field)
+                        {
+                            auto&& tmp = toHost(*field);
+                            writeField(writer, key, tmp.data(), c);
+                        },
+                        fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
@@ -165,8 +168,8 @@ protected:
             }
         };
 
-        output(first, last, simData.hydro, writer);
-        output(first, last, simData.chem, writer);
+        output(simData.hydro, writer);
+        output(simData.chem, writer);
     }
 
     void logDomainStats(const DomainType& domain, ParticleDataType& simData)

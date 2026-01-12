@@ -73,9 +73,6 @@ public:
     using Tmass     = sph::SphTypes::Tmass;
 
     template<class ValueType>
-    using PinnedVec = std::vector<ValueType, PinnedAlloc_t<AcceleratorType, ValueType>>;
-
-    template<class ValueType>
     using FieldVector = std::vector<ValueType, std::allocator<ValueType>>;
 
     using FieldVariant = std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*,
