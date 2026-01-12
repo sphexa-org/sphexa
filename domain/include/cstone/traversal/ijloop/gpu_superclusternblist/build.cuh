@@ -387,9 +387,6 @@ __device__ __forceinline__ void pruneCandidates(util::SharedMemAllocator& shared
 
     syncWarp();
 
-    constexpr unsigned iClustersPerWarp = Config::iThreads / Config::iSize;
-    const unsigned iClusterOffset       = iClustersPerWarp == 1 ? 0 : threadIdx.x / Config::iSize;
-
     std::uint32_t previousJCluster = std::numeric_limits<std::uint32_t>::max();
     unsigned numJClusters          = 0;
     for (unsigned candidate = 0; candidate < numCandidates; ++candidate)
@@ -410,10 +407,9 @@ __device__ __forceinline__ void pruneCandidates(util::SharedMemAllocator& shared
             const Tc zj                  = z[jClamped];
             const Th hj                  = loadAtIndexIfPtr(h, jClamped);
 
-            for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
+            for (unsigned c = 0; c < Config::iClustersPerSupercluster; ++c)
             {
-                const unsigned ci = c + iClusterOffset;
-                const unsigned si = ci * Config::iSize + threadIdx.x % Config::iSize;
+                const unsigned si = c * Config::iSize + threadIdx.x % Config::iSize;
                 const unsigned i  = iSupercluster * Config::superclusterSize + si;
                 if (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j))
                 {
@@ -546,7 +542,10 @@ collectJClusterCandidates(util::SharedMemAllocator& sharedAllocator,
         }
         bool overlaps;
         if constexpr (UsePbc) { overlaps = norm2(minDistance(iPos, srcCenter, srcSize, box)) < maxRadiusSq; }
-        else { overlaps = norm2(minDistance(iPos, srcCenter, srcSize)) < maxRadiusSq; }
+        else
+        {
+            overlaps = norm2(minDistance(iPos, srcCenter, srcSize)) < maxRadiusSq;
+        }
         return anySync(overlaps);
     };
 
@@ -956,9 +955,6 @@ pruneCandidatesAndComputeMasks(util::SharedMemAllocator& sharedAllocator,
 
     syncWarp();
 
-    constexpr unsigned iClustersPerWarp = Config::iThreads / Config::iSize;
-    const unsigned iClusterOffset       = iClustersPerWarp == 1 ? 0 : threadIdx.x / Config::iSize;
-
     std::uint32_t previousJCluster = std::numeric_limits<std::uint32_t>::max();
     numJClusters                   = 0;
     for (unsigned candidate = 0; candidate < numCandidates; ++candidate)
@@ -980,10 +976,9 @@ pruneCandidatesAndComputeMasks(util::SharedMemAllocator& sharedAllocator,
                 const Tc zj = z[j];
                 const Th hj = loadAtIndexIfPtr(h, j);
 
-                for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
+                for (unsigned c = 0; c < Config::iClustersPerSupercluster; ++c)
                 {
-                    const unsigned ci = c + iClusterOffset;
-                    const unsigned si = ci * Config::iSize + threadIdx.x % Config::iSize;
+                    const unsigned si = c * Config::iSize + threadIdx.x % Config::iSize;
                     const unsigned i  = iSupercluster * Config::superclusterSize + si;
                     if (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j))
                     {
@@ -1007,7 +1002,7 @@ pruneCandidatesAndComputeMasks(util::SharedMemAllocator& sharedAllocator,
                         const Th distSq             = xij * xij + yij * yij + zij * zij;
                         const Th hMax               = (Config::symmetric ? std::max(hi, hj) : hi) * searchExtFactor;
                         const bool overlaps         = distSq < Th(4) * hMax * hMax;
-                        const unsigned maskBitIndex = w * Config::iClustersPerSupercluster + ci;
+                        const unsigned maskBitIndex = w * Config::iClustersPerSupercluster + c;
                         assert(maskBitIndex < 32);
                         mask |= std::uint32_t(overlaps) << maskBitIndex;
                     }
@@ -1176,8 +1171,8 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
     GlobalBuildData* __restrict__ globalBuildData)
 {
     const unsigned laneIdx = laneIndex();
-    assert(blockDim.x == Config::iThreads);
-    assert(blockDim.y == GpuConfig::warpSize / Config::iThreads);
+    assert(blockDim.x == Config::iSize);
+    assert(blockDim.y == GpuConfig::warpSize / Config::iSize);
     assert(blockDim.z == NumSuperclustersPerBlock);
 
     using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
@@ -1258,9 +1253,8 @@ std::size_t buildNbList(const OctreeNsView<Tc, KeyType>& tree,
 {
     auto globalBuildData = util::deviceAlloc<GlobalBuildData>();
 
-    constexpr unsigned numSuperclustersPerBlock =
-        64 / (Config::iThreads * Config::jSize / Config::numWarpsPerInteraction);
-    const dim3 blockSize = {Config::iThreads, Config::jSize / Config::numWarpsPerInteraction, numSuperclustersPerBlock};
+    constexpr unsigned numSuperclustersPerBlock = 64 / (Config::iSize * Config::jSize / Config::numWarpsPerInteraction);
+    const dim3 blockSize = {Config::iSize, Config::jSize / Config::numWarpsPerInteraction, numSuperclustersPerBlock};
     const unsigned numBlocks = std::min(GpuConfig::smCount * (TravConfig::numWarpsPerSm / numSuperclustersPerBlock),
                                         (numISuperclusters + numSuperclustersPerBlock - 1) / numSuperclustersPerBlock);
     const unsigned sharedMem = numSuperclustersPerBlock * buildNbListSharedMemPerSupercluster<Config, Tc, ThP>(ncmax);

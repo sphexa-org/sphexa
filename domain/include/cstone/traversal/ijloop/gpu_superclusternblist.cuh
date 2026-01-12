@@ -208,6 +208,7 @@ struct GpuSuperclusterNbListNeighborhoodConfig
     static_assert((JSize & (JSize - 1)) == 0, "JSize must be power of two");
     static_assert(SuperclusterSize % ISize == 0, "SuperclusterSize must be divisible by ISize");
     static_assert(SuperclusterSize % JSize == 0, "SuperclusterSize must be divisible by JSize");
+    static_assert(ISize * JSize >= GpuConfig::warpSize, "ISize * JSize must be at least warpSize");
 
     static constexpr unsigned iSize            = ISize;
     static constexpr unsigned jSize            = JSize;
@@ -216,7 +217,6 @@ struct GpuSuperclusterNbListNeighborhoodConfig
     static constexpr bool symmetric            = Symmetric;
 
     static constexpr unsigned iClustersPerSupercluster = superclusterSize / iSize;
-    static constexpr unsigned iThreads                 = std::max(iSize, GpuConfig::warpSize / jSize);
     static constexpr unsigned numWarpsPerInteraction = (iSize * jSize + GpuConfig::warpSize - 1) / GpuConfig::warpSize;
 
     template<unsigned NewISize, unsigned NewJSize>

@@ -82,23 +82,23 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
                                                Postamble const& postamble,
                                                ParticleData const& iData)
 {
-    assert(blockDim.x == Config::iThreads);
+    assert(blockDim.x == Config::iSize);
 
-    if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < GpuConfig::warpSize / Config::iThreads &&
+    if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < GpuConfig::warpSize / Config::iSize &&
                   std::is_same<Postamble, detail::EmptyPostamble>())
     {
         // fast path: specialized reduction on multiple elements at the same time if all types in the tuple are the same
 
         const T0 res =
-            reduceTuple<GpuConfig::warpSize / Config::iThreads, true>(tuple,
-                                                                      [](auto result, auto const& value)
-                                                                      {
-                                                                          detail::updateResultImpl(result, value);
-                                                                          return result;
-                                                                      });
-        if ((threadIdx.y % (GpuConfig::warpSize / Config::iThreads) <= sizeof...(T)) & store)
+            reduceTuple<GpuConfig::warpSize / Config::iSize, true>(tuple,
+                                                                   [](auto result, auto const& value)
+                                                                   {
+                                                                       detail::updateResultImpl(result, value);
+                                                                       return result;
+                                                                   });
+        if ((threadIdx.y % (GpuConfig::warpSize / Config::iSize) <= sizeof...(T)) & store)
         {
-            auto* ptr = dynamicTupleGet(ptrs, threadIdx.y % (GpuConfig::warpSize / Config::iThreads));
+            auto* ptr = dynamicTupleGet(ptrs, threadIdx.y % (GpuConfig::warpSize / Config::iSize));
             if constexpr (Config::symmetric | (Config::numWarpsPerInteraction > 1))
                 atomicUpdatePtr(&ptr[index], res);
             else
@@ -110,17 +110,20 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
         // "slow" path: standard shuffle-based reduction for each tuple element
 
 #pragma unroll
-        for (unsigned offset = GpuConfig::warpSize / 2; offset >= Config::iThreads; offset /= 2)
+        for (unsigned offset = GpuConfig::warpSize / 2; offset >= Config::iSize; offset /= 2)
             util::for_each_tuple([&](auto& t) { detail::updateResultImpl(t, shflDownSync(t, offset)); }, tuple);
 
-        if ((threadIdx.y % (GpuConfig::warpSize / Config::iThreads) == 0) & store)
+        if ((threadIdx.y % (GpuConfig::warpSize / Config::iSize) == 0) & store)
         {
             if constexpr (Config::symmetric | Config::numWarpsPerInteraction > 1)
             {
                 util::for_each_tuple([index](auto* ptr, auto const& t) { atomicUpdatePtr(&ptr[index], t); }, ptrs,
                                      tuple);
             }
-            else { storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple))); }
+            else
+            {
+                storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple)));
+            }
         }
     }
 }
@@ -137,18 +140,18 @@ template<class Config, class T0, class... T, class... Ps>
 constexpr __device__ __forceinline__ void
 storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const unsigned index, const bool store)
 {
-    assert(blockDim.x == Config::iThreads);
+    assert(blockDim.x == Config::iSize);
 
-    if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < Config::iThreads)
+    if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < Config::iSize)
     {
         // fast path: specialized reduction on multiple elements at the same time if all types in the tuple are the same
 
-        const T0 res = reduceTuple<Config::iThreads, false>(tuple,
-                                                            [](auto result, auto const& value)
-                                                            {
-                                                                detail::updateResultImpl(result, value);
-                                                                return result;
-                                                            });
+        const T0 res = reduceTuple<Config::iSize, false>(tuple,
+                                                         [](auto result, auto const& value)
+                                                         {
+                                                             detail::updateResultImpl(result, value);
+                                                             return result;
+                                                         });
         if ((threadIdx.x <= sizeof...(T)) & store)
         {
             auto* ptr = dynamicTupleGet(ptrs, threadIdx.x);
@@ -160,7 +163,7 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
         // "slow" path: standard shuffle-based reduction for each tuple element
 
 #pragma unroll
-        for (unsigned offset = Config::iThreads / 2; offset >= 1; offset /= 2)
+        for (unsigned offset = Config::iSize / 2; offset >= 1; offset /= 2)
             util::for_each_tuple([&](auto& t) { detail::updateResultImpl(t, shflDownSync(t, offset)); }, tuple);
 
         if ((threadIdx.x == 0) & store)
@@ -186,7 +189,10 @@ inline constexpr auto loadParticleDataWithRadiusSq(
         const auto hi = loadAtIndexIfPtr(h, index);
         return std::tuple_cat(std::move(iPos), std::make_tuple(hi, 4 * hi * hi), std::move(iInput));
     }
-    else { return std::tuple_cat(std::move(iPos), std::move(iInput)); }
+    else
+    {
+        return std::tuple_cat(std::move(iPos), std::move(iInput));
+    }
 }
 
 template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
@@ -276,8 +282,8 @@ __device__ __forceinline__ auto loadSuperclusterIParticleData(util::SharedMemAll
 
     const unsigned base = iSupercluster * Config::superclusterSize;
 #pragma unroll
-    for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
-         offset += Config::iThreads * Config::jSize)
+    for (unsigned offset = threadIdx.y * Config::iSize + threadIdx.x; offset < Config::superclusterSize;
+         offset += Config::iSize * Config::jSize)
     {
         const unsigned i = base + offset;
         auto iData       = (i >= firstValidBody & i < totalBodies) ? loadParticleDataWithRadiusSq(x, y, z, h, input, i)
@@ -319,8 +325,7 @@ loadSuperclusterNeighborData(util::SharedMemAllocator& sharedAllocator,
 
     if constexpr (Config::compress)
     {
-        for (unsigned n = threadIdx.y * Config::iThreads + threadIdx.x; n < maskSize;
-             n += Config::iThreads * Config::jSize)
+        for (unsigned n = threadIdx.y * Config::iSize + threadIdx.x; n < maskSize; n += Config::iSize * Config::jSize)
             nbData[n] = neighborData[iSuperclusterDataIndex + n];
         if (warpIndex == 0)
         {
@@ -333,8 +338,7 @@ loadSuperclusterNeighborData(util::SharedMemAllocator& sharedAllocator,
     else
     {
         const unsigned nbDataSize = iSuperclusterNeighborsCount + maskSize;
-        for (unsigned n = threadIdx.y * Config::iThreads + threadIdx.x; n < nbDataSize;
-             n += Config::iThreads * Config::jSize)
+        for (unsigned n = threadIdx.y * Config::iSize + threadIdx.x; n < nbDataSize; n += Config::iSize * Config::jSize)
             nbData[n] = neighborData[iSuperclusterDataIndex + n];
     }
 
@@ -351,7 +355,7 @@ template<class Config,
          class Interaction,
          class Postamble,
          class Mask = void>
-__global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPerBlock) void runIjLoopKernel(
+__global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBlock) void runIjLoopKernel(
     const Box<Tc> __grid_constant__ box,
     const LocalIndex firstValidBody,
     const LocalIndex totalBodies,
@@ -373,16 +377,14 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 {
     assert(ncmax % GpuConfig::warpSize == 0);
     static_assert(NumSuperclustersPerBlock > 0);
-    static_assert(Config::iThreads * Config::jSize >= GpuConfig::warpSize);
-    static_assert(Config::iThreads * Config::jSize % GpuConfig::warpSize == 0);
+    static_assert(Config::iSize * Config::jSize >= GpuConfig::warpSize);
+    static_assert(Config::iSize * Config::jSize % GpuConfig::warpSize == 0);
 
-    assert(blockDim.x == Config::iThreads);
+    assert(blockDim.x == Config::iSize);
     assert(blockDim.y == Config::jSize);
     assert(blockDim.z == NumSuperclustersPerBlock);
 
     using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
-
-    constexpr unsigned iClustersPerWarp = Config::iThreads / Config::iSize;
 
     const unsigned warpIndex =
         Config::numWarpsPerInteraction == 1 ? 0 : threadIdx.y / (Config::jSize / Config::numWarpsPerInteraction);
@@ -410,8 +412,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
 
     __syncthreads();
 
-    std::array<Result, Config::iClustersPerSupercluster / iClustersPerWarp> iResults = {};
-    const unsigned iClusterOffset = iClustersPerWarp == 1 ? 0 : threadIdx.x / Config::iSize;
+    std::array<Result, Config::iClustersPerSupercluster> iResults = {};
 
     for (unsigned nb = 0; nb < iSuperclusterNeighborsCount; ++nb)
     {
@@ -432,9 +433,8 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
             std::get<0>(jData) -= firstValidBody;
             Result jResult = {};
 
-            warpMask >>= iClusterOffset;
 #pragma clang loop unroll(enable)
-            for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
+            for (unsigned c = 0; c < Config::iClustersPerSupercluster; ++c)
             {
                 const unsigned i = iSupercluster * Config::superclusterSize + c * Config::iSize + threadIdx.x;
                 if ((warpMask >> c) & (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j)))
@@ -458,7 +458,7 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
                     if (iClose | jClose)
                     {
                         const auto ijInteraction = interaction(iData, jData, ijPosDiff, distSq);
-                        if (iClose) updateResult(iResults[c / iClustersPerWarp], ijInteraction);
+                        if (iClose) updateResult(iResults[c], ijInteraction);
                         if (jClose)
                         {
                             const auto jiInteraction =
@@ -486,28 +486,28 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
         auto outputBufferPtrs = util::tupleMap([](auto& array) { return array.data(); }, *outputBuffers);
         auto init             = unwrapModifiers(Result{});
 #pragma clang loop unroll(enable)
-        for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
-             offset += Config::iThreads * Config::jSize)
+        for (unsigned offset = threadIdx.y * Config::iSize + threadIdx.x; offset < Config::superclusterSize;
+             offset += Config::iSize * Config::jSize)
             storeParticleData(outputBufferPtrs, offset, init);
 
         __syncthreads();
 
 #pragma clang loop unroll(enable)
-        for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
+        for (unsigned c = 0; c < Config::iClustersPerSupercluster; ++c)
         {
             const unsigned offset = c * Config::iSize + threadIdx.x;
             const unsigned i      = iSupercluster * Config::superclusterSize + offset;
             const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
-            storeTupleISum<Config>(iResults[c / iClustersPerWarp], outputBufferPtrs, c * Config::iSize + threadIdx.x,
-                                   true, detail::EmptyPostamble{}, iData);
+            storeTupleISum<Config>(iResults[c], outputBufferPtrs, c * Config::iSize + threadIdx.x, true,
+                                   detail::EmptyPostamble{}, iData);
         }
 
         __syncthreads();
 
         const unsigned base = iSupercluster * Config::superclusterSize;
 #pragma clang loop unroll(enable)
-        for (unsigned offset = threadIdx.y * Config::iThreads + threadIdx.x; offset < Config::superclusterSize;
-             offset += Config::iThreads * Config::jSize)
+        for (unsigned offset = threadIdx.y * Config::iSize + threadIdx.x; offset < Config::superclusterSize;
+             offset += Config::iSize * Config::jSize)
         {
             const unsigned i  = base + offset;
             const bool active = (activeMask >> offset) & 1;
@@ -522,14 +522,13 @@ __global__ __launch_bounds__(Config::iThreads* Config::jSize* NumSuperclustersPe
     else
     {
 #pragma clang loop unroll(enable)
-        for (unsigned c = 0; c < Config::iClustersPerSupercluster; c += iClustersPerWarp)
+        for (unsigned c = 0; c < Config::iClustersPerSupercluster; ++c)
         {
             const unsigned offset = c * Config::iSize + threadIdx.x;
             const auto i          = iSupercluster * Config::superclusterSize + offset;
             const bool active     = (activeMask >> (c * Config::iSize + threadIdx.x)) & 1;
             const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
-            storeTupleISum<Config>(iResults[c / iClustersPerWarp], output, i, i >= firstBody & i < lastBody & active,
-                                   postamble, iData);
+            storeTupleISum<Config>(iResults[c], output, i, i >= firstBody & i < lastBody & active, postamble, iData);
         }
     }
 }
@@ -561,8 +560,8 @@ void runIjLoop(const Box<Tc>& box,
                const Mask* const activeMasks,
                const unsigned ncmax)
 {
-    constexpr unsigned numSuperclustersPerBlock = 64 / (Config::iThreads * Config::jSize);
-    const dim3 blockSize                        = {Config::iThreads, Config::jSize, numSuperclustersPerBlock};
+    constexpr unsigned numSuperclustersPerBlock = 64 / (Config::iSize * Config::jSize);
+    const dim3 blockSize                        = {Config::iSize, Config::jSize, numSuperclustersPerBlock};
     const unsigned numBlocks                    = iceil(numISuperclusters, numSuperclustersPerBlock);
     const unsigned sharedMem =
         numSuperclustersPerBlock *
