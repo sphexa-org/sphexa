@@ -38,6 +38,7 @@
 
 #include "ipropagator.hpp"
 #include "gravity_wrapper.hpp"
+#include "hydro_flops.hpp"
 
 namespace sphexa
 {
@@ -65,6 +66,7 @@ protected:
 
     MHolder_t      mHolder_;
     GroupData<Acc> groups_;
+    HydroFlopCounter flopCounter_;
 
     /*! @brief the list of conserved particles fields with values preserved between iterations
      *
@@ -142,6 +144,9 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
+        // Initialize and count FLOPs for base hydrodynamics
+        initializeFlopCounting(domain, simData);
+
         fillMassHalos(get<"m">(d), first, last);
 
         findNeighborsSfc(first, last, d, domain.box());
@@ -190,6 +195,18 @@ public:
         computeMomentumEnergy<avClean>(groups_.view(), nullptr, d, domain.box());
         timer.step("MomentumAndEnergy");
         pmReader.step();
+        
+        // Log FLOP statistics using timer.logStatistics
+        // Get stats and calculate total (sum of all operation types)
+        const auto& flopStats = flopCounter_.getStats();
+        
+        // Calculate total FLOPs by summing all operation types
+        uint64_t totalFlops = flopStats.add + flopStats.multiply + flopStats.divide + 
+                              flopStats.sqrt + flopStats.exp + flopStats.cos + 
+                              flopStats.sin + flopStats.pow + flopStats.cbrt;
+        
+        // Log total FLOPs (sum of all operations)
+        timer.logStatistics("hydro_flops_total", static_cast<double>(totalFlops));
 
         if (d.g != 0.0)
         {
@@ -206,6 +223,12 @@ public:
             timer.logStatistics("sumM2P", stats[2] / timer.getLastStepTime());
         }
     }
+    
+    //! @brief Get FLOP counter for external access
+    const HydroFlopCounter& getFlopCounter() const { return flopCounter_; }
+    
+    //! @brief Get total FLOPs
+    uint64_t getTotalFlops() const { return flopCounter_.getTotalFlops(); }
 
     void integrate(DomainType& domain, DataType& simData) override
     {
@@ -223,6 +246,31 @@ public:
         }
         timer.step("UpdateQuantities");
     }
+
+    //! @brief Initialize FLOP counting for base hydrodynamics
+    void initializeFlopCounting(DomainType& domain, DataType& simData)
+    {
+        flopCounter_.reset();
+        auto& d = simData.hydro;
+        size_t numParticles = domain.nParticles();
+        size_t numParticlesWithHalos = domain.nParticlesWithHalos();
+        
+        // Get average neighbor count for SPH FLOP estimation
+        double avgNeighbors = 0.0;
+        if (numParticles > 0 && d.totalNeighbors > 0)
+        {
+            avgNeighbors = static_cast<double>(d.totalNeighbors) / static_cast<double>(d.numParticlesGlobal);
+        }
+        else
+        {
+            // Fallback estimate
+            avgNeighbors = static_cast<double>(d.ng0);
+        }
+        
+        // Count base hydro FLOPs
+        flopCounter_.countBaseHydro(numParticles, avgNeighbors, numParticlesWithHalos);
+    }
+
 
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,
                     const cstone::Box<T>& box) override
