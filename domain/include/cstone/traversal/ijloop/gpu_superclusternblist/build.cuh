@@ -103,50 +103,27 @@ __global__ void computeJClusterBboxesKernel(const LocalIndex firstValidBody,
     const unsigned numJClusters = jClusterIndex<Config>(totalBodies - 1) + 1;
     const unsigned jCluster     = jClusterIndex<Config>(i);
 
-    if constexpr (Config::jSize >= 3)
-    {
-        std::array<Tc, 3> bboxMin{xi, yi, zi};
-        std::array<Tc, 3> bboxMax{xi, yi, zi};
-
-        const Tc vMin = reduceArray<Config::jSize, false>(bboxMin, [](auto a, auto b) { return std::min(a, b); });
-        const Tc vMax = reduceArray<Config::jSize, false>(bboxMax, [](auto a, auto b) { return std::max(a, b); });
-
-        const Tc center = (vMax + vMin) * Tc(0.5);
-        const Tc size   = (vMax - vMin) * Tc(0.5);
-
-        const unsigned idx = laneIdx % Config::jSize;
-        if (idx < 3 & jCluster < numJClusters)
-        {
-            Tc* centerPtr = (Tc*)&bboxes[jCluster].center + idx;
-            Tc* sizePtr   = (Tc*)&bboxes[jCluster].size + idx;
-            *centerPtr    = center;
-            *sizePtr      = size;
-        }
-    }
-    else
-    {
-        Vec3<Tc> bboxMin{xi, yi, zi};
-        Vec3<Tc> bboxMax{xi, yi, zi};
+    Vec3<Tc> bboxMin{xi, yi, zi};
+    Vec3<Tc> bboxMax{xi, yi, zi};
 
 #pragma unroll
-        for (unsigned offset = Config::jSize / 2; offset >= 1; offset /= 2)
-        {
-            bboxMin = {std::min(shflDownSync(bboxMin[0], offset), bboxMin[0]),
-                       std::min(shflDownSync(bboxMin[1], offset), bboxMin[1]),
-                       std::min(shflDownSync(bboxMin[2], offset), bboxMin[2])};
-            bboxMax = {std::max(shflDownSync(bboxMax[0], offset), bboxMax[0]),
-                       std::max(shflDownSync(bboxMax[1], offset), bboxMax[1]),
-                       std::max(shflDownSync(bboxMax[2], offset), bboxMax[2])};
-        }
+    for (unsigned offset = Config::jSize / 2; offset >= 1; offset /= 2)
+    {
+        bboxMin = {std::min(shflDownSync(bboxMin[0], offset), bboxMin[0]),
+                   std::min(shflDownSync(bboxMin[1], offset), bboxMin[1]),
+                   std::min(shflDownSync(bboxMin[2], offset), bboxMin[2])};
+        bboxMax = {std::max(shflDownSync(bboxMax[0], offset), bboxMax[0]),
+                   std::max(shflDownSync(bboxMax[1], offset), bboxMax[1]),
+                   std::max(shflDownSync(bboxMax[2], offset), bboxMax[2])};
+    }
 
-        Vec3<Tc> center = (bboxMax + bboxMin) * Tc(0.5);
-        Vec3<Tc> size   = (bboxMax - bboxMin) * Tc(0.5);
+    Vec3<Tc> center = (bboxMax + bboxMin) * Tc(0.5);
+    Vec3<Tc> size   = (bboxMax - bboxMin) * Tc(0.5);
 
-        if (i % Config::jSize == 0 && jCluster < numJClusters)
-        {
-            bboxes[jCluster].center = center;
-            bboxes[jCluster].size   = size;
-        }
+    if (i % Config::jSize == 0 && jCluster < numJClusters)
+    {
+        bboxes[jCluster].center = center;
+        bboxes[jCluster].size   = size;
     }
 
     if constexpr (Config::symmetric)
