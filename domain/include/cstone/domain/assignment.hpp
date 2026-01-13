@@ -111,12 +111,13 @@ public:
         sequence<gpu>(o1.start, numPart, reorderFunctor.getBuf(), growthRate_);
         sortByKey<gpu>(keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_);
 
-        updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_, d_nodeCounts_, false);
-        if (firstCall_)
+        auto maxCount = updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
+                                                    d_nodeCounts_, false);
+        if (firstCall_ || maxCount >= 8 * bucketSize_)
         {
             firstCall_ = false;
-            while (!updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
-                                                d_nodeCounts_, true))
+            while (updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
+                                               d_nodeCounts_, true) > bucketSize_)
                 ;
         }
 

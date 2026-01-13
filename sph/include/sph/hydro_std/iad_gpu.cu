@@ -101,9 +101,12 @@ __global__ void IADGpuKernel(Tc K, unsigned ngmax, cstone::Box<Tc> box, const Lo
 
         if (i >= bodyEnd) { continue; }
 
-        unsigned ncCapped = stl::min(ncTrue[0], ngmax);
-        sph::IADJLoopSTD<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, h, m, rho, wh,
-                                                 whd, c11, c12, c13, c22, c23, c33);
+        if (ncTrue[0] < 25 || ncTrue[0] > ngmax) { c11[i] = c12[i] = c13[i] = c22[i] = c23[i] = c33[i] = 0.; }
+        else
+        {
+            sph::IADJLoopSTD<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncTrue[0], x, y, z, h, m, rho,
+                                                     wh, whd, c11, c12, c13, c22, c23, c33);
+        }
     }
 }
 

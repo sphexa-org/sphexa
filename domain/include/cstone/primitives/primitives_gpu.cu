@@ -185,6 +185,7 @@ std::tuple<T, T> MinMaxGpu<T>::operator()(const T* first, const T* last)
 
 template class MinMaxGpu<double>;
 template class MinMaxGpu<float>;
+template class MinMaxGpu<unsigned>;
 
 using thrust::get;
 
