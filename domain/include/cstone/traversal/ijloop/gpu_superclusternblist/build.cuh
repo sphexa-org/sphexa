@@ -596,7 +596,7 @@ std::size_t buildNbList(const OctreeNsView<Tc, KeyType>& tree,
 {
     auto globalBuildData = util::deviceAlloc<GlobalBuildData>();
 
-    constexpr unsigned numSuperclustersPerBlock = 4;
+    constexpr unsigned numSuperclustersPerBlock = 2;
     const dim3 blockSize                        = {GpuConfig::warpSize, 1, numSuperclustersPerBlock};
     const unsigned numBlocks = std::min(GpuConfig::smCount * (TravConfig::numWarpsPerSm / numSuperclustersPerBlock),
                                         (numISuperclusters + numSuperclustersPerBlock - 1) / numSuperclustersPerBlock);
