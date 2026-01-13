@@ -345,10 +345,12 @@ using Neighborhoods = ::testing::Types<
     ijloop::CpuFullNbListNeighborhood,
     ijloop::GpuAlwaysTraverseNeighborhood,
     ijloop::GpuFullNbListNeighborhood,
+#ifdef __CUDACC__
     ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 4>::withoutSymmetry::withoutCompression,
     ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 4>::withSymmetry::withoutCompression,
     ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 4>::withoutSymmetry::withCompression,
     ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 4>::withSymmetry::withCompression,
+#endif
     ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withoutSymmetry::withoutCompression,
     ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSymmetry::withoutCompression,
     ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withoutSymmetry::withCompression,
