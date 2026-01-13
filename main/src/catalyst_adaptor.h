@@ -82,7 +82,7 @@ void Execute(DataType& d, long startIndex, long endIndex)
     mesh["coordsets/coords/values/z"].set_external(get<"z">(d).data() + startIndex, endIndex - startIndex);
 
 // #define IMPLICIT_CONNECTIVITY_LIST 1 // the connectivity list is not given, but created by vtkm
-#ifdef  IMPLICIT_CONNECTIVITY_LIST
+#ifdef IMPLICIT_CONNECTIVITY_LIST
     mesh["topologies/mesh/type"] = "points";
 #else
     mesh["topologies/mesh/type"] = "unstructured";
@@ -114,7 +114,7 @@ void Execute(DataType& d, long startIndex, long endIndex)
 
     conduit_cpp::Node verify_info;
     if (!conduit_blueprint_verify("mesh", conduit_cpp::c_node(&mesh), conduit_cpp::c_node(&verify_info)))
-      std::cerr << "ERROR: blueprint verify failed!" + verify_info.to_json() << std::endl;
+        std::cerr << "ERROR: blueprint verify failed!" + verify_info.to_json() << std::endl;
     // else std::cerr << "PASS: blueprint verify passed!"<< std::endl;
       
     catalyst_status err = catalyst_execute(conduit_cpp::c_node(&exec_params));
