@@ -306,12 +306,10 @@ struct GpuSuperclusterNbListNeighborhood
         auto neighborData                         = util::deviceAllocVirtual<std::uint32_t[]>(neighborDataVirtualSize);
 
         // second main data array: storing some data for each supercluster
-        auto superclusterInfo = initSuperclusterInfo(firstISupercluster, numISuperclusters);
+        auto superclusterInfo = util::deviceAlloc<SuperclusterInfo[]>(numISuperclusters);
 
         // temporary data arrays, only used during build
         auto jClusterBboxes = computeJClusterBboxes<Config>(firstValidBody, totalBodies, x, y, z, h);
-        auto superclusterSplitMasks =
-            computeSuperclusterSplitMasks<Config>(firstValidBody, groups, firstISupercluster, numISuperclusters);
 
         using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
         util::UniqueDevicePtr<Th[]> nodeRMax;
@@ -321,13 +319,15 @@ struct GpuSuperclusterNbListNeighborhood
             nodeRMax     = computeNodeRMax<Config>(tree, h + firstValidBody);
             nodeRMaxData = nodeRMax.get();
         }
-        else { nodeRMaxData = h; }
+        else
+        {
+            nodeRMaxData = h;
+        }
 
         // main build with octree traversal
-        std::size_t neighborDataSize =
-            buildNbList<Config>(tree, box, totalBodies, groups, x, y, z, h, firstValidBody, numISuperclusters,
-                                jClusterBboxes.get(), nodeRMaxData, ncmax, superclusterSplitMasks.get(),
-                                neighborData.get(), neighborDataVirtualSize, superclusterInfo.get());
+        std::size_t neighborDataSize = buildNbList<Config>(
+            tree, box, totalBodies, groups, x, y, z, h, firstValidBody, numISuperclusters, jClusterBboxes.get(),
+            nodeRMaxData, ncmax, neighborData.get(), neighborDataVirtualSize, superclusterInfo.get());
 
         // sort supercluster array by descending neighbor count for load balancing (schedule large work packages first)
         thrust::stable_sort(thrust::device, superclusterInfo.get(), superclusterInfo.get() + numISuperclusters);
