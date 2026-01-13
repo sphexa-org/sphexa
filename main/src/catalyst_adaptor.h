@@ -116,7 +116,7 @@ void Execute(DataType& d, long startIndex, long endIndex)
     if (!conduit_blueprint_verify("mesh", conduit_cpp::c_node(&mesh), conduit_cpp::c_node(&verify_info)))
         std::cerr << "ERROR: blueprint verify failed!" + verify_info.to_json() << std::endl;
     // else std::cerr << "PASS: blueprint verify passed!"<< std::endl;
-      
+
     catalyst_status err = catalyst_execute(conduit_cpp::c_node(&exec_params));
     if (err != catalyst_status_ok) { std::cerr << "ERROR: Failed to execute Catalyst: " << err << std::endl; }
 }
