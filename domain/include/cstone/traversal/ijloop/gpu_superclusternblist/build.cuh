@@ -34,8 +34,6 @@
 #include "cstone/traversal/ijloop/upsweep.cuh"
 #include "cstone/tree/octree.hpp"
 
-#define CSTONE_SUPERCLUSTER_STACKLESS_TRAVERSAL 0
-
 namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail
 {
 
