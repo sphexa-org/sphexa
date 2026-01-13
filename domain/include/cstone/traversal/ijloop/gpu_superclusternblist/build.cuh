@@ -283,6 +283,222 @@ __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& shar
     }
 }
 
+template<class Config, class Tc, class ThP>
+__device__ __forceinline__ auto loadSuperclusterParticleData(const LocalIndex firstBody,
+                                                             const LocalIndex lastBody,
+                                                             const Tc* const __restrict__ x,
+                                                             const Tc* const __restrict__ y,
+                                                             const Tc* const __restrict__ z,
+                                                             const ThP h,
+                                                             const float searchExtFactor)
+{
+    constexpr unsigned warpsPerSupercluster = Config::superclusterSize / GpuConfig::warpSize;
+    using Th                                = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
+    const unsigned laneIdx                  = laneIndex();
+
+    std::array<Vec3<Tc>, warpsPerSupercluster> iPos;
+    std::array<Th, warpsPerSupercluster> iRadius;
+
+    for (unsigned w = 0; w < warpsPerSupercluster; ++w)
+    {
+        const unsigned i = std::min(firstBody + w * GpuConfig::warpSize + laneIdx, lastBody - 1);
+        iPos[w]          = {x[i], y[i], z[i]};
+        iRadius[w]       = 2 * loadAtIndexIfPtr(h, i) * searchExtFactor;
+    }
+    return std::make_tuple(iPos, iRadius);
+}
+
+template<class Config, std::size_t WarpsPerSupercluster, class Tc, class Th>
+__device__ __forceinline__ std::tuple<Vec3<Tc>, Vec3<Tc>, Th>
+superclusterBoundingBox(const std::array<Vec3<Tc>, WarpsPerSupercluster>& iPos,
+                        const std::array<Th, WarpsPerSupercluster>& iRadius)
+{
+    Vec3<Tc> bBoxMin = {std::numeric_limits<Tc>::max(), std::numeric_limits<Tc>::max(), std::numeric_limits<Tc>::max()};
+    Vec3<Tc> bBoxMax = {std::numeric_limits<Tc>::lowest(), std::numeric_limits<Tc>::lowest(),
+                        std::numeric_limits<Tc>::lowest()};
+    Th maxParticleRadius = 0;
+    for (unsigned w = 0; w < WarpsPerSupercluster; ++w)
+    {
+        const Tc iBbRadius = Config::symmetric ? 0 : iRadius[w];
+        for (unsigned d = 0; d < 3; ++d)
+        {
+            bBoxMin[d] = std::min(bBoxMin[d], iPos[w][d] - iBbRadius);
+            bBoxMax[d] = std::max(bBoxMax[d], iPos[w][d] + iBbRadius);
+        }
+        maxParticleRadius = std::max(maxParticleRadius, iRadius[w]);
+    }
+
+    for (unsigned d = 0; d < 3; ++d)
+    {
+        bBoxMin[d] = warpMin(bBoxMin[d]);
+        bBoxMax[d] = warpMax(bBoxMax[d]);
+    }
+    maxParticleRadius = warpMax(maxParticleRadius);
+
+    const Vec3<Tc> bBoxCenter = (bBoxMax + bBoxMin) * Tc(0.5);
+    const Vec3<Tc> bBoxSize   = (bBoxMax - bBoxMin) * Tc(0.5);
+
+    return {bBoxCenter, bBoxSize, maxParticleRadius};
+}
+
+/*! traverse the octree to find neighbor clusters for a supercluster
+ *
+ * @param[in]    tree                   octree
+ * @param[in]    box                    domain box
+ * @param[in]    firstValidBody         index of first valid particle
+ * @param[in]    totalBodies            total number of particles
+ * @param[in]    x                      particle x coordinates
+ * @param[in]    y                      particle y coordinates
+ * @param[in]    z                      particle z coordinates
+ * @param[in]    h                      particle smoothing lengths
+ * @param[in]    jClusterBboxes         bounding boxes of j-clusters
+ * @param[in]    nodeRMax               max. particle radii of tree nodes
+ * @param[in]    ncmax                  max. number of neighbor clusters
+ * @param[in]    firstISupercluster     supercluster index offset
+ * @param[in]    lastISupercluster      index of the last supercluster
+ * @param[inout] jClusters              shared memory array for neighbor cluster indices
+ * @param[inout] masks                  shared memory array for interaction bitmasks
+ * @param[inout] globalBuildData        global build status
+ * @param[inout] info                   supercluster info
+ */
+template<class Config, bool UsePbc, class Tc, class ThP, class KeyType>
+__device__ __forceinline__ void
+collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
+                         const Box<Tc>& box,
+                         const LocalIndex firstValidBody,
+                         const LocalIndex totalBodies,
+                         const Tc* const __restrict__ x,
+                         const Tc* const __restrict__ y,
+                         const Tc* const __restrict__ z,
+                         const ThP h,
+                         const JClusterBbox<Config, Tc>* const __restrict__ jClusterBboxes,
+                         const ThP nodeRMax,
+                         const unsigned ncmax,
+                         const unsigned firstISupercluster,
+                         const unsigned lastISupercluster,
+                         std::uint32_t* const jClusters,
+                         std::uint32_t* const masks,
+                         GlobalBuildData* __restrict__ globalBuildData,
+                         SuperclusterInfo& info)
+{
+    constexpr unsigned warpsPerSupercluster = Config::superclusterSize / GpuConfig::warpSize;
+
+    using Th               = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
+    const unsigned laneIdx = laneIndex();
+
+    const unsigned firstBody     = std::max(info.index * Config::superclusterSize, firstValidBody);
+    const unsigned lastBody      = std::min((info.index + 1) * Config::superclusterSize, totalBodies);
+    const unsigned iSupercluster = superclusterIndex<Config>(firstBody);
+
+    const auto [iPos, iRadius] =
+        loadSuperclusterParticleData<Config>(firstBody, lastBody, x, y, z, h, tree.searchExtFactor);
+    const auto [bBoxCenter, bBoxSize, maxParticleRadius] = superclusterBoundingBox<Config>(iPos, iRadius);
+
+    const auto overlapsInternalNode = [&](const TreeNodeIndex idx)
+    {
+        const Vec3<Tc> srcCenter = tree.centers[idx];
+        const Vec3<Tc> srcSize   = tree.sizes[idx];
+        const Th srcRadius       = Config::symmetric ? loadAtIndexIfPtr(nodeRMax, idx) * tree.searchExtFactor : Th(0);
+
+        bool overlaps = false;
+        for (unsigned w = 0; w < warpsPerSupercluster; ++w)
+        {
+            const Th maxRadius = std::max(iRadius[w], srcRadius);
+            const auto distance =
+                UsePbc ? minDistance(iPos[w], srcCenter, srcSize, box) : minDistance(iPos[w], srcCenter, srcSize);
+            overlaps |= norm2(distance) < maxRadius * maxRadius;
+        }
+
+        return bool(anySync(overlaps));
+    };
+
+    const auto overlapsLeafNode = [&](const TreeNodeIndex idx)
+    {
+        const TreeNodeIndex leafIdx    = tree.internalToLeaf[idx];
+        const LocalIndex firstJCluster = jClusterIndex<Config>(tree.layout[leafIdx] + firstValidBody);
+        const LocalIndex lastJCluster  = tree.layout[leafIdx + 1] == tree.layout[leafIdx]
+                                             ? 0
+                                             : jClusterIndex<Config>(tree.layout[leafIdx + 1] + firstValidBody - 1) + 1;
+
+        for (LocalIndex baseJCluster = firstJCluster; baseJCluster < lastJCluster; baseJCluster += GpuConfig::warpSize)
+        {
+            const LocalIndex jCluster = std::min(baseJCluster + laneIdx, lastJCluster - 1);
+            bool bBoxesOverlap        = true;
+            if (info.neighborsCount > 0 && jClusters[info.neighborsCount - 1] == jCluster) bBoxesOverlap = false;
+
+            if constexpr (Config::symmetric)
+            {
+                const LocalIndex jSupercluster = superclusterIndex<Config>(jCluster * Config::jSize);
+                if (bBoxesOverlap)
+                {
+                    bBoxesOverlap &=
+                        includeNbSymmetric(iSupercluster, jSupercluster, firstISupercluster, lastISupercluster);
+                }
+            }
+
+            if (bBoxesOverlap)
+            {
+                auto jClusterBBox = jClusterBboxes[jCluster];
+                if constexpr (Config::symmetric)
+                {
+                    const Tc rMaxBound = std::max(Tc(maxParticleRadius), jClusterBBox.rMax * tree.searchExtFactor);
+                    for (unsigned d = 0; d < 3; ++d)
+                        jClusterBBox.size[d] += rMaxBound;
+                }
+                bBoxesOverlap &= cellOverlap<UsePbc>(jClusterBBox.center, jClusterBBox.size, bBoxCenter, bBoxSize, box);
+            }
+
+            for (unsigned lane = 0; lane < GpuConfig::warpSize; ++lane)
+            {
+                const unsigned jCluster = baseJCluster + lane;
+                if (jCluster >= lastJCluster) break;
+                if (!shflSync(bBoxesOverlap, lane)) continue;
+
+                unsigned warpMask = 0;
+                for (LocalIndex jClusterParticle = 0; jClusterParticle < Config::jSize; ++jClusterParticle)
+                {
+                    const LocalIndex j =
+                        std::clamp(jCluster * Config::jSize + jClusterParticle, firstValidBody, totalBodies - 1);
+                    const Vec3<Tc> jPos = {x[j], y[j], z[j]};
+                    const Th jRadius    = Config::symmetric ? 2 * loadAtIndexIfPtr(h, j) * tree.searchExtFactor : Th(0);
+                    const unsigned warpIndex = jClusterParticle / (Config::jSize / Config::numWarpsPerInteraction);
+
+                    for (unsigned w = 0; w < warpsPerSupercluster; ++w)
+                    {
+                        const unsigned c   = laneIdx / Config::iSize + w * (GpuConfig::warpSize / Config::iSize);
+                        const Th maxRadius = std::max(jRadius, iRadius[w]);
+                        const bool jClusterOverlaps =
+                            distanceSq<UsePbc>(jPos[0], jPos[1], jPos[2], iPos[w][0], iPos[w][1], iPos[w][2], box) <
+                            maxRadius * maxRadius;
+                        warpMask |= unsigned(jClusterOverlaps) << (warpIndex * Config::iClustersPerSupercluster + c);
+                    }
+                }
+                warpMask = warpBitwiseOr(warpMask);
+
+                if (warpMask)
+                {
+                    if (info.neighborsCount >= ncmax)
+                    {
+                        if (laneIdx == 0) globalBuildData->status = BuildStatus::neighbor_list_overflow;
+                        return;
+                    }
+                    if (laneIdx == 0)
+                    {
+                        jClusters[info.neighborsCount] = jCluster;
+                        const unsigned maskStartIndex =
+                            info.neighborsCount * (Config::iClustersPerSupercluster * Config::numWarpsPerInteraction);
+                        const unsigned prevMask    = maskStartIndex % 32 == 0 ? 0 : masks[maskStartIndex / 32];
+                        masks[maskStartIndex / 32] = (warpMask << (maskStartIndex % 32)) | prevMask;
+                    }
+                    ++info.neighborsCount;
+                }
+            }
+        }
+    };
+
+    singleTraversal(tree.childOffsets, tree.parents, overlapsInternalNode, overlapsLeafNode);
+}
+
 /*! compute required shared memory amount
  *
  * @param[in] ncmax maximum number of neighbor clusters
@@ -346,12 +562,12 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
     const unsigned numSuperClusters,
     GlobalBuildData* __restrict__ globalBuildData)
 {
+    static_assert(Config::superclusterSize % GpuConfig::warpSize == 0);
     assert(blockDim.x == GpuConfig::warpSize);
     assert(blockDim.y == 1);
     assert(blockDim.z == NumSuperclustersPerBlock);
 
-    constexpr unsigned warpsPerSupercluster =
-        (Config::superclusterSize + GpuConfig::warpSize - 1) / GpuConfig::warpSize;
+    constexpr unsigned warpsPerSupercluster = Config::superclusterSize / GpuConfig::warpSize;
 
     const unsigned laneIdx = laneIndex();
 
@@ -364,7 +580,6 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
 
     const unsigned firstISupercluster = superclusterIndex<Config>(firstBody);
     const unsigned lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
-    const unsigned numJClusters       = jClusterIndex<Config>(totalBodies - 1) + 1;
 
     while (true)
     {
@@ -375,159 +590,9 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
 
         SuperclusterInfo info = {.index = index + firstISupercluster, .neighborsCount = 0, .dataIndex = 0};
 
-        const unsigned firstBody     = std::max(info.index * Config::superclusterSize, firstValidBody);
-        const unsigned lastBody      = std::min((info.index + 1) * Config::superclusterSize, totalBodies);
-        const unsigned iSupercluster = superclusterIndex<Config>(firstBody);
-
-        std::array<Vec3<Tc>, warpsPerSupercluster> iPos;
-        std::array<Th, warpsPerSupercluster> iRadiusSq;
-        Th iMaxRadius = 0, bBoxRadius = 0;
-        Vec3<Tc> bBoxMin = {std::numeric_limits<Tc>::max(), std::numeric_limits<Tc>::max(),
-                            std::numeric_limits<Tc>::max()};
-        Vec3<Tc> bBoxMax = {std::numeric_limits<Tc>::lowest(), std::numeric_limits<Tc>::lowest(),
-                            std::numeric_limits<Tc>::lowest()};
-
-#pragma unroll
-        for (unsigned w = 0; w < warpsPerSupercluster; ++w)
-        {
-            const unsigned i   = std::min(firstBody + w * GpuConfig::warpSize + laneIdx, lastBody - 1);
-            iPos[w]            = {x[i], y[i], z[i]};
-            const Th iRadius   = 2 * loadAtIndexIfPtr(h, i) * tree.searchExtFactor;
-            iRadiusSq[w]       = iRadius * iRadius;
-            iMaxRadius         = std::max(iMaxRadius, iRadius);
-            const Tc iBbRadius = Config::symmetric ? Tc(0) : iRadius;
-#pragma unroll
-            for (unsigned d = 0; d < 3; ++d)
-            {
-                bBoxMin[d] = std::min(bBoxMin[d], iPos[w][d] - iBbRadius);
-                bBoxMax[d] = std::max(bBoxMax[d], iPos[w][d] + iBbRadius);
-            }
-            bBoxRadius = std::max(bBoxRadius, iRadius);
-        }
-#pragma unroll
-        for (unsigned d = 0; d < 3; ++d)
-        {
-            bBoxMin[d] = warpMin(bBoxMin[d]);
-            bBoxMax[d] = warpMax(bBoxMax[d]);
-        }
-        bBoxRadius = warpMax(bBoxRadius);
-
-        const Vec3<Tc> bBoxCenter = (bBoxMax + bBoxMin) * Tc(0.5);
-        const Vec3<Tc> bBoxSize   = (bBoxMax - bBoxMin) * Tc(0.5);
-
-        const auto overlapsInternalNode = [&](const TreeNodeIndex idx)
-        {
-            const Vec3<Tc> srcCenter = tree.centers[idx];
-            Vec3<Tc> srcSize         = tree.sizes[idx];
-            const Th srcRadius   = Config::symmetric ? loadAtIndexIfPtr(nodeRMax, idx) * tree.searchExtFactor : Th(0);
-            const Th srcRadiusSq = srcRadius * srcRadius;
-
-            bool overlaps = false;
-#pragma unroll
-            for (unsigned w = 0; w < warpsPerSupercluster; ++w)
-            {
-                const Th maxRadiusSq = std::max(iRadiusSq[w], srcRadiusSq);
-                const auto distance =
-                    UsePbc ? minDistance(iPos[w], srcCenter, srcSize, box) : minDistance(iPos[w], srcCenter, srcSize);
-                overlaps |= norm2(distance) < maxRadiusSq;
-            }
-
-            return anySync(overlaps);
-        };
-
-        const auto overlapsLeafNode = [&](const TreeNodeIndex idx)
-        {
-            const TreeNodeIndex leafIdx    = tree.internalToLeaf[idx];
-            const LocalIndex firstJCluster = jClusterIndex<Config>(tree.layout[leafIdx] + firstValidBody);
-            const LocalIndex lastJCluster =
-                tree.layout[leafIdx + 1] == tree.layout[leafIdx]
-                    ? 0
-                    : jClusterIndex<Config>(tree.layout[leafIdx + 1] + firstValidBody - 1) + 1;
-
-            for (LocalIndex baseJCluster = firstJCluster; baseJCluster < lastJCluster;
-                 baseJCluster += GpuConfig::warpSize)
-            {
-                const LocalIndex jCluster = std::min(baseJCluster + laneIdx, lastJCluster - 1);
-                bool bBoxesOverlap        = true;
-                if (info.neighborsCount > 0 && jClusters[info.neighborsCount - 1] == jCluster) bBoxesOverlap = false;
-
-                if constexpr (Config::symmetric)
-                {
-                    const LocalIndex jSupercluster = superclusterIndex<Config>(jCluster * Config::jSize);
-                    if (bBoxesOverlap)
-                    {
-                        bBoxesOverlap &=
-                            includeNbSymmetric(iSupercluster, jSupercluster, firstISupercluster, lastISupercluster);
-                    }
-                }
-
-                if (bBoxesOverlap)
-                {
-                    auto jClusterBBox = jClusterBboxes[jCluster];
-                    if constexpr (Config::symmetric)
-                    {
-                        const Tc rMaxBound = std::max(Tc(bBoxRadius), jClusterBBox.rMax * tree.searchExtFactor);
-#pragma unroll
-                        for (unsigned d = 0; d < 3; ++d)
-                            jClusterBBox.size[d] += rMaxBound;
-                    }
-                    bBoxesOverlap &=
-                        cellOverlap<UsePbc>(jClusterBBox.center, jClusterBBox.size, bBoxCenter, bBoxSize, box);
-                }
-
-                for (unsigned lane = 0; lane < GpuConfig::warpSize; ++lane)
-                {
-                    const unsigned jCluster = baseJCluster + lane;
-                    if (jCluster >= lastJCluster) break;
-                    if (!shflSync(bBoxesOverlap, lane)) continue;
-
-                    unsigned warpMask = 0;
-#pragma unroll
-                    for (LocalIndex jClusterParticle = 0; jClusterParticle < Config::jSize; ++jClusterParticle)
-                    {
-                        const LocalIndex j =
-                            std::clamp(jCluster * Config::jSize + jClusterParticle, firstValidBody, totalBodies - 1);
-                        const Vec3<Tc> jPos = {x[j], y[j], z[j]};
-                        const Th jRadius =
-                            Config::symmetric ? 2 * loadAtIndexIfPtr(h, j) * tree.searchExtFactor : Th(0);
-                        const Th jRadiusSq       = jRadius * jRadius;
-                        const unsigned warpIndex = jClusterParticle / (Config::jSize / Config::numWarpsPerInteraction);
-
-#pragma unroll
-                        for (unsigned w = 0; w < warpsPerSupercluster; ++w)
-                        {
-                            const unsigned c     = laneIdx / Config::iSize + w * (GpuConfig::warpSize / Config::iSize);
-                            const Th maxRadiusSq = std::max(jRadiusSq, iRadiusSq[w]);
-                            const bool jClusterOverlaps = distanceSq<UsePbc>(jPos[0], jPos[1], jPos[2], iPos[w][0],
-                                                                             iPos[w][1], iPos[w][2], box) < maxRadiusSq;
-                            warpMask |= unsigned(jClusterOverlaps)
-                                        << (warpIndex * Config::iClustersPerSupercluster + c);
-                        }
-                    }
-                    warpMask = warpBitwiseOr(warpMask);
-
-                    if (warpMask)
-                    {
-                        if (info.neighborsCount >= ncmax)
-                        {
-                            if (laneIdx == 0) globalBuildData->status = BuildStatus::neighbor_list_overflow;
-                            return;
-                        }
-                        if (laneIdx == 0)
-                        {
-                            jClusters[info.neighborsCount] = jCluster;
-                            const unsigned maskStartIndex  = info.neighborsCount * (Config::iClustersPerSupercluster *
-                                                                                   Config::numWarpsPerInteraction);
-                            const unsigned prevMask        = maskStartIndex % 32 == 0 ? 0 : masks[maskStartIndex / 32];
-                            masks[maskStartIndex / 32]     = (warpMask << (maskStartIndex % 32)) | prevMask;
-                        }
-                        ++info.neighborsCount;
-                    }
-                }
-            }
-        };
-
-        singleTraversal(tree.childOffsets, tree.parents, overlapsInternalNode, overlapsLeafNode);
+        collectNeighborJClusters<Config, UsePbc>(tree, box, firstValidBody, totalBodies, x, y, z, h, jClusterBboxes,
+                                                 nodeRMax, ncmax, firstISupercluster, lastISupercluster,
+                                                 jClusters.get(), masks.get(), globalBuildData, info);
 
         storeNeighborData<Config, NumSuperclustersPerBlock>(sharedAllocator, jClusters.get(), masks.get(), neighborData,
                                                             neighborDataSize, info, globalBuildData);
