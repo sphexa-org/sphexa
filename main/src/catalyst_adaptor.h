@@ -29,9 +29,9 @@ void Initialize(int argc, char* argv[])
     }
 
     node["catalyst_load/implementation"].set_string("paraview");
-    //node["catalyst_load/search_paths/paraview"] = PARAVIEW_IMPL_DIR;
-    // the run-time env variable CATALYST_IMPLEMENTATION_PATHS should point to
-    // a ParaView compilation folder with libcatalyst-paraview.so
+    // node["catalyst_load/search_paths/paraview"] = PARAVIEW_IMPL_DIR;
+    //  the run-time env variable CATALYST_IMPLEMENTATION_PATHS should point to
+    //  a ParaView compilation folder with libcatalyst-paraview.so
 
     catalyst_status err = catalyst_initialize(conduit_cpp::c_node(&node));
     if (err != catalyst_status_ok) { std::cerr << "ERROR: Failed to initialize Catalyst: " << err << std::endl; }
@@ -81,7 +81,7 @@ void Execute(DataType& d, long startIndex, long endIndex)
     mesh["coordsets/coords/values/y"].set_external(get<"y">(d).data() + startIndex, endIndex - startIndex);
     mesh["coordsets/coords/values/z"].set_external(get<"z">(d).data() + startIndex, endIndex - startIndex);
 
-//#define IMPLICIT_CONNECTIVITY_LIST 1 // the connectivity list is not given, but created by vtkm
+// #define IMPLICIT_CONNECTIVITY_LIST 1 // the connectivity list is not given, but created by vtkm
 #ifdef  IMPLICIT_CONNECTIVITY_LIST
     mesh["topologies/mesh/type"] = "points";
 #else
@@ -93,29 +93,29 @@ void Execute(DataType& d, long startIndex, long endIndex)
 #endif
     mesh["topologies/mesh/coordset"].set("coords");
 
-    addField(mesh, "x",                  get<"x">(d).data(), startIndex, endIndex);
-    addField(mesh, "y",                  get<"y">(d).data(), startIndex, endIndex);
-    addField(mesh, "z",                  get<"z">(d).data(), startIndex, endIndex);
-    addField(mesh, "vx",                 get<"vx">(d).data(), startIndex, endIndex);
-    addField(mesh, "vy",                 get<"vy">(d).data(), startIndex, endIndex);
-    addField(mesh, "vz",                 get<"vz">(d).data(), startIndex, endIndex);
-    addField(mesh, "kx",                 get<"kx">(d).data(), startIndex, endIndex);
-    addField(mesh, "xm",                 get<"xm">(d).data(), startIndex, endIndex);
-    addField(mesh, "alpha",              get<"alpha">(d).data(), startIndex, endIndex);
-    //addField(mesh, "Density",          d.rho.data(), startIndex, endIndex);
-    //addField(mesh, "Mass",             d.m.data(), startIndex, endIndex);
-    //addField(mesh, "Smoothing Length", d.h.data(), startIndex, endIndex);
-    //addField(mesh, "Pressure",         d.p.data(), startIndex, endIndex);
-    //addField(mesh, "Speed of Sound",   d.c.data(), startIndex, endIndex);
-    //addField(mesh, "ax",               d.ax.data(), startIndex, endIndex);
-    //addField(mesh, "ay",               d.ay.data(), startIndex, endIndex);
-    //addField(mesh, "az",               d.az.data(), startIndex, endIndex);
-    //addField(mesh, "Internal Energy",  d.u.data(), startIndex, endIndex);
+    addField(mesh, "x", get<"x">(d).data(), startIndex, endIndex);
+    addField(mesh, "y", get<"y">(d).data(), startIndex, endIndex);
+    addField(mesh, "z", get<"z">(d).data(), startIndex, endIndex);
+    addField(mesh, "vx", get<"vx">(d).data(), startIndex, endIndex);
+    addField(mesh, "vy", get<"vy">(d).data(), startIndex, endIndex);
+    addField(mesh, "vz", get<"vz">(d).data(), startIndex, endIndex);
+    addField(mesh, "kx", get<"kx">(d).data(), startIndex, endIndex);
+    addField(mesh, "xm", get<"xm">(d).data(), startIndex, endIndex);
+    addField(mesh, "alpha", get<"alpha">(d).data(), startIndex, endIndex);
+    // addField(mesh, "Density", d.rho.data(), startIndex, endIndex);
+    // addField(mesh, "Mass", d.m.data(), startIndex, endIndex);
+    // addField(mesh, "Smoothing Length", d.h.data(), startIndex, endIndex);
+    // addField(mesh, "Pressure", d.p.data(), startIndex, endIndex);
+    // addField(mesh, "Speed of Sound", d.c.data(), startIndex, endIndex);
+    // addField(mesh, "ax", d.ax.data(), startIndex, endIndex);
+    // addField(mesh, "ay", d.ay.data(), startIndex, endIndex);
+    // addField(mesh, "az", d.az.data(), startIndex, endIndex);
+    // addField(mesh, "Internal Energy", d.u.data(), startIndex, endIndex);
 
     conduit_cpp::Node verify_info;
     if (!conduit_blueprint_verify("mesh", conduit_cpp::c_node(&mesh), conduit_cpp::c_node(&verify_info)))
       std::cerr << "ERROR: blueprint verify failed!" + verify_info.to_json() << std::endl;
-    //else std::cerr << "PASS: blueprint verify passed!"<< std::endl;
+    // else std::cerr << "PASS: blueprint verify passed!"<< std::endl;
       
     catalyst_status err = catalyst_execute(conduit_cpp::c_node(&exec_params));
     if (err != catalyst_status_ok) { std::cerr << "ERROR: Failed to execute Catalyst: " << err << std::endl; }
