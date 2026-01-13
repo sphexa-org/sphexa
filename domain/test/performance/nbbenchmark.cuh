@@ -188,6 +188,18 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
                                .groupStart = rawPtr(groups),
                                .groupEnd   = rawPtr(groups) + 1};
 
+    // prefetch vectors to device memory, required on some AMD hardware/software for reasonable performance
+    int device;
+    checkGpuErrors(cudaGetDevice(&device));
+    auto const prefetchToDevice = [&]<class Tv>(const thrust::universal_vector<Tv>& v)
+    { checkGpuErrors(cudaMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), device, 0)); };
+    util::for_each_tuple(prefetchToDevice, std::tie(dX, dY, dZ, dH));
+    util::for_each_tuple(prefetchToDevice, dInputs);
+    util::for_each_tuple(prefetchToDevice, dOutputs);
+    util::for_each_tuple(prefetchToDevice, std::tie(dPrefixes, dChildOffsets, dParents, dInternalToLeaf,
+                                                    dLeafToInternal, dLevelRange, dLayout, dCenters, dSizes, groups));
+    checkGpuErrors(cudaDeviceSynchronize());
+
     // build neighborhood, measure CPU time
     using Clock     = std::chrono::high_resolution_clock;
     auto buildStart = Clock::now();
@@ -201,15 +213,6 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     const float numBytesPerParticle = static_cast<float>(stats.numBytes / double(stats.numBodies));
     printf("Memory usage of neighborhood data: %.2f MB (%.1f B/particle)\n", stats.numBytes / 1.0e6,
            numBytesPerParticle);
-
-    // prefetch vectors to device memory, required on some AMD hardware/software for reasonable performance
-    int device;
-    checkGpuErrors(cudaGetDevice(&device));
-    auto const prefetchToDevice = [&]<class Tv>(const thrust::universal_vector<Tv>& v)
-    { checkGpuErrors(cudaMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), device, 0)); };
-    util::for_each_tuple(prefetchToDevice, std::tie(dX, dY, dZ, dH));
-    util::for_each_tuple(prefetchToDevice, dInputs);
-    util::for_each_tuple(prefetchToDevice, dOutputs);
 
     // run the actual interaction kernel and measure time with GPU timers
     std::vector<float> times(101);
