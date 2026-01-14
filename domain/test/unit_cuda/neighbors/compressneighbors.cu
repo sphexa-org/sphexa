@@ -35,11 +35,10 @@ __global__ void roundtrip(std::uint32_t const* __restrict__ input,
 {
     extern __shared__ char compressed[];
 
-    warpCompressNeighbors(input, compressed, n_input);
+    const unsigned nBytes = warpCompressNeighbors(input, compressed, n_input);
     __syncthreads();
     if (threadIdx.x == 0)
     {
-        const unsigned nBytes = compressedNeighborsSize(compressed);
         for (unsigned i = nBytes; i < sharedMemSize; ++i)
             compressed[i] = 0xff;
     }
