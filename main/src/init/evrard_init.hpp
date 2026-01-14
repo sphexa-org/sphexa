@@ -86,9 +86,9 @@ void initEvrardFields(Dataset& d, const std::map<std::string, double>& constants
     // c(r) = 2/3 * 1/r * Ntot / Vtot
     T c0 = 2. / 3. * d.numParticlesGlobal / totalVolume;
 
-    auto x = toHost(d.x);
-    auto y = toHost(d.y);
-    auto z = toHost(d.z);
+    auto&& x = toHost(d.x);
+    auto&& y = toHost(d.y);
+    auto&& z = toHost(d.z);
     auto h = toHost(d.h);
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
@@ -98,9 +98,6 @@ void initEvrardFields(Dataset& d, const std::map<std::string, double>& constants
         h[i]            = std::cbrt(3 / (4 * M_PI) * d.ng0 / concentration) * 0.5;
     }
 
-    d.x = std::move(x);
-    d.y = std::move(y);
-    d.z = std::move(z);
     d.h = std::move(h);
 }
 
