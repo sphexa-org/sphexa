@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/box.hpp"
 
 #include "isim_init.hpp"
@@ -51,8 +52,11 @@ void restoreDataset(IFileReader* reader, Dataset& d)
         {
             if (reader->rank() == 0) { std::cout << "restoring " << d.fieldNames[i]; }
             auto t0 = std::chrono::high_resolution_clock::now();
-            std::visit([reader, key = d.fieldNames[i]](auto field)
-                       { reader->readField(Dataset::prefix + key, field->data()); }, fieldPointers[i]);
+            std::visit([reader, key = d.fieldNames[i]](auto field){
+                auto tmp = toHost(*field);
+                reader->readField(Dataset::prefix + key, tmp.data());
+                *field = std::move(tmp);
+            }, fieldPointers[i]);
             MPI_Barrier(MPI_COMM_WORLD);
             auto  t1       = std::chrono::high_resolution_clock::now();
             int   typeSize = std::visit([](auto field) { return sizeof(*field->data()); }, fieldPointers[i]);
@@ -133,6 +137,7 @@ public:
     cstone::Box<typename Dataset::RealType> init(int rank, int, size_t, Dataset& simData,
                                                  IFileReader* reader) const override
     {
+        constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
         reader->setStep(h5_fname, -1, FileMode::collective);
 
         size_t numParticlesInFile = reader->localNumParticles();
@@ -180,14 +185,17 @@ public:
             gatherSwap(y0, sfcOrder);
             gatherSwap(z0, sfcOrder);
 
+            auto x = toHost(d.x);
+            auto y = toHost(d.y);
+            auto z = toHost(d.z);
 #pragma omp parallel for schedule(static)
             for (size_t i = 0; i < numParticlesInFile; ++i)
             {
                 size_t sIdx = numSplits * i;
 
-                d.x[sIdx] = x0[i];
-                d.y[sIdx] = y0[i];
-                d.z[sIdx] = z0[i];
+                x[sIdx] = x0[i];
+                y[sIdx] = y0[i];
+                z[sIdx] = z0[i];
 
                 bool isLast   = (i == numParticlesInFile - 1);
                 long keyDelta = (isLast ? -(keys[i] - keys[i - 1]) : keys[i + 1] - keys[i]) / (numSplits + isLast);
@@ -196,11 +204,14 @@ public:
                 {
                     auto [ixj, iyj, izj] = cstone::decodeSfc(cstone::sfcKey(keys[i] + j * keyDelta));
 
-                    d.x[sIdx + j] = box.xmin() + (ixj * box.lx()) / cstone::maxCoord<KeyType>{};
-                    d.y[sIdx + j] = box.ymin() + (iyj * box.ly()) / cstone::maxCoord<KeyType>{};
-                    d.z[sIdx + j] = box.zmin() + (izj * box.lz()) / cstone::maxCoord<KeyType>{};
+                    x[sIdx + j] = box.xmin() + (ixj * box.lx()) / cstone::maxCoord<KeyType>{};
+                    y[sIdx + j] = box.ymin() + (iyj * box.ly()) / cstone::maxCoord<KeyType>{};
+                    z[sIdx + j] = box.zmin() + (izj * box.lz()) / cstone::maxCoord<KeyType>{};
                 }
             }
+            d.x = std::move(x);
+            d.y = std::move(y);
+            d.z = std::move(z);
         }
 
         auto replicateField = [&sfcOrder, numParticlesInFile, numParticlesSplit,
@@ -221,28 +232,47 @@ public:
         };
 
         d.resize(numParticlesSplit);
-        replicateField(reader, "m", d.m, T(1) / numSplits);
-        replicateField(reader, "h", d.h, T(1) / std::cbrt(numSplits));
-        replicateField(reader, "vx", d.vx, T(1));
-        replicateField(reader, "vy", d.vy, T(1));
-        replicateField(reader, "vz", d.vz, T(1));
-        replicateField(reader, "temp", d.temp, T(1));
+        auto m = toHost(d.m);
+        auto h = toHost(d.h);
+        auto vx = toHost(d.vx);
+        auto vy = toHost(d.vy);
+        auto vz = toHost(d.vz);
+        auto x_m1 = toHost(d.x_m1);
+        auto y_m1 = toHost(d.y_m1);
+        auto z_m1 = toHost(d.z_m1);
+        auto temp = toHost(d.temp);
+        replicateField(reader, "m", m, T(1) / numSplits);
+        replicateField(reader, "h", h, T(1) / std::cbrt(numSplits));
+        replicateField(reader, "vx", vx, T(1));
+        replicateField(reader, "vy", vy, T(1));
+        replicateField(reader, "vz", vz, T(1));
+        replicateField(reader, "temp", temp, T(1));
+        cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0);
+        cstone::fill<gpu>(d.rung.begin(), d.rung.end(), 0);
+        std::transform(vx.begin(), vx.end(), x_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
+        std::transform(vy.begin(), vy.end(), y_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
+        std::transform(vz.begin(), vz.end(), z_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
 
-        std::fill(d.du_m1.begin(), d.du_m1.end(), 0);
-        std::fill(d.rung.begin(), d.rung.end(), 0);
-        std::transform(d.vx.begin(), d.vx.end(), d.x_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
-        std::transform(d.vy.begin(), d.vy.end(), d.y_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
-        std::transform(d.vz.begin(), d.vz.end(), d.z_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
-
+        d.m = std::move(m);
+        d.h = std::move(h);
+        d.vx = std::move(vx);
+        d.vy = std::move(vy);
+        d.vz = std::move(vz);
+        d.x_m1 = std::move(x_m1);
+        d.y_m1 = std::move(y_m1);
+        d.z_m1 = std::move(z_m1);
+        d.temp = std::move(temp);
         if (d.isAllocated("alpha"))
         {
             try
             {
-                replicateField(reader, "alpha", d.alpha, T(1));
+                auto alpha = toHost(d.alpha);
+                replicateField(reader, "alpha", alpha, T(1));
+                d.alpha = std::move(alpha);
             }
             catch (std::runtime_error&)
             {
-                std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
+                cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
             }
         }
 

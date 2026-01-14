@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/box.hpp"
 #include "cstone/sfc/sfc.hpp"
 #include "cstone/primitives/gather.hpp"
@@ -54,6 +55,7 @@ InitSettings KelvinHelmholtzConstants()
 template<class T, class Dataset>
 void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& constants, T massPart)
 {
+    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
     T rhoInt = constants.at("rhoInt");
     T rhoExt = constants.at("rhoExt");
     T omega0 = constants.at("omega0");
@@ -70,56 +72,75 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
     T hInt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoInt);
     T hExt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoExt);
 
-    std::fill(d.m.begin(), d.m.end(), massPart);
-    std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    std::fill(d.mue.begin(), d.mue.end(), 2.0);
-    std::fill(d.mui.begin(), d.mui.end(), 10.0);
-    std::fill(d.alpha.begin(), d.alpha.end(), d.alphamax);
-    std::fill(d.vz.begin(), d.vz.end(), 0.0);
+    cstone::fill<gpu>(d.m.begin(), d.m.end(), massPart);
+    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
+    cstone::fill<gpu>(d.mue.begin(), d.mue.end(), 2.0);
+    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), 10.0);
+    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamax);
+    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
 
-    generateParticleIDs(d.id);
+    generateParticleIDs<gpu>(d.id);
 
     auto  cv     = sph::idealGasCv(d.muiConst, gamma);
-    auto* u_or_t = d.u.empty() ? d.temp.data() : d.u.data();
-
+    auto u_or_t = d.u.empty() ? toHost(d.temp) : toHost(d.u);
+    auto&& x = toHost(d.x);
+    auto&& y = toHost(d.y);
+    auto h = toHost(d.h);
+    auto vx = toHost(d.vx);
+    auto vy = toHost(d.vy);
+    auto&& vz = toHost(d.vz);
+    auto x_m1 = toHost(d.x_m1);
+    auto y_m1 = toHost(d.y_m1);
+    auto z_m1 = toHost(d.z_m1);
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
-        d.vy[i] = omega0 * std::sin(4 * M_PI * d.x[i]);
+        vy[i] = omega0 * std::sin(4 * M_PI * x[i]);
 
-        if (d.y[i] < 0.75 && d.y[i] > 0.25)
+        if (y[i] < 0.75 && y[i] > 0.25)
         {
-            d.h[i]    = hInt;
+            h[i]    = hInt;
             u_or_t[i] = uInt;
-            if (d.y[i] > 0.5) { d.vx[i] = vxInt + vDif * std::exp((d.y[i] - 0.75) / ls); }
-            else { d.vx[i] = vxInt + vDif * std::exp((0.25 - d.y[i]) / ls); }
+            if (y[i] > 0.5) { vx[i] = vxInt + vDif * std::exp((y[i] - 0.75) / ls); }
+            else { vx[i] = vxInt + vDif * std::exp((0.25 - y[i]) / ls); }
         }
         else
         {
-            if (d.y[i] > 0.75 + 2 * hExt || d.y[i] < 0.25 - 2 * hExt)
+            if (y[i] > 0.75 + 2 * hExt || y[i] < 0.25 - 2 * hExt)
             {
                 // more than two smoothing lengths away from the high density band
-                d.h[i] = hExt;
+                h[i] = hExt;
             }
             else
             {
-                T dist = (d.y[i] > 0.75) ? d.y[i] - 0.75 : 0.25 - d.y[i];
+                T dist = (y[i] > 0.75) ? y[i] - 0.75 : 0.25 - y[i];
                 // linear interpolation from hInt to hExt for particles within 2 * hExt of the high density band
-                d.h[i] = hInt * (1 - dist / (2 * hExt)) + hExt * dist / (2 * hExt);
+                h[i] = hInt * (1 - dist / (2 * hExt)) + hExt * dist / (2 * hExt);
             }
 
             u_or_t[i] = uExt;
-            if (d.y[i] < 0.25) { d.vx[i] = vxExt - vDif * std::exp((d.y[i] - 0.25) / ls); }
-            else { d.vx[i] = vxExt - vDif * std::exp((0.75 - d.y[i]) / ls); }
+            if (y[i] < 0.25) { vx[i] = vxExt - vDif * std::exp((y[i] - 0.25) / ls); }
+            else { vx[i] = vxExt - vDif * std::exp((0.75 - y[i]) / ls); }
         }
 
-        d.x_m1[i] = d.vx[i] * d.minDt;
-        d.y_m1[i] = d.vy[i] * d.minDt;
-        d.z_m1[i] = d.vz[i] * d.minDt;
+        x_m1[i] = vx[i] * d.minDt;
+        y_m1[i] = vy[i] * d.minDt;
+        z_m1[i] = vz[i] * d.minDt;
     }
+    d.h = std::move(h);
+    d.vx = std::move(vx);
+    d.vy = std::move(vy);
+    d.x_m1 = std::move(x_m1);
+    d.y_m1 = std::move(y_m1);
+    d.z_m1 = std::move(z_m1);
     if (d.u.empty())
     {
-        std::for_each(d.temp.begin(), d.temp.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
+        std::for_each(u_or_t.begin(), u_or_t.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
+        d.temp = std::move(u_or_t);
+    }
+    else
+    {
+        d.u = std::move(u_or_t);
     }
 }
 
@@ -177,18 +198,21 @@ public:
             // crop layer1 back to original size
             if (inLayer1(X[0], X[1], X[2]))
             {
-                d.x.push_back(X[0]);
-                d.y.push_back(X[1]);
-                d.z.push_back(X[2]);
+                x.push_back(X[0]);
+                y.push_back(X[1]);
+                z.push_back(X[2]);
                 // layer3: reflect (to preserve the relaxed PBC surface in y direction) and translate
                 T yLayer3 = -X[1] + topEdge;
-                d.x.push_back(X[0]);
-                d.y.push_back(yLayer3);
-                d.z.push_back(X[2]);
+                x.push_back(X[0]);
+                y.push_back(yLayer3);
+                z.push_back(X[2]);
             }
         }
 
-        assembleCuboid<T>(keyStart, keyEnd, layer2, innerMulti, xBlock, yBlock, zBlock, d.x, d.y, d.z);
+        assembleCuboid<T>(keyStart, keyEnd, layer2, innerMulti, xBlock, yBlock, zBlock, x, y, z);
+        d.x = x; // uploads to GPU if active
+        d.y = y;
+        d.z = z;
 
         size_t numParticlesGlobal = d.x.size();
         MPI_Allreduce(MPI_IN_PLACE, &numParticlesGlobal, 1, MpiType<size_t>{}, MPI_SUM, simData.comm);

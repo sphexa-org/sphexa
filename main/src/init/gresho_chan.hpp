@@ -29,6 +29,7 @@
  * @author Lukas Schmidt
  */
 
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/box.hpp"
 #include "isim_init.hpp"
 #include "grid.hpp"
@@ -53,6 +54,7 @@ double twoDimRadius(T x, T y)
 template<class Dataset, class T>
 void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& settings, T mPart)
 {
+    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
     double ng0 = settings.at("ng0");
     double rho = settings.at("rho");
     // double mPart         = settings.at("mTotal") / d.numParticlesGlobal;
@@ -68,22 +70,31 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     double v0 = settings.at("v0");
     double P0 = settings.at("P0");
 
-    std::fill(d.m.begin(), d.m.end(), mPart);
-    std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    std::fill(d.h.begin(), d.h.end(), hInit);
-    std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
-    std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
+    cstone::fill<gpu>(d.m.begin(), d.m.end(), mPart);
+    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
+    cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
+    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
+    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
 
-    std::fill(d.z_m1.begin(), d.z_m1.end(), 0.0);
+    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
 
-    generateParticleIDs(d.id);
+    generateParticleIDs<gpu>(d.id);
 
+    auto&& x = toHost(d.x);
+    auto&& y = toHost(d.y);
+    auto temp = toHost(d.temp);
+    auto u = toHost(d.u);
+    auto vx = toHost(d.vx);
+    auto vy = toHost(d.vy);
+    auto vz = toHost(d.vz);
+    auto x_m1 = toHost(d.x_m1);
+    auto y_m1 = toHost(d.y_m1);
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); ++i)
     {
         T vi, pi;
-        T xi    = d.x[i];
-        T yi    = d.y[i];
+        T xi    = x[i];
+        T yi    = y[i];
         T psi   = twoDimRadius(xi, yi) / R1;
         T theta = std::atan2(yi, xi);
 
@@ -104,15 +115,22 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
         }
 
         auto ui = pi / ((d.gamma - 1.) * rho);
-        if (d.u.empty()) { d.temp[i] = ui / cv; }
-        else { d.u[i] = ui; }
-        d.vx[i] = -1.0 * vi * std::sin(theta);
-        d.vy[i] = vi * std::cos(theta);
-        d.vz[i] = 0.0;
+        if (u.empty()) { temp[i] = ui / cv; }
+        else { u[i] = ui; }
+        vx[i] = -1.0 * vi * std::sin(theta);
+        vy[i] = vi * std::cos(theta);
+        vz[i] = 0.0;
 
-        d.x_m1[i] = d.vx[i] * firstTimeStep;
-        d.y_m1[i] = d.vy[i] * firstTimeStep;
+        x_m1[i] = vx[i] * firstTimeStep;
+        y_m1[i] = vy[i] * firstTimeStep;
     }
+    d.temp = std::move(temp);
+    d.u = std::move(u);
+    d.vx = std::move(vx);
+    d.vy = std::move(vy);
+    d.vz = std::move(vz);
+    d.x_m1 = std::move(x_m1);
+    d.y_m1 = std::move(y_m1);
 }
 
 template<class Dataset>
@@ -151,7 +169,11 @@ public:
         KeyType  keyStart          = initialBoundaries[rank];
         KeyType  keyEnd            = initialBoundaries[rank + 1];
 
-        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
+        std::vector<T> x, y, z;
+        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, x, y, z);
+        d.x = x; // uploads to GPU if active
+        d.y = y;
+        d.z = z;
         d.resize(d.x.size());
 
         settings_["numParticlesGlobal"] = double(numParticlesGlobal);
