@@ -47,60 +47,60 @@ std::unique_ptr<ISimInitializer<Dataset>> initializerFactory(std::string testCas
     std::string testNamedBase = strBeforeSign(testCase, ":");
     std::string settingsFile  = strAfterSign(testCase, ":");
 
-    //if (testNamedBase == "sedov")
-    //{
-    //    if (glassBlock.empty()) { return SimInitializers<Dataset>::makeSedovGrid(); }
-    //    else { return SimInitializers<Dataset>::makeSedovGlass(glassBlock, settingsFile, reader); }
-    //}
-    //if (testNamedBase == "noh")
-    //{
-    //    if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for Noh implosion\n"); }
-    //    return SimInitializers<Dataset>::makeNoh(glassBlock, settingsFile, reader);
-    //}
-    //if (testNamedBase == "gresho-chan")
-    //{
-    //    if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for Gresho-Chan\n"); }
-    //    return SimInitializers<Dataset>::makeGreshoChan(glassBlock, settingsFile, reader);
-    //}
-    //if (testNamedBase == "isobaric-cube")
-    //{
-    //    if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for isobaric cube\n"); }
-    //    return SimInitializers<Dataset>::makeIsobaricCube(glassBlock, settingsFile, reader);
-    //}
-    //if (testNamedBase == "wind-shock")
-    //{
-    //    if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for Wind shock\n"); }
-    //    return SimInitializers<Dataset>::makeWindShock(glassBlock, settingsFile, reader);
-    //}
+    if (testNamedBase == "sedov")
+    {
+       if (glassBlock.empty()) { return SimInitializers<Dataset>::makeSedovGrid(); }
+       else { return SimInitializers<Dataset>::makeSedovGlass(glassBlock, settingsFile, reader); }
+    }
+    if (testNamedBase == "noh")
+    {
+       if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for Noh implosion\n"); }
+       return SimInitializers<Dataset>::makeNoh(glassBlock, settingsFile, reader);
+    }
+    if (testNamedBase == "gresho-chan")
+    {
+       if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for Gresho-Chan\n"); }
+       return SimInitializers<Dataset>::makeGreshoChan(glassBlock, settingsFile, reader);
+    }
+    if (testNamedBase == "isobaric-cube")
+    {
+       if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for isobaric cube\n"); }
+       return SimInitializers<Dataset>::makeIsobaricCube(glassBlock, settingsFile, reader);
+    }
+    if (testNamedBase == "wind-shock")
+    {
+       if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for Wind shock\n"); }
+       return SimInitializers<Dataset>::makeWindShock(glassBlock, settingsFile, reader);
+    }
     if (testNamedBase == "evrard")
     {
         if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for evrard\n"); }
         return SimInitializers<Dataset>::makeEvrard(glassBlock, settingsFile, reader);
     }
-    //if (testNamedBase == "turbulence")
-    //{
-    //    if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for turbulence test\n"); }
-    //    else { return SimInitializers<Dataset>::makeTurbulence(glassBlock, settingsFile, reader); }
-    //}
-    //if (testNamedBase == "kelvin-helmholtz")
-    //{
-    //    if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for Kelvin-Helmholtz test\n"); }
-    //    else { return SimInitializers<Dataset>::makeKelvinHelmholtz(glassBlock, settingsFile, reader); }
-    //}
-    //if (testNamedBase == "evrard-cooling")
-    //{
-    //    if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for evrard-cooling\n"); }
-    //    return SimInitializers<Dataset>::makeEvrardCooling(glassBlock, settingsFile, reader);
-    //}
-    //if (std::filesystem::exists(strBeforeSign(testCase, ":")))
-    //{
-    //    return SimInitializers<Dataset>::makeFile(strBeforeSign(testCase, ":"), numberAfterSign(testCase, ":"), reader);
-    //}
-    //if (std::filesystem::exists(strBeforeSign(testCase, ",")))
-    //{
-    //    return SimInitializers<Dataset>::makeFileSplit(strBeforeSign(testCase, ","), numberAfterSign(testCase, ","),
-    //                                                   reader);
-    //}
+    if (testNamedBase == "turbulence")
+    {
+       if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for turbulence test\n"); }
+       else { return SimInitializers<Dataset>::makeTurbulence(glassBlock, settingsFile, reader); }
+    }
+    if (testNamedBase == "kelvin-helmholtz")
+    {
+       if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for Kelvin-Helmholtz test\n"); }
+       else { return SimInitializers<Dataset>::makeKelvinHelmholtz(glassBlock, settingsFile, reader); }
+    }
+    if (testNamedBase == "evrard-cooling")
+    {
+       if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for evrard-cooling\n"); }
+       return SimInitializers<Dataset>::makeEvrardCooling(glassBlock, settingsFile, reader);
+    }
+    if (std::filesystem::exists(strBeforeSign(testCase, ":")))
+    {
+       return SimInitializers<Dataset>::makeFile(strBeforeSign(testCase, ":"), numberAfterSign(testCase, ":"), reader);
+    }
+    if (std::filesystem::exists(strBeforeSign(testCase, ",")))
+    {
+       return SimInitializers<Dataset>::makeFileSplit(strBeforeSign(testCase, ","), numberAfterSign(testCase, ","),
+                                                      reader);
+    }
 
     auto msg = "supplied value of --init " + (testCase.empty() ? "[empty string]" : "(\"" + testCase + "\")") +
                " is not a usable file or supported test case\n";
