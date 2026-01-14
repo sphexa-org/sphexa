@@ -56,13 +56,11 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
 
 #if CSTONE_USE_BAND_ET_AL_COMPRESSION
     GpuConfig::ThreadMask* control = (GpuConfig::ThreadMask*)output + 1;
-    std::uint32_t* first = (std::uint32_t*)(control + (n - 1 + GpuConfig::warpSize - 1) / GpuConfig::warpSize * 2);
-    std::uint8_t* data   = (std::uint8_t*)(first + 1);
+    std::uint8_t* data             = (std::uint8_t*)(control + (n + GpuConfig::warpSize - 1) / GpuConfig::warpSize * 2);
 
     unsigned dataSize = 0;
-    unsigned previous = neighbors[0];
-    if (laneIdx == 0) *first = previous;
-    for (unsigned offset = 1; offset < n; offset += GpuConfig::warpSize)
+    unsigned previous = unsigned(-1);
+    for (unsigned offset = 0; offset < n; offset += GpuConfig::warpSize)
     {
         const unsigned nb           = offset + laneIdx;
         const unsigned neighbor     = nb < n ? neighbors[nb] : 0;
@@ -74,8 +72,8 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
         const auto secondControl = ballotSync((diff == 1) | (diff >= 256));
         if (laneIdx == 0)
         {
-            control[2 * ((offset - 1) / GpuConfig::warpSize)]     = firstControl;
-            control[2 * ((offset - 1) / GpuConfig::warpSize) + 1] = secondControl;
+            control[2 * (offset / GpuConfig::warpSize)]     = firstControl;
+            control[2 * (offset / GpuConfig::warpSize) + 1] = secondControl;
         }
 
         const unsigned dataBytes      = diff >= 2 ? (diff >= 256 ? 4 : 1) : 0;
@@ -88,8 +86,7 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
     }
 
     const unsigned totalBytes =
-        sizeof(GpuConfig::ThreadMask) * (1 + (n - 1 + GpuConfig::warpSize - 1) / GpuConfig::warpSize * 2) + 4 +
-        dataSize;
+        sizeof(GpuConfig::ThreadMask) * (1 + (n + GpuConfig::warpSize - 1) / GpuConfig::warpSize * 2) + dataSize;
     assert(n < (1 << 16));
     if (laneIdx == 0) *((unsigned*)output) = totalBytes | (n << 16);
 #else
@@ -108,7 +105,7 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
     };
 
     unsigned dataSize = 0;
-    int previous      = -1;
+    unsigned previous = unsigned(-1);
     for (unsigned offset = 0; offset < n; offset += GpuConfig::warpSize)
     {
         const unsigned nb           = offset + laneIdx;
@@ -194,18 +191,15 @@ warpDecompressNeighbors(const char* const __restrict__ input, std::uint32_t* con
 
 #if CSTONE_USE_BAND_ET_AL_COMPRESSION
     const GpuConfig::ThreadMask* control = (const GpuConfig::ThreadMask*)input + 1;
-    const std::uint32_t* first =
-        (std::uint32_t*)(control + (n - 1 + GpuConfig::warpSize - 1) / GpuConfig::warpSize * 2);
-    const std::uint8_t* data = (std::uint8_t*)(first + 1);
+    const std::uint8_t* data = (const std::uint8_t*)(control + (n + GpuConfig::warpSize - 1) / GpuConfig::warpSize * 2);
 
     unsigned dataSize = 0;
-    unsigned previous = *first;
-    if (laneIdx == 0) neighbors[0] = previous;
-    for (unsigned offset = 1; offset < n; offset += GpuConfig::warpSize)
+    unsigned previous = unsigned(-1);
+    for (unsigned offset = 0; offset < n; offset += GpuConfig::warpSize)
     {
         const unsigned nb        = offset + laneIdx;
-        const auto firstControl  = control[2 * ((offset - 1) / GpuConfig::warpSize)];
-        const auto secondControl = control[2 * ((offset - 1) / GpuConfig::warpSize) + 1];
+        const auto firstControl  = control[2 * (offset / GpuConfig::warpSize)];
+        const auto secondControl = control[2 * (offset / GpuConfig::warpSize) + 1];
 
         const bool firstControlBit  = (firstControl >> laneIdx) & 1;
         const bool secondControlBit = (secondControl >> laneIdx) & 1;
@@ -237,7 +231,7 @@ warpDecompressNeighbors(const char* const __restrict__ input, std::uint32_t* con
     };
 
     unsigned dataSize = 0;
-    int previous      = -1;
+    unsigned previous = unsigned(-1);
     for (unsigned offset = 0; offset < n; offset += GpuConfig::warpSize)
     {
         const auto nonOneBits = nonOnes[offset / GpuConfig::warpSize];
