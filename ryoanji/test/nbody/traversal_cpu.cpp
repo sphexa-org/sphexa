@@ -39,13 +39,12 @@ TEST(Gravity, TreeWalk)
     LocalIndex     numParticles = 100000;
 
     RandomGaussianCoordinates<T, SfcKind<KeyType>> coordinates(numParticles, box);
+    coordinates.adjustH(2, 5);
 
     const T* x = coordinates.x().data();
     const T* y = coordinates.y().data();
     const T* z = coordinates.z().data();
-
-    std::vector<T> h(numParticles, 0.1);
-    adjustSmoothingLength<KeyType>(h.size(), 2, 5, coordinates.x(), coordinates.y(), coordinates.z(), h, box);
+    const T* h = coordinates.h().data();
 
     std::vector<T> masses(numParticles, T(1) / numParticles);
     for (size_t i = 0; i < masses.size(); ++i)
@@ -87,7 +86,7 @@ TEST(Gravity, TreeWalk)
     auto t0       = std::chrono::high_resolution_clock::now();
     T    egravTot = 0;
     computeGravity(octree.childOffsets.data(), octree.parents.data(), octree.internalToLeaf.data(), centers.data(),
-                   multipoles.data(), layout.data(), 0, octree.numLeafNodes, x, y, z, h.data(), masses.data(), box, G,
+                   multipoles.data(), layout.data(), 0, octree.numLeafNodes, x, y, z, h, masses.data(), box, G,
                    (T*)nullptr, ax.data(), ay.data(), az.data(), &egravTot, numShells);
     auto   t1      = std::chrono::high_resolution_clock::now();
     double elapsed = std::chrono::duration<double>(t1 - t0).count();
@@ -102,7 +101,7 @@ TEST(Gravity, TreeWalk)
     std::vector<T> potentialReference(numParticles, 0);
 
     t0 = std::chrono::high_resolution_clock::now();
-    directSum(x, y, z, h.data(), masses.data(), numParticles, G, {box.lx(), box.ly(), box.lz()}, numShells, Ax.data(),
+    directSum(x, y, z, h, masses.data(), numParticles, G, {box.lx(), box.ly(), box.lz()}, numShells, Ax.data(),
               Ay.data(), Az.data(), potentialReference.data());
     t1      = std::chrono::high_resolution_clock::now();
     elapsed = std::chrono::duration<double>(t1 - t0).count();

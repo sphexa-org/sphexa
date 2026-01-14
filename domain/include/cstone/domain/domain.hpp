@@ -188,15 +188,24 @@ public:
             focusTree_.converge(box(), keyView, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
                                 invThetaEff, std::get<0>(scratch));
         }
-        focusTree_.updateMinMac(global_.assignment(), invThetaEff, true);
-        focusTree_.updateTree(global_.assignment(), global_.treeLeaves(), box(), std::get<0>(scratch));
-        focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
 
-        reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
-        focusTree_.discoverHalos(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), {rawPtr(layoutAcc_), layoutAcc_.size()},
-                                 haloSearchExt_, get<0>(scratch), false);
-        focusTree_.computeLayout({rawPtr(layoutAcc_), layoutAcc_.size()}, layout_);
-        halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), layout_);
+        int fail = 0, maxRep = 10;
+        do
+        {
+            focusTree_.updateMinMac(global_.assignment(), invThetaEff, true);
+            focusTree_.updateTree(global_.assignment(), global_.treeLeaves(), box(), std::get<0>(scratch));
+            focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
+
+            reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
+            focusTree_.discoverHalos(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h),
+                                     {rawPtr(layoutAcc_), layoutAcc_.size()}, haloSearchExt_, get<0>(scratch), false);
+            fail = focusTree_.computeLayout({rawPtr(layoutAcc_), layoutAcc_.size()}, layout_);
+            MPI_Allreduce(MPI_IN_PLACE, &fail, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+            halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), layout_);
+
+            if (fail && myRank_ == 0) { std::cout << "LET refine, mode=" << fail << std::endl; }
+        } while (fail && maxRep--);
 
         updateLayout(sorter, keyView, particleKeys, std::tie(x, y, z, h), particleProperties, scratch);
         setupHalos(particleKeys, x, y, z, h, scratch);
@@ -262,10 +271,7 @@ public:
 
             halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), layout_);
 
-            if (fail)
-            {
-                if (myRank_ == 0) { std::cout << "LET refine, mode=" << fail << std::endl; }
-            }
+            if (fail && myRank_ == 0) { std::cout << "LET refine, mode=" << fail << std::endl; }
         } while (fail && maxRep--);
 
         // diagnostics(keyView.size());
@@ -586,9 +592,8 @@ private:
             {
                 std::cout << "rank " << i << " " << assignedSize << " " << layout_.back()
                           << " focus h/true/peers/loc/tot: " << numFlags << "/" << numFocusTruePeer << "/"
-                          << numFocusPeers << "/" << focusAssignment[myRank_].count() << "/"
-                          << flags.size() << " peers: [" << std::max(hPeers.size(), fPeers.size())
-                          << "] ";
+                          << numFocusPeers << "/" << focusAssignment[myRank_].count() << "/" << flags.size()
+                          << " peers: [" << std::max(hPeers.size(), fPeers.size()) << "] ";
                 if (numRanks_ <= 64)
                 {
                     for (auto r : fPeers)
