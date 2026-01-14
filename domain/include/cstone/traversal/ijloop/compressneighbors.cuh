@@ -20,6 +20,7 @@
 #define CSTONE_USE_BAND_ET_AL_COMPRESSION 0
 #endif
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 
@@ -32,43 +33,38 @@ namespace cstone
 
 struct WarpCompression
 {
-    char* start;
-    std::uint8_t* buffer;
-    unsigned previous;
-    unsigned numNeighbors;
-
-    __device__ __forceinline__ WarpCompression(char* output)
-        : start(output)
-        , buffer(reinterpret_cast<std::uint8_t*>(reinterpret_cast<unsigned*>(output) + 1))
-        , previous(static_cast<unsigned>(-1))
-        , numNeighbors(0)
+    __device__ __forceinline__ explicit WarpCompression(void* output)
+        : start_(reinterpret_cast<std::uint8_t*>(output))
+        , buffer_(reinterpret_cast<std::uint8_t*>(reinterpret_cast<unsigned*>(output) + 1))
+        , previous_(static_cast<unsigned>(-1))
+        , numNeighbors_(0)
     {
     }
 
     WarpCompression(const WarpCompression&)            = delete;
     WarpCompression& operator=(const WarpCompression&) = delete;
-    WarpCompression(WarpCompression&&)                 = default;
-    WarpCompression& operator=(WarpCompression&&)      = default;
+    WarpCompression(WarpCompression&&)                 = delete;
+    WarpCompression& operator=(WarpCompression&&)      = delete;
 
     __device__ __forceinline__ void add(const unsigned neighbor, const unsigned activeLanes)
     {
         assert(activeLanes > 0);
 
-        numNeighbors += activeLanes;
+        numNeighbors_ += activeLanes;
         const unsigned laneIdx = laneIndex();
 
 #if CSTONE_USE_BAND_ET_AL_COMPRESSION
-        std::uint8_t* vleData = buffer + 2 * sizeof(GpuConfig::ThreadMask);
+        std::uint8_t* vleData = buffer_ + 2 * sizeof(GpuConfig::ThreadMask);
 
         const unsigned leftNeighbor = shflUpSync(neighbor, 1);
-        const unsigned diff = laneIdx < activeLanes ? (neighbor - (laneIdx > 0 ? leftNeighbor : previous)) - 1 : 0;
-        previous            = shflSync(neighbor, GpuConfig::warpSize - 1);
+        const unsigned diff = laneIdx < activeLanes ? (neighbor - (laneIdx > 0 ? leftNeighbor : previous_)) - 1 : 0;
+        previous_           = shflSync(neighbor, GpuConfig::warpSize - 1);
 
         const auto firstControl   = ballotSync(diff > 1);
         const auto secondControl  = ballotSync((diff == 1) | (diff >= 256));
         const auto controlToStore = laneIdx < sizeof(GpuConfig::ThreadMask) ? firstControl : secondControl;
         if (laneIdx < 2 * sizeof(GpuConfig::ThreadMask))
-            buffer[laneIdx] = controlToStore >> (8 * (laneIdx % sizeof(GpuConfig::ThreadMask)));
+            buffer_[laneIdx] = controlToStore >> (8 * (laneIdx % sizeof(GpuConfig::ThreadMask)));
 
         const unsigned dataBytes      = diff >= 2 ? (diff >= 256 ? 4 : 1) : 0;
         const unsigned dataBytesScan  = inclusiveScanInt(dataBytes);
@@ -78,9 +74,9 @@ struct WarpCompression
         for (unsigned i = 0; i < dataBytes; ++i)
             vleData[dataBytesIndex + i] = (diff >> (8 * i)) & 0xff;
 
-        buffer += 2 * sizeof(GpuConfig::ThreadMask) + warpDataBytes;
+        buffer_ += 2 * sizeof(GpuConfig::ThreadMask) + warpDataBytes;
 #else
-        std::uint8_t* vleData = buffer + sizeof(GpuConfig::ThreadMask);
+        std::uint8_t* vleData = buffer_ + sizeof(GpuConfig::ThreadMask);
 
         const auto writeDataNibble = [&](unsigned index, std::uint8_t value, bool odd)
         {
@@ -94,30 +90,28 @@ struct WarpCompression
         };
 
         const unsigned leftNeighbor = shflUpSync(neighbor, 1);
-        const unsigned diff         = neighbor - (laneIdx > 0 ? leftNeighbor : previous);
-        previous                    = shflSync(neighbor, GpuConfig::warpSize - 1);
+        const unsigned diff         = neighbor - (laneIdx > 0 ? leftNeighbor : previous_);
+        previous_                   = shflSync(neighbor, GpuConfig::warpSize - 1);
 
         const bool nonOne     = (diff != 1) & (laneIdx < activeLanes);
         const auto nonOneBits = ballotSync(nonOne);
-        if (laneIdx < sizeof(GpuConfig::ThreadMask)) buffer[laneIdx] = (nonOneBits >> (8 * laneIdx));
+        if (laneIdx < sizeof(GpuConfig::ThreadMask)) buffer_[laneIdx] = (nonOneBits >> (8 * laneIdx));
         const bool additionalStorage = (diff > 9) & (laneIdx < activeLanes);
         const unsigned nBits         = 32 - countLeadingZeros(diff);
         const unsigned nNibbles      = additionalStorage ? (nBits + 3) / 4 : 0;
         const unsigned nNibblesData  = additionalStorage ? nNibbles - 1 : diff + 6;
 
-        const unsigned nNibblesIndex     = exclusiveScanBool(nonOne);
-        unsigned vleDataSize             = 0;
-        const unsigned nNibblesDataIndex = vleDataSize + nNibblesIndex;
-        vleDataSize += popCount(nonOneBits);
+        const unsigned nNibblesIndex = popCount(nonOneBits & lanemask_lt());
+        unsigned vleDataSize         = popCount(nonOneBits);
 
-        if (nonOne) writeDataNibble(nNibblesDataIndex, nNibblesData, false);
+        if (nonOne) writeDataNibble(nNibblesIndex, nNibblesData, false);
 #ifdef __HIP_PLATFORM_AMD__
         // This should not be necessary, a memory fence should be enough, but tests fail without
         __syncthreads();
 #else
         syncWarp();
 #endif
-        if (nonOne) writeDataNibble(nNibblesDataIndex, nNibblesData, true);
+        if (nonOne) writeDataNibble(nNibblesIndex, nNibblesData, true);
 
         const unsigned nbValueScan      = inclusiveScanInt(nNibbles);
         const unsigned nbValueDataIndex = vleDataSize + nbValueScan - nNibbles;
@@ -130,51 +124,59 @@ struct WarpCompression
         for (unsigned i = 0; i < nNibbles; ++i)
             writeDataNibble(nbValueDataIndex + i, (diff >> (4 * i)) & 0xf, true);
 
-        buffer += sizeof(GpuConfig::ThreadMask) + (vleDataSize + 1) / 2;
+        buffer_ += sizeof(GpuConfig::ThreadMask) + (vleDataSize + 1) / 2;
 #endif
     }
 
-    __device__ __forceinline__ unsigned numBytes() const { return (unsigned)(buffer - (std::uint8_t*)start); }
+    __device__ __forceinline__ unsigned numBytes() const { return (unsigned)(buffer_ - (std::uint8_t*)start_); }
+    __device__ __forceinline__ unsigned numNeighbors() const { return numNeighbors_; }
 
     __device__ __forceinline__ ~WarpCompression()
     {
         const unsigned laneIdx    = laneIndex();
         const unsigned totalBytes = numBytes();
-        assert(numNeighbors > 0 || totalBytes == sizeof(unsigned));
+        assert(numNeighbors_ > 0 || totalBytes == sizeof(unsigned));
         assert(totalBytes < (1 << 16));
-        assert(numNeighbors < (1 << 16));
-        if (laneIdx == 0) *((unsigned*)start) = totalBytes | (numNeighbors << 16);
+        assert(numNeighbors_ < (1 << 16));
+        if (laneIdx == 0) *((unsigned*)start_) = totalBytes | (numNeighbors_ << 16);
     }
+
+private:
+    std::uint8_t *start_, *buffer_;
+    unsigned previous_, numNeighbors_;
 };
 
 struct WarpDecompression
 {
-    const std::uint8_t* buffer;
-    unsigned previous;
-    unsigned _numNeighbors;
-
-    __device__ __forceinline__ WarpDecompression(const char* input)
-        : buffer((const std::uint8_t*)((const unsigned*)input + 1))
-        , previous(unsigned(-1))
+    __device__ __forceinline__ explicit WarpDecompression(const void* input)
+        : buffer_(reinterpret_cast<const std::uint8_t*>(reinterpret_cast<const unsigned*>(input) + 1))
+        , previous_(static_cast<unsigned>(-1))
+        , numBytes_(*reinterpret_cast<const unsigned*>(input) & 0xffff)
+        , numNeighbors_(*reinterpret_cast<const unsigned*>(input) >> 16)
     {
-        _numNeighbors = *((const unsigned*)input) >> 16;
     }
 
-    __device__ __forceinline__ unsigned numNeighbors() const { return _numNeighbors; }
+    WarpDecompression(const WarpDecompression&)            = delete;
+    WarpDecompression& operator=(const WarpDecompression&) = delete;
+    WarpDecompression(WarpDecompression&&)                 = delete;
+    WarpDecompression& operator=(WarpDecompression&&)      = delete;
+
+    __device__ __forceinline__ unsigned numBytes() const { return numBytes_; }
+    __device__ __forceinline__ unsigned numNeighbors() const { return numNeighbors_; }
 
     __device__ __forceinline__ unsigned next()
     {
         const unsigned laneIdx = laneIndex();
 
 #if CSTONE_USE_BAND_ET_AL_COMPRESSION
-        const std::uint8_t* vleData = buffer + 2 * sizeof(GpuConfig::ThreadMask);
+        const std::uint8_t* vleData = buffer_ + 2 * sizeof(GpuConfig::ThreadMask);
 
         GpuConfig::ThreadMask firstControl  = 0;
         GpuConfig::ThreadMask secondControl = 0;
         for (unsigned i = 0; i < sizeof(GpuConfig::ThreadMask); ++i)
         {
-            firstControl |= GpuConfig::ThreadMask(buffer[i]) << (8 * i);
-            secondControl |= GpuConfig::ThreadMask(buffer[sizeof(GpuConfig::ThreadMask) + i]) << (8 * i);
+            firstControl |= GpuConfig::ThreadMask(buffer_[i]) << (8 * i);
+            secondControl |= GpuConfig::ThreadMask(buffer_[sizeof(GpuConfig::ThreadMask) + i]) << (8 * i);
         }
 
         const bool firstControlBit  = (firstControl >> laneIdx) & 1;
@@ -187,16 +189,16 @@ struct WarpDecompression
         const unsigned dataBytesIndex = dataBytesScan - dataBytes;
         const unsigned warpDataBytes  = shflSync(dataBytesScan, GpuConfig::warpSize - 1);
 
-        previous = shflSync(previous, GpuConfig::warpSize - 1);
+        previous_ = shflSync(previous_, GpuConfig::warpSize - 1);
 
         for (unsigned i = 0; i < dataBytes; ++i)
-            diff |= unsigned(vleData[dataBytesIndex + i]) << (8 * i);
+            diff |= static_cast<unsigned>(vleData[dataBytesIndex + i]) << (8 * i);
 
-        previous += inclusiveScanInt(diff + 1);
+        previous_ += inclusiveScanInt(diff + 1);
 
-        buffer += 2 * sizeof(GpuConfig::ThreadMask) + warpDataBytes;
+        buffer_ += 2 * sizeof(GpuConfig::ThreadMask) + warpDataBytes;
 #else
-        const std::uint8_t* vleData = buffer + sizeof(GpuConfig::ThreadMask);
+        const std::uint8_t* vleData = buffer_ + sizeof(GpuConfig::ThreadMask);
 
         const auto readDataNibble = [vleData](unsigned index)
         {
@@ -206,13 +208,12 @@ struct WarpDecompression
 
         GpuConfig::ThreadMask nonOneBits = 0;
         for (unsigned i = 0; i < sizeof(GpuConfig::ThreadMask); ++i)
-            nonOneBits |= GpuConfig::ThreadMask(buffer[i]) << (8 * i);
+            nonOneBits |= GpuConfig::ThreadMask(buffer_[i]) << (8 * i);
 
         const bool nonOne = (nonOneBits >> laneIdx) & 1;
 
-        unsigned vleDataSize        = 0;
-        const unsigned nNibbleIndex = vleDataSize + popCount(nonOneBits & lanemask_lt());
-        vleDataSize += popCount(nonOneBits);
+        const unsigned nNibbleIndex = popCount(nonOneBits & lanemask_lt());
+        unsigned vleDataSize        = popCount(nonOneBits);
 
         const unsigned nNibblesData  = nonOne ? readDataNibble(nNibbleIndex) : 0;
         const bool additionalStorage = nonOne ? nNibblesData <= 7 : 0;
@@ -223,18 +224,22 @@ struct WarpDecompression
         const unsigned nbValueSize      = shflSync(nbValueScan, GpuConfig::warpSize - 1);
         vleDataSize += nbValueSize;
 
-        previous = shflSync(previous, GpuConfig::warpSize - 1);
+        previous_ = shflSync(previous_, GpuConfig::warpSize - 1);
 
         unsigned diff = nonOne ? (additionalStorage ? readDataNibble(nbValueDataIndex) : nNibblesData - 6) : 1;
         for (unsigned i = 1; i < nNibbles; ++i)
             diff |= readDataNibble(nbValueDataIndex + i) << (4 * i);
 
-        previous += inclusiveScanInt(diff);
+        previous_ += inclusiveScanInt(diff);
 
-        buffer += sizeof(GpuConfig::ThreadMask) + (vleDataSize + 1) / 2;
+        buffer_ += sizeof(GpuConfig::ThreadMask) + (vleDataSize + 1) / 2;
 #endif
-        return previous;
+        return previous_;
     }
+
+private:
+    const std::uint8_t* buffer_;
+    unsigned numBytes_, numNeighbors_, previous_;
 };
 
 /*! compress a list of neighbor indices with a single warp
@@ -251,10 +256,10 @@ struct WarpDecompression
  * @param[in]  n          number of neighbor indices in the input array
  */
 __device__ __forceinline__ unsigned
-warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restrict__ output, const unsigned n)
+warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, void* __restrict__ output, const unsigned n)
 {
     const unsigned laneIdx = laneIndex();
-    auto compression       = WarpCompression(output);
+    WarpCompression compression(output);
     for (unsigned offset = 0; offset < n; offset += GpuConfig::warpSize)
     {
         const unsigned nb          = offset + laneIdx;
@@ -276,11 +281,11 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, char* __restr
  * @param[out] n         reference to an unsigned integer where the number of neighbor indices will be stored
  */
 __device__ __forceinline__ void
-warpDecompressNeighbors(const char* const __restrict__ input, std::uint32_t* const __restrict__ neighbors, unsigned& n)
+warpDecompressNeighbors(const void* const __restrict__ input, std::uint32_t* const __restrict__ neighbors, unsigned& n)
 {
     const unsigned laneIdx = laneIndex();
-    auto decompression     = WarpDecompression(input);
-    n                      = decompression.numNeighbors();
+    WarpDecompression decompression(input);
+    n = decompression.numNeighbors();
     for (unsigned offset = 0; offset < n; offset += GpuConfig::warpSize)
     {
         const unsigned nb       = offset + laneIdx;
