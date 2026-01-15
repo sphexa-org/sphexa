@@ -24,16 +24,18 @@ void Initialize(int argc, char* argv[])
             const auto fname = std::string(argv[cc + 1]);
             const auto path  = "catalyst/scripts/script" + std::to_string(cc - 1);
             node[path + "/filename"].set_string(fname);
+            std::cout << "Catalyst script using " << fname << std::endl;
         }
     }
 
-    // indicate that we want to load ParaView-Catalyst
     node["catalyst_load/implementation"].set_string("paraview");
-    //node["catalyst_load/search_paths/paraview"] = PARAVIEW_IMPL_DIR;
+    // node["catalyst_load/search_paths/paraview"] = PARAVIEW_IMPL_DIR;
+    //  the run-time env variable CATALYST_IMPLEMENTATION_PATHS should point to
+    //  a ParaView compilation folder with libcatalyst-paraview.so
 
     catalyst_status err = catalyst_initialize(conduit_cpp::c_node(&node));
     if (err != catalyst_status_ok) { std::cerr << "ERROR: Failed to initialize Catalyst: " << err << std::endl; }
-    std::cout << "CatalystAdaptor::Initialize" << std::endl;
+    std::cout << "CatalystAdaptor::Initialized" << std::endl;
 }
 
 /*! @brief Add a volume-independent vertex field to a mesh
@@ -75,32 +77,46 @@ void Execute(DataType& d, long startIndex, long endIndex)
 
     // start with coordsets
     mesh["coordsets/coords/type"] = "explicit";
-    mesh["coordsets/coords/values/x"].set_external(d.x.data() + startIndex, endIndex - startIndex);
-    mesh["coordsets/coords/values/y"].set_external(d.y.data() + startIndex, endIndex - startIndex);
-    mesh["coordsets/coords/values/z"].set_external(d.z.data() + startIndex, endIndex - startIndex);
+    mesh["coordsets/coords/values/x"].set_external(get<"x">(d).data() + startIndex, endIndex - startIndex);
+    mesh["coordsets/coords/values/y"].set_external(get<"y">(d).data() + startIndex, endIndex - startIndex);
+    mesh["coordsets/coords/values/z"].set_external(get<"z">(d).data() + startIndex, endIndex - startIndex);
 
-    // Next, add topology with implicit connectivity
+// #define IMPLICIT_CONNECTIVITY_LIST 1 // the connectivity list is not given, but created by vtkm
+#ifdef IMPLICIT_CONNECTIVITY_LIST
     mesh["topologies/mesh/type"] = "points";
+#else
+    mesh["topologies/mesh/type"] = "unstructured";
+    std::vector<conduit_int32> conn(endIndex - startIndex);
+    std::iota(conn.begin(), conn.end(), 0);
+    mesh["topologies/mesh/elements/connectivity"].set_external(conn);
+    mesh["topologies/mesh/elements/shape"] = "point";
+#endif
     mesh["topologies/mesh/coordset"].set("coords");
 
-    addField(mesh, "vx",               d.vx.data(), startIndex, endIndex);
-    addField(mesh, "vy",               d.vy.data(), startIndex, endIndex);
-    addField(mesh, "vz",               d.vz.data(), startIndex, endIndex);
-    addField(mesh, "Density",          d.rho.data(), startIndex, endIndex);
-    addField(mesh, "Mass",             d.m.data(), startIndex, endIndex);
-    addField(mesh, "Smoothing Length", d.h.data(), startIndex, endIndex);
-    addField(mesh, "Pressure",         d.p.data(), startIndex, endIndex);
-    addField(mesh, "Speed of Sound",   d.c.data(), startIndex, endIndex);
-    addField(mesh, "ax",               d.ax.data(), startIndex, endIndex);
-    addField(mesh, "ay",               d.ay.data(), startIndex, endIndex);
-    addField(mesh, "az",               d.az.data(), startIndex, endIndex);
-    //addField(mesh, "Internal Energy",  d.u.data(), startIndex, endIndex);
+    addField(mesh, "x", get<"x">(d).data(), startIndex, endIndex);
+    addField(mesh, "y", get<"y">(d).data(), startIndex, endIndex);
+    addField(mesh, "z", get<"z">(d).data(), startIndex, endIndex);
+    addField(mesh, "vx", get<"vx">(d).data(), startIndex, endIndex);
+    addField(mesh, "vy", get<"vy">(d).data(), startIndex, endIndex);
+    addField(mesh, "vz", get<"vz">(d).data(), startIndex, endIndex);
+    addField(mesh, "kx", get<"kx">(d).data(), startIndex, endIndex);
+    addField(mesh, "xm", get<"xm">(d).data(), startIndex, endIndex);
+    addField(mesh, "alpha", get<"alpha">(d).data(), startIndex, endIndex);
+    // addField(mesh, "Density", d.rho.data(), startIndex, endIndex);
+    // addField(mesh, "Mass", d.m.data(), startIndex, endIndex);
+    // addField(mesh, "Smoothing Length", d.h.data(), startIndex, endIndex);
+    // addField(mesh, "Pressure", d.p.data(), startIndex, endIndex);
+    // addField(mesh, "Speed of Sound", d.c.data(), startIndex, endIndex);
+    // addField(mesh, "ax", d.ax.data(), startIndex, endIndex);
+    // addField(mesh, "ay", d.ay.data(), startIndex, endIndex);
+    // addField(mesh, "az", d.az.data(), startIndex, endIndex);
+    // addField(mesh, "Internal Energy", d.u.data(), startIndex, endIndex);
 
     conduit_cpp::Node verify_info;
     if (!conduit_blueprint_verify("mesh", conduit_cpp::c_node(&mesh), conduit_cpp::c_node(&verify_info)))
-      std::cerr << "ERROR: blueprint verify failed!" + verify_info.to_json() << std::endl;
-    //else std::cerr << "PASS: blueprint verify passed!"<< std::endl;
-      
+        std::cerr << "ERROR: blueprint verify failed!" + verify_info.to_json() << std::endl;
+    // else std::cerr << "PASS: blueprint verify passed!"<< std::endl;
+
     catalyst_status err = catalyst_execute(conduit_cpp::c_node(&exec_params));
     if (err != catalyst_status_ok) { std::cerr << "ERROR: Failed to execute Catalyst: " << err << std::endl; }
 }

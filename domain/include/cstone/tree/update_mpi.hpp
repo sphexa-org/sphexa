@@ -40,7 +40,7 @@ bool updateOctreeGlobal(std::span<const KeyType> keys,
     bool converged = updateOctree(keys, bucketSize, tree, counts, maxCount);
 
     std::vector<unsigned> counts_reduced(counts.size());
-    MPI_Allreduce(counts.data(), counts_reduced.data(), counts.size(), MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
+    mpiAllreduce(counts.data(), counts_reduced.data(), counts.size(), MPI_SUM, MPI_COMM_WORLD);
 
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < counts.size(); ++i)
@@ -58,17 +58,15 @@ bool updateOctreeGlobal(std::span<const KeyType> keys,
  * @param[in]     bucketSize  max number of particles per leaf
  * @param[inout]  tree        a fully linked octree
  * @param[inout]  counts      leaf node particle counts
- * @param[in]     numRanks    number of MPI ranks
- * @return                    true if tree was not changed
+ * @return                    maximum number of particles per cell capped to 2^32-1 or 0 if tree has max depth
  */
 template<class KeyType>
-bool updateOctreeGlobal(std::span<const KeyType> keys,
-                        unsigned bucketSize,
-                        OctreeData<KeyType, CpuTag>& tree,
-                        std::vector<KeyType>& leaves,
-                        std::vector<unsigned>& counts)
+unsigned updateOctreeGlobal(std::span<const KeyType> keys,
+                            unsigned bucketSize,
+                            OctreeData<KeyType, CpuTag>& tree,
+                            std::vector<KeyType>& leaves,
+                            std::vector<unsigned>& counts)
 {
-    unsigned maxCount = std::numeric_limits<unsigned>::max();
     bool converged =
         rebalanceDecision(leaves.data(), counts.data(), nNodes(leaves), bucketSize, tree.childOffsets.data());
     rebalanceTree(leaves, tree.prefixes, tree.childOffsets.data());
@@ -78,18 +76,22 @@ bool updateOctreeGlobal(std::span<const KeyType> keys,
     updateInternalTree<KeyType>(leaves, tree.data());
 
     counts.resize(tree.numLeafNodes);
-    computeNodeCounts(leaves.data(), counts.data(), tree.numLeafNodes, keys, maxCount, true);
+    computeNodeCounts(leaves.data(), counts.data(), tree.numLeafNodes, keys, std::numeric_limits<unsigned>::max(),
+                      true);
 
     std::vector<unsigned> counts_reduced(counts.size());
-    MPI_Allreduce(counts.data(), counts_reduced.data(), counts.size(), MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
+    mpiAllreduce(counts.data(), counts_reduced.data(), counts.size(), MPI_SUM, MPI_COMM_WORLD);
 
-#pragma omp parallel for schedule(static)
+    unsigned maxCount = 0;
+#pragma omp parallel for schedule(static) reduction(max : maxCount)
     for (size_t i = 0; i < counts.size(); ++i)
     {
         counts[i] = std::max(counts[i], counts_reduced[i]);
+        maxCount  = std::max(counts[i], maxCount);
     }
 
-    return converged;
+    if (converged) { return 0; }
+    return maxCount;
 }
 
 } // namespace cstone

@@ -14,29 +14,59 @@
  */
 
 #include "cstone/primitives/math.hpp"
+#include "cstone/primitives/warpscan.cuh"
 #include "source_center.hpp"
 #include "source_center_gpu.h"
 
 namespace cstone
 {
-
-template<class Tc, class Th>
+template<int TPL, class Tc, class Th>
 __global__ void computeBoundingBoxKernel(const Tc* x,
                                          const Tc* y,
                                          const Tc* z,
                                          const Th* h,
                                          const LocalIndex* layout,
-                                         TreeNodeIndex first,
-                                         TreeNodeIndex last,
+                                         TreeNodeIndex firstLeaf,
+                                         TreeNodeIndex lastLeaf,
                                          Th scale,
                                          Vec3<Tc>* searchCenters,
                                          Vec3<Tc>* searchSizes)
 {
-    TreeNodeIndex i = first + blockIdx.x * blockDim.x + threadIdx.x;
-    if (i >= last) { return; }
+    TreeNodeIndex tid     = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex leafIdx = firstLeaf + tid / TPL;
 
-    Vec3<Tc> init                               = searchCenters[i];
-    util::tie(searchCenters[i], searchSizes[i]) = computeBoundingBox(x, y, z, h, layout[i], layout[i + 1], scale, init);
+    Vec3<Tc> init      = searchCenters[leafIdx];
+    Vec3<Tc> commonMin = init, commonMax = init;
+    if (leafIdx < lastLeaf)
+    {
+        auto first = layout[leafIdx];
+        auto last  = layout[leafIdx + 1];
+
+        for (LocalIndex i = first + threadIdx.x % TPL; i < last; i += TPL)
+        {
+            auto r = h[i] * scale;
+            Vec3<Tc> p{x[i], y[i], z[i]};
+            commonMin = min(commonMin, Vec3<Tc>{p[0] - r, p[1] - r, p[2] - r});
+            commonMax = max(commonMax, Vec3<Tc>{p[0] + r, p[1] + r, p[2] + r});
+        }
+    }
+
+#pragma unroll
+    for (int offset = 1; offset < TPL; offset *= 2)
+    {
+#pragma unroll
+        for (int d = 0; d < 3; ++d)
+        {
+            commonMin[d] = stl::min(commonMin[d], shflDownSync(commonMin[d], offset));
+            commonMax[d] = stl::max(commonMax[d], shflDownSync(commonMax[d], offset));
+        }
+    }
+
+    if (tid % TPL == 0 && leafIdx < lastLeaf)
+    {
+        searchCenters[leafIdx] = (commonMax + commonMin) * Tc(0.5);
+        searchSizes[leafIdx]   = (commonMax - commonMin) * Tc(0.5);
+    }
 }
 
 template<class Tc, class Th>
@@ -51,12 +81,13 @@ void computeBoundingBoxGpu(const Tc* x,
                            Vec3<Tc>* searchCenters,
                            Vec3<Tc>* searchSizes)
 {
-    unsigned numThreads = 256;
-    unsigned numBlocks  = iceil(last - first, numThreads);
+    constexpr int threadsPerLeaf = 8;
+    unsigned numThreads          = 256;
+    unsigned numBlocks           = iceil(threadsPerLeaf * (last - first), numThreads);
 
     if (numBlocks == 0) { return; }
-    computeBoundingBoxKernel<<<numBlocks, numThreads>>>(x, y, z, h, layout, first, last, scale, searchCenters,
-                                                        searchSizes);
+    computeBoundingBoxKernel<threadsPerLeaf>
+        <<<numBlocks, numThreads>>>(x, y, z, h, layout, first, last, scale, searchCenters, searchSizes);
 }
 
 #define COMPUTE_BOUNDING_BOX_GPU(Tc, Th)                                                                               \
@@ -68,7 +99,7 @@ COMPUTE_BOUNDING_BOX_GPU(double, double);
 COMPUTE_BOUNDING_BOX_GPU(double, float);
 COMPUTE_BOUNDING_BOX_GPU(float, float);
 
-template<class Tc, class Tm, class Tf>
+template<int TPL, class Tc, class Tm, class Tf>
 __global__ void computeLeafSourceCenterKernel(const Tc* x,
                                               const Tc* y,
                                               const Tc* z,
@@ -78,11 +109,35 @@ __global__ void computeLeafSourceCenterKernel(const Tc* x,
                                               const LocalIndex* layout,
                                               Vec4<Tf>* centers)
 {
-    TreeNodeIndex leafIdx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (leafIdx >= numLeaves) { return; }
+    TreeNodeIndex tid     = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex leafIdx = tid / TPL;
 
-    TreeNodeIndex nodeIdx = leafToInternal[leafIdx];
-    centers[nodeIdx]      = massCenter<Tf>(x, y, z, m, layout[leafIdx], layout[leafIdx + 1]);
+    Vec4<Tf> mc_loc{0, 0, 0, 0};
+    if (leafIdx < numLeaves)
+    {
+        auto first = layout[leafIdx];
+        auto last  = layout[leafIdx + 1];
+
+        for (LocalIndex i = first + threadIdx.x % TPL; i < last; i += TPL)
+        {
+            addBody(mc_loc, {x[i], y[i], z[i], m[i]});
+        }
+    }
+
+#pragma unroll
+    for (int offset = 1; offset < TPL; offset *= 2)
+    {
+        mc_loc[0] += shflDownSync(mc_loc[0], offset);
+        mc_loc[1] += shflDownSync(mc_loc[1], offset);
+        mc_loc[2] += shflDownSync(mc_loc[2], offset);
+        mc_loc[3] += shflDownSync(mc_loc[3], offset);
+    }
+
+    if (tid % TPL == 0 && leafIdx < numLeaves)
+    {
+        TreeNodeIndex nodeIdx = leafToInternal[leafIdx];
+        centers[nodeIdx]      = normalizeMass(mc_loc);
+    }
 }
 
 template<class Tc, class Tm, class Tf>
@@ -95,11 +150,13 @@ void computeLeafSourceCenterGpu(const Tc* x,
                                 const LocalIndex* layout,
                                 Vec4<Tf>* centers)
 {
-    unsigned numThreads = 256;
-    unsigned numBlocks  = iceil(numLeaves, numThreads);
+    constexpr int threadsPerLeaf = 8;
+    unsigned numThreads          = 256;
+    unsigned numBlocks           = iceil(threadsPerLeaf * numLeaves, numThreads);
 
     if (numBlocks == 0) { return; }
-    computeLeafSourceCenterKernel<<<numBlocks, numThreads>>>(x, y, z, m, leafToInternal, numLeaves, layout, centers);
+    computeLeafSourceCenterKernel<threadsPerLeaf>
+        <<<numBlocks, numThreads>>>(x, y, z, m, leafToInternal, numLeaves, layout, centers);
 }
 
 #define COMPUTE_LEAF_SOURCE_CENTER_GPU(Tc, Tm, Tf)                                                                     \

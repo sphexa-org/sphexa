@@ -19,7 +19,6 @@ function(addRyoanjiGpuMpiTest source exename testname ranks)
 
     if (CMAKE_HIP_COMPILER AND SPH_EXA_WITH_HIP)
         target_link_libraries(${exename} PRIVATE hip::host)
-        target_compile_definitions(${exename} PRIVATE THRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)
         set_target_properties(${exename} PROPERTIES LINKER_LANGUAGE CXX)
     endif ()
 

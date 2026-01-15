@@ -26,6 +26,7 @@
 
 #include <iostream>
 
+#include "cstone/util/tuple.hpp"
 #include "morton.hpp"
 
 namespace cstone

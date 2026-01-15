@@ -68,8 +68,6 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
 
     // *******************************
 
-    auto peers = findPeersMac(thisRank, assignment, domainTree, box, invThetaEff);
-
     KeyType focusStart = assignment[thisRank];
     KeyType focusEnd   = assignment[thisRank + 1];
 
@@ -93,7 +91,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
     else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box); }
 
     FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal);
-    focusTree.converge(box, particleKeys, peers, assignment, tree, counts, invThetaEff);
+    focusTree.converge(box, particleKeys, assignment, tree, counts, invThetaEff);
 
     auto octree = focusTree.octreeViewAcc();
     std::vector<unsigned> testCounts(octree.numNodes, -1);
@@ -188,8 +186,6 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>
 
     /*******************************/
 
-    auto peers = findPeersMac(thisRank, assignment, domainTree, box, invThetaEff);
-
     KeyType focusStart = assignment[thisRank];
     KeyType focusEnd   = assignment[thisRank + 1];
 
@@ -214,7 +210,7 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>
     else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box); }
 
     FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal);
-    focusTree.converge(box, particleKeys, peers, assignment, tree, counts, invThetaEff);
+    focusTree.converge(box, particleKeys, assignment, tree, counts, invThetaEff);
 
     auto octree = focusTree.octreeViewAcc();
 

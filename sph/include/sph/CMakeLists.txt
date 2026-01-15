@@ -13,7 +13,6 @@ endif ()
 if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     add_library(timesteps_gpu OBJECT ${TIMESTEP_GPU_KERNELS})
     target_include_directories(timesteps_gpu PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE_DIR}/include)
-    target_compile_definitions(timesteps_gpu PRIVATE USE_CUDA)
 
     add_library(sph_gpu
             $<TARGET_OBJECTS:timesteps_gpu>
@@ -21,4 +20,8 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
             $<TARGET_OBJECTS:hydro_turb_gpu>
             $<TARGET_OBJECTS:hydro_ve_gpu>)
     set_target_properties(sph_gpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+endif ()
+
+if (CMAKE_HIP_COMPILER)
+    target_link_libraries(timesteps_gpu PRIVATE roc::rocthrust hip::hipcub)
 endif ()

@@ -125,3 +125,19 @@ TEST_F(SphKernelTestsStd, MomentumEnergy)
     EXPECT_NEAR(du, -0.40541191600274296, 1e-8);
     EXPECT_NEAR(maxvsignal, 1.4112466828564341, 1e-10);
 }
+
+TEST_F(SphKernelTestsStd, MomentumEnergyZero)
+{
+    auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
+
+    momentumAndEnergyJLoop(0, K, box(), neighbors.data(), 0, x.data(), y.data(), z.data(), vx.data(), vy.data(),
+                           vz.data(), h.data(), m.data(), rho.data(), p.data(), c.data(), c11.data(), c12.data(),
+                           c13.data(), c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), &grad_Px, &grad_Py,
+                           &grad_Pz, &du, &maxvsignal);
+
+    EXPECT_EQ(grad_Px, 0.0);
+    EXPECT_EQ(grad_Py, 0.0);
+    EXPECT_EQ(grad_Pz, 0.0);
+    EXPECT_EQ(du, 0.0);
+    EXPECT_EQ(maxvsignal, 0.0);
+}
