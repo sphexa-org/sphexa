@@ -187,7 +187,7 @@ sph-run-cuda12-sm90-release-sphexa-cuda-constants-check:
 sph-run-cuda12-sm90-release-sphexa-cpu-constants-check:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-release']
-  image: "${MYUENV}"
+  image: prgenv-gnu/25.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
