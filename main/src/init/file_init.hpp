@@ -53,7 +53,8 @@ void restoreDataset(IFileReader* reader, Dataset& d)
             if (reader->rank() == 0) { std::cout << "restoring " << d.fieldNames[i]; }
             auto t0 = std::chrono::high_resolution_clock::now();
             std::visit([reader, key = d.fieldNames[i]](auto field){
-                auto tmp = toHost(*field);
+                using T = std::remove_reference<decltype(*field->data())>::type;
+                std::vector<T> tmp(field->size());
                 reader->readField(Dataset::prefix + key, tmp.data());
                 *field = std::move(tmp);
             }, fieldPointers[i]);
@@ -185,9 +186,9 @@ public:
             gatherSwap(y0, sfcOrder);
             gatherSwap(z0, sfcOrder);
 
-            auto x = toHost(d.x);
-            auto y = toHost(d.y);
-            auto z = toHost(d.z);
+            std::vector<T> x(numParticlesSplit);
+            std::vector<T> y(numParticlesSplit);
+            std::vector<T> z(numParticlesSplit);
 #pragma omp parallel for schedule(static)
             for (size_t i = 0; i < numParticlesInFile; ++i)
             {
@@ -221,54 +222,37 @@ public:
             reader->readField(key, src.data());
             cstone::gather<cstone::LocalIndex>(sfcOrder, src.data(), tmp.data());
             swap(src, tmp);
+            tmp.clear();
 
-            dest.resize(numParticlesSplit);
+            using DestVectorType = std::decay_t<decltype(dest)>::value_type;
+            std::vector<DestVectorType> outTmp(numParticlesSplit);
 #pragma omp parallel for schedule(static)
             for (size_t i = 0; i < numParticlesInFile; ++i)
             {
                 size_t sIdx = numSplits * i;
-                std::fill(dest.data() + sIdx, dest.data() + sIdx + numSplits, src[i] * scale);
+                std::fill(outTmp.data() + sIdx, outTmp.data() + sIdx + numSplits, src[i] * scale);
             }
+            dest = std::move(outTmp);
         };
 
         d.resize(numParticlesSplit);
-        auto m = toHost(d.m);
-        auto h = toHost(d.h);
-        auto vx = toHost(d.vx);
-        auto vy = toHost(d.vy);
-        auto vz = toHost(d.vz);
-        auto x_m1 = toHost(d.x_m1);
-        auto y_m1 = toHost(d.y_m1);
-        auto z_m1 = toHost(d.z_m1);
-        auto temp = toHost(d.temp);
-        replicateField(reader, "m", m, T(1) / numSplits);
-        replicateField(reader, "h", h, T(1) / std::cbrt(numSplits));
-        replicateField(reader, "vx", vx, T(1));
-        replicateField(reader, "vy", vy, T(1));
-        replicateField(reader, "vz", vz, T(1));
-        replicateField(reader, "temp", temp, T(1));
+        replicateField(reader, "m", d.m, T(1) / numSplits);
+        replicateField(reader, "h", d.h, T(1) / std::cbrt(numSplits));
+        replicateField(reader, "vx", d.vx, T(1));
+        replicateField(reader, "vy", d.vy, T(1));
+        replicateField(reader, "vz", d.vz, T(1));
+        replicateField(reader, "temp", d.temp, T(1));
         cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0);
         cstone::fill<gpu>(d.rung.begin(), d.rung.end(), 0);
-        std::transform(vx.begin(), vx.end(), x_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
-        std::transform(vy.begin(), vy.end(), y_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
-        std::transform(vz.begin(), vz.end(), z_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
+        cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), d.minDt);
+        cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), d.minDt);
+        cstone::scaleGpuAcc<gpu>(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), d.minDt);
 
-        d.m = std::move(m);
-        d.h = std::move(h);
-        d.vx = std::move(vx);
-        d.vy = std::move(vy);
-        d.vz = std::move(vz);
-        d.x_m1 = std::move(x_m1);
-        d.y_m1 = std::move(y_m1);
-        d.z_m1 = std::move(z_m1);
-        d.temp = std::move(temp);
         if (d.isAllocated("alpha"))
         {
             try
             {
-                auto alpha = toHost(d.alpha);
-                replicateField(reader, "alpha", alpha, T(1));
-                d.alpha = std::move(alpha);
+                replicateField(reader, "alpha", d.alpha, T(1));
             }
             catch (std::runtime_error&)
             {

@@ -89,7 +89,7 @@ void initEvrardFields(Dataset& d, const std::map<std::string, double>& constants
     auto&& x = toHost(d.x);
     auto&& y = toHost(d.y);
     auto&& z = toHost(d.z);
-    auto h = toHost(d.h);
+    std::vector<typename Dataset::HydroType> h(d.x.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {

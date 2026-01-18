@@ -69,6 +69,8 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
 {
     constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
     using T = typename Dataset::RealType;
+    using HydroType = typename Dataset::HydroType;
+    using XM1Type = typename Dataset::XM1Type;
 
     double r           = constants.at("r1");
     double totalVolume = 4. * M_PI / 3. * r * r * r;
@@ -91,12 +93,12 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
     auto&& x = toHost(d.x);
     auto&& y = toHost(d.y);
     auto&& z = toHost(d.z);
-    auto vx = toHost(d.vx);
-    auto vy = toHost(d.vy);
-    auto vz = toHost(d.vz);
-    auto x_m1 = toHost(d.x_m1);
-    auto y_m1 = toHost(d.y_m1);
-    auto z_m1 = toHost(d.z_m1);
+    std::vector<HydroType> vx(d.vx.size());
+    std::vector<HydroType> vy(d.vy.size());
+    std::vector<HydroType> vz(d.vz.size());
+    std::vector<XM1Type> x_m1(d.x_m1.size());
+    std::vector<XM1Type> y_m1(d.y_m1.size());
+    std::vector<XM1Type> z_m1(d.z_m1.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {

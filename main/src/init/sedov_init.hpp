@@ -85,8 +85,7 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
     auto&& x = toHost(d.x);
     auto&& y = toHost(d.y);
     auto&& z = toHost(d.z);
-    auto temp = toHost(d.temp);
-    auto u = toHost(d.u);
+    std::vector<T> u_or_t(d.x.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
@@ -96,12 +95,17 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
         T r2 = xi * xi + yi * yi + zi * zi;
 
         T ui = constants.at("ener0") * exp(-(r2 / width2)) + constants.at("u0");
-        if (temp.empty()) { u[i] = ui; }
-        else { temp[i] = ui / cv; }
+        u_or_t[i] = ui;
     }
-
-    d.temp = std::move(temp);
-    d.u = std::move(u);
+    if (d.u.empty())
+    {
+        std::for_each(u_or_t.begin(), u_or_t.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
+        d.temp = std::move(u_or_t);
+    }
+    else
+    {
+        d.u = std::move(u_or_t);
+    }
 }
 
 template<class Dataset>

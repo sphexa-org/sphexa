@@ -70,6 +70,8 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
 {
     constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
     using T = typename Dataset::RealType;
+    using HydroType = typename Dataset::HydroType;
+    using XM1Type = typename Dataset::XM1Type;
 
     T r         = constants.at("r");
     T rhoInt    = constants.at("rhoInt");
@@ -94,18 +96,17 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
 
     generateParticleIDs<gpu>(d.id);
 
-    auto* u_or_t = d.temp.empty() ? d.u.data() : d.temp.data();
-
+    std::vector<T> u_or_t(d.x.size());
     auto&& x = toHost(d.x);
     auto&& y = toHost(d.y);
     auto&& z = toHost(d.z);
     auto&& vx = toHost(d.vx);
     auto&& vy = toHost(d.vy);
     auto&& vz = toHost(d.vz);
-    auto h = toHost(d.h);
-    auto x_m1 = toHost(d.x_m1);
-    auto y_m1 = toHost(d.y_m1);
-    auto z_m1 = toHost(d.z_m1);
+    std::vector<HydroType> h(d.h.size());
+    std::vector<XM1Type> x_m1(d.x_m1.size());
+    std::vector<XM1Type> y_m1(d.y_m1.size());
+    std::vector<XM1Type> z_m1(d.z_m1.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
@@ -143,12 +144,14 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
     d.x_m1 = std::move(x_m1);
     d.y_m1 = std::move(y_m1);
     d.z_m1 = std::move(z_m1);
-
-    if (d.u.empty())
+    if (d.temp.empty())
     {
-        auto temp = toHost(d.temp);
-        std::for_each(temp.begin(), temp.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
-        d.temp = std::move(temp);
+        d.u = std::move(u_or_t);
+    }
+    else
+    {
+        std::for_each(u_or_t.begin(), u_or_t.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
+        d.temp = std::move(u_or_t);
     }
 }
 
