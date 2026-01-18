@@ -201,7 +201,10 @@ sph-run-cuda12-sm90-debug-sphexa-cpu-constants-check:
     - export OMP_NUM_THREADS=64
   script:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
+    - pwd
     - $APP_INSTALL_DIR/sphexa --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 100 -w 10
+    - ls -l
+    - ls -l constants.txt
     - mv constants.txt constants_ref.txt
     - $APP_INSTALL_DIR/sphexa --init dump_sedov.h5:4 -s 100
     - awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
