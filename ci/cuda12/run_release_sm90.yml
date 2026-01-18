@@ -205,9 +205,12 @@ sph-run-cuda12-sm90-release-sphexa-cpu-constants-check:
     - if [ "$SLURM_PROCID" -eq 0 ]; then mv constants.txt constants_ref.txt; fi
     - wait
     - $APP_INSTALL_DIR/sphexa --init dump_sedov.h5:4 -s 100
-    - if [ "$SLURM_PROCID" -eq 0 ]; then \
-          awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt; \
-          python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt; \
-          if [ $? -ne 0 ]; then exit 1; fi
+    - |
+      if [ "$SLURM_PROCID" -eq 0 ]; then
+        awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
+        python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
+        if [ $? -ne 0 ]; then
+          exit 1
+        fi
       fi
     - date
