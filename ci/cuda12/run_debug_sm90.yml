@@ -176,18 +176,24 @@ sph-run-cuda12-sm90-debug-sphexa-cuda-constants-check:
     - export OMP_NUM_THREADS=64
   script:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
-    - $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init sedov --G 1.0 -n 100 -s 100 -w 10
-    - mv constants.txt constants_ref.txt
+    - $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 100 -w 10
+    - if [ "$SLURM_PROCID" -eq 0 ]; then mv constants.txt constants_ref.txt; fi
+    - wait
     - $APP_INSTALL_DIR/sphexa-cuda --init dump_sedov.h5:4 -s 100
-    - awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
-    - python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
-    - if [ $? -ne 0 ]; then exit 1; fi
+    - |
+      if [ "$SLURM_PROCID" -eq 0 ]; then
+        awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
+        python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
+        if [ $? -ne 0 ]; then
+          exit 1
+        fi
+      fi
     - date
 
 sph-run-cuda12-sm90-debug-sphexa-cpu-constants-check:
   stage: sphexa_run
   needs: ['sph-build-cuda12-sm90-debug']
-  image: "${MYUENV}"
+  image: prgenv-gnu/25.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -201,13 +207,16 @@ sph-run-cuda12-sm90-debug-sphexa-cpu-constants-check:
     - export OMP_NUM_THREADS=64
   script:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
-    - pwd
     - $APP_INSTALL_DIR/sphexa --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 100 -w 10
-    - ls -l
-    - ls -l constants.txt
-    - mv constants.txt constants_ref.txt
+    - if [ "$SLURM_PROCID" -eq 0 ]; then mv constants.txt constants_ref.txt; fi
+    - wait
     - $APP_INSTALL_DIR/sphexa --init dump_sedov.h5:4 -s 100
-    - awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
-    - python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
-    - if [ $? -ne 0 ]; then exit 1; fi
+    - |
+      if [ "$SLURM_PROCID" -eq 0 ]; then
+        awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
+        python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
+        if [ $? -ne 0 ]; then
+          exit 1
+        fi
+      fi
     - date
