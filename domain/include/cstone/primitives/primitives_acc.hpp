@@ -56,6 +56,13 @@ void copy_n(const T* src, std::size_t n, T* dest)
     else { omp_copy(src, src + n, dest); }
 }
 
+template<bool useGpu, class T1, class T2, class T3>
+void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value)
+{
+    if constexpr (useGpu) { scaleGpu(in1, in2, out, value); }
+    else { std::transform(in1, in2, out, [value](auto v_) { return v_ * value; }); }
+}
+
 template<bool useGpu, class IndexType, class ValueType>
 void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
 {
