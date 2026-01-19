@@ -208,7 +208,7 @@ constexpr __forceinline__ bool includeNbSymmetric(unsigned i, unsigned j, unsign
  */
 template<class Config, unsigned NumSuperclustersPerBlock>
 __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& sharedAllocator,
-                                                  const std::uint32_t* const __restrict__ jClusters,
+                                                  std::uint32_t* const __restrict__ jClusters,
                                                   const std::uint32_t* const __restrict__ masks,
                                                   std::uint32_t* const __restrict__ neighborData,
                                                   const std::size_t neighborDataSize,
@@ -222,13 +222,10 @@ __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& shar
     const unsigned mSize = masksSize<Config>(info.neighborsCount);
     unsigned nbSize      = info.neighborsCount;
 
-    auto compressedJClusters = sharedAllocator.alloc<std::uint32_t[]>(Config::compress ? info.neighborsCount : 0);
-
     if constexpr (Config::compress)
     {
-        const unsigned compressedSize =
-            warpCompressNeighbors(jClusters, (char*)compressedJClusters.get(), info.neighborsCount);
-        nbSize = (compressedSize + sizeof(std::uint32_t) - 1) / sizeof(std::uint32_t);
+        const unsigned compressedSize = warpCompressNeighbors(jClusters, jClusters, info.neighborsCount);
+        nbSize                        = (compressedSize + sizeof(std::uint32_t) - 1) / sizeof(std::uint32_t);
     }
 
     const unsigned long long totalSize = nbSize + mSize;
@@ -254,7 +251,7 @@ __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& shar
             globalBuildData->status = BuildStatus::neighbor_data_overflow;
             return;
         }
-        neighborData[index] = (Config::compress ? compressedJClusters.get() : jClusters)[n];
+        neighborData[index] = jClusters[n];
     }
 }
 
@@ -486,10 +483,7 @@ constexpr unsigned buildNbListSharedMemPerSupercluster(const unsigned ncmax)
     // storage requirements for cluster-cluster interaction bitmasks
     const unsigned masksDataSize = masksSize<Config>(ncmax) * sizeof(std::uint32_t);
 
-    // storage requirements for temporary array used for compression
-    const unsigned compressedJClustersSize = (Config::compress ? ncmax : 0) * sizeof(std::uint32_t);
-
-    return jClustersSize + masksDataSize + compressedJClustersSize;
+    return jClustersSize + masksDataSize;
 }
 
 /*! main GPU kernel for building the supercluster neighbor list

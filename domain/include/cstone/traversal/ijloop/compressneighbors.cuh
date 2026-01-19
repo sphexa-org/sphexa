@@ -321,7 +321,9 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, void* __restr
     Compression compression(output);
     for (unsigned offset = 0; offset < n; offset += GpuConfig::warpSize)
     {
-        const unsigned nb          = offset + laneIdx;
+        const unsigned nb = offset + laneIdx;
+        assert(neighbors != output ||
+               &neighbors[nb] > reinterpret_cast<std::uint8_t*>(output) + compression.numBytes());
         const unsigned neighbor    = nb < n ? neighbors[nb] : 0;
         const unsigned activeLanes = std::min(n - offset, static_cast<unsigned>(GpuConfig::warpSize));
         compression.add(neighbor, activeLanes);
