@@ -323,21 +323,15 @@ loadSuperclusterNeighborData(util::SharedMemAllocator& sharedAllocator,
     auto nbData             = sharedAllocator.alloc<unsigned[]>(ncmax + masksSize<Config>(ncmax));
     const unsigned maskSize = masksSize<Config>(iSuperclusterNeighborsCount);
 
-    if constexpr (Config::compress)
+    using Decompression = std::conditional_t<Config::compress, WarpDecompression, DummyWarpDecompression>;
+
+    for (unsigned n = threadIdx.y * Config::iSize + threadIdx.x; n < maskSize; n += Config::iSize * Config::jSize)
+        nbData[n] = neighborData[iSuperclusterDataIndex + n];
+
+    if (warpIndex == 0)
     {
-        for (unsigned n = threadIdx.y * Config::iSize + threadIdx.x; n < maskSize; n += Config::iSize * Config::jSize)
-            nbData[n] = neighborData[iSuperclusterDataIndex + n];
-        if (warpIndex == 0)
-        {
-            warpDecompressNeighbors((const char*)&neighborData[iSuperclusterDataIndex + maskSize], &nbData[maskSize],
-                                    iSuperclusterNeighborsCount);
-        }
-    }
-    else
-    {
-        const unsigned nbDataSize = iSuperclusterNeighborsCount + maskSize;
-        for (unsigned n = threadIdx.y * Config::iSize + threadIdx.x; n < nbDataSize; n += Config::iSize * Config::jSize)
-            nbData[n] = neighborData[iSuperclusterDataIndex + n];
+        warpDecompressNeighbors<Decompression>((const char*)&neighborData[iSuperclusterDataIndex + maskSize],
+                                               &nbData[maskSize], iSuperclusterNeighborsCount);
     }
 
     return {std::move(nbData), maskSize};

@@ -240,6 +240,66 @@ private:
     unsigned numBytes_, numNeighbors_, previous_;
 };
 
+struct DummyWarpCompression
+{
+    __device__ __forceinline__ explicit DummyWarpCompression(void* output)
+        : start_(reinterpret_cast<unsigned*>(output))
+        , buffer_(reinterpret_cast<unsigned*>(output))
+        , numNeighbors_(0)
+    {
+    }
+
+    DummyWarpCompression(const DummyWarpCompression&)            = delete;
+    DummyWarpCompression& operator=(const DummyWarpCompression&) = delete;
+    DummyWarpCompression(DummyWarpCompression&&)                 = delete;
+    DummyWarpCompression& operator=(DummyWarpCompression&&)      = delete;
+
+    __device__ __forceinline__ void add(const unsigned neighbor, const unsigned activeLanes)
+    {
+        const unsigned laneIdx = laneIndex();
+        if (laneIdx < activeLanes) buffer_[numNeighbors_ + laneIdx] = neighbor;
+        numNeighbors_ += activeLanes;
+    }
+
+    __device__ __forceinline__ unsigned numBytes() const { return numNeighbors_ * sizeof(unsigned); }
+    __device__ __forceinline__ unsigned numNeighbors() const { return numNeighbors_; }
+
+    __device__ __forceinline__ ~DummyWarpCompression() { *start_ = numNeighbors_; }
+
+private:
+    unsigned *start_, *buffer_;
+    unsigned numNeighbors_;
+};
+
+struct DummyWarpDecompression
+{
+    __device__ __forceinline__ explicit DummyWarpDecompression(const void* input, const unsigned numNeighbors)
+        : buffer_(reinterpret_cast<const unsigned*>(input))
+        , numNeighbors_(numNeighbors)
+        , index_(laneIndex())
+    {
+    }
+
+    DummyWarpDecompression(const DummyWarpDecompression&)            = delete;
+    DummyWarpDecompression& operator=(const DummyWarpDecompression&) = delete;
+    DummyWarpDecompression(DummyWarpDecompression&&)                 = delete;
+    DummyWarpDecompression& operator=(DummyWarpDecompression&&)      = delete;
+
+    __device__ __forceinline__ unsigned next()
+    {
+        const unsigned current = index_ < numNeighbors_ ? buffer_[index_] : 0;
+        index_ += GpuConfig::warpSize;
+        return current;
+    }
+
+    __device__ __forceinline__ unsigned numBytes() const { return (numNeighbors_ + 1) * sizeof(unsigned); }
+    __device__ __forceinline__ unsigned numNeighbors() const { return numNeighbors_; }
+
+private:
+    const unsigned* buffer_;
+    unsigned numNeighbors_, index_;
+};
+
 /*! compress a list of neighbor indices with a single warp
  *
  * This function compresses an array of neighbor indices using either the compression scheme proposed in 'Compressed
@@ -253,11 +313,12 @@ private:
  * @param[out] output     pointer to the output buffer where compressed data will be written
  * @param[in]  n          number of neighbor indices in the input array
  */
+template<class Compression = WarpCompression>
 __device__ __forceinline__ unsigned
 warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, void* __restrict__ output, const unsigned n)
 {
     const unsigned laneIdx = laneIndex();
-    WarpCompression compression(output);
+    Compression compression(output);
     for (unsigned offset = 0; offset < n; offset += GpuConfig::warpSize)
     {
         const unsigned nb          = offset + laneIdx;
@@ -278,12 +339,13 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, void* __restr
  * @param[out] neighbors pointer to the array where decompressed neighbor indices will be stored
  * @param[in]  n         expected number of neighbor indices (must match the number passed to warpCompressNeighbors)
  */
+template<class Decompression = WarpDecompression>
 __device__ __forceinline__ void warpDecompressNeighbors(const void* const __restrict__ input,
                                                         std::uint32_t* const __restrict__ neighbors,
                                                         const unsigned n)
 {
     const unsigned laneIdx = laneIndex();
-    WarpDecompression decompression(input, n);
+    Decompression decompression(input, n);
     for (unsigned offset = 0; offset < n; offset += GpuConfig::warpSize)
     {
         const unsigned nb       = offset + laneIdx;
