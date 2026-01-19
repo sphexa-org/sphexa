@@ -220,13 +220,11 @@ __device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& shar
     assert(blockDim.z == NumSuperclustersPerBlock);
 
     const unsigned mSize = masksSize<Config>(info.neighborsCount);
-    unsigned nbSize      = info.neighborsCount;
 
-    if constexpr (Config::compress)
-    {
-        const unsigned compressedSize = warpCompressNeighbors(jClusters, jClusters, info.neighborsCount);
-        nbSize                        = (compressedSize + sizeof(std::uint32_t) - 1) / sizeof(std::uint32_t);
-    }
+    using Compression = std::conditional_t<Config::compress, WarpCompression, DummyWarpCompression>;
+
+    const unsigned compressedSize = warpCompressNeighbors<Compression>(jClusters, jClusters, info.neighborsCount);
+    const unsigned nbSize         = (compressedSize + sizeof(std::uint32_t) - 1) / sizeof(std::uint32_t);
 
     const unsigned long long totalSize = nbSize + mSize;
     if (laneIdx == 0) info.dataIndex = atomicAdd(&globalBuildData->neighborDataSize, totalSize);
