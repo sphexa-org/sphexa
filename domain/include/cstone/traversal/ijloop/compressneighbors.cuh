@@ -264,8 +264,6 @@ struct DummyWarpCompression
     __device__ __forceinline__ unsigned numBytes() const { return numNeighbors_ * sizeof(unsigned); }
     __device__ __forceinline__ unsigned numNeighbors() const { return numNeighbors_; }
 
-    __device__ __forceinline__ ~DummyWarpCompression() { *start_ = numNeighbors_; }
-
 private:
     unsigned *start_, *buffer_;
     unsigned numNeighbors_;
@@ -292,7 +290,7 @@ struct DummyWarpDecompression
         return current;
     }
 
-    __device__ __forceinline__ unsigned numBytes() const { return (numNeighbors_ + 1) * sizeof(unsigned); }
+    __device__ __forceinline__ unsigned numBytes() const { return numNeighbors_ * sizeof(unsigned); }
     __device__ __forceinline__ unsigned numNeighbors() const { return numNeighbors_; }
 
 private:
