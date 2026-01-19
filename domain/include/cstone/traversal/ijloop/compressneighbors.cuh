@@ -41,7 +41,6 @@ struct NibbleWarpCompression
         : start_(reinterpret_cast<std::uint8_t*>(output))
         , buffer_(reinterpret_cast<std::uint8_t*>(reinterpret_cast<unsigned*>(output) + 1))
         , previous_(static_cast<unsigned>(-1))
-        , numNeighbors_(0)
     {
     }
 
@@ -54,7 +53,6 @@ struct NibbleWarpCompression
     {
         assert(activeLanes > 0);
 
-        numNeighbors_ += activeLanes;
         const unsigned laneIdx = laneIndex();
 
         std::uint8_t* vleData = buffer_ + sizeof(GpuConfig::ThreadMask);
@@ -109,13 +107,11 @@ struct NibbleWarpCompression
     }
 
     __device__ __forceinline__ unsigned numBytes() const { return (unsigned)(buffer_ - (std::uint8_t*)start_); }
-    __device__ __forceinline__ unsigned numNeighbors() const { return numNeighbors_; }
 
     __device__ __forceinline__ ~NibbleWarpCompression()
     {
         const unsigned laneIdx    = laneIndex();
         const unsigned totalBytes = numBytes();
-        assert(numNeighbors_ > 0 || totalBytes == sizeof(unsigned));
         if (laneIdx == 0) *reinterpret_cast<unsigned*>(start_) = totalBytes;
     }
 
@@ -130,7 +126,6 @@ struct NibbleWarpDecompression
         : buffer_(reinterpret_cast<const std::uint8_t*>(reinterpret_cast<const unsigned*>(input) + 1))
         , previous_(static_cast<unsigned>(-1))
         , numBytes_(*reinterpret_cast<const unsigned*>(input))
-        , numNeighbors_(numNeighbors)
     {
     }
 
@@ -140,7 +135,6 @@ struct NibbleWarpDecompression
     NibbleWarpDecompression& operator=(NibbleWarpDecompression&&)      = delete;
 
     __device__ __forceinline__ unsigned numBytes() const { return numBytes_; }
-    __device__ __forceinline__ unsigned numNeighbors() const { return numNeighbors_; }
 
     __device__ __forceinline__ unsigned next()
     {
@@ -186,7 +180,7 @@ struct NibbleWarpDecompression
 
 private:
     const std::uint8_t* buffer_;
-    unsigned numBytes_, numNeighbors_, previous_;
+    unsigned numBytes_, previous_;
 };
 
 struct BandEtAlWarpDecompression;
@@ -199,7 +193,6 @@ struct BandEtAlWarpCompression
         : start_(reinterpret_cast<std::uint8_t*>(output))
         , buffer_(reinterpret_cast<std::uint8_t*>(reinterpret_cast<unsigned*>(output) + 1))
         , previous_(static_cast<unsigned>(-1))
-        , numNeighbors_(0)
     {
     }
 
@@ -212,7 +205,6 @@ struct BandEtAlWarpCompression
     {
         assert(activeLanes > 0);
 
-        numNeighbors_ += activeLanes;
         const unsigned laneIdx = laneIndex();
 
         std::uint8_t* vleData = buffer_ + 2 * sizeof(GpuConfig::ThreadMask);
@@ -239,19 +231,16 @@ struct BandEtAlWarpCompression
     }
 
     __device__ __forceinline__ unsigned numBytes() const { return (unsigned)(buffer_ - (std::uint8_t*)start_); }
-    __device__ __forceinline__ unsigned numNeighbors() const { return numNeighbors_; }
-
     __device__ __forceinline__ ~BandEtAlWarpCompression()
     {
         const unsigned laneIdx    = laneIndex();
         const unsigned totalBytes = numBytes();
-        assert(numNeighbors_ > 0 || totalBytes == sizeof(unsigned));
         if (laneIdx == 0) *reinterpret_cast<unsigned*>(start_) = totalBytes;
     }
 
 private:
     std::uint8_t *start_, *buffer_;
-    unsigned previous_, numNeighbors_;
+    unsigned previous_;
 };
 
 struct BandEtAlWarpDecompression
@@ -260,7 +249,6 @@ struct BandEtAlWarpDecompression
         : buffer_(reinterpret_cast<const std::uint8_t*>(reinterpret_cast<const unsigned*>(input) + 1))
         , previous_(static_cast<unsigned>(-1))
         , numBytes_(*reinterpret_cast<const unsigned*>(input))
-        , numNeighbors_(numNeighbors)
     {
     }
 
@@ -270,7 +258,6 @@ struct BandEtAlWarpDecompression
     BandEtAlWarpDecompression& operator=(BandEtAlWarpDecompression&&)      = delete;
 
     __device__ __forceinline__ unsigned numBytes() const { return numBytes_; }
-    __device__ __forceinline__ unsigned numNeighbors() const { return numNeighbors_; }
 
     __device__ __forceinline__ unsigned next()
     {
@@ -309,7 +296,7 @@ struct BandEtAlWarpDecompression
 
 private:
     const std::uint8_t* buffer_;
-    unsigned numBytes_, numNeighbors_, previous_;
+    unsigned numBytes_, previous_;
 };
 
 #if CSTONE_USE_BAND_ET_AL_COMPRESSION
@@ -327,8 +314,7 @@ struct DummyWarpCompression
     using Decompression = DummyWarpDecompression;
 
     __device__ __forceinline__ explicit DummyWarpCompression(void* output)
-        : start_(reinterpret_cast<unsigned*>(output))
-        , buffer_(reinterpret_cast<unsigned*>(output))
+        : buffer_(reinterpret_cast<unsigned*>(output))
         , numNeighbors_(0)
     {
     }
@@ -346,10 +332,9 @@ struct DummyWarpCompression
     }
 
     __device__ __forceinline__ unsigned numBytes() const { return numNeighbors_ * sizeof(unsigned); }
-    __device__ __forceinline__ unsigned numNeighbors() const { return numNeighbors_; }
 
 private:
-    unsigned *start_, *buffer_;
+    unsigned* buffer_;
     unsigned numNeighbors_;
 };
 
@@ -375,7 +360,6 @@ struct DummyWarpDecompression
     }
 
     __device__ __forceinline__ unsigned numBytes() const { return numNeighbors_ * sizeof(unsigned); }
-    __device__ __forceinline__ unsigned numNeighbors() const { return numNeighbors_; }
 
 private:
     const unsigned* buffer_;
