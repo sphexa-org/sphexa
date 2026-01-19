@@ -136,9 +136,7 @@ struct WarpCompression
         const unsigned laneIdx    = laneIndex();
         const unsigned totalBytes = numBytes();
         assert(numNeighbors_ > 0 || totalBytes == sizeof(unsigned));
-        assert(totalBytes < (1 << 16));
-        assert(numNeighbors_ < (1 << 16));
-        if (laneIdx == 0) *((unsigned*)start_) = totalBytes | (numNeighbors_ << 16);
+        if (laneIdx == 0) *reinterpret_cast<unsigned*>(start_) = totalBytes;
     }
 
 private:
@@ -148,11 +146,11 @@ private:
 
 struct WarpDecompression
 {
-    __device__ __forceinline__ explicit WarpDecompression(const void* input)
+    __device__ __forceinline__ explicit WarpDecompression(const void* input, const unsigned numNeighbors)
         : buffer_(reinterpret_cast<const std::uint8_t*>(reinterpret_cast<const unsigned*>(input) + 1))
         , previous_(static_cast<unsigned>(-1))
-        , numBytes_(*reinterpret_cast<const unsigned*>(input) & 0xffff)
-        , numNeighbors_(*reinterpret_cast<const unsigned*>(input) >> 16)
+        , numBytes_(*reinterpret_cast<const unsigned*>(input))
+        , numNeighbors_(numNeighbors)
     {
     }
 
@@ -278,14 +276,14 @@ warpCompressNeighbors(const std::uint32_t* __restrict__ neighbors, void* __restr
  *
  * @param[in]  input     pointer to the buffer containing the compressed neighbor list
  * @param[out] neighbors pointer to the array where decompressed neighbor indices will be stored
- * @param[out] n         reference to an unsigned integer where the number of neighbor indices will be stored
+ * @param[in]  n         expected number of neighbor indices (must match the number passed to warpCompressNeighbors)
  */
-__device__ __forceinline__ void
-warpDecompressNeighbors(const void* const __restrict__ input, std::uint32_t* const __restrict__ neighbors, unsigned& n)
+__device__ __forceinline__ void warpDecompressNeighbors(const void* const __restrict__ input,
+                                                        std::uint32_t* const __restrict__ neighbors,
+                                                        const unsigned n)
 {
     const unsigned laneIdx = laneIndex();
-    WarpDecompression decompression(input);
-    n = decompression.numNeighbors();
+    WarpDecompression decompression(input, n);
     for (unsigned offset = 0; offset < n; offset += GpuConfig::warpSize)
     {
         const unsigned nb       = offset + laneIdx;

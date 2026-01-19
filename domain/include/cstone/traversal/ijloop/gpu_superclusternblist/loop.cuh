@@ -329,10 +329,8 @@ loadSuperclusterNeighborData(util::SharedMemAllocator& sharedAllocator,
             nbData[n] = neighborData[iSuperclusterDataIndex + n];
         if (warpIndex == 0)
         {
-            unsigned n;
             warpDecompressNeighbors((const char*)&neighborData[iSuperclusterDataIndex + maskSize], &nbData[maskSize],
-                                    n);
-            assert(n == iSuperclusterNeighborsCount);
+                                    iSuperclusterNeighborsCount);
         }
     }
     else

@@ -29,13 +29,12 @@ using namespace cstone;
 
 __global__ void roundtrip(std::uint32_t const* __restrict__ input,
                           std::uint32_t* __restrict__ output,
-                          unsigned n_input,
-                          unsigned* n_output,
-                          unsigned sharedMemSize)
+                          const unsigned numNeighbors,
+                          const unsigned sharedMemSize)
 {
     extern __shared__ char compressed[];
 
-    const unsigned nBytes = warpCompressNeighbors(input, compressed, n_input);
+    const unsigned nBytes = warpCompressNeighbors(input, compressed, numNeighbors);
     __syncthreads();
     if (threadIdx.x == 0)
     {
@@ -43,7 +42,7 @@ __global__ void roundtrip(std::uint32_t const* __restrict__ input,
             compressed[i] = 0xff;
     }
     __syncthreads();
-    warpDecompressNeighbors(compressed, output, *n_output);
+    warpDecompressNeighbors(compressed, output, numNeighbors);
 }
 
 TEST(CompressNeighborsGpu, roundtrip)
@@ -51,14 +50,11 @@ TEST(CompressNeighborsGpu, roundtrip)
     thrust::device_vector<std::uint32_t> nbs = {300, 301, 302, 100, 101, 200, 400, 402, 403,
                                                 404, 405, 406, 407, 408, 409, 410, 411};
     thrust::device_vector<std::uint32_t> roundtripped(nbs.size());
-    thrust::device_vector<unsigned> output_nb_count(1);
 
     const unsigned sharedMemSize = sizeof(std::uint32_t) * nbs.size();
-    roundtrip<<<1, GpuConfig::warpSize, sharedMemSize>>>(rawPtr(nbs), rawPtr(roundtripped), nbs.size(),
-                                                         rawPtr(output_nb_count), sharedMemSize);
+    roundtrip<<<1, GpuConfig::warpSize, sharedMemSize>>>(rawPtr(nbs), rawPtr(roundtripped), nbs.size(), sharedMemSize);
     kernelSuccess("roundtrip");
 
-    ASSERT_EQ(output_nb_count[0], nbs.size());
     EXPECT_EQ(roundtripped, nbs);
 }
 
@@ -66,14 +62,11 @@ TEST(CompressNeighborsGpu, empty)
 {
     thrust::device_vector<std::uint32_t> nbs(0);
     thrust::device_vector<std::uint32_t> roundtripped(nbs.size());
-    thrust::device_vector<unsigned> output_nb_count(1);
 
     const unsigned sharedMemSize = sizeof(std::uint32_t);
-    roundtrip<<<1, GpuConfig::warpSize, sharedMemSize>>>(rawPtr(nbs), rawPtr(roundtripped), nbs.size(),
-                                                         rawPtr(output_nb_count), sharedMemSize);
+    roundtrip<<<1, GpuConfig::warpSize, sharedMemSize>>>(rawPtr(nbs), rawPtr(roundtripped), nbs.size(), sharedMemSize);
     kernelSuccess("roundtrip");
 
-    ASSERT_EQ(output_nb_count[0], nbs.size());
     EXPECT_EQ(nbs, roundtripped);
 }
 
@@ -83,14 +76,11 @@ TEST(CompressNeighborsGpu, manyConsecutive)
                                                 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
                                                 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 45, 46, 47, 48, 49};
     thrust::device_vector<std::uint32_t> roundtripped(nbs.size());
-    thrust::device_vector<unsigned> output_nb_count(1);
 
     const unsigned sharedMemSize = sizeof(std::uint32_t) * nbs.size();
-    roundtrip<<<1, GpuConfig::warpSize, sharedMemSize>>>(rawPtr(nbs), rawPtr(roundtripped), nbs.size(),
-                                                         rawPtr(output_nb_count), sharedMemSize);
+    roundtrip<<<1, GpuConfig::warpSize, sharedMemSize>>>(rawPtr(nbs), rawPtr(roundtripped), nbs.size(), sharedMemSize);
     kernelSuccess("roundtrip");
 
-    EXPECT_EQ(output_nb_count[0], nbs.size());
     EXPECT_EQ(roundtripped, nbs);
 }
 
@@ -108,13 +98,10 @@ TEST(CompressNeighborsGpu, large)
         785115, 785116, 785117, 785118, 785119, 785120, 785121, 785122, 785123, 785124, 785125, 785126, 785127,
         785128, 785129, 785130, 785131, 785132, 785133, 785134, 785135, 785137, 785141, 785145, 785146, 785151};
     thrust::device_vector<std::uint32_t> roundtripped(nbs.size());
-    thrust::device_vector<unsigned> output_nb_count(1);
 
     const unsigned sharedMemSize = sizeof(std::uint32_t) * nbs.size();
-    roundtrip<<<1, GpuConfig::warpSize, sharedMemSize>>>(rawPtr(nbs), rawPtr(roundtripped), nbs.size(),
-                                                         rawPtr(output_nb_count), sharedMemSize);
+    roundtrip<<<1, GpuConfig::warpSize, sharedMemSize>>>(rawPtr(nbs), rawPtr(roundtripped), nbs.size(), sharedMemSize);
     kernelSuccess("roundtrip");
 
-    ASSERT_EQ(output_nb_count[0], nbs.size());
     EXPECT_EQ(roundtripped, nbs);
 }
