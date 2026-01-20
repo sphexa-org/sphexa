@@ -298,7 +298,7 @@ template<class Config,
          class Postamble,
          class Mask = void>
 __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBlock) void runIjLoopKernel(
-    const Box<Tc> __grid_constant__ box,
+    const Box<Tc> box,
     const LocalIndex firstValidBody,
     const LocalIndex totalBodies,
     const LocalIndex firstBody,
@@ -529,8 +529,8 @@ __global__ void initResultKernel(const LocalIndex firstBody,
                                  const Tc* __restrict__ y,
                                  const Tc* __restrict__ z,
                                  const ThP h,
-                                 const In __grid_constant__ input,
-                                 const Out __grid_constant__ output,
+                                 const In input,
+                                 const Out output,
                                  Interaction interaction)
 {
     const LocalIndex i = blockDim.x * blockIdx.x + threadIdx.x + firstBody;
@@ -569,9 +569,9 @@ __global__ void applyPostambleKernel(const LocalIndex firstBody,
                                      const Tc* __restrict__ y,
                                      const Tc* __restrict__ z,
                                      const ThP h,
-                                     const In __grid_constant__ input,
-                                     const Tmp __grid_constant__ tmp,
-                                     const Out __grid_constant__ output,
+                                     const In input,
+                                     const Tmp tmp,
+                                     const Out output,
                                      const Postamble postamble)
 {
     const LocalIndex i = blockDim.x * blockIdx.x + threadIdx.x + firstBody;
@@ -612,7 +612,7 @@ void applyPostamble(const LocalIndex firstBody,
 template<class Config>
 __global__ void computeActiveMasksKernel(const LocalIndex firstISupercluster,
                                          const LocalIndex firstValidBody,
-                                         const GroupView __grid_constant__ groups,
+                                         const GroupView groups,
                                          typename Config::SuperclusterParticleMask* __restrict__ activeMasks)
 {
     using Mask = typename Config::SuperclusterParticleMask;
