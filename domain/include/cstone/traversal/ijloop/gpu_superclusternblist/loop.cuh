@@ -18,7 +18,7 @@
 // if 1, a bank-conflict reducing shared memory layout is used which might increase register count
 // and required load/store instructions and thus not necessarily improve performance
 #ifndef CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
-#define CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS 1
+#define CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS 0
 #endif
 
 #include <array>
@@ -221,13 +221,12 @@ constexpr unsigned runIjLoopSharedMemPerSupercluster(unsigned ncmax)
 
     constexpr unsigned iSuperclusterDataSize =
         (Config::iClustersPerSupercluster * Config::iSize) * sizeof(ParticleDataWithRadiusSq);
-    unsigned nbDataSize = (ncmax + masksSize<Config>(ncmax)) * sizeof(unsigned);
     constexpr unsigned outputBuffersSize =
         !Config::symmetric && Config::numWarpsPerInteraction > 1
             ? sizeof(decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(Result()))))
             : 0;
 
-    return iSuperclusterDataSize + nbDataSize + outputBuffersSize;
+    return iSuperclusterDataSize + outputBuffersSize;
 }
 
 template<class ThP, class Tc, class... Ts>
@@ -357,8 +356,8 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     const Tc* const __restrict__ y,
     const Tc* const __restrict__ z,
     const ThP h,
-    const In __grid_constant__ input,
-    const Out __grid_constant__ output,
+    const In input,
+    const Out output,
     const Interaction interaction,
     const Postamble postamble,
     const std::uint32_t* const __restrict__ neighborData,
@@ -396,26 +395,33 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     util::SharedMemAllocator sharedAllocator(runIjLoopSharedMemPerSupercluster<Config, Tc, ThP, In, Interaction>(ncmax),
                                              threadIdx.z);
 
+    using Decompression = std::conditional_t<Config::compress, WarpDecompression, DummyWarpDecompression>;
+
     const auto iSuperclusterData = loadSuperclusterIParticleData<Config, ParticleDataWithRadiusSq>(
         sharedAllocator, firstValidBody, totalBodies, iSupercluster, x, y, z, h, input);
-
-    const auto [nbData, maskSize] = loadSuperclusterNeighborData<Config>(
-        sharedAllocator, warpIndex, iSuperclusterDataIndex, iSuperclusterNeighborsCount, neighborData, ncmax);
 
     __syncthreads();
 
     std::array<Result, Config::iClustersPerSupercluster> iResults = {};
 
+    const unsigned maskSize = masksSize<Config>(iSuperclusterNeighborsCount);
+    Decompression decompression(&neighborData[iSuperclusterDataIndex + maskSize], iSuperclusterNeighborsCount);
+
+    unsigned warpJCluster = decompression.next();
     for (unsigned nb = 0; nb < iSuperclusterNeighborsCount; ++nb)
     {
+        const unsigned jCluster = shflSync(warpJCluster, nb % GpuConfig::warpSize);
+        if (nb + 1 < iSuperclusterNeighborsCount && (nb + 1) % GpuConfig::warpSize == 0)
+            warpJCluster = decompression.next();
+
         const unsigned maskStartIndex = nb * (Config::iClustersPerSupercluster * Config::numWarpsPerInteraction) +
-                                        (warpIndex * Config::iClustersPerSupercluster);
-        unsigned warpMask =
-            (nbData[maskStartIndex / 32] >> (maskStartIndex % 32)) & ((1 << Config::iClustersPerSupercluster) - 1);
+                                        warpIndex * Config::iClustersPerSupercluster;
+        const unsigned warpMask =
+            (neighborData[iSuperclusterDataIndex + maskStartIndex / 32] >> (maskStartIndex % 32)) &
+            ((1 << Config::iClustersPerSupercluster) - 1);
 
         if (warpMask)
         {
-            const unsigned jCluster      = nb < iSuperclusterNeighborsCount ? nbData[nb + maskSize] : ~0u;
             const unsigned j             = jCluster * Config::jSize + threadIdx.y;
             const unsigned jSupercluster = superclusterIndex<Config>(j);
             auto jData                   = (nb < iSuperclusterNeighborsCount & j >= firstValidBody & j < totalBodies)
@@ -425,7 +431,6 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             std::get<0>(jData) -= firstValidBody;
             Result jResult = {};
 
-#pragma clang loop unroll(enable)
             for (unsigned c = 0; c < Config::iClustersPerSupercluster; ++c)
             {
                 const unsigned i = iSupercluster * Config::superclusterSize + c * Config::iSize + threadIdx.x;
@@ -477,14 +482,12 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             sharedAllocator.alloc<decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(Result())))>();
         auto outputBufferPtrs = util::tupleMap([](auto& array) { return array.data(); }, *outputBuffers);
         auto init             = unwrapModifiers(Result{});
-#pragma clang loop unroll(enable)
         for (unsigned offset = threadIdx.y * Config::iSize + threadIdx.x; offset < Config::superclusterSize;
              offset += Config::iSize * Config::jSize)
             storeParticleData(outputBufferPtrs, offset, init);
 
         __syncthreads();
 
-#pragma clang loop unroll(enable)
         for (unsigned c = 0; c < Config::iClustersPerSupercluster; ++c)
         {
             const unsigned offset = c * Config::iSize + threadIdx.x;
@@ -497,7 +500,6 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         __syncthreads();
 
         const unsigned base = iSupercluster * Config::superclusterSize;
-#pragma clang loop unroll(enable)
         for (unsigned offset = threadIdx.y * Config::iSize + threadIdx.x; offset < Config::superclusterSize;
              offset += Config::iSize * Config::jSize)
         {
@@ -513,7 +515,6 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     }
     else
     {
-#pragma clang loop unroll(enable)
         for (unsigned c = 0; c < Config::iClustersPerSupercluster; ++c)
         {
             const unsigned offset = c * Config::iSize + threadIdx.x;
