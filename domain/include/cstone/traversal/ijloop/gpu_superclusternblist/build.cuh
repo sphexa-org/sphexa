@@ -382,6 +382,7 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
         return bool(anySync(overlaps));
     };
 
+    unsigned jClusterQueue, previousJCluster = ~0u;
     const auto overlapsLeafNode = [&](const TreeNodeIndex idx)
     {
         const TreeNodeIndex leafIdx    = tree.internalToLeaf[idx];
@@ -393,8 +394,7 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
         for (LocalIndex baseJCluster = firstJCluster; baseJCluster < lastJCluster; baseJCluster += GpuConfig::warpSize)
         {
             const LocalIndex jCluster = std::min(baseJCluster + laneIdx, lastJCluster - 1);
-            bool bBoxesOverlap        = true;
-            if (info.neighborsCount > 0 && jClusters[info.neighborsCount - 1] == jCluster) bBoxesOverlap = false;
+            bool bBoxesOverlap        = jCluster != previousJCluster;
 
             if constexpr (Config::symmetric)
             {
@@ -452,21 +452,27 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
                         if (laneIdx == 0) globalBuildData->status = BuildStatus::neighbor_list_overflow;
                         return;
                     }
+                    previousJCluster = jCluster;
+                    if (laneIdx == (info.neighborsCount % GpuConfig::warpSize)) jClusterQueue = jCluster;
                     if (laneIdx == 0)
                     {
-                        jClusters[info.neighborsCount] = jCluster;
                         const unsigned maskStartIndex =
                             info.neighborsCount * (Config::iClustersPerSupercluster * Config::numWarpsPerInteraction);
                         const unsigned prevMask    = maskStartIndex % 32 == 0 ? 0 : masks[maskStartIndex / 32];
                         masks[maskStartIndex / 32] = (warpMask << (maskStartIndex % 32)) | prevMask;
                     }
                     ++info.neighborsCount;
+                    if ((info.neighborsCount % GpuConfig::warpSize) == 0)
+                        jClusters[info.neighborsCount - GpuConfig::warpSize + laneIdx] = jClusterQueue;
                 }
             }
         }
     };
 
     singleTraversal(tree.childOffsets, tree.parents, overlapsInternalNode, overlapsLeafNode);
+
+    if (laneIdx < (info.neighborsCount % GpuConfig::warpSize))
+        jClusters[info.neighborsCount / GpuConfig::warpSize * GpuConfig::warpSize + laneIdx] = jClusterQueue;
 }
 
 /*! compute required shared memory amount
