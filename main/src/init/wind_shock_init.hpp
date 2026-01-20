@@ -38,6 +38,7 @@
 #include <cmath>
 #include <algorithm>
 
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/box.hpp"
 #include "sph/eos.hpp"
 
@@ -59,7 +60,10 @@ InitSettings WindShockConstants()
 template<class Dataset>
 void initWindShockFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
+    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
     using T = typename Dataset::RealType;
+    using HydroType = typename Dataset::HydroType;
+    using XM1Type = typename Dataset::XM1Type;
 
     T r       = constants.at("r");
     T rSphere = constants.at("rSphere");
@@ -76,24 +80,33 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
 
-    std::fill(d.m.begin(), d.m.end(), massPart);
-    std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
-    std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
+    cstone::fill<gpu>(d.m.begin(), d.m.end(), massPart);
+    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
+    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
+    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
 
-    generateParticleIDs(d.id);
+    generateParticleIDs<gpu>(d.id);
 
     T uInt = uExt / (rhoInt / rhoExt);
 
     T k = d.ngmax / r;
 
     util::array<T, 3> blobCenter{r, r, r};
-    auto*             u_or_t = d.u.empty() ? d.temp.data() : d.u.data();
-
+    std::vector<T> u_or_t(d.x.size());
+    auto&& x = toHost(d.x);
+    auto&& y = toHost(d.y);
+    auto&& z = toHost(d.z);
+    std::vector<HydroType> h(d.h.size());
+    std::vector<HydroType> vx(d.vx.size());
+    std::vector<HydroType> vy(d.vy.size());
+    std::vector<HydroType> vz(d.vz.size());
+    std::vector<XM1Type> x_m1(d.x_m1.size());
+    std::vector<XM1Type> y_m1(d.y_m1.size());
+    std::vector<XM1Type> z_m1(d.z_m1.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
-        util::array<T, 3> X{d.x[i], d.y[i], d.z[i]};
+        util::array<T, 3> X{x[i], y[i], z[i]};
 
         T rPos = std::sqrt(norm2(X - blobCenter));
 
@@ -102,35 +115,47 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
             if (rPos > rSphere + 2 * hExt)
             {
                 // more than two smoothing lengths away from the inner sphere
-                d.h[i] = hExt;
+                h[i] = hExt;
             }
             else
             {
                 // reduce smoothing lengths for particles outside, but close to the inner sphere
-                d.h[i] = hInt + 0.5 * (hExt - hInt) * (1. + std::tanh(k * (rPos - rSphere - hExt)));
+                h[i] = hInt + 0.5 * (hExt - hInt) * (1. + std::tanh(k * (rPos - rSphere - hExt)));
             }
 
             u_or_t[i] = uExt;
-            d.vx[i]   = vxExt;
-            d.vy[i]   = vyExt;
-            d.vz[i]   = vzExt;
+            vx[i]   = vxExt;
+            vy[i]   = vyExt;
+            vz[i]   = vzExt;
         }
         else
         {
-            d.h[i]    = hInt;
+            h[i]    = hInt;
             u_or_t[i] = uInt;
-            d.vx[i]   = 0.;
-            d.vy[i]   = 0.;
-            d.vz[i]   = 0.;
+            vx[i]   = 0.;
+            vy[i]   = 0.;
+            vz[i]   = 0.;
         }
 
-        d.x_m1[i] = d.vx[i] * d.minDt;
-        d.y_m1[i] = d.vy[i] * d.minDt;
-        d.z_m1[i] = d.vz[i] * d.minDt;
+        x_m1[i] = vx[i] * d.minDt;
+        y_m1[i] = vy[i] * d.minDt;
+        z_m1[i] = vz[i] * d.minDt;
     }
+    d.h = std::move(h);
+    d.x_m1 = std::move(x_m1);
+    d.y_m1 = std::move(y_m1);
+    d.z_m1 = std::move(z_m1);
+    d.vx = std::move(vx);
+    d.vy = std::move(vy);
+    d.vz = std::move(vz);
     if (d.u.empty())
     {
-        std::for_each(d.temp.begin(), d.temp.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
+        std::for_each(u_or_t.begin(), u_or_t.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
+        d.temp = std::move(u_or_t);
+    }
+    else
+    {
+        d.u = std::move(u_or_t);
     }
 }
 
@@ -175,7 +200,8 @@ public:
         cstone::Box<T> globalBox(0, 8 * r, 0, 2 * r, 0, 2 * r, pbc, pbc, pbc);
 
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
-        assembleCuboid<T>(keyStart, keyEnd, globalBox, surroundingMulti, xBlock, yBlock, zBlock, d.x, d.y, d.z);
+        std::vector<T> x, y, z;
+        assembleCuboid<T>(keyStart, keyEnd, globalBox, surroundingMulti, xBlock, yBlock, zBlock, x, y, z);
 
         auto cutSphereOut = [r, rSphere](auto x, auto y, auto z)
         {
@@ -184,7 +210,7 @@ public:
             util::array<T_, 3> center{r, r, r};
             return std::sqrt(norm2(X - center)) > rSphere;
         };
-        selectParticles(d.x, d.y, d.z, cutSphereOut);
+        selectParticles(x, y, z, cutSphereOut);
 
         // create the high-density blob
         cstone::Vec3<int> blobMulti = {multi1D, multi1D, multi1D};
@@ -199,9 +225,9 @@ public:
             return std::sqrt(norm2(X - center)) < rSphere;
         };
         selectParticles(xBlob, yBlob, zBlob, keepSphere);
-        std::copy(xBlob.begin(), xBlob.end(), std::back_inserter(d.x));
-        std::copy(yBlob.begin(), yBlob.end(), std::back_inserter(d.y));
-        std::copy(zBlob.begin(), zBlob.end(), std::back_inserter(d.z));
+        std::copy(xBlob.begin(), xBlob.end(), std::back_inserter(x));
+        std::copy(yBlob.begin(), yBlob.end(), std::back_inserter(y));
+        std::copy(zBlob.begin(), zBlob.end(), std::back_inserter(z));
 
         // Calculate particle mass with the internal sphere
         T innerSide   = rSphere;
@@ -214,6 +240,9 @@ public:
         size_t numParticlesGlobal = d.x.size();
         MPI_Allreduce(MPI_IN_PLACE, &numParticlesGlobal, 1, MpiType<size_t>{}, MPI_SUM, simData.comm);
 
+        d.x = x; // uploads to GPU if active
+        d.y = y;
+        d.z = z;
         syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, d.x, d.y, d.z, globalBox);
         d.x.shrink_to_fit();
         d.y.shrink_to_fit();
