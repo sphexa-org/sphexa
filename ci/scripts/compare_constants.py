@@ -4,6 +4,7 @@ from pathlib import Path
 eps_zero = 1e-30
 relative_tolerance = 1e-2
 
+
 def load_rows(path: Path):
     rows = []
     with path.open() as fh:
@@ -11,6 +12,7 @@ def load_rows(path: Path):
             cols = row.split()
             rows.append([float(p) for p in cols])
     return rows
+
 
 def main(ref_path: Path, new_path: Path):
     ref = load_rows(ref_path)
