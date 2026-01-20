@@ -36,6 +36,7 @@
 #include "cstone/traversal/ijloop/compressneighbors.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/common.cuh"
 #include "cstone/util/tuple_util.hpp"
+#include "cstone/util/uninitialized.hpp"
 
 namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail
 {
@@ -206,29 +207,6 @@ inline constexpr auto dummyParticleDataWithRadiusSq(
         return std::make_tuple(nan, nan, nan, Ts{}...);
 }
 
-/*! compute the amount of shared memory required per supercluster for the ij-loop kernel
- *
- * @param[in] ncmax maximum number of neighbor clusters for any supercluster
- * @return          total shared memory required per supercluster, in bytes
- */
-template<class Config, class Tc, class ThP, class In, class Interaction>
-constexpr unsigned runIjLoopSharedMemPerSupercluster(unsigned ncmax)
-{
-    using ParticleData             = decltype(loadParticleData((Tc*)0, (Tc*)0, (Tc*)0, (ThP)0, In{}, 0));
-    using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq((Tc*)0, (Tc*)0, (Tc*)0, (ThP)0, In{}, 0));
-    using Result =
-        std::decay_t<decltype(std::declval<Interaction>()(ParticleData(), ParticleData(), Vec3<Tc>(), Tc(0)))>;
-
-    constexpr unsigned iSuperclusterDataSize =
-        (Config::iClustersPerSupercluster * Config::iSize) * sizeof(ParticleDataWithRadiusSq);
-    constexpr unsigned outputBuffersSize =
-        !Config::symmetric && Config::numWarpsPerInteraction > 1
-            ? sizeof(decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(Result()))))
-            : 0;
-
-    return iSuperclusterDataSize + outputBuffersSize;
-}
-
 template<class ThP, class Tc, class... Ts>
 inline constexpr auto splitParticleDataWithRadiusSq(std::tuple<Tc, Tc, Tc, Ts...> const& particleDataWithRadiusSq,
                                                     const LocalIndex index,
@@ -259,9 +237,8 @@ inline constexpr auto splitParticleDataWithRadiusSq(std::tuple<Tc, Tc, Tc, Ts...
     return std::make_tuple(iData, radiusSq);
 }
 
-template<class Config, class ParticleData, class Tc, class ThP, class Input>
-__device__ __forceinline__ auto loadSuperclusterIParticleData(util::SharedMemAllocator& sharedAllocator,
-                                                              const LocalIndex firstValidBody,
+template<class Config, unsigned NumSuperclustersPerBlock, class ParticleData, class Tc, class ThP, class Input>
+__device__ __forceinline__ auto loadSuperclusterIParticleData(const LocalIndex firstValidBody,
                                                               const LocalIndex totalBodies,
                                                               const LocalIndex iSupercluster,
                                                               const Tc* const __restrict__ x,
@@ -272,12 +249,12 @@ __device__ __forceinline__ auto loadSuperclusterIParticleData(util::SharedMemAll
 
 {
 #if CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
-    auto iSuperclusterData =
-        sharedAllocator
-            .alloc<decltype(buffersForResults<Config::iClustersPerSupercluster * Config::iSize>(ParticleData{}))>();
+    using Buffer = decltype(buffersForResults<Config::iClustersPerSupercluster * Config::iSize>(ParticleData{}));
 #else
-    auto iSuperclusterData = sharedAllocator.alloc<ParticleData[]>(Config::iClustersPerSupercluster * Config::iSize);
+    using Buffer = ParticleData[Config::iClustersPerSupercluster * Config::iSize];
 #endif
+    __shared__ util::Uninitialized<Buffer> iSuperclusterDataBuffer[NumSuperclustersPerBlock];
+    auto* iSuperclusterData = iSuperclusterDataBuffer[threadIdx.z].data();
 
     const unsigned base = iSupercluster * Config::superclusterSize;
 #pragma unroll
@@ -308,32 +285,6 @@ getIData(ISuperclusterData const& iSuperclusterData, const unsigned offset, cons
     auto iDataWithRadiusSq = iSuperclusterData[offset];
 #endif
     return splitParticleDataWithRadiusSq(iDataWithRadiusSq, index, h);
-}
-
-template<class Config>
-__device__ __forceinline__ std::tuple<util::SharedMemAllocator::SharedMemPtr<unsigned[]>, unsigned>
-loadSuperclusterNeighborData(util::SharedMemAllocator& sharedAllocator,
-                             const unsigned warpIndex,
-                             const LocalIndex iSuperclusterDataIndex,
-                             const unsigned iSuperclusterNeighborsCount,
-                             const std::uint32_t* const __restrict__ neighborData,
-                             const unsigned ncmax)
-{
-    auto nbData             = sharedAllocator.alloc<unsigned[]>(ncmax + masksSize<Config>(ncmax));
-    const unsigned maskSize = masksSize<Config>(iSuperclusterNeighborsCount);
-
-    using Decompression = std::conditional_t<Config::compress, WarpDecompression, DummyWarpDecompression>;
-
-    for (unsigned n = threadIdx.y * Config::iSize + threadIdx.x; n < maskSize; n += Config::iSize * Config::jSize)
-        nbData[n] = neighborData[iSuperclusterDataIndex + n];
-
-    if (warpIndex == 0)
-    {
-        warpDecompressNeighbors<Decompression>((const char*)&neighborData[iSuperclusterDataIndex + maskSize],
-                                               &nbData[maskSize], iSuperclusterNeighborsCount);
-    }
-
-    return {std::move(nbData), maskSize};
 }
 
 template<class Config,
@@ -392,13 +343,11 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq(x, y, z, h, input, firstBody));
     using Result = std::decay_t<decltype(interaction(ParticleData(), ParticleData(), Vec3<Tc>(), Tc(0)))>;
 
-    util::SharedMemAllocator sharedAllocator(runIjLoopSharedMemPerSupercluster<Config, Tc, ThP, In, Interaction>(ncmax),
-                                             threadIdx.z);
-
     using Decompression = std::conditional_t<Config::compress, WarpDecompression, DummyWarpDecompression>;
 
-    const auto iSuperclusterData = loadSuperclusterIParticleData<Config, ParticleDataWithRadiusSq>(
-        sharedAllocator, firstValidBody, totalBodies, iSupercluster, x, y, z, h, input);
+    const auto iSuperclusterData =
+        loadSuperclusterIParticleData<Config, NumSuperclustersPerBlock, ParticleDataWithRadiusSq>(
+            firstValidBody, totalBodies, iSupercluster, x, y, z, h, input);
 
     __syncthreads();
 
@@ -478,9 +427,10 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
 
     if constexpr (!Config::symmetric && Config::numWarpsPerInteraction > 1)
     {
-        auto outputBuffers =
-            sharedAllocator.alloc<decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(Result())))>();
-        auto outputBufferPtrs = util::tupleMap([](auto& array) { return array.data(); }, *outputBuffers);
+        using Buffer = decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(Result())));
+        __shared__ util::Uninitialized<Buffer> outputBuffers[NumSuperclustersPerBlock];
+        Buffer* outputBuffer  = outputBuffers[threadIdx.z].data();
+        auto outputBufferPtrs = util::tupleMap([](auto& array) { return array.data(); }, *outputBuffer);
         auto init             = unwrapModifiers(Result{});
         for (unsigned offset = threadIdx.y * Config::iSize + threadIdx.x; offset < Config::superclusterSize;
              offset += Config::iSize * Config::jSize)
@@ -556,13 +506,9 @@ void runIjLoop(const Box<Tc>& box,
     constexpr unsigned numSuperclustersPerBlock = 64 / (Config::iSize * Config::jSize);
     const dim3 blockSize                        = {Config::iSize, Config::jSize, numSuperclustersPerBlock};
     const unsigned numBlocks                    = iceil(numISuperclusters, numSuperclustersPerBlock);
-    const unsigned sharedMem =
-        numSuperclustersPerBlock *
-        runIjLoopSharedMemPerSupercluster<Config, Tc, ThP, std::decay_t<decltype(makeConst(input))>,
-                                          std::decay_t<Interaction>>(ncmax);
-    const auto run = [&](auto usePbc)
+    const auto run                              = [&](auto usePbc)
     {
-        runIjLoopKernel<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, sharedMem>>>(
+        runIjLoopKernel<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize>>>(
             box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, std::forward<Input>(input),
             std::forward<Output>(output), std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
             neighborData, superclusterInfo, numISuperclusters, activeMasks, ncmax);
