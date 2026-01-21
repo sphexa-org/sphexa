@@ -20,6 +20,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <tuple>
@@ -212,6 +213,7 @@ template<class Config, unsigned NumSuperclustersPerBlock>
 __device__ __forceinline__ bool storeNeighborData(std::uint32_t* const __restrict__ jClusters,
                                                   const unsigned jClusterBytes,
                                                   const std::uint32_t* const __restrict__ masks,
+                                                  const unsigned ncmax,
                                                   std::uint32_t* const __restrict__ neighborData,
                                                   const std::size_t maxNeighborDataSize,
                                                   unsigned long long* __restrict__ neighborDataSize,
@@ -221,7 +223,7 @@ __device__ __forceinline__ bool storeNeighborData(std::uint32_t* const __restric
     assert(blockDim.x * blockDim.y == GpuConfig::warpSize);
     assert(blockDim.z == NumSuperclustersPerBlock);
 
-    const unsigned mSize  = masksSize<Config>(info.neighborsCount);
+    const unsigned mSize  = masksSize<Config>(std::min(info.neighborsCount, ncmax));
     const unsigned nbSize = (jClusterBytes + sizeof(std::uint32_t) - 1) / sizeof(std::uint32_t);
 
     const unsigned long long totalSize = nbSize + mSize;
@@ -459,8 +461,8 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
 
     singleTraversal(tree.childOffsets, tree.parents, overlapsInternalNode, overlapsLeafNode);
 
-    const unsigned remaining = info.neighborsCount % GpuConfig::warpSize;
-    if (remaining != 0 && info.neighborsCount <= ncmax) compression.add(jClusterQueue, remaining);
+    const unsigned remaining = std::min(info.neighborsCount, ncmax) % GpuConfig::warpSize;
+    if (remaining != 0) compression.add(jClusterQueue, remaining);
 
     return compression.numBytes();
 }
@@ -561,14 +563,10 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
 
         maxNeighbors = std::max(info.neighborsCount, maxNeighbors);
 
-        if (info.neighborsCount > ncmax)
-        {
-            if (laneIdx == 0) globalBuildData->status = BuildStatus::neighbor_list_overflow;
-            continue;
-        }
+        if (info.neighborsCount > ncmax && laneIdx == 0) globalBuildData->status = BuildStatus::neighbor_list_overflow;
 
         const bool storeSuccessful = storeNeighborData<Config, NumSuperclustersPerBlock>(
-            jClusters.get(), jClusterBytes, masks.get(), neighborData, neighborDataSize,
+            jClusters.get(), jClusterBytes, masks.get(), ncmax, neighborData, neighborDataSize,
             &globalBuildData->neighborDataSize, info);
 
         if (!storeSuccessful)
@@ -633,9 +631,10 @@ std::size_t buildNbList(const OctreeNsView<Tc, KeyType>& tree,
     {
         case BuildStatus::success: break;
         case BuildStatus::neighbor_list_overflow:
-            throw std::runtime_error(
-                "overflow in cluster neighbor list in supercluster neighborhood, try to increase ncmax (ncmax: " +
-                std::to_string(ncmax) + ", max. found neighbors: " + std::to_string(buildData.maxNeighbors) + ")");
+            std::cerr << "WARNING: overflow in cluster neighbor list in supercluster neighborhood. Missing neighbors! "
+                         "Try to increase ncmax. Current ncmax is "
+                      << ncmax << ", but found up to " << buildData.maxNeighbors << " neighbor clusters." << std::endl;
+            break;
         case BuildStatus::neighbor_data_overflow: throw std::runtime_error("overflow in cluster neighbor data");
     }
 
