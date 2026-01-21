@@ -15,12 +15,14 @@
 
 #pragma once
 
+#include <iostream>
 #include <tuple>
 
 #include <thrust/execution_policy.h>
 
 #include "cstone/cuda/memory.cuh"
 #include "cstone/primitives/math.hpp"
+#include "cstone/primitives/warpscan.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/tree/octree.hpp"
@@ -43,7 +45,8 @@ __global__ __launch_bounds__(TravConfig::numThreads) void gpuFullNbListNeighborh
     const unsigned ngmax,
     LocalIndex* __restrict__ neighbors,
     unsigned* __restrict__ neighborsCount,
-    int* __restrict__ globalPool)
+    int* __restrict__ globalPool,
+    unsigned* __restrict__ globalMaxNeighbors)
 {
     const unsigned laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned targetIdx     = 0;
@@ -52,6 +55,8 @@ __global__ __launch_bounds__(TravConfig::numThreads) void gpuFullNbListNeighborh
 
     neighbors -= groups.firstBody;
     neighborsCount -= groups.firstBody;
+
+    unsigned maxNeighbors = 0;
 
     while (true)
     {
@@ -77,9 +82,16 @@ __global__ __launch_bounds__(TravConfig::numThreads) void gpuFullNbListNeighborh
         for (unsigned warpTarget = 0; warpTarget < TravConfig::nwt; ++warpTarget)
         {
             const LocalIndex i = bodyBegin + warpTarget * GpuConfig::warpSize + laneIdx;
-            if (i < bodyEnd) neighborsCount[i] = nc[warpTarget];
+            if (i < bodyEnd)
+            {
+                neighborsCount[i] = nc[warpTarget];
+                maxNeighbors      = std::max(maxNeighbors, nc[warpTarget]);
+            }
         }
     }
+
+    maxNeighbors = warpMax(maxNeighbors);
+    if (laneIdx == 0) atomicMax(globalMaxNeighbors, maxNeighbors);
 }
 
 template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble>
@@ -261,12 +273,23 @@ struct GpuFullNbListNeighborhood
         auto neighbors      = util::deviceAlloc<LocalIndex[]>(ngmax * numBodies);
         auto neighborsCount = util::deviceAlloc<unsigned[]>(numBodies);
         auto globalPool     = util::deviceAlloc<int[]>(TravConfig::poolSize());
+        auto maxNeighbors   = util::deviceAlloc<unsigned>();
 
         resetTraversalCounters<<<1, 1>>>();
         gpuFullNbListNeighborhoodBuild<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-            tree, box, groups, x, y, z, h, ngmax, neighbors.get(), neighborsCount.get(), globalPool.get());
+            tree, box, groups, x, y, z, h, ngmax, neighbors.get(), neighborsCount.get(), globalPool.get(),
+            maxNeighbors.get());
         checkGpuErrors(cudaGetLastError());
-        checkGpuErrors(cudaDeviceSynchronize());
+
+        unsigned maxNeighborsHost;
+        checkGpuErrors(cudaMemcpy(&maxNeighborsHost, maxNeighbors.get(), sizeof(unsigned), cudaMemcpyDeviceToHost));
+        if (maxNeighborsHost > ngmax)
+        {
+            std::cerr
+                << "WARNING: overflow in neighbor list. Missing neighbors! Try to increase ngmax. Current ngmax is "
+                << ngmax << ", but found up to " << maxNeighborsHost << " neighbor particles." << std::endl;
+        }
+
         return {box,   groups.firstBody,     groups.lastBody,          x, y, z, h,
                 ngmax, std::move(neighbors), std::move(neighborsCount)};
     }

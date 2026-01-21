@@ -16,6 +16,7 @@
 #pragma once
 
 #include <algorithm>
+#include <iostream>
 #include <tuple>
 #include <memory>
 
@@ -154,17 +155,29 @@ struct CpuFullNbListNeighborhood
                 tree.searchExtFactor = 1;
                 hExt                 = hExtData.get();
             }
-            else { hExt = h * tree.searchExtFactor; }
+            else
+            {
+                hExt = h * tree.searchExtFactor;
+            }
         }
 
-#pragma omp parallel for
+        unsigned maxNeighbors = 0;
+#pragma omp parallel for reduction(max : maxNeighbors)
         for (LocalIndex i = 0; i < numBodies; ++i)
         {
-            nbList.neighborsCount[i] = std::min(
+            const unsigned neighborCount = std::min(
                 findNeighbors(i + groups.firstBody, x, y, z, hExt, tree, box, ngmax, &nbList.neighbors[i * ngmax]),
                 ngmax);
+            nbList.neighborsCount[i] = neighborCount;
+            maxNeighbors             = std::max(maxNeighbors, neighborCount);
         }
 
+        if (maxNeighbors > ngmax)
+        {
+            std::cerr
+                << "WARNING: overflow in neighbor list. Missing neighbors! Try to increase ngmax. Current ngmax is "
+                << ngmax << ", but found up to " << maxNeighbors << " neighbor particles." << std::endl;
+        }
         return nbList;
     }
 };
