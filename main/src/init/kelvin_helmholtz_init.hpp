@@ -175,8 +175,8 @@ public:
         cstone::Box<T> layer2(0, 1, 0.25, 0.75, 0, 0.0625, pbc, pbc, pbc);
         cstone::Box<T> layer3(0, 1, 0.75, 1, 0, 0.0625, pbc, pbc, pbc);
 
-        std::vector<T> x, y, z;
-        assembleCuboid<T>(keyStart, keyEnd, layer1, outerMulti, xBlock, yBlock, zBlock, x, y, z);
+        std::vector<T> xl1, yl1, zl1;
+        assembleCuboid<T>(keyStart, keyEnd, layer1, outerMulti, xBlock, yBlock, zBlock, xl1, yl1, zl1);
 
         T stretch = std::cbrt(settings_.at("rhoInt") / settings_.at("rhoExt"));
         T topEdge = layer3.ymax();
@@ -184,9 +184,10 @@ public:
         auto inLayer1 = [b = layer1](T u, T v, T w)
         { return u >= b.xmin() && u < b.xmax() && v >= b.ymin() && v < b.ymax() && w >= b.zmin() && w < b.zmax(); };
 
-        for (size_t i = 0; i < x.size(); ++i)
+        std::vector<T> x, y, z;
+        for (size_t i = 0; i < xl1.size(); ++i)
         {
-            cstone::Vec3<T> X{x[i], y[i], z[i]};
+            cstone::Vec3<T> X{xl1[i], yl1[i], zl1[i]};
             // double the volume of layer1 to halve the density
             X *= stretch;
             // crop layer1 back to original size
