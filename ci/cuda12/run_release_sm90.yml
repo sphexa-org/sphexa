@@ -201,7 +201,7 @@ sph-compare-constants-cuda12-sm90-release-sphexa-cuda:
     - |
       for ic in sedov noh isobaric-cube evrard turbulence
       do
-        $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init $ic -s 10 -n 50
+        $APP_INSTALL_DIR/sphexa-cuda --quiet--glass ./50c.h5 --init $ic -s 10 -n 50
         if [ "$SLURM_PROCID" -eq 0 ]; then
           python ci/scripts/compare_constants.py ci/reference/const-${ic}-ref.txt constants.txt
           if [ $? -ne 0 ]; then
@@ -212,7 +212,7 @@ sph-compare-constants-cuda12-sm90-release-sphexa-cuda:
       done
       for ic in gresho-chan wind-shock kelvin-helmholtz
       do
-        $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init $ic -s 2 -n 30
+        $APP_INSTALL_DIR/sphexa-cuda --quiet --glass ./50c.h5 --init $ic -s 2 -n 30
         if [ "$SLURM_PROCID" -eq 0 ]; then
           python ci/scripts/compare_constants.py ci/reference/const-${ic}-ref.txt constants.txt
           if [ $? -ne 0 ]; then
@@ -243,7 +243,7 @@ sph-compare-constants-cuda12-sm90-release-sphexa-cpu:
     - |
       for ic in sedov noh isobaric-cube evrard turbulence
       do
-        $APP_INSTALL_DIR/sphexa --glass ./50c.h5 --init $ic -s 10 -n 50
+        $APP_INSTALL_DIR/sphexa --quiet --glass ./50c.h5 --init $ic -s 10 -n 50
         if [ "$SLURM_PROCID" -eq 0 ]; then
           python ci/scripts/compare_constants.py ci/reference/const-${ic}-ref.txt constants.txt
           if [ $? -ne 0 ]; then
@@ -254,7 +254,7 @@ sph-compare-constants-cuda12-sm90-release-sphexa-cpu:
       done
       for ic in gresho-chan wind-shock kelvin-helmholtz
       do
-        $APP_INSTALL_DIR/sphexa --glass ./50c.h5 --init $ic -s 2 -n 30
+        $APP_INSTALL_DIR/sphexa --quiet --glass ./50c.h5 --init $ic -s 2 -n 30
         if [ "$SLURM_PROCID" -eq 0 ]; then
           python ci/scripts/compare_constants.py ci/reference/const-${ic}-ref.txt constants.txt
           if [ $? -ne 0 ]; then
