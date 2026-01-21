@@ -44,19 +44,19 @@ struct NeighborhoodData
     template<class Dataset, class T>
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool /* subgroups */)
     {
-        data.emplace<0>();
+        neighborhood.emplace<0>();
 
         std::variant<cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder,
                      cstone::ijloop::CpuFullNbListNeighborhoodBuilder>
-            neighborhood;
+            builder;
 
         switch (neighborhoodType)
         {
             case NeighborhoodType::alwaysTraverse:
-                neighborhood = cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder{d.ngmax};
+                builder = cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder{d.ngmax};
                 break;
             case NeighborhoodType::fullNeighborList:
-                neighborhood = cstone::ijloop::CpuFullNbListNeighborhoodBuilder{d.ngmax};
+                builder = cstone::ijloop::CpuFullNbListNeighborhoodBuilder{d.ngmax};
                 break;
             case NeighborhoodType::clusteredNeighborList:
                 throw std::runtime_error("clustered neighbor lists are not available on CPU");
@@ -65,20 +65,23 @@ struct NeighborhoodData
 
         std::visit(
             [&](auto const& nb)
-            { data = nb.build(d.treeView, box, d.size(), groups, d.x.data(), d.y.data(), d.z.data(), d.h.data()); },
-            neighborhood);
+            {
+                neighborhood =
+                    nb.build(d.treeView, box, d.size(), groups, d.x.data(), d.y.data(), d.z.data(), d.h.data());
+            },
+            builder);
     }
 
     template<class... Args>
     void ijLoop(Args&&... args) const
     {
-        std::visit([&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); }, data);
+        std::visit([&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); }, neighborhood);
     }
 
 private:
     std::variant<NeighborhoodDataType<cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder>,
                  NeighborhoodDataType<cstone::ijloop::CpuFullNbListNeighborhoodBuilder>>
-                     data;
+                     neighborhood;
     NeighborhoodType neighborhoodType = NeighborhoodType::alwaysTraverse;
 };
 
