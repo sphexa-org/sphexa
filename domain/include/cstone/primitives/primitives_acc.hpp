@@ -109,9 +109,7 @@ void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthR
 {
     reallocateBytes(buffer, sizeof(LocalIndex) * (first + n), growthRate);
     auto* seq = reinterpret_cast<LocalIndex*>(buffer.data());
-    // Todo use sequenceAcc from here
-    if constexpr (useGpu) { sequenceGpu(seq + first, n, first); }
-    else { std::iota(seq + first, seq + first + n, first); }
+    sequenceAcc<useGpu>(seq + first, seq + first + n, first);
 }
 
 template<bool useGpu, class KeyType, class ValueType, class KeyBuf, class ValueBuf>
