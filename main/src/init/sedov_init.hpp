@@ -82,27 +82,23 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
     // If temperature is not allocated, we can still use this initializer for just the coordinates
     if (d.temp.empty() && d.u.empty()) { return; }
 
-    auto&&         x = toHost(d.x);
-    auto&&         y = toHost(d.y);
-    auto&&         z = toHost(d.z);
-    std::vector<T> u_or_t(d.x.size());
+    auto&& x = toHost(d.x);
+    auto&& y = toHost(d.y);
+    auto&& z = toHost(d.z);
+
+    std::vector<T> u(d.x.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
-        T xi = x[i];
-        T yi = y[i];
-        T zi = z[i];
-        T r2 = xi * xi + yi * yi + zi * zi;
-
-        T ui      = constants.at("ener0") * exp(-(r2 / width2)) + constants.at("u0");
-        u_or_t[i] = ui;
+        T r2 = norm2(cstone::Vec3<T>{x[i], y[i], z[i]});
+        u[i] = constants.at("ener0") * exp(-(r2 / width2)) + constants.at("u0");
     }
     if (d.u.empty())
     {
-        std::for_each(u_or_t.begin(), u_or_t.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
-        d.temp = std::move(u_or_t);
+        std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
+        d.temp = std::move(u);
     }
-    else { d.u = std::move(u_or_t); }
+    else { d.u = std::move(u); }
 }
 
 template<class Dataset>

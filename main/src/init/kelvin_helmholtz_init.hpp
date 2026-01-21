@@ -80,20 +80,19 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
     cstone::fill<gpu>(d.mui.begin(), d.mui.end(), 10.0);
     cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamax);
     cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
+    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
 
     generateParticleIDs<gpu>(d.id);
 
-    auto                   cv = sph::idealGasCv(d.muiConst, gamma);
-    std::vector<T>         u_or_t(d.x.size());
-    auto&&                 x = toHost(d.x);
-    auto&&                 y = toHost(d.y);
-    std::vector<HydroType> h(d.h.size());
-    std::vector<HydroType> vx(d.vx.size());
-    std::vector<HydroType> vy(d.vy.size());
-    auto&&                 vz = toHost(d.vz);
-    std::vector<XM1Type>   x_m1(d.x_m1.size());
-    std::vector<XM1Type>   y_m1(d.y_m1.size());
-    std::vector<XM1Type>   z_m1(d.z_m1.size());
+    auto   cv = sph::idealGasCv(d.muiConst, gamma);
+    auto&& x  = toHost(d.x);
+    auto&& y  = toHost(d.y);
+
+    cstone::LocalIndex     numPartLocal = d.x.size();
+    std::vector<HydroType> h(numPartLocal);
+    std::vector<HydroType> vx(numPartLocal), vy(numPartLocal);
+    std::vector<T>         u(numPartLocal);
+
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
@@ -101,8 +100,8 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
 
         if (y[i] < 0.75 && y[i] > 0.25)
         {
-            h[i]      = hInt;
-            u_or_t[i] = uInt;
+            h[i] = hInt;
+            u[i] = uInt;
             if (y[i] > 0.5) { vx[i] = vxInt + vDif * std::exp((y[i] - 0.75) / ls); }
             else { vx[i] = vxInt + vDif * std::exp((0.25 - y[i]) / ls); }
         }
@@ -120,27 +119,23 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
                 h[i] = hInt * (1 - dist / (2 * hExt)) + hExt * dist / (2 * hExt);
             }
 
-            u_or_t[i] = uExt;
+            u[i] = uExt;
             if (y[i] < 0.25) { vx[i] = vxExt - vDif * std::exp((y[i] - 0.25) / ls); }
             else { vx[i] = vxExt - vDif * std::exp((0.75 - y[i]) / ls); }
         }
-
-        x_m1[i] = vx[i] * d.minDt;
-        y_m1[i] = vy[i] * d.minDt;
-        z_m1[i] = vz[i] * d.minDt;
     }
-    d.h    = std::move(h);
-    d.vx   = std::move(vx);
-    d.vy   = std::move(vy);
-    d.x_m1 = std::move(x_m1);
-    d.y_m1 = std::move(y_m1);
-    d.z_m1 = std::move(z_m1);
+    d.h  = std::move(h);
+    d.vx = std::move(vx);
+    d.vy = std::move(vy);
+    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
+    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
+
     if (d.u.empty())
     {
-        std::for_each(u_or_t.begin(), u_or_t.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
-        d.temp = std::move(u_or_t);
+        std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
+        d.temp = std::move(u);
     }
-    else { d.u = std::move(u_or_t); }
+    else { d.u = std::move(u); }
 }
 
 template<class Dataset>

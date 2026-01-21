@@ -90,15 +90,12 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
 
     generateParticleIDs<gpu>(d.id);
 
-    auto&&                 x = toHost(d.x);
-    auto&&                 y = toHost(d.y);
-    auto&&                 z = toHost(d.z);
-    std::vector<HydroType> vx(d.vx.size());
-    std::vector<HydroType> vy(d.vy.size());
-    std::vector<HydroType> vz(d.vz.size());
-    std::vector<XM1Type>   x_m1(d.x_m1.size());
-    std::vector<XM1Type>   y_m1(d.y_m1.size());
-    std::vector<XM1Type>   z_m1(d.z_m1.size());
+    auto&& x = toHost(d.x);
+    auto&& y = toHost(d.y);
+    auto&& z = toHost(d.z);
+
+    std::vector<HydroType> vx(d.vx.size()), vy(d.vy.size()), vz(d.vz.size());
+
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
@@ -108,17 +105,13 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
         vx[i] = constants.at("vr0") * (x[i] / radius);
         vy[i] = constants.at("vr0") * (y[i] / radius);
         vz[i] = constants.at("vr0") * (z[i] / radius);
-
-        x_m1[i] = vx[i] * constants.at("minDt");
-        y_m1[i] = vy[i] * constants.at("minDt");
-        z_m1[i] = vz[i] * constants.at("minDt");
     }
-    d.vx   = std::move(vx);
-    d.vy   = std::move(vy);
-    d.vz   = std::move(vz);
-    d.x_m1 = std::move(x_m1);
-    d.y_m1 = std::move(y_m1);
-    d.z_m1 = std::move(z_m1);
+    d.vx = std::move(vx);
+    d.vy = std::move(vy);
+    d.vz = std::move(vz);
+    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
+    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
+    cstone::scaleGpuAcc<gpu>(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
 }
 
 template<class Dataset>

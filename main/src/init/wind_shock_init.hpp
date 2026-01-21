@@ -91,18 +91,15 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
 
     T k = d.ngmax / r;
 
-    util::array<T, 3>      blobCenter{r, r, r};
-    std::vector<T>         u_or_t(d.x.size());
-    auto&&                 x = toHost(d.x);
-    auto&&                 y = toHost(d.y);
-    auto&&                 z = toHost(d.z);
+    util::array<T, 3> blobCenter{r, r, r};
+    auto&&            x = toHost(d.x);
+    auto&&            y = toHost(d.y);
+    auto&&            z = toHost(d.z);
+
     std::vector<HydroType> h(d.h.size());
-    std::vector<HydroType> vx(d.vx.size());
-    std::vector<HydroType> vy(d.vy.size());
-    std::vector<HydroType> vz(d.vz.size());
-    std::vector<XM1Type>   x_m1(d.x_m1.size());
-    std::vector<XM1Type>   y_m1(d.y_m1.size());
-    std::vector<XM1Type>   z_m1(d.z_m1.size());
+    std::vector<T>         u(d.x.size());
+    std::vector<HydroType> vx(d.vx.size(), 0), vy(d.vy.size(), 0), vz(d.vz.size(), 0);
+
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
@@ -123,37 +120,31 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
                 h[i] = hInt + 0.5 * (hExt - hInt) * (1. + std::tanh(k * (rPos - rSphere - hExt)));
             }
 
-            u_or_t[i] = uExt;
-            vx[i]     = vxExt;
-            vy[i]     = vyExt;
-            vz[i]     = vzExt;
+            u[i]  = uExt;
+            vx[i] = vxExt;
+            vy[i] = vyExt;
+            vz[i] = vzExt;
         }
         else
         {
-            h[i]      = hInt;
-            u_or_t[i] = uInt;
-            vx[i]     = 0.;
-            vy[i]     = 0.;
-            vz[i]     = 0.;
+            h[i] = hInt;
+            u[i] = uInt;
         }
-
-        x_m1[i] = vx[i] * d.minDt;
-        y_m1[i] = vy[i] * d.minDt;
-        z_m1[i] = vz[i] * d.minDt;
     }
-    d.h    = std::move(h);
-    d.x_m1 = std::move(x_m1);
-    d.y_m1 = std::move(y_m1);
-    d.z_m1 = std::move(z_m1);
-    d.vx   = std::move(vx);
-    d.vy   = std::move(vy);
-    d.vz   = std::move(vz);
+    d.h  = std::move(h);
+    d.vx = std::move(vx);
+    d.vy = std::move(vy);
+    d.vz = std::move(vz);
+    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
+    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
+    cstone::scaleGpuAcc<gpu>(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
+
     if (d.u.empty())
     {
-        std::for_each(u_or_t.begin(), u_or_t.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
-        d.temp = std::move(u_or_t);
+        std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
+        d.temp = std::move(u);
     }
-    else { d.u = std::move(u_or_t); }
+    else { d.u = std::move(u); }
 }
 
 template<class Dataset>

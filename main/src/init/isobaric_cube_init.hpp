@@ -93,20 +93,18 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
     cstone::fill<gpu>(d.vx.begin(), d.vx.end(), 0.0);
     cstone::fill<gpu>(d.vy.begin(), d.vy.end(), 0.0);
     cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
+    cstone::fill<gpu>(d.x_m1.begin(), d.x_m1.end(), 0.0);
+    cstone::fill<gpu>(d.y_m1.begin(), d.y_m1.end(), 0.0);
+    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
 
     generateParticleIDs<gpu>(d.id);
 
-    std::vector<T>         u_or_t(d.x.size());
-    auto&&                 x  = toHost(d.x);
-    auto&&                 y  = toHost(d.y);
-    auto&&                 z  = toHost(d.z);
-    auto&&                 vx = toHost(d.vx);
-    auto&&                 vy = toHost(d.vy);
-    auto&&                 vz = toHost(d.vz);
+    auto&&                 x = toHost(d.x);
+    auto&&                 y = toHost(d.y);
+    auto&&                 z = toHost(d.z);
+    std::vector<T>         u(d.x.size());
     std::vector<HydroType> h(d.h.size());
-    std::vector<XM1Type>   x_m1(d.x_m1.size());
-    std::vector<XM1Type>   y_m1(d.y_m1.size());
-    std::vector<XM1Type>   z_m1(d.z_m1.size());
+
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
@@ -128,27 +126,21 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
                 h[i] = hInt * (1 - dist / (2 * hExt)) + hExt * dist / (2 * hExt);
             }
 
-            u_or_t[i] = uExt;
+            u[i] = uExt;
         }
         else
         {
-            h[i]      = hInt;
-            u_or_t[i] = uInt;
+            h[i] = hInt;
+            u[i] = uInt;
         }
-
-        x_m1[i] = vx[i] * constants.at("minDt");
-        y_m1[i] = vy[i] * constants.at("minDt");
-        z_m1[i] = vz[i] * constants.at("minDt");
     }
-    d.h    = std::move(h);
-    d.x_m1 = std::move(x_m1);
-    d.y_m1 = std::move(y_m1);
-    d.z_m1 = std::move(z_m1);
-    if (d.temp.empty()) { d.u = std::move(u_or_t); }
+    d.h = std::move(h);
+
+    if (d.temp.empty()) { d.u = std::move(u); }
     else
     {
-        std::for_each(u_or_t.begin(), u_or_t.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
-        d.temp = std::move(u_or_t);
+        std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; }); // convert to temperature
+        d.temp = std::move(u);
     }
 }
 

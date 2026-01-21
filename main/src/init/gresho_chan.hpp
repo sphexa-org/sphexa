@@ -53,12 +53,12 @@ double twoDimRadius(T x, T y)
 template<class Dataset, class T>
 void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& settings, T mPart)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using HydroType    = typename Dataset::HydroType;
-    using RealType     = typename Dataset::RealType;
-    using XM1Type      = typename Dataset::XM1Type;
-    double ng0         = settings.at("ng0");
-    double rho         = settings.at("rho");
+    constexpr bool gpu   = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
+    using HydroType      = typename Dataset::HydroType;
+    using RealType       = typename Dataset::RealType;
+    using XM1Type        = typename Dataset::XM1Type;
+    double ng0           = settings.at("ng0");
+    double rho           = settings.at("rho");
     double hInit         = 0.5 * std::cbrt(3. * ng0 * mPart / 4. / M_PI / rho);
     double firstTimeStep = settings.at("minDt");
 
@@ -76,20 +76,18 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
     cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
     cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
-
+    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
     cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
 
     generateParticleIDs<gpu>(d.id);
 
-    auto&&                 x = toHost(d.x);
-    auto&&                 y = toHost(d.y);
-    std::vector<RealType>  temp(d.temp.size());
-    auto                   u = toHost(d.u); // TODO: when u.empty() is true (line 121)?
-    std::vector<HydroType> vx(d.vx.size());
-    std::vector<HydroType> vy(d.vy.size());
-    std::vector<HydroType> vz(d.vz.size());
-    std::vector<XM1Type>   x_m1(d.x_m1.size());
-    std::vector<XM1Type>   y_m1(d.y_m1.size());
+    auto&& x = toHost(d.x);
+    auto&& y = toHost(d.y);
+
+    cstone::LocalIndex     numPartLoc = d.x.size();
+    std::vector<RealType>  u(numPartLoc);
+    std::vector<HydroType> vx(numPartLoc), vy(numPartLoc);
+
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); ++i)
     {
@@ -115,23 +113,21 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
             vi = 0.0;
         }
 
-        auto ui = pi / ((d.gamma - 1.) * rho);
-        if (u.empty()) { temp[i] = ui / cv; }
-        else { u[i] = ui; }
+        u[i]  = pi / ((d.gamma - 1.) * rho);
         vx[i] = -1.0 * vi * std::sin(theta);
         vy[i] = vi * std::cos(theta);
-        vz[i] = 0.0;
-
-        x_m1[i] = vx[i] * firstTimeStep;
-        y_m1[i] = vy[i] * firstTimeStep;
     }
-    d.temp = std::move(temp);
-    d.u    = std::move(u);
-    d.vx   = std::move(vx);
-    d.vy   = std::move(vy);
-    d.vz   = std::move(vz);
-    d.x_m1 = std::move(x_m1);
-    d.y_m1 = std::move(y_m1);
+    d.vx = std::move(vx);
+    d.vy = std::move(vy);
+    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), firstTimeStep);
+    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), firstTimeStep);
+
+    if (d.temp.empty()) { d.u = std::move(u); }
+    else
+    {
+        std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; }); // convert to temperature
+        d.temp = std::move(u);
+    }
 }
 
 template<class Dataset>
