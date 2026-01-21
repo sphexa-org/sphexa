@@ -194,7 +194,7 @@ struct ScaleFunctor
 };
 
 template<class Tc, class ThP>
-struct GpuFullNbListNeighborhoodImpl
+struct GpuFullNbListNeighborhood
 {
     Box<Tc> box = {0, 0};
     LocalIndex firstBody, lastBody;
@@ -228,7 +228,7 @@ struct GpuFullNbListNeighborhoodImpl
 
     struct Subgroup
     {
-        GpuFullNbListNeighborhoodImpl const& parent;
+        GpuFullNbListNeighborhood const& parent;
         GroupView groups;
 
         template<class... In, class... Out, class Interaction, class Postamble>
@@ -251,19 +251,19 @@ struct GpuFullNbListNeighborhoodImpl
 };
 } // namespace gpu_full_nb_list_neighborhood_detail
 
-struct GpuFullNbListNeighborhood
+struct GpuFullNbListNeighborhoodBuilder
 {
     unsigned ngmax;
 
     template<class Tc, class KeyType, class ThP>
-    gpu_full_nb_list_neighborhood_detail::GpuFullNbListNeighborhoodImpl<Tc, ThP> build(OctreeNsView<Tc, KeyType> tree,
-                                                                                       const Box<Tc>& box,
-                                                                                       const LocalIndex totalBodies,
-                                                                                       const GroupView& groups,
-                                                                                       const Tc* x,
-                                                                                       const Tc* y,
-                                                                                       const Tc* z,
-                                                                                       const ThP h) const
+    gpu_full_nb_list_neighborhood_detail::GpuFullNbListNeighborhood<Tc, ThP> build(OctreeNsView<Tc, KeyType> tree,
+                                                                                   const Box<Tc>& box,
+                                                                                   const LocalIndex totalBodies,
+                                                                                   const GroupView& groups,
+                                                                                   const Tc* x,
+                                                                                   const Tc* y,
+                                                                                   const Tc* z,
+                                                                                   const ThP h) const
     {
         using namespace gpu_full_nb_list_neighborhood_detail;
         const std::size_t numBodies = groups.lastBody - groups.firstBody;

@@ -94,13 +94,13 @@ void benchmarkMain()
         printf("\n");
     };
 
-    runBenchmark("DIRECT TREE TRAVERSAL", ijloop::GpuAlwaysTraverseNeighborhood{ngmax});
-    runBenchmark("FULL NB LIST", ijloop::GpuFullNbListNeighborhood{ngmax});
-    runBenchmark("GROMACS SUPERCLUSTERED", ijloop::GromacsLikeNeighborhood{ngmax});
+    runBenchmark("DIRECT TREE TRAVERSAL", ijloop::GpuAlwaysTraverseNeighborhoodBuilder{ngmax});
+    runBenchmark("FULL NB LIST", ijloop::GpuFullNbListNeighborhoodBuilder{ngmax});
+    runBenchmark("GROMACS SUPERCLUSTERED", ijloop::GromacsLikeNeighborhoodBuilder{ngmax});
 
     using BaseSuperclusterNb =
-        ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8,
-                                                                     GpuConfig::warpSize / 8>::withSuperclusterSize<64>;
+        ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, GpuConfig::warpSize /
+                                                                                   8>::withSuperclusterSize<64>;
     const unsigned ncmax = 300 + scale3 * 150;
     runBenchmark("SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withoutCompression{ncmax});
     runBenchmark("COMPRESSED SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withCompression{ncmax});

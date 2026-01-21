@@ -371,7 +371,7 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
 }
 
 template<class Tc, class ThP>
-struct GromacsLikeNeighborhoodImpl
+struct GromacsLikeNeighborhood
 {
     thrust::universal_vector<Sci> sciSorted;
     thrust::universal_vector<CjPacked> cjPacked;
@@ -426,35 +426,35 @@ struct GromacsLikeNeighborhoodImpl
 
 } // namespace gromacs_like_neighborhood_detail
 
-struct GromacsLikeNeighborhood
+struct GromacsLikeNeighborhoodBuilder
 {
     unsigned ngmax;
 
     template<class Tc, class KeyType, class ThP>
-    gromacs_like_neighborhood_detail::GromacsLikeNeighborhoodImpl<Tc, ThP> build(OctreeNsView<Tc, KeyType> tree,
-                                                                                 const Box<Tc>& box,
-                                                                                 const LocalIndex totalBodies,
-                                                                                 const GroupView& groups,
-                                                                                 const Tc* x,
-                                                                                 const Tc* y,
-                                                                                 const Tc* z,
-                                                                                 const ThP h) const
+    gromacs_like_neighborhood_detail::GromacsLikeNeighborhood<Tc, ThP> build(OctreeNsView<Tc, KeyType> tree,
+                                                                             const Box<Tc>& box,
+                                                                             const LocalIndex totalBodies,
+                                                                             const GroupView& groups,
+                                                                             const Tc* x,
+                                                                             const Tc* y,
+                                                                             const Tc* z,
+                                                                             const ThP h) const
     {
         using namespace gromacs_like_neighborhood_detail;
 
         assert(groups.firstBody == 0 && totalBodies == groups.lastBody);
         const unsigned numSuperclusters = iceil(groups.lastBody, superClusterSize);
 
-        GromacsLikeNeighborhoodImpl<Tc, ThP> nbList{thrust::universal_vector<Sci>(numSuperclusters),
-                                                    thrust::universal_vector<CjPacked>(0),
-                                                    thrust::universal_vector<Excl>(1),
-                                                    box,
-                                                    groups.firstBody,
-                                                    groups.lastBody,
-                                                    x,
-                                                    y,
-                                                    z,
-                                                    h};
+        GromacsLikeNeighborhood<Tc, ThP> nbList{thrust::universal_vector<Sci>(numSuperclusters),
+                                                thrust::universal_vector<CjPacked>(0),
+                                                thrust::universal_vector<Excl>(1),
+                                                box,
+                                                groups.firstBody,
+                                                groups.lastBody,
+                                                x,
+                                                y,
+                                                z,
+                                                h};
         nbList.cjPacked.reserve(numSuperclusters);
         nbList.excl.front().pair.fill(0xffffffffu);
 
@@ -495,7 +495,10 @@ struct GromacsLikeNeighborhood
                 hExt[i] = h[i] * tree.searchExtFactor;
             tree.searchExtFactor = 1;
         }
-        else { hExtData = h * tree.searchExtFactor; }
+        else
+        {
+            hExtData = h * tree.searchExtFactor;
+        }
 
 #pragma omp parallel
         {

@@ -49,12 +49,12 @@ template<class Tc,
          class T,
          class StrongKeyType,
          class Coords,
-         cstone::ijloop::Neighborhood Neighborhood,
+         cstone::ijloop::NeighborhoodBuilder NeighborhoodBuilder,
          class Interaction,
          class... InputTs,
          class... OutputTs>
 NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
-                                                   const Neighborhood& neighborhood,
+                                                   const NeighborhoodBuilder& neighborhoodBuilder,
                                                    const T hVal,
                                                    const float searchExtFactor,
                                                    unsigned ngmax,
@@ -125,7 +125,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     const auto allocVec = [n]<class Tv>(Tv initialValue) { return std::vector<Tv>(n, initialValue); };
     const std::tuple<std::vector<InputTs>...> inputs = util::tupleMap(allocVec, inputValues);
     std::tuple<std::vector<OutputTs>...> outputs     = util::tupleMap(allocVec, initialOutputValues);
-    ijloop::CpuAlwaysTraverseNeighborhood{ngmax}
+    ijloop::CpuAlwaysTraverseNeighborhoodBuilder{ngmax}
         .build(nsView, box, n, groupView, x, y, z, hVal)
         .ijLoop(util::tupleMap([](auto const& v) { return v.data(); }, inputs),
                 util::tupleMap([](auto& v) { return v.data(); }, outputs), interaction, ijloop::empty_postamble);
@@ -203,13 +203,13 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     // build neighborhood, measure CPU time
     using Clock     = std::chrono::high_resolution_clock;
     auto buildStart = Clock::now();
-    const auto neighborhoodGPU =
-        neighborhood.build(dNsView, box, n, dGroupView, rawPtr(dX), rawPtr(dY), rawPtr(dZ), hVal);
+    const auto neighborhood =
+        neighborhoodBuilder.build(dNsView, box, n, dGroupView, rawPtr(dX), rawPtr(dY), rawPtr(dZ), hVal);
     checkGpuErrors(cudaDeviceSynchronize());
     auto buildEnd         = Clock::now();
     const float buildTime = std::chrono::duration<float>(buildEnd - buildStart).count();
     printf("Neighborhood build time (CPU time): %7.6f s\n", buildTime);
-    const ijloop::Statistics stats  = neighborhoodGPU.stats();
+    const ijloop::Statistics stats  = neighborhood.stats();
     const float numBytesPerParticle = static_cast<float>(stats.numBytes / double(stats.numBodies));
     printf("Memory usage of neighborhood data: %.2f MB (%.1f B/particle)\n", stats.numBytes / 1.0e6,
            numBytesPerParticle);
@@ -222,9 +222,9 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     checkGpuErrors(cudaEventRecord(events[0]));
     for (std::size_t i = 1; i < events.size(); ++i)
     {
-        neighborhoodGPU.ijLoop(util::tupleMap([](auto const& v) { return rawPtr(v); }, dInputs),
-                               util::tupleMap([](auto& v) { return rawPtr(v); }, dOutputs), interaction,
-                               ijloop::empty_postamble);
+        neighborhood.ijLoop(util::tupleMap([](auto const& v) { return rawPtr(v); }, dInputs),
+                            util::tupleMap([](auto& v) { return rawPtr(v); }, dOutputs), interaction,
+                            ijloop::empty_postamble);
         checkGpuErrors(cudaEventRecord(events[i]));
     }
     checkGpuErrors(cudaEventSynchronize(events.back()));

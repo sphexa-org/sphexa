@@ -19,16 +19,16 @@ enum class NeighborhoodType
     clusteredNeighborList
 };
 
-template<class Neighborhood>
-using NeighborhoodDataType = decltype(std::declval<Neighborhood>().build(
+template<class NeighborhoodBuilder>
+using NeighborhoodDataType = decltype(std::declval<NeighborhoodBuilder>().build(
     std::declval<cstone::OctreeNsView<sph::SphTypes::CoordinateType, sph::SphTypes::KeyType>>(),
     std::declval<cstone::Box<sph::SphTypes::CoordinateType>>(), 0, std::declval<cstone::GroupView>(),
     std::declval<sph::SphTypes::CoordinateType*>(), std::declval<sph::SphTypes::CoordinateType*>(),
     std::declval<sph::SphTypes::CoordinateType*>(), std::declval<sph::SphTypes::HydroType*>()));
 
-template<class Neighborhood>
+template<class NeighborhoodBuilder>
 using NeighborhoodSubgroupType =
-    decltype(std::declval<NeighborhoodDataType<Neighborhood>>().subgroup(std::declval<cstone::GroupView>()));
+    decltype(std::declval<NeighborhoodDataType<NeighborhoodBuilder>>().subgroup(std::declval<cstone::GroupView>()));
 
 struct NeighborhoodData
 {
@@ -46,16 +46,17 @@ struct NeighborhoodData
     {
         data.emplace<0>();
 
-        std::variant<cstone::ijloop::CpuAlwaysTraverseNeighborhood, cstone::ijloop::CpuFullNbListNeighborhood>
+        std::variant<cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder,
+                     cstone::ijloop::CpuFullNbListNeighborhoodBuilder>
             neighborhood;
 
         switch (neighborhoodType)
         {
             case NeighborhoodType::alwaysTraverse:
-                neighborhood = cstone::ijloop::CpuAlwaysTraverseNeighborhood{d.ngmax};
+                neighborhood = cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder{d.ngmax};
                 break;
             case NeighborhoodType::fullNeighborList:
-                neighborhood = cstone::ijloop::CpuFullNbListNeighborhood{d.ngmax};
+                neighborhood = cstone::ijloop::CpuFullNbListNeighborhoodBuilder{d.ngmax};
                 break;
             case NeighborhoodType::clusteredNeighborList:
                 throw std::runtime_error("clustered neighbor lists are not available on CPU");
@@ -75,8 +76,8 @@ struct NeighborhoodData
     }
 
 private:
-    std::variant<NeighborhoodDataType<cstone::ijloop::CpuAlwaysTraverseNeighborhood>,
-                 NeighborhoodDataType<cstone::ijloop::CpuFullNbListNeighborhood>>
+    std::variant<NeighborhoodDataType<cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder>,
+                 NeighborhoodDataType<cstone::ijloop::CpuFullNbListNeighborhoodBuilder>>
                      data;
     NeighborhoodType neighborhoodType = NeighborhoodType::alwaysTraverse;
 };

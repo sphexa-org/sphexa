@@ -90,7 +90,7 @@ __launch_bounds__(TravConfig::numThreads) void runIjLoop(const OctreeNsView<Tc, 
 }
 
 template<class Tc, class KeyType, class ThP>
-struct GpuAlwaysTraverseNeighborhoodImpl
+struct GpuAlwaysTraverseNeighborhood
 {
     OctreeNsView<Tc, KeyType> tree;
     Box<Tc> box = {0, 0};
@@ -124,7 +124,7 @@ struct GpuAlwaysTraverseNeighborhoodImpl
 
     struct Subgroup
     {
-        GpuAlwaysTraverseNeighborhoodImpl const& parent;
+        GpuAlwaysTraverseNeighborhood const& parent;
         GroupView groups;
 
         template<class... In, class... Out, class Interaction, class Postamble>
@@ -169,12 +169,12 @@ protected:
 };
 } // namespace gpu_always_traverse_neighborhood_detail
 
-struct GpuAlwaysTraverseNeighborhood
+struct GpuAlwaysTraverseNeighborhoodBuilder
 {
     unsigned ngmax;
 
     template<class Tc, class KeyType, class ThP>
-    gpu_always_traverse_neighborhood_detail::GpuAlwaysTraverseNeighborhoodImpl<Tc, KeyType, ThP>
+    gpu_always_traverse_neighborhood_detail::GpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP>
     build(const OctreeNsView<Tc, KeyType>& tree,
           const Box<Tc>& box,
           const LocalIndex /* totalBodies */,
@@ -185,17 +185,16 @@ struct GpuAlwaysTraverseNeighborhood
           ThP h) const
     {
         using namespace gpu_always_traverse_neighborhood_detail;
-        return {
-            tree,
-            box,
-            groups,
-            x,
-            y,
-            z,
-            h,
-            ngmax,
-            util::deviceAlloc<LocalIndex[]>(GpuAlwaysTraverseNeighborhoodImpl<Tc, KeyType, ThP>::neighborsSize(ngmax)),
-            util::deviceAlloc<int[]>(TravConfig::poolSize())};
+        return {tree,
+                box,
+                groups,
+                x,
+                y,
+                z,
+                h,
+                ngmax,
+                util::deviceAlloc<LocalIndex[]>(GpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP>::neighborsSize(ngmax)),
+                util::deviceAlloc<int[]>(TravConfig::poolSize())};
     }
 };
 

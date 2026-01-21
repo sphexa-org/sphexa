@@ -30,7 +30,7 @@ namespace cstone::ijloop
 namespace cpu_always_traverse_neighborhood_detail
 {
 template<class Tc, class KeyType, class ThP>
-struct CpuAlwaysTraverseNeighborhoodImpl
+struct CpuAlwaysTraverseNeighborhood
 {
     OctreeNsView<Tc, KeyType> tree;
     Box<Tc> box = {0, 0};
@@ -61,7 +61,7 @@ struct CpuAlwaysTraverseNeighborhoodImpl
 
     struct Subgroup
     {
-        CpuAlwaysTraverseNeighborhoodImpl const& parent;
+        CpuAlwaysTraverseNeighborhood const& parent;
         GroupView groups;
 
         template<class... In, class... Out, class Interaction, class Postamble>
@@ -116,12 +116,12 @@ protected:
 
 } // namespace cpu_always_traverse_neighborhood_detail
 
-struct CpuAlwaysTraverseNeighborhood
+struct CpuAlwaysTraverseNeighborhoodBuilder
 {
     unsigned ngmax;
 
     template<class Tc, class KeyType, class ThP>
-    cpu_always_traverse_neighborhood_detail::CpuAlwaysTraverseNeighborhoodImpl<Tc, KeyType, ThP>
+    cpu_always_traverse_neighborhood_detail::CpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP>
     build(const OctreeNsView<Tc, KeyType>& tree,
           const Box<Tc>& box,
           const LocalIndex /* totalBodies */,

@@ -151,19 +151,19 @@ void benchmarkMain()
         printf("\n");
     };
 
-    runBenchmark("DIRECT TREE TRAVERSAL", ijloop::GpuAlwaysTraverseNeighborhood{ngmax});
-    runBenchmark("FULL NB LIST", ijloop::GpuFullNbListNeighborhood{ngmax});
-    runBenchmark("GROMACS SUPERCLUSTERED", ijloop::GromacsLikeNeighborhood{ngmax});
+    runBenchmark("DIRECT TREE TRAVERSAL", ijloop::GpuAlwaysTraverseNeighborhoodBuilder{ngmax});
+    runBenchmark("FULL NB LIST", ijloop::GpuFullNbListNeighborhoodBuilder{ngmax});
+    runBenchmark("GROMACS SUPERCLUSTERED", ijloop::GromacsLikeNeighborhoodBuilder{ngmax});
 
     using BaseSuperclusterNb =
-        ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8,
-                                                                     GpuConfig::warpSize / 8>::withSuperclusterSize<64>;
-    runBenchmark("SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withoutCompression{1024});
-    runBenchmark("COMPRESSED SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withCompression{1024});
+        ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, GpuConfig::warpSize /
+                                                                                   8>::withSuperclusterSize<64>;
+    runBenchmark("SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withoutCompression{360});
+    runBenchmark("COMPRESSED SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withCompression{360});
 
     using SymmetricSuperclusterNb = BaseSuperclusterNb::withSymmetry;
-    runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{512});
-    runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{512});
+    runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{320});
+    runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{320});
 
     saveCsv(std::format("sph_density_results_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), times);
     saveCsv(std::format("sph_density_buildtime_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), buildTimes);

@@ -89,7 +89,7 @@ constexpr static auto resultNames = std::make_tuple("iSum",
                                                     "hiSumNormalized",
                                                     "jMin");
 
-template<class Neighborhood>
+template<class NeighborhoodBuilder>
 struct IjLoopTest : testing::Test
 {
     static constexpr LocalIndex totalBodies = 997, firstBody = 241, lastBody = 701;
@@ -341,33 +341,34 @@ struct IjLoopTest : testing::Test
 };
 
 using Neighborhoods = ::testing::Types<
-    ijloop::CpuAlwaysTraverseNeighborhood,
-    ijloop::CpuFullNbListNeighborhood,
-    ijloop::GpuAlwaysTraverseNeighborhood,
-    ijloop::GpuFullNbListNeighborhood,
+    ijloop::CpuAlwaysTraverseNeighborhoodBuilder,
+    ijloop::CpuFullNbListNeighborhoodBuilder,
+    ijloop::GpuAlwaysTraverseNeighborhoodBuilder,
+    ijloop::GpuFullNbListNeighborhoodBuilder,
 #ifdef __CUDACC__
-    ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 4>::withoutSymmetry::withoutCompression,
-    ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 4>::withSymmetry::withoutCompression,
-    ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 4>::withoutSymmetry::withCompression,
-    ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 4>::withSymmetry::withCompression,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withoutSymmetry::withoutCompression,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withSymmetry::withoutCompression,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withoutSymmetry::withCompression,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withSymmetry::withCompression,
 #endif
-    ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withoutSymmetry::withoutCompression,
-    ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSymmetry::withoutCompression,
-    ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withoutSymmetry::withCompression,
-    ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSymmetry::withCompression>;
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withoutSymmetry::withoutCompression,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withSymmetry::withoutCompression,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withoutSymmetry::withCompression,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withSymmetry::withCompression>;
 
 TYPED_TEST_SUITE(IjLoopTest, Neighborhoods);
 
 TYPED_TEST(IjLoopTest, IjLoop)
 {
-    using Neighborhood = TypeParam;
+    using NeighborhoodBuilder = TypeParam;
 
     for (BoundaryType boundaryType : {BoundaryType::open, BoundaryType::periodic, BoundaryType::fixed})
     {
         this->setBoundaryType(boundaryType);
 
-        const auto nb = Neighborhood{1024}.build(this->treeView(), this->box, this->totalBodies, this->groupView(),
-                                                 rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
+        const auto nb =
+            NeighborhoodBuilder{1024}.build(this->treeView(), this->box, this->totalBodies, this->groupView(),
+                                            rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
 
         Result result;
         util::for_each_tuple([&](auto& v) { v.resize(this->totalBodies); }, result);
@@ -383,31 +384,31 @@ TYPED_TEST(IjLoopTest, IjLoop)
     }
 }
 
-template<ijloop::Neighborhood Neighborhood>
-consteval bool supportsSubgroup(Neighborhood)
+template<ijloop::NeighborhoodBuilder NeighborhoodBuilder>
+consteval bool supportsSubgroup(NeighborhoodBuilder)
 {
     return true;
 }
 
 template<class Config>
-consteval bool supportsSubgroup(ijloop::GpuSuperclusterNbListNeighborhood<Config>)
+consteval bool supportsSubgroup(ijloop::GpuSuperclusterNbListNeighborhoodBuilder<Config>)
 {
     return !Config::symmetric;
 }
 
 TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
 {
-    using Neighborhood = TypeParam;
+    using NeighborhoodBuilder = TypeParam;
 
-    if constexpr (supportsSubgroup(Neighborhood{}))
+    if constexpr (supportsSubgroup(NeighborhoodBuilder{}))
     {
         for (BoundaryType boundaryType : {BoundaryType::open, BoundaryType::periodic, BoundaryType::fixed})
         {
             this->setBoundaryType(boundaryType);
 
             const auto nb =
-                Neighborhood{1024}.build(this->treeView(), this->box, this->totalBodies, this->groupView(),
-                                         rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
+                NeighborhoodBuilder{1024}.build(this->treeView(), this->box, this->totalBodies, this->groupView(),
+                                                rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
 
             const auto subgroupNb = nb.subgroup(this->subgroupView());
 
@@ -424,5 +425,8 @@ TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
             this->validate(reference, result);
         }
     }
-    else { GTEST_SKIP() << "subgroups not supported"; }
+    else
+    {
+        GTEST_SKIP() << "subgroups not supported";
+    }
 }

@@ -78,7 +78,7 @@ namespace gpu_supercluster_nb_list_neighborhood_detail
 {
 
 template<class Config, class Tc, class ThP>
-struct GpuSuperclusterNbListNeighborhoodImpl
+struct GpuSuperclusterNbListNeighborhood
 {
     Box<Tc> box               = {0, 0};
     LocalIndex firstValidBody = 0, totalBodies = 0, firstBody = 0, lastBody = 0;
@@ -110,7 +110,7 @@ struct GpuSuperclusterNbListNeighborhoodImpl
 
     struct Subgroup
     {
-        GpuSuperclusterNbListNeighborhoodImpl const& parent;
+        GpuSuperclusterNbListNeighborhood const& parent;
         GroupView groups;
         util::UniqueDevicePtr<typename Config::SuperclusterParticleMask[]> activeMasks;
         util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo;
@@ -239,17 +239,18 @@ struct GpuSuperclusterNbListNeighborhoodConfig
 } // namespace gpu_supercluster_nb_list_neighborhood_detail
 
 template<class Config = gpu_supercluster_nb_list_neighborhood_detail::GpuSuperclusterNbListNeighborhoodConfig<>>
-struct GpuSuperclusterNbListNeighborhood
+struct GpuSuperclusterNbListNeighborhoodBuilder
 {
     template<unsigned ISize, unsigned JSize>
-    using withClusterSize = GpuSuperclusterNbListNeighborhood<typename Config::template withClusterSize<ISize, JSize>>;
+    using withClusterSize =
+        GpuSuperclusterNbListNeighborhoodBuilder<typename Config::template withClusterSize<ISize, JSize>>;
     template<unsigned SuperclusterSize>
     using withSuperclusterSize =
-        GpuSuperclusterNbListNeighborhood<typename Config::template withSuperclusterSize<SuperclusterSize>>;
-    using withCompression    = GpuSuperclusterNbListNeighborhood<typename Config::withCompression>;
-    using withoutCompression = GpuSuperclusterNbListNeighborhood<typename Config::withoutCompression>;
+        GpuSuperclusterNbListNeighborhoodBuilder<typename Config::template withSuperclusterSize<SuperclusterSize>>;
+    using withCompression    = GpuSuperclusterNbListNeighborhoodBuilder<typename Config::withCompression>;
+    using withoutCompression = GpuSuperclusterNbListNeighborhoodBuilder<typename Config::withoutCompression>;
     template<bool Symmetric>
-    using setSymmetry     = GpuSuperclusterNbListNeighborhood<typename Config::template setSymmetry<Symmetric>>;
+    using setSymmetry     = GpuSuperclusterNbListNeighborhoodBuilder<typename Config::template setSymmetry<Symmetric>>;
     using withSymmetry    = setSymmetry<true>;
     using withoutSymmetry = setSymmetry<false>;
 
@@ -263,7 +264,7 @@ struct GpuSuperclusterNbListNeighborhood
     std::size_t upperBoundBytesPerParticle = 128;
 
     template<class Tc, class KeyType, class ThP>
-    gpu_supercluster_nb_list_neighborhood_detail::GpuSuperclusterNbListNeighborhoodImpl<Config, Tc, ThP>
+    gpu_supercluster_nb_list_neighborhood_detail::GpuSuperclusterNbListNeighborhood<Config, Tc, ThP>
     build(const OctreeNsView<Tc, KeyType>& tree,
           const Box<Tc>& box,
           LocalIndex totalBodies,

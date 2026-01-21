@@ -32,7 +32,7 @@ namespace cpu_full_nb_list_neighborhood_detail
 {
 
 template<class Tc, class KeyType, class ThP>
-struct CpuFullNbListNeighborhoodImpl
+struct CpuFullNbListNeighborhood
 {
     OctreeNsView<Tc, KeyType> tree;
     Box<Tc> box = {0, 0};
@@ -63,7 +63,7 @@ struct CpuFullNbListNeighborhoodImpl
 
     struct Subgroup
     {
-        CpuFullNbListNeighborhoodImpl const& parent;
+        CpuFullNbListNeighborhood const& parent;
         GroupView groups;
 
         template<class... In, class... Out, class Interaction, class Postamble>
@@ -109,12 +109,12 @@ protected:
 };
 } // namespace cpu_full_nb_list_neighborhood_detail
 
-struct CpuFullNbListNeighborhood
+struct CpuFullNbListNeighborhoodBuilder
 {
     unsigned ngmax;
 
     template<class Tc, class KeyType, class ThP>
-    cpu_full_nb_list_neighborhood_detail::CpuFullNbListNeighborhoodImpl<Tc, KeyType, ThP>
+    cpu_full_nb_list_neighborhood_detail::CpuFullNbListNeighborhood<Tc, KeyType, ThP>
     build(OctreeNsView<Tc, KeyType> tree,
           const Box<Tc>& box,
           const LocalIndex totalBodies,
@@ -128,7 +128,7 @@ struct CpuFullNbListNeighborhood
 
         const LocalIndex numBodies = groups.lastBody - groups.firstBody;
 
-        CpuFullNbListNeighborhoodImpl<Tc, KeyType, ThP> nbList{
+        CpuFullNbListNeighborhood<Tc, KeyType, ThP> nbList{
             tree,
             box,
             groups.firstBody,

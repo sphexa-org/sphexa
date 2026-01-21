@@ -119,24 +119,21 @@ struct ConceptTestInteraction
 } // namespace detail
 
 template<class T>
-concept Neighborhood = requires(T nb,
-                                OctreeNsView<double, unsigned> tree,
-                                Box<double> box,
-                                LocalIndex totalBodies,
-                                GroupView groups,
-                                const double* x,
-                                const double* y,
-                                const double* z,
-                                const float* h)
+concept NeighborhoodBuilder = requires(T nb,
+                                       OctreeNsView<double, unsigned> tree,
+                                       Box<double> box,
+                                       LocalIndex totalBodies,
+                                       GroupView groups,
+                                       const double* x,
+                                       const double* y,
+                                       const double* z,
+                                       const float* h)
 {
     nb.build(tree, box, totalBodies, groups, x, y, z, h);
-    {
-        nb.build(tree, box, totalBodies, groups, x, y, z, h).stats()
-    } -> std::same_as<Statistics>;
-    {
-        nb.build(tree, box, totalBodies, groups, x, y, z, h)
-            .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble)
-    } -> std::same_as<void>;
+    {nb.build(tree, box, totalBodies, groups, x, y, z, h).stats()}->std::same_as<Statistics>;
+    {nb.build(tree, box, totalBodies, groups, x, y, z, h)
+         .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble)}
+        ->std::same_as<void>;
 };
 
 } // namespace cstone::ijloop

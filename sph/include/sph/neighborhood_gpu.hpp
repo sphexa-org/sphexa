@@ -36,8 +36,8 @@ private:
 
 #if defined(__CUDACC__) || defined(__HIP__)
 template<bool Symmetric>
-using ClusteredNeighborhood =
-    cstone::ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, cstone::GpuConfig::warpSize / 8>::
+using ClusteredNeighborhoodBuilder =
+    cstone::ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, cstone::GpuConfig::warpSize / 8>::
         withSuperclusterSize<cstone::TravConfig::targetSize>::setSymmetry<Symmetric>::withCompression;
 
 struct DeviceNeighborhoodData::Impl
@@ -51,7 +51,8 @@ struct DeviceNeighborhoodData::Impl
             std::visit(
                 [&]<class Neighborhood>(Neighborhood const& nb)
                 {
-                    if constexpr (!std::is_same_v<Neighborhood, NeighborhoodDataType<ClusteredNeighborhood<true>>>)
+                    if constexpr (!std::is_same_v<Neighborhood,
+                                                  NeighborhoodDataType<ClusteredNeighborhoodBuilder<true>>>)
                         subgroupData.emplace(nb.subgroup(groups));
                 },
                 data);
@@ -63,22 +64,23 @@ struct DeviceNeighborhoodData::Impl
 
             const unsigned ncmax = std::bit_ceil(d.ngmax * 2);
 
-            std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhood, cstone::ijloop::GpuFullNbListNeighborhood,
-                         ClusteredNeighborhood<false>, ClusteredNeighborhood<true>>
+            std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder,
+                         cstone::ijloop::GpuFullNbListNeighborhoodBuilder, ClusteredNeighborhoodBuilder<false>,
+                         ClusteredNeighborhoodBuilder<true>>
                 neighborhood;
             switch (neighborhoodType)
             {
                 case NeighborhoodType::alwaysTraverse:
-                    neighborhood = cstone::ijloop::GpuAlwaysTraverseNeighborhood{d.ngmax};
+                    neighborhood = cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder{d.ngmax};
                     break;
                 case NeighborhoodType::fullNeighborList:
-                    neighborhood = cstone::ijloop::GpuFullNbListNeighborhood{d.ngmax};
+                    neighborhood = cstone::ijloop::GpuFullNbListNeighborhoodBuilder{d.ngmax};
                     break;
                 case NeighborhoodType::clusteredNeighborList:
                     if (subgroups)
-                        neighborhood = ClusteredNeighborhood<false>{ncmax};
+                        neighborhood = ClusteredNeighborhoodBuilder<false>{ncmax};
                     else
-                        neighborhood = ClusteredNeighborhood<true>{ncmax};
+                        neighborhood = ClusteredNeighborhoodBuilder<true>{ncmax};
                     break;
             }
 
@@ -102,13 +104,14 @@ struct DeviceNeighborhoodData::Impl
             std::visit(runIjLoop, data);
     }
 
-    std::variant<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhood>,
-                 NeighborhoodDataType<cstone::ijloop::GpuFullNbListNeighborhood>,
-                 NeighborhoodDataType<ClusteredNeighborhood<false>>, NeighborhoodDataType<ClusteredNeighborhood<true>>>
+    std::variant<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder>,
+                 NeighborhoodDataType<cstone::ijloop::GpuFullNbListNeighborhoodBuilder>,
+                 NeighborhoodDataType<ClusteredNeighborhoodBuilder<false>>,
+                 NeighborhoodDataType<ClusteredNeighborhoodBuilder<true>>>
         data;
-    std::optional<std::variant<NeighborhoodSubgroupType<cstone::ijloop::GpuAlwaysTraverseNeighborhood>,
-                               NeighborhoodSubgroupType<cstone::ijloop::GpuFullNbListNeighborhood>,
-                               NeighborhoodSubgroupType<ClusteredNeighborhood<false>>>>
+    std::optional<std::variant<NeighborhoodSubgroupType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder>,
+                               NeighborhoodSubgroupType<cstone::ijloop::GpuFullNbListNeighborhoodBuilder>,
+                               NeighborhoodSubgroupType<ClusteredNeighborhoodBuilder<false>>>>
                      subgroupData;
     NeighborhoodType neighborhoodType = NeighborhoodType::alwaysTraverse;
 };
