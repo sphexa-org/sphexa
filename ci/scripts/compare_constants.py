@@ -14,7 +14,7 @@ def load_rows(path: Path):
     return rows
 
 
-def main(ref_path: Path, new_path: Path):
+def main(ref_path: Path, new_path: Path, rel_tolerance = relative_tolerance):
     ref = load_rows(ref_path)
     new = load_rows(new_path)
     if len(ref) != len(new):
@@ -30,7 +30,7 @@ def main(ref_path: Path, new_path: Path):
             diff = abs(vn - vr)
             den = max(abs(vr), eps_zero)
             rel = diff / den
-            if rel > relative_tolerance:
+            if rel > rel_tolerance:
                 above_tolerance.append((idx, col, vr, vn, diff, rel))
     if above_tolerance:
         print("Rows exceeding tolerances (row, col, ref, new, abs, rel):")
