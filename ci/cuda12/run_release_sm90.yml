@@ -203,7 +203,7 @@ sph-compare-constants-cuda12-sm90-release-sphexa-cuda:
       do
         $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init $ic -s 10 -n 50
         if [ "$SLURM_PROCID" -eq 0 ]; then
-          python ci/scripts/compare_constants.py ci/reference/constants-${ic}-ref.txt constants.txt
+          python ci/scripts/compare_constants.py ci/reference/const-${ic}-ref.txt constants.txt
           if [ $? -ne 0 ]; then
             exit 1
           fi
@@ -214,7 +214,7 @@ sph-compare-constants-cuda12-sm90-release-sphexa-cuda:
       do
         $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init $ic -s 2 -n 30
         if [ "$SLURM_PROCID" -eq 0 ]; then
-          python ci/scripts/compare_constants.py ci/reference/constants-${ic}-ref.txt constants.txt
+          python ci/scripts/compare_constants.py ci/reference/const-${ic}-ref.txt constants.txt
           if [ $? -ne 0 ]; then
             exit 1
           fi
