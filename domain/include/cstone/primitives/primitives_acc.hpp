@@ -39,10 +39,10 @@ struct HaveGpu : public std::integral_constant<int, std::is_same_v<AccType, GpuT
 {
 };
 
-template<bool useGpu, class Iterator, class T2>
-void fill(Iterator first, Iterator last, T2 value)
+template<bool useGpu, class Iterator, class T>
+void fill(Iterator first, Iterator last, T value)
 {
-    using T1 = decltype(*first);
+    using T1 = std::decay_t<decltype(*first)>;
     if (last <= first) { return; }
 
     if constexpr (useGpu) { fillGpu(first, last, T1(value)); }
