@@ -38,7 +38,7 @@ private:
 template<bool Symmetric>
 using ClusteredNeighborhoodBuilder =
     cstone::ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, cstone::GpuConfig::warpSize / 8>::
-        withSuperclusterSize<cstone::TravConfig::targetSize>::setSymmetry<Symmetric>::withCompression;
+        withSuperclusterSize<cstone::TravConfig::targetSize>::setSymmetry<Symmetric>::template withCompression<>;
 
 struct DeviceNeighborhoodData::Impl
 {

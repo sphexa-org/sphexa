@@ -348,13 +348,13 @@ using Neighborhoods = ::testing::Types<
 #ifdef __CUDACC__
     ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withoutSymmetry::withoutCompression,
     ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withSymmetry::withoutCompression,
-    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withoutSymmetry::withCompression,
-    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withSymmetry::withCompression,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withoutSymmetry::withCompression<>,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withSymmetry::withCompression<>,
 #endif
     ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withoutSymmetry::withoutCompression,
     ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withSymmetry::withoutCompression,
-    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withoutSymmetry::withCompression,
-    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withSymmetry::withCompression>;
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withoutSymmetry::withCompression<>,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withSymmetry::withCompression<>>;
 
 TYPED_TEST_SUITE(IjLoopTest, Neighborhoods);
 

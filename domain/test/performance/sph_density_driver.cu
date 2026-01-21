@@ -155,15 +155,22 @@ void benchmarkMain()
     runBenchmark("FULL NB LIST", ijloop::GpuFullNbListNeighborhoodBuilder{ngmax});
     runBenchmark("GROMACS SUPERCLUSTERED", ijloop::GromacsLikeNeighborhoodBuilder{ngmax});
 
-    using BaseSuperclusterNb =
-        ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, GpuConfig::warpSize /
-                                                                                   8>::withSuperclusterSize<64>;
-    runBenchmark("SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withoutCompression{360});
-    runBenchmark("COMPRESSED SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withCompression{360});
+    using SuperclusterNb = ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<
+        8, GpuConfig::warpSize / 8>::withSuperclusterSize<64>::withoutSymmetry;
+    constexpr unsigned ncmax = 360;
+    runBenchmark("SUPERCLUSTERED", SuperclusterNb::withoutCompression{ncmax});
+    runBenchmark("COMPRESSED SUPERCLUSTERED (Band et al. Compression)",
+                 SuperclusterNb::withCompression<BandEtAlWarpCompression>{ncmax});
+    runBenchmark("COMPRESSED SUPERCLUSTERED (Nibble-based Compression)",
+                 SuperclusterNb::withCompression<NibbleWarpCompression>{ncmax});
 
-    using SymmetricSuperclusterNb = BaseSuperclusterNb::withSymmetry;
-    runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{320});
-    runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{320});
+    using SymmetricSuperclusterNb     = SuperclusterNb::withSymmetry;
+    constexpr unsigned ncmaxSymmetric = 320;
+    runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{ncmaxSymmetric});
+    runBenchmark("COMPRESSED SUPERCLUSTERED (Band et al. Compression)",
+                 SuperclusterNb::withCompression<BandEtAlWarpCompression>{ncmaxSymmetric});
+    runBenchmark("COMPRESSED SUPERCLUSTERED (Nibble-based Compression)",
+                 SuperclusterNb::withCompression<NibbleWarpCompression>{ncmaxSymmetric});
 
     saveCsv(std::format("sph_density_results_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), times);
     saveCsv(std::format("sph_density_buildtime_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), buildTimes);

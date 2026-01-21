@@ -365,9 +365,7 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
         return bool(anySync(overlaps));
     };
 
-    using Compression = std::conditional_t<Config::compress, WarpCompression, DummyWarpCompression>;
-
-    Compression compression(jClusters);
+    typename Config::Compression compression(jClusters);
 
     unsigned jClusterQueue, previousJCluster = ~0u;
     const auto overlapsLeafNode = [&](const TreeNodeIndex idx)

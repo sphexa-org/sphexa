@@ -343,8 +343,6 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq(x, y, z, h, input, firstBody));
     using Result = std::decay_t<decltype(interaction(ParticleData(), ParticleData(), Vec3<Tc>(), Tc(0)))>;
 
-    using Decompression = std::conditional_t<Config::compress, WarpDecompression, DummyWarpDecompression>;
-
     const auto iSuperclusterData =
         loadSuperclusterIParticleData<Config, NumSuperclustersPerBlock, ParticleDataWithRadiusSq>(
             firstValidBody, totalBodies, iSupercluster, x, y, z, h, input);
@@ -354,7 +352,8 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     std::array<Result, Config::iClustersPerSupercluster> iResults = {};
 
     const unsigned maskSize = masksSize<Config>(iSuperclusterNeighborsCount);
-    Decompression decompression(&neighborData[iSuperclusterDataIndex + maskSize], iSuperclusterNeighborsCount);
+    typename Config::Compression::Decompression decompression(&neighborData[iSuperclusterDataIndex + maskSize],
+                                                              iSuperclusterNeighborsCount);
 
     unsigned warpJCluster = decompression.next();
     for (unsigned nb = 0; nb < iSuperclusterNeighborsCount; ++nb)

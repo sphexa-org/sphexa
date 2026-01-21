@@ -200,7 +200,7 @@ protected:
 template<unsigned ISize            = 8,
          unsigned JSize            = 8,
          unsigned SuperclusterSize = ISize * std::max(JSize, GpuConfig::warpSize / ISize),
-         bool Compress             = false,
+         class WarpCompression     = NibbleWarpCompression,
          bool Symmetric            = true>
 struct GpuSuperclusterNbListNeighborhoodConfig
 {
@@ -213,7 +213,7 @@ struct GpuSuperclusterNbListNeighborhoodConfig
     static constexpr unsigned iSize            = ISize;
     static constexpr unsigned jSize            = JSize;
     static constexpr unsigned superclusterSize = SuperclusterSize;
-    static constexpr bool compress             = Compress;
+    using Compression                          = WarpCompression;
     static constexpr bool symmetric            = Symmetric;
 
     static constexpr unsigned iClustersPerSupercluster = superclusterSize / iSize;
@@ -221,15 +221,16 @@ struct GpuSuperclusterNbListNeighborhoodConfig
 
     template<unsigned NewISize, unsigned NewJSize>
     using withClusterSize =
-        GpuSuperclusterNbListNeighborhoodConfig<NewISize, NewJSize, SuperclusterSize, Compress, Symmetric>;
+        GpuSuperclusterNbListNeighborhoodConfig<NewISize, NewJSize, SuperclusterSize, WarpCompression, Symmetric>;
     template<unsigned NewSuperclusterSize>
     using withSuperclusterSize =
-        GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, NewSuperclusterSize, Compress, Symmetric>;
-    using withCompression = GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, SuperclusterSize, true, Symmetric>;
-    using withoutCompression =
-        GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, SuperclusterSize, false, Symmetric>;
+        GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, NewSuperclusterSize, WarpCompression, Symmetric>;
+    template<class NewCompression>
+    using withCompression =
+        GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, SuperclusterSize, NewCompression, Symmetric>;
     template<bool NewSymmetric>
-    using setSymmetry = GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, SuperclusterSize, Compress, NewSymmetric>;
+    using setSymmetry =
+        GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, SuperclusterSize, WarpCompression, NewSymmetric>;
 
     // per-particle mask type for superclusters, always 32 or 64 bits to support atomic operations
     using SuperclusterParticleMask = std::conditional_t<(superclusterSize > 32), unsigned long long, unsigned>;
@@ -247,8 +248,11 @@ struct GpuSuperclusterNbListNeighborhoodBuilder
     template<unsigned SuperclusterSize>
     using withSuperclusterSize =
         GpuSuperclusterNbListNeighborhoodBuilder<typename Config::template withSuperclusterSize<SuperclusterSize>>;
-    using withCompression    = GpuSuperclusterNbListNeighborhoodBuilder<typename Config::withCompression>;
-    using withoutCompression = GpuSuperclusterNbListNeighborhoodBuilder<typename Config::withoutCompression>;
+    template<class Compression = NibbleWarpCompression>
+    using withCompression =
+        GpuSuperclusterNbListNeighborhoodBuilder<typename Config::template withCompression<Compression>>;
+    using withoutCompression =
+        GpuSuperclusterNbListNeighborhoodBuilder<typename Config::template withCompression<DummyWarpCompression>>;
     template<bool Symmetric>
     using setSymmetry     = GpuSuperclusterNbListNeighborhoodBuilder<typename Config::template setSymmetry<Symmetric>>;
     using withSymmetry    = setSymmetry<true>;
@@ -257,7 +261,7 @@ struct GpuSuperclusterNbListNeighborhoodBuilder
     static constexpr unsigned iSize            = Config::iSize;
     static constexpr unsigned jSize            = Config::jSize;
     static constexpr unsigned superclusterSize = Config::superclusterSize;
-    static constexpr bool compress             = Config::compress;
+    using Compression                          = Config::Compression;
     static constexpr bool symmetric            = Config::symmetric;
 
     unsigned ncmax;

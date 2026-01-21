@@ -98,17 +98,22 @@ void benchmarkMain()
     runBenchmark("FULL NB LIST", ijloop::GpuFullNbListNeighborhoodBuilder{ngmax});
     runBenchmark("GROMACS SUPERCLUSTERED", ijloop::GromacsLikeNeighborhoodBuilder{ngmax});
 
-    using BaseSuperclusterNb =
-        ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, GpuConfig::warpSize /
-                                                                                   8>::withSuperclusterSize<64>;
+    using SuperclusterNb = ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<
+        8, GpuConfig::warpSize / 8>::withSuperclusterSize<64>::withoutSymmetry;
     const unsigned ncmax = 300 + scale3 * 150;
-    runBenchmark("SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withoutCompression{ncmax});
-    runBenchmark("COMPRESSED SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withCompression{ncmax});
+    runBenchmark("SUPERCLUSTERED", SuperclusterNb::withoutCompression{ncmax});
+    runBenchmark("COMPRESSED SUPERCLUSTERED (Band et al. Compression)",
+                 SuperclusterNb::withCompression<BandEtAlWarpCompression>{ncmax});
+    runBenchmark("COMPRESSED SUPERCLUSTERED (Nibble-based Compression)",
+                 SuperclusterNb::withCompression<NibbleWarpCompression>{ncmax});
 
-    using SymmetricSuperclusterNb = BaseSuperclusterNb::withSymmetry;
+    using SymmetricSuperclusterNb = SuperclusterNb::withSymmetry;
     const unsigned ncmaxSymmetric = 300 + scale3 * 130;
     runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{ncmaxSymmetric});
-    runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{ncmaxSymmetric});
+    runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC (Band et al. Compression)",
+                 SymmetricSuperclusterNb::withCompression<BandEtAlWarpCompression>{ncmaxSymmetric});
+    runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC (Nibble-based Compression)",
+                 SymmetricSuperclusterNb::withCompression<NibbleWarpCompression>{ncmaxSymmetric});
 
     saveCsv(std::format("lennard_jones_results_{}_{}_{}.csv", typeid(Tc).name(), typeid(T).name(), scale3), times);
     saveCsv(std::format("lennard_jones_buildtime_{}_{}_{}.csv", typeid(Tc).name(), typeid(T).name(), scale3),
