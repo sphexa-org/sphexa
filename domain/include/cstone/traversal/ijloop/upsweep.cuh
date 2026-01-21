@@ -15,6 +15,7 @@
 
 #include <array>
 
+#include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/tuple_util.hpp"

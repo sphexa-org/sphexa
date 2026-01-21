@@ -95,8 +95,6 @@ __global__ void computeJClusterBboxesKernel(const LocalIndex firstValidBody,
 {
     static_assert(GpuConfig::warpSize % Config::jSize == 0);
 
-    const unsigned laneIdx = laneIndex();
-
     const unsigned i = threadIdx.x + blockDim.x * blockIdx.x;
 
     const Tc xi = x[std::max(std::min(i, totalBodies - 1), firstValidBody)];
@@ -200,7 +198,6 @@ constexpr __forceinline__ bool includeNbSymmetric(unsigned i, unsigned j, unsign
 
 /*! store neighbor index data in global memory
  *
- * @param[inout] sharedAllocator     shared memory allocator
  * @param[in]    jClusters           sorted array of neighbor cluster indices
  * @param[in]    masks               array of cluster-cluster interaction bitmasks
  * @param[out]   neighborData        global memory neighbor data array where (possibly compressed) neighbor indices will

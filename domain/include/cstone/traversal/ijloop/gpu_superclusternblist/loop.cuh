@@ -25,10 +25,12 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <tuple>
 #include <type_traits>
 #include <utility>
 
+#include "cstone/cuda/gpu_config.cuh"
 #include "cstone/cuda/memory.cuh"
 #include "cstone/reducearray.cuh"
 #include "cstone/traversal/ijloop/atomic_update_ptr.cuh"
