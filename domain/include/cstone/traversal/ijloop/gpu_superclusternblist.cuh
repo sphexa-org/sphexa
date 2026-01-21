@@ -183,7 +183,7 @@ protected:
 
         runIjLoop<Config>(box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConst(input),
                           tmpOrOutput, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
-                          neighborData.get(), superclusterInfo, numISuperclusters, activeMasks, ncmax);
+                          neighborData.get(), superclusterInfo, numISuperclusters, activeMasks);
 
         if constexpr (Config::symmetric)
         {

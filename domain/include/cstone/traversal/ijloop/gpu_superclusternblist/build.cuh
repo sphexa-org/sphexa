@@ -52,6 +52,8 @@ struct GlobalBuildData
     //! @brief global group index counter, atomically increased during build
     unsigned index;
     BuildStatus status;
+    //! @brief maximum number of cluster neighbors
+    unsigned maxNeighbors;
 };
 
 template<class Tc>
@@ -197,60 +199,44 @@ constexpr __forceinline__ bool includeNbSymmetric(unsigned i, unsigned j, unsign
 
 /*! store neighbor index data in global memory
  *
- * @param[inout] sharedAllocator  shared memory allocator
- * @param[in]    jClusters        sorted array of neighbor cluster indices
- * @param[in]    masks            array of cluster-cluster interaction bitmasks
- * @param[out]   neighborData     global memory neighbor data array where (possibly compressed) neighbor indices will be
- * stored
- * @param[in]    neighborDataSize size of neighborData array to avoid out of bounds accesses
- * @param[inout] info             supercluster info, will be updated with proper data index
- * @param[inout] globalBuildData  global build data used to get a global memory region
+ * @param[inout] sharedAllocator     shared memory allocator
+ * @param[in]    jClusters           sorted array of neighbor cluster indices
+ * @param[in]    masks               array of cluster-cluster interaction bitmasks
+ * @param[out]   neighborData        global memory neighbor data array where (possibly compressed) neighbor indices will
+ *                                   be stored
+ * @param[in]    maxNeighborDataSize max size of neighborData array to avoid out of bounds accesses
+ * @param[inout] neighborDataSize    current size of neighborData array
+ * @param[inout] info                supercluster info, will be updated with proper data index
  */
 template<class Config, unsigned NumSuperclustersPerBlock>
-__device__ __forceinline__ void storeNeighborData(util::SharedMemAllocator& sharedAllocator,
-                                                  std::uint32_t* const __restrict__ jClusters,
+__device__ __forceinline__ bool storeNeighborData(std::uint32_t* const __restrict__ jClusters,
+                                                  const unsigned jClusterBytes,
                                                   const std::uint32_t* const __restrict__ masks,
                                                   std::uint32_t* const __restrict__ neighborData,
-                                                  const std::size_t neighborDataSize,
-                                                  SuperclusterInfo& info,
-                                                  GlobalBuildData* __restrict__ globalBuildData)
+                                                  const std::size_t maxNeighborDataSize,
+                                                  unsigned long long* __restrict__ neighborDataSize,
+                                                  SuperclusterInfo& info)
 {
     const unsigned laneIdx = laneIndex();
     assert(blockDim.x * blockDim.y == GpuConfig::warpSize);
     assert(blockDim.z == NumSuperclustersPerBlock);
 
-    const unsigned mSize = masksSize<Config>(info.neighborsCount);
-
-    using Compression = std::conditional_t<Config::compress, WarpCompression, DummyWarpCompression>;
-
-    const unsigned compressedSize = warpCompressNeighbors<Compression>(jClusters, jClusters, info.neighborsCount);
-    const unsigned nbSize         = (compressedSize + sizeof(std::uint32_t) - 1) / sizeof(std::uint32_t);
+    const unsigned mSize  = masksSize<Config>(info.neighborsCount);
+    const unsigned nbSize = (jClusterBytes + sizeof(std::uint32_t) - 1) / sizeof(std::uint32_t);
 
     const unsigned long long totalSize = nbSize + mSize;
-    if (laneIdx == 0) info.dataIndex = atomicAdd(&globalBuildData->neighborDataSize, totalSize);
+    if (laneIdx == 0) info.dataIndex = atomicAdd(neighborDataSize, totalSize);
     info.dataIndex = shflSync(info.dataIndex, 0);
 
+    if (info.dataIndex + mSize + nbSize > maxNeighborDataSize) return false;
+
     for (unsigned n = laneIdx; n < mSize; n += GpuConfig::warpSize)
-    {
-        const std::size_t index = info.dataIndex + n;
-        if (index >= neighborDataSize)
-        {
-            globalBuildData->status = BuildStatus::neighbor_data_overflow;
-            return;
-        }
-        neighborData[index] = masks[n];
-    }
+        neighborData[info.dataIndex + n] = masks[n];
 
     for (unsigned n = laneIdx; n < nbSize; n += GpuConfig::warpSize)
-    {
-        const std::size_t index = info.dataIndex + mSize + n;
-        if (index >= neighborDataSize)
-        {
-            globalBuildData->status = BuildStatus::neighbor_data_overflow;
-            return;
-        }
-        neighborData[index] = jClusters[n];
-    }
+        neighborData[info.dataIndex + mSize + n] = jClusters[n];
+
+    return true;
 }
 
 template<class Config, class Tc, class ThP>
@@ -328,11 +314,10 @@ superclusterBoundingBox(const std::array<Vec3<Tc>, WarpsPerSupercluster>& iPos,
  * @param[in]    lastISupercluster      index of the last supercluster
  * @param[inout] jClusters              shared memory array for neighbor cluster indices
  * @param[inout] masks                  shared memory array for interaction bitmasks
- * @param[inout] globalBuildData        global build status
  * @param[inout] info                   supercluster info
  */
 template<class Config, bool UsePbc, class Tc, class ThP, class KeyType>
-__device__ __forceinline__ void
+__device__ __forceinline__ unsigned
 collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
                          const Box<Tc>& box,
                          const LocalIndex firstValidBody,
@@ -348,7 +333,6 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
                          const unsigned lastISupercluster,
                          std::uint32_t* const jClusters,
                          std::uint32_t* const masks,
-                         GlobalBuildData* __restrict__ globalBuildData,
                          SuperclusterInfo& info)
 {
     constexpr unsigned warpsPerSupercluster = Config::superclusterSize / GpuConfig::warpSize;
@@ -381,6 +365,10 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
 
         return bool(anySync(overlaps));
     };
+
+    using Compression = std::conditional_t<Config::compress, WarpCompression, DummyWarpCompression>;
+
+    Compression compression(jClusters);
 
     unsigned jClusterQueue, previousJCluster = ~0u;
     const auto overlapsLeafNode = [&](const TreeNodeIndex idx)
@@ -447,12 +435,12 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
 
                 if (warpMask)
                 {
+                    previousJCluster = jCluster;
                     if (info.neighborsCount >= ncmax)
                     {
-                        if (laneIdx == 0) globalBuildData->status = BuildStatus::neighbor_list_overflow;
-                        return;
+                        ++info.neighborsCount;
+                        continue;
                     }
-                    previousJCluster = jCluster;
                     if (laneIdx == (info.neighborsCount % GpuConfig::warpSize)) jClusterQueue = jCluster;
                     if (laneIdx == 0)
                     {
@@ -463,7 +451,7 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
                     }
                     ++info.neighborsCount;
                     if ((info.neighborsCount % GpuConfig::warpSize) == 0)
-                        jClusters[info.neighborsCount - GpuConfig::warpSize + laneIdx] = jClusterQueue;
+                        compression.add(jClusterQueue, GpuConfig::warpSize);
                 }
             }
         }
@@ -471,8 +459,10 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
 
     singleTraversal(tree.childOffsets, tree.parents, overlapsInternalNode, overlapsLeafNode);
 
-    if (laneIdx < (info.neighborsCount % GpuConfig::warpSize))
-        jClusters[info.neighborsCount / GpuConfig::warpSize * GpuConfig::warpSize + laneIdx] = jClusterQueue;
+    const unsigned remaining = info.neighborsCount % GpuConfig::warpSize;
+    if (remaining != 0 && info.neighborsCount <= ncmax) compression.add(jClusterQueue, remaining);
+
+    return compression.numBytes();
 }
 
 /*! compute required shared memory amount
@@ -506,7 +496,7 @@ constexpr unsigned buildNbListSharedMemPerSupercluster(const unsigned ncmax)
  * @param[in]    nodeRMax               max. particle radii of tree nodes
  * @param[in]    ncmax                  max. number of neighbor clusters (upper bound for numCandidates)
  * @param[out]   neighborData           global memory neighbor data array where (possibly compressed) neighbor indices
- * will be stored
+ *                                      will be stored
  * @param[in]    neighborDataSize       size of neighborData array to avoid out of bounds accesses
  * @param[inout] superclusterInfo       supercluster info
  * @param[in]    numSuperClusters       number of superclusters
@@ -554,24 +544,43 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
     const unsigned firstISupercluster = superclusterIndex<Config>(firstBody);
     const unsigned lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
 
+    unsigned maxNeighbors = 0;
+
     while (true)
     {
         unsigned index;
         if (laneIdx == 0) index = atomicAdd(&globalBuildData->index, 1);
         index = shflSync(index, 0);
-        if (index >= numSuperClusters) return;
+        if (index >= numSuperClusters) break;
 
         SuperclusterInfo info = {.index = index + firstISupercluster, .neighborsCount = 0, .dataIndex = 0};
 
-        collectNeighborJClusters<Config, UsePbc>(tree, box, firstValidBody, totalBodies, x, y, z, h, jClusterBboxes,
-                                                 nodeRMax, ncmax, firstISupercluster, lastISupercluster,
-                                                 jClusters.get(), masks.get(), globalBuildData, info);
+        const unsigned jClusterBytes = collectNeighborJClusters<Config, UsePbc>(
+            tree, box, firstValidBody, totalBodies, x, y, z, h, jClusterBboxes, nodeRMax, ncmax, firstISupercluster,
+            lastISupercluster, jClusters.get(), masks.get(), info);
 
-        storeNeighborData<Config, NumSuperclustersPerBlock>(sharedAllocator, jClusters.get(), masks.get(), neighborData,
-                                                            neighborDataSize, info, globalBuildData);
+        maxNeighbors = std::max(info.neighborsCount, maxNeighbors);
+
+        if (info.neighborsCount > ncmax)
+        {
+            if (laneIdx == 0) globalBuildData->status = BuildStatus::neighbor_list_overflow;
+            continue;
+        }
+
+        const bool storeSuccessful = storeNeighborData<Config, NumSuperclustersPerBlock>(
+            jClusters.get(), jClusterBytes, masks.get(), neighborData, neighborDataSize,
+            &globalBuildData->neighborDataSize, info);
+
+        if (!storeSuccessful)
+        {
+            if (laneIdx == 0) globalBuildData->status = BuildStatus::neighbor_data_overflow;
+            break;
+        }
 
         if (laneIdx == 0) superclusterInfo[index] = info;
     }
+
+    if (laneIdx == 0) atomicMax(&globalBuildData->maxNeighbors, maxNeighbors);
 }
 
 template<class Config, class Tc, class ThP, class KeyType>
@@ -625,7 +634,8 @@ std::size_t buildNbList(const OctreeNsView<Tc, KeyType>& tree,
         case BuildStatus::success: break;
         case BuildStatus::neighbor_list_overflow:
             throw std::runtime_error(
-                "overflow in cluster neighbor list in supercluster neighborhood, try to increase ncmax");
+                "overflow in cluster neighbor list in supercluster neighborhood, try to increase ncmax (ncmax: " +
+                std::to_string(ncmax) + ", max. found neighbors: " + std::to_string(buildData.maxNeighbors) + ")");
         case BuildStatus::neighbor_data_overflow: throw std::runtime_error("overflow in cluster neighbor data");
     }
 
