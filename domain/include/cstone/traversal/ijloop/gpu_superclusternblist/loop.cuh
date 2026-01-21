@@ -314,10 +314,8 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     const std::uint32_t* const __restrict__ neighborData,
     const SuperclusterInfo* const __restrict__ superclusterInfo,
     const unsigned numISuperclusters,
-    const Mask* const __restrict__ activeMasks,
-    const unsigned ncmax)
+    const Mask* const __restrict__ activeMasks)
 {
-    assert(ncmax % GpuConfig::warpSize == 0);
     static_assert(NumSuperclustersPerBlock > 0);
     static_assert(Config::iSize * Config::jSize >= GpuConfig::warpSize);
     static_assert(Config::iSize * Config::jSize % GpuConfig::warpSize == 0);
@@ -500,8 +498,7 @@ void runIjLoop(const Box<Tc>& box,
                const std::uint32_t* const neighborData,
                const SuperclusterInfo* const superclusterInfo,
                const LocalIndex numISuperclusters,
-               const Mask* const activeMasks,
-               const unsigned ncmax)
+               const Mask* const activeMasks)
 {
     constexpr unsigned numSuperclustersPerBlock = 64 / (Config::iSize * Config::jSize);
     const dim3 blockSize                        = {Config::iSize, Config::jSize, numSuperclustersPerBlock};
@@ -511,7 +508,7 @@ void runIjLoop(const Box<Tc>& box,
         runIjLoopKernel<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize>>>(
             box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, std::forward<Input>(input),
             std::forward<Output>(output), std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
-            neighborData, superclusterInfo, numISuperclusters, activeMasks, ncmax);
+            neighborData, superclusterInfo, numISuperclusters, activeMasks);
         checkGpuErrors(cudaGetLastError());
     };
 
