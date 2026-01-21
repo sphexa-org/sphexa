@@ -253,7 +253,7 @@ public:
 
     FieldVector<cstone::LocalIndex> traversalStack;
     //! @brief non-stateful variables for statistics
-    size_t stackUsedNc, stackUsedGravity;
+    size_t stackUsedNc{0}, stackUsedGravity{0};
 
     /*! @brief
      * Name of each field as string for use e.g in HDF5 output. Order has to correspond to what's returned by data().

@@ -225,16 +225,13 @@ public:
         MPI_Allreduce(MPI_IN_PLACE, &numParticlesInternal, 1, MpiType<size_t>{}, MPI_SUM, simData.comm);
         T massPart = innerVolume * rhoInt / numParticlesInternal;
 
-        size_t numParticlesGlobal = d.x.size();
+        size_t numParticlesGlobal = x.size();
         MPI_Allreduce(MPI_IN_PLACE, &numParticlesGlobal, 1, MpiType<size_t>{}, MPI_SUM, simData.comm);
 
         d.x = x; // uploads to GPU if active
         d.y = y;
         d.z = z;
         syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, d.x, d.y, d.z, globalBox);
-        d.x.shrink_to_fit();
-        d.y.shrink_to_fit();
-        d.z.shrink_to_fit();
 
         d.resize(d.x.size());
 
