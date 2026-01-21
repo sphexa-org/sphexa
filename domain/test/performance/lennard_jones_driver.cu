@@ -99,13 +99,14 @@ void benchmarkMain()
     runBenchmark("GROMACS SUPERCLUSTERED", ijloop::GromacsLikeNeighborhood{ngmax});
 
     using BaseSuperclusterNb =
-        ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, 8>::withSuperclusterSize<64>;
-    const unsigned ncmax = std::clamp((ngmax + 31u) / 32u * 32u, 256u, 2048u);
+        ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8,
+                                                                     GpuConfig::warpSize / 8>::withSuperclusterSize<64>;
+    const unsigned ncmax = 300 + scale3 * 150;
     runBenchmark("SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withoutCompression{ncmax});
     runBenchmark("COMPRESSED SUPERCLUSTERED", BaseSuperclusterNb::withoutSymmetry::withCompression{ncmax});
 
     using SymmetricSuperclusterNb = BaseSuperclusterNb::withSymmetry;
-    const unsigned ncmaxSymmetric = std::clamp((ngmax + 31u) / 32u * 16u, 256u, 2048u);
+    const unsigned ncmaxSymmetric = 300 + scale3 * 130;
     runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{ncmaxSymmetric});
     runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withCompression{ncmaxSymmetric});
 

@@ -36,8 +36,9 @@ private:
 
 #if defined(__CUDACC__) || defined(__HIP__)
 template<bool Symmetric>
-using ClusteredNeighborhood = cstone::ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<
-    8, 8>::withSuperclusterSize<cstone::TravConfig::targetSize>::setSymmetry<Symmetric>::withCompression;
+using ClusteredNeighborhood =
+    cstone::ijloop::GpuSuperclusterNbListNeighborhood<>::withClusterSize<8, cstone::GpuConfig::warpSize / 8>::
+        withSuperclusterSize<cstone::TravConfig::targetSize>::setSymmetry<Symmetric>::withCompression;
 
 struct DeviceNeighborhoodData::Impl
 {
