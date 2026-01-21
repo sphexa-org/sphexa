@@ -180,3 +180,47 @@ sph-run-cuda12-sm90-release-sphexa-cpu:
         fi
       fi
     - date
+
+sph-compare-constants-cuda12-sm90-release-sphexa-cuda:
+  stage: sphexa_run
+  needs: ['sph-build-cuda12-sm90-release']
+  image: prgenv-gnu/25.11:v1
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    WITH_UENV_VIEW: 'default'
+    # SLURM_PARTITION: 'debug'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+  before_script:
+    - pwd
+    - date
+    - export OMP_NUM_THREADS=64
+  script:
+    - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
+    - |
+      for ic in sedov noh isobaric-cube evrard turbulence
+      do
+        $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init $ic -s 10 -n 50
+        if [ "$SLURM_PROCID" -eq 0 ]; then
+          mv constants.txt constants_${ic}.txt
+          python ci/scripts/compare_constants.py ci/reference/constants_${ic}_ref.txt constants_${ic}.txt
+          if [ $? -ne 0 ]; then
+            exit 1
+          fi
+        fi
+        wait
+      done
+      for ic in gresho-chan wind-shock kelvin-helmholtz
+      do
+        $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init $ic -s 2 -n 30
+        if [ "$SLURM_PROCID" -eq 0 ]; then
+          mv constants.txt constants_${ic}.txt
+          python ci/scripts/compare_constants.py ci/reference/constants_${ic}_ref.txt constants_${ic}.txt
+          if [ $? -ne 0 ]; then
+            exit 1
+          fi
+        fi
+        wait
+      done
+    - date
