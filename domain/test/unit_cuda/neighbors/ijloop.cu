@@ -426,7 +426,5 @@ TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
         }
     }
     else
-    {
-        GTEST_SKIP() << "subgroups not supported";
-    }
+    { GTEST_SKIP() << "subgroups not supported"; }
 }

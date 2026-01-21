@@ -155,10 +155,7 @@ struct CpuFullNbListNeighborhoodBuilder
                 tree.searchExtFactor = 1;
                 hExt                 = hExtData.get();
             }
-            else
-            {
-                hExt = h * tree.searchExtFactor;
-            }
+            else { hExt = h * tree.searchExtFactor; }
         }
 
         unsigned maxNeighbors = 0;

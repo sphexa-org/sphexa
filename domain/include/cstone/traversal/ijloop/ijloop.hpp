@@ -130,10 +130,13 @@ concept NeighborhoodBuilder = requires(T nb,
                                        const float* h)
 {
     nb.build(tree, box, totalBodies, groups, x, y, z, h);
-    {nb.build(tree, box, totalBodies, groups, x, y, z, h).stats()}->std::same_as<Statistics>;
-    {nb.build(tree, box, totalBodies, groups, x, y, z, h)
-         .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble)}
-        ->std::same_as<void>;
+    {
+        nb.build(tree, box, totalBodies, groups, x, y, z, h).stats()
+    } -> std::same_as<Statistics>;
+    {
+        nb.build(tree, box, totalBodies, groups, x, y, z, h)
+            .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble)
+    } -> std::same_as<void>;
 };
 
 } // namespace cstone::ijloop
