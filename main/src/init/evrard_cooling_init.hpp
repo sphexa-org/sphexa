@@ -81,7 +81,7 @@ public:
                                                  IFileReader* reader) const override
     {
         constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-        auto box = Base::init(rank, numRanks, cbrtNumPart, simData, reader);
+        auto           box = Base::init(rank, numRanks, cbrtNumPart, simData, reader);
         cstone::fill<gpu>(simData.hydro.u.begin(), simData.hydro.u.end(), settings_.at("u0"));
         cooling::initChemistryData(simData.chem, simData.hydro.x.size());
         return box;

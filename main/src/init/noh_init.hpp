@@ -68,9 +68,9 @@ template<class Dataset>
 void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
 {
     constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T = typename Dataset::RealType;
-    using HydroType = typename Dataset::HydroType;
-    using XM1Type = typename Dataset::XM1Type;
+    using T            = typename Dataset::RealType;
+    using HydroType    = typename Dataset::HydroType;
+    using XM1Type      = typename Dataset::XM1Type;
 
     double r           = constants.at("r1");
     double totalVolume = 4. * M_PI / 3. * r * r * r;
@@ -90,15 +90,15 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
 
     generateParticleIDs<gpu>(d.id);
 
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
-    auto&& z = toHost(d.z);
+    auto&&                 x = toHost(d.x);
+    auto&&                 y = toHost(d.y);
+    auto&&                 z = toHost(d.z);
     std::vector<HydroType> vx(d.vx.size());
     std::vector<HydroType> vy(d.vy.size());
     std::vector<HydroType> vz(d.vz.size());
-    std::vector<XM1Type> x_m1(d.x_m1.size());
-    std::vector<XM1Type> y_m1(d.y_m1.size());
-    std::vector<XM1Type> z_m1(d.z_m1.size());
+    std::vector<XM1Type>   x_m1(d.x_m1.size());
+    std::vector<XM1Type>   y_m1(d.y_m1.size());
+    std::vector<XM1Type>   z_m1(d.z_m1.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
@@ -113,9 +113,9 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
         y_m1[i] = vy[i] * constants.at("minDt");
         z_m1[i] = vz[i] * constants.at("minDt");
     }
-    d.vx = std::move(vx);
-    d.vy = std::move(vy);
-    d.vz = std::move(vz);
+    d.vx   = std::move(vx);
+    d.vy   = std::move(vy);
+    d.vz   = std::move(vz);
     d.x_m1 = std::move(x_m1);
     d.y_m1 = std::move(y_m1);
     d.z_m1 = std::move(z_m1);

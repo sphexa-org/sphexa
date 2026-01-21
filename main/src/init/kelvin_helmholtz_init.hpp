@@ -56,15 +56,15 @@ template<class T, class Dataset>
 void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& constants, T massPart)
 {
     constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using HydroType = typename Dataset::HydroType;
-    using XM1Type = typename Dataset::XM1Type;
-    T rhoInt = constants.at("rhoInt");
-    T rhoExt = constants.at("rhoExt");
-    T omega0 = constants.at("omega0");
-    T gamma  = constants.at("gamma");
-    T p      = constants.at("p");
-    T vxInt  = constants.at("vxInt");
-    T vxExt  = constants.at("vxExt");
+    using HydroType    = typename Dataset::HydroType;
+    using XM1Type      = typename Dataset::XM1Type;
+    T rhoInt           = constants.at("rhoInt");
+    T rhoExt           = constants.at("rhoExt");
+    T omega0           = constants.at("omega0");
+    T gamma            = constants.at("gamma");
+    T p                = constants.at("p");
+    T vxInt            = constants.at("vxInt");
+    T vxExt            = constants.at("vxExt");
 
     T uInt = p / ((gamma - 1.) * rhoInt);
     T uExt = p / ((gamma - 1.) * rhoExt);
@@ -83,17 +83,17 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
 
     generateParticleIDs<gpu>(d.id);
 
-    auto  cv     = sph::idealGasCv(d.muiConst, gamma);
-    std::vector<T> u_or_t(d.x.size());
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
+    auto                   cv = sph::idealGasCv(d.muiConst, gamma);
+    std::vector<T>         u_or_t(d.x.size());
+    auto&&                 x = toHost(d.x);
+    auto&&                 y = toHost(d.y);
     std::vector<HydroType> h(d.h.size());
     std::vector<HydroType> vx(d.vx.size());
     std::vector<HydroType> vy(d.vy.size());
-    auto&& vz = toHost(d.vz);
-    std::vector<XM1Type> x_m1(d.x_m1.size());
-    std::vector<XM1Type> y_m1(d.y_m1.size());
-    std::vector<XM1Type> z_m1(d.z_m1.size());
+    auto&&                 vz = toHost(d.vz);
+    std::vector<XM1Type>   x_m1(d.x_m1.size());
+    std::vector<XM1Type>   y_m1(d.y_m1.size());
+    std::vector<XM1Type>   z_m1(d.z_m1.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
@@ -101,7 +101,7 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
 
         if (y[i] < 0.75 && y[i] > 0.25)
         {
-            h[i]    = hInt;
+            h[i]      = hInt;
             u_or_t[i] = uInt;
             if (y[i] > 0.5) { vx[i] = vxInt + vDif * std::exp((y[i] - 0.75) / ls); }
             else { vx[i] = vxInt + vDif * std::exp((0.25 - y[i]) / ls); }
@@ -129,9 +129,9 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
         y_m1[i] = vy[i] * d.minDt;
         z_m1[i] = vz[i] * d.minDt;
     }
-    d.h = std::move(h);
-    d.vx = std::move(vx);
-    d.vy = std::move(vy);
+    d.h    = std::move(h);
+    d.vx   = std::move(vx);
+    d.vy   = std::move(vy);
     d.x_m1 = std::move(x_m1);
     d.y_m1 = std::move(y_m1);
     d.z_m1 = std::move(z_m1);
@@ -140,10 +140,7 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
         std::for_each(u_or_t.begin(), u_or_t.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
         d.temp = std::move(u_or_t);
     }
-    else
-    {
-        d.u = std::move(u_or_t);
-    }
+    else { d.u = std::move(u_or_t); }
 }
 
 template<class Dataset>

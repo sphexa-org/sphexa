@@ -50,7 +50,7 @@ template<class Dataset>
 void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
 {
     constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T = typename Dataset::RealType;
+    using T            = typename Dataset::RealType;
 
     double r           = constants.at("r1");
     double totalVolume = std::pow(2 * r, 3);
@@ -82,9 +82,9 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
     // If temperature is not allocated, we can still use this initializer for just the coordinates
     if (d.temp.empty() && d.u.empty()) { return; }
 
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
-    auto&& z = toHost(d.z);
+    auto&&         x = toHost(d.x);
+    auto&&         y = toHost(d.y);
+    auto&&         z = toHost(d.z);
     std::vector<T> u_or_t(d.x.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
@@ -94,7 +94,7 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
         T zi = z[i];
         T r2 = xi * xi + yi * yi + zi * zi;
 
-        T ui = constants.at("ener0") * exp(-(r2 / width2)) + constants.at("u0");
+        T ui      = constants.at("ener0") * exp(-(r2 / width2)) + constants.at("u0");
         u_or_t[i] = ui;
     }
     if (d.u.empty())
@@ -102,10 +102,7 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
         std::for_each(u_or_t.begin(), u_or_t.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
         d.temp = std::move(u_or_t);
     }
-    else
-    {
-        d.u = std::move(u_or_t);
-    }
+    else { d.u = std::move(u_or_t); }
 }
 
 template<class Dataset>

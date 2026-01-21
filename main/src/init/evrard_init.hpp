@@ -56,7 +56,7 @@ template<class Dataset>
 void initEvrardFields(Dataset& d, const std::map<std::string, double>& constants)
 {
     constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T = typename Dataset::RealType;
+    using T            = typename Dataset::RealType;
 
     double mPart = constants.at("mTotal") / d.numParticlesGlobal;
 
@@ -86,9 +86,9 @@ void initEvrardFields(Dataset& d, const std::map<std::string, double>& constants
     // c(r) = 2/3 * 1/r * Ntot / Vtot
     T c0 = 2. / 3. * d.numParticlesGlobal / totalVolume;
 
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
-    auto&& z = toHost(d.z);
+    auto&&                                   x = toHost(d.x);
+    auto&&                                   y = toHost(d.y);
+    auto&&                                   z = toHost(d.z);
     std::vector<typename Dataset::HydroType> h(d.x.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
@@ -186,7 +186,7 @@ public:
 
         contractRhoProfile(x, y, z);
 
-        t0 = std::chrono::high_resolution_clock::now();
+        t0  = std::chrono::high_resolution_clock::now();
         d.x = x; // uploads to GPU if active
         d.y = y;
         d.z = z;

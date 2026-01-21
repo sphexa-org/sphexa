@@ -61,9 +61,9 @@ template<class Dataset>
 void initWindShockFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
     constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T = typename Dataset::RealType;
-    using HydroType = typename Dataset::HydroType;
-    using XM1Type = typename Dataset::XM1Type;
+    using T            = typename Dataset::RealType;
+    using HydroType    = typename Dataset::HydroType;
+    using XM1Type      = typename Dataset::XM1Type;
 
     T r       = constants.at("r");
     T rSphere = constants.at("rSphere");
@@ -91,18 +91,18 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
 
     T k = d.ngmax / r;
 
-    util::array<T, 3> blobCenter{r, r, r};
-    std::vector<T> u_or_t(d.x.size());
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
-    auto&& z = toHost(d.z);
+    util::array<T, 3>      blobCenter{r, r, r};
+    std::vector<T>         u_or_t(d.x.size());
+    auto&&                 x = toHost(d.x);
+    auto&&                 y = toHost(d.y);
+    auto&&                 z = toHost(d.z);
     std::vector<HydroType> h(d.h.size());
     std::vector<HydroType> vx(d.vx.size());
     std::vector<HydroType> vy(d.vy.size());
     std::vector<HydroType> vz(d.vz.size());
-    std::vector<XM1Type> x_m1(d.x_m1.size());
-    std::vector<XM1Type> y_m1(d.y_m1.size());
-    std::vector<XM1Type> z_m1(d.z_m1.size());
+    std::vector<XM1Type>   x_m1(d.x_m1.size());
+    std::vector<XM1Type>   y_m1(d.y_m1.size());
+    std::vector<XM1Type>   z_m1(d.z_m1.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
@@ -124,39 +124,36 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
             }
 
             u_or_t[i] = uExt;
-            vx[i]   = vxExt;
-            vy[i]   = vyExt;
-            vz[i]   = vzExt;
+            vx[i]     = vxExt;
+            vy[i]     = vyExt;
+            vz[i]     = vzExt;
         }
         else
         {
-            h[i]    = hInt;
+            h[i]      = hInt;
             u_or_t[i] = uInt;
-            vx[i]   = 0.;
-            vy[i]   = 0.;
-            vz[i]   = 0.;
+            vx[i]     = 0.;
+            vy[i]     = 0.;
+            vz[i]     = 0.;
         }
 
         x_m1[i] = vx[i] * d.minDt;
         y_m1[i] = vy[i] * d.minDt;
         z_m1[i] = vz[i] * d.minDt;
     }
-    d.h = std::move(h);
+    d.h    = std::move(h);
     d.x_m1 = std::move(x_m1);
     d.y_m1 = std::move(y_m1);
     d.z_m1 = std::move(z_m1);
-    d.vx = std::move(vx);
-    d.vy = std::move(vy);
-    d.vz = std::move(vz);
+    d.vx   = std::move(vx);
+    d.vy   = std::move(vy);
+    d.vz   = std::move(vz);
     if (d.u.empty())
     {
         std::for_each(u_or_t.begin(), u_or_t.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
         d.temp = std::move(u_or_t);
     }
-    else
-    {
-        d.u = std::move(u_or_t);
-    }
+    else { d.u = std::move(u_or_t); }
 }
 
 template<class Dataset>

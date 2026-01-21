@@ -40,9 +40,8 @@ namespace sphexa
 
 InitSettings GreshoChanSettings()
 {
-    return {{"R1", 0.2},         {"v0", 1.}, {"P0", 5.},     {"gamma", 5. / 3.}, {"mTotal", 1.}, {"minDt", 1e-7},
-            {"minDt_m1", 1e-7},  {"rho", 1}, {"Kcour", 0.2}, {"ng0", 100},       {"ngmax", 150}, {"gravConstant", 0.0},
-            {"gresho-chan", 1.0}};
+    return {{"R1", 0.2}, {"v0", 1.},     {"P0", 5.},   {"gamma", 5. / 3.}, {"minDt", 1e-7},       {"minDt_m1", 1e-7},
+            {"rho", 1},  {"Kcour", 0.2}, {"ng0", 100}, {"ngmax", 150},     {"gravConstant", 0.0}, {"gresho-chan", 1.0}};
 }
 
 template<class T>
@@ -55,12 +54,11 @@ template<class Dataset, class T>
 void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& settings, T mPart)
 {
     constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using HydroType = typename Dataset::HydroType;
-    using RealType  = typename Dataset::RealType;
-    using XM1Type   = typename Dataset::XM1Type;
-    double ng0 = settings.at("ng0");
-    double rho = settings.at("rho");
-    // double mPart         = settings.at("mTotal") / d.numParticlesGlobal;
+    using HydroType    = typename Dataset::HydroType;
+    using RealType     = typename Dataset::RealType;
+    using XM1Type      = typename Dataset::XM1Type;
+    double ng0         = settings.at("ng0");
+    double rho         = settings.at("rho");
     double hInit         = 0.5 * std::cbrt(3. * ng0 * mPart / 4. / M_PI / rho);
     double firstTimeStep = settings.at("minDt");
 
@@ -83,15 +81,15 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
 
     generateParticleIDs<gpu>(d.id);
 
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
-    std::vector<RealType> temp(d.temp.size());
-    auto u = toHost(d.u); // TODO: when u.empty() is true (line 121)?
+    auto&&                 x = toHost(d.x);
+    auto&&                 y = toHost(d.y);
+    std::vector<RealType>  temp(d.temp.size());
+    auto                   u = toHost(d.u); // TODO: when u.empty() is true (line 121)?
     std::vector<HydroType> vx(d.vx.size());
     std::vector<HydroType> vy(d.vy.size());
     std::vector<HydroType> vz(d.vz.size());
-    std::vector<XM1Type> x_m1(d.x_m1.size());
-    std::vector<XM1Type> y_m1(d.y_m1.size());
+    std::vector<XM1Type>   x_m1(d.x_m1.size());
+    std::vector<XM1Type>   y_m1(d.y_m1.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); ++i)
     {
@@ -128,10 +126,10 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
         y_m1[i] = vy[i] * firstTimeStep;
     }
     d.temp = std::move(temp);
-    d.u = std::move(u);
-    d.vx = std::move(vx);
-    d.vy = std::move(vy);
-    d.vz = std::move(vz);
+    d.u    = std::move(u);
+    d.vx   = std::move(vx);
+    d.vy   = std::move(vy);
+    d.vz   = std::move(vz);
     d.x_m1 = std::move(x_m1);
     d.y_m1 = std::move(y_m1);
 }

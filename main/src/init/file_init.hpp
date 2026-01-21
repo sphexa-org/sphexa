@@ -52,12 +52,15 @@ void restoreDataset(IFileReader* reader, Dataset& d)
         {
             if (reader->rank() == 0) { std::cout << "restoring " << d.fieldNames[i]; }
             auto t0 = std::chrono::high_resolution_clock::now();
-            std::visit([reader, key = d.fieldNames[i]](auto field){
-                using T = std::remove_reference<decltype(*field->data())>::type;
-                std::vector<T> tmp(field->size());
-                reader->readField(Dataset::prefix + key, tmp.data());
-                *field = std::move(tmp);
-            }, fieldPointers[i]);
+            std::visit(
+                [reader, key = d.fieldNames[i]](auto field)
+                {
+                    using T = std::remove_reference<decltype(*field->data())>::type;
+                    std::vector<T> tmp(field->size());
+                    reader->readField(Dataset::prefix + key, tmp.data());
+                    *field = std::move(tmp);
+                },
+                fieldPointers[i]);
             MPI_Barrier(MPI_COMM_WORLD);
             auto  t1       = std::chrono::high_resolution_clock::now();
             int   typeSize = std::visit([](auto field) { return sizeof(*field->data()); }, fieldPointers[i]);
