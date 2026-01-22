@@ -86,4 +86,61 @@ extern double machSquareSumGpu(const Tv* vx, const Tv* vy, const Tv* vz, const T
 template<class T, class Tt, class Tm>
 extern double survivingMassGpu(const Tt* temp, const T* kx, const T* xmass, const Tm* m, double rhoBubble,
                                double tempWind, size_t first, size_t last);
+/*!
+ * @brief struct and sorting functors for the Rayleigh-Taylor Observable
+ * @tparam T floating point type of coordinates and velocities
+ */
+
+#define RT_N_AVG 1000
+template<class T>
+struct AuxT
+{
+    T pos = T(0.0 / 0.0);
+    T vel = 0.0;
+};
+
+struct greaterRT
+{
+    template<class AuxT>
+    HOST_DEVICE_FUN bool operator()(AuxT const& a, AuxT const& b) const
+    {
+        return a.pos > b.pos;
+    }
+};
+
+struct lowerRT
+{
+    template<class AuxT>
+    HOST_DEVICE_FUN bool operator()(AuxT const& a, AuxT const& b) const
+    {
+        return a.pos < b.pos;
+    }
+};
+
+template<class T>
+struct invalidAuxTEntry
+{
+    template<class AuxT>
+    HOST_DEVICE_FUN bool operator()(const AuxT a) const
+    {
+        return !(a.pos == a.pos);
+    }
+};
+/*!
+ * @brief collect velocity data of the bubble and peaks in the RT
+ *
+ * @param first     index of first local particle
+ * @param last      index of last local particle
+ * @param ymin      bounding box mimimum in y-direction
+ * @param ymax      bounding box maximum
+ * @param h         smoothing length
+ * @param y         y-position
+ * @param vy        y-velocity
+ * @param markRamp  switch between crossed and uncrossed versions of the SPH equations
+ * @return
+ */
+template<class T, class Tc, class Th>
+extern std::tuple<std::vector<AuxT<T>>, std::vector<AuxT<T>>> localGrowthRateRTGpu(size_t first, size_t last, Tc ymin,
+                                                                                   Tc ymax, const Th* h, const T* y,
+                                                                                   const Th* vy, const Th* markRamp);
 } // namespace sphexa

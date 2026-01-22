@@ -66,6 +66,12 @@ extern void computeIsothermalEOS_HydroStd(size_t firstParticle, size_t lastParti
 template<typename Dataset>
 extern void computePolytropicEOS_HydroStd(size_t firstParticle, size_t lastParticle, Dataset& d);
 
+template<class Dataset>
+extern void computeMarkRamp(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
+
+template<class T, class Dataset>
+extern void artificialGravity(size_t, size_t, Dataset& d, T grav);
+
 } // namespace gpu
 
 template<class Tc, class Thydro, class Tm1, class Tdu>

@@ -34,6 +34,7 @@
 #include "propagator.h"
 #include "turb_ve.hpp"
 #include "ve_hydro.hpp"
+#include "external_gravity_ve.hpp"
 
 namespace sphexa
 {
@@ -53,6 +54,23 @@ PropLib<DomainType, ParticleDataType>::makeTurbVeProp(std::ostream& output, size
 {
     if (avClean) { return std::make_unique<TurbVeProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
     else { return std::make_unique<TurbVeProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
+}
+
+template<class DomainType, class ParticleDataType>
+typename PropLib<DomainType, ParticleDataType>::PropPtr
+PropLib<DomainType, ParticleDataType>::makeExternalGravityVeProp(std::ostream& output, size_t rank,
+                                                                 const InitSettings& settings, bool avClean)
+{
+    if (avClean)
+    {
+        return std::make_unique<ExternalGravityVeProp<true, DomainType, ParticleDataType>>(
+            output, rank, settings.at("gravityConstant"));
+    }
+    else
+    {
+        return std::make_unique<ExternalGravityVeProp<false, DomainType, ParticleDataType>>(
+            output, rank, settings.at("gravityConstant"));
+    }
 }
 
 #ifdef USE_CUDA

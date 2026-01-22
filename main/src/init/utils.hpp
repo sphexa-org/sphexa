@@ -40,6 +40,7 @@
 #include "cstone/sfc/sfc.hpp"
 #include "io/ifile_io.hpp"
 #include "init/settings.hpp"
+#include "cstone/tree/definitions.h"
 
 namespace sphexa
 {
@@ -48,7 +49,8 @@ namespace sphexa
 template<class KeyType, class T>
 void sortBySfcKey(std::vector<T>& x, std::vector<T>& y, std::vector<T>& z)
 {
-    assert(x.size() == y.size() == z.size());
+    assert(x.size() == y.size());
+    assert(y.size() == z.size());
     size_t blockSize = x.size();
 
     cstone::Box<T> box(0, 1);

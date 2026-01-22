@@ -32,8 +32,12 @@
 #include <thrust/execution_policy.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/transform_reduce.h>
+#include <thrust/device_vector.h>
+#include <thrust/sort.h>
+#include <thrust/remove.h>
 
 #include "gpu_reductions.h"
+#include "sph/positions.hpp"
 
 namespace sphexa
 {
@@ -177,5 +181,70 @@ double survivingMassGpu(const Tt* temp, const T* kx, const T* xmass, const Tm* m
 SURVIVORS(double, double, double);
 SURVIVORS(float, float, float);
 SURVIVORS(float, double, float);
+
+//! @brief functor to gather valid position/velocity pairs for Rayleigh-Taylor observable
+template<class T, class Tc, class Tm>
+struct MarkRampCond
+{
+    HOST_DEVICE_FUN
+    void operator()(thrust::tuple<T, T, T, Tm, AuxT<T>&, AuxT<T>&> p)
+    {
+        T    h               = get<0>(p);
+        T    y               = get<1>(p);
+        T    vy              = get<2>(p);
+        Tm   markRamp        = get<3>(p);
+        bool closeToBoundary = thrust::min(std::abs(y - ymin), std::abs(y - ymax)) / h < 8.;
+        if (markRamp > 0.05 && !closeToBoundary)
+        {
+            thrust::get<4>(p) = {y, vy};
+            thrust::get<5>(p) = {y, vy};
+        }
+    }
+    Tc ymin;
+    Tc ymax;
+};
+
+//! @brief calculates the Rayleigh-Taylor observable on GPUs
+template<class T, class Tc, class Th>
+std::tuple<std::vector<AuxT<T>>, std::vector<AuxT<T>>> localGrowthRateRTGpu(size_t first, size_t last, Tc ymin, Tc ymax,
+                                                                            const Th* h, const T* y, const Th* vy,
+                                                                            const Th* markRamp)
+{
+    thrust::device_vector<AuxT<T>> targetUp(last - first);
+    thrust::device_vector<AuxT<T>> targetDown(last - first);
+
+    auto it1 = thrust::make_zip_iterator(
+        thrust::make_tuple(h + first, y + first, vy + first, markRamp + first, targetUp.begin(), targetDown.begin()));
+    auto it2 = thrust::make_zip_iterator(
+        thrust::make_tuple(h + last, y + last, vy + last, markRamp + last, targetUp.end(), targetDown.end()));
+
+    thrust::for_each(thrust::device, it1, it2, MarkRampCond<T, Tc, Th>{ymin, ymax});
+
+    auto endUp   = thrust::remove_if(thrust::device, targetUp.begin(), targetUp.end(), invalidAuxTEntry<T>());
+    auto endDown = thrust::remove_if(thrust::device, targetDown.begin(), targetDown.end(), invalidAuxTEntry<T>());
+
+    thrust::sort(thrust::device, targetUp.begin(), endUp, greaterRT());
+    thrust::sort(thrust::device, targetDown.begin(), endDown, lowerRT());
+
+    targetUp.resize(RT_N_AVG);
+    targetDown.resize(RT_N_AVG);
+
+    std::vector<AuxT<T>> retUp(RT_N_AVG);
+    std::vector<AuxT<T>> retDown(RT_N_AVG);
+    thrust::copy(targetUp.begin(), targetUp.end(), retUp.begin());
+    thrust::copy(targetDown.begin(), targetDown.end(), retDown.begin());
+
+    return std::make_tuple(retUp, retDown);
+}
+
+#define RTGROWTH(T, Tc, Th)                                                                                            \
+    template std::tuple<std::vector<AuxT<T>>, std::vector<AuxT<T>>> localGrowthRateRTGpu(                              \
+        size_t first, size_t last, Tc ymin, Tc ymax, const Th* h, const T* y, const Th* vy, const Th* markRamp);
+
+RTGROWTH(double, double, double);
+RTGROWTH(double, float, double);
+RTGROWTH(double, double, float);
+RTGROWTH(double, float, float);
+RTGROWTH(float, float, float);
 
 } // namespace sphexa

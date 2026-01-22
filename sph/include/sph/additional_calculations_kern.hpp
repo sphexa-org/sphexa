@@ -1,8 +1,8 @@
 /*
  * MIT License
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2023 CSCS, ETH Zurich
+ *               2023 University of Basel
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -24,43 +24,37 @@
  */
 
 /*! @file
- * @brief to add
+ * @brief additional fields kernel
  *
  * @author Lukas Schmidt
  */
 
-#pragma once
+#include "cstone/cuda/annotation.hpp"
 
-#include "cstone/sfc/box.hpp"
-#include "sphexa/simulation_data.hpp"
-
-namespace sphexa
+namespace sph
 {
 
-template<class Dataset>
-class IObservables
+template<size_t stride = 1, class T, class Tm>
+HOST_DEVICE_FUN void markRampJLoop(cstone::LocalIndex i, const cstone::LocalIndex* neighbors, unsigned neighborsCount,
+                                   T Atmin, T Atmax, T ramp, const T* kx, const T* xm, const Tm* m, T* markRamp)
 {
-public:
-    virtual void computeAndWrite(Dataset& d, size_t firstIndex, size_t lastIndex,
-                                 const cstone::Box<typename Dataset::RealType>& box) = 0;
+    auto rhoi   = kx[i] * m[i] / xm[i];
+    markRamp[i] = T(0);
 
-    virtual ~IObservables() = default;
-};
+    for (unsigned pj = 0; pj < neighborsCount; ++pj)
+    {
+        cstone::LocalIndex j    = neighbors[stride * pj];
+        auto               rhoj = kx[j] * m[j] / xm[j];
 
-template<class Dataset>
-struct Observables
-{
-    using ObsPtr = std::unique_ptr<IObservables<Dataset>>;
+        T Atwood = (std::abs(rhoi - rhoj)) / (rhoi + rhoj);
+        if (Atwood > Atmax) { markRamp[i] += T(1); }
+        else if (Atwood >= Atmin)
+        {
+            T sigma_ij = ramp * (Atwood - Atmin);
+            markRamp[i] += sigma_ij;
+        }
+    }
+    markRamp[i] /= neighborsCount;
+}
 
-    static ObsPtr makeGravWaveObs(std::ostream& out, double theta, double phi);
-    static ObsPtr makeTimeEnergyObs(std::ostream& out);
-    static ObsPtr makeTimeEnergyGrowthObs(std::ostream& out);
-    static ObsPtr makeTurbMachObs(std::ostream& out);
-    static ObsPtr makeWindBubbleObs(std::ostream& out, double rhoI, double uE, double r);
-    static ObsPtr makeTimeEnergyGrowthRT(std::ostream& out);
-};
-
-extern template struct Observables<SimulationData<cstone::CpuTag>>;
-extern template struct Observables<SimulationData<cstone::GpuTag>>;
-
-} // namespace sphexa
+} // namespace sph

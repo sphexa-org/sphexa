@@ -5,6 +5,7 @@ set(UNIT_TESTS
         io/h5part_wrapper.cpp
         io/id_tag_utils.cpp
         observables/gravitational_waves.cpp
+        observables/rt_growthrate.cpp
         sphexa/particles_data.cpp
         test_main.cpp)
 
