@@ -197,7 +197,11 @@ sph-compare-constants-cuda12-sm90-release-sphexa-cuda:
     - date
     - export OMP_NUM_THREADS=71
   script:
-    - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
+    - |
+      if [ "$SLURM_PROCID" -eq 0 ]; then
+        wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
+      fi
+      wait
     - |
       for ic in sedov noh isobaric-cube evrard turbulence gresho-chan wind-shock kelvin-helmholtz; do
         if [ "$SLURM_PROCID" -eq 0 ]; then
@@ -231,7 +235,11 @@ sph-compare-constants-cuda12-sm90-release-sphexa-cpu:
     - date
     - export OMP_NUM_THREADS=71
   script:
-    - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
+    - |
+      if [ "$SLURM_PROCID" -eq 0 ]; then
+        wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
+      fi
+      wait
     - |
       for ic in sedov noh isobaric-cube evrard turbulence gresho-chan wind-shock kelvin-helmholtz; do
         if [ "$SLURM_PROCID" -eq 0 ]; then
