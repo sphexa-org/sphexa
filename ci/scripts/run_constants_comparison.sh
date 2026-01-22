@@ -7,6 +7,21 @@ if [ "$#" -ne 1 ]; then
 fi
 
 binary_path="$1"
+# Expand possible wildcards in binary path
+shopt -s nullglob
+matches=( $binary_path )
+shopt -u nullglob
+
+# We expect exactly one match
+if [ ${#matches[@]} -eq 0 ]; then
+  echo "Binary path '$binary_path' did not match any file" >&2
+  exit 1
+fi
+if [ ${#matches[@]} -gt 1 ]; then
+  echo "Binary path '$binary_path' is ambiguous; matches: ${matches[*]}" >&2
+  exit 1
+fi
+binary_path="${matches[0]}"
 case "$(basename "$binary_path")" in
   sphexa-cuda)
     backend="cuda"
