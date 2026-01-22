@@ -197,26 +197,7 @@ sph-compare-constants-cuda12-sm90-debug-sphexa-cuda:
     - date
     - export OMP_NUM_THREADS=71
   script:
-    - |
-      if [ "$SLURM_PROCID" -eq 0 ]; then
-        wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
-      fi
-      wait
-    - |
-      for ic in sedov noh isobaric-cube evrard turbulence gresho-chan wind-shock kelvin-helmholtz; do
-        if [ "$SLURM_PROCID" -eq 0 ]; then
-          echo "Running test for init condition: $ic"
-        fi
-        wait
-        $APP_INSTALL_DIR/sphexa-cuda --quiet --glass ./50c.h5 --init $ic -s 10 -n 50
-        if [ "$SLURM_PROCID" -eq 0 ]; then
-          python ci/scripts/compare_constants.py ci/reference/const-${ic}-cuda-ref.txt constants.txt
-          if [ $? -ne 0 ]; then
-            exit 1
-          fi
-        fi
-        wait
-      done
+    - bash ci/scripts/run_constants_comparison.sh "$APP_INSTALL_DIR/sphexa-cuda"
     - date
 
 sph-compare-constants-cuda12-sm90-debug-sphexa-cpu:
@@ -235,28 +216,5 @@ sph-compare-constants-cuda12-sm90-debug-sphexa-cpu:
     - date
     - export OMP_NUM_THREADS=71
   script:
-    - |
-      if [ "$SLURM_PROCID" -eq 0 ]; then
-        wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
-      fi
-      wait
-    - |
-      for ic in sedov noh isobaric-cube evrard turbulence gresho-chan wind-shock kelvin-helmholtz; do
-        if [ "$SLURM_PROCID" -eq 0 ]; then
-          echo "Running test for init condition: $ic"
-        fi
-        wait
-        if [ "$SLURM_PROCID" -eq 0 ]; then
-          echo "Running test for init condition: $ic"
-        fi
-        wait
-        $APP_INSTALL_DIR/sphexa --quiet --glass ./50c.h5 --init $ic -s 10 -n 50
-        if [ "$SLURM_PROCID" -eq 0 ]; then
-          python ci/scripts/compare_constants.py ci/reference/const-${ic}-cpu-ref.txt constants.txt
-          if [ $? -ne 0 ]; then
-            exit 1
-          fi
-        fi
-        wait
-      done
+    - bash ci/scripts/run_constants_comparison.sh "$APP_INSTALL_DIR/sphexa"
     - date
