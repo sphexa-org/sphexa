@@ -191,6 +191,7 @@ public:
         d.y = y;
         d.z = z;
         syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, d.x, d.y, d.z, globalBox);
+        // 2nd call needed to reduce imbalance, 1st call is not able to fully balance number of particles per rank
         syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, d.x, d.y, d.z, globalBox);
         t1 = std::chrono::high_resolution_clock::now();
         if (rank == 0) std::cout << "earlySync " << std::chrono::duration<float>(t1 - t0).count() << std::endl;
