@@ -199,12 +199,11 @@ sph-compare-constants-cuda12-sm90-release-sphexa-cuda:
   script:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
     - |
-      for ic in sedov noh isobaric-cube evrard turbulence
-      if [ "$SLURM_PROCID" -eq 0 ]; then
-        echo "Running test for init condition: $ic"
-      fi
-      wait
-      do
+      for ic in sedov noh isobaric-cube evrard turbulence; do
+        if [ "$SLURM_PROCID" -eq 0 ]; then
+          echo "Running test for init condition: $ic"
+        fi
+        wait
         $APP_INSTALL_DIR/sphexa-cuda --quiet --glass ./50c.h5 --init $ic -s 10 -n 50
         if [ "$SLURM_PROCID" -eq 0 ]; then
           python ci/scripts/compare_constants.py ci/reference/const-${ic}-ref.txt constants.txt
@@ -214,12 +213,11 @@ sph-compare-constants-cuda12-sm90-release-sphexa-cuda:
         fi
         wait
       done
-      for ic in gresho-chan wind-shock kelvin-helmholtz
-      if [ "$SLURM_PROCID" -eq 0 ]; then
-        echo "Running test for init condition: $ic"
-      fi
-      wait
-      do
+      for ic in gresho-chan wind-shock kelvin-helmholtz; do
+        if [ "$SLURM_PROCID" -eq 0 ]; then
+          echo "Running test for init condition: $ic"
+        fi
+        wait
         $APP_INSTALL_DIR/sphexa-cuda --quiet --glass ./50c.h5 --init $ic -s 2 -n 30
         if [ "$SLURM_PROCID" -eq 0 ]; then
           python ci/scripts/compare_constants.py ci/reference/const-${ic}-ref.txt constants.txt
@@ -249,12 +247,11 @@ sph-compare-constants-cuda12-sm90-release-sphexa-cpu:
   script:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
     - |
-      for ic in sedov noh isobaric-cube evrard turbulence
-      if [ "$SLURM_PROCID" -eq 0 ]; then
-        echo "Running test for init condition: $ic"
-      fi
-      wait
-      do
+      for ic in sedov noh isobaric-cube evrard turbulence; do
+        if [ "$SLURM_PROCID" -eq 0 ]; then
+          echo "Running test for init condition: $ic"
+        fi
+        wait
         $APP_INSTALL_DIR/sphexa --quiet --glass ./50c.h5 --init $ic -s 10 -n 50
         if [ "$SLURM_PROCID" -eq 0 ]; then
           python ci/scripts/compare_constants.py ci/reference/const-${ic}-ref.txt constants.txt
@@ -264,12 +261,11 @@ sph-compare-constants-cuda12-sm90-release-sphexa-cpu:
         fi
         wait
       done
-      for ic in gresho-chan wind-shock kelvin-helmholtz
-      if [ "$SLURM_PROCID" -eq 0 ]; then
-        echo "Running test for init condition: $ic"
-      fi
-      wait
-      do
+      for ic in gresho-chan wind-shock kelvin-helmholtz; do
+        if [ "$SLURM_PROCID" -eq 0 ]; then
+          echo "Running test for init condition: $ic"
+        fi
+        wait
         $APP_INSTALL_DIR/sphexa --quiet --glass ./50c.h5 --init $ic -s 2 -n 30
         if [ "$SLURM_PROCID" -eq 0 ]; then
           python ci/scripts/compare_constants.py ci/reference/const-${ic}-ref.txt constants.txt
