@@ -80,14 +80,22 @@ __global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, c
 
         if (i >= bodyEnd) continue;
 
-        unsigned ncCapped = stl::min(ncTrue[0], ngmax);
-        T        maxvsignal;
+        if (ncTrue[0] >= 25 && ncTrue[0] <= ngmax)
+        {
+            T maxvsignal;
+            momentumAndEnergyJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncTrue[0], x, y, z, vx,
+                                                           vy, vz, h, m, rho, p, c, c11, c12, c13, c22, c23, c33, wh,
+                                                           whd, grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal);
 
-        momentumAndEnergyJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, vx, vy,
-                                                       vz, h, m, rho, p, c, c11, c12, c13, c22, c23, c33, wh, whd,
-                                                       grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal);
-
-        dt_i = stl::min(dt_i, tsKCourant(maxvsignal, h[i], c[i], Kcour));
+            dt_i = stl::min(dt_i, tsKCourant(maxvsignal, h[i], c[i], Kcour));
+        }
+        else
+        {
+            du[i]       = 0.;
+            grad_P_x[i] = 0.;
+            grad_P_y[i] = 0.;
+            grad_P_z[i] = 0.;
+        }
     }
 
     typedef cub::BlockReduce<T, TravConfig::numThreads> BlockReduce;
@@ -105,10 +113,10 @@ __global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, c
  * @param[inout] ax    x particle acceleration
  * @param[inout] ay
  * @param[inout] az
- * @param[inout] h     smoothing lengths
+ * @param[inout] nc    neighbor counts
  */
-template<class Ta, class Tu, class Th>
-__global__ void markNaN(GroupView grp, Ta* ax, Ta* ay, Ta* az, Tu* du, Th* h)
+template<class Ta, class Tu>
+__global__ void markNaN(GroupView grp, Ta* ax, Ta* ay, Ta* az, Tu* du, unsigned* nc)
 {
     LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
@@ -123,7 +131,7 @@ __global__ void markNaN(GroupView grp, Ta* ax, Ta* ay, Ta* az, Tu* du, Th* h)
         ay[i] = Ta(0);
         az[i] = Ta(0);
         du[i] = Tu(0);
-        h[i]  = 0;
+        nc[i] = 1;
     }
 }
 
@@ -152,7 +160,7 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
         if (numBlocks > 0)
         {
             markNaN<<<numBlocks, numThreads>>>(grp, rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az),
-                                               rawPtr(d.devData.du), rawPtr(d.devData.h));
+                                               rawPtr(d.devData.du), rawPtr(d.devData.nc));
         }
     }
 

@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "cstone/findneighbors.hpp"
+#include "cstone/domain/layout.hpp"
 #include "cstone/primitives/gather.hpp"
 #include "cstone/sfc/sfc.hpp"
 #include "cstone/tree/definitions.h"
@@ -67,164 +68,22 @@ std::vector<Integer> makeRandomGaussianKeys(size_t numKeys, int seed = 42)
     return ret;
 }
 
-template<class T, class KeyType_>
-class RandomCoordinates
-{
-public:
-    using KeyType = KeyType_;
-    using Integer = typename KeyType::ValueType;
-
-    RandomCoordinates(size_t n, Box<T> box, int seed = 42)
-        : box_(std::move(box))
-        , x_(n)
-        , y_(n)
-        , z_(n)
-        , codes_(n)
-    {
-        // std::random_device rd;
-        std::mt19937 gen(seed);
-        std::uniform_real_distribution<T> disX(box_.xmin(), box_.xmax());
-        std::uniform_real_distribution<T> disY(box_.ymin(), box_.ymax());
-        std::uniform_real_distribution<T> disZ(box_.zmin(), box_.zmax());
-
-        auto randX = [&disX, &gen]() { return disX(gen); };
-        auto randY = [&disY, &gen]() { return disY(gen); };
-        auto randZ = [&disZ, &gen]() { return disZ(gen); };
-
-        std::generate(begin(x_), end(x_), randX);
-        std::generate(begin(y_), end(y_), randY);
-        std::generate(begin(z_), end(z_), randZ);
-
-        auto keyData = (KeyType*)(codes_.data());
-        computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box);
-
-        std::vector<LocalIndex> sfcOrder(n);
-        std::iota(begin(sfcOrder), end(sfcOrder), LocalIndex(0));
-        sort_by_key(begin(codes_), end(codes_), begin(sfcOrder));
-
-        std::vector<T> temp(x_.size());
-        gather<LocalIndex>(sfcOrder, x_.data(), temp.data());
-        swap(x_, temp);
-        gather<LocalIndex>(sfcOrder, y_.data(), temp.data());
-        swap(y_, temp);
-        gather<LocalIndex>(sfcOrder, z_.data(), temp.data());
-        swap(z_, temp);
-    }
-
-    const std::vector<T>& x() const { return x_; }
-    const std::vector<T>& y() const { return y_; }
-    const std::vector<T>& z() const { return z_; }
-    const std::vector<Integer>& particleKeys() const { return codes_; }
-
-private:
-    Box<T> box_;
-    std::vector<T> x_, y_, z_;
-    std::vector<Integer> codes_;
-};
-
-template<class T, class KeyType_>
-class RandomGaussianCoordinates
-{
-public:
-    using KeyType = KeyType_;
-    using Integer = typename KeyType::ValueType;
-
-    RandomGaussianCoordinates(unsigned n, Box<T> box, int seed = 42)
-        : box_(std::move(box))
-        , x_(n)
-        , y_(n)
-        , z_(n)
-        , codes_(n)
-    {
-        // std::random_device rd;
-        std::mt19937 gen(seed);
-        // random gaussian distribution at the center
-        std::normal_distribution<T> disX((box_.xmax() + box_.xmin()) / 2, (box_.xmax() - box_.xmin()) / 5);
-        std::normal_distribution<T> disY((box_.ymax() + box_.ymin()) / 2, (box_.ymax() - box_.ymin()) / 5);
-        std::normal_distribution<T> disZ((box_.zmax() + box_.zmin()) / 2, (box_.zmax() - box_.zmin()) / 5);
-
-        auto randX = [cmin = box_.xmin(), cmax = box_.xmax(), &disX, &gen]()
-        { return std::max(std::min(disX(gen), cmax), cmin); };
-
-        auto randY = [cmin = box_.ymin(), cmax = box_.ymax(), &disY, &gen]()
-        { return std::max(std::min(disY(gen), cmax), cmin); };
-
-        auto randZ = [cmin = box_.zmin(), cmax = box_.zmax(), &disZ, &gen]()
-        { return std::max(std::min(disZ(gen), cmax), cmin); };
-
-        std::generate(begin(x_), end(x_), randX);
-        std::generate(begin(y_), end(y_), randY);
-        std::generate(begin(z_), end(z_), randZ);
-
-        auto keyData = (KeyType*)(codes_.data());
-        computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box);
-
-        std::vector<LocalIndex> sfcOrder(n);
-        std::iota(begin(sfcOrder), end(sfcOrder), LocalIndex(0));
-        sort_by_key(begin(codes_), end(codes_), begin(sfcOrder));
-
-        std::vector<T> temp(x_.size());
-        gather<LocalIndex>(sfcOrder, x_.data(), temp.data());
-        swap(x_, temp);
-        gather<LocalIndex>(sfcOrder, y_.data(), temp.data());
-        swap(y_, temp);
-        gather<LocalIndex>(sfcOrder, z_.data(), temp.data());
-        swap(z_, temp);
-    }
-
-    const std::vector<T>& x() const { return x_; }
-    const std::vector<T>& y() const { return y_; }
-    const std::vector<T>& z() const { return z_; }
-    const std::vector<Integer>& particleKeys() const { return codes_; }
-
-private:
-    Box<T> box_;
-    std::vector<T> x_, y_, z_;
-    std::vector<Integer> codes_;
-};
-
 //! @brief can be used to calculate reasonable smoothing lengths for each particle
 template<class KeyType, class Tc, class Th>
 void adjustSmoothingLength(LocalIndex numParticles,
                            unsigned ng0,
                            unsigned ngmax,
-                           const std::vector<Tc>& xGlob,
-                           const std::vector<Tc>& yGlob,
-                           const std::vector<Tc>& zGlob,
-                           std::vector<Th>& hGlob,
+                           const std::vector<KeyType>& sfcKeys,
+                           const std::vector<Tc>& x,
+                           const std::vector<Tc>& y,
+                           const std::vector<Tc>& z,
+                           std::vector<Th>& h,
                            const Box<Tc>& box)
 {
-    std::vector<KeyType> sfcKeys(numParticles);
-
-    std::vector<Tc> x = xGlob;
-    std::vector<Tc> y = yGlob;
-    std::vector<Tc> z = zGlob;
-    std::vector<Tc> h = hGlob;
-
-    computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(sfcKeys.data()), numParticles, box);
-    std::vector<LocalIndex> ordering(numParticles);
-    std::iota(ordering.begin(), ordering.end(), LocalIndex(0));
-    sort_by_key(sfcKeys.begin(), sfcKeys.end(), ordering.begin());
-
-    std::vector<Tc> temp(x.size());
-    gather<LocalIndex>(ordering, x.data(), temp.data());
-    swap(temp, x);
-    gather<LocalIndex>(ordering, y.data(), temp.data());
-    swap(temp, y);
-    gather<LocalIndex>(ordering, z.data(), temp.data());
-    swap(temp, z);
-    gather<LocalIndex>(ordering, h.data(), temp.data());
-    swap(temp, h);
-
-    std::vector<LocalIndex> inverseOrdering(numParticles);
-    std::iota(inverseOrdering.begin(), inverseOrdering.end(), 0);
-    std::vector<LocalIndex> orderCpy = ordering;
-    sort_by_key(orderCpy.begin(), orderCpy.end(), inverseOrdering.begin());
-
     std::vector<cstone::LocalIndex> neighbors(numParticles * ngmax);
     std::vector<unsigned> neighborCounts(numParticles);
 
-    unsigned bucketSize   = 64;
+    unsigned bucketSize   = 16;
     auto [csTree, counts] = computeOctree<KeyType>(std::span(sfcKeys), bucketSize);
     OctreeData<KeyType, CpuTag> octree;
     octree.resize(nNodes(csTree));
@@ -263,11 +122,149 @@ void adjustSmoothingLength(LocalIndex numParticles,
             h[i]        = h[i] * 0.5 * pow(1.0 + (c0 * ng0) / nn, 1.0 / 10.0);
         } while ((neighborCounts[i] < ng0 / 4u || neighborCounts[i] >= ngmax) && iteration++ < 10);
     }
-
-    for (LocalIndex i = 0; i < numParticles; ++i)
-    {
-        hGlob[i] = h[inverseOrdering[i]];
-    }
 }
+
+template<class T, class KeyType_>
+class RandomCoordinatesBase
+{
+public:
+    using KeyType = KeyType_;
+    using Integer = typename KeyType::ValueType;
+
+    RandomCoordinatesBase(size_t n, Box<T> box)
+        : box_(std::move(box))
+        , x_(n)
+        , y_(n)
+        , z_(n)
+        , h_(n)
+        , codes_(n)
+    {
+    }
+
+    void adjustH(unsigned ng0, unsigned ngmax)
+    {
+        if (not isSfcOrdered_) throw std::runtime_error("adjustH can only be called with SFC ordered particles\n");
+        adjustSmoothingLength(x_.size(), ng0, ngmax, codes_, x_, y_, z_, h_, box_);
+    }
+
+    void shuffle()
+    {
+        std::vector<LocalIndex> permutation(x_.size());
+        std::iota(begin(permutation), end(permutation), LocalIndex(0));
+        std::mt19937 gen(0);
+        std::ranges::shuffle(permutation, gen);
+
+        std::vector<T> s1(x_.size());
+        std::vector<Integer> s2(x_.size());
+        gatherArrays(permutation, 0, std::tie(x_, y_, z_, h_, codes_), std::tie(s1, s2));
+        isSfcOrdered_ = false;
+    }
+
+    const std::vector<T>& x() const { return x_; }
+    const std::vector<T>& y() const { return y_; }
+    const std::vector<T>& z() const { return z_; }
+    const std::vector<T>& h() const { return h_; }
+    const std::vector<Integer>& particleKeys() const { return codes_; }
+
+protected:
+    void sfcSort()
+    {
+        std::size_t n = x_.size();
+        auto keyData  = (KeyType*)(codes_.data());
+        computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_);
+
+        std::vector<LocalIndex> sfcOrder(n);
+        std::iota(begin(sfcOrder), end(sfcOrder), LocalIndex(0));
+        sort_by_key(begin(codes_), end(codes_), begin(sfcOrder));
+
+        std::vector<T> temp(x_.size());
+        gatherArrays(sfcOrder, 0, std::tie(x_, y_, z_, h_), std::tie(temp));
+        isSfcOrdered_ = true;
+    }
+
+    void estimateH(std::size_t hOffset)
+    {
+        if (not isSfcOrdered_) throw std::runtime_error("estimateH can only be called with SFC ordered particles\n");
+        std::size_t n = x_.size();
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            std::size_t j = i > hOffset ? i - hOffset : std::min(n, i + hOffset);
+
+            Vec3<T> pi{x_[i], y_[i], z_[i]};
+            Vec3<T> pj{x_[j], y_[j], z_[j]};
+
+            // avoid exact 0.5, because this will lead to lots of borderline particle pairs with dist == searchRadius
+            h_[i] = 0.5001 * std::sqrt(norm2(pi - pj));
+        }
+    }
+
+    bool isSfcOrdered_{false};
+    Box<T> box_;
+    std::vector<T> x_, y_, z_, h_;
+    std::vector<Integer> codes_;
+};
+
+template<class T, class KeyType_>
+class RandomCoordinates : public RandomCoordinatesBase<T, KeyType_>
+{
+public:
+    using Base = RandomCoordinatesBase<T, KeyType_>;
+
+    RandomCoordinates(std::size_t n, Box<T> box, std::size_t hOffset = 5, int seed = 42)
+        : Base(n, box)
+    {
+        std::mt19937 gen(seed);
+        std::uniform_real_distribution<T> disX(box.xmin(), box.xmax());
+        std::uniform_real_distribution<T> disY(box.ymin(), box.ymax());
+        std::uniform_real_distribution<T> disZ(box.zmin(), box.zmax());
+
+        auto randX = [&disX, &gen]() { return disX(gen); };
+        auto randY = [&disY, &gen]() { return disY(gen); };
+        auto randZ = [&disZ, &gen]() { return disZ(gen); };
+
+        std::ranges::generate(Base::x_, randX);
+        std::ranges::generate(Base::y_, randY);
+        std::ranges::generate(Base::z_, randZ);
+
+        Base::sfcSort();
+        Base::estimateH(hOffset);
+    }
+};
+
+template<class T, class KeyType_>
+class RandomGaussianCoordinates : public RandomCoordinatesBase<T, KeyType_>
+{
+public:
+    using Base = RandomCoordinatesBase<T, KeyType_>;
+
+    RandomGaussianCoordinates(std::size_t n, Box<T> box, std::size_t hOffset = 5, int seed = 42)
+        : Base(n, box)
+    {
+        std::mt19937 gen(seed);
+        std::normal_distribution<T> disX((box.xmax() + box.xmin()) / 2, box.lx() / 5);
+        std::normal_distribution<T> disY((box.ymax() + box.ymin()) / 2, box.ly() / 5);
+        std::normal_distribution<T> disZ((box.zmax() + box.zmin()) / 2, box.lz() / 5);
+
+        auto makeDist = [&gen](auto& dist, T a, T b)
+        {
+            return [a, b, &dist, &gen]()
+            {
+                T x = dist(gen);
+                while (x < a || x >= b)
+                {
+                    x = dist(gen);
+                }
+                return x;
+            };
+        };
+
+        std::ranges::generate(Base::x_, makeDist(disX, box.xmin(), box.xmax()));
+        std::ranges::generate(Base::y_, makeDist(disY, box.ymin(), box.ymax()));
+        std::ranges::generate(Base::z_, makeDist(disZ, box.zmin(), box.zmax()));
+
+        Base::sfcSort();
+        Base::estimateH(hOffset);
+    }
+};
 
 } // namespace cstone
