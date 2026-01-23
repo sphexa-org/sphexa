@@ -331,18 +331,16 @@ TEST(FocusDomain, reapplySync)
 template<class KeyType, class T>
 void randomGaussianGrav(int thisRank, int numRanks)
 {
-    const LocalIndex numParticles    = 100000;
-    unsigned         bucketSize      = numParticles / (100 * numRanks);
-    unsigned         bucketSizeLocal = std::min(64u, bucketSize);
-    float            theta           = 0.5;
+    const LocalIndex numParticles = 100000;
+    unsigned bucketSize           = numParticles / (100 * numRanks);
+    unsigned bucketSizeLocal      = std::min(64u, bucketSize);
+    float theta                   = 0.5;
 
-    Box<T> box{-1, 1};
+    Box<T> box{-1, 1, cstone::BoundaryType::fixed}; // need to fix box to avoid domain.sync computing a tight fit
 
     // common pool of coordinates, identical on all ranks
     RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box);
-
-    std::vector<T> globalH(numParticles, 0.1);
-    adjustSmoothingLength<KeyType>(globalH.size(), 200, 250, coords.x(), coords.y(), coords.z(), globalH, box);
+    coords.adjustH(200, 250);
 
     std::vector<T> globalMasses(numParticles, 1.0 / numParticles);
 
@@ -351,11 +349,11 @@ void randomGaussianGrav(int thisRank, int numRanks)
 
     // extract a slice of the common pool, each rank takes a different slice, but all slices together
     // are equal to the common pool
-    std::vector<T>       x(coords.x().begin() + firstIndex, coords.x().begin() + lastIndex);
-    std::vector<T>       y(coords.y().begin() + firstIndex, coords.y().begin() + lastIndex);
-    std::vector<T>       z(coords.z().begin() + firstIndex, coords.z().begin() + lastIndex);
-    std::vector<T>       h(globalH.begin() + firstIndex, globalH.begin() + lastIndex);
-    std::vector<T>       m(globalMasses.begin() + firstIndex, globalMasses.begin() + lastIndex);
+    std::vector<T> x(coords.x().begin() + firstIndex, coords.x().begin() + lastIndex);
+    std::vector<T> y(coords.y().begin() + firstIndex, coords.y().begin() + lastIndex);
+    std::vector<T> z(coords.z().begin() + firstIndex, coords.z().begin() + lastIndex);
+    std::vector<T> h(coords.h().begin() + firstIndex, coords.h().begin() + lastIndex);
+    std::vector<T> m(globalMasses.begin() + firstIndex, globalMasses.begin() + lastIndex);
     std::vector<KeyType> keys(x.size());
 
     Domain<KeyType, T, CpuTag> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta, box);
@@ -397,7 +395,6 @@ void randomGaussianGrav(int thisRank, int numRanks)
             {
                 EXPECT_EQ(keys[let_layout[i] + d], gkeys[gi1 + d]);
             }
-
         }
     }
 
@@ -431,8 +428,8 @@ void randomGaussianGrav(int thisRank, int numRanks)
             auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
             unsigned maxLevel               = maxTreeLevel<KeyType>{};
 
-            markMacPerBox(targetCenter, targetSize, maxLevel, let_full.prefixes, let_full.childOffsets, centers.data(),
-                          box, focusStart, focusEnd, marks.data());
+            markMacPerBox(targetCenter, targetSize, maxLevel, let_full.prefixes, let_full.childOffsets,
+                          let_full.parents, centers.data(), box, focusStart, focusEnd, marks.data());
         }
         for (TreeNodeIndex j = 0; j < let_full.numNodes; ++j)
         {
@@ -475,13 +472,12 @@ void randomGaussianGrav(int thisRank, int numRanks)
         nodeFpCenters<KeyType>(octree.prefixes, geoCenters.data(), geoSizes.data(), box);
 
         auto o = octree.data();
-        OctreeNsView<T, KeyType> octreeProps{o.numLeafNodes,   o.prefixes,        o.childOffsets,
-                                             o.internalToLeaf, o.levelRange,      globCsarray.data(),
-                                             layout.data(),    geoCenters.data(), geoSizes.data()};
+        OctreeNsView<T, KeyType> octreeProps{o.numLeafNodes,    o.prefixes,     o.childOffsets,     o.parents,
+                                             o.internalToLeaf,  o.levelRange,   globCsarray.data(), layout.data(),
+                                             geoCenters.data(), geoSizes.data()};
 
-        findNeighbors(coords.x().data(), coords.y().data(), coords.z().data(), globalH.data(), firstGlobalIdx,
+        findNeighbors(coords.x().data(), coords.y().data(), coords.z().data(), coords.h().data(), firstGlobalIdx,
                       lastGlobalIdx, box, octreeProps, ngmax, neighborsRef.data(), neighborsCountRef.data());
-
 
         uint64_t neighborSumRef = std::accumulate(begin(neighborsCountRef), end(neighborsCountRef), uint64_t(0));
         EXPECT_EQ(neighborSum, neighborSumRef);
@@ -493,7 +489,6 @@ TEST(FocusDomain, randomGaussianGrav)
     int rank = 0, nRanks = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
-    {
-        randomGaussianGrav<uint64_t, double>(rank, nRanks);
-    }
+
+    randomGaussianGrav<uint64_t, double>(rank, nRanks);
 }
