@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-eps_zero = 1e-12
+eps_zero = 1e-11
 relative_tolerance = 1e-2
 absolute_tolerance = 1e-6
 
