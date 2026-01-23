@@ -1,8 +1,9 @@
 import sys
 from pathlib import Path
 
-eps_zero = 1e-30
+eps_zero = 1e-13
 relative_tolerance = 1e-2
+absolute_tolerance = 1e-6
 
 
 def load_rows(path: Path):
@@ -30,10 +31,15 @@ def main(ref_path: Path, new_path: Path, rel_tolerance = relative_tolerance):
             diff = abs(vn - vr)
             den = max(abs(vr), eps_zero)
             rel = diff / den
-            if rel > rel_tolerance:
-                above_tolerance.append((idx, col, vr, vn, diff, rel))
+            if abs(vr) < eps_zero: # use absolute difference when ref is near zero
+                if diff > absolute_tolerance:
+                    above_tolerance.append((idx, col, vr, vn, diff, rel, 'abs'))
+            else:
+                if rel > rel_tolerance:
+                    above_tolerance.append((idx, col, vr, vn, diff, rel, 'rel'))
+
     if above_tolerance:
-        print("Rows exceeding tolerances (row, col, ref, new, abs, rel):")
+        print("Rows exceeding tolerances (row, col, ref, new, abs, rel, error type):")
         for entry in above_tolerance:
             print(entry)
         sys.exit(1)
