@@ -79,8 +79,8 @@ double calculateSurvivingMass(size_t first, size_t last, double rhoBubble, doubl
 
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        bubbleMass = survivingMassGpu(rawPtr(d.devData.temp), rawPtr(d.devData.kx), rawPtr(d.devData.xm),
-                                      rawPtr(d.devData.m), rhoBubble, uWind, first, last);
+        bubbleMass = survivingMassGpu(rawPtr(d.temp), rawPtr(d.kx), rawPtr(d.xm),
+                                      rawPtr(d.m), rhoBubble, uWind, first, last);
     }
     else
     {
