@@ -15,27 +15,25 @@ def load_rows(path: Path):
     return rows
 
 
-def main(ref_path: Path, new_path: Path, ignored_cols: list[int] | None = None, rel_tolerance: float = relative_tolerance, absolute_tolerance: float = absolute_tolerance):
+def main(ref_path: Path, new_path: Path, abs_check_cols: list[int] | None = None, rel_tolerance: float = relative_tolerance, absolute_tolerance: float = absolute_tolerance):
     ref = load_rows(ref_path)
     new = load_rows(new_path)
     if len(ref) != len(new):
         print(f"Length mismatch: {len(ref)} (ref) vs {len(new)} (new)")
         sys.exit(2)
     above_tolerance = []
-    ignored = set(ignored_cols or [])
-    print(f"Ignoring columns: {sorted(ignored)}")
+    abs_check_c = set(abs_check_cols or [])
+    print(f"Absolute value check for columns: {sorted(abs_check_c)}")
     for idx in range(len(ref)):
         r, n = ref[idx], new[idx]
         if len(r) != len(n):
             print(f"Column mismatch on row {idx}: {len(r)} vs {len(n)}")
             continue
         for col, (vr, vn) in enumerate(zip(r, n)):
-            if col in ignored:
-                continue
             diff = abs(vn - vr)
             den = max(abs(vr), eps_zero)
             rel = diff / den
-            if abs(vr) < eps_zero: # use absolute difference when ref is near zero
+            if col in abs_check_c: # use absolute difference
                 if diff > absolute_tolerance:
                     above_tolerance.append((idx, col, vr, vn, diff, rel, 'abs'))
             else:

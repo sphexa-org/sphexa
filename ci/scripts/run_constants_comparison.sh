@@ -41,20 +41,20 @@ if [ "$rank_id" -eq 0 ]; then
 fi
 wait
 
-ignored_columns_for_ic() {
+use_abs_columns_for_ic() {
   local ic="$1"
   case "$ic" in
     sedov)
       # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
-      echo "7,8"
+      echo "6,7,8"
       ;;
     noh)
       # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
-      echo "7,8"
+      echo "6,8"
       ;;
     isobaric-cube)
       # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
-      echo "7,8"
+      echo "6" # TODO: why linear and angular momentum are not conserved here?
       ;;
     evrard)
       # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
@@ -65,19 +65,19 @@ ignored_columns_for_ic() {
       # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
       # else
       # Colums for TurbulenceMachRMS observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom, machRms
-      echo "7,8"
+      echo "6,7,8"
       ;;
     gresho-chan)
       # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
-      echo "7,8"
+      echo "6"
       ;;
     wind-shock)
       # Colums for WindBubble observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom, bubbleMass / initialMass, normalizedTime
-      echo "7,8"
+      echo "6"
       ;;
     kelvin-helmholtz)
       # Colums for TimeEnergyGrowth observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom, khgr
-      echo "7,8"
+      echo "6"
       ;;
     *)
       echo ""
@@ -92,10 +92,10 @@ for ic in sedov noh isobaric-cube evrard turbulence gresho-chan wind-shock kelvi
   wait
   "$binary_path" --quiet --glass "./50c.h5" --init "$ic" -s 10 -n 50
   if [ "$rank_id" -eq 0 ]; then
-    ignore_cols=$(ignored_columns_for_ic "$ic")
+    abs_cols=$(use_abs_columns_for_ic "$ic")
     cmd=(python ci/scripts/compare_constants.py "ci/reference/const-${ic}-${backend}-ref.txt" constants.txt)
-    if [ -n "$ignore_cols" ]; then
-      cmd+=("$ignore_cols")
+    if [ -n "$abs_cols" ]; then
+      cmd+=("$abs_cols")
     fi
     "${cmd[@]}"
   fi
