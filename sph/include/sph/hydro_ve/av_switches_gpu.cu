@@ -45,16 +45,14 @@ void computeAVswitches(const GroupView&, Dataset& d, const cstone::Box<typename 
 {
     // alpha is an input and output field, thus first copy alpha to a temporary vector to properly support symmetric
     // neighborhoods
-    auto& tmp = d.devData.ax;
-    assert(d.devData.ax.size() >= d.devData.alpha.size());
-    checkGpuErrors(cudaMemcpyAsync(rawPtr(tmp), rawPtr(d.devData.alpha),
-                                   sizeof(typename Dataset::HydroType) * d.devData.alpha.size(),
+    auto& tmp = d.ax;
+    assert(d.ax.size() >= d.alpha.size());
+    checkGpuErrors(cudaMemcpyAsync(rawPtr(tmp), rawPtr(d.alpha), sizeof(typename Dataset::HydroType) * d.alpha.size(),
                                    cudaMemcpyDeviceToDevice));
-    AVswitchesIjLoop(d.devData.neighborhood, d.K, d.minDt, d.alphamin, d.alphamax, d.decay_constant,
-                     rawPtr(d.devData.xm), rawPtr(d.devData.kx), rawPtr(d.devData.divv), rawPtr(tmp),
-                     rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz), rawPtr(d.devData.c),
-                     rawPtr(d.devData.c11), rawPtr(d.devData.c12), rawPtr(d.devData.c13), rawPtr(d.devData.c22),
-                     rawPtr(d.devData.c23), rawPtr(d.devData.c33), rawPtr(d.devData.wh), rawPtr(d.devData.alpha));
+    AVswitchesIjLoop(d.neighborhood, d.K, d.minDt, d.alphamin, d.alphamax, d.decay_constant, rawPtr(d.xm), rawPtr(d.kx),
+                     rawPtr(d.divv), rawPtr(tmp), rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.c), rawPtr(d.c11),
+                     rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.wh),
+                     rawPtr(d.alpha));
 
     checkGpuErrors(cudaDeviceSynchronize());
 }

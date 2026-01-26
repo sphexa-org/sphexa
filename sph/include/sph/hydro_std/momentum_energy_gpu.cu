@@ -75,12 +75,10 @@ __global__ void markNaN(GroupView grp, Ta* ax, Ta* ay, Ta* az, Tu* du, unsigned*
 template<class Dataset>
 void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    momentumAndEnergyIjLoop(d.devData.neighborhood, d.K, d.Kcour, rawPtr(d.devData.m), rawPtr(d.devData.rho),
-                            rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz), rawPtr(d.devData.p),
-                            rawPtr(d.devData.c), rawPtr(d.devData.c11), rawPtr(d.devData.c12), rawPtr(d.devData.c13),
-                            rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33), rawPtr(d.devData.wh),
-                            rawPtr(d.devData.du), rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az),
-                            rawPtr(d.devData.dtCourant));
+    momentumAndEnergyIjLoop(d.neighborhood, d.K, d.Kcour, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.vx), rawPtr(d.vy),
+                            rawPtr(d.vz), rawPtr(d.p), rawPtr(d.c), rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13),
+                            rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.wh), rawPtr(d.du), rawPtr(d.ax),
+                            rawPtr(d.ay), rawPtr(d.az), rawPtr(d.dtCourant));
 
     {
         unsigned numThreads       = 256;
@@ -88,16 +86,15 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
         unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
         if (numBlocks > 0)
         {
-            markNaN<<<numBlocks, numThreads>>>(grp, rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az),
-                                               rawPtr(d.devData.du), rawPtr(d.devData.nc));
+            markNaN<<<numBlocks, numThreads>>>(grp, rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.du),
+                                               rawPtr(d.nc));
         }
     }
 
-    using DtCourantType = typename std::decay_t<decltype(d.devData.dtCourant)>::value_type;
-    auto minDt          = thrust::reduce(thrust::device, rawPtr(d.devData.dtCourant) + grp.firstBody,
-                                         rawPtr(d.devData.dtCourant) + grp.lastBody,
-                                         std::numeric_limits<DtCourantType>::infinity(), thrust::minimum<DtCourantType>());
-    d.minDtCourant      = minDt;
+    using DtCourantType = typename std::decay_t<decltype(d.dtCourant)>::value_type;
+    auto minDt = thrust::reduce(thrust::device, rawPtr(d.dtCourant) + grp.firstBody, rawPtr(d.dtCourant) + grp.lastBody,
+                                std::numeric_limits<DtCourantType>::infinity(), thrust::minimum<DtCourantType>());
+    d.minDtCourant = minDt;
 }
 
 template void computeMomentumEnergyStdGpu(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,

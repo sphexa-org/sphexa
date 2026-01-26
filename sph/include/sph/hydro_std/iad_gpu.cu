@@ -42,9 +42,8 @@ using cstone::GroupView;
 template<class Dataset>
 void computeIADGpu(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    IADIjLoop(d.devData.neighborhood, d.K, rawPtr(d.devData.m), rawPtr(d.devData.rho), rawPtr(d.devData.nc),
-              rawPtr(d.devData.wh), rawPtr(d.devData.c11), rawPtr(d.devData.c12), rawPtr(d.devData.c13),
-              rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33));
+    IADIjLoop(d.neighborhood, d.K, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.nc), rawPtr(d.wh), rawPtr(d.c11), rawPtr(d.c12),
+              rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 

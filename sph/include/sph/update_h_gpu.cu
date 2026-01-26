@@ -33,7 +33,6 @@
 
 #include "sph/kernels.hpp"
 #include "sph/particles_data.hpp"
-#include "sph/particles_data_gpu.cuh"
 #include "sph/sph_gpu.hpp"
 
 namespace sph
@@ -131,12 +130,12 @@ updateSmoothingLengthIterativeGpuKernel(unsigned ng0, unsigned ngmax, const csto
 template<class T, class Dataset>
 void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d, const cstone::Box<T>& box)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     updateSmoothingLengthIterativeGpuKernel<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.ng0, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x),
-        rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.nc), nidxPool, traversalPool);
+        d.ng0, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.x), rawPtr(d.y),
+        rawPtr(d.z), rawPtr(d.h), rawPtr(d.nc), nidxPool, traversalPool);
     checkGpuErrors(cudaDeviceSynchronize());
 
     NcStats::type stats[NcStats::numStats];
@@ -145,7 +144,7 @@ void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d,
     NcStats::type maxP2P   = stats[cstone::NcStats::maxP2P];
     NcStats::type maxStack = stats[cstone::NcStats::maxStack];
 
-    d.devData.stackUsedNc = maxStack;
+    d.stackUsedNc = maxStack;
 
     if (maxP2P == 0xFFFFFFFF) { throw std::runtime_error("GPU traversal stack exhausted in neighbor search\n"); }
 }

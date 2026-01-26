@@ -79,21 +79,18 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
                            const cstone::Box<typename Dataset::RealType>&)
 {
     momentumAndEnergyIjLoop<avClean>(
-        d.devData.neighborhood, d.K, d.Kcour, d.Atmin, d.Atmax, d.ramp, rawPtr(d.devData.vx), rawPtr(d.devData.vy),
-        rawPtr(d.devData.vz), rawPtr(d.devData.m), rawPtr(d.devData.c), rawPtr(d.devData.kx), rawPtr(d.devData.alpha),
-        rawPtr(d.devData.xm), rawPtr(d.devData.prho), rawPtr(d.devData.c11), rawPtr(d.devData.c12),
-        rawPtr(d.devData.c13), rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33),
-        rawPtr(d.devData.nc), rawPtr(d.devData.dV11), rawPtr(d.devData.dV12), rawPtr(d.devData.dV13),
-        rawPtr(d.devData.dV22), rawPtr(d.devData.dV23), rawPtr(d.devData.dV33), rawPtr(d.devData.tdpdTrho),
-        rawPtr(d.devData.wh), rawPtr(d.devData.du), rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az),
-        rawPtr(d.devData.dtCourant));
+        d.neighborhood, d.K, d.Kcour, d.Atmin, d.Atmax, d.ramp, rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.m),
+        rawPtr(d.c), rawPtr(d.kx), rawPtr(d.alpha), rawPtr(d.xm), rawPtr(d.prho), rawPtr(d.c11), rawPtr(d.c12),
+        rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.nc), rawPtr(d.dV11), rawPtr(d.dV12),
+        rawPtr(d.dV13), rawPtr(d.dV22), rawPtr(d.dV23), rawPtr(d.dV33), rawPtr(d.tdpdTrho), rawPtr(d.wh), rawPtr(d.du),
+        rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.dtCourant));
 
     float minDt = std::numeric_limits<float>::infinity();
     checkGpuErrors(cudaMemcpyToSymbolAsync(GPU_SYMBOL(minDt_ve_device), &minDt, sizeof(minDt)));
 
     constexpr LocalIndex threads = 256;
     const LocalIndex     blocks  = cstone::iceil(grp.numGroups, threads / GpuConfig::warpSize);
-    reduceDt<<<blocks, threads>>>(grp.groupStart, grp.groupEnd, grp.numGroups, rawPtr(d.devData.dtCourant), groupDt);
+    reduceDt<<<blocks, threads>>>(grp.groupStart, grp.groupEnd, grp.numGroups, rawPtr(d.dtCourant), groupDt);
 
     checkGpuErrors(cudaMemcpyFromSymbol(&minDt, GPU_SYMBOL(minDt_ve_device), sizeof(minDt)));
     d.minDtCourant = minDt;

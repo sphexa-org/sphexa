@@ -109,7 +109,10 @@ protected:
     static int activeRung(int substep, int numRungs)
     {
         if (substep == 0 || substep >= (1 << (numRungs - 1))) { return 0; }
-        else { return cstone::butterfly(substep); }
+        else
+        {
+            return cstone::butterfly(substep);
+        }
     }
 
 public:
@@ -144,11 +147,6 @@ public:
         d.setDependent("keys");
         std::apply([&d](auto... f) { d.setConserved(f.value...); }, make_tuple(ConservedFields{}));
         std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
-
-        d.devData.setConserved("x", "y", "z", "h", "m");
-        d.devData.setDependent("keys");
-        std::apply([&d](auto... f) { d.devData.setConserved(f.value...); }, make_tuple(ConservedFields{}));
-        std::apply([&d](auto... f) { d.devData.setDependent(f.value...); }, make_tuple(DependentFields{}));
     }
 
     void save(IFileWriter* writer) override { timestep_.loadOrStore(writer, "ts::"); }
@@ -184,13 +182,13 @@ public:
         }
         d.treeView = domain.octreeProperties();
 
-        d.resizeAcc(domain.nParticlesWithHalos());
+        d.resize(domain.nParticlesWithHalos());
 
         computeGroups(domain.startIndex(), domain.endIndex(), d, domain.box(), groups_);
         activeRungs_ = groups_.view();
 
         reallocate(groups_.numGroups, d.getAllocGrowthRate(), groupDt_, groupIndices_);
-        fill(groupDt_, 0, groupDt_.size(), std::numeric_limits<float>::max());
+        cstone::fill<cstone::HaveGpu<Acc>{}>(groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max());
     }
 
     void partialSync(DomainType& domain, DataType& simData)
@@ -216,7 +214,10 @@ public:
         domain.setHaloFactor(1.0 + float(timestep_.numRungs) / 40);
 
         if (activeRung(timestep_.substep, timestep_.numRungs) == 0) { fullSync(domain, simData); }
-        else { partialSync(domain, simData); }
+        else
+        {
+            partialSync(domain, simData);
+        }
     }
 
     bool isSynced() override { return activeRung(timestep_.substep, timestep_.numRungs) == 0; }
@@ -269,7 +270,10 @@ public:
             domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "alpha">(d), get<"keys">(d),
                                  haloRecvScratch);
         }
-        else { domain.exchangeHalos(std::tie(get<"alpha">(d)), get<"keys">(d), haloRecvScratch); }
+        else
+        {
+            domain.exchangeHalos(std::tie(get<"alpha">(d)), get<"keys">(d), haloRecvScratch);
+        }
         timer.step("mpi::synchronizeHalos");
 
         computeMomentumEnergy<avClean>(activeRungs_, rawPtr(groupDt_), d, domain.box());
@@ -404,10 +408,13 @@ public:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    transferToHost(d, first, last, {d.fieldNames[fidx]});
-                    std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
-                    deallocateField(d, fidx);
+                    std::visit(
+                        [writer, c = column, key = namesDone[i]](auto field)
+                        {
+                            auto&& tmp = toHost(*field);
+                            writeField(writer, key, tmp.data(), c);
+                        },
+                        fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }

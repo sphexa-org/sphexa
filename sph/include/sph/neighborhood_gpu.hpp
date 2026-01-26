@@ -87,8 +87,8 @@ struct DeviceNeighborhoodData::Impl
             std::visit(
                 [&](auto const& nb)
                 {
-                    neighborhood = nb.build(d.treeView, box, d.devData.size(), groups, rawPtr(d.devData.x),
-                                            rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h));
+                    neighborhood =
+                        nb.build(d.treeView, box, d.size(), groups, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h));
                 },
                 builder);
         }

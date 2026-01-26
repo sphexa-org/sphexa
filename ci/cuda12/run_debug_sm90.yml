@@ -179,3 +179,41 @@ sph-run-cuda12-sm90-debug-sphexa-cpu:
         fi
       fi
     - date
+
+sph-compare-constants-cuda12-sm90-debug-sphexa-cuda:
+  stage: sphexa_run
+  needs: ['sph-build-cuda12-sm90-debug']
+  image: prgenv-gnu/25.11:v1
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    WITH_UENV_VIEW: 'default'
+    # SLURM_PARTITION: 'debug'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+  before_script:
+    - pwd
+    - date
+    - export OMP_NUM_THREADS=71
+  script:
+    - bash ci/scripts/run_constants_comparison.sh "$APP_INSTALL_DIR/sphexa-cuda"
+    - date
+
+sph-compare-constants-cuda12-sm90-debug-sphexa-cpu:
+  stage: sphexa_run
+  needs: ['sph-build-cuda12-sm90-debug']
+  image: prgenv-gnu/25.11:v1
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    WITH_UENV_VIEW: 'default'
+    # SLURM_PARTITION: 'debug'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+  before_script:
+    - pwd
+    - date
+    - export OMP_NUM_THREADS=71
+  script:
+    - bash ci/scripts/run_constants_comparison.sh "$APP_INSTALL_DIR/sphexa"
+    - date

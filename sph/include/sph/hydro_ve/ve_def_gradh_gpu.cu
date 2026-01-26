@@ -45,8 +45,8 @@ namespace gpu
 template<class Dataset>
 void computeVeDefGradh(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    veDefGradhIjLoop(d.devData.neighborhood, d.K, rawPtr(d.devData.m), rawPtr(d.devData.xm), rawPtr(d.devData.wh),
-                     rawPtr(d.devData.whd), rawPtr(d.devData.kx), rawPtr(d.devData.gradh));
+    veDefGradhIjLoop(d.neighborhood, d.K, rawPtr(d.m), rawPtr(d.xm), rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.kx),
+                     rawPtr(d.gradh));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 

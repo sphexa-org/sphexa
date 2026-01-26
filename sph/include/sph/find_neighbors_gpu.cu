@@ -1,5 +1,5 @@
 #include "sph/find_neighbors_gpu.hpp"
-#include "sph/particles_data_gpu.cuh"
+#include "sph/particles_data.hpp"
 
 namespace sph
 {
@@ -9,7 +9,7 @@ void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cst
 {
     if (d.ng0 > d.ngmax) { throw std::runtime_error("ng0 should be smaller than ngmax\n"); }
 
-    d.devData.neighborhood.build(groups, d, box, subgroups);
+    d.neighborhood.build(groups, d, box, subgroups);
 }
 
 } // namespace sph
