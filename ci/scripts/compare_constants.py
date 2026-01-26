@@ -55,13 +55,13 @@ if __name__ == "__main__":
             f"usage: {Path(sys.argv[0]).name} <reference> <new> [comma-separated ignored columns]"
         )
 
-    ignore_arg = sys.argv[3] if len(sys.argv) == 4 else ""
-    if ignore_arg:
+    abs_cols_arg = sys.argv[3] if len(sys.argv) == 4 else ""
+    if abs_cols_arg:
         try:
-            ignored_columns = [int(idx.strip()) for idx in ignore_arg.split(",") if idx.strip()]
+            abs_check_columns = [int(idx.strip()) for idx in abs_cols_arg.split(",") if idx.strip()]
         except ValueError as exc:
-            sys.exit(f"Invalid ignored column specification '{ignore_arg}': {exc}")
+            sys.exit(f"Invalid absolute check column specification '{abs_cols_arg}': {exc}")
     else:
-        ignored_columns = []
+        abs_check_columns = []
 
-    main(Path(sys.argv[1]), Path(sys.argv[2]), ignored_cols=ignored_columns)
+    main(Path(sys.argv[1]), Path(sys.argv[2]), abs_check_cols=abs_check_columns)
