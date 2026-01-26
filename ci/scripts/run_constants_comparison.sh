@@ -45,35 +45,38 @@ ignored_columns_for_ic() {
   local ic="$1"
   case "$ic" in
     sedov)
-      # Colums: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
+      # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
       echo "7,8"
       ;;
     noh)
-      # Colums: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
+      # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
       echo "7,8"
       ;;
     isobaric-cube)
-      # Colums: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
+      # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
       echo "7,8"
       ;;
     evrard)
-      # Colums: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
+      # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
       echo "7,8"
       ;;
-    turbulence) # TODO: Identify subcases
-      # Colums: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom, machRms
+    turbulence) # TODO: Identify subcases:
+      # if eosChoice exists in settings and is == 1
+      # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
+      # else
+      # Colums for TurbulenceMachRMS observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom, machRms
       echo "7,8"
       ;;
     gresho-chan)
-      # Colums: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
+      # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
       echo "7,8"
       ;;
     wind-shock)
-      # Colums: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom, bubbleMass / initialMass, normalizedTime
+      # Colums for WindBubble observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom, bubbleMass / initialMass, normalizedTime
       echo "7,8"
       ;;
     kelvin-helmholtz)
-      # Colums: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom, khgr
+      # Colums for TimeEnergyGrowth observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom, khgr
       echo "7,8"
       ;;
     *)

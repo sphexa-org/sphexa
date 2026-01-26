@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-eps_zero = 1e-10
+eps_zero = 1e-13
 relative_tolerance = 1e-2
 absolute_tolerance = 1e-6
 
@@ -23,6 +23,7 @@ def main(ref_path: Path, new_path: Path, ignored_cols: list[int] | None = None, 
         sys.exit(2)
     above_tolerance = []
     ignored = set(ignored_cols or [])
+    print(f"Ignoring columns: {sorted(ignored)}")
     for idx in range(len(ref)):
         r, n = ref[idx], new[idx]
         if len(r) != len(n):
