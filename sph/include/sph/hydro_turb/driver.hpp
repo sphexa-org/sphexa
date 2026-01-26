@@ -113,8 +113,8 @@ void driveTurbulence(GroupView grp, Dataset& d,
         turb.d_phasesReal = turb.phasesReal;
         turb.d_phasesImag = turb.phasesImag;
 
-        computeStirringGpu(grp, turb.numDim, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
-                           rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az), turb.numModes,
+        computeStirringGpu(grp, turb.numDim, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z),
+                           rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), turb.numModes,
                            rawPtr(turb.d_modes), rawPtr(turb.d_phasesReal), rawPtr(turb.d_phasesImag),
                            rawPtr(turb.d_amplitudes), turb.solWeightNorm);
         syncGpu();

@@ -84,13 +84,13 @@ __global__ void veDefGradhGpu(Tc K, unsigned ngmax, const cstone::Box<Tc> box, c
 template<class Dataset>
 void computeVeDefGradh(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     veDefGradhGpu<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x),
-        rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.m), rawPtr(d.devData.wh),
-        rawPtr(d.devData.whd), rawPtr(d.devData.xm), rawPtr(d.devData.kx), rawPtr(d.devData.gradh), nidxPool,
+        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.x),
+        rawPtr(d.y), rawPtr(d.z), rawPtr(d.h), rawPtr(d.m), rawPtr(d.wh),
+        rawPtr(d.whd), rawPtr(d.xm), rawPtr(d.kx), rawPtr(d.gradh), nidxPool,
         traversalPool);
 
     checkGpuErrors(cudaDeviceSynchronize());

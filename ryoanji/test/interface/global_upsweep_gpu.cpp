@@ -36,13 +36,11 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     unsigned         bucketSizeLocal = 16;
     float            theta           = 1.0;
 
-    cstone::Box<T> box{-1, 1};
+    cstone::Box<T> box(-1, 1, cstone::BoundaryType::fixed);
 
     // common pool of coordinates, identical on all ranks
     cstone::RandomGaussianCoordinates<T, cstone::SfcKind<KeyType>> coords(numRanks * numParticles, box);
-
-    std::vector<T> globalH(numRanks * numParticles, 0.1);
-    adjustSmoothingLength<KeyType>(globalH.size(), 5, 10, coords.x(), coords.y(), coords.z(), globalH, box);
+    coords.adjustH(5, 10);
 
     std::vector<T> globalMasses(numRanks * numParticles, 1.0 / (numRanks * numParticles));
 
@@ -54,7 +52,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     std::vector<T> x(coords.x().begin() + firstIndex, coords.x().begin() + lastIndex);
     std::vector<T> y(coords.y().begin() + firstIndex, coords.y().begin() + lastIndex);
     std::vector<T> z(coords.z().begin() + firstIndex, coords.z().begin() + lastIndex);
-    std::vector<T> h(globalH.begin() + firstIndex, globalH.begin() + lastIndex);
+    std::vector<T> h(coords.h().begin() + firstIndex, coords.h().begin() + lastIndex);
     std::vector<T> m(globalMasses.begin() + firstIndex, globalMasses.begin() + lastIndex);
 
     std::vector<KeyType> particleKeys(x.size());

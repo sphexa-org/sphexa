@@ -59,14 +59,15 @@ struct ScaleFunctor
     __host__ __device__ T operator()(const T& x) const { return s * x; }
 };
 
-template<class T>
-void scaleGpu(T* first, T* last, T value)
+template<class T1, class T2, class T3>
+void scaleGpu(const T1* in1, const T1* in2, T2* out, T3 value)
 {
-    thrust::transform(thrust::device, first, last, first, ScaleFunctor<T>(value));
+    thrust::transform(thrust::device, in1, in2, out, ScaleFunctor<T3>(value));
 }
 
-template void scaleGpu(double*, double*, double);
-template void scaleGpu(float*, float*, float);
+template void scaleGpu(const double*, const double*, double*, double);
+template void scaleGpu(const float*, const float*, float*, double);
+template void scaleGpu(const float*, const float*, float*, float);
 
 template<class TS, class TD, class IndexType>
 __global__ void gatherGpuKernel(const IndexType* map, size_t n, const TS* source, TD* destination)

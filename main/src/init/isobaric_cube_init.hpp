@@ -35,6 +35,7 @@
 #include <cmath>
 #include <algorithm>
 
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/box.hpp"
 #include "sph/eos.hpp"
 
@@ -67,7 +68,10 @@ InitSettings IsobaricCubeConstants()
 template<class Dataset>
 void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
-    using T = typename Dataset::RealType;
+    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
+    using T            = typename Dataset::RealType;
+    using HydroType    = typename Dataset::HydroType;
+    using XM1Type      = typename Dataset::XM1Type;
 
     T r         = constants.at("r");
     T rhoInt    = constants.at("rhoInt");
@@ -82,55 +86,61 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
 
-    std::fill(d.m.begin(), d.m.end(), massPart);
-    std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
-    std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
-    std::fill(d.vx.begin(), d.vx.end(), 0.0);
-    std::fill(d.vy.begin(), d.vy.end(), 0.0);
-    std::fill(d.vz.begin(), d.vz.end(), 0.0);
+    cstone::fill<gpu>(d.m.begin(), d.m.end(), massPart);
+    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
+    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
+    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
+    cstone::fill<gpu>(d.vx.begin(), d.vx.end(), 0.0);
+    cstone::fill<gpu>(d.vy.begin(), d.vy.end(), 0.0);
+    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
+    cstone::fill<gpu>(d.x_m1.begin(), d.x_m1.end(), 0.0);
+    cstone::fill<gpu>(d.y_m1.begin(), d.y_m1.end(), 0.0);
+    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
 
-    generateParticleIDs(d.id);
+    generateParticleIDs<gpu>(d.id);
 
-    auto* u_or_t = d.temp.empty() ? d.u.data() : d.temp.data();
+    auto&&                 x = toHost(d.x);
+    auto&&                 y = toHost(d.y);
+    auto&&                 z = toHost(d.z);
+    std::vector<T>         u(d.x.size());
+    std::vector<HydroType> h(d.h.size());
 
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
-        T xi = std::abs(d.x[i]);
-        T yi = std::abs(d.y[i]);
-        T zi = std::abs(d.z[i]);
+        T xi = std::abs(x[i]);
+        T yi = std::abs(y[i]);
+        T zi = std::abs(z[i]);
 
         if ((xi > r + epsilon) || (yi > r + epsilon) || (zi > r + epsilon))
         {
             if ((xi > r + 2 * hExt) || (yi > r + 2 * hExt) || (zi > r + 2 * hExt))
             {
                 // more than two smoothing lengths away from the inner cube
-                d.h[i] = hExt;
+                h[i] = hExt;
             }
             else
             {
                 T dist = std::max({xi - r, yi - r, zi - r});
                 // reduce smoothing lengths for particles outside, but close to the inner cube
-                d.h[i] = hInt * (1 - dist / (2 * hExt)) + hExt * dist / (2 * hExt);
+                h[i] = hInt * (1 - dist / (2 * hExt)) + hExt * dist / (2 * hExt);
             }
 
-            u_or_t[i] = uExt;
+            u[i] = uExt;
         }
         else
         {
-            d.h[i]    = hInt;
-            u_or_t[i] = uInt;
+            h[i] = hInt;
+            u[i] = uInt;
         }
-
-        d.x_m1[i] = d.vx[i] * constants.at("minDt");
-        d.y_m1[i] = d.vy[i] * constants.at("minDt");
-        d.z_m1[i] = d.vz[i] * constants.at("minDt");
     }
+    d.h = std::move(h);
 
-    if (d.u.empty())
+    if (d.temp.empty()) { d.u = std::move(u); }
+    else
     {
-        std::for_each(d.temp.begin(), d.temp.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
+        std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; }); // convert to temperature
+        d.temp = std::move(u);
     }
 }
 
@@ -196,10 +206,14 @@ public:
 
         cstone::Box<T> globalBox(-2 * r, 2 * r, cstone::BoundaryType::periodic);
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
-        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
+        std::vector<T> x, y, z;
+        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, x, y, z);
 
         T s = computeStretchFactor(r, 2 * r, rhoInt / rhoExt);
-        compressCenterCube<T>(d.x, d.y, d.z, r, s, 2. * r, epsilon);
+        compressCenterCube<T>(x, y, z, r, s, 2. * r, epsilon);
+        d.x = x; // uploads to GPU if active
+        d.y = y;
+        d.z = z;
 
         size_t numParticlesInternal = numParticlesGlobal * std::pow(s / (2. * r), 3);
 

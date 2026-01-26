@@ -64,14 +64,11 @@ struct Cqi
  * @param[in]   center center of mass of particles in input range
  * @param[out]  gv     output quadrupole
  */
-template<class T1, class T2, class T3>
-HOST_DEVICE_FUN void P2M(const T1* x, const T1* y, const T1* z, const T2* m, LocalIndex begin, LocalIndex end,
-                         const Vec4<T1>& center, CartesianQuadrupole<T3>& gv)
+template<int stride, class T1, class T2, class T3>
+HOST_DEVICE_FUN void P2M_add(const T1* x, const T1* y, const T1* z, const T2* m, LocalIndex begin, LocalIndex end,
+                             const Vec4<T1>& center, CartesianQuadrupole<T3>& gv)
 {
-    gv = T3(0);
-    if (begin == end) { return; }
-
-    for (LocalIndex i = begin; i < end; ++i)
+    for (LocalIndex i = begin; i < end; i += stride)
     {
         T1 xx  = x[i];
         T1 yy  = y[i];
@@ -90,8 +87,12 @@ HOST_DEVICE_FUN void P2M(const T1* x, const T1* y, const T1* z, const T2* m, Loc
         gv[Cqi::qyz] += ry * rz * m_i;
         gv[Cqi::qzz] += rz * rz * m_i;
     }
+}
 
-    T3 traceQ = gv[Cqi::qxx] + gv[Cqi::qyy] + gv[Cqi::qzz];
+template<class T>
+HOST_DEVICE_FUN CartesianQuadrupole<T> P2M_finalize(CartesianQuadrupole<T> gv)
+{
+    T traceQ = gv[Cqi::qxx] + gv[Cqi::qyy] + gv[Cqi::qzz];
 
     gv[Cqi::trace] = traceQ;
 
@@ -102,6 +103,17 @@ HOST_DEVICE_FUN void P2M(const T1* x, const T1* y, const T1* z, const T2* m, Loc
     gv[Cqi::qxy] *= 3;
     gv[Cqi::qxz] *= 3;
     gv[Cqi::qyz] *= 3;
+
+    return gv;
+}
+
+template<int stride = 1, class T1, class T2, class T3>
+HOST_DEVICE_FUN void P2M(const T1* x, const T1* y, const T1* z, const T2* m, LocalIndex begin, LocalIndex end,
+                         const Vec4<T1>& center, CartesianQuadrupole<T3>& gv)
+{
+    gv = T3(0);
+    P2M_add<stride>(x, y, z, m, begin, end, center, gv);
+    gv = P2M_finalize(gv);
 }
 
 template<class T>
@@ -119,30 +131,16 @@ void moveExpansionCenter(Vec3<T> Xold, Vec3<T> Xnew, CartesianQuadrupole<T>& gv)
     gv[Cqi::qyz] = gv.qyz - ry * rz * gv[Cqi::mass];
     gv[Cqi::qzz] = gv.qzz - rz * rz * gv[Cqi::mass];
 
-    T traceQ = gv[Cqi::qxx] + gv[Cqi::qyy] + gv[Cqi::qzz];
-
-    gv[Cqi::trace] = traceQ;
-
-    // remove trace
-    gv[Cqi::qxx] = 3 * gv[Cqi::qxx] - traceQ;
-    gv[Cqi::qyy] = 3 * gv[Cqi::qyy] - traceQ;
-    gv[Cqi::qzz] = 3 * gv[Cqi::qzz] - traceQ;
-    gv[Cqi::qxy] *= 3;
-    gv[Cqi::qxz] *= 3;
-    gv[Cqi::qyz] *= 3;
+    gv = P2M_finalize(gv);
 }
 
 /*! @brief apply gravitational interaction with a multipole to a particle
  *
- * @tparam        T1         float or double
- * @tparam        T2         float or double
- * @param[in]     tx         target particle x coordinate
- * @param[in]     ty         target particle y coordinate
- * @param[in]     tz         target particle z coordinate
+ * @param[in]     acc        target particle (u, ax, ay, az) to add to
+ * @param[in]     target     coordinates of the target particle
  * @param[in]     center     source center of mass
  * @param[in]     multipole  multipole source
- * @param[inout]  ugrav      location to add gravitational potential to
- * @return                   tuple(ax, ay, az, u)
+ * @return                   @p acc + tuple(u, ax, ay, az)
  *
  * Note: contribution is added to output
  *
@@ -236,28 +234,11 @@ HOST_DEVICE_FUN void M2M(int begin, int end, const Vec4<T>& Xout, const Vec4<T>*
     }
 }
 
-/*! @brief Compute the monopole, dipole and quadruple moments from particle coordinates
- *
- * @tparam      T1     float or double
- * @tparam      T2     float or double
- * @tparam      T3     float or double
- * @param[in]   x      x coordinate array
- * @param[in]   y      y coordinate array
- * @param[in]   z      z coordinate array
- * @param[in]   m      masses array
- * @param[in]   begin  first particle to access in coordinate arrays
- * @param[in]   end    last particle to access in coordinate arrays
- * @param[in]   center center of mass of particles in input range
- * @param[out]  gv     output multipole
- */
-template<class T1, class T2, class T3>
-HOST_DEVICE_FUN void P2M(const T1* x, const T1* y, const T1* z, const T2* m, LocalIndex begin, LocalIndex end,
-                         const Vec4<T1>& center, CartesianMDQpole<T3>& gv)
+template<int stride, class T1, class T2, class T3>
+HOST_DEVICE_FUN void P2M_add(const T1* x, const T1* y, const T1* z, const T2* m, LocalIndex begin, LocalIndex end,
+                             const Vec4<T1>& center, CartesianMDQpole<T3>& gv)
 {
-    gv = T3(0);
-    if (begin == end) { return; }
-
-    for (LocalIndex i = begin; i < end; ++i)
+    for (LocalIndex i = begin; i < end; i += stride)
     {
         T1 xx  = x[i];
         T1 yy  = y[i];
@@ -279,8 +260,12 @@ HOST_DEVICE_FUN void P2M(const T1* x, const T1* y, const T1* z, const T2* m, Loc
         gv[Cqi::qyz] += ry * rz * m_i;
         gv[Cqi::qzz] += rz * rz * m_i;
     }
+}
 
-    T3 traceQ = gv[Cqi::qxx] + gv[Cqi::qyy] + gv[Cqi::qzz];
+template<class T>
+HOST_DEVICE_FUN CartesianMDQpole<T> P2M_finalize(CartesianMDQpole<T> gv)
+{
+    T traceQ = gv[Cqi::qxx] + gv[Cqi::qyy] + gv[Cqi::qzz];
 
     gv[Cqi::trace] = traceQ;
 
@@ -291,19 +276,40 @@ HOST_DEVICE_FUN void P2M(const T1* x, const T1* y, const T1* z, const T2* m, Loc
     gv[Cqi::qxy] *= 3;
     gv[Cqi::qxz] *= 3;
     gv[Cqi::qyz] *= 3;
+
+    return gv;
 }
 
-/*! @brief apply gravitational/electrostatic interactions up to quadrupoles to a particle
+/*! @brief Compute the monopole, dipole and quadruple moments from particle coordinates
  *
- * @tparam        T1         float or double
- * @tparam        T2         float or double
- * @param[in]     tx         target particle x coordinate
- * @param[in]     ty         target particle y coordinate
- * @param[in]     tz         target particle z coordinate
+ * @tparam      T1     float or double
+ * @tparam      T2     float or double
+ * @tparam      T3     float or double
+ * @param[in]   x      x coordinate array
+ * @param[in]   y      y coordinate array
+ * @param[in]   z      z coordinate array
+ * @param[in]   m      masses array
+ * @param[in]   begin  first particle to access in coordinate arrays
+ * @param[in]   end    last particle to access in coordinate arrays
+ * @param[in]   center center of mass of particles in input range
+ * @param[out]  gv     output multipole
+ */
+template<int stride = 1, class T1, class T2, class T3>
+HOST_DEVICE_FUN void P2M(const T1* x, const T1* y, const T1* z, const T2* m, LocalIndex begin, LocalIndex end,
+                         const Vec4<T1>& center, CartesianMDQpole<T3>& gv)
+{
+    gv = T3(0);
+    P2M_add<stride>(x, y, z, m, begin, end, center, gv);
+    gv = P2M_finalize(gv);
+}
+
+/*! @brief apply gravitational interaction with a multipole to a particle
+ *
+ * @param[in]     acc        target particle (u, ax, ay, az) to add to
+ * @param[in]     target     coordinates of the target particle
  * @param[in]     center     source center of mass
  * @param[in]     multipole  multipole source
- * @param[inout]  ugrav      location to add gravitational potential to
- * @return                   tuple(u, ax, ay, az)
+ * @return                   @p acc + tuple(u, ax, ay, az)
  *
  * Note: contribution is added to output
  *
