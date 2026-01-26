@@ -114,6 +114,30 @@ const T* DeviceVector<T>::data() const
 }
 
 template<class T>
+T* DeviceVector<T>::begin()
+{
+    return impl_->data();
+}
+
+template<class T>
+const T* DeviceVector<T>::cbegin() const
+{
+    return impl_->data();
+}
+
+template<class T>
+T* DeviceVector<T>::end()
+{
+    return impl_->data() + impl_->size();
+}
+
+template<class T>
+const T* DeviceVector<T>::cend() const
+{
+    return impl_->data() + impl_->size();
+}
+
+template<class T>
 void DeviceVector<T>::resize(std::size_t size)
 {
     impl_->resize(size);

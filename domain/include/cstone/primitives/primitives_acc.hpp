@@ -39,12 +39,13 @@ struct HaveGpu : public std::integral_constant<int, std::is_same_v<AccType, GpuT
 {
 };
 
-template<bool useGpu, class T>
-void fill(T* first, T* last, T value)
+template<bool useGpu, class Iterator, class T>
+void fill(Iterator first, Iterator last, T value)
 {
+    using T1 = std::decay_t<decltype(*first)>;
     if (last <= first) { return; }
 
-    if constexpr (useGpu) { fillGpu(first, last, value); }
+    if constexpr (useGpu) { fillGpu(first, last, T1(value)); }
     else { std::fill(first, last, value); }
 }
 
@@ -53,6 +54,13 @@ void copy_n(const T* src, std::size_t n, T* dest)
 {
     if constexpr (useGpu) { memcpyD2D(src, n, dest); }
     else { omp_copy(src, src + n, dest); }
+}
+
+template<bool useGpu, class T1, class T2, class T3>
+void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value)
+{
+    if constexpr (useGpu) { scaleGpu(in1, in2, out, value); }
+    else { std::transform(in1, in2, out, [value](auto v_) { return v_ * value; }); }
 }
 
 template<bool useGpu, class IndexType, class ValueType>
@@ -89,13 +97,19 @@ void sortByKeyGpu(
     reallocate(valueBuf, s2, 1.0);
 }
 
+template<bool useGpu, class T1, class T2>
+void sequenceAcc(T1* first, T1* last, T2 value)
+{
+    if constexpr (useGpu) { sequenceGpu(first, last - first, T1(value)); }
+    else { std::iota(first, last, value); }
+}
+
 template<bool useGpu, class BufferType>
 void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate)
 {
     reallocateBytes(buffer, sizeof(LocalIndex) * (first + n), growthRate);
     auto* seq = reinterpret_cast<LocalIndex*>(buffer.data());
-    if constexpr (useGpu) { sequenceGpu(seq + first, n, first); }
-    else { std::iota(seq + first, seq + first + n, first); }
+    sequenceAcc<useGpu>(seq + first, seq + first + n, first);
 }
 
 template<bool useGpu, class KeyType, class ValueType, class KeyBuf, class ValueBuf>
