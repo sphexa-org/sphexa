@@ -27,7 +27,26 @@ module load ParaView/5.10.1-CrayGNU-21.09-EGL
 
 ## build with ASCENT on Alps Daint
 
-- uenv:
+### uenv + spack
+
+<details>
+
+```sh
+uenv start ascent/0.9.5:rc2
+source spack.git/share/spack/setup-env.sh
+spack env create -d .
+spack -e . config add 'include:[/user-tools/config]'
+spack find -lvp ascent
+
+spack -e . spec sphexa@insitu_spack_build_support+ascent ^ascent+occa+fortran+python # OK
+spack -e . install --add sphexa@insitu_spack_build_support+ascent ^ascent+occa+fortran+python # OK
+```
+
+</details>
+
+### uenv + cmake
+
+<details>
 
 ```
 # with occa:
@@ -100,6 +119,8 @@ AscentInitialize
 s1/p1 pseudocolor plot yielded no data, i.e., no cells remains
 s1/p2 pseudocolor plot yielded no data, i.e., no cells remains
 ```
+
+</details>
 
 </p>
 </details>
