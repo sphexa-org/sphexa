@@ -32,14 +32,14 @@ module load ParaView/5.10.1-CrayGNU-21.09-EGL
 <details>
 
 ```sh
-uenv start ascent/0.9.5:rc2
+uenv start -v default ascent/0.9.5:rc2
 source spack.git/share/spack/setup-env.sh
 spack env create -d .
 spack -e . config add 'include:[/user-tools/config]'
 spack find -lvp ascent
 
-spack -e . spec sphexa@insitu_spack_build_support+ascent ^ascent+occa+fortran+python # OK
-spack -e . install --add sphexa@insitu_spack_build_support+ascent ^ascent+occa+fortran+python # OK
+spack -e . spec sphexa ^ascent+occa+fortran+python # OK
+spack -e . install --add sphexa ^ascent+occa+fortran+python # OK
 ```
 
 </details>
