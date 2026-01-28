@@ -32,12 +32,12 @@
 #pragma once
 
 #include "sph/sph_gpu.hpp"
-#include "ve_def_gradh_kern.hpp"
+#include "ve_kern.hpp"
 
 namespace sph
 {
 template<class Tc, class Dataset>
-void computeVeDefGradhImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box)
+void computeVeImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box)
 {
     const cstone::LocalIndex* neighbors      = d.neighbors.data();
     const unsigned*           neighborsCount = d.nc.data();
@@ -46,15 +46,12 @@ void computeVeDefGradhImpl(size_t startIndex, size_t endIndex, Dataset& d, const
     const auto* y = d.y.data();
     const auto* z = d.z.data();
     const auto* h = d.h.data();
-    const auto* m = d.m.data();
 
     const auto* wh  = d.wh.data();
-    const auto* whd = d.whd.data();
 
     const auto* xm = d.xm.data();
 
     auto* kx    = d.kx.data();
-    auto* gradh = d.gradh.data();
 
     const Tc K         = d.K;
     const Tc sincIndex = d.sincIndex;
@@ -64,10 +61,9 @@ void computeVeDefGradhImpl(size_t startIndex, size_t endIndex, Dataset& d, const
     {
         size_t   ni        = i - startIndex;
         unsigned ncCapped  = std::min(neighborsCount[i] - 1, d.ngmax);
-        auto [kxi, gradhi] = veDefGradhJLoop(i, K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, h, m, wh, whd, xm);
+        auto kxi = veJLoop(i, K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, h, wh, xm);
 
-        kx[i]    = kxi;
-        gradh[i] = gradhi;
+        kx[i] = kxi;
 
 #ifndef NDEBUG
         auto rhoi = kxi * m[i] / xm[i];
@@ -78,10 +74,10 @@ void computeVeDefGradhImpl(size_t startIndex, size_t endIndex, Dataset& d, const
 }
 
 template<typename Tc, class Dataset>
-void computeVeDefGradh(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
+void computeVe(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeVeDefGradh(grp, d, box); }
-    else { computeVeDefGradhImpl(grp.firstBody, grp.lastBody, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeVe(grp, d, box); }
+    else { computeVeImpl(grp.firstBody, grp.lastBody, d, box); }
 }
 
 } // namespace sph

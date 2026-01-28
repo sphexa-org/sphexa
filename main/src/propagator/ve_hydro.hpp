@@ -151,13 +151,18 @@ public:
 
         release(d, "ay");
         acquire(d, "gradh");
-        computeVeDefGradh(groups_.view(), d, domain.box());
-        timer.step("Normalization & Gradh");
+        computeVe(groups_.view(), d, domain.box());
+        timer.step("Generalized Volume Elements");
+        domain.exchangeHalos(std::tie(get<"kx">(d)), get<"ax">(d), get<"keys">(d));
+        timer.step("mpi::synchronizeHalos");
+
+        computeGradh(groups_.view(), d, domain.box());
+        timer.step("Gradh correction");
 
         computeEOS(first, last, d);
         timer.step("EquationOfState");
 
-        domain.exchangeHalos(get<"vx", "vy", "vz", "prho", "c", "kx">(d), get<"ax">(d), get<"keys">(d));
+        domain.exchangeHalos(get<"vx", "vy", "vz", "prho", "c">(d), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
         release(d, "gradh", "az");

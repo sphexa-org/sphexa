@@ -15,7 +15,8 @@
 
 #include "sph/hydro_ve/av_switches.hpp"
 #include "sph/hydro_ve/eos.hpp"
-#include "sph/hydro_ve/ve_def_gradh.hpp"
+#include "sph/hydro_ve/ve.hpp"
+#include "sph/hydro_ve/gradh.hpp"
 #include "sph/hydro_ve/iad_divv_curlv.hpp"
 #include "sph/hydro_ve/momentum_energy.hpp"
 #include "sph/hydro_ve/xmass.hpp"

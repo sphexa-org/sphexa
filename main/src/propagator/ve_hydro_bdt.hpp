@@ -240,13 +240,18 @@ public:
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
-        computeVeDefGradh(activeRungs_, d, domain.box());
-        timer.step("Normalization & Gradh");
+        computeVe(activeRungs_, d, domain.box());
+        timer.step("Generalized Volume Elements");
+        domain.exchangeHalos(std::tie(get<"kx">(d)), get<"keys">(d), haloRecvScratch);
+        timer.step("mpi::synchronizeHalos");
+
+        computeGradh(activeRungs_, d, domain.box());
+        timer.step("Gradh correction");
 
         computeEOS(first, last, d);
         timer.step("EquationOfState");
 
-        domain.exchangeHalos(get<"vx", "vy", "vz", "prho", "c", "kx">(d), get<"keys">(d), haloRecvScratch);
+        domain.exchangeHalos(get<"vx", "vy", "vz", "prho", "c">(d), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
         computeIadDivvCurlv(activeRungs_, d, domain.box());
