@@ -38,7 +38,7 @@
 #include <vector>
 
 #include "cstone/primitives/gather.hpp"
-#include "cstone/primitives/mpi_wrappers.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/sfc.hpp"
 #include "io/id_tag_utils.hpp"
 #include "io/ifile_io.hpp"
@@ -51,7 +51,7 @@ namespace sphexa
 template<class KeyType, class T>
 void sortBySfcKey(std::vector<T>& x, std::vector<T>& y, std::vector<T>& z)
 {
-    assert(x.size() == y.size() == z.size());
+    assert(x.size() == y.size() && y.size() == z.size());
     size_t blockSize = x.size();
 
     cstone::Box<T> box(0, 1);
@@ -184,7 +184,8 @@ inline void readFileTaggingAttributes(const std::string& settingsFile, IFileRead
 
 
 //! @brief generate particle IDs at the beginning of the simulation initialization
-inline void generateParticleIDs(std::span<uint64_t> id)
+template<bool gpu>
+void generateParticleIDs(std::span<uint64_t> id)
 {
     int rank = 0, numRanks = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -199,7 +200,7 @@ inline void generateParticleIDs(std::span<uint64_t> id)
 
     std::exclusive_scan(ranksLocalParticles.begin(), ranksLocalParticles.end(), ranksLocalParticles.begin(),
                         uint64_t(0));
-    std::iota(id.begin(), id.end(), ranksLocalParticles[rank]);
+    cstone::sequenceAcc<gpu>(id.data(), id.data() + id.size(), ranksLocalParticles[rank]);
 }
 
 //! @brief Used to read the default values of dataset attributes

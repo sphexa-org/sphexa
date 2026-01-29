@@ -30,6 +30,8 @@
 
 #pragma once
 
+#include "cstone/primitives/primitives_acc.hpp"
+
 #include "evrard_init.hpp"
 #include "cooling/cooler.hpp"
 
@@ -79,8 +81,9 @@ public:
     cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
                                                  IFileReader* reader) const override
     {
-        auto box = Base::init(rank, numRanks, cbrtNumPart, simData, reader);
-        std::fill(simData.hydro.u.begin(), simData.hydro.u.end(), settings_.at("u0"));
+        constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
+        auto           box = Base::init(rank, numRanks, cbrtNumPart, simData, reader);
+        cstone::fill<gpu>(simData.hydro.u.begin(), simData.hydro.u.end(), settings_.at("u0"));
         cooling::initChemistryData(simData.chem, simData.hydro.x.size());
 
         Base::runTagging(reader, Base::settingsFile_, rank == 0, simData.hydro);

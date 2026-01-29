@@ -123,14 +123,14 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
 
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        if (!d.devData.nc.empty())
+        if (!d.nc.empty())
         {
-            ncsum = cstone::reduceGpu(rawPtr(d.devData.nc) + startIndex, endIndex - startIndex, size_t(0));
+            ncsum = cstone::reduceGpu(rawPtr(d.nc) + startIndex, endIndex - startIndex, size_t(0));
         }
         std::tie(eKin, eInt, linmom, angmom) = conservedQuantitiesGpu(
-            sph::idealGasCv(d.muiConst, d.gamma), rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
-            rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz), rawPtr(d.devData.temp),
-            rawPtr(d.devData.u), rawPtr(d.devData.m), startIndex, endIndex);
+            sph::idealGasCv(d.muiConst, d.gamma), rawPtr(d.x), rawPtr(d.y), rawPtr(d.z),
+            rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.temp),
+            rawPtr(d.u), rawPtr(d.m), startIndex, endIndex);
     }
     else
     {

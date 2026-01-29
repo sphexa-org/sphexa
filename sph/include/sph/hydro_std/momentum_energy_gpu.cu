@@ -80,14 +80,22 @@ __global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, c
 
         if (i >= bodyEnd) continue;
 
-        unsigned ncCapped = stl::min(ncTrue[0], ngmax);
-        T        maxvsignal;
+        if (ncTrue[0] >= 25 && ncTrue[0] <= ngmax)
+        {
+            T maxvsignal;
+            momentumAndEnergyJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncTrue[0], x, y, z, vx,
+                                                           vy, vz, h, m, rho, p, c, c11, c12, c13, c22, c23, c33, wh,
+                                                           whd, grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal);
 
-        momentumAndEnergyJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, vx, vy,
-                                                       vz, h, m, rho, p, c, c11, c12, c13, c22, c23, c33, wh, whd,
-                                                       grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal);
-
-        dt_i = stl::min(dt_i, tsKCourant(maxvsignal, h[i], c[i], Kcour));
+            dt_i = stl::min(dt_i, tsKCourant(maxvsignal, h[i], c[i], Kcour));
+        }
+        else
+        {
+            du[i]       = 0.;
+            grad_P_x[i] = 0.;
+            grad_P_y[i] = 0.;
+            grad_P_z[i] = 0.;
+        }
     }
 
     typedef cub::BlockReduce<T, TravConfig::numThreads> BlockReduce;
@@ -105,10 +113,10 @@ __global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, c
  * @param[inout] ax    x particle acceleration
  * @param[inout] ay
  * @param[inout] az
- * @param[inout] h     smoothing lengths
+ * @param[inout] nc    neighbor counts
  */
-template<class Ta, class Tu, class Th>
-__global__ void markNaN(GroupView grp, Ta* ax, Ta* ay, Ta* az, Tu* du, Th* h)
+template<class Ta, class Tu>
+__global__ void markNaN(GroupView grp, Ta* ax, Ta* ay, Ta* az, Tu* du, unsigned* nc)
 {
     LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
@@ -123,14 +131,14 @@ __global__ void markNaN(GroupView grp, Ta* ax, Ta* ay, Ta* az, Tu* du, Th* h)
         ay[i] = Ta(0);
         az[i] = Ta(0);
         du[i] = Tu(0);
-        h[i]  = 0;
+        nc[i] = 1;
     }
 }
 
 template<class Dataset>
 void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     float huge = 1e10;
@@ -138,12 +146,12 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     cudaGradP<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.K, d.Kcour, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x),
-        rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
-        rawPtr(d.devData.h), rawPtr(d.devData.m), rawPtr(d.devData.rho), rawPtr(d.devData.p), rawPtr(d.devData.c),
-        rawPtr(d.devData.c11), rawPtr(d.devData.c12), rawPtr(d.devData.c13), rawPtr(d.devData.c22),
-        rawPtr(d.devData.c23), rawPtr(d.devData.c33), rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.ax),
-        rawPtr(d.devData.ay), rawPtr(d.devData.az), rawPtr(d.devData.du), nidxPool, traversalPool);
+        d.K, d.Kcour, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.x),
+        rawPtr(d.y), rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz),
+        rawPtr(d.h), rawPtr(d.m), rawPtr(d.rho), rawPtr(d.p), rawPtr(d.c),
+        rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22),
+        rawPtr(d.c23), rawPtr(d.c33),
+        rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.du), nidxPool, traversalPool);
 
     {
         unsigned numThreads       = 256;
@@ -151,8 +159,8 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
         unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
         if (numBlocks > 0)
         {
-            markNaN<<<numBlocks, numThreads>>>(grp, rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az),
-                                               rawPtr(d.devData.du), rawPtr(d.devData.h));
+            markNaN<<<numBlocks, numThreads>>>(grp, rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.du),
+                                               rawPtr(d.nc));
         }
     }
 
