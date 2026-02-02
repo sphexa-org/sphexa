@@ -111,6 +111,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
         };
 
         auto child          = cpToHost(octree.childOffsets, octree.numNodes);
+        auto parents        = cpToHost(octree.parents, 1 + octree.numNodes / 8);
         auto intToLeaf      = cpToHost(octree.internalToLeaf, octree.numNodes);
         auto centers_cpu    = cpToHost(centers.data(), centers.size());
         auto multipoles_cpu = cpToHost(multipoleHolder.deviceMultipoles(), octree.numNodes);
@@ -123,9 +124,9 @@ static int multipoleHolderTest(int thisRank, int numRanks)
         auto m = toHost(d_m);
 
         T egravTot_cpu = 0;
-        computeGravity(child.data(), intToLeaf.data(), centers_cpu.data(), multipoles_cpu.data(), layout.data(), 0,
-                       octree.numLeafNodes, x.data(), y.data(), z.data(), h.data(), m.data(), box, G, (T*)nullptr,
-                       ax_cpu.data(), ay_cpu.data(), az_cpu.data(), &egravTot_cpu, numShells);
+        computeGravity(child.data(), parents.data(), intToLeaf.data(), centers_cpu.data(), multipoles_cpu.data(),
+                       layout.data(), 0, octree.numLeafNodes, x.data(), y.data(), z.data(), h.data(), m.data(), box, G,
+                       (T*)nullptr, ax_cpu.data(), ay_cpu.data(), az_cpu.data(), &egravTot_cpu, numShells);
         ax_cpu.erase(ax_cpu.begin(), ax_cpu.begin() + domain.startIndex());
         ay_cpu.erase(ay_cpu.begin(), ay_cpu.begin() + domain.startIndex());
         az_cpu.erase(az_cpu.begin(), az_cpu.begin() + domain.startIndex());
