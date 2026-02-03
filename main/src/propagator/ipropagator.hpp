@@ -173,48 +173,6 @@ public:
 
 protected:
 
-    // static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData)
-    // {
-    //     auto output = [](auto& d, IFileWriter* writer)
-    //     {
-    //         auto fieldPointers = d.data();
-    //         auto indicesDone   = d.outputFieldIndices;
-    //         auto namesDone     = d.outputFieldNames;
-
-    //         for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
-    //         {
-    //             int fidx = indicesDone[i];
-    //             if (d.isAllocated(fidx))
-    //             {
-    //                 int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
-    //                              d.outputFieldIndices.begin();
-    //                 std::visit(
-    //                     [writer, c = column, key = namesDone[i]](auto field)
-    //                     {
-    //                         auto&& tmp = toHost(*field);
-    //                         writeField(writer, key, tmp.data(), c);
-    //                     },
-    //                     fieldPointers[fidx]);
-    //                 indicesDone.erase(indicesDone.begin() + i);
-    //                 namesDone.erase(namesDone.begin() + i);
-    //             }
-    //         }
-
-    //         if (!indicesDone.empty() && writer->rank() == 0)
-    //         {
-    //             std::cout << "WARNING: the following fields are not in use and therefore not output: ";
-    //             for (int fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
-    //             {
-    //                 std::cout << d.fieldNames[fidx] << ",";
-    //             }
-    //             std::cout << d.fieldNames[indicesDone.back()] << std::endl;
-    //         }
-    //     };
-
-    //     output(simData.hydro, writer);
-    //     output(simData.chem, writer);
-    // }
-
     static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData, std::optional<std::span<const uint64_t>> selectedParticlesIndexes = std::nullopt)
     {
         auto output = [](auto& d, IFileWriter* writer, std::optional<std::span<const uint64_t>> selectedParticlesIndexes = std::nullopt)
@@ -231,10 +189,11 @@ protected:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    if(selectedParticlesIndexes != std::nullopt)
-                    {
-                        std::visit(
-                            [writer, c = column, key = namesDone[i], &selectedParticlesIndexes, &buffer](auto field)
+
+                    std::visit(
+                        [writer, c = column, key = namesDone[i], &selectedParticlesIndexes, &buffer](auto field)
+                        {
+                            if(selectedParticlesIndexes != std::nullopt)
                             {
                                 const auto selIndexes = selectedParticlesIndexes.value();
                                 using ValueType = std::remove_pointer_t<decltype(field)>::value_type;
@@ -243,19 +202,15 @@ protected:
                                 cstone::gatherAcc<gpu>(selIndexes, field->data(), packedBuffer[0].data());
                                 auto&& tmp = toHost(buffer);
                                 writeField(writer, key, tmp.data(), c);
-                            },
-                            fieldPointers[fidx]);
-                    }
-                    else
-                    {
-                    std::visit(
-                        [writer, c = column, key = namesDone[i]](auto field)
-                        {
-                            auto&& tmp = toHost(*field);
-                            writeField(writer, key, tmp.data(), c);
+                            }
+                            else
+                            {
+                                auto&& tmp = toHost(*field);
+                                writeField(writer, key, tmp.data(), c);
+                            }
                         },
                         fieldPointers[fidx]);
-                    }
+
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
@@ -275,54 +230,6 @@ protected:
         output(simData.hydro, writer, selectedParticlesIndexes);
         output(simData.chem, writer, selectedParticlesIndexes);
     }
-
-
-    // // TODO: is there any way to avoid code duplication with outputAllocatedFields()?
-    // static void outputSubsetAllocatedFields(IFileWriter* writer, std::span<const uint64_t> selectedParticlesIndexes, 
-    //     ParticleDataType& simData)
-    // {
-    //     auto output = [](auto& d, IFileWriter* writer, const std::span<const uint64_t> selectedParticlesIndexes)
-    //     {
-    //         auto indicesDone   = d.subsetOutputFieldIndices;
-    //         auto namesDone     = d.subsetOutputFieldNames;
-    //         // TODO: use AccVector for subsetField (resize/clean if needed)
-    //         // TODO: have a look to PackedBuffer and PackAlloc
-    //         for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
-    //         {
-    //             int fidx = indicesDone[i];
-    //             if (d.isAllocated(fidx))
-    //             {
-    //                 int column = std::find(d.subsetOutputFieldIndices.begin(), d.subsetOutputFieldIndices.end(), fidx) -
-    //                              d.subsetOutputFieldIndices.begin();
-                    
-    //                 // TODO: passing the entire data is not needed
-    //                 using FieldVariant = std::variant<std::vector<float>, std::vector<double>, std::vector<unsigned>, std::vector<uint64_t>, std::vector<uint8_t>>;                    
-    //                 FieldVariant subsetField;
-    //                 createHostSubsetFieldDataset(d, selectedParticlesIndexes, fidx, subsetField);
-
-    //                 std::visit([writer, c = column, key = namesDone[i]](auto field)
-    //                            { writeField(writer, key, field.data(), c); }, subsetField);
-
-    //                 indicesDone.erase(indicesDone.begin() + i);
-    //                 namesDone.erase(namesDone.begin() + i);
-    //             }
-    //         }
-
-    //         if (!indicesDone.empty() && writer->rank() == 0)
-    //         {
-    //             std::cout << "WARNING: the following fields are not in use and therefore not output for subset: ";
-    //             for (int fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
-    //             {
-    //                 std::cout << d.fieldNames[fidx] << ",";
-    //             }
-    //             std::cout << d.fieldNames[indicesDone.back()] << std::endl;
-    //         }
-    //     };
-
-    //     output(simData.hydro, writer, selectedParticlesIndexes);
-    //     output(simData.chem, writer, selectedParticlesIndexes);
-    // }
-
 
     void logDomainStats(const DomainType& domain, ParticleDataType& simData)
     {
