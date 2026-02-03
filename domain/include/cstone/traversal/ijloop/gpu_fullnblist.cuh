@@ -275,6 +275,8 @@ struct GpuFullNbListNeighborhoodBuilder
         auto globalPool     = util::deviceAlloc<int[]>(TravConfig::poolSize());
         auto maxNeighbors   = util::deviceAlloc<unsigned>();
 
+        checkGpuErrors(cudaMemsetAsync(maxNeighbors.get(), 0, sizeof(unsigned)));
+
         resetTraversalCounters<<<1, 1>>>();
         gpuFullNbListNeighborhoodBuild<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
             tree, box, groups, x, y, z, h, ngmax, neighbors.get(), neighborsCount.get(), globalPool.get(),
