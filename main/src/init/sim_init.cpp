@@ -78,12 +78,12 @@ std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFile(std
    return std::make_unique<FileInit<Dataset>>(testCase, initStep, reader);
 }
 
-template<class Dataset>
-std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFileSplit(std::string testCase, int numSplits,
-                                                                                 IFileReader* reader)
-{
-   return std::make_unique<FileSplitInit<Dataset>>(testCase, numSplits, reader);
-}
+// template<class Dataset>
+// std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFileSplit(std::string testCase, int numSplits,
+//                                                                                  IFileReader* reader)
+// {
+//    return std::make_unique<FileSplitInit<Dataset>>(testCase, numSplits, reader);
+// }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
