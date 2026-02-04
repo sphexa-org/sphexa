@@ -136,11 +136,10 @@ double computeClusterOverhead(const std::tuple<std::vector<unsigned>, std::vecto
 
 std::vector<double> radii()
 {
-    return {0.62035};
-    /*std::vector<double> rs;
+    std::vector<double> rs;
     for (unsigned i = 20; i >= 5; --i)
         rs.push_back(i / 10.0);
-    return rs;*/
+    return rs;
 }
 
 std::vector<std::tuple<unsigned, unsigned>> clusterSizes() { return {{1, 1}, {2, 2}, {4, 2}, {4, 4}, {4, 8}}; }
