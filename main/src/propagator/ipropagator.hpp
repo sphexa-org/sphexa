@@ -82,7 +82,7 @@ public:
     //! @brief save particle data fields to file
     virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&) {}
 
-    // TODO: can be in the saveSubsetsFields method below if we don't need to override it in derived classes (for example in case of EOS related ouput)
+    // TODO: can we merge to the saveSubsetsFields method below if we don't need to override it in derived classes (for example in case of EOS related ouput)
     //! @brief save particle subset data fields to file
     virtual void saveSubFields(IFileWriter* writer, std::span<const uint64_t> selectedParticlesIndexes, ParticleDataType& simData) 
     {
@@ -99,14 +99,10 @@ public:
         // TODO: check selectedParticlesIndexes template parameter type
         AccVector<uint64_t> selectedParticlesIndexes;
         if constexpr (cstone::HaveGpu<typename ParticleDataType::AcceleratorType>{}) {
-            // cstone::DeviceVector<uint64_t> selectedParticlesIndexesDev;
             findTaggedIdsGPU(std::span<const uint64_t>(simData.hydro.id.data(), simData.hydro.id.size()), first, last, selectedParticlesIndexes);
-            // selectedParticlesIndexes.resize(selectedParticlesIndexesDev.size());
-            // size_t transferSize = selectedParticlesIndexesDev.size() * sizeof(uint64_t);
-            // memcpyH2D(rawPtr(selectedParticlesIndexesDev), transferSize, selectedParticlesIndexes.data());
         }
         else {
-            // TODO: why different from  findTaggedIdsGPU
+            // TODO: why different from  findTaggedIdsGPU, can we have a findTaggedIdsAcc<gpu>?
             findTaggedIds(std::span<const uint64_t>(simData.hydro.id), first, last, selectedParticlesIndexes);
         }
         timer.step("FindTaggedIds");
