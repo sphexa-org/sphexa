@@ -140,8 +140,8 @@ int main(int argc, char** argv)
     auto box = simInit->init(rank, numRanks, problemSize, simData, fileReader.get());
     auto& d = simData.hydro;
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
-    if (writeEnabledSubset) { simData.setSubsetOutputFields(taggingOutputSetup.outputFields.empty() ? 
-        propagator->conservedFields() : taggingOutputSetup.outputFields); }
+    if (writeEnabledSubset) { simData.setOutputFields(taggingOutputSetup.outputFields.empty() ?
+        propagator->conservedFields() : taggingOutputSetup.outputFields, true); }
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
     bool  haveGrav = (d.g != 0.0);
     float theta    = parser.get("--theta", haveGrav ? 0.5f : 1.0f);

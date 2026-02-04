@@ -61,12 +61,19 @@ public:
 
     MPI_Comm comm;
 
-    //! @brief record user selection of output fields
-    void setOutputFields(std::vector<std::string> outFields)
+    //! @brief record user selection of output fields for full particle set or subset
+    void setOutputFields(std::vector<std::string> outFields, bool isSubset = false)
     {
-        hydro.setOutputFields(outFields);
-        chem.setOutputFields(outFields);
-
+        if(!isSubset)
+        {
+            hydro.setOutputFields(outFields);
+            chem.setOutputFields(outFields);
+        }
+        else
+        {
+            hydro.setSubsetOutputFields(outFields);
+            chem.setSubsetOutputFields(outFields);
+        }
         if (!outFields.empty())
         {
             std::string msg;
@@ -74,28 +81,16 @@ public:
             {
                 msg += s + ", ";
             }
-            throw std::runtime_error("The following fields for output were not found: " + msg);
-        }
-    }
-
-    // TODO: refactor to avoid code duplication with setOutputFields
-    //! @brief record user selection of output fields for particle subset
-    void setSubsetOutputFields(std::vector<std::string> outputFieldsSubset)
-    {
-        hydro.setSubsetOutputFields(outputFieldsSubset);
-        chem.setSubsetOutputFields(outputFieldsSubset);
-
-        if (!outputFieldsSubset.empty())
-        {
-            std::string msg;
-            for (auto& s : outputFieldsSubset)
+            if(!isSubset)
             {
-                msg += s + ", ";
+                throw std::runtime_error("The following fields for output were not found: " + msg);
             }
-            throw std::runtime_error("The following fields for subset output were not found: " + msg);
+            else
+            {
+                throw std::runtime_error("The following fields for subset output were not found: " + msg);
+            }
         }
     }
-
 };
 
 } // namespace sphexa
