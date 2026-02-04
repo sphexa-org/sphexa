@@ -153,7 +153,7 @@ public:
 
         initTurbulenceHydroFields(d, settings_);
 
-        Base::runTagging(reader, Base::settingsFile_, rank == 0, d);
+        Base::runTagging(reader, rank == 0, d);
 
         return globalBox;
     }

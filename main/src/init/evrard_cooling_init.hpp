@@ -86,7 +86,7 @@ public:
         cstone::fill<gpu>(simData.hydro.u.begin(), simData.hydro.u.end(), settings_.at("u0"));
         cooling::initChemistryData(simData.chem, simData.hydro.x.size());
 
-        Base::runTagging(reader, Base::settingsFile_, rank == 0, simData.hydro);
+        Base::runTagging(reader, rank == 0, simData.hydro);
 
         return box;
     }

@@ -69,24 +69,23 @@ protected:
     /*! @brief Id tagging initialization and execution
      *
      * @param[in]     reader         parameter file reader
-     * @param[in]     settingsFile   settings file path
      * @param[in]     printLog       activate logging
      * @param[inout]  particlesData  particle data to perform selection on
      * @param[in]     initStep       time step at which selection is done
      */
     // TODO: I have to pass a ref to the entire dataset because I could need the coordinates, if selection is geometrical
-    void runTagging(IFileReader* reader, std::string settingsFile, bool printLog, Dataset::HydroData& particlesData) const
+    void runTagging(IFileReader* reader, bool printLog, Dataset::HydroData& particlesData) const
     {
         taggingSetup_.selSpheres.clear();
         taggingSetup_.sphereGroupIds.clear();
         taggingSetup_.selList.clear();
         taggingSetup_.selListGroupIds.clear();
 
-        if (not settingsFile.empty())
+        if (not settingsFile_.empty())
         {
-            readFileTaggingAttributes(settingsFile, reader, taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds, 
+            readFileTaggingAttributes(settingsFile_, reader, taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds,
                 taggingSetup_.selList, taggingSetup_.selListGroupIds);
-            std::cout<<"Tagging setup read from file: "<<settingsFile<<std::endl;
+            std::cout<<"Tagging setup read from file: "<<settingsFile_<<std::endl;
             std::cout<<" - Number of id selection spheres: "<<taggingSetup_.selSpheres.size()<<std::endl;
             idTaggingSetupCheck(taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds, taggingSetup_.selList, 
                 taggingSetup_.selListGroupIds, printLog);
@@ -114,6 +113,7 @@ protected:
 
     // May be empty, if no settings file is provided (e.g., restart from dump)
     std::string settingsFile_;
+    // TODO: is it necessary to store the tagging setup? we only need it in writeSettings and writeTaggingSettings
     mutable IdTaggingSetup taggingSetup_;
 
 };

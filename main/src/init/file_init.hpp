@@ -112,7 +112,7 @@ public:
         reader->setStep(Base::settingsFile_, initStep, FileMode::collective);
         auto box = restoreData(reader, simData);
         reader->closeStep();
-        Base::runTagging(reader, Base::settingsFile_, rank == 0, simData.hydro);
+        Base::runTagging(reader, rank == 0, simData.hydro);
         return box;
     }
 
