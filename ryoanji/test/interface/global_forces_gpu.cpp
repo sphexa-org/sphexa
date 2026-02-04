@@ -111,7 +111,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
         };
 
         auto child          = cpToHost(octree.childOffsets, octree.numNodes);
-        auto parents        = cpToHost(octree.parents, 1 + octree.numNodes / 8);
+        auto parents        = cpToHost(octree.parents, octree.numParents);
         auto intToLeaf      = cpToHost(octree.internalToLeaf, octree.numNodes);
         auto centers_cpu    = cpToHost(centers.data(), centers.size());
         auto multipoles_cpu = cpToHost(multipoleHolder.deviceMultipoles(), octree.numNodes);
