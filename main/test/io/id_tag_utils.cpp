@@ -34,34 +34,9 @@
 #include <numeric>
 #include <vector>
 
+#include "id_tag_utils.hpp"
 #include "gtest/gtest.h"
 #include "io/id_tag_utils.hpp"
-
-void makeParticleDistribution(std::vector<sphexa::CoordinateType>& x, std::vector<sphexa::CoordinateType>& y,
-                              std::vector<sphexa::CoordinateType>& z, std::size_t numParticles)
-{
-    x.resize(numParticles);
-    y.resize(numParticles);
-    z.resize(numParticles);
-
-    unsigned int gridSize = std::cbrt(numParticles);
-    double       step     = 2.0 / (gridSize - 1);
-    unsigned int index    = 0;
-    for (unsigned int i = 0; i < gridSize; ++i)
-    {
-        for (unsigned int j = 0; j < gridSize; ++j)
-        {
-            for (unsigned int k = 0; k < gridSize; ++k)
-            {
-                if (index >= numParticles) break;
-                x[index] = -1.0 + i * step;
-                y[index] = -1.0 + j * step;
-                z[index] = -1.0 + k * step;
-                ++index;
-            }
-        }
-    }
-}
 
 TEST(IO, applyTaggingMaskZero)
 {
