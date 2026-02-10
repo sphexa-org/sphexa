@@ -114,18 +114,21 @@ int main(int argc, char** argv)
     const bool writeEnabledSubset = readFileTaggingOutputAttributes(initCond, fileReader.get(), fileWriter->suffix(),
                                                                     taggingOutputSetup);
 
-    std::cout<<"subset output enabled: "<<writeEnabledSubset<<"\n";
-    std::cout<<"subset output file: "<<taggingOutputSetup.outFile<<"\n";
-    std::cout<<"subset output freq: "<<taggingOutputSetup.writeFreqStr<<"\n";
-    std::cout<<"subset output extra writes: ";
-    for(const auto& we : taggingOutputSetup.writeExtra)
-    { std::cout<<we<<" "; }
-    std::cout<<"\n";
-    std::cout<<"subset output fields: ";
-    for(const auto& of : taggingOutputSetup.outputFields)
-    { std::cout<<of<<" "; }
-    std::cout<<"\n";
-
+    // TODO: to be removed after testing, just to check that the attributes are correctly read and parsed from the file
+    std::cout<<"subset output enabled: "<<(writeEnabledSubset ? "true" : "false")<<"\n";
+    if(writeEnabledSubset)
+    {
+        std::cout<<"subset output file: "<<taggingOutputSetup.outFile<<"\n";
+        std::cout<<"subset output freq: "<<taggingOutputSetup.writeFreqStr<<"\n";
+        std::cout<<"subset output extra writes: ";
+        for(const auto& we : taggingOutputSetup.writeExtra)
+        { std::cout<<we<<" "; }
+        std::cout<<"\n";
+        std::cout<<"subset output fields: ";
+        for(const auto& of : taggingOutputSetup.outputFields)
+        { std::cout<<of<<" "; }
+        std::cout<<"\n";
+    }
     Dataset simData;
     simData.comm = MPI_COMM_WORLD;
 
