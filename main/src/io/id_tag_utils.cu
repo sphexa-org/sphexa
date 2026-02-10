@@ -46,6 +46,93 @@
 namespace sphexa
 {
 
+struct FindAndTagIdsInList
+{
+    FindAndTagIdsInList(const thrust::device_vector<uint64_t>& selectedIds, const thrust::device_vector<unsigned>& selectedIdsGroups)
+        : selectedIdsSize(selectedIds.size())
+        , selectedIdsPtr(thrust::raw_pointer_cast(selectedIds.data()))
+        , selectedIdsGroupsPtr(thrust::raw_pointer_cast(selectedIdsGroups.data()))
+    {}
+
+    HOST_DEVICE_FUN uint64_t operator()(uint64_t id) const
+    {
+        // Since ids may be already tagged we need to unmask them in the search
+        uint64_t untaggedId = id & ~taggingCheckMask;
+        for(std::size_t i = 0; i < selectedIdsSize; ++i)
+        {
+            if (selectedIdsPtr[i] == untaggedId)
+            {
+                return applyTaggingMask(selectedIdsGroupsPtr[i], id);
+            }
+        }
+        return id;
+    }
+
+    uint64_t selectedIdsSize;
+    const uint64_t* selectedIdsPtr;
+    const unsigned* selectedIdsGroupsPtr;
+};
+
+struct FindAndTagInSphere
+{
+    FindAndTagInSphere(const thrust::device_vector<IdSelectionSphere>& selSpheres, const thrust::device_vector<unsigned>& sphereGroupIds)
+        : numSpheres(selSpheres.size())
+        , selSpheresPtr(thrust::raw_pointer_cast(selSpheres.data()))
+        , sphereGroupIdsPtr(thrust::raw_pointer_cast(sphereGroupIds.data()))
+    {}
+
+    HOST_DEVICE_FUN uint64_t operator()(const thrust::tuple<uint64_t, CoordinateType, CoordinateType, CoordinateType>& particleData) const
+    {
+        uint64_t currentId = get<0>(particleData);
+        const cstone::Vec3<CoordinateType> currentPosition{get<1>(particleData), get<2>(particleData), get<3>(particleData)};
+        for (unsigned groupIndex = 0; groupIndex < numSpheres; ++groupIndex)
+        {
+            const auto     sphere          = selSpheresPtr[groupIndex];
+            const auto     squareRadius    = sphere[3] * sphere[3];
+            const auto     sphereCenter    = util::makeVec3(sphere);
+            auto           squaredDistance = util::norm2(currentPosition - sphereCenter);
+            if (squaredDistance < squareRadius)
+            {
+                currentId = applyTaggingMask(sphereGroupIdsPtr[groupIndex], currentId);
+            }
+        }
+        return currentId;
+    }
+
+    uint64_t numSpheres;
+    const IdSelectionSphere* selSpheresPtr;
+    const unsigned* sphereGroupIdsPtr;
+};
+
+void tagIdsInListGPU(std::span<uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
+                     std::span<const uint64_t> selectedIds, std::span<const unsigned> selectedIdsGroups)
+{
+    if (selectedIds.size() != selectedIdsGroups.size())
+        throw std::runtime_error("Number of selected ids and number of group ids must be the same\n");
+
+    thrust::device_vector<uint64_t> selectedIdsDev(selectedIds.begin(), selectedIds.end());
+    thrust::device_vector<unsigned> selectedIdsGroupsDev(selectedIdsGroups.begin(), selectedIdsGroups.end());
+    FindAndTagIdsInList findAndTagIdsInList(selectedIdsDev, selectedIdsGroupsDev);
+    thrust::transform(thrust::device, ids.data() + firstIndex, ids.data() + lastIndex, ids.data() + firstIndex, findAndTagIdsInList);
+}
+
+void tagIdsInSphereGPU(std::span<uint64_t> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
+                       std::span<const CoordinateType> z, std::size_t firstIndex, std::size_t lastIndex,
+                       std::span<const IdSelectionSphere> selSpheres, std::span<const unsigned> sphereGroupIds)
+{
+    if (selSpheres.size() != sphereGroupIds.size())
+        throw std::runtime_error("Number of spherical volumes and number of group ids must be the same\n");
+
+    auto first = thrust::make_zip_iterator(thrust::make_tuple(ids.data() + firstIndex, x.data() + firstIndex,
+                                                        y.data() + firstIndex,  z.data() + firstIndex));
+    auto last  = thrust::make_zip_iterator(thrust::make_tuple(ids.data() + lastIndex,  x.data() + lastIndex,
+                                                        y.data() + lastIndex,  z.data() + lastIndex));
+    thrust::device_vector<IdSelectionSphere> selSpheresDev(selSpheres.begin(), selSpheres.end());
+    thrust::device_vector<unsigned> sphereGroupIdsDev(sphereGroupIds.begin(), sphereGroupIds.end());
+    FindAndTagInSphere findAndTagInSphere(selSpheresDev, sphereGroupIdsDev);
+    thrust::transform(thrust::device, first, last, ids.data() + firstIndex, findAndTagInSphere);
+}
+
 template<class LocalIndexP, template<class> class DeviceVector>
 extern void findTaggedIdsGPU(std::span<const uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
                              DeviceVector<LocalIndexP>& taggedIdsIndexes)
