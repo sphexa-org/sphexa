@@ -96,7 +96,14 @@ protected:
                 {
                     std::cout<<"Tagging particles in id lists"<<std::endl;
                 }
-                tagIdsInList(particlesData.id, 0, particlesData.id.size(), taggingSetup_.selList, taggingSetup_.selListGroupIds);
+                if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+                {
+                    tagIdsInListGPU(particlesData.id, 0, particlesData.id.size(), taggingSetup_.selList, taggingSetup_.selListGroupIds);
+                }
+                else
+                {
+                    tagIdsInList(particlesData.id, 0, particlesData.id.size(), taggingSetup_.selList, taggingSetup_.selListGroupIds);
+                }
             }
 
             if(taggingSetup_.selSpheres.size() > 0)
@@ -105,8 +112,16 @@ protected:
                 {
                     std::cout<<"Tagging particles in spheres"<<std::endl;
                 }
-                tagIdsInSphere(particlesData.id, particlesData.x, particlesData.y, particlesData.z,
-                    0, particlesData.id.size(), taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds);
+                if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+                {
+                    tagIdsInSphereGPU(particlesData.id, particlesData.x, particlesData.y, particlesData.z,
+                        0, particlesData.id.size(), taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds);
+                }
+                else
+                {
+                    tagIdsInSphere(particlesData.id, particlesData.x, particlesData.y, particlesData.z,
+                        0, particlesData.id.size(), taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds);
+                }
             }
         }
     };
