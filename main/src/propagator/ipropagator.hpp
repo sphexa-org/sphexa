@@ -196,8 +196,20 @@ protected:
                                 auto packedBuffer = util::packAllocBuffer<ValueType>(buffer, std::vector<size_t>{selIndexes.size()}, 1);
                                 constexpr bool gpu = cstone::HaveGpu<Acc>{};
                                 cstone::gatherAcc<gpu>(selIndexes, field->data(), packedBuffer[0].data());
-                                auto&& tmp = toHost(buffer);
-                                writeField(writer, key, tmp.data(), c);
+                                if constexpr (gpu)
+                                {
+                                    std::vector<ValueType> tmpVec(packedBuffer[0].size());
+                                    memcpyD2H(packedBuffer[0].data(), packedBuffer[0].size(), tmpVec.data());
+                                    writeField(writer, key, tmpVec.data(), c);
+                                }
+                                else
+                                {
+                                    writeField(writer, key, packedBuffer[0].data(), c);
+                                }
+                                // // TODO: it would be nice to have something like:
+                                // AccVector<ValueType> tmpVec(packedBuffer[0].begin(), packedBuffer[0].end());
+                                // auto&& tmp = toHost(tmpVec);
+                                // writeField(writer, key, tmp.data(), c);
                             }
                             else
                             {
