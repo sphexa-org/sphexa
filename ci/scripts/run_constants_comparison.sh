@@ -41,58 +41,46 @@ if [ "$rank_id" -eq 0 ]; then
 fi
 wait
 
-use_abs_columns_for_ic() {
-  local ic="$1"
-  case "$ic" in
-    sedov)
-      # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
-      echo "6,7,8"
-      ;;
-    noh)
-      # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
-      echo "6,8"
-      ;;
-    isobaric-cube)
-      # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
-      echo "6" # TODO: why linear and angular momentum are not conserved here?
-      ;;
-    evrard)
-      # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
-      echo "7,8"
-      ;;
-    turbulence) # TODO: Identify subcases:
-      # if eosChoice exists in settings and is == 1
-      # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
-      # else
-      # Colums for TurbulenceMachRMS observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom, machRms
-      echo "6,7,8"
-      ;;
-    gresho-chan)
-      # Colums for TimeAndEnergy observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom
-      echo "6"
-      ;;
-    wind-shock)
-      # Colums for WindBubble observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom, bubbleMass / initialMass, normalizedTime
-      echo "6"
-      ;;
-    kelvin-helmholtz)
-      # Colums for TimeEnergyGrowth observables: iteration, ttot, minDt, etot, ecin, eint, egrav, linmom, angmom, khgr
-      echo "6"
-      ;;
-    *)
-      echo ""
-      ;;
-  esac
-}
+# Init cases
+ics=(
+  sedov
+  noh
+  isobaric-cube
+  evrard
+  turbulence
+  gresho-chan
+  wind-shock
+  kelvin-helmholtz
+)
 
-for ic in sedov noh isobaric-cube evrard turbulence gresho-chan wind-shock kelvin-helmholtz; do
+# Constants observables to be checked
+declare -A abs_columns_for_ic=(
+  # TimeAndEnergy: etot/ecin/eint
+  [sedov]="6,7,8"
+  # TimeAndEnergy: etot/eint
+  [noh]="6,8"
+  # TimeAndEnergy: etot (TODO: why linear and angular momentum are not conserved as well?)
+  [isobaric-cube]="6"
+  # TimeAndEnergy: ecin/eint
+  [evrard]="7,8"
+  # TimeAndEnergy or TurbulenceMachRMS (TODO: Identify subcases split by eosChoice)
+  [turbulence]="6,7,8"
+  # TimeAndEnergy: etot
+  [gresho-chan]="6"
+  # WindBubble: etot
+  [wind-shock]="6"
+  # TimeEnergyGrowth: etot
+  [kelvin-helmholtz]="6"
+)
+
+for ic in "${ics[@]}"; do
   if [ "$rank_id" -eq 0 ]; then
     echo "Running test for init condition: $ic"
   fi
   wait
   "$binary_path" --quiet --glass "./50c.h5" --init "$ic" -s 10 -n 50
   if [ "$rank_id" -eq 0 ]; then
-    abs_cols=$(use_abs_columns_for_ic "$ic")
+    abs_cols="${abs_columns_for_ic[$ic]:-}"
     cmd=(python ci/scripts/compare_constants.py "ci/reference/const-${ic}-${backend}-ref.txt" constants.txt)
     if [ -n "$abs_cols" ]; then
       cmd+=("$abs_cols")
