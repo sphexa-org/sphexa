@@ -53,7 +53,7 @@ ics=(
   kelvin-helmholtz
 )
 
-# Constants observables to be checked
+# Observables compared by absolute value (not relative error) in compare_constants.py.
 declare -A abs_columns_for_ic=(
   # TimeAndEnergy: etot/ecin/eint
   [sedov]="6,7,8"
