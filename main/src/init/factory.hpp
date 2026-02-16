@@ -96,11 +96,11 @@ std::unique_ptr<ISimInitializer<Dataset>> initializerFactory(std::string testCas
     {
         return SimInitializers<Dataset>::makeFile(strBeforeSign(testCase, ":"), numberAfterSign(testCase, ":"), reader);
     }
-    // if (std::filesystem::exists(strBeforeSign(testCase, ",")))
-    // {
-    //     return SimInitializers<Dataset>::makeFileSplit(strBeforeSign(testCase, ","), numberAfterSign(testCase, ","),
-    //                                                    reader);
-    // }
+    if (std::filesystem::exists(strBeforeSign(testCase, ",")))
+    {
+        return SimInitializers<Dataset>::makeFileSplit(strBeforeSign(testCase, ","), numberAfterSign(testCase, ","),
+                                                       reader);
+    }
 
     auto msg = "supplied value of --init " + (testCase.empty() ? "[empty string]" : "(\"" + testCase + "\")") +
                " is not a usable file or supported test case\n";

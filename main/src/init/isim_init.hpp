@@ -83,10 +83,11 @@ protected:
 
         if (not settingsFile_.empty())
         {
+            std::cout<<"Looking for tagging setup in file: "<<settingsFile_<<std::endl;
             readFileTaggingAttributes(settingsFile_, reader, taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds,
                 taggingSetup_.selList, taggingSetup_.selListGroupIds);
-            std::cout<<"Tagging setup read from file: "<<settingsFile_<<std::endl;
-            std::cout<<" - Number of id selection spheres: "<<taggingSetup_.selSpheres.size()<<std::endl;
+            if(taggingSetup_.selSpheres.size() == 0 &&  taggingSetup_.selList.size() == 0)
+                std::cout<<"No tagging setup found"<<std::endl;
             idTaggingSetupCheck(taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds, taggingSetup_.selList, 
                 taggingSetup_.selListGroupIds, printLog);
 
@@ -141,7 +142,7 @@ struct SimInitializers
     static InitPtr makeEvrard(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeEvrardCooling(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeFile(std::string testCase, int initStep, IFileReader* reader);
-    // static InitPtr makeFileSplit(std::string testCase, int numsplits, IFileReader* reader);
+    static InitPtr makeFileSplit(std::string testCase, int numsplits, IFileReader* reader);
     static InitPtr makeGreshoChan(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeKelvinHelmholtz(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeIsobaricCube(std::string glassBlock, std::string settingsFile, IFileReader* reader);
