@@ -122,14 +122,15 @@ public:
 template<class Dataset>
 class FileSplitInit : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     InitSettings settings_;
-    std::string  h5_fname;
     int          numSplits;
 
 public:
     explicit FileSplitInit(const std::string& fname, int numSplits_, IFileReader* reader)
-        : h5_fname(fname)
-        , numSplits(numSplits_)
+        : numSplits(numSplits_)
+        , Base(fname)
     {
         if (numSplits < 1)
         {
@@ -137,14 +138,14 @@ public:
                                      std::to_string(numSplits));
         }
         // Read file attributes and put them in constants_ such that they propagate to the new output after a restart
-        readFileAttributes(settings_, h5_fname, reader, false);
+        readFileAttributes(settings_, Base::settingsFile_, reader, false);
     }
 
     cstone::Box<typename Dataset::RealType> init(int rank, int, size_t, Dataset& simData,
                                                  IFileReader* reader) const override
     {
         constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-        reader->setStep(h5_fname, -1, FileMode::collective);
+        reader->setStep(Base::settingsFile_, -1, FileMode::collective);
 
         size_t numParticlesInFile = reader->localNumParticles();
         size_t numParticlesSplit  = numParticlesInFile * numSplits;
@@ -266,6 +267,7 @@ public:
         }
 
         reader->closeStep();
+        Base::runTagging(reader, rank == 0, d);
 
         return box;
     }
