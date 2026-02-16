@@ -174,8 +174,19 @@ protected:
         auto output = [](auto& d, IFileWriter* writer, std::optional<std::span<const uint64_t>> selectedParticlesIndexes = std::nullopt)
         {
             auto fieldPointers = d.data();
-            auto indicesDone   = d.outputFieldIndices;
-            auto namesDone     = d.outputFieldNames;
+            std::vector<int> indicesDone;
+            std::vector<std::string> namesDone;
+            if(selectedParticlesIndexes == std::nullopt)
+            {
+                indicesDone = d.outputFieldIndices;
+                namesDone = d.outputFieldNames;
+            }
+            else
+            {
+                indicesDone = d.subsetOutputFieldIndices;
+                namesDone = d.subsetOutputFieldNames;
+            }
+
             AccVector<char> buffer;
 
             for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
