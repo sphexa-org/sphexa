@@ -62,7 +62,7 @@ struct DeviceNeighborhoodData::Impl
             neighborhood.emplace<0>();
             subgroupNeighborhood.reset();
 
-            const unsigned ncmax = d.ngmax * 2;
+            const unsigned ncmax = d.ngmax * 3;
 
             std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder,
                          cstone::ijloop::GpuFullNbListNeighborhoodBuilder, ClusteredNeighborhoodBuilder<false>,
