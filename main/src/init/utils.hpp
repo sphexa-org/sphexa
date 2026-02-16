@@ -142,10 +142,6 @@ inline void readFileTaggingAttributes(const std::string& settingsFile, IFileRead
         reader->setStep(settingsFile, -1, FileMode::independent);
 
         auto fileAttributes = reader->fileAttributes();
-        for(auto const& attr : fileAttributes)
-        {   
-            std::cout<<"File attribute found: "<<attr<<std::endl;
-        }
         // Read sphere selection data
         if(std::ranges::find(fileAttributes, std::string("id_selection_spheres")) != fileAttributes.end())
         {
