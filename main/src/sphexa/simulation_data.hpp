@@ -62,18 +62,11 @@ public:
     MPI_Comm comm;
 
     //! @brief record user selection of output fields for full particle set or subset
-    void setOutputFields(std::vector<std::string> outFields, bool isSubset = false)
+    void setOutputFields(std::vector<std::string> outFields, bool setSubsetOutputFields = false)
     {
-        if(!isSubset)
-        {
-            hydro.setOutputFields(outFields);
-            chem.setOutputFields(outFields);
-        }
-        else
-        {
-            hydro.setSubsetOutputFields(outFields);
-            chem.setSubsetOutputFields(outFields);
-        }
+        hydro.setOutputFields(outFields, setSubsetOutputFields);
+        chem.setOutputFields(outFields, setSubsetOutputFields);
+
         if (!outFields.empty())
         {
             std::string msg;
@@ -81,7 +74,7 @@ public:
             {
                 msg += s + ", ";
             }
-            if(!isSubset)
+            if(!setSubsetOutputFields)
             {
                 throw std::runtime_error("The following fields for output were not found: " + msg);
             }
