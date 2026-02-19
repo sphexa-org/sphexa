@@ -42,7 +42,6 @@ namespace sphexa
         std::vector<uint64_t>& selList, std::vector<unsigned int>& selListGroupIds, bool printLog)
     {
         // Check sphere selection data
-        // for(unsigned int i=0; i<selSpheres.size(); ++i)
         for(auto sphere : selSpheres)
         {
             if(sphere[3] <= 0.0)
