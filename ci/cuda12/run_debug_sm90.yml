@@ -204,7 +204,7 @@ sph-check-hdf5-tag-attrs-cuda12-sm90-debug-sphexa-cuda:
         python -m venv sph-venv
         source sph-venv/bin/activate
         pip install h5py
-        python ci/scripts/check_hdf5_attrs.py tag_sphere.h5 dump_sedov.h5
+        python ci/scripts/check_hdf5_attrs.py ci/reference/tag_sphere.h5 dump_sedov.h5
         if [ $? -ne 0 ]; then
           exit 1
         fi
@@ -234,7 +234,7 @@ sph-check-hdf5-tag-attrs-cuda12-sm90-debug-sphexa-cpu:
         python -m venv sph-venv
         source sph-venv/bin/activate
         pip install h5py
-        python ci/scripts/check_hdf5_attrs.py tag_sphere.h5 dump_sedov.h5
+        python ci/scripts/check_hdf5_attrs.py ci/reference/tag_sphere.h5 dump_sedov.h5
         if [ $? -ne 0 ]; then
           exit 1
         fi
