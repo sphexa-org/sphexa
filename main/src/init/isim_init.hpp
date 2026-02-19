@@ -71,9 +71,7 @@ protected:
      * @param[in]     reader         parameter file reader
      * @param[in]     printLog       activate logging
      * @param[inout]  particlesData  particle data to perform selection on
-     * @param[in]     initStep       time step at which selection is done
      */
-    // TODO: I have to pass a ref to the entire dataset because I could need the coordinates, if selection is geometrical
     void runTagging(IFileReader* reader, bool printLog, Dataset::HydroData& particlesData) const
     {
         taggingSetup_.selSpheres.clear();
@@ -83,55 +81,17 @@ protected:
 
         if (not settingsFile_.empty())
         {
-            std::cout<<"Looking for tagging setup in file: "<<settingsFile_<<std::endl;
             readFileTaggingAttributes(settingsFile_, reader, taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds,
                 taggingSetup_.selList, taggingSetup_.selListGroupIds);
-            if(taggingSetup_.selSpheres.size() == 0 &&  taggingSetup_.selList.size() == 0)
-                std::cout<<"No tagging setup found"<<std::endl;
             idTaggingSetupCheck(taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds, taggingSetup_.selList, 
                 taggingSetup_.selListGroupIds, printLog);
 
-            if(taggingSetup_.selList.size() > 0)
-            {
-                if (printLog)
-                {
-                    std::cout<<"Tagging particles in id lists"<<std::endl;
-                }
-                if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
-                {
-                    tagIdsInListGPU(particlesData.id, 0, particlesData.id.size(), taggingSetup_.selList, taggingSetup_.selListGroupIds);
-                }
-                else
-                {
-                    tagIdsInList(particlesData.id, 0, particlesData.id.size(), taggingSetup_.selList, taggingSetup_.selListGroupIds);
-                }
-            }
-
-            if(taggingSetup_.selSpheres.size() > 0)
-            {
-                if (printLog)
-                {
-                    std::cout<<"Tagging particles in spheres"<<std::endl;
-                }
-                if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
-                {
-                    tagIdsInSphereGPU(particlesData.id, particlesData.x, particlesData.y, particlesData.z,
-                        0, particlesData.id.size(), taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds);
-                }
-                else
-                {
-                    tagIdsInSphere(particlesData.id, particlesData.x, particlesData.y, particlesData.z,
-                        0, particlesData.id.size(), taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds);
-                }
-            }
+            // Call to tagIdsInSpheres and tagIdsInList goes here
         }
     };
 
-    // May be empty, if no settings file is provided (e.g., restart from dump)
     std::string settingsFile_;
-    // TODO: is it necessary to store the tagging setup? we only need it in writeSettings and writeTaggingSettings
     mutable IdTaggingSetup taggingSetup_;
-
 };
 
 template<class Dataset>
