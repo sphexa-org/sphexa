@@ -156,7 +156,7 @@ class SedovGlass : public ISimInitializer<Dataset>
 {
     using Base = ISimInitializer<Dataset>;
 
-    std::string          glassBlock; // TODO: move to base class?
+    std::string          glassBlock;
     mutable InitSettings settings_;
 
 public:

@@ -105,7 +105,6 @@ namespace sphexa
      *
      * @return true if id tagging output is requested, false otherwise
      */
-    // TODO: remove warning logging?
     bool readFileTaggingOutputAttributes(const std::string& initCond, IFileReader* reader,
                                          const std::string& outputFileSuffix, IdTaggingOutputSetup& taggingOutputSetup);
 

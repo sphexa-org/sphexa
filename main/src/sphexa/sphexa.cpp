@@ -125,8 +125,12 @@ int main(int argc, char** argv)
     propagator->activateFields(simData);
     propagator->load(initCond, fileReader.get());
     auto box = simInit->init(rank, numRanks, problemSize, simData, fileReader.get());
+
     auto& d = simData.hydro;
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
+    if (writeEnabledSubset) { simData.setOutputFields(taggingOutputSetup.outputFields.empty() ?
+        propagator->conservedFields() : taggingOutputSetup.outputFields, true); }
+
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
     bool  haveGrav = (d.g != 0.0);
     float theta    = parser.get("--theta", haveGrav ? 0.5f : 1.0f);
@@ -134,6 +138,7 @@ int main(int argc, char** argv)
     if (!parser.exists("-o")) { outFile += fileWriter->suffix(); }
     if (writeEnabled) { writeSettings(simInit->constants(), simInit->taggingSetup(), taggingOutputSetup, outFile, fileWriter.get()); }
     if (rank == 0) { std::cout << "Data generated for " << d.numParticlesGlobal << " global particles\n"; }
+
     uint64_t bucketSizeFocus = 64;
     // ~100 global nodes per rank to decompose the domain with +-1% accuracy
     uint64_t bucketSize = std::max(bucketSizeFocus, d.numParticlesGlobal / (100 * numRanks));

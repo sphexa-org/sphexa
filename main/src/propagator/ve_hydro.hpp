@@ -227,7 +227,6 @@ public:
         auto  indicesDone   = d.outputFieldIndices;
         auto  namesDone     = d.outputFieldNames;
 
-        // TODO: refactor to avoid code duplication with outputAllocatedFields in ipropagator.hpp?
         auto output = [&]()
         {
             for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
@@ -253,7 +252,6 @@ public:
         // first output pass: write everything allocated at the end of computeForces()
         output();
 
-        // TODO: are the quantities produced by the EOS relevant in particle subset?
         // second output pass: write temporary quantities produced by the EOS
         release(d, "c11", "c12", "c13");
         acquire(d, "rho", "p", "gradh");

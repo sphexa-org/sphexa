@@ -123,7 +123,7 @@ SimInitializers<Dataset>::makeSedovGlass(std::string glassBlock, std::string set
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeSedovGrid(std::string settingsFile)
 {
-    return std::make_unique<SedovGrid<Dataset>>(settingsFile);
+   return std::make_unique<SedovGrid<Dataset>>(settingsFile);
 }
 
 template<class Dataset>
