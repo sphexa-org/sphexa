@@ -41,6 +41,19 @@
 namespace sphexa
 {
 
+uint64_t applyTaggingMask(uint64_t groupId, uint64_t id)
+{
+    if (groupId >= maxNumGroupIds)
+        throw std::runtime_error("Tagging group id larger than max value (" + std::to_string(maxNumGroupIds) + ")\n");
+
+    // Clear previous tagging bits if any
+    uint64_t taggedId = id & ~taggingCheckMask;
+
+    taggedId |= ((groupId + 1) << taggingMaskStartingBit);
+
+    return taggedId;
+}
+
 void tagIdsInList(std::span<uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
                   std::span<const uint64_t> selectedIds, std::span<const unsigned> selectedIdsGroups)
 {
