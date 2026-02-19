@@ -118,21 +118,6 @@ inline void writeSettings(const InitSettings& settings, const IdTaggingSetup& ta
     writer->closeStep();
 }
 
-//! @brief write @p IdTaggingSetup as file attributes of a new file @p subsetOutFilePath
-inline void writeTaggingSettings(const IdTaggingSetup& taggingSetup, const std::string& subsetOutFilePath, IFileWriter* writer)
-{
-    if (std::filesystem::exists(subsetOutFilePath))
-    {
-        throw std::runtime_error("Cannot write settings: file " + subsetOutFilePath + " already exists\n");
-    }
-
-    writer->addStep(0, 0, subsetOutFilePath);
-
-    saveTaggingSetup(taggingSetup, writer);
-
-    writer->closeStep();
-}
-
 //! @brief Used to initialize particle dataset attributes from builtin named test-cases
 class BuiltinWriter
 {
