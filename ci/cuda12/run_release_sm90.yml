@@ -201,6 +201,9 @@ sph-check-hdf5-tag-attrs-cuda12-sm90-release-sphexa-cuda:
     - $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init sedov:tag_sphere --G 1.0 -n 40 -s 4 -w 2
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
+        python -m venv sph-venv
+        source sph-venv/bin/activate
+        pip install h5py
         python ci/scripts/check_hdf5_attrs.py tag_sphere.h5 dump_sedov.h5
         if [ $? -ne 0 ]; then
           exit 1
@@ -228,6 +231,9 @@ sph-check-hdf5-tag-attrs-cuda12-sm90-release-sphexa-cpu:
     - $APP_INSTALL_DIR/sphexa --glass ./50c.h5 --init sedov:tag_sphere --G 1.0 -n 40 -s 4 -w 2
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
+        python -m venv sph-venv
+        source sph-venv/bin/activate
+        pip install h5py
         python ci/scripts/check_hdf5_attrs.py tag_sphere.h5 dump_sedov.h5
         if [ $? -ne 0 ]; then
           exit 1
