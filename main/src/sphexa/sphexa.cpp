@@ -114,21 +114,6 @@ int main(int argc, char** argv)
     const bool writeEnabledSubset = readFileTaggingOutputAttributes(initCond, fileReader.get(), fileWriter->suffix(),
                                                                     taggingOutputSetup);
 
-    // TODO: to be removed after testing, just to check that the attributes are correctly read and parsed from the file
-    std::cout<<"subset output enabled: "<<(writeEnabledSubset ? "true" : "false")<<"\n";
-    if(writeEnabledSubset)
-    {
-        std::cout<<"subset output file: "<<taggingOutputSetup.outFile<<"\n";
-        std::cout<<"subset output freq: "<<taggingOutputSetup.writeFreqStr<<"\n";
-        std::cout<<"subset output extra writes: ";
-        for(const auto& we : taggingOutputSetup.writeExtra)
-        { std::cout<<we<<" "; }
-        std::cout<<"\n";
-        std::cout<<"subset output fields: ";
-        for(const auto& of : taggingOutputSetup.outputFields)
-        { std::cout<<of<<" "; }
-        std::cout<<"\n";
-    }
     Dataset simData;
     simData.comm = MPI_COMM_WORLD;
 
@@ -139,19 +124,15 @@ int main(int argc, char** argv)
     propagator->addCounters(pmroot, getNumLocalRanks(numRanks));
     propagator->activateFields(simData);
     propagator->load(initCond, fileReader.get());
-    // TODO: id tagging happens here. What about separate the tagging from the initialization? 
     auto box = simInit->init(rank, numRanks, problemSize, simData, fileReader.get());
     auto& d = simData.hydro;
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
-    if (writeEnabledSubset) { simData.setOutputFields(taggingOutputSetup.outputFields.empty() ?
-        propagator->conservedFields() : taggingOutputSetup.outputFields, true); }
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
     bool  haveGrav = (d.g != 0.0);
     float theta    = parser.get("--theta", haveGrav ? 0.5f : 1.0f);
 
     if (!parser.exists("-o")) { outFile += fileWriter->suffix(); }
     if (writeEnabled) { writeSettings(simInit->constants(), simInit->taggingSetup(), taggingOutputSetup, outFile, fileWriter.get()); }
-    if (writeEnabledSubset) { writeTaggingSettings(simInit->taggingSetup(), taggingOutputSetup.outFile, fileWriter.get()); }
     if (rank == 0) { std::cout << "Data generated for " << d.numParticlesGlobal << " global particles\n"; }
     uint64_t bucketSizeFocus = 64;
     // ~100 global nodes per rank to decompose the domain with +-1% accuracy
@@ -167,7 +148,6 @@ int main(int argc, char** argv)
 
     size_t startIteration    = d.iteration;
     bool   isOutputTriggered = false;
-    bool   isSubsetOutputTriggered = false;
 
     for (bool keepRunning = true; keepRunning; d.iteration++)
     {
@@ -199,21 +179,6 @@ int main(int argc, char** argv)
         }
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
-
-        if(writeEnabledSubset)
-        {
-            isSubsetOutputTriggered =
-                (isOutputStep(d.iteration, taggingOutputSetup.writeFreqStr) ||
-                isOutputTime(d.ttot - d.minDt, d.ttot, taggingOutputSetup.writeFreqStr) ||
-                isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, taggingOutputSetup.writeExtra) ||
-                (isWallClockReached && writeEnabledSubset) || isSubsetOutputTriggered) &&
-                d.iteration > startIteration;
-            if (isSubsetOutputTriggered)
-            {
-                propagator->saveSubsetsFields(fileWriter.get(), taggingOutputSetup.outFile, domain.startIndex(), domain.endIndex(), simData);
-                isSubsetOutputTriggered = false;
-            }
-        }
 
         viz::execute(d, domain.startIndex(), domain.endIndex());
 
