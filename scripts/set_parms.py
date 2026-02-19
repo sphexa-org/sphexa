@@ -34,16 +34,12 @@ import os
 from argparse import ArgumentParser
 
 import h5py
-
-
-def group_list(lst, n):
-    return [lst[i:i+n] for i in range(0, len(lst), n)]
-
+import numpy as np
 
 def parse_value(v):
     if "," in v:
         try:
-        # Try parsing as list of floats
+        # Try parsing as list of integers
             return [int(x) for x in v.split(",")]
         except ValueError:
             pass
@@ -87,6 +83,21 @@ def format_sequence(value):
         return "[" + ", ".join(parts) + "]"
     return format_number(value)
 
+def select_int_dtype(value):
+    min32, max32 = -(1 << 31), (1 << 31) - 1
+    if isinstance(value, int):
+        if min32 <= value <= max32:
+            return np.int32(value)
+        return np.int64(value)
+    if isinstance(value, (list, tuple)) and all(isinstance(v, int) for v in value):
+        arr = np.asarray(value, dtype=np.int64)
+        if arr.size == 0:
+            return arr.astype(np.int32)
+        if arr.min() >= min32 and arr.max() <= max32:
+            return arr.astype(np.int32)
+        return arr
+    return value
+
 if __name__ == "__main__":
     parser = ArgumentParser(description="Create settings file")
     parser.add_argument("settingsFile", help="Simulation settings HDF5 file")
@@ -106,7 +117,13 @@ if __name__ == "__main__":
             dtype = h5py.string_dtype(encoding="ascii", length=len(v))
             f.attrs.create(key, v, dtype=dtype)
         else:
-            f.attrs[key] = v
+            v = select_int_dtype(v)
+            if key in f.attrs:
+                del f.attrs[key]
+            if isinstance(v, np.ndarray):
+                f.attrs.create(key, v, dtype=v.dtype)
+            else:
+                f.attrs.create(key, v)
 
     print("{0} now contains the following settings:".format(args.settingsFile))
     for k, v in f.attrs.items():
