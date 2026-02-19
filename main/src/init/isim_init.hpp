@@ -85,8 +85,6 @@ protected:
                 taggingSetup_.selList, taggingSetup_.selListGroupIds);
             idTaggingSetupCheck(taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds, taggingSetup_.selList, 
                 taggingSetup_.selListGroupIds, printLog);
-
-            // Call to tagIdsInSpheres and tagIdsInList goes here
         }
     };
 
