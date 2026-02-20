@@ -33,6 +33,8 @@
 #pragma once
 
 #include <span>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "cstone/tree/definitions.h"
@@ -71,7 +73,22 @@ struct IsMasked
  * @param[in] id            input id
  * @return                  tagged id
  */
-uint64_t applyTaggingMask(uint64_t groupId, uint64_t id);
+HOST_DEVICE_FUN inline uint64_t applyTaggingMask(uint64_t groupId, uint64_t id)
+{
+    // TODO: implement check for device code as well
+    #if !defined(__CUDACC__) && !defined(__HIPCC__)
+    if (groupId >= maxNumGroupIds)
+        fprintf(stderr, "Tagging group id larger than max value ( %s\n)", std::to_string(maxNumGroupIds).c_str());
+    #endif
+
+    // Clear previous tagging bits if any
+    uint64_t taggedId = id & ~taggingCheckMask;
+
+    taggedId |= ((groupId + 1) << taggingMaskStartingBit);
+
+    return taggedId;
+}
+
 
 /*! @brief Tagged id (in first:last range) identification, CPU version
  *
@@ -111,6 +128,17 @@ using IdSelectionSphere = cstone::Vec4<CoordinateType>;
 void tagIdsInList(std::span<uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
                   std::span<const uint64_t> selectedIds, std::span<const unsigned> selectedIdsGroups);
 
+/*! @brief Id tagging (in first:last range) from list, GPU version
+ *
+ * @param[inout] ids               id list
+ * @param[in]    firstIndex        first id index
+ * @param[in]    lastIndex         last (excluded) id index
+ * @param[in]    selectedIds       ids to be tagged (no duplications allowed)
+ * @param[in]    selectedIdsGroups group id for each selected id
+ */
+void tagIdsInListGPU(std::span<uint64_t> ids, std::size_t firstIndex, std::size_t lastIndex,
+                     std::span<const uint64_t> selectedIds, std::span<const unsigned> selectedIdsGroups);
+
 /*! @brief Id tagging (in first:last range) in spherical volume
  *
  * @param[out] ids               id list
@@ -125,4 +153,20 @@ void tagIdsInList(std::span<uint64_t> ids, std::size_t firstIndex, std::size_t l
 void tagIdsInSphere(std::span<uint64_t> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
                     std::span<const CoordinateType> z, std::size_t firstIndex, std::size_t lastIndex,
                     std::span<const IdSelectionSphere> selSphereData, std::span<const unsigned> sphereGroupIds);
+
+/*! @brief Id tagging (in first:last range) in spherical volume, GPU version
+ *
+ * @param[out] ids               id list
+ * @param[in]  x                 x coordinates
+ * @param[in]  y                 y coordinates
+ * @param[in]  z                 z coordinates
+ * @param[in]  firstIndex        first id index
+ * @param[in]  lastIndex         last (excluded) id index
+ * @param[in]  selSphereData     set of spherical volume definitions
+ * @param[in]  sphereGroupIds    group id for each spherical volume definition
+ */
+void tagIdsInSphereGPU(std::span<uint64_t> ids, std::span<const CoordinateType> x, std::span<const CoordinateType> y,
+                       std::span<const CoordinateType> z, std::size_t firstIndex, std::size_t lastIndex,
+                       std::span<const IdSelectionSphere> selSphereData, std::span<const unsigned> sphereGroupIds);
+
 } // namespace sphexa
