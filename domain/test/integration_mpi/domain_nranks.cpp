@@ -327,3 +327,168 @@ TEST(FocusDomain, reapplySync)
         EXPECT_EQ(numCommon, domain.nParticles());
     }
 }
+
+template<class KeyType, class T>
+void randomGaussianGrav(int thisRank, int numRanks)
+{
+    const LocalIndex numParticles = 100000;
+    unsigned bucketSize           = numParticles / (100 * numRanks);
+    unsigned bucketSizeLocal      = std::min(64u, bucketSize);
+    float theta                   = 0.5;
+
+    Box<T> box{-1, 1, cstone::BoundaryType::fixed}; // need to fix box to avoid domain.sync computing a tight fit
+
+    // common pool of coordinates, identical on all ranks
+    RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box);
+    coords.adjustH(200, 250);
+
+    std::vector<T> globalMasses(numParticles, 1.0 / numParticles);
+
+    LocalIndex firstIndex = (numParticles * thisRank) / numRanks;
+    LocalIndex lastIndex  = (numParticles * (thisRank + 1)) / numRanks;
+
+    // extract a slice of the common pool, each rank takes a different slice, but all slices together
+    // are equal to the common pool
+    std::vector<T> x(coords.x().begin() + firstIndex, coords.x().begin() + lastIndex);
+    std::vector<T> y(coords.y().begin() + firstIndex, coords.y().begin() + lastIndex);
+    std::vector<T> z(coords.z().begin() + firstIndex, coords.z().begin() + lastIndex);
+    std::vector<T> h(coords.h().begin() + firstIndex, coords.h().begin() + lastIndex);
+    std::vector<T> m(globalMasses.begin() + firstIndex, globalMasses.begin() + lastIndex);
+    std::vector<KeyType> keys(x.size());
+
+    Domain<KeyType, T, CpuTag> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta, box);
+
+    std::vector<T> s1, s2, s3;
+    domain.syncGrav(keys, x, y, z, h, m, std::tuple{}, std::tie(s1, s2, s3));
+    domain.exchangeHalos(std::tie(m), s1, s2);
+
+    std::span<const KeyType> gkeys(coords.particleKeys());
+    LocalIndex firstGlobalIdx = std::lower_bound(gkeys.begin(), gkeys.end(), keys[domain.startIndex()]) - gkeys.begin();
+    LocalIndex lastGlobalIdx =
+        std::upper_bound(gkeys.begin(), gkeys.end(), keys[domain.endIndex() - 1]) - gkeys.begin();
+
+    //! the focused octree, structure only
+    auto ftree       = domain.focusTree();
+    auto let_full    = ftree.octreeViewAcc();
+    auto let_leaves  = ftree.treeLeavesAcc();
+    auto let_lcounts = ftree.leafCountsAcc();
+    auto let_layout  = domain.layout();
+
+    std::span<const SourceCenterType<T>> centers = ftree.expansionCentersAcc();
+
+    // Any leaf in the tree with particles: does it contain the same particles as in the reference set of particles?
+
+    ASSERT_EQ(let_leaves.size(), let_layout.size());
+    for (int i = 0; i < let_leaves.size() - 1; ++i)
+    {
+        if (let_layout[i + 1] > let_layout[i])
+        {
+            EXPECT_EQ(let_layout[i + 1] - let_layout[i], let_lcounts[i]);
+            auto pk1 = keys[let_layout[i]];
+            auto pk2 = keys[let_layout[i + 1] - 1];
+
+            int gi1 = std::lower_bound(gkeys.begin(), gkeys.end(), pk1) - gkeys.begin();
+            int gi2 = std::lower_bound(gkeys.begin(), gkeys.end(), pk2) - gkeys.begin();
+            EXPECT_EQ(gi2 - gi1 + 1, let_lcounts[i]);
+
+            for (int d = 0; d < let_lcounts[i]; ++d)
+            {
+                EXPECT_EQ(keys[let_layout[i] + d], gkeys[gi1 + d]);
+            }
+        }
+    }
+
+    // Are all local and remote mass centers correct ?
+
+    for (int i = 0; i < let_full.numNodes; ++i)
+    {
+        KeyType k1 = decodePlaceholderBit(let_full.prefixes[i]);
+        KeyType k2 = k1 + (1ul << (3 * maxTreeLevel<KeyType>{} - decodePrefixLength(let_full.prefixes[i])));
+        int gi1    = std::lower_bound(gkeys.begin(), gkeys.end(), k1) - gkeys.begin();
+        int gi2    = std::lower_bound(gkeys.begin(), gkeys.end(), k2) - gkeys.begin();
+        auto globCenter =
+            massCenter<T>(coords.x().data(), coords.y().data(), coords.z().data(), globalMasses.data(), gi1, gi2);
+        EXPECT_NEAR(sqrt(norm2(makeVec3(globCenter) - makeVec3(centers[i]))), 0.0, 1e-5);
+    }
+
+    // Are the MAC flags set correctly? Do nodes marked by MAC have correct particle counts?
+
+    {
+        KeyType focusStart = let_leaves[ftree.assignment()[thisRank].start()];
+        KeyType focusEnd   = let_leaves[ftree.assignment()[thisRank].end()];
+
+        std::vector<KeyType> spanningKeys(spanSfcRange(focusStart, focusEnd) + 1);
+        spanSfcRange(focusStart, focusEnd, spanningKeys.data());
+        spanningKeys.back() = focusEnd;
+
+        std::vector<uint8_t> marks(let_full.numNodes, 0);
+        for (TreeNodeIndex i = 0; i < nNodes(spanningKeys); ++i)
+        {
+            IBox target                     = sfcIBox(sfcKey(spanningKeys[i]), sfcKey(spanningKeys[i + 1]));
+            auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
+            unsigned maxLevel               = maxTreeLevel<KeyType>{};
+
+            markMacPerBox(targetCenter, targetSize, maxLevel, let_full.prefixes, let_full.childOffsets,
+                          let_full.parents, centers.data(), box, focusStart, focusEnd, marks.data());
+        }
+        for (TreeNodeIndex j = 0; j < let_full.numNodes; ++j)
+        {
+            TreeNodeIndex leafIdx = let_full.internalToLeaf[j];
+            bool isLeaf           = leafIdx >= 0;
+            bool isRemote =
+                ftree.assignment()[thisRank].start() <= leafIdx && leafIdx < ftree.assignment()[thisRank].end();
+            if (isLeaf && isRemote && marks[j])
+            {
+                LocalIndex gi1 = std::lower_bound(gkeys.begin(), gkeys.end(), let_leaves[leafIdx]) - gkeys.begin();
+                LocalIndex gi2 = std::lower_bound(gkeys.begin(), gkeys.end(), let_leaves[leafIdx + 1]) - gkeys.begin();
+                EXPECT_EQ(gi2 - gi1 + 1, let_layout[leafIdx + 1] - let_layout[leafIdx]);
+            }
+        }
+    }
+
+    // Do we have all halos to compute correct neighbor counts?
+
+    int ngmax = 1; // don't store neighbors, only counts
+    std::vector<LocalIndex> neighbors(domain.nParticles() * ngmax);
+    std::vector<unsigned> neighborsCount(domain.nParticles());
+    findNeighbors(x.data(), y.data(), z.data(), h.data(), domain.startIndex(), domain.endIndex(), box,
+                  domain.octreeProperties(), ngmax, neighbors.data(), neighborsCount.data());
+
+    uint64_t neighborSum = std::accumulate(begin(neighborsCount), end(neighborsCount), 0);
+    {
+        std::vector<LocalIndex> neighborsRef(numParticles * ngmax);
+        std::vector<unsigned> neighborsCountRef(numParticles);
+
+        auto [globCsarray, globCounts] = computeOctree(gkeys, 16);
+
+        OctreeData<KeyType, CpuTag> octree;
+        octree.resize(nNodes(globCsarray));
+        updateInternalTree<KeyType>(globCsarray, octree.data());
+
+        std::vector<LocalIndex> layout(globCounts.size() + 1, 0);
+        std::inclusive_scan(globCounts.begin(), globCounts.end(), layout.begin() + 1);
+
+        std::vector<Vec3<T>> geoCenters(octree.numNodes), geoSizes(octree.numNodes);
+        nodeFpCenters<KeyType>(octree.prefixes, geoCenters.data(), geoSizes.data(), box);
+
+        auto o = octree.data();
+        OctreeNsView<T, KeyType> octreeProps{o.numLeafNodes,    o.prefixes,     o.childOffsets,     o.parents,
+                                             o.internalToLeaf,  o.levelRange,   globCsarray.data(), layout.data(),
+                                             geoCenters.data(), geoSizes.data()};
+
+        findNeighbors(coords.x().data(), coords.y().data(), coords.z().data(), coords.h().data(), firstGlobalIdx,
+                      lastGlobalIdx, box, octreeProps, ngmax, neighborsRef.data(), neighborsCountRef.data());
+
+        uint64_t neighborSumRef = std::accumulate(begin(neighborsCountRef), end(neighborsCountRef), uint64_t(0));
+        EXPECT_EQ(neighborSum, neighborSumRef);
+    }
+}
+
+TEST(FocusDomain, randomGaussianGrav)
+{
+    int rank = 0, nRanks = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
+
+    randomGaussianGrav<uint64_t, double>(rank, nRanks);
+}
