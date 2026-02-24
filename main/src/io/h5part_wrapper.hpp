@@ -82,6 +82,16 @@ make_h5_trait(std::int16_t,   H5T_NATIVE_SHORT,   H5_INT16_T,    "C++:  int16 / 
 make_h5_trait(std::uint16_t,  H5T_NATIVE_USHORT,  H5_UINT16_T,   "C++: uint16 / python: np.uint16");
 make_h5_trait(char,           H5T_NATIVE_CHAR,    H5_INT8_T,     "C++:  char  / python: np.int8");
 make_h5_trait(unsigned char,  H5T_NATIVE_UCHAR,   H5_UINT8_T,    "C++: uchar  / python: np.uint8");
+
+template<typename T>
+requires(std::is_same_v<T, std::size_t> && !std::is_same_v<std::size_t, std::uint64_t> && sizeof(std::size_t) == sizeof(std::uint64_t))
+struct h5_traits<T>
+{
+    operator h5_int64_t() const noexcept { return H5T_NATIVE_ULONG; }
+    static constexpr h5_types_t h5hut_type = H5_UINT64_T;
+    static const std::string    stringval() { return "C++: uint64 / python: np.uint64"; }
+};
+
 //clang-format on
 
 // ---------------------------------------------------------------------------

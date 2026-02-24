@@ -46,7 +46,10 @@ struct IO
     template<class T>
     using ConstPtr = const T*;
 
-    using Types = util::TypeList<double, float, char, uint8_t, int, int64_t, unsigned, uint64_t>;
+    using Types_ = util::TypeList<double, float, char, uint8_t, int, int64_t, unsigned, uint64_t>;
+//If size_t is defined as none of the above, add it to the list
+    using SizeTList = std::conditional_t<util::Contains<size_t, Types_>::value, util::TypeList<>, util::TypeList<size_t>>;
+    using Types = util::Fuse<Types_, SizeTList>;
 };
 
 class IFileWriter

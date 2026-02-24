@@ -113,12 +113,19 @@ public:
             std::visit(writeField, item.second);
         }
 
-        char hostname[HOST_NAME_MAX];
-        gethostname(hostname, HOST_NAME_MAX);
-        ar->addStep(0, HOST_NAME_MAX, outFile + ar->suffix());
+#ifdef HOST_NAME_MAX
+        const auto host_name_max = HOST_NAME_MAX;
+#else
+        const auto host_name_max = sysconf(_SC_HOST_NAME_MAX);
+#endif
+        std::vector<char> hostname(host_name_max);
+        gethostname(hostname.data(), host_name_max);
+        ar->addStep(0, host_name_max, outFile + ar->suffix());
+
         ar->stepAttribute("name", "hostnames");
         ar->stepAttribute("numRanks", &numRanks, 1);
-        ar->writeField("hostnames", hostname, HOST_NAME_MAX);
+        ar->writeField("hostnames", hostname.data(), host_name_max);
+
         ar->closeStep();
 
         numStartCalled = 0;
@@ -132,7 +139,10 @@ private:
     std::vector<float>       stepTimes;
     std::vector<std::string> stepTimeNames;
 
-    using SupportedTypes   = util::TypeList<float, double, uint32_t, uint64_t, int32_t, int64_t>;
+    using SupportedTypes_   = util::TypeList<float, double, uint32_t, uint64_t, int32_t, int64_t>;
+    //If size_t is defined as none of the above, add it to the list
+    using SizeTList = std::conditional_t<util::Contains<size_t, SupportedTypes_>::value, util::TypeList<>, util::TypeList<size_t>>;
+    using SupportedTypes = util::Fuse<SupportedTypes_, SizeTList>;
     using SupportedVariant = util::Reduce<std::variant, util::Map<std::vector, SupportedTypes>>;
 
     std::map<std::string, SupportedVariant> perfStats;
