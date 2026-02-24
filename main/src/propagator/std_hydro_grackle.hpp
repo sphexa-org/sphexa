@@ -209,21 +209,11 @@ public:
         computeTimestep(first, last, d, minDtCooling);
         timer.step("Timestep");
 
-        // TODO: this is needed to avoid the deep copy of du in CPU case.
-        if constexpr (IsDeviceVector<std::decay_t<decltype(d.du)>>::value)
-        {
-            auto du = toHost(d.du);
-            cooling_data.cool_particles(T(d.minDt), rho.data(), u.data(),
-                                        cstone::getPointers(get<CoolingFields>(simData.chem), 0), du.data(), first,
-                                        last);
-            d.du = std::move(du);
-        }
-        else
-        {
-            cooling_data.cool_particles(T(d.minDt), rho.data(), u.data(),
-                                        cstone::getPointers(get<CoolingFields>(simData.chem), 0), d.du.data(), first,
-                                        last);
-        }
+        auto du = toHost(d.du);
+        cooling_data.cool_particles(T(d.minDt), rho.data(), u.data(),
+                                    cstone::getPointers(get<CoolingFields>(simData.chem), 0), du.data(), first, last);
+
+        d.du = std::move(du);
         timer.step("GRACKLE chemistry and cooling");
 
         computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
