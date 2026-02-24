@@ -219,7 +219,7 @@ and a warp-aware tree-traversal inspired by the
 * Jg Piccinali
 * Tom Quinn
 * Darren Reed
-* Lukas Schmid
+* Lukas Schmidt
 * Osman Seckin Simsek
 * Yiqing Zhu
 
