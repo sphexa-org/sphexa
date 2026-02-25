@@ -77,6 +77,8 @@ unsigned long updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const
     checkGpuErrors(cudaMemcpyToSymbol(GPU_SYMBOL(n_removed), &n_removed_host, sizeof(n_removed_host)));
 
     updateSmoothingLengthGpuKernel<numThreads><<<numBlocks, numThreads>>>(grp, ng0, nc, h, keys);
+    checkGpuErrors(cudaDeviceSynchronize());
+    checkGpuErrors(cudaGetLastError());
 
     checkGpuErrors(cudaMemcpyFromSymbol(&n_removed_host, GPU_SYMBOL(n_removed), sizeof(n_removed_host)));
 
