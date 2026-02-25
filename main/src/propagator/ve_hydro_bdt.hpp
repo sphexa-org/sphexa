@@ -367,8 +367,8 @@ public:
             }
         }
 
-        bool haveUnconvergedParticles = updateSmoothingLength(activeRungs_, d);
-        if (haveUnconvergedParticles && not d.removeUnconvergedParticles)
+        const auto n_unconverged = updateSmoothingLength(activeRungs_, d);
+        if (n_unconverged > 0 && not d.removeUnconvergedParticles)
         {
             throw std::runtime_error("Neighbor search did not converge\n");
         }

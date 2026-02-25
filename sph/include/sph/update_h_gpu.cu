@@ -28,6 +28,7 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/gpu_config.cuh"
 #include "sph/sph_gpu.hpp"
 #include "sph/kernels.hpp"
@@ -36,9 +37,9 @@ namespace sph
 {
 using cstone::LocalIndex;
 
-__device__ bool nc_h_convergenceFailure = false;
+static __device__ unsigned long n_removed = 0;
 
-template<class Th, class KeyType>
+template<unsigned numThreads, class Th, class KeyType>
 __global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, const unsigned* nc, Th* h, KeyType* keys)
 {
     LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
@@ -48,29 +49,43 @@ __global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, cons
     LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
     if (i >= grp.groupEnd[warpIdx]) { return; }
 
+    unsigned long n_removed_local = 0;
     if (nc[i] <= 1)
     {
-        keys[i]                 = cstone::removeKey<KeyType>{};
-        nc_h_convergenceFailure = true;
+        keys[i]         = cstone::removeKey<KeyType>{};
+        n_removed_local = 1;
     }
     h[i] = updateH(ng0, nc[i], h[i]);
+
+    typedef cub::BlockReduce<unsigned long, numThreads> BlockReduce;
+    __shared__ typename BlockReduce::TempStorage        temp_storage;
+    BlockReduce                                         reduce(temp_storage);
+
+    unsigned long n_removed_block = reduce.Sum(n_removed_local);
+    __syncthreads();
+    if (threadIdx.x == 0) { atomicAdd(&n_removed, n_removed_block); }
 }
 
 template<class Th, class KeyType>
-bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, Th* h, KeyType* keys)
+unsigned long updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, Th* h, KeyType* keys)
 {
-    unsigned numThreads       = 256;
-    unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
-    unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+    constexpr unsigned numThreads       = 256;
+    unsigned           numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
+    unsigned           numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
     if (numBlocks == 0) { return false; }
-    updateSmoothingLengthGpuKernel<<<numBlocks, numThreads>>>(grp, ng0, nc, h, keys);
+    unsigned long n_removed_host = 0;
+    checkGpuErrors(cudaMemcpyToSymbol(GPU_SYMBOL(n_removed), &n_removed_host, sizeof(n_removed_host)));
 
-    bool convergenceFailure;
-    checkGpuErrors(cudaMemcpyFromSymbol(&convergenceFailure, GPU_SYMBOL(nc_h_convergenceFailure), sizeof(bool)));
-    return convergenceFailure;
+    updateSmoothingLengthGpuKernel<numThreads><<<numBlocks, numThreads>>>(grp, ng0, nc, h, keys);
+
+    checkGpuErrors(cudaMemcpyFromSymbol(&n_removed_host, GPU_SYMBOL(n_removed), sizeof(n_removed_host)));
+
+    return n_removed_host;
 }
 
-template bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, float* h, uint64_t*);
-template bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, double* h, uint64_t*);
+template unsigned long updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, float* h,
+                                                uint64_t*);
+template unsigned long updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, double* h,
+                                                uint64_t*);
 
 } // namespace sph
