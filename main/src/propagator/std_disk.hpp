@@ -89,11 +89,11 @@ public:
         timer.step("Timestep");
 
         computePositions(Base::groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
-        unsigned long n_unconverged = updateSmoothingLength(Base::groups_.view(), d);
+        unsigned long long n_unconverged = updateSmoothingLength(Base::groups_.view(), d);
         if (d.removeUnconvergedParticles)
         {
-            MPI_Allreduce(MPI_IN_PLACE, &n_unconverged, 1, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
-            if (Base::rank_ == 0 && n_unconverged > 0) { std::printf("removed particles: %u\n", n_unconverged); }
+            MPI_Allreduce(MPI_IN_PLACE, &n_unconverged, 1, MpiType<unsigned long long>{}, MPI_SUM, MPI_COMM_WORLD);
+            if (Base::rank_ == 0) { std::printf("removed particles: %lu\n", n_unconverged); }
         }
         else
         {

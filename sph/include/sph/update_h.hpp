@@ -10,9 +10,9 @@ namespace sph
 {
 
 template<class T, class KeyType>
-unsigned long updateSmoothingLengthCpu(size_t startIndex, size_t endIndex, unsigned ng0, const unsigned* nc, T* h, KeyType* keys)
+unsigned long long updateSmoothingLengthCpu(size_t startIndex, size_t endIndex, unsigned ng0, const unsigned* nc, T* h, KeyType* keys)
 {
-    unsigned long n_removed = 0;
+    unsigned long long n_removed = 0;
 #pragma omp parallel for schedule(static) reduction(+: n_removed)
     for (size_t i = startIndex; i < endIndex; i++)
     {
@@ -31,11 +31,11 @@ unsigned long updateSmoothingLengthCpu(size_t startIndex, size_t endIndex, unsig
 }
 
 template<class Dataset>
-unsigned long updateSmoothingLength(const GroupView& grp, Dataset& d)
+unsigned long long updateSmoothingLength(const GroupView& grp, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        unsigned long keysRemoved =
+        unsigned long long keysRemoved =
             updateSmoothingLengthGpu(grp, d.ng0, rawPtr(d.nc), rawPtr(d.h), rawPtr(d.keys));
         syncGpu();
         return keysRemoved;
