@@ -53,12 +53,19 @@ public:
         MPI_Comm_rank(simData.comm, &rank);
         auto& d = simData.hydro;
 
+        const auto numParticlesGlobal_previous = d.numParticlesGlobal;
         computeConservedQuantities(firstIndex, lastIndex, d, simData.comm);
 
         if (rank == 0)
         {
             fileutils::writeColumns(constantsFile, ' ', d.iteration, d.ttot, d.minDt, d.etot, d.ecin, d.eint, d.egrav,
                                     d.linmom, d.angmom);
+            if (numParticlesGlobal_previous != d.numParticlesGlobal)
+            {
+                std::cout << "particle number changed: "
+                          << std::int64_t(d.numParticlesGlobal) - std::int64_t(numParticlesGlobal_previous)
+                          << std::endl;
+            }
         }
     }
 };

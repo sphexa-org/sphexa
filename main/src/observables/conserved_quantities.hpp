@@ -146,7 +146,7 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
         std::tie(eKin, eInt, linmom, angmom) = localConservedQuantities(startIndex, endIndex, d);
     }
 
-    util::array<double, 10> quantities, globalQuantities;
+    util::array<double, 11> quantities, globalQuantities;
     std::fill(globalQuantities.begin(), globalQuantities.end(), double(0));
 
     quantities[0] = eKin;
@@ -159,6 +159,7 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
     quantities[7] = angmom[1];
     quantities[8] = angmom[2];
     quantities[9] = double(ncsum);
+    quantities[10] = double(endIndex - startIndex);
 
     int rootRank = 0;
     MPI_Reduce(quantities.data(), globalQuantities.data(), quantities.size(), MpiType<double>{}, MPI_SUM, rootRank,
@@ -174,6 +175,8 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
     d.linmom         = std::sqrt(norm2(globalLinmom));
     d.angmom         = std::sqrt(norm2(globalAngmom));
     d.totalNeighbors = size_t(globalQuantities[9]);
+    d.numParticlesGlobal = size_t(globalQuantities[10]);
+
 }
 
 } // namespace sphexa
