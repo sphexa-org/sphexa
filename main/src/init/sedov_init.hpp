@@ -126,7 +126,7 @@ public:
 
         T              r = settings_.at("r1");
         cstone::Box<T> globalBox(-r, r, cstone::BoundaryType::periodic);
-        std::vector<T> x, y, z;
+        std::vector<T> x(last - first), y(last - first), z(last - first);
         regularGrid(r, cubeSide, first, last, x, y, z);
         d.x = x; // uploads to GPU if active
         d.y = y;
