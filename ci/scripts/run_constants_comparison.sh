@@ -83,6 +83,8 @@ if [ "$rank_id" -eq 0 ]; then
 fi
 wait
 
+failed_comparisons=()
+
 for ic in "${ics[@]}"; do
   if [ "$rank_id" -eq 0 ]; then
     echo "Running test for init condition: $ic"
@@ -96,8 +98,18 @@ for ic in "${ics[@]}"; do
     if [ -n "$abs_cols" ]; then
       cmd+=("$abs_cols")
     fi
-    "${cmd[@]}"
+    if ! "${cmd[@]}"; then
+      failed_comparisons+=("$ic")
+    fi
     deactivate
   fi
   wait
 done
+
+if [ "$rank_id" -eq 0 ]; then
+  if [ ${#failed_comparisons[@]} -gt 0 ]; then
+    echo "Comparison failed for init conditions: ${failed_comparisons[*]}" >&2
+    exit 1
+  fi
+  echo "All constant comparisons passed."
+fi
