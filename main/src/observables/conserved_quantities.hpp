@@ -167,10 +167,11 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
 
     util::array<double, 3> globalLinmom{globalQuantities[3], globalQuantities[4], globalQuantities[5]};
     util::array<double, 3> globalAngmom{globalQuantities[6], globalQuantities[7], globalQuantities[8]};
-    d.linmom             = std::sqrt(norm2(globalLinmom));
-    d.angmom             = std::sqrt(norm2(globalAngmom));
-    d.totalNeighbors     = size_t(globalQuantities[9]);
-    d.numParticlesGlobal = size_t(globalQuantities[10]);
+    d.linmom                 = std::sqrt(norm2(globalLinmom));
+    d.angmom                 = std::sqrt(norm2(globalAngmom));
+    d.totalNeighbors         = size_t(globalQuantities[9]);
+    d.numParticlesGlobalPrev = d.numParticlesGlobal;
+    d.numParticlesGlobal     = size_t(globalQuantities[10]);
 }
 
 } // namespace sphexa
