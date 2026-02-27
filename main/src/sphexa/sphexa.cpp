@@ -121,7 +121,8 @@ int main(int argc, char** argv)
     propagator->load(initCond, fileReader.get());
     auto box = simInit->init(rank, numRanks, problemSize, simData, fileReader.get());
 
-    auto& d = simData.hydro;
+    auto& d                  = simData.hydro;
+    d.numParticlesGlobalPrev = d.numParticlesGlobal;
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
 
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
