@@ -73,6 +73,11 @@ declare -A abs_columns_for_ic=(
   [kelvin-helmholtz]="6"
 )
 
+# Execution of python comparison script needs numpy which is not available in the used uenv
+python -m venv constant_comparison_venv
+source constant_comparison_venv/bin/activate
+pip install --quiet numpy
+
 for ic in "${ics[@]}"; do
   if [ "$rank_id" -eq 0 ]; then
     echo "Running test for init condition: $ic"
@@ -89,3 +94,5 @@ for ic in "${ics[@]}"; do
   fi
   wait
 done
+
+deactivate
