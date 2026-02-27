@@ -18,12 +18,12 @@ def main(ref_path: Path, new_path: Path, abs_check_cols: list[int] | None = None
     abs_diffs = abs(new[:,1:] - ref[:,1:])
     denoms = np.maximum(np.abs(ref[:,1:]), eps_zero)
     rel_diffs = abs_diffs/denoms
-    for row in range(abs_diffs.shape[0]):
-        for col in range(abs_diffs.shape[1]):
-             if col in abs_check_c and abs_diffs[row, col] > absolute_tolerance:
-                above_tolerance.append((row, col+1, ref[row, col+1], new[row, col+1], abs_diffs[row, col], rel_diffs[row, col], 'abs'))
-             elif col not in abs_check_c and rel_diffs[row, col] > rel_tolerance:
-                above_tolerance.append((row, col+1, ref[row, col+1], new[row, col+1], abs_diffs[row, col], rel_diffs[row, col], 'rel'))
+    for row_idx, abs_row in enumerate(abs_diffs):
+        for col_idx, abs_diff in enumerate(abs_row):
+            if col_idx in abs_check_c and abs_diff > absolute_tolerance:
+                above_tolerance.append((row_idx, col_idx+1, ref[row_idx, col_idx+1], new[row_idx, col_idx+1], abs_diff, rel_diffs[row_idx, col_idx], 'abs'))
+            elif col_idx not in abs_check_c and rel_diffs[row_idx, col_idx] > rel_tolerance:
+                above_tolerance.append((row_idx, col_idx+1, ref[row_idx, col_idx+1], new[row_idx, col_idx+1], abs_diff, rel_diffs[row_idx, col_idx], 'rel'))
 
     if above_tolerance:
         print("Rows exceeding tolerances (row, col, ref, new, abs, rel, error type):")
