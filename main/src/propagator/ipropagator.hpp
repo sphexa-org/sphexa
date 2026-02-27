@@ -113,7 +113,7 @@ public:
         if (d.numParticlesGlobalPrev != d.numParticlesGlobal)
         {
             out << "### Check ### Particles (global): " << d.numParticlesGlobal
-                << ", differs by: " << d.numParticlesGlobalPrev - d.numParticlesGlobal << std::endl;
+                << ", differs by: " << std::int64_t(d.numParticlesGlobal) - std::int64_t(d.numParticlesGlobalPrev)  << std::endl;
         }
         out << "### Check ### Global Tree Nodes: " << nodeCount << ", Particles: " << particleCount
             << ", Halos: " << haloCount << std::endl;
