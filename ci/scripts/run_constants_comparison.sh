@@ -108,7 +108,10 @@ done
 
 if [ "$rank_id" -eq 0 ]; then
   if [ ${#failed_comparisons[@]} -gt 0 ]; then
-    echo "Comparison failed for init conditions: ${failed_comparisons[*]}" >&2
+    echo "Constant comparison failed for init conditions:" >&2
+    for failed_ic in "${failed_comparisons[@]}"; do
+      echo "  - $failed_ic" >&2
+    done
     exit 1
   fi
   echo "All constant comparisons passed."
