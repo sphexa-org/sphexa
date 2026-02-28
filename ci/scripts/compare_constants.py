@@ -28,7 +28,7 @@ def main(ref_path: Path, new_path: Path, abs_check_cols: list[int] | None = None
     if above_tolerance:
         print("Rows exceeding tolerances (row, col, ref, new, abs, rel, error type):")
         for entry in above_tolerance:
-            print(entry)
+            print(tuple(value.item() if isinstance(value, np.generic) else value for value in entry))
         sys.exit(1)
     else:
         print("Files agree within tolerances.")
