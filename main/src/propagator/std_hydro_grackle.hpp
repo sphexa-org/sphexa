@@ -218,7 +218,11 @@ public:
 
         computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
         timer.step("UpdateQuantities");
-        updateSmoothingLength(groups_.view(), d);
+        bool haveUnconvergedParticles = updateSmoothingLength(groups_.view(), d);
+        if (haveUnconvergedParticles && not d.removeUnconvergedParticles)
+        {
+            throw std::runtime_error("Neighbor search did not converge\n");
+        }
         timer.step("UpdateSmoothingLength");
     }
 };
