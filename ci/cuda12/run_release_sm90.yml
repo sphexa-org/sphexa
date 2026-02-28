@@ -143,10 +143,15 @@ sph-run-cuda12-sm90-release-sphexa-cuda:
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
+        echo "Building venv and installing numpy for constants comparison script"
+        python -m venv constant_comparison_venv
+        source constant_comparison_venv/bin/activate
+        pip install --quiet numpy
         python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
         if [ $? -ne 0 ]; then
           exit 1
         fi
+        deactivate
       fi
     - date
 
@@ -174,10 +179,15 @@ sph-run-cuda12-sm90-release-sphexa-cpu:
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
+        echo "Building venv and installing numpy for constants comparison script"
+        python -m venv constant_comparison_venv
+        source constant_comparison_venv/bin/activate
+        pip install --quiet numpy
         python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
         if [ $? -ne 0 ]; then
           exit 1
         fi
+        deactivate
       fi
     - date
 
