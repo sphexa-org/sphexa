@@ -110,6 +110,11 @@ public:
         auto totalNeighbors     = d.totalNeighbors;
         auto totalParticleCount = d.numParticlesGlobal;
 
+        if (d.numParticlesGlobalPrev != d.numParticlesGlobal)
+        {
+            out << "### Check ### Particles (global): " << d.numParticlesGlobal
+                << ", differs by: " << std::int64_t(d.numParticlesGlobal) - std::int64_t(d.numParticlesGlobalPrev)  << std::endl;
+        }
         out << "### Check ### Global Tree Nodes: " << nodeCount << ", Particles: " << particleCount
             << ", Halos: " << haloCount << std::endl;
         out << "### Check ### Computational domain: " << box.xmin() << " " << box.xmax() << " " << box.ymin() << " "
