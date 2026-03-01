@@ -35,8 +35,8 @@ sph-run-cuda12-sm90-release-1rank:
     # --- grackle
     # https://github.com/grackle-project/grackle_data_files/blob/928696482fbe15d9bac4382de6134d95568f099c/input/CloudyData_UVB%3DHM2012.h5
     - wget https://jfrog.svc.cscs.ch/artifactory/cscs-reframe-tests/sphexa/CloudyData_UVB%3DHM2012.h5
-    - mkdir -p extern/grackle/grackle_repo/grackle_data_files/input
-    - mv CloudyData_UVB=HM2012.h5 extern/grackle/grackle_repo/grackle_data_files/input/
+    - mkdir -p extern/grackle/grackle_repo/input
+    - mv CloudyData_UVB=HM2012.h5 extern/grackle/grackle_repo/input/
     - $TEST_INSTALL_DIR/physics/cooling_tests
     # GPU tests:
     - $TEST_INSTALL_DIR/hydro/sph_gpu_tests
