@@ -75,11 +75,7 @@ declare -A abs_columns_for_ic=(
 
 # Execution of python comparison script needs numpy which is not available in the used uenv
 if [ "$rank_id" -eq 0 ]; then
-  echo "Building venv and installing numpy for constants comparison script"
-  python -m venv constant_comparison_venv
-  source constant_comparison_venv/bin/activate
-  pip install --quiet numpy
-  deactivate
+  bash ci/scripts/setup_constant_comparison_venv.sh
 fi
 wait
 
