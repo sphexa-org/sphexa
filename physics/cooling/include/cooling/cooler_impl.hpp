@@ -34,7 +34,6 @@ protected:
     {
         local_initialize_chemistry_parameters(&global_values.data);
         global_values.data.grackle_data_file = &grackle_data_file_path[0];
-        std::cout<<"DEBUG grackle_data_file_path = "<<grackle_data_file_path<<std::endl;
     }
 
 private:
