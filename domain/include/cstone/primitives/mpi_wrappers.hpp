@@ -52,6 +52,12 @@ struct MpiType<unsigned char>
 };
 
 template<>
+struct MpiType<signed char>
+{
+    operator MPI_Datatype() const noexcept { return MPI_SIGNED_CHAR; }
+};
+
+template<>
 struct MpiType<short>
 {
     operator MPI_Datatype() const noexcept { return MPI_SHORT; }
