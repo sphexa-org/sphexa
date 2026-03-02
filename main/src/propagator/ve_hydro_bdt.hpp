@@ -242,23 +242,20 @@ public:
 
         computeVe(activeRungs_, d, domain.box());
         timer.step("Generalized Volume Elements");
-        domain.exchangeHalos(std::tie(get<"kx">(d)), get<"keys">(d), haloRecvScratch);
+        domain.exchangeHalos(get<"kx", "vx", "vy", "vz">(d), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
-        computeGradh(activeRungs_, d, domain.box());
-        timer.step("Gradh correction");
+        computeIadDivvCurlvGradh(activeRungs_, d, domain.box());
+        groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
+        timer.step("IadVelocityDivCurlGradh");
+
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "gradh">(d), get<"keys">(d), haloRecvScratch);
+        timer.step("mpi::synchronizeHalos");
 
         computeEOS(first, last, d);
         timer.step("EquationOfState");
 
-        domain.exchangeHalos(get<"vx", "vy", "vz", "prho", "c">(d), get<"keys">(d), haloRecvScratch);
-        timer.step("mpi::synchronizeHalos");
-
-        computeIadDivvCurlv(activeRungs_, d, domain.box());
-        groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
-        timer.step("IadVelocityDivCurl");
-
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv">(d), get<"keys">(d), haloRecvScratch);
+        domain.exchangeHalos(get<"prho", "c">(d), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
         computeAVswitches(activeRungs_, d, domain.box());
@@ -429,7 +426,7 @@ public:
 
         // third output pass: recover temporary curlv and divv quantities
         acquire(d, "curlv");
-        if (!indicesDone.empty()) { computeIadDivvCurlv(groups_.view(), d, box); }
+        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
         output();
         release(d, "curlv");
         acquire(d, "ay", "az");

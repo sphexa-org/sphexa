@@ -156,12 +156,9 @@ public:
 
         release(d, "ay", "az");
         acquire(d, "divv", "gradh");
-        computeIadDivvCurlv(groups_.view(), d, domain.box());
+        computeIadDivvCurlvGradh(groups_.view(), d, domain.box());
         d.minDtRho = rhoTimestep(first, last, d);
-        timer.step("IadVelocityDivCurl");
-
-        computeGradh(groups_.view(), d, domain.box());
-        timer.step("Gradh correction");
+        timer.step("IadVelocityDivCurlGradh");
 
         computeEOS(first, last, d);
         timer.step("EquationOfState");
@@ -265,7 +262,7 @@ public:
         release(d, "prho", "c");
         acquire(d, "divv", "curlv");
         // partial recovery of cij in range [first:last] without halos, which are not needed for divv and curlv
-        if (!indicesDone.empty()) { computeIadDivvCurlv(groups_.view(), d, box); }
+        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
         output();
         release(d, "divv", "curlv");
         acquire(d, "prho", "c");

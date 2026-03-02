@@ -3,8 +3,7 @@ set(VE_KERNELS
         xmass_gpu.cu
         eos_gpu.cu
         ve_gpu.cu
-        gradh_gpu.cu
-        iad_divv_curlv_gpu.cu
+        iad_divv_curlv_gradh_gpu.cu
         av_switches_gpu.cu
         momentum_energy_gpu.cu)
 
