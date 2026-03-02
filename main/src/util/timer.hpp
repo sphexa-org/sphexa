@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <limits.h>
 
+#include "io/type_config.hpp"
+
 #if defined(USE_PROFILING_NVTX) || defined(USE_PROFILING_SCOREP)
 
 #ifdef USE_PROFILING_NVTX
@@ -139,10 +141,7 @@ private:
     std::vector<float>       stepTimes;
     std::vector<std::string> stepTimeNames;
 
-    using SupportedTypes_   = util::TypeList<float, double, uint32_t, uint64_t, int32_t, int64_t>;
-    //If size_t is defined as none of the above, add it to the list
-    using SizeTList = std::conditional_t<util::Contains<size_t, SupportedTypes_>::value, util::TypeList<>, util::TypeList<size_t>>;
-    using SupportedTypes = util::Fuse<SupportedTypes_, SizeTList>;
+    using SupportedTypes   = IO::Types;
     using SupportedVariant = util::Reduce<std::variant, util::Map<std::vector, SupportedTypes>>;
 
     std::map<std::string, SupportedVariant> perfStats;

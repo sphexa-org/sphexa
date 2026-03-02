@@ -46,7 +46,8 @@ namespace sphexa::fileutils
 
 // ---------------------------------------------------------------------------
 // types used by sph-exa throughout
-using H5PartTypes = util::TypeList<double, float, char, int, uint, int64_t, uint64_t>;
+using H5PartTypes = util::TypeList<double, float, std::int8_t, std::uint8_t, std::int16_t, std::uint16_t, std::int32_t,
+                                   std::uint32_t, std::int64_t, std::uint64_t>;
 
 // ---------------------------------------------------------------------------
 enum attribute_type
@@ -55,44 +56,111 @@ enum attribute_type
     step,
 };
 
+template<typename I>
+struct H5hutType;
+
+template<>
+struct H5hutType<double>
+{
+    inline static constexpr auto value    = H5_FLOAT64_T;
+    inline static constexpr char string[] = "python: np.float64";
+};
+
+template<>
+struct H5hutType<float>
+{
+    inline static constexpr auto value    = H5_FLOAT32_T;
+    inline static constexpr char string[] = "python: np.float32";
+};
+
+template<std::signed_integral I>
+requires(sizeof(I) == 1) struct H5hutType<I>
+{
+    inline static constexpr auto value    = H5_INT8_T;
+    inline static constexpr char string[] = "python: np.int8";
+};
+
+template<std::signed_integral I>
+requires(sizeof(I) == 2) struct H5hutType<I>
+{
+    inline static constexpr auto value    = H5_INT16_T;
+    inline static constexpr char string[] = "python: np.int16";
+};
+
+template<std::signed_integral I>
+requires(sizeof(I) == 4) struct H5hutType<I>
+{
+    inline static constexpr auto value    = H5_INT32_T;
+    inline static constexpr char string[] = "python: np.int32";
+};
+
+template<std::signed_integral I>
+requires(sizeof(I) == 8) struct H5hutType<I>
+{
+    inline static constexpr auto value    = H5_INT64_T;
+    inline static constexpr char string[] = "python: np.int64";
+};
+
+template<std::unsigned_integral I>
+requires(sizeof(I) == 1) struct H5hutType<I>
+{
+    inline static constexpr auto value    = H5_UINT8_T;
+    inline static constexpr char string[] = "python: np.uint8";
+};
+
+template<std::unsigned_integral I>
+requires(sizeof(I) == 2) struct H5hutType<I>
+{
+    inline static constexpr auto value    = H5_UINT16_T;
+    inline static constexpr char string[] = "python: np.uint16";
+};
+
+template<std::unsigned_integral I>
+requires(sizeof(I) == 4) struct H5hutType<I>
+{
+    inline static constexpr auto value    = H5_UINT32_T;
+    inline static constexpr char string[] = "python: np.uint32";
+};
+
+template<std::unsigned_integral I>
+requires(sizeof(I) == 8) struct H5hutType<I>
+{
+    inline static constexpr auto value    = H5_UINT64_T;
+    inline static constexpr char string[] = "python: np.uint64";
+};
+
+template<typename I>
+inline constexpr auto H5hutType_v = H5hutType<I>::value;
+
+
 // ---------------------------------------------------------------------------
 // helper to define traits that we can use for brevity
 template<typename H5_Type>
 struct h5_traits
 {
 };
-
-#define make_h5_trait(T, NATIVE_TYPE, H5HUT_TYPE, STRING)                                                              \
+#define make_h5_trait(T, NATIVE_TYPE, STRING)                                                                          \
     template<>                                                                                                         \
     struct h5_traits<T>                                                                                                \
     {                                                                                                                  \
         operator h5_int64_t() const noexcept { return NATIVE_TYPE; }                                                   \
-        static constexpr h5_types_t h5hut_type = H5HUT_TYPE;                                                           \
-        static const std::string    stringval() { return STRING; }                                                     \
+        static constexpr h5_types_t h5hut_type = H5hutType_v<T>;                                                       \
+        static const std::string    stringval() { return std::string{STRING} + H5hutType<T>::string; }                 \
     }
 
-// clang-format off
-make_h5_trait(double,         H5T_NATIVE_DOUBLE,  H5_FLOAT64_T,  "C++: double / python: np.float64");
-make_h5_trait(float,          H5T_NATIVE_FLOAT,   H5_FLOAT32_T,  "C++: float  / python: np.float32");
-make_h5_trait(std::int64_t,   H5T_NATIVE_LONG,    H5_INT64_T,    "C++:  int64 / python: np.int64");
-make_h5_trait(std::uint64_t,  H5T_NATIVE_ULONG,   H5_UINT64_T,   "C++: uint64 / python: np.uint64");
-make_h5_trait(int,            H5T_NATIVE_INT,     H5_INT32_T,    "C++:  int   / python: np.int32");
-make_h5_trait(unsigned,       H5T_NATIVE_UINT,    H5_UINT32_T,   "C++: uint   / python: np.uint32");
-make_h5_trait(std::int16_t,   H5T_NATIVE_SHORT,   H5_INT16_T,    "C++:  int16 / python: np.int16");
-make_h5_trait(std::uint16_t,  H5T_NATIVE_USHORT,  H5_UINT16_T,   "C++: uint16 / python: np.uint16");
-make_h5_trait(char,           H5T_NATIVE_CHAR,    H5_INT8_T,     "C++:  char  / python: np.int8");
-make_h5_trait(unsigned char,  H5T_NATIVE_UCHAR,   H5_UINT8_T,    "C++: uchar  / python: np.uint8");
-
-template<typename T>
-requires(std::is_same_v<T, std::size_t> && !std::is_same_v<std::size_t, std::uint64_t> && sizeof(std::size_t) == sizeof(std::uint64_t))
-struct h5_traits<T>
-{
-    operator h5_int64_t() const noexcept { return H5T_NATIVE_ULONG; }
-    static constexpr h5_types_t h5hut_type = H5_UINT64_T;
-    static const std::string    stringval() { return "C++: uint64 / python: np.uint64"; }
-};
-
-//clang-format on
+make_h5_trait(double, H5T_NATIVE_DOUBLE, "C++: double / ");
+make_h5_trait(float, H5T_NATIVE_FLOAT, "C++: float / ");
+make_h5_trait(char, H5T_NATIVE_CHAR, "C++: char / ");
+make_h5_trait(unsigned char, H5T_NATIVE_UCHAR, "C++: uchar / ");
+make_h5_trait(signed char, H5T_NATIVE_SCHAR, "C++: schar / ");
+make_h5_trait(short, H5T_NATIVE_SHORT, "C++: short / ");
+make_h5_trait(unsigned short, H5T_NATIVE_USHORT, "C++: ushort / ");
+make_h5_trait(int, H5T_NATIVE_INT, "C++: int / ");
+make_h5_trait(unsigned int, H5T_NATIVE_UINT, "C++: uint / ");
+make_h5_trait(long, H5T_NATIVE_LONG, "C++: long / ");
+make_h5_trait(unsigned long, H5T_NATIVE_ULONG, "C++: ulong / ");
+make_h5_trait(long long, H5T_NATIVE_LLONG, "C++: llong / ");
+make_h5_trait(unsigned long long, H5T_NATIVE_ULLONG, "C++: ullong / ");
 
 // ---------------------------------------------------------------------------
 //! @brief return the names of all datasets in @p h5_file
