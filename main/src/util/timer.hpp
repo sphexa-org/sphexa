@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <limits.h>
 
-#include "io/type_config.hpp"
+#include "type_config.h"
 
 #if defined(USE_PROFILING_NVTX) || defined(USE_PROFILING_SCOREP)
 

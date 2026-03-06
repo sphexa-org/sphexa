@@ -37,7 +37,7 @@
 #include <vector>
 
 #include "cstone/util/type_list.hpp"
-#include "type_config.hpp"
+#include "type_config.h"
 
 namespace sphexa
 {
