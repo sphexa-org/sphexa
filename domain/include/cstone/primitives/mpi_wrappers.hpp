@@ -17,80 +17,24 @@
 
 #include <mpi.h>
 #include <algorithm>
-#include <cassert>
-#include <limits>
 #include <type_traits>
 #include <vector>
 
+#include "cstone/util/type_list.hpp"
+
 template<class T>
-struct MpiType
+class MpiType
 {
-};
+    // clang-format off
+    using Types = util::TypeList<double, float, char, signed char, unsigned char, short, unsigned short, int, unsigned,
+                                 long, unsigned long, long long, unsigned long long>;
 
-template<>
-struct MpiType<double>
-{
-    operator MPI_Datatype() const noexcept { return MPI_DOUBLE; }
-};
-
-template<>
-struct MpiType<float>
-{
-    operator MPI_Datatype() const noexcept { return MPI_FLOAT; }
-};
-
-template<>
-struct MpiType<char>
-{
-    operator MPI_Datatype() const noexcept { return MPI_CHAR; }
-};
-
-template<>
-struct MpiType<unsigned char>
-{
-    operator MPI_Datatype() const noexcept { return MPI_UNSIGNED_CHAR; }
-};
-
-template<>
-struct MpiType<short>
-{
-    operator MPI_Datatype() const noexcept { return MPI_SHORT; }
-};
-
-template<>
-struct MpiType<unsigned short>
-{
-    operator MPI_Datatype() const noexcept { return MPI_UNSIGNED_SHORT; }
-};
-
-template<>
-struct MpiType<int>
-{
-    operator MPI_Datatype() const noexcept { return MPI_INT; }
-};
-
-template<>
-struct MpiType<unsigned>
-{
-    operator MPI_Datatype() const noexcept { return MPI_UNSIGNED; }
-};
-
-template<>
-struct MpiType<long>
-{
-    operator MPI_Datatype() const noexcept { return MPI_LONG; }
-};
-
-template<>
-struct MpiType<unsigned long>
-{
-    operator MPI_Datatype() const noexcept { return MPI_UNSIGNED_LONG; }
-};
-
-template<>
-struct MpiType<unsigned long long>
-{
-    operator MPI_Datatype() const noexcept { return MPI_UNSIGNED_LONG_LONG; }
+    constexpr static MPI_Datatype typeIDs[] = {MPI_DOUBLE, MPI_FLOAT, MPI_CHAR, MPI_SIGNED_CHAR, MPI_UNSIGNED_CHAR,
+                                               MPI_SHORT, MPI_UNSIGNED_SHORT, MPI_INT, MPI_UNSIGNED, MPI_LONG,
+                                               MPI_UNSIGNED_LONG, MPI_LONG_LONG, MPI_UNSIGNED_LONG_LONG};
+    // clang-format on
+public:
+    operator MPI_Datatype() const noexcept { return typeIDs[util::FindIndex<T, Types>{}]; }
 };
 
 template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
