@@ -64,12 +64,6 @@ void computeVeImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone:
         auto kxi = veJLoop(i, K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, h, wh, xm);
 
         kx[i] = kxi;
-
-#ifndef NDEBUG
-        auto rhoi = kxi * m[i] / xm[i];
-        if (std::isnan(rhoi))
-            printf("ERROR::Density(%zu) density %f, position: (%f %f %f), h: %f\n", i, rhoi, x[i], y[i], z[i], h[i]);
-#endif
     }
 }
 
