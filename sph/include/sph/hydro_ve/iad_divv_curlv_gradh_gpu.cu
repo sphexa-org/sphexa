@@ -50,11 +50,12 @@ using cstone::TreeNodeIndex;
 
 template<class Tc, class Tm, class T, class KeyType>
 __global__ void
-iadDivvCurlvGradhGpu(Tc K, unsigned ngmax, const cstone::Box<Tc> box, const LocalIndex* grpStart, const LocalIndex* grpEnd,
-                LocalIndex numGroups, const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* x, const Tc* y,
-                const Tc* z, const T* vx, const T* vy, const T* vz, const T* h, const Tm* m, const T* wh, const T* whd, const T* xm,
-                const T* kx, T* gradh, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, T* divv, T* curlv, T* dV11, T* dV12,
-                T* dV13, T* dV22, T* dV23, T* dV33, cstone::LocalIndex* nidx, TreeNodeIndex* globalPool, bool doGradV)
+iadDivvCurlvGradhGpu(Tc K, unsigned ngmax, const cstone::Box<Tc> box, const LocalIndex* grpStart,
+                     const LocalIndex* grpEnd, LocalIndex numGroups, const cstone::OctreeNsView<Tc, KeyType> tree,
+                     const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy, const T* vz, const T* h,
+                     const Tm* m, const T* wh, const T* whd, const T* xm, const T* kx, T* gradh, T* c11, T* c12, T* c13,
+                     T* c22, T* c23, T* c33, T* divv, T* curlv, T* dV11, T* dV12, T* dV13, T* dV22, T* dV23, T* dV33,
+                     cstone::LocalIndex* nidx, TreeNodeIndex* globalPool, bool doGradV)
 {
     unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned targetIdx   = 0;
@@ -79,13 +80,11 @@ iadDivvCurlvGradhGpu(Tc K, unsigned ngmax, const cstone::Box<Tc> box, const Loca
         if (i >= bodyEnd) continue;
 
         unsigned ncCapped = stl::min(ncTrue[0], ngmax);
-        IADJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, h, wh, whd, xm, kx, c11,
-                                         c12, c13, c22, c23, c33);
+        IAD_gradhJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, h, m, wh, whd, xm,
+                                               kx, c11, c12, c13, c22, c23, c33, gradh);
         divV_curlVJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, vx, vy, vz, h,
                                                 c11, c12, c13, c22, c23, c33, wh, whd, kx, xm, divv, curlv, dV11, dV12,
                                                 dV13, dV22, dV23, dV33, doGradV);
-        gradh[i] = GradhJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, h, m, wh,
-                                                      whd, xm, kx);
     }
 }
 
@@ -99,13 +98,11 @@ void computeIadDivvCurlvGradh(const GroupView& grp, Dataset& d, const cstone::Bo
     auto* d_curlv = (d.x.size() == d.curlv.size()) ? rawPtr(d.curlv) : nullptr;
 
     iadDivvCurlvGradhGpu<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.x),
-        rawPtr(d.y), rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz),
-        rawPtr(d.h), rawPtr(d.m), rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.xm), rawPtr(d.kx), rawPtr(d.gradh),
-        rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22),
-        rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.divv), d_curlv, rawPtr(d.dV11),
-        rawPtr(d.dV12), rawPtr(d.dV13), rawPtr(d.dV22), rawPtr(d.dV23),
-        rawPtr(d.dV33), nidxPool, traversalPool, doGradV);
+        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.x), rawPtr(d.y),
+        rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.h), rawPtr(d.m), rawPtr(d.wh), rawPtr(d.whd),
+        rawPtr(d.xm), rawPtr(d.kx), rawPtr(d.gradh), rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22),
+        rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.divv), d_curlv, rawPtr(d.dV11), rawPtr(d.dV12), rawPtr(d.dV13),
+        rawPtr(d.dV22), rawPtr(d.dV23), rawPtr(d.dV33), nidxPool, traversalPool, doGradV);
     checkGpuErrors(cudaDeviceSynchronize());
 }
 

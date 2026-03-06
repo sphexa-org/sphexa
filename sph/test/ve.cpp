@@ -41,7 +41,7 @@
 #include "sph/hydro_ve/iad_kern.hpp"
 #include "sph/hydro_ve/momentum_energy_kern.hpp"
 #include "sph/hydro_ve/ve_kern.hpp"
-#include "sph/hydro_ve/gradh_kern.hpp" 
+#include "sph/hydro_ve/gradh_kern.hpp"
 #include "sph/hydro_ve/xmass_kern.hpp"
 #include "sph/sph_kernel_tables.hpp"
 #include "sph/table_lookup.hpp"
@@ -142,10 +142,12 @@ TEST_F(SphKernelTests, IAD)
 {
     // fill with invalid initial value to make sure that the kernel overwrites it instead of add to it
     std::vector<T> iad(6, -1);
+    T              gradh = -1;
 
     // compute the 6 tensor components for particle 0
-    IADJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), wh.data(),
-             whd.data(), xm.data(), kx.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5]);
+    IAD_gradhJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), m.data(),
+                   wh.data(), whd.data(), xm.data(), kx.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5],
+                   &gradh);
 
     EXPECT_NEAR(iad[0], 1.9296619855715329e-18, 1e-10);
     EXPECT_NEAR(iad[1], -1.7838691836843698e-20, 1e-10);
@@ -153,6 +155,7 @@ TEST_F(SphKernelTests, IAD)
     EXPECT_NEAR(iad[3], 1.9482845913025683e-18, 1e-10);
     EXPECT_NEAR(iad[4], 1.635410357476855e-20, 1e-10);
     EXPECT_NEAR(iad[5], 1.9246939006338132e-18, 1e-10);
+    EXPECT_NEAR(gradh, 0.99783225455705071, 5e-7);
 }
 
 template<class T>
@@ -186,7 +189,7 @@ TEST_F(SphKernelTests, MomentumEnergy)
                                      alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
                                      dV33.data(), &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
-        EXPECT_NEAR(grad_Px,-23175.29155183331, 0.023);
+        EXPECT_NEAR(grad_Px, -23175.29155183331, 0.023);
         EXPECT_NEAR(grad_Py, 13564.560025399775, 0.053);
         EXPECT_NEAR(grad_Pz, -80978.279574341461, 0.043);
         EXPECT_NEAR(du, -2.6643381633458105e11, 7.1e5);
@@ -228,14 +231,11 @@ TEST_F(SphKernelTests, MomentumEnergy)
 
 TEST_F(SphKernelTests, VeDefGradh)
 {
-    T kxx   = veJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(),
-                      h.data(), wh.data(), xm.data());
-    T gradh = GradhJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(),
-			 h.data(), m.data(), wh.data(), whd.data(), xm.data(), kx.data());
+    T kxx = veJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), wh.data(),
+                    xm.data());
 
     T density = kxx * m[0] / xm[0];
     EXPECT_NEAR(density, 3.4662283566584293e1, 8e-7);
-    EXPECT_NEAR(gradh, 0.99783225455705071, 5e-7);
     EXPECT_NEAR(kxx, 1.0042661134076782, 3e-7);
 }
 
