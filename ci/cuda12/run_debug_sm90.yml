@@ -123,7 +123,10 @@ sph-run-cuda12-sm90-debug-12ranks:
 
 sph-run-cuda12-sm90-debug-sphexa-cuda:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-debug']
+  needs:
+    - job: sph-build-cuda12-sm90-debug
+    - job: sph-test-venv-setup
+      artifacts: true
   image: prgenv-gnu/25.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
@@ -145,8 +148,7 @@ sph-run-cuda12-sm90-debug-sphexa-cuda:
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
-        bash ci/scripts/setup_constant_comparison_venv.sh
-        source constant_comparison_venv/bin/activate
+        . constant_comparison_venv/bin/activate
         python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
         if [ $? -ne 0 ]; then
           exit 1
@@ -157,7 +159,10 @@ sph-run-cuda12-sm90-debug-sphexa-cuda:
 
 sph-run-cuda12-sm90-debug-sphexa-cpu:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-debug']
+  needs:
+    - job: sph-build-cuda12-sm90-debug
+    - job: sph-test-venv-setup
+      artifacts: true
   image: prgenv-gnu/25.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
@@ -179,8 +184,7 @@ sph-run-cuda12-sm90-debug-sphexa-cpu:
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
-        bash ci/scripts/setup_constant_comparison_venv.sh
-        source constant_comparison_venv/bin/activate
+        . constant_comparison_venv/bin/activate
         python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
         if [ $? -ne 0 ]; then
           exit 1
@@ -191,7 +195,10 @@ sph-run-cuda12-sm90-debug-sphexa-cpu:
 
 sph-compare-constants-cuda12-sm90-debug-sphexa-cuda:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-debug']
+  needs:
+    - job: sph-build-cuda12-sm90-debug
+    - job: sph-test-venv-setup
+      artifacts: true
   image: prgenv-gnu/25.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
@@ -210,7 +217,10 @@ sph-compare-constants-cuda12-sm90-debug-sphexa-cuda:
 
 sph-compare-constants-cuda12-sm90-debug-sphexa-cpu:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-debug']
+  needs:
+    - job: sph-build-cuda12-sm90-debug
+    - job: sph-test-venv-setup
+      artifacts: true
   image: prgenv-gnu/25.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:

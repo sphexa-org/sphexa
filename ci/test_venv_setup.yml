@@ -1,0 +1,27 @@
+sph-test-venv-setup:
+  stage: sphexa_test_venv_setup
+  image: prgenv-gnu/25.11:v1
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    WITH_UENV_VIEW: 'default'
+    # SLURM_PARTITION: 'debug'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 1
+  before_script:
+    - pwd
+    - date
+  script:
+    - |
+      set -euo pipefail
+      venv_dir="constant_comparison_venv"
+      if [ ! -d "$venv_dir" ]; then
+        echo "Creating python venv at '$venv_dir' for constants comparison"
+        python -m venv "$venv_dir"
+      fi
+      source "$venv_dir/bin/activate"
+      pip install --quiet numpy
+      deactivate
+    - date
+  artifacts:
+    paths:
+      - constant_comparison_venv/

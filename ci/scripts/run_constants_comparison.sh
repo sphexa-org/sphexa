@@ -73,12 +73,6 @@ declare -A abs_columns_for_ic=(
   [kelvin-helmholtz]="6"
 )
 
-# Execution of python comparison script needs numpy which is not available in the used uenv
-if [ "$rank_id" -eq 0 ]; then
-  bash ci/scripts/setup_constant_comparison_venv.sh
-fi
-wait
-
 failed_comparisons=()
 
 for ic in "${ics[@]}"; do
@@ -89,7 +83,7 @@ for ic in "${ics[@]}"; do
   "$binary_path" --quiet --glass "./50c.h5" --init "$ic" -s 10 -n 50
   if [ "$rank_id" -eq 0 ]; then
     abs_cols="${abs_columns_for_ic[$ic]:-}"
-    source constant_comparison_venv/bin/activate
+    . constant_comparison_venv/bin/activate
     cmd=(python ci/scripts/compare_constants.py "ci/reference/const-${ic}-${backend}-ref.txt" constants.txt)
     if [ -n "$abs_cols" ]; then
       cmd+=("$abs_cols")

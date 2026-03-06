@@ -3,4 +3,5 @@ include:
 
 stages:
   - sphexa_build
+  - sphexa_test_venv_setup
   - sphexa_run
