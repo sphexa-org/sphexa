@@ -23,13 +23,14 @@
  */
 
 /*! @file
- * @brief A C++ layer over H5Part
+ * @brief A C++ layer over H5Hut
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <stdexcept>
@@ -48,88 +49,47 @@ namespace sphexa::fileutils
 using H5Types = util::TypeList<double, float, std::int8_t, std::uint8_t, std::int16_t, std::uint16_t, std::int32_t,
                                std::uint32_t, std::int64_t, std::uint64_t>;
 
-enum attribute_type
-{
-    file,
-    step,
+static constexpr h5_types_t H5TypeIDs[] = {H5_FLOAT64_T, H5_FLOAT32_T, H5_INT8_T,   H5_UINT8_T, H5_INT16_T,
+                                           H5_UINT16_T,  H5_INT32_T,   H5_UINT32_T, H5_INT64_T, H5_UINT64_T};
+
+static constexpr std::array H5TypeNames{
+    "C++ double / python np.float64",  "C++ float / python np.float32",   "C++ int8_t / python np.int8",
+    "C++ uint8_t / python np.uint8",   "C++ int16_t / python np.int16",   "C++ uint16_t / python np.uint16",
+    "C++ int32_t / python np.int32",   "C++ uint32_t / python np.uint32", "C++ int64_t / python np.int64",
+    "C++ uint64_t / python np.uint64",
 };
 
-template<typename I>
-struct H5hutType;
-
-template<>
-struct H5hutType<double>
+//! @brief Match type T with type of tuple_element_t<N, Tuple> if signedness and byte-width match and both are integral
+template<int N, class T, class Tuple>
+struct MatchSignednessAndBytes
+    : std::bool_constant<sizeof(T) == sizeof(util::TypeListElement_t<N, Tuple>) &&
+                         std::is_integral_v<T> == std::is_integral_v<util::TypeListElement_t<N, Tuple>> &&
+                         std::is_signed_v<T> == std::is_signed_v<util::TypeListElement_t<N, Tuple>>>
 {
-    inline static constexpr auto value    = H5_FLOAT64_T;
-    inline static constexpr char string[] = "python: np.float64";
 };
 
-template<>
-struct H5hutType<float>
+/*! @brief translate Native C++ types to fixed-width types supported by HDF5
+ * @tparam AppType Native C++ type from the application
+ *
+ * The byte-width of native C++ types such as "long" are implementation dependent, e.g. 32-bit on Windows and 64-bit
+ * on Linux, Unix and macOS. Therefore, we must map them to fixed-width types suitable for serialization.
+ */
+template<typename AppType>
+struct H5hutType
 {
-    inline static constexpr auto value    = H5_FLOAT32_T;
-    inline static constexpr char string[] = "python: np.float32";
-};
-
-template<std::signed_integral I>
-requires(sizeof(I) == 1) struct H5hutType<I>
-{
-    inline static constexpr auto value    = H5_INT8_T;
-    inline static constexpr char string[] = "python: np.int8";
-};
-
-template<std::signed_integral I>
-requires(sizeof(I) == 2) struct H5hutType<I>
-{
-    inline static constexpr auto value    = H5_INT16_T;
-    inline static constexpr char string[] = "python: np.int16";
-};
-
-template<std::signed_integral I>
-requires(sizeof(I) == 4) struct H5hutType<I>
-{
-    inline static constexpr auto value    = H5_INT32_T;
-    inline static constexpr char string[] = "python: np.int32";
-};
-
-template<std::signed_integral I>
-requires(sizeof(I) == 8) struct H5hutType<I>
-{
-    inline static constexpr auto value    = H5_INT64_T;
-    inline static constexpr char string[] = "python: np.int64";
-};
-
-template<std::unsigned_integral I>
-requires(sizeof(I) == 1) struct H5hutType<I>
-{
-    inline static constexpr auto value    = H5_UINT8_T;
-    inline static constexpr char string[] = "python: np.uint8";
-};
-
-template<std::unsigned_integral I>
-requires(sizeof(I) == 2) struct H5hutType<I>
-{
-    inline static constexpr auto value    = H5_UINT16_T;
-    inline static constexpr char string[] = "python: np.uint16";
-};
-
-template<std::unsigned_integral I>
-requires(sizeof(I) == 4) struct H5hutType<I>
-{
-    inline static constexpr auto value    = H5_UINT32_T;
-    inline static constexpr char string[] = "python: np.uint32";
-};
-
-template<std::unsigned_integral I>
-requires(sizeof(I) == 8) struct H5hutType<I>
-{
-    inline static constexpr auto value    = H5_UINT64_T;
-    inline static constexpr char string[] = "python: np.uint64";
+    constexpr static int         typeIndex = util::FindIndex<std::decay_t<AppType>, H5Types, MatchSignednessAndBytes>{};
+    constexpr static auto        value     = H5TypeIDs[typeIndex];
+    constexpr static const char* nameString = H5TypeNames[typeIndex];
 };
 
 template<typename I>
 inline constexpr auto H5hutType_v = H5hutType<I>::value;
 
+enum attribute_type
+{
+    file,
+    step,
+};
 
 //! @brief return the names of all datasets in @p h5_file
 std::vector<std::string> datasetNames(h5_file_t h5_file)
@@ -290,7 +250,7 @@ void readAttribute_typesafe(h5_file_t h5_file, attribute_type domain, ExtractTyp
             bool h5IsSame            = H5hutType_v<TrialType> == H5hutType_v<ExtractType>;
             bool bothFloating        = std::is_floating_point_v<TrialType> && std::is_floating_point_v<ExtractType>;
             bool extractToCommonType = std::is_same_v<std::common_type_t<TrialType, ExtractType>, ExtractType>;
-            if (h5IsSame ||  bothFloating || extractToCommonType)
+            if (h5IsSame || bothFloating || extractToCommonType)
             {
                 std::vector<TrialType> attrBuf(attrSizeFile);
                 if (std::invoke(
@@ -309,8 +269,8 @@ void readAttribute_typesafe(h5_file_t h5_file, attribute_type domain, ExtractTyp
             else
             {
                 throw std::runtime_error("Reading attribute " + std::string(attrName) +
-                                         " failed: " + "type in file is " + H5hutType<TrialType>::string +
-                                         ", but supplied buffer type is " + H5hutType<ExtractType>::string + "\n");
+                                         " failed: " + "type in file is " + H5hutType<TrialType>::nameString +
+                                         ", but supplied buffer type is " + H5hutType<ExtractType>::nameString + "\n");
             }
             breakLoop = true;
         }
