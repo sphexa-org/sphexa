@@ -11,10 +11,12 @@
 
 #include <array>
 #include <cmath>
+#include <cstdlib>
 #include <functional>
 #include <iostream>
 #include <optional>
 #include <omp.h>
+#include <string>
 #include <vector>
 
 namespace cooling
@@ -35,6 +37,20 @@ protected:
     }
 
 private:
+    static std::string dataFilePath()
+    {
+        if (const char* fullPath = std::getenv("GRACKLE_DATA_FILE"); fullPath && fullPath[0] != '\0')
+        {
+            return std::string(fullPath);
+        }
+        if (const char* dataDir = std::getenv("GRACKLE_DATA_DIR"); dataDir && dataDir[0] != '\0')
+        {
+            return std::string(dataDir) + "/CloudyData_UVB=HM2012.h5";
+        }
+
+        return CMAKE_SOURCE_DIR "/extern/grackle/grackle_repo/input/CloudyData_UVB=HM2012.h5";
+    }
+
     //! @brief Number of particles that are passed simultaneously to Grackle
     inline constexpr static size_t blockSize = 1000;
 
@@ -49,7 +65,7 @@ private:
     //! @brief code unit length in kpc
     T l_code_in_kpc = 46400.;
     //! @brief Path to Grackle data file
-    std::string grackle_data_file_path = CMAKE_SOURCE_DIR "/extern/grackle/grackle_repo/input/CloudyData_UVB=HM2012.h5";
+    std::string grackle_data_file_path = dataFilePath();
 
     //! @brief Struct storing the values that need to be initialized once and passed to Grackle at each call
     struct GlobalValues

@@ -2,6 +2,8 @@
 
 ![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/sphexa-org/sphexa?include_prereleases)
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/sphexa-org/sphexa)
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/sphexa-org/sphexa/refs/heads/develop/docs/artwork/SPH-EXA_logo.png" alt="SPH-EXA logo" width="200"/>
 </p>
