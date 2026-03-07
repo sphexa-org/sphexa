@@ -33,8 +33,7 @@
 
 #include "sph/sph_gpu.hpp"
 #include "divv_curlv_kern.hpp"
-#include "iad_kern.hpp"
-#include "gradh_kern.hpp"
+#include "iad_gradh_kern.hpp"
 
 namespace sph
 {

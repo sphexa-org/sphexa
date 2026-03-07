@@ -34,9 +34,8 @@
 
 #include "sph/sph_gpu.hpp"
 #include "sph/particles_data.hpp"
-#include "sph/hydro_ve/iad_kern.hpp"
+#include "sph/hydro_ve/iad_gradh_kern.hpp"
 #include "sph/hydro_ve/divv_curlv_kern.hpp"
-#include "sph/hydro_ve/gradh_kern.hpp"
 
 namespace sph
 {

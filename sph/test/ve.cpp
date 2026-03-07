@@ -38,10 +38,9 @@
 
 #include "sph/hydro_ve/av_switches_kern.hpp"
 #include "sph/hydro_ve/divv_curlv_kern.hpp"
-#include "sph/hydro_ve/iad_kern.hpp"
+#include "sph/hydro_ve/iad_gradh_kern.hpp"
 #include "sph/hydro_ve/momentum_energy_kern.hpp"
 #include "sph/hydro_ve/ve_kern.hpp"
-#include "sph/hydro_ve/gradh_kern.hpp"
 #include "sph/hydro_ve/xmass_kern.hpp"
 #include "sph/sph_kernel_tables.hpp"
 #include "sph/table_lookup.hpp"
