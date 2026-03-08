@@ -7,10 +7,13 @@ relative_tolerance = 1e-2
 absolute_tolerance = 1e-6
 
 
-def main(ref_path: Path, new_path: Path,
-         abs_check_cols: list[int] | None = None,
-         rel_tolerance: float = relative_tolerance,
-         absolute_tolerance: float = absolute_tolerance):
+def main(
+    ref_path: Path,
+    new_path: Path,
+    abs_check_cols: list[int] | None = None,
+    rel_tolerance: float = relative_tolerance,
+    absolute_tolerance: float = absolute_tolerance,
+):
     ref = np.loadtxt(ref_path)
     new = np.loadtxt(new_path)
     if ref.shape != new.shape:
@@ -21,7 +24,7 @@ def main(ref_path: Path, new_path: Path,
     print(f"Absolute value check for columns: {sorted(abs_check_c)}")
     abs_diffs = abs(new[:, 1:] - ref[:, 1:])
     denoms = np.maximum(np.abs(ref[:, 1:]), eps_zero)
-    rel_diffs = abs_diffs/denoms
+    rel_diffs = abs_diffs / denoms
     for row_idx, abs_row in enumerate(abs_diffs):
         for col_idx, abs_diff in enumerate(abs_row):
             if col_idx in abs_check_c and abs_diff > absolute_tolerance:
@@ -29,8 +32,10 @@ def main(ref_path: Path, new_path: Path,
                     (row_idx, col_idx+1, ref[row_idx, col_idx+1],
                      new[row_idx, col_idx+1], abs_diff,
                      rel_diffs[row_idx, col_idx], 'abs'))
-            elif col_idx not in abs_check_c and \
-            rel_diffs[row_idx, col_idx] > rel_tolerance:
+            elif (
+                col_idx not in abs_check_c
+                and rel_diffs[row_idx, col_idx] > rel_tolerance
+            ):
                 above_tolerance.append(
                     (row_idx, col_idx+1, ref[row_idx, col_idx+1],
                      new[row_idx, col_idx+1], abs_diff,
