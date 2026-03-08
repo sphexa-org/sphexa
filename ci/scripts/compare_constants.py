@@ -29,7 +29,7 @@ def main(ref_path: Path, new_path: Path,
                     (row_idx, col_idx+1, ref[row_idx, col_idx+1],
                      new[row_idx, col_idx+1], abs_diff,
                      rel_diffs[row_idx, col_idx], 'abs'))
-            elif col_idx not in abs_check_c and
+            elif col_idx not in abs_check_c and \
             rel_diffs[row_idx, col_idx] > rel_tolerance:
                 above_tolerance.append(
                     (row_idx, col_idx+1, ref[row_idx, col_idx+1],
