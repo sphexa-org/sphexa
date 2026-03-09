@@ -31,12 +31,12 @@ TEST(Integrator, timeReversal)
     std::tie(Xnp1, Vnp1, dXnp1) = positionUpdate(dtn, dtnm1, Xn, An, dXn, box);
 
     // advance to an intermediate time
-    Vec3<T> Xtmp, Vtmp;
-    std::tie(Xtmp, Vtmp, std::ignore) = positionUpdate(0.5 * dtn, dtnm1, Xn, An, dXn, box);
+    Vec3<T> Xtmp, Vtmp, dXtmp;
+    std::tie(Xtmp, Vtmp, dXtmp) = positionUpdate(0.5 * dtn, dtnm1, Xn, An, dXn, box);
 
     // undo last advance to an intermediate time
     Vec3<T> Xn_re;
-    std::tie(Xn_re, std::ignore, std::ignore) = positionUpdate(-0.5 * dtn, dtnm1, Xtmp, An, dXn, box);
+    std::tie(Xn_re, std::ignore, std::ignore) = positionUpdate(-0.5 * dtn, 0.5 * dtn, Xtmp, An, dXtmp, box);
 
     // advance to final time
     Vec3<T> Xnp1_ts, Vnp1_ts, dXnp1_ts;
