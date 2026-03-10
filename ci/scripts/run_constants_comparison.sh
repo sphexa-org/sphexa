@@ -53,24 +53,24 @@ ics=(
   kelvin-helmholtz
 )
 
-# Observables compared by absolute value (not relative error) in compare_constants.py.
+# Exaclty conserved observables to be compared by absolute value (not relative error) in compare_constants.py.
 declare -A abs_columns_for_ic=(
-  # TimeAndEnergy: etot/ecin/eint
+  # TimeAndEnergy: egrav/linmom/angmom (if not changed in CLI, gravConstant = 0.0)
   [sedov]="6,7,8"
-  # TimeAndEnergy: etot/eint
+  # TimeAndEnergy: egrav/angmom (if not changed in CLI, gravConstant = 0.0)
   [noh]="6,8"
-  # TimeAndEnergy: etot (TODO: why linear and angular momentum are not conserved as well?)
-  [isobaric-cube]="6"
-  # TimeAndEnergy: ecin/eint
-  [evrard]="7,8"
-  # TimeAndEnergy or TurbulenceMachRMS (TODO: Identify subcases split by eosChoice)
+  # TimeAndEnergy: egrav (if not changed in CLI, gravConstant = 0.0)
+  [isobaric-cube]="6,7,8"
+  # TimeAndEnergy: linmom/angmom
+  [evrard]="3,7,8"
+  # TimeAndEnergy: egrav/linmom/angmom (if not changed in CLI, eosChoice = 0 and gravConstant = 0.0)
   [turbulence]="6,7,8"
-  # TimeAndEnergy: etot
+  # TimeAndEnergy: egrav (if not changed in CLI, gravConstant = 0.0)
   [gresho-chan]="6"
-  # WindBubble: etot
+  # WindBubble: egrav (if not changed in CLI, gravConstant = 0.0)
   [wind-shock]="6"
-  # TimeEnergyGrowth: etot
-  [kelvin-helmholtz]="6"
+  # TimeEnergyGrowth: egrav (if not changed in CLI, gravConstant = 0.0)
+  [kelvin-helmholtz]="6,7"
 )
 
 failed_comparisons=()
