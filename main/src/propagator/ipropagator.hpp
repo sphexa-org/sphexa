@@ -181,6 +181,7 @@ protected:
     {
         timer.logStatistics("numParticles", domain.nParticles());
         timer.logStatistics("numHalos", domain.nParticlesWithHalos() - domain.nParticles());
+        timer.logStatistics("numNeighborPairs", simData.hydro.localNeighbors);
         timer.logStatistics("assignment", domain.assignmentStart());
 
         auto hostMem = simData.hydro.memStats();
