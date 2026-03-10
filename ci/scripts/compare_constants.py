@@ -27,13 +27,13 @@ def main(
     rel_diffs = abs_diffs / denoms
     for row_idx, abs_row in enumerate(abs_diffs):
         for col_idx, abs_diff in enumerate(abs_row):
-            if col_idx in abs_check_c and abs_diff > absolute_tolerance:
+            if col_idx+1 in abs_check_c and abs_diff > absolute_tolerance:
                 above_tolerance.append(
                     (row_idx, col_idx+1, ref[row_idx, col_idx+1],
                      new[row_idx, col_idx+1], abs_diff,
                      rel_diffs[row_idx, col_idx], 'abs'))
             elif (
-                col_idx not in abs_check_c
+                col_idx+1 not in abs_check_c
                 and rel_diffs[row_idx, col_idx] > rel_tolerance
             ):
                 above_tolerance.append(
