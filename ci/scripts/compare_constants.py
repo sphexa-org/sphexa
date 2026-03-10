@@ -19,33 +19,63 @@ def main(
     if ref.shape != new.shape:
         print(f"Shape mismatch: {ref.shape} (ref) vs {new.shape} (new)")
         sys.exit(2)
-    above_tolerance = []
     abs_check_c = set(abs_check_cols or [])
     print(f"Absolute value check for columns: {sorted(abs_check_c)}")
     abs_diffs = abs(new[:, 1:] - ref[:, 1:])
     denoms = np.maximum(np.abs(ref[:, 1:]), eps_zero)
     rel_diffs = abs_diffs / denoms
-    for row_idx, abs_row in enumerate(abs_diffs):
-        for col_idx, abs_diff in enumerate(abs_row):
-            if col_idx+1 in abs_check_c and abs_diff > absolute_tolerance:
-                above_tolerance.append(
-                    (row_idx, col_idx+1, ref[row_idx, col_idx+1],
-                     new[row_idx, col_idx+1], abs_diff,
-                     rel_diffs[row_idx, col_idx], 'abs'))
-            elif (
-                col_idx+1 not in abs_check_c
-                and rel_diffs[row_idx, col_idx] > rel_tolerance
-            ):
-                above_tolerance.append(
-                    (row_idx, col_idx+1, ref[row_idx, col_idx+1],
-                     new[row_idx, col_idx+1], abs_diff,
-                     rel_diffs[row_idx, col_idx], 'rel'))
+    ncols = abs_diffs.shape[1]
+
+    # Define absolute and relative check column masks
+    col_mask_abs = np.zeros(ncols, dtype=bool)
+    cols_abs_check = np.array(
+        [c - 1 for c in abs_check_c if 1 <= c <= ncols],
+        dtype=int,
+    )
+    col_mask_abs[cols_abs_check] = True
+    col_mask_rel = ~col_mask_abs
+
+    # Determine where absolute or relative differences exceed tolerances
+    abs_mask = (abs_diffs > absolute_tolerance) & col_mask_abs
+    rel_mask = (rel_diffs > rel_tolerance) & col_mask_rel
+
+    above_tolerance = []
+    above_tolerance_kind = []
+
+    for mask, kind in ((abs_mask, "abs"), (rel_mask, "rel")):
+        rows, cols = np.where(mask)
+        if rows.size == 0:
+            continue
+        above_tolerance.append(np.column_stack((
+            rows,
+            cols + 1,
+            ref[rows, cols + 1],
+            new[rows, cols + 1],
+            abs_diffs[rows, cols],
+            rel_diffs[rows, cols],
+        )))
+        above_tolerance_kind.append(np.full(rows.size, kind))
 
     if above_tolerance:
-        print("Rows exceeding tolerances (row, col, ref, new, abs, rel, error type):")  # noqa: E501
-        for entry in above_tolerance:
-            print(tuple(value.item() if isinstance(value, np.generic) else
-                  value for value in entry))
+        above_tolerance = np.vstack(above_tolerance)
+        above_tolerance_kind = np.concatenate(above_tolerance_kind)
+    else:
+        above_tolerance = np.empty((0, 6))
+        above_tolerance_kind = np.empty((0,), dtype='<U3')
+
+    if above_tolerance.shape[0] > 0:
+        print("Rows exceeding tolerances (row, col, ref, new, abs, rel, error type):")
+        for entry, kind in zip(above_tolerance, above_tolerance_kind):
+            row, col, ref_val, new_val, abs_val, rel_val = entry
+            print((
+                int(row),
+                int(col),
+                float(ref_val),
+                float(new_val),
+                float(abs_val),
+                float(rel_val),
+                kind,
+            ))
         sys.exit(1)
     else:
         print("Files agree within tolerances.")
