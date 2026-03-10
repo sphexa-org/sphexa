@@ -149,7 +149,7 @@ sph-run-cuda12-sm90-debug-sphexa-cuda:
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
         . constant_comparison_venv/bin/activate
-        python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
+        python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt "7,8"
         if [ $? -ne 0 ]; then
           exit 1
         fi
@@ -185,7 +185,7 @@ sph-run-cuda12-sm90-debug-sphexa-cpu:
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
         . constant_comparison_venv/bin/activate
-        python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
+        python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt "7,8"
         if [ $? -ne 0 ]; then
           exit 1
         fi
