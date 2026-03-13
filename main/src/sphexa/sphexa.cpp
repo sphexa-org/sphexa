@@ -147,7 +147,7 @@ int main(int argc, char** argv)
     if (rank == 0) std::cout << "Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
 
     viz::init_catalyst(argc, argv);
-    viz::init_ascent(d, domain.startIndex());
+    viz::init_ascent(argc, argv);
 
     size_t startIteration    = d.iteration;
     bool   isOutputTriggered = false;

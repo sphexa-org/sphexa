@@ -22,11 +22,10 @@ void init_catalyst([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 #endif
 }
 
-template<class DataType>
-void init_ascent([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
+void init_ascent(int argc, char** argv)
 {
 #ifdef SPH_EXA_USE_ASCENT
-    AscentAdaptor::Initialize(d, startIndex);
+    AscentAdaptor::Initialize(argc, argv);
     std::cout << "AscentInitialize\n";
 #endif
 }

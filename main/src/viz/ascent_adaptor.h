@@ -16,8 +16,7 @@ namespace AscentAdaptor
 ascent::Ascent a;
 conduit::Node  actions;
 
-template<class DataType>
-void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
+void Initialize(int, char**)
 {
     conduit::Node ascent_options;
     std::string   output_path = "datasets/";
