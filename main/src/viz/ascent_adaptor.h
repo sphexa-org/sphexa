@@ -1,15 +1,13 @@
 #pragma once
 
-#include "sph/particles_data.hpp"
+#include "utils.h"
 
-#include <ascent/ascent.hpp>
-#include "conduit_blueprint.hpp"
 #include <cstring>
-#include <fstream>
 #include <iostream>
 #include <string>
-#include <vector>
-#include <numeric>
+#include <mpi.h>
+
+#include <ascent/ascent.hpp>
 
 namespace AscentAdaptor
 {
@@ -115,24 +113,6 @@ void Initialize(int, char**)
     // std::cout << actions.to_yaml() << std::endl;
 }
 
-/*! @brief Add a volume-independent vertex field to a mesh
- *
- * @tparam       FieldType  and elementary type like float, double, int, ...
- * @param[inout] mesh       the mesh to add the field to
- * @param[in]    name       the name of the field to use within the mesh
- * @param[in]    field      field base pointer to publish to the mesh as external (zero-copy)
- * @param[in]    start      first element of @p field to reveal to the mesh
- * @param[in]    end        last element of @p field to reveal to the meash
- */
-template<class FieldType>
-void addField(conduit::Node& mesh, const std::string& name, FieldType* field, size_t start, size_t end)
-{
-    mesh["fields/" + name + "/association"] = "vertex";
-    mesh["fields/" + name + "/topology"]    = "mesh";
-    mesh["fields/" + name + "/values"].set_external(field + start, end - start);
-    mesh["fields/" + name + "/volume_dependent"].set("false");
-}
-
 template<class DataType>
 void Execute(DataType& d, long startIndex, long endIndex)
 {
@@ -140,49 +120,7 @@ void Execute(DataType& d, long startIndex, long endIndex)
     mesh["state/cycle"].set_external(&d.iteration);
     mesh["state/time"].set_external(&d.ttot);
 
-    mesh["coordsets/coords/type"] = "explicit";
-    mesh["coordsets/coords/values/x"].set_external(get<"x">(d).data() + startIndex, endIndex - startIndex);
-    mesh["coordsets/coords/values/y"].set_external(get<"y">(d).data() + startIndex, endIndex - startIndex);
-    mesh["coordsets/coords/values/z"].set_external(get<"z">(d).data() + startIndex, endIndex - startIndex);
-// #define IMPLICIT_CONNECTIVITY_LIST 1 // the connectivity list is not given, but created by vtkm
-#ifdef IMPLICIT_CONNECTIVITY_LIST
-    mesh["topologies/mesh/type"] = "points";
-#else
-    mesh["topologies/mesh/type"] = "unstructured";
-    std::vector<conduit_int32> conn(endIndex - startIndex);
-    std::iota(conn.begin(), conn.end(), 0);
-    mesh["topologies/mesh/elements/connectivity"].set(conn);
-    mesh["topologies/mesh/elements/shape"] = "point";
-#endif
-    mesh["topologies/mesh/coordset"] = "coords";
-
-    addField(mesh, "x", get<"x">(d).data(), startIndex, endIndex);
-    addField(mesh, "y", get<"y">(d).data(), startIndex, endIndex);
-    addField(mesh, "z", get<"z">(d).data(), startIndex, endIndex);
-    addField(mesh, "vx", get<"vx">(d).data(), startIndex, endIndex);
-    addField(mesh, "vy", get<"vy">(d).data(), startIndex, endIndex);
-    addField(mesh, "vz", get<"vz">(d).data(), startIndex, endIndex);
-    addField(mesh, "kx", get<"kx">(d).data(), startIndex, endIndex);
-    addField(mesh, "xm", get<"xm">(d).data(), startIndex, endIndex);
-    // addField(mesh, "Temperature", get<"temp">(d).data(), startIndex, endIndex);
-    addField(mesh, "alpha", get<"alpha">(d).data(), startIndex, endIndex);
-    addField(mesh, "m", get<"m">(d).data(), startIndex, endIndex);
-    // addField(mesh, "Smoothing Length", get<"h">(d).data(), startIndex, endIndex);
-    // addField(mesh, "Density", get<"rho">(d).data(), startIndex, endIndex);
-    // addField(mesh, "Internal Energy", get<"u">(d).data(), startIndex, endIndex);
-    // addField(mesh, "Pressure", get<"p">(d).data(), startIndex, endIndex);
-    // addField(mesh, "Speed of Sound", get<"c">(d).data(), startIndex, endIndex);
-    // addField(mesh, "ax", get<"ax">(d).data(), startIndex, endIndex);
-    // addField(mesh, "ay", get<"ay">(d).data(), startIndex, endIndex);
-    // addField(mesh, "az", get<"az">(d).data(), startIndex, endIndex);
-
-    conduit::Node verify_info;
-    if (!conduit::blueprint::mesh::verify(mesh, verify_info))
-    {
-        // verify failed, print error message
-        CONDUIT_INFO("blueprint verify failed!" + verify_info.to_json());
-    }
-    // else CONDUIT_INFO("blueprint verify success!" + verify_info.to_json());
+    mesh.update(mesh_from(d, startIndex, endIndex));
 
     a.publish(mesh);
     a.execute(actions);
