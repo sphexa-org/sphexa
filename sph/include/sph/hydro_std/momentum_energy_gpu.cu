@@ -29,6 +29,8 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include <thrust/functional.h>
+
 #include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/primitives/warpscan.cuh"
@@ -102,7 +104,7 @@ __global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, c
     __shared__ typename BlockReduce::TempStorage        temp_storage;
 
     BlockReduce reduce(temp_storage);
-    T           blockMin = reduce.Reduce(dt_i, cub::Min());
+    T           blockMin = reduce.Reduce(dt_i, thrust::minimum<>{});
     __syncthreads();
 
     if (threadIdx.x == 0) { cstone::atomicMinFloat(&minDt_device, blockMin); }
