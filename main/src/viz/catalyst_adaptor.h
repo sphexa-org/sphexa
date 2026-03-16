@@ -52,13 +52,17 @@ struct CatalystAdaptor
     void execute(DataType& d, long startIndex, long endIndex)
     {
         conduit::Node exec_params;
+
         // add time/cycle information
-        auto state = exec_params["catalyst/state"];
+        auto& state = exec_params["catalyst/state"];
         state["timestep"].set(&d.iteration);
         state["time"].set(&d.ttot);
 
-        // We only have 1 channel here. Let's name it 'grid'.
-        auto channel = exec_params["catalyst/channels/grid"];
+        // Note:
+        // In principle it could be whatever the name of the channel, but to not leave out ascent,
+        // let's stick to "grid", since at the time of writing ascent has this name hard-coded for the channel.
+        // https://github.com/Alpine-DAV/ascent/blob/f67dc0b80f2fa7bbb344d32af286be386235f0ab/src/libs/catalyst/AscentCatalyst.cxx#L124
+        auto& channel = exec_params["catalyst/channels/grid"];
 
         // Since this example is using Conduit Mesh Blueprint to define the mesh,
         // we set the channel's type to "mesh".
