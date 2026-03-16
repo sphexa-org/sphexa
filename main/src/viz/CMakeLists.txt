@@ -4,15 +4,14 @@ set(INSITU
 set_property(CACHE INSITU PROPERTY STRINGS None Catalyst Ascent)
 
 if(INSITU STREQUAL "Catalyst")
-  find_package(catalyst REQUIRED PATHS
-               "$ENV{EBROOTPARAVIEW}/lib/cmake/paraview-5.10")
+  find_package(catalyst REQUIRED)
 elseif(INSITU STREQUAL "Ascent")
-  find_package(Ascent REQUIRED PATHS "$ENV{EBROOTASCENT}/lib/cmake/ascent")
+  find_package(Ascent REQUIRED)
 endif()
 
 add_library(viz INTERFACE)
-
-target_include_directories(viz INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(
+  viz INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>)
 
 if(INSITU STREQUAL "Catalyst")
   target_compile_definitions(viz INTERFACE SPH_EXA_USE_CATALYST2)
