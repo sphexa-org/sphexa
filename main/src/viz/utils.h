@@ -37,15 +37,13 @@ conduit::Node mesh_from(ParticleData& d, const std::size_t begin, const std::siz
 #ifdef IMPLICIT_CONNECTIVITY_LIST
     mesh["topologies/mesh/type"] = "points";
 #else
-    mesh["topologies/mesh/type"] = "unstructured";
+    mesh["topologies/mesh/type"]           = "unstructured";
+    mesh["topologies/mesh/elements/shape"] = "point";
 
+    // Note: it cannot be set as external because it goes out of scope on return
     std::vector<conduit_int32> conn(end - begin);
     std::iota(conn.begin(), conn.end(), 0);
-
-    // FIXME: ascent has problems with this set as external
     mesh["topologies/mesh/elements/connectivity"].set(conn);
-
-    mesh["topologies/mesh/elements/shape"] = "point";
 #endif
     mesh["topologies/mesh/coordset"] = "coords";
 
