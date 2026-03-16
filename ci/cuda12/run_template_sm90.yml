@@ -124,7 +124,7 @@ variables:
     WITH_UENV_VIEW: 'default'
     # SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
-    SLURM_NTASKS: 1 # TODO: restore to 4
+    SLURM_NTASKS: 4
     SLURM_CPUS_PER_TASK: 71
   before_script:
     - pwd
@@ -154,7 +154,7 @@ variables:
     WITH_UENV_VIEW: 'default'
     # SLURM_PARTITION: 'debug'
     SLURM_JOB_NUM_NODES: 1
-    SLURM_NTASKS: 1 # TODO: restore to 4
+    SLURM_NTASKS: 4
     SLURM_CPUS_PER_TASK: 71
   before_script:
     - pwd
