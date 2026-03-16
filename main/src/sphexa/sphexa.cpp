@@ -146,8 +146,12 @@ int main(int argc, char** argv)
     propagator->sync(domain, simData);
     if (rank == 0) std::cout << "Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
 
-    viz::init_catalyst(argc, argv);
-    viz::init_ascent(argc, argv);
+#ifdef SPH_EXA_USE_CATALYST2
+    using VizAdaptor = viz::CatalystAdaptor;
+#elif SPH_EXA_USE_ASCENT
+    using VizAdaptor = viz::AscentAdaptor;
+#endif
+    VizAdaptor viz(argc, argv);
 
     size_t startIteration    = d.iteration;
     bool   isOutputTriggered = false;
@@ -183,7 +187,7 @@ int main(int argc, char** argv)
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
 
-        viz::execute(d, domain.startIndex(), domain.endIndex());
+        viz.execute(d, domain.startIndex(), domain.endIndex());
 
         propagator->integrate(domain, simData);
         propagator->printIterationTimings(domain, simData);
@@ -199,7 +203,6 @@ int main(int argc, char** argv)
                     initCond + " up to t = " + std::to_string(d.ttot));
 
     constantsFile.close();
-    viz::finalize();
     return exitSuccess();
 }
 
