@@ -102,7 +102,7 @@ struct AscentAdaptor
             trigger_actions.save(trigger_file);
         }
 
-        std::string   condition = "cycle() % 1 == 0";
+        std::string   condition = "cycle() % 200 == 0";
         conduit::Node triggers;
         triggers["t1/params/condition"]    = condition;
         triggers["t1/params/actions_file"] = trigger_file;
