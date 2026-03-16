@@ -139,17 +139,6 @@ variables:
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
-        echo "[diag] comparing constants files (cuda)"
-        wc -l constants_ref.txt constants_ref_tail.txt constants.txt
-        sha256sum constants_ref.txt constants_ref_tail.txt constants.txt
-        echo "[diag] constants_ref_tail.txt head"
-        head -n 5 constants_ref_tail.txt
-        echo "[diag] constants_ref_tail.txt tail"
-        tail -n 5 constants_ref_tail.txt
-        echo "[diag] constants.txt head"
-        head -n 5 constants.txt
-        echo "[diag] constants.txt tail"
-        tail -n 5 constants.txt
         python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
         if [ $? -ne 0 ]; then
           exit 1
@@ -180,17 +169,6 @@ variables:
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
-        echo "[diag] comparing constants files (cpu)"
-        wc -l constants_ref.txt constants_ref_tail.txt constants.txt
-        sha256sum constants_ref.txt constants_ref_tail.txt constants.txt
-        echo "[diag] constants_ref_tail.txt head"
-        head -n 5 constants_ref_tail.txt
-        echo "[diag] constants_ref_tail.txt tail"
-        tail -n 5 constants_ref_tail.txt
-        echo "[diag] constants.txt head"
-        head -n 5 constants.txt
-        echo "[diag] constants.txt tail"
-        tail -n 5 constants.txt
         python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
         if [ $? -ne 0 ]; then
           exit 1
