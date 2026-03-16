@@ -2,7 +2,7 @@
 
 #include "utils.h"
 
-#include <catalyst-2.0/catalyst.hpp>
+#include <catalyst-2.0/catalyst.h>
 
 #include <conduit/conduit.hpp>
 #include <conduit/conduit_blueprint.hpp>
@@ -22,18 +22,16 @@ struct CatalystAdaptor
         // TODO go over all the SPH-exa runtime flags, ignoring them, until we find our own flags
         // Else, specifiy our Catalyst flags *first*
         conduit::Node node;
-        for (auto cc = 1; cc < argc; ++cc)
+        for (auto cc = 1, script_index = 0; cc < argc; ++cc)
         {
             if (strcmp(argv[cc], "--catalyst") == 0 && (cc + 1) < argc)
             {
                 const auto fname = std::string(argv[cc + 1]);
-                const auto path  = "catalyst/scripts/script" + std::to_string(cc - 1);
+                const auto path  = "catalyst/scripts/script" + std::to_string(script_index++);
                 node[path + "/filename"].set_string(fname);
                 std::cout << "Catalyst script using " << fname << std::endl;
             }
         }
-
-        // node["catalyst_load/implementation"].set_string("paraview");
 
         catalyst_status err = catalyst_initialize(conduit::c_node(&node));
         if (err != catalyst_status_ok) { std::cerr << "ERROR: Failed to initialize Catalyst: " << err << std::endl; }
