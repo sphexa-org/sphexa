@@ -32,6 +32,7 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -69,13 +70,15 @@ sph::NeighborhoodType nbTypeFromName(const std::string_view nbType);
 
 int main(int argc, char** argv)
 {
-    auto [rank, numRanks] = initMpi();
+    MPIScope mpi;
+    auto [rank, numRanks] = mpi.info();
+
     const ArgParser parser(argc, (const char**)argv);
 
     if (parser.exists("-h") || parser.exists("--h") || parser.exists("-help") || parser.exists("--help"))
     {
         printHelp(argv[0], rank);
-        return exitSuccess();
+        return EXIT_SUCCESS;
     }
 
     using Dataset = SimulationData<AccType>;
@@ -151,6 +154,7 @@ int main(int argc, char** argv)
 #elif SPH_EXA_USE_ASCENT
     using VizAdaptor = viz::AscentAdaptor;
 #endif
+
     VizAdaptor viz(argc, argv);
 
     size_t startIteration    = d.iteration;
@@ -203,7 +207,8 @@ int main(int argc, char** argv)
                     initCond + " up to t = " + std::to_string(d.ttot));
 
     constantsFile.close();
-    return exitSuccess();
+
+    return EXIT_SUCCESS;
 }
 
 //! @brief check whether the stop conditions based on evolved time (not wall-clock) or iteration count are reached
