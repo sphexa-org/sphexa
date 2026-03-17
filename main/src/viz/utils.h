@@ -1,9 +1,22 @@
 #pragma once
 
 #include <numeric>
+#include <filesystem>
+#include <vector>
 
 #include <conduit/conduit.hpp>
 #include <conduit/conduit_blueprint_mesh.hpp>
+
+auto extract_arg_values(const std::string& arg_name, int argc, char** argv)
+{
+    std::vector<std::filesystem::path> arg_values;
+    for (auto arg_index = 1; arg_index < argc; ++arg_index)
+    {
+        if (arg_name == argv[arg_index] && (arg_index + 1) < argc) { arg_values.push_back(argv[arg_index + 1]); }
+    }
+
+    return arg_values;
+}
 
 /*! @brief Add a volume-independent vertex field to a mesh
  *

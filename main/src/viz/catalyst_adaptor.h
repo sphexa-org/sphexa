@@ -22,15 +22,11 @@ struct CatalystAdaptor
         // TODO go over all the SPH-exa runtime flags, ignoring them, until we find our own flags
         // Else, specifiy our Catalyst flags *first*
         conduit::Node node;
-        for (auto cc = 1, script_index = 0; cc < argc; ++cc)
+        for (const auto& script_filepath : extract_arg_values("--catalyst", argc, argv))
         {
-            if (strcmp(argv[cc], "--catalyst") == 0 && (cc + 1) < argc)
-            {
-                const auto fname = std::string(argv[cc + 1]);
-                const auto path  = "catalyst/scripts/script" + std::to_string(script_index++);
-                node[path + "/filename"].set_string(fname);
-                std::cout << "Catalyst script using " << fname << std::endl;
-            }
+            const auto path = "catalyst/scripts/" + script_filepath.stem().string();
+            node[path + "/filename"].set_string(script_filepath);
+            std::cout << "Catalyst script using " << script_filepath << std::endl;
         }
 
         catalyst_status err = catalyst_initialize(conduit::c_node(&node));
