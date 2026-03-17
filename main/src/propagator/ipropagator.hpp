@@ -101,6 +101,7 @@ public:
 
     void printIterationTimings(const DomainType& domain, const ParticleDataType& simData)
     {
+        if (rank_ > 0) { return; } // global particle and nc counts are only valid on rank 0
         const auto& d   = simData.hydro;
         const auto& box = domain.box();
 
@@ -108,7 +109,7 @@ public:
         auto particleCount    = domain.nParticles();
         auto haloCount        = d.maxHalos;
         auto totalNeighbors   = d.totalNeighbors;
-        auto avgNcPerParticle = rank_ == 0 ? totalNeighbors / d.numParticlesGlobal : 0;
+        auto avgNcPerParticle = totalNeighbors / d.numParticlesGlobal;
 
         if (d.numParticlesGlobalPrev != d.numParticlesGlobal)
         {
