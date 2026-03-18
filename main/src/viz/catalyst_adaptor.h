@@ -1,16 +1,14 @@
 #pragma once
 
-#include "utils.h"
+#include <cstring>
+#include <iostream>
 
 #include <catalyst-2.0/catalyst.h>
-
 #include <conduit/conduit.hpp>
 #include <conduit/conduit_blueprint.hpp>
 #include <conduit/conduit_cpp_to_c.hpp>
 
-#include <cstring>
-#include <iostream>
-#include <string>
+#include "utils.h"
 
 namespace viz
 {
@@ -63,7 +61,8 @@ struct CatalystAdaptor
         channel["type"].set("mesh");
 
         // now create the mesh.
-        channel["data"].update(mesh_from(d, startIndex, endIndex));
+        conduit::Node mesh = mesh_from(d, startIndex, endIndex);
+        channel["data"].move(mesh);
 
         catalyst_status err = catalyst_execute(conduit::c_node(&exec_params));
         if (err != catalyst_status_ok) { std::cerr << "ERROR: Failed to execute Catalyst: " << err << std::endl; }
