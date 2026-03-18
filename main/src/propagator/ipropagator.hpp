@@ -101,26 +101,28 @@ public:
 
     void printIterationTimings(const DomainType& domain, const ParticleDataType& simData)
     {
+        if (rank_ > 0) { return; } // global particle and nc counts are only valid on rank 0
         const auto& d   = simData.hydro;
         const auto& box = domain.box();
 
-        auto nodeCount          = domain.globalTree().numLeafNodes;
-        auto particleCount      = domain.nParticles();
-        auto haloCount          = d.maxHalos;
-        auto totalNeighbors     = d.totalNeighbors;
-        auto totalParticleCount = d.numParticlesGlobal;
+        auto nodeCount        = domain.globalTree().numLeafNodes;
+        auto particleCount    = domain.nParticles();
+        auto haloCount        = d.maxHalos;
+        auto totalNeighbors   = d.totalNeighbors;
+        auto avgNcPerParticle = totalNeighbors / d.numParticlesGlobal;
 
         if (d.numParticlesGlobalPrev != d.numParticlesGlobal)
         {
             out << "### Check ### Particles (global): " << d.numParticlesGlobal
-                << ", differs by: " << std::int64_t(d.numParticlesGlobal) - std::int64_t(d.numParticlesGlobalPrev)  << std::endl;
+                << ", differs by: " << std::int64_t(d.numParticlesGlobal) - std::int64_t(d.numParticlesGlobalPrev)
+                << std::endl;
         }
         out << "### Check ### Global Tree Nodes: " << nodeCount << ", Particles: " << particleCount
             << ", Halos: " << haloCount << std::endl;
         out << "### Check ### Computational domain: " << box.xmin() << " " << box.xmax() << " " << box.ymin() << " "
             << box.ymax() << " " << box.zmin() << " " << box.zmax() << std::endl;
         out << "### Check ### Total Neighbors: " << totalNeighbors
-            << ", Avg neighbor count per particle: " << totalNeighbors / totalParticleCount << std::endl;
+            << ", Avg neighbor count per particle: " << avgNcPerParticle << std::endl;
         out << "### Check ### Total time: " << d.ttot - d.minDt << ", current time-step: " << d.minDt << std::endl;
         out << "### Check ### Total energy: " << d.etot << ", (internal: " << d.eint << ", kinetic: " << d.ecin;
         out << ", gravitational: " << d.egrav;

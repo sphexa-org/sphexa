@@ -59,7 +59,7 @@ __global__ void computeGravityEwaldKernel(cstone::GroupView grp, const Tc* x, co
     __shared__ typename BlockReduce::TempStorage                temp_storage;
 
     BlockReduce reduce(temp_storage);
-    Ta          blockSum = reduce.Reduce(Uewald, cub::Sum());
+    Ta          blockSum = reduce.Sum(Uewald);
     __syncthreads();
 
     if (threadIdx.x == 0) { atomicAdd(&totalEwaldPotentialGlob, blockSum); }

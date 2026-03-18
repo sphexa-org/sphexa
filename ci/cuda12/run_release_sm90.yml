@@ -19,16 +19,28 @@ sph-run-cuda12-sm90-release-12ranks:
 
 sph-run-cuda12-sm90-release-sphexa-cuda:
   extends: [.sph-run-cuda12-sm90-sphexa-cuda]
-  needs: ['sph-build-cuda12-sm90-release']
+  needs:
+    - job: sph-build-cuda12-sm90-release
+    - job: sph-test-venv-setup
+      artifacts: true
 
 sph-run-cuda12-sm90-release-sphexa-cpu:
   extends: [.sph-run-cuda12-sm90-sphexa-cpu]
-  needs: ['sph-build-cuda12-sm90-release']
+  needs:
+    - job: sph-build-cuda12-sm90-release
+    - job: sph-test-venv-setup
+      artifacts: true
 
 sph-compare-constants-cuda12-sm90-release-sphexa-cuda:
   extends: [.sph-compare-constants-cuda12-sm90-sphexa-cuda]
-  needs: ['sph-build-cuda12-sm90-release']
+  needs:
+    - job: sph-build-cuda12-sm90-release
+    - job: sph-test-venv-setup
+      artifacts: true
 
 sph-compare-constants-cuda12-sm90-release-sphexa-cpu:
   extends: [.sph-compare-constants-cuda12-sm90-sphexa-cpu]
-  needs: ['sph-build-cuda12-sm90-release']
+  needs:
+    - job: sph-build-cuda12-sm90-release
+    - job: sph-test-venv-setup
+      artifacts: true
