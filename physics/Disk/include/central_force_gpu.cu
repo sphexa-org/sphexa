@@ -1,6 +1,9 @@
 //
 // Created by Noah Kubli on 11.03.2024.
 //
+
+#include <thrust/functional.h>
+
 #include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/primitives/math.hpp"
@@ -49,7 +52,7 @@ __global__ void computeCentralForceGPUKernel(size_t first, size_t last, const Da
     __shared__ typename BlockReduceTStar::TempStorage temp_storage_t_star;
     BlockReduceTStar                                  reduce_t_star(temp_storage_t_star);
 
-    float t_star_block = reduce_t_star.Reduce(t_star, cub::Min());
+    float t_star_block = reduce_t_star.Reduce(t_star, thrust::minimum<>{});
     __syncthreads();
 
     if (threadIdx.x == 0)
