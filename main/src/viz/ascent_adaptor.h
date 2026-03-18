@@ -8,7 +8,6 @@
 #include <ascent/ascent.hpp>
 
 #include <conduit/conduit.hpp>
-#include <conduit/conduit_relay_io.hpp>
 
 namespace viz
 {
@@ -18,8 +17,10 @@ struct AscentAdaptor
     AscentAdaptor(int argc, char** argv)
     {
         conduit::Node ascent_options;
-        std::string   output_path = "datasets/";
+
+        std::string output_path = "datasets/";
         if (!conduit::utils::is_directory(output_path)) { conduit::utils::create_directory(output_path); }
+
         ascent_options["default_dir"] = output_path;
         ascent_options["mpi_comm"]    = MPI_Comm_c2f(MPI_COMM_WORLD);
 #ifdef CAMP_HAVE_CUDA
@@ -38,7 +39,7 @@ struct AscentAdaptor
         }
         const auto ascent_script = ascent_scripts.at(0);
         std::cout << "Ascent script using " << ascent_script << std::endl;
-        conduit::relay::io::load(ascent_script, _actions);
+        _actions.load(ascent_script, "yaml");
     }
 
     ~AscentAdaptor() { _instance.close(); }
