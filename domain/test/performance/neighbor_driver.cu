@@ -158,12 +158,9 @@ void benchmarkGpu()
     int n = 2000000;
 
     RandomCoordinates<T, StrongKeyType> coords(n, box);
-    std::vector<T> h(n, 0.012);
-
-    // RandomGaussianCoordinates<T, StrongKeyType> coords(n, box);
-    // adjustSmoothingLength<KeyType>(n, 100, 200, coords.x(), coords.y(), coords.z(), h, box);
 
     int ngmax = 200;
+    coords.adjustH(ngmax / 2, ngmax);
 
     std::vector<LocalIndex> neighborsCPU(ngmax * n);
     std::vector<unsigned> neighborsCountCPU(n);
@@ -171,6 +168,7 @@ void benchmarkGpu()
     const T* x = coords.x().data();
     const T* y = coords.y().data();
     const T* z = coords.z().data();
+    const T* h = coords.h().data();
 
     unsigned bucketSize   = 64;
     auto [csTree, counts] = computeOctree(std::span(coords.particleKeys()), bucketSize);
@@ -201,8 +199,7 @@ void benchmarkGpu()
 #pragma omp parallel for
         for (LocalIndex i = 0; i < n; ++i)
         {
-            neighborsCountCPU[i] =
-                findNeighbors(i, x, y, z, h.data(), nsView, box, ngmax, neighborsCPU.data() + i * ngmax);
+            neighborsCountCPU[i] = findNeighbors(i, x, y, z, h, nsView, box, ngmax, neighborsCPU.data() + i * ngmax);
         }
     };
 
@@ -218,7 +215,7 @@ void benchmarkGpu()
     thrust::device_vector<T> d_x(coords.x().begin(), coords.x().end());
     thrust::device_vector<T> d_y(coords.y().begin(), coords.y().end());
     thrust::device_vector<T> d_z(coords.z().begin(), coords.z().end());
-    thrust::device_vector<T> d_h = h;
+    thrust::device_vector<T> d_h(coords.h().begin(), coords.h().end());
 
     thrust::device_vector<KeyType> d_prefixes             = octree.prefixes;
     thrust::device_vector<TreeNodeIndex> d_childOffsets   = octree.childOffsets;

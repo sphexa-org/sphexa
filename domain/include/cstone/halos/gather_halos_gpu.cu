@@ -52,6 +52,7 @@ void gatherRanges(const IndexType* rangeScan,
 {
     int numThreads = 256;
     int numBlocks  = iceil(bufferSize, numThreads);
+    if (numBlocks == 0) { return; }
     gatherRangesKernel<<<numBlocks, numThreads>>>(rangeScan, rangeOffsets, numRanges, src, buffer, bufferSize);
 }
 

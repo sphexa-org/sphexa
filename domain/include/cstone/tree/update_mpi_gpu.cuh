@@ -50,17 +50,16 @@ inline void sumCapped(void* inP, void* inoutP, int* len, MPI_Datatype*)
  * @param[inout]  d_csTree    leaf nodes
  * @param[out]    d_countsBuf leaf node particle counts
  * @param[in]     expectOverflows  use sum-reduction that guards against integer overflow if true
- * @return                         true if tree was not changed
+ * @return                         maximum number of particles per cell capped to 2^32-1 or 0 if tree has max depth
  */
 template<class KeyType, class DevKeyVec, class DevCountVec>
-bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
-                           unsigned bucketSize,
-                           OctreeData<KeyType, GpuTag>& tree,
-                           DevKeyVec& d_csTree,
-                           DevCountVec& d_countsBuf,
-                           bool expectOverflows)
+unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
+                               unsigned bucketSize,
+                               OctreeData<KeyType, GpuTag>& tree,
+                               DevKeyVec& d_csTree,
+                               DevCountVec& d_countsBuf,
+                               bool expectOverflows)
 {
-    unsigned maxCount = std::numeric_limits<unsigned>::max();
     auto newNumNodes =
         computeNodeOpsGpu(d_csTree.data(), nNodes(d_csTree), d_countsBuf.data(), bucketSize, tree.childOffsets.data());
     reallocate(tree.prefixes, newNumNodes + 1, 1.01);
@@ -75,7 +74,8 @@ bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
     auto [d_counts, d_countsRed] =
         util::packAllocBuffer(d_countsBuf, util::TypeList<unsigned, unsigned>{}, {numLeafNodes, numLeafNodes}, 128);
 
-    computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys, maxCount, true);
+    computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys, std::numeric_limits<unsigned>::max(),
+                         true);
 
     syncGpu();
     if (expectOverflows)
@@ -89,18 +89,21 @@ bool updateOctreeGlobalGpu(std::span<const KeyType> keys,
     sequenceMax(d_counts.data(), d_counts.data() + d_counts.size(), d_countsRed.data(), d_counts.data());
     d_countsBuf.resize(numLeafNodes);
 
-    return converged;
+    if (converged) { return 0; }
+
+    auto [minCount, maxCount] = MinMaxGpu<unsigned>{}(d_counts.data(), d_counts.data() + d_counts.size());
+    return maxCount;
 }
 
 template<class KeyType, class Accelerator, class DevKeyVec, class DevCountVec>
-bool updateOctreeGlobal(std::span<const KeyType> keys,
-                        unsigned bucketSize,
-                        OctreeData<KeyType, Accelerator>& tree,
-                        std::vector<KeyType>& leaves,
-                        DevKeyVec& d_csTree,
-                        std::vector<unsigned>& counts,
-                        DevCountVec& d_counts,
-                        bool firstCall)
+unsigned updateOctreeGlobal(std::span<const KeyType> keys,
+                            unsigned bucketSize,
+                            OctreeData<KeyType, Accelerator>& tree,
+                            std::vector<KeyType>& leaves,
+                            DevKeyVec& d_csTree,
+                            std::vector<unsigned>& counts,
+                            DevCountVec& d_counts,
+                            bool firstCall)
 {
     if constexpr (HaveGpu<Accelerator>{})
     {

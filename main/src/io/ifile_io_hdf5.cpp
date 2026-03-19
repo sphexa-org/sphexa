@@ -61,7 +61,7 @@ public:
         MPI_Comm_size(comm, &numRanks_);
     }
 
-    ~H5PartWriter() override { closeStep(); }
+    ~H5PartWriter() override { H5PartWriter::closeStep(); }
 
     [[nodiscard]] int rank() const override { return rank_; }
     [[nodiscard]] int numRanks() const override { return numRanks_; }
@@ -176,7 +176,7 @@ public:
 
     ~H5PartWriterSeq() override
     {
-        if (rank_ == 0) { closeStep(); }
+        if (rank_ == 0) { H5PartWriter::closeStep(); }
         MPI_Comm_free(&comm_);
     }
 

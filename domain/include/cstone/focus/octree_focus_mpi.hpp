@@ -117,41 +117,22 @@ public:
             prevFocusEnd   = focusEnd;
         }
 
-        std::vector<KeyType> enforcedKeys{focusStart, focusEnd};
-        focusTransfer<KeyType, useGpu>(leaves_, {leafCountsAcc_.data(), leafCountsAcc_.size()}, bucketSize_, myRank_,
-                                       prevFocusStart, prevFocusEnd, focusStart, focusEnd, enforcedKeys);
-        std::span gLeavesRank = globalLeaves.subspan(assignment.treeOffsetsConst()[myRank_],
-                                                     assignment.numNodesPerRankConst()[myRank_] + 1);
-        float invThetaRefine  = sqrt(3) / 2 + 1e-6; // half the cube-diagonal + eps for a min-like MAC with geo centers
+        std::span enforcedKeys = globalLeaves.subspan(assignment.treeOffsetsConst()[myRank_],
+                                                      assignment.numNodesPerRankConst()[myRank_] + 1);
         bool converged;
         if constexpr (HaveGpu<Accelerator>{})
         {
-            std::size_t scratchSize = scratch.size();
-            auto [enforcedKeysAcc]  = util::packAllocBuffer(scratch, util::TypeList<KeyType>{},
-                                                            {enforcedKeys.size() + gLeavesRank.size()}, 128);
-            memcpyH2D(enforcedKeys.data(), enforcedKeys.size(), enforcedKeysAcc.data());
-            memcpyD2D(gLeavesRank.data(), gLeavesRank.size(), enforcedKeysAcc.data() + enforcedKeys.size());
-
             converged = CombinedUpdate<KeyType>::updateFocusGpu(
-                octreeAcc_, leavesAcc_, bucketSize_, focusStart, focusEnd, enforcedKeysAcc,
+                octreeAcc_, leavesAcc_, bucketSize_, focusStart, focusEnd, enforcedKeys,
                 {rawPtr(countsAcc_), countsAcc_.size()}, {rawPtr(macsAcc_), macsAcc_.size()}, scratch);
-
-            while (not macRefineGpu(octreeAcc_, leavesAcc_, centersAcc_, macsAcc_, prevFocusStart, prevFocusEnd,
-                                    focusStart, focusEnd, invThetaRefine, box))
-                ;
 
             reallocateDestructive(leaves_, leavesAcc_.size(), allocGrowthRate_);
             memcpyD2H(rawPtr(leavesAcc_), leavesAcc_.size(), rawPtr(leaves_));
-            reallocate(scratch, scratchSize, 1.0);
         }
         else
         {
-            std::copy(gLeavesRank.begin(), gLeavesRank.end(), std::back_inserter(enforcedKeys));
             converged = CombinedUpdate<KeyType>::updateFocus(octreeAcc_, leaves_, bucketSize_, focusStart, focusEnd,
                                                              enforcedKeys, countsAcc_, macsAcc_);
-            while (not macRefine(octreeAcc_, leaves_, centersAcc_, macsAcc_, prevFocusStart, prevFocusEnd, focusStart,
-                                 focusEnd, invThetaRefine, box))
-                ;
         }
 
         translateAssignment<KeyType>(assignment, leaves_, assignment_);
@@ -593,7 +574,7 @@ public:
                                   leafToInternal(octreeAcc_), assignment_[myRank_], useGpu ? layoutAcc : layout);
         if constexpr (useGpu) { memcpyD2H(layoutAcc.data(), layoutAcc.size(), layout.data()); }
 
-        return checkLayout(myRank_, assignment_, layout, treeLeaves());
+        return checkLayout(myRank_, assignment_, layout, treeLeaves(), 512 * bucketSize_);
     }
 
     //! @brief update until converged with a simple min-distance MAC

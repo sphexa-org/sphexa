@@ -61,85 +61,85 @@ template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeEvrardCooling(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-    return std::make_unique<EvrardGlassSphereCooling<Dataset>>(glassBlock, settingsFile, reader);
+   return std::make_unique<EvrardGlassSphereCooling<Dataset>>(glassBlock, settingsFile, reader);
 }
 #else
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeEvrardCooling(std::string /*glass*/, std::string /*settingsFile*/, IFileReader*)
 {
-    throw std::runtime_error("Missing GRACKLE build option for evrard-cooling\n");
-    return nullptr;
+   throw std::runtime_error("Missing GRACKLE build option for evrard-cooling\n");
+   return nullptr;
 }
 #endif
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFile(std::string testCase, int initStep,
-                                                                             IFileReader* reader)
+                                                                            IFileReader* reader)
 {
-    return std::make_unique<FileInit<Dataset>>(testCase, initStep, reader);
+   return std::make_unique<FileInit<Dataset>>(testCase, initStep, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFileSplit(std::string testCase, int numSplits,
-                                                                                  IFileReader* reader)
+                                                                                 IFileReader* reader)
 {
-    return std::make_unique<FileSplitInit<Dataset>>(testCase, numSplits, reader);
+   return std::make_unique<FileSplitInit<Dataset>>(testCase, numSplits, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeGreshoChan(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-    return std::make_unique<GreshoChan<Dataset>>(glassBlock, settingsFile, reader);
+   return std::make_unique<GreshoChan<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeKelvinHelmholtz(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-    return std::make_unique<KelvinHelmholtzGlass<Dataset>>(glassBlock, settingsFile, reader);
+   return std::make_unique<KelvinHelmholtzGlass<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeIsobaricCube(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-    return std::make_unique<IsobaricCubeGlass<Dataset>>(glassBlock, settingsFile, reader);
+   return std::make_unique<IsobaricCubeGlass<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeNoh(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-    return std::make_unique<NohGlassSphere<Dataset>>(glassBlock, settingsFile, reader);
+   return std::make_unique<NohGlassSphere<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeSedovGlass(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-    return std::make_unique<SedovGlass<Dataset>>(glassBlock, settingsFile, reader);
+   return std::make_unique<SedovGlass<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeSedovGrid()
 {
-    return std::make_unique<SedovGrid<Dataset>>();
+   return std::make_unique<SedovGrid<Dataset>>();
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeTurbulence(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-    return std::make_unique<TurbulenceGlass<Dataset>>(glassBlock, settingsFile, reader);
+   return std::make_unique<TurbulenceGlass<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeWindShock(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-    return std::make_unique<WindShockGlass<Dataset>>(glassBlock, settingsFile, reader);
+   return std::make_unique<WindShockGlass<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 template<class Dataset>

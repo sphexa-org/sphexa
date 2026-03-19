@@ -101,23 +101,26 @@ __global__ void IADGpuKernel(Tc K, unsigned ngmax, cstone::Box<Tc> box, const Lo
 
         if (i >= bodyEnd) { continue; }
 
-        unsigned ncCapped = stl::min(ncTrue[0], ngmax);
-        sph::IADJLoopSTD<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, h, m, rho, wh,
-                                                 whd, c11, c12, c13, c22, c23, c33);
+        if (ncTrue[0] < 25 || ncTrue[0] > ngmax) { c11[i] = c12[i] = c13[i] = c22[i] = c23[i] = c33[i] = 0.; }
+        else
+        {
+            sph::IADJLoopSTD<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncTrue[0], x, y, z, h, m, rho,
+                                                     wh, whd, c11, c12, c13, c22, c23, c33);
+        }
     }
 }
 
 template<class Dataset>
 void computeIADGpu(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     IADGpuKernel<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x),
-        rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.m), rawPtr(d.devData.rho),
-        rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.c11), rawPtr(d.devData.c12),
-        rawPtr(d.devData.c13), rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33), nidxPool,
+        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.x),
+        rawPtr(d.y), rawPtr(d.z), rawPtr(d.h), rawPtr(d.m), rawPtr(d.rho),
+        rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.c11), rawPtr(d.c12),
+        rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), nidxPool,
         traversalPool);
     checkGpuErrors(cudaDeviceSynchronize());
 }

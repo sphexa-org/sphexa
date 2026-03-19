@@ -88,11 +88,7 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
                 1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
 
             bool ncFail = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
-            if (ncIt == ncMaxIteration && ncFail)
-            {
-                h[i]  = T(0);
-                ncSph = 1;
-            }
+            if (ncIt == ncMaxIteration && ncFail) { ncSph = 1; }
         }
 
         if (i >= bodyEnd) continue;
@@ -107,13 +103,13 @@ __global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<T
 template<class Dataset>
 void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     xmassGpu<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.K, d.ng0, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.nc),
-        rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.m),
-        rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.xm), nidxPool, traversalPool);
+        d.K, d.ng0, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.nc),
+        rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h), rawPtr(d.m),
+        rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.xm), nidxPool, traversalPool);
     checkGpuErrors(cudaDeviceSynchronize());
 
     NcStats::type stats[NcStats::numStats];
@@ -122,7 +118,7 @@ void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<typename D
     NcStats::type maxP2P   = stats[cstone::NcStats::maxP2P];
     NcStats::type maxStack = stats[cstone::NcStats::maxStack];
 
-    d.devData.stackUsedNc = maxStack;
+    d.stackUsedNc = maxStack;
 
     if (maxP2P == 0xFFFFFFFF) { throw std::runtime_error("GPU traversal stack exhausted in neighbor search\n"); }
 }
@@ -150,17 +146,17 @@ __global__ void convertXmassToRho(const LocalIndex* grpStart, const LocalIndex* 
 template<class Dataset>
 void computeDensity(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    swap(d.devData.xm, d.devData.rho);
+    swap(d.xm, d.rho);
     computeXMass(grp, d, box);
-    swap(d.devData.xm, d.devData.rho);
+    swap(d.xm, d.rho);
 
     unsigned numThreads = 256;
     unsigned numBlocks  = (grp.numGroups + numThreads - 1) / numThreads;
     if (numBlocks == 0) { return; }
 
     // rho[i] = m[i] / rho[i];
-    convertXmassToRho<<<numBlocks, numThreads>>>(grp.groupStart, grp.groupEnd, grp.numGroups, rawPtr(d.devData.m),
-                                                 rawPtr(d.devData.rho));
+    convertXmassToRho<<<numBlocks, numThreads>>>(grp.groupStart, grp.groupEnd, grp.numGroups, rawPtr(d.m),
+                                                 rawPtr(d.rho));
 }
 
 template void computeDensity(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,

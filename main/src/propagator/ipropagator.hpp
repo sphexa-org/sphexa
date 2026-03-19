@@ -110,6 +110,11 @@ public:
         auto totalNeighbors     = d.totalNeighbors;
         auto totalParticleCount = d.numParticlesGlobal;
 
+        if (d.numParticlesGlobalPrev != d.numParticlesGlobal)
+        {
+            out << "### Check ### Particles (global): " << d.numParticlesGlobal
+                << ", differs by: " << std::int64_t(d.numParticlesGlobal) - std::int64_t(d.numParticlesGlobalPrev)  << std::endl;
+        }
         out << "### Check ### Global Tree Nodes: " << nodeCount << ", Particles: " << particleCount
             << ", Halos: " << haloCount << std::endl;
         out << "### Check ### Computational domain: " << box.xmin() << " " << box.xmax() << " " << box.ymin() << " "
@@ -124,15 +129,15 @@ public:
             << domain.focusTree().depth();
         if constexpr (cstone::HaveGpu<typename ParticleDataType::AcceleratorType>{})
         {
-            out << ", maxStackNc " << d.devData.stackUsedNc << ", maxStackGravity " << d.devData.stackUsedGravity;
+            out << ", maxStackNc " << d.stackUsedNc << ", maxStackGravity " << d.stackUsedGravity;
         }
         out << "\n=== Total time for iteration(" << d.iteration << ") " << timer.sumOfSteps() << "s\n\n";
     }
 
 protected:
-    static void outputAllocatedFields(IFileWriter* writer, size_t first, size_t last, ParticleDataType& simData)
+    static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData)
     {
-        auto output = [](size_t first, size_t last, auto& d, IFileWriter* writer)
+        auto output = [](auto& d, IFileWriter* writer)
         {
             auto fieldPointers = d.data();
             auto indicesDone   = d.outputFieldIndices;
@@ -145,10 +150,13 @@ protected:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    transferToHost(d, first, last, {d.fieldNames[fidx]});
-                    std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
-                    deallocateField(d, fidx);
+                    std::visit(
+                        [writer, c = column, key = namesDone[i]](auto field)
+                        {
+                            auto&& tmp = toHost(*field);
+                            writeField(writer, key, tmp.data(), c);
+                        },
+                        fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
@@ -165,8 +173,8 @@ protected:
             }
         };
 
-        output(first, last, simData.hydro, writer);
-        output(first, last, simData.chem, writer);
+        output(simData.hydro, writer);
+        output(simData.chem, writer);
     }
 
     void logDomainStats(const DomainType& domain, ParticleDataType& simData)
@@ -182,7 +190,7 @@ protected:
         using AccType = ParticleDataType::AcceleratorType;
         if constexpr (cstone::HaveGpu<AccType>{})
         {
-            auto devMem = simData.hydro.devData.memStats();
+            auto devMem = simData.hydro.memStats();
             timer.logStatistics("devMemSizeBytes", devMem[1]);
             timer.logStatistics("devCapSizeBytes", devMem[2]);
             timer.logStatistics("devFreeSizeBytes", devMem[3]);

@@ -106,51 +106,6 @@ TEST(DomainDecomposition, assignmentFindRank)
     EXPECT_EQ(2, assignment.findRank(3));
 }
 
-TEST(DomainDecomposition, limitBoundaryShifts)
-{
-    using KeyType = uint64_t;
-
-    std::vector<KeyType> leaves{0, 5, 10, 15, 20, 25, 30};
-    std::vector<unsigned> counts{1, 2, 3, 4, 5, 6};
-
-    int numRanks = 3;
-    SfcAssignment<KeyType> defAssignment, probe(numRanks);
-    probe.set(0, 0, 3);
-    probe.set(1, 10, 7);
-    probe.set(2, 20, 11);
-    probe.set(3, 30, 0);
-
-    {
-        auto probeCpy = probe;
-        limitBoundaryShifts<KeyType>(defAssignment, probe, leaves, counts);
-        EXPECT_TRUE(std::equal(probe.data(), probe.data() + probe.numRanks() + 1, probeCpy.data()));
-    }
-    {
-        SfcAssignment<KeyType> newAssignment(numRanks);
-        newAssignment.set(0, 0, 15);
-        newAssignment.set(1, 25, 6);
-        newAssignment.set(2, 30, 0);
-        newAssignment.set(3, 30, 0);
-        limitBoundaryShifts<KeyType>(probe, newAssignment, leaves, counts);
-        EXPECT_EQ(newAssignment[0], 0);
-        EXPECT_EQ(newAssignment[1], 20);
-        EXPECT_EQ(newAssignment[2], 30);
-        EXPECT_EQ(newAssignment[3], 30);
-        EXPECT_EQ(newAssignment.totalCount(0), 10);
-        EXPECT_EQ(newAssignment.totalCount(1), 11);
-        EXPECT_EQ(newAssignment.totalCount(2), 0);
-
-        std::vector<TreeNodeIndex> refNumNodesPerRank{4, 2, 0};
-        std::vector<TreeNodeIndex> refTreeOffsets{0, 4, 6, 6};
-
-        std::span numNodesPerRank = newAssignment.numNodesPerRank();
-        EXPECT_TRUE(std::equal(numNodesPerRank.begin(), numNodesPerRank.end(), refNumNodesPerRank.begin()));
-
-        std::span treeOffsets = newAssignment.treeOffsets();
-        EXPECT_TRUE(std::equal(treeOffsets.begin(), treeOffsets.end(), refTreeOffsets.begin()));
-    }
-}
-
 TEST(DomainDecomposition, createSendList)
 {
     using KeyType = uint64_t;

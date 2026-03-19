@@ -238,6 +238,7 @@ struct OctreeView
     TreeNodeIndex numLeafNodes;
     TreeNodeIndex numInternalNodes;
     TreeNodeIndex numNodes;
+    TreeNodeIndex numParents;
 
     KeyType* prefixes;
     NodeType* childOffsets;
@@ -309,6 +310,7 @@ public:
         return {numLeafNodes,
                 numInternalNodes,
                 numNodes,
+                TreeNodeIndex(parents.size()),
                 rawPtr(prefixes),
                 rawPtr(childOffsets),
                 rawPtr(parents),
@@ -324,6 +326,7 @@ public:
         return {numLeafNodes,
                 numInternalNodes,
                 numNodes,
+                TreeNodeIndex(parents.size()),
                 rawPtr(prefixes),
                 rawPtr(childOffsets),
                 rawPtr(parents),
@@ -410,6 +413,7 @@ public:
     {
         return {numLeafNodes_,
                 numInternalNodes_,
+                TreeNodeIndex(parents_.size()),
                 levelRange_.back(),
                 prefixes_.data(),
                 childOffsets_.data(),
@@ -425,6 +429,7 @@ public:
     {
         return {numLeafNodes_,
                 numInternalNodes_,
+                TreeNodeIndex(parents_.size()),
                 levelRange_.back(),
                 prefixes_.data(),
                 childOffsets_.data(),

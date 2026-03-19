@@ -16,7 +16,7 @@ bool updateSmoothingLengthCpu(size_t startIndex, size_t endIndex, unsigned ng0, 
 #pragma omp parallel for schedule(static)
     for (size_t i = startIndex; i < endIndex; i++)
     {
-        if (h[i] == 0)
+        if (nc[i] <= 1)
         {
             keys[i]     = cstone::removeKey<KeyType>{};
             keysRemoved = true;
@@ -36,7 +36,7 @@ bool updateSmoothingLength(const GroupView& grp, Dataset& d)
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         bool keysRemoved =
-            updateSmoothingLengthGpu(grp, d.ng0, rawPtr(d.devData.nc), rawPtr(d.devData.h), rawPtr(d.devData.keys));
+            updateSmoothingLengthGpu(grp, d.ng0, rawPtr(d.nc), rawPtr(d.h), rawPtr(d.keys));
         syncGpu();
         return keysRemoved;
     }

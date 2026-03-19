@@ -33,6 +33,7 @@
 
 #include <map>
 
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/box.hpp"
 #include "sph/eos.hpp"
 
@@ -66,7 +67,10 @@ std::map<std::string, double> nohConstants()
 template<class Dataset>
 void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
 {
-    using T = typename Dataset::RealType;
+    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
+    using T            = typename Dataset::RealType;
+    using HydroType    = typename Dataset::HydroType;
+    using XM1Type      = typename Dataset::XM1Type;
 
     double r           = constants.at("r1");
     double totalVolume = 4. * M_PI / 3. * r * r * r;
@@ -76,30 +80,38 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
     auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
     auto temp0 = constants.at("u0") / cv;
 
-    std::fill(d.m.begin(), d.m.end(), mPart);
-    std::fill(d.h.begin(), d.h.end(), hInit);
-    std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
-    std::fill(d.temp.begin(), d.temp.end(), temp0);
-    std::fill(d.u.begin(), d.u.end(), constants.at("u0"));
-    std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
+    cstone::fill<gpu>(d.m.begin(), d.m.end(), mPart);
+    cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
+    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
+    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
+    cstone::fill<gpu>(d.temp.begin(), d.temp.end(), temp0);
+    cstone::fill<gpu>(d.u.begin(), d.u.end(), constants.at("u0"));
+    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
 
-    generateParticleIDs(d.id);
+    generateParticleIDs<gpu>(d.id);
+
+    auto&& x = toHost(d.x);
+    auto&& y = toHost(d.y);
+    auto&& z = toHost(d.z);
+
+    std::vector<HydroType> vx(d.vx.size()), vy(d.vy.size()), vz(d.vz.size());
 
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
-        T radius = std::sqrt(d.x[i] * d.x[i] + d.y[i] * d.y[i] + d.z[i] * d.z[i]);
+        T radius = std::sqrt(x[i] * x[i] + y[i] * y[i] + z[i] * z[i]);
         radius   = std::max(radius, T(1e-10));
 
-        d.vx[i] = constants.at("vr0") * (d.x[i] / radius);
-        d.vy[i] = constants.at("vr0") * (d.y[i] / radius);
-        d.vz[i] = constants.at("vr0") * (d.z[i] / radius);
-
-        d.x_m1[i] = d.vx[i] * constants.at("minDt");
-        d.y_m1[i] = d.vy[i] * constants.at("minDt");
-        d.z_m1[i] = d.vz[i] * constants.at("minDt");
+        vx[i] = constants.at("vr0") * (x[i] / radius);
+        vy[i] = constants.at("vr0") * (y[i] / radius);
+        vz[i] = constants.at("vr0") * (z[i] / radius);
     }
+    d.vx = std::move(vx);
+    d.vy = std::move(vy);
+    d.vz = std::move(vz);
+    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
+    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
+    cstone::scaleGpuAcc<gpu>(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
 }
 
 template<class Dataset>
@@ -134,8 +146,12 @@ public:
         cstone::Box<T> globalBox(-r, r, cstone::BoundaryType::open);
 
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
-        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
-        cutSphere(r, d.x, d.y, d.z);
+        std::vector<T> x, y, z;
+        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, x, y, z);
+        cutSphere(r, x, y, z);
+        d.x = x; // uploads to GPU if active
+        d.y = y;
+        d.z = z;
 
         size_t numParticlesGlobal = d.x.size();
         MPI_Allreduce(MPI_IN_PLACE, &numParticlesGlobal, 1, MpiType<size_t>{}, MPI_SUM, simData.comm);

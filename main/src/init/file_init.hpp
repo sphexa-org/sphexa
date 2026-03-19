@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/box.hpp"
 
 #include "isim_init.hpp"
@@ -51,8 +52,16 @@ void restoreDataset(IFileReader* reader, Dataset& d)
         {
             if (reader->rank() == 0) { std::cout << "restoring " << d.fieldNames[i]; }
             auto t0 = std::chrono::high_resolution_clock::now();
-            std::visit([reader, key = d.fieldNames[i]](auto field)
-                       { reader->readField(Dataset::prefix + key, field->data()); }, fieldPointers[i]);
+            std::visit(
+                [reader, key = d.fieldNames[i]](auto field)
+                {
+                    using T = std::remove_reference<decltype(*field->data())>::type;
+                    std::vector<T> tmp(field->size());
+                    reader->readField(Dataset::prefix + key, tmp.data());
+                    *field = std::move(tmp);
+                },
+                fieldPointers[i]);
+            MPI_Barrier(MPI_COMM_WORLD);
             auto  t1       = std::chrono::high_resolution_clock::now();
             int   typeSize = std::visit([](auto field) { return sizeof(*field->data()); }, fieldPointers[i]);
             float readTime = std::chrono::duration<float>(t1 - t0).count();
@@ -132,6 +141,7 @@ public:
     cstone::Box<typename Dataset::RealType> init(int rank, int, size_t, Dataset& simData,
                                                  IFileReader* reader) const override
     {
+        constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
         reader->setStep(h5_fname, -1, FileMode::collective);
 
         size_t numParticlesInFile = reader->localNumParticles();
@@ -179,14 +189,17 @@ public:
             gatherSwap(y0, sfcOrder);
             gatherSwap(z0, sfcOrder);
 
+            std::vector<T> x(numParticlesSplit);
+            std::vector<T> y(numParticlesSplit);
+            std::vector<T> z(numParticlesSplit);
 #pragma omp parallel for schedule(static)
             for (size_t i = 0; i < numParticlesInFile; ++i)
             {
                 size_t sIdx = numSplits * i;
 
-                d.x[sIdx] = x0[i];
-                d.y[sIdx] = y0[i];
-                d.z[sIdx] = z0[i];
+                x[sIdx] = x0[i];
+                y[sIdx] = y0[i];
+                z[sIdx] = z0[i];
 
                 bool isLast   = (i == numParticlesInFile - 1);
                 long keyDelta = (isLast ? -(keys[i] - keys[i - 1]) : keys[i + 1] - keys[i]) / (numSplits + isLast);
@@ -195,11 +208,14 @@ public:
                 {
                     auto [ixj, iyj, izj] = cstone::decodeSfc(cstone::sfcKey(keys[i] + j * keyDelta));
 
-                    d.x[sIdx + j] = box.xmin() + (ixj * box.lx()) / cstone::maxCoord<KeyType>{};
-                    d.y[sIdx + j] = box.ymin() + (iyj * box.ly()) / cstone::maxCoord<KeyType>{};
-                    d.z[sIdx + j] = box.zmin() + (izj * box.lz()) / cstone::maxCoord<KeyType>{};
+                    x[sIdx + j] = box.xmin() + (ixj * box.lx()) / cstone::maxCoord<KeyType>{};
+                    y[sIdx + j] = box.ymin() + (iyj * box.ly()) / cstone::maxCoord<KeyType>{};
+                    z[sIdx + j] = box.zmin() + (izj * box.lz()) / cstone::maxCoord<KeyType>{};
                 }
             }
+            d.x = std::move(x);
+            d.y = std::move(y);
+            d.z = std::move(z);
         }
 
         auto replicateField = [&sfcOrder, numParticlesInFile, numParticlesSplit,
@@ -209,14 +225,17 @@ public:
             reader->readField(key, src.data());
             cstone::gather<cstone::LocalIndex>(sfcOrder, src.data(), tmp.data());
             swap(src, tmp);
+            tmp.clear();
 
-            dest.resize(numParticlesSplit);
+            using DestVectorType = std::decay_t<decltype(dest)>::value_type;
+            std::vector<DestVectorType> outTmp(numParticlesSplit);
 #pragma omp parallel for schedule(static)
             for (size_t i = 0; i < numParticlesInFile; ++i)
             {
                 size_t sIdx = numSplits * i;
-                std::fill(dest.data() + sIdx, dest.data() + sIdx + numSplits, src[i] * scale);
+                std::fill(outTmp.data() + sIdx, outTmp.data() + sIdx + numSplits, src[i] * scale);
             }
+            dest = std::move(outTmp);
         };
 
         d.resize(numParticlesSplit);
@@ -228,14 +247,15 @@ public:
 
         if (d.isAllocated("temp")) { replicateField(reader, "temp", d.temp, T(1)); }
         else if (d.isAllocated("u")) { replicateField(reader, "u", d.u, T(1)); }
+        cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0);
+        cstone::fill<gpu>(d.rung.begin(), d.rung.end(), 0);
+        cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), d.minDt);
+        cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), d.minDt);
+        cstone::scaleGpuAcc<gpu>(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), d.minDt);
 
-        std::fill(d.du_m1.begin(), d.du_m1.end(), 0);
-        std::fill(d.rung.begin(), d.rung.end(), 0);
-        std::transform(d.vx.begin(), d.vx.end(), d.x_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
-        std::transform(d.vy.begin(), d.vy.end(), d.y_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
-        std::transform(d.vz.begin(), d.vz.end(), d.z_m1.begin(), [dt = d.minDt](auto v_) { return v_ * dt; });
+        generateParticleIDs<gpu>(d.id);
 
-        generateParticleIDs(d.id);
+//        generateParticleIDs(d.id);
 
         if (d.isAllocated("alpha"))
         {
@@ -245,7 +265,7 @@ public:
             }
             catch (std::runtime_error&)
             {
-                std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
+                cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
             }
         }
 

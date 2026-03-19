@@ -31,9 +31,8 @@
 
 #pragma once
 
-#include <variant>
-
 #include "cstone/fields/field_get.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "sph/groups.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/positions.hpp"
@@ -100,10 +99,10 @@ public:
         std::apply([&d](auto... f) { d.setConserved(f.value...); }, make_tuple(ConservedFields{}));
         std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
 
-        d.devData.setConserved("x", "y", "z", "h", "m");
-        d.devData.setDependent("keys");
-        std::apply([&d](auto... f) { d.devData.setConserved(f.value...); }, make_tuple(ConservedFields{}));
-        std::apply([&d](auto... f) { d.devData.setDependent(f.value...); }, make_tuple(DependentFields{}));
+        d.setConserved("x", "y", "z", "h", "m");
+        d.setDependent("keys");
+        std::apply([&d](auto... f) { d.setConserved(f.value...); }, make_tuple(ConservedFields{}));
+        std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
     }
 
     void sync(DomainType& domain, DataType& simData) override
@@ -132,9 +131,9 @@ public:
 
         computeGroups(first, last, d, domain.box(), groups_);
 
-        fill(get<"ax">(d), first, last, HydroType(0));
-        fill(get<"ay">(d), first, last, HydroType(0));
-        fill(get<"az">(d), first, last, HydroType(0));
+        cstone::fill<cstone::HaveGpu<Acc>{}>(d.x.begin() + first, d.x.begin() + last, HydroType(0));
+        cstone::fill<cstone::HaveGpu<Acc>{}>(d.y.begin() + first, d.y.begin() + last, HydroType(0));
+        cstone::fill<cstone::HaveGpu<Acc>{}>(d.z.begin() + first, d.z.begin() + last, HydroType(0));
 
         auto groups = mHolder_.computeSpatialGroups(d, domain);
         mHolder_.upsweep(d, domain);
@@ -164,7 +163,7 @@ public:
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,
                     const cstone::Box<T>& /*box*/) override
     {
-        Base::outputAllocatedFields(writer, first, last, simData);
+        Base::outputAllocatedFields(writer, simData);
         timer.step("FileOutput");
     }
 };
