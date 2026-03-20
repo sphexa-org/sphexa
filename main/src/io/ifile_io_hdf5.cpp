@@ -98,8 +98,14 @@ public:
     void stepAttribute(const std::string& key, FieldType val, int64_t size) override
     {
         std::visit(
-            [this, &key, size](auto arg) { //
-                fileutils::H5WriteStepAttribT(h5File_, key.c_str(), arg, size);
+            [this, &key, size](auto argp) { //
+                // if val differs between rank it's a data race, if we only call on rank 0 it hangs
+                // so we explicitly broadcast the value of rank 0 to all ranks
+                using Type = std::decay_t<decltype(*argp)>;
+                std::vector<Type> arg(size);
+                std::copy(argp, argp + size, arg.data());
+                MPI_Bcast(arg.data(), size, MpiType<Type>{}, 0, comm_);
+                fileutils::H5WriteStepAttribT(h5File_, key.c_str(), arg.data(), size);
             },
             val);
     }
@@ -208,7 +214,14 @@ public:
 
     void stepAttribute(const std::string& key, FieldType val, int64_t size) override
     {
-        if (rank_ == 0) { Base::stepAttribute(key, val, size); }
+        if (rank_ == 0)
+        {
+            std::visit(
+                [this, &key, size](auto arg) { //
+                    fileutils::H5WriteStepAttribT(h5File_, key.c_str(), arg, size);
+                },
+                val);
+        }
     }
 
     void stepAttribute(const std::string& key, const std::string& val) override
