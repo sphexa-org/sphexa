@@ -52,7 +52,8 @@ struct AscentAdaptor
         mesh["state/cycle"].set_external(&d.iteration);
         mesh["state/time"].set_external(&d.ttot);
 
-        mesh.update(mesh_from(d, startIndex, endIndex));
+        conduit::Node mesh_blueprint = mesh_from(d, startIndex, endIndex);
+        mesh.move(mesh_blueprint);
 
         _instance.publish(mesh);
         _instance.execute(_actions);
