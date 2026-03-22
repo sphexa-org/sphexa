@@ -16,7 +16,6 @@
 #include <mpi.h>
 #include <gtest/gtest.h>
 
-#include "cstone/traversal/peers.hpp"
 #include "cstone/focus/octree_focus_mpi.hpp"
 
 #include "coord_samples/random.hpp"
@@ -53,16 +52,15 @@ void globalRandomGaussian(int thisRank, int numRanks)
     // common pool of coordinates, identical on all ranks
     RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numRanks * numParticles, box);
 
-    auto [tree, counts] = computeOctree(std::span(coords.particleKeys()), bucketSize);
+    auto [leaves, counts] = computeOctree(std::span(coords.particleKeys()), bucketSize);
 
-    Octree<KeyType> domainTree;
-    domainTree.update(tree.data(), nNodes(tree));
+    OctreeData<KeyType, CpuTag> domainTree;
+    domainTree.resize(nNodes(leaves));
+    updateInternalTree<KeyType>(leaves, domainTree.data());
 
-    auto assignment = makeSfcAssignment(numRanks, counts, tree.data());
+    auto assignment = makeSfcAssignment(numRanks, counts, leaves.data());
 
     /*******************************/
-
-    auto peers = findPeersMac(thisRank, assignment, domainTree.cdata(), box, invThetaEff);
 
     KeyType focusStart = assignment[thisRank];
     KeyType focusEnd   = assignment[thisRank + 1];
@@ -103,8 +101,8 @@ void globalRandomGaussian(int thisRank, int numRanks)
     int converged = 0;
     while (converged != numRanks)
     {
-        converged = focusTree.updateTree(assignment, domainTree.treeLeaves(), box, scratch);
-        focusTree.updateCounts(particleKeys, tree, counts, scratch);
+        converged = focusTree.updateTree(assignment, leaves, box, scratch);
+        focusTree.updateCounts(particleKeys, leaves, counts, scratch);
         focusTree.updateMinMac(assignment, invThetaEff, false);
         MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
 
@@ -129,7 +127,7 @@ void globalRandomGaussian(int thisRank, int numRanks)
                            referenceFocusTree.leafCounts().begin()));
 }
 
-TEST(GlobalTreeDomain, randomGaussian)
+TEST(OctreeFocusLET, randomGaussian)
 {
     int rank = 0, nRanks = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);

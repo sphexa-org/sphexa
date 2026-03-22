@@ -372,6 +372,7 @@ std::span<const TreeNodeIndex> leafToInternal(const OctreeData<KeyType, Accelera
     return {rawPtr(octree.leafToInternal) + octree.numInternalNodes, size_t(octree.numLeafNodes)};
 }
 
+//! @brief Deprecated, do not use in new code. Not used anymore in production code, some unit test usage remaining.
 template<class KeyType>
 class Octree
 {
