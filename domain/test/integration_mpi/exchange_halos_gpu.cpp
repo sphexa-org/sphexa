@@ -40,7 +40,7 @@ void gpuDirect(int rank)
     }
     else
     {
-        int err = mpiRecvSync(rawPtr(dest), msg.size(), 0, tag, MPI_STATUS_IGNORE);
+        int err = mpiRecvSync(rawPtr(dest), msg.size(), 0, tag, MPI_STATUS_IGNORE, MPI_COMM_WORLD);
         EXPECT_EQ(err, MPI_SUCCESS);
 
         std::vector<int> probe = toHost(dest);
@@ -124,7 +124,7 @@ void simpleTest(int thisRank, int numRanks)
     DeviceVector<char> receiveBuffer = std::vector<char>(7 * 24);
 
     //! Perform exchange with GPU buffers
-    haloExchangeGpu(0, incomingHalos, outgoingHalos, sendBuffer, receiveBuffer, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z));
+    haloExchangeGpu(0, incomingHalos, outgoingHalos, sendBuffer, receiveBuffer, MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z));
 
     //! download from device
     memcpyD2H(d_x.data(), d_x.size(), x.data());

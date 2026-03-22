@@ -74,6 +74,7 @@ void exchangeParticlesGpu(int epoch,
                           DeviceVector& sendScratchBuffer,
                           DeviceVector& recvScratchBuffer,
                           const LocalIndex* ordering,
+                          MPI_Comm comm,
                           Arrays... arrays)
 {
     using TransferType          = uint64_t;
@@ -103,7 +104,7 @@ void exchangeParticlesGpu(int epoch,
         size_t numBytes = headerBytes + packArrays<alignment>(gatherGpuL, ordering + sendStart, sendCount,
                                                               sendPtr + headerBytes, arrays...);
         checkGpuErrors(cudaDeviceSynchronize());
-        mpiSendGpuDirect(sendPtr, numBytes, destinationRank, domExTag, sendRequests, sendBuffers);
+        mpiSendGpuDirect(sendPtr, numBytes, destinationRank, domExTag, sendRequests, sendBuffers, comm);
         sendPtr += numBytes;
     }
 
@@ -111,7 +112,7 @@ void exchangeParticlesGpu(int epoch,
     while (receiveStart != receiveEnd)
     {
         MPI_Status status;
-        MPI_Probe(MPI_ANY_SOURCE, domExTag, MPI_COMM_WORLD, &status);
+        MPI_Probe(MPI_ANY_SOURCE, domExTag, comm, &status);
         int receiveRank = status.MPI_SOURCE;
         int receiveCountTransfer;
         MPI_Get_count(&status, MpiType<TransferType>{}, &receiveCountTransfer);
@@ -120,7 +121,7 @@ void exchangeParticlesGpu(int epoch,
         reallocateBytes(recvScratchBuffer, receiveCountBytes, allocGrowthRate);
         char* receiveBuffer = reinterpret_cast<char*>(rawPtr(recvScratchBuffer));
         mpiRecvGpuDirect(reinterpret_cast<TransferType*>(receiveBuffer), receiveCountTransfer, receiveRank, domExTag,
-                         &status);
+                         &status, comm);
 
         size_t receiveCount;
         receiveBuffer = decodeSendCount(receiveBuffer, &receiveCount, alignment);

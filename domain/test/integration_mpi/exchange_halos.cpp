@@ -82,7 +82,7 @@ void simpleTest(int thisRank)
         EXPECT_EQ(yOrig, y);
     }
 
-    haloexchange(0, incomingHalos, outgoingHalos, x.data(), y.data(), velocity.data());
+    haloexchange(0, incomingHalos, outgoingHalos, MPI_COMM_WORLD, x.data(), y.data(), velocity.data());
 
     std::vector<double> xRef{20, 21, 22, 23, 24, 25, 26, 27, 28, 29};
     std::vector<float> yRef{30, 31, 32, 33, 34, 35, 36, 37, 38, 39};
