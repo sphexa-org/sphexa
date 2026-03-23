@@ -57,8 +57,14 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
     double hInit       = std::cbrt(3.0 / (4 * M_PI) * d.ng0 * totalVolume / d.numParticlesGlobal) * 0.5;
 
     double mPart  = constants.at("mTotal") / d.numParticlesGlobal;
-    double width  = constants.at("width");
+    double width  = T(2) * hInit;
     double width2 = width * width;
+
+    // We distribute energy as exp(-r2 / width2), with width taken as the current 2h, so that the enery
+    // is deposited in about ng0 neighbors.
+    // ener0 is the constant that should multiply the Gaussian so that its integral equals energytotal
+    double ener0  = constants.at("energyTotal") / std::pow(M_PI, 1.5) / width2 / width;
+
 
     cstone::fill<gpu>(d.m.begin(), d.m.end(), mPart);
     cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
@@ -91,7 +97,7 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
     for (size_t i = 0; i < d.x.size(); i++)
     {
         T r2 = norm2(cstone::Vec3<T>{x[i], y[i], z[i]});
-        u[i] = constants.at("ener0") * exp(-(r2 / width2)) + constants.at("u0");
+        u[i] = ener0 * exp(-(r2 / width2)) + constants.at("u0");
     }
     if (d.u.empty())
     {
