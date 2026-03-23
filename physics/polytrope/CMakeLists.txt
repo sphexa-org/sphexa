@@ -5,7 +5,3 @@ set(POLYTROPE_DIR ${CMAKE_SOURCE_DIR}/physics/polytrope/include)
 set(SPH_DIR ${PROJECT_SOURCE_DIR}/sph/include)
 
 add_subdirectory(include/polytrope)
-
-if (BUILD_TESTING)
-#    add_subdirectory(test)
-endif ()

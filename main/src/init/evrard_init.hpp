@@ -134,7 +134,7 @@ class EvrardGlassSphere : public RadialProfile<Dataset>
 
 public:
     explicit EvrardGlassSphere(std::string initBlock, std::string settingsFile, IFileReader* reader)
-        : RadialProfile<Dataset>(std::move(initBlock), reader) // glassBlock(std::move(initBlock))
+        : RadialProfile<Dataset>(std::move(initBlock), reader)
     {
         Dataset d;
         settings_ = buildSettings(d, evrardConstants(), settingsFile, reader);
