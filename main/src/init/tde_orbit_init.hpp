@@ -137,10 +137,10 @@ public:
         reader->closeStep();
 
         // hydro settings that have to be overriden
-        simData.hydro.iteration           = 0;
-        simData.hydro.ttot                = 0.0;
-        simData.hydro.minDt               = 1e-9;
-        simData.hydro.minDt_m1            = 1e-9;
+        simData.hydro.iteration = 0;
+        simData.hydro.ttot      = 0.0;
+        simData.hydro.minDt     = 1e-9;
+        simData.hydro.minDt_m1  = 1e-9;
 
         const cstone::Vec3<double> pos_b = {settings_.at("star::x"), settings_.at("star::y"), settings_.at("star::z")};
 
@@ -160,20 +160,40 @@ public:
     //! @brief Displace system by a position and velocity
     void displaceSystem(Dataset& simData, const cstone::Vec3<double>& X, const cstone::Vec3<double>& V) const
     {
-        auto& d = simData.hydro;
+        auto& d    = simData.hydro;
+        auto  x    = toHost(d.x);
+        auto  y    = toHost(d.y);
+        auto  z    = toHost(d.z);
+        auto  vx   = toHost(d.vx);
+        auto  vy   = toHost(d.vy);
+        auto  vz   = toHost(d.vz);
+        using Tx_m1 = typename decltype(d.x_m1)::value_type;
+        std::vector<Tx_m1> x_m1(x.size());
+        std::vector<Tx_m1> y_m1(x.size());
+        std::vector<Tx_m1> z_m1(x.size());
+
 #pragma omp parallel for
         for (size_t i = 0; i < d.x.size(); i++)
         {
-            d.x[i] += X[0];
-            d.y[i] += X[1];
-            d.z[i] += X[2];
-            d.vx[i] += V[0];
-            d.vy[i] += V[1];
-            d.vz[i] += V[2];
-            d.x_m1[i] = d.vx[i] * d.minDt;
-            d.y_m1[i] = d.vy[i] * d.minDt;
-            d.z_m1[i] = d.vz[i] * d.minDt;
+            x[i] += X[0];
+            y[i] += X[1];
+            z[i] += X[2];
+            vx[i] += V[0];
+            vy[i] += V[1];
+            vz[i] += V[2];
+            x_m1[i] = vx[i] * d.minDt;
+            y_m1[i] = vy[i] * d.minDt;
+            z_m1[i] = vz[i] * d.minDt;
         }
+        d.x    = std::move(x);
+        d.y    = std::move(y);
+        d.z    = std::move(z);
+        d.vx   = std::move(vx);
+        d.vy   = std::move(vy);
+        d.vz   = std::move(vz);
+        d.x_m1 = std::move(x_m1);
+        d.y_m1 = std::move(y_m1);
+        d.z_m1 = std::move(z_m1);
     }
 };
 } // namespace sphexa
