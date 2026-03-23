@@ -44,70 +44,76 @@ public:
 };
 
 template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-auto mpiSendAsync(T* data, size_t count, int rank, int tag, std::vector<MPI_Request>& requests)
+auto mpiSendAsync(T* data, size_t count, int rank, int tag, std::vector<MPI_Request>& requests,
+                  MPI_Comm comm)
 {
     assert(count <= std::numeric_limits<int>::max());
     requests.push_back(MPI_Request{});
-    return MPI_Isend(data, int(count), MpiType<std::decay_t<T>>{}, rank, tag, MPI_COMM_WORLD, &requests.back());
+    return MPI_Isend(data, int(count), MpiType<std::decay_t<T>>{}, rank, tag, comm, &requests.back());
 }
 
 //! @brief adaptor to wrap compile-time size arrays into flattened arrays of the underlying type
 template<class T, std::enable_if_t<!std::is_arithmetic_v<T>, int> = 0>
-auto mpiSendAsync(T* data, size_t count, int rank, int tag, std::vector<MPI_Request>& requests)
+auto mpiSendAsync(T* data, size_t count, int rank, int tag, std::vector<MPI_Request>& requests,
+                  MPI_Comm comm)
 {
     using ValueType    = typename T::value_type;
     constexpr size_t N = T{}.size();
     ValueType* ptr     = reinterpret_cast<ValueType*>(data);
 
-    return mpiSendAsync(ptr, count * N, rank, tag, requests);
+    return mpiSendAsync(ptr, count * N, rank, tag, requests, comm);
 }
 
 //! @brief Send char buffers as type T to mitigate the 32-bit send count limitation of MPI
 template<class T>
-auto mpiSendAsyncAs(char* data, size_t numBytes, int rank, int tag, std::vector<MPI_Request>& requests)
+auto mpiSendAsyncAs(char* data, size_t numBytes, int rank, int tag, std::vector<MPI_Request>& requests,
+                    MPI_Comm comm)
 {
-    return mpiSendAsync(reinterpret_cast<T*>(data), numBytes / sizeof(T), rank, tag, requests);
+    return mpiSendAsync(reinterpret_cast<T*>(data), numBytes / sizeof(T), rank, tag, requests, comm);
 }
 
 template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-auto mpiRecvSync(T* data, int count, int rank, int tag, MPI_Status* status)
+auto mpiRecvSync(T* data, int count, int rank, int tag, MPI_Status* status, MPI_Comm comm)
 {
-    return MPI_Recv(data, count, MpiType<std::decay_t<T>>{}, rank, tag, MPI_COMM_WORLD, status);
+    return MPI_Recv(data, count, MpiType<std::decay_t<T>>{}, rank, tag, comm, status);
 }
 
 //! @brief adaptor to wrap compile-time size arrays into flattened arrays of the underlying type
 template<class T, std::enable_if_t<!std::is_arithmetic_v<T>, int> = 0>
-auto mpiRecvSync(T* data, int count, int rank, int tag, MPI_Status* status)
+auto mpiRecvSync(T* data, int count, int rank, int tag, MPI_Status* status, MPI_Comm comm)
 {
     using ValueType    = typename T::value_type;
     constexpr size_t N = T{}.size();
     ValueType* ptr     = reinterpret_cast<ValueType*>(data);
 
-    return mpiRecvSync(ptr, count * N, rank, tag, status);
+    return mpiRecvSync(ptr, count * N, rank, tag, status, comm);
 }
 
 template<class T>
-auto mpiRecvSyncAs(char* data, size_t numBytes, int rank, int tag, MPI_Status* status)
+auto mpiRecvSyncAs(char* data, size_t numBytes, int rank, int tag, MPI_Status* status,
+                   MPI_Comm comm)
 {
-    return mpiRecvSync(reinterpret_cast<T*>(data), numBytes / sizeof(T), rank, tag, status);
+    return mpiRecvSync(reinterpret_cast<T*>(data), numBytes / sizeof(T), rank, tag, status, comm);
 }
 
 template<class T, std::enable_if_t<std::is_arithmetic_v<T>, int> = 0>
-auto mpiRecvAsync(T* data, int count, int rank, int tag, std::vector<MPI_Request>& requests)
+auto mpiRecvAsync(T* data, int count, int rank, int tag, std::vector<MPI_Request>& requests,
+                  MPI_Comm comm)
 {
     requests.push_back(MPI_Request{});
-    return MPI_Irecv(data, count, MpiType<std::decay_t<T>>{}, rank, tag, MPI_COMM_WORLD, &requests.back());
+    return MPI_Irecv(data, count, MpiType<std::decay_t<T>>{}, rank, tag, comm, &requests.back());
 }
 
 //! @brief adaptor to wrap compile-time size arrays into flattened arrays of the underlying type
 template<class T, std::enable_if_t<!std::is_arithmetic_v<T>, int> = 0>
-auto mpiRecvAsync(T* data, int count, int rank, int tag, std::vector<MPI_Request>& requests)
+auto mpiRecvAsync(T* data, int count, int rank, int tag, std::vector<MPI_Request>& requests,
+                  MPI_Comm comm)
 {
     using ValueType    = typename T::value_type;
     constexpr size_t N = T{}.size();
     ValueType* ptr     = reinterpret_cast<ValueType*>(data);
 
-    return mpiRecvAsync(ptr, count * N, rank, tag, requests);
+    return mpiRecvAsync(ptr, count * N, rank, tag, requests, comm);
 }
 
 //! @brief MPI_Get_count for standard types

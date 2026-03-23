@@ -33,18 +33,19 @@ auto mpiSendGpuDirect(T* data,
                       int rank,
                       int tag,
                       std::vector<MPI_Request>& requests,
-                      [[maybe_unused]] std::vector<std::vector<T, util::DefaultInitAdaptor<T>>>& buffers)
+                      [[maybe_unused]] std::vector<std::vector<T, util::DefaultInitAdaptor<T>>>& buffers,
+                      MPI_Comm comm)
 {
     if constexpr (!useGpuDirect)
     {
         std::vector<T, util::DefaultInitAdaptor<T>> hostBuffer(count);
         memcpyD2H(data, count, hostBuffer.data());
-        auto errCode = mpiSendAsync(hostBuffer.data(), count, rank, tag, requests);
+        auto errCode = mpiSendAsync(hostBuffer.data(), count, rank, tag, requests, comm);
         buffers.push_back(std::move(hostBuffer));
 
         return errCode;
     }
-    else { return mpiSendAsync(data, count, rank, tag, requests); }
+    else { return mpiSendAsync(data, count, rank, tag, requests, comm); }
 }
 
 //! @brief Send char buffers cast to a transfer type @p T to mitigate the 32-bit send count limitation of MPI
@@ -54,23 +55,24 @@ auto mpiSendGpuDirect(char* data,
                       int rank,
                       int tag,
                       std::vector<MPI_Request>& requests,
-                      std::vector<std::vector<T, util::DefaultInitAdaptor<T>>>& buffers)
+                      std::vector<std::vector<T, util::DefaultInitAdaptor<T>>>& buffers,
+                      MPI_Comm comm)
 {
-    return mpiSendGpuDirect(reinterpret_cast<T*>(data), numBytes / sizeof(T), rank, tag, requests, buffers);
+    return mpiSendGpuDirect(reinterpret_cast<T*>(data), numBytes / sizeof(T), rank, tag, requests, buffers, comm);
 }
 
 template<class T>
-auto mpiRecvGpuDirect(T* data, int count, int rank, int tag, MPI_Status* status)
+auto mpiRecvGpuDirect(T* data, int count, int rank, int tag, MPI_Status* status, MPI_Comm comm)
 {
     if constexpr (!useGpuDirect)
     {
         std::vector<T, util::DefaultInitAdaptor<T>> hostBuffer(count);
-        auto errCode = mpiRecvSync(hostBuffer.data(), count, rank, tag, status);
+        auto errCode = mpiRecvSync(hostBuffer.data(), count, rank, tag, status, comm);
         memcpyH2D(hostBuffer.data(), count, data);
 
         return errCode;
     }
-    else { return mpiRecvSync(data, count, rank, tag, status); }
+    else { return mpiRecvSync(data, count, rank, tag, status, comm); }
 }
 
 //! @brief this wrapper is needed to support sending from GPU buffers with staging through host (no GPU-direct MPI)
@@ -80,18 +82,19 @@ auto mpiSendAsyncAcc(T* data,
                      int rank,
                      int tag,
                      std::vector<MPI_Request>& requests,
-                     [[maybe_unused]] std::vector<std::vector<T, util::DefaultInitAdaptor<T>>>& buffers)
+                     [[maybe_unused]] std::vector<std::vector<T, util::DefaultInitAdaptor<T>>>& buffers,
+                     MPI_Comm comm)
 {
-    if constexpr (useGpu) { mpiSendGpuDirect(data, count, rank, tag, requests, buffers); }
-    else { mpiSendAsync(data, count, rank, tag, requests); }
+    if constexpr (useGpu) { mpiSendGpuDirect(data, count, rank, tag, requests, buffers, comm); }
+    else { mpiSendAsync(data, count, rank, tag, requests, comm); }
 }
 
 //! @brief this wrapper is needed to support sending from GPU buffers with staging through host (no GPU-direct MPI)
 template<bool useGpu, class T>
-auto mpiRecvSyncAcc(T* data, int count, int rank, int tag, MPI_Status* status)
+auto mpiRecvSyncAcc(T* data, int count, int rank, int tag, MPI_Status* status, MPI_Comm comm)
 {
-    if constexpr (useGpu) { mpiRecvGpuDirect(data, count, rank, tag, status); }
-    else { mpiRecvSync(data, count, rank, tag, status); }
+    if constexpr (useGpu) { mpiRecvGpuDirect(data, count, rank, tag, status, comm); }
+    else { mpiRecvSync(data, count, rank, tag, status, comm); }
 }
 
 template<class T>

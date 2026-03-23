@@ -94,7 +94,7 @@ void exchangeFocusIrregular(int myRank, int numRanks)
 
     std::vector<std::vector<KeyType>> treelets(numRanks);
     ConcatVector<TreeNodeIndex> treeletIdx;
-    syncTreelets(peers, peers, peerFocusIndices, octree, treeLeaves, treelets);
+    syncTreelets(peers, peers, peerFocusIndices, octree, treeLeaves, treelets, MPI_COMM_WORLD);
     indexTreelets<KeyType>(peers, octree.prefixes, octree.levelRange, treelets, treeletIdx);
 
     auto treeletView = treeletIdx.view();
@@ -155,13 +155,13 @@ TEST(PeerExchange, arrayWrap)
         std::vector<Vec> buffer{{0, 1, 2, 3}, {4, 5, 6, 7}, {8, 9, 10, 11}};
 
         std::vector<MPI_Request> requests;
-        mpiSendAsync(buffer.data(), buffer.size(), 1, 0, requests);
+        mpiSendAsync(buffer.data(), buffer.size(), 1, 0, requests, MPI_COMM_WORLD);
         MPI_Waitall(int(requests.size()), requests.data(), MPI_STATUS_IGNORE);
     }
     if (rank == 1)
     {
         std::vector<Vec> buffer(3);
-        mpiRecvSync(buffer.data(), buffer.size(), 0, 0, MPI_STATUS_IGNORE);
+        mpiRecvSync(buffer.data(), buffer.size(), 0, 0, MPI_STATUS_IGNORE, MPI_COMM_WORLD);
 
         std::vector<Vec> reference{{0, 1, 2, 3}, {4, 5, 6, 7}, {8, 9, 10, 11}};
         EXPECT_EQ(buffer, reference);
