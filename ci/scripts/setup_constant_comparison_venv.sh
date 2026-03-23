@@ -28,9 +28,8 @@ fi
 # shellcheck source=/dev/null
 source "$venv_dir/bin/activate"
 
-if ! python -c 'import numpy' >/dev/null 2>&1; then
-  echo "Installing numpy into '$venv_dir'"
-  pip install --quiet numpy
-fi
+echo "Ensuring numpy is installed in '$venv_dir'"
+python -m pip install --quiet numpy
+python -c 'import numpy' >/dev/null
 
 deactivate
