@@ -66,7 +66,7 @@ public:
         auto exteriorPeerFlags = haloPeers(myRank_, layout, assignment);
         exchangePeers(exteriorPeerFlags, exteriorPeers_, interiorPeers_, comm_);
 
-        outgoingHaloIndices_ = exchangeRequestKeys<KeyType>(leaves, assignment, exteriorPeers_, interiorPeers_, layout);
+        outgoingHaloIndices_ = exchangeRequestKeys<KeyType>(leaves, assignment, exteriorPeers_, interiorPeers_, layout, comm_);
 
         incomingHaloIndices_.resize(assignment.size());
         std::fill(incomingHaloIndices_.begin(), incomingHaloIndices_.end(), RecvList::value_type{0, 0});
