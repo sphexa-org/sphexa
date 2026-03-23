@@ -66,7 +66,7 @@ struct AccretionTest : public ::testing::Test
         int   bucketSize = 8;
         float theta      = 1.0;
 
-        domain_ptr = std::make_unique<cstone::Domain<KeyType, T>>(rank, numRanks, bucketSize, bucketSize, theta);
+        domain_ptr = std::make_unique<cstone::Domain<KeyType, T>>(rank, numRanks, bucketSize, bucketSize, theta, MPI_COMM_WORLD);
 
         star.inner_size      = inner_limit;
         star.removal_limit_h = INFINITY;

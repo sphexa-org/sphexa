@@ -107,15 +107,15 @@ std::vector<int> findPeersMac(int myRank,
 template<class KeyType, class T>
 std::vector<int> findPeersMacStt(int myRank,
                                  const SfcAssignment<KeyType>& assignment,
-                                 const Octree<KeyType>& octree,
+                                 const OctreeView<const KeyType>& octree,
                                  const Box<T>& box,
                                  float invThetaEff)
 {
     KeyType domainStart     = assignment[myRank];
     KeyType domainEnd       = assignment[myRank + 1];
-    const KeyType* leaves   = octree.treeLeaves().data();
-    TreeNodeIndex firstLeaf = findNodeAbove(leaves, octree.numLeafNodes(), domainStart);
-    TreeNodeIndex lastLeaf  = findNodeAbove(leaves, octree.numLeafNodes(), domainEnd);
+    const KeyType* leaves   = octree.leaves;
+    TreeNodeIndex firstLeaf = findNodeAbove(leaves, octree.numLeafNodes, domainStart);
+    TreeNodeIndex lastLeaf  = findNodeAbove(leaves, octree.numLeafNodes, domainEnd);
 
     int maxCoord = 1u << maxTreeLevel<KeyType>{};
     auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invThetaEff;
@@ -131,22 +131,21 @@ std::vector<int> findPeersMacStt(int myRank,
 
         auto violatesMac = [target, ellipse, pbc, &octree, domainStart, domainEnd](TreeNodeIndex idx)
         {
-            KeyType nodeStart = octree.codeStart(idx);
-            KeyType nodeEnd   = octree.codeEnd(idx);
+            auto [nodeStart, nodeEnd] = decodePlaceholderBit2K(octree.prefixes[idx]);
             // if the tree node with index idx is fully contained in the focus, we stop traversal
             if (containedIn(nodeStart, nodeEnd, domainStart, domainEnd)) { return false; }
 
-            IBox source = sfcIBox(sfcKey(nodeStart), octree.level(idx));
+            IBox source = sfcIBox(sfcKey(nodeStart), treeLevel(nodeEnd - nodeStart));
             return !minMacMutualInt(target, source, ellipse, pbc);
         };
 
         auto markLeafIdx = [&octree, &peers, &assignment](TreeNodeIndex idx)
         {
-            int peerRank    = assignment.findRank(octree.codeStart(idx));
+            int peerRank    = assignment.findRank(decodePlaceholderBit(octree.prefixes[idx]));
             peers[peerRank] = 1;
         };
 
-        singleTraversal(octree.childOffsets().data(), octree.parents().data(), violatesMac, markLeafIdx);
+        singleTraversal(octree.childOffsets, octree.parents, violatesMac, markLeafIdx);
     }
 
     std::vector<int> ret;

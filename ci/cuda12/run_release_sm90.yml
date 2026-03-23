@@ -34,10 +34,11 @@ sph-run-cuda12-sm90-release-1rank:
     - $TEST_INSTALL_DIR/unit/component_units
     # --- grackle
     # https://github.com/grackle-project/grackle_data_files/blob/928696482fbe15d9bac4382de6134d95568f099c/input/CloudyData_UVB%3DHM2012.h5
-    # - wget https://jfrog.svc.cscs.ch/artifactory/cscs-reframe-tests/sphexa/CloudyData_UVB%3DHM2012.h5
-    # - mkdir -p extern/grackle/grackle_repo/grackle_data_files/input
-    # - mv CloudyData_UVB=HM2012.h5 extern/grackle/grackle_repo/grackle_data_files/input/
-    # - $TEST_INSTALL_DIR/physics/cooling_tests
+    - wget https://jfrog.svc.cscs.ch/artifactory/cscs-reframe-tests/sphexa/CloudyData_UVB%3DHM2012.h5
+    - mkdir -p extern/grackle/grackle_repo/input
+    - mv CloudyData_UVB=HM2012.h5 extern/grackle/grackle_repo/input/
+    - export GRACKLE_DATA_FILE="$PWD/extern/grackle/grackle_repo/input/CloudyData_UVB=HM2012.h5"
+    - $TEST_INSTALL_DIR/physics/cooling_tests
     # GPU tests:
     - $TEST_INSTALL_DIR/hydro/sph_gpu_tests
     - $TEST_INSTALL_DIR/performance/hilbert_perf_gpu
@@ -121,7 +122,10 @@ sph-run-cuda12-sm90-release-12ranks:
 
 sph-run-cuda12-sm90-release-sphexa-cuda:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-release']
+  needs:
+    - job: sph-build-cuda12-sm90-release
+    - job: sph-test-venv-setup
+      artifacts: true
   image: prgenv-gnu/25.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
@@ -143,16 +147,21 @@ sph-run-cuda12-sm90-release-sphexa-cuda:
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
-        python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
+        . constant_comparison_venv/bin/activate
+        python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt "7,8"
         if [ $? -ne 0 ]; then
           exit 1
         fi
+        deactivate
       fi
     - date
 
 sph-run-cuda12-sm90-release-sphexa-cpu:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-release']
+  needs:
+    - job: sph-build-cuda12-sm90-release
+    - job: sph-test-venv-setup
+      artifacts: true
   image: prgenv-gnu/25.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
@@ -174,16 +183,21 @@ sph-run-cuda12-sm90-release-sphexa-cpu:
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
-        python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
+        . constant_comparison_venv/bin/activate
+        python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt "7,8"
         if [ $? -ne 0 ]; then
           exit 1
         fi
+        deactivate
       fi
     - date
 
 sph-compare-constants-cuda12-sm90-release-sphexa-cuda:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-release']
+  needs:
+    - job: sph-build-cuda12-sm90-release
+    - job: sph-test-venv-setup
+      artifacts: true
   image: prgenv-gnu/25.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
@@ -202,7 +216,10 @@ sph-compare-constants-cuda12-sm90-release-sphexa-cuda:
 
 sph-compare-constants-cuda12-sm90-release-sphexa-cpu:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-release']
+  needs:
+    - job: sph-build-cuda12-sm90-release
+    - job: sph-test-venv-setup
+      artifacts: true
   image: prgenv-gnu/25.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:

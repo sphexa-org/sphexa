@@ -106,19 +106,19 @@ TEST(FocusDomain, randomGaussianNeighborSum)
     float theta = 0.75;
 
     {
-        Domain<unsigned, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {-1, 1});
+        Domain<unsigned, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, {-1, 1});
         randomGaussianDomain<unsigned, double>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {-1, 1});
+        Domain<uint64_t, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, {-1, 1});
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {-1, 1});
+        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, {-1, 1});
         randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {-1, 1});
+        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, {-1, 1});
         randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
 }
@@ -135,19 +135,19 @@ TEST(FocusDomain, randomGaussianNeighborSumPbc)
 
     auto periodic = BoundaryType::periodic;
     {
-        Domain<unsigned, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {-1, 1, periodic});
+        Domain<unsigned, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, {-1, 1, periodic});
         randomGaussianDomain<unsigned, double>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {-1, 1, periodic});
+        Domain<uint64_t, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, {-1, 1, periodic});
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {-1, 1, periodic});
+        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, {-1, 1, periodic});
         randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, {-1, 1, periodic});
+        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, {-1, 1, periodic});
         randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
 }
@@ -174,7 +174,7 @@ TEST(FocusDomain, assignmentShift)
     std::vector<Real> z(coordinates.z().begin(), coordinates.z().end());
     std::vector<Real> h(numParticlesPerRank, 0.1 / std::cbrt(numRanks));
 
-    Domain<KeyType, Real> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, box);
+    Domain<KeyType, Real> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, box);
 
     std::vector<KeyType> particleKeys(x.size());
 
@@ -228,7 +228,7 @@ TEST(FocusDomain, removeParticle)
     std::vector<uint64_t> id(x.size());
     std::iota(begin(id), end(id), uint64_t(rank * numParticlesPerRank));
 
-    Domain<KeyType, Real> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, box);
+    Domain<KeyType, Real> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, box);
 
     std::vector<KeyType> particleKeys(x.size());
 
@@ -281,7 +281,7 @@ TEST(FocusDomain, reapplySync)
     std::vector<Real> h(numParticlesPerRank, 0.1 / std::cbrt(numRanks));
     std::vector<KeyType> particleKeys(x.size());
 
-    Domain<KeyType, Real> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, box);
+    Domain<KeyType, Real> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, box);
 
     std::vector<Real> s1, s2, s3;
     domain.sync(particleKeys, x, y, z, h, std::tuple{}, std::tie(s1, s2, s3));
@@ -356,7 +356,7 @@ void randomGaussianGrav(int thisRank, int numRanks)
     std::vector<T> m(globalMasses.begin() + firstIndex, globalMasses.begin() + lastIndex);
     std::vector<KeyType> keys(x.size());
 
-    Domain<KeyType, T, CpuTag> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta, box);
+    Domain<KeyType, T, CpuTag> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta, MPI_COMM_WORLD, box);
 
     std::vector<T> s1, s2, s3;
     domain.syncGrav(keys, x, y, z, h, m, std::tuple{}, std::tie(s1, s2, s3));
