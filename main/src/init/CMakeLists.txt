@@ -21,6 +21,7 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
             ${SPH_DIR} ${MPI_CXX_INCLUDE_PATH} ${DISK_DIR})
     target_link_libraries(sim_init_gpu PRIVATE ${MPI_CXX_LIBRARIES} OpenMP::OpenMP_CXX)
     enableGrackle(sim_init_gpu)
+    enableTDEInit(sim_init_gpu)
 endif ()
 
 if (CMAKE_CUDA_COMPILER)
