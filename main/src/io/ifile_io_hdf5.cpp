@@ -103,7 +103,10 @@ public:
                 // so we explicitly broadcast the value of rank 0 to all ranks
                 using Type = std::decay_t<decltype(*argp)>;
                 std::vector<Type> arg(size);
-                std::copy(argp, argp + size, arg.data());
+                if (size > 0 && rank_ == 0)
+                {
+                    std::copy(argp, argp + size, arg.data());
+                }
                 MPI_Bcast(arg.data(), size, MpiType<Type>{}, 0, comm_);
                 fileutils::H5WriteStepAttribT(h5File_, key.c_str(), arg.data(), size);
             },
