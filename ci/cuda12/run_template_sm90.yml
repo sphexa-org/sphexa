@@ -139,7 +139,8 @@ variables:
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
-        python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
+        venv_python="constant_comparison_venv/bin/python"
+        "$venv_python" ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
         if [ $? -ne 0 ]; then
           exit 1
         fi
@@ -169,7 +170,8 @@ variables:
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
-        python ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
+        venv_python="constant_comparison_venv/bin/python"
+        "$venv_python" ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt
         if [ $? -ne 0 ]; then
           exit 1
         fi

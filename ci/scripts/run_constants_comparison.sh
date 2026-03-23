@@ -35,6 +35,7 @@ case "$(basename "$binary_path")" in
     ;;
 esac
 rank_id="${SLURM_PROCID:-0}"
+venv_python="constant_comparison_venv/bin/python"
 
 if [ "$rank_id" -eq 0 ]; then
   wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
@@ -83,15 +84,13 @@ for ic in "${ics[@]}"; do
   "$binary_path" --quiet --glass "./50c.h5" --init "$ic" -s 10 -n 50
   if [ "$rank_id" -eq 0 ]; then
     abs_cols="${abs_columns_for_ic[$ic]:-}"
-    . constant_comparison_venv/bin/activate
-    cmd=(python ci/scripts/compare_constants.py "ci/reference/const-${ic}-${backend}-ref.txt" constants.txt)
+    cmd=("$venv_python" ci/scripts/compare_constants.py "ci/reference/const-${ic}-${backend}-ref.txt" constants.txt)
     if [ -n "$abs_cols" ]; then
       cmd+=("$abs_cols")
     fi
     if ! "${cmd[@]}"; then
       failed_comparisons+=("$ic")
     fi
-    deactivate
   fi
   wait
 done
