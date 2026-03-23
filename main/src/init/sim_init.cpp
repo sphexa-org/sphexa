@@ -40,10 +40,13 @@
 #include "sedov_init.hpp"
 #include "turbulence_init.hpp"
 #include "wind_shock_init.hpp"
-#include "polytrope_init.hpp"
-#include "tde_orbit_init.hpp"
+
 #ifdef SPH_EXA_HAVE_GRACKLE
 #include "evrard_cooling_init.hpp"
+#endif
+#ifdef SPH_EXA_HAVE_TDE_INIT
+#include "polytrope_init.hpp"
+#include "tde_orbit_init.hpp"
 #endif
 
 namespace sphexa
@@ -61,87 +64,88 @@ template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeEvrardCooling(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-   return std::make_unique<EvrardGlassSphereCooling<Dataset>>(glassBlock, settingsFile, reader);
+    return std::make_unique<EvrardGlassSphereCooling<Dataset>>(glassBlock, settingsFile, reader);
 }
 #else
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeEvrardCooling(std::string /*glass*/, std::string /*settingsFile*/, IFileReader*)
 {
-   throw std::runtime_error("Missing GRACKLE build option for evrard-cooling\n");
-   return nullptr;
+    throw std::runtime_error("Missing GRACKLE build option for evrard-cooling\n");
+    return nullptr;
 }
 #endif
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFile(std::string testCase, int initStep,
-                                                                            IFileReader* reader)
+                                                                             IFileReader* reader)
 {
-   return std::make_unique<FileInit<Dataset>>(testCase, initStep, reader);
+    return std::make_unique<FileInit<Dataset>>(testCase, initStep, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeFileSplit(std::string testCase, int numSplits,
-                                                                                 IFileReader* reader)
+                                                                                  IFileReader* reader)
 {
-   return std::make_unique<FileSplitInit<Dataset>>(testCase, numSplits, reader);
+    return std::make_unique<FileSplitInit<Dataset>>(testCase, numSplits, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeGreshoChan(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-   return std::make_unique<GreshoChan<Dataset>>(glassBlock, settingsFile, reader);
+    return std::make_unique<GreshoChan<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeKelvinHelmholtz(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-   return std::make_unique<KelvinHelmholtzGlass<Dataset>>(glassBlock, settingsFile, reader);
+    return std::make_unique<KelvinHelmholtzGlass<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeIsobaricCube(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-   return std::make_unique<IsobaricCubeGlass<Dataset>>(glassBlock, settingsFile, reader);
+    return std::make_unique<IsobaricCubeGlass<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeNoh(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-   return std::make_unique<NohGlassSphere<Dataset>>(glassBlock, settingsFile, reader);
+    return std::make_unique<NohGlassSphere<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeSedovGlass(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-   return std::make_unique<SedovGlass<Dataset>>(glassBlock, settingsFile, reader);
+    return std::make_unique<SedovGlass<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeSedovGrid()
 {
-   return std::make_unique<SedovGrid<Dataset>>();
+    return std::make_unique<SedovGrid<Dataset>>();
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeTurbulence(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-   return std::make_unique<TurbulenceGlass<Dataset>>(glassBlock, settingsFile, reader);
+    return std::make_unique<TurbulenceGlass<Dataset>>(glassBlock, settingsFile, reader);
 }
 
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makeWindShock(std::string glassBlock, std::string settingsFile, IFileReader* reader)
 {
-   return std::make_unique<WindShockGlass<Dataset>>(glassBlock, settingsFile, reader);
+    return std::make_unique<WindShockGlass<Dataset>>(glassBlock, settingsFile, reader);
 }
 
+#ifdef SPH_EXA_HAVE_TDE_INIT
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
 SimInitializers<Dataset>::makePolytrope(std::string glassBlock, std::string settingsFile, IFileReader* reader)
@@ -155,6 +159,23 @@ std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeTDEOrbit
 {
     return std::make_unique<TDEOrbitInit<Dataset>>(filePath, initStep, reader);
 }
+#else
+template<class Dataset>
+std::unique_ptr<ISimInitializer<Dataset>>
+SimInitializers<Dataset>::makePolytrope(std::string glassBlock, std::string settingsFile, IFileReader* reader)
+{
+    throw std::runtime_error("Missing TDE initializers build option for polytrope\n");
+    return nullptr;
+}
+
+template<class Dataset>
+std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeTDEOrbitInit(const std::string& filePath,
+                                                                                     int initStep, IFileReader* reader)
+{
+    throw std::runtime_error("Missing TDE initializers build option for tde-orbit\n");
+    return nullptr;
+}
+#endif
 
 #ifdef USE_CUDA
 template struct SimInitializers<SimulationData<cstone::GpuTag>>;

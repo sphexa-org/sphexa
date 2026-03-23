@@ -16,6 +16,7 @@
 #include "utils.hpp"
 #include "polytrope/bisect.hpp"
 #include "polytrope/polytrope_profile.hpp"
+#include "radial_profile.hpp"
 
 namespace sphexa
 {
@@ -36,24 +37,24 @@ std::map<std::string, double> polytropeConstants()
 template<class Dataset>
 void initPolytropeFields(Dataset& d, const std::map<std::string, double>& constants, double m_part)
 {
-    using T = typename Dataset::RealType;
+    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
 
-    std::fill(d.m.begin(), d.m.end(), m_part);
-    std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
-    std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
+    cstone::fill<gpu>(d.m.begin(), d.m.end(), m_part);
+    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
+    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
+    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
 
-    std::fill(d.vx.begin(), d.vx.end(), 0.0);
-    std::fill(d.vy.begin(), d.vy.end(), 0.0);
-    std::fill(d.vz.begin(), d.vz.end(), 0.0);
+    cstone::fill<gpu>(d.vx.begin(), d.vx.end(), 0.0);
+    cstone::fill<gpu>(d.vy.begin(), d.vy.end(), 0.0);
+    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
 
-    std::fill(d.x_m1.begin(), d.x_m1.end(), 0.0);
-    std::fill(d.y_m1.begin(), d.y_m1.end(), 0.0);
-    std::fill(d.z_m1.begin(), d.z_m1.end(), 0.0);
+    cstone::fill<gpu>(d.x_m1.begin(), d.x_m1.end(), 0.0);
+    cstone::fill<gpu>(d.y_m1.begin(), d.y_m1.end(), 0.0);
+    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
 
-    std::fill(d.u.begin(), d.u.end(), 0.0);
+    cstone::fill<gpu>(d.u.begin(), d.u.end(), 0.0);
 
-    generateParticleIDs(d.id);
+    generateParticleIDs<gpu>(d.id);
 }
 
 template<class Vector>
@@ -77,9 +78,13 @@ void contractRadialProfile(Vector& x, Vector& y, Vector& z, double rho_uniform, 
 template<typename Dataset>
 void estimateSmoothingLengths(auto rhoAtRadius, Dataset& d, double m_part, size_t ng0, double r_total)
 {
-    d.h.resize(d.x.size());
+    auto x = toHost(d.x);
+    auto y = toHost(d.y);
+    auto z = toHost(d.z);
 
-    auto smoothing_length = [rhoAtRadius, m_part, ng0](double r)
+    using Th = decltype(d.h)::value_type;
+    std::vector<Th> h(x.size());
+    auto            smoothing_length = [rhoAtRadius, m_part, ng0](double r)
     { return 0.5 * std::cbrt(3. * ng0 * m_part / (4. * M_PI * rhoAtRadius(r))); };
 
     // Find the resolved radius, from which on the smoothing length is capped, such that it does not diverge
@@ -93,20 +98,21 @@ void estimateSmoothingLengths(auto rhoAtRadius, Dataset& d, double m_part, size_
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
-        const auto radius = std::sqrt(d.x[i] * d.x[i] + d.y[i] * d.y[i] + d.z[i] * d.z[i]);
-        d.h[i]            = std::min(h_max, smoothing_length(radius));
+        const auto radius = std::sqrt(x[i] * x[i] + y[i] * y[i] + z[i] * z[i]);
+        h[i]              = std::min(h_max, smoothing_length(radius));
     }
+    d.h = std::move(h);
 }
 
 template<class Dataset>
-class Polytrope : public ISimInitializer<Dataset>
+class Polytrope : public RadialProfile<Dataset>
 {
-    std::string          glassBlock;
+    using Base = RadialProfile<Dataset>;
     mutable InitSettings settings_;
 
 public:
     explicit Polytrope(std::string initBlock, std::string settingsFile, IFileReader* reader)
-        : glassBlock(std::move(initBlock))
+        : RadialProfile<Dataset>(std::move(initBlock), reader)
     {
         Dataset d;
         settings_ = buildSettings(d, polytropeConstants(), settingsFile, reader);
@@ -141,89 +147,54 @@ public:
         }
     }
 
+    void initAttributes(Dataset& simData) const
+    {
+        BuiltinWriter attributeSetter(settings_);
+        simData.hydro.loadOrStoreAttributes(&attributeSetter);
+    }
+
     cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
                                                  IFileReader* reader) const override
     {
-        auto& d       = simData.hydro;
-        using KeyType = typename Dataset::KeyType;
-        using T       = typename Dataset::RealType;
-
         const double polytropic_index = settings_.at("polytropic_index");
         const double n_polytropic     = 1. / (settings_.at("polytropic_index") - 1.);
         const double m_total          = settings_.at("polytrope::mTotal");
         const double r_total          = settings_.at("polytrope::r");
-        const double G                = settings_.at("gravConstant");
-        const size_t ng0              = settings_.at("ng0");
 
-        auto [rho_r, M_r, polytropic_const] = polytrope::computePolytropeProfile(n_polytropic, m_total, r_total, G);
-        settings_["polytropic_const"]       = polytropic_const;
+        auto [rho_r, M_r, polytropic_const] =
+            polytrope::computePolytropeProfile(n_polytropic, m_total, r_total, settings_.at("gravConstant"));
+        settings_["polytropic_const"] = polytropic_const;
 
         if (rank == 0)
         {
             std::printf("polytropic constant: %lf\tpolytropic exponent: %lf\n", polytropic_const, polytropic_index);
             std::printf("r_total: %lf\tachieved r: %lf\n", r_total, M_r.y_values.back());
         }
-        const auto globalBox = createUniformSphere(rank, numRanks, cbrtNumPart, simData, reader, r_total);
 
-        const double rho_original = m_total / (4. / 3. * M_PI * r_total * r_total * r_total);
+        auto [globalBox, x, y, z] = Base::createUniformSphere(rank, numRanks, cbrtNumPart, reader, r_total);
 
-        contractRadialProfile(d.x, d.y, d.z, rho_original, M_r);
+        const double rho_old = m_total / (4. / 3. * M_PI * r_total * r_total * r_total);
 
-        syncAndLoadAttributes(rank, numRanks, simData, globalBox);
+        auto polytrope_transformation = [&](auto old_radius)
+        {
+            const auto old_volume    = 4. * M_PI / 3. * old_radius * old_radius * old_radius;
+            const auto enclosed_mass = old_volume * rho_old;
+            const auto new_radius    = M_r(enclosed_mass);
+            const auto factor        = new_radius / old_radius;
+            return factor;
+        };
+        Base::radialTransformation(x, y, z, polytrope_transformation);
+
+        const auto numParticlesGlobal   = Base::syncAndLoadAttributes(rank, numRanks, simData, globalBox, x, y, z);
+        settings_["numParticlesGlobal"] = double(numParticlesGlobal);
+        initAttributes(simData);
+
+        auto&        d      = simData.hydro;
         const double m_part = m_total / d.numParticlesGlobal;
+        const size_t ng0    = settings_.at("ng0");
 
         estimateSmoothingLengths(rho_r, d, m_part, ng0, r_total);
-
         initPolytropeFields(d, settings_, m_part);
-
-        return globalBox;
-    }
-
-    void syncAndLoadAttributes(int rank, int numRanks, Dataset& simData, const auto& globalBox) const
-    {
-        auto& d       = simData.hydro;
-        using KeyType = typename Dataset::KeyType;
-
-        size_t numParticlesGlobal = d.x.size();
-        MPI_Allreduce(MPI_IN_PLACE, &numParticlesGlobal, 1, MpiType<size_t>{}, MPI_SUM, simData.comm);
-
-        auto t0 = std::chrono::high_resolution_clock::now();
-        transferToDevice(d, 0, d.x.size(), {"x", "y", "z"});
-        syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, get<"x">(d), get<"y">(d), get<"z">(d), globalBox);
-        transferToHost(d, 0, get<"x">(d).size(), {"x", "y", "z"});
-        auto t1 = std::chrono::high_resolution_clock::now();
-        if (rank == 0) std::cout << "earlySync " << std::chrono::duration<float>(t1 - t0).count() << std::endl;
-
-        d.resize(d.x.size());
-
-        settings_["numParticlesGlobal"] = double(numParticlesGlobal);
-        BuiltinWriter attributeSetter(settings_);
-        d.loadOrStoreAttributes(&attributeSetter);
-    }
-
-    auto createUniformSphere(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData, IFileReader* reader,
-                             const double r_total) const
-    {
-        using T       = typename Dataset::RealType;
-        using KeyType = typename Dataset::KeyType;
-        auto& d       = simData.hydro;
-
-        std::vector<T> xBlock, yBlock, zBlock;
-        readTemplateBlock(glassBlock, reader, xBlock, yBlock, zBlock);
-        size_t blockSize = xBlock.size();
-
-        int               multi1D      = rint(cbrtNumPart / std::cbrt(blockSize));
-        cstone::Vec3<int> multiplicity = {multi1D, multi1D, multi1D};
-
-        cstone::Box<T> globalBox(-r_total, r_total, cstone::BoundaryType::open);
-
-        auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
-
-        auto t0 = std::chrono::high_resolution_clock::now();
-        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
-        cutSphere(r_total, d.x, d.y, d.z);
-        auto t1 = std::chrono::high_resolution_clock::now();
-        if (rank == 0) std::cout << "assembly " << std::chrono::duration<float>(t1 - t0).count() << std::endl;
 
         return globalBox;
     }

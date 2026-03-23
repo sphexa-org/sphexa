@@ -142,8 +142,6 @@ public:
     //! @brief choice of smoothing kernel type
     sph::SphKernelType kernelChoice{sph::SphKernelType::sinc_n};
 
-    RealType relaxationTimescale{0.};
-
     //! @brief Unified interface to attribute initialization, reading and writing
     template<class Archive>
     void loadOrStoreAttributes(Archive* ar)
@@ -202,7 +200,6 @@ public:
 
         optionalIO("sincIndex", &sincIndex, 1);
         optionalIO("kernelChoice", &kernelChoice, 1);
-        optionalIO("relaxationTimescale", &relaxationTimescale, 1);
 
         createTables();
     }

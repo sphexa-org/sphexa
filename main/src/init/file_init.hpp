@@ -244,7 +244,6 @@ public:
         replicateField(reader, "vx", d.vx, T(1));
         replicateField(reader, "vy", d.vy, T(1));
         replicateField(reader, "vz", d.vz, T(1));
-
         if (d.isAllocated("temp")) { replicateField(reader, "temp", d.temp, T(1)); }
         else if (d.isAllocated("u")) { replicateField(reader, "u", d.u, T(1)); }
         cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0);
@@ -254,8 +253,6 @@ public:
         cstone::scaleGpuAcc<gpu>(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), d.minDt);
 
         generateParticleIDs<gpu>(d.id);
-
-//        generateParticleIDs(d.id);
 
         if (d.isAllocated("alpha"))
         {

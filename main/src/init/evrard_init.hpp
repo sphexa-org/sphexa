@@ -42,6 +42,7 @@
 #include "early_sync.hpp"
 #include "grid.hpp"
 #include "utils.hpp"
+#include "radial_profile.hpp"
 
 namespace sphexa
 {
@@ -101,22 +102,6 @@ void initEvrardFields(Dataset& d, const std::map<std::string, double>& constants
     d.h = std::move(h);
 }
 
-template<class Vector>
-void contractRhoProfile(Vector& x, Vector& y, Vector& z)
-{
-#pragma omp parallel for schedule(static)
-    for (size_t i = 0; i < x.size(); i++)
-    {
-        auto radius0 = std::sqrt(x[i] * x[i] + y[i] * y[i] + z[i] * z[i]);
-
-        // multiply coordinates by sqrt(r) to generate a density profile ~ 1/r
-        auto contraction = std::sqrt(radius0);
-        x[i] *= contraction;
-        y[i] *= contraction;
-        z[i] *= contraction;
-    }
-}
-
 //! @brief Estimate SFC partition of the Evrard sphere based on approximate continuum particle counts
 template<class KeyType, class T>
 std::tuple<KeyType, KeyType> estimateEvrardSfcPartition(size_t cbrtNumPart, const cstone::Box<T>& box, int rank,
@@ -142,67 +127,41 @@ std::tuple<KeyType, KeyType> estimateEvrardSfcPartition(size_t cbrtNumPart, cons
 }
 
 template<class Dataset>
-class EvrardGlassSphere : public ISimInitializer<Dataset>
+class EvrardGlassSphere : public RadialProfile<Dataset>
 {
-    std::string          glassBlock;
+    using Base = RadialProfile<Dataset>;
     mutable InitSettings settings_;
 
 public:
     explicit EvrardGlassSphere(std::string initBlock, std::string settingsFile, IFileReader* reader)
-        : glassBlock(std::move(initBlock))
+        : RadialProfile<Dataset>(std::move(initBlock), reader) // glassBlock(std::move(initBlock))
     {
         Dataset d;
         settings_ = buildSettings(d, evrardConstants(), settingsFile, reader);
     }
 
+    void initAttributes(Dataset& simData) const
+    {
+        BuiltinWriter attributeSetter(settings_);
+        simData.hydro.loadOrStoreAttributes(&attributeSetter);
+    }
+
     cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
                                                  IFileReader* reader) const override
     {
-        auto& d       = simData.hydro;
-        using KeyType = typename Dataset::KeyType;
-        using T       = typename Dataset::RealType;
+        using T = typename Dataset::RealType;
 
-        std::vector<T> xBlock, yBlock, zBlock;
-        readTemplateBlock(glassBlock, reader, xBlock, yBlock, zBlock);
-        size_t blockSize = xBlock.size();
+        T r                       = settings_.at("r");
+        auto [globalBox, x, y, z] = Base::createUniformSphere(rank, numRanks, cbrtNumPart, reader, r);
 
-        int               multi1D      = std::rint(cbrtNumPart / std::cbrt(blockSize));
-        cstone::Vec3<int> multiplicity = {multi1D, multi1D, multi1D};
+        Base::radialTransformation(x, y, z, [](auto r) { return std::sqrt(r); });
 
-        T              r = settings_.at("r");
-        cstone::Box<T> globalBox(-r, r, cstone::BoundaryType::open);
-
-        auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
-
-        std::vector<T> x, y, z;
-        auto           t0 = std::chrono::high_resolution_clock::now();
-        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, x, y, z);
-        cutSphere(r, x, y, z);
-        auto t1 = std::chrono::high_resolution_clock::now();
-        if (rank == 0) std::cout << "assembly " << std::chrono::duration<float>(t1 - t0).count() << std::endl;
-
-        size_t numParticlesGlobal = x.size();
-        MPI_Allreduce(MPI_IN_PLACE, &numParticlesGlobal, 1, MpiType<size_t>{}, MPI_SUM, simData.comm);
-
-        contractRhoProfile(x, y, z);
-
-        t0  = std::chrono::high_resolution_clock::now();
-        d.x = x; // uploads to GPU if active
-        d.y = y;
-        d.z = z;
-        syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, d.x, d.y, d.z, globalBox);
-        // 2nd call needed to reduce imbalance, 1st call is not able to fully balance number of particles per rank
-        syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, d.x, d.y, d.z, globalBox);
-        t1 = std::chrono::high_resolution_clock::now();
-        if (rank == 0) std::cout << "earlySync " << std::chrono::duration<float>(t1 - t0).count() << std::endl;
-
-        d.resize(d.x.size());
+        const auto numParticlesGlobal = Base::syncAndLoadAttributes(rank, numRanks, simData, globalBox, x, y, z);
 
         settings_["numParticlesGlobal"] = double(numParticlesGlobal);
-        BuiltinWriter attributeSetter(settings_);
-        d.loadOrStoreAttributes(&attributeSetter);
+        initAttributes(simData);
 
-        initEvrardFields(d, settings_);
+        initEvrardFields(simData.hydro, settings_);
 
         return globalBox;
     }
