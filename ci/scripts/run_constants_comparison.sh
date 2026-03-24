@@ -60,9 +60,9 @@ declare -A abs_columns_for_ic=(
   [sedov]="6,7,8"
   # TimeAndEnergy: egrav/angmom (if not changed in CLI, gravConstant = 0.0)
   [noh]="6,8"
-  # TimeAndEnergy: egrav (if not changed in CLI, gravConstant = 0.0)
+  # TimeAndEnergy: egrav/linmom/angmom (if not changed in CLI, gravConstant = 0.0)
   [isobaric-cube]="6,7,8"
-  # TimeAndEnergy: linmom/angmom
+  # TimeAndEnergy: etot/linmom/angmom
   [evrard]="3,7,8"
   # TimeAndEnergy: egrav/linmom/angmom (if not changed in CLI, eosChoice = 0 and gravConstant = 0.0)
   [turbulence]="6,7,8"
@@ -70,7 +70,7 @@ declare -A abs_columns_for_ic=(
   [gresho-chan]="6"
   # WindBubble: egrav (if not changed in CLI, gravConstant = 0.0)
   [wind-shock]="6"
-  # TimeEnergyGrowth: egrav (if not changed in CLI, gravConstant = 0.0)
+  # TimeEnergyGrowth: egrav/linmom (if not changed in CLI, gravConstant = 0.0)
   [kelvin-helmholtz]="6,7"
 )
 
