@@ -74,7 +74,7 @@ def main(
                 float(new_val),
                 float(abs_val),
                 float(rel_val),
-                kind,
+                str(kind),
             ))
         sys.exit(1)
     else:
