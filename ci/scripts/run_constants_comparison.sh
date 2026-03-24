@@ -84,7 +84,7 @@ for ic in "${ics[@]}"; do
   "$binary_path" --quiet --glass "./50c.h5" --init "$ic" -s 10 -n 50
   if [ "$rank_id" -eq 0 ]; then
     abs_cols="${abs_columns_for_ic[$ic]:-}"
-    cmd=("$venv_python" ci/scripts/compare_constants.py "ci/reference/const-${ic}-${backend}-ref.txt" constants.txt)
+    cmd=("$venv_python" ci/scripts/compare_constants.py "ci/reference/const-${ic}-${backend}-rel-ref.txt" constants.txt)
     if [ -n "$abs_cols" ]; then
       cmd+=("$abs_cols")
     fi
