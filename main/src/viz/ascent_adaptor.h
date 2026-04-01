@@ -23,9 +23,7 @@ struct AscentAdaptor
 
         ascent_options["default_dir"] = output_path;
         ascent_options["mpi_comm"]    = MPI_Comm_c2f(MPI_COMM_WORLD);
-#ifdef CAMP_HAVE_CUDA
-        ascent_options["runtime/viskores/backend"] = "cuda";
-#endif
+
         _instance.open(ascent_options);
 
         const auto ascent_scripts = extract_arg_values("--ascent", argc, argv);

@@ -1,12 +1,12 @@
 set(INSITU
-    None
+    "None"
     CACHE STRING "Enable in-situ support")
 set_property(CACHE INSITU PROPERTY STRINGS None Catalyst Ascent)
 
 if(INSITU STREQUAL "Catalyst")
   find_package(catalyst REQUIRED)
 elseif(INSITU STREQUAL "Ascent")
-  find_package(Ascent REQUIRED)
+  find_package(Ascent 0.9.5 REQUIRED)
 endif()
 
 add_library(viz INTERFACE)
