@@ -68,7 +68,7 @@ conduit::Node mesh_from(ParticleData& d, const std::size_t begin, const std::siz
     addField(mesh, "vz", get<"vz">(d).data(), begin, end);
     addField(mesh, "kx", get<"kx">(d).data(), begin, end);
     addField(mesh, "xm", get<"xm">(d).data(), begin, end);
-    // addField(mesh, "Temperature", get<"temp">(d).data(), startIndex, endIndex);
+    addField(mesh, "temperature", get<"temp">(d).data(), begin, end);
     addField(mesh, "alpha", get<"alpha">(d).data(), begin, end);
     addField(mesh, "m", get<"m">(d).data(), begin, end);
     // addField(mesh, "Smoothing Length", get<"h">(d).data(), startIndex, endIndex);
