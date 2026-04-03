@@ -72,6 +72,7 @@ struct SimInitializers
     static InitPtr makeSedovGrid();
     static InitPtr makeTurbulence(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeWindShock(std::string glassBlock, std::string settingsFile, IFileReader* reader);
+    static InitPtr makeSodShock(std::string glassBlock, std::string settingsFile, IFileReader* reader);
 };
 
 extern template struct SimInitializers<SimulationData<cstone::CpuTag>>;
