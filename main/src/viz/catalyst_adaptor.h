@@ -21,8 +21,15 @@ struct CatalystAdaptor
         conduit_cpp::Node node;
         for (const auto& script_filepath : extract_arg_values("--catalyst", argc, argv))
         {
-            const auto path = "catalyst/scripts/" + script_filepath.stem().string();
-            node[path + "/filename"].set_string(script_filepath);
+            if (script_filepath.extension() != ".xml")
+            {
+                const auto path = "catalyst/scripts/" + script_filepath.stem().string();
+                node[path + "/filename"].set_string(script_filepath);
+            }
+            else
+            {
+                node["adios/config_filepath"] = script_filepath;
+            }
             std::cout << "Catalyst script using " << script_filepath << std::endl;
         }
 
