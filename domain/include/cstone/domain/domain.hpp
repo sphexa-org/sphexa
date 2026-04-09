@@ -65,13 +65,16 @@ public:
            unsigned bucketSize,
            unsigned bucketSizeFocus,
            float theta,
+           MPI_Comm comm,
            const Box<T>& box = Box<T>{0, 1})
         : myRank_(rank)
         , numRanks_(nRanks)
         , bucketSizeFocus_(bucketSizeFocus)
         , theta_(theta)
-        , focusTree_(rank, numRanks_, bucketSizeFocus_)
-        , global_(rank, nRanks, bucketSize, box)
+        , comm_(comm)
+        , focusTree_(rank, numRanks_, bucketSizeFocus_, comm)
+        , global_(rank, nRanks, bucketSize, box, comm)
+        , halos_(myRank_, comm)
     {
         if (bucketSize < bucketSizeFocus_)
         {
@@ -200,7 +203,7 @@ public:
             focusTree_.discoverHalos(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h),
                                      {rawPtr(layoutAcc_), layoutAcc_.size()}, haloSearchExt_, get<0>(scratch), false);
             fail = focusTree_.computeLayout({rawPtr(layoutAcc_), layoutAcc_.size()}, layout_);
-            MPI_Allreduce(MPI_IN_PLACE, &fail, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+            MPI_Allreduce(MPI_IN_PLACE, &fail, 1, MPI_INT, MPI_SUM, comm_);
 
             halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), layout_);
 
@@ -248,7 +251,7 @@ public:
                 focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(),
                                          std::get<0>(scratch), std::get<1>(scratch));
                 focusTree_.updateMacs(global_.assignment(), 1.0 / theta_, false);
-                MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+                MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, comm_);
                 reps++;
             }
         }
@@ -267,7 +270,7 @@ public:
             focusTree_.discoverHalos(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h),
                                      {rawPtr(layoutAcc_), layoutAcc_.size()}, haloSearchExt_, get<0>(scratch), true);
             fail = focusTree_.computeLayout({rawPtr(layoutAcc_), layoutAcc_.size()}, layout_);
-            MPI_Allreduce(MPI_IN_PLACE, &fail, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+            MPI_Allreduce(MPI_IN_PLACE, &fail, 1, MPI_INT, MPI_SUM, comm_);
 
             halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), layout_);
 
@@ -610,7 +613,7 @@ private:
                 }
                 std::cout << std::endl;
             }
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Barrier(comm_);
         }
     }
 
@@ -620,6 +623,9 @@ private:
 
     //! @brief MAC parameter for focus resolution and gravity treewalk
     float theta_;
+
+    //! @brief MPI communicator for all collective and point-to-point operations
+    MPI_Comm comm_;
 
     bool convergeTrees{false};
     //! @brief Extra search factor for halo discovery, allowing multiple time integration steps between sync() calls
@@ -652,7 +658,7 @@ private:
 
     GlobalAssignment<KeyType, T, Accelerator> global_;
 
-    Halos<KeyType, Accelerator> halos_{myRank_};
+    Halos<KeyType, Accelerator> halos_;
 
     bool firstCall_{true};
 };

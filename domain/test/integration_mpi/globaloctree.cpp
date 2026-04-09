@@ -35,7 +35,7 @@ void buildTree(int rank)
 
     std::vector<KeyType> tree = makeRootNodeTree<KeyType>();
     std::vector<unsigned> counts{unsigned(codes.size())};
-    while (!updateOctreeGlobal<KeyType>(codes, bucketSize, tree, counts))
+    while (!updateOctreeGlobal<KeyType>(codes, bucketSize, tree, counts, MPI_COMM_WORLD))
         ;
 
     std::vector<KeyType> refTree = OctreeMaker<KeyType>{}.divide().makeTree();

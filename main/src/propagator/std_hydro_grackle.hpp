@@ -202,14 +202,14 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        const auto&& rho = toHost(d.rho);
-        const auto&& u   = toHost(d.u);
+        auto&& rho = toHost(d.rho);
+        auto&& u   = toHost(d.u);
 
         auto minDtCooling = cooling::coolingTimestep(first, last, rho.data(), u.data(), cooling_data, simData.chem);
         computeTimestep(first, last, d, minDtCooling);
         timer.step("Timestep");
 
-        auto&& du = toHost(d.du);
+        auto du = toHost(d.du);
         cooling_data.cool_particles(T(d.minDt), rho.data(), u.data(),
                                     cstone::getPointers(get<CoolingFields>(simData.chem), 0), du.data(), first, last);
 
@@ -218,7 +218,11 @@ public:
 
         computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
         timer.step("UpdateQuantities");
-        updateSmoothingLength(groups_.view(), d);
+        bool haveUnconvergedParticles = updateSmoothingLength(groups_.view(), d);
+        if (haveUnconvergedParticles && not d.removeUnconvergedParticles)
+        {
+            throw std::runtime_error("Neighbor search did not converge\n");
+        }
         timer.step("UpdateSmoothingLength");
     }
 };

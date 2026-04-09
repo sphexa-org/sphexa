@@ -89,7 +89,12 @@ public:
         timer.step("Timestep");
 
         computePositions(Base::groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
-        updateSmoothingLength(Base::groups_.view(), d);
+
+        bool haveUnconvergedParticles = updateSmoothingLength(Base::groups_.view(), d);
+        if (haveUnconvergedParticles && not d.removeUnconvergedParticles)
+        {
+            throw std::runtime_error("Neighbor search did not converge\n");
+        }
         timer.step("UpdateQuantities");
 
         disk::computeAndExchangeStarPosition(star, d.minDt, d.minDt_m1);

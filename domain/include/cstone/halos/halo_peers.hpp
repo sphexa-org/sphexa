@@ -37,10 +37,11 @@ haloPeers(int myRank, std::span<const LocalIndex> layout, std::span<const TreeIn
 }
 
 inline void
-exchangePeers(std::span<const int> exteriorPeerFlags, std::vector<int>& exteriorPeers, std::vector<int>& interiorPeers)
+exchangePeers(std::span<const int> exteriorPeerFlags, std::vector<int>& exteriorPeers, std::vector<int>& interiorPeers,
+              MPI_Comm comm)
 {
     std::vector<int> interiorPeerFlags(exteriorPeerFlags.size(), 0);
-    MPI_Alltoall(exteriorPeerFlags.data(), 1, MPI_INT, interiorPeerFlags.data(), 1, MPI_INT, MPI_COMM_WORLD);
+    MPI_Alltoall(exteriorPeerFlags.data(), 1, MPI_INT, interiorPeerFlags.data(), 1, MPI_INT, comm);
 
     peerFlagsToList(exteriorPeerFlags, exteriorPeers, PeerMask::halo);
     peerFlagsToList(interiorPeerFlags, interiorPeers, PeerMask::halo);

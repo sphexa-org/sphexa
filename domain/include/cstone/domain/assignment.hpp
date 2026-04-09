@@ -51,11 +51,13 @@ class GlobalAssignment
     constexpr static bool gpu = HaveGpu<Accelerator>{};
 
 public:
-    GlobalAssignment(int rank, int nRanks, unsigned bucketSize, const Box<T>& box)
+    GlobalAssignment(int rank, int nRanks, unsigned bucketSize, const Box<T>& box,
+                     MPI_Comm comm)
         : myRank_(rank)
         , numRanks_(nRanks)
         , bucketSize_(bucketSize)
         , box_(box)
+        , comm_(comm)
     {
         unsigned level         = log8ceil<KeyType>(100 * nRanks);
         auto initialBoundaries = initialDomainSplits<KeyType>(nRanks, level);
@@ -101,7 +103,7 @@ public:
         LocalIndex numPart = o1.end - o1.start;
 
         using Op        = std::conditional_t<HaveGpu<Accelerator>{}, MinMaxGpu<T>, MinMax<T>>;
-        auto fittingBox = makeGlobalBox<T, Op>(x + o1.start, y + o1.start, z + o1.start, numPart, box_);
+        auto fittingBox = makeGlobalBox<T, Op>(x + o1.start, y + o1.start, z + o1.start, numPart, comm_, box_);
         if (firstCall_) { box_ = fittingBox; }
         else { box_ = limitBoxShrinking(fittingBox, box_); }
 
@@ -112,12 +114,12 @@ public:
         sortByKey<gpu>(keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_);
 
         auto maxCount = updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
-                                                    d_nodeCounts_, false);
+                                                    d_nodeCounts_, false, comm_);
         if (firstCall_ || maxCount >= 8 * bucketSize_)
         {
             firstCall_ = false;
             while (updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
-                                               d_nodeCounts_, true) > bucketSize_)
+                                               d_nodeCounts_, true, comm_) > bucketSize_)
                 ;
         }
 
@@ -180,12 +182,12 @@ public:
         if constexpr (gpu)
         {
             exchangeParticlesGpu(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, s0, s1,
-                                 reorderFunctor.getMap() + o1e.start, x, y, z, properties...);
+                                 reorderFunctor.getMap() + o1e.start, comm_, x, y, z, properties...);
         }
         else
         {
             exchangeParticles(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv,
-                              reorderFunctor.getMap() + o1e.start, x, y, z, properties...);
+                              reorderFunctor.getMap() + o1e.start, comm_, x, y, z, properties...);
         }
 
         auto [newStart, newEnd] = domain_exchange::assignedEnvelope(o1e, numAssigned() - numPresent());
@@ -208,7 +210,8 @@ public:
         auto numRecv    = numAssigned() - numPresent();
         auto recvStart  = domain_exchange::receiveStart(o1e, numRecv);
         auto exchangeO2 = shiftSendRanges(exchanges_, myRank_, numRecv);
-        exchangeParticles(1, recvLog_, exchangeO2, myRank_, recvStart, recvStart + numRecv, ordering, properties...);
+        exchangeParticles(1, recvLog_, exchangeO2, myRank_, recvStart, recvStart + numRecv, ordering, comm_,
+                          properties...);
     }
 
     //! @brief read only visibility of the global octree leaves to the outside
@@ -259,6 +262,8 @@ private:
 
     //! @brief global coordinate bounding box
     Box<T> box_;
+
+    MPI_Comm comm_;
 
     SfcAssignment<KeyType> assignment_;
     SendRanges exchanges_;

@@ -149,24 +149,22 @@ public:
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        release(d, "ay");
-        acquire(d, "gradh");
-        computeVeDefGradh(groups_.view(), d, domain.box());
-        timer.step("Normalization & Gradh");
+        computeVe(groups_.view(), d, domain.box());
+        timer.step("Generalized Volume Elements");
+        domain.exchangeHalos(get<"vx", "vy", "vz", "kx">(d), get<"ax">(d), get<"keys">(d));
+        timer.step("mpi::synchronizeHalos");
+
+        release(d, "ay", "az");
+        acquire(d, "divv", "gradh");
+        computeIadDivvCurlvGradh(groups_.view(), d, domain.box());
+        d.minDtRho = rhoTimestep(first, last, d);
+        timer.step("IadVelocityDivCurlGradh");
 
         computeEOS(first, last, d);
         timer.step("EquationOfState");
 
-        domain.exchangeHalos(get<"vx", "vy", "vz", "prho", "c", "kx">(d), get<"ax">(d), get<"keys">(d));
-        timer.step("mpi::synchronizeHalos");
-
-        release(d, "gradh", "az");
-        acquire(d, "divv", "curlv");
-        computeIadDivvCurlv(groups_.view(), d, domain.box());
-        d.minDtRho = rhoTimestep(first, last, d);
-        timer.step("IadVelocityDivCurl");
-
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv">(d), get<"ax">(d), get<"keys">(d));
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "c">(d), get<"ax">(d),
+                             get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
         computeAVswitches(groups_.view(), d, domain.box());
@@ -174,13 +172,13 @@ public:
 
         if (avClean)
         {
-            domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "alpha">(d), get<"ax">(d),
+            domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "prho", "alpha">(d), get<"ax">(d),
                                  get<"keys">(d));
         }
-        else { domain.exchangeHalos(std::tie(get<"alpha">(d)), get<"ax">(d), get<"keys">(d)); }
+        else { domain.exchangeHalos(get<"prho", "alpha">(d), get<"ax">(d), get<"keys">(d)); }
         timer.step("mpi::synchronizeHalos");
 
-        release(d, "divv", "curlv");
+        release(d, "divv", "gradh");
         acquire(d, "ay", "az");
         computeMomentumEnergy<avClean>(groups_.view(), nullptr, d, domain.box());
         timer.step("MomentumAndEnergy");
@@ -264,7 +262,7 @@ public:
         release(d, "prho", "c");
         acquire(d, "divv", "curlv");
         // partial recovery of cij in range [first:last] without halos, which are not needed for divv and curlv
-        if (!indicesDone.empty()) { computeIadDivvCurlv(groups_.view(), d, box); }
+        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
         output();
         release(d, "divv", "curlv");
         acquire(d, "prho", "c");

@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <limits.h>
 
+#include "type_config.h"
+
 #if defined(USE_PROFILING_NVTX) || defined(USE_PROFILING_SCOREP)
 
 #ifdef USE_PROFILING_NVTX
@@ -80,10 +82,11 @@ public:
         int lastIterationSaved = iteration - numStartCalled;
         int numIterations      = numStartCalled;
         int numSubSteps        = int(stepTimeNames.size());
+        uint64_t lastIterationSaved64 = static_cast<uint64_t>(lastIterationSaved);
 
         ar->addStep(0, stepTimes.size(), outFile + ar->suffix());
         ar->stepAttribute("name", "timings");
-        ar->stepAttribute("iteration", &lastIterationSaved, 1);
+        ar->stepAttribute("iteration", &lastIterationSaved64, 1);
         ar->stepAttribute("numRanks", &numRanks, 1);
         ar->stepAttribute("numIterations", &numIterations, 1);
         ar->stepAttribute("numDataPerIteration", &numSubSteps, 1);
@@ -101,9 +104,10 @@ public:
                                numSteps = numStartCalled](auto& field)
             {
                 if (field.empty()) { return; }
+                uint64_t it64 = static_cast<uint64_t>(it);
                 ar->addStep(0, field.size(), outFile + ar->suffix());
                 ar->stepAttribute("name", name);
-                ar->stepAttribute("iteration", &it, 1);
+                ar->stepAttribute("iteration", &it64, 1);
                 ar->stepAttribute("numRanks", &numRanks, 1);
                 ar->stepAttribute("numIterations", &numSteps, 1);
                 ar->writeField(name, field.data(), field.size());
@@ -113,12 +117,19 @@ public:
             std::visit(writeField, item.second);
         }
 
-        char hostname[HOST_NAME_MAX];
-        gethostname(hostname, HOST_NAME_MAX);
-        ar->addStep(0, HOST_NAME_MAX, outFile + ar->suffix());
+#ifdef HOST_NAME_MAX
+        const auto host_name_max = HOST_NAME_MAX;
+#else
+        const auto host_name_max = sysconf(_SC_HOST_NAME_MAX);
+#endif
+        std::vector<char> hostname(host_name_max);
+        gethostname(hostname.data(), host_name_max);
+        ar->addStep(0, host_name_max, outFile + ar->suffix());
+
         ar->stepAttribute("name", "hostnames");
         ar->stepAttribute("numRanks", &numRanks, 1);
-        ar->writeField("hostnames", hostname, HOST_NAME_MAX);
+        ar->writeField("hostnames", hostname.data(), host_name_max);
+
         ar->closeStep();
 
         numStartCalled = 0;
@@ -132,7 +143,7 @@ private:
     std::vector<float>       stepTimes;
     std::vector<std::string> stepTimeNames;
 
-    using SupportedTypes   = util::TypeList<float, double, uint32_t, uint64_t, int32_t, int64_t>;
+    using SupportedTypes   = IO::Types;
     using SupportedVariant = util::Reduce<std::variant, util::Map<std::vector, SupportedTypes>>;
 
     std::map<std::string, SupportedVariant> perfStats;

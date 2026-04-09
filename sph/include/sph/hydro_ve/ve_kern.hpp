@@ -40,26 +40,21 @@
 namespace sph
 {
 
-template<size_t stride = 1, class Tc, class Tm, class T>
-HOST_DEVICE_FUN inline util::tuple<T, T> veDefGradhJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
-                                                         const cstone::LocalIndex* neighbors, unsigned neighborsCount,
-                                                         const Tc* x, const Tc* y, const Tc* z, const T* h, const Tm* m,
-                                                         const T* wh, const T* whd, const T* xm)
+template<size_t stride = 1, class Tc, class T>
+HOST_DEVICE_FUN inline T veJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
+                                 const cstone::LocalIndex* neighbors, unsigned neighborsCount,
+                                 const Tc* x, const Tc* y, const Tc* z, const T* h, const T* wh, const T* xm)
 {
     auto xi     = x[i];
     auto yi     = y[i];
     auto zi     = z[i];
     auto hi     = h[i];
-    auto mi     = m[i];
-    auto xmassi = xm[i];
 
     auto hInv  = T(1) / hi;
     auto h3Inv = hInv * hInv * hInv;
 
     // initialize with self-contribution
-    auto kxi      = xmassi;
-    auto whomegai = -T(3) * xmassi;
-    auto wrho0i   = -T(3) * mi;
+    auto kxi      = xm[i];
 
     for (unsigned pj = 0; pj < neighborsCount; ++pj)
     {
@@ -68,25 +63,14 @@ HOST_DEVICE_FUN inline util::tuple<T, T> veDefGradhJLoop(cstone::LocalIndex i, T
         T dist   = distancePBC(box, hi, xi, yi, zi, x[j], y[j], z[j]);
         T vloc   = dist * hInv;
         T w      = lt::lookup(wh, vloc);
-        T dw     = lt::lookup(whd, vloc);
-        T dterh  = -(T(3) * w + vloc * dw);
         T xmassj = xm[j];
 
         kxi += w * xmassj;
-        whomegai += dterh * xmassj;
-        wrho0i += dterh * m[j];
     }
 
     kxi *= K * h3Inv;
-    whomegai *= K * h3Inv * hInv;
-    wrho0i *= K * h3Inv * hInv;
-
-    whomegai = whomegai * mi / xmassi + (kxi - K * xmassi * h3Inv) * wrho0i;
-    T rhoi   = kxi * mi / xmassi;
-    T dhdrho = -hi / (rhoi * T(3)); // This /3 is the dimension hard-coded.
-
-    T gradhi = T(1) - dhdrho * whomegai;
-    return {kxi, gradhi};
+    
+    return kxi;
 }
 
 } // namespace sph

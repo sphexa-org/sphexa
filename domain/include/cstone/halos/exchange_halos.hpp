@@ -24,7 +24,8 @@ namespace cstone
 {
 
 template<class... Arrays>
-void haloexchange(int epoch, const RecvList& incomingHalos, const SendList& outgoingHalos, Arrays... arrays)
+void haloexchange(int epoch, const RecvList& incomingHalos, const SendList& outgoingHalos, MPI_Comm comm,
+                  Arrays... arrays)
 {
     using TransferType      = uint64_t;
     constexpr int alignment = sizeof(TransferType);
@@ -52,7 +53,7 @@ void haloexchange(int epoch, const RecvList& incomingHalos, const SendList& outg
         auto packTuple = util::packBufferPtrs<alignment>(buffer.data(), sendCount, arrays...);
         for_each_tuple(packSendBuffer, packTuple);
 
-        mpiSendAsync(buffer.data(), buffer.size(), destinationRank, haloExchangeTag, sendRequests);
+        mpiSendAsync(buffer.data(), buffer.size(), destinationRank, haloExchangeTag, sendRequests, comm);
         sendBuffers.push_back(std::move(buffer));
     }
 
@@ -70,7 +71,7 @@ void haloexchange(int epoch, const RecvList& incomingHalos, const SendList& outg
     while (numMessages--)
     {
         MPI_Status status;
-        mpiRecvSync(receiveBuffer.data(), receiveBuffer.size(), MPI_ANY_SOURCE, haloExchangeTag, &status);
+        mpiRecvSync(receiveBuffer.data(), receiveBuffer.size(), MPI_ANY_SOURCE, haloExchangeTag, &status, comm);
         int receiveRank     = status.MPI_SOURCE;
         size_t receiveCount = incomingHalos[receiveRank].count();
 

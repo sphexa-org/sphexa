@@ -33,14 +33,15 @@ template<class KeyType>
 bool updateOctreeGlobal(std::span<const KeyType> keys,
                         unsigned bucketSize,
                         std::vector<KeyType>& tree,
-                        std::vector<unsigned>& counts)
+                        std::vector<unsigned>& counts,
+                        MPI_Comm comm)
 {
     unsigned maxCount = std::numeric_limits<unsigned>::max();
 
     bool converged = updateOctree(keys, bucketSize, tree, counts, maxCount);
 
     std::vector<unsigned> counts_reduced(counts.size());
-    mpiAllreduce(counts.data(), counts_reduced.data(), counts.size(), MPI_SUM, MPI_COMM_WORLD);
+    mpiAllreduce(counts.data(), counts_reduced.data(), counts.size(), MPI_SUM, comm);
 
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < counts.size(); ++i)
@@ -65,7 +66,8 @@ unsigned updateOctreeGlobal(std::span<const KeyType> keys,
                             unsigned bucketSize,
                             OctreeData<KeyType, CpuTag>& tree,
                             std::vector<KeyType>& leaves,
-                            std::vector<unsigned>& counts)
+                            std::vector<unsigned>& counts,
+                            MPI_Comm comm)
 {
     bool converged =
         rebalanceDecision(leaves.data(), counts.data(), nNodes(leaves), bucketSize, tree.childOffsets.data());
@@ -80,7 +82,7 @@ unsigned updateOctreeGlobal(std::span<const KeyType> keys,
                       true);
 
     std::vector<unsigned> counts_reduced(counts.size());
-    mpiAllreduce(counts.data(), counts_reduced.data(), counts.size(), MPI_SUM, MPI_COMM_WORLD);
+    mpiAllreduce(counts.data(), counts_reduced.data(), counts.size(), MPI_SUM, comm);
 
     unsigned maxCount = 0;
 #pragma omp parallel for schedule(static) reduction(max : maxCount)

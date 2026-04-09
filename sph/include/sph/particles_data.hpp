@@ -79,6 +79,7 @@ public:
 
     uint64_t iteration{1};
     uint64_t numParticlesGlobal{0};
+    uint64_t numParticlesGlobalPrev{};
 
     //! @brief default mean desired number of neighbors per particle, can be overriden per test case or input file
     unsigned ng0{100};
@@ -207,7 +208,7 @@ public:
     RealType K{0};
 
     //! @brief non-stateful variables for statistics
-    uint64_t totalNeighbors{0}, maxHalos{0};
+    uint64_t totalNeighbors{0}, localNeighbors{0}, maxHalos{0};
 
     /*! @brief Particle fields
      *
@@ -380,10 +381,11 @@ public:
 private:
     void createTables()
     {
-        using H = HydroType;
-        K       = sph::kernel_3D_k(getSphKernel(kernelChoice, sincIndex), 2.0);
-        auto a_wh      = sph::tabulateFunction<H, lt::kTableSize>(sph::getSphKernel(kernelChoice, sincIndex), 0, 2);
-        auto a_whd     = sph::tabulateFunction<H, lt::kTableSize>(sph::getSphKernelDerivative(kernelChoice, sincIndex), 0, 2);
+        using H   = HydroType;
+        K         = sph::kernel_3D_k(getSphKernel(kernelChoice, sincIndex), 2.0);
+        auto a_wh = sph::tabulateFunction<H, lt::kTableSize>(sph::getSphKernel(kernelChoice, sincIndex), 0, 2);
+        auto a_whd =
+            sph::tabulateFunction<H, lt::kTableSize>(sph::getSphKernelDerivative(kernelChoice, sincIndex), 0, 2);
 
         wh  = FieldVector<HydroType>(a_wh.begin(), a_wh.end());
         whd = FieldVector<HydroType>(a_whd.begin(), a_whd.end());
