@@ -71,7 +71,6 @@ class EvrardGlassSphereCooling : public EvrardGlassSphere<Dataset>
 public:
     EvrardGlassSphereCooling(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : EvrardGlassSphere<Dataset>(initBlock, settingsFile, reader)
-        , Base(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, evrardCoolingConstants(), settingsFile, reader);
