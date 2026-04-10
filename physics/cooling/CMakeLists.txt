@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 set(CSTONE_DIR ${CMAKE_SOURCE_DIR}/domain/include)
 set(MAIN_APP_DIR ${CMAKE_SOURCE_DIR}/main/src)
+set(SPH_DIR ${CMAKE_SOURCE_DIR}/sph/include)
 
 #include(CTest)
 #include(CheckLanguage)
