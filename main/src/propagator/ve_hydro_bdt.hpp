@@ -249,7 +249,8 @@ public:
         groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
         timer.step("IadVelocityDivCurlGradh");
 
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "gradh">(d), get<"keys">(d), haloRecvScratch);
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "gradh">(d), get<"keys">(d),
+                             haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
         computeEOS(first, last, d);
