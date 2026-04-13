@@ -95,33 +95,34 @@ struct IADDivVCurlVPostamble
 template<class Neighborhood, class Tc, class T>
 void iadDivvCurlvGradhIjLoop(const Neighborhood& neighborhood, Tc K, const T* vx, const T* vy, const T* vz, const T* m,
                              const T* xm, const T* kx, const unsigned* nc, T* c11, T* c12, T* c13, T* c22, T* c23,
-                             T* c33, const T* wh, T* gradh, T* divv, T* curlv, T* dV11, T* dV12, T* dV13, T* dV22,
-                             T* dV23, T* dV33, bool doGradV)
+                             T* c33, const T* wh, const T* whd, T* gradh, T* divv, T* curlv, T* dV11, T* dV12, T* dV13,
+                             T* dV22, T* dV23, T* dV33, bool doGradV)
 {
     const auto input = std::make_tuple(vx, vy, vz, m, xm, kx, nc);
     if (curlv && doGradV)
     {
         const auto output =
             std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33);
-        neighborhood.ijLoop(input, output, IADDivVCurlVInteraction<T>{wh}, IADDivVCurlVPostamble<true, true, T, Tc>{K});
+        neighborhood.ijLoop(input, output, IADDivVCurlVInteraction<T>{wh, whd},
+                            IADDivVCurlVPostamble<true, true, T, Tc>{K});
     }
     else if (curlv)
     {
         const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, divv, curlv);
-        neighborhood.ijLoop(input, output, IADDivVCurlVInteraction<T>{wh},
+        neighborhood.ijLoop(input, output, IADDivVCurlVInteraction<T>{wh, whd},
                             IADDivVCurlVPostamble<true, false, T, Tc>{K});
     }
     else if (doGradV)
     {
         const auto output =
             std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, divv, dV11, dV12, dV13, dV22, dV23, dV33);
-        neighborhood.ijLoop(input, output, IADDivVCurlVInteraction<T>{wh},
+        neighborhood.ijLoop(input, output, IADDivVCurlVInteraction<T>{wh, whd},
                             IADDivVCurlVPostamble<false, true, T, Tc>{K});
     }
     else
     {
         const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, divv);
-        neighborhood.ijLoop(input, output, IADDivVCurlVInteraction<T>{wh},
+        neighborhood.ijLoop(input, output, IADDivVCurlVInteraction<T>{wh, whd},
                             IADDivVCurlVPostamble<false, false, T, Tc>{K});
     }
 }
