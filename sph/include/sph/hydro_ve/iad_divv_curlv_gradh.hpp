@@ -24,7 +24,7 @@
  */
 
 /*! @file
- * @brief Volume element definition i-loop driver
+ * @brief Integral-approach-to-derivative and velocity divergence/curl i-loop driver
  *
  * @author Ruben Cabezon <ruben.cabezon@unibas.ch>
  */
@@ -32,19 +32,23 @@
 #pragma once
 
 #include "sph/sph_gpu.hpp"
-#include "ve_def_gradh_kern.hpp"
+#include "iad_divv_curlv_kern.hpp"
 
 namespace sph
 {
 
-template<typename Tc, class Dataset>
-void computeVeDefGradh(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
+template<class Tc, class Dataset>
+void computeIadDivvCurlvGradh(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeVeDefGradh(grp, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeIadDivvCurlvGradh(grp, d, box); }
     else
     {
-        veDefGradhIjLoop(d.neighborhood, d.K, d.m.data(), d.xm.data(), d.wh.data(), d.whd.data(), d.kx.data(),
-                         d.gradh.data());
+        iadDivvCurlvGradhIjLoop(d.neighborhood, d.K, d.vx.data(), d.vy.data(), d.vz.data(), d.m.data(), d.xm.data(),
+                                d.kx.data(), d.nc.data(), d.c11.data(), d.c12.data(), d.c13.data(), d.c22.data(),
+                                d.c23.data(), d.c33.data(), d.wh.data(), d.gradh.data(), d.divv.data(),
+                                d.curlv.size() == d.x.size() ? d.curlv.data() : nullptr, d.dV11.data(), d.dV12.data(),
+                                d.dV13.data(), d.dV22.data(), d.dV23.data(), d.dV33.data(),
+                                d.dV11.size() == d.x.size());
     }
 }
 

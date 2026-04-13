@@ -39,73 +39,53 @@ namespace sph
 {
 
 template<class T>
-struct VeDefGradHInteraction
+struct VeInteraction
 {
-    const T *wh, *whd;
+    const T* wh;
 
     template<class ParticleData, class Tc>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& /* r_ij */,
                               T r2) const
     {
-        const auto [i, iPos, hi, mi, xmassi] = iData;
-        const auto [j, jPos, hj, mj, xmassj] = jData;
+        const auto [i, iPos, hi, xmassi] = iData;
+        const auto [j, jPos, hj, xmassj] = jData;
 
         auto hInv = T(1) / hi;
 
-        T dist  = std::sqrt(r2);
-        T vloc  = dist * hInv;
-        T w     = lt::lookup(wh, vloc);
-        T dw    = lt::lookup(whd, vloc);
-        T dterh = -(T(3) * w + vloc * dw);
+        T dist = std::sqrt(r2);
+        T vloc = dist * hInv;
+        T w    = lt::lookup(wh, vloc);
 
-        T kxi      = w * xmassj;
-        T whomegai = dterh * xmassj;
-        T wrho0i   = dterh * mj;
+        T kxi = w * xmassj;
 
-        return std::make_tuple(kxi, whomegai, wrho0i);
+        return std::make_tuple(kxi);
     }
 };
 
 template<class T, class Tc>
-struct VeDefGradHPostamble
+struct VePostamble
 {
     Tc K;
 
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
-        const auto [i, iPos, hi, mi, xmassi] = iData;
-        auto [kxi, whomegai, wrho0i]         = result;
+        const auto [i, iPos, hi, xmassi] = iData;
+        auto [kxi]                       = result;
 
         auto hInv  = T(1) / hi;
         auto h3Inv = hInv * hInv * hInv;
 
         kxi *= K * h3Inv;
-        whomegai *= K * h3Inv * hInv;
-        wrho0i *= K * h3Inv * hInv;
 
-        whomegai = whomegai * mi / xmassi + (kxi - K * xmassi * h3Inv) * wrho0i;
-        T rhoi   = kxi * mi / xmassi;
-        T dhdrho = -hi / (rhoi * T(3)); // This /3 is the dimension hard-coded.
-
-        T gradhi = T(1) - dhdrho * whomegai;
-#ifndef NDEBUG
-        if (std::isnan(rhoi))
-        {
-            printf("ERROR::Density(%u) density %f, position: (%f %f %f), h: %f\n", i, rhoi, iPos[0], iPos[1], iPos[2],
-                   hi);
-        }
-#endif
-        return std::make_tuple(kxi, gradhi);
+        return std::make_tuple(kxi);
     }
 };
 
-template<class Neighbordhood, class Tc, class Tm, class T>
-void veDefGradhIjLoop(const Neighbordhood& neighborhood, Tc K, const Tm* m, const T* xm, const T* wh, const T* whd,
-                      T* kx, T* gradh)
+template<class Neighbordhood, class Tc, class T>
+void veIjLoop(const Neighbordhood& neighborhood, Tc K, const T* xm, const T* wh, T* kx)
 {
-    neighborhood.ijLoop(std::make_tuple(m, xm), std::make_tuple(kx, gradh), VeDefGradHInteraction{wh, whd},
-                        VeDefGradHPostamble<T, Tc>{K});
+    neighborhood.ijLoop(std::make_tuple(xm), std::make_tuple(kx), VeInteraction{wh}, VePostamble<T, Tc>{K});
 }
 
 } // namespace sph

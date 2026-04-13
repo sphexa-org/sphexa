@@ -24,31 +24,33 @@
  */
 
 /*! @file
- * @brief Integral-approach-to-derivative and velocity divergence/curl i-loop driver
+ * @brief Density i-loop GPU driver
  *
- * @author Ruben Cabezon <ruben.cabezon@unibas.ch>
+ * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#pragma once
+#include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/traversal/find_neighbors.cuh"
 
+#include "sph/neighborhood_gpu.hpp"
 #include "sph/sph_gpu.hpp"
-#include "iad_divv_curlv_kern.hpp"
+#include "sph/particles_data.hpp"
+#include "sph/hydro_ve/ve_kern.hpp"
 
 namespace sph
 {
-
-template<class Tc, class Dataset>
-void computeIadDivvCurlv(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
+namespace gpu
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeIadDivvCurlv(grp, d, box); }
-    else
-    {
-        iadDivVCurlVIjLoop(d.neighborhood, d.K, d.vx.data(), d.vy.data(), d.vz.data(), d.xm.data(), d.kx.data(),
-                           d.nc.data(), d.c11.data(), d.c12.data(), d.c13.data(), d.c22.data(), d.c23.data(),
-                           d.c33.data(), d.wh.data(), d.divv.data(),
-                           d.curlv.size() == d.x.size() ? d.curlv.data() : nullptr, d.dV11.data(), d.dV12.data(),
-                           d.dV13.data(), d.dV22.data(), d.dV23.data(), d.dV33.data(), d.dV11.size() == d.x.size());
-    }
+
+template<class Dataset>
+void computeVe(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
+{
+    veIjLoop(d.neighborhood, d.K, rawPtr(d.xm), rawPtr(d.wh), rawPtr(d.kx));
+    checkGpuErrors(cudaDeviceSynchronize());
 }
 
+template void computeVe(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,
+                        const cstone::Box<SphTypes::CoordinateType>&);
+
+} // namespace gpu
 } // namespace sph

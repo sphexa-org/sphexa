@@ -128,7 +128,7 @@ __global__ void protectAncestorsKernel(const KeyType* prefixes,
     __shared__ typename BlockReduce::TempStorage temp_storage;
 
     BlockReduce reduce(temp_storage);
-    int blockMin = reduce.Reduce(int(nodeOp != 1), cub::Sum());
+    int blockMin = reduce.Sum(int(nodeOp != 1));
     __syncthreads();
 
     if (threadIdx.x == 0) { atomicAdd(&nodeOpSum, blockMin); }

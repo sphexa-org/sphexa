@@ -81,6 +81,7 @@ public:
 
     uint64_t iteration{1};
     uint64_t numParticlesGlobal{0};
+    uint64_t numParticlesGlobalPrev{};
 
     //! @brief default mean desired number of neighbors per particle, can be overriden per test case or input file
     unsigned ng0{100};
@@ -209,7 +210,7 @@ public:
     RealType K{0};
 
     //! @brief non-stateful variables for statistics
-    uint64_t totalNeighbors{0}, maxHalos{0};
+    uint64_t totalNeighbors{0}, localNeighbors{0}, maxHalos{0};
 
     /*! @brief Particle fields
      *

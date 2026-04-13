@@ -48,7 +48,7 @@ void makeGlobalBox(int rank, int numRanks)
     std::vector<T> y{val, 2 * val};
     std::vector<T> z{-val, -2 * val};
 
-    Box<T> box = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), Box<T>{0, 1});
+    Box<T> box = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), MPI_COMM_WORLD, Box<T>{0, 1});
 
     T rVal = numRanks;
     EXPECT_EQ(box.xmin(), -rVal);
@@ -64,25 +64,25 @@ void makeGlobalBox(int rank, int numRanks)
     // PBC case
     {
         Box<T> pbcBox{0, 1, 0, 1, 0, 1, periodic, periodic, periodic};
-        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), pbcBox);
+        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), MPI_COMM_WORLD, pbcBox);
         EXPECT_EQ(pbcBox, newPbcBox);
     }
     // partial PBC
     {
         Box<T> pbcBox{0, 1, 0, 1, 0, 1, open, periodic, periodic};
-        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), pbcBox);
+        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), MPI_COMM_WORLD, pbcBox);
         Box<T> refBox{-rVal, rVal, 0, 1, 0, 1, open, periodic, periodic};
         EXPECT_EQ(refBox, newPbcBox);
     }
     {
         Box<T> pbcBox{0, 1, 0, 1, 0, 1, periodic, open, periodic};
-        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), pbcBox);
+        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), MPI_COMM_WORLD, pbcBox);
         Box<T> refBox{0, 1, T(1), 2 * rVal, 0, 1, periodic, open, periodic};
         EXPECT_EQ(refBox, newPbcBox);
     }
     {
         Box<T> pbcBox{0, 1, 0, 1, 0, 1, periodic, periodic, open};
-        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), pbcBox);
+        Box<T> newPbcBox = makeGlobalBox(x.data(), y.data(), z.data(), x.size(), MPI_COMM_WORLD, pbcBox);
         Box<T> refBox{0, 1, 0, 1, -2 * rVal, T(-1), periodic, periodic, open};
         EXPECT_EQ(refBox, newPbcBox);
     }

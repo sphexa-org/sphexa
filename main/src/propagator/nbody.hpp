@@ -131,9 +131,9 @@ public:
 
         computeGroups(first, last, d, domain.box(), groups_);
 
-        cstone::fill<cstone::HaveGpu<Acc>{}>(d.x.begin() + first, d.x.begin() + last, HydroType(0));
-        cstone::fill<cstone::HaveGpu<Acc>{}>(d.y.begin() + first, d.y.begin() + last, HydroType(0));
-        cstone::fill<cstone::HaveGpu<Acc>{}>(d.z.begin() + first, d.z.begin() + last, HydroType(0));
+        cstone::fill<cstone::HaveGpu<Acc>{}>(d.ax.begin() + first, d.ax.begin() + last, HydroType(0));
+        cstone::fill<cstone::HaveGpu<Acc>{}>(d.ay.begin() + first, d.ay.begin() + last, HydroType(0));
+        cstone::fill<cstone::HaveGpu<Acc>{}>(d.az.begin() + first, d.az.begin() + last, HydroType(0));
 
         auto groups = mHolder_.computeSpatialGroups(d, domain);
         mHolder_.upsweep(d, domain);

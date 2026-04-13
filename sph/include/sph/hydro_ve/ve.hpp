@@ -24,34 +24,27 @@
  */
 
 /*! @file
- * @brief Density i-loop GPU driver
+ * @brief Volume element definition i-loop driver
  *
- * @author Sebastian Keller <sebastian.f.keller@gmail.com>
+ * @author Ruben Cabezon <ruben.cabezon@unibas.ch>
  */
 
-#include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/traversal/find_neighbors.cuh"
+#pragma once
 
-#include "sph/neighborhood_gpu.hpp"
 #include "sph/sph_gpu.hpp"
-#include "sph/particles_data.hpp"
-#include "sph/hydro_ve/ve_def_gradh_kern.hpp"
+#include "ve_kern.hpp"
 
 namespace sph
 {
-namespace gpu
-{
 
-template<class Dataset>
-void computeVeDefGradh(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
+template<typename Tc, class Dataset>
+void computeVe(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    veDefGradhIjLoop(d.neighborhood, d.K, rawPtr(d.m), rawPtr(d.xm), rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.kx),
-                     rawPtr(d.gradh));
-    checkGpuErrors(cudaDeviceSynchronize());
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeVe(grp, d, box); }
+    else
+    {
+        veIjLoop(d.neighborhood, d.K, d.xm.data(), d.wh.data(), d.kx.data());
+    }
 }
 
-template void computeVeDefGradh(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,
-                                const cstone::Box<SphTypes::CoordinateType>&);
-
-} // namespace gpu
 } // namespace sph

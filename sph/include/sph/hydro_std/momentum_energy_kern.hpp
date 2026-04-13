@@ -22,8 +22,8 @@ struct MomentumAndEnergyInteractionStd
         constexpr T gradh_i = 1.0;
         constexpr T gradh_j = 1.0;
 
-        const auto [i, iPos, hi, mi, roi, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
-        const auto [j, jPos, hj, mj, roj, vxj, vyj, vzj, prj, cj, c11j, c12j, c13j, c22j, c23j, c33j] = jData;
+        const auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
+        const auto [j, jPos, hj, mj, roj, ncj, vxj, vyj, vzj, prj, cj, c11j, c12j, c13j, c22j, c23j, c33j] = jData;
 
         T rx = r_ij[0];
         T ry = r_ij[1];
@@ -97,9 +97,20 @@ struct MomentumAndEnergyPostambleStd
     Tc K;
 
     template<class ParticleData, class Result>
-    constexpr auto operator()(const ParticleData&, const Result& result) const
+    constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
-        const auto [energy, momentum_x, momentum_y, momentum_z, maxvsignal] = result;
+        const auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
+        auto [energy, momentum_x, momentum_y, momentum_z, maxvsignal]                                      = result;
+
+        if (nci <= 1)
+        {
+            energy     = 0;
+            momentum_x = 0;
+            momentum_y = 0;
+            momentum_z = 0;
+            maxvsignal = 0;
+        }
+
         // with the choice of calculating coordinate (r) and velocity (v_ij) differences as i - j,
         // we add the negative sign only here at the end instead of to termA123_ij in each interaction
         using T = std::remove_cvref_t<decltype(momentum_x)>;
@@ -124,7 +135,7 @@ struct MomentumAndEnergyPostambleStdWithDt : MomentumAndEnergyPostambleStd<Tc, T
     {
         const auto [du, grad_P_x, grad_P_y, grad_P_z, maxvsignal] =
             MomentumAndEnergyPostambleStd<Tc, Tm1>::operator()(iData, result);
-        const auto [i, iPos, hi, mi, roi, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
+        const auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
 
         auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
         return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
@@ -132,12 +143,12 @@ struct MomentumAndEnergyPostambleStdWithDt : MomentumAndEnergyPostambleStd<Tc, T
 };
 
 template<class Neighborhood, class Tc, class T, class Tm, class Tm1>
-void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, const Tm* m, const T* rho, const T* vx,
-                             const T* vy, const T* vz, const T* p, const T* c, const T* c11, const T* c12, const T* c13,
-                             const T* c22, const T* c23, const T* c33, const T* wh, Tm1* du, T* grad_P_x, T* grad_P_y,
-                             T* grad_P_z, T* dt)
+void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, const Tm* m, const T* rho,
+                             const unsigned* nc, const T* vx, const T* vy, const T* vz, const T* p, const T* c,
+                             const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
+                             const T* wh, Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z, T* dt)
 {
-    neighborhood.ijLoop(std::make_tuple(m, rho, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
+    neighborhood.ijLoop(std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
                         std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt),
                         MomentumAndEnergyInteractionStd<T, Tm1>{wh},
                         MomentumAndEnergyPostambleStdWithDt<Tc, Tm1>{K, Kcour});

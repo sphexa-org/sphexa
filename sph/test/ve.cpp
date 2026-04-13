@@ -39,9 +39,9 @@
 
 #include "sph/hydro_ve/av_switches_kern.hpp"
 #include "sph/hydro_ve/divv_curlv_kern.hpp"
-#include "sph/hydro_ve/iad_kern.hpp"
+#include "sph/hydro_ve/iad_gradh_kern.hpp"
 #include "sph/hydro_ve/momentum_energy_kern.hpp"
-#include "sph/hydro_ve/ve_def_gradh_kern.hpp"
+#include "sph/hydro_ve/ve_kern.hpp"
 #include "sph/hydro_ve/xmass_kern.hpp"
 #include "sph/sph_kernel_tables.hpp"
 #include "sph/table_lookup.hpp"
@@ -74,14 +74,13 @@ protected:
         std::apply([this](auto&&... vecs)
                    { sphexa::fileutils::readAscii("example_data.txt", npart, std::vector<T*>{vecs.data()...}); },
                    std::tie(x, y, z, vx, vy, vz, h, c, c11, c12, c13, c22, c23, c33, p, gradh, rho0, sumwhrho0, sumwh,
-                            dvxdx, dvxdy, dvxdz, dvydx, dvydy, dvydz, dvzdx, dvzdy, dvzdz, alpha, u, divv));
+                            dvxdx, dvxdy, dvxdz, dvydx, dvydy, dvydz, dvzdx, dvzdy, dvzdz, alpha, u, divv, kx));
 
         std::fill(m.begin(), m.end(), mpart);
 
         for (unsigned i = 0; i < npart; i++)
         {
             xm[i]   = mpart / rho0[i];
-            kx[i]   = K * xm[i] / std::pow(h[i], 3);
             prho[i] = p[i] / (kx[i] * m[i] * m[i] * gradh[i]);
         }
     }
@@ -154,7 +153,7 @@ TEST_F(SphKernelTests, AVSwitches)
                                  c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), kx.data(), xm.data(),
                                  divv.data(), alpha.data(), dt, alphamin, alphamax, decay_constant);
 
-    EXPECT_NEAR(newAlpha, 0.93941905320351171, 2e-9);
+    EXPECT_NEAR(newAlpha, 0.34425163896226968, 2e-9);
 }
 
 template<size_t stride = 1, typename Tc, class T>
@@ -223,27 +222,28 @@ TEST_F(SphKernelTests, Divv_Curlv)
                     wh.data(), whd.data(), kx.data(), xm.data(), &divv, &curlv, &dV11, &dV12, &dV13, &dV22, &dV23,
                     &dV33, true);
 
-    EXPECT_NEAR(divv, 3.3760353440920682e-2, 2e-9);
-    EXPECT_NEAR(curlv, 3.7836647734377962e-2, 2e-9);
-    EXPECT_NEAR(dV11, 0.0013578323369918166, 2e-9);
-    EXPECT_NEAR(dV12, 0.02465266861727711, 2e-9);
-    EXPECT_NEAR(dV13, -0.0046604174274769167, 2e-9);
-    EXPECT_NEAR(dV22, 0.022556438947324862, 2e-9);
-    EXPECT_NEAR(dV23, 0.0097704904179710741, 2e-9);
-    EXPECT_NEAR(dV33, 0.0098460821566040066, 2e-9);
+    EXPECT_NEAR(divv, 8.9647658450583111e-3, 2e-9);
+    EXPECT_NEAR(curlv, 1.0047189924410768e-2, 2e-9);
+    EXPECT_NEAR(dV11, 3.605605379030074e-4, 2e-9);
+    EXPECT_NEAR(dV12, 6.5462998887902994e-3, 2e-9);
+    EXPECT_NEAR(dV13, -1.2375328303458487e-3, 2e-9);
+    EXPECT_NEAR(dV22, 5.9896645443181197e-3, 2e-9);
+    EXPECT_NEAR(dV23, 2.5944680841419438e-3, 2e-9);
+    EXPECT_NEAR(dV33, 2.6145407628371843e-3, 2e-9);
 }
 
 template<size_t stride = 1, class Tc, class T>
-HOST_DEVICE_FUN inline void IADJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
-                                     const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
-                                     const Tc* y, const Tc* z, const T* h, const T* wh, const T* /*whd*/, const T* xm,
-                                     const T* kx, const unsigned* nc, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33)
+HOST_DEVICE_FUN inline void IAD_gradhJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
+                                           const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
+                                           const Tc* y, const Tc* z, const T* h, const T* m, const T* wh, const T* whd,
+                                           const T* xm, const T* kx, const unsigned* nc, T* c11, T* c12, T* c13, T* c22,
+                                           T* c23, T* c33, T* gradh)
 {
-    IADInteraction      interaction{wh};
-    IADPostamble<T, Tc> postamble{K};
+    IADGradhInteraction      interaction{wh, whd};
+    IADGradhPostamble<T, Tc> postamble{K};
 
-    const auto input  = std::make_tuple(xm, kx, nc);
-    const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33);
+    const auto input  = std::make_tuple(m, xm, kx, nc);
+    const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh);
 
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
     const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
@@ -269,11 +269,13 @@ TEST_F(SphKernelTests, IAD)
 {
     // fill with invalid initial value to make sure that the kernel overwrites it instead of add to it
     std::vector<T>        iad(6, -1);
+    T                     gradh = -1;
     std::vector<unsigned> nc(x.size(), neighborsCount + 1);
 
     // compute the 6 tensor components for particle 0
-    IADJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), wh.data(),
-             whd.data(), xm.data(), kx.data(), nc.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5]);
+    IAD_gradhJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), m.data(),
+                   wh.data(), whd.data(), xm.data(), kx.data(), nc.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4],
+                   &iad[5], &gradh);
 
     EXPECT_NEAR(iad[0], 1.9296619855715329e-18, 1e-10);
     EXPECT_NEAR(iad[1], -1.7838691836843698e-20, 1e-10);
@@ -281,6 +283,7 @@ TEST_F(SphKernelTests, IAD)
     EXPECT_NEAR(iad[3], 1.9482845913025683e-18, 1e-10);
     EXPECT_NEAR(iad[4], 1.635410357476855e-20, 1e-10);
     EXPECT_NEAR(iad[5], 1.9246939006338132e-18, 1e-10);
+    EXPECT_NEAR(gradh, 0.99783225455705071, 5e-7);
 }
 
 template<class T>
@@ -362,10 +365,10 @@ TEST_F(SphKernelTests, MomentumEnergy)
                                      alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
                                      dV33.data(), &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
-        EXPECT_NEAR(grad_Px, -505548.68073726865, 0.023);
-        EXPECT_NEAR(grad_Py, 303384.91384746187, 0.053);
-        EXPECT_NEAR(grad_Pz, -1767463.9739728321, 0.043);
-        EXPECT_NEAR(du, 8.5525242525359648e12, 7.1e5);
+        EXPECT_NEAR(grad_Px, -23175.29155183331, 0.023);
+        EXPECT_NEAR(grad_Py, 13564.560025399775, 0.053);
+        EXPECT_NEAR(grad_Pz, -80978.279574341461, 0.043);
+        EXPECT_NEAR(du, -2.6643381633458105e11, 7.1e5);
         EXPECT_NEAR(maxvsignal, 26490876.319252387, 1e-6);
     }
     { // test without AV cleaning
@@ -379,10 +382,10 @@ TEST_F(SphKernelTests, MomentumEnergy)
                                       alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
                                       dV33.data(), &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
-        EXPECT_NEAR(grad_Px, -521261.07791667967, 0.022);
-        EXPECT_NEAR(grad_Py, -74471.016515749841, 0.064);
-        EXPECT_NEAR(grad_Pz, -1730426.827721074, 0.042);
-        EXPECT_NEAR(du, 7.1838438980436924e12, 3.1e5);
+        EXPECT_NEAR(grad_Px, -23599.138813909038, 0.022);
+        EXPECT_NEAR(grad_Py, 335.48616557085978, 0.064);
+        EXPECT_NEAR(grad_Pz, -79670.116695894292, 0.042);
+        EXPECT_NEAR(du, -3.1273454967721649e11, 3.1e5);
         EXPECT_NEAR(maxvsignal, 26490876.319252387, 1e-6);
     }
     { // test zero neighbors
@@ -404,18 +407,17 @@ TEST_F(SphKernelTests, MomentumEnergy)
     }
 }
 
-template<size_t stride = 1, class Tc, class Tm, class T>
-HOST_DEVICE_FUN inline util::tuple<T, T> veDefGradhJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
-                                                         const cstone::LocalIndex* neighbors, unsigned neighborsCount,
-                                                         const Tc* x, const Tc* y, const Tc* z, const T* h, const Tm* m,
-                                                         const T* wh, const T* whd, const T* xm)
+template<size_t stride = 1, class Tc, class T>
+HOST_DEVICE_FUN inline T veJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
+                                 const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x, const Tc* y,
+                                 const Tc* z, const T* h, const T* wh, const T* xm)
 {
-    VeDefGradHInteraction      interaction{wh, whd};
-    VeDefGradHPostamble<T, Tc> postamble{K};
+    VeInteraction      interaction{wh};
+    VePostamble<T, Tc> postamble{K};
 
-    const auto input = std::make_tuple(m, xm);
-    T          kxi, gradhi;
-    const auto output = std::make_tuple(&kxi - i, &gradhi - i);
+    const auto input = std::make_tuple(xm);
+    T          kxi;
+    const auto output = std::make_tuple(&kxi - i);
 
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
     const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
@@ -435,18 +437,17 @@ HOST_DEVICE_FUN inline util::tuple<T, T> veDefGradhJLoop(cstone::LocalIndex i, T
     auto presult = postamble(iData, result);
 
     cstone::ijloop::storeParticleData(output, i, presult);
-    return {kxi, gradhi};
+    return kxi;
 }
 
 TEST_F(SphKernelTests, VeDefGradh)
 {
-    auto [kx, gradh] = veDefGradhJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(),
-                                       h.data(), m.data(), wh.data(), whd.data(), xm.data());
+    T kxx = veJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), wh.data(),
+                    xm.data());
 
-    T density = kx * m[0] / xm[0];
+    T density = kxx * m[0] / xm[0];
     EXPECT_NEAR(density, 3.4662283566584293e1, 8e-7);
-    EXPECT_NEAR(gradh, 0.98699067585409861, 5e-7);
-    EXPECT_NEAR(kx, 1.0042661134076782, 3e-7);
+    EXPECT_NEAR(kxx, 1.0042661134076782, 3e-7);
 }
 
 template<size_t stride = 1, class Tc, class Tm, class T>

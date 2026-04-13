@@ -151,12 +151,13 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
                        unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy,
                        const T* vz, const T* h, const Tm* m, const T* rho, const T* p, const T* c, const T* c11,
                        const T* c12, const T* c13, const T* c22, const T* c23, const T* c33, const T* wh,
-                       const T* /*whd*/, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, T* maxvsignal)
+                       const T* /*whd*/, const cstone::LocalIndex* nc, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du,
+                       T* maxvsignal)
 {
     MomentumAndEnergyInteractionStd<T, Tm1> interaction{wh};
     MomentumAndEnergyPostambleStd<Tc, Tm1>  postamble{K};
 
-    const auto input  = std::make_tuple(m, rho, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33);
+    const auto input  = std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33);
     const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, maxvsignal - i);
 
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
@@ -183,10 +184,11 @@ TEST_F(SphKernelTestsStd, MomentumEnergy)
 {
     auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
+    std::vector<cstone::LocalIndex> nc(x.size(), neighborsCount + 1);
     momentumAndEnergyJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), vx.data(),
                            vy.data(), vz.data(), h.data(), m.data(), rho.data(), p.data(), c.data(), c11.data(),
-                           c12.data(), c13.data(), c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), &grad_Px,
-                           &grad_Py, &grad_Pz, &du, &maxvsignal);
+                           c12.data(), c13.data(), c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), nc.data(),
+                           &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
     EXPECT_NEAR(grad_Px, 14.407211846688075, 1.3e-7);
     EXPECT_NEAR(grad_Py, -1.2396802157028355, 1.4e-7);
@@ -199,10 +201,11 @@ TEST_F(SphKernelTestsStd, MomentumEnergyZero)
 {
     auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
+    std::vector<cstone::LocalIndex> nc(x.size(), neighborsCount + 1);
     momentumAndEnergyJLoop(0, K, box(), neighbors.data(), 0, x.data(), y.data(), z.data(), vx.data(), vy.data(),
                            vz.data(), h.data(), m.data(), rho.data(), p.data(), c.data(), c11.data(), c12.data(),
-                           c13.data(), c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), &grad_Px, &grad_Py,
-                           &grad_Pz, &du, &maxvsignal);
+                           c13.data(), c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), nc.data(), &grad_Px,
+                           &grad_Py, &grad_Pz, &du, &maxvsignal);
 
     EXPECT_EQ(grad_Px, 0.0);
     EXPECT_EQ(grad_Py, 0.0);
