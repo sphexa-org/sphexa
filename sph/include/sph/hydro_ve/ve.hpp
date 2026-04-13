@@ -41,10 +41,7 @@ template<typename Tc, class Dataset>
 void computeVe(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeVe(grp, d, box); }
-    else
-    {
-        veIjLoop(d.neighborhood, d.K, d.xm.data(), d.wh.data(), d.kx.data());
-    }
+    else { veIjLoop(d.neighborhood, d.K, d.xm.data(), d.wh.data(), d.kx.data()); }
 }
 
 } // namespace sph
