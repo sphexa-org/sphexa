@@ -8,6 +8,7 @@
 #include <ascent/ascent.hpp>
 
 #include <conduit/conduit.hpp>
+#include <conduit/conduit_blueprint_mesh.hpp>
 
 namespace viz
 {
@@ -50,8 +51,12 @@ struct AscentAdaptor
         mesh["state/cycle"].set_external(&d.iteration);
         mesh["state/time"].set_external(&d.ttot);
 
-        conduit::Node mesh_blueprint = mesh_from(d, startIndex, endIndex);
-        mesh.move(mesh_blueprint);
+        define_mesh(mesh, d, startIndex, endIndex);
+
+        if (conduit::Node info; !conduit::blueprint::mesh::verify(mesh, info))
+        {
+            CONDUIT_INFO("blueprint verify failed!" + info.to_json());
+        }
 
         _instance.publish(mesh);
         _instance.execute(_actions);

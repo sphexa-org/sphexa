@@ -1,11 +1,9 @@
 #pragma once
 
+#include <cstdint>
 #include <numeric>
 #include <filesystem>
 #include <vector>
-
-#include <conduit/conduit.hpp>
-#include <conduit/conduit_blueprint_mesh.hpp>
 
 auto extract_arg_values(const std::string& arg_name, int argc, char** argv)
 {
@@ -27,8 +25,8 @@ auto extract_arg_values(const std::string& arg_name, int argc, char** argv)
  * @param[in]    start      first element of @p field to reveal to the mesh
  * @param[in]    end        last element of @p field to reveal to the meash
  */
-template<class FieldType>
-void addField(conduit::Node& mesh, const std::string& name, FieldType* field, size_t startIndex, size_t endIndex)
+template<class Node, class FieldType>
+void addField(Node&& mesh, const std::string& name, FieldType* field, size_t startIndex, size_t endIndex)
 {
     mesh["fields/" + name + "/association"] = "vertex";
     mesh["fields/" + name + "/topology"]    = "mesh";
@@ -36,11 +34,9 @@ void addField(conduit::Node& mesh, const std::string& name, FieldType* field, si
     mesh["fields/" + name + "/volume_dependent"].set("false");
 }
 
-template<class ParticleData>
-conduit::Node mesh_from(ParticleData& d, const std::size_t begin, const std::size_t end)
+template<class Node, class ParticleData>
+void define_mesh(Node&& mesh, ParticleData& d, const std::size_t begin, const std::size_t end)
 {
-    conduit::Node mesh;
-
     mesh["coordsets/coords/type"] = "explicit";
     mesh["coordsets/coords/values/x"].set_external(get<"x">(d).data() + begin, end - begin);
     mesh["coordsets/coords/values/y"].set_external(get<"y">(d).data() + begin, end - begin);
@@ -54,7 +50,7 @@ conduit::Node mesh_from(ParticleData& d, const std::size_t begin, const std::siz
     mesh["topologies/mesh/elements/shape"] = "point";
 
     // Note: it cannot be set as external because it goes out of scope on return
-    std::vector<conduit_int32> conn(end - begin);
+    std::vector<std::int32_t> conn(end - begin);
     std::iota(conn.begin(), conn.end(), 0);
     mesh["topologies/mesh/elements/connectivity"].set(conn);
 #endif
@@ -79,12 +75,4 @@ conduit::Node mesh_from(ParticleData& d, const std::size_t begin, const std::siz
     // addField(mesh, "ax", get<"ax">(d).data(), startIndex, endIndex);
     // addField(mesh, "ay", get<"ay">(d).data(), startIndex, endIndex);
     // addField(mesh, "az", get<"az">(d).data(), startIndex, endIndex);
-
-    conduit::Node verify_info;
-    if (!conduit::blueprint::mesh::verify(mesh, verify_info))
-    {
-        CONDUIT_INFO("blueprint verify failed!" + verify_info.to_json());
-    }
-
-    return mesh;
 }
