@@ -153,6 +153,7 @@ int main(int argc, char** argv)
 
     size_t startIteration    = d.iteration;
     bool   isOutputTriggered = false;
+    bool   isSubsetOutputTriggered = false;
 
     for (bool keepRunning = true; keepRunning; d.iteration++)
     {
@@ -182,6 +183,19 @@ int main(int argc, char** argv)
             fileWriter->closeStep();
             isOutputTriggered = false;
         }
+
+        isSubsetOutputTriggered =
+            (isOutputStep(d.iteration, taggingOutputSetup.writeFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, taggingOutputSetup.writeFreqStr) ||
+             isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, taggingOutputSetup.writeExtra) ||
+             (isWallClockReached && writeEnabledSubset) || isSubsetOutputTriggered) &&
+            d.iteration > startIteration;
+
+        if (isSubsetOutputTriggered)
+        {
+            propagator->saveSubsetFields(fileWriter.get(), taggingOutputSetup.outFile, domain.startIndex(), domain.endIndex(), simData);
+            isSubsetOutputTriggered = false;
+        }
+
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
 
