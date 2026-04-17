@@ -86,6 +86,44 @@ protected:
             idTaggingSetupCheck(taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds, taggingSetup_.selList, 
                 taggingSetup_.selListGroupIds, printLog);
         }
+
+        std::vector<uint64_t> idBuffer;
+        std::span<uint64_t> idSpan;
+        if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+        {
+            idBuffer = toHost(particlesData.id);
+            idSpan = idBuffer;
+        }
+        else
+        {
+            idSpan = particlesData.id;
+        }
+
+        if (!taggingSetup_.selList.empty())
+        {
+            tagIdsInList(idSpan, 0, idSpan.size(), taggingSetup_.selList, taggingSetup_.selListGroupIds);
+        }
+
+        if (!taggingSetup_.selSpheres.empty())
+        {
+            if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+            {
+                auto x = toHost(particlesData.x);
+                auto y = toHost(particlesData.y);
+                auto z = toHost(particlesData.z);
+                tagIdsInSphere(idSpan, x, y, z, 0, idSpan.size(), taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds);
+            }
+            else
+            {
+                tagIdsInSphere(idSpan, particlesData.x, particlesData.y, particlesData.z, 0, idSpan.size(),
+                    taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds);
+            }
+        }
+
+        if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+        {
+            memcpyH2D(idSpan.data(), idSpan.size(), particlesData.id.data());
+        }
     };
 
     std::string settingsFile_;
