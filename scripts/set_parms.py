@@ -113,13 +113,13 @@ if __name__ == "__main__":
     for k, v in settingsDict.items():
         key = k.strip("-")
         v = parse_value(v)
+        if key in f.attrs:
+            del f.attrs[key]
         if isinstance(v, str):
             dtype = h5py.string_dtype(encoding="ascii", length=len(v))
             f.attrs.create(key, v, dtype=dtype)
         else:
             v = select_int_dtype(v)
-            if key in f.attrs:
-                del f.attrs[key]
             if isinstance(v, np.ndarray):
                 f.attrs.create(key, v, dtype=v.dtype)
             else:
