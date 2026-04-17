@@ -57,7 +57,7 @@ namespace sphexa
         // Tagged id output file name
         std::string outFile;
         // Write frequency (iterations or time)
-        std::string writeFreqStr;
+        std::string writeFreqStr = "0";
         // Output fields
         std::vector<std::string> outputFields;
         // Extra writes steps/times
