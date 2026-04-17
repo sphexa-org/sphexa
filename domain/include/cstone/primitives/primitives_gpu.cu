@@ -114,6 +114,20 @@ template void gatherGpu(const unsigned*, size_t, const util::array<float, 2>*, u
 template void gatherGpu(const unsigned*, size_t, const util::array<float, 3>*, util::array<float, 3>*);
 template void gatherGpu(const unsigned*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
 
+template void gatherGpu(const unsigned long*, size_t, const uint8_t*, uint8_t*);
+template void gatherGpu(const unsigned long*, size_t, const double*, double*);
+template void gatherGpu(const unsigned long*, size_t, const float*, float*);
+template void gatherGpu(const unsigned long*, size_t, const char*, char*);
+template void gatherGpu(const unsigned long*, size_t, const int*, int*);
+template void gatherGpu(const unsigned long*, size_t, const long*, long*);
+template void gatherGpu(const unsigned long*, size_t, const unsigned*, unsigned*);
+template void gatherGpu(const unsigned long*, size_t, const unsigned long*, unsigned long*);
+template void gatherGpu(const unsigned long*, size_t, const unsigned long long*, unsigned long long*);
+template void gatherGpu(const unsigned long*, size_t, const util::array<float, 1>*, util::array<float, 1>*);
+template void gatherGpu(const unsigned long*, size_t, const util::array<float, 2>*, util::array<float, 2>*);
+template void gatherGpu(const unsigned long*, size_t, const util::array<float, 3>*, util::array<float, 3>*);
+template void gatherGpu(const unsigned long*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+
 template<class T, class IndexType>
 __global__ void scatterGpuKernel(const IndexType* map, size_t n, const T* source, T* destination)
 {
