@@ -33,13 +33,13 @@
 
 #include "sph/sph_gpu.hpp"
 #include "divv_curlv_kern.hpp"
-#include "iad_kern.hpp"
+#include "iad_gradh_kern.hpp"
 
 namespace sph
 {
 
 template<class Tc, class Dataset>
-void computeIadDivvCurlvImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box)
+void computeIadDivvCurlvGradhImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box)
 {
     const cstone::LocalIndex* neighbors      = d.neighbors.data();
     const unsigned*           neighborsCount = d.nc.data();
@@ -51,6 +51,7 @@ void computeIadDivvCurlvImpl(size_t startIndex, size_t endIndex, Dataset& d, con
     const auto* vy = d.vy.data();
     const auto* vz = d.vz.data();
     const auto* h  = d.h.data();
+    const auto* m = d.m.data();
 
     auto* c11 = d.c11.data();
     auto* c12 = d.c12.data();
@@ -76,14 +77,16 @@ void computeIadDivvCurlvImpl(size_t startIndex, size_t endIndex, Dataset& d, con
     const auto* kx  = d.kx.data();
     const auto* xm  = d.xm.data();
 
+    auto* gradh = d.gradh.data();
+
 #pragma omp parallel for
     for (size_t i = startIndex; i < endIndex; ++i)
     {
         size_t   ni       = i - startIndex;
         unsigned ncCapped = std::min(neighborsCount[i] - 1, d.ngmax);
 
-        IADJLoop(i, d.K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, h, wh, whd, xm, kx, c11, c12, c13, c22, c23,
-                 c33);
+        IAD_gradhJLoop(i, d.K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, h, m, wh, whd, xm, kx, c11, c12, c13,
+                       c22, c23, c33, gradh);
 
         divV_curlVJLoop(i, d.K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, vx, vy, vz, h, c11, c12, c13, c22,
                         c23, c33, wh, whd, kx, xm, divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33, doGradV);
@@ -91,10 +94,10 @@ void computeIadDivvCurlvImpl(size_t startIndex, size_t endIndex, Dataset& d, con
 }
 
 template<class Tc, class Dataset>
-void computeIadDivvCurlv(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
+void computeIadDivvCurlvGradh(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeIadDivvCurlv(grp, d, box); }
-    else { computeIadDivvCurlvImpl(grp.firstBody, grp.lastBody, d, box); }
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeIadDivvCurlvGradh(grp, d, box); }
+    else { computeIadDivvCurlvGradhImpl(grp.firstBody, grp.lastBody, d, box); }
 }
 
 } // namespace sph

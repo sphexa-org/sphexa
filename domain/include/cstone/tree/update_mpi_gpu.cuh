@@ -58,7 +58,8 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
                                OctreeData<KeyType, GpuTag>& tree,
                                DevKeyVec& d_csTree,
                                DevCountVec& d_countsBuf,
-                               bool expectOverflows)
+                               bool expectOverflows,
+                               MPI_Comm comm)
 {
     auto newNumNodes =
         computeNodeOpsGpu(d_csTree.data(), nNodes(d_csTree), d_countsBuf.data(), bucketSize, tree.childOffsets.data());
@@ -82,10 +83,10 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
     {
         MPI_Op limitSum;
         MPI_Op_create(&sumCapped, true, &limitSum);
-        mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), limitSum, MPI_COMM_WORLD);
+        mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), limitSum, comm);
         MPI_Op_free(&limitSum);
     }
-    else { mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, MPI_COMM_WORLD); }
+    else { mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, comm); }
     sequenceMax(d_counts.data(), d_counts.data() + d_counts.size(), d_countsRed.data(), d_counts.data());
     d_countsBuf.resize(numLeafNodes);
 
@@ -103,13 +104,14 @@ unsigned updateOctreeGlobal(std::span<const KeyType> keys,
                             DevKeyVec& d_csTree,
                             std::vector<unsigned>& counts,
                             DevCountVec& d_counts,
-                            bool firstCall)
+                            bool firstCall,
+                            MPI_Comm comm)
 {
     if constexpr (HaveGpu<Accelerator>{})
     {
-        return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, d_counts, firstCall);
+        return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, d_counts, firstCall, comm);
     }
-    else { return updateOctreeGlobal(keys, bucketSize, tree, leaves, counts); }
+    else { return updateOctreeGlobal(keys, bucketSize, tree, leaves, counts, comm); }
 }
 
 } // namespace cstone

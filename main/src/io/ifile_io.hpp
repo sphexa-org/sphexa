@@ -57,8 +57,13 @@ public:
 
     virtual ~IFileWriter() = default;
 
-    virtual void     addStep(size_t firstIndex, size_t lastIndex, std::string path) = 0;
-    virtual int64_t  stepAttributeSize(const std::string& /*key*/) { return 0; }
+    virtual void    addStep(size_t firstIndex, size_t lastIndex, std::string path) = 0;
+    virtual int64_t stepAttributeSize(const std::string& /*key*/) { return 0; }
+    //! @brief Writes a step attribute.
+    //! If called from multiple ranks, the value of rank 0 will be written. The call is collective in that
+    //! case, and all participating ranks must provide the same @p size and a @p FieldType holding the
+    //! same underlying attribute type. Supplying mismatched sizes or types across ranks may cause the
+    //! underlying collective communication to hang or fail.
     virtual void     stepAttribute(const std::string& key, FieldType val, int64_t size) = 0;
     virtual void     stepAttribute(const std::string& key, const std::string& val)      = 0;
     virtual void     fileAttribute(const std::string& key, FieldType val, int64_t size) = 0;

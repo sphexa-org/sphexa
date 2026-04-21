@@ -82,10 +82,11 @@ public:
         int lastIterationSaved = iteration - numStartCalled;
         int numIterations      = numStartCalled;
         int numSubSteps        = int(stepTimeNames.size());
+        uint64_t lastIterationSaved64 = static_cast<uint64_t>(lastIterationSaved);
 
         ar->addStep(0, stepTimes.size(), outFile + ar->suffix());
         ar->stepAttribute("name", "timings");
-        ar->stepAttribute("iteration", &lastIterationSaved, 1);
+        ar->stepAttribute("iteration", &lastIterationSaved64, 1);
         ar->stepAttribute("numRanks", &numRanks, 1);
         ar->stepAttribute("numIterations", &numIterations, 1);
         ar->stepAttribute("numDataPerIteration", &numSubSteps, 1);
@@ -103,9 +104,10 @@ public:
                                numSteps = numStartCalled](auto& field)
             {
                 if (field.empty()) { return; }
+                uint64_t it64 = static_cast<uint64_t>(it);
                 ar->addStep(0, field.size(), outFile + ar->suffix());
                 ar->stepAttribute("name", name);
-                ar->stepAttribute("iteration", &it, 1);
+                ar->stepAttribute("iteration", &it64, 1);
                 ar->stepAttribute("numRanks", &numRanks, 1);
                 ar->stepAttribute("numIterations", &numSteps, 1);
                 ar->writeField(name, field.data(), field.size());
