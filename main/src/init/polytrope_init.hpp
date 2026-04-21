@@ -20,15 +20,16 @@ namespace sphexa
 
 std::map<std::string, double> polytropeConstants()
 {
-    return {{"gravConstant", 1.0},
-            {"polytrope::r", 4.72108762739756E-01},
-            {"polytrope::mTotal", 1e-6},
-            {"polytropic_index", 5. / 3.},
-            {"minDt", 1e-4},
-            {"minDt_m1", 1e-4},
-            {"ng0", 100},
-            {"ngmax", 150},
-            {"eosChoice", sph::EosType::polytropic}};
+    std::map<std::string, double> ret{{"gravConstant", 1.0},
+                                      {"polytrope::r", 4.72108762739756E-01},
+                                      {"polytrope::mTotal", 1e-6},
+                                      {"polytropic_index", 5. / 3.},
+                                      {"minDt", 1e-4},
+                                      {"minDt_m1", 1e-4},
+                                      {"ng0", 100},
+                                      {"ngmax", 150},
+                                      {"eosChoice", sph::EosType::polytropic}};
+    return ret;
 }
 
 template<class Dataset>
@@ -96,33 +97,13 @@ public:
         Dataset d;
         settings_ = buildSettings(d, polytropeConstants(), settingsFile, reader);
 
-        const double r                   = settings_["polytrope::r"];
-        const double mTotal              = settings_["polytrope::mTotal"];
-        const double gravConstant        = settings_["gravConstant"];
-        const double t_relax             = std::sqrt(r * r * r / (gravConstant * mTotal)) / 3.;
-        settings_["relaxationTimescale"] = t_relax;
-
-        readSingleAttribute("relaxationTimescale", settingsFile, reader);
-    }
-
-    void readSingleAttribute(const std::string& attr, const std::string& settingsFile, IFileReader* reader)
-    {
-        if (not settingsFile.empty())
+        if (not settings_.contains("relaxationTimescale"))
         {
-            reader->setStep(settingsFile, -1, FileMode::independent);
-
-            const auto fileAttributes = reader->fileAttributes();
-
-            if (std::find(fileAttributes.begin(), fileAttributes.end(), attr) != fileAttributes.end())
-            {
-                int64_t sz = reader->fileAttributeSize(attr);
-                if (sz == 1)
-                {
-                    settings_[attr] = {};
-                    reader->fileAttribute(attr, &settings_[attr], sz);
-                }
-            }
-            reader->closeStep();
+            const double r                   = settings_["polytrope::r"];
+            const double mTotal              = settings_["polytrope::mTotal"];
+            const double gravConstant        = settings_["gravConstant"];
+            const double t_relax             = std::sqrt(r * r * r / (gravConstant * mTotal)) / 3.;
+            settings_["relaxationTimescale"] = t_relax;
         }
     }
 
