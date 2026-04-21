@@ -7,12 +7,9 @@
 #include <map>
 
 #include "cstone/sfc/box.hpp"
-#include "cstone/tree/continuum.hpp"
 #include "sph/eos.hpp"
 
 #include "isim_init.hpp"
-#include "early_sync.hpp"
-#include "grid.hpp"
 #include "utils.hpp"
 #include "polytrope/bisect.hpp"
 #include "polytrope/polytrope_profile.hpp"
@@ -55,24 +52,6 @@ void initPolytropeFields(Dataset& d, const std::map<std::string, double>& consta
     cstone::fill<gpu>(d.u.begin(), d.u.end(), 0.0);
 
     generateParticleIDs<gpu>(d.id);
-}
-
-template<class Vector>
-void contractRadialProfile(Vector& x, Vector& y, Vector& z, double rho_uniform, auto radiusOfEnclosedMass)
-{
-#pragma omp parallel for schedule(static)
-    for (size_t i = 0; i < x.size(); i++)
-    {
-        const auto old_radius    = std::sqrt(x[i] * x[i] + y[i] * y[i] + z[i] * z[i]);
-        const auto old_volume    = 4. * M_PI / 3. * old_radius * old_radius * old_radius;
-        const auto enclosed_mass = old_volume * rho_uniform;
-        const auto new_radius    = radiusOfEnclosedMass(enclosed_mass);
-        const auto factor        = new_radius / old_radius;
-
-        x[i] *= factor;
-        y[i] *= factor;
-        z[i] *= factor;
-    }
 }
 
 template<typename Dataset>
