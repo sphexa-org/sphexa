@@ -28,29 +28,6 @@ InitSettings polytropeConstants()
             {"eosChoice", sph::EosType::polytropic}};
 }
 
-template<class Dataset>
-void initPolytropeFields(Dataset& d, const std::map<std::string, double>& constants, double m_part)
-{
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-
-    cstone::fill<gpu>(d.m.begin(), d.m.end(), m_part);
-    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
-    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
-
-    cstone::fill<gpu>(d.vx.begin(), d.vx.end(), 0.0);
-    cstone::fill<gpu>(d.vy.begin(), d.vy.end(), 0.0);
-    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
-
-    cstone::fill<gpu>(d.x_m1.begin(), d.x_m1.end(), 0.0);
-    cstone::fill<gpu>(d.y_m1.begin(), d.y_m1.end(), 0.0);
-    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
-
-    cstone::fill<gpu>(d.u.begin(), d.u.end(), 0.0);
-
-    generateParticleIDs<gpu>(d.id);
-}
-
 template<typename Dataset>
 void estimateSmoothingLengths(auto rhoAtRadius, Dataset& d, double m_part, size_t ng0, double r_total)
 {
@@ -138,7 +115,7 @@ public:
 
         const double m_part = m_total / settings_.at("numParticlesGlobal");
         estimateSmoothingLengths(rho_r, simData.hydro, m_part, settings_.at("ng0"), r_total);
-        initPolytropeFields(simData.hydro, settings_, m_part);
+        initFieldsAtRest(simData.hydro, m_part);
 
         return globalBox;
     }
