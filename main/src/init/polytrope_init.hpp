@@ -86,41 +86,46 @@ class Polytrope : public RadialProfile<Dataset>
     using Base = RadialProfile<Dataset>;
     using Base::settings_;
 
+    polytrope::LinearInterpolator rho_r;
+    polytrope::LinearInterpolator M_r;
+
 public:
     explicit Polytrope(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : Base(std::move(initBlock), polytropeConstants(), std::move(settingsFile), reader)
     {
+        const double r_total      = settings_.at("polytrope::r");
+        const double gravConstant = settings_.at("gravConstant");
+        const double m_total      = settings_.at("polytrope::mTotal");
+
         if (not settings_.contains("relaxationTimescale"))
         {
-            const double r                   = settings_["polytrope::r"];
-            const double mTotal              = settings_["polytrope::mTotal"];
-            const double gravConstant        = settings_["gravConstant"];
-            const double t_relax             = std::sqrt(r * r * r / (gravConstant * mTotal)) / 3.;
+            const double t_relax             = std::sqrt(r_total * r_total * r_total / (gravConstant * m_total)) / 3.;
             settings_["relaxationTimescale"] = t_relax;
         }
+        const double n_polytropic = 1. / (settings_.at("polytropic_index") - 1.);
+
+        double polytropic_const;
+        std::tie(rho_r, M_r, polytropic_const) =
+            polytrope::computePolytropeProfile(n_polytropic, m_total, r_total, gravConstant);
+        settings_["polytropic_const"] = polytropic_const;
     }
 
     cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
                                                  IFileReader* reader) const override
     {
-        const double polytropic_index = settings_.at("polytropic_index");
-        const double n_polytropic     = 1. / (settings_.at("polytropic_index") - 1.);
-        const double m_total          = settings_.at("polytrope::mTotal");
-        const double r_total          = settings_.at("polytrope::r");
-
-        auto [rho_r, M_r, polytropic_const] =
-            polytrope::computePolytropeProfile(n_polytropic, m_total, r_total, settings_.at("gravConstant"));
-        settings_["polytropic_const"] = polytropic_const;
+        const double m_total = settings_.at("polytrope::mTotal");
+        const double r_total = settings_.at("polytrope::r");
 
         if (rank == 0)
         {
-            std::printf("polytropic constant: %lf\tpolytropic exponent: %lf\n", polytropic_const, polytropic_index);
+            std::printf("polytropic constant: %lf\tpolytropic exponent: %lf\n", settings_.at("polytropic_const"),
+                        settings_.at("polytropic_index"));
             std::printf("r_total: %lf\tachieved r: %lf\n", r_total, M_r.y_values.back());
         }
 
         const double rho_old = m_total / (4. / 3. * M_PI * r_total * r_total * r_total);
 
-        auto polytrope_transformation = [M_r, rho_old](auto old_radius)
+        auto polytrope_transformation = [this, rho_old](auto old_radius)
         {
             const auto old_volume    = 4. * M_PI / 3. * old_radius * old_radius * old_radius;
             const auto enclosed_mass = old_volume * rho_old;
