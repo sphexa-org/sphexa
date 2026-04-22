@@ -30,12 +30,8 @@
 
 #pragma once
 
-#include "cstone/primitives/primitives_acc.hpp"
-
 #include "evrard_init.hpp"
-#include "../../../../spack/var/spack/environments/cuda130-ompi/spack-env/view/targets/x86_64-linux/include/nvtx3/nvtx3.hpp"
 #include "cooling/cooler.hpp"
-
 #include "cooling/init_chemistry.h"
 
 namespace sphexa
