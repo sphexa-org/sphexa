@@ -1,46 +1,46 @@
 include:
-  - local: 'ci/cuda12/run_template_sm90.yml'
+  - local: 'ci/cuda13/run_template_sm90.yml'
 
-sph-run-cuda12-sm90-release-1rank:
-  extends: [.sph-run-cuda12-sm90-1rank]
-  needs: ['sph-build-cuda12-sm90-release']
+sph-run-cuda13-sm90-release-1rank:
+  extends: [.sph-run-cuda13-sm90-1rank]
+  needs: ['sph-build-cuda13-sm90-release']
 
-sph-run-cuda12-sm90-release-2ranks:
-  extends: [.sph-run-cuda12-sm90-2ranks]
-  needs: ['sph-build-cuda12-sm90-release']
+sph-run-cuda13-sm90-release-2ranks:
+  extends: [.sph-run-cuda13-sm90-2ranks]
+  needs: ['sph-build-cuda13-sm90-release']
 
-sph-run-cuda12-sm90-release-4ranks:
-  extends: [.sph-run-cuda12-sm90-4ranks]
-  needs: ['sph-build-cuda12-sm90-release']
+sph-run-cuda13-sm90-release-4ranks:
+  extends: [.sph-run-cuda13-sm90-4ranks]
+  needs: ['sph-build-cuda13-sm90-release']
 
-sph-run-cuda12-sm90-release-12ranks:
-  extends: [.sph-run-cuda12-sm90-12ranks]
-  needs: ['sph-build-cuda12-sm90-release']
+sph-run-cuda13-sm90-release-12ranks:
+  extends: [.sph-run-cuda13-sm90-12ranks]
+  needs: ['sph-build-cuda13-sm90-release']
 
-sph-run-cuda12-sm90-release-sphexa-cuda:
-  extends: [.sph-run-cuda12-sm90-sphexa-cuda]
+sph-run-cuda13-sm90-release-sphexa-cuda:
+  extends: [.sph-run-cuda13-sm90-sphexa-cuda]
   needs:
-    - job: sph-build-cuda12-sm90-release
+    - job: sph-build-cuda13-sm90-release
     - job: sph-test-venv-setup
       artifacts: true
 
-sph-run-cuda12-sm90-release-sphexa-cpu:
-  extends: [.sph-run-cuda12-sm90-sphexa-cpu]
+sph-run-cuda13-sm90-release-sphexa-cpu:
+  extends: [.sph-run-cuda13-sm90-sphexa-cpu]
   needs:
-    - job: sph-build-cuda12-sm90-release
+    - job: sph-build-cuda13-sm90-release
     - job: sph-test-venv-setup
       artifacts: true
 
-sph-compare-constants-cuda12-sm90-release-sphexa-cuda:
-  extends: [.sph-compare-constants-cuda12-sm90-sphexa-cuda]
+sph-compare-constants-cuda13-sm90-release-sphexa-cuda:
+  extends: [.sph-compare-constants-cuda13-sm90-sphexa-cuda]
   needs:
-    - job: sph-build-cuda12-sm90-release
+    - job: sph-build-cuda13-sm90-release
     - job: sph-test-venv-setup
       artifacts: true
 
-sph-compare-constants-cuda12-sm90-release-sphexa-cpu:
-  extends: [.sph-compare-constants-cuda12-sm90-sphexa-cpu]
+sph-compare-constants-cuda13-sm90-release-sphexa-cpu:
+  extends: [.sph-compare-constants-cuda13-sm90-sphexa-cpu]
   needs:
-    - job: sph-build-cuda12-sm90-release
+    - job: sph-build-cuda13-sm90-release
     - job: sph-test-venv-setup
       artifacts: true
