@@ -9,7 +9,6 @@
 
 #include <cstdio>
 
-#include "cstone/fields/field_get.hpp"
 #include "io/arg_parser.hpp"
 #include "ipropagator.hpp"
 #include "std_hydro.hpp"

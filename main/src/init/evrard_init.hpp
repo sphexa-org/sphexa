@@ -1,26 +1,10 @@
 /*
- * MIT License
+ * SPH-EXA
  *
- * Copyright (c) 2021 CSCS, ETH Zurich
- *               2021 University of Basel
+ * Copyright (c) 2026 CSCS, ETH Zurich, University of Zurich, University of Basel
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Please, refer to the LICENSE file in the root directory.
+ * SPDX-License-Identifier: MIT License
  */
 
 /*! @file
@@ -36,7 +20,6 @@
 #include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/box.hpp"
 #include "cstone/tree/continuum.hpp"
-#include "sph/eos.hpp"
 
 #include "isim_init.hpp"
 #include "early_sync.hpp"
@@ -127,14 +110,17 @@ std::tuple<KeyType, KeyType> estimateEvrardSfcPartition(size_t cbrtNumPart, cons
 }
 
 template<class Dataset>
-class EvrardGlassSphere : public RadialProfile<Dataset>
+class EvrardGlassSphere : public ISimInitializer<Dataset>
 {
-    using Base = RadialProfile<Dataset>;
+    std::string          glassBlock_;
     mutable InitSettings settings_;
+
+    using T       = Dataset::RealType;
+    using KeyType = Dataset::KeyType;
 
 public:
     explicit EvrardGlassSphere(std::string initBlock, std::string settingsFile, IFileReader* reader)
-        : RadialProfile<Dataset>(std::move(initBlock), reader)
+        : glassBlock_(std::move(initBlock))
     {
         Dataset d;
         settings_ = buildSettings(d, evrardConstants(), settingsFile, reader);
@@ -146,17 +132,15 @@ public:
         simData.hydro.loadOrStoreAttributes(&attributeSetter);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<T> init(int rank, int nRanks, size_t cbrtNumPart, Dataset& simData, IFileReader* reader) const override
     {
-        using T = typename Dataset::RealType;
-
         T r                       = settings_.at("r");
-        auto [globalBox, x, y, z] = Base::createUniformSphere(rank, numRanks, cbrtNumPart, reader, r);
+        auto [globalBox, x, y, z] = createUniformSphere<T, KeyType>(rank, nRanks, cbrtNumPart, reader, r, glassBlock_);
 
-        Base::radialTransformation(x, y, z, [](auto r) { return std::sqrt(r); });
+        radialTransformation(x, y, z, [](auto r) { return std::sqrt(r); });
 
-        const auto numParticlesGlobal = Base::syncAndLoadAttributes(rank, numRanks, simData, globalBox, x, y, z);
+        const auto numParticlesGlobal =
+            syncAndLoadAttributes(rank, nRanks, simData.hydro, simData.comm, globalBox, x, y, z);
 
         settings_["numParticlesGlobal"] = double(numParticlesGlobal);
         initAttributes(simData);

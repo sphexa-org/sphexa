@@ -7,7 +7,6 @@
 #include <map>
 
 #include "cstone/sfc/box.hpp"
-#include "sph/eos.hpp"
 
 #include "isim_init.hpp"
 #include "utils.hpp"
@@ -85,14 +84,17 @@ void estimateSmoothingLengths(auto rhoAtRadius, Dataset& d, double m_part, size_
 }
 
 template<class Dataset>
-class Polytrope : public RadialProfile<Dataset>
+class Polytrope : public ISimInitializer<Dataset>
 {
-    using Base = RadialProfile<Dataset>;
+    std::string          glassBlock_;
     mutable InitSettings settings_;
+
+    using T       = Dataset::RealType;
+    using KeyType = Dataset::KeyType;
 
 public:
     explicit Polytrope(std::string initBlock, std::string settingsFile, IFileReader* reader)
-        : RadialProfile<Dataset>(std::move(initBlock), reader)
+        : glassBlock_(std::move(initBlock))
     {
         Dataset d;
         settings_ = buildSettings(d, polytropeConstants(), settingsFile, reader);
@@ -113,8 +115,7 @@ public:
         simData.hydro.loadOrStoreAttributes(&attributeSetter);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<T> init(int rank, int nRanks, size_t cbrtNumPart, Dataset& simData, IFileReader* reader) const override
     {
         const double polytropic_index = settings_.at("polytropic_index");
         const double n_polytropic     = 1. / (settings_.at("polytropic_index") - 1.);
@@ -131,7 +132,8 @@ public:
             std::printf("r_total: %lf\tachieved r: %lf\n", r_total, M_r.y_values.back());
         }
 
-        auto [globalBox, x, y, z] = Base::createUniformSphere(rank, numRanks, cbrtNumPart, reader, r_total);
+        auto [globalBox, x, y, z] =
+            createUniformSphere<T, KeyType>(rank, nRanks, cbrtNumPart, reader, r_total, glassBlock_);
 
         const double rho_old = m_total / (4. / 3. * M_PI * r_total * r_total * r_total);
 
@@ -143,9 +145,10 @@ public:
             const auto factor        = new_radius / old_radius;
             return factor;
         };
-        Base::radialTransformation(x, y, z, polytrope_transformation);
+        radialTransformation(x, y, z, polytrope_transformation);
 
-        const auto numParticlesGlobal   = Base::syncAndLoadAttributes(rank, numRanks, simData, globalBox, x, y, z);
+        const auto numParticlesGlobal =
+            syncAndLoadAttributes(rank, nRanks, simData.hydro, simData.comm, globalBox, x, y, z);
         settings_["numParticlesGlobal"] = double(numParticlesGlobal);
         initAttributes(simData);
 
