@@ -36,8 +36,7 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
     depends_on("cmake@3.22:", type="build")
 
     depends_on("mpi")
-    depends_on("cuda@13:", when="@0.95: +cuda")
-    #depends_on("cuda@11.2:", when="+cuda")
+    depends_on("cuda@11.2:", when="+cuda")
     depends_on("hip", when="+rocm")
     depends_on("rocthrust", when="+rocm")
     depends_on("hipcub", when="+rocm")
@@ -48,8 +47,8 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
     with when("+gpu_aware_mpi"):
         depends_on("openmpi +cuda", when="+cuda ^[virtuals=mpi] openmpi")
         depends_on("mpich +cuda", when="+cuda ^[virtuals=mpi] mpich")
-        depends_on("mvapich +cuda", when="+cuda ^[virtuals=mpi] mvapich")
-        depends_on("mvapich2 +cuda", when="+cuda ^[virtuals=mpi] mvapich2")
+        # depends_on("mvapich +cuda", when="+cuda ^[virtuals=mpi] mvapich")
+        # depends_on("mvapich2 +cuda", when="+cuda ^[virtuals=mpi] mvapich2")
 
         depends_on("mpich +rocm", when="+rocm ^[virtuals=mpi] mpich")
 
