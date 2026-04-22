@@ -36,7 +36,7 @@ sph-build-cuda12-sm90-debug:
     - 'sed -e "s/ci_fake_version/$CI_COMMIT_SHORT_SHA/" -e "s/ci_sha/$CI_COMMIT_SHA/" -e "s!ci_git!$CI_PROJECT_URL.git!" ../ci/scripts/package.py > env/repo/packages/sphexa/package.py'
     - ln -fs ./env/repo/packages/sphexa/package.py .
     - 'grep specs: ./env/spack.yaml'
-    - cat sphexa+spack/env/spack.yaml
+    - cat env/spack.yaml
     - ./build
     - cd ..
   artifacts:
