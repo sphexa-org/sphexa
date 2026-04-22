@@ -7,7 +7,7 @@ variables:
 
 .sph-run-cuda13-sm90-1rank:
   stage: sphexa_run
-  image: prgenv-gnu/26.3:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     SLURM_TIMELIMIT: '01:00:00'
@@ -48,7 +48,7 @@ variables:
 
 .sph-run-cuda13-sm90-2ranks:
   stage: sphexa_run
-  image: prgenv-gnu/26.3:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -80,7 +80,7 @@ variables:
 
 .sph-run-cuda13-sm90-4ranks:
   stage: sphexa_run
-  image: prgenv-gnu/26.3:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -98,7 +98,7 @@ variables:
 
 .sph-run-cuda13-sm90-12ranks:
   stage: sphexa_run
-  image: prgenv-gnu/26.3:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -118,7 +118,7 @@ variables:
 
 .sph-run-cuda13-sm90-sphexa-cuda:
   stage: sphexa_run
-  image: prgenv-gnu/26.3:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -149,7 +149,7 @@ variables:
 
 .sph-run-cuda13-sm90-sphexa-cpu:
   stage: sphexa_run
-  image: prgenv-gnu/26.3:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -180,7 +180,7 @@ variables:
 
 .sph-compare-constants-cuda13-sm90-sphexa-cuda:
   stage: sphexa_run
-  image: prgenv-gnu/26.3:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -198,7 +198,7 @@ variables:
 
 .sph-compare-constants-cuda13-sm90-sphexa-cpu:
   stage: sphexa_run
-  image: prgenv-gnu/26.3:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'

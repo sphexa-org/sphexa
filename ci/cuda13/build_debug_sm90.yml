@@ -6,7 +6,7 @@ variables:
 
 sph-build-cuda13-sm90-debug:
   stage: sphexa_build
-  image: prgenv-gnu/26.3:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     SLURM_TIMELIMIT: '01:00:00'
