@@ -90,11 +90,6 @@ public:
     explicit Polytrope(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : Base(std::move(initBlock), polytropeConstants(), std::move(settingsFile), reader)
     {
-    }
-
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
-    {
         if (not settings_.contains("relaxationTimescale"))
         {
             const double r                   = settings_["polytrope::r"];
@@ -103,6 +98,11 @@ public:
             const double t_relax             = std::sqrt(r * r * r / (gravConstant * mTotal)) / 3.;
             settings_["relaxationTimescale"] = t_relax;
         }
+    }
+
+    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                 IFileReader* reader) const override
+    {
         const double polytropic_index = settings_.at("polytropic_index");
         const double n_polytropic     = 1. / (settings_.at("polytropic_index") - 1.);
         const double m_total          = settings_.at("polytrope::mTotal");
