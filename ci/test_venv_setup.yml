@@ -1,6 +1,6 @@
 sph-test-venv-setup:
   stage: sphexa_run
-  image: image: prgenv-gnu/26.3:v1
+  image: prgenv-gnu/26.3:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
