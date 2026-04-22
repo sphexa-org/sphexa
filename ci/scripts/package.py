@@ -47,13 +47,12 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
     with when("+gpu_aware_mpi"):
         depends_on("openmpi +cuda", when="+cuda ^[virtuals=mpi] openmpi")
         depends_on("mpich +cuda", when="+cuda ^[virtuals=mpi] mpich")
-        # depends_on("mvapich +cuda", when="+cuda ^[virtuals=mpi] mvapich")
-        # depends_on("mvapich2 +cuda", when="+cuda ^[virtuals=mpi] mvapich2")
+        depends_on("mvapich +cuda", when="+cuda ^[virtuals=mpi] mvapich")
+        depends_on("mvapich2 +cuda", when="+cuda ^[virtuals=mpi] mvapich2")
 
         depends_on("mpich +rocm", when="+rocm ^[virtuals=mpi] mpich")
 
     conflicts("%gcc@:11", when="@0.95:")
-    #conflicts("%gcc@:10")
     conflicts("cuda_arch=none", when="+cuda", msg="CUDA architecture is required")
     conflicts("amdgpu_target=none", when="+rocm", msg="HIP architecture is required")
     conflicts("+cuda", when="+rocm", msg="CUDA and HIP cannot both be enabled")
