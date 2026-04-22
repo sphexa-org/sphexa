@@ -18,19 +18,14 @@
 #include <map>
 
 #include "cstone/primitives/primitives_acc.hpp"
-#include "cstone/sfc/box.hpp"
 #include "cstone/tree/continuum.hpp"
 
-#include "isim_init.hpp"
-#include "early_sync.hpp"
-#include "grid.hpp"
-#include "utils.hpp"
 #include "radial_profile.hpp"
 
 namespace sphexa
 {
 
-std::map<std::string, double> evrardConstants()
+InitSettings evrardConstants()
 {
     return {{"gravConstant", 1.}, {"r", 1.},          {"mTotal", 1.}, {"gamma", 5. / 3.}, {"u0", 0.05},
             {"minDt", 1e-4},      {"minDt_m1", 1e-4}, {"mui", 10},    {"ng0", 100},       {"ngmax", 150}};
@@ -110,49 +105,25 @@ std::tuple<KeyType, KeyType> estimateEvrardSfcPartition(size_t cbrtNumPart, cons
 }
 
 template<class Dataset>
-class EvrardGlassSphere : public ISimInitializer<Dataset>
+class EvrardGlassSphere : public RadialProfile<Dataset>
 {
-    std::string          glassBlock_;
-    mutable InitSettings settings_;
-
-    using T       = Dataset::RealType;
-    using KeyType = Dataset::KeyType;
+    using Base = RadialProfile<Dataset>;
+    using Base::settings_;
 
 public:
     explicit EvrardGlassSphere(std::string initBlock, std::string settingsFile, IFileReader* reader)
-        : glassBlock_(std::move(initBlock))
+        : Base(std::move(initBlock), evrardConstants(), std::move(settingsFile), reader)
     {
-        Dataset d;
-        settings_ = buildSettings(d, evrardConstants(), settingsFile, reader);
     }
 
-    void initAttributes(Dataset& simData) const
+    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                 IFileReader* reader) const override
     {
-        BuiltinWriter attributeSetter(settings_);
-        simData.hydro.loadOrStoreAttributes(&attributeSetter);
-    }
-
-    cstone::Box<T> init(int rank, int nRanks, size_t cbrtNumPart, Dataset& simData, IFileReader* reader) const override
-    {
-        T r                       = settings_.at("r");
-        auto [globalBox, x, y, z] = createUniformSphere<T, KeyType>(rank, nRanks, cbrtNumPart, reader, r, glassBlock_);
-
-        radialTransformation(x, y, z, [](auto r) { return std::sqrt(r); });
-
-        const auto numParticlesGlobal =
-            syncAndLoadAttributes(rank, nRanks, simData.hydro, simData.comm, globalBox, x, y, z);
-
-        settings_["numParticlesGlobal"] = double(numParticlesGlobal);
-        initAttributes(simData);
-
+        auto radialTransform = [](auto r) { return std::sqrt(r); };
+        auto globalBox = Base::init(rank, numRanks, cbrtNumPart, simData, reader, settings_.at("r"), radialTransform);
         initEvrardFields(simData.hydro, settings_);
-
         return globalBox;
     }
-
-    void resetConstants(InitSettings newSettings) { settings_ = std::move(newSettings); }
-
-    [[nodiscard]] const InitSettings& constants() const override { return settings_; }
 };
 
 } // namespace sphexa

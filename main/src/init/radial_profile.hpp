@@ -21,6 +21,9 @@
 #include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
 #include "grid.hpp"
+#include "utils.hpp"
+#include "early_sync.hpp"
+#include "isim_init.hpp"
 
 namespace sphexa
 {
@@ -87,5 +90,56 @@ void radialTransformation(Vector& x, Vector& y, Vector& z, F&& f)
         z[i] *= contraction;
     }
 }
+
+template<class Dataset>
+class RadialProfile : public ISimInitializer<Dataset>
+{
+    using T       = Dataset::RealType;
+    using KeyType = Dataset::KeyType;
+
+    std::string glassBlock_;
+
+protected:
+    mutable InitSettings settings_;
+
+public:
+    explicit RadialProfile(std::string initBlock, const InitSettings& testCaseSettings, std::string settingsFile,
+                           IFileReader* reader)
+        : glassBlock_(std::move(initBlock))
+    {
+        Dataset d;
+        settings_ = buildSettings(d, testCaseSettings, settingsFile, reader);
+    }
+
+    void initAttributes(Dataset& simData) const
+    {
+        BuiltinWriter attributeSetter(settings_);
+        simData.hydro.loadOrStoreAttributes(&attributeSetter);
+    }
+
+    //! @brief Create local x,y,z particles. Note: radialTransform is NOT the radial profile, profile and transform
+    //!        are related to each other via a differential equation, e.g. profile=1/r -> transform=r->sqrt(r)
+    template<class F>
+    cstone::Box<T> init(int rank, int nRanks, size_t cbrtNumPart, Dataset& simData, IFileReader* reader, T radius,
+                        F&& radialTransform) const
+    {
+        auto [globalBox, x, y, z] =
+            createUniformSphere<T, KeyType>(rank, nRanks, cbrtNumPart, reader, radius, glassBlock_);
+
+        radialTransformation(x, y, z, radialTransform);
+
+        const auto numParticlesGlobal =
+            syncAndLoadAttributes(rank, nRanks, simData.hydro, simData.comm, globalBox, x, y, z);
+
+        settings_["numParticlesGlobal"] = double(numParticlesGlobal);
+        initAttributes(simData);
+
+        return globalBox;
+    }
+
+    void resetConstants(InitSettings newSettings) { settings_ = std::move(newSettings); }
+
+    [[nodiscard]] const InitSettings& constants() const override { return settings_; }
+};
 
 } // namespace sphexa

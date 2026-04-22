@@ -6,10 +6,8 @@
 
 #include <map>
 
-#include "cstone/sfc/box.hpp"
+#include "sph/eos.hpp"
 
-#include "isim_init.hpp"
-#include "utils.hpp"
 #include "polytrope/bisect.hpp"
 #include "polytrope/polytrope_profile.hpp"
 #include "radial_profile.hpp"
@@ -17,18 +15,17 @@
 namespace sphexa
 {
 
-std::map<std::string, double> polytropeConstants()
+InitSettings polytropeConstants()
 {
-    std::map<std::string, double> ret{{"gravConstant", 1.0},
-                                      {"polytrope::r", 4.72108762739756E-01},
-                                      {"polytrope::mTotal", 1e-6},
-                                      {"polytropic_index", 5. / 3.},
-                                      {"minDt", 1e-4},
-                                      {"minDt_m1", 1e-4},
-                                      {"ng0", 100},
-                                      {"ngmax", 150},
-                                      {"eosChoice", sph::EosType::polytropic}};
-    return ret;
+    return {{"gravConstant", 1.0},
+            {"polytrope::r", 4.72108762739756E-01},
+            {"polytrope::mTotal", 1e-6},
+            {"polytropic_index", 5. / 3.},
+            {"minDt", 1e-4},
+            {"minDt_m1", 1e-4},
+            {"ng0", 100},
+            {"ngmax", 150},
+            {"eosChoice", sph::EosType::polytropic}};
 }
 
 template<class Dataset>
@@ -84,21 +81,20 @@ void estimateSmoothingLengths(auto rhoAtRadius, Dataset& d, double m_part, size_
 }
 
 template<class Dataset>
-class Polytrope : public ISimInitializer<Dataset>
+class Polytrope : public RadialProfile<Dataset>
 {
-    std::string          glassBlock_;
-    mutable InitSettings settings_;
-
-    using T       = Dataset::RealType;
-    using KeyType = Dataset::KeyType;
+    using Base = RadialProfile<Dataset>;
+    using Base::settings_;
 
 public:
     explicit Polytrope(std::string initBlock, std::string settingsFile, IFileReader* reader)
-        : glassBlock_(std::move(initBlock))
+        : Base(std::move(initBlock), polytropeConstants(), std::move(settingsFile), reader)
     {
-        Dataset d;
-        settings_ = buildSettings(d, polytropeConstants(), settingsFile, reader);
+    }
 
+    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                 IFileReader* reader) const override
+    {
         if (not settings_.contains("relaxationTimescale"))
         {
             const double r                   = settings_["polytrope::r"];
@@ -107,16 +103,6 @@ public:
             const double t_relax             = std::sqrt(r * r * r / (gravConstant * mTotal)) / 3.;
             settings_["relaxationTimescale"] = t_relax;
         }
-    }
-
-    void initAttributes(Dataset& simData) const
-    {
-        BuiltinWriter attributeSetter(settings_);
-        simData.hydro.loadOrStoreAttributes(&attributeSetter);
-    }
-
-    cstone::Box<T> init(int rank, int nRanks, size_t cbrtNumPart, Dataset& simData, IFileReader* reader) const override
-    {
         const double polytropic_index = settings_.at("polytropic_index");
         const double n_polytropic     = 1. / (settings_.at("polytropic_index") - 1.);
         const double m_total          = settings_.at("polytrope::mTotal");
@@ -132,12 +118,9 @@ public:
             std::printf("r_total: %lf\tachieved r: %lf\n", r_total, M_r.y_values.back());
         }
 
-        auto [globalBox, x, y, z] =
-            createUniformSphere<T, KeyType>(rank, nRanks, cbrtNumPart, reader, r_total, glassBlock_);
-
         const double rho_old = m_total / (4. / 3. * M_PI * r_total * r_total * r_total);
 
-        auto polytrope_transformation = [&](auto old_radius)
+        auto polytrope_transformation = [M_r, rho_old](auto old_radius)
         {
             const auto old_volume    = 4. * M_PI / 3. * old_radius * old_radius * old_radius;
             const auto enclosed_mass = old_volume * rho_old;
@@ -145,25 +128,14 @@ public:
             const auto factor        = new_radius / old_radius;
             return factor;
         };
-        radialTransformation(x, y, z, polytrope_transformation);
 
-        const auto numParticlesGlobal =
-            syncAndLoadAttributes(rank, nRanks, simData.hydro, simData.comm, globalBox, x, y, z);
-        settings_["numParticlesGlobal"] = double(numParticlesGlobal);
-        initAttributes(simData);
+        auto globalBox = Base::init(rank, numRanks, cbrtNumPart, simData, reader, r_total, polytrope_transformation);
 
-        auto&        d      = simData.hydro;
-        const double m_part = m_total / d.numParticlesGlobal;
-        const size_t ng0    = settings_.at("ng0");
-
-        estimateSmoothingLengths(rho_r, d, m_part, ng0, r_total);
-        initPolytropeFields(d, settings_, m_part);
+        const double m_part = m_total / settings_.at("numParticlesGlobal");
+        estimateSmoothingLengths(rho_r, simData.hydro, m_part, settings_.at("ng0"), r_total);
+        initPolytropeFields(simData.hydro, settings_, m_part);
 
         return globalBox;
     }
-
-    void resetConstants(InitSettings newSettings) { settings_ = std::move(newSettings); }
-
-    [[nodiscard]] const InitSettings& constants() const override { return settings_; }
 };
 } // namespace sphexa
