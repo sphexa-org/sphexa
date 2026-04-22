@@ -34,8 +34,10 @@ sph-build-cuda12-sm90-debug:
     - cd sphexa+spack
     - mkdir -p ./env/repo/packages/sphexa
     - 'sed -e "s/ci_fake_version/$CI_COMMIT_SHORT_SHA/" -e "s/ci_sha/$CI_COMMIT_SHA/" -e "s!ci_git!$CI_PROJECT_URL.git!" ../ci/scripts/package.py > env/repo/packages/sphexa/package.py'
+    # match cray-mpich version in uenv:
+    - 'sed -i "s-8.1.32-9.1.0-" ./config/system/packages.yaml'
     - ln -fs ./env/repo/packages/sphexa/package.py .
-    - 'grep specs: ./env/spack.yaml'
+    - cat ./env/spack.yaml
     - ./build
     - cd ..
   artifacts:
