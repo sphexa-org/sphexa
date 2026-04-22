@@ -6,7 +6,7 @@ variables:
 
 sph-build-cuda12-sm90-debug:
   stage: sphexa_build
-  image: prgenv-gnu/26.3:v1
+  image: prgenv-gnu/25.11:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
     SLURM_TIMELIMIT: '01:00:00'
@@ -29,30 +29,13 @@ sph-build-cuda12-sm90-debug:
     - 'export SPACK_SYSTEM_CONFIG_PATH=$UENV_SPACK_CONFIG_PATH'
     - echo "SPACK_SYSTEM_CONFIG_PATH=$SPACK_SYSTEM_CONFIG_PATH"
     - pwd
-
-    - export SPACK_JG=$PWD/spack_repo/daint
-    - mkdir -p $SPACK_JG/packages
-    - cat <<EOF > $SPACK_JG/repo.yaml
-    - echo "repo:" > $SPACK_JG/repo.yaml
-    - echo "  namespace: jg" >> $SPACK_JG/repo.yaml
-    - echo "  api: v2.2" >> $SPACK_JG/repo.yaml
-    - spack repo add $SPACK_JG
-    - mkdir -p $SPACK_JG/packages/sphexa
-    #
-    - 'sed -e "s/ci_fake_version/$CI_COMMIT_SHORT_SHA/" -e "s/ci_sha/$CI_COMMIT_SHA/" -e "s!ci_git!$CI_PROJECT_URL.git!" ../ci/scripts/package.py > $SPACK_JG/packages/sphexa/package.py'
-
-    - cp ~/sphexa.git/ci/scripts/package.py $SPACK_JG/spack_repo/jg/packages/sphexa/
-    vim $SPACK_JG/spack_repo/jg/packages/sphexa/package.py # comment out mvapich
-
-
-    - 'uenv-spack --uarch=gh200 --specs="sphexa@$CI_COMMIT_SHORT_SHA +cuda +hdf5 cuda_arch=90 build_type=Debug" --name=sphexa sphexa+spack'
+    - 'uenv-spack --uarch=gh200 --specs="sphexa@$CI_COMMIT_SHORT_SHA +disks +cuda +grackle cuda_arch=90 build_type=Debug" --name=sphexa sphexa+spack'
   script:
     - cd sphexa+spack
-#    - mkdir -p ./env/repo/packages/sphexa
-#    - 'sed -e "s/ci_fake_version/$CI_COMMIT_SHORT_SHA/" -e "s/ci_sha/$CI_COMMIT_SHA/" -e "s!ci_git!$CI_PROJECT_URL.git!" ../ci/scripts/package.py > env/repo/packages/sphexa/package.py'
-#    - ln -fs ./env/repo/packages/sphexa/package.py .
-#    - 'grep specs: ./env/spack.yaml'
-#    - cat env/spack.yaml
+    - mkdir -p ./env/repo/packages/sphexa
+    - 'sed -e "s/ci_fake_version/$CI_COMMIT_SHORT_SHA/" -e "s/ci_sha/$CI_COMMIT_SHA/" -e "s!ci_git!$CI_PROJECT_URL.git!" ../ci/scripts/package.py > env/repo/packages/sphexa/package.py'
+    - ln -fs ./env/repo/packages/sphexa/package.py .
+    - 'grep specs: ./env/spack.yaml'
     - ./build
     - cd ..
   artifacts:
