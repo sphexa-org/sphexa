@@ -137,8 +137,6 @@ public:
         return globalBox;
     }
 
-    void resetConstants(InitSettings newSettings) { settings_ = std::move(newSettings); }
-
     [[nodiscard]] const InitSettings& constants() const override { return settings_; }
 };
 
