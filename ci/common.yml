@@ -4,6 +4,3 @@ include:
 stages:
   - sphexa_build
   - sphexa_run
-
-variables:
-  MYUENV: prgenv-gnu/26.3:v1

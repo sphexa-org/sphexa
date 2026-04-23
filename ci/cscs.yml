@@ -1,3 +1,6 @@
+variables:
+  MYUENV: prgenv-gnu/26.3:v1
+
 include:
   # NVIDIA/GH200:
   - local: 'ci/test_venv_setup.yml'
