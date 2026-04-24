@@ -38,7 +38,7 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
     depends_on("cxx", type="build")
 
     depends_on("mpi")
-    depends_on("cuda@13:", when="@0.95: +cuda")
+    depends_on("cuda@12:", when="@0.95: +cuda")
     depends_on("hip", when="+rocm")
     depends_on("rocthrust", when="+rocm")
     depends_on("hipcub", when="+rocm")
