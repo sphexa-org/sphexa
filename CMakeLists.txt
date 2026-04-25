@@ -109,6 +109,7 @@ if (SPH_EXA_WITH_GRACKLE)
 endif()
 
 option(SPH_EXA_WITH_DISKS "Enable disk physics and propagator" OFF)
+option(SPH_EXA_WITH_TDE_INIT "Enable TDE initializers" OFF)
 
 add_subdirectory(domain)
 add_subdirectory(ryoanji)
