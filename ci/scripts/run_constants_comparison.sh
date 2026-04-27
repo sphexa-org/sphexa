@@ -35,7 +35,7 @@ case "$(basename "$binary_path")" in
     ;;
 esac
 rank_id="${SLURM_PROCID:-0}"
-venv_python="constant_comparison_venv/bin/python"
+venv_python="testing_venv/bin/python"
 
 if [ "$rank_id" -eq 0 ]; then
   wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5

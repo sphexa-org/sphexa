@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-venv_dir="${1:-constant_comparison_venv}"
+venv_dir="${1:-testing_venv}"
 
 # Keep Python import resolution predictable inside uenv jobs.
 unset PYTHONPATH || true
