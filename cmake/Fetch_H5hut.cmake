@@ -37,12 +37,12 @@ if (H5HUT_VERSION_GIT)
   # the user has asked for a particular version build from source
   set(fetch_string
     GIT_TAG ${H5HUT_VERSION_GIT}
-    GIT_REPOSITORY https://github.com/eth-cscs/h5hut)
+    GIT_REPOSITORY https://github.com/H5hut/H5hut)
 else()
   # the user has asked for a version - use find or checkout if find fails
   set(fetch_string
     GIT_TAG ${H5hut_VERSION}
-    GIT_REPOSITORY https://github.com/eth-cscs/h5hut
+    GIT_REPOSITORY https://github.com/H5hut/H5hut
     FIND_PACKAGE_ARGS ${H5hut_VERSION} COMPONENTS ${IPPL_PLATFORMS}
   )
 endif()

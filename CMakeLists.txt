@@ -88,7 +88,7 @@ if (SPH_EXA_WITH_H5HUT)
     set(HDF5_ENABLE_PARALLEL ON)
     find_package(HDF5)
     # until merged, we need the cmake branch of H5hut from ethz repo
-    set(H5hut_VERSION git.cmake)
+    set(H5hut_VERSION git.53666583861f944b1284eb7324337dfe025242d0)
     set(H5hut_WITH_MPI ON)
     include(Fetch_H5hut)
     if (HDF5_FOUND AND H5hut_FOUND)
@@ -113,6 +113,7 @@ if (SPH_EXA_WITH_GRACKLE)
 endif()
 
 option(SPH_EXA_WITH_DISKS "Enable disk physics and propagator" OFF)
+option(SPH_EXA_WITH_TDE_INIT "Enable TDE initializers" OFF)
 
 add_subdirectory(domain)
 add_subdirectory(ryoanji)
