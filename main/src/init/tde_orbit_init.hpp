@@ -78,6 +78,8 @@ void printMap(const auto& map)
 template<typename Dataset>
 class TDEOrbitInit : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     InitSettings settings_;
     std::string  h5_fname;
     int          initStep = -1;
@@ -153,6 +155,8 @@ public:
         std::printf("Placed orbiter: \n");
         std::printf("x: %lf, %lf, %lf\n", X[0], X[1], X[2]);
         std::printf("v: %lf, %lf, %lf\n", V[0], V[1], V[2]);
+
+        Base::runTagging(reader, rank == 0, simData.hydro);
 
         return box;
     }
