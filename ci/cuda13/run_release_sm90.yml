@@ -33,7 +33,11 @@ include:
 
 sph-run-tag-cuda13-sm90-release-sphexa-cuda:
   stage: sphexa_run
-  needs: ['sph-build-cuda13-sm90-release']
+  needs:
+  # ['sph-build-cuda13-sm90-release']
+    - job: sph-build-cuda13-sm90-release'
+    - job: sph-test-venv-setup
+      artifacts: true
   image: prgenv-gnu/26.3:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
@@ -61,7 +65,10 @@ sph-run-tag-cuda13-sm90-release-sphexa-cuda:
 
 sph-run-tag-restart-cuda13-sm90-release-sphexa-cuda:
   stage: sphexa_run
-  needs: ['sph-build-cuda13-sm90-release']
+  needs:
+    - job: sph-build-cuda13-sm90-release'
+    - job: sph-test-venv-setup
+      artifacts: true
   image: prgenv-gnu/26.3:v1
   extends: [.uenv-runner-daint-gh200]
   variables:
