@@ -139,7 +139,7 @@ variables:
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
-        venv_python="constant_comparison_venv/bin/python"
+        venv_python="testing_venv/bin/python"
         "$venv_python" ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt "7,8"
         if [ $? -ne 0 ]; then
           exit 1
@@ -170,7 +170,7 @@ variables:
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
         awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
-        venv_python="constant_comparison_venv/bin/python"
+        venv_python="testing_venv/bin/python"
         "$venv_python" ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt "7,8"
         if [ $? -ne 0 ]; then
           exit 1
@@ -233,7 +233,7 @@ variables:
     - $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init evrard:ci/reference/tag_list_and_multiple_spheres.h5 --G 1.0 -n 100 -s 4 -w 2
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
-        venv_python="constant_comparison_venv/bin/python"
+        venv_python="testing_venv/bin/python"
         "$venv_python" ci/scripts/check_tagging.py ci/reference/tag_list_and_multiple_spheres.h5 dump_evrard.h5 list_and_spheres_subset.h5
         if [ $? -ne 0 ]; then
           exit 1
@@ -260,7 +260,7 @@ variables:
     - $APP_INSTALL_DIR/sphexa --glass ./50c.h5 --init evrard:ci/reference/tag_list_and_multiple_spheres.h5 --G 1.0 -n 100 -s 4 -w 2
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
-        venv_python="constant_comparison_venv/bin/python"
+        venv_python="testing_venv/bin/python"
         "$venv_python" ci/scripts/check_tagging.py ci/reference/tag_list_and_multiple_spheres.h5 dump_evrard.h5 list_and_spheres_subset.h5
         if [ $? -ne 0 ]; then
           exit 1
@@ -287,7 +287,7 @@ variables:
     - $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init sedov --G 1.0 -n 100 -s 4 -w 2
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
-        venv_python="constant_comparison_venv/bin/python"
+        venv_python="testing_venv/bin/python"
         "$venv_python" scripts/set_parms.py dump_sedov.h5 --add \
           f_subset x,y,z,id \
           id_selection_spheres 0.,0.,0.,0.3 \
@@ -324,7 +324,7 @@ variables:
     - $APP_INSTALL_DIR/sphexa --glass ./50c.h5 --init sedov --G 1.0 -n 100 -s 4 -w 2
     - |
       if [ "$SLURM_PROCID" -eq 0 ]; then
-        venv_python="constant_comparison_venv/bin/python"
+        venv_python="testing_venv/bin/python"
         "$venv_python" scripts/set_parms.py dump_sedov.h5 --add \
           f_subset x,y,z,id \
           id_selection_spheres 0.,0.,0.,0.3 \
