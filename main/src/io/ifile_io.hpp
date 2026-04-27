@@ -57,7 +57,7 @@ public:
 
     virtual ~IFileWriter() = default;
 
-    virtual void    addStep(size_t firstIndex, size_t lastIndex, std::string path) = 0;
+    virtual void    addStep(size_t firstIndex, size_t lastIndex, std::string path, bool settingsWriting = false) = 0;
     virtual int64_t stepAttributeSize(const std::string& /*key*/) { return 0; }
     //! @brief Writes a step attribute.
     //! If called from multiple ranks, the value of rank 0 will be written. The call is collective in that
