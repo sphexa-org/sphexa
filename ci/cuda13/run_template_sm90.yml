@@ -205,6 +205,7 @@ variables:
   variables:
     WITH_UENV_VIEW: 'default'
     # SLURM_PARTITION: 'debug'
+    SLURM_TIMELIMIT: '00:30:00'
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 4
     SLURM_CPUS_PER_TASK: 71
