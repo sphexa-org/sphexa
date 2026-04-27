@@ -49,12 +49,21 @@ PropLib<DomainType, ParticleDataType>::makeHydroProp(std::ostream& output, size_
 }
 
 #ifdef SPH_EXA_HAVE_DISKS
+
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
 PropLib<DomainType, ParticleDataType>::makeDiskProp(std::ostream& output, size_t rank, const InitSettings& settings)
 {
     return std::make_unique<DiskProp<DomainType, ParticleDataType>>(output, rank, settings);
 }
+
+template<class DomainType, class ParticleDataType>
+std::unique_ptr<Propagator<DomainType, ParticleDataType>>
+PropLib<DomainType, ParticleDataType>::makeRelaxProp(std::ostream& output, size_t rank, const InitSettings& settings)
+{
+    return std::make_unique<HydroPropRelax<DomainType, ParticleDataType>>(output, rank, settings);
+}
+
 #endif
 
 #ifdef USE_CUDA

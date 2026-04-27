@@ -1,16 +1,27 @@
 add_library(sim_init sim_init.cpp)
 target_include_directories(sim_init PRIVATE ${PROJECT_SOURCE_DIR}/main/src ${COOLING_DIR} ${CSTONE_DIR} ${SPH_DIR}
-        ${MPI_CXX_INCLUDE_PATH})
+        ${MPI_CXX_INCLUDE_PATH} ${DISK_DIR})
 target_link_libraries(sim_init PRIVATE ${MPI_CXX_LIBRARIES} io OpenMP::OpenMP_CXX)
+
+function(enableTDEInit exename)
+    if (SPH_EXA_WITH_TDE_INIT)
+        target_include_directories(${exename} PRIVATE ${POLYTROPE_DIR})
+        target_compile_definitions(${exename} PRIVATE SPH_EXA_HAVE_TDE_INIT)
+        target_link_libraries(${exename} PRIVATE polytrope)
+    endif ()
+endfunction()
+
+enableTDEInit(sim_init)
 enableGrackle(sim_init)
 
 if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     add_library(sim_init_gpu sim_init.cpp)
     target_compile_definitions(sim_init_gpu PRIVATE USE_CUDA)
     target_include_directories(sim_init_gpu PRIVATE ${PROJECT_SOURCE_DIR}/main/src ${COOLING_DIR} ${CSTONE_DIR}
-            ${SPH_DIR} ${MPI_CXX_INCLUDE_PATH})
+            ${SPH_DIR} ${MPI_CXX_INCLUDE_PATH} ${DISK_DIR})
     target_link_libraries(sim_init_gpu PRIVATE ${MPI_CXX_LIBRARIES} io OpenMP::OpenMP_CXX)
     enableGrackle(sim_init_gpu)
+    enableTDEInit(sim_init_gpu)
 endif ()
 
 if (CMAKE_CUDA_COMPILER)

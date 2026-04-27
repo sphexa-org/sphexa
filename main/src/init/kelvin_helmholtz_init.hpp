@@ -33,12 +33,11 @@
 
 #include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/box.hpp"
-#include "cstone/sfc/sfc.hpp"
-#include "cstone/primitives/gather.hpp"
 
-#include "isim_init.hpp"
 #include "grid.hpp"
 #include "utils.hpp"
+#include "early_sync.hpp"
+#include "isim_init.hpp"
 
 namespace sphexa
 {
