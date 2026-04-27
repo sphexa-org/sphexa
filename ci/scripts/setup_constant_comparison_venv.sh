@@ -28,8 +28,10 @@ fi
 # shellcheck source=/dev/null
 source "$venv_dir/bin/activate"
 
-echo "Ensuring numpy is installed in '$venv_dir'"
+echo "Ensuring numpy and h5py are installed in '$venv_dir'"
 python -m pip install --quiet numpy
 python -c 'import numpy' >/dev/null
+python -m pip install --quiet h5py
+python -c 'import h5py' >/dev/null
 
 deactivate
