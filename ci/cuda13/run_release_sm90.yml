@@ -1,46 +1,112 @@
 include:
   - local: 'ci/cuda13/run_template_sm90.yml'
 
-sph-run-cuda13-sm90-release-1rank:
-  extends: [.sph-run-cuda13-sm90-1rank]
+# sph-run-cuda13-sm90-release-1rank:
+#   extends: [.sph-run-cuda13-sm90-1rank]
+#   needs: ['sph-build-cuda13-sm90-release']
+
+# sph-run-cuda13-sm90-release-2ranks:
+#   extends: [.sph-run-cuda13-sm90-2ranks]
+#   needs: ['sph-build-cuda13-sm90-release']
+
+# sph-run-cuda13-sm90-release-4ranks:
+#   extends: [.sph-run-cuda13-sm90-4ranks]
+#   needs: ['sph-build-cuda13-sm90-release']
+
+# sph-run-cuda13-sm90-release-12ranks:
+#   extends: [.sph-run-cuda13-sm90-12ranks]
+#   needs: ['sph-build-cuda13-sm90-release']
+
+# sph-run-cuda13-sm90-release-sphexa-cuda:
+#   extends: [.sph-run-cuda13-sm90-sphexa-cuda]
+#   needs:
+#     - job: sph-build-cuda13-sm90-release
+#     - job: sph-test-venv-setup
+#       artifacts: true
+
+# sph-run-cuda13-sm90-release-sphexa-cpu:
+#   extends: [.sph-run-cuda13-sm90-sphexa-cpu]
+#   needs:
+#     - job: sph-build-cuda13-sm90-release
+#     - job: sph-test-venv-setup
+#       artifacts: true
+
+sph-run-tag-cuda13-sm90-release-sphexa-cuda:
+  stage: sphexa_run
   needs: ['sph-build-cuda13-sm90-release']
+  image: prgenv-gnu/25.11:v1
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    WITH_UENV_VIEW: 'default'
+    # SLURM_PARTITION: 'debug'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+  before_script:
+    - pwd
+    - date
+    - export OMP_NUM_THREADS=64
+  script:
+    - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
+    - $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init evrard:ci/reference/tag_list_and_multiple_spheres.h5 --G 1.0 -n 100 -s 4 -w 2
+    - |
+      if [ "$SLURM_PROCID" -eq 0 ]; then
+        venv_python="constant_comparison_venv/bin/python"
+        "$venv_python" ci/scripts/check_tagging.py ci/reference/tag_list_and_multiple_spheres.h5 dump_evrard.h5 list_and_spheres_subset.h5
+        if [ $? -ne 0 ]; then
+          exit 1
+        fi
+      fi
+    - date
 
-sph-run-cuda13-sm90-release-2ranks:
-  extends: [.sph-run-cuda13-sm90-2ranks]
+sph-run-tag-restart-cuda13-sm90-release-sphexa-cuda:
+  stage: sphexa_run
   needs: ['sph-build-cuda13-sm90-release']
+  image: prgenv-gnu/25.11:v1
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    WITH_UENV_VIEW: 'default'
+    # SLURM_PARTITION: 'debug'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+  before_script:
+    - pwd
+    - date
+    - export OMP_NUM_THREADS=64
+  script:
+    - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
+    - $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init sedov --G 1.0 -n 100 -s 4 -w 2
+    - |
+      if [ "$SLURM_PROCID" -eq 0 ]; then
+        venv_python="constant_comparison_venv/bin/python"
+        "$venv_python" scripts/set_parms.py dump_sedov.h5 --add \
+          f_subset x,y,z,id \
+          id_selection_spheres 0.,0.,0.,0.3 \
+          id_selection_spheres_group_ids 1 \
+          o_subset sphere_subset \
+          wextra_subset 3,4,8
+      fi
+    - $APP_INSTALL_DIR/sphexa-cuda --init dump_sedov.h5:0 -s 10 --wextra 3
+    - |
+      if [ "$SLURM_PROCID" -eq 0 ]; then
+        "$venv_python" ci/scripts/check_tagging.py dump_sedov.h5 dump_dump_sedov.h5.h5 sphere_subset.h5
+        if [ $? -ne 0 ]; then
+          exit 1
+        fi
+      fi
+    - date
 
-sph-run-cuda13-sm90-release-4ranks:
-  extends: [.sph-run-cuda13-sm90-4ranks]
-  needs: ['sph-build-cuda13-sm90-release']
+# sph-compare-constants-cuda13-sm90-release-sphexa-cuda:
+#   extends: [.sph-compare-constants-cuda13-sm90-sphexa-cuda]
+#   needs:
+#     - job: sph-build-cuda13-sm90-release
+#     - job: sph-test-venv-setup
+#       artifacts: true
 
-sph-run-cuda13-sm90-release-12ranks:
-  extends: [.sph-run-cuda13-sm90-12ranks]
-  needs: ['sph-build-cuda13-sm90-release']
-
-sph-run-cuda13-sm90-release-sphexa-cuda:
-  extends: [.sph-run-cuda13-sm90-sphexa-cuda]
-  needs:
-    - job: sph-build-cuda13-sm90-release
-    - job: sph-test-venv-setup
-      artifacts: true
-
-sph-run-cuda13-sm90-release-sphexa-cpu:
-  extends: [.sph-run-cuda13-sm90-sphexa-cpu]
-  needs:
-    - job: sph-build-cuda13-sm90-release
-    - job: sph-test-venv-setup
-      artifacts: true
-
-sph-compare-constants-cuda13-sm90-release-sphexa-cuda:
-  extends: [.sph-compare-constants-cuda13-sm90-sphexa-cuda]
-  needs:
-    - job: sph-build-cuda13-sm90-release
-    - job: sph-test-venv-setup
-      artifacts: true
-
-sph-compare-constants-cuda13-sm90-release-sphexa-cpu:
-  extends: [.sph-compare-constants-cuda13-sm90-sphexa-cpu]
-  needs:
-    - job: sph-build-cuda13-sm90-release
-    - job: sph-test-venv-setup
-      artifacts: true
+# sph-compare-constants-cuda13-sm90-release-sphexa-cpu:
+#   extends: [.sph-compare-constants-cuda13-sm90-sphexa-cpu]
+#   needs:
+#     - job: sph-build-cuda13-sm90-release
+#     - job: sph-test-venv-setup
+#       artifacts: true
