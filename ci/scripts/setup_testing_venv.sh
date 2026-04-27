@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-venv_dir="${1:-constant_comparison_venv}"
+venv_dir="${1:-testing_venv}"
 
 # Keep Python import resolution predictable inside uenv jobs.
 unset PYTHONPATH || true
@@ -28,8 +28,10 @@ fi
 # shellcheck source=/dev/null
 source "$venv_dir/bin/activate"
 
-echo "Ensuring numpy is installed in '$venv_dir'"
+echo "Ensuring numpy and h5py are installed in '$venv_dir'"
 python -m pip install --quiet numpy
 python -c 'import numpy' >/dev/null
+python -m pip install --quiet h5py
+python -c 'import h5py' >/dev/null
 
 deactivate

@@ -140,6 +140,8 @@ public:
         estimateSmoothingLengths(rho_r, simData.hydro, m_part, settings_.at("ng0"), r_total);
         initPolytropeFields(simData.hydro, settings_, m_part);
 
+        Base::runTagging(reader, rank == 0, simData.hydro);
+
         return globalBox;
     }
 };

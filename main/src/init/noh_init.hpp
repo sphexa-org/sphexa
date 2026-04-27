@@ -117,12 +117,15 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
 template<class Dataset>
 class NohGlassSphere : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     std::string          glassBlock;
     mutable InitSettings settings_;
 
 public:
     NohGlassSphere(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , Base(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, nohConstants(), settingsFile, reader);
@@ -163,6 +166,8 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initNohFields(d, settings_);
+       
+        Base::runTagging(reader, rank == 0, d);
 
         return globalBox;
     }

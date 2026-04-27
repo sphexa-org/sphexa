@@ -173,12 +173,15 @@ void compressCenterCube(std::span<T> x, std::span<T> y, std::span<T> z, T rInt, 
 template<class Dataset>
 class IsobaricCubeGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     std::string          glassBlock;
     mutable InitSettings settings_;
 
 public:
     explicit IsobaricCubeGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , Base(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, IsobaricCubeConstants(), settingsFile, reader);
@@ -230,6 +233,8 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initIsobaricCubeFields(d, settings_, massPart);
+
+        Base::runTagging(reader, rank == 0, d);
 
         return globalBox;
     }

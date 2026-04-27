@@ -36,8 +36,11 @@
 
 #include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
+#include "io/id_tag_utils.hpp"
+#include "io/id_tag_setup.hpp"
 #include "sphexa/simulation_data.hpp"
 
+#include "utils.hpp"
 #include "settings.hpp"
 
 namespace sphexa
@@ -47,12 +50,84 @@ template<class Dataset>
 class ISimInitializer
 {
 public:
+
+    ISimInitializer(std::string settingsFile)
+        : settingsFile_(std::move(settingsFile))
+    {
+    }
+
     virtual cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t, Dataset& d,
                                                          IFileReader*) const = 0;
 
     virtual const InitSettings& constants() const = 0;
 
     virtual ~ISimInitializer() = default;
+
+    const IdTaggingSetup& taggingSetup() const { return taggingSetup_; }
+
+protected:
+    /*! @brief Id tagging initialization and execution
+     *
+     * @param[in]     reader         parameter file reader
+     * @param[in]     printLog       activate logging
+     * @param[inout]  particlesData  particle data to perform selection on
+     */
+    void runTagging(IFileReader* reader, bool printLog, Dataset::HydroData& particlesData) const
+    {
+        taggingSetup_.selSpheres.clear();
+        taggingSetup_.sphereGroupIds.clear();
+        taggingSetup_.selList.clear();
+        taggingSetup_.selListGroupIds.clear();
+
+        if (not settingsFile_.empty())
+        {
+            readFileTaggingAttributes(settingsFile_, reader, taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds,
+                taggingSetup_.selList, taggingSetup_.selListGroupIds);
+            idTaggingSetupCheck(taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds, taggingSetup_.selList, 
+                taggingSetup_.selListGroupIds, printLog);
+        }
+
+        std::vector<uint64_t> idBuffer;
+        std::span<uint64_t> idSpan;
+        if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+        {
+            idBuffer = toHost(particlesData.id);
+            idSpan = idBuffer;
+        }
+        else
+        {
+            idSpan = particlesData.id;
+        }
+
+        if (!taggingSetup_.selList.empty())
+        {
+            tagIdsInList(idSpan, 0, idSpan.size(), taggingSetup_.selList, taggingSetup_.selListGroupIds);
+        }
+
+        if (!taggingSetup_.selSpheres.empty())
+        {
+            if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+            {
+                auto x = toHost(particlesData.x);
+                auto y = toHost(particlesData.y);
+                auto z = toHost(particlesData.z);
+                tagIdsInSphere(idSpan, x, y, z, 0, idSpan.size(), taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds);
+            }
+            else
+            {
+                tagIdsInSphere(idSpan, particlesData.x, particlesData.y, particlesData.z, 0, idSpan.size(),
+                    taggingSetup_.selSpheres, taggingSetup_.sphereGroupIds);
+            }
+        }
+
+        if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+        {
+            memcpyH2D(idSpan.data(), idSpan.size(), particlesData.id.data());
+        }
+    };
+
+    std::string settingsFile_;
+    mutable IdTaggingSetup taggingSetup_;
 };
 
 template<class Dataset>
@@ -69,7 +144,7 @@ struct SimInitializers
     static InitPtr makeIsobaricCube(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeNoh(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeSedovGlass(std::string glassBlock, std::string settingsFile, IFileReader* reader);
-    static InitPtr makeSedovGrid();
+    static InitPtr makeSedovGrid(std::string settingsFile);
     static InitPtr makeTurbulence(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makeWindShock(std::string glassBlock, std::string settingsFile, IFileReader* reader);
     static InitPtr makePolytrope(std::string glassBlock, std::string settingsFile, IFileReader* reader);

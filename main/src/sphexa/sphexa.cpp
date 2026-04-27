@@ -109,6 +109,11 @@ int main(int argc, char** argv)
     auto propagator  = propagatorFactory<Domain, Dataset>(propChoice, avClean, output, rank, simInit->constants());
     auto observables = observablesFactory<Dataset>(simInit->constants(), constantsFile);
 
+    // ! @brief check if id tagging is requested (tagging setup check is done in simInit initialization)
+    IdTaggingOutputSetup taggingOutputSetup;
+    const bool writeEnabledSubset = readFileTaggingOutputAttributes(initCond, fileReader.get(), fileWriter->suffix(),
+                                                                    taggingOutputSetup);
+
     Dataset simData;
     simData.comm = MPI_COMM_WORLD;
 
@@ -123,13 +128,15 @@ int main(int argc, char** argv)
 
     auto& d = simData.hydro;
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
+    if (writeEnabledSubset) { simData.setOutputFields(taggingOutputSetup.outputFields.empty() ?
+        propagator->conservedFields() : taggingOutputSetup.outputFields, true); }
 
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
     bool  haveGrav = (d.g != 0.0);
     float theta    = parser.get("--theta", haveGrav ? 0.5f : 1.0f);
 
     if (!parser.exists("-o")) { outFile += fileWriter->suffix(); }
-    if (writeEnabled) { writeSettings(simInit->constants(), outFile, fileWriter.get()); }
+    if (writeEnabled) { writeSettings(simInit->constants(), simInit->taggingSetup(), taggingOutputSetup, outFile, fileWriter.get()); }
     if (rank == 0) { std::cout << "Data generated for " << d.numParticlesGlobal << " global particles\n"; }
 
     uint64_t bucketSizeFocus = 64;
@@ -146,6 +153,7 @@ int main(int argc, char** argv)
 
     size_t startIteration    = d.iteration;
     bool   isOutputTriggered = false;
+    bool   isSubsetOutputTriggered = false;
 
     for (bool keepRunning = true; keepRunning; d.iteration++)
     {
@@ -175,6 +183,19 @@ int main(int argc, char** argv)
             fileWriter->closeStep();
             isOutputTriggered = false;
         }
+
+        isSubsetOutputTriggered =
+            (isOutputStep(d.iteration, taggingOutputSetup.writeFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, taggingOutputSetup.writeFreqStr) ||
+             isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, taggingOutputSetup.writeExtra) ||
+             (isWallClockReached && writeEnabledSubset) || isSubsetOutputTriggered) &&
+            d.iteration > startIteration;
+
+        if (isSubsetOutputTriggered)
+        {
+            propagator->saveSubsetFields(fileWriter.get(), taggingOutputSetup.outFile, domain.startIndex(), domain.endIndex(), simData);
+            isSubsetOutputTriggered = false;
+        }
+
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
 

@@ -94,6 +94,9 @@ void radialTransformation(Vector& x, Vector& y, Vector& z, F&& f)
 template<class Dataset>
 class RadialProfile : public ISimInitializer<Dataset>
 {
+
+    using Base = ISimInitializer<Dataset>;
+
     using T       = Dataset::RealType;
     using KeyType = Dataset::KeyType;
 
@@ -102,10 +105,16 @@ class RadialProfile : public ISimInitializer<Dataset>
 protected:
     mutable InitSettings settings_;
 
+    void runTagging(IFileReader* reader, bool printLog, Dataset::HydroData& particlesData) const
+    {
+        Base::runTagging(reader, printLog, particlesData);
+    }
+
 public:
     explicit RadialProfile(std::string initBlock, const InitSettings& testCaseSettings, std::string settingsFile,
                            IFileReader* reader)
         : glassBlock_(std::move(initBlock))
+        , Base(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, testCaseSettings, settingsFile, reader);
@@ -133,6 +142,8 @@ public:
 
         settings_["numParticlesGlobal"] = double(numParticlesGlobal);
         initAttributes(simData);
+
+        runTagging(reader, rank == 0, simData.hydro);
 
         return globalBox;
     }

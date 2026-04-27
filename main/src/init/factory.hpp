@@ -49,7 +49,7 @@ std::unique_ptr<ISimInitializer<Dataset>> initializerFactory(std::string testCas
 
     if (testNamedBase == "sedov")
     {
-        if (glassBlock.empty()) { return SimInitializers<Dataset>::makeSedovGrid(); }
+        if (glassBlock.empty()) { return SimInitializers<Dataset>::makeSedovGrid(settingsFile); }
         else { return SimInitializers<Dataset>::makeSedovGlass(glassBlock, settingsFile, reader); }
     }
     if (testNamedBase == "noh")

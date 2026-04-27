@@ -32,10 +32,12 @@
 
 #pragma once
 
+#include <optional>
 #include <variant>
 
 #include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
+#include "io/id_tag_utils.hpp"
 #include "sph/particles_data.hpp"
 #include "util/pm_reader.hpp"
 #include "util/timer.hpp"
@@ -47,6 +49,7 @@ template<class DomainType, class ParticleDataType>
 class Propagator
 {
     using T = typename ParticleDataType::RealType;
+    using AccType = typename ParticleDataType::AcceleratorType;
 
 public:
     Propagator(std::ostream& output, int rank)
@@ -74,6 +77,29 @@ public:
 
     //! @brief save particle data fields to file
     virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&) {}
+
+    //! @brief save particle subset data fields to file
+    // TODO: should be const ParticleDataType& but at some point we use the data() method which is non-const
+    void saveSubsetFields(IFileWriter* fileWriter, const std::string& outFileSubset, std::size_t firstIndex, std::size_t lastIndex, ParticleDataType& simData)
+    {
+        timer.step("SelectedParticlesFileOutput");
+
+        // Find the selected particles positions in dataset
+        using ParticleIndexVectorType = decltype(ParticleDataType::HydroData::id);
+        ParticleIndexVectorType selectedParticlesIndexes;
+        if constexpr (cstone::HaveGpu<AccType>{}) {
+            findTaggedIdsGPU(std::span<const uint64_t>(simData.hydro.id.data(), simData.hydro.id.size()), firstIndex, lastIndex, selectedParticlesIndexes);
+        }
+        else {
+            findTaggedIds(std::span<const uint64_t>(simData.hydro.id), firstIndex, lastIndex, selectedParticlesIndexes);
+        }
+        fileWriter->addStep(0, selectedParticlesIndexes.size(), outFileSubset);
+        simData.hydro.loadOrStoreAttributes(fileWriter);
+
+        outputAllocatedFields(fileWriter, simData, selectedParticlesIndexes);
+
+        fileWriter->closeStep();
+    }
 
     //! @brief save internal state to file
     virtual void save(IFileWriter*) {}
@@ -129,7 +155,7 @@ public:
         out << ")" << std::endl;
         out << "### Check ### Focus Tree Nodes: " << domain.focusTree().octreeViewAcc().numLeafNodes << ", maxDepth "
             << domain.focusTree().depth();
-        if constexpr (cstone::HaveGpu<typename ParticleDataType::AcceleratorType>{})
+        if constexpr (cstone::HaveGpu<AccType>{})
         {
             out << ", maxStackNc " << d.stackUsedNc << ", maxStackGravity " << d.stackUsedGravity;
         }
@@ -137,28 +163,59 @@ public:
     }
 
 protected:
-    static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData)
+    static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData, std::optional<std::span<const uint64_t>> selectedParticlesIndexes = std::nullopt)
     {
-        auto output = [](auto& d, IFileWriter* writer)
+        auto output = [](auto& d, IFileWriter* writer, std::optional<std::span<const uint64_t>> selectedParticlesIndexes)
         {
             auto fieldPointers = d.data();
-            auto indicesDone   = d.outputFieldIndices;
-            auto namesDone     = d.outputFieldNames;
+            auto selPartIndexes = selectedParticlesIndexes.value_or(std::span<const uint64_t>{});
+            auto indicesDone = selectedParticlesIndexes.has_value() ? d.subsetOutputFieldIndices : d.outputFieldIndices;
+            auto namesDone = selectedParticlesIndexes.has_value() ? d.subsetOutputFieldNames : d.outputFieldNames;
 
             for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
             {
                 int fidx = indicesDone[i];
                 if (d.isAllocated(fidx))
                 {
-                    int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
-                                 d.outputFieldIndices.begin();
-                    std::visit(
-                        [writer, c = column, key = namesDone[i]](auto field)
-                        {
-                            auto&& tmp = toHost(*field);
-                            writeField(writer, key, tmp.data(), c);
-                        },
-                        fieldPointers[fidx]);
+                    // TODO: code refactoring needed
+                    if (!selectedParticlesIndexes.has_value())
+                    {
+                        int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
+                                    d.outputFieldIndices.begin();
+                        std::visit(
+                            [writer, c = column, key = namesDone[i]](auto field)
+                            {
+                                auto&& tmp = toHost(*field);
+                                writeField(writer, key, tmp.data(), c);
+                            },
+                            fieldPointers[fidx]);
+                    }
+                    else
+                    {
+                        int column = std::find(d.subsetOutputFieldIndices.begin(), d.subsetOutputFieldIndices.end(), fidx) -
+                                    d.subsetOutputFieldIndices.begin();
+                        std::visit(
+                            [writer, c = column, key = namesDone[i], selPartIndexes](auto field)
+                            {
+                                using ValueType = std::remove_pointer_t<decltype(field)>::value_type;
+                                if constexpr (cstone::HaveGpu<AccType>{})
+                                {
+                                    cstone::DeviceVector<ValueType> gatherResult(selPartIndexes.size());
+                                    cstone::gatherAcc<cstone::HaveGpu<AccType>::value>(std::span(selPartIndexes.data(), selPartIndexes.size()), 
+                                        field->data(), gatherResult.data());
+                                    auto&& tmp = toHost(gatherResult);
+                                    writeField(writer, key, tmp.data(), c);
+                                }
+                                else
+                                {
+                                    std::vector<ValueType> gatherResult(selPartIndexes.size());
+                                    cstone::gatherAcc<cstone::HaveGpu<AccType>::value>(std::span(selPartIndexes.data(), selPartIndexes.size()), 
+                                        field->data(), gatherResult.data());
+                                    writeField(writer, key, gatherResult.data(), c);
+                                }
+                            },
+                            fieldPointers[fidx]);
+                    }
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
@@ -166,7 +223,14 @@ protected:
 
             if (!indicesDone.empty() && writer->rank() == 0)
             {
-                std::cout << "WARNING: the following fields are not in use and therefore not output: ";
+                if(!selectedParticlesIndexes.has_value())
+                {
+                    std::cout << "WARNING: the following fields are not in use and therefore not output: ";
+                }
+                else
+                {
+                    std::cout << "WARNING: the following subset fields are not in use and therefore not output: ";
+                }
                 for (int fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
                 {
                     std::cout << d.fieldNames[fidx] << ",";
@@ -175,8 +239,8 @@ protected:
             }
         };
 
-        output(simData.hydro, writer);
-        output(simData.chem, writer);
+        output(simData.hydro, writer, selectedParticlesIndexes);
+        output(simData.chem, writer, selectedParticlesIndexes);
     }
 
     void logDomainStats(const DomainType& domain, ParticleDataType& simData)
@@ -190,7 +254,6 @@ protected:
         timer.logStatistics("hostMemSizeBytes", hostMem[1]);
         timer.logStatistics("hostCapSizeBytes", hostMem[2]);
 
-        using AccType = ParticleDataType::AcceleratorType;
         if constexpr (cstone::HaveGpu<AccType>{})
         {
             auto devMem = simData.hydro.memStats();
