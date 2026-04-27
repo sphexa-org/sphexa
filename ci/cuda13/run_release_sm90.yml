@@ -35,7 +35,7 @@ sph-run-tag-cuda13-sm90-release-sphexa-cuda:
   stage: sphexa_run
   needs:
   # ['sph-build-cuda13-sm90-release']
-    - job: sph-build-cuda13-sm90-release'
+    - job: sph-build-cuda13-sm90-release
     - job: sph-test-venv-setup
       artifacts: true
   image: prgenv-gnu/26.3:v1
@@ -66,7 +66,7 @@ sph-run-tag-cuda13-sm90-release-sphexa-cuda:
 sph-run-tag-restart-cuda13-sm90-release-sphexa-cuda:
   stage: sphexa_run
   needs:
-    - job: sph-build-cuda13-sm90-release'
+    - job: sph-build-cuda13-sm90-release
     - job: sph-test-venv-setup
       artifacts: true
   image: prgenv-gnu/26.3:v1
