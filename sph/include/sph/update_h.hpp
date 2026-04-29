@@ -79,7 +79,7 @@ void updateSmoothingLengthIterativeCpu(const Tc* x, const Tc* y, const Tc* z, T*
 
             nc[id] = ncSph;
 
-            if (iteration == maxIteration && (ngmin > ncSph || (ncSph - 1) > ngmax)) { nc[i] = 1; }
+            if (iteration == maxIteration && (ngmin > ncSph || (ncSph - 1) > ngmax)) { nc[id] = 1; }
         }
     }
 }
