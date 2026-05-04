@@ -192,7 +192,10 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     int device;
     checkGpuErrors(cudaGetDevice(&device));
     auto const prefetchToDevice = [&]<class Tv>(const thrust::universal_vector<Tv>& v)
-    { checkGpuErrors(cudaMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), device, 0)); };
+    {
+        checkGpuErrors(cudaMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(),
+                                            {.type = cudaMemLocationTypeDevice, .id = device}, 0));
+    };
     util::for_each_tuple(prefetchToDevice, std::tie(dX, dY, dZ, dH));
     util::for_each_tuple(prefetchToDevice, dInputs);
     util::for_each_tuple(prefetchToDevice, dOutputs);

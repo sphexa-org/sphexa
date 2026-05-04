@@ -41,6 +41,7 @@
 #define cudaMallocHost hipMallocHost
 #define cudaMallocManaged hipMallocManaged
 #define cudaMemAttachGlobal hipMemAttachGlobal
+#define cudaMemLocationTypeDevice hipMemLocationTypeDevice
 #define cudaMemcpy hipMemcpy
 #define cudaMemcpyAsync hipMemcpyAsync
 #define cudaMemcpyDeviceToDevice hipMemcpyDeviceToDevice
@@ -52,7 +53,7 @@
 #define cudaMemGetInfo hipMemGetInfo
 #define cudaMemoryTypeDevice hipMemoryTypeDevice
 #define cudaMemoryTypeManaged hipMemoryTypeManaged
-#define cudaMemPrefetchAsync hipMemPrefetchAsync
+#define cudaMemPrefetchAsync hipMemPrefetchAsync_v2
 #define cudaMemset hipMemset
 #define cudaMemsetAsync hipMemsetAsync
 #define cudaPointerAttributes hipPointerAttribute_t
