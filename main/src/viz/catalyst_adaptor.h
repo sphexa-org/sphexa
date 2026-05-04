@@ -3,9 +3,9 @@
 #include <cstring>
 #include <iostream>
 
-#include <catalyst-2.0/catalyst.h>
-#include <catalyst-2.0/catalyst_conduit.hpp>
-#include <catalyst-2.0/catalyst_conduit_blueprint.hpp>
+#include <catalyst.h>
+#include <catalyst_conduit.hpp>
+#include <catalyst_conduit_blueprint.hpp>
 
 #include "utils.h"
 
