@@ -29,6 +29,8 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include <thrust/functional.h>
+
 #include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/primitives/warpscan.cuh"
@@ -110,7 +112,7 @@ __global__ void momentumEnergyGpu(Tc K, Tc Kcour, T Atmin, T Atmax, T ramp, unsi
     __shared__ typename BlockReduce::TempStorage        temp_storage;
 
     BlockReduce reduce(temp_storage);
-    T           blockMin = reduce.Reduce(dt_i, cub::Min());
+    T           blockMin = reduce.Reduce(dt_i, thrust::minimum<>{});
     __syncthreads();
 
     if (threadIdx.x == 0) { cstone::atomicMinFloat(&minDt_ve_device, blockMin); }
@@ -120,7 +122,7 @@ template<bool avClean, class Dataset>
 void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
                            const cstone::Box<typename Dataset::RealType>& box)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.traversalStack, d.ngmax);
 
     float huge = 1e10;
     checkGpuErrors(cudaMemcpyToSymbol(GPU_SYMBOL(minDt_ve_device), &huge, sizeof(huge)));
@@ -128,14 +130,14 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
 
     momentumEnergyGpu<avClean><<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
         d.K, d.Kcour, d.Atmin, d.Atmax, d.ramp, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView,
-        rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.vx), rawPtr(d.devData.vy),
-        rawPtr(d.devData.vz), rawPtr(d.devData.h), rawPtr(d.devData.m), rawPtr(d.devData.prho),
-        rawPtr(d.devData.tdpdTrho), rawPtr(d.devData.c), rawPtr(d.devData.c11), rawPtr(d.devData.c12),
-        rawPtr(d.devData.c13), rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33),
-        rawPtr(d.devData.wh), rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.alpha),
-        rawPtr(d.devData.dV11), rawPtr(d.devData.dV12), rawPtr(d.devData.dV13), rawPtr(d.devData.dV22),
-        rawPtr(d.devData.dV23), rawPtr(d.devData.dV33), rawPtr(d.devData.ax), rawPtr(d.devData.ay),
-        rawPtr(d.devData.az), rawPtr(d.devData.du), nidxPool, traversalPool, groupDt);
+        rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy),
+        rawPtr(d.vz), rawPtr(d.h), rawPtr(d.m), rawPtr(d.prho),
+        rawPtr(d.tdpdTrho), rawPtr(d.c), rawPtr(d.c11), rawPtr(d.c12),
+        rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33),
+        rawPtr(d.wh), rawPtr(d.kx), rawPtr(d.xm), rawPtr(d.alpha),
+        rawPtr(d.dV11), rawPtr(d.dV12), rawPtr(d.dV13), rawPtr(d.dV22),
+        rawPtr(d.dV23), rawPtr(d.dV33), rawPtr(d.ax), rawPtr(d.ay),
+        rawPtr(d.az), rawPtr(d.du), nidxPool, traversalPool, groupDt);
     checkGpuErrors(cudaGetLastError());
 
     float minDt;

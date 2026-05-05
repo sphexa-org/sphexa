@@ -34,14 +34,16 @@ void haloExchangeGpu(int epoch,
                      const SendList& outgoingHalos,
                      DevVec1& sendScratchBuffer,
                      DevVec2& receiveScratchBuffer,
+                     MPI_Comm comm,
                      Arrays... arrays);
 
 template<class KeyType, class Accelerator>
 class Halos
 {
 public:
-    Halos(int myRank)
+    Halos(int myRank, MPI_Comm comm)
         : myRank_(myRank)
+        , comm_(comm)
     {
     }
 
@@ -62,9 +64,9 @@ public:
                           std::span<const LocalIndex> layout)
     {
         auto exteriorPeerFlags = haloPeers(myRank_, layout, assignment);
-        exchangePeers(exteriorPeerFlags, exteriorPeers_, interiorPeers_);
+        exchangePeers(exteriorPeerFlags, exteriorPeers_, interiorPeers_, comm_);
 
-        outgoingHaloIndices_ = exchangeRequestKeys<KeyType>(leaves, assignment, exteriorPeers_, interiorPeers_, layout);
+        outgoingHaloIndices_ = exchangeRequestKeys<KeyType>(leaves, assignment, exteriorPeers_, interiorPeers_, layout, comm_);
 
         incomingHaloIndices_.resize(assignment.size());
         std::fill(incomingHaloIndices_.begin(), incomingHaloIndices_.end(), RecvList::value_type{0, 0});
@@ -91,20 +93,21 @@ public:
                 [this, &sendBuffer, &receiveBuffer](auto&... arrays)
                 {
                     haloExchangeGpu(haloEpoch_++, incomingHaloIndices_, outgoingHaloIndices_, sendBuffer, receiveBuffer,
-                                    rawPtr(arrays)...);
+                                    comm_, rawPtr(arrays)...);
                 },
                 arrays);
         }
         else
         {
             std::apply([this](auto&... arrays)
-                       { haloexchange(haloEpoch_++, incomingHaloIndices_, outgoingHaloIndices_, rawPtr(arrays)...); },
+                       { haloexchange(haloEpoch_++, incomingHaloIndices_, outgoingHaloIndices_, comm_, rawPtr(arrays)...); },
                        arrays);
         }
     }
 
 private:
     int myRank_;
+    MPI_Comm comm_;
 
     RecvList incomingHaloIndices_;
     SendList outgoingHaloIndices_;

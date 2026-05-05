@@ -32,7 +32,6 @@
 
 #include "evrard_init.hpp"
 #include "cooling/cooler.hpp"
-
 #include "cooling/init_chemistry.h"
 
 namespace sphexa
@@ -61,30 +60,26 @@ InitSettings evrardCoolingConstants()
 }
 
 template<class Dataset>
-class EvrardGlassSphereCooling : public EvrardGlassSphere<Dataset>
+class EvrardGlassSphereCooling : public RadialProfile<Dataset>
 {
-    using Base = EvrardGlassSphere<Dataset>;
-    mutable InitSettings settings_;
+    using Base = RadialProfile<Dataset>;
+    using Base::settings_;
 
 public:
     EvrardGlassSphereCooling(std::string initBlock, std::string settingsFile, IFileReader* reader)
-        : EvrardGlassSphere<Dataset>(initBlock, settingsFile, reader)
+        : Base(std::move(initBlock), evrardCoolingConstants(), std::move(settingsFile), reader)
     {
-        Dataset d;
-        settings_ = buildSettings(d, evrardCoolingConstants(), settingsFile, reader);
-        Base::resetConstants(settings_);
     }
 
     cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
                                                  IFileReader* reader) const override
     {
-        auto box = Base::init(rank, numRanks, cbrtNumPart, simData, reader);
-        std::fill(simData.hydro.u.begin(), simData.hydro.u.end(), settings_.at("u0"));
+        auto radialTransform = [](auto r) { return std::sqrt(r); };
+        auto globalBox = Base::init(rank, numRanks, cbrtNumPart, simData, reader, settings_.at("r"), radialTransform);
+        initEvrardFields(simData.hydro, settings_);
         cooling::initChemistryData(simData.chem, simData.hydro.x.size());
-        return box;
+        return globalBox;
     }
-
-    [[nodiscard]] const InitSettings& constants() const override { return settings_; }
 };
 
 } // namespace sphexa

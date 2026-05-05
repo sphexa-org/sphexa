@@ -61,9 +61,9 @@ void computeIdealGasEOS_HydroStd(size_t firstParticle, size_t lastParticle, Data
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(lastParticle - firstParticle, numThreads);
 
-    cudaComputeIdealGasEOS_HydroStd<<<numBlocks, numThreads>>>(
-        firstParticle, lastParticle, d.muiConst, d.gamma, rawPtr(d.devData.temp), rawPtr(d.devData.u),
-        rawPtr(d.devData.m), rawPtr(d.devData.rho), rawPtr(d.devData.p), rawPtr(d.devData.c));
+    cudaComputeIdealGasEOS_HydroStd<<<numBlocks, numThreads>>>(firstParticle, lastParticle, d.muiConst, d.gamma,
+                                                               rawPtr(d.temp), rawPtr(d.u), rawPtr(d.m), rawPtr(d.rho),
+                                                               rawPtr(d.p), rawPtr(d.c));
 
     checkGpuErrors(cudaDeviceSynchronize());
 }
@@ -88,9 +88,8 @@ void computeIsothermalEOS_HydroStd(size_t first, size_t last, Dataset& d)
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(last - first, numThreads);
 
-    cudaComputeIsothermalEOS_HydroStd<<<numBlocks, numThreads>>>(first, last, d.soundSpeedConst, rawPtr(d.devData.c),
-                                                                 rawPtr(d.devData.rho), rawPtr(d.devData.p),
-                                                                 rawPtr(d.devData.temp));
+    cudaComputeIsothermalEOS_HydroStd<<<numBlocks, numThreads>>>(first, last, d.soundSpeedConst, rawPtr(d.c),
+                                                                 rawPtr(d.rho), rawPtr(d.p), rawPtr(d.temp));
 
     checkGpuErrors(cudaDeviceSynchronize());
 }
@@ -115,9 +114,8 @@ void computePolytropicEOS_HydroStd(size_t first, size_t last, Dataset& d)
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(last - first, numThreads);
 
-    cudaComputePolytropicEOS_HydroStd<<<numBlocks, numThreads>>>(first, last, d.polytropic_const, d.polytropic_index,
-                                                                 rawPtr(d.devData.rho), rawPtr(d.devData.p),
-                                                                 rawPtr(d.devData.temp), rawPtr(d.devData.c));
+    cudaComputePolytropicEOS_HydroStd<<<numBlocks, numThreads>>>(
+        first, last, d.polytropic_const, d.polytropic_index, rawPtr(d.rho), rawPtr(d.p), rawPtr(d.temp), rawPtr(d.c));
 
     checkGpuErrors(cudaDeviceSynchronize());
 }

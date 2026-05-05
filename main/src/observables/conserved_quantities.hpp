@@ -133,14 +133,10 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
 
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        if (!d.devData.nc.empty())
-        {
-            ncsum = cstone::reduceGpu(rawPtr(d.devData.nc) + startIndex, endIndex - startIndex, size_t(0));
-        }
+        if (!d.nc.empty()) { ncsum = cstone::reduceGpu(rawPtr(d.nc) + startIndex, endIndex - startIndex, size_t(0)); }
         std::tie(eKin, eInt, linmom, angmom) = conservedQuantitiesGpu(
-            sph::idealGasCv(d.muiConst, d.gamma), rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z),
-            rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz), rawPtr(d.devData.temp),
-            rawPtr(d.devData.u), rawPtr(d.devData.cv), rawPtr(d.devData.m), startIndex, endIndex);
+            sph::idealGasCv(d.muiConst, d.gamma), rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy),
+            rawPtr(d.vz), rawPtr(d.temp), rawPtr(d.u), rawPtr(d.m), startIndex, endIndex);
     }
     else
     {
@@ -155,24 +151,24 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
 
         std::tie(eKin, eInt, linmom, angmom) = localConservedQuantities(startIndex, endIndex, d);
     }
+    d.localNeighbors = ncsum;
 
-    util::array<double, 10> quantities, globalQuantities;
+    util::array<double, 11> quantities, globalQuantities;
     std::fill(globalQuantities.begin(), globalQuantities.end(), double(0));
 
-    quantities[0] = eKin;
-    quantities[1] = eInt;
-    quantities[2] = d.egrav;
-    quantities[3] = linmom[0];
-    quantities[4] = linmom[1];
-    quantities[5] = linmom[2];
-    quantities[6] = angmom[0];
-    quantities[7] = angmom[1];
-    quantities[8] = angmom[2];
-    quantities[9] = double(ncsum);
+    quantities[0]  = eKin;
+    quantities[1]  = eInt;
+    quantities[2]  = d.egrav;
+    quantities[3]  = linmom[0];
+    quantities[4]  = linmom[1];
+    quantities[5]  = linmom[2];
+    quantities[6]  = angmom[0];
+    quantities[7]  = angmom[1];
+    quantities[8]  = angmom[2];
+    quantities[9]  = double(ncsum);
+    quantities[10] = double(endIndex - startIndex);
 
-    int rootRank = 0;
-    MPI_Reduce(quantities.data(), globalQuantities.data(), quantities.size(), MpiType<double>{}, MPI_SUM, rootRank,
-               comm);
+    MPI_Reduce(quantities.data(), globalQuantities.data(), quantities.size(), MpiType<double>{}, MPI_SUM, 0, comm);
 
     d.ecin  = globalQuantities[0];
     d.eint  = globalQuantities[1];
@@ -181,9 +177,11 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
 
     util::array<double, 3> globalLinmom{globalQuantities[3], globalQuantities[4], globalQuantities[5]};
     util::array<double, 3> globalAngmom{globalQuantities[6], globalQuantities[7], globalQuantities[8]};
-    d.linmom         = std::sqrt(norm2(globalLinmom));
-    d.angmom         = std::sqrt(norm2(globalAngmom));
-    d.totalNeighbors = size_t(globalQuantities[9]);
+    d.linmom                 = std::sqrt(norm2(globalLinmom));
+    d.angmom                 = std::sqrt(norm2(globalAngmom));
+    d.totalNeighbors         = size_t(globalQuantities[9]);
+    d.numParticlesGlobalPrev = d.numParticlesGlobal;
+    d.numParticlesGlobal     = size_t(globalQuantities[10]);
 }
 
 } // namespace sphexa

@@ -85,16 +85,16 @@ __global__ void AVswitchesGpu(Tc K, unsigned ngmax, const cstone::Box<Tc> box, c
 template<class Dataset>
 void computeAVswitches(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     AVswitchesGpu<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x),
-        rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
-        rawPtr(d.devData.h), rawPtr(d.devData.c), rawPtr(d.devData.c11), rawPtr(d.devData.c12), rawPtr(d.devData.c13),
-        rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33), rawPtr(d.devData.wh),
-        rawPtr(d.devData.whd), rawPtr(d.devData.kx), rawPtr(d.devData.xm), rawPtr(d.devData.divv), d.minDt, d.alphamin,
-        d.alphamax, d.decay_constant, rawPtr(d.devData.alpha), nidxPool, traversalPool);
+        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.x),
+        rawPtr(d.y), rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz),
+        rawPtr(d.h), rawPtr(d.c), rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13),
+        rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.wh),
+        rawPtr(d.whd), rawPtr(d.kx), rawPtr(d.xm), rawPtr(d.divv), d.minDt, d.alphamin,
+        d.alphamax, d.decay_constant, rawPtr(d.alpha), nidxPool, traversalPool);
     checkGpuErrors(cudaDeviceSynchronize());
 }
 

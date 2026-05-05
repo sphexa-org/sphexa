@@ -126,59 +126,6 @@ SfcAssignment<KeyType> makeSfcAssignment(int numRanks, const std::vector<unsigne
     return ret;
 }
 
-/*! @brief limit SFC range assignment transfer to the domain of the rank above or below
- *
- * @tparam        KeyType          32- or 64-bit unsigned integer
- * @param[in]     oldAssignment    SFC key assignment boundaries to ranks from the previous step
- * @param[inout]  newAssignment    the current assignment, will be modified if needed
- * @param[in]     tree             the global octree leaves used for domain decomposition in the current step
- * @param[in]     counts           particle counts per leaf cell in @p newTree
- *
- * When assignment boundaries change, we limit the growth of any rank downwards or upwards the SFC
- * to the previous assignment of the rank below or above, i.e. rank r can only acquire new SFC areas
- * that belonged to ranks r-1 or r+1 in the previous step. Only required in extreme cases or testing scenarios
- * to guarantee that the in-focus LET resolution is never exceeded in the trees of other ranks.
- */
-template<class KeyType>
-void limitBoundaryShifts(const SfcAssignment<KeyType> oldAssignment,
-                         SfcAssignment<KeyType>& newAssignment,
-                         std::span<const KeyType> tree,
-                         std::span<const unsigned> counts)
-{
-    int numRanks = std::min(oldAssignment.numRanks(), newAssignment.numRanks()); // oldAssignment empty on first call
-
-    bool triggerRecount = false;
-    for (int rank = 1; rank < numRanks; ++rank)
-    {
-        KeyType newBoundary = std::min(std::max(newAssignment[rank], oldAssignment[rank - 1]), oldAssignment[rank + 1]);
-        if (newBoundary != newAssignment[rank])
-        {
-            triggerRecount             = true;
-            newAssignment.data()[rank] = newBoundary;
-        }
-    }
-    if (!triggerRecount) { return; }
-
-    std::span treeOffsets = newAssignment.treeOffsets();
-    treeOffsets.front()   = 0;
-    treeOffsets.back()    = nNodes(tree);
-
-    std::span numNodesPerRank = newAssignment.numNodesPerRank();
-    for (int rank = 1; rank < numRanks; ++rank)
-    {
-        treeOffsets[rank]         = findNodeAbove(tree.data(), nNodes(tree), newAssignment[rank]);
-        numNodesPerRank[rank - 1] = treeOffsets[rank] - treeOffsets[rank - 1];
-    }
-    numNodesPerRank[numRanks - 1] = treeOffsets.back() - treeOffsets[numRanks - 1];
-
-    std::span newCounts = newAssignment.counts();
-    for (int rank = 0; rank < numRanks; ++rank)
-    {
-        newCounts[rank] =
-            std::accumulate(counts.begin() + treeOffsets[rank], counts.begin() + treeOffsets[rank + 1], std::size_t(0));
-    }
-}
-
 /*! @brief translates an assignment of a given tree to a new tree
  *
  * @tparam     KeyType         32- or 64-bit unsigned integer

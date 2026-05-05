@@ -18,7 +18,11 @@ extern void computeIADGpu(const GroupView&, Dataset& d, const cstone::Box<typena
 template<class Dataset>
 extern void computeMomentumEnergyStdGpu(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
 
-namespace cuda
+template<typename Thydro, typename T>
+extern void relaxSystemGPU(size_t first, size_t last, Thydro* ax, Thydro* ay, Thydro* az, Thydro* vx, Thydro* vy,
+                           Thydro* vz, T relaxationTimescale);
+
+namespace gpu
 {
 
 template<class Dataset>
@@ -28,10 +32,10 @@ template<class Dataset>
 void computeDensity(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>& box);
 
 template<class Dataset>
-extern void computeVeDefGradh(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
+extern void computeVe(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
 
 template<class Dataset>
-extern void computeIadDivvCurlv(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
+extern void computeIadDivvCurlvGradh(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
 
 template<class Dataset>
 extern void computeAVswitches(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
@@ -73,7 +77,7 @@ extern void computeIsothermalEOS_HydroStd(size_t firstParticle, size_t lastParti
 template<typename Dataset>
 extern void computePolytropicEOS_HydroStd(size_t firstParticle, size_t lastParticle, Dataset& d);
 
-} // namespace cuda
+} // namespace gpu
 
 template<class Tc, class Thydro, class Tm1, class Tdu>
 extern void driftPositionsGpu(const GroupView& grp, float dt, float dt_back,

@@ -33,6 +33,7 @@
 
 #include <map>
 
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/box.hpp"
 #include "sph/eos.hpp"
 
@@ -48,50 +49,62 @@ namespace sphexa
 template<class Dataset>
 void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
 {
-    using T = typename Dataset::RealType;
+    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
+    using T            = typename Dataset::RealType;
 
     double r           = constants.at("r1");
     double totalVolume = std::pow(2 * r, 3);
     double hInit       = std::cbrt(3.0 / (4 * M_PI) * d.ng0 * totalVolume / d.numParticlesGlobal) * 0.5;
 
     double mPart  = constants.at("mTotal") / d.numParticlesGlobal;
-    double width  = constants.at("width");
+    double width  = T(2) * hInit;
     double width2 = width * width;
 
-    std::fill(d.m.begin(), d.m.end(), mPart);
-    std::fill(d.h.begin(), d.h.end(), hInit);
-    std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
-    std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
+    // We distribute energy as exp(-r2 / width2), with width taken as the current 2h, so that the enery
+    // is deposited in about ng0 neighbors.
+    // ener0 is the constant that should multiply the Gaussian so that its integral equals energytotal
+    double ener0  = constants.at("energyTotal") / std::pow(M_PI, 1.5) / width2 / width;
 
-    std::fill(d.vx.begin(), d.vx.end(), 0.0);
-    std::fill(d.vy.begin(), d.vy.end(), 0.0);
-    std::fill(d.vz.begin(), d.vz.end(), 0.0);
+
+    cstone::fill<gpu>(d.m.begin(), d.m.end(), mPart);
+    cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
+    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
+    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
+    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
+
+    cstone::fill<gpu>(d.vx.begin(), d.vx.end(), 0.0);
+    cstone::fill<gpu>(d.vy.begin(), d.vy.end(), 0.0);
+    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
 
     // general form: d.x_m1[i] = d.vx[i] * firstTimeStep;
-    std::fill(d.x_m1.begin(), d.x_m1.end(), 0.0);
-    std::fill(d.y_m1.begin(), d.y_m1.end(), 0.0);
-    std::fill(d.z_m1.begin(), d.z_m1.end(), 0.0);
+    cstone::fill<gpu>(d.x_m1.begin(), d.x_m1.end(), 0.0);
+    cstone::fill<gpu>(d.y_m1.begin(), d.y_m1.end(), 0.0);
+    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
 
-    generateParticleIDs(d.id);
+    generateParticleIDs<gpu>(d.id);
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
 
     // If temperature is not allocated, we can still use this initializer for just the coordinates
     if (d.temp.empty() && d.u.empty()) { return; }
 
+    auto&& x = toHost(d.x);
+    auto&& y = toHost(d.y);
+    auto&& z = toHost(d.z);
+
+    std::vector<T> u(d.x.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
-        T xi = d.x[i];
-        T yi = d.y[i];
-        T zi = d.z[i];
-        T r2 = xi * xi + yi * yi + zi * zi;
-
-        T ui = constants.at("ener0") * exp(-(r2 / width2)) + constants.at("u0");
-        if (d.temp.empty()) { d.u[i] = ui; }
-        else { d.temp[i] = ui / cv; }
+        T r2 = norm2(cstone::Vec3<T>{x[i], y[i], z[i]});
+        u[i] = ener0 * exp(-(r2 / width2)) + constants.at("u0");
     }
+    if (d.u.empty())
+    {
+        std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
+        d.temp = std::move(u);
+    }
+    else { d.u = std::move(u); }
 }
 
 template<class Dataset>
@@ -119,7 +132,11 @@ public:
 
         T              r = settings_.at("r1");
         cstone::Box<T> globalBox(-r, r, cstone::BoundaryType::periodic);
-        regularGrid(r, cubeSide, first, last, d.x, d.y, d.z);
+        std::vector<T> x(last - first), y(last - first), z(last - first);
+        regularGrid(r, cubeSide, first, last, x, y, z);
+        d.x = x; // uploads to GPU if active
+        d.y = y;
+        d.z = z;
         syncCoords<KeyType>(rank, numRanks, numParticlesGlobal, d.x, d.y, d.z, globalBox);
         d.resize(d.x.size());
 
@@ -176,8 +193,12 @@ public:
         cstone::Box<T> globalBox(-r, r, cstone::BoundaryType::periodic);
 
         auto [keyStart, keyEnd] = equiDistantSfcSegments<KeyType>(rank, numRanks, 100);
-        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
 
+        std::vector<T> x, y, z;
+        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, x, y, z);
+        d.x = x; // uploads to GPU if active
+        d.y = y;
+        d.z = z;
         d.resize(d.x.size());
 
         settings_["numParticlesGlobal"] = double(numParticlesGlobal);

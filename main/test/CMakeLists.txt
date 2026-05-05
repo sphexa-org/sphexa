@@ -22,7 +22,6 @@ endif ()
 if (CMAKE_CUDA_COMPILER AND SPH_EXA_WITH_H5HUT)
     set(testname frontend_units_cuda)
     add_executable(${testname}
-            cuda/gpu_particles_data.cpp
             io/id_tag_utils_gpu.cu
             test_main.cpp)
     target_include_directories(${testname} PRIVATE

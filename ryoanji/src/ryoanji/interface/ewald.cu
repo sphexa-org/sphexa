@@ -59,7 +59,7 @@ __global__ void computeGravityEwaldKernel(cstone::GroupView grp, const Tc* x, co
     __shared__ typename BlockReduce::TempStorage                temp_storage;
 
     BlockReduce reduce(temp_storage);
-    Ta          blockSum = reduce.Reduce(Uewald, thrust::plus<Ta>());
+    Ta          blockSum = reduce.Sum(Uewald);
     __syncthreads();
 
     if (threadIdx.x == 0) { atomicAdd(&totalEwaldPotentialGlob, blockSum); }
@@ -101,7 +101,7 @@ void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mro
 #define COMPUTE_GRAVITY_EWALD_GPU(MType, Tc, Ta, Tm, Tu)                                                               \
     template void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mroot, cstone::GroupView,    \
                                          const Tc* x, const Tc* y, const Tc* z, const Tm* m,                           \
-                                         const cstone::Box<Tc>& box, double G, Ta* ugrav, Ta* ax, Ta* ay, Ta* az,       \
+                                         const cstone::Box<Tc>& box, double G, Ta* ugrav, Ta* ax, Ta* ay, Ta* az,      \
                                          Tu* ugravTot, EwaldSettings settings)
 
 COMPUTE_GRAVITY_EWALD_GPU(CartesianQuadrupole<double>, double, double, double, double);

@@ -62,7 +62,8 @@ void exchangeTreelets(std::span<const int> exteriorPeers,
                       std::span<const int> interiorPeers,
                       std::span<const IndexPair<TreeNodeIndex>> assignment,
                       std::span<const KeyType> leaves,
-                      std::vector<std::vector<KeyType>>& treelets)
+                      std::vector<std::vector<KeyType>>& treelets,
+                      MPI_Comm comm)
 {
     constexpr int keyTag = static_cast<int>(P2pTags::focusTreelets);
 
@@ -72,7 +73,7 @@ void exchangeTreelets(std::span<const int> exteriorPeers,
     {
         // +1 to include the upper key boundary for the last node
         TreeNodeIndex sendCount = assignment[peer].count() + 1;
-        mpiSendAsync(leaves.data() + assignment[peer].start(), sendCount, peer, keyTag, sendRequests);
+        mpiSendAsync(leaves.data() + assignment[peer].start(), sendCount, peer, keyTag, sendRequests, comm);
     }
 
     std::vector<MPI_Request> receiveRequests;
@@ -81,13 +82,13 @@ void exchangeTreelets(std::span<const int> exteriorPeers,
     while (numMessages--)
     {
         MPI_Status status;
-        MPI_Probe(MPI_ANY_SOURCE, keyTag, MPI_COMM_WORLD, &status);
+        MPI_Probe(MPI_ANY_SOURCE, keyTag, comm, &status);
         int receiveRank = status.MPI_SOURCE;
         TreeNodeIndex receiveSize;
         MPI_Get_count(&status, MpiType<KeyType>{}, &receiveSize);
         treelets[receiveRank].resize(receiveSize);
 
-        mpiRecvAsync(treelets[receiveRank].data(), receiveSize, receiveRank, keyTag, receiveRequests);
+        mpiRecvAsync(treelets[receiveRank].data(), receiveSize, receiveRank, keyTag, receiveRequests, comm);
     }
 
     MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUS_IGNORE);
@@ -148,7 +149,8 @@ void exchangeRejectedKeys(std::span<const int> interiorPEers,
                           std::span<const int> exteriorPEers,
                           std::span<const KeyType> leaves,
                           const std::vector<std::vector<KeyType>>& treelets,
-                          std::span<TreeNodeIndex> nodeOps)
+                          std::span<TreeNodeIndex> nodeOps,
+                          MPI_Comm comm)
 
 {
     constexpr int keyTag = static_cast<int>(P2pTags::focusTreelets) + 1;
@@ -167,7 +169,7 @@ void exchangeRejectedKeys(std::span<const int> interiorPEers,
         {
             if (isMasked(treelet[i])) { rejectedKeys.push_back(unmaskKey(treelet[i])); }
         }
-        mpiSendAsync(rejectedKeys.data(), rejectedKeys.size(), peer, keyTag, sendRequests);
+        mpiSendAsync(rejectedKeys.data(), rejectedKeys.size(), peer, keyTag, sendRequests, comm);
         rejectedKeyBuffers.push_back(std::move(rejectedKeys));
     }
 
@@ -175,14 +177,14 @@ void exchangeRejectedKeys(std::span<const int> interiorPEers,
     while (numMessages--)
     {
         MPI_Status status;
-        MPI_Probe(MPI_ANY_SOURCE, keyTag, MPI_COMM_WORLD, &status);
+        MPI_Probe(MPI_ANY_SOURCE, keyTag, comm, &status);
         int receiveRank = status.MPI_SOURCE;
         TreeNodeIndex receiveSize;
         MPI_Get_count(&status, MpiType<KeyType>{}, &receiveSize);
 
         std::vector<KeyType, util::DefaultInitAdaptor<KeyType>> recvKeys(receiveSize);
         recvKeys.resize(receiveSize);
-        mpiRecvSync(recvKeys.data(), receiveSize, receiveRank, keyTag, &status);
+        mpiRecvSync(recvKeys.data(), receiveSize, receiveRank, keyTag, &status, comm);
         for (TreeNodeIndex i = 0; i < receiveSize; ++i)
         {
             TreeNodeIndex ki = findNodeAbove(leaves.data(), leaves.size(), recvKeys[i]);
@@ -199,13 +201,14 @@ void syncTreelets(std::span<const int> exteriorPeers,
                   std::span<const IndexPair<TreeNodeIndex>> assignment,
                   OctreeData<KeyType, CpuTag>& octree,
                   std::vector<KeyType>& leaves,
-                  std::vector<std::vector<KeyType>>& treelets)
+                  std::vector<std::vector<KeyType>>& treelets,
+                  MPI_Comm comm)
 {
-    exchangeTreelets<KeyType>(exteriorPeers, interiorPeers, assignment, leaves, treelets);
+    exchangeTreelets<KeyType>(exteriorPeers, interiorPeers, assignment, leaves, treelets, comm);
     checkTreelets<KeyType>(interiorPeers, leaves, treelets);
 
     std::vector<TreeNodeIndex> nodeOps(leaves.size(), 1);
-    exchangeRejectedKeys<KeyType>(interiorPeers, exteriorPeers, leaves, treelets, nodeOps);
+    exchangeRejectedKeys<KeyType>(interiorPeers, exteriorPeers, leaves, treelets, nodeOps, comm);
     pruneTreelets<KeyType>(interiorPeers, treelets);
 
     if (std::count(nodeOps.begin(), nodeOps.end(), 1) != std::make_signed_t<size_t>(nodeOps.size()))
@@ -225,13 +228,14 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
                      OctreeData<KeyType, GpuTag>& octreeAcc,
                      DeviceVector<KeyType>& leavesAcc,
                      std::vector<std::vector<KeyType>>& treelets,
-                     Vector& scratch)
+                     Vector& scratch,
+                     MPI_Comm comm)
 {
-    exchangeTreelets<KeyType>(exteriorPeers, interiorPeers, assignment, leaves, treelets);
+    exchangeTreelets<KeyType>(exteriorPeers, interiorPeers, assignment, leaves, treelets, comm);
     checkTreelets<KeyType>(interiorPeers, leaves, treelets);
 
     std::vector<TreeNodeIndex> nodeOps(leaves.size(), 1);
-    exchangeRejectedKeys<KeyType>(interiorPeers, exteriorPeers, leaves, treelets, nodeOps);
+    exchangeRejectedKeys<KeyType>(interiorPeers, exteriorPeers, leaves, treelets, nodeOps, comm);
     pruneTreelets<KeyType>(interiorPeers, treelets);
 
     if (std::count(nodeOps.begin(), nodeOps.end(), 1) != nodeOps.size())
@@ -308,7 +312,8 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
                             std::span<const TreeNodeIndex> csToInternalMap,
                             std::span<T> quantities,
                             int commTag,
-                            DevVec& scratch)
+                            DevVec& scratch,
+                            MPI_Comm comm)
 {
     constexpr int alignmentBytes = 64;
     constexpr bool useGpu        = IsDeviceVector<DevVec>{};
@@ -333,21 +338,21 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
         if constexpr (useGpu) { syncGpu(); }
         assert(sendBuffers[i].size() == treeletIdx[interiorPeers[i]].size());
         mpiSendAsyncAcc<useGpu>(sendBuffers[i].data(), treeletIdx[interiorPeers[i]].size(), interiorPeers[i], commTag,
-                                sendRequests, staging);
+                                sendRequests, staging, comm);
     }
 
     int numMessages = exteriorPeers.size();
     while (numMessages--)
     {
         MPI_Status status;
-        MPI_Probe(MPI_ANY_SOURCE, commTag, MPI_COMM_WORLD, &status);
+        MPI_Probe(MPI_ANY_SOURCE, commTag, comm, &status);
         int recvRank = status.MPI_SOURCE;
         TreeNodeIndex recvCount;
         mpiGetCount<T>(&status, &recvCount);
 
         int peerIdx = std::find(exteriorPeers.begin(), exteriorPeers.end(), recvRank) - exteriorPeers.begin();
         T* recvBuf  = recvBuffers[peerIdx].data();
-        mpiRecvSyncAcc<useGpu>(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE);
+        mpiRecvSyncAcc<useGpu>(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE, comm);
 
         auto mapToInternal = csToInternalMap.subspan(focusAssignment[recvRank].start(), recvCount);
         scatterAcc<useGpu>(mapToInternal, recvBuf, quantities.data());
@@ -356,106 +361,6 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
 
     MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUS_IGNORE);
     reallocate(scratch, origSize, 1.0);
-}
-
-/*! @brief Pass on focus tree parts from old owners to new owners
- *
- * @tparam       KeyType        32- or 64-bit unsigned integer
- * @param[in]    cstree         cornerstone leaf cell array (of the locally focused tree)
- * @param[in]    counts         particle counts per cell in @p cstree, length cstree.size() - 1
- * @param[in]    myRank         the executing rank
- * @param[in]    oldFocusStart  SFC assignment boundaries from previous iteration
- * @param[in]    oldFocusEnd
- * @param[in]    newFocusStart  new SFC assignment boundaries
- * @param[in]    newFocusEnd
- * @param[inout] buffer         cell keys of parts of a remote rank's @p cstree for the newly assigned area of @p myRank
- *                              will be appended to this
- *
- * When the assignment boundaries change, we let the previous owning rank pass on its focus tree of the part that it
- * lost to the new owning rank. Thanks to doing so we can guarantee that each rank always has the highest focus
- * tree resolution inside its focus of any rank: if rank a has focus SFC range F, then no other rank can have
- * tree cells in F that don't exist in rank a's focus tree.
- */
-template<class KeyType, bool useGpu = false>
-void focusTransfer(std::span<const KeyType> cstree,
-                   std::span<const unsigned> counts,
-                   unsigned bucketSize,
-                   int myRank,
-                   KeyType oldFocusStart,
-                   KeyType oldFocusEnd,
-                   KeyType newFocusStart,
-                   KeyType newFocusEnd,
-                   std::vector<KeyType>& buffer)
-{
-    constexpr int ownerTag = static_cast<int>(P2pTags::focusTransfer);
-
-    std::vector<MPI_Request> sendRequests;
-    std::vector<std::vector<KeyType>> sendBuffers;
-
-    auto toHost = [](std::span<const unsigned> srcCounts)
-    {
-        if constexpr (useGpu)
-        {
-            std::vector<unsigned> hostCounts(srcCounts.size());
-            memcpyD2H(srcCounts.data(), srcCounts.size(), hostCounts.data());
-            return hostCounts;
-        }
-        else { return srcCounts; }
-    };
-
-    if (oldFocusStart < newFocusStart)
-    {
-        // current rank lost range [oldFocusStart : newFocusStart] to rank below
-        TreeNodeIndex start = findNodeAbove(cstree.data(), cstree.size(), oldFocusStart);
-        TreeNodeIndex end   = findNodeAbove(cstree.data(), cstree.size(), newFocusStart);
-
-        size_t numNodes = end - start;
-        auto c          = toHost(counts.subspan(start, numNodes));
-        auto treelet    = updateTreelet(cstree.subspan(start, numNodes + 1), c, bucketSize);
-
-        mpiSendAsync(treelet.data(), int(treelet.size() - 1), myRank - 1, ownerTag, sendRequests);
-        sendBuffers.push_back(std::move(treelet));
-    }
-
-    if (newFocusEnd < oldFocusEnd)
-    {
-        // current rank lost range [newFocusEnd : oldFocusEnd] to rank above
-        TreeNodeIndex start = findNodeAbove(cstree.data(), cstree.size(), newFocusEnd);
-        TreeNodeIndex end   = findNodeAbove(cstree.data(), cstree.size(), oldFocusEnd);
-
-        size_t numNodes = end - start;
-        auto c          = toHost(counts.subspan(start, numNodes));
-        auto treelet    = updateTreelet(cstree.subspan(start, numNodes + 1), c, bucketSize);
-
-        mpiSendAsync(treelet.data(), int(treelet.size() - 1), myRank + 1, ownerTag, sendRequests);
-        sendBuffers.push_back(std::move(treelet));
-    }
-
-    if (newFocusStart < oldFocusStart)
-    {
-        // current rank gained range [newFocusStart : oldFocusStart] from rank below
-        MPI_Status status;
-        MPI_Probe(myRank - 1, ownerTag, MPI_COMM_WORLD, &status);
-        TreeNodeIndex receiveSize;
-        MPI_Get_count(&status, MpiType<KeyType>{}, &receiveSize);
-
-        buffer.resize(buffer.size() + receiveSize);
-        mpiRecvSync(buffer.data() + buffer.size() - receiveSize, receiveSize, myRank - 1, ownerTag, &status);
-    }
-
-    if (oldFocusEnd < newFocusEnd)
-    {
-        // current rank gained range [oldFocusEnd : newFocusEnd] from rank above
-        MPI_Status status;
-        MPI_Probe(myRank + 1, ownerTag, MPI_COMM_WORLD, &status);
-        TreeNodeIndex receiveSize;
-        MPI_Get_count(&status, MpiType<KeyType>{}, &receiveSize);
-
-        buffer.resize(buffer.size() + receiveSize);
-        mpiRecvSync(buffer.data() + buffer.size() - receiveSize, receiveSize, myRank + 1, ownerTag, MPI_STATUS_IGNORE);
-    }
-
-    MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUS_IGNORE);
 }
 
 } // namespace cstone

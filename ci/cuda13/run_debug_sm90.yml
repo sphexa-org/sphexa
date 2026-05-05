@@ -1,0 +1,46 @@
+include:
+  - local: 'ci/cuda13/run_template_sm90.yml'
+
+sph-run-cuda13-sm90-debug-1rank:
+  extends: [.sph-run-cuda13-sm90-1rank]
+  needs: ['sph-build-cuda13-sm90-debug']
+
+sph-run-cuda13-sm90-debug-2ranks:
+  extends: [.sph-run-cuda13-sm90-2ranks]
+  needs: ['sph-build-cuda13-sm90-debug']
+
+sph-run-cuda13-sm90-debug-4ranks:
+  extends: [.sph-run-cuda13-sm90-4ranks]
+  needs: ['sph-build-cuda13-sm90-debug']
+
+sph-run-cuda13-sm90-debug-12ranks:
+  extends: [.sph-run-cuda13-sm90-12ranks]
+  needs: ['sph-build-cuda13-sm90-debug']
+
+sph-run-cuda13-sm90-debug-sphexa-cuda:
+  extends: [.sph-run-cuda13-sm90-sphexa-cuda]
+  needs:
+    - job: sph-build-cuda13-sm90-debug
+    - job: sph-test-venv-setup
+      artifacts: true
+
+sph-run-cuda13-sm90-debug-sphexa-cpu:
+  extends: [.sph-run-cuda13-sm90-sphexa-cpu]
+  needs:
+    - job: sph-build-cuda13-sm90-debug
+    - job: sph-test-venv-setup
+      artifacts: true
+
+sph-compare-constants-cuda13-sm90-debug-sphexa-cuda:
+  extends: [.sph-compare-constants-cuda13-sm90-sphexa-cuda]
+  needs:
+    - job: sph-build-cuda13-sm90-debug
+    - job: sph-test-venv-setup
+      artifacts: true
+
+sph-compare-constants-cuda13-sm90-debug-sphexa-cpu:
+  extends: [.sph-compare-constants-cuda13-sm90-sphexa-cpu]
+  needs:
+    - job: sph-build-cuda13-sm90-debug
+    - job: sph-test-venv-setup
+      artifacts: true

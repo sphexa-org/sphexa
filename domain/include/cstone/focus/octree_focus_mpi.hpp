@@ -60,10 +60,11 @@ public:
      * @param numRanks      number of ranks
      * @param bucketSize    Maximum number of particles per leaf inside the focus area
      */
-    FocusedOctree(int myRank, int numRanks, unsigned bucketSize)
+    FocusedOctree(int myRank, int numRanks, unsigned bucketSize, MPI_Comm comm)
         : myRank_(myRank)
         , numRanks_(numRanks)
         , bucketSize_(bucketSize)
+        , comm_(comm)
         , treelets_(numRanks_)
         , macsAcc_(1, 1)
         , centersAcc_(1)
@@ -117,46 +118,27 @@ public:
             prevFocusEnd   = focusEnd;
         }
 
-        std::vector<KeyType> enforcedKeys{focusStart, focusEnd};
-        focusTransfer<KeyType, useGpu>(leaves_, {leafCountsAcc_.data(), leafCountsAcc_.size()}, bucketSize_, myRank_,
-                                       prevFocusStart, prevFocusEnd, focusStart, focusEnd, enforcedKeys);
-        std::span gLeavesRank = globalLeaves.subspan(assignment.treeOffsetsConst()[myRank_],
-                                                     assignment.numNodesPerRankConst()[myRank_] + 1);
-        float invThetaRefine  = sqrt(3) / 2 + 1e-6; // half the cube-diagonal + eps for a min-like MAC with geo centers
+        std::span enforcedKeys = globalLeaves.subspan(assignment.treeOffsetsConst()[myRank_],
+                                                      assignment.numNodesPerRankConst()[myRank_] + 1);
         bool converged;
         if constexpr (HaveGpu<Accelerator>{})
         {
-            std::size_t scratchSize = scratch.size();
-            auto [enforcedKeysAcc]  = util::packAllocBuffer(scratch, util::TypeList<KeyType>{},
-                                                            {enforcedKeys.size() + gLeavesRank.size()}, 128);
-            memcpyH2D(enforcedKeys.data(), enforcedKeys.size(), enforcedKeysAcc.data());
-            memcpyD2D(gLeavesRank.data(), gLeavesRank.size(), enforcedKeysAcc.data() + enforcedKeys.size());
-
             converged = CombinedUpdate<KeyType>::updateFocusGpu(
-                octreeAcc_, leavesAcc_, bucketSize_, focusStart, focusEnd, enforcedKeysAcc,
+                octreeAcc_, leavesAcc_, bucketSize_, focusStart, focusEnd, enforcedKeys,
                 {rawPtr(countsAcc_), countsAcc_.size()}, {rawPtr(macsAcc_), macsAcc_.size()}, scratch);
-
-            while (not macRefineGpu(octreeAcc_, leavesAcc_, centersAcc_, macsAcc_, prevFocusStart, prevFocusEnd,
-                                    focusStart, focusEnd, invThetaRefine, box))
-                ;
 
             reallocateDestructive(leaves_, leavesAcc_.size(), allocGrowthRate_);
             memcpyD2H(rawPtr(leavesAcc_), leavesAcc_.size(), rawPtr(leaves_));
-            reallocate(scratch, scratchSize, 1.0);
         }
         else
         {
-            std::copy(gLeavesRank.begin(), gLeavesRank.end(), std::back_inserter(enforcedKeys));
             converged = CombinedUpdate<KeyType>::updateFocus(octreeAcc_, leaves_, bucketSize_, focusStart, focusEnd,
                                                              enforcedKeys, countsAcc_, macsAcc_);
-            while (not macRefine(octreeAcc_, leaves_, centersAcc_, macsAcc_, prevFocusStart, prevFocusEnd, focusStart,
-                                 focusEnd, invThetaRefine, box))
-                ;
         }
 
         translateAssignment<KeyType>(assignment, leaves_, assignment_);
         auto extPeers = focusPeersAcc<useGpu, KeyType>(globDispl_, assignment_, myRank_, globalLeaves, leaves_);
-        auto intPeers = exchangePeers(extPeers, MPI_COMM_WORLD);
+        auto intPeers = exchangePeers(extPeers, comm_);
         peerFlagsToList(extPeers, exteriorPeers_, PeerMask::focus);
         peerFlagsToList(intPeers, interiorPeers_, PeerMask::focus);
         extractPeerRanges(exteriorPeers_, myRank_, assignment_, peerRanges_);
@@ -164,12 +146,12 @@ public:
         if constexpr (HaveGpu<Accelerator>{})
         {
             syncTreeletsGpu<KeyType>(exteriorPeers_, interiorPeers_, assignment_, leaves_, octreeAcc_, leavesAcc_,
-                                     treelets_, scratch);
+                                     treelets_, scratch, comm_);
             downloadOctree();
         }
         else
         {
-            syncTreelets(exteriorPeers_, interiorPeers_, assignment_, octreeAcc_, leaves_, treelets_);
+            syncTreelets(exteriorPeers_, interiorPeers_, assignment_, octreeAcc_, leaves_, treelets_, comm_);
             hostPrefixes_ = octreeAcc_.prefixes;
         }
 
@@ -273,7 +255,7 @@ public:
     void peerExchange(std::span<T> q, int tag, DevVec& s) const
     {
         exchangeTreeletGeneral<T>(interiorPeers_, exteriorPeers_, treeletIdxAcc_.view(), assignment_,
-                                  leafToInternal(octreeAcc_), q, tag, s);
+                                  leafToInternal(octreeAcc_), q, tag, s, comm_);
     }
 
     /*! @brief transfer quantities of leaf cells inside the focus into a global array
@@ -364,7 +346,7 @@ public:
     {
         if constexpr (HaveGpu<Accelerator>{}) { syncGpu(); }
         mpiAllgathervGpuDirect<HaveGpu<Accelerator>{}>(gLeafQLoc.data(), globNumNodes_[myRank_], gLeafQAll.data(),
-                                                       globNumNodes_.data(), globDispl_.data(), MPI_COMM_WORLD);
+                                                       globNumNodes_.data(), globDispl_.data(), comm_);
     }
 
     template<class Tm, class DevVec1 = std::vector<LocalIndex>, class DevVec2 = std::vector<LocalIndex>>
@@ -593,7 +575,7 @@ public:
                                   leafToInternal(octreeAcc_), assignment_[myRank_], useGpu ? layoutAcc : layout);
         if constexpr (useGpu) { memcpyD2H(layoutAcc.data(), layoutAcc.size(), layout.data()); }
 
-        return checkLayout(myRank_, assignment_, layout, treeLeaves());
+        return checkLayout(myRank_, assignment_, layout, treeLeaves(), 512 * bucketSize_);
     }
 
     //! @brief update until converged with a simple min-distance MAC
@@ -613,7 +595,7 @@ public:
             converged = updateTree(assignment, globalTreeLeaves, box, scratch);
             updateCounts(particleKeys, globalTreeLeaves, globalCounts, scratch);
             updateGeoCenters();
-            MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+            MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, comm_);
         }
     }
 
@@ -748,6 +730,8 @@ private:
     int numRanks_;
     //! @brief bucket size (ncrit) inside the focus are
     unsigned bucketSize_;
+    //! @brief MPI communicator for all collective and point-to-point operations
+    MPI_Comm comm_;
 
     //! @brief allocation growth rate for focus tree arrays with length ~ numFocusNodes
     float allocGrowthRate_{1.05};
