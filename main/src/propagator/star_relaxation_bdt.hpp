@@ -92,7 +92,8 @@ protected:
      *
      * x, y, z, h and m are automatically considered conserved and must not be specified in this list
      */
-    using ConservedFields = FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "rung", "id", "abar", "zbar", "li3">;
+    using ConservedFields = FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "rung", "id",
+                                      "abar", "zbar", "li3">;
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
@@ -144,11 +145,6 @@ public:
         d.setDependent("keys");
         std::apply([&d](auto... f) { d.setConserved(f.value...); }, make_tuple(ConservedFields{}));
         std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
-
-        d.devData.setConserved("x", "y", "z", "h", "m");
-        d.devData.setDependent("keys");
-        std::apply([&d](auto... f) { d.devData.setConserved(f.value...); }, make_tuple(ConservedFields{}));
-        std::apply([&d](auto... f) { d.devData.setDependent(f.value...); }, make_tuple(DependentFields{}));
     }
 
     void save(IFileWriter* writer) override { timestep_.loadOrStore(writer, "ts::"); }
@@ -228,14 +224,13 @@ public:
         pmReader.start();
         sync(domain, simData);
         timer.step("domain::sync");
+        Base::logDomainStats(domain, simData);
 
         auto&  d     = simData.hydro;
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        transferToHost(d, first, first + 1, {"m"});
-        fill(get<"m">(d), 0, first, d.m[first]);
-        fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
+        fillMassHalos(get<"m">(d), first, last);
 
         findNeighborsSfc(first, last, d, domain.box());
         timer.step("FindNeighbors");
@@ -246,20 +241,23 @@ public:
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
-        computeVeDefGradh(activeRungs_, d, domain.box());
-        timer.step("Normalization & Gradh");
+        computeVe(activeRungs_, d, domain.box());
+        timer.step("Generalized Volume Elements");
+        domain.exchangeHalos(get<"kx", "vx", "vy", "vz">(d), get<"keys">(d), haloRecvScratch);
+        timer.step("mpi::synchronizeHalos");
+
+        computeIadDivvCurlvGradh(activeRungs_, d, domain.box());
+        groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
+        timer.step("IadVelocityDivCurlGradh");
+
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "gradh">(d), get<"keys">(d),
+                             haloRecvScratch);
+        timer.step("mpi::synchronizeHalos");
 
         computeEOS(first, last, d);
         timer.step("EquationOfState");
 
-        domain.exchangeHalos(get<"vx", "vy", "vz", "prho", "c", "kx">(d), get<"keys">(d), haloRecvScratch);
-        timer.step("mpi::synchronizeHalos");
-
-        computeIadDivvCurlv(activeRungs_, d, domain.box());
-        groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
-        timer.step("IadVelocityDivCurl");
-
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv">(d), get<"keys">(d), haloRecvScratch);
+        domain.exchangeHalos(get<"prho", "c">(d), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
         computeAVswitches(activeRungs_, d, domain.box());
@@ -288,6 +286,10 @@ public:
             mHolder_.traverse(gravGroup, d, domain);
             timer.step("Gravity");
             pmReader.step();
+
+            auto stats = mHolder_.readStats();
+            timer.logStatistics("sumP2P", stats[0] / timer.getLastStepTime());
+            timer.logStatistics("sumM2P", stats[2] / timer.getLastStepTime());
         }
         groupAccTimestep(activeRungs_, rawPtr(groupDt_), d);
     }
@@ -404,8 +406,7 @@ public:
                                  d.outputFieldIndices.begin();
                     transferToHost(d, first, last, {d.fieldNames[fidx]});
                     std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writer->writeField(key, field->data(), c); },
-                               fieldPointers[fidx]);
+                               { writer->writeField(key, field->data(), c); }, fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }

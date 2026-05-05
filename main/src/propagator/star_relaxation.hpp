@@ -69,11 +69,12 @@ protected:
      *
      * x, y, z, h and m are automatically considered conserved and must not be specified in this list
      */
-    using ConservedFields = FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "id", "abar", "zbar", "li3">;
+    using ConservedFields =
+        FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "id", "abar", "zbar", "li3">;
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
-    using DependentFields_ =
-        FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33", "xm", "kx", "nc", "cv", "tdpdTrho", "p">;
+    using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
+                                       "xm", "kx", "nc", "cv", "tdpdTrho", "p">;
 
     //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
@@ -81,7 +82,7 @@ protected:
     //! @brief what will be allocated based AV cleaning choice
     using DependentFields =
         std::conditional_t<avClean, decltype(DependentFields_{} + GradVFields{}), decltype(DependentFields_{})>;
-    
+
 public:
     StarRelaxationProp(std::ostream& output, size_t rank)
         : Base(output, rank)
@@ -133,16 +134,15 @@ public:
         pmReader.start();
         sync(domain, simData);
         timer.step("domain::sync");
+        Base::logDomainStats(domain, simData);
 
         auto& d = simData.hydro;
-        d.resizeAcc(domain.nParticlesWithHalos());
+        d.resize(domain.nParticlesWithHalos());
         resizeNeighbors(d, domain.nParticles() * d.ngmax);
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        transferToHost(d, first, first + 1, {"m"});
-        fill(get<"m">(d), 0, first, d.m[first]);
-        fill(get<"m">(d), last, domain.nParticlesWithHalos(), d.m[first]);
+        fillMassHalos(get<"m">(d), first, last);
 
         findNeighborsSfc(first, last, d, domain.box());
         computeGroups(first, last, d, domain.box(), groups_);
@@ -154,24 +154,22 @@ public:
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        release(d, "ay");
-        acquire(d, "gradh");
-        computeVeDefGradh(groups_.view(), d, domain.box());
-        timer.step("Normalization & Gradh");
+        computeVe(groups_.view(), d, domain.box());
+        timer.step("Generalized Volume Elements");
+        domain.exchangeHalos(get<"vx", "vy", "vz", "kx">(d), get<"ax">(d), get<"keys">(d));
+        timer.step("mpi::synchronizeHalos");
+
+        release(d, "ay", "az");
+        acquire(d, "divv", "gradh");
+        computeIadDivvCurlvGradh(groups_.view(), d, domain.box());
+        d.minDtRho = rhoTimestep(first, last, d);
+        timer.step("IadVelocityDivCurlGradh");
 
         computeEOS(first, last, d);
         timer.step("EquationOfState");
 
-        domain.exchangeHalos(get<"vx", "vy", "vz", "prho", "c", "kx">(d), get<"ax">(d), get<"keys">(d));
-        timer.step("mpi::synchronizeHalos");
-
-        release(d, "gradh", "az");
-        acquire(d, "divv", "curlv");
-        computeIadDivvCurlv(groups_.view(), d, domain.box());
-        d.minDtRho = rhoTimestep(first, last, d);
-        timer.step("IadVelocityDivCurl");
-
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv">(d), get<"ax">(d), get<"keys">(d));
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "c">(d), get<"ax">(d),
+                             get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
         computeAVswitches(groups_.view(), d, domain.box());
@@ -179,13 +177,13 @@ public:
 
         if (avClean)
         {
-            domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "alpha">(d), get<"ax">(d),
+            domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "prho", "alpha">(d), get<"ax">(d),
                                  get<"keys">(d));
         }
-        else { domain.exchangeHalos(std::tie(get<"alpha">(d)), get<"ax">(d), get<"keys">(d)); }
+        else { domain.exchangeHalos(get<"prho", "alpha">(d), get<"ax">(d), get<"keys">(d)); }
         timer.step("mpi::synchronizeHalos");
 
-        release(d, "divv", "curlv");
+        release(d, "divv", "gradh");
         acquire(d, "ay", "az");
         computeMomentumEnergy<avClean>(groups_.view(), nullptr, d, domain.box());
         timer.step("MomentumAndEnergy");
@@ -200,6 +198,10 @@ public:
             mHolder_.traverse(groups, d, domain);
             timer.step("Gravity");
             pmReader.step();
+
+            auto stats = mHolder_.readStats();
+            timer.logStatistics("sumP2P", stats[0] / timer.getLastStepTime());
+            timer.logStatistics("sumM2P", stats[2] / timer.getLastStepTime());
         }
     }
 
@@ -211,7 +213,6 @@ public:
 
         computeTimestep(first, last, d);
         timer.step("Timestep");
-        computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
         computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
         bool haveUnconvergedParticles = updateSmoothingLength(groups_.view(), d);
         if (haveUnconvergedParticles && not d.removeUnconvergedParticles)
@@ -241,8 +242,7 @@ public:
                                  d.outputFieldIndices.begin();
                     transferToHost(d, first, last, {d.fieldNames[fidx]});
                     std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writer->writeField(key, field->data(), c); },
-                               fieldPointers[fidx]);
+                               { writer->writeField(key, field->data(), c); }, fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
@@ -264,7 +264,7 @@ public:
         release(d, "prho", "c");
         acquire(d, "divv", "curlv");
         // partial recovery of cij in range [first:last] without halos, which are not needed for divv and curlv
-        if (!indicesDone.empty()) { computeIadDivvCurlv(groups_.view(), d, box); }
+        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
         output();
         release(d, "divv", "curlv");
         acquire(d, "prho", "c");
@@ -286,10 +286,7 @@ public:
         timer.step("FileOutput");
     }
 
-    void readHelmEOSTable(const std::string path) override
-    {
-        Helmholtz_EOS::init(path);
-    }
+    void readHelmEOSTable(const std::string path) override { Helmholtz_EOS::init(path); }
 };
 
 } // namespace sphexa
