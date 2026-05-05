@@ -4,7 +4,7 @@ set(INSITU
 set_property(CACHE INSITU PROPERTY STRINGS None Catalyst Ascent)
 
 if(INSITU STREQUAL "Catalyst")
-  find_package(catalyst REQUIRED)
+  find_package(catalyst 2.0 REQUIRED)
 elseif(INSITU STREQUAL "Ascent")
   find_package(Ascent 0.9.5 REQUIRED)
 endif()
