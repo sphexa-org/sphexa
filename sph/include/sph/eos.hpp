@@ -1,8 +1,8 @@
 #pragma once
 
 #include "cstone/util/tuple.hpp"
-
 #include "kernels.hpp"
+#include "helmholtz_eos.hpp"
 
 namespace sph
 {
@@ -11,7 +11,8 @@ enum EosType : int
 {
     idealGas   = 0,
     isothermal = 1,
-    polytropic = 2
+    polytropic = 2,
+    helmholtz  = 3
 };
 
 //! @brief returns the heat capacity for given mean molecular weight

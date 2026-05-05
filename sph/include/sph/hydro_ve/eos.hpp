@@ -34,6 +34,7 @@
 
 #include "sph/sph_gpu.hpp"
 #include "sph/eos.hpp"
+#include "sph/helmholtz_eos.hpp"
 
 namespace sph
 {
@@ -150,15 +151,54 @@ void computePolytropicEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
     }
 }
 
+template<typename Dataset>
+void computeHelmholtzEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
+{
+    const auto* kx    = d.kx.data();
+    const auto* xm    = d.xm.data();
+    const auto* m     = d.m.data();
+    const auto* temp  = d.temp.data();
+    const auto* abar  = d.abar.data();
+    const auto* zbar  = d.zbar.data();
+    const auto* gradh = d.gradh.data();
+
+    auto* prho     = d.prho.data();
+    auto* c        = d.c.data();
+    auto* cv       = d.cv.data();
+    auto* tdpdTrho = d.tdpdTrho.data();
+    auto* u        = d.u.data();
+    auto* p        = d.p.data();
+
+    bool storeRho      = (d.rho.size() == d.m.size());
+    bool storeP        = (d.p.size() == d.m.size());
+    bool storeCv       = (d.cv.size() == d.m.size());
+    bool storeTdpdTrho = (d.tdpdTrho.size() == d.m.size());
+
+    Helmholtz_EOS& helmEOS = sph::Helmholtz_EOS::instance();
+
+#pragma omp parallel for schedule(static)
+    for (size_t i = startIndex; i < endIndex; ++i)
+    {
+        auto rho = kx[i] * m[i] / xm[i];
+        //  get dpdt instead of u and calculate tdpdtrho = temp * dp/dT * prho
+        auto [dpdt, cvi] = helmEOS.helmholtzEOS(temp[i], rho, abar[i], zbar[i], &c[i], &p[i]);
+
+        prho[i] = p[i] / (kx[i] * m[i] * m[i] * gradh[i]);
+
+        if (storeRho) { d.rho[i] = rho; }
+        if (storeTdpdTrho) { tdpdTrho[i] = temp[i] * dpdt / (kx[i] * m[i] * m[i] * gradh[i]); }
+        if (storeCv) { d.cv[i] = cvi; }
+    }
+}
+
 template<class Dataset>
 void computeIdealGasEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        gpu::computeIdealGasEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.temp), rawPtr(d.u),
-                                rawPtr(d.m), rawPtr(d.kx), rawPtr(d.xm),
-                                rawPtr(d.gradh), rawPtr(d.prho), rawPtr(d.c),
-                                rawPtr(d.rho), rawPtr(d.p));
+        gpu::computeIdealGasEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.temp), rawPtr(d.u), rawPtr(d.m),
+                                rawPtr(d.kx), rawPtr(d.xm), rawPtr(d.gradh), rawPtr(d.prho), rawPtr(d.c), rawPtr(d.rho),
+                                rawPtr(d.p));
     }
     else { computeIdealGasEOS_Impl(startIndex, endIndex, d); }
 }
@@ -168,9 +208,9 @@ void computeIsothermalEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        gpu::computeIsothermalEOS(startIndex, endIndex, d.soundSpeedConst, rawPtr(d.c), rawPtr(d.rho),
-                                  rawPtr(d.p), rawPtr(d.m), rawPtr(d.kx), rawPtr(d.xm),
-                                  rawPtr(d.gradh), rawPtr(d.prho), rawPtr(d.temp));
+        gpu::computeIsothermalEOS(startIndex, endIndex, d.soundSpeedConst, rawPtr(d.c), rawPtr(d.rho), rawPtr(d.p),
+                                  rawPtr(d.m), rawPtr(d.kx), rawPtr(d.xm), rawPtr(d.gradh), rawPtr(d.prho),
+                                  rawPtr(d.temp));
     }
     else { computeIsothermalEOS_Impl(startIndex, endIndex, d); }
 }
@@ -181,11 +221,22 @@ void computePolytropicEOS(size_t startIndex, size_t endIndex, Dataset& d)
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         gpu::computePolytropicEOS(startIndex, endIndex, d.polytropic_const, d.polytropic_index, rawPtr(d.rho),
-                                  rawPtr(d.p), rawPtr(d.m), rawPtr(d.kx), rawPtr(d.xm),
-                                  rawPtr(d.gradh), rawPtr(d.prho), rawPtr(d.temp),
-                                  rawPtr(d.c));
+                                  rawPtr(d.p), rawPtr(d.m), rawPtr(d.kx), rawPtr(d.xm), rawPtr(d.gradh), rawPtr(d.prho),
+                                  rawPtr(d.temp), rawPtr(d.c));
     }
     else { computePolytropicEOS_Impl(startIndex, endIndex, d); }
+}
+
+template<class Dataset>
+void computeHelmholtzEOS(size_t startIndex, size_t endIndex, Dataset& d)
+{
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    {
+        cuda::computeHelmholtzEOS(startIndex, endIndex, rawPtr(d.kx), rawPtr(d.xm), rawPtr(d.m), rawPtr(d.temp),
+                                  rawPtr(d.abar), rawPtr(d.zbar), rawPtr(d.gradh), rawPtr(d.prho), rawPtr(d.c),
+                                  rawPtr(d.cv), rawPtr(d.tdpdTrho), rawPtr(d.rho), rawPtr(d.p));
+    }
+    else { computeHelmholtzEOS_Impl(startIndex, endIndex, d); }
 }
 
 template<class Dataset>
@@ -194,6 +245,7 @@ void computeEOS(size_t startIndex, size_t endIndex, Dataset& d)
     if (d.eosChoice == EosType::idealGas) { computeIdealGasEOS(startIndex, endIndex, d); }
     else if (d.eosChoice == EosType::isothermal) { computeIsothermalEOS(startIndex, endIndex, d); }
     else if (d.eosChoice == EosType::polytropic) { computePolytropicEOS(startIndex, endIndex, d); }
+    else if (d.eosChoice == EosType::helmholtz) { computeHelmholtzEOS(startIndex, endIndex, d); }
 }
 
 } // namespace sph

@@ -51,7 +51,7 @@ void computeIadDivvCurlvGradhImpl(size_t startIndex, size_t endIndex, Dataset& d
     const auto* vy = d.vy.data();
     const auto* vz = d.vz.data();
     const auto* h  = d.h.data();
-    const auto* m = d.m.data();
+    const auto* m  = d.m.data();
 
     auto* c11 = d.c11.data();
     auto* c12 = d.c12.data();

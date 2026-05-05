@@ -75,10 +75,26 @@ struct EMom
     }
 };
 
+/*! @brief Functor to compute internal energy contribution for one particle
+ *
+ * @tparam Tm   type of mass
+ * @tparam Tt   type of temperature/cv
+ */
+template<class Tm, class Tt>
+struct ComputeInternalEnergy
+{
+    const Tm* m;
+    const Tt* cv;
+    const Tt* temp;
+    size_t    first;
+
+    __device__ double operator()(size_t i) const { return m[i + first] * cv[i + first] * temp[i + first]; }
+};
+
 template<class Tc, class Tv, class Tt, class Tm>
 std::tuple<double, double, Vec3<double>, Vec3<double>>
-conservedQuantitiesGpu(double cv, const Tc* x, const Tc* y, const Tc* z, const Tv* vx, const Tv* vy, const Tv* vz,
-                       const Tt* temp, const Tt* u, const Tm* m, size_t first, size_t last)
+conservedQuantitiesGpu(double cvIdealGas, const Tc* x, const Tc* y, const Tc* z, const Tv* vx, const Tv* vy,
+                       const Tv* vz, const Tt* temp, const Tt* u, const Tt* cv, const Tm* m, size_t first, size_t last)
 {
     auto it1 = thrust::make_zip_iterator(
         thrust::make_tuple(x + first, y + first, z + first, m + first, vx + first, vy + first, vz + first));
@@ -92,7 +108,15 @@ conservedQuantitiesGpu(double cv, const Tc* x, const Tc* y, const Tc* z, const T
     double eInt = 0.0;
     if (temp != nullptr)
     {
-        eInt = cv * thrust::inner_product(thrust::device, m + first, m + last, temp + first, Tt(0.0));
+        if (cv != nullptr)
+        {
+            // elementwise product: eInt = sum_i( m[i] * cv[i] * temp[i] )
+            auto n = last - first;
+            eInt   = thrust::transform_reduce(
+                thrust::device, thrust::make_counting_iterator<size_t>(0), thrust::make_counting_iterator<size_t>(n),
+                ComputeInternalEnergy<Tm, Tt>{m, cv, temp, first}, 0.0, thrust::plus<double>());
+        }
+        else { eInt = cvIdealGas * thrust::inner_product(thrust::device, m + first, m + last, temp + first, Tt(0.0)); }
     }
     else if (u != nullptr) { eInt = thrust::inner_product(thrust::device, m + first, m + last, u + first, Tt(0.0)); }
 
@@ -101,8 +125,8 @@ conservedQuantitiesGpu(double cv, const Tc* x, const Tc* y, const Tc* z, const T
 
 #define CONSERVED_Q_GPU(Tc, Tv, Tt, Tm)                                                                                \
     template std::tuple<double, double, Vec3<double>, Vec3<double>> conservedQuantitiesGpu(                            \
-        double cv, const Tc* x, const Tc* y, const Tc* z, const Tv* vx, const Tv* vy, const Tv* vz, const Tt* temp,    \
-        const Tt* u, const Tm* m, size_t, size_t)
+        double cvIdealGas, const Tc* x, const Tc* y, const Tc* z, const Tv* vx, const Tv* vy, const Tv* vz,            \
+        const Tt* temp, const Tt* u, const Tt* cv, const Tm* m, size_t, size_t)
 
 CONSERVED_Q_GPU(double, double, double, double);
 CONSERVED_Q_GPU(double, double, double, float);
@@ -110,3 +134,4 @@ CONSERVED_Q_GPU(double, float, double, float);
 CONSERVED_Q_GPU(float, float, float, float);
 
 } // namespace sphexa
+

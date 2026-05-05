@@ -20,7 +20,7 @@
 namespace ryoanji
 {
 
-__device__ float totalEwaldPotentialGlob = 0;
+__device__ double totalEwaldPotentialGlob = 0;
 
 struct EwaldKernelConfig
 {
@@ -30,7 +30,7 @@ struct EwaldKernelConfig
 
 template<class Tc, class Ta, class Tm, class Tmm>
 __global__ void computeGravityEwaldKernel(cstone::GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m,
-                                          float G, Ta* ugrav, Ta* ax, Ta* ay, Ta* az,
+                                          double G, Ta* ugrav, Ta* ax, Ta* ay, Ta* az,
                                           const EwaldParameters<Tc, Tmm>* ewaldParams)
 {
     LocalIndex tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -70,7 +70,7 @@ __global__ void resetEwaldPotential() { totalEwaldPotentialGlob = 0; }
 //! GPU version of computeGravityEwald
 template<class MType, class Tc, class Ta, class Tm, class Tu>
 void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mroot, cstone::GroupView grp, const Tc* x,
-                            const Tc* y, const Tc* z, const Tm* m, const cstone::Box<Tc>& box, float G, Ta* ugrav,
+                            const Tc* y, const Tc* z, const Tm* m, const cstone::Box<Tc>& box, double G, Ta* ugrav,
                             Ta* ax, Ta* ay, Ta* az, Tu* ugravTot, EwaldSettings settings)
 {
     if (box.minExtent() != box.maxExtent()) { throw std::runtime_error("Ewald gravity requires cubic bounding boxes"); }
@@ -91,8 +91,8 @@ void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mro
     resetEwaldPotential<<<1, 1>>>();
     computeGravityEwaldKernel<<<numBlocks, numThreads>>>(grp, x, y, z, m, G, ugrav, ax, ay, az, ewaldParamsGpu);
 
-    float totalPotential;
-    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalEwaldPotentialGlob), sizeof(float)));
+    double totalPotential;
+    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalEwaldPotentialGlob), sizeof(double)));
     checkGpuErrors(cudaFree(ewaldParamsGpu));
 
     *ugravTot += 0.5 * G * totalPotential;
@@ -101,7 +101,7 @@ void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mro
 #define COMPUTE_GRAVITY_EWALD_GPU(MType, Tc, Ta, Tm, Tu)                                                               \
     template void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mroot, cstone::GroupView,    \
                                          const Tc* x, const Tc* y, const Tc* z, const Tm* m,                           \
-                                         const cstone::Box<Tc>& box, float G, Ta* ugrav, Ta* ax, Ta* ay, Ta* az,       \
+                                         const cstone::Box<Tc>& box, double G, Ta* ugrav, Ta* ax, Ta* ay, Ta* az,      \
                                          Tu* ugravTot, EwaldSettings settings)
 
 COMPUTE_GRAVITY_EWALD_GPU(CartesianQuadrupole<double>, double, double, double, double);

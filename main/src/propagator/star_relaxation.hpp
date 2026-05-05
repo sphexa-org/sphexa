@@ -24,10 +24,9 @@
  */
 
 /*! @file
- * @brief A Propagator class for modern SPH with generalized volume elements
+ * @brief A Propagator class for star relaxation for the engulfment case
  *
- * @author Sebastian Keller <sebastian.f.keller@gmail.com>
- * @author Jose A. Escartin <ja.escartin@gmail.com>
+ * @author Osman Seckin Simsek <osman.simsek@unibas.ch>
  */
 
 #pragma once
@@ -46,7 +45,7 @@ using namespace sph;
 using util::FieldList;
 
 template<bool avClean, class DomainType, class DataType>
-class HydroVeProp : public Propagator<DomainType, DataType>
+class StarRelaxationProp : public Propagator<DomainType, DataType>
 {
 protected:
     using Base = Propagator<DomainType, DataType>;
@@ -70,11 +69,12 @@ protected:
      *
      * x, y, z, h and m are automatically considered conserved and must not be specified in this list
      */
-    using ConservedFields = FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "id">;
+    using ConservedFields =
+        FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "id", "abar", "zbar", "li3">;
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
-    using DependentFields_ =
-        FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33", "xm", "kx", "nc">;
+    using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
+                                       "xm", "kx", "nc", "cv", "tdpdTrho", "p">;
 
     //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
@@ -84,7 +84,7 @@ protected:
         std::conditional_t<avClean, decltype(DependentFields_{} + GradVFields{}), decltype(DependentFields_{})>;
 
 public:
-    HydroVeProp(std::ostream& output, size_t rank)
+    StarRelaxationProp(std::ostream& output, size_t rank)
         : Base(output, rank)
     {
         if (avClean && rank == 0) { std::cout << "AV cleaning is activated" << std::endl; }
@@ -104,8 +104,12 @@ public:
         d.setConserved("x", "y", "z", "h", "m");
         d.setDependent("keys");
         std::apply([&d](auto... f) { d.setConserved(f.value...); }, make_tuple(ConservedFields{}));
-        std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
-        if (d.eosChoice == EosType::helmholtz) { d.setDependent("abar", "zbar"); }
+        std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields_{}));
+
+        d.devData.setConserved("x", "y", "z", "h", "m");
+        d.devData.setDependent("keys");
+        std::apply([&d](auto... f) { d.devData.setConserved(f.value...); }, make_tuple(ConservedFields{}));
+        std::apply([&d](auto... f) { d.devData.setDependent(f.value...); }, make_tuple(DependentFields_{}));
     }
 
     void sync(DomainType& domain, DataType& simData) override
@@ -221,10 +225,11 @@ public:
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,
                     const cstone::Box<T>& box) override
     {
-        auto& d             = simData.hydro;
-        auto  fieldPointers = d.data();
-        auto  indicesDone   = d.outputFieldIndices;
-        auto  namesDone     = d.outputFieldNames;
+        auto& d = simData.hydro;
+        d.resize(d.accSize());
+        auto fieldPointers = d.data();
+        auto indicesDone   = d.outputFieldIndices;
+        auto namesDone     = d.outputFieldNames;
 
         auto output = [&]()
         {
@@ -235,13 +240,9 @@ public:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    std::visit(
-                        [writer, c = column, key = namesDone[i]](auto field)
-                        {
-                            auto&& tmp = toHost(*field);
-                            writeField(writer, key, tmp.data(), c);
-                        },
-                        fieldPointers[fidx]);
+                    transferToHost(d, first, last, {d.fieldNames[fidx]});
+                    std::visit([writer, c = column, key = namesDone[i]](auto field)
+                               { writer->writeField(key, field->data(), c); }, fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
@@ -253,10 +254,10 @@ public:
 
         // second output pass: write temporary quantities produced by the EOS
         release(d, "c11", "c12", "c13");
-        acquire(d, "rho", "p", "gradh");
+        acquire(d, "rho", "gradh");
         computeEOS(first, last, d);
         output();
-        release(d, "rho", "p", "gradh");
+        release(d, "rho", "gradh");
         acquire(d, "c11", "c12", "c13");
 
         // third output pass: recover temporary curlv and divv quantities
@@ -284,6 +285,8 @@ public:
         }
         timer.step("FileOutput");
     }
+
+    void readHelmEOSTable(const std::string path) override { Helmholtz_EOS::init(path); }
 };
 
 } // namespace sphexa

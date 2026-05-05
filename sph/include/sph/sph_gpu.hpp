@@ -61,6 +61,13 @@ extern void computePolytropicEOS(size_t firstParticle, size_t lastParticle, Tt p
                                  Th* rho, Th* p, const Th* m, const Th* kx, const Th* xm, const Th* gradh, Th* prho,
                                  Tt* temp, Th* c);
 
+template<class Tt, class Tm, class Thydro>
+extern void computeHelmholtzEOS(size_t firstParticle, size_t lastParticle, const Thydro* kx, const Thydro* xm,
+                                const Tm* m, const Tt* temp, const Tt* abar, const Tt* zbar, const Thydro* gradh,
+                                Thydro* prho, Thydro* c, Thydro* cv, Thydro* tdpdTrho, Thydro* rho, Thydro* p);
+
+extern void freeDeviceHelmholtzEOSTables();
+
 template<class Dataset>
 extern void computeIdealGasEOS_HydroStd(size_t firstParticle, size_t lastParticle, Dataset& d);
 
@@ -77,13 +84,13 @@ extern void driftPositionsGpu(const GroupView& grp, float dt, float dt_back,
                               util::array<float, Timestep::maxNumRungs> dt_m1, Tc* x, Tc* y, Tc* z, Thydro* vx,
                               Thydro* vy, Thydro* vz, const Tm1* x_m1, const Tm1* y_m1, const Tm1* z_m1,
                               const Thydro* ax, const Thydro* ay, const Thydro* az, const uint8_t* rung, Tc* temp,
-                              Tc* u, Tdu* du, Tm1* du_m1, Thydro* mui, Tc gamma, Tc constCv);
+                              Tc* u, Tdu* du, Tm1* du_m1, Thydro* cv, Thydro* mui, Tc gamma, Tc constCv);
 
 template<class Tc, class Tv, class Ta, class Tdu, class Tm1, class Tu, class Thydro>
 extern void computePositionsGpu(const GroupView& grp, float dt, util::array<float, Timestep::maxNumRungs> dt_m1, Tc* x,
                                 Tc* y, Tc* z, Tv* vx, Tv* vy, Tv* vz, Tm1* x_m1, Tm1* y_m1, Tm1* z_m1, Ta* ax, Ta* ay,
                                 Ta* az, const uint8_t* rung, Tu* temp, Tu* u, Tdu* du, Tm1* du_m1, Thydro* h,
-                                Thydro* mui, Tc gamma, Tc constCv, const cstone::Box<Tc>& box);
+                                Thydro* cv, Thydro* mui, Tc gamma, Tc constCv, const cstone::Box<Tc>& box);
 
 template<class Th, class KeyType>
 extern bool updateSmoothingLengthGpu(const GroupView&, unsigned ng0, const unsigned* nc, Th* h, KeyType* keys);

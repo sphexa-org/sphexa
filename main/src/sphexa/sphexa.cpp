@@ -79,24 +79,25 @@ int main(int argc, char** argv)
     using Dataset = SimulationData<AccType>;
     using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, AccType>;
 
-    const std::string        initCond     = parser.get("--init");
-    const size_t             problemSize  = parser.get("-n", 50);
-    const std::string        glassBlock   = parser.get("--glass");
-    const std::string        propChoice   = parser.get("--prop", std::string("ve"));
-    const std::string        maxStepStr   = parser.get("-s", std::string("200"));
-    std::vector<std::string> writeExtra   = parser.getCommaList("--wextra");
-    std::vector<std::string> outputFields = parser.getCommaList("-f");
-    const bool               ascii        = parser.exists("--ascii");
-    const bool               quiet        = parser.exists("--quiet");
-    const bool               avClean      = parser.exists("--avclean");
-    const int                simDuration  = parser.get("--duration", std::numeric_limits<int>::max());
-    const std::string        writeFreqStr = parser.get("-w", std::string("0"));
-    const bool               writeEnabled = writeFreqStr != "0" || !writeExtra.empty();
-    const std::string        profFreqStr  = parser.get("--profile", maxStepStr);
-    const bool               profEnabled  = parser.exists("--profile") || writeEnabled;
-    const std::string        pmroot       = parser.get("--pmroot", std::string("")); // /sys/cray/pm_counters
-    std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
-    std::string              profFile     = parser.get("-op", std::string("profile"));
+    const std::string        initCond      = parser.get("--init");
+    const size_t             problemSize   = parser.get("-n", 50);
+    const std::string        glassBlock    = parser.get("--glass");
+    const std::string        propChoice    = parser.get("--prop", std::string("ve"));
+    const std::string        maxStepStr    = parser.get("-s", std::string("200"));
+    std::vector<std::string> writeExtra    = parser.getCommaList("--wextra");
+    std::vector<std::string> outputFields  = parser.getCommaList("-f");
+    const bool               ascii         = parser.exists("--ascii");
+    const bool               quiet         = parser.exists("--quiet");
+    const bool               avClean       = parser.exists("--avclean");
+    const int                simDuration   = parser.get("--duration", std::numeric_limits<int>::max());
+    const std::string        writeFreqStr  = parser.get("-w", std::string("0"));
+    const bool               writeEnabled  = writeFreqStr != "0" || !writeExtra.empty();
+    const std::string        profFreqStr   = parser.get("--profile", maxStepStr);
+    const bool               profEnabled   = parser.exists("--profile") || writeEnabled;
+    const std::string        helmTablePath = parser.get("--helmTablePath", std::string(""));
+    const std::string        pmroot        = parser.get("--pmroot", std::string("")); // /sys/cray/pm_counters
+    std::string              outFile       = parser.get("-o", "dump_" + removeModifiers(initCond));
+    std::string              profFile      = parser.get("-op", std::string("profile"));
 
     std::ofstream nullOutput("/dev/null");
     std::ostream& output = (quiet || rank) ? nullOutput : std::cout;
@@ -115,6 +116,10 @@ int main(int argc, char** argv)
     Timer totalTimer(output);
     MPI_Barrier(MPI_COMM_WORLD);
     totalTimer.start();
+
+    // EOS choice should be set before the necessary fields are activated
+    simData.hydro.eosChoice = helmTablePath.empty() ? sph::EosType::idealGas : sph::EosType::helmholtz;
+    if (simData.hydro.eosChoice == sph::EosType::helmholtz) { propagator->readHelmEOSTable(helmTablePath); }
 
     propagator->addCounters(pmroot, getNumLocalRanks(numRanks));
     propagator->activateFields(simData);

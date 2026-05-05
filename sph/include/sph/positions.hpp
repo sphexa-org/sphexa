@@ -77,7 +77,7 @@ HOST_DEVICE_FUN cstone::Vec3<Tc> fbcAdjustFactors(const cstone::Vec3<Tc> X, cons
 template<class TU>
 HOST_DEVICE_FUN TU energyUpdate(TU u_old, double dt, double dt_m1, double du, double du_m1)
 {
-    TU u_new = u_old + du * dt + 0.5 * (du - du_m1) / dt_m1 * std::abs(dt) * dt;
+    TU u_new = u_old + du * dt + 0.5 * (du - du_m1) / dt_m1 * dt * dt;
     // To prevent u < 0 (when cooling with GRACKLE is active)
     if (u_new < 0.) { u_new = u_old * std::exp(u_new * dt / u_old); }
     return u_new;
@@ -150,11 +150,11 @@ void updateTempHost(size_t startIndex, size_t endIndex, Dataset& d, const cstone
     for (std::size_t i = startIndex; i < endIndex; i++)
     {
         if (anyFBC) { adjustForFBC = min(fbcAdjustFactors({d.x[i], d.y[i], d.z[i]}, box, d.h[i])); }
-        auto cv    = haveMui ? idealGasCv(d.mui[i], d.gamma) : constCv;
-        auto u_old = cv * d.temp[i];
+        auto cvi   = !d.cv.empty() ? d.cv[i] : (haveMui ? idealGasCv(d.mui[i], d.gamma) : constCv);
+        auto u_old = cvi * d.temp[i];
         // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
         // we multiply dt_m1 by that factor so it applies only once to each of the updating terms
-        d.temp[i]  = energyUpdate(u_old, d.minDt * adjustForFBC, d.minDt_m1 * adjustForFBC, d.du[i], d.du_m1[i]) / cv;
+        d.temp[i]  = energyUpdate(u_old, d.minDt * adjustForFBC, d.minDt_m1 * adjustForFBC, d.du[i], d.du_m1[i]) / cvi;
         d.du_m1[i] = d.du[i];
     }
 }
@@ -196,11 +196,10 @@ void driftPositions(const GroupView& grp, Dataset& d, float dt_forward, float dt
         auto  constCv = d.mui.empty() ? idealGasCv(d.muiConst, d.gamma) : -1.0;
         auto* d_mui   = d.mui.empty() ? nullptr : rawPtr(d.mui);
 
-        driftPositionsGpu(grp, dt_forward, dt_backward, dt_prevRung, rawPtr(d.x), rawPtr(d.y),
-                          rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz),
-                          rawPtr(d.x_m1), rawPtr(d.y_m1), rawPtr(d.z_m1), rawPtr(d.ax),
-                          rawPtr(d.ay), rawPtr(d.az), rung, rawPtr(d.temp), rawPtr(d.u),
-                          rawPtr(d.du), rawPtr(d.du_m1), d_mui, d.gamma, constCv);
+        driftPositionsGpu(grp, dt_forward, dt_backward, dt_prevRung, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z),
+                          rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.x_m1), rawPtr(d.y_m1), rawPtr(d.z_m1),
+                          rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rung, rawPtr(d.temp), rawPtr(d.u), rawPtr(d.du),
+                          rawPtr(d.du_m1), d_mui, d.gamma, constCv);
     }
 }
 
@@ -213,12 +212,10 @@ void computePositions(const GroupView& grp, Dataset& d, const cstone::Box<T>& bo
         T     constCv = d.mui.empty() ? idealGasCv(d.muiConst, d.gamma) : -1.0;
         auto* d_mui   = d.mui.empty() ? nullptr : rawPtr(d.mui);
 
-        computePositionsGpu(grp, dt_forward, dt_m1, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z),
-                            rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.x_m1),
-                            rawPtr(d.y_m1), rawPtr(d.z_m1), rawPtr(d.ax), rawPtr(d.ay),
-                            rawPtr(d.az), rung, rawPtr(d.temp), rawPtr(d.u),
-                            rawPtr(d.du), rawPtr(d.du_m1), rawPtr(d.h), d_mui, d.gamma, constCv,
-                            box);
+        computePositionsGpu(grp, dt_forward, dt_m1, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy),
+                            rawPtr(d.vz), rawPtr(d.x_m1), rawPtr(d.y_m1), rawPtr(d.z_m1), rawPtr(d.ax), rawPtr(d.ay),
+                            rawPtr(d.az), rung, rawPtr(d.temp), rawPtr(d.u), rawPtr(d.du), rawPtr(d.du_m1), rawPtr(d.h),
+                            d_mui, d.gamma, constCv, box);
     }
     else
     {
