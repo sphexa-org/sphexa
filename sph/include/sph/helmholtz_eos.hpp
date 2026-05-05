@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <vector>
 #include <fstream>
 #include <sstream>
@@ -69,44 +70,19 @@ constexpr double esqu = qe * qe;
 class HelmholtzTableManager
 {
 public:
-    double d[IMAX]            = {0};
-    double dd_sav[IMAX - 1]   = {0};
-    double dd2_sav[IMAX - 1]  = {0};
-    double ddi_sav[IMAX - 1]  = {0};
-    double dd2i_sav[IMAX - 1] = {0};
-    double dd3i_sav[IMAX - 1] = {0};
+    std::array<double, IMAX> d{};
+    std::array<double, IMAX - 1> dd_sav{}, dd2_sav{}, ddi_sav{}, dd2i_sav{}, dd3i_sav{};
 
-    double t_[JMAX]           = {0};
-    double dt_sav[JMAX - 1]   = {0};
-    double dt2_sav[JMAX - 1]  = {0};
-    double dti_sav[JMAX - 1]  = {0};
-    double dt2i_sav[JMAX - 1] = {0};
-    double dt3i_sav[JMAX - 1] = {0};
+    std::array<double, JMAX> t_{};
+    std::array<double, JMAX - 1> dt_sav{}, dt2_sav{}, dti_sav{}, dt2i_sav{}, dt3i_sav{};
 
-    double f[IMAX * JMAX]     = {0};
-    double fd[IMAX * JMAX]    = {0};
-    double ft[IMAX * JMAX]    = {0};
-    double fdd[IMAX * JMAX]   = {0};
-    double ftt[IMAX * JMAX]   = {0};
-    double fdt[IMAX * JMAX]   = {0};
-    double fddt[IMAX * JMAX]  = {0};
-    double fdtt[IMAX * JMAX]  = {0};
-    double fddtt[IMAX * JMAX] = {0};
+    std::array<double, IMAX * JMAX> f{}, fd{}, ft{}, fdd{}, ftt{}, fdt{}, fddt{}, fdtt{}, fddtt{};
 
-    double dpdf[IMAX * JMAX]   = {0};
-    double dpdfd[IMAX * JMAX]  = {0};
-    double dpdft[IMAX * JMAX]  = {0};
-    double dpdfdt[IMAX * JMAX] = {0};
+    std::array<double, IMAX * JMAX> dpdf{}, dpdfd{}, dpdft{}, dpdfdt{};
 
-    double ef[IMAX * JMAX]   = {0};
-    double efd[IMAX * JMAX]  = {0};
-    double eft[IMAX * JMAX]  = {0};
-    double efdt[IMAX * JMAX] = {0};
+    std::array<double, IMAX * JMAX> ef{}, efd{}, eft{}, efdt{};
 
-    double xf[IMAX * JMAX]   = {0};
-    double xfd[IMAX * JMAX]  = {0};
-    double xft[IMAX * JMAX]  = {0};
-    double xfdt[IMAX * JMAX] = {0};
+    std::array<double, IMAX * JMAX> xf{}, xfd{}, xft{}, xfdt{};
 
     HelmholtzTableManager() = default;
 
@@ -371,44 +347,44 @@ public:
     inline HelmholtzTableView hostTableView() const
     {
         HelmholtzTableView v{};
-        v.d        = tableManager_->d;
-        v.dd_sav   = tableManager_->dd_sav;
-        v.dd2_sav  = tableManager_->dd2_sav;
-        v.ddi_sav  = tableManager_->ddi_sav;
-        v.dd2i_sav = tableManager_->dd2i_sav;
-        v.dd3i_sav = tableManager_->dd3i_sav;
+        v.d        = tableManager_->d.data();
+        v.dd_sav   = tableManager_->dd_sav.data();
+        v.dd2_sav  = tableManager_->dd2_sav.data();
+        v.ddi_sav  = tableManager_->ddi_sav.data();
+        v.dd2i_sav = tableManager_->dd2i_sav.data();
+        v.dd3i_sav = tableManager_->dd3i_sav.data();
 
-        v.t        = tableManager_->t_;
-        v.dt_sav   = tableManager_->dt_sav;
-        v.dt2_sav  = tableManager_->dt2_sav;
-        v.dti_sav  = tableManager_->dti_sav;
-        v.dt2i_sav = tableManager_->dt2i_sav;
-        v.dt3i_sav = tableManager_->dt3i_sav;
+        v.t        = tableManager_->t_.data();
+        v.dt_sav   = tableManager_->dt_sav.data();
+        v.dt2_sav  = tableManager_->dt2_sav.data();
+        v.dti_sav  = tableManager_->dti_sav.data();
+        v.dt2i_sav = tableManager_->dt2i_sav.data();
+        v.dt3i_sav = tableManager_->dt3i_sav.data();
 
-        v.f     = tableManager_->f;
-        v.fd    = tableManager_->fd;
-        v.ft    = tableManager_->ft;
-        v.fdd   = tableManager_->fdd;
-        v.ftt   = tableManager_->ftt;
-        v.fdt   = tableManager_->fdt;
-        v.fddt  = tableManager_->fddt;
-        v.fdtt  = tableManager_->fdtt;
-        v.fddtt = tableManager_->fddtt;
+        v.f     = tableManager_->f.data();
+        v.fd    = tableManager_->fd.data();
+        v.ft    = tableManager_->ft.data();
+        v.fdd   = tableManager_->fdd.data();
+        v.ftt   = tableManager_->ftt.data();
+        v.fdt   = tableManager_->fdt.data();
+        v.fddt  = tableManager_->fddt.data();
+        v.fdtt  = tableManager_->fdtt.data();
+        v.fddtt = tableManager_->fddtt.data();
 
-        v.dpdf   = tableManager_->dpdf;
-        v.dpdfd  = tableManager_->dpdfd;
-        v.dpdft  = tableManager_->dpdft;
-        v.dpdfdt = tableManager_->dpdfdt;
+        v.dpdf   = tableManager_->dpdf.data();
+        v.dpdfd  = tableManager_->dpdfd.data();
+        v.dpdft  = tableManager_->dpdft.data();
+        v.dpdfdt = tableManager_->dpdfdt.data();
 
-        v.ef   = tableManager_->ef;
-        v.efd  = tableManager_->efd;
-        v.eft  = tableManager_->eft;
-        v.efdt = tableManager_->efdt;
+        v.ef   = tableManager_->ef.data();
+        v.efd  = tableManager_->efd.data();
+        v.eft  = tableManager_->eft.data();
+        v.efdt = tableManager_->efdt.data();
 
-        v.xf   = tableManager_->xf;
-        v.xfd  = tableManager_->xfd;
-        v.xft  = tableManager_->xft;
-        v.xfdt = tableManager_->xfdt;
+        v.xf   = tableManager_->xf.data();
+        v.xfd  = tableManager_->xfd.data();
+        v.xft  = tableManager_->xft.data();
+        v.xfdt = tableManager_->xfdt.data();
         return v;
     }
 

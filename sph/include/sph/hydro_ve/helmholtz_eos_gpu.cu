@@ -30,6 +30,7 @@
  */
 
 #include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/cuda/device_vector.h"
 #include "cstone/primitives/math.hpp"
 #include "cstone/util/tuple.hpp"
 
@@ -43,81 +44,127 @@ namespace cuda
 {
 namespace
 {
-static bool initialized = false;
-// Allocate device copies of the tables on first use and reuse them afterwards
-inline HelmholtzTableView getDeviceTableView()
+struct HelmholtzDeviceTables
 {
-    static double *d_d = nullptr, *d_dd_sav = nullptr, *d_dd2_sav = nullptr, *d_ddi_sav = nullptr,
-                  *d_dd2i_sav = nullptr, *d_dd3i_sav = nullptr, *d_t = nullptr, *d_dt_sav = nullptr,
-                  *d_dt2_sav = nullptr, *d_dti_sav = nullptr, *d_dt2i_sav = nullptr, *d_dt3i_sav = nullptr,
-                  *d_f = nullptr, *d_fd = nullptr, *d_ft = nullptr, *d_fdd = nullptr, *d_ftt = nullptr,
-                  *d_fdt = nullptr, *d_fddt = nullptr, *d_fdtt = nullptr, *d_fddtt = nullptr, *d_dpdf = nullptr,
-                  *d_dpdfd = nullptr, *d_dpdft = nullptr, *d_dpdfdt = nullptr, *d_ef = nullptr, *d_efd = nullptr,
-                  *d_eft = nullptr, *d_efdt = nullptr, *d_xf = nullptr, *d_xfd = nullptr, *d_xft = nullptr,
-                  *d_xfdt = nullptr;
+    cstone::DeviceVector<double> d, dd_sav, dd2_sav, ddi_sav, dd2i_sav, dd3i_sav;
+    cstone::DeviceVector<double> t, dt_sav, dt2_sav, dti_sav, dt2i_sav, dt3i_sav;
+    cstone::DeviceVector<double> f, fd, ft, fdd, ftt, fdt, fddt, fdtt, fddtt;
+    cstone::DeviceVector<double> dpdf, dpdfd, dpdft, dpdfdt;
+    cstone::DeviceVector<double> ef, efd, eft, efdt;
+    cstone::DeviceVector<double> xf, xfd, xft, xfdt;
 
-    static HelmholtzTableView tv{};
+    HelmholtzTableView tv{};
+    bool               initialized{false};
 
-    if (!initialized)
+    const HelmholtzTableView& get()
     {
         const auto& htv = Helmholtz_EOS::instance().hostTableView();
 
-        auto alloc_and_copy = [](double** dst, const double* src, size_t n)
+        auto resize_and_copy = [](auto& dst, const double* src, size_t n)
         {
-            checkGpuErrors(cudaMalloc((void**)dst, n * sizeof(double)));
-            checkGpuErrors(cudaMemcpy(*dst, src, n * sizeof(double), cudaMemcpyHostToDevice));
+            dst.resize(n);
+            memcpyH2D(src, n, dst.data());
         };
 
-        alloc_and_copy(&d_d, htv.d, IMAX);
-        alloc_and_copy(&d_dd_sav, htv.dd_sav, IMAX - 1);
-        alloc_and_copy(&d_dd2_sav, htv.dd2_sav, IMAX - 1);
-        alloc_and_copy(&d_ddi_sav, htv.ddi_sav, IMAX - 1);
-        alloc_and_copy(&d_dd2i_sav, htv.dd2i_sav, IMAX - 1);
-        alloc_and_copy(&d_dd3i_sav, htv.dd3i_sav, IMAX - 1);
+        if (!initialized)
+        {
+            resize_and_copy(d, htv.d, IMAX);
+            resize_and_copy(dd_sav, htv.dd_sav, IMAX - 1);
+            resize_and_copy(dd2_sav, htv.dd2_sav, IMAX - 1);
+            resize_and_copy(ddi_sav, htv.ddi_sav, IMAX - 1);
+            resize_and_copy(dd2i_sav, htv.dd2i_sav, IMAX - 1);
+            resize_and_copy(dd3i_sav, htv.dd3i_sav, IMAX - 1);
 
-        alloc_and_copy(&d_t, htv.t, JMAX);
-        alloc_and_copy(&d_dt_sav, htv.dt_sav, JMAX - 1);
-        alloc_and_copy(&d_dt2_sav, htv.dt2_sav, JMAX - 1);
-        alloc_and_copy(&d_dti_sav, htv.dti_sav, JMAX - 1);
-        alloc_and_copy(&d_dt2i_sav, htv.dt2i_sav, JMAX - 1);
-        alloc_and_copy(&d_dt3i_sav, htv.dt3i_sav, JMAX - 1);
+            resize_and_copy(t, htv.t, JMAX);
+            resize_and_copy(dt_sav, htv.dt_sav, JMAX - 1);
+            resize_and_copy(dt2_sav, htv.dt2_sav, JMAX - 1);
+            resize_and_copy(dti_sav, htv.dti_sav, JMAX - 1);
+            resize_and_copy(dt2i_sav, htv.dt2i_sav, JMAX - 1);
+            resize_and_copy(dt3i_sav, htv.dt3i_sav, JMAX - 1);
 
-        size_t tabSize = size_t(IMAX) * size_t(JMAX);
-        alloc_and_copy(&d_f, htv.f, tabSize);
-        alloc_and_copy(&d_fd, htv.fd, tabSize);
-        alloc_and_copy(&d_ft, htv.ft, tabSize);
-        alloc_and_copy(&d_fdd, htv.fdd, tabSize);
-        alloc_and_copy(&d_ftt, htv.ftt, tabSize);
-        alloc_and_copy(&d_fdt, htv.fdt, tabSize);
-        alloc_and_copy(&d_fddt, htv.fddt, tabSize);
-        alloc_and_copy(&d_fdtt, htv.fdtt, tabSize);
-        alloc_and_copy(&d_fddtt, htv.fddtt, tabSize);
+            size_t tabSize = size_t(IMAX) * size_t(JMAX);
+            resize_and_copy(f, htv.f, tabSize);
+            resize_and_copy(fd, htv.fd, tabSize);
+            resize_and_copy(ft, htv.ft, tabSize);
+            resize_and_copy(fdd, htv.fdd, tabSize);
+            resize_and_copy(ftt, htv.ftt, tabSize);
+            resize_and_copy(fdt, htv.fdt, tabSize);
+            resize_and_copy(fddt, htv.fddt, tabSize);
+            resize_and_copy(fdtt, htv.fdtt, tabSize);
+            resize_and_copy(fddtt, htv.fddtt, tabSize);
 
-        alloc_and_copy(&d_dpdf, htv.dpdf, tabSize);
-        alloc_and_copy(&d_dpdfd, htv.dpdfd, tabSize);
-        alloc_and_copy(&d_dpdft, htv.dpdft, tabSize);
-        alloc_and_copy(&d_dpdfdt, htv.dpdfdt, tabSize);
+            resize_and_copy(dpdf, htv.dpdf, tabSize);
+            resize_and_copy(dpdfd, htv.dpdfd, tabSize);
+            resize_and_copy(dpdft, htv.dpdft, tabSize);
+            resize_and_copy(dpdfdt, htv.dpdfdt, tabSize);
 
-        alloc_and_copy(&d_ef, htv.ef, tabSize);
-        alloc_and_copy(&d_efd, htv.efd, tabSize);
-        alloc_and_copy(&d_eft, htv.eft, tabSize);
-        alloc_and_copy(&d_efdt, htv.efdt, tabSize);
+            resize_and_copy(ef, htv.ef, tabSize);
+            resize_and_copy(efd, htv.efd, tabSize);
+            resize_and_copy(eft, htv.eft, tabSize);
+            resize_and_copy(efdt, htv.efdt, tabSize);
 
-        alloc_and_copy(&d_xf, htv.xf, tabSize);
-        alloc_and_copy(&d_xfd, htv.xfd, tabSize);
-        alloc_and_copy(&d_xft, htv.xft, tabSize);
-        alloc_and_copy(&d_xfdt, htv.xfdt, tabSize);
+            resize_and_copy(xf, htv.xf, tabSize);
+            resize_and_copy(xfd, htv.xfd, tabSize);
+            resize_and_copy(xft, htv.xft, tabSize);
+            resize_and_copy(xfdt, htv.xfdt, tabSize);
 
-        tv = HelmholtzTableView{d_d,      d_dd_sav,  d_dd2_sav, d_ddi_sav,  d_dd2i_sav, d_dd3i_sav, d_t,
-                                d_dt_sav, d_dt2_sav, d_dti_sav, d_dt2i_sav, d_dt3i_sav, d_f,        d_fd,
-                                d_ft,     d_fdd,     d_ftt,     d_fdt,      d_fddt,     d_fdtt,     d_fddtt,
-                                d_dpdf,   d_dpdfd,   d_dpdft,   d_dpdfdt,   d_ef,       d_efd,      d_eft,
-                                d_efdt,   d_xf,      d_xfd,     d_xft,      d_xfdt};
+            tv = HelmholtzTableView{d.data(),        dd_sav.data(),   dd2_sav.data(), ddi_sav.data(), dd2i_sav.data(),
+                                    dd3i_sav.data(), t.data(),        dt_sav.data(),  dt2_sav.data(), dti_sav.data(),
+                                    dt2i_sav.data(), dt3i_sav.data(), f.data(),       fd.data(),      ft.data(),
+                                    fdd.data(),      ftt.data(),      fdt.data(),     fddt.data(),    fdtt.data(),
+                                    fddtt.data(),    dpdf.data(),     dpdfd.data(),   dpdft.data(),   dpdfdt.data(),
+                                    ef.data(),       efd.data(),      eft.data(),     efdt.data(),    xf.data(),
+                                    xfd.data(),      xft.data(),      xfdt.data()};
 
-        initialized = true;
+            initialized = true;
+        }
+        return tv;
     }
 
-    return tv;
+    void reset()
+    {
+        d           = {};
+        dd_sav      = {};
+        dd2_sav     = {};
+        ddi_sav     = {};
+        dd2i_sav    = {};
+        dd3i_sav    = {};
+        t           = {};
+        dt_sav      = {};
+        dt2_sav     = {};
+        dti_sav     = {};
+        dt2i_sav    = {};
+        dt3i_sav    = {};
+        f           = {};
+        fd          = {};
+        ft          = {};
+        fdd         = {};
+        ftt         = {};
+        fdt         = {};
+        fddt        = {};
+        fdtt        = {};
+        fddtt       = {};
+        dpdf        = {};
+        dpdfd       = {};
+        dpdft       = {};
+        dpdfdt      = {};
+        ef          = {};
+        efd         = {};
+        eft         = {};
+        efdt        = {};
+        xf          = {};
+        xfd         = {};
+        xft         = {};
+        xfdt        = {};
+        tv          = {};
+        initialized = false;
+    }
+};
+
+inline HelmholtzDeviceTables& getDeviceTables()
+{
+    static HelmholtzDeviceTables tables{};
+    return tables;
 }
 } // anonymous namespace
 
@@ -151,54 +198,14 @@ void computeHelmholtzEOS(size_t firstParticle, size_t lastParticle, const Thydro
     if (firstParticle == lastParticle) { return; }
     unsigned numThreads = 256;
     unsigned numBlocks  = cstone::iceil(lastParticle - firstParticle, numThreads);
-    auto     tv         = getDeviceTableView();
+    auto     tv         = getDeviceTables().get();
     cudaComputeHelmholtzEOS<<<numBlocks, numThreads>>>(firstParticle, lastParticle, tv, kx, xm, m, temp, abar, zbar,
                                                        gradh, prho, c, cv, tdpdtrho, rho, p);
 
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-void freeDeviceHelmholtzEOSTables()
-{
-    auto tv = getDeviceTableView();
-
-    if (initialized)
-    {
-        cudaFree((void*)tv.d);
-        cudaFree((void*)tv.dd_sav);
-        cudaFree((void*)tv.dd2_sav);
-        cudaFree((void*)tv.ddi_sav);
-        cudaFree((void*)tv.dd2i_sav);
-        cudaFree((void*)tv.dd3i_sav);
-        cudaFree((void*)tv.t);
-        cudaFree((void*)tv.dt_sav);
-        cudaFree((void*)tv.dt2_sav);
-        cudaFree((void*)tv.dti_sav);
-        cudaFree((void*)tv.dt2i_sav);
-        cudaFree((void*)tv.dt3i_sav);
-        cudaFree((void*)tv.f);
-        cudaFree((void*)tv.fd);
-        cudaFree((void*)tv.ft);
-        cudaFree((void*)tv.fdd);
-        cudaFree((void*)tv.ftt);
-        cudaFree((void*)tv.fdt);
-        cudaFree((void*)tv.fddt);
-        cudaFree((void*)tv.fdtt);
-        cudaFree((void*)tv.fddtt);
-        cudaFree((void*)tv.dpdf);
-        cudaFree((void*)tv.dpdfd);
-        cudaFree((void*)tv.dpdft);
-        cudaFree((void*)tv.dpdfdt);
-        cudaFree((void*)tv.ef);
-        cudaFree((void*)tv.efd);
-        cudaFree((void*)tv.eft);
-        cudaFree((void*)tv.efdt);
-        cudaFree((void*)tv.xf);
-        cudaFree((void*)tv.xfd);
-        cudaFree((void*)tv.xft);
-        cudaFree((void*)tv.xfdt);
-    }
-}
+void freeDeviceHelmholtzEOSTables() { getDeviceTables().reset(); }
 
 #define COMPUTE_HELMHOLTZ_EOS(Ttemp, Tm, Thydro)                                                                       \
     template void computeHelmholtzEOS(size_t firstParticle, size_t lastParticle, const Thydro* kx, const Thydro* xm,   \
