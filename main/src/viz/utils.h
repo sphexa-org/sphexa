@@ -35,7 +35,7 @@ void addField(Node&& mesh, const std::string& name, FieldType* field, size_t sta
 }
 
 template<class Node, class ParticleData>
-void define_mesh(Node&& mesh, ParticleData& d, const std::size_t begin, const std::size_t end)
+void define_mesh(Node& mesh, ParticleData& d, const std::size_t begin, const std::size_t end)
 {
     mesh["coordsets/coords/type"] = "explicit";
     mesh["coordsets/coords/values/x"].set_external(get<"x">(d).data() + begin, end - begin);

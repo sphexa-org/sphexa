@@ -59,8 +59,11 @@ struct CatalystAdaptor
         // we set the channel's type to "mesh".
         channel["type"].set("mesh");
 
-        // now create the mesh.
-        define_mesh(channel["data"], d, startIndex, endIndex);
+        // Note:
+        // conduit_cpp::Node::operator[], differently from conduit::Node, returns an rvalue, so it cannot be passed in
+        // define_mesh directly, but it needs to be stored and given a reference to it.
+        conduit_cpp::Node mesh_data = channel["data"];
+        define_mesh(mesh_data, d, startIndex, endIndex);
 
         if (conduit_cpp::Node info; !conduit_cpp::BlueprintMesh::verify(channel["data"], info))
         {
