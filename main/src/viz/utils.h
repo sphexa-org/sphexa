@@ -66,12 +66,13 @@ void define_mesh(Node& mesh, ParticleData& d, const std::size_t begin, const std
     addField(mesh, "temperature", get<"temp">(d).data(), begin, end);
     addField(mesh, "alpha", get<"alpha">(d).data(), begin, end);
     addField(mesh, "m", get<"m">(d).data(), begin, end);
-    // addField(mesh, "Smoothing Length", get<"h">(d).data(), startIndex, endIndex);
-    // addField(mesh, "Density", get<"rho">(d).data(), startIndex, endIndex);
-    // addField(mesh, "Internal Energy", get<"u">(d).data(), startIndex, endIndex);
-    // addField(mesh, "Pressure", get<"p">(d).data(), startIndex, endIndex);
-    // addField(mesh, "Speed of Sound", get<"c">(d).data(), startIndex, endIndex);
-    // addField(mesh, "ax", get<"ax">(d).data(), startIndex, endIndex);
-    // addField(mesh, "ay", get<"ay">(d).data(), startIndex, endIndex);
-    // addField(mesh, "az", get<"az">(d).data(), startIndex, endIndex);
+
+    // addField(mesh, "Smoothing Length", get<"h">(d).data(), begin, end);
+    // addField(mesh, "Density", get<"rho">(d).data(), begin, end);
+    // addField(mesh, "Internal Energy", get<"u">(d).data(), begin, end);
+    // addField(mesh, "Pressure", get<"p">(d).data(), begin, end);
+    // addField(mesh, "Speed of Sound", get<"c">(d).data(), begin, end);
+    // addField(mesh, "ax", get<"ax">(d).data(), begin, end);
+    // addField(mesh, "ay", get<"ay">(d).data(), begin, end);
+    // addField(mesh, "az", get<"az">(d).data(), begin, end);
 }
