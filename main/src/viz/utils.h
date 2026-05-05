@@ -42,8 +42,7 @@ void define_mesh(Node& mesh, ParticleData& d, const std::size_t begin, const std
     mesh["coordsets/coords/values/y"].set_external(get<"y">(d).data() + begin, end - begin);
     mesh["coordsets/coords/values/z"].set_external(get<"z">(d).data() + begin, end - begin);
 
-    // #define IMPLICIT_CONNECTIVITY_LIST 1 // the connectivity list is not given, but created by vtkm
-#ifdef IMPLICIT_CONNECTIVITY_LIST
+#if !defined(FORCE_EXPLICIT_CONNECTIVITY_LIST)
     mesh["topologies/mesh/type"] = "points";
 #else
     mesh["topologies/mesh/type"]           = "unstructured";
