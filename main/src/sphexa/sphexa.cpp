@@ -51,7 +51,14 @@
 #include "util/utils.hpp"
 
 #include "simulation_data.hpp"
-#include "insitu_viz.h"
+
+#ifdef SPH_EXA_USE_CATALYST2
+#include "catalyst_adaptor.h"
+using VizAdaptor = viz::CatalystAdaptor;
+#elif SPH_EXA_USE_ASCENT
+#include "ascent_adaptor.h"
+using VizAdaptor = viz::AscentAdaptor;
+#endif
 
 #ifdef USE_CUDA
 using AccType = cstone::GpuTag;
@@ -148,12 +155,6 @@ int main(int argc, char** argv)
 
     propagator->sync(domain, simData);
     if (rank == 0) std::cout << "Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
-
-#ifdef SPH_EXA_USE_CATALYST2
-    using VizAdaptor = viz::CatalystAdaptor;
-#elif SPH_EXA_USE_ASCENT
-    using VizAdaptor = viz::AscentAdaptor;
-#endif
 
     VizAdaptor viz(argc, argv);
 
