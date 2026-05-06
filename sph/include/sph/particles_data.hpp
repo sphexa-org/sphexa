@@ -105,6 +105,10 @@ public:
 
     //! @brief gravitational constant
     RealType g{0.0};
+    //! @brief duration of the gravity ramp after gravRampStartTime, disabled when zero
+    RealType gravRampTime{0.0};
+    //! @brief absolute simulation time at which the gravity ramp starts
+    RealType gravRampStartTime{-1.0};
     //! @brief gravitational smoothing
     RealType eps{0.005};
     //! @brief acceleration based time-step control
@@ -183,6 +187,8 @@ public:
         optionalIO("Kcour", &Kcour, 1);
         optionalIO("Krho", &Krho, 1);
         ar->stepAttribute("gravConstant", &g, 1);
+        optionalIO("gravRampTime", &gravRampTime, 1);
+        optionalIO("gravRampStartTime", &gravRampStartTime, 1);
         optionalIO("eps", &eps, 1);
         optionalIO("etaAcc", &etaAcc, 1);
 

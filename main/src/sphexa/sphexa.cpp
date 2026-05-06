@@ -125,6 +125,15 @@ int main(int argc, char** argv)
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
 
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
+    if (parser.exists("--grav-ramp-time"))
+    {
+        d.gravRampTime      = parser.get<double>("--grav-ramp-time");
+        d.gravRampStartTime = d.ttot;
+    }
+    if (parser.exists("--grav-ramp-start-time"))
+    {
+        d.gravRampStartTime = parser.get<double>("--grav-ramp-start-time");
+    }
     bool  haveGrav = (d.g != 0.0);
     float theta    = parser.get("--theta", haveGrav ? 0.5f : 1.0f);
 
@@ -245,6 +254,10 @@ void printHelp(char* name, int rank)
         printf("\t--theta NUM \t Gravity accuracy parameter [default 0.5 when self-gravity is active]\n\n");
 
         printf("\t--G NUM \t Gravitational constant [default dependent on test-case selection]\n\n");
+
+        printf("\t--grav-ramp-time NUM \t Ramp self-gravity from zero to --G over NUM seconds after restart\n\n");
+
+        printf("\t--grav-ramp-start-time NUM \t Override absolute simulation time where gravity ramp starts\n\n");
 
         printf("\t--prop STRING \t Choice of SPH propagator [default: modern SPH]. For standard SPH, use \"std\" \n\n");
 

@@ -39,6 +39,7 @@
 
 #include "ve_hydro_bdt.hpp"
 #include "gravity_wrapper.hpp"
+#include "gravity_ramp.hpp"
 
 namespace sphexa
 {
@@ -63,7 +64,10 @@ public:
 
     void computeForces(DomainType& domain, DataType& simData) override
     {
-        Base::computeForces(domain, simData);
+        {
+            ScopedGravityRamp<DataType> gravityRamp(simData);
+            Base::computeForces(domain, simData);
+        }
         driveTurbulence(Base::activeRungs_, simData.hydro, turbulenceData);
         timer.step("Turbulence Stirring");
     }

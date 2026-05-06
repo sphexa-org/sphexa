@@ -29,6 +29,7 @@
 #include "conserved_quantities.hpp"
 #include "gpu_reductions.h"
 #include "iobservables.hpp"
+#include "propagator/gravity_ramp.hpp"
 
 namespace sphexa
 {
@@ -107,8 +108,9 @@ public:
 
         if (rank == 0)
         {
+            double gInstant = d.g * gravityRampFactor(d.ttot, d.gravRampStartTime, d.gravRampTime);
             fileutils::writeColumns(constantsFile, ' ', d.iteration, d.ttot, d.minDt, d.etot, d.ecin, d.eint, d.egrav,
-                                    d.linmom, d.angmom, machRms);
+                                    d.linmom, d.angmom, machRms, gInstant);
         }
     }
 };
