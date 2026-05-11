@@ -197,7 +197,7 @@ void benchmarkGpu()
     auto findNeighborsCpu = [&]()
     {
 #pragma omp parallel for
-        for (LocalIndex i = 0; i < n; ++i)
+        for (int i = 0; i < n; ++i)
         {
             neighborsCountCPU[i] = findNeighbors(i, x, y, z, h, nsView, box, ngmax, neighborsCPU.data() + i * ngmax);
         }

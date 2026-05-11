@@ -56,7 +56,6 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     constexpr bool gpu   = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
     using HydroType      = typename Dataset::HydroType;
     using RealType       = typename Dataset::RealType;
-    using XM1Type        = typename Dataset::XM1Type;
     double ng0           = settings.at("ng0");
     double rho           = settings.at("rho");
     double hInit         = 0.5 * std::cbrt(3. * ng0 * mPart / 4. / M_PI / rho);

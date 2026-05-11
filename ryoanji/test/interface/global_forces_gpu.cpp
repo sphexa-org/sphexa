@@ -182,7 +182,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
 
         double         potentialSumRef = 0;
         std::vector<T> errors(ax.size()), errors_cpu(ax.size());
-        for (int i = 0; i < ax.size(); i++)
+        for (std::size_t i = 0; i < ax.size(); i++)
         {
             potentialSumRef += pRef[i];
             Vec3<T> ref       = {axRef[i], ayRef[i], azRef[i]};
@@ -270,7 +270,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
             std::vector<T> azt = toHost(d_azt);
 
             bool passTargets = true;
-            for (int i = 0; i < numTargets; i++)
+            for (LocalIndex i = 0; i < numTargets; i++)
             {
                 Vec3<T> ref   = {axRef[i], ayRef[i], azRef[i]};
                 Vec3<T> probe = {axt[i], ayt[i], azt[i]};

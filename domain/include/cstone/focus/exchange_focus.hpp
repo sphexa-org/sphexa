@@ -238,7 +238,7 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
     exchangeRejectedKeys<KeyType>(interiorPeers, exteriorPeers, leaves, treelets, nodeOps, comm);
     pruneTreelets<KeyType>(interiorPeers, treelets);
 
-    if (std::count(nodeOps.begin(), nodeOps.end(), 1) != nodeOps.size())
+    if (std::count(nodeOps.begin(), nodeOps.end(), 1) != long(nodeOps.size()))
     {
         assert(octreeAcc.childOffsets.size() >= nodeOps.size());
         std::span<TreeNodeIndex> nops(rawPtr(octreeAcc.childOffsets), nodeOps.size());

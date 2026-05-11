@@ -16,7 +16,7 @@ endfunction()
 
 add_library(io id_tag_utils.cpp ifile_io_ascii.cpp ifile_io_hdf5.cpp arg_parser.cpp)
 target_include_directories(io PRIVATE ${CSTONE_DIR} ${SPH_EXA_INCLUDE_DIRS} ${MPI_CXX_INCLUDE_PATH})
-target_link_libraries(io PRIVATE ${MPI_CXX_LIBRARIES})
+target_link_libraries(io PRIVATE ${MPI_CXX_LIBRARIES} OpenMP::OpenMP_CXX)
 
 if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     add_library(io_gpu OBJECT id_tag_utils.cu)

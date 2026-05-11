@@ -204,7 +204,7 @@ public:
                 bool isLast   = (i == numParticlesInFile - 1);
                 long keyDelta = (isLast ? -(keys[i] - keys[i - 1]) : keys[i + 1] - keys[i]) / (numSplits + isLast);
 
-                for (size_t j = 1; j < numSplits; ++j)
+                for (int j = 1; j < numSplits; ++j)
                 {
                     auto [ixj, iyj, izj] = cstone::decodeSfc(cstone::sfcKey(keys[i] + j * keyDelta));
 

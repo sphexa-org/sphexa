@@ -310,7 +310,7 @@ TEST(FocusDomain, reapplySync)
     EXPECT_EQ(property.size(), propertyCpy.size());
 
     int numPass = 0;
-    for (int i = domain.startIndex(); i < domain.endIndex(); ++i)
+    for (auto i = domain.startIndex(); i < domain.endIndex(); ++i)
     {
         if (property[i] == propertyCpy[i]) numPass++;
     }
@@ -379,7 +379,7 @@ void randomGaussianGrav(int thisRank, int numRanks)
     // Any leaf in the tree with particles: does it contain the same particles as in the reference set of particles?
 
     ASSERT_EQ(let_leaves.size(), let_layout.size());
-    for (int i = 0; i < let_leaves.size() - 1; ++i)
+    for (std::size_t i = 0; i < let_leaves.size() - 1; ++i)
     {
         if (let_layout[i + 1] > let_layout[i])
         {
@@ -391,7 +391,7 @@ void randomGaussianGrav(int thisRank, int numRanks)
             int gi2 = std::lower_bound(gkeys.begin(), gkeys.end(), pk2) - gkeys.begin();
             EXPECT_EQ(gi2 - gi1 + 1, let_lcounts[i]);
 
-            for (int d = 0; d < let_lcounts[i]; ++d)
+            for (LocalIndex d = 0; d < let_lcounts[i]; ++d)
             {
                 EXPECT_EQ(keys[let_layout[i] + d], gkeys[gi1 + d]);
             }
@@ -422,7 +422,7 @@ void randomGaussianGrav(int thisRank, int numRanks)
         spanningKeys.back() = focusEnd;
 
         std::vector<uint8_t> marks(let_full.numNodes, 0);
-        for (TreeNodeIndex i = 0; i < nNodes(spanningKeys); ++i)
+        for (std::size_t i = 0; i < nNodes(spanningKeys); ++i)
         {
             IBox target                     = sfcIBox(sfcKey(spanningKeys[i]), sfcKey(spanningKeys[i + 1]));
             auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);

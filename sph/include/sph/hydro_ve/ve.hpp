@@ -54,7 +54,6 @@ void computeVeImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone:
     auto* kx    = d.kx.data();
 
     const Tc K         = d.K;
-    const Tc sincIndex = d.sincIndex;
 
 #pragma omp parallel for
     for (size_t i = startIndex; i < endIndex; i++)

@@ -231,7 +231,7 @@ TEST(DomainGpu, reapplySync)
     std::vector<Real> dl_property = toHost(property);
 
     int numPass = 0;
-    for (int i = domain.startIndex(); i < domain.endIndex(); ++i)
+    for (auto i = domain.startIndex(); i < domain.endIndex(); ++i)
     {
         if (dl_property[i] == host_property[i]) numPass++;
     }
@@ -340,7 +340,7 @@ void randomGaussianGrav(int thisRank, int numRanks)
     }
 
     EXPECT_EQ(layout, h_layout);
-    for (TreeNodeIndex i = 0; i < centers.size(); ++i)
+    for (std::size_t i = 0; i < centers.size(); ++i)
     {
         EXPECT_NEAR(norm2(centers[i] - h_centers[i]), 0.0, 1e-6);
     }

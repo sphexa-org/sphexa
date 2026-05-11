@@ -167,7 +167,7 @@ protected:
             if (!indicesDone.empty() && writer->rank() == 0)
             {
                 std::cout << "WARNING: the following fields are not in use and therefore not output: ";
-                for (int fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
+                for (std::size_t fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
                 {
                     std::cout << d.fieldNames[fidx] << ",";
                 }

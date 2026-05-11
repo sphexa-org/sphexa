@@ -332,7 +332,7 @@ public:
         {
             gather<TreeNodeIndex>(idxFromGlob, toInternal, idxFromGlob.data());
 #pragma omp parallel for schedule(static)
-            for (TreeNodeIndex i = 0; i < idxFromGlob.size(); ++i)
+            for (std::size_t i = 0; i < idxFromGlob.size(); ++i)
             {
                 letToGlob[i] = locateNode(octreeAcc_.prefixes[idxFromGlob[i]], globalNodeKeys, globalLevelRange);
             }

@@ -136,7 +136,7 @@ int main(int argc, char** argv)
     std::vector<double> delta(numBodies);
 
     double potentialSum = 0;
-    for (int i = 0; i < numBodies; i++)
+    for (std::size_t i = 0; i < numBodies; i++)
     {
         potentialSum += h_p[i];
         Vec3<T> ref   = {h_refAx[i], h_refAy[i], h_refAz[i]};

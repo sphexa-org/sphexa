@@ -335,19 +335,28 @@ public:
             localCount_                       = lastIndex_ - firstIndex_;
             H5PartSetView(h5File_, firstIndex_, lastIndex_ - 1);
         }
-        else { std::tie(firstIndex_, lastIndex_, localCount_) = std::make_tuple(0, globalCount_, globalCount_); }
+        else
+        {
+            std::tie(firstIndex_, lastIndex_, localCount_) = std::make_tuple(0, globalCount_, globalCount_);
+        }
     }
 
     std::vector<std::string> fileAttributes() override
     {
         if (h5File_) { return fileutils::fileAttributeNames(h5File_); }
-        else { throw std::runtime_error("Cannot read file attributes: file not opened\n"); }
+        else
+        {
+            throw std::runtime_error("Cannot read file attributes: file not opened\n");
+        }
     }
 
     std::vector<std::string> stepAttributes() override
     {
         if (h5File_) { return fileutils::stepAttributeNames(h5File_); }
-        else { throw std::runtime_error("Cannot read file attributes: file not opened\n"); }
+        else
+        {
+            throw std::runtime_error("Cannot read file attributes: file not opened\n");
+        }
     }
 
     int64_t fileAttributeSize(const std::string& key) override
@@ -429,16 +438,16 @@ public:
 private:
     int64_t stepAttributeIndex(const std::string& key)
     {
-        auto    attributes = fileutils::stepAttributeNames(h5File_);
-        int64_t attrIndex  = std::find(attributes.begin(), attributes.end(), key) - attributes.begin();
+        auto        attributes = fileutils::stepAttributeNames(h5File_);
+        std::size_t attrIndex  = std::find(attributes.begin(), attributes.end(), key) - attributes.begin();
         if (attrIndex == attributes.size()) { throw std::out_of_range("Attribute " + key + " does not exist\n"); }
         return attrIndex;
     }
 
     int64_t fileAttributeIndex(const std::string& key)
     {
-        auto    attributes = fileutils::fileAttributeNames(h5File_);
-        int64_t attrIndex  = std::find(attributes.begin(), attributes.end(), key) - attributes.begin();
+        auto        attributes = fileutils::fileAttributeNames(h5File_);
+        std::size_t attrIndex  = std::find(attributes.begin(), attributes.end(), key) - attributes.begin();
         if (attrIndex == attributes.size()) { throw std::out_of_range("Attribute " + key + " does not exist\n"); }
         return attrIndex;
     }
