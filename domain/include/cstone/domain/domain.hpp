@@ -239,8 +239,8 @@ public:
         if (firstCall_)
         {
             // first rough convergence to avoid computing expansion centers of large nodes with a lot of particles
-            focusTree_.converge(box(), keyView, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
-                                1.0, std::get<0>(scratch));
+            focusTree_.converge(box(), keyView, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(), 1.0,
+                                std::get<0>(scratch));
             focusTree_.updateMinMac(global_.assignment(), 1.0, false);
             int converged = 0, reps = 0;
             while (converged != numRanks_ || reps < 2)
@@ -248,7 +248,8 @@ public:
                 converged =
                     focusTree_.updateTree(global_.assignment(), global_.treeLeaves(), box(), std::get<0>(scratch));
                 focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
-                focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(), std::get<0>(scratch));
+                focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(),
+                                         std::get<0>(scratch));
                 focusTree_.updateMacs(global_.assignment(), 1.0 / theta_, false);
                 MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, comm_);
                 reps++;
@@ -261,7 +262,8 @@ public:
             focusTree_.updateMacs(global_.assignment(), centerDriftTol_ / theta_, true);
             focusTree_.updateTree(global_.assignment(), global_.treeLeaves(), box(), std::get<0>(scratch));
             focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
-            focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(), std::get<0>(scratch));
+            focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(),
+                                     std::get<0>(scratch));
             focusTree_.updateMacs(global_.assignment(), 1.0 / theta_, false);
 
             reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
