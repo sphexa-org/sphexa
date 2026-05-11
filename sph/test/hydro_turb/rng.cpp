@@ -29,6 +29,7 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include <memory>
 #include <random>
 #include <sstream>
 
@@ -56,11 +57,11 @@ TEST(Turbulence, rngSerialize)
     EXPECT_NE(originalEngine, engine);
 
     // check conversion from char array, as that's what's going to be read from HDF5
-    char stateChar[engineState.size()];
-    std::copy(engineState.begin(), engineState.end(), stateChar);
+    auto stateChar = std::make_unique<char[]>(engineState.size());
+    std::copy(engineState.begin(), engineState.end(), stateChar.get());
 
     std::stringstream t;
-    t << stateChar;
+    t << stateChar.get();
     t >> engine;
 
     EXPECT_EQ(originalEngine, engine);

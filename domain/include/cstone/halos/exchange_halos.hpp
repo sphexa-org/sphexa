@@ -84,8 +84,7 @@ void haloexchange(int epoch, const RecvList& incomingHalos, const SendList& outg
 
     if (not sendRequests.empty())
     {
-        MPI_Status status[sendRequests.size()];
-        MPI_Waitall(int(sendRequests.size()), sendRequests.data(), status);
+        MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUSES_IGNORE);
     }
 
     // MUST call MPI_Barrier or any other collective MPI operation that enforces synchronization
