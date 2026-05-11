@@ -195,8 +195,7 @@ public:
         domain.exchangeHalos(get<"x", "y", "z", "h">(d), get<"keys">(d), haloRecvScratch);
         if (d.g != 0.0)
         {
-            domain.updateExpansionCenters(get<"x">(d), get<"y">(d), get<"z">(d), get<"m">(d), get<"keys">(d),
-                                          haloRecvScratch);
+            domain.updateExpansionCenters(get<"x">(d), get<"y">(d), get<"z">(d), get<"m">(d), get<"keys">(d));
         }
 
         //! @brief increase tree-cell search radius for each substep to account for particles drifting out of cells

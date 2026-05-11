@@ -355,8 +355,7 @@ public:
                        const RealType* z,
                        const Tm* m,
                        OctreeView<const KeyType> gOctree,
-                       DevVec1&& scratch1 = std::vector<LocalIndex>{},
-                       DevVec2&& scratch2 = std::vector<LocalIndex>{})
+                       DevVec1&& scratch1 = std::vector<LocalIndex>{})
     {
         assert(gOctree.leaves != nullptr);
         TreeNodeIndex firstIdx           = assignment_[myRank_].start();
@@ -377,7 +376,7 @@ public:
 
         if constexpr (HaveGpu<Accelerator>{})
         {
-            static_assert(IsDeviceVector<std::decay_t<DevVec1>>{} && IsDeviceVector<std::decay_t<DevVec2>>{});
+            static_assert(IsDeviceVector<std::decay_t<DevVec1>>{});
             size_t bytesLayout = (octree.numLeafNodes + 1) * sizeof(LocalIndex);
             size_t osz1        = reallocateBytes(scratch1, bytesLayout, allocGrowthRate_);
             auto* d_layout     = reinterpret_cast<LocalIndex*>(rawPtr(scratch1));
