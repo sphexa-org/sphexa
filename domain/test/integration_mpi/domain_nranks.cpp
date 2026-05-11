@@ -135,19 +135,23 @@ TEST(FocusDomain, randomGaussianNeighborSumPbc)
 
     auto periodic = BoundaryType::periodic;
     {
-        Domain<unsigned, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, {-1, 1, periodic});
+        Domain<unsigned, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
+                                        {-1, 1, periodic});
         randomGaussianDomain<unsigned, double>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, {-1, 1, periodic});
+        Domain<uint64_t, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
+                                        {-1, 1, periodic});
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, {-1, 1, periodic});
+        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
+                                       {-1, 1, periodic});
         randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, {-1, 1, periodic});
+        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
+                                       {-1, 1, periodic});
         randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
 }
