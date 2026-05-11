@@ -162,15 +162,15 @@ std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeTDEOrbit
 #else
 template<class Dataset>
 std::unique_ptr<ISimInitializer<Dataset>>
-SimInitializers<Dataset>::makePolytrope(std::string glassBlock, std::string settingsFile, IFileReader* reader)
+SimInitializers<Dataset>::makePolytrope(std::string /* glassBlock */, std::string /* settingsFile */, IFileReader* /* reader */)
 {
     throw std::runtime_error("Missing TDE initializers build option for polytrope\n");
     return nullptr;
 }
 
 template<class Dataset>
-std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeTDEOrbitInit(const std::string& filePath,
-                                                                                     int initStep, IFileReader* reader)
+std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeTDEOrbitInit(const std::string& /* filePath */,
+                                                                                     int /* initStep */, IFileReader* /* reader */)
 {
     throw std::runtime_error("Missing TDE initializers build option for tde-orbit\n");
     return nullptr;

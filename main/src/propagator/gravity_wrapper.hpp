@@ -120,16 +120,16 @@ public:
 
     cstone::GroupView computeSpatialGroups(const DataType& d, const DomainType& domain)
     {
-        return mHolder_.computeSpatialGroups(domain.startIndex(), domain.endIndex(), rawPtr(d.x),
-                                             rawPtr(d.y), rawPtr(d.z), rawPtr(d.h),
-                                             domain.focusTree(), domain.layout().data(), domain.box());
+        return mHolder_.computeSpatialGroups(domain.startIndex(), domain.endIndex(), rawPtr(d.x), rawPtr(d.y),
+                                             rawPtr(d.z), rawPtr(d.h), domain.focusTree(), domain.layout().data(),
+                                             domain.box());
     }
 
     void upsweep(const DataType& d, const DomainType& domain)
     {
         const auto& focusTree = domain.focusTree();
-        mHolder_.upsweep(rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m),
-                         domain.globalTree(), focusTree, domain.layout().data());
+        mHolder_.upsweep(rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m), domain.globalTree(), focusTree,
+                         domain.layout().data());
     }
 
     void traverse(cstone::GroupView grp, DataType& d, const DomainType& domain)
@@ -138,10 +138,8 @@ public:
         bool        usePbc    = box.boundaryX() == cstone::BoundaryType::periodic;
         int         numShells = usePbc ? ewaldSettings_.numReplicaShells : 0;
 
-        d.egrav =
-            mHolder_.compute(grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m),
-                             rawPtr(d.h), d.g, numShells, domain.box(), rawPtr(d.ugrav),
-                             rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az));
+        d.egrav = mHolder_.compute(grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m), rawPtr(d.h), d.g, numShells,
+                                   domain.box(), rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az));
 
         auto stats = mHolder_.readStats();
 
@@ -155,9 +153,8 @@ public:
             MType rootM;
             memcpyD2H(mHolder_.deviceMultipoles(), 1, &rootM);
 
-            computeGravityEwaldGpu(makeVec3(rootCenter), rootM, grp, rawPtr(d.x), rawPtr(d.y),
-                                   rawPtr(d.z), rawPtr(d.m), box, d.g, rawPtr(d.ugrav),
-                                   rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), &d.egrav,
+            computeGravityEwaldGpu(makeVec3(rootCenter), rootM, grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m),
+                                   box, d.g, rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), &d.egrav,
                                    ewaldSettings_);
         }
 

@@ -79,7 +79,7 @@ public:
     virtual void save(IFileWriter*) {}
 
     //! @brief load internal state from file
-    virtual void load(const std::string& path, IFileReader*) {}
+    virtual void load(const std::string& /* path */, IFileReader*) {}
 
     //! @brief whether conserved quantities are time-synchronized (when completing a full time-step hierarchy)
     virtual bool isSynced() { return true; }

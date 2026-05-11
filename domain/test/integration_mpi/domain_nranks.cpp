@@ -34,7 +34,7 @@
 using namespace cstone;
 
 template<class KeyType, class T, class DomainType>
-void randomGaussianDomain(DomainType domain, int rank, int nRanks, bool equalizeH = false)
+void randomGaussianDomain(DomainType domain, int rank, int nRanks)
 {
     LocalIndex numParticles = (1000 / nRanks) * nRanks;
     Box<T> box              = domain.box();
