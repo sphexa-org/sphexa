@@ -50,3 +50,9 @@ template<class Vector>
 struct IsDeviceVector : public std::false_type
 {
 };
+
+template<class T>
+const std::vector<T>& toHost(const std::vector<T>& v)
+{
+    return v;
+}

@@ -130,15 +130,15 @@ std::vector<int> findPeersMac(int myRank,
 template<class KeyType, class T>
 std::vector<int> findPeersMacStt(int myRank,
                                  const SfcAssignment<KeyType>& assignment,
-                                 const Octree<KeyType>& octree,
+                                 const OctreeView<const KeyType>& octree,
                                  const Box<T>& box,
                                  float invThetaEff)
 {
     KeyType domainStart     = assignment[myRank];
     KeyType domainEnd       = assignment[myRank + 1];
-    const KeyType* leaves   = octree.treeLeaves().data();
-    TreeNodeIndex firstLeaf = findNodeAbove(leaves, octree.numLeafNodes(), domainStart);
-    TreeNodeIndex lastLeaf  = findNodeAbove(leaves, octree.numLeafNodes(), domainEnd);
+    const KeyType* leaves   = octree.leaves;
+    TreeNodeIndex firstLeaf = findNodeAbove(leaves, octree.numLeafNodes, domainStart);
+    TreeNodeIndex lastLeaf  = findNodeAbove(leaves, octree.numLeafNodes, domainEnd);
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
@@ -169,14 +169,13 @@ std::vector<int> findPeersMacStt(int myRank,
 
         auto violatesMac = [target, ellipse, pbc, &octree, domainStart, domainEnd, mixDBits, useMixD](TreeNodeIndex idx)
         {
-            KeyType nodeStart = octree.codeStart(idx);
-            KeyType nodeEnd   = octree.codeEnd(idx);
+            auto [nodeStart, nodeEnd] = decodePlaceholderBit2K(octree.prefixes[idx]);
             // if the tree node with index idx is fully contained in the focus, we stop traversal
             if (containedIn(nodeStart, nodeEnd, domainStart, domainEnd)) { return false; }
 
-            IBox source = useMixD ? sfcIBox(sfcMixDKey(nodeStart), maxTreeLevel<KeyType>{} - octree.level(idx),
+            IBox source = useMixD ? sfcIBox(sfcMixDKey(nodeStart), maxTreeLevel<KeyType>{} - treeLevel(nodeEnd - nodeStart),
                                             mixDBits.bx, mixDBits.by, mixDBits.bz)
-                                  : sfcIBox(sfcKey(nodeStart), octree.level(idx));
+                                  : sfcIBox(sfcKey(nodeStart), treeLevel(nodeEnd - nodeStart));
             if (source.xmax() == 0 && source.xmin() == 0 && source.ymax() == 0 && source.ymin() == 0 &&
                 source.zmax() == 0 && source.zmin() == 0)
             {
@@ -187,11 +186,11 @@ std::vector<int> findPeersMacStt(int myRank,
 
         auto markLeafIdx = [&octree, &peers, &assignment](TreeNodeIndex idx)
         {
-            int peerRank    = assignment.findRank(octree.codeStart(idx));
+            int peerRank    = assignment.findRank(decodePlaceholderBit(octree.prefixes[idx]));
             peers[peerRank] = 1;
         };
 
-        singleTraversal(octree.childOffsets().data(), octree.parents().data(), violatesMac, markLeafIdx);
+        singleTraversal(octree.childOffsets, octree.parents, violatesMac, markLeafIdx);
     }
 
     std::vector<int> ret;

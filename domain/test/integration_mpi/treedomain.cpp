@@ -67,7 +67,7 @@ void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
     std::vector<KeyType> tree = makeRootNodeTree<KeyType>();
     std::vector<unsigned> counts{numRanks * unsigned(numParticles)};
 
-    while (!updateOctreeGlobal<KeyType>(coords.particleKeys(), bucketSize, tree, counts)) {}
+    while (!updateOctreeGlobal<KeyType>(coords.particleKeys(), bucketSize, tree, counts, MPI_COMM_WORLD)) {}
 
     std::vector<LocalIndex> ordering(numParticles);
     // particles are in SFC order
@@ -91,7 +91,7 @@ void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
     ExchangeLog log;
     auto recvStart = domain_exchange::receiveStart(bufDesc, numAssigned - numPresent);
     auto recvEnd   = recvStart + numAssigned - numPresent;
-    exchangeParticles(0, log, sends, thisRank, recvStart, recvEnd, ordering.data(), x.data(), y.data(), z.data());
+    exchangeParticles(0, log, sends, thisRank, recvStart, recvEnd, ordering.data(), MPI_COMM_WORLD, x.data(), y.data(), z.data());
 
     domain_exchange::extractLocallyOwned(bufDesc, numPresent, numAssigned, ordering.data() + sends[thisRank], x, y, z);
 
@@ -114,7 +114,7 @@ void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
 
     std::vector<KeyType> newTree = makeRootNodeTree<KeyType>();
     std::vector<unsigned> newCounts{unsigned(x.size())};
-    while (!updateOctreeGlobal<KeyType>(newCodes, bucketSize, newTree, newCounts))
+    while (!updateOctreeGlobal<KeyType>(newCodes, bucketSize, newTree, newCounts, MPI_COMM_WORLD))
         ;
 
     // global tree and counts stay the same

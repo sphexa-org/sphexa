@@ -25,9 +25,8 @@ endif()
 if ((CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER) AND (SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP))
     set(testname ryoanji_demo_mpi)
     add_executable(${testname} demo_mpi.cpp)
-    target_include_directories(${testname} PRIVATE ${RYOANJI_TEST_INCLUDE_DIRS})
-
-    target_link_libraries(${testname} PRIVATE cstone_gpu ryoanji)
+    target_include_directories(${testname} PRIVATE ${RYOANJI_TEST_INCLUDE_DIRS} ${MPI_CXX_INCLUDE_PATH})
+    target_link_libraries(${testname} PRIVATE cstone_gpu ryoanji ${MPI_CXX_LIBRARIES})
 
     if (CMAKE_HIP_COMPILER AND SPH_EXA_WITH_HIP)
         target_link_libraries(${testname} PRIVATE hip::host)

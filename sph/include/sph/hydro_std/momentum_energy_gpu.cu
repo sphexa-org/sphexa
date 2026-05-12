@@ -29,6 +29,8 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include <thrust/functional.h>
+
 #include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/primitives/warpscan.cuh"
@@ -102,7 +104,7 @@ __global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, c
     __shared__ typename BlockReduce::TempStorage        temp_storage;
 
     BlockReduce reduce(temp_storage);
-    T           blockMin = reduce.Reduce(dt_i, cub::Min());
+    T           blockMin = reduce.Reduce(dt_i, thrust::minimum<>{});
     __syncthreads();
 
     if (threadIdx.x == 0) { cstone::atomicMinFloat(&minDt_device, blockMin); }
@@ -138,7 +140,7 @@ __global__ void markNaN(GroupView grp, Ta* ax, Ta* ay, Ta* az, Tu* du, unsigned*
 template<class Dataset>
 void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     float huge = 1e10;
@@ -146,12 +148,12 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     cudaGradP<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.K, d.Kcour, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x),
-        rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.vx), rawPtr(d.devData.vy), rawPtr(d.devData.vz),
-        rawPtr(d.devData.h), rawPtr(d.devData.m), rawPtr(d.devData.rho), rawPtr(d.devData.p), rawPtr(d.devData.c),
-        rawPtr(d.devData.c11), rawPtr(d.devData.c12), rawPtr(d.devData.c13), rawPtr(d.devData.c22),
-        rawPtr(d.devData.c23), rawPtr(d.devData.c33), rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.ax),
-        rawPtr(d.devData.ay), rawPtr(d.devData.az), rawPtr(d.devData.du), nidxPool, traversalPool);
+        d.K, d.Kcour, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.x),
+        rawPtr(d.y), rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz),
+        rawPtr(d.h), rawPtr(d.m), rawPtr(d.rho), rawPtr(d.p), rawPtr(d.c),
+        rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22),
+        rawPtr(d.c23), rawPtr(d.c33),
+        rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.du), nidxPool, traversalPool);
 
     {
         unsigned numThreads       = 256;
@@ -159,8 +161,8 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
         unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
         if (numBlocks > 0)
         {
-            markNaN<<<numBlocks, numThreads>>>(grp, rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az),
-                                               rawPtr(d.devData.du), rawPtr(d.devData.nc));
+            markNaN<<<numBlocks, numThreads>>>(grp, rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.du),
+                                               rawPtr(d.nc));
         }
     }
 
@@ -173,4 +175,35 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
 
 template void computeMomentumEnergyStdGpu(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
                                           const cstone::Box<SphTypes::CoordinateType>&);
+
+template<typename Thydro, typename T>
+__global__ void relaxSystemKernel(size_t first, size_t last, Thydro* ax, Thydro* ay, Thydro* az, Thydro* vx, Thydro* vy,
+                                  Thydro* vz, T relaxationTimescale)
+{
+    cstone::LocalIndex i = first + blockDim.x * blockIdx.x + threadIdx.x;
+    if (i >= last) { return; }
+
+    ax[i] -= vx[i] / relaxationTimescale;
+    ay[i] -= vy[i] / relaxationTimescale;
+    az[i] -= vz[i] / relaxationTimescale;
+}
+
+template<typename Thydro, typename T>
+void relaxSystemGPU(size_t first, size_t last, Thydro* ax, Thydro* ay, Thydro* az, Thydro* vx, Thydro* vy, Thydro* vz,
+                    T relaxationTimescale)
+{
+    cstone::LocalIndex numParticles = last - first;
+    unsigned           numThreads   = 256;
+    unsigned           numBlocks    = (numParticles + numThreads - 1) / numThreads;
+
+    relaxSystemKernel<<<numBlocks, numThreads>>>(first, last, ax, ay, az, vx, vy, vz, relaxationTimescale);
+    checkGpuErrors(cudaDeviceSynchronize());
+}
+
+#define RELAX_SYSTEM_GPU(Thydro, T)                                                                                    \
+    template void relaxSystemGPU(size_t first, size_t last, Thydro* ax, Thydro* ay, Thydro* az, Thydro* vx,            \
+                                 Thydro* vy, Thydro* vz, T relaxationTimescale);
+RELAX_SYSTEM_GPU(float, double);
+RELAX_SYSTEM_GPU(double, double);
+
 } // namespace sph

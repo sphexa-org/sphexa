@@ -48,12 +48,7 @@
 #include "sph/table_lookup.hpp"
 #include "sph/types.hpp"
 
-#include "particles_data_stubs.hpp"
 #include "sph_kernel_tables.hpp"
-
-#if defined(USE_CUDA)
-#include "particles_data_gpu.cuh"
-#endif
 
 namespace sphexa
 {
@@ -73,10 +68,8 @@ public:
     using Tmass     = sph::SphTypes::Tmass;
 
     template<class ValueType>
-    using PinnedVec = std::vector<ValueType, PinnedAlloc_t<AcceleratorType, ValueType>>;
-
-    template<class ValueType>
-    using FieldVector = std::vector<ValueType, std::allocator<ValueType>>;
+    using FieldVector =
+        std::conditional_t<cstone::HaveGpu<AccType>{}, cstone::DeviceVector<ValueType>, std::vector<ValueType>>;
 
     using FieldVariant = std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*,
                                       FieldVector<uint64_t>*, FieldVector<uint8_t>*>;
@@ -86,6 +79,7 @@ public:
 
     uint64_t iteration{1};
     uint64_t numParticlesGlobal{0};
+    uint64_t numParticlesGlobalPrev{};
 
     //! @brief default mean desired number of neighbors per particle, can be overriden per test case or input file
     unsigned ng0{100};
@@ -214,7 +208,7 @@ public:
     RealType K{0};
 
     //! @brief non-stateful variables for statistics
-    uint64_t totalNeighbors{0}, maxHalos{0};
+    uint64_t totalNeighbors{0}, localNeighbors{0}, maxHalos{0};
 
     /*! @brief Particle fields
      *
@@ -255,10 +249,12 @@ public:
     std::vector<cstone::LocalIndex>         neighbors;
     cstone::OctreeNsView<RealType, KeyType> treeView;
 
-    DeviceData_t<AccType> devData;
-
     //! @brief lookup tables for the SPH-kernel and its derivative
-    std::array<HydroType, lt::kTableSize> wh{0}, whd{0};
+    FieldVector<HydroType> wh, whd;
+
+    FieldVector<cstone::LocalIndex> traversalStack;
+    //! @brief non-stateful variables for statistics
+    size_t stackUsedNc{0}, stackUsedGravity{0};
 
     /*! @brief
      * Name of each field as string for use e.g in HDF5 output. Order has to correspond to what's returned by data().
@@ -271,9 +267,6 @@ public:
 
     //! @brief dataset prefix to be prepended to fieldNames for structured output
     static const inline std::string prefix{};
-
-    static_assert(!cstone::HaveGpu<AcceleratorType>{} || fieldNames.size() == DeviceData_t<AccType>::fieldNames.size(),
-                  "ParticlesData on CPU and GPU must have the same fields");
 
     /*! @brief return a tuple of field references
      *
@@ -327,8 +320,8 @@ public:
 
         auto deallocateVector = [size](auto* devVectorPtr)
         {
-            using DevVector = std::decay_t<decltype(*devVectorPtr)>;
-            if (devVectorPtr->capacity() < size) { *devVectorPtr = DevVector{}; }
+            using VecType = std::decay_t<decltype(*devVectorPtr)>;
+            if (devVectorPtr->capacity() < size) { *devVectorPtr = VecType{}; }
         };
 
         for (size_t i = 0; i < data_.size(); ++i)
@@ -374,20 +367,6 @@ public:
         return {size(), sumOfSize, sumOfCap, free, total};
     }
 
-    //! @brief resize GPU arrays if in use, CPU arrays otherwise
-    void resizeAcc(size_t size)
-    {
-        if (cstone::HaveGpu<AccType>{}) { devData.resize(size, allocGrowthRate_); }
-        else { resize(size); }
-    }
-
-    //! @brief return the size of GPU arrays if in use, CPU arrays otherwise
-    size_t accSize()
-    {
-        if (cstone::HaveGpu<AccType>{}) { return devData.size(); }
-        else { return size(); }
-    }
-
     //! @brief particle fields selected for file output
     std::vector<int>         outputFieldIndices;
     std::vector<std::string> outputFieldNames;
@@ -397,11 +376,14 @@ public:
 private:
     void createTables()
     {
-        using H = HydroType;
-        K       = sph::kernel_3D_k(getSphKernel(kernelChoice, sincIndex), 2.0);
-        wh      = sph::tabulateFunction<H, lt::kTableSize>(sph::getSphKernel(kernelChoice, sincIndex), 0, 2);
-        whd     = sph::tabulateFunction<H, lt::kTableSize>(sph::getSphKernelDerivative(kernelChoice, sincIndex), 0, 2);
-        devData.uploadTables(wh, whd);
+        using H   = HydroType;
+        K         = sph::kernel_3D_k(getSphKernel(kernelChoice, sincIndex), 2.0);
+        auto a_wh = sph::tabulateFunction<H, lt::kTableSize>(sph::getSphKernel(kernelChoice, sincIndex), 0, 2);
+        auto a_whd =
+            sph::tabulateFunction<H, lt::kTableSize>(sph::getSphKernelDerivative(kernelChoice, sincIndex), 0, 2);
+
+        wh  = FieldVector<HydroType>(a_wh.begin(), a_wh.end());
+        whd = FieldVector<HydroType>(a_whd.begin(), a_whd.end());
     }
 
     //! @brief buffer growth factor when reallocating
@@ -421,42 +403,15 @@ template<class Dataset, class... Fs>
 void release(Dataset& d, const Fs&... fs)
 {
     d.release(fs...);
-    d.devData.release(fs...);
 }
 
 template<class Dataset, class... Fs>
 void acquire(Dataset& d, const Fs&... fs)
 {
     d.acquire(fs...);
-    d.devData.acquire(fs...);
 }
 
-template<class DataType, std::enable_if_t<not cstone::HaveGpu<typename DataType::AcceleratorType>{}, int> = 0>
-void deallocateField(DataType&, int)
-{
-}
-
-template<class Dataset, std::enable_if_t<not cstone::HaveGpu<typename Dataset::AcceleratorType>{}, int> = 0>
-void transferToDevice(Dataset&, size_t, size_t, const std::vector<std::string>&)
-{
-}
-
-template<class Dataset, std::enable_if_t<not cstone::HaveGpu<typename Dataset::AcceleratorType>{}, int> = 0>
-void migrateToDevice(Dataset&, size_t, size_t)
-{
-}
-
-template<class Dataset, std::enable_if_t<not cstone::HaveGpu<typename Dataset::AcceleratorType>{}, int> = 0>
-void transferToHost(Dataset&, size_t, size_t, const std::vector<std::string>&)
-{
-}
-
-template<class Vector, class T, std::enable_if_t<not IsDeviceVector<Vector>{}, int> = 0>
-void fill(Vector& v, size_t first, size_t last, T value)
-{
-    std::fill(v.data() + first, v.data() + last, value);
-}
-
+// TODO move this to a better place
 template<class Vector>
 void fillMassHalos(Vector& m, std::size_t first, std::size_t last)
 {
@@ -465,8 +420,8 @@ void fillMassHalos(Vector& m, std::size_t first, std::size_t last)
     if constexpr (IsDeviceVector<Vector>{}) { memcpyD2H(m.data() + first, 1, &mass); }
     else { mass = m[first]; }
 
-    fill(m, 0, first, mass);
-    fill(m, last, m.size(), mass);
+    cstone::fill<IsDeviceVector<Vector>{}>(m.begin(), m.begin() + first, mass);
+    cstone::fill<IsDeviceVector<Vector>{}>(m.begin() + last, m.end(), mass);
 }
 
 } // namespace sphexa

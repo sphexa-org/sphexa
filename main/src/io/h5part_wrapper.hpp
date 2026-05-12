@@ -23,68 +23,74 @@
  */
 
 /*! @file
- * @brief A C++ layer over H5Part
+ * @brief A C++ layer over H5Hut
  *
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+#include "H5hut.h"
+
 #include "cstone/util/type_list.hpp"
 #include "cstone/util/tuple_util.hpp"
-
-#include "H5hut.h"
+#include "type_config.h"
 
 namespace sphexa::fileutils
 {
 
-// ---------------------------------------------------------------------------
-// types used by sph-exa throughout
-using H5PartTypes = util::TypeList<double, float, char, int, uint, int64_t, uint64_t>;
+using H5Types = util::TypeList<double, float, std::int8_t, std::uint8_t, std::int16_t, std::uint16_t, std::int32_t,
+                               std::uint32_t, std::int64_t, std::uint64_t>;
 
-// ---------------------------------------------------------------------------
+static constexpr h5_types_t H5TypeIDs[] = {H5_FLOAT64_T, H5_FLOAT32_T, H5_INT8_T,   H5_UINT8_T, H5_INT16_T,
+                                           H5_UINT16_T,  H5_INT32_T,   H5_UINT32_T, H5_INT64_T, H5_UINT64_T};
+
+static constexpr std::array H5TypeNames{
+    "C++ double / python np.float64",  "C++ float / python np.float32",   "C++ int8_t / python np.int8",
+    "C++ uint8_t / python np.uint8",   "C++ int16_t / python np.int16",   "C++ uint16_t / python np.uint16",
+    "C++ int32_t / python np.int32",   "C++ uint32_t / python np.uint32", "C++ int64_t / python np.int64",
+    "C++ uint64_t / python np.uint64",
+};
+
+//! @brief Match type T with type of tuple_element_t<N, Tuple> if signedness and byte-width match and both are integral
+template<int N, class T, class Tuple>
+struct MatchSignednessAndBytes
+    : std::bool_constant<sizeof(T) == sizeof(util::TypeListElement_t<N, Tuple>) &&
+                         std::is_integral_v<T> == std::is_integral_v<util::TypeListElement_t<N, Tuple>> &&
+                         std::is_signed_v<T> == std::is_signed_v<util::TypeListElement_t<N, Tuple>>>
+{
+};
+
+/*! @brief translate Native C++ types to fixed-width types supported by HDF5
+ * @tparam AppType Native C++ type from the application
+ *
+ * The byte-width of native C++ types such as "long" are implementation dependent, e.g. 32-bit on Windows and 64-bit
+ * on Linux, Unix and macOS. Therefore, we must map them to fixed-width types suitable for serialization.
+ */
+template<typename AppType>
+struct H5hutType
+{
+    constexpr static int         typeIndex = util::FindIndex<std::decay_t<AppType>, H5Types, MatchSignednessAndBytes>{};
+    constexpr static auto        value     = H5TypeIDs[typeIndex];
+    constexpr static const char* nameString = H5TypeNames[typeIndex];
+};
+
+template<typename I>
+inline constexpr auto H5hutType_v = H5hutType<I>::value;
+
 enum attribute_type
 {
     file,
     step,
 };
 
-// ---------------------------------------------------------------------------
-// helper to define traits that we can use for brevity
-template<typename H5_Type>
-struct h5_traits
-{
-};
-
-#define make_h5_trait(T, NATIVE_TYPE, H5HUT_TYPE, STRING)                                                              \
-    template<>                                                                                                         \
-    struct h5_traits<T>                                                                                                \
-    {                                                                                                                  \
-        operator h5_int64_t() const noexcept { return NATIVE_TYPE; }                                                   \
-        static constexpr h5_types_t h5hut_type = H5HUT_TYPE;                                                           \
-        static const std::string    stringval() { return STRING; }                                                     \
-    }
-
-// clang-format off
-make_h5_trait(double,         H5T_NATIVE_DOUBLE,  H5_FLOAT64_T,  "C++: double / python: np.float64");
-make_h5_trait(float,          H5T_NATIVE_FLOAT,   H5_FLOAT32_T,  "C++: float  / python: np.float32");
-make_h5_trait(std::int64_t,   H5T_NATIVE_LONG,    H5_INT64_T,    "C++:  int64 / python: np.int64");
-make_h5_trait(std::uint64_t,  H5T_NATIVE_ULONG,   H5_UINT64_T,   "C++: uint64 / python: np.uint64");
-make_h5_trait(int,            H5T_NATIVE_INT,     H5_INT32_T,    "C++:  int   / python: np.int32");
-make_h5_trait(unsigned,       H5T_NATIVE_UINT,    H5_UINT32_T,   "C++: uint   / python: np.uint32");
-make_h5_trait(std::int16_t,   H5T_NATIVE_SHORT,   H5_INT16_T,    "C++:  int16 / python: np.int16");
-make_h5_trait(std::uint16_t,  H5T_NATIVE_USHORT,  H5_UINT16_T,   "C++: uint16 / python: np.uint16");
-make_h5_trait(char,           H5T_NATIVE_CHAR,    H5_INT8_T,     "C++:  char  / python: np.int8");
-make_h5_trait(unsigned char,  H5T_NATIVE_UCHAR,   H5_UINT8_T,    "C++: uchar  / python: np.uint8");
-//clang-format on
-
-// ---------------------------------------------------------------------------
 //! @brief return the names of all datasets in @p h5_file
 std::vector<std::string> datasetNames(h5_file_t h5_file)
 {
@@ -149,14 +155,14 @@ inline h5_err_t H5WriteStepAttribT(const h5_file_t f, const char* const attrib_n
                                    const h5_size_t nelems)
 {
     // copied from h5hut source, but templated to simplify calling
-    return h5_write_iteration_attrib(f, attrib_name, h5_traits<T>::h5hut_type, buffer, nelems);
+    return h5_write_iteration_attrib(f, attrib_name, H5hutType_v<T>, buffer, nelems);
 }
 
 template<typename T>
 inline h5_err_t H5ReadStepAttribT(const h5_file_t f, const char* const attrib_name, void* const buffer)
 {
     // copied from h5hut source, but templated to simplify calling
-    return h5_read_iteration_attrib(f, attrib_name, h5_traits<T>::h5hut_type, (void*)buffer);
+    return h5_read_iteration_attrib(f, attrib_name, H5hutType_v<T>, (void*)buffer);
 }
 
 template<class ExtractType>
@@ -172,14 +178,14 @@ static inline h5_err_t H5WriteFileAttribT(const h5_file_t f, const char* const a
                                           const h5_size_t nelems)
 {
     // copied from h5hut source, but templated to simplify calling
-    return h5_write_file_attrib(f, attrib_name, h5_traits<T>::h5hut_type, buffers, nelems);
+    return h5_write_file_attrib(f, attrib_name, H5hutType_v<T>, buffers, nelems);
 }
 
 template<typename T>
 static inline h5_err_t H5ReadFileAttribT(const h5_file_t f, const char* const attrib_name, void* const buffer)
 {
     // copied from h5hut source, but templated to simplify calling
-    return h5_read_file_attrib(f, attrib_name, h5_traits<T>::h5hut_type, (void*)buffer);
+    return h5_read_file_attrib(f, attrib_name, H5hutType_v<T>, (void*)buffer);
 }
 
 template<class ExtractType>
@@ -194,14 +200,14 @@ template<typename T>
 static inline h5_err_t H5PartWriteDataT(const h5_file_t f, const char* name, const T* data)
 {
     // copied from h5hut source, but templated to simplify calling
-    return h5u_write_dataset(f, name, (void*)data, h5_traits<T>::h5hut_type);
+    return h5u_write_dataset(f, name, (void*)data, H5hutType_v<T>);
 }
 
 template<typename T>
 static inline h5_err_t H5PartReadDataT(const h5_file_t f, const char* name, T* data)
 {
     // copied from h5hut source, but templated to simplify calling
-    return h5u_read_dataset(f, name, data, h5_traits<T>::h5hut_type);
+    return h5u_read_dataset(f, name, data, H5hutType_v<T>);
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +216,7 @@ template<class ExtractType>
 void readAttribute_typesafe(h5_file_t h5_file, attribute_type domain, ExtractType* attr, std::size_t attrSizeBuf,
                             int attrIndex)
 {
-    using IoTuple = util::Reduce<std::tuple, H5PartTypes>;
+    using IoTuple = util::Reduce<std::tuple, IO::Types>;
 
     h5_int64_t typeId;
     h5_size_t  attrSizeFile;
@@ -239,12 +245,12 @@ void readAttribute_typesafe(h5_file_t h5_file, attribute_type domain, ExtractTyp
     auto readTypesafe = [&](auto dummyValue)
     {
         using TrialType = std::decay_t<decltype(dummyValue)>;
-        if (h5_traits<TrialType>::h5hut_type == typeId && not breakLoop)
+        if (H5hutType_v<TrialType> == typeId && not breakLoop)
         {
-            bool h5IsSame            = h5_traits<TrialType>::h5hut_type == h5_traits<ExtractType>::h5hut_type;
+            bool h5IsSame            = H5hutType_v<TrialType> == H5hutType_v<ExtractType>;
             bool bothFloating        = std::is_floating_point_v<TrialType> && std::is_floating_point_v<ExtractType>;
             bool extractToCommonType = std::is_same_v<std::common_type_t<TrialType, ExtractType>, ExtractType>;
-            if (h5IsSame ||  bothFloating || extractToCommonType)
+            if (h5IsSame || bothFloating || extractToCommonType)
             {
                 std::vector<TrialType> attrBuf(attrSizeFile);
                 if (std::invoke(
@@ -263,8 +269,8 @@ void readAttribute_typesafe(h5_file_t h5_file, attribute_type domain, ExtractTyp
             else
             {
                 throw std::runtime_error("Reading attribute " + std::string(attrName) +
-                                         " failed: " + "type in file is " + h5_traits<TrialType>::stringval() +
-                                         ", but supplied buffer type is " + h5_traits<ExtractType>::stringval() + "\n");
+                                         " failed: " + "type in file is " + H5hutType<TrialType>::nameString +
+                                         ", but supplied buffer type is " + H5hutType<ExtractType>::nameString + "\n");
             }
             breakLoop = true;
         }

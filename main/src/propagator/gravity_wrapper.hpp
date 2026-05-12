@@ -116,15 +116,15 @@ public:
 
     cstone::GroupView computeSpatialGroups(const DataType& d, const DomainType& domain)
     {
-        return mHolder_.computeSpatialGroups(domain.startIndex(), domain.endIndex(), rawPtr(d.devData.x),
-                                             rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h),
+        return mHolder_.computeSpatialGroups(domain.startIndex(), domain.endIndex(), rawPtr(d.x),
+                                             rawPtr(d.y), rawPtr(d.z), rawPtr(d.h),
                                              domain.focusTree(), domain.layout().data(), domain.box());
     }
 
     void upsweep(const DataType& d, const DomainType& domain)
     {
         const auto& focusTree = domain.focusTree();
-        mHolder_.upsweep(rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.m),
+        mHolder_.upsweep(rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m),
                          domain.globalTree(), focusTree, domain.layout().data());
     }
 
@@ -135,9 +135,9 @@ public:
         int         numShells = usePbc ? ewaldSettings_.numReplicaShells : 0;
 
         d.egrav =
-            mHolder_.compute(grp, rawPtr(d.devData.x), rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.m),
-                             rawPtr(d.devData.h), d.g, numShells, domain.box(), rawPtr(d.devData.ugrav),
-                             rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az));
+            mHolder_.compute(grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m),
+                             rawPtr(d.h), d.g, numShells, domain.box(), rawPtr(d.ugrav),
+                             rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az));
 
         auto stats = mHolder_.readStats();
 
@@ -151,13 +151,13 @@ public:
             MType rootM;
             memcpyD2H(mHolder_.deviceMultipoles(), 1, &rootM);
 
-            computeGravityEwaldGpu(makeVec3(rootCenter), rootM, grp, rawPtr(d.devData.x), rawPtr(d.devData.y),
-                                   rawPtr(d.devData.z), rawPtr(d.devData.m), box, d.g, rawPtr(d.devData.ugrav),
-                                   rawPtr(d.devData.ax), rawPtr(d.devData.ay), rawPtr(d.devData.az), &d.egrav,
+            computeGravityEwaldGpu(makeVec3(rootCenter), rootM, grp, rawPtr(d.x), rawPtr(d.y),
+                                   rawPtr(d.z), rawPtr(d.m), box, d.g, rawPtr(d.ugrav),
+                                   rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), &d.egrav,
                                    ewaldSettings_);
         }
 
-        d.devData.stackUsedGravity = stats[4];
+        d.stackUsedGravity = stats[4];
     }
 
     //! @brief return numP2P, maxP2P, numM2P, maxM2P, maxStack stats

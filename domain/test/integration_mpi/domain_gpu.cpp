@@ -63,11 +63,11 @@ void randomGaussianAssignment(int rank, int numRanks)
     DeviceVector<T> d_m           = m;
     DeviceVector<uint8_t> d_rungs = rungs;
 
-    Domain<KeyType, T, CpuTag> domainCpu(rank, numRanks, bucketSize, bucketSizeFocus, 1.0, box);
+    Domain<KeyType, T, CpuTag> domainCpu(rank, numRanks, bucketSize, bucketSizeFocus, 1.0, MPI_COMM_WORLD, box);
     std::vector<T> hs1, hs2, hs3;
     domainCpu.sync(keys, x, y, z, h, std::tie(m, rungs), std::tie(hs1, hs2, hs3));
 
-    Domain<KeyType, T, GpuTag> domainGpu(rank, numRanks, bucketSize, bucketSizeFocus, 1.0, box);
+    Domain<KeyType, T, GpuTag> domainGpu(rank, numRanks, bucketSize, bucketSizeFocus, 1.0, MPI_COMM_WORLD, box);
     DeviceVector<T> s1, s2, s3;
     domainGpu.sync(d_keys, d_x, d_y, d_z, d_h, std::tie(d_m, d_rungs), std::tie(s1, s2, s3));
 
@@ -140,7 +140,7 @@ TEST(FocusDomain, removeParticle)
     DeviceVector<KeyType> d_keys = keys;
     DeviceVector<uint64_t> d_id  = id;
 
-    Domain<KeyType, Real, GpuTag> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, box);
+    Domain<KeyType, Real, GpuTag> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, box);
 
     DeviceVector<Real> s1, s2, s3;
     domain.sync(d_keys, d_x, d_y, d_z, d_h, std::tie(d_id), std::tie(s1, s2, s3));
@@ -200,7 +200,7 @@ TEST(DomainGpu, reapplySync)
     DeviceVector<Real> d_h       = h;
     DeviceVector<KeyType> d_keys = keys;
 
-    Domain<KeyType, Real, GpuTag> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, box);
+    Domain<KeyType, Real, GpuTag> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, box);
 
     DeviceVector<Real> s1, s2, gpuOrdering;
     domain.sync(d_keys, d_x, d_y, d_z, d_h, std::tuple{}, std::tie(s1, s2, gpuOrdering));
@@ -273,4 +273,95 @@ TEST(DomainGpu, Allgatherv)
     std::iota(ref.begin(), ref.end(), 100);
 
     EXPECT_EQ(dstDl, ref);
+}
+
+template<class KeyType, class T>
+void randomGaussianGrav(int thisRank, int numRanks)
+{
+    const LocalIndex numParticles    = 100000;
+    unsigned         bucketSize      = numParticles / (100 * numRanks);
+    unsigned         bucketSizeLocal = std::min(64u, bucketSize);
+    float            theta           = 0.5;
+
+    Box<T> box{-1, 1};
+
+    // common pool of coordinates, identical on all ranks
+    RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box);
+    coords.adjustH(20, 50);
+
+    std::vector<T> globalMasses(numParticles, 1.0 / numParticles);
+
+    LocalIndex firstIndex = (numParticles * thisRank) / numRanks;
+    LocalIndex lastIndex  = (numParticles * (thisRank + 1)) / numRanks;
+
+    // extract a slice of the common pool, each rank takes a different slice, but all slices together
+    // are equal to the common pool
+    std::vector<T>       x(coords.x().begin() + firstIndex, coords.x().begin() + lastIndex);
+    std::vector<T>       y(coords.y().begin() + firstIndex, coords.y().begin() + lastIndex);
+    std::vector<T>       z(coords.z().begin() + firstIndex, coords.z().begin() + lastIndex);
+    std::vector<T>       h(coords.h().begin() + firstIndex, coords.h().begin() + lastIndex);
+    std::vector<T>       m(globalMasses.begin() + firstIndex, globalMasses.begin() + lastIndex);
+    std::vector<KeyType> keys(x.size());
+
+    DeviceVector<T> d_x          = x;
+    DeviceVector<T> d_y          = y;
+    DeviceVector<T> d_z          = z;
+    DeviceVector<T> d_h          = h;
+    DeviceVector<T> d_m          = m;
+    DeviceVector<KeyType> d_keys = keys;
+
+    auto cpToHost = []<class X>(const X* ptr, int n)
+    {
+        std::vector<X> ret(n);
+        memcpyD2H(ptr, n, ret.data());
+        return ret;
+    };
+
+    std::vector<LocalIndex> layout, h_layout;
+    std::vector<SourceCenterType<T>> centers, h_centers;
+    {
+        Domain<KeyType, T, CpuTag> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta, MPI_COMM_WORLD, box);
+        std::vector<T> s1, s2, s3;
+        domain.syncGrav(keys, x, y, z, h, m, std::tuple{}, std::tie(s1, s2, s3));
+        domain.exchangeHalos(std::tie(m), s1, s2);
+        layout  = std::vector(domain.layout().begin(), domain.layout().end());
+        centers = std::vector<SourceCenterType<T>>(domain.focusTree().expansionCentersAcc().begin(),
+                                                   domain.focusTree().expansionCentersAcc().end());
+    }
+    {
+        Domain<KeyType, T, GpuTag> domainGpu(thisRank, numRanks, bucketSize, bucketSizeLocal, theta, MPI_COMM_WORLD, box);
+        DeviceVector<T> ds1, ds2, gpuOrdering;
+        domainGpu.syncGrav(d_keys, d_x, d_y, d_z, d_h, d_m, std::tuple{}, std::tie(ds1, ds2, gpuOrdering));
+        domainGpu.exchangeHalos(std::tie(d_m), ds1, ds2);
+
+        h_layout  = cpToHost(domainGpu.layout().data(), domainGpu.layout().size());
+        h_centers = cpToHost(domainGpu.focusTree().expansionCentersAcc().data(),
+                             domainGpu.focusTree().expansionCentersAcc().size());
+    }
+
+    EXPECT_EQ(layout, h_layout);
+    for (TreeNodeIndex i = 0; i < centers.size(); ++i)
+    {
+        EXPECT_NEAR(norm2(centers[i] - h_centers[i]), 0.0, 1e-6);
+    }
+
+    auto h_x = toHost(d_x);
+    auto h_y = toHost(d_y);
+    auto h_z = toHost(d_z);
+    auto h_h = toHost(d_h);
+    auto h_m = toHost(d_m);
+
+    EXPECT_EQ(h_x, x);
+    EXPECT_EQ(h_y, y);
+    EXPECT_EQ(h_z, z);
+    EXPECT_EQ(h_h, h);
+    EXPECT_EQ(h_m, m);
+}
+
+TEST(DomainGpu, gravMatchCpu)
+{
+    int rank = 0, nRanks = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
+    randomGaussianGrav<uint64_t, double>(rank, nRanks);
 }

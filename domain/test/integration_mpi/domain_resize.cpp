@@ -34,7 +34,7 @@ TEST(GlobalDomainResize, resize)
     if (numRanks != thisExampleRanks) throw std::runtime_error("this test needs 2 ranks\n");
     int bucketSize = 1;
     float theta    = 1.0;
-    Domain<KeyType, T> domain(rank, numRanks, bucketSize, bucketSize, theta);
+    Domain<KeyType, T> domain(rank, numRanks, bucketSize, bucketSize, theta, MPI_COMM_WORLD);
 
     std::vector<T> x{0.55, 0.56};
     std::vector<T> y{0.55, 0.56};

@@ -90,7 +90,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
     }
     else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box); }
 
-    FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal);
+    FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD);
     focusTree.converge(box, particleKeys, assignment, tree, counts, invThetaEff);
 
     auto octree = focusTree.octreeViewAcc();
@@ -209,7 +209,7 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>
     }
     else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box); }
 
-    FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal);
+    FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD);
     focusTree.converge(box, particleKeys, assignment, tree, counts, invThetaEff);
 
     auto octree = focusTree.octreeViewAcc();

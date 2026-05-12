@@ -40,20 +40,26 @@
 namespace sph
 {
 
-template<size_t stride = 1, class Tc, class T>
-HOST_DEVICE_FUN inline void IADJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
-                                     const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
-                                     const Tc* y, const Tc* z, const T* h, const T* wh, const T* /*whd*/, const T* xm,
-                                     const T* kx, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33)
+template<size_t stride = 1, class Tc, class Tm, class T>
+HOST_DEVICE_FUN void IAD_gradhJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
+                                    const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
+                                    const Tc* y, const Tc* z, const T* h, const Tm* m, const T* wh, const T* whd,
+                                    const T* xm, const T* kx, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, T* gradh)
 {
+    const auto xi = x[i];
+    const auto yi = y[i];
+    const auto zi = z[i];
+
+    const auto hi    = h[i];
+    const auto hiInv = T(1) / hi;
+
+    // IAD preamble
     T tau11 = 0.0, tau12 = 0.0, tau13 = 0.0, tau22 = 0.0, tau23 = 0.0, tau33 = 0.0;
 
-    auto xi = x[i];
-    auto yi = y[i];
-    auto zi = z[i];
-
-    auto hi    = h[i];
-    auto hiInv = T(1) / hi;
+    // gradh preamble
+    auto whomegai  = T(0);
+    auto wrho0i    = T(0);
+    auto sum_error = T(0);
 
     for (unsigned pj = 0; pj < neighborsCount; ++pj)
     {
@@ -65,13 +71,12 @@ HOST_DEVICE_FUN inline void IADJLoop(cstone::LocalIndex i, Tc K, const cstone::B
 
         applyPBC(box, T(2) * hi, rx, ry, rz);
 
-        T dist = std::sqrt(rx * rx + ry * ry + rz * rz);
+        T dist   = std::sqrt(rx * rx + ry * ry + rz * rz);
+        T vloc   = dist * hiInv;
+        T w      = lt::lookup(wh, vloc);
+        T xmassj = xm[j];
 
-        // calculate the v as ratio between the distance and the smoothing length
-        T vloc = dist * hiInv;
-        T w    = lt::lookup(wh, vloc);
-
-        T volj_w = xm[j] / kx[j] * w;
+        T volj_w = xmassj / kx[j] * w;
 
         tau11 += rx * rx * volj_w;
         tau12 += rx * ry * volj_w;
@@ -79,8 +84,17 @@ HOST_DEVICE_FUN inline void IADJLoop(cstone::LocalIndex i, Tc K, const cstone::B
         tau22 += ry * ry * volj_w;
         tau23 += ry * rz * volj_w;
         tau33 += rz * rz * volj_w;
+
+        // gradh summation
+        T dw    = lt::lookup(whd, vloc);
+        T dterh = -(T(3) * w + vloc * dw);
+        whomegai += dterh * xmassj;
+        wrho0i += dterh * m[j];
+        sum_error += dterh * xmassj / kx[j];
     }
 
+    // -----------------------------------------------------
+    // IAD postamble
     auto getExp    = [](T val) { return (val == T(0) ? 0 : std::ilogb(val)); };
     int  tauExpSum = getExp(tau11) + getExp(tau12) + getExp(tau13) + getExp(tau22) + getExp(tau23) + getExp(tau33);
     // normalize with 2^-averageTauExponent, ldexp(a, b) == a * 2^b
@@ -107,6 +121,31 @@ HOST_DEVICE_FUN inline void IADJLoop(cstone::LocalIndex i, Tc K, const cstone::B
     c22[i] = (tau11 * tau33 - tau13 * tau13) * factor;
     c23[i] = (tau13 * tau12 - tau11 * tau23) * factor;
     c33[i] = (tau11 * tau22 - tau12 * tau12) * factor;
+    // -----------------------------------------------------
+
+    // -----------------------------------------------------
+    // gradh postamble
+    auto h3Inv = hiInv * hiInv * hiInv;
+    auto dnorm = K * hiInv * h3Inv;
+
+    whomegai *= dnorm;
+    wrho0i *= dnorm;
+    sum_error *= dnorm;
+
+    auto mi     = m[i];
+    auto xmassi = xm[i];
+    auto kxi    = kx[i];
+    T    rhoi   = kxi * mi / xmassi;
+
+    // The following line uses kxi instead of rhoi/rho0i so that it doesn't need to save an extra variable.
+    // It is correct. However, assumes that the VE definition is xmass=mass/rho.
+    // If the VE definition changes, this line needs to be updated accordingly.
+    whomegai =
+        whomegai * mi / xmassi - rhoi * sum_error + (kxi - K * xmassi * h3Inv) * (wrho0i - rhoi / kxi * sum_error);
+    T dhdrho = -hi / (rhoi * T(3)); // This /3 is the dimension hard-coded.
+
+    T gradhi = T(1) - dhdrho * whomegai;
+    gradh[i] = gradhi;
 }
 
 } // namespace sph

@@ -113,14 +113,14 @@ __global__ void IADGpuKernel(Tc K, unsigned ngmax, cstone::Box<Tc> box, const Lo
 template<class Dataset>
 void computeIADGpu(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.devData.traversalStack, d.ngmax);
+    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.traversalStack, d.ngmax);
     cstone::resetTraversalCounters<<<1, 1>>>();
 
     IADGpuKernel<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.devData.x),
-        rawPtr(d.devData.y), rawPtr(d.devData.z), rawPtr(d.devData.h), rawPtr(d.devData.m), rawPtr(d.devData.rho),
-        rawPtr(d.devData.wh), rawPtr(d.devData.whd), rawPtr(d.devData.c11), rawPtr(d.devData.c12),
-        rawPtr(d.devData.c13), rawPtr(d.devData.c22), rawPtr(d.devData.c23), rawPtr(d.devData.c33), nidxPool,
+        d.K, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.x),
+        rawPtr(d.y), rawPtr(d.z), rawPtr(d.h), rawPtr(d.m), rawPtr(d.rho),
+        rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.c11), rawPtr(d.c12),
+        rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), nidxPool,
         traversalPool);
     checkGpuErrors(cudaDeviceSynchronize());
 }

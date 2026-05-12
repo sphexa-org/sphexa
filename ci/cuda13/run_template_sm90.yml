@@ -5,10 +5,9 @@ variables:
   TEST_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/sbin'
   APP_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/bin'
 
-sph-run-cuda12-sm90-release-1rank:
+.sph-run-cuda13-sm90-1rank:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-release']
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     SLURM_TIMELIMIT: '01:00:00'
@@ -34,10 +33,11 @@ sph-run-cuda12-sm90-release-1rank:
     - $TEST_INSTALL_DIR/unit/component_units
     # --- grackle
     # https://github.com/grackle-project/grackle_data_files/blob/928696482fbe15d9bac4382de6134d95568f099c/input/CloudyData_UVB%3DHM2012.h5
-    # - wget https://jfrog.svc.cscs.ch/artifactory/cscs-reframe-tests/sphexa/CloudyData_UVB%3DHM2012.h5
-    # - mkdir -p extern/grackle/grackle_repo/grackle_data_files/input
-    # - mv CloudyData_UVB=HM2012.h5 extern/grackle/grackle_repo/grackle_data_files/input/
-    # - $TEST_INSTALL_DIR/physics/cooling_tests
+    - wget https://jfrog.svc.cscs.ch/artifactory/cscs-reframe-tests/sphexa/CloudyData_UVB%3DHM2012.h5
+    - mkdir -p extern/grackle/grackle_repo/input
+    - mv CloudyData_UVB=HM2012.h5 extern/grackle/grackle_repo/input/
+    - export GRACKLE_DATA_FILE="$PWD/extern/grackle/grackle_repo/input/CloudyData_UVB=HM2012.h5"
+    - $TEST_INSTALL_DIR/physics/cooling_tests
     # GPU tests:
     - $TEST_INSTALL_DIR/hydro/sph_gpu_tests
     - $TEST_INSTALL_DIR/performance/hilbert_perf_gpu
@@ -46,10 +46,9 @@ sph-run-cuda12-sm90-release-1rank:
     - $TEST_INSTALL_DIR/unit_cuda/component_units_cuda
     - date
 
-sph-run-cuda12-sm90-release-2ranks:
+.sph-run-cuda13-sm90-2ranks:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-release']
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -79,10 +78,9 @@ sph-run-cuda12-sm90-release-2ranks:
     - $TEST_INSTALL_DIR/integration_mpi/exchange_halos_gpu
     - date
 
-sph-run-cuda12-sm90-release-4ranks:
+.sph-run-cuda13-sm90-4ranks:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-release']
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -98,10 +96,9 @@ sph-run-cuda12-sm90-release-4ranks:
     - $TEST_INSTALL_DIR/ryoanji/global_upsweep_gpu
     - date
 
-sph-run-cuda12-sm90-release-12ranks:
+.sph-run-cuda13-sm90-12ranks:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-release']
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -119,10 +116,9 @@ sph-run-cuda12-sm90-release-12ranks:
     - $TEST_INSTALL_DIR/integration_mpi/domain_nranks
     - date
 
-sph-run-cuda12-sm90-release-sphexa-cuda:
+.sph-run-cuda13-sm90-sphexa-cuda:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-release']
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -136,13 +132,24 @@ sph-run-cuda12-sm90-release-sphexa-cuda:
     - export OMP_NUM_THREADS=64
   script:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
-    - $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init sedov --G 1.0 -n 100 -s 10
+    - $APP_INSTALL_DIR/sphexa-cuda --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 100 -w 10
+    - if [ "$SLURM_PROCID" -eq 0 ]; then mv constants.txt constants_ref.txt; fi
+    - wait
+    - $APP_INSTALL_DIR/sphexa-cuda --init dump_sedov.h5:4 -s 100
+    - |
+      if [ "$SLURM_PROCID" -eq 0 ]; then
+        awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
+        venv_python="constant_comparison_venv/bin/python"
+        "$venv_python" ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt "7,8"
+        if [ $? -ne 0 ]; then
+          exit 1
+        fi
+      fi
     - date
 
-sph-run-cuda12-sm90-release-sphexa-cpu:
+.sph-run-cuda13-sm90-sphexa-cpu:
   stage: sphexa_run
-  needs: ['sph-build-cuda12-sm90-release']
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -156,5 +163,53 @@ sph-run-cuda12-sm90-release-sphexa-cpu:
     - export OMP_NUM_THREADS=64
   script:
     - wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
-    - $APP_INSTALL_DIR/sphexa --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 4
+    - $APP_INSTALL_DIR/sphexa --glass ./50c.h5 --init sedov --G 1.0 -n 40 -s 100 -w 10
+    - if [ "$SLURM_PROCID" -eq 0 ]; then mv constants.txt constants_ref.txt; fi
+    - wait
+    - $APP_INSTALL_DIR/sphexa --init dump_sedov.h5:4 -s 100
+    - |
+      if [ "$SLURM_PROCID" -eq 0 ]; then
+        awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt
+        venv_python="constant_comparison_venv/bin/python"
+        "$venv_python" ci/scripts/compare_constants.py constants_ref_tail.txt constants.txt "7,8"
+        if [ $? -ne 0 ]; then
+          exit 1
+        fi
+      fi
+    - date
+
+.sph-compare-constants-cuda13-sm90-sphexa-cuda:
+  stage: sphexa_run
+  image: $MYUENV
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    WITH_UENV_VIEW: 'default'
+    # SLURM_PARTITION: 'debug'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+  before_script:
+    - pwd
+    - date
+    - export OMP_NUM_THREADS=71
+  script:
+    - bash ci/scripts/run_constants_comparison.sh "$APP_INSTALL_DIR/sphexa-cuda"
+    - date
+
+.sph-compare-constants-cuda13-sm90-sphexa-cpu:
+  stage: sphexa_run
+  image: $MYUENV
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    WITH_UENV_VIEW: 'default'
+    # SLURM_PARTITION: 'debug'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+  before_script:
+    - pwd
+    - date
+    - export OMP_NUM_THREADS=71
+  script:
+    - bash ci/scripts/run_constants_comparison.sh "$APP_INSTALL_DIR/sphexa"
     - date

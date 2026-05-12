@@ -144,11 +144,6 @@ public:
         d.setDependent("keys");
         std::apply([&d](auto... f) { d.setConserved(f.value...); }, make_tuple(ConservedFields{}));
         std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
-
-        d.devData.setConserved("x", "y", "z", "h", "m");
-        d.devData.setDependent("keys");
-        std::apply([&d](auto... f) { d.devData.setConserved(f.value...); }, make_tuple(ConservedFields{}));
-        std::apply([&d](auto... f) { d.devData.setDependent(f.value...); }, make_tuple(DependentFields{}));
     }
 
     void save(IFileWriter* writer) override { timestep_.loadOrStore(writer, "ts::"); }
@@ -184,14 +179,14 @@ public:
         }
         d.treeView = domain.octreeProperties();
 
-        d.resizeAcc(domain.nParticlesWithHalos());
+        d.resize(domain.nParticlesWithHalos());
         resizeNeighbors(d, domain.nParticles() * d.ngmax);
 
         computeGroups(domain.startIndex(), domain.endIndex(), d, domain.box(), groups_);
         activeRungs_ = groups_.view();
 
         reallocate(groups_.numGroups, d.getAllocGrowthRate(), groupDt_, groupIndices_);
-        fill(groupDt_, 0, groupDt_.size(), std::numeric_limits<float>::max());
+        cstone::fill<cstone::HaveGpu<Acc>{}>(groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max());
     }
 
     void partialSync(DomainType& domain, DataType& simData)
@@ -245,20 +240,22 @@ public:
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
-        computeVeDefGradh(activeRungs_, d, domain.box());
-        timer.step("Normalization & Gradh");
+        computeVe(activeRungs_, d, domain.box());
+        timer.step("Generalized Volume Elements");
+        domain.exchangeHalos(get<"kx", "vx", "vy", "vz">(d), get<"keys">(d), haloRecvScratch);
+        timer.step("mpi::synchronizeHalos");
+
+        computeIadDivvCurlvGradh(activeRungs_, d, domain.box());
+        groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
+        timer.step("IadVelocityDivCurlGradh");
+
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "gradh">(d), get<"keys">(d), haloRecvScratch);
+        timer.step("mpi::synchronizeHalos");
 
         computeEOS(first, last, d);
         timer.step("EquationOfState");
 
-        domain.exchangeHalos(get<"vx", "vy", "vz", "prho", "c", "kx">(d), get<"keys">(d), haloRecvScratch);
-        timer.step("mpi::synchronizeHalos");
-
-        computeIadDivvCurlv(activeRungs_, d, domain.box());
-        groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
-        timer.step("IadVelocityDivCurl");
-
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv">(d), get<"keys">(d), haloRecvScratch);
+        domain.exchangeHalos(get<"prho", "c">(d), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
         computeAVswitches(activeRungs_, d, domain.box());
@@ -404,10 +401,13 @@ public:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    transferToHost(d, first, last, {d.fieldNames[fidx]});
-                    std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
-                    deallocateField(d, fidx);
+                    std::visit(
+                        [writer, c = column, key = namesDone[i]](auto field)
+                        {
+                            auto&& tmp = toHost(*field);
+                            writeField(writer, key, tmp.data(), c);
+                        },
+                        fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
@@ -426,7 +426,7 @@ public:
 
         // third output pass: recover temporary curlv and divv quantities
         acquire(d, "curlv");
-        if (!indicesDone.empty()) { computeIadDivvCurlv(groups_.view(), d, box); }
+        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
         output();
         release(d, "curlv");
         acquire(d, "ay", "az");

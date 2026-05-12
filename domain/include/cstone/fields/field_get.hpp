@@ -33,36 +33,10 @@ decltype(auto) getFields(Tuple&& tuple, util::FieldList<Fields...>)
     else { return std::tie(std::get<getFieldIndex(Fields.value, Dataset::fieldNames)>(std::forward<Tuple>(tuple))...); }
 }
 
-template<util::StructuralString... Fields, class Dataset>
-decltype(auto) getHost(Dataset& d)
-{
-    return getFields<Dataset>(d.dataTuple(), util::FieldList<Fields...>{});
-}
-
-template<class FL, class Dataset>
-decltype(auto) getHost(Dataset& d)
-{
-    return getFields<Dataset>(d.dataTuple(), FL{});
-}
-
-template<util::StructuralString... Fields, class Dataset>
-decltype(auto) getDevice(Dataset& d)
-{
-    return getFields<Dataset>(d.devData.dataTuple(), util::FieldList<Fields...>{});
-}
-
-template<class FL, class Dataset>
-decltype(auto) getDevice(Dataset& d)
-{
-    return getFields<Dataset>(d.devData.dataTuple(), FL{});
-}
-
 template<class FL, class Dataset>
 decltype(auto) get(Dataset& d)
 {
-    using AcceleratorType = typename Dataset::AcceleratorType;
-    if constexpr (std::is_same_v<AcceleratorType, CpuTag>) { return getHost<FL>(d); }
-    else { return getDevice<FL>(d); }
+    return getFields<Dataset>(d.dataTuple(), FL{});
 }
 
 //! @brief Return a tuple of references to the specified particle field indices, to GPU fields if GPU is enabled
