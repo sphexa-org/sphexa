@@ -9,13 +9,17 @@ def read_data_from_file(filename):
     parsed = [list(map(float, line.split())) for line in lines]
     return np.array(parsed)
 
-BACKEND = 'gpu'  # Change to 'gpu' if needed
+BACKEND = 'cpu'  # Change to 'gpu' if needed
 STEPS = 200
 N = 50
-RANKS = 1
-CORES = 1
+if BACKEND == 'cpu':
+    RANKS = 4
+    CORES = 72
+elif BACKEND == 'gpu':
+    RANKS = 1
+    CORES = 1
 
-TEST='windshock' #'windshock' or 'kelvin'
+TEST='kelvin' #'windshock' or 'kelvin'
 
 # normalize and validate TEST value (accept common variants)
 TEST = TEST.strip().lower()
