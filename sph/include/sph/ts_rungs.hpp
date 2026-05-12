@@ -33,7 +33,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <vector>
+#include <limits>
 #include <mpi.h>
 
 #include "cstone/primitives/math.hpp"
