@@ -61,7 +61,7 @@ TEST(Turbulence, rngSerialize)
     std::copy(engineState.begin(), engineState.end(), stateChar.get());
 
     std::stringstream t;
-    t << stateChar.get();
+    t.write(stateChar.get(), engineState.size());
     t >> engine;
 
     EXPECT_EQ(originalEngine, engine);
