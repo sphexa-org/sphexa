@@ -275,11 +275,31 @@ struct GpuFullNbListNeighborhoodBuilder
         auto globalPool     = util::deviceAlloc<int[]>(TravConfig::poolSize());
         auto maxNeighbors   = util::deviceAlloc<unsigned>();
 
+        using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
+        ThP hExt = h;
+        util::UniqueDevicePtr<Th[]> hExtData;
+        if (tree.searchExtFactor != 1)
+        {
+            if constexpr (std::is_pointer_v<ThP>)
+            {
+                hExtData = util::deviceAlloc<Th[]>(totalBodies);
+                thrust::transform(thrust::device, h, h + totalBodies, hExtData.get(),
+                                  [searchExtFactor = tree.searchExtFactor] __device__(Th hi)
+                                  { return hi * searchExtFactor; });
+                hExt = hExtData.get();
+            }
+            else
+            {
+                hExt = h * tree.searchExtFactor;
+            }
+            tree.searchExtFactor = 1;
+        }
+
         checkGpuErrors(cudaMemsetAsync(maxNeighbors.get(), 0, sizeof(unsigned)));
 
         resetTraversalCounters<<<1, 1>>>();
         gpuFullNbListNeighborhoodBuild<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-            tree, box, groups, x, y, z, h, ngmax, neighbors.get(), neighborsCount.get(), globalPool.get(),
+            tree, box, groups, x, y, z, hExt, ngmax, neighbors.get(), neighborsCount.get(), globalPool.get(),
             maxNeighbors.get());
         checkGpuErrors(cudaGetLastError());
 

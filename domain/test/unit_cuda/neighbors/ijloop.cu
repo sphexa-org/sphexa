@@ -175,20 +175,21 @@ struct IjLoopTest : testing::Test
                box.zmax(), boundaryType, boundaryType, boundaryType};
     }
 
-    OctreeNsView<double, KeyT> treeView() const
+    OctreeNsView<double, KeyT> treeView(float searchExtFactor = 1.0f) const
     {
-        return {.numLeafNodes   = numLeafNodes,
-                .numNodes       = numNodes,
-                .prefixes       = rawPtr(prefixes),
-                .childOffsets   = rawPtr(childOffsets),
-                .parents        = rawPtr(parents),
-                .internalToLeaf = rawPtr(internalToLeaf),
-                .leafToInternal = rawPtr(leafToInternal),
-                .levelRange     = rawPtr(levelRange),
-                .leaves         = rawPtr(leaves),
-                .layout         = rawPtr(layout),
-                .centers        = rawPtr(centers),
-                .sizes          = rawPtr(sizes)};
+        return {.numLeafNodes    = numLeafNodes,
+                .numNodes        = numNodes,
+                .prefixes        = rawPtr(prefixes),
+                .childOffsets    = rawPtr(childOffsets),
+                .parents         = rawPtr(parents),
+                .internalToLeaf  = rawPtr(internalToLeaf),
+                .leafToInternal  = rawPtr(leafToInternal),
+                .levelRange      = rawPtr(levelRange),
+                .leaves          = rawPtr(leaves),
+                .layout          = rawPtr(layout),
+                .centers         = rawPtr(centers),
+                .sizes           = rawPtr(sizes),
+                .searchExtFactor = searchExtFactor};
     }
 
     GroupView groupView() const
@@ -380,6 +381,42 @@ TYPED_TEST(IjLoopTest, IjLoop)
         checkGpuErrors(cudaDeviceSynchronize());
 
         Result reference = this->reference(this->groupView());
+        this->validate(reference, result);
+    }
+}
+
+TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
+{
+    using NeighborhoodBuilder = TypeParam;
+        constexpr float searchExtFactor = 1.5f;
+
+    for (BoundaryType boundaryType : {BoundaryType::open, BoundaryType::periodic, BoundaryType::fixed})
+    {
+        this->setBoundaryType(boundaryType);
+
+        const auto nb = NeighborhoodBuilder{1024}.build(this->treeView(searchExtFactor), this->box, this->totalBodies,
+                                                        this->groupView(), rawPtr(this->x), rawPtr(this->y),
+                                                        rawPtr(this->z), rawPtr(this->h));
+
+        Result result;
+        util::for_each_tuple([&](auto& v) { v.resize(this->totalBodies); }, result);
+
+        auto input  = std::make_tuple(rawPtr(this->v));
+        auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
+
+        nb.ijLoop(input, output, NeighborFun{}, PostambleFun{});
+        checkGpuErrors(cudaDeviceSynchronize());
+
+        Result reference = this->reference(this->groupView());
+        this->validate(reference, result);
+
+        for (auto& h : this->h)
+            h *= searchExtFactor;
+
+        nb.ijLoop(input, output, NeighborFun{}, PostambleFun{});
+        checkGpuErrors(cudaDeviceSynchronize());
+
+        reference = this->reference(this->groupView());
         this->validate(reference, result);
     }
 }

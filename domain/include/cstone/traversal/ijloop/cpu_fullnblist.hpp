@@ -150,12 +150,12 @@ struct CpuFullNbListNeighborhoodBuilder
             {
                 hExtData = std::make_unique_for_overwrite<Th[]>(totalBodies);
 #pragma omp parallel for
-                for (LocalIndex i = 0; i < numBodies; ++i)
+                for (LocalIndex i = 0; i < totalBodies; ++i)
                     hExtData[i] = h[i] * tree.searchExtFactor;
-                tree.searchExtFactor = 1;
                 hExt                 = hExtData.get();
             }
             else { hExt = h * tree.searchExtFactor; }
+            tree.searchExtFactor = 1;
         }
 
         unsigned maxNeighbors = 0;
