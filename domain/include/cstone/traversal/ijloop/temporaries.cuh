@@ -58,8 +58,7 @@ template<class Result, class Output>
 consteval auto mapTemporarySizes(Result, Output)
 {
     constexpr auto indexMap = mapSizes(typeSizes(Result{}), typeSizes(Output{}));
-    return [&]<std::size_t... Is>(std::index_sequence<Is...>)
-    {
+    return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
         return std::make_tuple(std::integral_constant<int, std::get<Is>(indexMap)>()...);
     }(std::make_index_sequence<indexMap.size()>());
 }

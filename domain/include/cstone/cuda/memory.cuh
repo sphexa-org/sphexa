@@ -135,7 +135,7 @@ struct SharedMemAllocator
     }
 
     constexpr SharedMemAllocator(SharedMemAllocator const&) = delete;
-    constexpr SharedMemAllocator(SharedMemAllocator&&) = default;
+    constexpr SharedMemAllocator(SharedMemAllocator&&)      = default;
 
     template<class T, std::enable_if_t<!std::is_array_v<T>, int> = 0>
     __device__ constexpr SharedMemPtr<T> alloc()

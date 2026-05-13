@@ -152,7 +152,7 @@ struct CpuFullNbListNeighborhoodBuilder
 #pragma omp parallel for
                 for (LocalIndex i = 0; i < totalBodies; ++i)
                     hExtData[i] = h[i] * tree.searchExtFactor;
-                hExt                 = hExtData.get();
+                hExt = hExtData.get();
             }
             else { hExt = h * tree.searchExtFactor; }
             tree.searchExtFactor = 1;
