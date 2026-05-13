@@ -31,6 +31,7 @@
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
 #include "cstone/traversal/ijloop/gpu_fullnblist.cuh"
+#include "cstone/traversal/ijloop/gpu_compressednblist.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
 #include "cstone/util/fastmath.hpp"
 
@@ -154,6 +155,8 @@ void benchmarkMain()
 
     runBenchmark("DIRECT TREE TRAVERSAL", ijloop::GpuAlwaysTraverseNeighborhoodBuilder{ngmax});
     runBenchmark("FULL NB LIST", ijloop::GpuFullNbListNeighborhoodBuilder{ngmax});
+    runBenchmark("COMPRESSED FULL NB LIST", ijloop::GpuCompressedNbListNeighborhoodBuilder<>::withoutSymmetry{ngmax});
+    runBenchmark("COMPRESSED HALF NB LIST", ijloop::GpuCompressedNbListNeighborhoodBuilder<>::withSymmetry{ngmax});
     runBenchmark("GROMACS SUPERCLUSTERED", ijloop::GromacsLikeNeighborhoodBuilder{ngmax});
 
     using SuperclusterNb = ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<
@@ -161,17 +164,17 @@ void benchmarkMain()
     constexpr unsigned ncmax = 360;
     runBenchmark("SUPERCLUSTERED", SuperclusterNb::withoutCompression{ncmax});
     runBenchmark("COMPRESSED SUPERCLUSTERED (Band et al. Compression)",
-                 SuperclusterNb::withCompression<BandEtAlWarpCompression>{ncmax});
+                 SuperclusterNb::withCompression<BandEtAlWarpCompression<false>>{ncmax});
     runBenchmark("COMPRESSED SUPERCLUSTERED (Nibble-based Compression)",
-                 SuperclusterNb::withCompression<NibbleWarpCompression>{ncmax});
+                 SuperclusterNb::withCompression<NibbleWarpCompression<false>>{ncmax});
 
     using SymmetricSuperclusterNb     = SuperclusterNb::withSymmetry;
     constexpr unsigned ncmaxSymmetric = 320;
     runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{ncmaxSymmetric});
     runBenchmark("COMPRESSED SUPERCLUSTERED (Band et al. Compression)",
-                 SuperclusterNb::withCompression<BandEtAlWarpCompression>{ncmaxSymmetric});
+                 SuperclusterNb::withCompression<BandEtAlWarpCompression<false>>{ncmaxSymmetric});
     runBenchmark("COMPRESSED SUPERCLUSTERED (Nibble-based Compression)",
-                 SuperclusterNb::withCompression<NibbleWarpCompression>{ncmaxSymmetric});
+                 SuperclusterNb::withCompression<NibbleWarpCompression<false>>{ncmaxSymmetric});
 
     saveCsv(std::format("sph_density_results_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), times);
     saveCsv(std::format("sph_density_buildtime_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), buildTimes);

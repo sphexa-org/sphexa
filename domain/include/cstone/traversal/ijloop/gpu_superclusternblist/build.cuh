@@ -163,21 +163,6 @@ util::UniqueDevicePtr<JClusterBbox<Config, Tc>[]> computeJClusterBboxes(const Lo
     return jClusterBboxes;
 }
 
-template<class Config, class Tc, class KeyType, class Th>
-util::UniqueDevicePtr<Th[]> computeNodeRMax(const OctreeNsView<Tc, KeyType>& tree, const Th* h)
-{
-    util::UniqueDevicePtr<Th[]> nodeRMax;
-    if constexpr (Config::symmetric)
-    {
-        nodeRMax = util::deviceAlloc<Th[]>(tree.numNodes);
-        upsweep(
-            tree, std::tuple(Th(0)), [] __device__(auto h) { return std::make_tuple(2 * std::get<0>(h)); },
-            [] __device__(auto accum, auto r) { return std::make_tuple(std::max(std::get<0>(accum), std::get<0>(r))); },
-            std::tuple(h), std::tuple(nodeRMax.get()));
-    }
-    return nodeRMax;
-}
-
 /*! decide if a neighbor index should be included in the symmetric neighbor list
  *
  * @param[in] i     own index
@@ -447,8 +432,7 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
                         masks[maskStartIndex / 32] = (warpMask << (maskStartIndex % 32)) | prevMask;
                     }
                     ++info.neighborsCount;
-                    if ((info.neighborsCount % GpuConfig::warpSize) == 0)
-                        compression.add(jClusterQueue, GpuConfig::warpSize);
+                    if ((info.neighborsCount % GpuConfig::warpSize) == 0) compression.add(jClusterQueue, true);
                 }
             }
         }
@@ -457,7 +441,7 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
     singleTraversal(tree.childOffsets, tree.parents, overlapsInternalNode, overlapsLeafNode);
 
     const unsigned remaining = std::min(info.neighborsCount, ncmax) % GpuConfig::warpSize;
-    if (remaining != 0) compression.add(jClusterQueue, remaining);
+    if (remaining != 0) compression.add(jClusterQueue, laneIdx < remaining);
 
     return compression.numBytes();
 }

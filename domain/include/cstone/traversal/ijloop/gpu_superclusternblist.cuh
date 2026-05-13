@@ -68,7 +68,7 @@
 
 #include "cstone/traversal/ijloop/gpu_superclusternblist/build.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/loop.cuh"
-#include "cstone/traversal/ijloop/gpu_superclusternblist/temporaries.cuh"
+#include "cstone/traversal/ijloop/temporaries.cuh"
 #include "cstone/tree/octree.hpp"
 
 namespace cstone::ijloop
@@ -200,7 +200,7 @@ protected:
 template<unsigned ISize            = 8,
          unsigned JSize            = 8,
          unsigned SuperclusterSize = ISize * std::max(JSize, GpuConfig::warpSize / ISize),
-         class WarpCompression     = NibbleWarpCompression,
+         class WarpCompression     = NibbleWarpCompression<false>,
          bool Symmetric            = true>
 struct GpuSuperclusterNbListNeighborhoodConfig
 {
@@ -209,6 +209,7 @@ struct GpuSuperclusterNbListNeighborhoodConfig
     static_assert(SuperclusterSize % ISize == 0, "SuperclusterSize must be divisible by ISize");
     static_assert(SuperclusterSize % JSize == 0, "SuperclusterSize must be divisible by JSize");
     static_assert(ISize * JSize >= GpuConfig::warpSize, "ISize * JSize must be at least warpSize");
+    static_assert(!WarpCompression::perThread, "Requires !WarpCompression::perThread");
 
     static constexpr unsigned iSize            = ISize;
     static constexpr unsigned jSize            = JSize;
@@ -248,11 +249,11 @@ struct GpuSuperclusterNbListNeighborhoodBuilder
     template<unsigned SuperclusterSize>
     using withSuperclusterSize =
         GpuSuperclusterNbListNeighborhoodBuilder<typename Config::template withSuperclusterSize<SuperclusterSize>>;
-    template<class Compression = NibbleWarpCompression>
+    template<class Compression = NibbleWarpCompression<false>>
     using withCompression =
         GpuSuperclusterNbListNeighborhoodBuilder<typename Config::template withCompression<Compression>>;
-    using withoutCompression =
-        GpuSuperclusterNbListNeighborhoodBuilder<typename Config::template withCompression<DummyWarpCompression>>;
+    using withoutCompression = GpuSuperclusterNbListNeighborhoodBuilder<
+        typename Config::template withCompression<DummyWarpCompression<false>>>;
     template<bool Symmetric>
     using setSymmetry     = GpuSuperclusterNbListNeighborhoodBuilder<typename Config::template setSymmetry<Symmetric>>;
     using withSymmetry    = setSymmetry<true>;

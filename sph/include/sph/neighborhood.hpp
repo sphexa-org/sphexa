@@ -16,6 +16,8 @@ enum class NeighborhoodType
 {
     alwaysTraverse,
     fullNeighborList,
+    compressedFullNeighborList,
+    compressedHalfNeighborList,
     clusteredNeighborList
 };
 
@@ -58,13 +60,14 @@ struct NeighborhoodData
             case NeighborhoodType::fullNeighborList:
                 builder = cstone::ijloop::CpuFullNbListNeighborhoodBuilder{d.ngmax};
                 break;
-            case NeighborhoodType::clusteredNeighborList:
-                throw std::runtime_error("clustered neighbor lists are not available on CPU");
+            default:
+                throw std::runtime_error("only always-traverse and full-neighbor-list are available on CPUs");
                 break;
         }
 
         std::visit(
-            [&](auto const& nb) {
+            [&](auto const& nb)
+            {
                 neighborhood =
                     nb.build(d.treeView, box, d.size(), groups, d.x.data(), d.y.data(), d.z.data(), d.h.data());
             },

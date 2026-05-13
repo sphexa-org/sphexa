@@ -14,6 +14,10 @@
  */
 
 #include <cstdint>
+#include <functional>
+#include <numeric>
+#include <random>
+#include <vector>
 
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
@@ -51,7 +55,8 @@ class CompressNeighborsGpu : public ::testing::Test
 {
 };
 
-using Compressions = ::testing::Types<NibbleWarpCompression, BandEtAlWarpCompression, DummyWarpCompression>;
+using Compressions =
+    ::testing::Types<NibbleWarpCompression<false>, BandEtAlWarpCompression<false>, DummyWarpCompression<false>>;
 
 TYPED_TEST_SUITE(CompressNeighborsGpu, Compressions);
 
@@ -123,6 +128,118 @@ TYPED_TEST(CompressNeighborsGpu, large)
     const unsigned sharedMemSize = sizeof(std::uint32_t) * nbs.size();
     roundtrip<Compression>
         <<<1, GpuConfig::warpSize, sharedMemSize>>>(rawPtr(nbs), rawPtr(roundtripped), nbs.size(), sharedMemSize);
+    kernelSuccess("roundtrip");
+
+    EXPECT_EQ(roundtripped, nbs);
+}
+
+template<class Compression>
+__global__ void perThreadRoundtrip(std::uint32_t const* __restrict__ input,
+                                   std::uint32_t const* __restrict__ offsets,
+                                   std::uint32_t* __restrict__ output,
+                                   const unsigned sharedMemSize)
+{
+    extern __shared__ char compressed[];
+
+    const unsigned numNeighbors = offsets[threadIdx.x + 1] - offsets[threadIdx.x];
+
+    const unsigned nBytes = warpCompressNeighbors<Compression>(input + offsets[threadIdx.x], compressed, numNeighbors);
+    __syncthreads();
+    if (threadIdx.x == 0)
+    {
+        for (unsigned i = nBytes; i < sharedMemSize; ++i)
+            compressed[i] = 0xff;
+    }
+    __syncthreads();
+    warpDecompressNeighbors<typename Compression::Decompression>(compressed, output + offsets[threadIdx.x],
+                                                                 numNeighbors);
+}
+
+template<class T>
+class PerThreadCompressNeighborsGpu : public ::testing::Test
+{
+};
+
+using PerThreadCompressions =
+    ::testing::Types<NibbleWarpCompression<true>, BandEtAlWarpCompression<true>, DummyWarpCompression<true>>;
+
+TYPED_TEST_SUITE(PerThreadCompressNeighborsGpu, PerThreadCompressions);
+
+TYPED_TEST(PerThreadCompressNeighborsGpu, perThreadRoundtrip)
+{
+    using Compression = TypeParam;
+
+    std::vector<std::uint32_t> nbsHost(2000), offsetsHost(GpuConfig::warpSize + 1);
+
+    std::default_random_engine eng(42);
+    offsetsHost[0]                   = 0;
+    offsetsHost[GpuConfig::warpSize] = nbsHost.size();
+    std::generate(offsetsHost.begin() + 1, offsetsHost.end() - 1,
+                  std::bind(std::uniform_int_distribution<std::uint32_t>(1, nbsHost.size() - 1), std::ref(eng)));
+    std::sort(offsetsHost.begin() + 1, offsetsHost.end() - 1);
+
+    std::bernoulli_distribution bd(0.25);
+    unsigned i = 0, j = 0, counter = 100000;
+    while (i < nbsHost.size())
+    {
+        if (bd(eng))
+        {
+            if (i == offsetsHost[j])
+            {
+                counter -= 100;
+                ++j;
+            }
+            nbsHost[i++] = counter;
+        }
+        ++counter;
+    }
+
+    thrust::device_vector<std::uint32_t> nbs = nbsHost;
+    thrust::device_vector<std::uint32_t> roundtripped(nbs.size());
+    thrust::device_vector<std::uint32_t> offsets = offsetsHost;
+
+    const unsigned sharedMemSize = sizeof(std::uint32_t) * nbs.size();
+    perThreadRoundtrip<Compression>
+        <<<1, GpuConfig::warpSize, sharedMemSize>>>(rawPtr(nbs), rawPtr(offsets), rawPtr(roundtripped), sharedMemSize);
+    kernelSuccess("roundtrip");
+
+    EXPECT_EQ(roundtripped, nbs);
+}
+
+TYPED_TEST(PerThreadCompressNeighborsGpu, perThreadEmpty)
+{
+    using Compression = TypeParam;
+
+    thrust::device_vector<std::uint32_t> offsets(cstone::GpuConfig::warpSize + 1);
+
+    const unsigned sharedMemSize = sizeof(std::uint32_t);
+    perThreadRoundtrip<Compression>
+        <<<1, GpuConfig::warpSize, sharedMemSize>>>(nullptr, rawPtr(offsets), nullptr, sharedMemSize);
+    kernelSuccess("roundtrip");
+}
+
+TYPED_TEST(PerThreadCompressNeighborsGpu, perThreadManyConsecutive)
+{
+    using Compression = TypeParam;
+
+    std::vector<std::uint32_t> nbsHost(2000), offsetsHost(GpuConfig::warpSize + 1);
+
+    std::default_random_engine eng(42);
+    offsetsHost[0]                   = 0;
+    offsetsHost[GpuConfig::warpSize] = nbsHost.size();
+    std::generate(offsetsHost.begin() + 1, offsetsHost.end() - 1,
+                  std::bind(std::uniform_int_distribution<std::uint32_t>(1, nbsHost.size() - 1), std::ref(eng)));
+    std::sort(offsetsHost.begin() + 1, offsetsHost.end() - 1);
+
+    std::iota(nbsHost.begin(), nbsHost.end(), 1000);
+
+    thrust::device_vector<std::uint32_t> nbs = nbsHost;
+    thrust::device_vector<std::uint32_t> roundtripped(nbs.size());
+    thrust::device_vector<std::uint32_t> offsets = offsetsHost;
+
+    const unsigned sharedMemSize = sizeof(std::uint32_t) * nbs.size();
+    perThreadRoundtrip<Compression>
+        <<<1, GpuConfig::warpSize, sharedMemSize>>>(rawPtr(nbs), rawPtr(offsets), rawPtr(roundtripped), sharedMemSize);
     kernelSuccess("roundtrip");
 
     EXPECT_EQ(roundtripped, nbs);

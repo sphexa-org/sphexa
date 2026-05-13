@@ -23,7 +23,7 @@
 #include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/util/type_list.hpp"
 
-namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail
+namespace cstone::ijloop
 {
 
 template<class... Ts>
@@ -129,4 +129,4 @@ auto allocateTemporaries(LocalIndex firstBody,
         return std::make_tuple(output, std::tuple());
     }
 }
-} // namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail
+} // namespace cstone::ijloop

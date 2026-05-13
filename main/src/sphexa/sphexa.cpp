@@ -238,9 +238,13 @@ sph::NeighborhoodType nbTypeFromName(const std::string_view nbType)
 {
     if (nbType == "always-traverse" || nbType == "t") return sph::NeighborhoodType::alwaysTraverse;
     if (nbType == "full-neighbor-list" || nbType == "f") return sph::NeighborhoodType::fullNeighborList;
+    if (nbType == "compressed-full-neighbor-list" || nbType == "fc")
+        return sph::NeighborhoodType::compressedFullNeighborList;
+    if (nbType == "compressed-half-neighbor-list" || nbType == "hc")
+        return sph::NeighborhoodType::compressedHalfNeighborList;
     if (nbType == "clustered-neighbor-list" || nbType == "c") return sph::NeighborhoodType::clusteredNeighborList;
-    throw std::invalid_argument("neighbor-search argument must be one of 'always-traverse', 'full-neighbor-list', or "
-                                "'clustered-neighbor-list'");
+    throw std::invalid_argument("neighbor-search argument must be one of 'always-traverse', 'full-neighbor-list', "
+                                " 'cull-compressed-neighbor-list', or 'clustered-neighbor-list'");
 }
 
 void printHelp(char* name, int rank)

@@ -13,9 +13,12 @@
  * @author Felix Thaler <thaler@cscs.ch>
  */
 
+#pragma once
+
 #include <array>
 
 #include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/cuda/memory.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/tuple_util.hpp"
@@ -115,6 +118,29 @@ void upsweep(const OctreeNsView<Tc, KeyType>& tree,
             checkGpuErrors(cudaGetLastError());
         }
     }
+}
+
+/*! @brief Compute per-node maximum smoothing radius (2*h) for an octree.
+ *
+ * Only computes the array when Config::symmetric is true; returns a null pointer otherwise.
+ *
+ * @param[in] tree  octree view
+ * @param[in] h     per-particle smoothing lengths
+ * @return device array of size tree.numNodes, or empty ptr when !Config::symmetric
+ */
+template<class Config, class Tc, class KeyType, class Th>
+util::UniqueDevicePtr<Th[]> computeNodeRMax(const OctreeNsView<Tc, KeyType>& tree, const Th* h)
+{
+    util::UniqueDevicePtr<Th[]> nodeRMax;
+    if constexpr (Config::symmetric)
+    {
+        nodeRMax = util::deviceAlloc<Th[]>(tree.numNodes);
+        upsweep(
+            tree, std::tuple(Th(0)), [] __device__(auto h) { return std::make_tuple(2 * std::get<0>(h)); },
+            [] __device__(auto accum, auto r) { return std::make_tuple(std::max(std::get<0>(accum), std::get<0>(r))); },
+            std::tuple(h), std::tuple(nodeRMax.get()));
+    }
+    return nodeRMax;
 }
 
 } // namespace cstone::ijloop
