@@ -1,7 +1,7 @@
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import re
 
 def read_data_from_file(filename):
     with open(filename, 'r') as f:
@@ -9,7 +9,14 @@ def read_data_from_file(filename):
     parsed = [list(map(float, line.split())) for line in lines]
     return np.array(parsed)
 
-BACKEND = 'cpu'  # Change to 'gpu' if needed
+parser = argparse.ArgumentParser(description='Compare SPH-EXA test results between MixD and develop builds.')
+parser.add_argument('--backend', choices=['cpu', 'gpu'], default='cpu', help='Backend to use (default: cpu)')
+parser.add_argument('--test', choices=['windshock', 'kelvin'], default='kelvin',
+                    help='Test case to compare (default: kelvin)')
+args = parser.parse_args()
+
+BACKEND = args.backend
+TEST    = args.test
 STEPS = 200
 N = 50
 if BACKEND == 'cpu':
@@ -18,15 +25,6 @@ if BACKEND == 'cpu':
 elif BACKEND == 'gpu':
     RANKS = 1
     CORES = 1
-
-TEST='kelvin' #'windshock' or 'kelvin'
-
-# normalize and validate TEST value (accept common variants)
-TEST = TEST.strip().lower()
-if TEST in ('wind_shock', 'wind-shock', 'wind shock'):
-    TEST = 'windshock'
-if TEST not in ('windshock', 'kelvin'):
-    raise ValueError("TEST must be either 'windshock' or 'kelvin' (case-insensitive)")
 
 # File names (adjust paths if needed)
 mixDConstants = f'/capstor/scratch/cscs/ioannmag/CORNERSTONE/sphexa/build_{BACKEND}/constants_{TEST}_r{RANKS}_c{CORES}_s{STEPS}_n{N}_{BACKEND}.txt'
