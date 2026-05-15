@@ -207,8 +207,8 @@ HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool> containedIn(
     const auto gridUnitZ = box.lz() * (Tc(1) / (1u << mixDBits.bz));
     boxMax += Vec3<Tc>{gridUnitX, gridUnitY, gridUnitZ};
 
-    KeyType lowCode  = iSfcMixDKey<SfcMixDKind<KeyType>>(boxMin[0], boxMin[1], boxMin[2], bx, by, bz);
-    KeyType highCode = iSfcMixDKey<SfcMixDKind<KeyType>>(boxMax[0], boxMax[1], boxMax[2], bx, by, bz);
+    KeyType lowCode  = sfcMixD<SfcMixDKind<KeyType>>(boxMin[0], boxMin[1], boxMin[2], box, bx, by, bz);
+    KeyType highCode = sfcMixD<SfcMixDKind<KeyType>>(boxMax[0], boxMax[1], boxMax[2], box, bx, by, bz);
     auto envelope    = smallestCommonBox(lowCode, highCode);
 
     return (util::get<0>(envelope) >= codeStart) && (util::get<1>(envelope) <= codeEnd);
