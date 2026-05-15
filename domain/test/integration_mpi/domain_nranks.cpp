@@ -39,66 +39,74 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks, bool equalize
     LocalIndex numParticles = (1000 / nRanks) * nRanks;
     Box<T> box              = domain.box();
 
-    // numParticles identical coordinates on each rank
-    RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box, 5);
-    coords.adjustH(10, 20);
-    coords.shuffle(); // destroy SFC order
+    const auto mixDBitsInit = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const bool useMixD0     = mixDBitsInit.bx != maxTreeLevel<KeyType>{} ||
+                              mixDBitsInit.by != maxTreeLevel<KeyType>{} ||
+                              mixDBitsInit.bz != maxTreeLevel<KeyType>{};
 
-    LocalIndex firstExtract = rank * numParticles / nRanks;
-    LocalIndex lastExtract  = (rank + 1) * numParticles / nRanks;
-
-    std::vector<T> x{coords.x().begin() + firstExtract, coords.x().begin() + lastExtract};
-    std::vector<T> y{coords.y().begin() + firstExtract, coords.y().begin() + lastExtract};
-    std::vector<T> z{coords.z().begin() + firstExtract, coords.z().begin() + lastExtract};
-    std::vector<T> h{coords.h().begin() + firstExtract, coords.h().begin() + lastExtract};
-
-    std::vector<KeyType> keys(x.size());
-    std::vector<T> s1, s2, s3;
-    domain.sync(keys, x, y, z, h, std::tuple{}, std::tie(s1, s2, s3));
-
-    LocalIndex localCount    = domain.endIndex() - domain.startIndex();
-    LocalIndex localCountSum = localCount;
-    // int extractedCount = x.size();
-    MPI_Allreduce(MPI_IN_PLACE, &localCountSum, 1, MpiType<int>{}, MPI_SUM, MPI_COMM_WORLD);
-    EXPECT_EQ(localCountSum, numParticles);
-
-    // box got updated if not using PBC
-    box = domain.box();
-    std::vector<KeyType> keysRef(x.size());
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{};
-    if (useMixD)
+    auto run = [&](auto coords)
     {
-        computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(keysRef.data()), x.size(), box, mixDBits.bx,
-                           mixDBits.by, mixDBits.bz);
-    }
-    else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysRef.data()), x.size(), box); }
+        coords.adjustH(10, 20);
+        coords.shuffle(); // destroy SFC order
 
-    // check that particles are SFC order sorted and the keys are in sync with the x,y,z arrays
-    EXPECT_EQ(keys, keysRef);
-    EXPECT_TRUE(std::is_sorted(begin(keysRef), end(keysRef)));
+        LocalIndex firstExtract = rank * numParticles / nRanks;
+        LocalIndex lastExtract  = (rank + 1) * numParticles / nRanks;
 
-    int ngmax = 300;
-    std::vector<cstone::LocalIndex> neighbors(localCount * ngmax);
-    std::vector<unsigned> neighborsCount(localCount);
-    findNeighbors(x.data(), y.data(), z.data(), h.data(), domain.startIndex(), domain.endIndex(), box,
-                  domain.octreeProperties(), ngmax, neighbors.data(), neighborsCount.data());
+        std::vector<T> x{coords.x().begin() + firstExtract, coords.x().begin() + lastExtract};
+        std::vector<T> y{coords.y().begin() + firstExtract, coords.y().begin() + lastExtract};
+        std::vector<T> z{coords.z().begin() + firstExtract, coords.z().begin() + lastExtract};
+        std::vector<T> h{coords.h().begin() + firstExtract, coords.h().begin() + lastExtract};
 
-    uint64_t neighborSum = std::accumulate(begin(neighborsCount), end(neighborsCount), 0);
-    MPI_Allreduce(MPI_IN_PLACE, &neighborSum, 1, MpiType<uint64_t>{}, MPI_SUM, MPI_COMM_WORLD);
+        std::vector<KeyType> keys(x.size());
+        std::vector<T> s1, s2, s3;
+        domain.sync(keys, x, y, z, h, std::tuple{}, std::tie(s1, s2, s3));
 
-    {
-        // Note: global coordinates are not yet in Morton order
-        // calculate reference neighbor sum from the full arrays
-        std::vector<cstone::LocalIndex> neighborsRef(numParticles * ngmax);
-        std::vector<unsigned> neighborsCountRef(numParticles);
-        all2allNeighbors(coords.x().data(), coords.y().data(), coords.z().data(), coords.h().data(), numParticles,
-                         neighborsRef.data(), neighborsCountRef.data(), ngmax, box);
+        LocalIndex localCount    = domain.endIndex() - domain.startIndex();
+        LocalIndex localCountSum = localCount;
+        MPI_Allreduce(MPI_IN_PLACE, &localCountSum, 1, MpiType<int>{}, MPI_SUM, MPI_COMM_WORLD);
+        EXPECT_EQ(localCountSum, numParticles);
 
-        int neighborSumRef = std::accumulate(begin(neighborsCountRef), end(neighborsCountRef), 0);
-        EXPECT_EQ(neighborSum, neighborSumRef);
-    }
+        // box got updated if not using PBC
+        box = domain.box();
+        std::vector<KeyType> keysRef(x.size());
+        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+        const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                             mixDBits.bz != maxTreeLevel<KeyType>{};
+        if (useMixD)
+        {
+            computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(keysRef.data()), x.size(), box,
+                               mixDBits.bx, mixDBits.by, mixDBits.bz);
+        }
+        else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysRef.data()), x.size(), box); }
+
+        // check that particles are SFC order sorted and the keys are in sync with the x,y,z arrays
+        EXPECT_EQ(keys, keysRef);
+        EXPECT_TRUE(std::is_sorted(begin(keysRef), end(keysRef)));
+
+        int ngmax = 300;
+        std::vector<cstone::LocalIndex> neighbors(localCount * ngmax);
+        std::vector<unsigned> neighborsCount(localCount);
+        findNeighbors(x.data(), y.data(), z.data(), h.data(), domain.startIndex(), domain.endIndex(), box,
+                      domain.octreeProperties(), ngmax, neighbors.data(), neighborsCount.data());
+
+        uint64_t neighborSum = std::accumulate(begin(neighborsCount), end(neighborsCount), 0);
+        MPI_Allreduce(MPI_IN_PLACE, &neighborSum, 1, MpiType<uint64_t>{}, MPI_SUM, MPI_COMM_WORLD);
+
+        {
+            // Note: global coordinates are not yet in Morton order
+            // calculate reference neighbor sum from the full arrays
+            std::vector<cstone::LocalIndex> neighborsRef(numParticles * ngmax);
+            std::vector<unsigned> neighborsCountRef(numParticles);
+            all2allNeighbors(coords.x().data(), coords.y().data(), coords.z().data(), coords.h().data(), numParticles,
+                             neighborsRef.data(), neighborsCountRef.data(), ngmax, box);
+
+            int neighborSumRef = std::accumulate(begin(neighborsCountRef), end(neighborsCountRef), 0);
+            EXPECT_EQ(neighborSum, neighborSumRef);
+        }
+    };
+
+    if (useMixD0) { run(RandomGaussianCoordinates<T, SfcMixDKind<KeyType>>{numParticles, box, 5}); }
+    else { run(RandomGaussianCoordinates<T, SfcKind<KeyType>>{numParticles, box, 5}); }
 }
 
 TEST(FocusDomain, randomGaussianNeighborSum)
