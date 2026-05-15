@@ -103,9 +103,9 @@ public:
         LocalIndex numPart = o1.end - o1.start;
 
         using Op        = std::conditional_t<HaveGpu<Accelerator>{}, MinMaxGpu<T>, MinMax<T>>;
-        auto fittingBox = makeGlobalBox<T, Op>(x + o1.start, y + o1.start, z + o1.start, numPart, comm_, box_);
-        if (firstCall_) { box_ = fittingBox; }
-        else { box_ = limitBoxShrinking(fittingBox, box_); }
+        // auto fittingBox = makeGlobalBox<T, Op>(x + o1.start, y + o1.start, z + o1.start, numPart, comm_, box_);
+        // if (firstCall_) { box_ = fittingBox; }
+        // else { box_ = limitBoxShrinking(fittingBox, box_); }
 
         // compute SFC particle keys only for particles participating in tree build
         std::span<KeyType> keyView(particleKeys + o1.start, numPart);
