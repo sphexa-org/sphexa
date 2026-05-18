@@ -46,7 +46,10 @@ TEST(TargetGroups, t0)
     EXPECT_EQ(hgroups, ref);
 }
 
-__device__ constexpr util::array<unsigned, 2> laneSeg(unsigned idx, unsigned warpSize_) { return {idx % warpSize, idx / warpSize_}; }
+__device__ constexpr util::array<unsigned, 2> laneSeg(unsigned idx, unsigned warpSize_)
+{
+    return {idx % warpSize, idx / warpSize_};
+}
 
 //! @brief test input setup for findSplits
 template<std::size_t N>

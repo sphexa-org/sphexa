@@ -372,8 +372,7 @@ __device__ __forceinline__ util::array<Vec4<Tc>, TravConfig::nwt> loadTarget(Ind
 
 //! @brief determine the bounding box around all particles-2h spheres in the warp
 template<class Tc>
-__device__ __forceinline__ util::tuple<Vec3<Tc>, Vec3<Tc>>
-warpBbox(const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i)
+__device__ __forceinline__ util::tuple<Vec3<Tc>, Vec3<Tc>> warpBbox(const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i)
 {
     Tc r0 = pos_i[0][3];
     Vec3<Tc> Xmin{pos_i[0][0] - r0, pos_i[0][1] - r0, pos_i[0][2] - r0};

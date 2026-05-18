@@ -564,9 +564,9 @@ double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restri
 
     resetTraversalCounters<<<1, 1>>>();
     if (numBlocks > 0)
-    traverseKernel<<<numBlocks, TravConfig::numThreads>>>(grp, initNodeIdx, xt, yt, zt, mt, ht, xs, ys, zs, ms, hs,
-                                                          childOffsets, internalToLeaf, layout, sourceCenter,
-                                                          multipoles, G, numShells, boxL, p, ax, ay, az, gmPool);
+        traverseKernel<<<numBlocks, TravConfig::numThreads>>>(grp, initNodeIdx, xt, yt, zt, mt, ht, xs, ys, zs, ms, hs,
+                                                              childOffsets, internalToLeaf, layout, sourceCenter,
+                                                              multipoles, G, numShells, boxL, p, ax, ay, az, gmPool);
     float totalPotential;
     checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
     return 0.5 * Tc(G) * totalPotential;

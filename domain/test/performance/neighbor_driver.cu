@@ -79,7 +79,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseBT(LocalIndex 
 {
     const unsigned laneIdx    = threadIdx.x & (GpuConfig::warpSize - 1);
     const unsigned numTargets = (lastBody - firstBody - 1) / TravConfig::targetSize + 1;
-    unsigned targetIdx             = 0;
+    unsigned targetIdx        = 0;
 
     while (true)
     {

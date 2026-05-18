@@ -50,10 +50,7 @@ __global__ void cudaComputeIdealGasEOS_HydroStd(size_t firstParticle, size_t las
     if (i >= lastParticle) return;
 
     if (u == nullptr) { util::tie(p[i], c[i]) = idealGasEOS(temp[i], rho[i], mui, gamma); }
-    else
-    {
-        util::tie(p[i], c[i]) = idealGasEOS_u(u[i], rho[i], gamma);
-    }
+    else { util::tie(p[i], c[i]) = idealGasEOS_u(u[i], rho[i], gamma); }
 }
 
 template<class Dataset>
