@@ -74,7 +74,7 @@ tabulateFunction(F&& func, const double lowerSupport, const double upperSupport,
     checkGpuErrors(hipMemPrefetchAsync(rawPtr(table), sizeof(T) * n, device));
 #else
     checkGpuErrors(
-        cudaMemPrefetchAsync(rawPtr(table), sizeof(T) * n, {.type = cudaMemLocationTypeDevice, .id = device}, 0));
+        cudaMemPrefetchAsync(rawPtr(table), sizeof(T) * n, {cudaMemLocationTypeDevice, device}, 0));
 #endif
 
     return table;

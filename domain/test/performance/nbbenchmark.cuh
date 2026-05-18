@@ -95,8 +95,6 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     OctreeData<KeyType, CpuTag> octree;
     octree.resize(nNodes(csTree));
     updateInternalTree<KeyType>(csTree, octree.data());
-    const TreeNodeIndex* childOffsets = octree.childOffsets.data();
-    const TreeNodeIndex* toLeafOrder  = octree.internalToLeaf.data();
 
     std::vector<LocalIndex> layout(nNodes(csTree) + 1, 0);
     std::inclusive_scan(counts.begin(), counts.end(), layout.begin() + 1);
@@ -196,8 +194,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
 #if defined(__HIPCC__) && (HIP_VERSION_MAJOR < 7 || (HIP_VERSION_MAJOR == 7 && HIP_VERSION_MINOR == 0))
         checkGpuErrors(hipMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), device));
 #else
-        checkGpuErrors(cudaMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(),
-                                            {.type = cudaMemLocationTypeDevice, .id = device}, 0));
+        checkGpuErrors(cudaMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), {cudaMemLocationTypeDevice, device}, 0));
 #endif
     };
     util::for_each_tuple(prefetchToDevice, std::tie(dX, dY, dZ, dH));

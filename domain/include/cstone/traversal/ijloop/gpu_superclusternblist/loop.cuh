@@ -195,7 +195,7 @@ inline constexpr auto loadParticleDataWithRadiusSq(
 
 template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
 inline constexpr auto dummyParticleDataWithRadiusSq(
-    const Tc*, const Tc*, const Tc*, const ThP, std::tuple<const Ts*...> const&, LocalIndex index)
+    const Tc*, const Tc*, const Tc*, const ThP, std::tuple<const Ts*...> const&, LocalIndex)
 {
     constexpr Tc nan = std::numeric_limits<Tc>::quiet_NaN();
     if constexpr (std::is_pointer_v<ThP>)
@@ -326,7 +326,6 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         Config::numWarpsPerInteraction == 1 ? 0 : threadIdx.y / (Config::jSize / Config::numWarpsPerInteraction);
 
     const unsigned firstISupercluster = superclusterIndex<Config>(firstBody);
-    const unsigned lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
     const unsigned iSuperclusterIndex = blockIdx.x * NumSuperclustersPerBlock + threadIdx.z;
     if (iSuperclusterIndex >= numISuperclusters) return;
 
@@ -507,7 +506,7 @@ void runIjLoop(const Box<Tc>& box,
         checkGpuErrors(cudaGetLastError());
     };
 
-    if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
+    if (box.boundaryX() == BoundaryType::periodic || box.boundaryY() == BoundaryType::periodic ||
         box.boundaryZ() == BoundaryType::periodic)
         run(std::true_type());
     else

@@ -82,7 +82,7 @@ dummyParticleData(const Tc*, const Tc*, const Tc*, const ThP, std::tuple<const T
 template<class Tc, class Th, class... Ts>
 inline constexpr bool requiresPbcHandling(Box<Tc> const& box, std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...> const& iData)
 {
-    if ((box.boundaryX() != BoundaryType::periodic) & (box.boundaryY() != BoundaryType::periodic) &
+    if ((box.boundaryX() != BoundaryType::periodic) && (box.boundaryY() != BoundaryType::periodic) &&
         (box.boundaryZ() != BoundaryType::periodic))
         return false;
     const Vec3<Tc>& iPos = std::get<1>(iData);

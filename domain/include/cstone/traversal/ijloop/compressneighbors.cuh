@@ -200,7 +200,7 @@ struct NibbleWarpDecompression
 
 private:
     const std::uint8_t* buffer_;
-    unsigned numBytes_, previous_, numNeighbors_, index_;
+    unsigned previous_, numBytes_, numNeighbors_, index_;
 };
 
 template<bool PerThread>
@@ -342,7 +342,7 @@ struct BandEtAlWarpDecompression
 
 private:
     const std::uint8_t* buffer_;
-    unsigned numBytes_, previous_, numNeighbors_, index_;
+    unsigned previous_, numBytes_, numNeighbors_, index_;
 };
 
 template<bool PerThread>

@@ -399,7 +399,7 @@ struct GromacsLikeNeighborhood
         const dim3 blockSize             = {clusterSize, clusterSize, 1};
         const unsigned numBlocks         = sciSorted.size();
         constexpr unsigned sharedMemSize = sizeof(ParticleData) * clusterSize * numClusterPerSupercluster;
-        if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
+        if (box.boundaryX() == BoundaryType::periodic || box.boundaryY() == BoundaryType::periodic ||
             box.boundaryZ() == BoundaryType::periodic)
         {
             gromacsLikeNeighborhoodKernel<true><<<numBlocks, blockSize, sharedMemSize>>>(

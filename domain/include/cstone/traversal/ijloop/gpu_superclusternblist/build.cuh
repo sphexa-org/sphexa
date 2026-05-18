@@ -511,11 +511,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
     assert(blockDim.y == 1);
     assert(blockDim.z == NumSuperclustersPerBlock);
 
-    constexpr unsigned warpsPerSupercluster = Config::superclusterSize / GpuConfig::warpSize;
-
     const unsigned laneIdx = laneIndex();
-
-    using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
 
     util::SharedMemAllocator sharedAllocator(buildNbListSharedMemPerSupercluster<Config, Tc, ThP>(ncmax), threadIdx.z);
 
@@ -529,7 +525,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
 
     while (true)
     {
-        unsigned index;
+        unsigned index = 0;
         if (laneIdx == 0) index = atomicAdd(&globalBuildData->index, 1);
         index = shflSync(index, 0);
         if (index >= numSuperClusters) break;
@@ -598,7 +594,7 @@ std::size_t buildNbList(const OctreeNsView<Tc, KeyType>& tree,
         checkGpuErrors(cudaGetLastError());
     };
 
-    if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
+    if (box.boundaryX() == BoundaryType::periodic || box.boundaryY() == BoundaryType::periodic ||
         box.boundaryZ() == BoundaryType::periodic)
         run(std::true_type());
     else

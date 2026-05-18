@@ -129,7 +129,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* WarpsPerBlock) void gpuCompres
 
     while (true)
     {
-        unsigned groupIdx;
+        unsigned groupIdx = 0;
         if (laneIdx == 0) groupIdx = atomicAdd(&globalBuildData->index, 1);
         groupIdx = shflSync(groupIdx, 0);
         if (groupIdx >= numGroups) break;
@@ -213,7 +213,7 @@ __global__ __launch_bounds__(GpuConfig::warpSize* WarpsPerBlock) void gpuCompres
             compressedSize += (comp.numBytes() + sizeof(std::uint32_t) - 1) / sizeof(std::uint32_t);
         }
 
-        unsigned long long dataStart;
+        unsigned long long dataStart = 0;
         if (laneIdx == 0) dataStart = atomicAdd(&globalBuildData->neighborDataSize, compressedSize);
         dataStart = shflSync(dataStart, 0);
 
@@ -272,7 +272,7 @@ __launch_bounds__(GpuConfig::warpSize* WarpsPerBlock) void runIjLoop(const Box<T
     const auto iData = i < lastBody ? loadParticleData(x, y, z, h, input, i) : dummyParticleData(x, y, z, h, input, i);
     constexpr auto pbc = BoundaryType::periodic;
     const bool usePbc  = Config::symmetric
-                             ? (box.boundaryX() == pbc) | (box.boundaryY() == pbc) | (box.boundaryZ() == pbc)
+                             ? (box.boundaryX() == pbc) || (box.boundaryY() == pbc) || (box.boundaryZ() == pbc)
                              : requiresPbcHandling(box, iData);
 
     auto result = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));

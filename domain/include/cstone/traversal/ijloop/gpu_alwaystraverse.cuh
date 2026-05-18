@@ -151,7 +151,7 @@ protected:
         if (groups.numGroups == 0) return;
         resetTraversalCounters<<<1, 1>>>();
 
-        if (box.boundaryX() == BoundaryType::periodic | box.boundaryY() == BoundaryType::periodic |
+        if (box.boundaryX() == BoundaryType::periodic || box.boundaryY() == BoundaryType::periodic ||
             box.boundaryZ() == BoundaryType::periodic)
         {
             runIjLoop<true><<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
