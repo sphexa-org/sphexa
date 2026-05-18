@@ -79,7 +79,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseBT(LocalIndex 
 {
     const unsigned laneIdx    = threadIdx.x & (GpuConfig::warpSize - 1);
     const unsigned numTargets = (lastBody - firstBody - 1) / TravConfig::targetSize + 1;
-    int targetIdx             = 0;
+    unsigned targetIdx             = 0;
 
     while (true)
     {
@@ -96,7 +96,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseBT(LocalIndex 
         auto nc_i = traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, warpNidx, ngmax, globalPool);
 
         const LocalIndex bodyIdxLane = bodyBegin + laneIdx;
-        for (int i = 0; i < TravConfig::nwt; i++)
+        for (unsigned i = 0; i < TravConfig::nwt; i++)
         {
             const LocalIndex bodyIdx = bodyIdxLane + i * GpuConfig::warpSize;
             if (bodyIdx < bodyEnd) { nc[bodyIdx] = nc_i[i]; }

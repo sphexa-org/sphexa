@@ -419,7 +419,7 @@ struct WarpStreamCompact
     {
         __shared__ T buffer[GpuConfig::warpSize * 3];
         T* tmp            = buffer + GpuConfig::warpSize * (threadIdx.z / 2);
-        const int numKeep = streamCompact(&x, x <= 0, tmp);
+        const unsigned numKeep = streamCompact(&x, x <= 0, tmp);
         return laneIndex() < numKeep ? x : T(42);
     }
 

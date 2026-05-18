@@ -39,7 +39,7 @@ __global__ void computeNodeCountsKernel(const KeyType* tree,
                                         const KeyType* codesEnd,
                                         unsigned maxCount)
 {
-    unsigned tid = blockDim.x * blockIdx.x + threadIdx.x;
+    TreeNodeIndex tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < nNodes) { counts[tid] = calculateNodeCount(tree[tid], tree[tid + 1], codesStart, codesEnd, maxCount); }
 }
 
@@ -52,7 +52,7 @@ __global__ void updateNodeCountsKernel(const KeyType* tree,
                                        const KeyType* codesEnd,
                                        unsigned maxCount)
 {
-    unsigned tid = blockDim.x * blockIdx.x + threadIdx.x;
+    TreeNodeIndex tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < numNodes)
     {
         unsigned firstGuess     = counts[tid];
@@ -147,7 +147,7 @@ template<class KeyType>
 __global__ void rebalanceDecisionKernel(
     const KeyType* tree, const unsigned* counts, TreeNodeIndex numNodes, unsigned bucketSize, TreeNodeIndex* nodeOps)
 {
-    unsigned tid = blockDim.x * blockIdx.x + threadIdx.x;
+    TreeNodeIndex tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < numNodes)
     {
         int decision = calculateNodeOp(tree, tid, counts, bucketSize);
@@ -168,7 +168,7 @@ template<class KeyType>
 __global__ void
 processNodes(const KeyType* oldTree, const TreeNodeIndex* nodeOps, TreeNodeIndex numOldNodes, KeyType* newTree)
 {
-    unsigned tid = blockDim.x * blockIdx.x + threadIdx.x;
+    TreeNodeIndex tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < numOldNodes) { processNode(tid, oldTree, nodeOps, newTree); }
 }
 
@@ -218,7 +218,7 @@ template bool rebalanceTreeGpu(const uint64_t*, TreeNodeIndex, TreeNodeIndex, co
 template<class KeyType>
 __global__ void countSfcGapsKernel(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps)
 {
-    unsigned i = blockDim.x * blockIdx.x + threadIdx.x;
+    TreeNodeIndex i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < numNodes) { nodeOps[i] = spanSfcRange(tree[i], tree[i + 1]); }
 }
 
@@ -236,7 +236,7 @@ template<class KeyType>
 __global__ void
 fillSfcGapsKernel(const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree)
 {
-    unsigned i = blockDim.x * blockIdx.x + threadIdx.x;
+    TreeNodeIndex i = blockDim.x * blockIdx.x + threadIdx.x;
     if (i < numNodes) { spanSfcRange(tree[i], tree[i + 1], newTree + nodeOps[i]); }
     if (i == numNodes) { newTree[nodeOps[i]] = tree[numNodes]; }
 }

@@ -91,7 +91,7 @@ __device__ void countNeighbors(Vec3<Tc> sourceBody,
         cstone::LocalIndex idx_j = shflSync(sourceBodyIdx, j);
 
 #pragma unroll
-        for (int k = 0; k < TravConfig::nwt; k++)
+        for (unsigned k = 0; k < TravConfig::nwt; k++)
         {
             Tc d2 = distanceSq<UsePbc>(pos_j[0], pos_j[1], pos_j[2], pos_i[k][0], pos_i[k][1], pos_i[k][2], box);
             if (d2 < pos_i[k][3] && d2 > Tc(0.0))
@@ -137,7 +137,7 @@ __device__ __forceinline__ bool tightOverlap(int laneIdx,
     GpuConfig::ThreadMask closeLanes = ballotSync(isClose);
 
     bool isTightClose = isClose;
-    for (unsigned lane = 0; lane < GpuConfig::warpSize; ++lane)
+    for (int lane = 0; lane < GpuConfig::warpSize; ++lane)
     {
         // skip if this lane does not have a close source
         if (!((GpuConfig::ThreadMask(1) << lane) & closeLanes)) { continue; }
@@ -362,7 +362,7 @@ __device__ __forceinline__ util::array<Vec4<Tc>, TravConfig::nwt> loadTarget(Ind
 {
     util::array<Vec4<Tc>, TravConfig::nwt> pos_i;
 #pragma unroll
-    for (int i = 0; i < TravConfig::nwt; i++)
+    for (unsigned i = 0; i < TravConfig::nwt; i++)
     {
         Index bodyIdx = imin(bodyBegin + i * GpuConfig::warpSize + lane, bodyEnd - 1);
         pos_i[i]      = {x[bodyIdx], y[bodyIdx], z[bodyIdx], Tc(2) * h[bodyIdx]};
@@ -379,7 +379,7 @@ warpBbox(const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i)
     Vec3<Tc> Xmin{pos_i[0][0] - r0, pos_i[0][1] - r0, pos_i[0][2] - r0};
     Vec3<Tc> Xmax{pos_i[0][0] + r0, pos_i[0][1] + r0, pos_i[0][2] + r0};
 #pragma unroll
-    for (int i = 1; i < TravConfig::nwt; i++)
+    for (unsigned i = 1; i < TravConfig::nwt; i++)
     {
         Tc ri = pos_i[i][3];
         Vec3<Tc> iboxMin{pos_i[i][0] - ri, pos_i[i][1] - ri, pos_i[i][2] - ri};
@@ -445,7 +445,7 @@ __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::Loca
     targetSize *= Tc(tree.searchExtFactor);
 
 #pragma unroll
-    for (int k = 0; k < TravConfig::nwt; ++k)
+    for (unsigned k = 0; k < TravConfig::nwt; ++k)
     {
         auto r      = pos_i[k][3];
         pos_i[k][3] = r * r;

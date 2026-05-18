@@ -421,7 +421,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
     // warp-common global mem storage
     int* cellQueue = gmPool + TravConfig::memPerWarp * ((blockIdx.x * numWarpsPerBlock) + warpIdx);
 
-    int targetIdx = 0;
+    LocalIndex targetIdx = 0;
 
     while (true)
     {
