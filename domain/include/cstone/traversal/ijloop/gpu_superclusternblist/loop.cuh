@@ -194,8 +194,8 @@ inline constexpr auto loadParticleDataWithRadiusSq(
 }
 
 template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
-inline constexpr auto dummyParticleDataWithRadiusSq(
-    const Tc*, const Tc*, const Tc*, const ThP, std::tuple<const Ts*...> const&, LocalIndex)
+inline constexpr auto
+dummyParticleDataWithRadiusSq(const Tc*, const Tc*, const Tc*, const ThP, std::tuple<const Ts*...> const&, LocalIndex)
 {
     constexpr Tc nan = std::numeric_limits<Tc>::quiet_NaN();
     if constexpr (std::is_pointer_v<ThP>)
