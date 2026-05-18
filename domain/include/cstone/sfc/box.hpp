@@ -79,9 +79,10 @@ HOST_DEVICE_FUN constexpr int pbcDistance(int x, int R)
 
 enum class BoundaryType : char
 {
-    open     = 0,
-    periodic = 1,
-    fixed    = 2
+    open       = 0,
+    periodic   = 1,
+    fixed      = 2,
+    cubic_open = 3
 };
 
 /*! @brief stores the coordinate bounds
