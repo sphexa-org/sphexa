@@ -141,6 +141,17 @@ int main(int argc, char** argv)
     propagator->sync(domain, simData);
     if (rank == 0) std::cout << "Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
 
+    // Write assigned (non-halo) particle coordinates for this rank to its own file
+    {
+        std::ofstream rankFile(fs::path(outFile).parent_path() /
+                               ("coords_rank" + std::to_string(rank) + ".txt"));
+        rankFile << std::scientific;
+        for (size_t i = domain.startIndex(); i < domain.endIndex(); ++i)
+        {
+            rankFile << d.x[i] << " " << d.y[i] << " " << d.z[i] << "\n";
+        }
+    }
+
     viz::init_catalyst(argc, argv);
     viz::init_ascent(d, domain.startIndex());
 
