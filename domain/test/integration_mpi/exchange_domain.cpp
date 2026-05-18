@@ -93,7 +93,7 @@ void exchangeAllToAll(int thisRank, int numRanks)
     {
         int seqStart = rank * gridSize + (gridSize / numRanks) * thisRank;
 
-        for (int i = 0; i < numPartPresent; ++i)
+        for (LocalIndex i = 0; i < numPartPresent; ++i)
             refY.push_back(seqStart++);
     }
 

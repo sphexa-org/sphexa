@@ -56,7 +56,6 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
 {
     constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
     using HydroType    = typename Dataset::HydroType;
-    using XM1Type      = typename Dataset::XM1Type;
     T rhoInt           = constants.at("rhoInt");
     T rhoExt           = constants.at("rhoExt");
     T omega0           = constants.at("omega0");

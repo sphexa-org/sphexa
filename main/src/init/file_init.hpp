@@ -105,7 +105,7 @@ public:
         readFileAttributes(settings_, h5_fname, reader, false);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int /*rank*/, int numRanks, size_t /*n*/, Dataset& simData,
+    cstone::Box<typename Dataset::RealType> init(int /* rank */, int /* numRanks */, size_t /* n */, Dataset& simData,
                                                  IFileReader* reader) const override
     {
         reader->setStep(h5_fname, initStep, FileMode::collective);
@@ -138,7 +138,7 @@ public:
         readFileAttributes(settings_, h5_fname, reader, false);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int, size_t, Dataset& simData,
+    cstone::Box<typename Dataset::RealType> init(int /* rank */, int, size_t, Dataset& simData,
                                                  IFileReader* reader) const override
     {
         constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
@@ -204,7 +204,7 @@ public:
                 bool isLast   = (i == numParticlesInFile - 1);
                 long keyDelta = (isLast ? -(keys[i] - keys[i - 1]) : keys[i + 1] - keys[i]) / (numSplits + isLast);
 
-                for (size_t j = 1; j < numSplits; ++j)
+                for (int j = 1; j < numSplits; ++j)
                 {
                     auto [ixj, iyj, izj] = cstone::decodeSfc(cstone::sfcKey(keys[i] + j * keyDelta));
 

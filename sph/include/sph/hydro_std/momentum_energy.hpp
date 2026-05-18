@@ -103,7 +103,6 @@ void computeMomentumEnergySTD(const GroupView& groups, Dataset& d, const cstone:
 template<typename Dataset>
 void relaxSystemImpl(size_t first, size_t last, Dataset& d, double relaxationTimescale)
 {
-    using T = std::decay_t<decltype(d.vx[0])>;
 #pragma omp parallel for
     for (size_t i = first; i < last; i++)
     {
@@ -119,8 +118,8 @@ void relaxSystem(size_t startIndex, size_t endIndex, Dataset& d, double relaxati
     if (relaxationTimescale <= 0.) return;
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        relaxSystemGPU(startIndex, endIndex, rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az),
-                       rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), relaxationTimescale);
+        relaxSystemGPU(startIndex, endIndex, rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.vx), rawPtr(d.vy),
+                       rawPtr(d.vz), relaxationTimescale);
     }
     else { relaxSystemImpl(startIndex, endIndex, d, relaxationTimescale); }
 }

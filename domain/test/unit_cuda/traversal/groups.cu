@@ -183,7 +183,7 @@ TEST(TargetGroups, makeSplits)
         SplitType splitMask = makeMask(0xFFFFFFFFu, 0x6FFFFFFFu);
 
         makeSplitTester<<<1, 1>>>(splitMask, rawPtr(splitLengths));
-        for (int i = 0; i < targetSize - 1; ++i)
+        for (std::size_t i = 0; i < targetSize - 1; ++i)
         {
             if (i == 60) { EXPECT_EQ(splitLengths[i], 2); }
             else { EXPECT_EQ(splitLengths[i], 1); }
@@ -194,7 +194,7 @@ TEST(TargetGroups, makeSplits)
         SplitType splitMask = makeMask(0xFFFFFFFF, 0x7FFFFFFF);
 
         makeSplitTester<<<1, 1>>>(splitMask, rawPtr(splitLengths));
-        for (int i = 0; i < targetSize - 1; ++i)
+        for (std::size_t i = 0; i < targetSize - 1; ++i)
         {
             EXPECT_EQ(splitLengths[i], 1);
         }

@@ -64,7 +64,8 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     std::vector<T>       m(globalMasses.begin() + firstIndex, globalMasses.begin() + lastIndex);
     std::vector<KeyType> h_keys(x.size());
 
-    cstone::Domain<KeyType, T, cstone::GpuTag> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta, MPI_COMM_WORLD, box);
+    cstone::Domain<KeyType, T, cstone::GpuTag> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta,
+                                                      MPI_COMM_WORLD, box);
 
     MultipoleHolder<T, T, T, T, T, KeyType, MultipoleType> multipoleHolder;
 
@@ -182,7 +183,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
 
         double         potentialSumRef = 0;
         std::vector<T> errors(ax.size()), errors_cpu(ax.size());
-        for (int i = 0; i < ax.size(); i++)
+        for (std::size_t i = 0; i < ax.size(); i++)
         {
             potentialSumRef += pRef[i];
             Vec3<T> ref       = {axRef[i], ayRef[i], azRef[i]};
@@ -270,7 +271,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
             std::vector<T> azt = toHost(d_azt);
 
             bool passTargets = true;
-            for (int i = 0; i < numTargets; i++)
+            for (LocalIndex i = 0; i < numTargets; i++)
             {
                 Vec3<T> ref   = {axRef[i], ayRef[i], azRef[i]};
                 Vec3<T> probe = {axt[i], ayt[i], azt[i]};
@@ -294,7 +295,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
 
 int main(int argc, char** argv)
 {
-    MPI_Init(NULL, NULL);
+    MPI_Init(&argc, &argv);
 
     int rank = 0, numRanks = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);

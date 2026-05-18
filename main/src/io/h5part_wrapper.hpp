@@ -99,8 +99,8 @@ std::vector<std::string> datasetNames(h5_file_t h5_file)
     std::vector<std::string> setNames(numSets);
     for (int64_t fi = 0; fi < numSets; ++fi)
     {
-        int  maxlen = 256;
-        char fieldName[maxlen];
+        constexpr int maxlen = 256;
+        char          fieldName[maxlen];
         H5PartGetDatasetName(h5_file, fi, fieldName, maxlen);
         setNames[fi] = std::string(fieldName);
     }
@@ -116,10 +116,10 @@ std::vector<std::string> fileAttributeNames(h5_file_t h5_file)
     std::vector<std::string> setNames(numAttributes);
     for (int64_t fi = 0; fi < numAttributes; ++fi)
     {
-        int        maxlen = 256;
-        char       attrName[maxlen];
-        h5_int64_t typeId;
-        h5_size_t  attrSize;
+        constexpr int maxlen = 256;
+        char          attrName[maxlen];
+        h5_int64_t    typeId;
+        h5_size_t     attrSize;
 
         H5GetFileAttribInfo(h5_file, fi, attrName, maxlen, &typeId, &attrSize);
         setNames[fi] = std::string(attrName);
@@ -136,10 +136,10 @@ std::vector<std::string> stepAttributeNames(h5_file_t h5_file)
     std::vector<std::string> setNames(numAttributes);
     for (int64_t fi = 0; fi < numAttributes; ++fi)
     {
-        int        maxlen = 256;
-        char       attrName[maxlen];
-        h5_int64_t typeId;
-        h5_size_t  attrSize;
+        constexpr int maxlen = 256;
+        char          attrName[maxlen];
+        h5_int64_t    typeId;
+        h5_size_t     attrSize;
 
         H5GetStepAttribInfo(h5_file, fi, attrName, maxlen, &typeId, &attrSize);
         setNames[fi] = std::string(attrName);
