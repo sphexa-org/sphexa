@@ -29,13 +29,13 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include <limits>
+
+#include <thrust/execution_policy.h>
 #include <thrust/functional.h>
+#include <thrust/reduce.h>
 
-#include "cstone/cuda/cub.hpp"
-#include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/primitives/warpscan.cuh"
-#include "cstone/traversal/find_neighbors.cuh"
-
+#include "sph/neighborhood_gpu.hpp"
 #include "sph/sph_gpu.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/hydro_std/momentum_energy_kern.hpp"
@@ -43,72 +43,7 @@
 namespace sph
 {
 
-using cstone::GpuConfig;
 using cstone::LocalIndex;
-using cstone::TravConfig;
-using cstone::TreeNodeIndex;
-
-static __device__ float minDt_device;
-
-template<class Tc, class Tm, class T, class Tm1, class KeyType>
-__global__ void cudaGradP(Tc K, Tc Kcour, unsigned ngmax, cstone::Box<Tc> box, const LocalIndex* grpStart,
-                          const LocalIndex* grpEnd, LocalIndex numGroups, const cstone::OctreeNsView<Tc, KeyType> tree,
-                          const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy, const T* vz, const T* h,
-                          const Tm* m, const T* rho, const T* p, const T* c, const T* c11, const T* c12, const T* c13,
-                          const T* c22, const T* c23, const T* c33, const T* wh, const T* whd, T* grad_P_x, T* grad_P_y,
-                          T* grad_P_z, Tm1* du, LocalIndex* nidx, TreeNodeIndex* globalPool)
-{
-    unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
-    unsigned targetIdx   = 0;
-    unsigned warpIdxGrid = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
-
-    LocalIndex* neighborsWarp = nidx + ngmax * TravConfig::targetSize * warpIdxGrid;
-
-    T dt_i = INFINITY;
-
-    while (true)
-    {
-        // first thread in warp grabs next target
-        if (laneIdx == 0) { targetIdx = atomicAdd(&cstone::targetCounterGlob, 1); }
-        targetIdx = cstone::shflSync(targetIdx, 0);
-
-        if (targetIdx >= numGroups) { break; }
-
-        LocalIndex bodyBegin = grpStart[targetIdx];
-        LocalIndex bodyEnd   = grpEnd[targetIdx];
-        LocalIndex i         = bodyBegin + laneIdx;
-
-        auto ncTrue = traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool);
-
-        if (i >= bodyEnd) continue;
-
-        if (ncTrue[0] >= 25 && ncTrue[0] <= ngmax)
-        {
-            T maxvsignal;
-            momentumAndEnergyJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncTrue[0], x, y, z, vx,
-                                                           vy, vz, h, m, rho, p, c, c11, c12, c13, c22, c23, c33, wh,
-                                                           whd, grad_P_x, grad_P_y, grad_P_z, du, &maxvsignal);
-
-            dt_i = stl::min(dt_i, tsKCourant(maxvsignal, h[i], c[i], Kcour));
-        }
-        else
-        {
-            du[i]       = 0.;
-            grad_P_x[i] = 0.;
-            grad_P_y[i] = 0.;
-            grad_P_z[i] = 0.;
-        }
-    }
-
-    typedef cub::BlockReduce<T, TravConfig::numThreads> BlockReduce;
-    __shared__ typename BlockReduce::TempStorage        temp_storage;
-
-    BlockReduce reduce(temp_storage);
-    T           blockMin = reduce.Reduce(dt_i, thrust::minimum<>{});
-    __syncthreads();
-
-    if (threadIdx.x == 0) { cstone::atomicMinFloat(&minDt_device, blockMin); }
-}
 
 /*! @brief Mark particles with NaN acceleration for removal by setting neighbor counts to 0
  * @param[in]    grp   active particle groups
@@ -138,22 +73,12 @@ __global__ void markNaN(GroupView grp, Ta* ax, Ta* ay, Ta* az, Tu* du, unsigned*
 }
 
 template<class Dataset>
-void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
+void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.traversalStack, d.ngmax);
-    cstone::resetTraversalCounters<<<1, 1>>>();
-
-    float huge = 1e10;
-    checkGpuErrors(cudaMemcpyToSymbol(GPU_SYMBOL(minDt_device), &huge, sizeof(huge)));
-    cstone::resetTraversalCounters<<<1, 1>>>();
-
-    cudaGradP<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.K, d.Kcour, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.x),
-        rawPtr(d.y), rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz),
-        rawPtr(d.h), rawPtr(d.m), rawPtr(d.rho), rawPtr(d.p), rawPtr(d.c),
-        rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22),
-        rawPtr(d.c23), rawPtr(d.c33),
-        rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.du), nidxPool, traversalPool);
+    momentumAndEnergyIjLoop(d.neighborhood, d.K, d.Kcour, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.nc), rawPtr(d.vx),
+                            rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.p), rawPtr(d.c), rawPtr(d.c11), rawPtr(d.c12),
+                            rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.wh), rawPtr(d.du),
+                            rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.dtCourant));
 
     {
         unsigned numThreads       = 256;
@@ -166,10 +91,9 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
         }
     }
 
-    checkGpuErrors(cudaGetLastError());
-
-    float minDt;
-    checkGpuErrors(cudaMemcpyFromSymbol(&minDt, GPU_SYMBOL(minDt_device), sizeof(minDt)));
+    using DtCourantType = typename std::decay_t<decltype(d.dtCourant)>::value_type;
+    auto minDt = thrust::reduce(thrust::device, rawPtr(d.dtCourant) + grp.firstBody, rawPtr(d.dtCourant) + grp.lastBody,
+                                std::numeric_limits<DtCourantType>::infinity(), thrust::minimum<DtCourantType>());
     d.minDtCourant = minDt;
 }
 

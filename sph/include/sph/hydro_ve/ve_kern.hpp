@@ -31,46 +31,61 @@
 
 #pragma once
 
-#include "cstone/cuda/annotation.hpp"
-#include "cstone/sfc/box.hpp"
+#include "cstone/traversal/ijloop/ijloop.hpp"
 
-#include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"
 
 namespace sph
 {
 
-template<size_t stride = 1, class Tc, class T>
-HOST_DEVICE_FUN inline T veJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
-                                 const cstone::LocalIndex* neighbors, unsigned neighborsCount,
-                                 const Tc* x, const Tc* y, const Tc* z, const T* h, const T* wh, const T* xm)
+template<class T>
+struct VeInteraction
 {
-    auto xi     = x[i];
-    auto yi     = y[i];
-    auto zi     = z[i];
-    auto hi     = h[i];
+    const T* wh;
 
-    auto hInv  = T(1) / hi;
-    auto h3Inv = hInv * hInv * hInv;
-
-    // initialize with self-contribution
-    auto kxi      = xm[i];
-
-    for (unsigned pj = 0; pj < neighborsCount; ++pj)
+    template<class ParticleData, class Tc>
+    constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& /* r_ij */,
+                              T r2) const
     {
-        cstone::LocalIndex j = neighbors[stride * pj];
+        const auto [i, iPos, hi, xmassi] = iData;
+        const auto [j, jPos, hj, xmassj] = jData;
 
-        T dist   = distancePBC(box, hi, xi, yi, zi, x[j], y[j], z[j]);
-        T vloc   = dist * hInv;
-        T w      = lt::lookup(wh, vloc);
-        T xmassj = xm[j];
+        auto hInv = T(1) / hi;
 
-        kxi += w * xmassj;
+        T dist = std::sqrt(r2);
+        T vloc = dist * hInv;
+        T w    = lt::lookup(wh, vloc);
+
+        T kxi = w * xmassj;
+
+        return std::make_tuple(kxi);
     }
+};
 
-    kxi *= K * h3Inv;
-    
-    return kxi;
+template<class T, class Tc>
+struct VePostamble
+{
+    Tc K;
+
+    template<class ParticleData, class Result>
+    constexpr auto operator()(const ParticleData& iData, const Result& result) const
+    {
+        const auto [i, iPos, hi, xmassi] = iData;
+        auto [kxi]                       = result;
+
+        auto hInv  = T(1) / hi;
+        auto h3Inv = hInv * hInv * hInv;
+
+        kxi *= K * h3Inv;
+
+        return std::make_tuple(kxi);
+    }
+};
+
+template<class Neighbordhood, class Tc, class T>
+void veIjLoop(const Neighbordhood& neighborhood, Tc K, const T* xm, const T* wh, T* kx)
+{
+    neighborhood.ijLoop(std::make_tuple(xm), std::make_tuple(kx), VeInteraction{wh}, VePostamble<T, Tc>{K});
 }
 
 } // namespace sph

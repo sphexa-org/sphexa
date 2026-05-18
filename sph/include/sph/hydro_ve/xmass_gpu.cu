@@ -33,6 +33,7 @@
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
 
+#include "sph/neighborhood_gpu.hpp"
 #include "sph/sph_gpu.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/hydro_ve/xmass_kern.hpp"
@@ -51,112 +52,21 @@ unsigned nsGroupSize() { return TravConfig::targetSize; }
 namespace gpu
 {
 
-template<class Tc, class Tm, class T, class KeyType>
-__global__ void xmassGpu(Tc K, unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box, const LocalIndex* grpStart,
-                         const LocalIndex* grpEnd, LocalIndex numGroups, const cstone::OctreeNsView<Tc, KeyType> tree,
-                         unsigned* nc, const Tc* x, const Tc* y, const Tc* z, T* h, const Tm* m, const T* wh,
-                         const T* whd, T* xm, LocalIndex* nidx, TreeNodeIndex* globalPool)
-{
-    unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
-    unsigned targetIdx   = 0;
-    unsigned warpIdxGrid = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
-
-    LocalIndex* neighborsWarp = nidx + ngmax * TravConfig::targetSize * warpIdxGrid;
-
-    while (true)
-    {
-        // first thread in warp grabs next target
-        if (laneIdx == 0) { targetIdx = atomicAdd(&cstone::targetCounterGlob, 1); }
-        targetIdx = cstone::shflSync(targetIdx, 0);
-
-        if (targetIdx >= numGroups) return;
-
-        LocalIndex bodyBegin = grpStart[targetIdx];
-        LocalIndex bodyEnd   = grpEnd[targetIdx];
-        LocalIndex i         = bodyBegin + laneIdx;
-
-        unsigned ncSph =
-            1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
-
-        constexpr int ncMaxIteration = 9;
-        for (int ncIt = 0; ncIt <= ncMaxIteration; ++ncIt)
-        {
-            bool repeat = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
-            if (!cstone::ballotSync(repeat)) { break; }
-            if (repeat) { h[i] = updateH(ng0, ncSph, h[i]); }
-            ncSph =
-                1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
-
-            bool ncFail = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
-            if (ncIt == ncMaxIteration && ncFail) { ncSph = 1; }
-        }
-
-        if (i >= bodyEnd) continue;
-
-        unsigned ncCapped = stl::min(ncSph - 1, ngmax);
-        xm[i] = sph::xmassJLoop<TravConfig::targetSize>(i, K, box, neighborsWarp + laneIdx, ncCapped, x, y, z, h, m, wh,
-                                                        whd);
-        nc[i] = ncSph;
-    }
-}
-
 template<class Dataset>
-void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
+void computeXMass(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.traversalStack, d.ngmax);
-    cstone::resetTraversalCounters<<<1, 1>>>();
-
-    xmassGpu<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.K, d.ng0, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.nc),
-        rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h), rawPtr(d.m),
-        rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.xm), nidxPool, traversalPool);
+    xmassIjLoop(d.neighborhood, d.K, rawPtr(d.m), rawPtr(d.wh), rawPtr(d.xm));
     checkGpuErrors(cudaDeviceSynchronize());
-
-    NcStats::type stats[NcStats::numStats];
-    checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(cstone::ncStats), NcStats::numStats * sizeof(NcStats::type)));
-
-    NcStats::type maxP2P   = stats[cstone::NcStats::maxP2P];
-    NcStats::type maxStack = stats[cstone::NcStats::maxStack];
-
-    d.stackUsedNc = maxStack;
-
-    if (maxP2P == 0xFFFFFFFF) { throw std::runtime_error("GPU traversal stack exhausted in neighbor search\n"); }
 }
 
 template void computeXMass(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
                            const cstone::Box<SphTypes::CoordinateType>&);
 
-template<class Tm, class Trho>
-__global__ void convertXmassToRho(const LocalIndex* grpStart, const LocalIndex* grpEnd, LocalIndex numGroups,
-                                  const Tm* m, Trho* rho)
-{
-    LocalIndex tid = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (tid >= numGroups) { return; }
-
-    LocalIndex bodyBegin = grpStart[tid];
-    LocalIndex bodyEnd   = grpEnd[tid];
-
-    for (auto i = bodyBegin; i < bodyEnd; ++i)
-    {
-        rho[i] = m[i] / rho[i];
-    }
-}
-
 template<class Dataset>
-void computeDensity(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>& box)
+void computeDensity(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    swap(d.xm, d.rho);
-    computeXMass(grp, d, box);
-    swap(d.xm, d.rho);
-
-    unsigned numThreads = 256;
-    unsigned numBlocks  = (grp.numGroups + numThreads - 1) / numThreads;
-    if (numBlocks == 0) { return; }
-
-    // rho[i] = m[i] / rho[i];
-    convertXmassToRho<<<numBlocks, numThreads>>>(grp.groupStart, grp.groupEnd, grp.numGroups, rawPtr(d.m),
-                                                 rawPtr(d.rho));
+    densityIjLoop(d.neighborhood, d.K, rawPtr(d.m), rawPtr(d.wh), rawPtr(d.rho));
+    checkGpuErrors(cudaDeviceSynchronize());
 }
 
 template void computeDensity(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,

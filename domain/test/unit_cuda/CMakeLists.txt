@@ -2,6 +2,7 @@ include(cstone_add_test)
 
 set(UNIT_TEST_SOURCES_GPU
         cuda/device_vector.cu
+        cuda/memory.cu
         domain/domaindecomp_gpu.cu
         halos/gather_halos_gpu.cu
         primitives/clz.cu
@@ -16,6 +17,7 @@ set(UNIT_TEST_SOURCES_GPU
         tree/btree.cu
         tree/csarray.cu
         tree/octree.cu
+        neighbors/ijloop.cu
 )
 
 if(CMAKE_HIP_COMPILER)

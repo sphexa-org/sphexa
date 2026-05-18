@@ -223,6 +223,7 @@ and a warp-aware tree-traversal inspired by the
 * Darren Reed
 * Lukas Schmidt
 * Osman Seckin Simsek
+* Felix Thaler
 * Yiqing Zhu
 
 ## Paper references

@@ -97,10 +97,12 @@ void adjustSmoothingLength(LocalIndex numParticles,
     nodeFpCenters<KeyType>(nodeKeys, centers.data(), sizes.data(), box);
 
     OctreeNsView<Tc, KeyType> nsView{octree.numLeafNodes,
+                                     octree.numNodes,
                                      octree.prefixes.data(),
                                      octree.childOffsets.data(),
                                      octree.parents.data(),
                                      octree.internalToLeaf.data(),
+                                     octree.leafToInternal.data(),
                                      octree.levelRange.data(),
                                      nullptr,
                                      layout.data(),
@@ -165,6 +167,7 @@ public:
     const std::vector<T>& z() const { return z_; }
     const std::vector<T>& h() const { return h_; }
     const std::vector<Integer>& particleKeys() const { return codes_; }
+    const Box<T>& box() const { return box_; }
 
 protected:
     void sfcSort()
