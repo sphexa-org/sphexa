@@ -100,4 +100,28 @@ void computeMomentumEnergySTD(const GroupView& groups, Dataset& d, const cstone:
     else { computeMomentumEnergyStdImpl(groups.firstBody, groups.lastBody, d, box); }
 }
 
+template<typename Dataset>
+void relaxSystemImpl(size_t first, size_t last, Dataset& d, double relaxationTimescale)
+{
+#pragma omp parallel for
+    for (size_t i = first; i < last; i++)
+    {
+        d.ax[i] -= d.vx[i] / relaxationTimescale;
+        d.ay[i] -= d.vy[i] / relaxationTimescale;
+        d.az[i] -= d.vz[i] / relaxationTimescale;
+    }
+}
+
+template<typename Dataset>
+void relaxSystem(size_t startIndex, size_t endIndex, Dataset& d, double relaxationTimescale)
+{
+    if (relaxationTimescale <= 0.) return;
+    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    {
+        relaxSystemGPU(startIndex, endIndex, rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.vx), rawPtr(d.vy),
+                       rawPtr(d.vz), relaxationTimescale);
+    }
+    else { relaxSystemImpl(startIndex, endIndex, d, relaxationTimescale); }
+}
+
 } // namespace sph

@@ -105,7 +105,7 @@ public:
         readFileAttributes(settings_, h5_fname, reader, false);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int /*rank*/, int numRanks, size_t /*n*/, Dataset& simData,
+    cstone::Box<typename Dataset::RealType> init(int /* rank */, int /* numRanks */, size_t /* n */, Dataset& simData,
                                                  IFileReader* reader) const override
     {
         reader->setStep(h5_fname, initStep, FileMode::collective);
@@ -138,7 +138,7 @@ public:
         readFileAttributes(settings_, h5_fname, reader, false);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int, size_t, Dataset& simData,
+    cstone::Box<typename Dataset::RealType> init(int /* rank */, int, size_t, Dataset& simData,
                                                  IFileReader* reader) const override
     {
         constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
@@ -204,7 +204,7 @@ public:
                 bool isLast   = (i == numParticlesInFile - 1);
                 long keyDelta = (isLast ? -(keys[i] - keys[i - 1]) : keys[i + 1] - keys[i]) / (numSplits + isLast);
 
-                for (size_t j = 1; j < numSplits; ++j)
+                for (int j = 1; j < numSplits; ++j)
                 {
                     auto [ixj, iyj, izj] = cstone::decodeSfc(cstone::sfcKey(keys[i] + j * keyDelta));
 
@@ -244,12 +244,15 @@ public:
         replicateField(reader, "vx", d.vx, T(1));
         replicateField(reader, "vy", d.vy, T(1));
         replicateField(reader, "vz", d.vz, T(1));
-        replicateField(reader, "temp", d.temp, T(1));
+        if (d.isAllocated("temp")) { replicateField(reader, "temp", d.temp, T(1)); }
+        else if (d.isAllocated("u")) { replicateField(reader, "u", d.u, T(1)); }
         cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0);
         cstone::fill<gpu>(d.rung.begin(), d.rung.end(), 0);
         cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), d.minDt);
         cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), d.minDt);
         cstone::scaleGpuAcc<gpu>(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), d.minDt);
+
+        generateParticleIDs<gpu>(d.id);
 
         if (d.isAllocated("alpha"))
         {

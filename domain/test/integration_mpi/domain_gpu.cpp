@@ -231,7 +231,7 @@ TEST(DomainGpu, reapplySync)
     std::vector<Real> dl_property = toHost(property);
 
     int numPass = 0;
-    for (int i = domain.startIndex(); i < domain.endIndex(); ++i)
+    for (auto i = domain.startIndex(); i < domain.endIndex(); ++i)
     {
         if (dl_property[i] == host_property[i]) numPass++;
     }
@@ -278,10 +278,10 @@ TEST(DomainGpu, Allgatherv)
 template<class KeyType, class T>
 void randomGaussianGrav(int thisRank, int numRanks)
 {
-    const LocalIndex numParticles    = 100000;
-    unsigned         bucketSize      = numParticles / (100 * numRanks);
-    unsigned         bucketSizeLocal = std::min(64u, bucketSize);
-    float            theta           = 0.5;
+    const LocalIndex numParticles = 100000;
+    unsigned bucketSize           = numParticles / (100 * numRanks);
+    unsigned bucketSizeLocal      = std::min(64u, bucketSize);
+    float theta                   = 0.5;
 
     Box<T> box{-1, 1};
 
@@ -296,11 +296,11 @@ void randomGaussianGrav(int thisRank, int numRanks)
 
     // extract a slice of the common pool, each rank takes a different slice, but all slices together
     // are equal to the common pool
-    std::vector<T>       x(coords.x().begin() + firstIndex, coords.x().begin() + lastIndex);
-    std::vector<T>       y(coords.y().begin() + firstIndex, coords.y().begin() + lastIndex);
-    std::vector<T>       z(coords.z().begin() + firstIndex, coords.z().begin() + lastIndex);
-    std::vector<T>       h(coords.h().begin() + firstIndex, coords.h().begin() + lastIndex);
-    std::vector<T>       m(globalMasses.begin() + firstIndex, globalMasses.begin() + lastIndex);
+    std::vector<T> x(coords.x().begin() + firstIndex, coords.x().begin() + lastIndex);
+    std::vector<T> y(coords.y().begin() + firstIndex, coords.y().begin() + lastIndex);
+    std::vector<T> z(coords.z().begin() + firstIndex, coords.z().begin() + lastIndex);
+    std::vector<T> h(coords.h().begin() + firstIndex, coords.h().begin() + lastIndex);
+    std::vector<T> m(globalMasses.begin() + firstIndex, globalMasses.begin() + lastIndex);
     std::vector<KeyType> keys(x.size());
 
     DeviceVector<T> d_x          = x;
@@ -329,7 +329,8 @@ void randomGaussianGrav(int thisRank, int numRanks)
                                                    domain.focusTree().expansionCentersAcc().end());
     }
     {
-        Domain<KeyType, T, GpuTag> domainGpu(thisRank, numRanks, bucketSize, bucketSizeLocal, theta, MPI_COMM_WORLD, box);
+        Domain<KeyType, T, GpuTag> domainGpu(thisRank, numRanks, bucketSize, bucketSizeLocal, theta, MPI_COMM_WORLD,
+                                             box);
         DeviceVector<T> ds1, ds2, gpuOrdering;
         domainGpu.syncGrav(d_keys, d_x, d_y, d_z, d_h, d_m, std::tuple{}, std::tie(ds1, ds2, gpuOrdering));
         domainGpu.exchangeHalos(std::tie(d_m), ds1, ds2);
@@ -340,7 +341,7 @@ void randomGaussianGrav(int thisRank, int numRanks)
     }
 
     EXPECT_EQ(layout, h_layout);
-    for (TreeNodeIndex i = 0; i < centers.size(); ++i)
+    for (std::size_t i = 0; i < centers.size(); ++i)
     {
         EXPECT_NEAR(norm2(centers[i] - h_centers[i]), 0.0, 1e-6);
     }

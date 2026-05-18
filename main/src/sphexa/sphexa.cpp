@@ -201,7 +201,7 @@ int main(int argc, char** argv)
 //! @brief check whether the stop conditions based on evolved time (not wall-clock) or iteration count are reached
 bool stopConditionReached(size_t iteration, double time, const std::string& maxStepStr)
 {
-    bool lastIteration = strIsIntegral(maxStepStr) && iteration >= std::stoi(maxStepStr);
+    bool lastIteration = strIsIntegral(maxStepStr) && iteration >= std::stoull(maxStepStr);
     bool simTimeLimit  = !strIsIntegral(maxStepStr) && time > std::stod(maxStepStr);
 
     return lastIteration || simTimeLimit;

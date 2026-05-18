@@ -79,8 +79,8 @@ double calculateSurvivingMass(size_t first, size_t last, double rhoBubble, doubl
 
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        bubbleMass = survivingMassGpu(rawPtr(d.temp), rawPtr(d.kx), rawPtr(d.xm),
-                                      rawPtr(d.m), rhoBubble, uWind, first, last);
+        bubbleMass =
+            survivingMassGpu(rawPtr(d.temp), rawPtr(d.kx), rawPtr(d.xm), rawPtr(d.m), rhoBubble, uWind, first, last);
     }
     else
     {
@@ -115,7 +115,7 @@ public:
 
     using T = typename Dataset::RealType;
 
-    void computeAndWrite(Dataset& simData, size_t firstIndex, size_t lastIndex, const cstone::Box<T>& box) override
+    void computeAndWrite(Dataset& simData, size_t firstIndex, size_t lastIndex, const cstone::Box<T>&) override
     {
         auto& d = simData.hydro;
         computeConservedQuantities(firstIndex, lastIndex, d, simData.comm);
