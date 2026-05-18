@@ -40,7 +40,7 @@ void upsweepReference(const OctreeNsView<Tc, KeyType>& tree,
 {
     auto numInternalNodes = tree.numNodes - tree.numLeafNodes;
 #pragma omp parallel for
-    for (std::size_t leafIdx = 0; leafIdx < tree.numLeafNodes; ++leafIdx)
+    for (TreeNodeIndex leafIdx = 0; leafIdx < tree.numLeafNodes; ++leafIdx)
     {
         TreeNodeIndex nodeIdx = tree.leafToInternal[numInternalNodes + leafIdx];
         auto accum            = init;

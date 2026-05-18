@@ -194,8 +194,7 @@ public:
         domain.exchangeHalos(get<"x", "y", "z", "h">(d), get<"keys">(d), haloRecvScratch);
         if (d.g != 0.0)
         {
-            domain.updateExpansionCenters(get<"x">(d), get<"y">(d), get<"z">(d), get<"m">(d), get<"keys">(d),
-                                          haloRecvScratch);
+            domain.updateExpansionCenters(get<"x">(d), get<"y">(d), get<"z">(d), get<"m">(d), get<"keys">(d));
         }
 
         //! @brief increase tree-cell search radius for each substep to account for particles drifting out of cells
@@ -438,7 +437,7 @@ public:
         if (!indicesDone.empty() && Base::rank_ == 0)
         {
             std::cout << "WARNING: the following fields are not in use and therefore not output: ";
-            for (int fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
+            for (std::size_t fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
             {
                 std::cout << d.fieldNames[fidx] << ",";
             }

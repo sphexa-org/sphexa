@@ -60,7 +60,6 @@ void computeMomentumEnergySTD(const GroupView& groups, Dataset& d, const cstone:
 template<typename Dataset>
 void relaxSystemImpl(size_t first, size_t last, Dataset& d, double relaxationTimescale)
 {
-    using T = std::decay_t<decltype(d.vx[0])>;
 #pragma omp parallel for
     for (size_t i = first; i < last; i++)
     {

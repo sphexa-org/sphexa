@@ -153,7 +153,6 @@ int main()
 {
     using namespace cstone;
     using StrongKeyType = cstone::HilbertKey<std::uint64_t>;
-    using KeyType       = typename StrongKeyType::ValueType;
 
     constexpr unsigned n = 100000;
     const double rfac    = 1.0 / 10.0;

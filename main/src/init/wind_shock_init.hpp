@@ -63,7 +63,6 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
     using T            = typename Dataset::RealType;
     using HydroType    = typename Dataset::HydroType;
-    using XM1Type      = typename Dataset::XM1Type;
 
     T r       = constants.at("r");
     T rSphere = constants.at("rSphere");
