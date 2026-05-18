@@ -96,7 +96,7 @@ protected:
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
-                                       "xm", "kx", "nc", "divv", "gradh">;
+                                       "xm", "kx", "nc", "divv", "gradh", "dtCourant">;
 
     //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
@@ -180,7 +180,6 @@ public:
         d.treeView = domain.octreeProperties();
 
         d.resize(domain.nParticlesWithHalos());
-        resizeNeighbors(d, domain.nParticles() * d.ngmax);
 
         computeGroups(domain.startIndex(), domain.endIndex(), d, domain.box(), groups_);
         activeRungs_ = groups_.view();
@@ -230,7 +229,8 @@ public:
 
         fillMassHalos(get<"m">(d), first, last);
 
-        findNeighborsSfc(first, last, d, domain.box());
+        updateSmoothingLengthIterative(activeRungs_, d, domain.box());
+        findNeighborsSfc(activeRungs_, d, domain.box(), true);
         timer.step("FindNeighbors");
         pmReader.step();
 

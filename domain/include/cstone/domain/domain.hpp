@@ -375,10 +375,12 @@ public:
     {
         auto ft = focusTree_.octreeViewAcc();
         return {ft.numLeafNodes,
+                ft.numNodes,
                 ft.prefixes,
                 ft.childOffsets,
                 ft.parents,
                 ft.internalToLeaf,
+                ft.leafToInternal,
                 ft.levelRange,
                 focusTree_.treeLeavesAcc().data(),
                 rawPtr(layoutAcc_),

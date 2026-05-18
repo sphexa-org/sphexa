@@ -41,7 +41,6 @@ variables:
     # GPU tests:
     - $TEST_INSTALL_DIR/hydro/sph_gpu_tests
     - $TEST_INSTALL_DIR/performance/hilbert_perf_gpu
-    - $TEST_INSTALL_DIR/performance/neighbors_test_gpu
     - $TEST_INSTALL_DIR/performance/octree_perf_gpu
     - $TEST_INSTALL_DIR/unit_cuda/component_units_cuda
     - date
@@ -203,6 +202,7 @@ variables:
   variables:
     WITH_UENV_VIEW: 'default'
     # SLURM_PARTITION: 'debug'
+    SLURM_TIMELIMIT: '00:30:00'
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 4
     SLURM_CPUS_PER_TASK: 71

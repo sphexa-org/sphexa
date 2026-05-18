@@ -72,10 +72,12 @@ void neighborCheck(const Coordinates& coords, T radius, const Box<T>& box)
     nodeFpCenters<KeyType>(nodeKeys, centers.data(), sizes.data(), box);
 
     OctreeNsView<T, KeyType> nsView{octree.numLeafNodes,
+                                    octree.numNodes,
                                     octree.prefixes.data(),
                                     octree.childOffsets.data(),
                                     octree.parents.data(),
                                     octree.internalToLeaf.data(),
+                                    octree.leafToInternal.data(),
                                     octree.levelRange.data(),
                                     nullptr,
                                     layout.data(),

@@ -476,9 +476,9 @@ void randomGaussianGrav(int thisRank, int numRanks)
         nodeFpCenters<KeyType>(octree.prefixes, geoCenters.data(), geoSizes.data(), box);
 
         auto o = octree.data();
-        OctreeNsView<T, KeyType> octreeProps{o.numLeafNodes,    o.prefixes,     o.childOffsets,     o.parents,
-                                             o.internalToLeaf,  o.levelRange,   globCsarray.data(), layout.data(),
-                                             geoCenters.data(), geoSizes.data()};
+        OctreeNsView<T, KeyType> octreeProps{o.numLeafNodes,     o.numNodes,       o.prefixes,        o.childOffsets,
+                                             o.parents,          o.internalToLeaf, o.leafToInternal,  o.levelRange,
+                                             globCsarray.data(), layout.data(),    geoCenters.data(), geoSizes.data()};
 
         findNeighbors(coords.x().data(), coords.y().data(), coords.z().data(), coords.h().data(), firstGlobalIdx,
                       lastGlobalIdx, box, octreeProps, ngmax, neighborsRef.data(), neighborsCountRef.data());
