@@ -46,17 +46,20 @@ TEST(TargetGroups, t0)
     EXPECT_EQ(hgroups, ref);
 }
 
-__device__ constexpr util::array<int, 2> laneSeg(int idx, int warpSize_) { return {idx % warpSize, idx / warpSize_}; }
+__device__ constexpr util::array<unsigned, 2> laneSeg(unsigned idx, unsigned warpSize_)
+{
+    return {idx % warpSize, idx / warpSize_};
+}
 
 //! @brief test input setup for findSplits
-template<size_t N>
+template<std::size_t N>
 __global__ void findSplitTester(util::array<GpuConfig::ThreadMask, N>* splits)
 {
     using T          = double;
     unsigned laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
 
     util::array<Vec4<T>, N> pos;
-    for (int k = 0; k < N; ++k)
+    for (std::size_t k = 0; k < N; ++k)
     {
         T x    = T(laneIdx) + k * GpuConfig::warpSize;
         pos[k] = Vec4<T>{x, x, x, T(N * GpuConfig::warpSize)};

@@ -369,7 +369,7 @@ public:
         auto si = startIndex();
         focusTree_.updateCenters(rawPtr(x) + si, rawPtr(y) + si, rawPtr(z) + si, rawPtr(m) + si, global_.octree(), s1);
         focusTree_.setMacRadius(1.0 / theta_);
-    };
+    }
 
     OctreeNsView<T, KeyType> octreeProperties() const
     {
