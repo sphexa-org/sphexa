@@ -70,8 +70,12 @@ tabulateFunction(F&& func, const double lowerSupport, const double upperSupport,
     // required on AMD for decent performance
     int device;
     checkGpuErrors(cudaGetDevice(&device));
+#if defined(__HIPCC__) && (HIP_VERSION_MAJOR < 7 || (HIP_VERSION_MAJOR == 7 && HIP_VERSION_MINOR == 0))
+    checkGpuErrors(hipMemPrefetchAsync(rawPtr(table), sizeof(T) * n, device));
+#else
     checkGpuErrors(
         cudaMemPrefetchAsync(rawPtr(table), sizeof(T) * n, {.type = cudaMemLocationTypeDevice, .id = device}, 0));
+#endif
 
     return table;
 }
