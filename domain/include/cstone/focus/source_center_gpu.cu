@@ -208,7 +208,7 @@ template<class KeyType, class T>
 __global__ void computeGeoCentersKernel(
     const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T> box)
 {
-    unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numNodes) { return; }
 
     KeyType prefix                  = prefixes[i];
@@ -239,7 +239,7 @@ template<class KeyType, class T>
 __global__ void geoMacSpheresKernel(
     const KeyType* prefixes, TreeNodeIndex numNodes, SourceCenterType<T>* centers, float invTheta, Box<T> box)
 {
-    unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numNodes) { return; }
     centers[i] = computeMinMacR2(prefixes[i], invTheta, box);
 }
@@ -266,7 +266,7 @@ template<class KeyType, class T>
 __global__ void
 setMacKernel(const KeyType* prefixes, TreeNodeIndex numNodes, Vec4<T>* macSpheres, float invTheta, const Box<T> box)
 {
-    unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numNodes) { return; }
 
     Vec4<T> center   = macSpheres[i];
@@ -294,7 +294,7 @@ SET_MAC_GPU(uint64_t, double);
 template<class T>
 __global__ void moveCentersKernel(const Vec3<T>* src, TreeNodeIndex numNodes, Vec4<T>* dest)
 {
-    unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numNodes) { return; }
     dest[i][0] = src[i][0];
     dest[i][1] = src[i][1];

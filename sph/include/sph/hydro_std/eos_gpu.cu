@@ -44,8 +44,7 @@ namespace gpu
 
 template<class Tt, class Tm, class Thydro>
 __global__ void cudaComputeIdealGasEOS_HydroStd(size_t firstParticle, size_t lastParticle, Tm mui, Tt gamma,
-                                                const Tt* temp, const Tt* u, const Tm* m, Thydro* rho, Thydro* p,
-                                                Thydro* c)
+                                                const Tt* temp, const Tt* u, Thydro* rho, Thydro* p, Thydro* c)
 {
     unsigned i = firstParticle + blockDim.x * blockIdx.x + threadIdx.x;
     if (i >= lastParticle) return;
@@ -62,8 +61,8 @@ void computeIdealGasEOS_HydroStd(size_t firstParticle, size_t lastParticle, Data
     unsigned numBlocks  = cstone::iceil(lastParticle - firstParticle, numThreads);
 
     cudaComputeIdealGasEOS_HydroStd<<<numBlocks, numThreads>>>(firstParticle, lastParticle, d.muiConst, d.gamma,
-                                                               rawPtr(d.temp), rawPtr(d.u), rawPtr(d.m), rawPtr(d.rho),
-                                                               rawPtr(d.p), rawPtr(d.c));
+                                                               rawPtr(d.temp), rawPtr(d.u), rawPtr(d.rho), rawPtr(d.p),
+                                                               rawPtr(d.c));
 
     checkGpuErrors(cudaDeviceSynchronize());
 }
