@@ -26,14 +26,13 @@ elif BACKEND == 'gpu':
     RANKS = 1
     CORES = 1
 
-# File names (adjust paths if needed)
-mixDConstants = f'/capstor/scratch/cscs/ioannmag/CORNERSTONE/sphexa/build_{BACKEND}/constants_{TEST}_r{RANKS}_c{CORES}_s{STEPS}_n{N}_{BACKEND}.txt'
-developConstants = f'/capstor/scratch/cscs/ioannmag/CORNERSTONE/sphexa-develop/build_{BACKEND}/constants_{TEST}_r{RANKS}_c{CORES}_s{STEPS}_n{N}_{BACKEND}.txt'
+MIXD_ROOT    = "/capstor/scratch/cscs/ioannmag/CORNERSTONE/sphexa"
+DEV_ROOT     = "/capstor/scratch/cscs/ioannmag/CORNERSTONE/sphexa-develop"
+RUN_DIR_NAME = f'{TEST}_r{RANKS}_c{CORES}_s{STEPS}_n{N}_{BACKEND}'
 
-base1 = os.path.basename(mixDConstants)
-base2 = os.path.basename(developConstants)
-if base1 != base2:
-    raise ValueError(f"Filenames must match but differ: {base1!r} != {base2!r}")
+# File paths (must match the layout produced by run_common.sh)
+mixDConstants    = os.path.join(MIXD_ROOT, f'build_{BACKEND}', RUN_DIR_NAME, 'constants.txt')
+developConstants = os.path.join(DEV_ROOT,  f'build_{BACKEND}', RUN_DIR_NAME, 'constants.txt')
 
 for p in (mixDConstants, developConstants):
     if not os.path.isfile(p):
