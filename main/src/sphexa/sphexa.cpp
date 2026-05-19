@@ -243,8 +243,9 @@ sph::NeighborhoodType nbTypeFromName(const std::string_view nbType)
     if (nbType == "compressed-half-neighbor-list" || nbType == "hc")
         return sph::NeighborhoodType::compressedHalfNeighborList;
     if (nbType == "clustered-neighbor-list" || nbType == "c") return sph::NeighborhoodType::clusteredNeighborList;
-    throw std::invalid_argument("neighbor-search argument must be one of 'always-traverse', 'full-neighbor-list', "
-                                " 'cull-compressed-neighbor-list', or 'clustered-neighbor-list'");
+    throw std::invalid_argument(
+        "neighbor-search argument must be one of 'always-traverse', 'full-neighbor-list', "
+        " 'compressed-full-neighbor-list', 'compressed-half-neighbor-list', or 'clustered-neighbor-list'");
 }
 
 void printHelp(char* name, int rank)
