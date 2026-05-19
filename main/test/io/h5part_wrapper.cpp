@@ -43,18 +43,18 @@ TEST(H5PartCpp, typesafeStepAttrRead)
     std::string testfile = "variant_read.h5";
     if (std::filesystem::exists(testfile)) { std::filesystem::remove(testfile); }
 
+    double            float64Attr = 0.5;
+    int64_t           int64Attr   = -42;
+    uint64_t          uint64Attr  = (uint64_t(2) << 40) + (uint64_t(1) << 63);
+    std::vector<char> charAttr{'a', 'b'};
     {
         h5_file_t h5File = H5OpenFile(testfile.c_str(), H5_O_RDWR, H5_PROP_DEFAULT);
         H5SetStep(h5File, 0);
 
-        double float64Attr = 0.5;
         H5WriteStepAttribT(h5File, "float64Attr", &float64Attr, 1);
-        int64_t int64Attr = -42;
         H5WriteStepAttribT(h5File, "int64Attr", &int64Attr, 1);
-        uint64_t uint64Attr = (uint64_t(2) << 40) + (uint64_t(1) << 63);
         H5WriteStepAttribT(h5File, "uint64Attr", &uint64Attr, 1);
-        char int8Attr = 1;
-        H5WriteStepAttribT(h5File, "int8Attr", &int8Attr, 1);
+        H5WriteStepAttribT(h5File, "charAttr", charAttr.data(), charAttr.size());
 
         H5CloseFile(h5File);
     }
@@ -96,9 +96,11 @@ TEST(H5PartCpp, typesafeStepAttrRead)
             EXPECT_EQ(a[0], (uint64_t(2) << 40) + (uint64_t(1) << 63));
         }
         {
-            std::vector<char> a(1);
+            std::cout << "Type is " << H5hutType<char>::nameString << std::endl;
+            std::vector<char> a(charAttr.size());
             readH5PartStepAttribute(a.data(), a.size(), 3, h5File);
-            EXPECT_EQ(a[0], 1);
+            EXPECT_EQ(a[0], 'a');
+            EXPECT_EQ(a[1], 'b');
         }
 
         H5CloseFile(h5File);
