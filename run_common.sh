@@ -66,6 +66,7 @@ run_sim() {
 
   local out_prefix="${run_dir}/dump"
   local const_file="${run_dir}/constants.txt"
+  rm profile.h5 ${run_dir}/profile.h5 2>/dev/null || true
 
   OMP_NUM_THREADS="${CORES}" \
   srun -n "${RANKS}" "${binary}" \
@@ -73,7 +74,10 @@ run_sim() {
     --init  "${INIT_COND}" \
     -n      "${N}" \
     -s      "${STEPS}" \
-    -o      "${out_prefix}" 2>&1 | tee "${log_file}"
+    -o      "${out_prefix}" \
+    --profile 2>&1 | tee "${log_file}"
+
+  mv profile.h5 "${run_dir}/"
 
   if [ ! -f "${const_file}" ]; then
     echo "ERROR: expected constants file not produced: ${const_file}" >&2
@@ -92,6 +96,11 @@ run_sim "MixD branch"    "${MIXD_BIN}" "${MIXD_RUN_DIR}"
 run_sim "develop branch" "${DEV_BIN}"  "${DEV_RUN_DIR}"
 
 echo "Done. Run compare_sphexa_tests.py to generate the comparison plot."
+
+# ── numHalos comparison ───────────────────────────────────────────────────────
+python3 "${MIXD_ROOT}/scripts/compare_num_halos.py" \
+    --test "${TEST}" --backend "${BACKEND}" --steps "${STEPS}" \
+    --ranks "${RANKS}" --cores "${CORES}" --n "${N}"
 
 # ── Timing comparison ─────────────────────────────────────────────────────────
 python3 "${MIXD_ROOT}/scripts/timing_summary.py" \
