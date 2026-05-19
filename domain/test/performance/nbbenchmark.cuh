@@ -240,6 +240,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
         checkGpuErrors(cudaEventDestroy(events[i]));
         times[i] = millisecs / 1000.0;
     }
+    checkGpuErrors(cudaEventDestroy(events.back()));
 
     // compute and print mean and standard deviation of performance measurements
     std::vector<double> gigaParticleUpdates(times.size());
