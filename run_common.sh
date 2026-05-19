@@ -14,7 +14,12 @@
 
 # ── Parameters (match the defaults in compare_sphexa_tests.py) ─────────────────
 # $1 is inherited from the positional parameters of the sourcing script.
+# Pass --nsys as any additional argument to enable nsys profiling (GPU only).
 TEST="${1:-windshock}"
+NSYS_ENABLED=0
+for _arg in "$@"; do
+  [ "$_arg" = "--nsys" ] && NSYS_ENABLED=1
+done
 N=50
 STEPS=200
 
@@ -51,6 +56,7 @@ run_sim() {
   local binary="$2"
   local run_dir="$3"
   local log_file="${run_dir}/timing.log"
+  local suffix="${4}"
 
   echo "=== Running ${label} ==="
   echo "    binary   : ${binary}"
@@ -62,6 +68,12 @@ run_sim() {
     exit 1
   fi
 
+  PROFILE_EXEC=""
+  if [ "$BACKEND" = "gpu" ] && [ "$NSYS_ENABLED" = "1" ]; then
+    NSYS_OUTPUT_FILE="nsys_${TEST}_r${RANKS}_${suffix}"
+    PROFILE_EXEC="nsys profile --trace=cuda,nvtx,osrt -o ${NSYS_OUTPUT_FILE} -f true"
+  fi
+
   mkdir -p "${run_dir}"
 
   local out_prefix="${run_dir}/dump"
@@ -69,7 +81,7 @@ run_sim() {
   rm profile.h5 ${run_dir}/profile.h5 2>/dev/null || true
 
   OMP_NUM_THREADS="${CORES}" \
-  srun -n "${RANKS}" "${binary}" \
+  srun -n "${RANKS}" ${PROFILE_EXEC} "${binary}" \
     --glass "${GLASS}" \
     --init  "${INIT_COND}" \
     -n      "${N}" \
@@ -92,8 +104,8 @@ run_sim() {
 MIXD_RUN_DIR="${MIXD_ROOT}/build_${BACKEND}/${RUN_DIR_NAME}"
 DEV_RUN_DIR="${DEV_ROOT}/build_${BACKEND}/${RUN_DIR_NAME}"
 
-run_sim "MixD branch"    "${MIXD_BIN}" "${MIXD_RUN_DIR}"
-run_sim "develop branch" "${DEV_BIN}"  "${DEV_RUN_DIR}"
+run_sim "MixD branch"    "${MIXD_BIN}" "${MIXD_RUN_DIR}" "MixD"
+run_sim "develop branch" "${DEV_BIN}"  "${DEV_RUN_DIR}" "develop"
 
 echo "Done. Run compare_sphexa_tests.py to generate the comparison plot."
 
