@@ -99,6 +99,8 @@ struct DeviceNeighborhoodData::Impl
                     else
                         builder = ClusteredNeighborhoodBuilder<true>{ncmax};
                     break;
+                default:
+                    throw std::runtime_error("invalid neighborhood type");
             }
 
             std::visit(
