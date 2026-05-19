@@ -18,6 +18,7 @@
 #include <thrust/sort.h>
 #include <thrust/fill.h>
 
+#include "cstone/cuda/thrust_util.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/primitives/primitives_gpu.h"
 #include "cstone/sfc/common.hpp"
@@ -139,38 +140,41 @@ void buildOctreeGpu(const KeyType* cstoneTree,
                     OctreeView<KeyType> d,
                     std::span<KeyType> keyBuf,
                     std::span<TreeNodeIndex> valueBuf,
-                    std::span<char> cubTmp)
+                    std::span<char> cubTmp,
+                    cudaStream_t stream)
 {
     constexpr unsigned numThreads = 256;
 
     TreeNodeIndex numNodes = d.numInternalNodes + d.numLeafNodes;
-    createUnsortedLayout<<<iceil(numNodes, numThreads), numThreads>>>(cstoneTree, d.numInternalNodes, d.numLeafNodes,
+    createUnsortedLayout<<<iceil(numNodes, numThreads), numThreads, 0, stream>>>(cstoneTree, d.numInternalNodes, d.numLeafNodes,
                                                                       d.prefixes, d.internalToLeaf);
 
     assert(keyBuf.size() == d.numNodes && valueBuf.size() == d.numNodes);
     sortByKeyGpu(d.prefixes, d.prefixes + numNodes, d.internalToLeaf, keyBuf.data(), valueBuf.data(), cubTmp.data(),
-                 cubTmp.size());
+                 cubTmp.size(), stream);
 
-    invertOrder<<<iceil(numNodes, numThreads), numThreads>>>(d.internalToLeaf, d.leafToInternal, numNodes,
+    invertOrder<<<iceil(numNodes, numThreads), numThreads, 0, stream>>>(d.internalToLeaf, d.leafToInternal, numNodes,
                                                              d.numInternalNodes);
-    getLevelRange<<<maxTreeLevel<KeyType>{} + 2, 1>>>(d.prefixes, numNodes, d.d_levelRange);
-    memcpyD2H(d.d_levelRange, maxTreeLevel<KeyType>{} + 2, d.levelRange);
+    getLevelRange<<<maxTreeLevel<KeyType>{} + 2, 1, 0, stream>>>(d.prefixes, numNodes, d.d_levelRange);
+    checkGpuErrors(cudaMemcpyAsync(d.levelRange, d.d_levelRange, (maxTreeLevel<KeyType>{} + 2) * sizeof(TreeNodeIndex),
+                                   cudaMemcpyDeviceToHost, stream));
+    checkGpuErrors(cudaStreamSynchronize(stream));
 
-    thrust::fill(thrust::device, d.childOffsets, d.childOffsets + numNodes, 0);
+    thrust::fill(devicePar(stream), d.childOffsets, d.childOffsets + numNodes, 0);
     if (d.numInternalNodes)
     {
-        linkTree<<<iceil(d.numInternalNodes, numThreads), numThreads>>>(
+        linkTree<<<iceil(d.numInternalNodes, numThreads), numThreads, 0, stream>>>(
             d.prefixes, d.numInternalNodes, d.leafToInternal, d.d_levelRange, d.childOffsets, d.parents);
     }
 }
 
 template void
-buildOctreeGpu(const uint32_t*, OctreeView<uint32_t>, std::span<uint32_t>, std::span<TreeNodeIndex>, std::span<char>);
+buildOctreeGpu(const uint32_t*, OctreeView<uint32_t>, std::span<uint32_t>, std::span<TreeNodeIndex>, std::span<char>, cudaStream_t);
 template void
-buildOctreeGpu(const uint64_t*, OctreeView<uint64_t>, std::span<uint64_t>, std::span<TreeNodeIndex>, std::span<char>);
+buildOctreeGpu(const uint64_t*, OctreeView<uint64_t>, std::span<uint64_t>, std::span<TreeNodeIndex>, std::span<char>, cudaStream_t);
 
 template<class KeyType>
-void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d)
+void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d, cudaStream_t stream)
 {
     KeyType* keyBuf;
     TreeNodeIndex* valueBuf;
@@ -180,15 +184,15 @@ void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d)
     checkGpuErrors(cudaMalloc(&valueBuf, sizeof(TreeNodeIndex) * d.numNodes));
     checkGpuErrors(cudaMalloc(&cubTmp, tmpStorage));
 
-    buildOctreeGpu(cstoneTree, d, {keyBuf, size_t(d.numNodes)}, {valueBuf, size_t(d.numNodes)}, {cubTmp, tmpStorage});
+    buildOctreeGpu(cstoneTree, d, {keyBuf, size_t(d.numNodes)}, {valueBuf, size_t(d.numNodes)}, {cubTmp, tmpStorage}, stream);
 
     checkGpuErrors(cudaFree(keyBuf));
     checkGpuErrors(cudaFree(valueBuf));
     checkGpuErrors(cudaFree(cubTmp));
 }
 
-template void buildOctreeGpu(const uint32_t*, OctreeView<uint32_t>);
-template void buildOctreeGpu(const uint64_t*, OctreeView<uint64_t>);
+template void buildOctreeGpu(const uint32_t*, OctreeView<uint32_t>, cudaStream_t);
+template void buildOctreeGpu(const uint64_t*, OctreeView<uint64_t>, cudaStream_t);
 
 __global__ void upsweepSumKernel(TreeNodeIndex firstCell,
                                  TreeNodeIndex lastCell,
@@ -206,7 +210,8 @@ __global__ void upsweepSumKernel(TreeNodeIndex firstCell,
 void upsweepSumGpu(int numLevels,
                    const TreeNodeIndex* levelRange,
                    const TreeNodeIndex* childOffsets,
-                   LocalIndex* nodeCounts)
+                   LocalIndex* nodeCounts,
+                   cudaStream_t stream)
 {
     constexpr int numThreads = 128;
 
@@ -216,8 +221,8 @@ void upsweepSumGpu(int numLevels,
         int numBlocks     = (numCellsLevel - 1) / numThreads + 1;
         if (numCellsLevel)
         {
-            upsweepSumKernel<<<numBlocks, numThreads>>>(levelRange[level], levelRange[level + 1], childOffsets,
-                                                        nodeCounts);
+            upsweepSumKernel<<<numBlocks, numThreads, 0, stream>>>(levelRange[level], levelRange[level + 1], childOffsets,
+                                                         nodeCounts);
         }
     }
 }
@@ -239,24 +244,27 @@ void locateNodesGpu(const KeyType* k1,
                     const KeyType* k2,
                     const KeyType* nodeKeys,
                     const TreeNodeIndex* lvlRange,
-                    TreeNodeIndex* indices)
+                    TreeNodeIndex* indices,
+                    cudaStream_t stream)
 {
     int numThreads = 256;
     int numBlocks  = iceil(k2 - k1 - 1, numThreads);
     if (numBlocks == 0) { return; }
-    locateNodesKernel<<<numBlocks, numThreads>>>(k1, k2, nodeKeys, lvlRange, indices);
+    locateNodesKernel<<<numBlocks, numThreads, 0, stream>>>(k1, k2, nodeKeys, lvlRange, indices);
 }
 
 template void locateNodesGpu(const uint32_t* k1,
                              const uint32_t* k2,
                              const uint32_t* nodeKeys,
                              const TreeNodeIndex* lvlRange,
-                             TreeNodeIndex* indices);
+                             TreeNodeIndex* indices,
+                             cudaStream_t);
 template void locateNodesGpu(const uint64_t* k1,
                              const uint64_t* k2,
                              const uint64_t* nodeKeys,
                              const TreeNodeIndex* lvlRange,
-                             TreeNodeIndex* indices);
+                             TreeNodeIndex* indices,
+                             cudaStream_t);
 
 template<class KeyType>
 __global__ void locateNodesKernel(const KeyType* k1,
@@ -276,12 +284,13 @@ void locateNodesGpu(const KeyType* k1,
                     size_t n,
                     const KeyType* nodeKeys,
                     const TreeNodeIndex* lvlRange,
-                    TreeNodeIndex* indices)
+                    TreeNodeIndex* indices,
+                    cudaStream_t stream)
 {
     int numThreads = 256;
     int numBlocks  = iceil(n, numThreads);
     if (numBlocks == 0) { return; }
-    locateNodesKernel<<<numBlocks, numThreads>>>(k1, map, n, nodeKeys, lvlRange, indices);
+    locateNodesKernel<<<numBlocks, numThreads, 0, stream>>>(k1, map, n, nodeKeys, lvlRange, indices);
 }
 
 template void locateNodesGpu(const uint32_t* k1,
@@ -289,12 +298,14 @@ template void locateNodesGpu(const uint32_t* k1,
                              size_t n,
                              const uint32_t* nodeKeys,
                              const TreeNodeIndex* lvlRange,
-                             TreeNodeIndex* indices);
+                             TreeNodeIndex* indices,
+                             cudaStream_t);
 template void locateNodesGpu(const uint64_t* k1,
                              const TreeNodeIndex* map,
                              size_t n,
                              const uint64_t* nodeKeys,
                              const TreeNodeIndex* lvlRange,
-                             TreeNodeIndex* indices);
+                             TreeNodeIndex* indices,
+                             cudaStream_t);
 
 } // namespace cstone

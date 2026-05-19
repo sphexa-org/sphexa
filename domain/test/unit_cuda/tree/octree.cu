@@ -27,10 +27,14 @@ void compareAgainstCpu(const std::vector<KeyType>& tree)
     // upload cornerstone tree to device
     DeviceVector<KeyType> d_leaves = tree;
 
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
     OctreeData<KeyType, GpuTag> gpuTree;
     gpuTree.resize(nNodes(tree));
 
-    buildOctreeGpu(rawPtr(d_leaves), gpuTree.data());
+    buildOctreeGpu(rawPtr(d_leaves), gpuTree.data(), stream);
+    cudaStreamSynchronize(stream);
+    cudaStreamDestroy(stream);
 
     Octree<KeyType> cpuTree;
     cpuTree.update(tree.data(), nNodes(tree));

@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include "cstone/cuda/stream.hpp"
 #include "cstone/cuda/device_vector.h"
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/groups.hpp"
@@ -28,7 +29,8 @@ namespace cstone
  * @param[in]  groupSize  number of particles per group
  * @param[out] groups     groups with fixed size @p groupSize
  */
-void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<GpuTag>& groups);
+void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<GpuTag>& groups,
+                        cudaStream_t stream = 0);
 
 /*!* @brief Compute groups of particles with a maximum size and distance between consecutive particles limited
  *
@@ -70,6 +72,7 @@ extern void computeGroupSplits(LocalIndex first,
                                unsigned groupSize,
                                float tolFactor,
                                DeviceVector<LocalIndex>& numSplitsPerGroup,
-                               DeviceVector<LocalIndex>& groups);
+                               DeviceVector<LocalIndex>& groups,
+                               cudaStream_t stream = 0);
 
 } // namespace cstone

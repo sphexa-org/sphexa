@@ -44,11 +44,14 @@ TEST(Macs, limitSource4x4_matchCPU)
     std::vector<KeyType> h_prefixes = toHost(fullTree.prefixes);
     std::vector<SourceCenterType<T>> h_centers(ov.numNodes);
     geoMacSpheres<KeyType>(h_prefixes, h_centers.data(), invTheta, box);
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
     thrust::device_vector<uint8_t> macs(ov.numNodes, 0);
     thrust::device_vector<SourceCenterType<T>> centers = h_centers;
 
     markMacsGpu(ov.prefixes, ov.childOffsets, ov.parents, rawPtr(centers), box, rawPtr(leaves) + 0, 32, true,
-                rawPtr(macs));
+                rawPtr(macs), stream);
+    cudaStreamSynchronize(stream);
     thrust::host_vector<uint8_t> h_macs = macs;
 
     thrust::host_vector<uint8_t> macRef = std::vector<uint8_t>{1, 0, 0, 0, 0, 1, 1, 1, 1};
@@ -57,8 +60,10 @@ TEST(Macs, limitSource4x4_matchCPU)
 
     thrust::fill(macs.begin(), macs.end(), 0);
     markMacsGpu(ov.prefixes, ov.childOffsets, ov.parents, rawPtr(centers), box, rawPtr(leaves) + 0, 32, false,
-                rawPtr(macs));
+                rawPtr(macs), stream);
+    cudaStreamSynchronize(stream);
     h_macs      = macs;
     int numMacs = std::accumulate(h_macs.begin(), h_macs.end(), 0);
     EXPECT_EQ(numMacs, 5 + 16);
+    cudaStreamDestroy(stream);
 }

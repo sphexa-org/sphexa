@@ -19,6 +19,7 @@
 
 #include <span>
 
+#include "cstone/cuda/stream.hpp"
 #include "csarray.hpp"
 
 namespace cstone
@@ -41,7 +42,8 @@ extern void computeNodeCountsGpu(const KeyType* tree,
                                  TreeNodeIndex numNodes,
                                  std::span<const KeyType> keys,
                                  unsigned maxCount,
-                                 bool useCountsAsGuess = false);
+                                 bool useCountsAsGuess = false,
+                                 cudaStream_t stream = 0);
 
 /*! @brief split or fuse octree nodes based on node counts relative to bucketSize
  *
@@ -55,19 +57,23 @@ extern void computeNodeCountsGpu(const KeyType* tree,
  */
 template<class KeyType>
 extern TreeNodeIndex computeNodeOpsGpu(
-    const KeyType* tree, TreeNodeIndex numNodes, const unsigned* counts, unsigned bucketSize, TreeNodeIndex* nodeOps);
+    const KeyType* tree, TreeNodeIndex numNodes, const unsigned* counts, unsigned bucketSize, TreeNodeIndex* nodeOps,
+    cudaStream_t stream = 0);
 
 template<class KeyType>
 extern bool rebalanceTreeGpu(const KeyType* tree,
                              TreeNodeIndex numNodes,
                              TreeNodeIndex newNumNodes,
                              const TreeNodeIndex* nodeOps,
-                             KeyType* newTree);
+                             KeyType* newTree,
+                             cudaStream_t stream = 0);
 
 template<class KeyType>
-extern void countSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps);
+extern void countSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps,
+                            cudaStream_t stream = 0);
 
 template<class KeyType>
-extern void fillSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree);
+extern void fillSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree,
+                           cudaStream_t stream = 0);
 
 } // namespace cstone

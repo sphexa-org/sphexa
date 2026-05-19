@@ -47,6 +47,7 @@
 #define cudaMemcpyDeviceToDevice hipMemcpyDeviceToDevice
 #define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define cudaMemcpyFromSymbol hipMemcpyFromSymbol
+#define cudaMemcpyFromSymbolAsync hipMemcpyFromSymbol // hipMemcpyFromSymbolAsync does not exist
 #define cudaMemcpyHostToDevice hipMemcpyHostToDevice
 #define cudaMemcpyToSymbol hipMemcpyToSymbol
 #define cudaMemcpyToSymbolAsync hipMemcpyToSymbol // hipMemcpyToSymbolAsync does not exist

@@ -18,6 +18,7 @@
 #include <thrust/reduce.h>
 
 #include "cstone/cuda/errorcheck.cuh"
+#include "cstone/cuda/thrust_util.cuh"
 #include "cstone/focus/rebalance.hpp"
 #include "cstone/focus/rebalance_gpu.h"
 #include "cstone/primitives/math.hpp"
@@ -55,10 +56,11 @@ void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
                                    KeyType focusEnd,
                                    unsigned bucketSize,
                                    TreeNodeIndex* nodeOps,
-                                   TreeNodeIndex numNodes)
+                                   TreeNodeIndex numNodes,
+                                   cudaStream_t stream)
 {
     constexpr unsigned numThreads = 256;
-    rebalanceDecisionEssentialKernel<<<iceil(numNodes, numThreads), numThreads>>>(
+    rebalanceDecisionEssentialKernel<<<iceil(numNodes, numThreads), numThreads, 0, stream>>>(
         prefixes, childOffsets, parents, counts, macs, focusStart, focusEnd, bucketSize, nodeOps, numNodes);
 }
 
@@ -66,7 +68,8 @@ void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
     template void rebalanceDecisionEssentialGpu(const KeyType* prefixes, const TreeNodeIndex* childOffsets,            \
                                                 const TreeNodeIndex* parents, const unsigned* counts,                  \
                                                 const uint8_t* macs, KeyType focusStart, KeyType focusEnd,             \
-                                                unsigned bucketSize, TreeNodeIndex* nodeOps, TreeNodeIndex numNodes)
+                                                unsigned bucketSize, TreeNodeIndex* nodeOps, TreeNodeIndex numNodes,   \
+                                                cudaStream_t)
 REBA_DEC_ESS_GPU(uint32_t);
 REBA_DEC_ESS_GPU(uint64_t);
 
@@ -91,16 +94,18 @@ void macRefineDecisionGpu(const KeyType* prefixes,
                           const TreeNodeIndex* l2i,
                           TreeNodeIndex numLeafNodes,
                           TreeIndexPair focus,
-                          TreeNodeIndex* nodeOps)
+                          TreeNodeIndex* nodeOps,
+                          cudaStream_t stream)
 {
     constexpr unsigned numThreads = 256;
-    macRefineDecisionKernel<<<iceil(numLeafNodes, numThreads), numThreads>>>(prefixes, macs, l2i, numLeafNodes,
+    macRefineDecisionKernel<<<iceil(numLeafNodes, numThreads), numThreads, 0, stream>>>(prefixes, macs, l2i, numLeafNodes,
                                                                              {focus.start(), focus.end()}, nodeOps);
 }
 
 #define MAC_REF_DEC_GPU(KeyType)                                                                                       \
     template void macRefineDecisionGpu(const KeyType* prefixes, const uint8_t* macs, const TreeNodeIndex* l2i,         \
-                                       TreeNodeIndex numLeafNodes, TreeIndexPair focus, TreeNodeIndex* nodeOps)
+                                       TreeNodeIndex numLeafNodes, TreeIndexPair focus, TreeNodeIndex* nodeOps,        \
+                                       cudaStream_t)
 MAC_REF_DEC_GPU(uint32_t);
 MAC_REF_DEC_GPU(uint64_t);
 
@@ -138,21 +143,23 @@ template<class KeyType>
 bool protectAncestorsGpu(const KeyType* prefixes,
                          const TreeNodeIndex* parents,
                          TreeNodeIndex* nodeOps,
-                         TreeNodeIndex numNodes)
+                         TreeNodeIndex numNodes,
+                         cudaStream_t stream)
 {
-    resetNodeOpSum<<<1, 1>>>();
+    resetNodeOpSum<<<1, 1, 0, stream>>>();
 
     constexpr unsigned numThreads = 256;
-    protectAncestorsKernel<<<iceil(numNodes, numThreads), numThreads>>>(prefixes, parents, nodeOps, numNodes);
+    protectAncestorsKernel<<<iceil(numNodes, numThreads), numThreads, 0, stream>>>(prefixes, parents, nodeOps, numNodes);
 
     int numNodesModify;
-    checkGpuErrors(cudaMemcpyFromSymbol(&numNodesModify, GPU_SYMBOL(nodeOpSum), sizeof(int)));
+    checkGpuErrors(cudaMemcpyFromSymbolAsync(&numNodesModify, GPU_SYMBOL(nodeOpSum), sizeof(int), 0, cudaMemcpyDeviceToHost, stream));
+    checkGpuErrors(cudaStreamSynchronize(stream));
 
     return numNodesModify == 0;
 }
 
-template bool protectAncestorsGpu(const uint32_t*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex);
-template bool protectAncestorsGpu(const uint64_t*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex);
+template bool protectAncestorsGpu(const uint32_t*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex, cudaStream_t);
+template bool protectAncestorsGpu(const uint64_t*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex, cudaStream_t);
 
 __device__ int enforceKeyStatus_device;
 __global__ void resetEnforceKeyStatus() { enforceKeyStatus_device = static_cast<int>(ResolutionStatus::converged); }
@@ -175,23 +182,25 @@ ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
                                 const KeyType* nodeKeys,
                                 const TreeNodeIndex* childOffsets,
                                 const TreeNodeIndex* parents,
-                                TreeNodeIndex* nodeOps)
+                                TreeNodeIndex* nodeOps,
+                                cudaStream_t stream)
 {
-    resetEnforceKeyStatus<<<1, 1>>>();
+    resetEnforceKeyStatus<<<1, 1, 0, stream>>>();
     if (numForcedKeys)
     {
-        enforceKeysKernel<<<numForcedKeys, 1>>>(forcedKeys, nodeKeys, childOffsets, parents, nodeOps);
+        enforceKeysKernel<<<numForcedKeys, 1, 0, stream>>>(forcedKeys, nodeKeys, childOffsets, parents, nodeOps);
     }
 
     int status;
-    checkGpuErrors(cudaMemcpyFromSymbol(&status, GPU_SYMBOL(enforceKeyStatus_device), sizeof(ResolutionStatus)));
+    checkGpuErrors(cudaMemcpyFromSymbolAsync(&status, GPU_SYMBOL(enforceKeyStatus_device), sizeof(ResolutionStatus), 0, cudaMemcpyDeviceToHost, stream));
+    checkGpuErrors(cudaStreamSynchronize(stream));
     return static_cast<ResolutionStatus>(status);
 }
 
 #define ENFORCE_KEYS_GPU(KeyType)                                                                                      \
     template ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys, TreeNodeIndex numForcedKeys,                   \
                                              const KeyType* nodeKeys, const TreeNodeIndex* childOffsets,               \
-                                             const TreeNodeIndex* parents, TreeNodeIndex* nodeOps)
+                                             const TreeNodeIndex* parents, TreeNodeIndex* nodeOps, cudaStream_t)
 ENFORCE_KEYS_GPU(uint32_t);
 ENFORCE_KEYS_GPU(uint64_t);
 
@@ -223,19 +232,20 @@ void rangeCountGpu(std::span<const KeyType> leaves,
                    std::span<const unsigned> counts,
                    std::span<const KeyType> leavesFocus,
                    std::span<const TreeNodeIndex> leavesFocusIdx,
-                   std::span<unsigned> countsFocus)
+                   std::span<unsigned> countsFocus,
+                   cudaStream_t stream)
 {
     constexpr unsigned numThreads = 64;
     unsigned numBlocks            = iceil(leavesFocusIdx.size(), numThreads);
     if (numBlocks == 0) { return; }
-    rangeCountKernel<<<numBlocks, numThreads>>>(leaves.data(), leaves.size(), counts.data(), leavesFocus.data(),
-                                                leavesFocusIdx.data(), leavesFocusIdx.size(), countsFocus.data());
+    rangeCountKernel<<<numBlocks, numThreads, 0, stream>>>(leaves.data(), leaves.size(), counts.data(), leavesFocus.data(),
+                                                  leavesFocusIdx.data(), leavesFocusIdx.size(), countsFocus.data());
 }
 
 #define RANGE_COUNT_GPU(KeyType)                                                                                       \
     template void rangeCountGpu(std::span<const KeyType> leaves, std::span<const unsigned> counts,                     \
                                 std::span<const KeyType> leavesFocus, std::span<const TreeNodeIndex> leavesFocusIdx,   \
-                                std::span<unsigned> countsFocus)
+                                std::span<unsigned> countsFocus, cudaStream_t)
 RANGE_COUNT_GPU(uint32_t);
 RANGE_COUNT_GPU(uint64_t);
 

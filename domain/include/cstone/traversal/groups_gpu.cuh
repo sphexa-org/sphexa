@@ -15,6 +15,7 @@
  * Separate header to allow inclusion in library as well as in unit testing of device-side functions
  */
 
+#include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/primitives/warpscan.cuh"

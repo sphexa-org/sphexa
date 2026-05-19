@@ -38,7 +38,12 @@ TEST(Halos, gatherRanges)
 
     thrust::device_vector<int> buffer = std::vector<int>(totalCount);
 
-    gatherRanges(rawPtr(rangeScan), rawPtr(rangeOffsets), rangeScan.size(), rawPtr(src), rawPtr(buffer), totalCount);
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+    gatherRanges(rawPtr(rangeScan), rawPtr(rangeOffsets), rangeScan.size(), rawPtr(src), rawPtr(buffer), totalCount,
+                 stream);
+    cudaStreamSynchronize(stream);
+    cudaStreamDestroy(stream);
 
     thrust::host_vector<int> h_buffer = buffer;
     thrust::host_vector<int> ref      = std::vector<int>{4, 5, 6, 7, 12, 13, 14, 22, 23, 24};

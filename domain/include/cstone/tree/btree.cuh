@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/primitives/math.hpp"
 #include "btree.hpp"
 
@@ -30,10 +31,11 @@ __global__ void createBinaryTreeKernel(const KeyType* cstree, TreeNodeIndex numN
 
 //! @brief convenience kernel wrapper
 template<class KeyType>
-void createBinaryTreeGpu(const KeyType* cstree, TreeNodeIndex numNodes, BinaryNode<KeyType>* binaryTree)
+void createBinaryTreeGpu(const KeyType* cstree, TreeNodeIndex numNodes, BinaryNode<KeyType>* binaryTree,
+                         cudaStream_t stream = 0)
 {
     constexpr int numThreads = 256;
-    createBinaryTreeKernel<<<iceil(numNodes, numThreads), numThreads>>>(cstree, numNodes, binaryTree);
+    createBinaryTreeKernel<<<iceil(numNodes, numThreads), numThreads, 0, stream>>>(cstree, numNodes, binaryTree);
 }
 
 } // namespace cstone

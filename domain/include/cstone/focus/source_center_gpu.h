@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include "cstone/cuda/stream.hpp"
 #include "cstone/focus/source_center.hpp"
 #include "cstone/tree/definitions.h"
 
@@ -45,7 +46,8 @@ extern void computeBoundingBoxGpu(const Tc* x,
                                   TreeNodeIndex last,
                                   Th scale,
                                   Vec3<Tc>* centers,
-                                  Vec3<Tc>* sizes);
+                                  Vec3<Tc>* sizes,
+                                  cudaStream_t stream = 0);
 
 /*! @brief compute mass centers of leaf cells
  *
@@ -66,7 +68,8 @@ extern void computeLeafSourceCenterGpu(const Tc* x,
                                        const TreeNodeIndex* leafToInternal,
                                        TreeNodeIndex numLeaves,
                                        const LocalIndex* layout,
-                                       Vec4<Tf>* centers);
+                                       Vec4<Tf>* centers,
+                                       cudaStream_t stream = 0);
 
 /*! @brief compute center of gravity for internal nodes with an upsweep
  *
@@ -80,23 +83,27 @@ template<class T>
 extern void upsweepCentersGpu(int numLevels,
                               const TreeNodeIndex* levelRange,
                               const TreeNodeIndex* childOffsets,
-                              SourceCenterType<T>* centers);
+                              SourceCenterType<T>* centers,
+                              cudaStream_t stream = 0);
 
 //! @brief compute geometric node center and sizes based on node SFC keys
 template<class KeyType, class T>
 extern void computeGeoCentersGpu(
-    const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box);
+    const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box,
+    cudaStream_t stream = 0);
 
 //! @brief set @p centers to geometric node centers with Mac radius l * invTheta
 template<class KeyType, class T>
 extern void geoMacSpheresGpu(
-    const KeyType* prefixes, TreeNodeIndex numNodes, SourceCenterType<T>* centers, float invTheta, const Box<T>& box);
+    const KeyType* prefixes, TreeNodeIndex numNodes, SourceCenterType<T>* centers, float invTheta, const Box<T>& box,
+    cudaStream_t stream = 0);
 
 template<class KeyType, class T>
 extern void
-setMacGpu(const KeyType* prefixes, TreeNodeIndex numNodes, Vec4<T>* macSpheres, float invTheta, const Box<T>& box);
+setMacGpu(const KeyType* prefixes, TreeNodeIndex numNodes, Vec4<T>* macSpheres, float invTheta, const Box<T>& box,
+          cudaStream_t stream = 0);
 
 template<class T>
-extern void moveCenters(const Vec3<T>* src, TreeNodeIndex numNodes, Vec4<T>* dest);
+extern void moveCenters(const Vec3<T>* src, TreeNodeIndex numNodes, Vec4<T>* dest, cudaStream_t stream = 0);
 
 } // namespace cstone

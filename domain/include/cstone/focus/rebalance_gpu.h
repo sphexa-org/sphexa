@@ -17,6 +17,7 @@
 
 #include <span>
 
+#include "cstone/cuda/stream.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/domain/index_ranges.hpp"
 
@@ -33,7 +34,8 @@ extern void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
                                           KeyType focusEnd,
                                           unsigned bucketSize,
                                           TreeNodeIndex* nodeOps,
-                                          TreeNodeIndex numNodes);
+                                          TreeNodeIndex numNodes,
+                                          cudaStream_t stream = 0);
 
 /*! @brief Take decision how to refine nodes based on Macs
  *
@@ -50,10 +52,11 @@ extern void macRefineDecisionGpu(const KeyType* prefixes,
                                  const TreeNodeIndex* l2i,
                                  TreeNodeIndex numLeafNodes,
                                  TreeIndexPair focus,
-                                 TreeNodeIndex* nodeOps);
+                                 TreeNodeIndex* nodeOps,
+                                 cudaStream_t stream = 0);
 
 template<class KeyType>
-extern bool protectAncestorsGpu(const KeyType*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex);
+extern bool protectAncestorsGpu(const KeyType*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex, cudaStream_t stream = 0);
 
 template<class KeyType>
 extern ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
@@ -61,7 +64,8 @@ extern ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
                                        const KeyType* nodeKeys,
                                        const TreeNodeIndex* childOffsets,
                                        const TreeNodeIndex* parents,
-                                       TreeNodeIndex* nodeOps);
+                                       TreeNodeIndex* nodeOps,
+                                       cudaStream_t stream = 0);
 
 //! @brief see CPU version
 template<class KeyType>
@@ -69,6 +73,7 @@ extern void rangeCountGpu(std::span<const KeyType> leaves,
                           std::span<const unsigned> counts,
                           std::span<const KeyType> leavesFocus,
                           std::span<const TreeNodeIndex> leavesFocusIdx,
-                          std::span<unsigned> countsFocus);
+                          std::span<unsigned> countsFocus,
+                          cudaStream_t stream = 0);
 
 } // namespace cstone

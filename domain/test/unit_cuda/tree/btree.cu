@@ -31,9 +31,13 @@ void internal4x4x4PrefixTest()
     // a tree with 4 subdivisions along each dimension, 64 nodes
     thrust::device_vector<I> tree = makeUniformNLevelTree<I>(64, 1);
 
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
     thrust::device_vector<BinaryNode<I>> d_internalTree(nNodes(tree));
     createBinaryTreeGpu(thrust::raw_pointer_cast(tree.data()), nNodes(tree),
-                        thrust::raw_pointer_cast(d_internalTree.data()));
+                        thrust::raw_pointer_cast(d_internalTree.data()), stream);
+    cudaStreamSynchronize(stream);
+    cudaStreamDestroy(stream);
 
     thrust::host_vector<BinaryNode<I>> internalTree = d_internalTree;
 

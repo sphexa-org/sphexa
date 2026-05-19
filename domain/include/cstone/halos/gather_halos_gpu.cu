@@ -48,33 +48,34 @@ void gatherRanges(const IndexType* rangeScan,
                   int numRanges,
                   const T* src,
                   T* buffer,
-                  size_t bufferSize)
+                  size_t bufferSize,
+                  cudaStream_t stream)
 {
     int numThreads = 256;
     int numBlocks  = iceil(bufferSize, numThreads);
     if (numBlocks == 0) { return; }
-    gatherRangesKernel<<<numBlocks, numThreads>>>(rangeScan, rangeOffsets, numRanges, src, buffer, bufferSize);
+    gatherRangesKernel<<<numBlocks, numThreads, 0, stream>>>(rangeScan, rangeOffsets, numRanges, src, buffer, bufferSize);
 }
 
-template void gatherRanges(const unsigned*, const unsigned*, int, const int*, int*, size_t);
-template void gatherRanges(const uint64_t*, const uint64_t*, int, const int*, int*, size_t);
+template void gatherRanges(const unsigned*, const unsigned*, int, const int*, int*, size_t, cudaStream_t);
+template void gatherRanges(const uint64_t*, const uint64_t*, int, const int*, int*, size_t, cudaStream_t);
 
 template void
-gatherRanges(const unsigned*, const unsigned*, int, const util::array<float, 1>*, util::array<float, 1>*, size_t);
+gatherRanges(const unsigned*, const unsigned*, int, const util::array<float, 1>*, util::array<float, 1>*, size_t, cudaStream_t);
 template void
-gatherRanges(const unsigned*, const unsigned*, int, const util::array<float, 2>*, util::array<float, 2>*, size_t);
+gatherRanges(const unsigned*, const unsigned*, int, const util::array<float, 2>*, util::array<float, 2>*, size_t, cudaStream_t);
 template void
-gatherRanges(const unsigned*, const unsigned*, int, const util::array<float, 3>*, util::array<float, 3>*, size_t);
+gatherRanges(const unsigned*, const unsigned*, int, const util::array<float, 3>*, util::array<float, 3>*, size_t, cudaStream_t);
 template void
-gatherRanges(const unsigned*, const unsigned*, int, const util::array<float, 4>*, util::array<float, 4>*, size_t);
+gatherRanges(const unsigned*, const unsigned*, int, const util::array<float, 4>*, util::array<float, 4>*, size_t, cudaStream_t);
 
 template void
-gatherRanges(const uint64_t*, const uint64_t*, int, const util::array<float, 1>*, util::array<float, 1>*, size_t);
+gatherRanges(const uint64_t*, const uint64_t*, int, const util::array<float, 1>*, util::array<float, 1>*, size_t, cudaStream_t);
 template void
-gatherRanges(const uint64_t*, const uint64_t*, int, const util::array<float, 2>*, util::array<float, 2>*, size_t);
+gatherRanges(const uint64_t*, const uint64_t*, int, const util::array<float, 2>*, util::array<float, 2>*, size_t, cudaStream_t);
 template void
-gatherRanges(const uint64_t*, const uint64_t*, int, const util::array<float, 3>*, util::array<float, 3>*, size_t);
+gatherRanges(const uint64_t*, const uint64_t*, int, const util::array<float, 3>*, util::array<float, 3>*, size_t, cudaStream_t);
 template void
-gatherRanges(const uint64_t*, const uint64_t*, int, const util::array<float, 4>*, util::array<float, 4>*, size_t);
+gatherRanges(const uint64_t*, const uint64_t*, int, const util::array<float, 4>*, util::array<float, 4>*, size_t, cudaStream_t);
 
 } // namespace cstone

@@ -15,6 +15,8 @@
 
 #pragma once
 
+#include "cstone/cuda/stream.hpp"
+
 namespace cstone
 {
 
@@ -24,6 +26,7 @@ extern void gatherRanges(const IndexType* rangeScan,
                          int numRanges,
                          const T* src,
                          T* buffer,
-                         size_t bufferSize);
+                         size_t bufferSize,
+                         cudaStream_t stream = 0);
 
 } // namespace cstone

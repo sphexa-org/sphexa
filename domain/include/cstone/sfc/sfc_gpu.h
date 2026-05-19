@@ -15,18 +15,21 @@
 
 #pragma once
 
+#include "cstone/cuda/stream.hpp"
 #include "cstone/sfc/sfc.hpp"
 
 namespace cstone
 {
 
 template<class KeyType, class T>
-extern void computeSfcKeysGpu(const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box);
+extern void computeSfcKeysGpu(const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box,
+                              cudaStream_t stream = 0);
 
 template<bool useGpu, class KeyType, class T>
-void computeSfcKeys(const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box)
+void computeSfcKeys(const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box,
+                    cudaStream_t stream = 0)
 {
-    if constexpr (useGpu) { computeSfcKeysGpu(x, y, z, keys, numKeys, box); }
+    if constexpr (useGpu) { computeSfcKeysGpu(x, y, z, keys, numKeys, box, stream); }
     else { computeSfcKeys(x, y, z, keys, numKeys, box); }
 }
 

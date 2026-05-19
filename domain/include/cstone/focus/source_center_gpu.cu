@@ -79,7 +79,8 @@ void computeBoundingBoxGpu(const Tc* x,
                            TreeNodeIndex last,
                            Th scale,
                            Vec3<Tc>* searchCenters,
-                           Vec3<Tc>* searchSizes)
+                           Vec3<Tc>* searchSizes,
+                           cudaStream_t stream)
 {
     constexpr int threadsPerLeaf = 8;
     unsigned numThreads          = 256;
@@ -87,13 +88,13 @@ void computeBoundingBoxGpu(const Tc* x,
 
     if (numBlocks == 0) { return; }
     computeBoundingBoxKernel<threadsPerLeaf>
-        <<<numBlocks, numThreads>>>(x, y, z, h, layout, first, last, scale, searchCenters, searchSizes);
+        <<<numBlocks, numThreads, 0, stream>>>(x, y, z, h, layout, first, last, scale, searchCenters, searchSizes);
 }
 
 #define COMPUTE_BOUNDING_BOX_GPU(Tc, Th)                                                                               \
     template void computeBoundingBoxGpu(const Tc* x, const Tc* y, const Tc* z, const Th* h, const LocalIndex* layout,  \
                                         TreeNodeIndex first, TreeNodeIndex last, Th scale, Vec3<Tc>* searchCenters,    \
-                                        Vec3<Tc>* searchSizes);
+                                        Vec3<Tc>* searchSizes, cudaStream_t);
 
 COMPUTE_BOUNDING_BOX_GPU(double, double);
 COMPUTE_BOUNDING_BOX_GPU(double, float);
@@ -148,7 +149,8 @@ void computeLeafSourceCenterGpu(const Tc* x,
                                 const TreeNodeIndex* leafToInternal,
                                 TreeNodeIndex numLeaves,
                                 const LocalIndex* layout,
-                                Vec4<Tf>* centers)
+                                Vec4<Tf>* centers,
+                                cudaStream_t stream)
 {
     constexpr int threadsPerLeaf = 8;
     unsigned numThreads          = 256;
@@ -156,12 +158,12 @@ void computeLeafSourceCenterGpu(const Tc* x,
 
     if (numBlocks == 0) { return; }
     computeLeafSourceCenterKernel<threadsPerLeaf>
-        <<<numBlocks, numThreads>>>(x, y, z, m, leafToInternal, numLeaves, layout, centers);
+        <<<numBlocks, numThreads, 0, stream>>>(x, y, z, m, leafToInternal, numLeaves, layout, centers);
 }
 
 #define COMPUTE_LEAF_SOURCE_CENTER_GPU(Tc, Tm, Tf)                                                                     \
     template void computeLeafSourceCenterGpu(const Tc*, const Tc*, const Tc*, const Tm*, const TreeNodeIndex*,         \
-                                             TreeNodeIndex, const LocalIndex*, Vec4<Tf>*);
+                                             TreeNodeIndex, const LocalIndex*, Vec4<Tf>*, cudaStream_t);
 
 COMPUTE_LEAF_SOURCE_CENTER_GPU(double, double, double);
 COMPUTE_LEAF_SOURCE_CENTER_GPU(double, float, double);
@@ -185,7 +187,8 @@ template<class T>
 void upsweepCentersGpu(int numLevels,
                        const TreeNodeIndex* levelRange,
                        const TreeNodeIndex* childOffsets,
-                       SourceCenterType<T>* centers)
+                       SourceCenterType<T>* centers,
+                       cudaStream_t stream)
 {
     constexpr int numThreads = 256;
 
@@ -195,14 +198,14 @@ void upsweepCentersGpu(int numLevels,
         int numBlocks     = (numCellsLevel - 1) / numThreads + 1;
         if (numCellsLevel)
         {
-            upsweepCentersKernel<<<numBlocks, numThreads>>>(levelRange[level], levelRange[level + 1], childOffsets,
-                                                            centers);
+            upsweepCentersKernel<<<numBlocks, numThreads, 0, stream>>>(levelRange[level], levelRange[level + 1], childOffsets,
+                                                             centers);
         }
     }
 }
 
-template void upsweepCentersGpu(int, const TreeNodeIndex*, const TreeNodeIndex*, SourceCenterType<float>*);
-template void upsweepCentersGpu(int, const TreeNodeIndex*, const TreeNodeIndex*, SourceCenterType<double>*);
+template void upsweepCentersGpu(int, const TreeNodeIndex*, const TreeNodeIndex*, SourceCenterType<float>*, cudaStream_t);
+template void upsweepCentersGpu(int, const TreeNodeIndex*, const TreeNodeIndex*, SourceCenterType<double>*, cudaStream_t);
 
 template<class KeyType, class T>
 __global__ void computeGeoCentersKernel(
@@ -220,16 +223,17 @@ __global__ void computeGeoCentersKernel(
 
 template<class KeyType, class T>
 void computeGeoCentersGpu(
-    const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box)
+    const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box,
+    cudaStream_t stream)
 {
     unsigned numThreads = 256;
     unsigned numBlocks  = iceil(numNodes, numThreads);
-    computeGeoCentersKernel<<<numBlocks, numThreads>>>(prefixes, numNodes, centers, sizes, box);
+    computeGeoCentersKernel<<<numBlocks, numThreads, 0, stream>>>(prefixes, numNodes, centers, sizes, box);
 }
 
 #define GEO_CENTERS_GPU(KeyType, T)                                                                                    \
     template void computeGeoCentersGpu(const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers,              \
-                                       Vec3<T>* sizes, const Box<T>& box)
+                                       Vec3<T>* sizes, const Box<T>& box, cudaStream_t)
 GEO_CENTERS_GPU(uint32_t, float);
 GEO_CENTERS_GPU(uint32_t, double);
 GEO_CENTERS_GPU(uint64_t, float);
@@ -247,16 +251,17 @@ __global__ void geoMacSpheresKernel(
 //! @brief set @p centers to geometric node centers with Mac radius l * invTheta
 template<class KeyType, class T>
 void geoMacSpheresGpu(
-    const KeyType* prefixes, TreeNodeIndex numNodes, SourceCenterType<T>* centers, float invTheta, const Box<T>& box)
+    const KeyType* prefixes, TreeNodeIndex numNodes, SourceCenterType<T>* centers, float invTheta, const Box<T>& box,
+    cudaStream_t stream)
 {
     unsigned numThreads = 256;
     unsigned numBlocks  = iceil(numNodes, numThreads);
-    geoMacSpheresKernel<<<numBlocks, numThreads>>>(prefixes, numNodes, centers, invTheta, box);
+    geoMacSpheresKernel<<<numBlocks, numThreads, 0, stream>>>(prefixes, numNodes, centers, invTheta, box);
 }
 
 #define GEO_MAC_SPHERES_GPU(KeyType, T)                                                                                \
     template void geoMacSpheresGpu(const KeyType* prefixes, TreeNodeIndex numNodes, SourceCenterType<T>* centers,      \
-                                   float invTheta, const Box<T>& box)
+                                   float invTheta, const Box<T>& box, cudaStream_t)
 GEO_MAC_SPHERES_GPU(uint32_t, float);
 GEO_MAC_SPHERES_GPU(uint32_t, double);
 GEO_MAC_SPHERES_GPU(uint64_t, float);
@@ -275,16 +280,17 @@ setMacKernel(const KeyType* prefixes, TreeNodeIndex numNodes, Vec4<T>* macSphere
 }
 
 template<class KeyType, class T>
-void setMacGpu(const KeyType* prefixes, TreeNodeIndex numNodes, Vec4<T>* macSpheres, float invTheta, const Box<T>& box)
+void setMacGpu(const KeyType* prefixes, TreeNodeIndex numNodes, Vec4<T>* macSpheres, float invTheta, const Box<T>& box,
+               cudaStream_t stream)
 {
     unsigned numThreads = 256;
     unsigned numBlocks  = iceil(numNodes, numThreads);
-    setMacKernel<<<numBlocks, numThreads>>>(prefixes, numNodes, macSpheres, invTheta, box);
+    setMacKernel<<<numBlocks, numThreads, 0, stream>>>(prefixes, numNodes, macSpheres, invTheta, box);
 }
 
 #define SET_MAC_GPU(KeyType, T)                                                                                        \
     template void setMacGpu(const KeyType* prefixes, TreeNodeIndex numNodes, Vec4<T>* macSpheres, float invTheta,      \
-                            const Box<T>& box)
+                            const Box<T>& box, cudaStream_t)
 
 SET_MAC_GPU(uint32_t, float);
 SET_MAC_GPU(uint64_t, float);
@@ -303,14 +309,14 @@ __global__ void moveCentersKernel(const Vec3<T>* src, TreeNodeIndex numNodes, Ve
 }
 
 template<class T>
-void moveCenters(const Vec3<T>* src, TreeNodeIndex numNodes, Vec4<T>* dest)
+void moveCenters(const Vec3<T>* src, TreeNodeIndex numNodes, Vec4<T>* dest, cudaStream_t stream)
 {
     unsigned numThreads = 256;
     unsigned numBlocks  = iceil(numNodes, numThreads);
-    moveCentersKernel<<<numBlocks, numThreads>>>(src, numNodes, dest);
+    moveCentersKernel<<<numBlocks, numThreads, 0, stream>>>(src, numNodes, dest);
 }
 
-template void moveCenters(const Vec3<double>*, TreeNodeIndex, Vec4<double>*);
-template void moveCenters(const Vec3<float>*, TreeNodeIndex, Vec4<float>*);
+template void moveCenters(const Vec3<double>*, TreeNodeIndex, Vec4<double>*, cudaStream_t);
+template void moveCenters(const Vec3<float>*, TreeNodeIndex, Vec4<float>*, cudaStream_t);
 
 } // namespace cstone

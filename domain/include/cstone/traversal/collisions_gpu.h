@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include "cstone/cuda/stream.hpp"
 #include "cstone/traversal/collisions.hpp"
 
 namespace cstone
@@ -53,7 +54,8 @@ extern void findHalosGpu(const KeyType* prefixes,
                          const Box<T>& box,
                          TreeNodeIndex firstNode,
                          TreeNodeIndex lastNode,
-                         uint8_t* collisionFlags);
+                         uint8_t* collisionFlags,
+                         cudaStream_t stream = 0);
 
 template<class T, class KeyType>
 extern void markMacsGpu(const KeyType* prefixes,
@@ -64,6 +66,7 @@ extern void markMacsGpu(const KeyType* prefixes,
                         const KeyType* focusNodes,
                         TreeNodeIndex numFocusNodes,
                         bool limitSource,
-                        uint8_t* markings);
+                        uint8_t* markings,
+                        cudaStream_t stream = 0);
 
 } // namespace cstone
