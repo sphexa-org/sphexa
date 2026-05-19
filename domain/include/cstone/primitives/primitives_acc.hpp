@@ -58,12 +58,14 @@ struct Stream<GpuTag>
 template<class It, class T>
 void fill(It first, It last, T value, Stream<CpuTag>)
 {
+    if (last <= first) { return; }
     std::fill(first, last, value);
 }
 
 template<class It, class T>
 void fill(It first, It last, T value, Stream<GpuTag> stream)
 {
+    if (last <= first) { return; }
     using T1 = std::decay_t<decltype(*first)>;
     fillGpu(first, last, T1(value), stream);
 }

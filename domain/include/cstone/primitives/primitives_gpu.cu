@@ -35,6 +35,7 @@ namespace cstone
 template<class T>
 void fillGpu(T* first, T* last, T value, cudaStream_t stream)
 {
+    if (last <= first) { return; }
     thrust::fill(devicePar(stream), first, last, value);
 }
 
