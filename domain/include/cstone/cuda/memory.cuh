@@ -86,7 +86,7 @@ struct SharedMemAllocator
         }
 
         __device__ constexpr std::remove_extent_t<T>& operator*() { return *get(); }
-        __device__ constexpr const std::remove_extent<T>& operator*() const { return *get(); }
+        __device__ constexpr const std::remove_extent_t<T>& operator*() const { return *get(); }
         __device__ constexpr std::remove_extent_t<T>* operator->() { return get(); }
         __device__ constexpr const std::remove_extent_t<T>* operator->() const { return get(); }
 
