@@ -174,9 +174,9 @@ void benchmarkMain()
     using SymmetricSuperclusterNb     = SuperclusterNb::withSymmetry;
     constexpr unsigned ncmaxSymmetric = 320;
     runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{ncmaxSymmetric});
-    runBenchmark("COMPRESSED SUPERCLUSTERED (Band et al. Compression)",
+    runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC (Band et al. Compression)",
                  SuperclusterNb::withCompression<BandEtAlWarpCompression<false>>{ncmaxSymmetric});
-    runBenchmark("COMPRESSED SUPERCLUSTERED (Nibble-based Compression)",
+    runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC (Nibble-based Compression)",
                  SuperclusterNb::withCompression<NibbleWarpCompression<false>>{ncmaxSymmetric});
 
     saveCsv(std::format("sph_density_results_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), times);
