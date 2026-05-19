@@ -96,7 +96,6 @@ TEST(H5PartCpp, typesafeStepAttrRead)
             EXPECT_EQ(a[0], (uint64_t(2) << 40) + (uint64_t(1) << 63));
         }
         {
-            std::cout << "Type is " << H5hutType<char>::nameString << std::endl;
             std::vector<char> a(charAttr.size());
             readH5PartStepAttribute(a.data(), a.size(), 3, h5File);
             EXPECT_EQ(a[0], 'a');
