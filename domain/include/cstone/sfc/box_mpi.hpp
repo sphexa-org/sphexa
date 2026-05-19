@@ -66,8 +66,8 @@ struct MinMax
  * For non-periodic dimensions, limits are determined by global min/max.
  */
 template<class T, class Op = MinMax<T>>
-auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, MPI_Comm comm,
-                   const Box<T>& previousBox = Box<T>(0, 1))
+auto makeGlobalBox(
+    const T* x, const T* y, const T* z, size_t numElements, MPI_Comm comm, const Box<T>& previousBox = Box<T>(0, 1))
 {
     bool keepX = previousBox.boundaryX() == BoundaryType::periodic || previousBox.boundaryX() == BoundaryType::fixed;
     bool keepY = previousBox.boundaryY() == BoundaryType::periodic || previousBox.boundaryY() == BoundaryType::fixed;
@@ -95,6 +95,15 @@ auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, MPI_C
         extrema[3] = -extrema[3];
         extrema[5] = -extrema[5];
     }
+
+    const T max_side_length = std::max({extrema[1] - extrema[0], extrema[3] - extrema[2], extrema[5] - extrema[4]});
+
+    if (previousBox.boundaryX() == BoundaryType::cubic_open)
+        extrema[1] = std::max(extrema[1], extrema[0] + max_side_length);
+    if (previousBox.boundaryY() == BoundaryType::cubic_open)
+        extrema[3] = std::max(extrema[3], extrema[2] + max_side_length);
+    if (previousBox.boundaryZ() == BoundaryType::cubic_open)
+        extrema[5] = std::max(extrema[5], extrema[4] + max_side_length);
 
     return Box<T>{extrema[0],
                   extrema[1],
