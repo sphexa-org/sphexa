@@ -41,13 +41,55 @@ void memcpyD2H(const T* src, std::size_t n, T* dest)
     checkGpuErrors(cudaMemcpy(dest, src, sizeof(T) * n, cudaMemcpyDeviceToHost));
 }
 
+//! @brief Async device-to-host copy on the given stream (stream=0 → default stream)
+template<class T>
+void memcpyD2H(const T* src, std::size_t n, T* dest, cudaStream_t stream)
+{
+    checkGpuErrors(cudaMemcpyAsync(dest, src, sizeof(T) * n, cudaMemcpyDeviceToHost, stream));
+}
+
 template<class T>
 void memcpyD2D(const T* src, std::size_t n, T* dest)
 {
     checkGpuErrors(cudaMemcpy(dest, src, sizeof(T) * n, cudaMemcpyDeviceToDevice));
 }
 
+//! @brief Async device-to-device copy on the given stream (stream=0 → default stream)
+template<class T>
+void memcpyD2D(const T* src, std::size_t n, T* dest, cudaStream_t stream)
+{
+    checkGpuErrors(cudaMemcpyAsync(dest, src, sizeof(T) * n, cudaMemcpyDeviceToDevice, stream));
+}
+
+//! @brief Async host-to-device copy on the given stream (stream=0 → default stream)
+template<class T>
+void memcpyH2D(const T* src, std::size_t n, T* dest, cudaStream_t stream)
+{
+    checkGpuErrors(cudaMemcpyAsync(dest, src, sizeof(T) * n, cudaMemcpyHostToDevice, stream));
+}
+
+template<class T>
+void memcpyH2DAsync(const T* src, std::size_t n, T* dest, cudaStream_t stream)
+{
+    checkGpuErrors(cudaMemcpyAsync(dest, src, sizeof(T) * n, cudaMemcpyHostToDevice, stream));
+}
+
+template<class T>
+void memcpyD2HAsync(const T* src, std::size_t n, T* dest, cudaStream_t stream)
+{
+    checkGpuErrors(cudaMemcpyAsync(dest, src, sizeof(T) * n, cudaMemcpyDeviceToHost, stream));
+}
+
+template<class T>
+void memcpyD2DAsync(const T* src, std::size_t n, T* dest, cudaStream_t stream)
+{
+    checkGpuErrors(cudaMemcpyAsync(dest, src, sizeof(T) * n, cudaMemcpyDeviceToDevice, stream));
+}
+
 inline void syncGpu() { checkGpuErrors(cudaDeviceSynchronize()); }
+
+//! @brief Wait for all work on @p stream to complete
+inline void syncGpu(cudaStream_t stream) { checkGpuErrors(cudaStreamSynchronize(stream)); }
 
 //! @brief Download DeviceVector to a host vector. Convenience function for use in testing.
 template<class T>

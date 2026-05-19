@@ -229,7 +229,8 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
                      DeviceVector<KeyType>& leavesAcc,
                      std::vector<std::vector<KeyType>>& treelets,
                      Vector& scratch,
-                     MPI_Comm comm)
+                     MPI_Comm comm,
+                     cudaStream_t stream = 0)
 {
     exchangeTreelets<KeyType>(exteriorPeers, interiorPeers, assignment, leaves, treelets, comm);
     checkTreelets<KeyType>(interiorPeers, leaves, treelets);
@@ -244,13 +245,14 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
         std::span<TreeNodeIndex> nops(rawPtr(octreeAcc.childOffsets), nodeOps.size());
         memcpyH2D(rawPtr(nodeOps), nodeOps.size(), nops.data());
 
-        exclusiveScanGpu(nops.data(), nops.data() + nops.size(), nops.data());
+        exclusiveScanGpu(nops.data(), nops.data() + nops.size(), nops.data(), stream);
         TreeNodeIndex newNumLeafNodes;
-        memcpyD2H(nops.data() + nops.size() - 1, 1, &newNumLeafNodes);
+        memcpyD2H(nops.data() + nops.size() - 1, 1, &newNumLeafNodes, stream);
+        syncGpu(stream);
 
         auto& newLeaves = octreeAcc.prefixes;
         reallocateDestructive(newLeaves, newNumLeafNodes + 1, 1.05);
-        rebalanceTreeGpu(rawPtr(leavesAcc), nNodes(leavesAcc), newNumLeafNodes, nops.data(), rawPtr(newLeaves));
+        rebalanceTreeGpu(rawPtr(leavesAcc), nNodes(leavesAcc), newNumLeafNodes, nops.data(), rawPtr(newLeaves), stream);
         swap(newLeaves, leavesAcc);
 
         octreeAcc.resize(nNodes(leavesAcc));
@@ -261,9 +263,9 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
 
         auto originalSize               = scratch.size();
         auto [keyBuf, valueBuf, cubTmp] = util::packAllocBuffer(scratch, util::TypeList<KeyType, TreeNodeIndex, char>{},
-                                                                {newNumNodes, newNumNodes, cubTmpSize}, 128);
+                                                                 {newNumNodes, newNumNodes, cubTmpSize}, 128);
 
-        buildOctreeGpu(rawPtr(leavesAcc), octreeAcc.data(), keyBuf, valueBuf, cubTmp);
+        buildOctreeGpu(rawPtr(leavesAcc), octreeAcc.data(), keyBuf, valueBuf, cubTmp, stream);
         scratch.resize(originalSize);
     }
 }
@@ -313,7 +315,8 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
                             std::span<T> quantities,
                             int commTag,
                             DevVec& scratch,
-                            MPI_Comm comm)
+                            MPI_Comm comm,
+                            cudaStream_t stream = 0)
 {
     constexpr int alignmentBytes = 64;
     constexpr bool useGpu        = IsDeviceVector<DevVec>{};
@@ -334,8 +337,9 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
     sendRequests.reserve(interiorPeers.size());
     for (size_t i = 0; i < interiorPeers.size(); ++i)
     {
-        gatherAcc<useGpu, TreeNodeIndex>(treeletIdx[interiorPeers[i]], quantities.data(), sendBuffers[i].data());
-        if constexpr (useGpu) { syncGpu(); }
+        gatherAcc(treeletIdx[interiorPeers[i]], quantities.data(), sendBuffers[i].data(),
+                  detail::makeStream<useGpu>(stream));
+        if constexpr (useGpu) { syncGpu(stream); }
         assert(sendBuffers[i].size() == treeletIdx[interiorPeers[i]].size());
         mpiSendAsyncAcc<useGpu>(sendBuffers[i].data(), treeletIdx[interiorPeers[i]].size(), interiorPeers[i], commTag,
                                 sendRequests, staging, comm);
@@ -355,12 +359,45 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
         mpiRecvSyncAcc<useGpu>(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE, comm);
 
         auto mapToInternal = csToInternalMap.subspan(focusAssignment[recvRank].start(), recvCount);
-        scatterAcc<useGpu>(mapToInternal, recvBuf, quantities.data());
+        scatterAcc(mapToInternal, recvBuf, quantities.data(), detail::makeStream<useGpu>(stream));
     }
-    if constexpr (useGpu) { syncGpu(); }
+    if constexpr (useGpu) { syncGpu(stream); }
 
     MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUS_IGNORE);
     reallocate(scratch, origSize, 1.0);
+}
+
+//! @brief Convenience overload for generic Stream<Accelerator> dispatch
+template<class T, class DevVec>
+void exchangeTreeletGeneral(std::span<const int> interiorPeers,
+                            std::span<const int> exteriorPeers,
+                            std::span<const std::span<const TreeNodeIndex>> treeletIdx,
+                            std::span<const IndexPair<TreeNodeIndex>> focusAssignment,
+                            std::span<const TreeNodeIndex> csToInternalMap,
+                            std::span<T> quantities,
+                            int commTag,
+                            DevVec& scratch,
+                            MPI_Comm comm,
+                            Stream<CpuTag> /*stream*/)
+{
+    exchangeTreeletGeneral(interiorPeers, exteriorPeers, treeletIdx, focusAssignment, csToInternalMap,
+                           quantities, commTag, scratch, comm, 0);
+}
+
+template<class T, class DevVec>
+void exchangeTreeletGeneral(std::span<const int> interiorPeers,
+                            std::span<const int> exteriorPeers,
+                            std::span<const std::span<const TreeNodeIndex>> treeletIdx,
+                            std::span<const IndexPair<TreeNodeIndex>> focusAssignment,
+                            std::span<const TreeNodeIndex> csToInternalMap,
+                            std::span<T> quantities,
+                            int commTag,
+                            DevVec& scratch,
+                            MPI_Comm comm,
+                            Stream<GpuTag> stream)
+{
+    exchangeTreeletGeneral(interiorPeers, exteriorPeers, treeletIdx, focusAssignment, csToInternalMap,
+                           quantities, commTag, scratch, comm, static_cast<cudaStream_t>(stream));
 }
 
 } // namespace cstone

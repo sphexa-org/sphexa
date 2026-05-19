@@ -73,25 +73,26 @@ void injectKeysGpu(DeviceVector<KeyType>& leaves,
                    std::span<const KeyType> keys,
                    DeviceVector<KeyType>& keyScratch,
                    DeviceVector<TreeNodeIndex>& spanOps,
-                   DeviceVector<TreeNodeIndex>& spanOpsScan)
+                   DeviceVector<TreeNodeIndex>& spanOpsScan,
+                   cudaStream_t stream = 0)
 {
     reallocate(leaves, leaves.size() + keys.size(), 1.0);
-    memcpyD2D(keys.data(), keys.size(), leaves.data() + leaves.size() - keys.size());
+    memcpyD2D(keys.data(), keys.size(), leaves.data() + leaves.size() - keys.size(), stream);
 
     reallocateDestructive(keyScratch, leaves.size(), 1.0);
-    sortGpu(rawPtr(leaves), rawPtr(leaves) + leaves.size(), rawPtr(keyScratch));
+    sortGpu(rawPtr(leaves), rawPtr(leaves) + leaves.size(), rawPtr(keyScratch), stream);
 
     reallocateDestructive(spanOps, leaves.size(), 1.0);
     reallocateDestructive(spanOpsScan, leaves.size(), 1.0);
 
-    countSfcGapsGpu(leaves.data(), nNodes(leaves), spanOps.data());
-    exclusiveScanGpu(spanOps.data(), spanOps.data() + leaves.size(), spanOpsScan.data());
+    countSfcGapsGpu(leaves.data(), nNodes(leaves), spanOps.data(), stream);
+    exclusiveScanGpu(spanOps.data(), spanOps.data() + leaves.size(), spanOpsScan.data(), stream);
 
     TreeNodeIndex numNodesGap;
-    memcpyD2H(spanOpsScan.data() + leaves.size() - 1, 1, &numNodesGap);
+    memcpyD2H(spanOpsScan.data() + leaves.size() - 1, 1, &numNodesGap, stream);
 
     reallocateDestructive(keyScratch, numNodesGap + 1, 1.0);
-    fillSfcGapsGpu(leaves.data(), nNodes(leaves), spanOpsScan.data(), keyScratch.data());
+    fillSfcGapsGpu(leaves.data(), nNodes(leaves), spanOpsScan.data(), keyScratch.data(), stream);
     swap(leaves, keyScratch);
 }
 

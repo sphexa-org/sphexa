@@ -66,14 +66,16 @@ public:
            unsigned bucketSizeFocus,
            float theta,
            MPI_Comm comm,
-           const Box<T>& box = Box<T>{0, 1})
+           const Box<T>& box = Box<T>{0, 1},
+           Stream<Accelerator> stream = {})
         : myRank_(rank)
         , numRanks_(nRanks)
         , bucketSizeFocus_(bucketSizeFocus)
         , theta_(theta)
         , comm_(comm)
-        , focusTree_(rank, numRanks_, bucketSizeFocus_, comm)
-        , global_(rank, nRanks, bucketSize, box, comm)
+        , stream_(stream)
+        , focusTree_(rank, numRanks_, bucketSizeFocus_, comm, stream_)
+        , global_(rank, nRanks, bucketSize, box, comm, stream_)
         , halos_(myRank_, comm)
     {
         if (bucketSize < bucketSizeFocus_)
@@ -313,7 +315,8 @@ public:
         {
             static_assert(IsDeviceVector<OVec>{}, "Need ordering on GPU for GPU-accelerated domain");
             orderingCpu.resize(envelope[1] - envelope[0]);
-            memcpyD2H(ord, orderingCpu.size(), orderingCpu.data());
+            memcpyD2H(ord, orderingCpu.size(), orderingCpu.data(), stream_);
+            syncGpu(stream_);
             ord = orderingCpu.data();
         }
 
@@ -460,7 +463,7 @@ private:
         lowMemReallocate(exchangeSize, allocGrowthRate_, distributedArrays, scratchBuffers);
 
         // Must zero new memory to exclude possibility of special value (removeKey) in uninitialized memory
-        fill<IsDeviceVector<KeyVec>{}>(rawPtr(keys) + bufDesc_.size, rawPtr(keys) + exchangeSize, KeyType(0));
+        fill(rawPtr(keys) + bufDesc_.size, rawPtr(keys) + exchangeSize, KeyType(0), stream_);
 
         return std::apply(
             [exchangeSize, &sorter, &scratchBuffers, this](auto&... arrays)
@@ -479,9 +482,10 @@ private:
         // compute SFC keys of received halo particles
         if constexpr (IsDeviceVector<KeyVec>{})
         {
-            computeSfcKeysGpu(rawPtr(x), rawPtr(y), rawPtr(z), sfcKindPointer(rawPtr(keys)), bufDesc_.start, box());
+            computeSfcKeysGpu(rawPtr(x), rawPtr(y), rawPtr(z), sfcKindPointer(rawPtr(keys)), bufDesc_.start, box(),
+                              stream_);
             computeSfcKeysGpu(rawPtr(x) + bufDesc_.end, rawPtr(y) + bufDesc_.end, rawPtr(z) + bufDesc_.end,
-                              sfcKindPointer(rawPtr(keys)) + bufDesc_.end, x.size() - bufDesc_.end, box());
+                              sfcKindPointer(rawPtr(keys)) + bufDesc_.end, x.size() - bufDesc_.end, box(), stream_);
         }
         else
         {
@@ -514,19 +518,20 @@ private:
         auto& swapSpace = std::get<j>(scratchBuffers);
         size_t origSize = reallocateBytes(swapSpace, keyView.size() * sizeof(KeyType), allocGrowthRate_);
         auto* swapPtr   = reinterpret_cast<KeyType*>(swapSpace.data());
-        copy_n<HaveGpu<Accelerator>{}>(keyView.data(), keyView.size(), swapPtr);
+        copy_n(keyView.data(), keyView.size(), swapPtr, stream_);
         reallocate(keys, newBufDesc.size, allocGrowthRate_);
-        fill<HaveGpu<Accelerator>{}>(rawPtr(keys) + bufDesc_.size, rawPtr(keys) + newBufDesc.size, KeyType(0));
-        copy_n<HaveGpu<Accelerator>{}>(swapPtr, keyView.size(), rawPtr(keys) + newBufDesc.start);
+        fill(rawPtr(keys) + bufDesc_.size, rawPtr(keys) + newBufDesc.size, KeyType(0), stream_);
+        copy_n(swapPtr, keyView.size(), rawPtr(keys) + newBufDesc.start, stream_);
         reallocate(swapSpace, origSize, 1.0);
 
         // relocate ordered buffer contents from offset 0 to offset newBufDesc.start
         auto relocate =
-            [size = keyView.size(), dest = newBufDesc.start, scratch = util::reverse(scratchBuffers)](auto& array)
+            [size = keyView.size(), dest = newBufDesc.start, scratch = util::reverse(scratchBuffers),
+             stream = stream_](auto& array)
         {
             static_assert(util::Contains<decltype(array), std::tuple<Arrays3&...>>{}, "No suitable scratch buffer");
             auto& swapSpace = util::pickType<decltype(array)>(scratch);
-            copy_n<IsDeviceVector<std::decay_t<decltype(array)>>{}>(rawPtr(array), size, rawPtr(swapSpace) + dest);
+            copy_n(rawPtr(array), size, rawPtr(swapSpace) + dest, stream);
             swap(array, swapSpace);
         };
         util::for_each_tuple(relocate, orderedBuffers);
@@ -552,12 +557,13 @@ private:
         if constexpr (cstone::HaveGpu<Accelerator>{})
         {
             globalTreeBackingBuffer.resize(globalTree.size());
-            memcpyD2H(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data());
+            memcpyD2H(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data(), stream_);
             globalTree = std::span(globalTreeBackingBuffer);
 
             flagsBackingBuffer.resize(flags.size());
-            memcpyD2H(flags.data(), flags.size(), flagsBackingBuffer.data());
+            memcpyD2H(flags.data(), flags.size(), flagsBackingBuffer.data(), stream_);
             flags = std::span(flagsBackingBuffer);
+            syncGpu(stream_);
         }
 
         TreeNodeIndex numFocusPeers    = 0;
@@ -627,6 +633,8 @@ private:
 
     //! @brief MPI communicator for all collective and point-to-point operations
     MPI_Comm comm_;
+    //! @brief CUDA stream for all GPU operations on this object and its children
+    Stream<Accelerator> stream_;
 
     bool convergeTrees{false};
     //! @brief Extra search factor for halo discovery, allowing multiple time integration steps between sync() calls

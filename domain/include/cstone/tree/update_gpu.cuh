@@ -21,6 +21,7 @@
 
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/tree/csarray_gpu.h"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "csarray.hpp"
 
 namespace cstone
@@ -45,20 +46,21 @@ bool updateOctreeGpu(std::span<const KeyType> keys,
                      DevCountVec& counts,
                      DevKeyVec& tmpTree,
                      DevIdxVec& workArray,
-                     unsigned maxCount = std::numeric_limits<unsigned>::max())
+                     unsigned maxCount = std::numeric_limits<unsigned>::max(),
+                     Stream<GpuTag> stream = {})
 {
     workArray.resize(tree.size());
     TreeNodeIndex newNumNodes =
-        computeNodeOpsGpu(rawPtr(tree), nNodes(tree), rawPtr(counts), bucketSize, rawPtr(workArray));
+        computeNodeOpsGpu(rawPtr(tree), nNodes(tree), rawPtr(counts), bucketSize, rawPtr(workArray), stream);
 
     tmpTree.resize(newNumNodes + 1);
-    bool converged = rebalanceTreeGpu(rawPtr(tree), nNodes(tree), newNumNodes, rawPtr(workArray), rawPtr(tmpTree));
+    bool converged = rebalanceTreeGpu(rawPtr(tree), nNodes(tree), newNumNodes, rawPtr(workArray), rawPtr(tmpTree), stream);
 
     swap(tree, tmpTree);
     counts.resize(nNodes(tree));
 
     // local node counts
-    computeNodeCountsGpu(rawPtr(tree), rawPtr(counts), nNodes(tree), keys, maxCount, true);
+    computeNodeCountsGpu(rawPtr(tree), rawPtr(counts), nNodes(tree), keys, maxCount, true, stream);
 
     return converged;
 }

@@ -148,26 +148,28 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
  * @param[out] layout            size numLeafNodes + 1. The first element is zero, the last element is
  *                               equal to the sum of all present (assigned+halo) node counts.
  */
-template<bool useGpu>
+template<class Accelerator>
 void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
                        std::span<const uint8_t> flags,
                        std::span<const TreeNodeIndex> leafToInternal,
                        TreeIndexPair idx,
-                       std::span<LocalIndex> layout)
+                       std::span<LocalIndex> layout,
+                       Stream<Accelerator> stream = {})
 {
-    if constexpr (useGpu)
+    if constexpr (HaveGpu<Accelerator>{})
     {
-        memcpyD2D(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start());
+        cudaStream_t s = stream;
+        memcpyD2D(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start(), s);
 
-        gatherGpu(leafToInternal.data(), idx.start(), flags.data(), layout.data());
-        selectCopyGpu(focusLeafCounts.data(), idx.start(), layout.data(), layout.data());
+        gatherGpu(leafToInternal.data(), idx.start(), flags.data(), layout.data(), s);
+        selectCopyGpu(focusLeafCounts.data(), idx.start(), layout.data(), layout.data(), s);
 
         gatherGpu(leafToInternal.data() + idx.end(), leafToInternal.size() - idx.end(), flags.data(),
-                  layout.data() + idx.end());
+                  layout.data() + idx.end(), s);
         selectCopyGpu(focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(), layout.data() + idx.end(),
-                      layout.data() + idx.end());
+                      layout.data() + idx.end(), s);
 
-        exclusiveScanGpu(layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0});
+        exclusiveScanGpu(layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0}, s);
     }
     else
     {
@@ -179,6 +181,17 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
         }
         std::exclusive_scan(layout.begin(), layout.end(), layout.begin(), LocalIndex{0});
     }
+}
+
+template<bool useGpu>
+void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
+                       std::span<const uint8_t> flags,
+                       std::span<const TreeNodeIndex> leafToInternal,
+                       TreeIndexPair idx,
+                       std::span<LocalIndex> layout)
+{
+    using Acc = std::conditional_t<useGpu, GpuTag, CpuTag>;
+    computeNodeLayout(focusLeafCounts, flags, leafToInternal, idx, layout, Stream<Acc>{});
 }
 
 //! @brief check halo discovery for sanity

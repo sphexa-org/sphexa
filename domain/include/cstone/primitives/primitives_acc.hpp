@@ -39,48 +39,104 @@ struct HaveGpu : public std::integral_constant<int, std::is_same_v<AccType, GpuT
 {
 };
 
-template<bool useGpu, class Iterator, class T>
-void fill(Iterator first, Iterator last, T value)
+template<class Accelerator>
+struct Stream;
+
+template<>
+struct Stream<CpuTag>
+{
+};
+
+template<>
+struct Stream<GpuTag>
+{
+    cudaStream_t stream = 0;
+    Stream(cudaStream_t s = 0) : stream(s) {}
+    operator cudaStream_t() const { return stream; }
+};
+
+template<class It, class T>
+void fill(It first, It last, T value, Stream<CpuTag>)
+{
+    std::fill(first, last, value);
+}
+
+template<class It, class T>
+void fill(It first, It last, T value, Stream<GpuTag> stream)
 {
     using T1 = std::decay_t<decltype(*first)>;
-    if (last <= first) { return; }
-
-    if constexpr (useGpu) { fillGpu(first, last, T1(value)); }
-    else { std::fill(first, last, value); }
+    fillGpu(first, last, T1(value), stream);
 }
 
-template<bool useGpu, class T>
-void copy_n(const T* src, std::size_t n, T* dest)
+template<class T>
+void copy_n(const T* src, std::size_t n, T* dest, Stream<CpuTag>)
 {
-    if constexpr (useGpu) { memcpyD2D(src, n, dest); }
-    else { omp_copy(src, src + n, dest); }
+    omp_copy(src, src + n, dest);
 }
 
-template<bool useGpu, class T1, class T2, class T3>
-void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value)
+template<class T>
+void copy_n(const T* src, std::size_t n, T* dest, Stream<GpuTag> stream)
 {
-    if constexpr (useGpu) { scaleGpu(in1, in2, out, value); }
-    else { std::transform(in1, in2, out, [value](auto v_) { return v_ * value; }); }
+    memcpyD2DAsync(src, n, dest, stream);
 }
 
-template<bool useGpu, class IndexType, class ValueType>
-void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
+template<class T1, class T2, class T3>
+void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value, Stream<CpuTag>)
 {
-    if constexpr (useGpu) { gatherGpu(ordering.data(), ordering.size(), source, destination); }
-    else { gather(ordering, source, destination); }
+    std::transform(in1, in2, out, [value](auto v_) { return v_ * value; });
 }
 
-template<bool useGpu, class IndexType, class ValueType>
-void scatterAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
+template<class T1, class T2, class T3>
+void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value, Stream<GpuTag> stream)
 {
-    if constexpr (useGpu) { scatterGpu(ordering.data(), ordering.size(), source, destination); }
-    else { scatter(ordering, source, destination); }
+    scaleGpu(in1, in2, out, value, stream);
+}
+
+template<class IndexType, class ValueType>
+void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, Stream<CpuTag>)
+{
+    gather(ordering, source, destination);
+}
+
+template<class IndexType, class ValueType>
+void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, Stream<GpuTag> stream)
+{
+    gatherGpu(ordering.data(), ordering.size(), source, destination, stream);
+}
+
+template<class IndexType, class ValueType>
+void scatterAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, Stream<CpuTag>)
+{
+    scatter(ordering, source, destination);
+}
+
+template<class IndexType, class ValueType>
+void scatterAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, Stream<GpuTag> stream)
+{
+    scatterGpu(ordering.data(), ordering.size(), source, destination, stream);
 }
 
 //! @brief sortByKey with temp buffer management
 template<class KeyType, class ValueType, class KeyBuf, class ValueBuf>
-void sortByKeyGpu(
-    std::span<KeyType> keys, std::span<ValueType> values, KeyBuf& keyBuf, ValueBuf& valueBuf, float growthRate)
+void sortByKeyGpu(std::span<KeyType> keys,
+                  std::span<ValueType> values,
+                  KeyBuf& /*keyBuf*/,
+                  ValueBuf& /*valueBuf*/,
+                  float /*growthRate*/,
+                  Stream<CpuTag>)
+{
+    assert(keys.size() == values.size());
+    sort_by_key(keys.begin(), keys.end(), values.begin());
+}
+
+//! @brief sortByKey with temp buffer management
+template<class KeyType, class ValueType, class KeyBuf, class ValueBuf>
+void sortByKeyGpu(std::span<KeyType> keys,
+                  std::span<ValueType> values,
+                  KeyBuf& keyBuf,
+                  ValueBuf& valueBuf,
+                  float growthRate,
+                  Stream<GpuTag> stream)
 {
     // temp storage for radix sort as multiples of IndexType
     uint64_t tempStorageEle = iceil(sortByKeyTempStorage<KeyType, ValueType>(keys.size()), sizeof(ValueType));
@@ -92,32 +148,154 @@ void sortByKeyGpu(
     auto tempBuffers        = util::packAllocBuffer<ValueType>(valueBuf, {numElements, 2}, 128);
 
     sortByKeyGpu(keys.data(), keys.data() + keys.size(), values.data(), (KeyType*)rawPtr(keyBuf), tempBuffers[0].data(),
-                 tempBuffers[1].data(), tempStorageEle * sizeof(ValueType));
+                 tempBuffers[1].data(), tempStorageEle * sizeof(ValueType), stream);
     reallocate(keyBuf, s1, 1.0);
     reallocate(valueBuf, s2, 1.0);
 }
 
-template<bool useGpu, class T1, class T2>
-void sequenceAcc(T1* first, T1* last, T2 value)
+template<class T1, class T2>
+void sequenceAcc(T1* first, T1* last, T2 value, Stream<CpuTag>)
 {
-    if constexpr (useGpu) { sequenceGpu(first, last - first, T1(value)); }
-    else { std::iota(first, last, value); }
+    std::iota(first, last, value);
+}
+
+template<class T1, class T2>
+void sequenceAcc(T1* first, T1* last, T2 value, Stream<GpuTag> stream)
+{
+    sequenceGpu(first, last - first, T1(value), stream);
+}
+
+template<class BufferType>
+void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate, Stream<CpuTag>)
+{
+    reallocateBytes(buffer, sizeof(LocalIndex) * (first + n), growthRate);
+    auto* seq = reinterpret_cast<LocalIndex*>(buffer.data());
+    sequenceAcc(seq + first, seq + first + n, first, Stream<CpuTag>{});
+}
+
+template<class BufferType>
+void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate, Stream<GpuTag> stream)
+{
+    reallocateBytes(buffer, sizeof(LocalIndex) * (first + n), growthRate);
+    auto* seq = reinterpret_cast<LocalIndex*>(buffer.data());
+    sequenceAcc(seq + first, seq + first + n, first, stream);
+}
+
+template<class KeyType, class ValueType>
+void sortByKey(std::span<KeyType> keys, std::span<ValueType> values, Stream<CpuTag>)
+{
+    assert(keys.size() == values.size());
+    sort_by_key(keys.begin(), keys.end(), values.begin());
+}
+
+//! @brief CPU overload ignores scratch buffers and growth rate
+template<class KeyType, class ValueType, class KeyBuf, class ValueBuf>
+void sortByKey(std::span<KeyType> keys,
+               std::span<ValueType> values,
+               KeyBuf& /*keyBuf*/,
+               ValueBuf& /*valueBuf*/,
+               double /*growth*/,
+               Stream<CpuTag>)
+{
+    assert(keys.size() == values.size());
+    sort_by_key(keys.begin(), keys.end(), values.begin());
+}
+
+template<class KeyType, class ValueType, class KeyBuf, class ValueBuf>
+void sortByKey(std::span<KeyType> keys,
+               std::span<ValueType> values,
+               KeyBuf& keyBuf,
+               ValueBuf& valueBuf,
+               double growth,
+               Stream<GpuTag> stream)
+{
+    assert(keys.size() == values.size());
+    sortByKeyGpu(keys, values, keyBuf, valueBuf, growth, stream);
+}
+
+//! Backward-compatible wrappers for callers still using template<bool useGpu>
+
+namespace detail
+{
+template<bool useGpu>
+struct SelectStream
+{
+    using type = Stream<typename std::conditional<useGpu, GpuTag, CpuTag>::type>;
+};
+
+template<bool useGpu>
+using SelectStream_t = typename SelectStream<useGpu>::type;
+
+//! @brief Build the correct Stream<> from a raw cudaStream_t, choosing CPU or GPU path at compile time
+template<bool useGpu>
+auto makeStream(cudaStream_t s)
+{
+    if constexpr (useGpu) { return Stream<GpuTag>{s}; }
+    else { return Stream<CpuTag>{}; }
+}
+} // namespace detail
+
+template<bool useGpu, class It, class T>
+void fill(It first, It last, T value)
+{
+    fill(first, last, value, detail::SelectStream_t<useGpu>{});
+}
+
+template<bool useGpu, class T>
+void copy_n(const T* src, std::size_t n, T* dest)
+{
+    copy_n(src, n, dest, detail::SelectStream_t<useGpu>{});
+}
+
+template<bool useGpu, class T1, class T2, class T3>
+void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value)
+{
+    scaleGpuAcc(in1, in2, out, value, detail::SelectStream_t<useGpu>{});
+}
+
+template<bool useGpu, class IndexType, class ValueType>
+void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
+{
+    gatherAcc(ordering, source, destination, detail::SelectStream_t<useGpu>{});
+}
+
+template<bool useGpu, class IndexType, class ValueType>
+void scatterAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
+{
+    scatterAcc(ordering, source, destination, detail::SelectStream_t<useGpu>{});
 }
 
 template<bool useGpu, class BufferType>
 void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate)
 {
-    reallocateBytes(buffer, sizeof(LocalIndex) * (first + n), growthRate);
-    auto* seq = reinterpret_cast<LocalIndex*>(buffer.data());
-    sequenceAcc<useGpu>(seq + first, seq + first + n, first);
+    sequence(first, n, buffer, growthRate, detail::SelectStream_t<useGpu>{});
+}
+
+template<bool useGpu, class T1, class T2>
+void sequenceAcc(T1* first, T1* last, T2 value)
+{
+    sequenceAcc(first, last, value, detail::SelectStream_t<useGpu>{});
+}
+
+template<bool useGpu, class KeyType, class ValueType>
+void sortByKey(std::span<KeyType> keys, std::span<ValueType> values)
+{
+    assert(keys.size() == values.size());
+    sortByKey(keys, values, detail::SelectStream_t<useGpu>{});
 }
 
 template<bool useGpu, class KeyType, class ValueType, class KeyBuf, class ValueBuf>
 void sortByKey(std::span<KeyType> keys, std::span<ValueType> values, KeyBuf& keyBuf, ValueBuf& valueBuf, double growth)
 {
     assert(keys.size() == values.size());
-    if constexpr (useGpu) { sortByKeyGpu(keys, values, keyBuf, valueBuf, growth); }
-    else { sort_by_key(keys.begin(), keys.end(), values.begin()); }
+    sortByKey(keys, values, keyBuf, valueBuf, growth, detail::SelectStream_t<useGpu>{});
+}
+
+template<bool useGpu, class KeyType, class ValueType, class KeyBuf, class ValueBuf>
+void sortByKeyGpu(std::span<KeyType> keys, std::span<ValueType> values, KeyBuf& keyBuf, ValueBuf& valueBuf,
+                  float growthRate)
+{
+    sortByKeyGpu(keys, values, keyBuf, valueBuf, growthRate, detail::SelectStream_t<useGpu>{});
 }
 
 } // namespace cstone

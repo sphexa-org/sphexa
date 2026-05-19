@@ -16,6 +16,7 @@
 
 #include <type_traits>
 #include <vector>
+#include "stream.hpp"
 
 template<class T, class Alloc>
 T* rawPtr(std::vector<T, Alloc>& p)
@@ -33,12 +34,22 @@ template<class T>
 void memcpyH2D(const T* src, std::size_t n, T* dest);
 
 template<class T>
+void memcpyH2D(const T* src, std::size_t n, T* dest, cudaStream_t stream);
+
+template<class T>
 void memcpyD2H(const T* src, std::size_t n, T* dest);
+
+template<class T>
+void memcpyD2H(const T* src, std::size_t n, T* dest, cudaStream_t stream);
 
 template<class T>
 void memcpyD2D(const T* src, std::size_t n, T* dest);
 
+template<class T>
+void memcpyD2D(const T* src, std::size_t n, T* dest, cudaStream_t stream);
+
 void syncGpu();
+void syncGpu(cudaStream_t stream);
 
 /*! @brief detection trait to determine whether a template parameter is a device vector
  *
