@@ -53,7 +53,7 @@ static constexpr h5_types_t H5TypeIDs[] = {H5_FLOAT64_T, H5_FLOAT32_T, H5_STRING
                                            H5_UINT16_T,  H5_INT32_T,   H5_UINT32_T, H5_INT64_T, H5_UINT64_T};
 
 static constexpr std::array H5TypeNames{
-    "C++ double / python np.float64",  "C++ float / python np.float32",   "C++ string / python np.char",
+    "C++ double / python np.float64",  "C++ float / python np.float32",   "C++ char / python np.bytes",
     "C++ int8_t / python np.int8",     "C++ uint8_t / python np.uint8",   "C++ int16_t / python np.int16",
     "C++ uint16_t / python np.uint16", "C++ int32_t / python np.int32",   "C++ uint32_t / python np.uint32",
     "C++ int64_t / python np.int64",   "C++ uint64_t / python np.uint64",

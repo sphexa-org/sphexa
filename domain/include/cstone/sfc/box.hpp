@@ -77,7 +77,7 @@ HOST_DEVICE_FUN constexpr int pbcDistance(int x, int R)
     return (ret > R / 2) ? ret - R : ret;
 }
 
-enum class BoundaryType : char
+enum class BoundaryType : uint8_t
 {
     open       = 0,
     periodic   = 1,
