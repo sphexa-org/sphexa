@@ -300,5 +300,12 @@ void printHelp(char* name, int rank)
                 \t NUM<=0:    Disable profiling output,\n\
                 \t int(NUM):  Dump profiling data every NUM iteration steps,\n\
                 \t real(NUM): Dump profiling data every NUM seconds of simulation (not wall-clock) time \n\n");
+
+        printf("\t--neighbor-search STRING \t Choice of neighborhood search algorithm [always-traverse]\n\
+                \t always-traverse:               Do not use neighbor lists; Always traverse the full tree for particle-particle interactions.\n\
+                \t full-neighbor-list:            Use a full neighbor list; Expect excessive memory usage. \n\
+                \t compressed-full-neighbor-list: Use a compressed full neighbor list; Significantly lower memory usage.\n\
+                \t compressed-half-neighbor-list: Use a compressed half (symmetric) neighbor list; Even lower memory usage, but uses atomic ops.\n\
+                \t clustered-neighbor-list:       Use a clustered neighbor list; Minimal memory usage.\n\n");
     }
 }
