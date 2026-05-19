@@ -207,8 +207,9 @@ public:
         std::span<KeyType> keyView(keys + newStart, envelopeSize);
 
         const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box_);
-        if (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-            mixDBits.bz != maxTreeLevel<KeyType>{})
+        const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                              mixDBits.bz != maxTreeLevel<KeyType>{});
+        if (useMixD)
         {
             computeSfcMixDKeys<gpu>(x + recvStart, y + recvStart, z + recvStart, SfcMixDKindPointer(keys + recvStart),
                                     numRecv, box_, mixDBits.bx, mixDBits.by, mixDBits.bz);

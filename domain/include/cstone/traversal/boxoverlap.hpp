@@ -387,8 +387,9 @@ template<class KeyType, class T>
 HOST_DEVICE_FUN T minDistanceSq(IBox a, IBox b, const Box<T>& box)
 {
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    if (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-        mixDBits.bz != maxTreeLevel<KeyType>{})
+    const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                         mixDBits.bz != maxTreeLevel<KeyType>{});
+    if (useMixD)
     {
         return minDistanceSq<KeyType>(a, b, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
     }

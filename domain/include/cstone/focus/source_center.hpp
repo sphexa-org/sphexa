@@ -150,7 +150,7 @@ void nodeFpCenters(
     std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box, bool disableMixD = false)
 {
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool isMixD =
+    const bool useMixD =
         !disableMixD && (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                          mixDBits.bz != maxTreeLevel<KeyType>{});
 #pragma omp parallel for schedule(static)
@@ -160,7 +160,7 @@ void nodeFpCenters(
         KeyType startKey = decodePlaceholderBit(prefix);
         unsigned level   = decodePrefixLength(prefix) / 3;
 
-        IBox nodeBox = isMixD ? sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx,
+        IBox nodeBox = useMixD ? sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx,
                                         mixDBits.by, mixDBits.bz)
                               : sfcIBox(sfcKey(startKey), level);
         if (nodeBox.xmin() == 0 && nodeBox.xmax() == 0 && nodeBox.ymin() == 0 && nodeBox.ymax() == 0 &&
