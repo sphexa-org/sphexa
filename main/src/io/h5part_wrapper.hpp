@@ -68,13 +68,6 @@ struct MatchSignednessAndBytes
 {
 };
 
-//! @brief Evaluates to true if types of T and Tuple<N> match or if T and Tuple<N> match in signedness and byte length
-template<int N, class T, class Tuple>
-struct ExactMatchOrSignednessAndBytes
-    : std::bool_constant<std::is_same_v<T, util::TypeListElement_t<N, Tuple>> or MatchSignednessAndBytes<N, T, Tuple>{}>
-{
-};
-
 /*! @brief translate Native C++ types to fixed-width types supported by HDF5
  * @tparam AppType Native C++ type from the application
  *
@@ -82,10 +75,14 @@ struct ExactMatchOrSignednessAndBytes
  * on Linux, Unix and macOS. Therefore, we must map them to fixed-width types suitable for serialization.
  */
 template<typename AppType>
-struct H5hutType
+class H5hutType
 {
-    constexpr static int  typeIndex = util::FindIndex<std::decay_t<AppType>, H5Types, ExactMatchOrSignednessAndBytes>{};
-    constexpr static auto value     = H5TypeIDs[typeIndex];
+    constexpr static int idxExact    = util::FindIndex<std::decay_t<AppType>, H5Types>{};
+    constexpr static int idxSignByte = util::FindIndex<std::decay_t<AppType>, H5Types, MatchSignednessAndBytes>{};
+
+public:
+    constexpr static int         typeIndex  = util::Contains<std::decay_t<AppType>, H5Types>{} ? idxExact : idxSignByte;
+    constexpr static auto        value      = H5TypeIDs[typeIndex];
     constexpr static const char* nameString = H5TypeNames[typeIndex];
 };
 
