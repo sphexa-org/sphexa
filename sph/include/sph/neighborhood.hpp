@@ -38,8 +38,8 @@ struct NeighborhoodData
 
     void setType(NeighborhoodType type)
     {
-        if (type == NeighborhoodType::clusteredNeighborList)
-            throw std::invalid_argument("clustered neighbor lists are not available on CPU");
+        if (type != NeighborhoodType::alwaysTraverse && type != NeighborhoodType::fullNeighborList)
+            throw std::runtime_error("only always-traverse and full-neighbor-list are available on CPUs");
         neighborhoodType = type;
     }
 
