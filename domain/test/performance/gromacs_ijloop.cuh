@@ -202,8 +202,8 @@ constexpr __forceinline__ void atomicAddScalarOrVec(util::array<T, N>* ptr, util
 template<class T0, class... T>
 __device__ inline constexpr T0 dynamicTupleGet(std::tuple<T0, T...> const& tuple, int index)
 {
-    T0 res;
-    int i = 0;
+    T0 res = {};
+    int i  = 0;
     util::for_each_tuple(
         [&](auto const& src)
         {
