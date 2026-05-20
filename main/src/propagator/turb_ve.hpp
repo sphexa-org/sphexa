@@ -59,8 +59,8 @@ class TurbVeProp final : public HydroVeProp<SLR, DomainType, DataType>
     sph::TurbulenceData<typename DataType::RealType, typename DataType::AcceleratorType> turbulenceData;
 
 public:
-    TurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings)
-        : Base(output, rank)
+    TurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings, bool AVswitches)
+        : Base(output, rank, AVswitches)
         , turbulenceData(settings, rank == 0)
     {
     }

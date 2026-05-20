@@ -55,8 +55,8 @@ class TurbVeBdtProp final : public HydroVeBdtProp<SLR, DomainType, DataType>
     TurbulenceData<typename DataType::RealType, typename DataType::AcceleratorType> turbulenceData;
 
 public:
-    TurbVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings)
-        : Base(output, rank, settings)
+    TurbVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool AVswitches)
+        : Base(output, rank, settings, AVswitches)
         , turbulenceData(settings, rank == 0)
     {
     }

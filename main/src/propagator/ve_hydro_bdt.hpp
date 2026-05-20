@@ -87,6 +87,7 @@ protected:
 
     //! @brief no dependent fields can be temporarily reused as scratch space for halo exchanges
     AccVector<LocalIndex> haloRecvScratch;
+    bool                  AVswitches_;
 
     /*! @brief the list of conserved particles fields with values preserved between iterations
      *
@@ -113,11 +114,13 @@ protected:
     }
 
 public:
-    HydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings)
+    HydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool AVswitches)
         : Base(output, rank)
+        , AVswitches_(AVswitches)
     {
         if (not cstone::HaveGpu<Acc>{}) { throw std::runtime_error("This propagator is not supported on CPUs\n"); }
         if (SLR && rank == 0) { std::cout << "SLR is activated" << std::endl; }
+        if (AVswitches_ && rank == 0) { std::cout << "AV switches are activated" << std::endl; }
         try
         {
             timestep_.dt_m1[0] = settings.at("minDt");
@@ -258,8 +261,11 @@ public:
         domain.exchangeHalos(get<"prho", "c">(d), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
-        //computeAVswitches(activeRungs_, d, domain.box());
-        //timer.step("AVswitches");
+        if (AVswitches_)
+        {
+            computeAVswitches(activeRungs_, d, domain.box());
+            timer.step("AVswitches");
+        }
 
         if (SLR)
         {

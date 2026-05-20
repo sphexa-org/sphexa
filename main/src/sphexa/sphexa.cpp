@@ -88,7 +88,8 @@ int main(int argc, char** argv)
     std::vector<std::string> outputFields = parser.getCommaList("-f");
     const bool               ascii        = parser.exists("--ascii");
     const bool               quiet        = parser.exists("--quiet");
-    const bool               SLR          = parser.exists("--slr");
+    const bool               SLR          = !parser.exists("--no-slr");
+    const bool               AVswitches   = parser.exists("--avswitches");
     const int                simDuration  = parser.get("--duration", std::numeric_limits<int>::max());
     const std::string        writeFreqStr = parser.get("-w", std::string("0"));
     const bool               writeEnabled = writeFreqStr != "0" || !writeExtra.empty();
@@ -106,7 +107,7 @@ int main(int argc, char** argv)
     auto fileWriter  = fileWriterFactory(ascii, MPI_COMM_WORLD);
     auto fileReader  = fileReaderFactory(ascii, MPI_COMM_WORLD);
     auto simInit     = initializerFactory<Dataset>(initCond, glassBlock, fileReader.get());
-    auto propagator  = propagatorFactory<Domain, Dataset>(propChoice, SLR, output, rank, simInit->constants());
+    auto propagator  = propagatorFactory<Domain, Dataset>(propChoice, SLR, AVswitches, output, rank, simInit->constants());
     auto observables = observablesFactory<Dataset>(simInit->constants(), constantsFile);
 
     Dataset simData;
@@ -272,7 +273,9 @@ void printHelp(char* name, int rank)
 
         printf("\t--quiet \t Don't print anything to stdout\n\n");
 
-        printf("\t--slr \t\t Enable slope-limited reconstruction for artificial-viscosity dissipation\n\n");
+        printf("\t--no-slr \t Disable slope-limited reconstruction for artificial-viscosity dissipation\n\n");
+
+        printf("\t--avswitches \t Enable artificial-viscosity switches [disabled by default]\n\n");
 
         printf("\t--duration \t Maximum wall-clock run time of the simulation in seconds.[MAX_INT]\n\n");
 

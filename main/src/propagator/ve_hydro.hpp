@@ -65,6 +65,7 @@ protected:
 
     MHolder_t      mHolder_;
     GroupData<Acc> groups_;
+    bool           AVswitches_;
 
     /*! @brief the list of conserved particles fields with values preserved between iterations
      *
@@ -84,10 +85,12 @@ protected:
         std::conditional_t<SLR, decltype(DependentFields_{} + GradVFields{}), decltype(DependentFields_{})>;
 
 public:
-    HydroVeProp(std::ostream& output, size_t rank)
+    HydroVeProp(std::ostream& output, size_t rank, bool AVswitches)
         : Base(output, rank)
+        , AVswitches_(AVswitches)
     {
         if (SLR && rank == 0) { std::cout << "SLR is activated" << std::endl; }
+        if (AVswitches_ && rank == 0) { std::cout << "AV switches are activated" << std::endl; }
     }
 
     std::vector<std::string> conservedFields() const override
@@ -167,8 +170,11 @@ public:
                              get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        //computeAVswitches(groups_.view(), d, domain.box());
-        //timer.step("AVswitches");
+        if (AVswitches_)
+        {
+            computeAVswitches(groups_.view(), d, domain.box());
+            timer.step("AVswitches");
+        }
 
         if (SLR)
         {
