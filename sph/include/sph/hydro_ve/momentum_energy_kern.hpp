@@ -66,7 +66,7 @@ template<bool SLR, class T>
 struct MomentumAndEnergyInteraction
 {
     const T* wh;
-    T        Atmin, Atmax, ramp;
+    T        Atmin, Atmax, ramp, avFloor;
 
     template<class ParticleData, class Tc>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
@@ -113,23 +113,21 @@ struct MomentumAndEnergyInteraction
 
         auto rhoj = kxj * mj / xmassj;
 
-        T eps_i   = T(1e-4) * ci * hiInv;
-        T eps_j   = T(1e-4) * cj * hjInv;
-        T denom_i = std::abs(divvi) + std::abs(curlvi) + eps_i;
-        T denom_j = std::abs(divvj) + std::abs(curlvj) + eps_j;
-        T f_i     = (denom_i > T(0)) ? std::abs(divvi) / denom_i : T(0);
-        T f_j     = (denom_j > T(0)) ? std::abs(divvj) / denom_j : T(0);
-        T Lij     = stl::max(T(0.5), T(0.5) * (f_i + f_j));
-        T Lbeta   = T(1);
-        //T Lbeta     = stl::max(Lij, T(0.2));
-        T balsi     = T(1) - f_i * f_i;
-        T balsj     = T(1) - f_j * f_j;
-
         T rv     = rx * vx_ij + ry * vy_ij + rz * vz_ij;
         T rv_slr = rv;
+        T Lij    = T(1);
 
         if constexpr (SLR)
         {
+            T eps_i   = T(1e-4) * ci * hiInv;
+            T eps_j   = T(1e-4) * cj * hjInv;
+            T denom_i = std::abs(divvi) + std::abs(curlvi) + eps_i;
+            T denom_j = std::abs(divvj) + std::abs(curlvj) + eps_j;
+            T f_i     = (denom_i > T(0)) ? std::abs(divvi) / denom_i : T(0);
+            T f_j     = (denom_j > T(0)) ? std::abs(divvj) / denom_j : T(0);
+            Lij       = stl::max(avFloor, T(0.5) * (f_i + f_j));
+            T balsi   = T(1) - f_i * f_i;
+            T balsj   = T(1) - f_j * f_j;
             rv_slr += avRvCorrection({rx, ry, rz}, stl::min(v1, v2), eta_crit, balsi, balsj,
                                        {dV11i, dV12i, dV13i, dV22i, dV23i, dV33i},
                                        {dV11j, dV12j, dV13j, dV22j, dV23j, dV33j});
@@ -137,7 +135,7 @@ struct MomentumAndEnergyInteraction
 
         T wij          = i == j ? 0 : rv / dist;
         T wij_slr      = i == j ? 0 : rv_slr / dist;
-        T viscosity_ij = artificial_viscosity(alpha_i, alpha_j, ci, cj, wij_slr, wij_slr, Lij, Lbeta);
+        T viscosity_ij = artificial_viscosity(alpha_i, alpha_j, ci, cj, wij_slr, wij_slr, Lij);
 
         // For time-step calculations
         T vijsignal = i == j ? 0 : T(0.5) * (ci + cj) - T(2) * wij_slr;
@@ -236,7 +234,8 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T
                              const T* xm, const T* prho, const T* c11, const T* c12, const T* c13, const T* c22,
                              const T* c23, const T* c33, const unsigned* nc, const T* dV11, const T* dV12,
                              const T* dV13, const T* dV22, const T* dV23, const T* dV33, const T* tdpdTrho, const T* wh,
-                             Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z, const T* divv, const T* curlv, T* dt)
+                             T avFloor, Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z, const T* divv, const T* curlv,
+                             T* dt)
 {
     if constexpr (!SLR) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
     const auto input =
@@ -246,12 +245,12 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T
     const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
     if (tdpdTrho)
     {
-        neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<SLR, T>{wh, Atmin, Atmax, ramp},
+        neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<SLR, T>{wh, Atmin, Atmax, ramp, avFloor},
                             MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour});
     }
     else
     {
-        neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<SLR, T>{wh, Atmin, Atmax, ramp},
+        neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<SLR, T>{wh, Atmin, Atmax, ramp, avFloor},
                             MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour});
     }
 }

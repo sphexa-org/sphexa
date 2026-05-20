@@ -69,14 +69,14 @@ HOST_DEVICE_FUN inline T wharmonic_derivative_std(T v)
  * @return        the viscosity
  */
 template<typename T>
-HOST_DEVICE_FUN inline T artificial_viscosity(T alpha_i, T alpha_j, T c_i, T c_j, T w_ij, T w_ij_slr, T Lij, T Lbeta)
+HOST_DEVICE_FUN inline T artificial_viscosity(T alpha_i, T alpha_j, T c_i, T c_j, T w_ij, T w_ij_slr, T Lij)
 {
     constexpr T beta = T(2.0);
 
     T viscosity_ij = T(0.0);
     if (w_ij < T(0.0))
     {
-        T vij_signal = Lij * (alpha_i + alpha_j) * T(0.25) * (c_i + c_j) * w_ij_slr - Lbeta * beta * w_ij * w_ij;
+        T vij_signal = Lij * (alpha_i + alpha_j) * T(0.25) * (c_i + c_j) * w_ij_slr - beta * w_ij * w_ij;
         viscosity_ij = -vij_signal;
     }
 

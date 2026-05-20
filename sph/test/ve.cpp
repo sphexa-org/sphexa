@@ -100,6 +100,7 @@ protected:
     T Atmin          = 0.1;
     T Atmax          = 0.2;
     T ramp           = 1.0 / (Atmax - Atmin);
+    T avFloor        = 1.0;
 
     uint64_t                        npart          = 99;
     unsigned                        neighborsCount = npart - 1;
@@ -308,10 +309,10 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
                        const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
                        const T Atmin, const T Atmax, const T ramp, const T* wh, const T* kx, const T* xm,
                        const T* alpha, const T* dV11, const T* dV12, const T* dV13, const T* dV22, const T* dV23,
-                       const T* dV33, const T* divv, const T* curlv, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du,
-                       T* maxvsignal)
+                       const T* dV33, const T* divv, const T* curlv, const T avFloor, T* grad_P_x, T* grad_P_y,
+                       T* grad_P_z, Tm1* du, T* maxvsignal)
 {
-    MomentumAndEnergyInteraction<SLR, T> interaction{wh, Atmin, Atmax, ramp};
+    MomentumAndEnergyInteraction<SLR, T> interaction{wh, Atmin, Atmax, ramp, avFloor};
 
     if constexpr (!SLR) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
     const auto input =
@@ -365,7 +366,7 @@ TEST_F(SphKernelTests, MomentumEnergy)
                                      (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
                                      c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
                                      alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
-                                     dV33.data(), divv.data(), curlv.data(), &grad_Px, &grad_Py, &grad_Pz, &du,
+                                     dV33.data(), divv.data(), curlv.data(), avFloor, &grad_Px, &grad_Py, &grad_Pz, &du,
                                      &maxvsignal);
 
         EXPECT_NEAR(grad_Px, -23175.29155183331, 0.023);
@@ -383,7 +384,7 @@ TEST_F(SphKernelTests, MomentumEnergy)
                                       (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
                                       c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
                                       alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
-                                      dV33.data(), divv.data(), curlv.data(), &grad_Px, &grad_Py, &grad_Pz, &du,
+                                      dV33.data(), divv.data(), curlv.data(), avFloor, &grad_Px, &grad_Py, &grad_Pz, &du,
                                       &maxvsignal);
 
         EXPECT_NEAR(grad_Px, -23599.138813909038, 0.022);
@@ -401,7 +402,7 @@ TEST_F(SphKernelTests, MomentumEnergy)
                                       (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
                                       c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
                                       alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
-                                      dV33.data(), divv.data(), curlv.data(), &grad_Px, &grad_Py, &grad_Pz, &du,
+                                      dV33.data(), divv.data(), curlv.data(), avFloor, &grad_Px, &grad_Py, &grad_Pz, &du,
                                       &maxvsignal);
 
         EXPECT_EQ(grad_Px, 0.0);

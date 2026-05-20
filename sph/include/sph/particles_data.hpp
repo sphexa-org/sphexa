@@ -129,6 +129,9 @@ public:
     HydroType alphamin{1.0};
     HydroType alphamax{1.0};
     HydroType decay_constant{0.2};
+    // Floor for SLR/Balsara viscosity limiter. The default 1.0 disables limiting;
+    // 0.5 is recommended for clamped behavior in subsonic turbulence.
+    HydroType avFloor{1.0};
 
     // Min. Atwood number in ramp function in momentum equation (crossed/uncrossed selection)
     // Complete uncrossed option (Atmin>=1.d50, Atmax it doesn't matter).
@@ -199,6 +202,7 @@ public:
         optionalIO("alphamin", &alphamin, 1);
         optionalIO("alphamax", &alphamax, 1);
         optionalIO("decay_constant", &decay_constant, 1);
+        optionalIO("avFloor", &avFloor, 1);
 
         optionalIO("sincIndex", &sincIndex, 1);
         optionalIO("kernelChoice", &kernelChoice, 1);
