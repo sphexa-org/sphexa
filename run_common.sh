@@ -74,6 +74,11 @@ run_sim() {
     PROFILE_EXEC="nsys profile --trace=cuda,nvtx,osrt -o ${NSYS_OUTPUT_FILE} -f true"
   fi
 
+  MPS_WRAP=""
+  if [ "$BACKEND" = "gpu" ]; then
+    MPS_WRAP="mps_wrapper.sh"
+  fi
+
   mkdir -p "${run_dir}"
 
   local out_prefix="${run_dir}/dump"
@@ -81,7 +86,7 @@ run_sim() {
   rm profile.h5 ${run_dir}/profile.h5 2>/dev/null || true
 
   OMP_NUM_THREADS="${CORES}" \
-  srun -n "${RANKS}" ${PROFILE_EXEC} "${binary}" \
+  srun -n "${RANKS}" ${MPS_WRAP} ${PROFILE_EXEC} "${binary}" \
     --glass "${GLASS}" \
     --init  "${INIT_COND}" \
     -n      "${N}" \

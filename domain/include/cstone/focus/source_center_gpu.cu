@@ -232,7 +232,7 @@ __global__ void computeGeoCentersKernel(const KeyType* prefixes,
     {
         util::tie(centers[i], sizes[i]) =
             useMixD ? centerAndSize<KeyType>(nodeBox, box, mixDBits.bx, mixDBits.by, mixDBits.bz)
-                    : centerAndSize<KeyType>(nodeBox, box, false);
+                    : centerAndSize<KeyType>(nodeBox, box, true);
     }
 }
 
