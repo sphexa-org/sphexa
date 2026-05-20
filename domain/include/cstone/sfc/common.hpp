@@ -103,9 +103,7 @@ HOST_DEVICE_FUN constexpr unsigned toNBitIntCeil(T x, unsigned nBits)
  */
 template<class KeyType>
 constexpr KeyType pad(KeyType prefix, int length)
-{
-    return prefix << (3 * maxTreeLevel<KeyType>{} - length);
-}
+{ return prefix << (3 * maxTreeLevel<KeyType>{} - length); }
 
 /*! @brief compute the maximum range of an octree node at a given subdivision level
  *
@@ -165,9 +163,7 @@ HOST_DEVICE_FUN constexpr bool isPowerOf8(KeyType n)
  */
 template<class KeyType>
 HOST_DEVICE_FUN constexpr int commonPrefix(KeyType key1, KeyType key2)
-{
-    return int(countLeadingZeros(key1 ^ key2)) - unusedBits<KeyType>{};
-}
+{ return int(countLeadingZeros(key1 ^ key2)) - unusedBits<KeyType>{}; }
 
 /*! @brief return octree subdivision level corresponding to codeRange
  *
@@ -212,9 +208,7 @@ HOST_DEVICE_FUN constexpr KeyType encodePlaceholderBit2K(KeyType k1, KeyType k2)
 //! @brief returns the number of key-bits in the input @p code
 template<class KeyType>
 HOST_DEVICE_FUN constexpr unsigned decodePrefixLength(KeyType code)
-{
-    return 8 * sizeof(KeyType) - 1 - countLeadingZeros(code);
-}
+{ return 8 * sizeof(KeyType) - 1 - countLeadingZeros(code); }
 
 /*! @brief decode an SFC key in Warren-Salmon placeholder bit format
  *
@@ -262,7 +256,10 @@ HOST_DEVICE_FUN TreeNodeIndex locateNode(KeyType nodeKey, const KeyType* prefixe
     unsigned level         = decodePrefixLength(nodeKey) / 3;
     auto it                = stl::lower_bound(prefixes + levelRange[level], prefixes + levelRange[level + 1], nodeKey);
     if (it != prefixes + numNodes && *it == nodeKey) { return it - prefixes; }
-    else { return numNodes; }
+    else
+    {
+        return numNodes;
+    }
 }
 
 /*! @brief finds the index of the node with SFC key range [startKey:endKey]
@@ -299,9 +296,7 @@ KeyType unmaskKey(KeyType key)
 
 template<class KeyType>
 bool isMasked(KeyType key)
-{
-    return key > nodeRange<KeyType>(0);
-}
+{ return key > nodeRange<KeyType>(0); }
 
 /*! @brief extract the n-th octal digit from an SFC key, starting from the most significant
  *
@@ -319,9 +314,7 @@ bool isMasked(KeyType key)
  */
 template<class KeyType>
 HOST_DEVICE_FUN constexpr unsigned octalDigit(KeyType code, unsigned position)
-{
-    return (code >> (3u * (maxTreeLevel<KeyType>{} - position))) & 7u;
-}
+{ return (code >> (3u * (maxTreeLevel<KeyType>{} - position))) & 7u; }
 
 //! @brief return true if a is an ancestor of b or if a is a sibling of an ancestor of b
 template<class KeyType>
@@ -415,9 +408,7 @@ HOST_DEVICE_FUN constexpr KeyType makePrefix(KeyType a)
  */
 template<class KeyType>
 HOST_DEVICE_FUN constexpr KeyType octalPower(int pos)
-{
-    return (KeyType(1) << 3 * (maxTreeLevel<KeyType>{} - pos));
-}
+{ return (KeyType(1) << 3 * (maxTreeLevel<KeyType>{} - pos)); }
 
 /*! @brief return the mixed key incremented by adding 1 in position @p pos
  *
@@ -437,7 +428,10 @@ HOST_DEVICE_FUN constexpr KeyType increaseKey(KeyType key, int pos, unsigned b0,
     if (posFromLeft + 1 > b0) { return key; }
     else if (posFromLeft + 1 > b1) { max = 1; }
     else if (posFromLeft + 1 > b2) { max = 3; }
-    else { max = 7; }
+    else
+    {
+        max = 7;
+    }
     auto digit = octalDigit(key, pos);
     if (digit + 1 <= max) { key += octalPower<KeyType>(pos); }
     else
@@ -515,9 +509,7 @@ spanSfcRange(KeyType a, KeyType b, [[maybe_unused]] Store output)
 //! output) above
 template<class KeyType>
 HOST_DEVICE_FUN int spanSfcRange(KeyType a, KeyType b)
-{
-    return spanSfcRange<KeyType, std::nullptr_t>(a, b, nullptr);
-}
+{ return spanSfcRange<KeyType, std::nullptr_t>(a, b, nullptr); }
 
 template<class KeyType, class Store>
 HOST_DEVICE_FUN std::enable_if_t<std::is_same_v<Store, std::nullptr_t> || std::is_same_v<Store, KeyType*>, int>
@@ -552,7 +544,10 @@ spanSfcRangeMixD(KeyType a, KeyType b, [[maybe_unused]] Store output, unsigned b
         {
             numDigits = (2 - octalDigit(a, pos)) % 2;
         }
-        else { continue; }
+        else
+        {
+            continue;
+        }
         numValues += numDigits;
         while (numDigits--)
         {
@@ -580,8 +575,6 @@ spanSfcRangeMixD(KeyType a, KeyType b, [[maybe_unused]] Store output, unsigned b
 //! output) above
 template<class KeyType>
 HOST_DEVICE_FUN int spanSfcRangeMixD(KeyType a, KeyType b, unsigned bx, unsigned by, unsigned bz)
-{
-    return spanSfcRangeMixD<KeyType, std::nullptr_t>(a, b, nullptr, bx, by, bz);
-}
+{ return spanSfcRangeMixD<KeyType, std::nullptr_t>(a, b, nullptr, bx, by, bz); }
 
 } // namespace cstone

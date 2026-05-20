@@ -70,7 +70,10 @@ std::vector<Integer> makeRandomGaussianKeys(size_t numKeys,
         auto randCoord = [&gen](std::normal_distribution<double>& dist, unsigned maxC) -> unsigned
         {
             double x = dist(gen);
-            while (x < 0.0 || x > double(maxC)) { x = dist(gen); }
+            while (x < 0.0 || x > double(maxC))
+            {
+                x = dist(gen);
+            }
             return unsigned(x);
         };
 
@@ -90,8 +93,12 @@ std::vector<Integer> makeRandomGaussianKeys(size_t numKeys,
         auto randInt = [&distribution, &gen, maxCoord]()
         {
             double x = distribution(gen);
-            // we can't cut down x to maxCoord in case it's too big, otherwise there will be too many keys in the last cell
-            while (x < 0.0 || x > maxCoord) { x = distribution(gen); }
+            // we can't cut down x to maxCoord in case it's too big, otherwise there will be too many keys in the last
+            // cell
+            while (x < 0.0 || x > maxCoord)
+            {
+                x = distribution(gen);
+            }
             return Integer(x);
         };
 
@@ -101,7 +108,6 @@ std::vector<Integer> makeRandomGaussianKeys(size_t numKeys,
     std::sort(ret.begin(), ret.end());
     return ret;
 }
-
 
 //! @brief can be used to calculate reasonable smoothing lengths for each particle
 template<class KeyType, class Tc, class Th>
@@ -212,9 +218,13 @@ protected:
         if constexpr (std::is_same_v<KeyType, SfcMixDKind<Integer>>)
         {
             const auto mixDBits = getBoxMixDimensionBits<T, Integer>(box_);
-            computeSfcMixDKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_, mixDBits.bx, mixDBits.by, mixDBits.bz);
+            computeSfcMixDKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_, mixDBits.bx, mixDBits.by,
+                               mixDBits.bz);
         }
-        else { computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_); }
+        else
+        {
+            computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_);
+        }
 
         std::vector<LocalIndex> sfcOrder(n);
         std::iota(begin(sfcOrder), end(sfcOrder), LocalIndex(0));

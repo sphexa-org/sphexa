@@ -375,9 +375,7 @@ void updateInternalTree(std::span<const KeyType> leaves, OctreeView<KeyType> o)
 
 template<class KeyType, class Accelerator>
 std::span<const TreeNodeIndex> leafToInternal(const OctreeData<KeyType, Accelerator>& octree)
-{
-    return {rawPtr(octree.leafToInternal) + octree.numInternalNodes, size_t(octree.numLeafNodes)};
-}
+{ return {rawPtr(octree.leafToInternal) + octree.numInternalNodes, size_t(octree.numLeafNodes)}; }
 
 //! @brief Deprecated, do not use in new code. Not used anymore in production code, some unit test usage remaining.
 template<class KeyType>
@@ -422,7 +420,8 @@ public:
         return {numLeafNodes_,          numInternalNodes_,      TreeNodeIndex(parents_.size()),
                 levelRange_.back(),     prefixes_.data(),       childOffsets_.data(),
                 parents_.data(),        levelRange_.data(),     nullptr,
-                internalToLeaf_.data(), leafToInternal_.data(), nullptr, empty_.data()};
+                internalToLeaf_.data(), leafToInternal_.data(), nullptr,
+                empty_.data()};
     }
 
     OctreeView<const KeyType> cdata() const
@@ -430,7 +429,8 @@ public:
         return {numLeafNodes_,          numInternalNodes_,      TreeNodeIndex(parents_.size()),
                 levelRange_.back(),     prefixes_.data(),       childOffsets_.data(),
                 parents_.data(),        levelRange_.data(),     nullptr,
-                internalToLeaf_.data(), leafToInternal_.data(), nullptr, empty_.data()};
+                internalToLeaf_.data(), leafToInternal_.data(), nullptr,
+                empty_.data()};
     }
 
     //! @brief return a const view of the cstone leaf array
@@ -446,9 +446,7 @@ public:
     std::span<const TreeNodeIndex> levelRange() const { return levelRange_; }
     //! @brief converts a cornerstone index into an internal index
     std::span<const TreeNodeIndex> internalOrder() const
-    {
-        return {leafToInternal_.data() + numInternalNodes_, size_t(numLeafNodes_)};
-    }
+    { return {leafToInternal_.data() + numInternalNodes_, size_t(numLeafNodes_)}; }
     //! @brief converts  an internal index into a cornerstone index
     std::span<const TreeNodeIndex> toLeafOrder() const { return {internalToLeaf_.data(), size_t(numTreeNodes())}; }
     const auto& leafToInternal() const { return leafToInternal_; }
@@ -610,9 +608,7 @@ template<class T>
 struct SumCombination
 {
     T operator()(TreeNodeIndex /*nodeIdx*/, TreeNodeIndex c, const T* Q)
-    {
-        return Q[c] + Q[c + 1] + Q[c + 2] + Q[c + 3] + Q[c + 4] + Q[c + 5] + Q[c + 6] + Q[c + 7];
-    }
+    { return Q[c] + Q[c + 1] + Q[c + 2] + Q[c + 3] + Q[c + 4] + Q[c + 5] + Q[c + 6] + Q[c + 7]; }
 };
 
 template<class CountType>

@@ -205,25 +205,35 @@ template void upsweepCentersGpu(int, const TreeNodeIndex*, const TreeNodeIndex*,
 template void upsweepCentersGpu(int, const TreeNodeIndex*, const TreeNodeIndex*, SourceCenterType<double>*);
 
 template<class KeyType, class T>
-__global__ void computeGeoCentersKernel(
-    const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T> box, bool useMixD, const AxisMixDBits mixDBits)
+__global__ void computeGeoCentersKernel(const KeyType* prefixes,
+                                        TreeNodeIndex numNodes,
+                                        Vec3<T>* centers,
+                                        Vec3<T>* sizes,
+                                        const Box<T> box,
+                                        bool useMixD,
+                                        const AxisMixDBits mixDBits)
 {
     TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numNodes) { return; }
 
-    KeyType prefix                  = prefixes[i];
-    KeyType startKey                = decodePlaceholderBit(prefix);
-    unsigned level                  = decodePrefixLength(prefix) / 3;
-    auto nodeBox                    = useMixD ? sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx,
-                                                        mixDBits.by, mixDBits.bz)
-                                              : sfcIBox(sfcKey(startKey), level);
+    KeyType prefix   = prefixes[i];
+    KeyType startKey = decodePlaceholderBit(prefix);
+    unsigned level   = decodePrefixLength(prefix) / 3;
+    auto nodeBox     = useMixD ? sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx,
+                                         mixDBits.by, mixDBits.bz)
+                               : sfcIBox(sfcKey(startKey), level);
     if (nodeBox.xmin() == 0 && nodeBox.xmax() == 0 && nodeBox.ymin() == 0 && nodeBox.ymax() == 0 &&
         nodeBox.zmin() == 0 && nodeBox.zmax() == 0)
     {
         centers[i] = {0, 0, 0};
         sizes[i]   = {0, 0, 0};
     }
-    else { util::tie(centers[i], sizes[i]) = useMixD ? centerAndSize<KeyType>(nodeBox, box, mixDBits.bx, mixDBits.by, mixDBits.bz) : centerAndSize<KeyType>(nodeBox, box, false); }
+    else
+    {
+        util::tie(centers[i], sizes[i]) =
+            useMixD ? centerAndSize<KeyType>(nodeBox, box, mixDBits.bx, mixDBits.by, mixDBits.bz)
+                    : centerAndSize<KeyType>(nodeBox, box, false);
+    }
 }
 
 template<class KeyType, class T>

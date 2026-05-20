@@ -131,7 +131,8 @@ template<class KeyType>
 void inversionTestMixD()
 {
     int numKeys{10};
-    std::vector<std::vector<unsigned>> n_encoding_bits_sweep = {{8, 6, 10}, {10, 9, 9}, {10, 10, 10}, {10, 10, 9}, {10, 4, 2}, {10, 3, 2}};
+    std::vector<std::vector<unsigned>> n_encoding_bits_sweep = {{8, 6, 10},  {10, 9, 9}, {10, 10, 10},
+                                                                {10, 10, 9}, {10, 4, 2}, {10, 3, 2}};
     std::mt19937 gen;
     for (const auto& n_encoding_bits : n_encoding_bits_sweep)
     {

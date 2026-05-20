@@ -50,7 +50,10 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
                               mixDBits.bz != maxTreeLevel<KeyType>{};
 
         // if the halo box is fully inside the assigned SFC range, we skip collision detection
-        if (useMixD && containedIn(lowestKey, highestKey, tC, tS, box, mixDBits.bx, mixDBits.by, mixDBits.bz)) { return; }
+        if (useMixD && containedIn(lowestKey, highestKey, tC, tS, box, mixDBits.bx, mixDBits.by, mixDBits.bz))
+        {
+            return;
+        }
         if (!useMixD && containedIn(lowestKey, highestKey, tC, tS, box)) { return; }
 
         // mark all colliding node indices outside [lowestKey:highestKey]
@@ -112,11 +115,11 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
     KeyType focusStart = focusNodes[0];
     KeyType focusEnd   = focusNodes[numFocusNodes];
 
-    IBox target    =  useMixD ? sfcIBox(sfcMixDKey(focusNodes[tid]), sfcMixDKey(focusNodes[tid + 1]), mixDBits.bx,
-                                        mixDBits.by, mixDBits.bz)
-                              : sfcIBox(sfcKey(focusNodes[tid]), sfcKey(focusNodes[tid + 1]));
-    if (target.xmin() == 0 && target.xmax() == 0 && target.ymin() == 0 && target.ymax() == 0 &&
-        target.zmin() == 0 && target.zmax() == 0)
+    IBox target = useMixD ? sfcIBox(sfcMixDKey(focusNodes[tid]), sfcMixDKey(focusNodes[tid + 1]), mixDBits.bx,
+                                    mixDBits.by, mixDBits.bz)
+                          : sfcIBox(sfcKey(focusNodes[tid]), sfcKey(focusNodes[tid + 1]));
+    if (target.xmin() == 0 && target.xmax() == 0 && target.ymin() == 0 && target.ymax() == 0 && target.zmin() == 0 &&
+        target.zmax() == 0)
     {
         return;
     }
@@ -148,7 +151,7 @@ void markMacsGpu(const KeyType* prefixes,
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{};
+                          mixDBits.bz != maxTreeLevel<KeyType>{};
 
     if (numFocusNodes)
     {

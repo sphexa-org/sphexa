@@ -55,14 +55,14 @@ std::vector<int> findPeersMac(int myRank,
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{};
+                          mixDBits.bz != maxTreeLevel<KeyType>{};
 
     constexpr float roundOff  = 1 + 1e-6; // ensure that peers are picked up in case of a numerical tie
     const Vec3<int> maxCoords = {(1 << mixDBits.bx), (1 << mixDBits.by), (1 << mixDBits.bz)};
     const Vec3<T> gridStep    = {box.lx() / maxCoords[0], box.ly() / maxCoords[1], box.lz() / maxCoords[2]};
     const T maxGridStep       = *std::max_element(gridStep.begin(), gridStep.end());
-    const auto ellipse = Vec3<T>{maxGridStep / gridStep[0], maxGridStep / gridStep[1], maxGridStep / gridStep[2]} *
-                         invThetaEff * roundOff;
+    const auto ellipse   = Vec3<T>{maxGridStep / gridStep[0], maxGridStep / gridStep[1], maxGridStep / gridStep[2]} *
+                           invThetaEff * roundOff;
     constexpr auto pbc_t = BoundaryType::periodic;
     const Vec3<int> pbc  = {(box.boundaryX() == pbc_t) * maxCoords[0], (box.boundaryY() == pbc_t) * maxCoords[1],
                             (box.boundaryZ() == pbc_t) * maxCoords[2]};
@@ -142,7 +142,7 @@ std::vector<int> findPeersMacStt(int myRank,
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{};
+                          mixDBits.bz != maxTreeLevel<KeyType>{};
 
     const Vec3<int> maxCoords = {(1 << mixDBits.bx), (1 << mixDBits.by), (1 << mixDBits.bz)};
     const Vec3<T> gridStep    = {box.lx() / maxCoords[0], box.ly() / maxCoords[1], box.lz() / maxCoords[2]};
@@ -173,9 +173,10 @@ std::vector<int> findPeersMacStt(int myRank,
             // if the tree node with index idx is fully contained in the focus, we stop traversal
             if (containedIn(nodeStart, nodeEnd, domainStart, domainEnd)) { return false; }
 
-            IBox source = useMixD ? sfcIBox(sfcMixDKey(nodeStart), maxTreeLevel<KeyType>{} - treeLevel(nodeEnd - nodeStart),
-                                            mixDBits.bx, mixDBits.by, mixDBits.bz)
-                                  : sfcIBox(sfcKey(nodeStart), treeLevel(nodeEnd - nodeStart));
+            IBox source = useMixD
+                              ? sfcIBox(sfcMixDKey(nodeStart), maxTreeLevel<KeyType>{} - treeLevel(nodeEnd - nodeStart),
+                                        mixDBits.bx, mixDBits.by, mixDBits.bz)
+                              : sfcIBox(sfcKey(nodeStart), treeLevel(nodeEnd - nodeStart));
             if (source.xmax() == 0 && source.xmin() == 0 && source.ymax() == 0 && source.ymin() == 0 &&
                 source.zmax() == 0 && source.zmin() == 0)
             {

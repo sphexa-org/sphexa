@@ -60,7 +60,7 @@ void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{});
+                           mixDBits.bz != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<T, sfcKeyType<KeyType>> coords{numParticles, box, thisRank};
 
@@ -91,7 +91,8 @@ void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
     ExchangeLog log;
     auto recvStart = domain_exchange::receiveStart(bufDesc, numAssigned - numPresent);
     auto recvEnd   = recvStart + numAssigned - numPresent;
-    exchangeParticles(0, log, sends, thisRank, recvStart, recvEnd, ordering.data(), MPI_COMM_WORLD, x.data(), y.data(), z.data());
+    exchangeParticles(0, log, sends, thisRank, recvStart, recvEnd, ordering.data(), MPI_COMM_WORLD, x.data(), y.data(),
+                      z.data());
 
     domain_exchange::extractLocallyOwned(bufDesc, numPresent, numAssigned, ordering.data() + sends[thisRank], x, y, z);
 
@@ -104,7 +105,10 @@ void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
         computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(newCodes.data()), x.size(), box,
                            mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
-    else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(newCodes.data()), x.size(), box); }
+    else
+    {
+        computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(newCodes.data()), x.size(), box);
+    }
 
     // received particles are not stored in SFC order after the exchange
     std::sort(begin(newCodes), end(newCodes));

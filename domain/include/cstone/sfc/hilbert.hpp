@@ -142,7 +142,8 @@ iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, un
         for (int i{0}; i < n; ++i)
         {
             const auto processesBitIndex = bits[0] - i - 1;
-            key |= static_cast<KeyType>(static_cast<KeyType>(sortedCoordinates[0] >> processesBitIndex) & 1) << (3 * processesBitIndex);
+            key |= static_cast<KeyType>(static_cast<KeyType>(sortedCoordinates[0] >> processesBitIndex) & 1)
+                   << (3 * processesBitIndex);
             // IM: Should it be 00? for x, 0?0 for y and ?00 for z?
         }
         const KeyType mask = (static_cast<KeyType>(1) << bits[1]) - 1;
@@ -164,7 +165,8 @@ iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, un
         {
             const auto processes2DKeyBitIndex      = n - 1 - i;
             const auto processesCoordinateBitIndex = bits[1] - 1 - i;
-            key |= static_cast<KeyType>(static_cast<KeyType>(key2D >> (2 * processes2DKeyBitIndex)) & 3) << (3 * processesCoordinateBitIndex);
+            key |= static_cast<KeyType>(static_cast<KeyType>(key2D >> (2 * processes2DKeyBitIndex)) & 3)
+                   << (3 * processesCoordinateBitIndex);
         }
         // remove n bits from sortedCoordinates[0] and sortedCoordinates[1]
         const KeyType mask = (static_cast<KeyType>(1) << bits[2]) - 1;
@@ -321,7 +323,8 @@ decodeHilbertMixD(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
         for (int i{0}; i < n; ++i)
         {
             const auto processesCoordinateBitIndex = bits[0] - 1 - i;
-            coordinates[0] |= static_cast<KeyType>(static_cast<KeyType>(key >> (3 * processesCoordinateBitIndex)) & static_cast<KeyType>(1))
+            coordinates[0] |= static_cast<KeyType>(static_cast<KeyType>(key >> (3 * processesCoordinateBitIndex)) &
+                                                   static_cast<KeyType>(1))
                               << processesCoordinateBitIndex;
         }
         key &= (static_cast<KeyType>(1) << (3 * bits[1])) - 1;
@@ -335,7 +338,8 @@ decodeHilbertMixD(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
         {
             const auto processes2DKeyBitIndex      = n - 1 - i;
             const auto processesCoordinateBitIndex = bits[1] - 1 - i;
-            key2D |= static_cast<KeyType>(static_cast<KeyType>(key >> (3 * processesCoordinateBitIndex)) & 3) << (2 * processes2DKeyBitIndex);
+            key2D |= static_cast<KeyType>(static_cast<KeyType>(key >> (3 * processesCoordinateBitIndex)) & 3)
+                     << (2 * processes2DKeyBitIndex);
         }
         const auto pair2D = decodeHilbert2D<KeyType>(key2D, bits[1] - bits[2]);
         coordinates[0] |= (get<0>(pair2D) & ((static_cast<KeyType>(1) << n) - 1)) << bits[2];
@@ -497,7 +501,10 @@ HOST_DEVICE_FUN constexpr unsigned treeLevelMixD(KeyType codeRange, unsigned bx,
     {
         if (level < bits[0]) { codeRangeLevel <<= 3; }
         else if (level < bits[1]) { codeRangeLevel <<= 2; }
-        else { codeRangeLevel <<= 1; }
+        else
+        {
+            codeRangeLevel <<= 1;
+        }
         level++;
     }
     return level;

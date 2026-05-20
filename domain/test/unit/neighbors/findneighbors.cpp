@@ -152,21 +152,13 @@ TEST_P(FindNeighborsRandom, HilbertGaussian32) { check<HilbertKey<uint32_t>, Ran
 TEST_P(FindNeighborsRandom, HilbertGaussian64) { check<HilbertKey<uint64_t>, RandomGaussianCoordinates>(); }
 
 TEST_P(CompareNeighborsRandomMixD, Hilbert3DvsMixDUniform32)
-{
-    check<HilbertKey<uint32_t>, HilbertMixDKey<uint32_t>, RandomCoordinates>();
-}
+{ check<HilbertKey<uint32_t>, HilbertMixDKey<uint32_t>, RandomCoordinates>(); }
 TEST_P(CompareNeighborsRandomMixD, Hilbert3DvsMixDUniform64)
-{
-    check<HilbertKey<uint64_t>, HilbertMixDKey<uint64_t>, RandomCoordinates>();
-}
+{ check<HilbertKey<uint64_t>, HilbertMixDKey<uint64_t>, RandomCoordinates>(); }
 TEST_P(CompareNeighborsRandomMixD, Hilbert3DvsMixDGaussian32)
-{
-    check<HilbertKey<uint32_t>, HilbertMixDKey<uint32_t>, RandomGaussianCoordinates>();
-}
+{ check<HilbertKey<uint32_t>, HilbertMixDKey<uint32_t>, RandomGaussianCoordinates>(); }
 TEST_P(CompareNeighborsRandomMixD, Hilbert3DvsMixDGaussian64)
-{
-    check<HilbertKey<uint64_t>, HilbertMixDKey<uint64_t>, RandomGaussianCoordinates>();
-}
+{ check<HilbertKey<uint64_t>, HilbertMixDKey<uint64_t>, RandomGaussianCoordinates>(); }
 
 std::array<double, 2> radii{0.124, 0.0624};
 std::array<int, 1> nParticles{2500};

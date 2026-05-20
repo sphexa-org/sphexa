@@ -128,7 +128,10 @@ void dualTraversal(const TreeNodeIndex* childOffsets,
                 stack_[stackPos++] = NodePair{a, b};
             }
         }
-        else { m2l(a, b); }
+        else
+        {
+            m2l(a, b);
+        }
     };
 
     while (stackPos > 0)

@@ -40,9 +40,8 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks)
     Box<T> box              = domain.box();
 
     const auto mixDBitsInit = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD0     = mixDBitsInit.bx != maxTreeLevel<KeyType>{} ||
-                              mixDBitsInit.by != maxTreeLevel<KeyType>{} ||
-                              mixDBitsInit.bz != maxTreeLevel<KeyType>{};
+    const bool useMixD0 = mixDBitsInit.bx != maxTreeLevel<KeyType>{} || mixDBitsInit.by != maxTreeLevel<KeyType>{} ||
+                          mixDBitsInit.bz != maxTreeLevel<KeyType>{};
 
     auto run = [&](auto coords)
     {
@@ -71,13 +70,16 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks)
         std::vector<KeyType> keysRef(x.size());
         const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
         const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                             mixDBits.bz != maxTreeLevel<KeyType>{};
+                              mixDBits.bz != maxTreeLevel<KeyType>{};
         if (useMixD)
         {
             computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(keysRef.data()), x.size(), box,
                                mixDBits.bx, mixDBits.by, mixDBits.bz);
         }
-        else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysRef.data()), x.size(), box); }
+        else
+        {
+            computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysRef.data()), x.size(), box);
+        }
 
         // check that particles are SFC order sorted and the keys are in sync with the x,y,z arrays
         EXPECT_EQ(keys, keysRef);
@@ -104,12 +106,15 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks)
             // Allow 1% deviation in the neighbor count
             // TODO(iomaganaris): Figure out why makeGlobalBox call in domain/include/cstone/domain/assignment.hpp:106
             // can lead to missing some of the neighbors
-            EXPECT_NEAR(static_cast<double>(neighborSumRef-neighborSum) / neighborSumRef, 0.0, 0.01);
+            EXPECT_NEAR(static_cast<double>(neighborSumRef - neighborSum) / neighborSumRef, 0.0, 0.01);
         }
     };
 
     if (useMixD0) { run(RandomGaussianCoordinates<T, SfcMixDKind<KeyType>>{numParticles, box, 5}); }
-    else { run(RandomGaussianCoordinates<T, SfcKind<KeyType>>{numParticles, box, 5}); }
+    else
+    {
+        run(RandomGaussianCoordinates<T, SfcKind<KeyType>>{numParticles, box, 5});
+    }
 }
 
 TEST(FocusDomain, randomGaussianNeighborSum)
@@ -141,23 +146,23 @@ TEST(FocusDomain, randomGaussianNeighborSum)
         randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625});
+        Domain<unsigned, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
+                                        {0, 1, 0, 0.015625, 0, 0.00390625});
         randomGaussianDomain<unsigned, double>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625});
+        Domain<uint64_t, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
+                                        {0, 1, 0, 0.015625, 0, 0.00390625});
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                       MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625});
+        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
+                                       {0, 1, 0, 0.015625, 0, 0.00390625});
         randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                       MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625});
+        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
+                                       {0, 1, 0, 0.015625, 0, 0.00390625});
         randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
 }
@@ -194,23 +199,23 @@ TEST(FocusDomain, randomGaussianNeighborSumPbc)
         randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
+        Domain<unsigned, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
+                                        {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
         randomGaussianDomain<unsigned, double>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
+        Domain<uint64_t, double> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
+                                        {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                       MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
+        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
+                                       {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
         randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                       MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
+        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
+                                       {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
         randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
 }
@@ -231,7 +236,7 @@ void testAssignmentShift(const Box<double>& box)
 
     const auto mixDBits = getBoxMixDimensionBits<Real, KeyType, Box<Real>>(box);
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{});
+                           mixDBits.bz != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, rank};
 
@@ -291,7 +296,7 @@ void removeParticle(const Box<double>& box)
 
     const auto mixDBits = getBoxMixDimensionBits<Real, KeyType, Box<Real>>(box);
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{});
+                           mixDBits.bz != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, rank};
 
@@ -355,7 +360,7 @@ void testReapplySync(const Box<double>& box)
     // Note: rank used as seed, so each rank will get different coordinates
     const auto mixDBits = getBoxMixDimensionBits<Real, KeyType, Box<Real>>(box);
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{});
+                           mixDBits.bz != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, rank};
 

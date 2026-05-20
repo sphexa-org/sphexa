@@ -43,9 +43,9 @@ HOST_DEVICE_FUN Vec4<T> computeMinMacR2(KeyType prefix, float invThetaEff, const
 {
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{};
-    KeyType nodeKey  = decodePlaceholderBit(prefix);
-    int prefixLength = decodePrefixLength(prefix);
+                          mixDBits.bz != maxTreeLevel<KeyType>{};
+    KeyType nodeKey     = decodePlaceholderBit(prefix);
+    int prefixLength    = decodePrefixLength(prefix);
 
     IBox cellBox = useMixD ? sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - (prefixLength / 3), mixDBits.bx,
                                      mixDBits.by, mixDBits.bz)
@@ -80,7 +80,7 @@ HOST_DEVICE_FUN T computeVecMacR2(KeyType prefix, Vec3<T> expCenter, float invTh
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{};
+                          mixDBits.bz != maxTreeLevel<KeyType>{};
 
     IBox cellBox = useMixD ? sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - (prefixLength / 3), mixDBits.bx,
                                      mixDBits.by, mixDBits.bz)
@@ -235,7 +235,7 @@ void markMacs(const KeyType* prefixes,
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{};
+                          mixDBits.bz != maxTreeLevel<KeyType>{};
 
 #pragma omp parallel for schedule(dynamic)
     for (TreeNodeIndex i = 0; i < numFocusNodes; ++i)

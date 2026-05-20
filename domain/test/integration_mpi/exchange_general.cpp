@@ -48,7 +48,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{});
+                           mixDBits.bz != maxTreeLevel<KeyType>{});
 
     // ******************************
     // identical data on all ranks
@@ -88,7 +88,10 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
         computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(particleKeys.data()), x.size(), box,
                            mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
-    else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box); }
+    else
+    {
+        computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box);
+    }
 
     FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD);
     focusTree.converge(box, particleKeys, assignment, tree, counts, invThetaEff);
@@ -164,7 +167,7 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType>(box);
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{});
+                           mixDBits.bz != maxTreeLevel<KeyType>{});
 
     /*******************************/
     /* identical data on all ranks */
@@ -207,7 +210,10 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>
         computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(particleKeys.data()), x.size(), box,
                            mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
-    else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box); }
+    else
+    {
+        computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box);
+    }
 
     FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD);
     focusTree.converge(box, particleKeys, assignment, tree, counts, invThetaEff);

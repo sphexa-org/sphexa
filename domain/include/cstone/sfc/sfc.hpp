@@ -44,46 +44,34 @@ using SfcKind = HilbertKey<IntegerType>;
 
 template<class KeyType>
 HOST_DEVICE_FUN SfcKind<KeyType> sfcKey(KeyType key)
-{
-    return SfcKind<KeyType>(key);
-}
+{ return SfcKind<KeyType>(key); }
 
 //! @brief convert an integer pointer to the corresponding strongly typed SFC key pointer
 template<class KeyType>
 HOST_DEVICE_FUN SfcKind<KeyType>* sfcKindPointer(KeyType* ptr)
-{
-    return reinterpret_cast<SfcKind<KeyType>*>(ptr);
-}
+{ return reinterpret_cast<SfcKind<KeyType>*>(ptr); }
 
 //! @brief convert a integer pointer to the corresponding strongly typed SFC key pointer
 template<class KeyType>
 HOST_DEVICE_FUN const SfcKind<KeyType>* sfcKindPointer(const KeyType* ptr)
-{
-    return reinterpret_cast<const SfcKind<KeyType>*>(ptr);
-}
+{ return reinterpret_cast<const SfcKind<KeyType>*>(ptr); }
 
 template<class IntegerType>
 using SfcMixDKind = HilbertMixDKey<IntegerType>;
 
 template<class KeyType>
 HOST_DEVICE_FUN SfcMixDKind<KeyType> sfcMixDKey(KeyType key)
-{
-    return SfcMixDKind<KeyType>(key);
-}
+{ return SfcMixDKind<KeyType>(key); }
 
 //! @brief convert an integer pointer to the corresponding strongly typed SFC key pointer
 template<class KeyType>
 HOST_DEVICE_FUN SfcMixDKind<KeyType>* SfcMixDKindPointer(KeyType* ptr)
-{
-    return reinterpret_cast<SfcMixDKind<KeyType>*>(ptr);
-}
+{ return reinterpret_cast<SfcMixDKind<KeyType>*>(ptr); }
 
 //! @brief convert a integer pointer to the corresponding strongly typed SFC key pointer
 template<class KeyType>
 HOST_DEVICE_FUN const SfcMixDKind<KeyType>* SfcMixDKindPointer(const KeyType* ptr)
-{
-    return reinterpret_cast<const SfcMixDKind<KeyType>*>(ptr);
-}
+{ return reinterpret_cast<const SfcMixDKind<KeyType>*>(ptr); }
 
 template<>
 struct unusedBits<MortonKey<unsigned>> : stl::integral_constant<unsigned, 2>
@@ -190,24 +178,18 @@ struct IsHilbertMixD : std::bool_constant<std::is_same_v<KeyType, HilbertMixDKey
 //! @brief Key encode overload for Morton keys
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsMorton<KeyType>{}, KeyType> iSfcKey(unsigned ix, unsigned iy, unsigned iz)
-{
-    return KeyType{iMorton<typename KeyType::ValueType>(ix, iy, iz)};
-}
+{ return KeyType{iMorton<typename KeyType::ValueType>(ix, iy, iz)}; }
 
 //! @brief Key encode overload for Hilbert keys
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsHilbert<KeyType>{}, KeyType> iSfcKey(unsigned ix, unsigned iy, unsigned iz)
-{
-    return KeyType{iHilbert<typename KeyType::ValueType>(ix, iy, iz)};
-}
+{ return KeyType{iHilbert<typename KeyType::ValueType>(ix, iy, iz)}; }
 
 //! @brief Key encode overload for Mixed Hilbert keys
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsHilbertMixD<KeyType>{}, KeyType>
-iSfcMixDKey(unsigned ix, unsigned iy, unsigned iz, unsigned bx, unsigned by, unsigned bz)
-{
-    return KeyType{iHilbertMixD<typename KeyType::ValueType>(ix, iy, iz, bx, by, bz)};
-}
+    iSfcMixDKey(unsigned ix, unsigned iy, unsigned iz, unsigned bx, unsigned by, unsigned bz)
+{ return KeyType{iHilbertMixD<typename KeyType::ValueType>(ix, iy, iz, bx, by, bz)}; }
 
 template<class KeyType, class T>
 HOST_DEVICE_FUN inline KeyType sfc3D(T x, T y, T z, T xmin, T ymin, T zmin, T mx, T my, T mz)
@@ -303,53 +285,39 @@ HOST_DEVICE_FUN inline KeyType sfcMixD(T x, T y, T z, const Box<T>& box, unsigne
 //! @brief decode a Morton key
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsMorton<KeyType>{}, util::tuple<unsigned, unsigned, unsigned>>
-decodeSfc(KeyType key)
-{
-    return decodeMorton<typename KeyType::ValueType>(key);
-}
+    decodeSfc(KeyType key)
+{ return decodeMorton<typename KeyType::ValueType>(key); }
 
 //! @brief decode a Hilbert key
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsHilbert<KeyType>{}, util::tuple<unsigned, unsigned, unsigned>>
-decodeSfc(KeyType key)
-{
-    return decodeHilbert<typename KeyType::ValueType>(key);
-}
+    decodeSfc(KeyType key)
+{ return decodeHilbert<typename KeyType::ValueType>(key); }
 
 //! @brief create and integer box from Morton keys
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsMorton<KeyType>{}, IBox> sfcIBox(KeyType keyStart, unsigned level) noexcept
-{
-    return mortonIBox<typename KeyType::ValueType>(keyStart, level);
-}
+{ return mortonIBox<typename KeyType::ValueType>(keyStart, level); }
 
 //! @brief create and integer box from Hilbert keys
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsHilbert<KeyType>{}, IBox> sfcIBox(KeyType keyStart, unsigned level) noexcept
-{
-    return hilbertIBox<typename KeyType::ValueType>(keyStart, level);
-}
+{ return hilbertIBox<typename KeyType::ValueType>(keyStart, level); }
 
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsHilbertMixD<KeyType>{}, IBox>
-sfcIBox(KeyType keyStart, unsigned level, unsigned bx, unsigned by, unsigned bz) noexcept
-{
-    return hilbertMixDIBox<typename KeyType::ValueType>(keyStart, level, bx, by, bz);
-}
+    sfcIBox(KeyType keyStart, unsigned level, unsigned bx, unsigned by, unsigned bz) noexcept
+{ return hilbertMixDIBox<typename KeyType::ValueType>(keyStart, level, bx, by, bz); }
 
 //! @brief convenience overload
 template<class KeyType>
 HOST_DEVICE_FUN inline IBox sfcIBox(KeyType keyStart, KeyType keyEnd) noexcept
-{
-    return sfcIBox(keyStart, treeLevel(keyEnd - keyStart));
-}
+{ return sfcIBox(keyStart, treeLevel(keyEnd - keyStart)); }
 
 //! @brief convenience overload
 template<class KeyType>
 HOST_DEVICE_FUN inline IBox sfcIBox(KeyType keyStart, KeyType keyEnd, unsigned bx, unsigned by, unsigned bz) noexcept
-{
-    return sfcIBox(keyStart, maxTreeLevel<KeyType>{} - treeLevel(keyEnd - keyStart), bx, by, bz);
-}
+{ return sfcIBox(keyStart, maxTreeLevel<KeyType>{} - treeLevel(keyEnd - keyStart), bx, by, bz); }
 
 //! @brief Compute the smallest octree node in placeholder-bit format that contains the given floating point box
 template<class KeyType, class T>

@@ -95,7 +95,7 @@ void findHalos(const KeyType* prefixes,
 
     const auto mixDBits = getBoxMixDimensionBits<Tc, KeyType, Box<Tc>>(box);
     const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{};
+                          mixDBits.bz != maxTreeLevel<KeyType>{};
 
 #pragma omp parallel for
     for (TreeNodeIndex leafIdx = firstNode; leafIdx < lastNode; ++leafIdx)

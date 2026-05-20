@@ -33,9 +33,15 @@ computeSfcKeysKernel(KeyType* keys, const T* x, const T* y, const T* z, size_t n
 }
 
 template<class KeyType, class T>
-__global__ void
-computeSfcMixDKeysKernel(KeyType* keys, const T* x, const T* y, const T* z, size_t numKeys, const Box<T> box, unsigned bx,
-                        unsigned by, unsigned bz)
+__global__ void computeSfcMixDKeysKernel(KeyType* keys,
+                                         const T* x,
+                                         const T* y,
+                                         const T* z,
+                                         size_t numKeys,
+                                         const Box<T> box,
+                                         unsigned bx,
+                                         unsigned by,
+                                         unsigned bz)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < numKeys)
@@ -56,12 +62,21 @@ void computeSfcKeysGpu(const T* x, const T* y, const T* z, KeyType* keys, size_t
 }
 
 template<class KeyType, class T>
-void computeSfcMixDKeysGpu(const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box, unsigned bx, unsigned by, unsigned bz)
+void computeSfcMixDKeysGpu(const T* x,
+                           const T* y,
+                           const T* z,
+                           KeyType* keys,
+                           size_t numKeys,
+                           const Box<T>& box,
+                           unsigned bx,
+                           unsigned by,
+                           unsigned bz)
 {
     if (numKeys == 0) { return; }
 
     constexpr int threadsPerBlock = 256;
-    computeSfcMixDKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock>>>(keys, x, y, z, numKeys, box, bx, by, bz);
+    computeSfcMixDKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock>>>(keys, x, y, z, numKeys, box, bx, by,
+                                                                                   bz);
     checkGpuErrors(cudaGetLastError());
 }
 
@@ -83,13 +98,41 @@ computeSfcKeysGpu(const float*, const float*, const float*, HilbertKey<uint64_t>
 template void
 computeSfcKeysGpu(const double*, const double*, const double*, HilbertKey<uint64_t>*, size_t, const Box<double>&);
 
-template void
-computeSfcMixDKeysGpu(const float*, const float*, const float*, HilbertMixDKey<unsigned>*, size_t, const Box<float>&, unsigned, unsigned, unsigned);
-template void
-computeSfcMixDKeysGpu(const double*, const double*, const double*, HilbertMixDKey<unsigned>*, size_t, const Box<double>&, unsigned, unsigned, unsigned);
-template void
-computeSfcMixDKeysGpu(const float*, const float*, const float*, HilbertMixDKey<uint64_t>*, size_t, const Box<float>&, unsigned, unsigned, unsigned);
-template void
-computeSfcMixDKeysGpu(const double*, const double*, const double*, HilbertMixDKey<uint64_t>*, size_t, const Box<double>&, unsigned, unsigned, unsigned);
+template void computeSfcMixDKeysGpu(const float*,
+                                    const float*,
+                                    const float*,
+                                    HilbertMixDKey<unsigned>*,
+                                    size_t,
+                                    const Box<float>&,
+                                    unsigned,
+                                    unsigned,
+                                    unsigned);
+template void computeSfcMixDKeysGpu(const double*,
+                                    const double*,
+                                    const double*,
+                                    HilbertMixDKey<unsigned>*,
+                                    size_t,
+                                    const Box<double>&,
+                                    unsigned,
+                                    unsigned,
+                                    unsigned);
+template void computeSfcMixDKeysGpu(const float*,
+                                    const float*,
+                                    const float*,
+                                    HilbertMixDKey<uint64_t>*,
+                                    size_t,
+                                    const Box<float>&,
+                                    unsigned,
+                                    unsigned,
+                                    unsigned);
+template void computeSfcMixDKeysGpu(const double*,
+                                    const double*,
+                                    const double*,
+                                    HilbertMixDKey<uint64_t>*,
+                                    size_t,
+                                    const Box<double>&,
+                                    unsigned,
+                                    unsigned,
+                                    unsigned);
 
 } // namespace cstone

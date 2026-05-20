@@ -274,7 +274,7 @@ void assembleCuboid(KeyType keyStart, KeyType keyEnd, const cstone::Box<T>& glob
     // extract the volume of each cell from the virtual global glass block grid
     for (size_t i = 0; i < cstone::nNodes(cells); ++i)
     {
-        auto iBox = cstone::sfcIBox(cstone::sfcKey(cells[i]), cstone::sfcKey(cells[i + 1]));
+        auto iBox      = cstone::sfcIBox(cstone::sfcKey(cells[i]), cstone::sfcKey(cells[i + 1]));
         auto selectBox = cstone::createFpBox<KeyType>(iBox, globalBox, true);
 
         // determine which building blocks in the glass block grid the current selectBox intersects with

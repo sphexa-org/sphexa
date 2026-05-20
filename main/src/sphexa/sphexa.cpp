@@ -143,8 +143,7 @@ int main(int argc, char** argv)
 
     // Write assigned (non-halo) particle coordinates for this rank to its own file
     {
-        std::ofstream rankFile(fs::path(outFile).parent_path() /
-                               ("coords_rank" + std::to_string(rank) + ".txt"));
+        std::ofstream rankFile(fs::path(outFile).parent_path() / ("coords_rank" + std::to_string(rank) + ".txt"));
         rankFile << std::scientific;
 
         size_t start = domain.startIndex();
@@ -253,9 +252,7 @@ bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float 
 }
 
 int getNumLocalRanks(int defValue)
-{
-    return getenv("SLURM_NTASKS_PER_NODE") == nullptr ? defValue : std::stoi(getenv("SLURM_NTASKS_PER_NODE"));
-}
+{ return getenv("SLURM_NTASKS_PER_NODE") == nullptr ? defValue : std::stoi(getenv("SLURM_NTASKS_PER_NODE")); }
 
 void printHelp(char* name, int rank)
 {

@@ -226,9 +226,7 @@ HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool> containedIn(
 template<class KeyType>
 HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
 containedIn(KeyType nodeStart, KeyType nodeEnd, KeyType codeStart, KeyType codeEnd)
-{
-    return !(nodeStart < codeStart || nodeEnd > codeEnd);
-}
+{ return !(nodeStart < codeStart || nodeEnd > codeEnd); }
 
 template<class KeyType>
 HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
@@ -247,7 +245,10 @@ HOST_DEVICE_FUN int addDelta(int value, int delta, bool pbc)
 
     int temp = value + delta;
     if (pbc) { return temp; }
-    else { return stl::min(stl::max(0, temp), maxCoordinate); }
+    else
+    {
+        return stl::min(stl::max(0, temp), maxCoordinate);
+    }
 }
 
 //! @brief create a box with specified radius around node delineated by codeStart/End
@@ -291,7 +292,7 @@ HOST_DEVICE_FUN IBox makeHaloBox(KeyType codeStart, KeyType codeEnd, RadiusType 
     assert(codeEnd > codeStart);
     const auto mixDBits = getBoxMixDimensionBits<CoordinateType, KeyType, Box<CoordinateType>>(box);
     const auto useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{};
+                          mixDBits.bz != maxTreeLevel<KeyType>{};
     IBox nodeBox = useMixD ? sfcIBox(sfcMixDKey(codeStart), sfcMixDKey(codeEnd), mixDBits.bx, mixDBits.by, mixDBits.bz)
                            : sfcIBox(sfcKey(codeStart), sfcKey(codeEnd));
     if (useMixD &&
@@ -388,11 +389,8 @@ HOST_DEVICE_FUN T minDistanceSq(IBox a, IBox b, const Box<T>& box)
 {
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{});
-    if (useMixD)
-    {
-        return minDistanceSq<KeyType>(a, b, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
-    }
+                           mixDBits.bz != maxTreeLevel<KeyType>{});
+    if (useMixD) { return minDistanceSq<KeyType>(a, b, box, mixDBits.bx, mixDBits.by, mixDBits.bz); }
     auto [aCenter, aSize] = centerAndSize<KeyType>(a, box);
     auto [bCenter, bSize] = centerAndSize<KeyType>(b, box);
     return norm2(minDistance(aCenter, aSize, bCenter, bSize, box));

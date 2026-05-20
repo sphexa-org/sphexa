@@ -38,9 +38,7 @@ namespace cstone
  */
 template<class T>
 HOST_DEVICE_FUN constexpr T normalize(T d, T min, T max)
-{
-    return (d - min) / (max - min);
-}
+{ return (d - min) / (max - min); }
 
 /*! @brief map x into periodic range 0...R-1
  *
@@ -282,9 +280,7 @@ public:
 
     //! @brief return the shortest coordinate range in any dimension
     HOST_DEVICE_FUN constexpr T minExtent() const // NOLINT
-    {
-        return stl::min(stl::min(xmax() - xmin(), ymax() - ymin()), zmax() - zmin());
-    }
+    { return stl::min(stl::min(xmax() - xmin(), ymax() - ymin()), zmax() - zmin()); }
 
 private:
     HOST_DEVICE_FUN
@@ -448,10 +444,10 @@ struct AxisMixDBits
 template<typename T, typename KeyType, typename BoxType>
 HOST_DEVICE_FUN AxisMixDBits getBoxMixDimensionBits(const BoxType& box)
 {
-    const T dx     = box.xmax() - box.xmin();
-    const T dy     = box.ymax() - box.ymin();
-    const T dz     = box.zmax() - box.zmin();
-    const T maxDim = stl::max(stl::max(dx, dy), dz);
+    const T dx                  = box.xmax() - box.xmin();
+    const T dy                  = box.ymax() - box.ymin();
+    const T dz                  = box.zmax() - box.zmin();
+    const T maxDim              = stl::max(stl::max(dx, dy), dz);
     constexpr unsigned maxLevel = maxTreeLevel<KeyType>{};
 
     const unsigned bx = dx == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::ceil(std::log2(maxDim / dx)));

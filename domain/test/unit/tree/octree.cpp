@@ -395,8 +395,8 @@ KeyType octalToDecimal(std::string octal)
 template<class KeyType>
 std::vector<KeyType> create_octree_from_key(KeyType key)
 {
-    const auto range_max          = std::is_same_v<KeyType, unsigned> ? octalToDecimal<KeyType>("10000000000")
-                                                                      : octalToDecimal<KeyType>("1000000000000000000000");
+    const auto range_max = std::is_same_v<KeyType, unsigned> ? octalToDecimal<KeyType>("10000000000")
+                                                             : octalToDecimal<KeyType>("1000000000000000000000");
     auto span_to_key_num_elements = spanSfcRange<KeyType>(0, key);
     std::vector<KeyType> span_to_key;
     span_to_key.resize(span_to_key_num_elements);
