@@ -49,10 +49,10 @@ namespace sphexa
 
 using namespace sph;
 
-template<bool avClean, class DomainType, class DataType>
-class TurbVeProp final : public HydroVeProp<avClean, DomainType, DataType>
+template<bool SLR, class DomainType, class DataType>
+class TurbVeProp final : public HydroVeProp<SLR, DomainType, DataType>
 {
-    using Base = HydroVeProp<avClean, DomainType, DataType>;
+    using Base = HydroVeProp<SLR, DomainType, DataType>;
     using Base::rank_;
     using Base::timer;
 

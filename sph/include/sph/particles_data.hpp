@@ -126,7 +126,7 @@ public:
     HydroType soundSpeedConst{1.0};
 
     // AV switches floor and ceiling
-    HydroType alphamin{0.05};
+    HydroType alphamin{1.0};
     HydroType alphamax{1.0};
     HydroType decay_constant{0.2};
 

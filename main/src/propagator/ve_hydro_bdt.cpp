@@ -41,9 +41,9 @@ namespace sphexa
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
 PropLib<DomainType, ParticleDataType>::makeHydroVeBdtProp(std::ostream& output, size_t rank,
-                                                          const InitSettings& settings, bool avClean)
+                                                          const InitSettings& settings, bool SLR)
 {
-    if (avClean)
+    if (SLR)
     {
         return std::make_unique<HydroVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings);
     }
@@ -53,9 +53,9 @@ PropLib<DomainType, ParticleDataType>::makeHydroVeBdtProp(std::ostream& output, 
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
 PropLib<DomainType, ParticleDataType>::makeTurbVeBdtProp(std::ostream& output, size_t rank,
-                                                         const InitSettings& settings, bool avClean)
+                                                         const InitSettings& settings, bool SLR)
 {
-    if (avClean) { return std::make_unique<TurbVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
+    if (SLR) { return std::make_unique<TurbVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
     else { return std::make_unique<TurbVeBdtProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
 }
 

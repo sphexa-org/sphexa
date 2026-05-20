@@ -74,16 +74,16 @@ __global__ void reduceDt(const LocalIndex* __restrict__ grpStart, const LocalInd
     if (threadIdx.x == 0) cstone::atomicMinFloat(&minDt_ve_device, minBlockDt);
 }
 
-template<bool avClean, class Dataset>
+template<bool SLR, class Dataset>
 void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
                            const cstone::Box<typename Dataset::RealType>&)
 {
-    momentumAndEnergyIjLoop<avClean>(
+    momentumAndEnergyIjLoop<SLR>(
         d.neighborhood, d.K, d.Kcour, d.Atmin, d.Atmax, d.ramp, rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.m),
         rawPtr(d.c), rawPtr(d.kx), rawPtr(d.alpha), rawPtr(d.xm), rawPtr(d.prho), rawPtr(d.c11), rawPtr(d.c12),
         rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.nc), rawPtr(d.dV11), rawPtr(d.dV12),
         rawPtr(d.dV13), rawPtr(d.dV22), rawPtr(d.dV23), rawPtr(d.dV33), rawPtr(d.tdpdTrho), rawPtr(d.wh), rawPtr(d.du),
-        rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.dtCourant));
+        rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.divv), rawPtr(d.curlv), rawPtr(d.dtCourant));
 
     float minDt = std::numeric_limits<float>::infinity();
     checkGpuErrors(cudaMemcpyToSymbolAsync(GPU_SYMBOL(minDt_ve_device), &minDt, sizeof(minDt)));
@@ -96,8 +96,8 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
     d.minDtCourant = minDt;
 }
 
-#define MOM_ENERGY(avc)                                                                                                \
-    template void computeMomentumEnergy<avc>(const GroupView& grp, float*, sphexa::ParticlesData<cstone::GpuTag>& d,   \
+#define MOM_ENERGY(slr)                                                                                                \
+    template void computeMomentumEnergy<slr>(const GroupView& grp, float*, sphexa::ParticlesData<cstone::GpuTag>& d,   \
                                              const cstone::Box<SphTypes::CoordinateType>&)
 
 MOM_ENERGY(true);

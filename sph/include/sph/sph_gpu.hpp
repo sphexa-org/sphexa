@@ -40,7 +40,7 @@ extern void computeIadDivvCurlvGradh(const GroupView&, Dataset& d, const cstone:
 template<class Dataset>
 extern void computeAVswitches(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
 
-template<bool avClean, class Dataset>
+template<bool SLR, class Dataset>
 extern void computeMomentumEnergy(const GroupView&, float*, Dataset&, const cstone::Box<typename Dataset::RealType>&);
 
 template<class Tt, class Tm, class Th>

@@ -46,10 +46,10 @@ namespace sphexa
 using namespace sph;
 
 //! @brief VE hydro propagator that adds turbulence stirring to the acceleration prior to position update
-template<bool avClean, class DomainType, class DataType>
-class TurbVeBdtProp final : public HydroVeBdtProp<avClean, DomainType, DataType>
+template<bool SLR, class DomainType, class DataType>
+class TurbVeBdtProp final : public HydroVeBdtProp<SLR, DomainType, DataType>
 {
-    using Base = HydroVeBdtProp<avClean, DomainType, DataType>;
+    using Base = HydroVeBdtProp<SLR, DomainType, DataType>;
     using Base::rank_;
     using Base::timer;
     TurbulenceData<typename DataType::RealType, typename DataType::AcceleratorType> turbulenceData;
