@@ -223,7 +223,7 @@ __global__ void computeGeoCentersKernel(
         centers[i] = {0, 0, 0};
         sizes[i]   = {0, 0, 0};
     }
-    else { util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box); }
+    else { util::tie(centers[i], sizes[i]) = useMixD ? centerAndSize<KeyType>(nodeBox, box, mixDBits.bx, mixDBits.by, mixDBits.bz) : centerAndSize<KeyType>(nodeBox, box, false); }
 }
 
 template<class KeyType, class T>

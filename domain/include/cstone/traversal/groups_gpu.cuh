@@ -196,7 +196,7 @@ __global__ void groupSplitsKernel(LocalIndex first,
                                          unitBox, mixDBits.bx, mixDBits.by, mixDBits.bz)
                 : centerAndSize<KeyType>(sfcIBox(sfcKey(leaves[leafIdx[0]]), sfcKey(leaves[leafIdx[0] + 1])), unitBox);
         T vol      = 8 * nodeSize[0] * nodeSize[1] * nodeSize[2];
-        nodeVolume = min(vol, nodeVolume);
+        nodeVolume = vol > 0 ? min(vol, nodeVolume) : nodeVolume;
     }
     nodeVolume  = warpMin(nodeVolume);
     Tc distCrit = std::cbrt(nodeVolume) * tolFactor;

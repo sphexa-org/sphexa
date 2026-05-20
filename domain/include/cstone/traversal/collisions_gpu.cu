@@ -43,8 +43,15 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
         KeyType lowestKey  = leaves[firstNode];
         KeyType highestKey = leaves[lastNode];
 
+        if (tS[0] == 0 && tS[0] == 0 && tS[0] == 0) { return; }
+
+        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+        const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+                              mixDBits.bz != maxTreeLevel<KeyType>{};
+
         // if the halo box is fully inside the assigned SFC range, we skip collision detection
-        if (containedIn(lowestKey, highestKey, tC, tS, box)) { return; }
+        if (useMixD && containedIn(lowestKey, highestKey, tC, tS, box, mixDBits.bx, mixDBits.by, mixDBits.bz)) { return; }
+        if (!useMixD && containedIn(lowestKey, highestKey, tC, tS, box)) { return; }
 
         // mark all colliding node indices outside [lowestKey:highestKey]
         findCollisions(nodePrefixes, childOffsets, parents, nodeCenters, nodeSizes, tC, tS, box, lowestKey, highestKey,

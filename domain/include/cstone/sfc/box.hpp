@@ -447,26 +447,17 @@ struct AxisMixDBits
 template<typename T, typename KeyType, typename BoxType>
 HOST_DEVICE_FUN AxisMixDBits getBoxMixDimensionBits(const BoxType& box)
 {
-    const std::array<T, 3> boxDimensions{box.xmax() - box.xmin(), box.ymax() - box.ymin(), box.zmax() - box.zmin()};
-    const auto maxDimIndex = std::max_element(boxDimensions.begin(), boxDimensions.end()) - boxDimensions.begin();
-    const auto maxDimValue = boxDimensions[maxDimIndex];
-    AxisMixDBits bitLimits;
-    // return {maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}};
+    const T dx     = box.xmax() - box.xmin();
+    const T dy     = box.ymax() - box.ymin();
+    const T dz     = box.zmax() - box.zmin();
+    const T maxDim = stl::max(stl::max(dx, dy), dz);
+    constexpr unsigned maxLevel = maxTreeLevel<KeyType>{};
 
-    for (int i = 0; i < 3; ++i)
-    {
-        const auto bits =
-            boxDimensions[i] == maxDimValue
-                ? maxTreeLevel<KeyType>{}
-                : maxTreeLevel<KeyType>{} - static_cast<int>(std::ceil(std::log2(maxDimValue / boxDimensions[i])));
-        if (i == 0)
-            bitLimits.bx = bits;
-        else if (i == 1)
-            bitLimits.by = bits;
-        else if (i == 2)
-            bitLimits.bz = bits;
-    }
-    return bitLimits;
+    const unsigned bx = dx == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::ceil(std::log2(maxDim / dx)));
+    const unsigned by = dy == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::ceil(std::log2(maxDim / dy)));
+    const unsigned bz = dz == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::ceil(std::log2(maxDim / dz)));
+
+    return {bx, by, bz};
 }
 
 } // namespace cstone
