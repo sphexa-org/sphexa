@@ -184,7 +184,7 @@ __global__ void groupSplitsKernel(LocalIndex first,
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType>(box);
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                           mixDBits.bz != maxTreeLevel<KeyType>{});
-    Box<T> unitBox(0, 1);
+    Box<T> unitBox(0, 1 / (1 << (maxTreeLevel<KeyType>{} - mixDBits.bx)), 0, 1 / (1 << (maxTreeLevel<KeyType>{} - mixDBits.by)), 0, 1 / (1 << (maxTreeLevel<KeyType>{} - mixDBits.bz)));
     T nodeVolume = 1;
     for (int k = 0; k < nwt; ++k)
     {
