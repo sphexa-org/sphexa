@@ -31,121 +31,115 @@
 
 #pragma once
 
-#include "cstone/cuda/annotation.hpp"
-#include "cstone/sfc/box.hpp"
+#include "cstone/traversal/ijloop/ijloop.hpp"
 
-#include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"
 
 namespace sph
 {
 
-template<size_t stride = 1, class Tc, class Tm, class T>
-HOST_DEVICE_FUN void IAD_gradhJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
-                                    const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
-                                    const Tc* y, const Tc* z, const T* h, const Tm* m, const T* wh, const T* whd,
-                                    const T* xm, const T* kx, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, T* gradh)
+template<class T>
+struct IADGradhInteraction
 {
-    const auto xi = x[i];
-    const auto yi = y[i];
-    const auto zi = z[i];
+    const T *wh, *whd;
 
-    const auto hi    = h[i];
-    const auto hiInv = T(1) / hi;
-
-    // IAD preamble
-    T tau11 = 0.0, tau12 = 0.0, tau13 = 0.0, tau22 = 0.0, tau23 = 0.0, tau33 = 0.0;
-
-    // gradh preamble
-    auto whomegai  = T(0);
-    auto wrho0i    = T(0);
-    auto sum_error = T(0);
-
-    for (unsigned pj = 0; pj < neighborsCount; ++pj)
+    template<class ParticleData, class Tc>
+    constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
+                              T r2) const
     {
-        cstone::LocalIndex j = neighbors[stride * pj];
+        const auto [i, iPos, hi, mi, xmi, kxi, nci] = iData;
+        const auto [j, jPos, hj, mj, xmj, kxj, ncj] = jData;
 
-        T rx = (xi - x[j]);
-        T ry = (yi - y[j]);
-        T rz = (zi - z[j]);
+        T rx = r_ij[0];
+        T ry = r_ij[1];
+        T rz = r_ij[2];
 
-        applyPBC(box, T(2) * hi, rx, ry, rz);
+        T hiInv = T(1) / hi;
 
-        T dist   = std::sqrt(rx * rx + ry * ry + rz * rz);
-        T vloc   = dist * hiInv;
-        T w      = lt::lookup(wh, vloc);
-        T xmassj = xm[j];
+        T dist = std::sqrt(r2);
+        T vloc = dist * hiInv;
+        T w    = i == j ? 0 : lt::lookup(wh, vloc);
 
-        T volj_w = xmassj / kx[j] * w;
+        T volj_w = xmj / kxj * w;
 
-        tau11 += rx * rx * volj_w;
-        tau12 += rx * ry * volj_w;
-        tau13 += rx * rz * volj_w;
-        tau22 += ry * ry * volj_w;
-        tau23 += ry * rz * volj_w;
-        tau33 += rz * rz * volj_w;
+        T tau11 = rx * rx * volj_w;
+        T tau12 = rx * ry * volj_w;
+        T tau13 = rx * rz * volj_w;
+        T tau22 = ry * ry * volj_w;
+        T tau23 = ry * rz * volj_w;
+        T tau33 = rz * rz * volj_w;
 
         // gradh summation
-        T dw    = lt::lookup(whd, vloc);
-        T dterh = -(T(3) * w + vloc * dw);
-        whomegai += dterh * xmassj;
-        wrho0i += dterh * m[j];
-        sum_error += dterh * xmassj / kx[j];
+        T dw        = i == j ? 0 : lt::lookup(whd, vloc);
+        T dterh     = -(T(3) * w + vloc * dw);
+        T whomegai  = dterh * xmj;
+        T wrho0i    = dterh * mj;
+        T sum_error = dterh * xmj / kxj;
+
+        return std::make_tuple(tau11, tau12, tau13, tau22, tau23, tau33, whomegai, wrho0i, sum_error);
     }
+};
 
-    // -----------------------------------------------------
-    // IAD postamble
-    auto getExp    = [](T val) { return (val == T(0) ? 0 : std::ilogb(val)); };
-    int  tauExpSum = getExp(tau11) + getExp(tau12) + getExp(tau13) + getExp(tau22) + getExp(tau23) + getExp(tau33);
-    // normalize with 2^-averageTauExponent, ldexp(a, b) == a * 2^b
-    T normalization = std::ldexp(T(1), -tauExpSum / 6);
+template<class T, class Tc>
+struct IADGradhPostamble
+{
+    Tc K;
 
-    tau11 *= normalization;
-    tau12 *= normalization;
-    tau13 *= normalization;
-    tau22 *= normalization;
-    tau23 *= normalization;
-    tau33 *= normalization;
+    template<class ParticleData, class Result>
+    constexpr auto operator()(const ParticleData& iData, const Result& result) const
+    {
+        const auto [i, iPos, hi, mi, xmi, kxi, nci]                                  = iData;
+        auto [tau11, tau12, tau13, tau22, tau23, tau33, whomegai, wrho0i, sum_error] = result;
 
-    T det = tau11 * tau22 * tau33 + T(2) * tau12 * tau23 * tau13 - tau11 * tau23 * tau23 - tau22 * tau13 * tau13 -
-            tau33 * tau12 * tau12;
+        auto getExp    = [](T val) { return (val == T(0) ? 0 : std::ilogb(val)); };
+        int  tauExpSum = getExp(tau11) + getExp(tau12) + getExp(tau13) + getExp(tau22) + getExp(tau23) + getExp(tau33);
+        // normalize with 2^-averageTauExponent, ldexp(a, b) == a * 2^b
+        T normalization = std::ldexp(T(1), -tauExpSum / 6);
 
-    // note normalization factor: cij have units of 1/tau because det is proportional to tau^3, so we have to
-    // divide by K/h^3
-    T factor = normalization * (hi * hi * hi) / (det * K);
-    if (std::isnan(factor) && neighborsCount == 0) { factor = T(0); }
+        tau11 *= normalization;
+        tau12 *= normalization;
+        tau13 *= normalization;
+        tau22 *= normalization;
+        tau23 *= normalization;
+        tau33 *= normalization;
 
-    c11[i] = (tau22 * tau33 - tau23 * tau23) * factor;
-    c12[i] = (tau13 * tau23 - tau33 * tau12) * factor;
-    c13[i] = (tau12 * tau23 - tau22 * tau13) * factor;
-    c22[i] = (tau11 * tau33 - tau13 * tau13) * factor;
-    c23[i] = (tau13 * tau12 - tau11 * tau23) * factor;
-    c33[i] = (tau11 * tau22 - tau12 * tau12) * factor;
-    // -----------------------------------------------------
+        T det = tau11 * tau22 * tau33 + T(2) * tau12 * tau23 * tau13 - tau11 * tau23 * tau23 - tau22 * tau13 * tau13 -
+                tau33 * tau12 * tau12;
 
-    // -----------------------------------------------------
-    // gradh postamble
-    auto h3Inv = hiInv * hiInv * hiInv;
-    auto dnorm = K * hiInv * h3Inv;
+        // note normalization factor: cij have units of 1/tau because det is proportional to tau^3, so we have to
+        // divide by K/h^3
+        T factor = normalization * (hi * hi * hi) / (det * K);
+        if (std::isnan(factor) && nci <= 1) { factor = T(0); }
 
-    whomegai *= dnorm;
-    wrho0i *= dnorm;
-    sum_error *= dnorm;
+        T c11i = (tau22 * tau33 - tau23 * tau23) * factor;
+        T c12i = (tau13 * tau23 - tau33 * tau12) * factor;
+        T c13i = (tau12 * tau23 - tau22 * tau13) * factor;
+        T c22i = (tau11 * tau33 - tau13 * tau13) * factor;
+        T c23i = (tau13 * tau12 - tau11 * tau23) * factor;
+        T c33i = (tau11 * tau22 - tau12 * tau12) * factor;
+        // -----------------------------------------------------
 
-    auto mi     = m[i];
-    auto xmassi = xm[i];
-    auto kxi    = kx[i];
-    T    rhoi   = kxi * mi / xmassi;
+        // -----------------------------------------------------
+        // gradh postamble
+        T    hiInv = T(1) / hi;
+        auto h3Inv = hiInv * hiInv * hiInv;
+        auto dnorm = K * hiInv * h3Inv;
 
-    // The following line uses kxi instead of rhoi/rho0i so that it doesn't need to save an extra variable.
-    // It is correct. However, assumes that the VE definition is xmass=mass/rho.
-    // If the VE definition changes, this line needs to be updated accordingly.
-    whomegai =
-        whomegai * mi / xmassi - rhoi * sum_error + (kxi - K * xmassi * h3Inv) * (wrho0i - rhoi / kxi * sum_error);
-    T dhdrho = -hi / (rhoi * T(3)); // This /3 is the dimension hard-coded.
+        whomegai *= dnorm;
+        wrho0i *= dnorm;
+        sum_error *= dnorm;
 
-    T gradhi = T(1) - dhdrho * whomegai;
-    gradh[i] = gradhi;
-}
+        T rhoi = kxi * mi / xmi;
+
+        // The following line uses kxi instead of rhoi/rho0i so that it doesn't need to save an extra variable.
+        // It is correct. However, assumes that the VE definition is xmass=mass/rho.
+        // If the VE definition changes, this line needs to be updated accordingly.
+        whomegai = whomegai * mi / xmi - rhoi * sum_error + (kxi - K * xmi * h3Inv) * (wrho0i - rhoi / kxi * sum_error);
+        T dhdrho = -hi / (rhoi * T(3)); // This /3 is the dimension hard-coded.
+
+        T gradhi = T(1) - dhdrho * whomegai;
+        return std::make_tuple(c11i, c12i, c13i, c22i, c23i, c33i, gradhi);
+    }
+};
 
 } // namespace sph

@@ -24,8 +24,8 @@ namespace cstone
 {
 
 template<class... Arrays>
-void haloexchange(int epoch, const RecvList& incomingHalos, const SendList& outgoingHalos, MPI_Comm comm,
-                  Arrays... arrays)
+void haloexchange(
+    int epoch, const RecvList& incomingHalos, const SendList& outgoingHalos, MPI_Comm comm, Arrays... arrays)
 {
     using TransferType      = uint64_t;
     constexpr int alignment = sizeof(TransferType);
@@ -82,11 +82,7 @@ void haloexchange(int epoch, const RecvList& incomingHalos, const SendList& outg
         for_each_tuple(unpack, packTuple);
     }
 
-    if (not sendRequests.empty())
-    {
-        MPI_Status status[sendRequests.size()];
-        MPI_Waitall(int(sendRequests.size()), sendRequests.data(), status);
-    }
+    if (not sendRequests.empty()) { MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUSES_IGNORE); }
 
     // MUST call MPI_Barrier or any other collective MPI operation that enforces synchronization
     // across all ranks before calling this function again.

@@ -34,7 +34,7 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
                                 TreeNodeIndex lastNode,
                                 uint8_t* collisionFlags)
 {
-    unsigned leafIdx = blockIdx.x * blockDim.x + threadIdx.x + firstNode;
+    TreeNodeIndex leafIdx = blockIdx.x * blockDim.x + threadIdx.x + firstNode;
 
     if (leafIdx < lastNode)
     {
@@ -105,7 +105,7 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
                                   bool useMixD,
                                   const AxisMixDBits mixDBits)
 {
-    unsigned tid = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (tid >= numFocusNodes) { return; }
 

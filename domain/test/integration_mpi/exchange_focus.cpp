@@ -29,7 +29,7 @@ using namespace cstone;
 template<class KeyType>
 void exchangeFocusIrregular(int myRank, int numRanks)
 {
-    std::vector<KeyType> treeLeavesRef[numRanks], treeLeavesInitial[numRanks];
+    std::vector<std::vector<KeyType>> treeLeavesRef(numRanks), treeLeavesInitial(numRanks);
     std::vector<int> peers;
     std::vector<IndexPair<TreeNodeIndex>> peerFocusIndices(numRanks);
 

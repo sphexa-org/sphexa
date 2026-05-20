@@ -24,7 +24,7 @@ namespace cstone
 template<class KeyType>
 __global__ void createBinaryTreeKernel(const KeyType* cstree, TreeNodeIndex numNodes, BinaryNode<KeyType>* binaryTree)
 {
-    unsigned tid = blockDim.x * blockIdx.x + threadIdx.x;
+    TreeNodeIndex tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < numNodes) { constructInternalNode(cstree, numNodes + 1, binaryTree, tid); }
 }
 

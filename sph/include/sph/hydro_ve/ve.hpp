@@ -36,42 +36,12 @@
 
 namespace sph
 {
-template<class Tc, class Dataset>
-void computeVeImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box)
-{
-    const cstone::LocalIndex* neighbors      = d.neighbors.data();
-    const unsigned*           neighborsCount = d.nc.data();
-
-    const auto* x = d.x.data();
-    const auto* y = d.y.data();
-    const auto* z = d.z.data();
-    const auto* h = d.h.data();
-
-    const auto* wh  = d.wh.data();
-
-    const auto* xm = d.xm.data();
-
-    auto* kx    = d.kx.data();
-
-    const Tc K         = d.K;
-    const Tc sincIndex = d.sincIndex;
-
-#pragma omp parallel for
-    for (size_t i = startIndex; i < endIndex; i++)
-    {
-        size_t   ni        = i - startIndex;
-        unsigned ncCapped  = std::min(neighborsCount[i] - 1, d.ngmax);
-        auto kxi = veJLoop(i, K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, h, wh, xm);
-
-        kx[i] = kxi;
-    }
-}
 
 template<typename Tc, class Dataset>
 void computeVe(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeVe(grp, d, box); }
-    else { computeVeImpl(grp.firstBody, grp.lastBody, d, box); }
+    else { veIjLoop(d.neighborhood, d.K, d.xm.data(), d.wh.data(), d.kx.data()); }
 }
 
 } // namespace sph

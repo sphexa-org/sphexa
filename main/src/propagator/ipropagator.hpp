@@ -79,7 +79,7 @@ public:
     virtual void save(IFileWriter*) {}
 
     //! @brief load internal state from file
-    virtual void load(const std::string& path, IFileReader*) {}
+    virtual void load(const std::string& /* path */, IFileReader*) {}
 
     //! @brief whether conserved quantities are time-synchronized (when completing a full time-step hierarchy)
     virtual bool isSynced() { return true; }
@@ -167,7 +167,7 @@ protected:
             if (!indicesDone.empty() && writer->rank() == 0)
             {
                 std::cout << "WARNING: the following fields are not in use and therefore not output: ";
-                for (int fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
+                for (std::size_t fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
                 {
                     std::cout << d.fieldNames[fidx] << ",";
                 }

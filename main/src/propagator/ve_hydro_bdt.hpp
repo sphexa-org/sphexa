@@ -96,7 +96,7 @@ protected:
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
-                                       "xm", "kx", "nc", "divv", "gradh">;
+                                       "xm", "kx", "nc", "divv", "gradh", "dtCourant">;
 
     //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
@@ -180,7 +180,6 @@ public:
         d.treeView = domain.octreeProperties();
 
         d.resize(domain.nParticlesWithHalos());
-        resizeNeighbors(d, domain.nParticles() * d.ngmax);
 
         computeGroups(domain.startIndex(), domain.endIndex(), d, domain.box(), groups_);
         activeRungs_ = groups_.view();
@@ -195,8 +194,7 @@ public:
         domain.exchangeHalos(get<"x", "y", "z", "h">(d), get<"keys">(d), haloRecvScratch);
         if (d.g != 0.0)
         {
-            domain.updateExpansionCenters(get<"x">(d), get<"y">(d), get<"z">(d), get<"m">(d), get<"keys">(d),
-                                          haloRecvScratch);
+            domain.updateExpansionCenters(get<"x">(d), get<"y">(d), get<"z">(d), get<"m">(d), get<"keys">(d));
         }
 
         //! @brief increase tree-cell search radius for each substep to account for particles drifting out of cells
@@ -231,7 +229,8 @@ public:
 
         fillMassHalos(get<"m">(d), first, last);
 
-        findNeighborsSfc(first, last, d, domain.box());
+        updateSmoothingLengthIterative(activeRungs_, d, domain.box());
+        findNeighborsSfc(activeRungs_, d, domain.box(), true);
         timer.step("FindNeighbors");
         pmReader.step();
 
@@ -249,7 +248,8 @@ public:
         groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
         timer.step("IadVelocityDivCurlGradh");
 
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "gradh">(d), get<"keys">(d), haloRecvScratch);
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "gradh">(d), get<"keys">(d),
+                             haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
         computeEOS(first, last, d);
@@ -437,7 +437,7 @@ public:
         if (!indicesDone.empty() && Base::rank_ == 0)
         {
             std::cout << "WARNING: the following fields are not in use and therefore not output: ";
-            for (int fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
+            for (std::size_t fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
             {
                 std::cout << d.fieldNames[fidx] << ",";
             }

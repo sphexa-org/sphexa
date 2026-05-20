@@ -56,7 +56,7 @@ static void all2allNeighbors(const T* x,
     }
 }
 
-static void sortNeighbors(LocalIndex* neighbors, unsigned* neighborsCount, LocalIndex n, unsigned ngmax)
+inline void sortNeighbors(LocalIndex* neighbors, unsigned* neighborsCount, LocalIndex n, unsigned ngmax)
 {
     for (LocalIndex i = 0; i < n; ++i)
     {

@@ -96,6 +96,15 @@ auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, MPI_C
         extrema[5] = -extrema[5];
     }
 
+    const T max_side_length = std::max({extrema[1] - extrema[0], extrema[3] - extrema[2], extrema[5] - extrema[4]});
+
+    if (previousBox.boundaryX() == BoundaryType::cubic_open)
+        extrema[1] = std::max(extrema[1], extrema[0] + max_side_length);
+    if (previousBox.boundaryY() == BoundaryType::cubic_open)
+        extrema[3] = std::max(extrema[3], extrema[2] + max_side_length);
+    if (previousBox.boundaryZ() == BoundaryType::cubic_open)
+        extrema[5] = std::max(extrema[5], extrema[4] + max_side_length);
+
     return Box<T>{extrema[0],
                   extrema[1],
                   extrema[2],

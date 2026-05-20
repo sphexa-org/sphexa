@@ -232,7 +232,7 @@ __device__ __forceinline__ T warpBitwiseOr(T laneVal)
 //! @brief standard inclusive warp-scan
 __device__ __forceinline__ int inclusiveScanInt(int value)
 {
-    unsigned lane = laneIndex();
+    int lane = laneIndex();
 #pragma unroll
     for (int i = 1; i < GpuConfig::warpSize; i *= 2)
     {
