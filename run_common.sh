@@ -86,7 +86,7 @@ run_sim() {
   rm profile.h5 ${run_dir}/profile.h5 2>/dev/null || true
 
   OMP_NUM_THREADS="${CORES}" \
-  srun -n "${RANKS}" ${MPS_WRAP} ${PROFILE_EXEC} "${binary}" \
+  srun -n "${RANKS}" --mpi=cray_shasta ${MPS_WRAP} ${PROFILE_EXEC} "${binary}" \
     --glass "${GLASS}" \
     --init  "${INIT_COND}" \
     -n      "${N}" \
