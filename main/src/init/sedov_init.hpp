@@ -47,10 +47,10 @@ namespace sphexa
 {
 
 template<class Dataset>
-void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
+void initSedovFields(Dataset& d, const InitSettings& constants)
 {
     constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T            = typename Dataset::RealType;
+    using T            = Dataset::RealType;
 
     double r           = constants.at("r1");
     double totalVolume = std::pow(2 * r, 3);
@@ -63,25 +63,10 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
     // We distribute energy as exp(-r2 / width2), with width taken as the current 2h, so that the enery
     // is deposited in about ng0 neighbors.
     // ener0 is the constant that should multiply the Gaussian so that its integral equals energytotal
-    double ener0  = constants.at("energyTotal") / std::pow(M_PI, 1.5) / width2 / width;
+    double ener0 = constants.at("energyTotal") / std::pow(M_PI, 1.5) / width2 / width;
 
-
-    cstone::fill<gpu>(d.m.begin(), d.m.end(), mPart);
+    initFieldsAtRest(d, mPart);
     cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
-    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
-    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
-
-    cstone::fill<gpu>(d.vx.begin(), d.vx.end(), 0.0);
-    cstone::fill<gpu>(d.vy.begin(), d.vy.end(), 0.0);
-    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
-
-    // general form: d.x_m1[i] = d.vx[i] * firstTimeStep;
-    cstone::fill<gpu>(d.x_m1.begin(), d.x_m1.end(), 0.0);
-    cstone::fill<gpu>(d.y_m1.begin(), d.y_m1.end(), 0.0);
-    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
-
-    generateParticleIDs<gpu>(d.id);
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
 
