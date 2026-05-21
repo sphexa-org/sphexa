@@ -33,6 +33,7 @@
 #include "cstone/sfc/box.hpp"
 #include "isim_init.hpp"
 #include "grid.hpp"
+#include "utils.hpp"
 #include "sph/eos.hpp"
 
 namespace sphexa
