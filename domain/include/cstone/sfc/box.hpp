@@ -450,9 +450,9 @@ HOST_DEVICE_FUN AxisMixDBits getBoxMixDimensionBits(const BoxType& box)
     const T maxDim              = stl::max(stl::max(dx, dy), dz);
     constexpr unsigned maxLevel = maxTreeLevel<KeyType>{};
 
-    const unsigned bx = dx == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::ceil(std::log2(maxDim / dx)));
-    const unsigned by = dy == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::ceil(std::log2(maxDim / dy)));
-    const unsigned bz = dz == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::ceil(std::log2(maxDim / dz)));
+    const unsigned bx = dx == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::floor(std::log2(maxDim / dx)));
+    const unsigned by = dy == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::floor(std::log2(maxDim / dy)));
+    const unsigned bz = dz == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::floor(std::log2(maxDim / dz)));
 
     return {bx, by, bz};
 }
