@@ -90,6 +90,7 @@ int main(int argc, char** argv)
     const bool               quiet        = parser.exists("--quiet");
     const bool               SLR          = !parser.exists("--no-slr");
     const bool               AVswitches   = parser.exists("--avswitches");
+    const bool               haveAvFloor  = parser.exists("--avfloor");
     const int                simDuration  = parser.get("--duration", std::numeric_limits<int>::max());
     const std::string        writeFreqStr = parser.get("-w", std::string("0"));
     const bool               writeEnabled = writeFreqStr != "0" || !writeExtra.empty();
@@ -98,6 +99,7 @@ int main(int argc, char** argv)
     const std::string        pmroot       = parser.get("--pmroot", std::string("")); // /sys/cray/pm_counters
     std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
     std::string              profFile     = parser.get("-op", std::string("profile"));
+    const bool               initFromFile = fs::exists(strBeforeSign(initCond, ":")) || fs::exists(strBeforeSign(initCond, ","));
 
     std::ofstream nullOutput("/dev/null");
     std::ostream& output = (quiet || rank) ? nullOutput : std::cout;
@@ -112,6 +114,7 @@ int main(int argc, char** argv)
 
     Dataset simData;
     simData.comm = MPI_COMM_WORLD;
+    if (AVswitches) { simData.hydro.alphamin = 0.05; }
 
     Timer totalTimer(output);
     MPI_Barrier(MPI_COMM_WORLD);
@@ -123,6 +126,14 @@ int main(int argc, char** argv)
     auto box = simInit->init(rank, numRanks, problemSize, simData, fileReader.get());
 
     auto& d = simData.hydro;
+    if (haveAvFloor) { d.avFloor = parser.get<double>("--avfloor"); }
+    if (!AVswitches && initFromFile)
+    {
+        constexpr bool gpu = cstone::HaveGpu<AccType>{};
+        d.alphamin         = 1.0;
+        d.alphamax         = 1.0;
+        cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
+    }
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
 
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
@@ -276,6 +287,9 @@ void printHelp(char* name, int rank)
         printf("\t--no-slr \t Disable slope-limited reconstruction for artificial-viscosity dissipation\n\n");
 
         printf("\t--avswitches \t Enable artificial-viscosity switches [disabled by default]\n\n");
+
+        printf("\t--avFloor NUM \t Set the floor F in the SLR/Balsara AV amplitude clamp.\n"
+               "\t\t\t F=1 disables the floor [default], F=0.5 is useful for subsonic turbulence.\n\n");
 
         printf("\t--duration \t Maximum wall-clock run time of the simulation in seconds.[MAX_INT]\n\n");
 
