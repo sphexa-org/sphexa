@@ -77,11 +77,12 @@ HOST_DEVICE_FUN constexpr int pbcDistance(int x, int R)
     return (ret > R / 2) ? ret - R : ret;
 }
 
-enum class BoundaryType : char
+enum class BoundaryType : uint8_t
 {
-    open     = 0,
-    periodic = 1,
-    fixed    = 2
+    open       = 0,
+    periodic   = 1,
+    fixed      = 2,
+    cubic_open = 3
 };
 
 /*! @brief stores the coordinate bounds
@@ -151,7 +152,7 @@ public:
     void loadOrStore(Archive* ar)
     {
         ar->stepAttribute("box", limits, 6);
-        ar->stepAttribute("boundaryType", (char*)boundaries, 3);
+        ar->stepAttribute("boundaryType", reinterpret_cast<std::underlying_type_t<BoundaryType>*>(boundaries), 3);
 
         *this = Box<T>(limits[0], limits[1], limits[2], limits[3], limits[4], limits[5], boundaries[0], boundaries[1],
                        boundaries[2]);

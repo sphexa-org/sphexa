@@ -10,11 +10,6 @@ if(CMAKE_CUDA_COMPILER)
 endif ()
 
 if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
-    cstone_add_cuda_performance_test(neighbor_driver.cu neighbors_test_gpu)
     cstone_add_cuda_performance_test(octree.cu octree_perf_gpu)
     cstone_add_cuda_performance_test(hilbert.cu hilbert_perf_gpu)
-
-    if (CMAKE_CUDA_COMPILER)
-        set_source_files_properties(octree.cu PROPERTIES COMPILE_OPTIONS --expt-relaxed-constexpr)
-    endif()
 endif()

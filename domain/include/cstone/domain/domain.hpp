@@ -369,16 +369,18 @@ public:
         auto si = startIndex();
         focusTree_.updateCenters(rawPtr(x) + si, rawPtr(y) + si, rawPtr(z) + si, rawPtr(m) + si, global_.octree(), s1);
         focusTree_.setMacRadius(1.0 / theta_);
-    };
+    }
 
     OctreeNsView<T, KeyType> octreeProperties() const
     {
         auto ft = focusTree_.octreeViewAcc();
         return {ft.numLeafNodes,
+                ft.numNodes,
                 ft.prefixes,
                 ft.childOffsets,
                 ft.parents,
                 ft.internalToLeaf,
+                ft.leafToInternal,
                 ft.levelRange,
                 focusTree_.treeLeavesAcc().data(),
                 rawPtr(layoutAcc_),

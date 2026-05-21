@@ -83,7 +83,7 @@ __global__ void linkTree(const KeyType* prefixes,
                          TreeNodeIndex* parents)
 {
     // loop over octree nodes index in unsorted layout A
-    unsigned tid = blockDim.x * blockIdx.x + threadIdx.x;
+    TreeNodeIndex tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < numInternalNodes)
     {
         TreeNodeIndex idxA    = leafToInternal[tid];
@@ -229,8 +229,8 @@ __global__ void locateNodesKernel(const KeyType* k1,
                                   const TreeNodeIndex* lvlRange,
                                   TreeNodeIndex* indices)
 {
-    LocalIndex tid  = blockIdx.x * blockDim.x + threadIdx.x;
-    TreeNodeIndex n = k2 - k1 - 1;
+    TreeNodeIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex n   = k2 - k1 - 1;
     if (tid < n) { indices[tid] = locateNode(k1[tid], k1[tid + 1], nodeKeys, lvlRange); }
 }
 
