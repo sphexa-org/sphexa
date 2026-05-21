@@ -492,8 +492,26 @@ HOST_DEVICE_FUN IBox hilbertIBoxKeys(KeyType keyStart, KeyType keyEnd) noexcept
 template<class KeyType>
 HOST_DEVICE_FUN bool isValidHilbertMixDKey(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
 {
-    std::array<unsigned, 3> bits{bx, by, bz};
-    std::sort(bits.begin(), bits.end());
+    // Ascending 3-element sort network (GPU-friendly, no std::sort)
+    unsigned bits[3] = {bx, by, bz};
+    if (bits[0] > bits[1])
+    {
+        unsigned t = bits[0];
+        bits[0]    = bits[1];
+        bits[1]    = t;
+    }
+    if (bits[0] > bits[2])
+    {
+        unsigned t = bits[0];
+        bits[0]    = bits[2];
+        bits[2]    = t;
+    }
+    if (bits[1] > bits[2])
+    {
+        unsigned t = bits[1];
+        bits[1]    = bits[2];
+        bits[2]    = t;
+    }
     for (unsigned i{1}; i <= maxTreeLevel<KeyType>(); ++i)
     {
         const KeyType shiftedKey               = key >> (3 * (i - 1));
@@ -546,8 +564,26 @@ HOST_DEVICE_FUN IBox hilbertMixDIBox(KeyType keyStart, unsigned level, unsigned 
 template<class KeyType>
 HOST_DEVICE_FUN constexpr unsigned treeLevelMixD(KeyType codeRange, unsigned bx, unsigned by, unsigned bz) noexcept
 {
-    std::array<unsigned, 3> bits{bx, by, bz};
-    std::sort(bits.begin(), bits.end());
+    // Ascending 3-element sort network (GPU-friendly, no std::sort)
+    unsigned bits[3] = {bx, by, bz};
+    if (bits[0] > bits[1])
+    {
+        unsigned t = bits[0];
+        bits[0]    = bits[1];
+        bits[1]    = t;
+    }
+    if (bits[0] > bits[2])
+    {
+        unsigned t = bits[0];
+        bits[0]    = bits[2];
+        bits[2]    = t;
+    }
+    if (bits[1] > bits[2])
+    {
+        unsigned t = bits[1];
+        bits[1]    = bits[2];
+        bits[2]    = t;
+    }
     unsigned level{0};
     KeyType codeRangeLevel{1};
     while (codeRange > codeRangeLevel)
