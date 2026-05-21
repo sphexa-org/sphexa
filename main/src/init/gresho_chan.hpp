@@ -46,9 +46,7 @@ InitSettings GreshoChanSettings()
 
 template<class T>
 double twoDimRadius(T x, T y)
-{
-    return std::sqrt(x * x + y * y);
-}
+{ return std::sqrt(x * x + y * y); }
 
 template<class Dataset, class T>
 void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& settings, T mPart)

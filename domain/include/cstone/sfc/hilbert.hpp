@@ -128,22 +128,37 @@ iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, un
     KeyType key = 0;
 
     // Sort bits[] descending while tracking permutation[] — 3-element sort network (GPU-friendly)
-    unsigned bits[3] = {bx, by, bz};
+    unsigned bits[3]   = {bx, by, bz};
     int permutation[3] = {0, 1, 2};
-    if (bits[0] < bits[1]) {
-        unsigned t = bits[0]; bits[0] = bits[1]; bits[1] = t;
-        int tp = permutation[0]; permutation[0] = permutation[1]; permutation[1] = tp;
+    if (bits[0] < bits[1])
+    {
+        unsigned t     = bits[0];
+        bits[0]        = bits[1];
+        bits[1]        = t;
+        int tp         = permutation[0];
+        permutation[0] = permutation[1];
+        permutation[1] = tp;
     }
-    if (bits[0] < bits[2]) {
-        unsigned t = bits[0]; bits[0] = bits[2]; bits[2] = t;
-        int tp = permutation[0]; permutation[0] = permutation[2]; permutation[2] = tp;
+    if (bits[0] < bits[2])
+    {
+        unsigned t     = bits[0];
+        bits[0]        = bits[2];
+        bits[2]        = t;
+        int tp         = permutation[0];
+        permutation[0] = permutation[2];
+        permutation[2] = tp;
     }
-    if (bits[1] < bits[2]) {
-        unsigned t = bits[1]; bits[1] = bits[2]; bits[2] = t;
-        int tp = permutation[1]; permutation[1] = permutation[2]; permutation[2] = tp;
+    if (bits[1] < bits[2])
+    {
+        unsigned t     = bits[1];
+        bits[1]        = bits[2];
+        bits[2]        = t;
+        int tp         = permutation[1];
+        permutation[1] = permutation[2];
+        permutation[2] = tp;
     }
 
-    KeyType coordinates[3] = {px, py, pz};
+    KeyType coordinates[3]       = {px, py, pz};
     KeyType sortedCoordinates[3] = {coordinates[permutation[0]], coordinates[permutation[1]],
                                     coordinates[permutation[2]]};
 
@@ -323,19 +338,34 @@ HOST_DEVICE_FUN inline util::tuple<unsigned, unsigned, unsigned>
 decodeHilbertMixD(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
 {
     // Sort bits[] descending while tracking permutation[] — 3-element sort network (GPU-friendly)
-    unsigned bits[3] = {bx, by, bz};
+    unsigned bits[3]   = {bx, by, bz};
     int permutation[3] = {0, 1, 2};
-    if (bits[0] < bits[1]) {
-        unsigned t = bits[0]; bits[0] = bits[1]; bits[1] = t;
-        int tp = permutation[0]; permutation[0] = permutation[1]; permutation[1] = tp;
+    if (bits[0] < bits[1])
+    {
+        unsigned t     = bits[0];
+        bits[0]        = bits[1];
+        bits[1]        = t;
+        int tp         = permutation[0];
+        permutation[0] = permutation[1];
+        permutation[1] = tp;
     }
-    if (bits[0] < bits[2]) {
-        unsigned t = bits[0]; bits[0] = bits[2]; bits[2] = t;
-        int tp = permutation[0]; permutation[0] = permutation[2]; permutation[2] = tp;
+    if (bits[0] < bits[2])
+    {
+        unsigned t     = bits[0];
+        bits[0]        = bits[2];
+        bits[2]        = t;
+        int tp         = permutation[0];
+        permutation[0] = permutation[2];
+        permutation[2] = tp;
     }
-    if (bits[1] < bits[2]) {
-        unsigned t = bits[1]; bits[1] = bits[2]; bits[2] = t;
-        int tp = permutation[1]; permutation[1] = permutation[2]; permutation[2] = tp;
+    if (bits[1] < bits[2])
+    {
+        unsigned t     = bits[1];
+        bits[1]        = bits[2];
+        bits[2]        = t;
+        int tp         = permutation[1];
+        permutation[1] = permutation[2];
+        permutation[2] = tp;
     }
 
     KeyType coordinates[3] = {0, 0, 0};
@@ -375,7 +405,7 @@ decodeHilbertMixD(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
     coordinates[1] |= get<1>(pair3D);
     coordinates[2] |= get<2>(pair3D);
 
-    KeyType returnCoordinates[3] = {0, 0, 0};
+    KeyType returnCoordinates[3]      = {0, 0, 0};
     returnCoordinates[permutation[0]] = coordinates[0];
     returnCoordinates[permutation[1]] = coordinates[1];
     returnCoordinates[permutation[2]] = coordinates[2];

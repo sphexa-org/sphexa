@@ -63,8 +63,7 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
     // We distribute energy as exp(-r2 / width2), with width taken as the current 2h, so that the enery
     // is deposited in about ng0 neighbors.
     // ener0 is the constant that should multiply the Gaussian so that its integral equals energytotal
-    double ener0  = constants.at("energyTotal") / std::pow(M_PI, 1.5) / width2 / width;
-
+    double ener0 = constants.at("energyTotal") / std::pow(M_PI, 1.5) / width2 / width;
 
     cstone::fill<gpu>(d.m.begin(), d.m.end(), mPart);
     cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
@@ -104,7 +103,10 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
         std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
         d.temp = std::move(u);
     }
-    else { d.u = std::move(u); }
+    else
+    {
+        d.u = std::move(u);
+    }
 }
 
 template<class Dataset>
