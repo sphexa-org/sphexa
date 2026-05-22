@@ -114,7 +114,6 @@ int main(int argc, char** argv)
 
     Dataset simData;
     simData.comm = MPI_COMM_WORLD;
-    if (AVswitches) { simData.hydro.alphamin = 0.05; }
 
     Timer totalTimer(output);
     MPI_Barrier(MPI_COMM_WORLD);
@@ -126,6 +125,13 @@ int main(int argc, char** argv)
     auto box = simInit->init(rank, numRanks, problemSize, simData, fileReader.get());
 
     auto& d = simData.hydro;
+    if (AVswitches)
+    {
+        constexpr bool gpu        = cstone::HaveGpu<AccType>{};
+        const bool     resetAlpha = !initFromFile || d.alphamin == 1.0;
+        d.alphamin                = 0.05;
+        if (resetAlpha) { cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin); }
+    }
     if (haveAvFloor) { d.avFloor = parser.get<double>("--avfloor"); }
     if (!AVswitches && initFromFile)
     {
@@ -288,7 +294,7 @@ void printHelp(char* name, int rank)
 
         printf("\t--avswitches \t Enable artificial-viscosity switches [disabled by default]\n\n");
 
-        printf("\t--avFloor NUM \t Set the floor F in the SLR/Balsara AV amplitude clamp.\n"
+        printf("\t--avfloor NUM \t Set the floor F in the SLR/Balsara AV amplitude clamp.\n"
                "\t\t\t F=1 disables the floor [default], F=0.5 is useful for subsonic turbulence.\n\n");
 
         printf("\t--duration \t Maximum wall-clock run time of the simulation in seconds.[MAX_INT]\n\n");
