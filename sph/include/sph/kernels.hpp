@@ -60,13 +60,15 @@ HOST_DEVICE_FUN inline T wharmonic_derivative_std(T v)
 
 /*! @brief calculate the artificial viscosity between a pair of two particles
  *
- * @tparam T      float or double
- * @param alpha_i viscosity switch of particle i
- * @param alpha_j viscosity switch of particle j
- * @param c_i     speed of sound particle i
- * @param c_j     speed of sound particle j
- * @param w_ij    relative velocity (v_i - v_j), projected onto the connecting axis (r_i - r_j)
- * @return        the viscosity
+ * @tparam T       float or double
+ * @param alpha_i  viscosity switch of particle i
+ * @param alpha_j  viscosity switch of particle j
+ * @param c_i      speed of sound particle i
+ * @param c_j      speed of sound particle j
+ * @param w_ij     relative velocity (v_i - v_j), projected onto the connecting axis (r_i - r_j)
+ * @param w_ij_slr relative SLR corrected velocity (v'_i - v'_j), projected onto the connecting axis (r_i - r_j)
+ * @param Lij      Floor limit for the linear term (Default: Lij=1.0, i.e. deactivated)
+ * @return         the viscosity
  */
 template<typename T>
 HOST_DEVICE_FUN inline T artificial_viscosity(T alpha_i, T alpha_j, T c_i, T c_j, T w_ij, T w_ij_slr, T Lij)
