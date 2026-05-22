@@ -413,6 +413,39 @@ TEST_F(SphKernelTests, MomentumEnergy)
     }
 }
 
+TEST_F(SphKernelTests, MomentumEnergyAvFloor)
+{
+    using Vec3 = cstone::Vec3<T>;
+
+    auto makeParticle = [](unsigned id, T vx)
+    {
+        return std::make_tuple(id, Vec3{0, 0, 0}, T(1), vx, T(0), T(0), T(1), T(1), T(1), T(1), T(1), T(0),
+                               T(1), T(0), T(0), T(1), T(0), T(1), unsigned(2), T(0), T(0), T(0), T(0),
+                               T(0), T(0), T(0), T(0), T(1));
+    };
+
+    const auto iData = makeParticle(0, T(0));
+    const auto jData = makeParticle(1, T(1));
+    const Vec3 r_ij{1, 0, 0};
+
+    auto evaluate = [&](T floor)
+    {
+        MomentumAndEnergyInteraction<true, T> interaction{wh.data(), Atmin, Atmax, ramp, floor};
+        MomentumAndEnergyPostamble<false, T, T> postamble{K};
+        return postamble(iData, cstone::ijloop::unwrapModifiers(interaction(iData, jData, r_ij, T(1))));
+    };
+
+    const auto defaultFloor = evaluate(T(1.0));
+    const auto clampedFloor = evaluate(T(0.5));
+    const T    ratio        = T(2.5) / T(3.0);
+
+    EXPECT_NEAR(std::get<0>(clampedFloor) / std::get<0>(defaultFloor), ratio, 1e-12);
+    EXPECT_NEAR(std::get<1>(clampedFloor) / std::get<1>(defaultFloor), ratio, 1e-12);
+    EXPECT_NEAR(std::get<2>(defaultFloor), T(0), 1e-12);
+    EXPECT_NEAR(std::get<3>(defaultFloor), T(0), 1e-12);
+    EXPECT_NEAR(std::get<4>(clampedFloor), std::get<4>(defaultFloor), 1e-12);
+}
+
 template<size_t stride = 1, class Tc, class T>
 HOST_DEVICE_FUN inline T veJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
                                  const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x, const Tc* y,
