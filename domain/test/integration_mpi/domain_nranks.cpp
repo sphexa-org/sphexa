@@ -71,6 +71,7 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks)
         const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
         const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                               mixDBits.bz != maxTreeLevel<KeyType>{};
+        EXPECT_EQ(useMixD0, useMixD);
         if (useMixD)
         {
             computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(keysRef.data()), x.size(), box,
