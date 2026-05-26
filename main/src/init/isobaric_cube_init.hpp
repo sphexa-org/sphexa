@@ -84,19 +84,7 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
     T epsilon   = constants.at("epsilon");
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
-
-    cstone::fill<gpu>(d.m.begin(), d.m.end(), massPart);
-    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
-    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
-    cstone::fill<gpu>(d.vx.begin(), d.vx.end(), 0.0);
-    cstone::fill<gpu>(d.vy.begin(), d.vy.end(), 0.0);
-    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
-    cstone::fill<gpu>(d.x_m1.begin(), d.x_m1.end(), 0.0);
-    cstone::fill<gpu>(d.y_m1.begin(), d.y_m1.end(), 0.0);
-    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
-
-    generateParticleIDs<gpu>(d.id);
+    initFieldsAtRest(d, massPart);
 
     auto&&                 x = toHost(d.x);
     auto&&                 y = toHost(d.y);
