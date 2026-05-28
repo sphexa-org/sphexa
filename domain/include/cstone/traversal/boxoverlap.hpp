@@ -251,62 +251,6 @@ HOST_DEVICE_FUN int addDelta(int value, int delta, bool pbc)
     }
 }
 
-//! @brief create a box with specified radius around node delineated by codeStart/End
-template<class KeyType, class CoordinateType, class RadiusType>
-HOST_DEVICE_FUN IBox makeHaloBox(const IBox& nodeBox, RadiusType radius, const Box<CoordinateType>& box)
-{
-    int dx = toNBitIntCeil<KeyType>(radius * box.ilx());
-    int dy = toNBitIntCeil<KeyType>(radius * box.ily());
-    int dz = toNBitIntCeil<KeyType>(radius * box.ilz());
-
-    bool pbcX = (box.boundaryX() == cstone::BoundaryType::periodic);
-    bool pbcY = (box.boundaryY() == cstone::BoundaryType::periodic);
-    bool pbcZ = (box.boundaryZ() == cstone::BoundaryType::periodic);
-
-    return IBox(addDelta<KeyType>(nodeBox.xmin(), -dx, pbcX), addDelta<KeyType>(nodeBox.xmax(), dx, pbcX),
-                addDelta<KeyType>(nodeBox.ymin(), -dy, pbcY), addDelta<KeyType>(nodeBox.ymax(), dy, pbcY),
-                addDelta<KeyType>(nodeBox.zmin(), -dz, pbcZ), addDelta<KeyType>(nodeBox.zmax(), dz, pbcZ));
-}
-
-template<class KeyType, class CoordinateType, class RadiusType>
-HOST_DEVICE_FUN IBox makeHaloBox(
-    const IBox& nodeBox, RadiusType radius, const Box<CoordinateType>& box, unsigned bx, unsigned by, unsigned bz)
-{
-    int dx    = toNBitIntCeil<KeyType>(radius * box.ilx(), bx); // TODO(iomaganaris): is this reasonable?
-    int dy    = toNBitIntCeil<KeyType>(radius * box.ily(), by); // TODO(iomaganaris): is this reasonable?
-    int dz    = toNBitIntCeil<KeyType>(radius * box.ilz(), bz); // TODO(iomaganaris): is this reasonable?
-    bool pbcX = (box.boundaryX() == cstone::BoundaryType::periodic);
-    bool pbcY = (box.boundaryY() == cstone::BoundaryType::periodic);
-    bool pbcZ = (box.boundaryZ() == cstone::BoundaryType::periodic);
-
-    return IBox(addDelta<KeyType>(nodeBox.xmin(), -dx, pbcX), addDelta<KeyType>(nodeBox.xmax(), dx, pbcX),
-                addDelta<KeyType>(nodeBox.ymin(), -dy, pbcY), addDelta<KeyType>(nodeBox.ymax(), dy, pbcY),
-                addDelta<KeyType>(nodeBox.zmin(), -dz, pbcZ), addDelta<KeyType>(nodeBox.zmax(), dz, pbcZ));
-}
-
-//! @brief create a box with specified radius around node delineated by codeStart/End
-template<class KeyType, class CoordinateType, class RadiusType>
-HOST_DEVICE_FUN IBox makeHaloBox(KeyType codeStart, KeyType codeEnd, RadiusType radius, const Box<CoordinateType>& box)
-{
-    // disallow boxes with no volume
-    assert(codeEnd > codeStart);
-    const auto mixDBits = getBoxMixDimensionBits<CoordinateType, KeyType, Box<CoordinateType>>(box);
-    const auto useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{};
-    IBox nodeBox = useMixD ? sfcIBox(sfcMixDKey(codeStart), sfcMixDKey(codeEnd), mixDBits.bx, mixDBits.by, mixDBits.bz)
-                           : sfcIBox(sfcKey(codeStart), sfcKey(codeEnd));
-    if (useMixD &&
-        (nodeBox.xmin() == nodeBox.xmax() || nodeBox.ymin() == nodeBox.ymax() || nodeBox.zmin() == nodeBox.zmax()))
-    {
-        // zero volume boxes cannot have a halo box
-        return nodeBox;
-    }
-    const auto finalHaloBox = useMixD
-                                  ? makeHaloBox<KeyType>(nodeBox, radius, box, mixDBits.bx, mixDBits.by, mixDBits.bz)
-                                  : makeHaloBox<KeyType>(nodeBox, radius, box);
-    return finalHaloBox;
-}
-
 //! @brief returns true if the cuboid defined by center and size is contained within the bounding box
 template<class T>
 HOST_DEVICE_FUN bool insideBox(const Vec3<T>& center, const Vec3<T>& size, const Box<T>& box)
