@@ -144,6 +144,8 @@ public:
     //! @brief choice of smoothing kernel type
     sph::SphKernelType kernelChoice{sph::SphKernelType::sinc_n};
 
+    HydroType condition_quality_target{1e-6};
+
     //! @brief Unified interface to attribute initialization, reading and writing
     template<class Archive>
     void loadOrStoreAttributes(Archive* ar)
@@ -202,6 +204,7 @@ public:
 
         optionalIO("sincIndex", &sincIndex, 1);
         optionalIO("kernelChoice", &kernelChoice, 1);
+        optionalIO("condition_quality_target", &condition_quality_target, 1);
 
         createTables();
     }
