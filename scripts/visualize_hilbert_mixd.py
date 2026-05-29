@@ -142,7 +142,7 @@ def main() -> None:
         ax.plot(xs, ys, zs, linewidth=1.0, marker="o", markersize=2)
         # Mark start (green) and end (red)
         ax.scatter([xs[0]], [ys[0]], [zs[0]], color="green", s=60, label="start")
-        ax.scatter([xs[-2]], [ys[-2]], [zs[-2]], color="red", s=60, label="end")
+        ax.scatter([xs[-1]], [ys[-1]], [zs[-1]], color="red", s=60, label="end")
         ax.legend()
         ax.set_title(
             f"MixD Hilbert curve centers (bx, by, bz)=({bx}, {by}, {bz}), key_type={args.key_type}, "
@@ -175,7 +175,7 @@ def main() -> None:
             name='start'
         )
         end_marker = go.Scatter3d(
-            x=[xs[-2]], y=[ys[-2]], z=[zs[-2]],
+            x=[xs[-1]], y=[ys[-1]], z=[zs[-1]],
             mode='markers',
             marker=dict(size=7, color='red', symbol='circle'),
             name='end'
