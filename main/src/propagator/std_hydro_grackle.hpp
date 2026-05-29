@@ -164,7 +164,9 @@ public:
         size_t last  = domain.endIndex();
 
         computeGroups(first, last, d, domain.box(), groups_);
+        timer.step("computeGroups");
         updateSmoothingLengthIterative(groups_.view(), d, domain.box());
+        timer.step("updateSmoothingLengthIterative");
         findNeighborsSfc(groups_.view(), d, domain.box());
         timer.step("FindNeighbors");
 

@@ -139,7 +139,9 @@ public:
         fillMassHalos(get<"m">(d), first, last);
 
         computeGroups(first, last, d, domain.box(), groups_);
+        timer.step("computeGroups");
         updateSmoothingLengthIterative(groups_.view(), d, domain.box());
+        timer.step("updateSmoothingLengthIterative");
         findNeighborsSfc(groups_.view(), d, domain.box());
         timer.step("FindNeighbors");
         pmReader.step();

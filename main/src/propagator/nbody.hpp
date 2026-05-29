@@ -130,6 +130,7 @@ public:
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
 
         computeGroups(first, last, d, domain.box(), groups_);
+        timer.step("computeGroups");
 
         cstone::fill<cstone::HaveGpu<Acc>{}>(d.ax.begin() + first, d.ax.begin() + last, HydroType(0));
         cstone::fill<cstone::HaveGpu<Acc>{}>(d.ay.begin() + first, d.ay.begin() + last, HydroType(0));
