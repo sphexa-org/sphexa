@@ -210,7 +210,6 @@ __global__ void computeGeoCentersKernel(const KeyType* prefixes,
                                         Vec3<T>* centers,
                                         Vec3<T>* sizes,
                                         const Box<T> box,
-                                        bool useMixD,
                                         const AxisMixDBits mixDBits)
 {
     TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -219,15 +218,14 @@ __global__ void computeGeoCentersKernel(const KeyType* prefixes,
     KeyType prefix   = prefixes[i];
     KeyType startKey = decodePlaceholderBit(prefix);
     unsigned level   = decodePrefixLength(prefix) / 3;
-    auto nodeBox     = useMixD ? sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx,
-                                         mixDBits.by, mixDBits.bz)
-                               : sfcIBox(sfcKey(startKey), level);
+    auto nodeBox =
+        sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx, mixDBits.by, mixDBits.bz);
     if (nodeBox == IBox{})
     {
         centers[i] = {0, 0, 0};
         sizes[i]   = {0, 0, 0};
     }
-    else { util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box, not useMixD); }
+    else { util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box); }
 }
 
 template<class KeyType, class T>
@@ -237,9 +235,7 @@ void computeGeoCentersGpu(
     unsigned numThreads = 256;
     unsigned numBlocks  = iceil(numNodes, numThreads);
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                           mixDBits.bz != maxTreeLevel<KeyType>{});
-    computeGeoCentersKernel<<<numBlocks, numThreads>>>(prefixes, numNodes, centers, sizes, box, useMixD, mixDBits);
+    computeGeoCentersKernel<<<numBlocks, numThreads>>>(prefixes, numNodes, centers, sizes, box, mixDBits);
 }
 
 #define GEO_CENTERS_GPU(KeyType, T)                                                                                    \
