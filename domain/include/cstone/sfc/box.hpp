@@ -317,34 +317,16 @@ template<class KeyType, class T>
 constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>>
 centerAndSize(const IBox& ibox, const Box<T>& box, const bool disableMixD = false)
 {
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD =
-        !disableMixD && (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{});
-    if (useMixD) { return centerAndSize<KeyType>(ibox, box, mixDBits.bx, mixDBits.by, mixDBits.bz); }
+    auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    if (disableMixD) { mixDBits = {maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}}; }
+
     constexpr int maxCoord = 1u << maxTreeLevel<KeyType>{};
     // smallest octree cell edge length in unit cube
     constexpr T uL = T(1.) / maxCoord;
 
-    T halfUnitLengthX = T(0.5) * uL * box.lx();
-    T halfUnitLengthY = T(0.5) * uL * box.ly();
-    T halfUnitLengthZ = T(0.5) * uL * box.lz();
-    Vec3<T> boxCenter = {box.xmin() + (ibox.xmax() + ibox.xmin()) * halfUnitLengthX,
-                         box.ymin() + (ibox.ymax() + ibox.ymin()) * halfUnitLengthY,
-                         box.zmin() + (ibox.zmax() + ibox.zmin()) * halfUnitLengthZ};
-    Vec3<T> boxSize   = {(ibox.xmax() - ibox.xmin()) * halfUnitLengthX, (ibox.ymax() - ibox.ymin()) * halfUnitLengthY,
-                         (ibox.zmax() - ibox.zmin()) * halfUnitLengthZ};
-
-    return {boxCenter, boxSize};
-}
-
-template<class KeyType, class T>
-constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>>
-centerAndSize(const IBox& ibox, const Box<T>& box, unsigned bx, unsigned by, unsigned bz)
-{
-    T halfUnitLengthX = T(0.5) * box.lx() / (1u << bx);
-    T halfUnitLengthY = T(0.5) * box.ly() / (1u << by);
-    T halfUnitLengthZ = T(0.5) * box.lz() / (1u << bz);
+    T halfUnitLengthX = T(0.5) * uL * box.lx() * (1u << (maxTreeLevel<KeyType>{} - mixDBits.bx));
+    T halfUnitLengthY = T(0.5) * uL * box.ly() * (1u << (maxTreeLevel<KeyType>{} - mixDBits.by));
+    T halfUnitLengthZ = T(0.5) * uL * box.lz() * (1u << (maxTreeLevel<KeyType>{} - mixDBits.bz));
     Vec3<T> boxCenter = {box.xmin() + (ibox.xmax() + ibox.xmin()) * halfUnitLengthX,
                          box.ymin() + (ibox.ymax() + ibox.ymin()) * halfUnitLengthY,
                          box.zmin() + (ibox.zmax() + ibox.zmin()) * halfUnitLengthZ};

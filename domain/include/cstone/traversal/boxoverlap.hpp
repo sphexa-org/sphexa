@@ -331,26 +331,11 @@ overlap(const Vec3<T>& aCenter, const Vec3<T>& aSize, const Vec3<T>& bCenter, co
 template<class KeyType, class T>
 HOST_DEVICE_FUN T minDistanceSq(IBox a, IBox b, const Box<T>& box)
 {
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                           mixDBits.bz != maxTreeLevel<KeyType>{});
-    if (useMixD) { return minDistanceSq<KeyType>(a, b, box, mixDBits.bx, mixDBits.by, mixDBits.bz); }
     auto [aCenter, aSize] = centerAndSize<KeyType>(a, box);
     auto [bCenter, bSize] = centerAndSize<KeyType>(b, box);
-    return norm2(minDistance(aCenter, aSize, bCenter, bSize, box));
-}
-
-//! @brief Convenience wrapper to minDistance. This should only be used for testing.
-template<class KeyType, class T>
-HOST_DEVICE_FUN T minDistanceSq(IBox a, IBox b, const Box<T>& box, unsigned bx, unsigned by, unsigned bz)
-{
-
-    auto [aCenter, aSize] = centerAndSize<KeyType>(a, box, bx, by, bz);
-    auto [bCenter, bSize] = centerAndSize<KeyType>(b, box, bx, by, bz);
-    if ((aSize[0] == 0 && aSize[1] == 0 && aSize[2] == 0) || (bSize[0] == 0 && bSize[1] == 0 && bSize[2] == 0))
+    if (aSize == Vec3<T>{0, 0, 0} || bSize == Vec3<T>{0, 0, 0})
     {
-        // if one of the boxes has no size, the distance is infinite
-        // this is the case for nodes that shouldn't have any particles in them
+        // if a or b has no size, it's from a unmapped area of a mix-dim SFC curve and contains no particles
         return std::numeric_limits<T>::max();
     }
     return norm2(minDistance(aCenter, aSize, bCenter, bSize, box));

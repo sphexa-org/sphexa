@@ -243,11 +243,8 @@ void markMacs(const KeyType* prefixes,
         IBox target = useMixD ? sfcIBox(sfcMixDKey(focusNodes[i]), sfcMixDKey(focusNodes[i + 1]), mixDBits.bx,
                                         mixDBits.by, mixDBits.bz)
                               : sfcIBox(sfcKey(focusNodes[i]), sfcKey(focusNodes[i + 1]));
-        if (target.xmin() == 0 && target.xmax() == 0 && target.ymin() == 0 && target.ymax() == 0 &&
-            target.zmin() == 0 && target.zmax() == 0)
-        {
-            continue;
-        }
+        if (target == IBox{}) { continue; }
+
         IBox targetExt = IBox(target.xmin() - 1, target.xmax() + 1, target.ymin() - 1, target.ymax() + 1,
                               target.zmin() - 1, target.zmax() + 1);
         if (useMixD && containedIn(focusStart, focusEnd, targetExt, mixDBits.bx, mixDBits.by, mixDBits.bz))
