@@ -220,12 +220,7 @@ __global__ void computeGeoCentersKernel(const KeyType* prefixes,
     unsigned level   = decodePrefixLength(prefix) / 3;
     auto nodeBox =
         sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx, mixDBits.by, mixDBits.bz);
-    if (nodeBox == IBox{})
-    {
-        centers[i] = {0, 0, 0};
-        sizes[i]   = {0, 0, 0};
-    }
-    else { util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box); }
+    util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box);
 }
 
 template<class KeyType, class T>
