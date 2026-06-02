@@ -314,11 +314,9 @@ using FBox = SimpleBox<T>;
  * @return           the geometrical center and the vector from the center to the box corner farthest from the origin
  */
 template<class KeyType, class T>
-constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>>
-centerAndSize(const IBox& ibox, const Box<T>& box, const bool disableMixD = false)
+constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox& ibox, const Box<T>& box)
 {
     auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    if (disableMixD) { mixDBits = {maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}}; }
 
     constexpr int maxCoord = 1u << maxTreeLevel<KeyType>{};
     // smallest octree cell edge length in unit cube
@@ -345,9 +343,9 @@ centerAndSize(const IBox& ibox, const Box<T>& box, const bool disableMixD = fals
  * @return           the floating point box
  */
 template<class KeyType, class T>
-constexpr HOST_DEVICE_FUN FBox<T> createFpBox(const IBox& ibox, const Box<T>& box, bool disableMixD = false)
+constexpr HOST_DEVICE_FUN FBox<T> createFpBox(const IBox& ibox, const Box<T>& box)
 {
-    auto [center, size] = centerAndSize<KeyType>(ibox, box, disableMixD);
+    auto [center, size] = centerAndSize<KeyType>(ibox, box);
 
     auto Xmin = center - size;
     auto Xmax = center + size;

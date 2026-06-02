@@ -146,11 +146,9 @@ void setMac(std::span<const KeyType> nodeKeys,
 
 //! @brief compute geometric node centers based on node SFC keys and the global bounding box
 template<class KeyType, class T>
-void nodeFpCenters(
-    std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box, bool disableMixD = false)
+void nodeFpCenters(std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box)
 {
     auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    if (disableMixD) { mixDBits = {maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}}; }
 
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < prefixes.size(); ++i)
@@ -161,7 +159,7 @@ void nodeFpCenters(
 
         IBox nodeBox = sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx, mixDBits.by,
                                mixDBits.bz);
-        util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box, disableMixD);
+        util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box);
     }
 }
 
