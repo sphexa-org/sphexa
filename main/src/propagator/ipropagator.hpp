@@ -32,8 +32,12 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cstdint>
+#include <numeric>
 #include <variant>
 
+#include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
 #include "sph/particles_data.hpp"
@@ -137,6 +141,28 @@ public:
     }
 
 protected:
+    template<class HydroData>
+    void printIadRegularizationStats(const HydroData& d, size_t first, size_t last, const char* label)
+    {
+        auto&& flags = toHost(d.iadRegularized);
+        last         = std::min(last, flags.size());
+
+        uint64_t localCount = 0;
+        for (size_t i = first; i < last; ++i)
+        {
+            localCount += flags[i] != 0;
+        }
+
+        uint64_t globalCount = 0;
+        mpiAllreduce(&localCount, &globalCount, 1, MPI_SUM, MPI_COMM_WORLD);
+
+        if (rank_ == 0)
+        {
+            out << "### IAD regularization ### " << label << ": " << globalCount << " / " << d.numParticlesGlobal
+                << " particles, target " << d.condition_quality_target << std::endl;
+        }
+    }
+
     static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData)
     {
         auto output = [](auto& d, IFileWriter* writer)

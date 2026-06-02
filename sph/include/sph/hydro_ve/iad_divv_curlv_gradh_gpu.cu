@@ -47,7 +47,7 @@ void computeIadDivvCurlvGradh(const GroupView&, Dataset& d, const cstone::Box<ty
                             rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.gradh), rawPtr(d.divv),
                             d.curlv.size() == d.x.size() ? rawPtr(d.curlv) : nullptr, rawPtr(d.dV11), rawPtr(d.dV12),
                             rawPtr(d.dV13), rawPtr(d.dV22), rawPtr(d.dV23), rawPtr(d.dV33),
-                            d.dV11.size() == d.x.size());
+                            d.dV11.size() == d.x.size(), d.condition_quality_target, rawPtr(d.iadRegularized));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 

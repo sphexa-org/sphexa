@@ -31,8 +31,11 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
+#include "sph/iad_regularization.hpp"
 #include "sph/table_lookup.hpp"
 
 namespace sph
@@ -84,6 +87,8 @@ template<class T, class Tc>
 struct IADGradhPostamble
 {
     Tc K;
+    T        condition_quality_target{};
+    uint8_t* iadRegularized{nullptr};
 
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
@@ -103,13 +108,18 @@ struct IADGradhPostamble
         tau23 *= normalization;
         tau33 *= normalization;
 
-        T det = tau11 * tau22 * tau33 + T(2) * tau12 * tau23 * tau13 - tau11 * tau23 * tau23 - tau22 * tau13 * tau13 -
-                tau33 * tau12 * tau12;
+        bool wasRegularized = false;
+        T    det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, condition_quality_target,
+                                             &wasRegularized);
+        if (iadRegularized) { iadRegularized[i] = wasRegularized; }
 
         // note normalization factor: cij have units of 1/tau because det is proportional to tau^3, so we have to
         // divide by K/h^3
-        T factor = normalization * (hi * hi * hi) / (det * K);
-        if (std::isnan(factor) && nci <= 1) { factor = T(0); }
+        T factor = (nci > 1 && det > T(0)) ? normalization * (hi * hi * hi) / (det * K) : T(0);
+        if (std::isnan(factor) || factor > std::numeric_limits<T>::max() || factor < -std::numeric_limits<T>::max())
+        {
+            factor = T(0);
+        }
 
         T c11i = (tau22 * tau33 - tau23 * tau23) * factor;
         T c12i = (tau13 * tau23 - tau33 * tau12) * factor;

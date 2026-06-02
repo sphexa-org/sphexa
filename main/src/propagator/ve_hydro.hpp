@@ -74,7 +74,7 @@ protected:
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
-                                       "xm", "kx", "nc", "dtCourant">;
+                                       "xm", "kx", "nc", "dtCourant", "iadRegularized">;
 
     //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
@@ -157,6 +157,7 @@ public:
         release(d, "ay", "az");
         acquire(d, "divv", "gradh");
         computeIadDivvCurlvGradh(groups_.view(), d, domain.box());
+        Base::printIadRegularizationStats(d, groups_.view().firstBody, groups_.view().lastBody, "ve");
         d.minDtRho = rhoTimestep(first, last, d);
         timer.step("IadVelocityDivCurlGradh");
 

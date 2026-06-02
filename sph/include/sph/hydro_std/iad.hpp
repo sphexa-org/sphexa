@@ -45,7 +45,8 @@ void computeIAD(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
     else
     {
         IADIjLoop(d.neighborhood, d.K, d.m.data(), d.rho.data(), d.nc.data(), d.wh.data(), d.c11.data(), d.c12.data(),
-                  d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data(), d.condition_quality_target);
+                  d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data(), d.condition_quality_target,
+                  d.iadRegularized.data());
     }
 }
 

@@ -43,7 +43,8 @@ template<class Dataset>
 void computeIADGpu(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
     IADIjLoop(d.neighborhood, d.K, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.nc), rawPtr(d.wh), rawPtr(d.c11), rawPtr(d.c12),
-              rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), d.condition_quality_target);
+              rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), d.condition_quality_target,
+              rawPtr(d.iadRegularized));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 

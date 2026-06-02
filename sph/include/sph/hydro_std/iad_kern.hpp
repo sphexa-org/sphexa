@@ -1,7 +1,10 @@
 #pragma once
 
+#include <cstdint>
+
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
+#include "sph/iad_regularization.hpp"
 #include "sph/table_lookup.hpp"
 
 namespace sph
@@ -47,7 +50,8 @@ template<class T, class Tc>
 struct IADPostambleSTD
 {
     Tc K;
-    T condition_quality_target;
+    T        condition_quality_target{};
+    uint8_t* iadRegularized{nullptr};
 
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
@@ -67,21 +71,18 @@ struct IADPostambleSTD
         tau23 *= normalization;
         tau33 *= normalization;
 
-        T det = tau11 * tau22 * tau33 + T(2) * tau12 * tau23 * tau13 - tau11 * tau23 * tau23 - tau22 * tau13 * tau13 -
-                tau33 * tau12 * tau12;
-
-        const T tr_avg = (tau11 + tau22 + tau33) / 3;
-        const T condition_quality = std::max(det / (tr_avg * tr_avg * tr_avg), T(0));
-        if (condition_quality < condition_quality_target)
-        {
-            tau12 = tau13 = tau23 = 0.;
-            det = tau11 * tau22 * tau33;
-        }
+        bool wasRegularized = false;
+        T    det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, condition_quality_target,
+                                             &wasRegularized);
+        if (iadRegularized) { iadRegularized[i] = wasRegularized; }
 
         // Note normalization factor: cij have units of 1/tau because det is proportional to tau^3 so we have to
         // divide by K/h^3.
-        T factor = normalization * (hi * hi * hi) / (det * K);
-        if (std::isnan(factor) && nci <= 1) { factor = T(0); }
+        T factor = (nci > 1 && det > T(0)) ? normalization * (hi * hi * hi) / (det * K) : T(0);
+        if (std::isnan(factor) || factor > std::numeric_limits<T>::max() || factor < -std::numeric_limits<T>::max())
+        {
+            factor = T(0);
+        }
 
         return std::make_tuple(                       //
             (tau22 * tau33 - tau23 * tau23) * factor, //
@@ -95,10 +96,11 @@ struct IADPostambleSTD
 
 template<class Neighborhood, class Tc, class Tm, class T>
 void IADIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* rho, const unsigned* nc, const T* wh,
-               T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, T condition_quality_target)
+               T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, T condition_quality_target,
+               uint8_t* iadRegularized)
 {
     neighborhood.ijLoop(std::make_tuple(m, rho, nc), std::make_tuple(c11, c12, c13, c22, c23, c33),
-                        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K, condition_quality_target});
+                        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K, condition_quality_target, iadRegularized});
 }
 
 } // namespace sph

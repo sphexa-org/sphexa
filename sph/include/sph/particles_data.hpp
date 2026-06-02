@@ -250,6 +250,7 @@ public:
     FieldVector<uint8_t>   rung;                               // rung per particle of previous timestep
     FieldVector<uint64_t>  id;                                 // unique particle id
     FieldVector<HydroType> dtCourant;                          // per-particle timestep restriction
+    FieldVector<uint8_t>   iadRegularized;                      // whether IAD ridge regularization was applied
 
     std::conditional_t<cstone::HaveGpu<AccType>{}, sph::DeviceNeighborhoodData, sph::NeighborhoodData> neighborhood;
     cstone::OctreeNsView<RealType, KeyType>                                                            treeView;
@@ -269,7 +270,8 @@ public:
         "u",   "p",    "prho",  "tdpdTrho", "h",    "m",    "c",     "ugrav", "ax",    "ay",
         "az",  "du",   "du_m1", "c11",      "c12",  "c13",  "c22",   "c23",   "c33",   "mue",
         "mui", "temp", "cv",    "xm",       "kx",   "divv", "curlv", "alpha", "gradh", "keys",
-        "nc",  "dV11", "dV12",  "dV13",     "dV22", "dV23", "dV33",  "rung",  "id",    "dtCourant"};
+        "nc",  "dV11", "dV12",  "dV13",     "dV22", "dV23", "dV33",  "rung",  "id",    "dtCourant",
+        "iadRegularized"};
 
     //! @brief dataset prefix to be prepended to fieldNames for structured output
     static const inline std::string prefix{};
@@ -282,7 +284,8 @@ public:
     {
         auto ret = std::tie(x, y, z, x_m1, y_m1, z_m1, vx, vy, vz, rho, u, p, prho, tdpdTrho, h, m, c, ugrav, ax, ay,
                             az, du, du_m1, c11, c12, c13, c22, c23, c33, mue, mui, temp, cv, xm, kx, divv, curlv, alpha,
-                            gradh, keys, nc, dV11, dV12, dV13, dV22, dV23, dV33, rung, id, dtCourant);
+                            gradh, keys, nc, dV11, dV12, dV13, dV22, dV23, dV33, rung, id, dtCourant,
+                            iadRegularized);
 
 #if defined(__clang__) || __GNUC__ > 11
         static_assert(std::tuple_size_v<decltype(ret)> == fieldNames.size());

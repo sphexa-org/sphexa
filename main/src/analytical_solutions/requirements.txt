@@ -1,1 +1,4 @@
-../../../scripts/requirements.txt
+h5py
+matplotlib
+numpy
+scipy

@@ -71,7 +71,8 @@ class HydroGrackleProp final : public HydroProp<DomainType, DataType>
 
     //! @brief the list of dependent particle fields, these may be used as scratch space during domain sync
     using DependentFields =
-        FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33", "nc">;
+        FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33", "nc",
+                  "iadRegularized">;
 
     //! @brief All fields listed in Chemistry data are used. This could be overridden with a sublist if desired
     using CoolingFields = typename cooling::Cooler<T>::CoolingFields;
@@ -178,6 +179,7 @@ public:
         timer.step("mpi::synchronizeHalos");
 
         computeIAD(groups_.view(), d, domain.box());
+        Base::printIadRegularizationStats(d, groups_.view().firstBody, groups_.view().lastBody, "std-grackle");
         timer.step("IAD");
 
         domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33">(d), get<"ax">(d), get<"ay">(d));
