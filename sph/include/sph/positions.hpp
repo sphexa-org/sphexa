@@ -85,6 +85,19 @@ HOST_DEVICE_FUN auto positionUpdate(double dt, double dt_m1, cstone::Vec3<T> Xn,
     auto Xnp1    = cstone::putInBox(Xn + dXnp1, box);
 
     return util::tuple<cstone::Vec3<T>, cstone::Vec3<T>, cstone::Vec3<T>>{Xnp1, Vnp1, dXnp1};
+    // auto Vnmhalf = dXn * (T(1) / dt_m1);
+    // auto Vn      = Vnmhalf + T(0.5) * dt_m1 * An;
+    // auto Vnp1    = Vn + An * dt;
+
+    // auto r2      = dot(Xn, Xn);
+    // auto u       = Xn * (T(1) / std::sqrt(r2));
+    // Vn          -= u * dot(Vn, u);
+    // Vnp1        -= u * dot(Vnp1, u);
+
+    // auto dXnp1   = (Vn + T(0.5) * An * dt) * dt;
+    // auto Xnp1    = cstone::putInBox(Xn + dXnp1, box);
+
+    // return util::tuple<cstone::Vec3<T>, cstone::Vec3<T>, cstone::Vec3<T>>{Xnp1, Vnp1, dXnp1};
 }
 
 template<class T, class Dataset>

@@ -157,7 +157,7 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
     {
         Thydro cvi    = (cv != nullptr) ? cv[i] : ((constCv < 0) ? idealGasCv(mui[i], gamma) : constCv);
         auto   u_old = temp[i] * cvi;
-        temp[i]      = energyUpdate(u_old, dt, dt_m1_rung, du[i], du_m1[i]) / cvi;
+        // temp[i]      = energyUpdate(u_old, dt, dt_m1_rung, du[i], du_m1[i]) / cvi;
         du_m1[i]     = du[i];
     }
     else if (u != nullptr)

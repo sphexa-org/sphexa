@@ -15,6 +15,7 @@
 
 #include "cstone/cuda/cub.hpp"
 #include <thrust/execution_policy.h>
+#include <thrust/reduce.h>
 
 #include "cstone/cuda/errorcheck.cuh"
 #include "cstone/focus/rebalance.hpp"

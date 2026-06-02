@@ -127,8 +127,9 @@ public:
     HydroType soundSpeedConst{1.0};
 
     // AV switches floor and ceiling
-    HydroType alphamin{0.05};
-    HydroType alphamax{1.0};
+    // HydroType alphamin{0.05};
+    HydroType alphamin{1.5};
+    HydroType alphamax{1.5};
     HydroType decay_constant{0.2};
 
     // Min. Atwood number in ramp function in momentum equation (crossed/uncrossed selection)

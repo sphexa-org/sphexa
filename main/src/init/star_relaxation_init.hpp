@@ -54,7 +54,8 @@ std::map<std::string, double> StarRelaxationConstants()
             {"gravConstant", 6.6726e-8},
             {"eosChoice", sph::EosType::helmholtz},
             {"ng0", 100},
-            {"ngmax", 150}};
+            {"ngmax", 150},
+            {"star-relaxation", 1.0}};
 }
 
 template<class Dataset>

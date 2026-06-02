@@ -57,6 +57,7 @@ struct Observables
     static ObsPtr makeTimeEnergyGrowthObs(std::ostream& out);
     static ObsPtr makeTurbMachObs(std::ostream& out);
     static ObsPtr makeWindBubbleObs(std::ostream& out, double rhoI, double uE, double r);
+    static ObsPtr makeTimeEnergyStabilObs(std::ostream& out);
 };
 
 extern template struct Observables<SimulationData<cstone::CpuTag>>;

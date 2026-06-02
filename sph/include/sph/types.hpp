@@ -40,9 +40,9 @@ struct SphTypes
 {
     using KeyType        = uint64_t;
     using CoordinateType = double;
-    using HydroType      = float;
-    using XM1Type        = float;
-    using Tmass          = float;
+    using HydroType      = double;
+    using XM1Type        = double;
+    using Tmass          = double;
 };
 
 } // namespace sph

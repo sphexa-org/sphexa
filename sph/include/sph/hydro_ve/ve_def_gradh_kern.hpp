@@ -85,7 +85,7 @@ HOST_DEVICE_FUN inline util::tuple<T, T> veDefGradhJLoop(cstone::LocalIndex i, T
     T rhoi   = kxi * mi / xmassi;
     T dhdrho = -hi / (rhoi * T(3)); // This /3 is the dimension hard-coded.
 
-    T gradhi = T(1) - dhdrho * whomegai;
+    T gradhi = T(1);// - dhdrho * whomegai;
     return {kxi, gradhi};
 }
 

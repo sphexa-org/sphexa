@@ -67,7 +67,9 @@ std::unique_ptr<IObservables<Dataset>> observablesFactory(const InitSettings& se
     }
     if (settings.count("kelvin-helmholtz")) { return Observables<Dataset>::makeTimeEnergyGrowthObs(constantsFile); }
 
-    return Observables<Dataset>::makeTimeEnergyObs(constantsFile);
+    if (settings.count("star-relaxation")) { return Observables<Dataset>::makeTimeEnergyStabilObs(constantsFile); }
+
+    return Observables<Dataset>::makeTimeEnergyStabilObs(constantsFile);
 }
 
 } // namespace sphexa

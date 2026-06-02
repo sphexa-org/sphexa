@@ -29,8 +29,16 @@
  * @author Lukas Schmidt
  */
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
+
 #include <thrust/execution_policy.h>
+#include <thrust/copy.h>
+#include <thrust/device_vector.h>
 #include <thrust/iterator/zip_iterator.h>
+#include <thrust/sort.h>
+#include <thrust/transform.h>
 #include <thrust/transform_reduce.h>
 
 #include "cstone/util/tuple.hpp"
@@ -166,5 +174,76 @@ double survivingMassGpu(const Tt* temp, const T* kx, const T* xmass, const Tm* m
 SURVIVORS(double, double, double);
 SURVIVORS(float, float, float);
 SURVIVORS(float, double, float);
+
+//! @brief functor to compute particle radius and density for stabil observable
+template<class Tc, class Tk, class Tm, class Txm>
+struct StabilRadiusDensity
+{
+    HOST_DEVICE_FUN
+    thrust::tuple<double, double> operator()(const thrust::tuple<Tc, Tc, Tc, Tk, Tm, Txm>& p)
+    {
+        auto x  = static_cast<double>(get<0>(p));
+        auto y  = static_cast<double>(get<1>(p));
+        auto z  = static_cast<double>(get<2>(p));
+        auto kx = static_cast<double>(get<3>(p));
+        auto m  = static_cast<double>(get<4>(p));
+        auto xm = static_cast<double>(get<5>(p));
+
+        double r   = std::sqrt(x * x + y * y + z * z);
+        double rho = kx * m / xm;
+
+        return thrust::make_tuple(r, rho);
+    }
+};
+
+template<class Tc, class Tk, class Tm, class Txm>
+std::tuple<std::vector<double>, std::vector<double>, std::vector<double>> gpuStabilLocal(
+    const Tc* x, const Tc* y, const Tc* z, const Tk* kx, const Tm* m, const Txm* xm, size_t startIndex,
+    size_t endIndex, size_t sampleSize)
+{
+    std::vector<double> centralRadii(sampleSize, std::numeric_limits<double>::max());
+    std::vector<double> centralDensities(sampleSize, 0.0);
+    std::vector<double> surfaceRadii(sampleSize, std::numeric_limits<double>::lowest());
+
+    size_t localCount = endIndex - startIndex;
+    if (localCount == 0 || sampleSize == 0) { return {centralRadii, centralDensities, surfaceRadii}; }
+
+    thrust::device_vector<double> radii(localCount);
+    thrust::device_vector<double> densities(localCount);
+
+    auto inFirst = thrust::make_zip_iterator(
+        thrust::make_tuple(x + startIndex, y + startIndex, z + startIndex, kx + startIndex, m + startIndex, xm + startIndex));
+    auto inLast = thrust::make_zip_iterator(
+        thrust::make_tuple(x + endIndex, y + endIndex, z + endIndex, kx + endIndex, m + endIndex, xm + endIndex));
+
+    auto outFirst = thrust::make_zip_iterator(thrust::make_tuple(radii.begin(), densities.begin()));
+
+    thrust::transform(thrust::device, inFirst, inLast, outFirst, StabilRadiusDensity<Tc, Tk, Tm, Txm>{});
+
+    thrust::sort_by_key(thrust::device, radii.begin(), radii.end(), densities.begin(), thrust::less<double>{});
+
+    size_t nCandidates = std::min(sampleSize, localCount);
+
+    thrust::copy_n(radii.begin(), nCandidates, centralRadii.begin());
+    thrust::copy_n(densities.begin(), nCandidates, centralDensities.begin());
+
+    // Copy the largest radii to host without using reverse iterators on the device copy path
+    thrust::copy(radii.end() - nCandidates, radii.end(), surfaceRadii.begin());
+    std::reverse(surfaceRadii.begin(), surfaceRadii.begin() + nCandidates);
+
+    return {centralRadii, centralDensities, surfaceRadii};
+}
+
+#define STABIL_GPU(Tc, Tk, Tm, Txm)                                                                                  \
+    template std::tuple<std::vector<double>, std::vector<double>, std::vector<double>> gpuStabilLocal(             \
+        const Tc* x, const Tc* y, const Tc* z, const Tk* kx, const Tm* m, const Txm* xm, size_t startIndex,        \
+        size_t endIndex, size_t sampleSize)
+
+STABIL_GPU(double, double, double, double);
+STABIL_GPU(float, float, float, float);
+STABIL_GPU(double, float, float, float);
+STABIL_GPU(float, double, float, float);
+STABIL_GPU(float, float, double, float);
+STABIL_GPU(float, float, float, double);
 
 } // namespace sphexa

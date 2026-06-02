@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include <vector>
 #include <tuple>
 #include "cstone/sfc/box.hpp"
 
@@ -86,4 +87,29 @@ extern double machSquareSumGpu(const Tv* vx, const Tv* vy, const Tv* vz, const T
 template<class T, class Tt, class Tm>
 extern double survivingMassGpu(const Tt* temp, const T* kx, const T* xmass, const Tm* m, double rhoBubble,
                                double tempWind, size_t first, size_t last);
+
+/*! @brief compute local stabil observable candidates on GPU
+ *
+ * Computes local particle radii and densities on device, selects the particles with smallest radii for
+ * central-density candidates, and the largest radii for surface-radius candidates.
+ *
+ * @tparam Tc          coordinate type
+ * @tparam Tk          volume element normalization type
+ * @tparam Tm          mass type
+ * @tparam Txm         volume element definition type
+ * @param x            x-coordinates
+ * @param y            y-coordinates
+ * @param z            z-coordinates
+ * @param kx           VE normalization
+ * @param m            particle mass
+ * @param xm           VE definition
+ * @param startIndex   first local particle
+ * @param endIndex     last local particle
+ * @param sampleSize   number of candidates to return for each output vector
+ * @return             tuple(centralRadiiSmallest, centralDensitiesAtSmallestRadii, surfaceRadiiLargest)
+ */
+template<class Tc, class Tk, class Tm, class Txm>
+extern std::tuple<std::vector<double>, std::vector<double>, std::vector<double>> gpuStabilLocal(
+    const Tc* x, const Tc* y, const Tc* z, const Tk* kx, const Tm* m, const Txm* xm, size_t startIndex,
+    size_t endIndex, size_t sampleSize);
 } // namespace sphexa

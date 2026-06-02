@@ -9,6 +9,7 @@
 #include "time_energy_growth.hpp"
 #include "turbulence_mach_rms.hpp"
 #include "wind_bubble_fraction.hpp"
+#include "time_energy_stabil.hpp"
 
 #include "iobservables.hpp"
 
@@ -45,6 +46,12 @@ std::unique_ptr<IObservables<Dataset>> Observables<Dataset>::makeWindBubbleObs(s
                                                                                double uExt, double r)
 {
     return std::make_unique<WindBubble<Dataset>>(out, rhoI, uExt, r);
+}
+
+template<class Dataset>
+std::unique_ptr<IObservables<Dataset>> Observables<Dataset>::makeTimeEnergyStabilObs(std::ostream& out)
+{
+    return std::make_unique<TimeEnergyStabil<Dataset>>(out);
 }
 
 #ifdef USE_CUDA
