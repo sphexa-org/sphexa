@@ -35,11 +35,7 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
                                     KeyType excludeEnd,
                                     uint8_t* flags)
 {
-    if (targetSize[0] == 0 && targetSize[1] == 0 && targetSize[2] == 0)
-    {
-        // if the target is empty, we return no overlap
-        return;
-    }
+    if (targetSize == Vec3<T>{0, 0, 0}) { return; }
     auto overlaps = [&](TreeNodeIndex idx)
     {
         auto [nk1, nk2] = decodePlaceholderBit2K(nodePrefixes[idx]);
@@ -94,23 +90,12 @@ void findHalos(const KeyType* prefixes,
     KeyType highestKey = leaves[lastNode];
 
     const auto mixDBits = getBoxMixDimensionBits<Tc, KeyType, Box<Tc>>(box);
-    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{};
 
 #pragma omp parallel for
     for (TreeNodeIndex leafIdx = firstNode; leafIdx < lastNode; ++leafIdx)
     {
-        if (searchSizes[leafIdx][0] == 0 && searchSizes[leafIdx][1] == 0 && searchSizes[leafIdx][2] == 0)
-        {
-            // if the target is empty, we skip it
-            continue;
-        }
-        if (useMixD && containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box,
-                                   mixDBits.bx, mixDBits.by, mixDBits.bz))
-        {
-            continue;
-        }
-        if (!useMixD && containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box))
+        if (containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box, mixDBits.bx,
+                        mixDBits.by, mixDBits.bz))
         {
             continue;
         }
