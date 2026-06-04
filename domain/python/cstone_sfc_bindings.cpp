@@ -242,7 +242,6 @@ NB_MODULE(cstone_sfc, m)
     m.def("centerAndSize",
           [](const std::array<int, 6>& iboxLimits,
              const std::array<double, 6>& boxLimits,
-             bool disableMixD,
              const std::string& keyType)
           {
               validateIBox(iboxLimits);
@@ -253,51 +252,19 @@ NB_MODULE(cstone_sfc, m)
               {
               case KeyKind::uint64:
               {
-                  auto [center, size] = cstone::centerAndSize<KeyType64>(ibox, box, disableMixD);
+                  auto [center, size] = cstone::centerAndSize<KeyType64>(ibox, box);
                   return std::make_pair(toStdArray(center), toStdArray(size));
               }
               case KeyKind::u32:
               {
-                  auto [center, size] = cstone::centerAndSize<KeyType32>(ibox, box, disableMixD);
+                  auto [center, size] = cstone::centerAndSize<KeyType32>(ibox, box);
                   return std::make_pair(toStdArray(center), toStdArray(size));
               }
               }
               return std::make_pair(std::array<double, 3>{0, 0, 0}, std::array<double, 3>{0, 0, 0});
           },
-          nb::arg("ibox_limits"), nb::arg("box_limits"), nb::arg("disableMixD") = false,
+          nb::arg("ibox_limits"), nb::arg("box_limits"),
           nb::arg("key_type") = "uint64_t",
           "Compute center and half-size from integer box and physical box");
 
-    m.def("centerAndSizeMixD",
-          [](const std::array<int, 6>& iboxLimits,
-             const std::array<double, 6>& boxLimits,
-             unsigned bx,
-             unsigned by,
-             unsigned bz,
-             const std::string& keyType)
-          {
-              validateIBox(iboxLimits);
-              validateBox(boxLimits);
-              const auto ibox = makeIBox(iboxLimits);
-              const auto box = makeBox(boxLimits);
-              switch (parseKeyKind(keyType))
-              {
-              case KeyKind::uint64:
-              {
-                  validateBits<KeyType64>(bx, by, bz);
-                  auto [center, size] = cstone::centerAndSize<KeyType64>(ibox, box, bx, by, bz);
-                  return std::make_pair(toStdArray(center), toStdArray(size));
-              }
-              case KeyKind::u32:
-              {
-                  validateBits<KeyType32>(bx, by, bz);
-                  auto [center, size] = cstone::centerAndSize<KeyType32>(ibox, box, bx, by, bz);
-                  return std::make_pair(toStdArray(center), toStdArray(size));
-              }
-              }
-              return std::make_pair(std::array<double, 3>{0, 0, 0}, std::array<double, 3>{0, 0, 0});
-          },
-          nb::arg("ibox_limits"), nb::arg("box_limits"), nb::arg("bx"), nb::arg("by"), nb::arg("bz"),
-          nb::arg("key_type") = "uint64_t",
-          "Compute center and half-size from integer box and physical box with explicit MixD bits");
 }

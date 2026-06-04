@@ -151,7 +151,7 @@ def main() -> None:
         print(f"Visiting key {key} (octal: {oct(key)})...")
         ibox_arr = cstone_sfc.hilbertMixDIBox(key, args.level, bx, by, bz, args.key_type)
         ibox = (int(ibox_arr[0]), int(ibox_arr[1]), int(ibox_arr[2]), int(ibox_arr[3]), int(ibox_arr[4]), int(ibox_arr[5]))
-        center, size = cstone_sfc.centerAndSizeMixD(ibox, box_limits, bx, by, bz, args.key_type)
+        center, size = cstone_sfc.centerAndSize(ibox, box_limits, args.key_type)
         if not (size[0] <= 0 and size[1] <= 0 and size[2] <= 0):
             if ibox in seen_iboxes:
                 raise SystemExit(
