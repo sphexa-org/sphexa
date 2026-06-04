@@ -133,6 +133,49 @@ NB_MODULE(cstone_sfc, m)
           nb::arg("key_type") = "uint64_t",
           "Encode mixed-dimension integer coordinates into a Hilbert key for the selected key type");
 
+    m.def("increaseKey",
+          [](std::uint64_t key,
+             int pos,
+             unsigned bx,
+             unsigned by,
+             unsigned bz,
+             const std::string& keyType)
+          {
+              switch (parseKeyKind(keyType))
+              {
+              case KeyKind::uint64:
+              {
+                  validateBits<KeyType64>(bx, by, bz);
+                  constexpr int maxPos = static_cast<int>(cstone::maxTreeLevel<KeyType64>{});
+                  if (pos > maxPos)
+                  {
+                      throw std::invalid_argument("pos must be <= maxTreeLevel for the selected key_type");
+                  }
+                  auto out = cstone::increaseKey<KeyType64>(KeyType64(key), pos, bx, by, bz);
+                  return std::uint64_t(out);
+              }
+              case KeyKind::u32:
+              {
+                  validateBits<KeyType32>(bx, by, bz);
+                  constexpr int maxPos = static_cast<int>(cstone::maxTreeLevel<KeyType32>{});
+                  if (pos > maxPos)
+                  {
+                      throw std::invalid_argument("pos must be <= maxTreeLevel for the selected key_type");
+                  }
+                  if (key > std::uint64_t(std::numeric_limits<KeyType32>::max()))
+                  {
+                      throw std::invalid_argument("key does not fit in selected key_type 'unsigned'");
+                  }
+                  auto out = cstone::increaseKey<KeyType32>(KeyType32(key), pos, bx, by, bz);
+                  return std::uint64_t(out);
+              }
+              }
+              return std::uint64_t(0);
+          },
+          nb::arg("key"), nb::arg("pos"), nb::arg("bx"), nb::arg("by"), nb::arg("bz"),
+          nb::arg("key_type") = "uint64_t",
+          "Return next valid MixD key by adding one at octal position pos (counted from left)");
+
     m.def("decodeHilbertMixD",
           [](std::uint64_t key, unsigned bx, unsigned by, unsigned bz, const std::string& keyType)
           {
@@ -159,6 +202,42 @@ NB_MODULE(cstone_sfc, m)
           },
           nb::arg("key"), nb::arg("bx"), nb::arg("by"), nb::arg("bz"), nb::arg("key_type") = "uint64_t",
           "Decode a mixed-dimension Hilbert key into (px, py, pz) for the selected key type");
+
+    m.def("hilbertMixDIBox",
+          [](std::uint64_t key, unsigned level, unsigned bx, unsigned by, unsigned bz, const std::string& keyType)
+          {
+              switch (parseKeyKind(keyType))
+              {
+              case KeyKind::uint64:
+              {
+                  validateBits<KeyType64>(bx, by, bz);
+                  if (level > cstone::maxTreeLevel<KeyType64>{})
+                  {
+                      throw std::invalid_argument("level must be <= maxTreeLevel for the selected key_type");
+                  }
+                  auto ibox = cstone::hilbertMixDIBox<KeyType64>(KeyType64(key), level, bx, by, bz);
+                  return std::array<int, 6>{ibox.xmin(), ibox.xmax(), ibox.ymin(), ibox.ymax(), ibox.zmin(), ibox.zmax()};
+              }
+              case KeyKind::u32:
+              {
+                  validateBits<KeyType32>(bx, by, bz);
+                  if (level > cstone::maxTreeLevel<KeyType32>{})
+                  {
+                      throw std::invalid_argument("level must be <= maxTreeLevel for the selected key_type");
+                  }
+                  if (key > std::uint64_t(std::numeric_limits<KeyType32>::max()))
+                  {
+                      throw std::invalid_argument("key does not fit in selected key_type 'unsigned'");
+                  }
+                  auto ibox = cstone::hilbertMixDIBox<KeyType32>(KeyType32(key), level, bx, by, bz);
+                  return std::array<int, 6>{ibox.xmin(), ibox.xmax(), ibox.ymin(), ibox.ymax(), ibox.zmin(), ibox.zmax()};
+              }
+              }
+              return std::array<int, 6>{0, 0, 0, 0, 0, 0};
+          },
+          nb::arg("key"), nb::arg("level"), nb::arg("bx"), nb::arg("by"), nb::arg("bz"),
+          nb::arg("key_type") = "uint64_t",
+          "Return MixD integer box [xmin, xmax, ymin, ymax, zmin, zmax] for key and level-from-right");
 
     m.def("centerAndSize",
           [](const std::array<int, 6>& iboxLimits,
