@@ -221,10 +221,7 @@ protected:
             computeSfcMixDKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_, mixDBits.bx, mixDBits.by,
                                mixDBits.bz);
         }
-        else
-        {
-            computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_);
-        }
+        else { computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_); }
 
         std::vector<LocalIndex> sfcOrder(n);
         std::iota(begin(sfcOrder), end(sfcOrder), LocalIndex(0));

@@ -38,10 +38,7 @@ template<bool useGpu, class KeyType, class T>
 void computeSfcKeys(const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box)
 {
     if constexpr (useGpu) { computeSfcKeysGpu(x, y, z, keys, numKeys, box); }
-    else
-    {
-        computeSfcKeys(x, y, z, keys, numKeys, box);
-    }
+    else { computeSfcKeys(x, y, z, keys, numKeys, box); }
 }
 
 template<bool useGpu, class KeyType, class T>
@@ -56,10 +53,7 @@ void computeSfcMixDKeys(const T* x,
                         unsigned bz)
 {
     if constexpr (useGpu) { computeSfcMixDKeysGpu(x, y, z, keys, numKeys, box, bx, by, bz); }
-    else
-    {
-        computeSfcMixDKeys(x, y, z, keys, numKeys, box, bx, by, bz);
-    }
+    else { computeSfcMixDKeys(x, y, z, keys, numKeys, box, bx, by, bz); }
 }
 
 } // namespace cstone

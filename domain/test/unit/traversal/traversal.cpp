@@ -193,10 +193,7 @@ void surfaceDetectionMixDNonUniform()
                      makeLevelBoxMixD<KeyType>(3, 0, 0, 3, mixDBits.bx, mixDBits.by, mixDBits.bz),
                      makeLevelBoxMixD<KeyType>(4, 0, 0, 3, mixDBits.bx, mixDBits.by, mixDBits.bz)};
     }
-    else
-    {
-        reference = {makeLevelBoxMixD<KeyType>(0, 0, 0, 3, mixDBits.bx, mixDBits.by, mixDBits.bz)};
-    }
+    else { reference = {makeLevelBoxMixD<KeyType>(0, 0, 0, 3, mixDBits.bx, mixDBits.by, mixDBits.bz)}; }
 
     std::sort(begin(reference), end(reference));
     EXPECT_EQ(surfaceBoxes, reference);

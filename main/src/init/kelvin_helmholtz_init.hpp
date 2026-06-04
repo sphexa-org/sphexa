@@ -95,10 +95,7 @@ void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T mass
             h[i] = hInt;
             u[i] = uInt;
             if (y[i] > 0.5) { vx[i] = vxInt + vDif * std::exp((y[i] - 0.75) / ls); }
-            else
-            {
-                vx[i] = vxInt + vDif * std::exp((0.25 - y[i]) / ls);
-            }
+            else { vx[i] = vxInt + vDif * std::exp((0.25 - y[i]) / ls); }
         }
         else
         {
@@ -116,10 +113,7 @@ void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T mass
 
             u[i] = uExt;
             if (y[i] < 0.25) { vx[i] = vxExt - vDif * std::exp((y[i] - 0.25) / ls); }
-            else
-            {
-                vx[i] = vxExt - vDif * std::exp((0.75 - y[i]) / ls);
-            }
+            else { vx[i] = vxExt - vDif * std::exp((0.75 - y[i]) / ls); }
         }
     }
     d.h  = std::move(h);
@@ -133,10 +127,7 @@ void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T mass
         std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
         d.temp = std::move(u);
     }
-    else
-    {
-        d.u = std::move(u);
-    }
+    else { d.u = std::move(u); }
 }
 
 template<class Dataset>

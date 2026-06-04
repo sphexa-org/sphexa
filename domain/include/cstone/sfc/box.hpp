@@ -38,7 +38,9 @@ namespace cstone
  */
 template<class T>
 HOST_DEVICE_FUN constexpr T normalize(T d, T min, T max)
-{ return (d - min) / (max - min); }
+{
+    return (d - min) / (max - min);
+}
 
 /*! @brief map x into periodic range 0...R-1
  *
@@ -280,7 +282,9 @@ public:
 
     //! @brief return the shortest coordinate range in any dimension
     HOST_DEVICE_FUN constexpr T minExtent() const // NOLINT
-    { return stl::min(stl::min(xmax() - xmin(), ymax() - ymin()), zmax() - zmin()); }
+    {
+        return stl::min(stl::min(xmax() - xmin(), ymax() - ymin()), zmax() - zmin());
+    }
 
 private:
     HOST_DEVICE_FUN

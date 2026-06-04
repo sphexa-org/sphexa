@@ -137,10 +137,7 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
         std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
         d.temp = std::move(u);
     }
-    else
-    {
-        d.u = std::move(u);
-    }
+    else { d.u = std::move(u); }
 }
 
 template<class Dataset>

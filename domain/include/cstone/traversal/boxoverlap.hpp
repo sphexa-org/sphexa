@@ -226,7 +226,9 @@ HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool> containedIn(
 template<class KeyType>
 HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
 containedIn(KeyType nodeStart, KeyType nodeEnd, KeyType codeStart, KeyType codeEnd)
-{ return !(nodeStart < codeStart || nodeEnd > codeEnd); }
+{
+    return !(nodeStart < codeStart || nodeEnd > codeEnd);
+}
 
 template<class KeyType>
 HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
@@ -245,10 +247,7 @@ HOST_DEVICE_FUN int addDelta(int value, int delta, bool pbc)
 
     int temp = value + delta;
     if (pbc) { return temp; }
-    else
-    {
-        return stl::min(stl::max(0, temp), maxCoordinate);
-    }
+    else { return stl::min(stl::max(0, temp), maxCoordinate); }
 }
 
 //! @brief returns true if the cuboid defined by center and size is contained within the bounding box

@@ -234,7 +234,7 @@ inline TreeNodeIndex maxDepth(const TreeNodeIndex* levelOffsets, TreeNodeIndex l
 template<class KeyType>
 struct OctreeView
 {
-    using NodeType  = std::conditional_t<std::is_const_v<KeyType>, const TreeNodeIndex, TreeNodeIndex>;
+    using NodeType = std::conditional_t<std::is_const_v<KeyType>, const TreeNodeIndex, TreeNodeIndex>;
     TreeNodeIndex numLeafNodes;
     TreeNodeIndex numInternalNodes;
     TreeNodeIndex numNodes;
@@ -309,18 +309,20 @@ public:
 
     OctreeView<KeyType> data()
     {
-        return {numLeafNodes,
-                numInternalNodes,
-                numNodes,
-                TreeNodeIndex(parents.size()),
-                rawPtr(prefixes),
-                rawPtr(childOffsets),
-                rawPtr(parents),
-                rawPtr(levelRange),
-                rawPtr(d_levelRange),
-                rawPtr(internalToLeaf),
-                rawPtr(leafToInternal),
-                nullptr,};
+        return {
+            numLeafNodes,
+            numInternalNodes,
+            numNodes,
+            TreeNodeIndex(parents.size()),
+            rawPtr(prefixes),
+            rawPtr(childOffsets),
+            rawPtr(parents),
+            rawPtr(levelRange),
+            rawPtr(d_levelRange),
+            rawPtr(internalToLeaf),
+            rawPtr(leafToInternal),
+            nullptr,
+        };
     }
 
     OctreeView<const KeyType> cdata() const
@@ -371,7 +373,9 @@ void updateInternalTree(std::span<const KeyType> leaves, OctreeView<KeyType> o)
 
 template<class KeyType, class Accelerator>
 std::span<const TreeNodeIndex> leafToInternal(const OctreeData<KeyType, Accelerator>& octree)
-{ return {rawPtr(octree.leafToInternal) + octree.numInternalNodes, size_t(octree.numLeafNodes)}; }
+{
+    return {rawPtr(octree.leafToInternal) + octree.numInternalNodes, size_t(octree.numLeafNodes)};
+}
 
 //! @brief Deprecated, do not use in new code. Not used anymore in production code, some unit test usage remaining.
 template<class KeyType>
@@ -440,7 +444,9 @@ public:
     std::span<const TreeNodeIndex> levelRange() const { return levelRange_; }
     //! @brief converts a cornerstone index into an internal index
     std::span<const TreeNodeIndex> internalOrder() const
-    { return {leafToInternal_.data() + numInternalNodes_, size_t(numLeafNodes_)}; }
+    {
+        return {leafToInternal_.data() + numInternalNodes_, size_t(numLeafNodes_)};
+    }
     //! @brief converts  an internal index into a cornerstone index
     std::span<const TreeNodeIndex> toLeafOrder() const { return {internalToLeaf_.data(), size_t(numTreeNodes())}; }
     const auto& leafToInternal() const { return leafToInternal_; }
@@ -592,7 +598,9 @@ template<class T>
 struct SumCombination
 {
     T operator()(TreeNodeIndex /*nodeIdx*/, TreeNodeIndex c, const T* Q)
-    { return Q[c] + Q[c + 1] + Q[c + 2] + Q[c + 3] + Q[c + 4] + Q[c + 5] + Q[c + 6] + Q[c + 7]; }
+    {
+        return Q[c] + Q[c + 1] + Q[c + 2] + Q[c + 3] + Q[c + 4] + Q[c + 5] + Q[c + 6] + Q[c + 7];
+    }
 };
 
 template<class CountType>

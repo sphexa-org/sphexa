@@ -252,7 +252,9 @@ bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float 
 }
 
 int getNumLocalRanks(int defValue)
-{ return getenv("SLURM_NTASKS_PER_NODE") == nullptr ? defValue : std::stoi(getenv("SLURM_NTASKS_PER_NODE")); }
+{
+    return getenv("SLURM_NTASKS_PER_NODE") == nullptr ? defValue : std::stoi(getenv("SLURM_NTASKS_PER_NODE"));
+}
 
 void printHelp(char* name, int rank)
 {

@@ -60,7 +60,7 @@ void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                           mixDBits.bz != maxTreeLevel<KeyType>{});
+                          mixDBits.bz != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<T, sfcKeyType<KeyType>> coords{numParticles, box, static_cast<std::size_t>(thisRank)};
 
@@ -105,10 +105,7 @@ void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
         computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(newCodes.data()), x.size(), box,
                            mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
-    else
-    {
-        computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(newCodes.data()), x.size(), box);
-    }
+    else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(newCodes.data()), x.size(), box); }
 
     // received particles are not stored in SFC order after the exchange
     std::sort(begin(newCodes), end(newCodes));

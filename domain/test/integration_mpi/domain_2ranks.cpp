@@ -302,7 +302,7 @@ void multiStepSync(int rank, int numRanks, Box<T> box = Box<T>{0, 1})
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                           mixDBits.bz != maxTreeLevel<KeyType>{});
+                          mixDBits.bz != maxTreeLevel<KeyType>{});
 
     std::vector<T> xGlobal, yGlobal, zGlobal, hGlobal;
     if (useMixD)
@@ -363,10 +363,7 @@ void multiStepSync(int rank, int numRanks, Box<T> box = Box<T>{0, 1})
         computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(keysChk.data()), x.size(), domain.box(),
                            mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
-    else
-    {
-        computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysChk.data()), x.size(), domain.box());
-    }
+    else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysChk.data()), x.size(), domain.box()); }
     EXPECT_EQ(keys, keysChk);
     EXPECT_TRUE(std::is_sorted(keys.begin(), keys.end()));
 

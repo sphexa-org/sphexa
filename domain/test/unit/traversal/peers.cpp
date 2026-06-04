@@ -32,7 +32,7 @@ static std::vector<int> findPeersAll2All(int myRank,
 {
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const bool mixD     = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{};
+                      mixDBits.bz != maxTreeLevel<KeyType>{};
 
     TreeNodeIndex firstIdx = findNodeAbove(tree.data(), nNodes(tree), assignment[myRank]);
     TreeNodeIndex lastIdx  = findNodeAbove(tree.data(), nNodes(tree), assignment[myRank + 1]);
@@ -134,7 +134,7 @@ static void findPeers(Box<double> box)
 
     const auto mixDBits = getBoxMixDimensionBits<double, KeyType, Box<double>>(box);
     const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{};
+                         mixDBits.bz != maxTreeLevel<KeyType>{};
     auto particleKeys =
         useMixD ? makeRandomGaussianKeys<KeyType>(nParticles, 42, useMixD, mixDBits.bx, mixDBits.by, mixDBits.bz)
                 : makeRandomGaussianKeys<KeyType>(nParticles);

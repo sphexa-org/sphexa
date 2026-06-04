@@ -70,17 +70,14 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks)
         std::vector<KeyType> keysRef(x.size());
         const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
         const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                              mixDBits.bz != maxTreeLevel<KeyType>{};
+                             mixDBits.bz != maxTreeLevel<KeyType>{};
         EXPECT_EQ(useMixD0, useMixD);
         if (useMixD)
         {
             computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(keysRef.data()), x.size(), box,
                                mixDBits.bx, mixDBits.by, mixDBits.bz);
         }
-        else
-        {
-            computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysRef.data()), x.size(), box);
-        }
+        else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysRef.data()), x.size(), box); }
 
         // check that particles are SFC order sorted and the keys are in sync with the x,y,z arrays
         EXPECT_EQ(keys, keysRef);
@@ -112,10 +109,7 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks)
     };
 
     if (useMixD0) { run(RandomGaussianCoordinates<T, SfcMixDKind<KeyType>>{numParticles, box, 5}); }
-    else
-    {
-        run(RandomGaussianCoordinates<T, SfcKind<KeyType>>{numParticles, box, 5});
-    }
+    else { run(RandomGaussianCoordinates<T, SfcKind<KeyType>>{numParticles, box, 5}); }
 }
 
 TEST(FocusDomain, randomGaussianNeighborSum)
@@ -237,7 +231,7 @@ void testAssignmentShift(const Box<double>& box)
 
     const auto mixDBits = getBoxMixDimensionBits<Real, KeyType, Box<Real>>(box);
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                           mixDBits.bz != maxTreeLevel<KeyType>{});
+                          mixDBits.bz != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, static_cast<std::size_t>(rank)};
 
@@ -297,7 +291,7 @@ void removeParticle(const Box<double>& box)
 
     const auto mixDBits = getBoxMixDimensionBits<Real, KeyType, Box<Real>>(box);
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                           mixDBits.bz != maxTreeLevel<KeyType>{});
+                          mixDBits.bz != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, static_cast<std::size_t>(rank)};
 
@@ -361,7 +355,7 @@ void testReapplySync(const Box<double>& box)
     // Note: rank used as seed, so each rank will get different coordinates
     const auto mixDBits = getBoxMixDimensionBits<Real, KeyType, Box<Real>>(box);
     const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                           mixDBits.bz != maxTreeLevel<KeyType>{});
+                          mixDBits.bz != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, static_cast<std::size_t>(rank)};
 
@@ -378,7 +372,8 @@ void testReapplySync(const Box<double>& box)
 
     // modify coordinates
     {
-        RandomCoordinates<Real, sfcKeyType<KeyType>> scord{domain.nParticles(), box, static_cast<std::size_t>(numRanks + rank)};
+        RandomCoordinates<Real, sfcKeyType<KeyType>> scord{domain.nParticles(), box,
+                                                           static_cast<std::size_t>(numRanks + rank)};
         std::copy(scord.x().begin(), scord.x().end(), x.begin() + domain.startIndex());
         std::copy(scord.y().begin(), scord.y().end(), y.begin() + domain.startIndex());
         std::copy(scord.z().begin(), scord.z().end(), z.begin() + domain.startIndex());

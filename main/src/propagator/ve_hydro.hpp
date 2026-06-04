@@ -177,10 +177,7 @@ public:
             domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "prho", "alpha">(d), get<"ax">(d),
                                  get<"keys">(d));
         }
-        else
-        {
-            domain.exchangeHalos(get<"prho", "alpha">(d), get<"ax">(d), get<"keys">(d));
-        }
+        else { domain.exchangeHalos(get<"prho", "alpha">(d), get<"ax">(d), get<"keys">(d)); }
         timer.step("mpi::synchronizeHalos");
 
         release(d, "divv", "gradh");

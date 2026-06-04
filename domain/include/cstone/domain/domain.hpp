@@ -478,7 +478,7 @@ private:
 
         const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box());
         const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                              mixDBits.bz != maxTreeLevel<KeyType>{};
+                             mixDBits.bz != maxTreeLevel<KeyType>{};
         // compute SFC keys of received halo particles
         if constexpr (IsDeviceVector<KeyVec>{})
         {
@@ -629,10 +629,7 @@ private:
                     {
                         bool isHalo = std::count(hPeers.begin(), hPeers.end(), r) == 1;
                         if (isHalo) { std::cout << r << " "; }
-                        else
-                        {
-                            std::cout << "*" << r << " ";
-                        }
+                        else { std::cout << "*" << r << " "; }
                     }
                     for (auto r : hPeers)
                     {
