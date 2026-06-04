@@ -210,7 +210,6 @@ __global__ void computeGeoCentersKernel(const KeyType* prefixes,
                                         Vec3<T>* centers,
                                         Vec3<T>* sizes,
                                         const Box<T> box,
-                                        bool useMixD,
                                         const AxisMixDBits mixDBits)
 {
     TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -219,21 +218,9 @@ __global__ void computeGeoCentersKernel(const KeyType* prefixes,
     KeyType prefix   = prefixes[i];
     KeyType startKey = decodePlaceholderBit(prefix);
     unsigned level   = decodePrefixLength(prefix) / 3;
-    auto nodeBox     = useMixD ? sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx,
-                                         mixDBits.by, mixDBits.bz)
-                               : sfcIBox(sfcKey(startKey), level);
-    if (nodeBox.xmin() == 0 && nodeBox.xmax() == 0 && nodeBox.ymin() == 0 && nodeBox.ymax() == 0 &&
-        nodeBox.zmin() == 0 && nodeBox.zmax() == 0)
-    {
-        centers[i] = {0, 0, 0};
-        sizes[i]   = {0, 0, 0};
-    }
-    else
-    {
-        util::tie(centers[i], sizes[i]) =
-            useMixD ? centerAndSize<KeyType>(nodeBox, box, mixDBits.bx, mixDBits.by, mixDBits.bz)
-                    : centerAndSize<KeyType>(nodeBox, box, true);
-    }
+    auto nodeBox =
+        sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx, mixDBits.by, mixDBits.bz);
+    util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box);
 }
 
 template<class KeyType, class T>
@@ -243,9 +230,7 @@ void computeGeoCentersGpu(
     unsigned numThreads = 256;
     unsigned numBlocks  = iceil(numNodes, numThreads);
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                           mixDBits.bz != maxTreeLevel<KeyType>{});
-    computeGeoCentersKernel<<<numBlocks, numThreads>>>(prefixes, numNodes, centers, sizes, box, useMixD, mixDBits);
+    computeGeoCentersKernel<<<numBlocks, numThreads>>>(prefixes, numNodes, centers, sizes, box, mixDBits);
 }
 
 #define GEO_CENTERS_GPU(KeyType, T)                                                                                    \

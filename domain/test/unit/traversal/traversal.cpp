@@ -110,9 +110,9 @@ void surfaceDetectionMixDUniform()
                                mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
 
-    auto isSurface = [targetBox, bbox = Box<double>(0, 1), boxes = treeBoxes.data(), mixDBits](TreeNodeIndex idx)
+    auto isSurface = [targetBox, bbox = Box<double>(0, 1), boxes = treeBoxes.data()](TreeNodeIndex idx)
     {
-        double distance = minDistanceSq<KeyType>(targetBox, boxes[idx], bbox, mixDBits.bx, mixDBits.by, mixDBits.bz);
+        double distance = minDistanceSq<KeyType>(targetBox, boxes[idx], bbox);
         return distance == 0.0;
     };
 
@@ -165,9 +165,9 @@ void surfaceDetectionMixDNonUniform()
                                mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
 
-    auto isSurface = [targetBox, bbox = Box<double>(0, 1), boxes = treeBoxes.data(), mixDBits](TreeNodeIndex idx)
+    auto isSurface = [targetBox, bbox = Box<double>(0, 1), boxes = treeBoxes.data()](TreeNodeIndex idx)
     {
-        double distance = minDistanceSq<KeyType>(targetBox, boxes[idx], bbox, mixDBits.bx, mixDBits.by, mixDBits.bz);
+        double distance = minDistanceSq<KeyType>(targetBox, boxes[idx], bbox);
         return distance == 0.0;
     };
 
@@ -331,7 +331,7 @@ void dualTraversalNeighborsMixD()
                             mixDBits.by, mixDBits.bz);
         IBox bBox = sfcIBox(sfcMixDKey(tree.codeStart(b)), maxTreeLevel<KeyType>() - tree.level(b), mixDBits.bx,
                             mixDBits.by, mixDBits.bz);
-        const auto distance{minDistanceSq<KeyType>(aBox, bBox, box, mixDBits.bx, mixDBits.by, mixDBits.bz)};
+        const auto distance{minDistanceSq<KeyType>(aBox, bBox, box)};
         return std::abs(distance) < 1e-6;
     };
 
@@ -345,7 +345,7 @@ void dualTraversalNeighborsMixD()
                             mixDBits.by, mixDBits.bz);
         IBox bBox = sfcIBox(sfcMixDKey(tree.codeStart(b)), maxTreeLevel<KeyType>() - tree.level(b), mixDBits.bx,
                             mixDBits.by, mixDBits.bz);
-        const auto distance{minDistanceSq<KeyType>(aBox, bBox, box, mixDBits.bx, mixDBits.by, mixDBits.bz)};
+        const auto distance{minDistanceSq<KeyType>(aBox, bBox, box)};
         if (std::abs(distance) < 1e-6) { multipole_pairs.push_back({a, b}); }
     };
 

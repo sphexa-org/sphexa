@@ -146,13 +146,10 @@ void setMac(std::span<const KeyType> nodeKeys,
 
 //! @brief compute geometric node centers based on node SFC keys and the global bounding box
 template<class KeyType, class T>
-void nodeFpCenters(
-    std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box, bool disableMixD = false)
+void nodeFpCenters(std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box)
 {
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD =
-        !disableMixD && (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{});
+    auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < prefixes.size(); ++i)
     {
@@ -160,64 +157,10 @@ void nodeFpCenters(
         KeyType startKey = decodePlaceholderBit(prefix);
         unsigned level   = decodePrefixLength(prefix) / 3;
 
-        IBox nodeBox = useMixD ? sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx,
-                                         mixDBits.by, mixDBits.bz)
-                               : sfcIBox(sfcKey(startKey), level);
-        if (nodeBox.xmin() == 0 && nodeBox.xmax() == 0 && nodeBox.ymin() == 0 && nodeBox.ymax() == 0 &&
-            nodeBox.zmin() == 0 && nodeBox.zmax() == 0)
-        {
-            centers[i] = {0, 0, 0};
-            sizes[i]   = {0, 0, 0};
-        }
-        else
-        {
-            util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box, disableMixD);
-        }
+        IBox nodeBox = sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx, mixDBits.by,
+                               mixDBits.bz);
+        util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box);
     }
-}
-
-template<class TreeType, class KeyType, class T>
-std::pair<Vec3<T>, Vec3<T>> getCenterSizeMixDTree(TreeType tree, const TreeNodeIndex node, const Box<T>& box)
-{
-    KeyType startKey    = tree.codeStart(node);
-    unsigned level      = tree.level(node);
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    auto nodeBox =
-        sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx, mixDBits.by, mixDBits.bz);
-    auto [center, size] = centerAndSize<KeyType>(nodeBox, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
-    if (size[0] == 0 && size[1] == 0 && size[2] == 0) { tree.setEmpty(node); }
-    return {center, size};
-}
-
-template<class KeyType, class T>
-util::tuple<Vec3<T>, Vec3<T>> getCenterSizeMixD(const KeyType& prefix, const Box<T>& box)
-{
-    KeyType startKey          = decodePlaceholderBit(prefix);
-    unsigned level            = decodePrefixLength(prefix) / 3;
-    unsigned levelKey         = octalDigit(startKey, level);
-    const auto levelFromRight = maxTreeLevel<KeyType>{} - level + 1;
-    const auto mixDBits       = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    unsigned sorted[3]        = {mixDBits.bx, mixDBits.by, mixDBits.bz};
-    std::sort(std::begin(sorted), std::end(sorted));
-    auto nodeBox = sfcIBox(sfcMixDKey<KeyType>(startKey), levelFromRight - 1, mixDBits.bx, mixDBits.by, mixDBits.bz);
-    Vec3<T> center, size;
-    util::tie(center, size) = centerAndSize<KeyType>(nodeBox, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
-    if (levelFromRight > sorted[2] && levelKey > 0)
-    {
-        center = {0, 0, 0};
-        size   = {0, 0, 0};
-    }
-    else if (levelFromRight <= sorted[2] && levelFromRight > sorted[1] && levelKey > 1)
-    {
-        center = {0, 0, 0};
-        size   = {0, 0, 0};
-    }
-    else if (levelFromRight <= sorted[1] && levelFromRight > sorted[0] && levelKey > 3)
-    {
-        center = {0, 0, 0};
-        size   = {0, 0, 0};
-    }
-    return {center, size};
 }
 
 //! @brief set @p centers to geometric node centers with Mac radius l * invTheta
