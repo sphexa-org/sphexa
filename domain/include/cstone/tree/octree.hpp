@@ -235,7 +235,6 @@ template<class KeyType>
 struct OctreeView
 {
     using NodeType  = std::conditional_t<std::is_const_v<KeyType>, const TreeNodeIndex, TreeNodeIndex>;
-    using EmptyType = std::conditional_t<std::is_const_v<KeyType>, const uint8_t, uint8_t>;
     TreeNodeIndex numLeafNodes;
     TreeNodeIndex numInternalNodes;
     TreeNodeIndex numNodes;
@@ -249,7 +248,6 @@ struct OctreeView
     NodeType* internalToLeaf;
     NodeType* leafToInternal;
     KeyType* leaves{nullptr};
-    EmptyType* empty;
 
     std::span<NodeType> leafToInternalSpan() { return {leafToInternal + numInternalNodes, size_t(numLeafNodes)}; }
     std::span<NodeType> levelRangeSpan() { return {levelRange, maxTreeLevel<std::decay_t<KeyType>>{} + 2}; }
@@ -322,8 +320,7 @@ public:
                 rawPtr(d_levelRange),
                 rawPtr(internalToLeaf),
                 rawPtr(leafToInternal),
-                nullptr,
-                rawPtr(empty)};
+                nullptr,};
     }
 
     OctreeView<const KeyType> cdata() const
@@ -339,8 +336,7 @@ public:
                 rawPtr(d_levelRange),
                 rawPtr(internalToLeaf),
                 rawPtr(leafToInternal),
-                nullptr,
-                rawPtr(empty)};
+                nullptr};
     }
 
     TreeNodeIndex numNodes{0};
@@ -420,8 +416,7 @@ public:
         return {numLeafNodes_,          numInternalNodes_,      TreeNodeIndex(parents_.size()),
                 levelRange_.back(),     prefixes_.data(),       childOffsets_.data(),
                 parents_.data(),        levelRange_.data(),     nullptr,
-                internalToLeaf_.data(), leafToInternal_.data(), nullptr,
-                empty_.data()};
+                internalToLeaf_.data(), leafToInternal_.data(), nullptr};
     }
 
     OctreeView<const KeyType> cdata() const
@@ -429,8 +424,7 @@ public:
         return {numLeafNodes_,          numInternalNodes_,      TreeNodeIndex(parents_.size()),
                 levelRange_.back(),     prefixes_.data(),       childOffsets_.data(),
                 parents_.data(),        levelRange_.data(),     nullptr,
-                internalToLeaf_.data(), leafToInternal_.data(), nullptr,
-                empty_.data()};
+                internalToLeaf_.data(), leafToInternal_.data(), nullptr};
     }
 
     //! @brief return a const view of the cstone leaf array
@@ -466,13 +460,6 @@ public:
      * @return            true or false
      */
     inline bool isLeaf(TreeNodeIndex node) const { return childOffsets_[node] == 0; }
-
-    inline std::vector<uint8_t>& empty() { return empty_; }
-    inline const std::vector<uint8_t>& empty() const { return empty_; }
-
-    inline uint8_t isEmpty(TreeNodeIndex node) const { return empty_[node]; }
-
-    inline void setEmpty(TreeNodeIndex node) { empty_[node] = static_cast<uint8_t>(true); }
 
     /*! @brief return child node index
      *
@@ -544,7 +531,6 @@ private:
         TreeNodeIndex numNodes = numLeafNodes_ + numInternalNodes_;
 
         prefixes_.resize(numNodes);
-        empty_.resize(numNodes);
         // +1 to accommodate nodeOffsets in FocusedOctreeCore::update when numNodes == 1
         childOffsets_.resize(numNodes + 1);
         parents_.resize((numNodes - 1) / 8);
@@ -557,7 +543,6 @@ private:
 
         internalToLeaf_.resize(numNodes);
         leafToInternal_.resize(numNodes);
-        empty_.resize(numNodes);
     }
 
     TreeNodeIndex numLeafNodes_{0};
@@ -567,7 +552,6 @@ private:
 
     //! @brief the SFC key and level of each node (Warren-Salmon placeholder-bit), length = numNodes
     std::vector<KeyType> prefixes_;
-    std::vector<uint8_t> empty_;
     //! @brief the index of the first child of each node, a value of 0 indicates a leaf, length = numNodes
     std::vector<TreeNodeIndex, Alloc> childOffsets_;
     //! @brief stores the parent index for every group of 8 sibling nodes, length the (numNodes - 1) / 8

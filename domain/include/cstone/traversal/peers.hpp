@@ -114,7 +114,7 @@ std::vector<int> findPeersMac(int myRank,
     {
         TreeNodeIndex nodeIdx =
             locateNode(spanningNodeKeys[i], spanningNodeKeys[i + 1], domainTree.prefixes, domainTree.levelRange);
-        dualTraversal(domainTree.childOffsets, domainTree.empty, nodeIdx, 0, crossFocusPairs, m2l, p2p);
+        dualTraversal(domainTree.childOffsets, nodeIdx, 0, crossFocusPairs, m2l, p2p);
     }
 
     std::vector<int> ret;
