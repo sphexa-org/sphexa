@@ -43,14 +43,14 @@ TEST(MixedHilbertBox, x10y9z9)
     for (int i = 0; i < numKeys; ++i)
     {
         auto hilbertMixDKey = iHilbertMixD<unsigned>(x_le_511[i], y[i], z[i], bx, by, bz);
-        auto hilbertKey     = iHilbert<unsigned>(x_le_511[i], y[i], z[i]);
+        auto hilbertKey     = iHilbert3D<unsigned>(x_le_511[i], y[i], z[i]);
         EXPECT_EQ(hilbertMixDKey, hilbertKey);
     };
 
     for (int i = 0; i < numKeys; ++i)
     {
         auto hilbertMixDKey      = iHilbertMixD<unsigned>(x_ge_512[i], y[i], z[i], bx, by, bz);
-        auto hilbertKey_px_m_512 = iHilbert<unsigned>(x_ge_512[i] - 512, y[i], z[i]);
+        auto hilbertKey_px_m_512 = iHilbert3D<unsigned>(x_ge_512[i] - 512, y[i], z[i]);
         EXPECT_EQ(hilbertMixDKey, (1 << 27) + hilbertKey_px_m_512);
     };
 }
@@ -88,7 +88,7 @@ TEST(MixedHilbertBox, x10y10z9)
     for (int i = 0; i < numKeys; ++i)
     {
         auto hilbertMixDKey = iHilbertMixD<unsigned>(x_le_511[i], y_le_511[i], z[i], bx, by, bz);
-        auto hilbertKey     = iHilbert<unsigned>(x_le_511[i], y_le_511[i], z[i]);
+        auto hilbertKey     = iHilbert3D<unsigned>(x_le_511[i], y_le_511[i], z[i]);
 
         EXPECT_EQ(hilbertMixDKey, hilbertKey);
     };
@@ -96,7 +96,7 @@ TEST(MixedHilbertBox, x10y10z9)
     for (int i = 0; i < numKeys; ++i)
     {
         auto hilbertMixDKey      = iHilbertMixD<unsigned>(x_le_511[i], y_ge_512[i], z[i], bx, by, bz);
-        auto hilbertKey_py_m_512 = iHilbert<unsigned>(x_le_511[i], y_ge_512[i] - 512, z[i]);
+        auto hilbertKey_py_m_512 = iHilbert3D<unsigned>(x_le_511[i], y_ge_512[i] - 512, z[i]);
 
         EXPECT_EQ(hilbertMixDKey, (1 << 27) + hilbertKey_py_m_512);
     };
@@ -104,7 +104,7 @@ TEST(MixedHilbertBox, x10y10z9)
     for (int i = 0; i < numKeys; ++i)
     {
         auto hilbertMixDKey      = iHilbertMixD<unsigned>(x_ge_512[i], y_ge_512[i], z[i], bx, by, bz);
-        auto hilbertKey_py_m_512 = iHilbert<unsigned>(x_ge_512[i] - 512, y_ge_512[i] - 512, z[i]);
+        auto hilbertKey_py_m_512 = iHilbert3D<unsigned>(x_ge_512[i] - 512, y_ge_512[i] - 512, z[i]);
 
         EXPECT_EQ(hilbertMixDKey, (2 << 27) + hilbertKey_py_m_512);
     };
@@ -112,17 +112,17 @@ TEST(MixedHilbertBox, x10y10z9)
     for (int i = 0; i < numKeys; ++i)
     {
         auto hilbertMixDKey      = iHilbertMixD<unsigned>(x_ge_512[i], y_ge_512[i], z[i], bx, by, bz);
-        auto hilbertKey_py_m_512 = iHilbert<unsigned>(x_ge_512[i] - 512, y_ge_512[i] - 512, z[i]);
+        auto hilbertKey_py_m_512 = iHilbert3D<unsigned>(x_ge_512[i] - 512, y_ge_512[i] - 512, z[i]);
 
         EXPECT_EQ(hilbertMixDKey, (2 << 27) + hilbertKey_py_m_512);
     };
 
     // clang-format off
-    // iHilbertMixD(px in [0:512], py in [0:512], pz, bx, by, bz)       == iHilbert(px, py, pz) >> 3
-    // iHilbertMixD(px in [0:512], py in [512:1024], pz, bx, by, bz)    == 01000000000 (=8^9) + (iHilbert(px, py - 512, pz) >> 3)
-    // iHilbertMixD(px in [512:1024], py in [512:1024], pz, bx, by, bz) == 02000000000 (=8^9) + (iHilbert(px - 512, py - 512, pz) >> 3)
+    // iHilbertMixD(px in [0:512], py in [0:512], pz, bx, by, bz)       == iHilbert3D(px, py, pz) >> 3
+    // iHilbertMixD(px in [0:512], py in [512:1024], pz, bx, by, bz)    == 01000000000 (=8^9) + (iHilbert3D(px, py - 512, pz) >> 3)
+    // iHilbertMixD(px in [512:1024], py in [512:1024], pz, bx, by, bz) == 02000000000 (=8^9) + (iHilbert3D(px - 512, py - 512, pz) >> 3)
     // IM: Can't understand below since inputs to the functions are the same as the 2nd case
-    // iHilbertMixD(px in [0:512], py in [512:1024], pz, bx, by, bz)    == 03000000000 (=8^9) + (iHilbert(px, py - 512, pz) >> 3)
+    // iHilbertMixD(px in [0:512], py in [512:1024], pz, bx, by, bz)    == 03000000000 (=8^9) + (iHilbert3D(px, py - 512, pz) >> 3)
     // clang-format on
 }
 

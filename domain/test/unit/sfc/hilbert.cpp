@@ -96,13 +96,13 @@ void firstOrderCurve()
                 unsigned mortonOctant = 4 * xi + 2 * yi + zi;
 
                 {
-                    KeyType hilbertKey     = iHilbert<KeyType>(L1Range * xi, L1Range * yi, L1Range * zi);
+                    KeyType hilbertKey     = iHilbert3D<KeyType>(L1Range * xi, L1Range * yi, L1Range * zi);
                     unsigned hilbertOctant = octalDigit(hilbertKey, 1);
                     EXPECT_EQ(mortonOctant, hilbertToMorton[hilbertOctant]);
                 }
                 {
-                    KeyType hilbertKey     = iHilbert<KeyType>(L1Range * xi + L1Range - 1, L1Range * yi + L1Range - 1,
-                                                               L1Range * zi + L1Range - 1);
+                    KeyType hilbertKey     = iHilbert3D<KeyType>(L1Range * xi + L1Range - 1, L1Range * yi + L1Range - 1,
+                                                                 L1Range * zi + L1Range - 1);
                     unsigned hilbertOctant = octalDigit(hilbertKey, 1);
                     EXPECT_EQ(mortonOctant, hilbertToMorton[hilbertOctant]);
                 }
@@ -172,7 +172,7 @@ void inversionTest()
 
     for (int i = 0; i < numKeys; ++i)
     {
-        KeyType hilbertKey = iHilbert<KeyType>(x[i], y[i], z[i]);
+        KeyType hilbertKey = iHilbert3D<KeyType>(x[i], y[i], z[i]);
 
         auto [a, b, c] = decodeHilbert(hilbertKey);
         EXPECT_EQ(x[i], a);
@@ -197,8 +197,8 @@ std::tuple<KeyType, KeyType> findMinMaxKey(const IBox& ibox)
         for (int hy = 0; hy < 2; ++hy)
             for (int hz = 0; hz < 2; ++hz)
             {
-                cornerKeys.push_back(iHilbert<KeyType>(ibox.xmin() + hx * cubeLength, ibox.ymin() + hy * cubeLength,
-                                                       ibox.zmin() + hz * cubeLength));
+                cornerKeys.push_back(iHilbert3D<KeyType>(ibox.xmin() + hx * cubeLength, ibox.ymin() + hy * cubeLength,
+                                                         ibox.zmin() + hz * cubeLength));
             }
 
     return {*std::min_element(cornerKeys.begin(), cornerKeys.end()),

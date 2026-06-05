@@ -44,7 +44,7 @@ __device__ static unsigned mortonToHilbertDevice[8] = {0, 1, 3, 2, 7, 6, 4, 5};
  */
 template<class KeyType>
 constexpr HOST_DEVICE_FUN inline std::enable_if_t<std::is_unsigned_v<KeyType>, KeyType>
-iHilbert(unsigned px, unsigned py, unsigned pz, int order = maxTreeLevel<KeyType>{}) noexcept
+iHilbert3D(unsigned px, unsigned py, unsigned pz, int order = maxTreeLevel<KeyType>{}) noexcept
 {
     assert(px < (1u << order));
     assert(py < (1u << order));
@@ -210,7 +210,7 @@ iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, un
     assert(sortedCoordinates[1] < (static_cast<KeyType>(1) << bits[2]));
 
     // encode remaining bits[0] == min(bx,by,bz) 3D levels or octal digits with 3D-Hilbert and add to key
-    const KeyType key3D = iHilbert<KeyType>(sortedCoordinates[0], sortedCoordinates[1], sortedCoordinates[2]);
+    const KeyType key3D = iHilbert3D<KeyType>(sortedCoordinates[0], sortedCoordinates[1], sortedCoordinates[2]);
     key |= key3D;
     // Example for (bx,by,bz) = (10,9,7): 1D,2D,2D,3D*7
 
@@ -251,7 +251,7 @@ iHilbert2D(unsigned px, unsigned py, int order) noexcept
     return key;
 }
 
-//! @brief inverse function of iHilbert
+//! @brief inverse function of iHilbert3D
 template<class KeyType>
 HOST_DEVICE_FUN inline util::tuple<unsigned, unsigned, unsigned>
 decodeHilbert(KeyType key, unsigned order = maxTreeLevel<KeyType>{}) noexcept
@@ -413,7 +413,7 @@ decodeHilbertMixD(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
     return {returnCoordinates[0], returnCoordinates[1], returnCoordinates[2]};
 }
 
-//! @brief inverse function of iHilbert 32 bit only up to oder 16 but works at constant time.
+//! @brief inverse function of iHilbert3D 32 bit only up to oder 16 but works at constant time.
 template<class KeyType>
 HOST_DEVICE_FUN inline util::tuple<unsigned, unsigned> decodeHilbert2DConstant(KeyType key) noexcept
 {

@@ -198,7 +198,7 @@ HOST_DEVICE_FUN inline std::enable_if_t<IsMorton<KeyType>{}, KeyType> iSfcKey(un
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsHilbert<KeyType>{}, KeyType> iSfcKey(unsigned ix, unsigned iy, unsigned iz)
 {
-    return KeyType{iHilbert<typename KeyType::ValueType>(ix, iy, iz)};
+    return KeyType{iHilbert3D<typename KeyType::ValueType>(ix, iy, iz)};
 }
 
 //! @brief Key encode overload for Mixed Hilbert keys
