@@ -141,8 +141,8 @@ public:
         DeviceVector<KeyType> tmpTree;
         DeviceVector<TreeNodeIndex> workArray;
 
-        while (!updateOctreeGpu<KeyType>({rawPtr(d_codes), d_codes.size()}, bucketSize, d_tree, d_counts, tmpTree,
-                                         workArray))
+        while (!updateOctreeGpu<KeyType>({rawPtr(d_codes), d_codes.size()}, bucketSize, d_tree, d_counts, tmpTree, 
+                                         workArray, Stream<GpuTag>{0}))
             ;
     }
 

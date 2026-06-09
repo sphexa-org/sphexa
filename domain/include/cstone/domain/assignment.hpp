@@ -52,7 +52,7 @@ class GlobalAssignment
 
 public:
     GlobalAssignment(
-        int rank, int nRanks, unsigned bucketSize, const Box<T>& box, MPI_Comm comm, Stream<Accelerator> stream = {})
+        int rank, int nRanks, unsigned bucketSize, const Box<T>& box, MPI_Comm comm, Stream<Accelerator> stream)
         : myRank_(rank)
         , numRanks_(nRanks)
         , bucketSize_(bucketSize)

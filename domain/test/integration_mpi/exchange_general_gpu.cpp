@@ -49,7 +49,7 @@ TEST(GeneralFocusExchangeGpu, bareTreelet)
     std::vector<IndexPair<TreeNodeIndex>> scatterSubRangePerRank{{0, 2}, {0, 2}};
 
     ConcatVector<TreeNodeIndex, DeviceVector> d_gatherMaps;
-    copy(gatherMaps, d_gatherMaps, Stream<GpuTag>{});
+    copy(gatherMaps, d_gatherMaps, Stream<GpuTag>{0});
     DeviceVector<TreeNodeIndex> d_scatterMap = scatterMap;
     DeviceVector<unsigned> d_counts          = counts;
     DeviceVector<char> scratch;
@@ -58,7 +58,7 @@ TEST(GeneralFocusExchangeGpu, bareTreelet)
     exchangeTreeletGeneral<unsigned>(peers, peers, d_gatherMapsView,
                                      {rawPtr(scatterSubRangePerRank), scatterSubRangePerRank.size()},
                                      {rawPtr(d_scatterMap), d_scatterMap.size()}, {rawPtr(d_counts), d_counts.size()},
-                                     0, scratch, MPI_COMM_WORLD, 0);
+                                     0, scratch, MPI_COMM_WORLD, Stream<GpuTag>{0});
 
     std::vector<unsigned> h_counts = toHost(d_counts);
 
@@ -128,7 +128,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
     DeviceVector<unsigned> d_globCounts = counts;
     std::span<const unsigned> d_globCountsView{rawPtr(d_globCounts), d_globCounts.size()};
 
-    FocusedOctree<KeyType, T, GpuTag> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD);
+    FocusedOctree<KeyType, T, GpuTag> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD, Stream<GpuTag>{0});
     focusTree.converge(box, d_keysView, assignment, d_globTreeView, d_globCountsView, invThetaEff, d_scratch);
 
     auto d_countsView = focusTree.countsAcc();

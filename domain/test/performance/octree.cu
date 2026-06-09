@@ -70,12 +70,15 @@ int main(int argc, char** argv)
 
     thrust::device_vector<KeyType> particleCodes(randomBox.particleKeys().begin(), randomBox.particleKeys().end());
 
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+
     // cornerstone build benchmark
 
     auto fullBuild = [&]()
     {
         while (!updateOctreeGpu<KeyType>({rawPtr(particleCodes), numParticles}, bucketSize, tree, counts, tmpTree,
-                                         workArray))
+                                         workArray, Stream<GpuTag>{stream}))
             ;
     };
 
@@ -84,7 +87,10 @@ int main(int argc, char** argv)
               << " count: " << thrust::reduce(counts.begin(), counts.end(), 0) << std::endl;
 
     auto updateTree = [&]()
-    { updateOctreeGpu<KeyType>({rawPtr(particleCodes), numParticles}, bucketSize, tree, counts, tmpTree, workArray); };
+    {
+        updateOctreeGpu<KeyType>({rawPtr(particleCodes), numParticles}, bucketSize, tree, counts, tmpTree, workArray,
+                                 Stream<GpuTag>{stream});
+    };
 
     float updateTime = timeGpu(updateTree);
     std::cout << "build time with guess " << updateTime / 1000 << " nNodes(tree): " << nNodes(tree)
@@ -94,17 +100,13 @@ int main(int argc, char** argv)
 
     OctreeData<KeyType, GpuTag> octree;
     octree.resize(nNodes(tree));
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
-    auto buildInternal = [&]() { buildOctreeGpu(rawPtr(tree), octree.data(), stream); };
-    auto syncStream    = [&]() { cudaStreamSynchronize(stream); };
-    auto wrapBuild = [&]()
+    auto buildInternal = [&]()
     {
-        buildInternal();
-        syncStream();
+        buildOctreeGpu(rawPtr(tree), octree.data(), stream);
+        cudaStreamSynchronize(stream);
     };
 
-    float internalBuildTime = timeGpu(wrapBuild);
+    float internalBuildTime = timeGpu(buildInternal);
     std::cout << "internal build time " << internalBuildTime / 1000 << std::endl;
     std::cout << "level ranges: ";
     for (unsigned i = 0; i <= maxTreeLevel<KeyType>{}; ++i)
@@ -131,7 +133,7 @@ int main(int argc, char** argv)
     }
     searchSizes = h_searchSizes;
 
-    auto od = octree.data();
+    auto od              = octree.data();
     auto findHalosLambda = [&]()
     {
         findHalosGpu(od.prefixes, od.childOffsets, od.parents, rawPtr(nodeCenters), rawPtr(nodeSizes), rawPtr(tree),

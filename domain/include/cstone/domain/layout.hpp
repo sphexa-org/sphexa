@@ -154,7 +154,7 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
                        std::span<const TreeNodeIndex> leafToInternal,
                        TreeIndexPair idx,
                        std::span<LocalIndex> layout,
-                       Stream<Accelerator> stream = {})
+                       Stream<Accelerator> stream)
 {
     if constexpr (HaveGpu<Accelerator>{})
     {

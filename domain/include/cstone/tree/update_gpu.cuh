@@ -46,8 +46,8 @@ bool updateOctreeGpu(std::span<const KeyType> keys,
                      DevCountVec& counts,
                      DevKeyVec& tmpTree,
                      DevIdxVec& workArray,
-                     unsigned maxCount = std::numeric_limits<unsigned>::max(),
-                     Stream<GpuTag> stream = {})
+                     Stream<GpuTag> stream,
+                     unsigned maxCount = std::numeric_limits<unsigned>::max())
 {
     workArray.resize(tree.size());
     TreeNodeIndex newNumNodes =

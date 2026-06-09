@@ -60,7 +60,7 @@ public:
      * @param numRanks      number of ranks
      * @param bucketSize    Maximum number of particles per leaf inside the focus area
      */
-    FocusedOctree(int myRank, int numRanks, unsigned bucketSize, MPI_Comm comm, Stream<Accelerator> stream = {})
+    FocusedOctree(int myRank, int numRanks, unsigned bucketSize, MPI_Comm comm, Stream<Accelerator> stream)
         : myRank_(myRank)
         , numRanks_(numRanks)
         , bucketSize_(bucketSize)

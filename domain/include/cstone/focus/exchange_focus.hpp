@@ -307,7 +307,7 @@ void indexTreelets(std::span<const int> peerRanks,
 }
 
 //! @brief send cell properties, send to interior peers, recv from exterior peers
-template<class T, class DevVec>
+template<class T, class DevVec, class Accelerator>
 void exchangeTreeletGeneral(std::span<const int> interiorPeers,
                             std::span<const int> exteriorPeers,
                             std::span<const std::span<const TreeNodeIndex>> treeletIdx,
@@ -317,10 +317,10 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
                             int commTag,
                             DevVec& scratch,
                             MPI_Comm comm,
-                            cudaStream_t stream)
+                            Stream<Accelerator> stream)
 {
     constexpr int alignmentBytes = 64;
-    constexpr bool useGpu        = IsDeviceVector<DevVec>{};
+    constexpr bool useGpu        = HaveGpu<Accelerator>{};
 
     std::vector<std::size_t> treeletSizes(interiorPeers.size() + exteriorPeers.size());
     for (size_t i = 0; i < interiorPeers.size(); ++i)
@@ -339,7 +339,7 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
     for (size_t i = 0; i < interiorPeers.size(); ++i)
     {
         gatherAcc(treeletIdx[interiorPeers[i]], quantities.data(), sendBuffers[i].data(),
-                  detail::makeStream<useGpu>(stream));
+                  stream);
         if constexpr (useGpu) { syncGpu(stream); }
         assert(sendBuffers[i].size() == treeletIdx[interiorPeers[i]].size());
         mpiSendAsyncAcc<useGpu>(sendBuffers[i].data(), treeletIdx[interiorPeers[i]].size(), interiorPeers[i], commTag,
@@ -360,45 +360,12 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
         mpiRecvSyncAcc<useGpu>(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE, comm);
 
         auto mapToInternal = csToInternalMap.subspan(focusAssignment[recvRank].start(), recvCount);
-        scatterAcc(mapToInternal, recvBuf, quantities.data(), detail::makeStream<useGpu>(stream));
+        scatterAcc(mapToInternal, recvBuf, quantities.data(), stream);
     }
     if constexpr (useGpu) { syncGpu(stream); }
 
     MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUS_IGNORE);
     reallocate(scratch, origSize, 1.0);
-}
-
-//! @brief Convenience overload for generic Stream<Accelerator> dispatch
-template<class T, class DevVec>
-void exchangeTreeletGeneral(std::span<const int> interiorPeers,
-                            std::span<const int> exteriorPeers,
-                            std::span<const std::span<const TreeNodeIndex>> treeletIdx,
-                            std::span<const IndexPair<TreeNodeIndex>> focusAssignment,
-                            std::span<const TreeNodeIndex> csToInternalMap,
-                            std::span<T> quantities,
-                            int commTag,
-                            DevVec& scratch,
-                            MPI_Comm comm,
-                            Stream<CpuTag> /*stream*/)
-{
-    exchangeTreeletGeneral(interiorPeers, exteriorPeers, treeletIdx, focusAssignment, csToInternalMap,
-                           quantities, commTag, scratch, comm, 0);
-}
-
-template<class T, class DevVec>
-void exchangeTreeletGeneral(std::span<const int> interiorPeers,
-                            std::span<const int> exteriorPeers,
-                            std::span<const std::span<const TreeNodeIndex>> treeletIdx,
-                            std::span<const IndexPair<TreeNodeIndex>> focusAssignment,
-                            std::span<const TreeNodeIndex> csToInternalMap,
-                            std::span<T> quantities,
-                            int commTag,
-                            DevVec& scratch,
-                            MPI_Comm comm,
-                            Stream<GpuTag> stream)
-{
-    exchangeTreeletGeneral(interiorPeers, exteriorPeers, treeletIdx, focusAssignment, csToInternalMap,
-                           quantities, commTag, scratch, comm, static_cast<cudaStream_t>(stream));
 }
 
 } // namespace cstone

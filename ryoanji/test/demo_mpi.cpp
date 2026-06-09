@@ -51,7 +51,7 @@ void ryoanjiTest(int thisRank, int numRanks, size_t numParticlesGlobal)
     std::vector<T> m(numParticles, 1.0f / float(numParticlesGlobal));
 
     cstone::Domain<KeyType, T, AccType> domain(thisRank, numRanks, bucketSizeGlobal, bucketSizeFocus, theta,
-                                               MPI_COMM_WORLD, box);
+                                               MPI_COMM_WORLD, cstone::Stream<AccType>::Default(), box);
 
     // upload particles to GPU
     cstone::DeviceVector<KeyType> d_keys = std::vector<KeyType>(numParticles);

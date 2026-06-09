@@ -191,85 +191,76 @@ void sortByKey(std::span<KeyType> keys,
 
 namespace detail
 {
-template<bool useGpu>
-struct SelectStream
-{
-    using type = Stream<typename std::conditional<useGpu, GpuTag, CpuTag>::type>;
-};
 
-template<bool useGpu>
-using SelectStream_t = typename SelectStream<useGpu>::type;
-
-//! @brief Build the correct Stream<> from a raw cudaStream_t, choosing CPU or GPU path at compile time
-template<bool useGpu>
-auto makeStream(cudaStream_t s)
-{
-    if constexpr (useGpu) { return Stream<GpuTag>{s}; }
-    else { return Stream<CpuTag>{}; }
+template <bool useGpu>
+constexpr auto selectStream() {
+    if constexpr (useGpu) return Stream<GpuTag>{0};
+    else return Stream<CpuTag>{};
 }
+
 } // namespace detail
 
 template<bool useGpu, class It, class T>
 void fill(It first, It last, T value)
 {
-    fill(first, last, value, detail::SelectStream_t<useGpu>{});
+    fill(first, last, value, detail::selectStream<useGpu>());
 }
 
 template<bool useGpu, class T>
 void copy_n(const T* src, std::size_t n, T* dest)
 {
-    copy_n(src, n, dest, detail::SelectStream_t<useGpu>{});
+    copy_n(src, n, dest, detail::selectStream<useGpu>());
 }
 
 template<bool useGpu, class T1, class T2, class T3>
 void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value)
 {
-    scaleGpuAcc(in1, in2, out, value, detail::SelectStream_t<useGpu>{});
+    scaleGpuAcc(in1, in2, out, value, detail::selectStream<useGpu>());
 }
 
 template<bool useGpu, class IndexType, class ValueType>
 void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
 {
-    gatherAcc(ordering, source, destination, detail::SelectStream_t<useGpu>{});
+    gatherAcc(ordering, source, destination, detail::selectStream<useGpu>());
 }
 
 template<bool useGpu, class IndexType, class ValueType>
 void scatterAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
 {
-    scatterAcc(ordering, source, destination, detail::SelectStream_t<useGpu>{});
+    scatterAcc(ordering, source, destination, detail::selectStream<useGpu>());
 }
 
 template<bool useGpu, class BufferType>
 void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate)
 {
-    sequence(first, n, buffer, growthRate, detail::SelectStream_t<useGpu>{});
+    sequence(first, n, buffer, growthRate, detail::selectStream<useGpu>());
 }
 
 template<bool useGpu, class T1, class T2>
 void sequenceAcc(T1* first, T1* last, T2 value)
 {
-    sequenceAcc(first, last, value, detail::SelectStream_t<useGpu>{});
+    sequenceAcc(first, last, value, detail::selectStream<useGpu>());
 }
 
 template<bool useGpu, class KeyType, class ValueType>
 void sortByKey(std::span<KeyType> keys, std::span<ValueType> values)
 {
     assert(keys.size() == values.size());
-    sortByKey(keys, values, detail::SelectStream_t<useGpu>{});
+    sortByKey(keys, values, detail::selectStream<useGpu>());
 }
 
 template<bool useGpu, class KeyType, class ValueType, class KeyBuf, class ValueBuf>
 void sortByKey(std::span<KeyType> keys, std::span<ValueType> values, KeyBuf& keyBuf, ValueBuf& valueBuf, double growth)
 {
     assert(keys.size() == values.size());
-    sortByKey(keys, values, keyBuf, valueBuf, growth, detail::SelectStream_t<useGpu>{});
+    sortByKey(keys, values, keyBuf, valueBuf, growth, detail::selectStream<useGpu>());
 }
 
 template<bool useGpu, class KeyType, class ValueType, class KeyBuf, class ValueBuf>
 void sortByKeyGpu(std::span<KeyType> keys, std::span<ValueType> values, KeyBuf& keyBuf, ValueBuf& valueBuf,
                   float growthRate)
 {
-    sortByKeyGpu(keys, values, keyBuf, valueBuf, growthRate, detail::SelectStream_t<useGpu>{});
+    sortByKeyGpu(keys, values, keyBuf, valueBuf, growthRate, detail::selectStream<useGpu>());
 }
 
 } // namespace cstone

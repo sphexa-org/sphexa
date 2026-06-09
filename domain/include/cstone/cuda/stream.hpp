@@ -56,16 +56,20 @@ struct Stream;
 template<>
 struct Stream<CpuTag>
 {
+    constexpr static Stream<CpuTag> Default() { return {}; }
 };
 
 template<>
 struct Stream<GpuTag>
 {
     cudaStream_t stream;
-    Stream(cudaStream_t s = 0)
+    constexpr Stream(cudaStream_t s)
         : stream(s)
     {
     }
+
+    constexpr static Stream<GpuTag> Default() { return {0}; }
+
     operator cudaStream_t() const { return stream; }
 };
 

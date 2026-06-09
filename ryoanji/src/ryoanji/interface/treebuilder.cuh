@@ -36,7 +36,10 @@ class TreeBuilder
 {
 public:
     //! @brief initialize with the desired maximum particles per leaf cell
-    TreeBuilder(unsigned ncrit) : bucketSize_(ncrit) {}
+    TreeBuilder(unsigned ncrit)
+        : bucketSize_(ncrit)
+    {
+    }
 
     /*! @brief construct an octree from body coordinates
      *
@@ -64,7 +67,8 @@ public:
 
         cstone::sequenceGpu(rawPtr(d_ordering), d_ordering.size(), 0, 0);
         cstone::sortByKeyGpu(rawPtr(d_keys), rawPtr(d_keys) + d_keys.size(), rawPtr(d_ordering), rawPtr(d_keys_tmp),
-                             rawPtr(d_values_tmp), rawPtr(cubTmpStorage), tempStorageEle, cstone::Stream<cstone::GpuTag>{0});
+                             rawPtr(d_values_tmp), rawPtr(cubTmpStorage), tempStorageEle,
+                             cstone::Stream<cstone::GpuTag>{0});
 
         thrust::gather(thrust::device, d_ordering.begin(), d_ordering.end(), x, tmp.begin());
         thrust::copy(tmp.begin(), tmp.end(), x);
@@ -81,7 +85,7 @@ public:
         }
 
         while (!cstone::updateOctreeGpu<KeyType>({rawPtr(d_keys), d_keys.size()}, bucketSize_, d_tree_, d_counts_,
-                                                 tmpTree_, workArray_))
+                                                 tmpTree_, workArray_, cstone::Stream<cstone::GpuTag>{0}))
             ;
 
         octreeGpuData_.resize(cstone::nNodes(d_tree_));
@@ -97,10 +101,7 @@ public:
     const LocalIndex*    layout() const { return rawPtr(d_layout_); }
     const KeyType*       nodeKeys() const { return rawPtr(octreeGpuData_.prefixes); }
     const TreeNodeIndex* childOffsets() const { return rawPtr(octreeGpuData_.childOffsets); }
-    const TreeNodeIndex* leafToInternal() const
-    {
-        return cstone::leafToInternal(octreeGpuData_).data();
-    }
+    const TreeNodeIndex* leafToInternal() const { return cstone::leafToInternal(octreeGpuData_).data(); }
     const TreeNodeIndex* internalToLeaf() const { return rawPtr(octreeGpuData_.internalToLeaf); }
     //! @brief return host-resident octree level cell ranges
     const TreeNodeIndex* levelRange() const { return octreeGpuData_.levelRange.data(); }

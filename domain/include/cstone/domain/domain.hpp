@@ -66,8 +66,8 @@ public:
            unsigned bucketSizeFocus,
            float theta,
            MPI_Comm comm,
-           const Box<T>& box          = Box<T>{0, 1},
-           Stream<Accelerator> stream = {})
+           Stream<Accelerator> stream,
+           const Box<T>& box          = Box<T>{0, 1})
         : myRank_(rank)
         , numRanks_(nRanks)
         , bucketSizeFocus_(bucketSizeFocus)
