@@ -17,7 +17,10 @@ set(UNIT_TEST_SOURCES_GPU
         tree/btree.cu
         tree/csarray.cu
         tree/octree.cu
+        neighbors/compressneighbors.cu
+        neighbors/reducearray.cu
         neighbors/ijloop.cu
+        neighbors/ijloop_upsweep.cu
 )
 
 if(CMAKE_HIP_COMPILER)

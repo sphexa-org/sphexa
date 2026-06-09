@@ -187,7 +187,7 @@ struct MomentumAndEnergyPostamble
 
         // grad_P_xyz is stored as the acceleration,s accel = -grad_P / rho
         return std::make_tuple(Tc(dui), T(-K * momentum_x), T(-K * momentum_y), T(-K * momentum_z), maxvsignal);
-    };
+    }
 };
 
 template<bool UseTdpdTrho, class T, class Tc>
@@ -211,7 +211,7 @@ struct MomentumAndEnergyPostambleWithDt : MomentumAndEnergyPostamble<UseTdpdTrho
 
         auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
         return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
-    };
+    }
 };
 
 template<bool AvClean, class Neighborhood, class Tc, class T, class Tm, class Tm1>
