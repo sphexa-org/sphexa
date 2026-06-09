@@ -39,15 +39,17 @@ template<class KeyType>
 SendRanges createSendRangesGpu(const SfcAssignment<KeyType>& assignment,
                                std::span<const KeyType> particleKeys,
                                KeyType* d_searchKeys,
-                               LocalIndex* d_indices)
+                               LocalIndex* d_indices,
+                               cudaStream_t stream = 0)
 {
     size_t numSearchKeys = assignment.numRanks() + 1;
     SendRanges ret(numSearchKeys);
 
-    memcpyH2D(assignment.data(), numSearchKeys, d_searchKeys);
+    memcpyH2DAsync(assignment.data(), numSearchKeys, d_searchKeys, stream);
     lowerBoundGpu(particleKeys.data(), particleKeys.data() + particleKeys.size(), d_searchKeys,
-                  d_searchKeys + numSearchKeys, d_indices);
-    memcpyD2H(d_indices, numSearchKeys, ret.data());
+                  d_searchKeys + numSearchKeys, d_indices, stream);
+    memcpyD2HAsync(d_indices, numSearchKeys, ret.data(), stream);
+    syncGpu(stream);
 
     return ret;
 }

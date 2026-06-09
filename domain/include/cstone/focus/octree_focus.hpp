@@ -178,7 +178,7 @@ struct CombinedUpdate
 
         exclusiveScanGpu(nodeOps.data(), nodeOps.data() + nodeOps.size(), nodeOps.data(), stream);
         TreeNodeIndex newNumLeafNodes;
-        memcpyD2H(nodeOps.data() + nodeOps.size() - 1, 1, &newNumLeafNodes, stream);
+        memcpyD2HAsync(nodeOps.data() + nodeOps.size() - 1, 1, &newNumLeafNodes, stream);
         syncGpu(stream); // wait for D2H before using newNumLeafNodes on host
 
         auto& newLeaves = tree.prefixes;

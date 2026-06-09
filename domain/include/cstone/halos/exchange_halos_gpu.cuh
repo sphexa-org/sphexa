@@ -38,6 +38,7 @@ void haloExchangeGpu(int epoch,
                      DevVec1& sendScratchBuffer,
                      DevVec2& receiveScratchBuffer,
                      MPI_Comm comm,
+                     cudaStream_t stream,
                      Arrays... arrays)
 {
     using TransferType          = uint64_t;
@@ -69,11 +70,11 @@ void haloExchangeGpu(int epoch,
         checkGpuErrors(
             cudaMemcpy(d_rangeScan, outHalos.scan(), outHalos.nRanges() * sizeof(IndexType), cudaMemcpyHostToDevice));
 
-        auto gatherArray = [d_range, d_rangeScan, numRanges = outHalos.nRanges(), sendCount](auto arrayPtr)
-        { gatherRanges(d_rangeScan, d_range, numRanges, arrayPtr[0], arrayPtr[1], sendCount); };
+        auto gatherArray = [d_range, d_rangeScan, numRanges = outHalos.nRanges(), sendCount, stream](auto arrayPtr)
+        { gatherRanges(d_rangeScan, d_range, numRanges, arrayPtr[0], arrayPtr[1], sendCount, stream); };
 
         for_each_tuple(gatherArray, util::packBufferPtrs<alignment>(sendPtr, sendCount, arrays...));
-        checkGpuErrors(cudaDeviceSynchronize());
+        syncGpu(stream);
 
         size_t numElementsSend = util::computeByteOffsets(sendCount, alignment, arrays...).back() / alignment;
         mpiSendGpuDirect(sendPtr, numElementsSend, int(destinationRank), haloExchangeTag, sendRequests, sendBuffers,
@@ -101,11 +102,14 @@ void haloExchangeGpu(int epoch,
         const auto& inHalos     = incomingHalos[receiveRank];
         LocalIndex receiveCount = inHalos.count();
 
-        auto unpack = [start = inHalos.start(), receiveCount](auto arrayPair)
-        { memcpyD2H(arrayPair[1], receiveCount, arrayPair[0] + start); };
+        auto unpack = [start = inHalos.start(), receiveCount, stream](auto arrayPair)
+        {
+            memcpyD2HAsync(arrayPair[1], receiveCount, arrayPair[0] + start, stream);
+            syncGpu(stream);
+        };
 
         for_each_tuple(unpack, util::packBufferPtrs<alignment>(receiveBuffer, receiveCount, arrays...));
-        checkGpuErrors(cudaDeviceSynchronize());
+        syncGpu(stream);
     }
 
     if (not sendRequests.empty()) { MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUSES_IGNORE); }

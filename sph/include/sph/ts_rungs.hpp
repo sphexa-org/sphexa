@@ -89,8 +89,9 @@ void sortGroupDt(float* groupDt, cstone::LocalIndex* groupIndices, cstone::Local
 inline auto timestepRangeGpu(const float* groupDt, cstone::LocalIndex numGroups, float fastFraction)
 {
     std::array<float, 2> minGroupDt;
-    memcpyD2H(groupDt, 1, minGroupDt.data());
-    memcpyD2H(groupDt + cstone::LocalIndex(fastFraction * numGroups), 1, minGroupDt.data() + 1);
+    memcpyD2HAsync(groupDt, 1, minGroupDt.data(), 0);
+    memcpyD2HAsync(groupDt + cstone::LocalIndex(fastFraction * numGroups), 1, minGroupDt.data() + 1, 0);
+    syncGpu(0);
     return minGroupDt;
 }
 

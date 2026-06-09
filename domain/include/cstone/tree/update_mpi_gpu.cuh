@@ -78,7 +78,7 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
     computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys, std::numeric_limits<unsigned>::max(),
                          true);
 
-    syncGpu();
+    syncGpu(0);
     if (expectOverflows)
     {
         MPI_Op limitSum;

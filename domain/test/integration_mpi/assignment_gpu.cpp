@@ -122,7 +122,8 @@ void randomGaussianAssignment(int rank, int numRanks)
 
     {
         std::vector<KeyType> keyDownload(devKeyView.size());
-        memcpyD2H(devKeyView.data(), devKeyView.size(), keyDownload.data());
+        memcpyD2HAsync(devKeyView.data(), devKeyView.size(), keyDownload.data(), 0);
+        syncGpu(0);
         EXPECT_TRUE(std::equal(keyDownload.begin(), keyDownload.end(), cpuKeyView.begin()));
     }
 }

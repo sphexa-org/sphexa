@@ -411,7 +411,7 @@ void fillMassHalos(Vector& m, std::size_t first, std::size_t last)
 {
     using T = std::decay_t<Vector>::value_type;
     T mass;
-    if constexpr (IsDeviceVector<Vector>{}) { memcpyD2H(m.data() + first, 1, &mass); }
+    if constexpr (IsDeviceVector<Vector>{}) { memcpyD2HAsync(m.data() + first, 1, &mass, 0); syncGpu(0); }
     else { mass = m[first]; }
 
     cstone::fill<IsDeviceVector<Vector>{}>(m.begin(), m.begin() + first, mass);

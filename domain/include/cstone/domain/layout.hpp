@@ -159,7 +159,7 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
     if constexpr (HaveGpu<Accelerator>{})
     {
         cudaStream_t s = stream;
-        memcpyD2D(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start(), s);
+        memcpyD2DAsync(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start(), s);
 
         gatherGpu(leafToInternal.data(), idx.start(), flags.data(), layout.data(), s);
         selectCopyGpu(focusLeafCounts.data(), idx.start(), layout.data(), layout.data(), s);

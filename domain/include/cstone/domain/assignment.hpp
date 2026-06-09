@@ -137,8 +137,8 @@ public:
         {
             reallocate(leaves_, d_csTree_.size(), growthRate_);
             reallocate(nodeCounts_, d_nodeCounts_.size(), growthRate_);
-            memcpyD2H(d_csTree_.data(), d_csTree_.size(), leaves_.data(), stream_);
-            memcpyD2H(d_nodeCounts_.data(), d_nodeCounts_.size(), nodeCounts_.data(), stream_);
+            memcpyD2HAsync(d_csTree_.data(), d_csTree_.size(), leaves_.data(), stream_);
+            memcpyD2HAsync(d_nodeCounts_.data(), d_nodeCounts_.size(), nodeCounts_.data(), stream_);
             syncGpu(stream_);
         }
 
@@ -147,7 +147,7 @@ public:
         if constexpr (gpu)
         {
             exchanges_ =
-                createSendRangesGpu<KeyType>(assignment_, keyView, rawPtr(d_boundaryKeys_), rawPtr(d_boundaryIndices_));
+                createSendRangesGpu<KeyType>(assignment_, keyView, rawPtr(d_boundaryKeys_), rawPtr(d_boundaryIndices_), stream_);
         }
         else { exchanges_ = createSendRanges<KeyType>(assignment_, keyView); }
 

@@ -315,7 +315,7 @@ public:
         {
             static_assert(IsDeviceVector<OVec>{}, "Need ordering on GPU for GPU-accelerated domain");
             orderingCpu.resize(envelope[1] - envelope[0]);
-            memcpyD2H(ord, orderingCpu.size(), orderingCpu.data(), stream_);
+            memcpyD2HAsync(ord, orderingCpu.size(), orderingCpu.data(), stream_);
             syncGpu(stream_);
             ord = orderingCpu.data();
         }
@@ -333,7 +333,7 @@ public:
     void exchangeHalos(std::tuple<Vectors&...> arrays, SendBuffer& sendBuffer, ReceiveBuffer& receiveBuffer) const
     {
         std::apply([this](auto&... arrays) { this->checkSizesEqual(this->bufDesc_.size, arrays...); }, arrays);
-        this->halos_.exchangeHalos(arrays, sendBuffer, receiveBuffer);
+        this->halos_.exchangeHalos(arrays, sendBuffer, receiveBuffer, stream_);
     }
 
     //! @brief return the index of the first particle that's part of the local assignment
@@ -557,11 +557,11 @@ private:
         if constexpr (cstone::HaveGpu<Accelerator>{})
         {
             globalTreeBackingBuffer.resize(globalTree.size());
-            memcpyD2H(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data(), stream_);
+            memcpyD2HAsync(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data(), stream_);
             globalTree = std::span(globalTreeBackingBuffer);
 
             flagsBackingBuffer.resize(flags.size());
-            memcpyD2H(flags.data(), flags.size(), flagsBackingBuffer.data(), stream_);
+            memcpyD2HAsync(flags.data(), flags.size(), flagsBackingBuffer.data(), stream_);
             flags = std::span(flagsBackingBuffer);
             syncGpu(stream_);
         }

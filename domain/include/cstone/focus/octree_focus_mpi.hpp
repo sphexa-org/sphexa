@@ -130,7 +130,8 @@ public:
                 {rawPtr(countsAcc_), countsAcc_.size()}, {rawPtr(macsAcc_), macsAcc_.size()}, scratch, stream_);
 
             reallocateDestructive(leaves_, leavesAcc_.size(), allocGrowthRate_);
-            memcpyD2H(rawPtr(leavesAcc_), leavesAcc_.size(), rawPtr(leaves_));
+            memcpyD2HAsync(rawPtr(leavesAcc_), leavesAcc_.size(), rawPtr(leaves_), stream_);
+            syncGpu(stream_);
         }
         else
         {
@@ -139,7 +140,7 @@ public:
         }
 
         translateAssignment<KeyType>(assignment, leaves_, assignment_);
-        auto extPeers = focusPeersAcc<useGpu, KeyType>(globDispl_, assignment_, myRank_, globalLeaves, leaves_);
+        auto extPeers = focusPeersAcc<useGpu, KeyType>(globDispl_, assignment_, myRank_, globalLeaves, leaves_, stream_);
         auto intPeers = exchangePeers(extPeers, comm_);
         peerFlagsToList(extPeers, exteriorPeers_, PeerMask::focus);
         peerFlagsToList(intPeers, interiorPeers_, PeerMask::focus);
@@ -163,7 +164,7 @@ public:
         extractPeerRanges(exteriorPeers_, myRank_, assignment_, peerRanges_);
         std::copy_n(assignment.numNodesPerRankConst().begin(), numRanks_, globNumNodes_.begin());
         std::copy_n(assignment.treeOffsetsConst().begin(), numRanks_ + 1, globDispl_.begin());
-        copy(treeletIdx_, treeletIdxAcc_);
+        copy(treeletIdx_, treeletIdxAcc_, stream_);
 
         /*! Store box for use in all property updates (counts, centers, MACs, etc) until updateTree() is called again.
          *  We store it here in order to disallow calling updateMacs with a changed bounding box, because changing
@@ -211,7 +212,7 @@ public:
 
             std::size_t numIndices = idxFromGlob.size();
             auto* d_indices        = util::packAllocBuffer<TreeNodeIndex>(scratch, {&numIndices, 1}, 64)[0].data();
-            memcpyH2D(idxFromGlob.data(), idxFromGlob.size(), d_indices, stream_);
+            memcpyH2DAsync(idxFromGlob.data(), idxFromGlob.size(), d_indices, stream_);
 
             std::span<const KeyType> leavesAcc{rawPtr(leavesAcc_), leavesAcc_.size()};
             rangeCountGpu<KeyType>(globalTreeLeaves, globalCounts, leavesAcc, {d_indices, idxFromGlob.size()},
@@ -323,7 +324,7 @@ public:
         std::span letToGlob{letToGlobBuf, idxFromGlob.size()};
         if constexpr (HaveGpu<Accelerator>{})
         {
-            memcpyH2D(idxFromGlob.data(), idxFromGlob.size(), letIdx.data(), stream_);
+            memcpyH2DAsync(idxFromGlob.data(), idxFromGlob.size(), letIdx.data(), stream_);
             gatherGpu(letIdx.data(), idxFromGlob.size(), toInternal, letIdx.data(), stream_);
 
             locateNodesGpu(octreeAcc_.prefixes.data(), letIdx.data(), idxFromGlob.size(), globalNodeKeys,
@@ -577,7 +578,7 @@ public:
                           leafToInternal(octreeAcc_), assignment_[myRank_], useGpu ? layoutAcc : layout, stream_);
         if constexpr (useGpu)
         {
-            memcpyD2H(layoutAcc.data(), layoutAcc.size(), layout.data(), stream_);
+            memcpyD2HAsync(layoutAcc.data(), layoutAcc.size(), layout.data(), stream_);
             syncGpu(stream_);
         }
 
@@ -713,10 +714,10 @@ private:
             TreeNodeIndex numNodes     = octreeAcc_.numNodes;
 
             reallocate(numNodes, allocGrowthRate_, hostPrefixes_);
-            memcpyD2H(rawPtr(octreeAcc_.prefixes), numNodes, hostPrefixes_.data(), stream_);
+            memcpyD2HAsync(rawPtr(octreeAcc_.prefixes), numNodes, hostPrefixes_.data(), stream_);
 
             reallocateDestructive(leaves_, numLeafNodes + 1, allocGrowthRate_);
-            memcpyD2H(rawPtr(leavesAcc_), numLeafNodes + 1, leaves_.data(), stream_);
+            memcpyD2HAsync(rawPtr(leavesAcc_), numLeafNodes + 1, leaves_.data(), stream_);
             syncGpu(stream_);
         }
     }

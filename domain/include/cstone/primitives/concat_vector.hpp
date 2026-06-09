@@ -58,7 +58,7 @@ private:
 
 //! @brief copy src to dst
 template<class T, template<class...> class AccVec1, template<class...> class AccVec2, int A>
-void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst)
+void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, cudaStream_t stream = 0)
 {
     std::vector<std::size_t> sizes(src.sizes().begin(), src.sizes().end());
     auto dstView = dst.reindex(std::move(sizes));
@@ -66,20 +66,37 @@ void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& d
 
     if constexpr (!IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{})
     {
-        memcpyH2D(src.data().data(), src.data().size(), dstBuffer);
+        memcpyH2DAsync(src.data().data(), src.data().size(), dstBuffer, stream);
     }
     else if constexpr (IsDeviceVector<AccVec1<T>>{} && !IsDeviceVector<AccVec2<T>>{})
     {
-        memcpyD2H(src.data().data(), src.data().size(), dstBuffer);
+        memcpyD2HAsync(src.data().data(), src.data().size(), dstBuffer, stream);
     }
     else if constexpr (IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{})
     {
-        memcpyD2D(src.data().data(), src.data().size(), dstBuffer);
+        memcpyD2DAsync(src.data().data(), src.data().size(), dstBuffer, stream);
     }
     else if constexpr (!IsDeviceVector<AccVec1<T>>{} && !IsDeviceVector<AccVec2<T>>{})
     {
         std::copy_n(src.data().data(), src.data().size(), dstBuffer);
     }
+    if constexpr (IsDeviceVector<AccVec1<T>>{} || IsDeviceVector<AccVec2<T>>{})
+    {
+        syncGpu(stream);
+    }
+}
+
+//! @brief Convenience overload for generic Stream<Accelerator> dispatch
+template<class T, template<class...> class AccVec1, template<class...> class AccVec2, int A>
+void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, Stream<CpuTag>)
+{
+    copy(src, dst, 0);
+}
+
+template<class T, template<class...> class AccVec1, template<class...> class AccVec2, int A>
+void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, Stream<GpuTag> stream)
+{
+    copy(src, dst, static_cast<cudaStream_t>(stream));
 }
 
 } // namespace cstone

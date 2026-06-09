@@ -70,17 +70,43 @@ std::vector<int> focusPeersAcc(std::span<const TreeNodeIndex> globalOffsets,
                                std::span<const TreeIndexPair> focusOffsets,
                                int myRank,
                                std::span<const KeyType> globalTree,
-                               std::span<const KeyType> focusTree)
+                               std::span<const KeyType> focusTree,
+                               cudaStream_t stream = 0)
 {
     if constexpr (useGpu)
     {
         std::vector<KeyType> globalTreeBackingBuffer;
         globalTreeBackingBuffer.resize(globalTree.size());
-        memcpyD2H(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data());
+        memcpyD2HAsync(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data(), stream);
+        syncGpu(stream);
         auto globalTreeHost = std::span(globalTreeBackingBuffer);
         return focusPeers<KeyType>(globalOffsets, focusOffsets, myRank, globalTreeHost, focusTree);
     }
     return focusPeers<KeyType>(globalOffsets, focusOffsets, myRank, globalTree, focusTree);
+}
+
+//! @brief Convenience overload for generic Stream<Accelerator> dispatch
+template<bool useGpu, class KeyType>
+std::vector<int> focusPeersAcc(std::span<const TreeNodeIndex> globalOffsets,
+                               std::span<const TreeIndexPair> focusOffsets,
+                               int myRank,
+                               std::span<const KeyType> globalTree,
+                               std::span<const KeyType> focusTree,
+                               Stream<CpuTag>)
+{
+    return focusPeersAcc<useGpu, KeyType>(globalOffsets, focusOffsets, myRank, globalTree, focusTree, 0);
+}
+
+template<bool useGpu, class KeyType>
+std::vector<int> focusPeersAcc(std::span<const TreeNodeIndex> globalOffsets,
+                               std::span<const TreeIndexPair> focusOffsets,
+                               int myRank,
+                               std::span<const KeyType> globalTree,
+                               std::span<const KeyType> focusTree,
+                               Stream<GpuTag> stream)
+{
+    return focusPeersAcc<useGpu, KeyType>(globalOffsets, focusOffsets, myRank, globalTree, focusTree,
+                                          static_cast<cudaStream_t>(stream));
 }
 
 inline void peerFlagsToList(std::span<const int> peerFlags, std::vector<int>& peersList, PeerMask mask)

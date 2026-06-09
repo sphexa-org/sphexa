@@ -149,9 +149,10 @@ TEST(FocusDomain, removeParticle)
     LocalIndex removeIndex = domain.startIndex() + domain.nParticles() / 2;
     assert(removeIndex < domain.endIndex());
     auto rmKey = removeKey<KeyType>::value;
-    memcpyH2D(&rmKey, 1, rawPtr(d_keys) + removeIndex);
+    memcpyH2DAsync(&rmKey, 1, rawPtr(d_keys) + removeIndex, 0);
     uint64_t removeID;
-    memcpyD2H(rawPtr(d_id) + removeIndex, 1, &removeID);
+    memcpyD2HAsync(rawPtr(d_id) + removeIndex, 1, &removeID, 0);
+    syncGpu(0);
 
     domain.sync(d_keys, d_x, d_y, d_z, d_h, std::tie(d_id), std::tie(s1, s2, s3));
 
@@ -208,9 +209,10 @@ TEST(DomainGpu, reapplySync)
     // modify coordinates
     {
         RandomCoordinates<Real, SfcKind<KeyType>> scord(domain.nParticles(), box, numRanks + rank);
-        memcpyH2D(scord.x().data(), scord.x().size(), d_x.data() + domain.startIndex());
-        memcpyH2D(scord.y().data(), scord.y().size(), d_y.data() + domain.startIndex());
-        memcpyH2D(scord.z().data(), scord.z().size(), d_z.data() + domain.startIndex());
+        memcpyH2DAsync(scord.x().data(), scord.x().size(), d_x.data() + domain.startIndex(), 0);
+        memcpyH2DAsync(scord.y().data(), scord.y().size(), d_y.data() + domain.startIndex(), 0);
+        memcpyH2DAsync(scord.z().data(), scord.z().size(), d_z.data() + domain.startIndex(), 0);
+        syncGpu(0);
     }
 
     std::vector<Real> host_property(d_x.size());
@@ -313,7 +315,8 @@ void randomGaussianGrav(int thisRank, int numRanks)
     auto cpToHost = []<class X>(const X* ptr, int n)
     {
         std::vector<X> ret(n);
-        memcpyD2H(ptr, n, ret.data());
+        memcpyD2HAsync(ptr, n, ret.data(), 0);
+        syncGpu(0);
         return ret;
     };
 

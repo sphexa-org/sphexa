@@ -35,6 +35,7 @@ void haloExchangeGpu(int epoch,
                      DevVec1& sendScratchBuffer,
                      DevVec2& receiveScratchBuffer,
                      MPI_Comm comm,
+                     cudaStream_t stream,
                      Arrays... arrays);
 
 template<class KeyType, class Accelerator>
@@ -84,16 +85,17 @@ public:
      * Note that if the ScratchVectors are on device, all arrays need to be on the device too.
      */
     template<class Scratch1, class Scratch2, class... Vectors>
-    void exchangeHalos(std::tuple<Vectors&...> arrays, Scratch1& sendBuffer, Scratch2& receiveBuffer) const
+    void exchangeHalos(std::tuple<Vectors&...> arrays, Scratch1& sendBuffer, Scratch2& receiveBuffer,
+                       cudaStream_t stream = 0) const
     {
         if constexpr (HaveGpu<Accelerator>{})
         {
             static_assert(IsDeviceVector<Scratch1>{} && IsDeviceVector<Scratch2>{});
             std::apply(
-                [this, &sendBuffer, &receiveBuffer](auto&... arrays)
+                [this, &sendBuffer, &receiveBuffer, stream](auto&... arrays)
                 {
                     haloExchangeGpu(haloEpoch_++, incomingHaloIndices_, outgoingHaloIndices_, sendBuffer, receiveBuffer,
-                                    comm_, rawPtr(arrays)...);
+                                    comm_, stream, rawPtr(arrays)...);
                 },
                 arrays);
         }
@@ -103,6 +105,21 @@ public:
                        { haloexchange(haloEpoch_++, incomingHaloIndices_, outgoingHaloIndices_, comm_, rawPtr(arrays)...); },
                        arrays);
         }
+    }
+
+    //! @brief Convenience overload for generic Stream<Accelerator> dispatch
+    template<class Scratch1, class Scratch2, class... Vectors>
+    void exchangeHalos(std::tuple<Vectors&...> arrays, Scratch1& sendBuffer, Scratch2& receiveBuffer,
+                       Stream<CpuTag>) const
+    {
+        exchangeHalos(arrays, sendBuffer, receiveBuffer, 0);
+    }
+
+    template<class Scratch1, class Scratch2, class... Vectors>
+    void exchangeHalos(std::tuple<Vectors&...> arrays, Scratch1& sendBuffer, Scratch2& receiveBuffer,
+                       Stream<GpuTag> stream) const
+    {
+        exchangeHalos(arrays, sendBuffer, receiveBuffer, static_cast<cudaStream_t>(stream));
     }
 
 private:

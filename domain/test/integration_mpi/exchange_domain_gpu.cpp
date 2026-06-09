@@ -90,12 +90,13 @@ void exchangeAllToAll(int thisRank, int numRanks)
     ExchangeLog log;
     auto recvStart = domain_exchange::receiveStart(bufDesc, numPartAssigned - numPartPresent);
     auto recvEnd   = recvStart + numPartAssigned - numPartPresent;
-    exchangeParticlesGpu(0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch, rawPtr(d_ordering),
-                         MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y));
+     exchangeParticlesGpu(0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch, rawPtr(d_ordering),
+                          MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y));
 
-    reallocate(bufDesc.size, 1.01, x, y);
-    memcpyD2H(d_x.data(), d_x.size(), x.data());
-    memcpyD2H(d_y.data(), d_y.size(), y.data());
+     reallocate(bufDesc.size, 1.01, x, y);
+     memcpyD2HAsync(d_x.data(), d_x.size(), x.data(), 0);
+     memcpyD2HAsync(d_y.data(), d_y.size(), y.data(), 0);
+     syncGpu(0);
 
     ex::extractLocallyOwned(bufDesc, numPartPresent, numPartAssigned, ordering.data() + sends[thisRank], x, y);
 
@@ -183,10 +184,11 @@ void exchangeCyclicNeighbors(int thisRank, int numRanks)
                          MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y), rawPtr(d_uint8Array), rawPtr(d_testArray));
 
     reallocate(bufDesc.size, 1.01, x, y, testArray, uint8Array);
-    memcpyD2H(d_x.data(), d_x.size(), x.data());
-    memcpyD2H(d_y.data(), d_y.size(), y.data());
-    memcpyD2H(d_testArray.data(), d_testArray.size(), testArray.data());
-    memcpyD2H(d_uint8Array.data(), d_uint8Array.size(), uint8Array.data());
+    memcpyD2HAsync(d_x.data(), d_x.size(), x.data(), 0);
+    memcpyD2HAsync(d_y.data(), d_y.size(), y.data(), 0);
+    memcpyD2HAsync(d_testArray.data(), d_testArray.size(), testArray.data(), 0);
+    memcpyD2HAsync(d_uint8Array.data(), d_uint8Array.size(), uint8Array.data(), 0);
+    syncGpu(0);
 
     ex::extractLocallyOwned(bufDesc, numPartPresent, numPartAssigned, ordering.data() + sends[thisRank], x, y,
                             testArray, uint8Array);

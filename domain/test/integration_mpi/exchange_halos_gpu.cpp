@@ -124,12 +124,13 @@ void simpleTest(int thisRank, int numRanks)
     DeviceVector<char> receiveBuffer = std::vector<char>(7 * 24);
 
     //! Perform exchange with GPU buffers
-    haloExchangeGpu(0, incomingHalos, outgoingHalos, sendBuffer, receiveBuffer, MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z));
+    haloExchangeGpu(0, incomingHalos, outgoingHalos, sendBuffer, receiveBuffer, MPI_COMM_WORLD, 0, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z));
 
     //! download from device
-    memcpyD2H(d_x.data(), d_x.size(), x.data());
-    memcpyD2H(d_y.data(), d_y.size(), y.data());
-    memcpyD2H(d_z.data(), d_z.size(), z.data());
+    memcpyD2HAsync(d_x.data(), d_x.size(), x.data(), 0);
+    memcpyD2HAsync(d_y.data(), d_y.size(), y.data(), 0);
+    memcpyD2HAsync(d_z.data(), d_z.size(), z.data(), 0);
+    syncGpu(0);
 
     EXPECT_EQ(xRef, x);
     EXPECT_EQ(yRef, y);

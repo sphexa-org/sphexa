@@ -243,11 +243,12 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
     {
         assert(octreeAcc.childOffsets.size() >= nodeOps.size());
         std::span<TreeNodeIndex> nops(rawPtr(octreeAcc.childOffsets), nodeOps.size());
-        memcpyH2D(rawPtr(nodeOps), nodeOps.size(), nops.data());
+        memcpyH2DAsync(rawPtr(nodeOps), nodeOps.size(), nops.data(), stream);
+        syncGpu(stream);
 
         exclusiveScanGpu(nops.data(), nops.data() + nops.size(), nops.data(), stream);
         TreeNodeIndex newNumLeafNodes;
-        memcpyD2H(nops.data() + nops.size() - 1, 1, &newNumLeafNodes, stream);
+        memcpyD2HAsync(nops.data() + nops.size() - 1, 1, &newNumLeafNodes, stream);
         syncGpu(stream);
 
         auto& newLeaves = octreeAcc.prefixes;

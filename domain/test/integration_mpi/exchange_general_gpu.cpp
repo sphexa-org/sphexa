@@ -132,11 +132,12 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
 
     auto d_countsView = focusTree.countsAcc();
     std::vector<unsigned> testCounts(d_countsView.size());
-    memcpyD2H(d_countsView.data(), d_countsView.size(), testCounts.data());
+    memcpyD2HAsync(d_countsView.data(), d_countsView.size(), testCounts.data(), 0);
 
     auto octreeView = focusTree.octreeViewAcc();
     std::vector<KeyType> prefixes(octreeView.numNodes);
-    memcpyD2H(octreeView.prefixes, octreeView.numNodes, prefixes.data());
+    memcpyD2HAsync(octreeView.prefixes, octreeView.numNodes, prefixes.data(), 0);
+    syncGpu(0);
 
     {
         for (size_t i = 0; i < testCounts.size(); ++i)

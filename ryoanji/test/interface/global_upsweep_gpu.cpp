@@ -80,13 +80,14 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     bool passMultipole = false;
     {
         std::vector<MultipoleType> multipoles(octree.numNodes);
-        memcpyD2H(multipoleHolder.deviceMultipoles(), multipoles.size(), multipoles.data());
+        memcpyD2HAsync(multipoleHolder.deviceMultipoles(), multipoles.size(), multipoles.data(), 0);
 
         MultipoleType globalRootMultipole = multipoles[0];
 
         auto                                     d_centers = focusTree.expansionCentersAcc();
         std::vector<cstone::SourceCenterType<T>> centers(d_centers.size());
-        memcpyD2H(d_centers.data(), d_centers.size(), centers.data());
+        memcpyD2HAsync(d_centers.data(), d_centers.size(), centers.data(), 0);
+        syncGpu(0);
 
         // compute reference root cell multipole from global particle data
         MultipoleType reference;

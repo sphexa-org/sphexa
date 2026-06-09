@@ -39,7 +39,8 @@ auto mpiSendGpuDirect(T* data,
     if constexpr (!useGpuDirect)
     {
         std::vector<T, util::DefaultInitAdaptor<T>> hostBuffer(count);
-        memcpyD2H(data, count, hostBuffer.data());
+        memcpyD2HAsync(data, count, hostBuffer.data(), 0);
+        syncGpu(0);
         auto errCode = mpiSendAsync(hostBuffer.data(), count, rank, tag, requests, comm);
         buffers.push_back(std::move(hostBuffer));
 
@@ -68,7 +69,8 @@ auto mpiRecvGpuDirect(T* data, int count, int rank, int tag, MPI_Status* status,
     {
         std::vector<T, util::DefaultInitAdaptor<T>> hostBuffer(count);
         auto errCode = mpiRecvSync(hostBuffer.data(), count, rank, tag, status, comm);
-        memcpyH2D(hostBuffer.data(), count, data);
+        memcpyH2DAsync(hostBuffer.data(), count, data, 0);
+        syncGpu(0);
 
         return errCode;
     }
@@ -103,9 +105,11 @@ auto mpiAllreduceGpuDirect(const T* src, T* dest, size_t count, MPI_Op op, MPI_C
     if constexpr (!useGpuDirect)
     {
         std::vector<T> srcBuf(count), destBuf(count);
-        memcpyD2H(src, count, srcBuf.data());
+        memcpyD2HAsync(src, count, srcBuf.data(), 0);
+        syncGpu(0);
         mpiAllreduce(srcBuf.data(), destBuf.data(), count, op, comm);
-        memcpyH2D(destBuf.data(), count, dest);
+        memcpyH2DAsync(destBuf.data(), count, dest, 0);
+        syncGpu(0);
     }
     else { mpiAllreduce(src, dest, count, op, comm); }
 }
@@ -128,14 +132,20 @@ auto mpiAllgathervGpuDirect(const Ts* src, int sendCount, Td* dest, const int* c
             {
                 srcStage.resize(sizeof(Ts) * numElements);
                 srcUse = reinterpret_cast<Ts*>(srcStage.data());
-                memcpyD2H(src, numElements, srcUse);
+                memcpyD2HAsync(src, numElements, srcUse, 0);
+                syncGpu(0);
             }
         }
 
         std::vector<Td> destStage(numElements);
-        if (src == MPI_IN_PLACE) { memcpyD2H(dest, numElements, destStage.data()); }
+        if (src == MPI_IN_PLACE)
+        {
+            memcpyD2HAsync(dest, numElements, destStage.data(), 0);
+            syncGpu(0);
+        }
         mpiAllgatherv(srcUse, sendCount, destStage.data(), counts, displ, comm);
-        memcpyH2D(destStage.data(), destStage.size(), dest);
+        memcpyH2DAsync(destStage.data(), destStage.size(), dest, 0);
+        syncGpu(0);
     }
     else
     {
