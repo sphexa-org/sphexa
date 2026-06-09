@@ -176,7 +176,7 @@ util::array<Tc, 5> computeAcceleration(size_t firstBody, size_t lastBody, const 
 {
     auto                              numBodies = lastBody - firstBody;
     cstone::GroupData<cstone::GpuTag> groups;
-    cstone::computeFixedGroups(firstBody, lastBody, bhMaxTargetSize(), groups);
+    cstone::computeFixedGroups(firstBody, lastBody, bhMaxTargetSize(), groups, 0);
     thrust::device_vector<int> globalPool(stackSize(groups.numGroups));
 
     double totalPotential = traverse(groups.view(), 1, x, y, z, m, h, x, y, z, m, h, childOffsets, internalToLeaf,
@@ -196,8 +196,8 @@ void upsweep(int numSources, int numLeaves, int numLevels, float theta, const Tr
 {
     auto t0 = std::chrono::high_resolution_clock::now();
 
-    cstone::computeLeafSourceCenterGpu(x, y, z, m, leafToInternal, numLeaves, layout, centers);
-    cstone::upsweepCentersGpu(cstone::maxTreeLevel<KeyType>{}, levelRange, childOffsets, centers);
+    cstone::computeLeafSourceCenterGpu(x, y, z, m, leafToInternal, numLeaves, layout, centers, 0);
+    cstone::upsweepCentersGpu(cstone::maxTreeLevel<KeyType>{}, levelRange, childOffsets, centers, 0);
 
     computeLeafMultipoles(x, y, z, m, leafToInternal, numLeaves, layout, centers, Multipole);
     for (int level = numLevels - 1; level >= 1; level--)
@@ -205,7 +205,7 @@ void upsweep(int numSources, int numLeaves, int numLevels, float theta, const Tr
         upsweepMultipoles(levelRange[level], levelRange[level + 1], childOffsets, centers, Multipole);
     }
 
-    cstone::setMacGpu(prefixes, numSources, centers, 1.f / theta, box);
+    cstone::setMacGpu(prefixes, numSources, centers, 1.f / theta, box, 0);
 
     auto   t1 = std::chrono::high_resolution_clock::now();
     double dt = std::chrono::duration<double>(t1 - t0).count();

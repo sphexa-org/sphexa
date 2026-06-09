@@ -230,7 +230,7 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
                      std::vector<std::vector<KeyType>>& treelets,
                      Vector& scratch,
                      MPI_Comm comm,
-                     cudaStream_t stream = 0)
+                     cudaStream_t stream)
 {
     exchangeTreelets<KeyType>(exteriorPeers, interiorPeers, assignment, leaves, treelets, comm);
     checkTreelets<KeyType>(interiorPeers, leaves, treelets);
@@ -317,7 +317,7 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
                             int commTag,
                             DevVec& scratch,
                             MPI_Comm comm,
-                            cudaStream_t stream = 0)
+                            cudaStream_t stream)
 {
     constexpr int alignmentBytes = 64;
     constexpr bool useGpu        = IsDeviceVector<DevVec>{};

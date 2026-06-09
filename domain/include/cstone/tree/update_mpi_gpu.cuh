@@ -59,26 +59,27 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
                                DevKeyVec& d_csTree,
                                DevCountVec& d_countsBuf,
                                bool expectOverflows,
-                               MPI_Comm comm)
+                               MPI_Comm comm,
+                               Stream<GpuTag> stream)
 {
-    auto newNumNodes =
-        computeNodeOpsGpu(d_csTree.data(), nNodes(d_csTree), d_countsBuf.data(), bucketSize, tree.childOffsets.data());
+    auto newNumNodes = computeNodeOpsGpu(d_csTree.data(), nNodes(d_csTree), d_countsBuf.data(), bucketSize,
+                                         tree.childOffsets.data(), stream);
     reallocate(tree.prefixes, newNumNodes + 1, 1.01);
     bool converged = rebalanceTreeGpu(d_csTree.data(), nNodes(d_csTree), newNumNodes, tree.childOffsets.data(),
-                                      tree.prefixes.data());
+                                      tree.prefixes.data(), stream);
     swap(d_csTree, tree.prefixes);
 
     tree.resize(newNumNodes);
-    buildOctreeGpu(d_csTree.data(), tree.data());
+    buildOctreeGpu(d_csTree.data(), tree.data(), stream);
 
     size_t numLeafNodes = tree.numLeafNodes;
     auto [d_counts, d_countsRed] =
         util::packAllocBuffer(d_countsBuf, util::TypeList<unsigned, unsigned>{}, {numLeafNodes, numLeafNodes}, 128);
 
     computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys, std::numeric_limits<unsigned>::max(),
-                         true);
+                         true, stream);
 
-    syncGpu(0);
+    syncGpu(stream);
     if (expectOverflows)
     {
         MPI_Op limitSum;
@@ -86,32 +87,48 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
         mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), limitSum, comm);
         MPI_Op_free(&limitSum);
     }
-    else { mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, comm); }
-    sequenceMax(d_counts.data(), d_counts.data() + d_counts.size(), d_countsRed.data(), d_counts.data());
+    else
+    {
+        mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, comm);
+    }
+    sequenceMax(d_counts.data(), d_counts.data() + d_counts.size(), d_countsRed.data(), d_counts.data(), stream);
     d_countsBuf.resize(numLeafNodes);
 
     if (converged) { return 0; }
 
-    auto [minCount, maxCount] = MinMaxGpu<unsigned>{}(d_counts.data(), d_counts.data() + d_counts.size());
+    auto [minCount, maxCount] =
+        MinMax<Stream<GpuTag>, unsigned>{stream}(d_counts.data(), d_counts.data() + d_counts.size());
     return maxCount;
 }
 
-template<class KeyType, class Accelerator, class DevKeyVec, class DevCountVec>
+template<class KeyType, class DevKeyVec, class DevCountVec>
 unsigned updateOctreeGlobal(std::span<const KeyType> keys,
                             unsigned bucketSize,
-                            OctreeData<KeyType, Accelerator>& tree,
+                            OctreeData<KeyType, CpuTag>& tree,
                             std::vector<KeyType>& leaves,
-                            DevKeyVec& d_csTree,
+                            DevKeyVec&,
                             std::vector<unsigned>& counts,
+                            DevCountVec&,
+                            bool,
+                            MPI_Comm comm,
+                            Stream<CpuTag>)
+{
+    return updateOctreeGlobal(keys, bucketSize, tree, leaves, counts, comm);
+}
+
+template<class KeyType, class DevKeyVec, class DevCountVec>
+unsigned updateOctreeGlobal(std::span<const KeyType> keys,
+                            unsigned bucketSize,
+                            OctreeData<KeyType, GpuTag>& tree,
+                            std::vector<KeyType>&,
+                            DevKeyVec& d_csTree,
+                            std::vector<unsigned>&,
                             DevCountVec& d_counts,
                             bool firstCall,
-                            MPI_Comm comm)
+                            MPI_Comm comm,
+                            Stream<GpuTag> stream)
 {
-    if constexpr (HaveGpu<Accelerator>{})
-    {
-        return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, d_counts, firstCall, comm);
-    }
-    else { return updateOctreeGlobal(keys, bucketSize, tree, leaves, counts, comm); }
+    return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, d_counts, firstCall, comm, stream);
 }
 
 } // namespace cstone

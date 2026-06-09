@@ -38,14 +38,14 @@ TEST(Macs, limitSource4x4_matchCPU)
     thrust::device_vector<KeyType> leaves = makeUniformNLevelTree<KeyType>(64, 1);
     OctreeData<KeyType, GpuTag> fullTree;
     fullTree.resize(nNodes(leaves));
-    buildOctreeGpu(rawPtr(leaves), fullTree.data());
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+    buildOctreeGpu(rawPtr(leaves), fullTree.data(), stream);
     OctreeView<KeyType> ov = fullTree.data();
 
     std::vector<KeyType> h_prefixes = toHost(fullTree.prefixes);
     std::vector<SourceCenterType<T>> h_centers(ov.numNodes);
     geoMacSpheres<KeyType>(h_prefixes, h_centers.data(), invTheta, box);
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
     thrust::device_vector<uint8_t> macs(ov.numNodes, 0);
     thrust::device_vector<SourceCenterType<T>> centers = h_centers;
 

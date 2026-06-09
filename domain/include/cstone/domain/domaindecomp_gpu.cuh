@@ -40,7 +40,7 @@ SendRanges createSendRangesGpu(const SfcAssignment<KeyType>& assignment,
                                std::span<const KeyType> particleKeys,
                                KeyType* d_searchKeys,
                                LocalIndex* d_indices,
-                               cudaStream_t stream = 0)
+                               cudaStream_t stream)
 {
     size_t numSearchKeys = assignment.numRanks() + 1;
     SendRanges ret(numSearchKeys);

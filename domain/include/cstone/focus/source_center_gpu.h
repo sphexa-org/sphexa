@@ -47,7 +47,7 @@ extern void computeBoundingBoxGpu(const Tc* x,
                                   Th scale,
                                   Vec3<Tc>* centers,
                                   Vec3<Tc>* sizes,
-                                  cudaStream_t stream = 0);
+                                  cudaStream_t stream);
 
 /*! @brief compute mass centers of leaf cells
  *
@@ -69,7 +69,7 @@ extern void computeLeafSourceCenterGpu(const Tc* x,
                                        TreeNodeIndex numLeaves,
                                        const LocalIndex* layout,
                                        Vec4<Tf>* centers,
-                                       cudaStream_t stream = 0);
+                                       cudaStream_t stream);
 
 /*! @brief compute center of gravity for internal nodes with an upsweep
  *
@@ -84,26 +84,26 @@ extern void upsweepCentersGpu(int numLevels,
                               const TreeNodeIndex* levelRange,
                               const TreeNodeIndex* childOffsets,
                               SourceCenterType<T>* centers,
-                              cudaStream_t stream = 0);
+                              cudaStream_t stream);
 
 //! @brief compute geometric node center and sizes based on node SFC keys
 template<class KeyType, class T>
 extern void computeGeoCentersGpu(
     const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box,
-    cudaStream_t stream = 0);
+    cudaStream_t stream);
 
 //! @brief set @p centers to geometric node centers with Mac radius l * invTheta
 template<class KeyType, class T>
 extern void geoMacSpheresGpu(
     const KeyType* prefixes, TreeNodeIndex numNodes, SourceCenterType<T>* centers, float invTheta, const Box<T>& box,
-    cudaStream_t stream = 0);
+    cudaStream_t stream);
 
 template<class KeyType, class T>
 extern void
 setMacGpu(const KeyType* prefixes, TreeNodeIndex numNodes, Vec4<T>* macSpheres, float invTheta, const Box<T>& box,
-          cudaStream_t stream = 0);
+          cudaStream_t stream);
 
 template<class T>
-extern void moveCenters(const Vec3<T>* src, TreeNodeIndex numNodes, Vec4<T>* dest, cudaStream_t stream = 0);
+extern void moveCenters(const Vec3<T>* src, TreeNodeIndex numNodes, Vec4<T>* dest, cudaStream_t stream);
 
 } // namespace cstone

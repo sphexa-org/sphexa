@@ -180,7 +180,7 @@ template void
 gatherScatterGpu(const int*, const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*, cudaStream_t);
 
 template<class T>
-std::tuple<T, T> MinMaxGpu<T>::operator()(const T* first, const T* last, cudaStream_t stream)
+std::tuple<T, T> MinMax<Stream<GpuTag>, T>::operator()(const T* first, const T* last)
 {
     auto minMax = thrust::minmax_element(devicePar(stream), first, last);
 
@@ -192,9 +192,9 @@ std::tuple<T, T> MinMaxGpu<T>::operator()(const T* first, const T* last, cudaStr
     return std::make_tuple(theMinimum, theMaximum);
 }
 
-template struct MinMaxGpu<double>;
-template struct MinMaxGpu<float>;
-template struct MinMaxGpu<unsigned>;
+template struct MinMax<Stream<GpuTag>, double>;
+template struct MinMax<Stream<GpuTag>, float>;
+template struct MinMax<Stream<GpuTag>, unsigned>;
 
 using thrust::get;
 

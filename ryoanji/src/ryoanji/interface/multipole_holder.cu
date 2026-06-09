@@ -40,7 +40,7 @@ public:
         auto  d_leaves  = focusTree.treeLeavesAcc();
         float tolFactor = 2.0f;
         cstone::computeGroupSplits(first, last, x, y, z, h, d_leaves.data(), d_leaves.size() - 1, layout, box,
-                                   bhMaxTargetSize(), tolFactor, traversalStack_, groups_.data);
+                                   bhMaxTargetSize(), tolFactor, traversalStack_, groups_.data, 0);
 
         groups_.firstBody  = first;
         groups_.lastBody   = last;

@@ -66,7 +66,7 @@ public:
            unsigned bucketSizeFocus,
            float theta,
            MPI_Comm comm,
-           const Box<T>& box = Box<T>{0, 1},
+           const Box<T>& box          = Box<T>{0, 1},
            Stream<Accelerator> stream = {})
         : myRank_(rank)
         , numRanks_(nRanks)
@@ -525,9 +525,8 @@ private:
         reallocate(swapSpace, origSize, 1.0);
 
         // relocate ordered buffer contents from offset 0 to offset newBufDesc.start
-        auto relocate =
-            [size = keyView.size(), dest = newBufDesc.start, scratch = util::reverse(scratchBuffers),
-             stream = stream_](auto& array)
+        auto relocate = [size = keyView.size(), dest = newBufDesc.start, scratch = util::reverse(scratchBuffers),
+                         stream = stream_](auto& array)
         {
             static_assert(util::Contains<decltype(array), std::tuple<Arrays3&...>>{}, "No suitable scratch buffer");
             auto& swapSpace = util::pickType<decltype(array)>(scratch);
@@ -610,7 +609,10 @@ private:
                     {
                         bool isHalo = std::count(hPeers.begin(), hPeers.end(), r) == 1;
                         if (isHalo) { std::cout << r << " "; }
-                        else { std::cout << "*" << r << " "; }
+                        else
+                        {
+                            std::cout << "*" << r << " ";
+                        }
                     }
                     for (auto r : hPeers)
                     {

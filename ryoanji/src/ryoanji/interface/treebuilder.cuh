@@ -60,11 +60,11 @@ public:
         uint64_t                    tempStorageEle = cstone::sortByKeyTempStorage<KeyType, LocalIndex>(numBodies);
         thrust::device_vector<char> cubTmpStorage(tempStorageEle);
 
-        cstone::computeSfcKeysGpu(x, y, z, cstone::sfcKindPointer(rawPtr(d_keys)), numBodies, box);
+        cstone::computeSfcKeysGpu(x, y, z, cstone::sfcKindPointer(rawPtr(d_keys)), numBodies, box, 0);
 
-        cstone::sequenceGpu(rawPtr(d_ordering), d_ordering.size(), 0);
+        cstone::sequenceGpu(rawPtr(d_ordering), d_ordering.size(), 0, 0);
         cstone::sortByKeyGpu(rawPtr(d_keys), rawPtr(d_keys) + d_keys.size(), rawPtr(d_ordering), rawPtr(d_keys_tmp),
-                             rawPtr(d_values_tmp), rawPtr(cubTmpStorage), tempStorageEle);
+                             rawPtr(d_values_tmp), rawPtr(cubTmpStorage), tempStorageEle, cstone::Stream<cstone::GpuTag>{0});
 
         thrust::gather(thrust::device, d_ordering.begin(), d_ordering.end(), x, tmp.begin());
         thrust::copy(tmp.begin(), tmp.end(), x);
@@ -85,11 +85,11 @@ public:
             ;
 
         octreeGpuData_.resize(cstone::nNodes(d_tree_));
-        cstone::buildOctreeGpu(rawPtr(d_tree_), octreeGpuData_.data());
+        cstone::buildOctreeGpu(rawPtr(d_tree_), octreeGpuData_.data(), 0);
 
         d_layout_.resize(d_counts_.size() + 1);
-        cstone::fillGpu(rawPtr(d_layout_), rawPtr(d_layout_) + 1, LocalIndex(0));
-        cstone::inclusiveScanGpu(rawPtr(d_counts_), rawPtr(d_counts_) + d_counts_.size(), rawPtr(d_layout_) + 1);
+        cstone::fillGpu(rawPtr(d_layout_), rawPtr(d_layout_) + 1, LocalIndex(0), 0);
+        cstone::inclusiveScanGpu(rawPtr(d_counts_), rawPtr(d_counts_) + d_counts_.size(), rawPtr(d_layout_) + 1, 0);
 
         return octreeGpuData_.numInternalNodes + octreeGpuData_.numLeafNodes;
     }

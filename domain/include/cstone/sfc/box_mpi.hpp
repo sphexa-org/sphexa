@@ -24,14 +24,18 @@
 #include <cmath>
 
 #include "cstone/primitives/mpi_wrappers.hpp"
+#include "cstone/cuda/stream.hpp"
 #include "box.hpp"
 
 namespace cstone
 {
 
-//! @brief compute minimum and maximum of an array range with an OpenMP reduction
-template<class T>
-struct MinMax
+//! @brief compute minimum and maximum of an array range
+template<class Stream, class T>
+struct MinMax;
+
+template <class T>
+struct MinMax<Stream<CpuTag>, T>
 {
     std::tuple<T, T> operator()(const T* start, const T* end)
     {
@@ -50,6 +54,8 @@ struct MinMax
 
         return std::make_tuple(minimum, maximum);
     }
+
+    Stream<CpuTag> stream;
 };
 
 /*! @brief compute global bounding box for local x,y,z arrays
@@ -65,8 +71,8 @@ struct MinMax
  * For each periodic dimension, limits are fixed and will not be modified.
  * For non-periodic dimensions, limits are determined by global min/max.
  */
-template<class T, class Op = MinMax<T>>
-auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, MPI_Comm comm,
+template<class T, class Stream>
+auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, MPI_Comm comm, Stream stream,
                    const Box<T>& previousBox = Box<T>(0, 1))
 {
     bool keepX = previousBox.boundaryX() == BoundaryType::periodic || previousBox.boundaryX() == BoundaryType::fixed;
@@ -77,12 +83,13 @@ auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, MPI_C
                              previousBox.ymax(), previousBox.zmin(), previousBox.zmax()};
     if (numElements)
     {
+        MinMax<Stream, T> op{stream};
         std::tie(extrema[0], extrema[1]) =
-            keepX ? std::make_tuple(previousBox.xmin(), previousBox.xmax()) : Op{}(x, x + numElements);
+            keepX ? std::make_tuple(previousBox.xmin(), previousBox.xmax()) : op(x, x + numElements);
         std::tie(extrema[2], extrema[3]) =
-            keepY ? std::make_tuple(previousBox.ymin(), previousBox.ymax()) : Op{}(y, y + numElements);
+            keepY ? std::make_tuple(previousBox.ymin(), previousBox.ymax()) : op(y, y + numElements);
         std::tie(extrema[4], extrema[5]) =
-            keepZ ? std::make_tuple(previousBox.zmin(), previousBox.zmax()) : Op{}(z, z + numElements);
+            keepZ ? std::make_tuple(previousBox.zmin(), previousBox.zmax()) : op(z, z + numElements);
     }
 
     if (!keepX || !keepY || !keepZ)

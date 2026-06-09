@@ -43,9 +43,9 @@ void computeSpatialGroups(cstone::LocalIndex startIndex, cstone::LocalIndex endI
                           const cstone::Box<typename Dataset::RealType>& box, GroupData<cstone::GpuTag>& groups)
 {
     float tolFactor = 2.0f;
-    cstone::computeGroupSplits(startIndex, endIndex, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z),
-                               rawPtr(d.h), d.treeView.leaves, d.treeView.numLeafNodes, d.treeView.layout, box,
-                               nsGroupSize(), tolFactor, d.traversalStack, groups.data);
+    cstone::computeGroupSplits(startIndex, endIndex, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h),
+                               d.treeView.leaves, d.treeView.numLeafNodes, d.treeView.layout, box, nsGroupSize(),
+                               tolFactor, d.traversalStack, groups.data, 0);
 
     groups.firstBody  = startIndex;
     groups.lastBody   = endIndex;
@@ -88,8 +88,8 @@ inline void extractGroupGpu(const GroupView& grp, const cstone::LocalIndex* indi
     out.groupEnd   = rawPtr(out.data) + numOutGroups;
 
     if (numOutGroups == 0) { return; }
-    cstone::gatherGpu(indices + first, numOutGroups, grp.groupStart, out.groupStart);
-    cstone::gatherGpu(indices + first, numOutGroups, grp.groupEnd, out.groupEnd);
+    cstone::gatherGpu(indices + first, numOutGroups, grp.groupStart, out.groupStart, 0);
+    cstone::gatherGpu(indices + first, numOutGroups, grp.groupEnd, out.groupEnd, 0);
 }
 
 //! @brief return a new GroupView that corresponds to a slice [first:last] of the input group @p grp

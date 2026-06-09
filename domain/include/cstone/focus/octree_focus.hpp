@@ -144,7 +144,7 @@ struct CombinedUpdate
                                std::span<const unsigned> counts,
                                std::span<const uint8_t> macs,
                                Vector& scratch,
-                               cudaStream_t stream = 0)
+                               cudaStream_t stream)
     {
         TreeNodeIndex numNodes = tree.numLeafNodes + tree.numInternalNodes;
         assert(TreeNodeIndex(counts.size()) == numNodes);
@@ -159,10 +159,10 @@ struct CombinedUpdate
 
         auto status = ResolutionStatus::converged;
 
-        status         = enforceKeysGpu(mandatoryKeys.data(), mandatoryKeys.size(), rawPtr(tree.prefixes),
-                                         rawPtr(tree.childOffsets), rawPtr(tree.parents), nodeOpsAll.data(), stream);
-        bool converged = protectAncestorsGpu(rawPtr(tree.prefixes), rawPtr(tree.parents), nodeOpsAll.data(), numNodes,
-                                             stream);
+        status = enforceKeysGpu(mandatoryKeys.data(), mandatoryKeys.size(), rawPtr(tree.prefixes),
+                                rawPtr(tree.childOffsets), rawPtr(tree.parents), nodeOpsAll.data(), stream);
+        bool converged =
+            protectAncestorsGpu(rawPtr(tree.prefixes), rawPtr(tree.parents), nodeOpsAll.data(), numNodes, stream);
 
         // extract leaf decision, using childOffsets as temp storage
         assert(tree.childOffsets.size() >= size_t(tree.numLeafNodes + 1));
@@ -171,8 +171,8 @@ struct CombinedUpdate
 
         if (status == ResolutionStatus::cancelMerge)
         {
-            converged =
-                countGpu(nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1) == std::size_t(tree.numLeafNodes);
+            converged = countGpu(nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1, stream) ==
+                        std::size_t(tree.numLeafNodes);
         }
         else if (status == ResolutionStatus::rebalance) { converged = false; }
 
@@ -203,7 +203,7 @@ struct CombinedUpdate
 
         auto originalSize               = scratch.size();
         auto [keyBuf, valueBuf, cubTmp] = util::packAllocBuffer(scratch, util::TypeList<KeyType, TreeNodeIndex, char>{},
-                                                                 {newNumNodes, newNumNodes, cubTmpSize}, 128);
+                                                                {newNumNodes, newNumNodes, cubTmpSize}, 128);
 
         buildOctreeGpu(rawPtr(leaves), tree.data(), keyBuf, valueBuf, cubTmp, stream);
         scratch.resize(originalSize);

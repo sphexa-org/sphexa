@@ -55,9 +55,10 @@ TEST(GeneralFocusExchangeGpu, bareTreelet)
     DeviceVector<char> scratch;
 
     auto d_gatherMapsView = static_cast<const ConcatVector<TreeNodeIndex, DeviceVector>&>(d_gatherMaps).view();
-    exchangeTreeletGeneral<unsigned>(
-        peers, peers, d_gatherMapsView, {rawPtr(scatterSubRangePerRank), scatterSubRangePerRank.size()},
-        {rawPtr(d_scatterMap), d_scatterMap.size()}, {rawPtr(d_counts), d_counts.size()}, 0, scratch, MPI_COMM_WORLD);
+    exchangeTreeletGeneral<unsigned>(peers, peers, d_gatherMapsView,
+                                     {rawPtr(scatterSubRangePerRank), scatterSubRangePerRank.size()},
+                                     {rawPtr(d_scatterMap), d_scatterMap.size()}, {rawPtr(d_counts), d_counts.size()},
+                                     0, scratch, MPI_COMM_WORLD, 0);
 
     std::vector<unsigned> h_counts = toHost(d_counts);
 

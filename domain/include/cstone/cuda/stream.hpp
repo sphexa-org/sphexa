@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <type_traits>
+
 #if defined(__HIP_PLATFORM_AMD__) || defined(__HIPCC__)
 
 #define cudaStream_t hipStream_t
@@ -32,3 +34,39 @@ struct CUstream_st;
 typedef struct CUstream_st* cudaStream_t;
 
 #endif
+
+namespace cstone
+{
+
+struct CpuTag
+{
+};
+struct GpuTag
+{
+};
+
+template<class AccType>
+struct HaveGpu : public std::integral_constant<int, std::is_same_v<AccType, GpuTag>>
+{
+};
+
+template<class Accelerator>
+struct Stream;
+
+template<>
+struct Stream<CpuTag>
+{
+};
+
+template<>
+struct Stream<GpuTag>
+{
+    cudaStream_t stream;
+    Stream(cudaStream_t s = 0)
+        : stream(s)
+    {
+    }
+    operator cudaStream_t() const { return stream; }
+};
+
+} // namespace cstone

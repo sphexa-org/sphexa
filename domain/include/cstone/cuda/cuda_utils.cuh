@@ -55,7 +55,6 @@ template<class T>
 std::vector<T> toHost(const cstone::DeviceVector<T>& v)
 {
     std::vector<T> ret(v.size());
-    memcpyD2HAsync(v.data(), v.size(), ret.data(), 0);
-    syncGpu(0);
+    checkGpuErrors(cudaMemcpy(ret.data(), v.data(), sizeof(T) * v.size(), cudaMemcpyDeviceToHost));
     return ret;
 }

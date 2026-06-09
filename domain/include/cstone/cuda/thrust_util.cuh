@@ -52,7 +52,7 @@ const T* rawPtr(const thrust::universal_vector<T, Alloc>& p)
  *
  * Uses thrust::cuda::par.on(stream) for CUDA and thrust::hip::par.on(stream) for HIP.
  */
-inline auto devicePar(cudaStream_t stream = 0)
+inline auto devicePar(cudaStream_t stream)
 {
 #if defined(__HIP_PLATFORM_AMD__) || defined(__HIPCC__)
     return thrust::hip::par.on(stream);

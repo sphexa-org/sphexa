@@ -32,7 +32,7 @@ namespace cstone
  * This does not allocate memory on the GPU, (except thrust temp buffers for scans and sorting)
  */
 template<class KeyType>
-extern void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d, cudaStream_t stream = 0);
+extern void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d, cudaStream_t stream);
 
 //! @brief same as above, but using existing buffers to avoid temporary memory allocation
 template<class KeyType>
@@ -41,11 +41,11 @@ extern void buildOctreeGpu(const KeyType* cstoneTree,
                            std::span<KeyType> keyBuf,
                            std::span<TreeNodeIndex> valueBuf,
                            std::span<char> cubTmp,
-                           cudaStream_t stream = 0);
+                           cudaStream_t stream);
 
 //! @brief Upsweep by summing up child nodes, e.g. to compute particle node counts
 void upsweepSumGpu(int numLvl, const TreeNodeIndex* lvlRange, const TreeNodeIndex* childOffsets, LocalIndex* counts,
-                   cudaStream_t stream = 0);
+                   cudaStream_t stream);
 
 /*!  @brief locate all nodes between k1 and k2 in nodeKeys and store indices
  * @param[in]  k1        cornerstone leaf sequence start
@@ -60,7 +60,7 @@ extern void locateNodesGpu(const KeyType* k1,
                            const KeyType* nodeKeys,
                            const TreeNodeIndex* lvlRange,
                            TreeNodeIndex* indices,
-                           cudaStream_t stream = 0);
+                           cudaStream_t stream);
 
 /*!  @brief locate all nodes between k1 and k2 in nodeKeys and store indices
  * @param[in]  queryKeys  SFC keys to look up in @nodeKeys, in WS-prefix-bit format
@@ -77,6 +77,6 @@ extern void locateNodesGpu(const KeyType* queryKeys,
                            const KeyType* nodeKeys,
                            const TreeNodeIndex* lvlRange,
                            TreeNodeIndex* indices,
-                           cudaStream_t stream = 0);
+                           cudaStream_t stream);
 
 } // namespace cstone

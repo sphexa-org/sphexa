@@ -58,7 +58,7 @@ TEST(Ewald, MatchCpu)
     thrust::device_vector<T> p(numBodies), ax(numBodies), ay(numBodies), az(numBodies);
 
     GroupData<GpuTag> groups;
-    computeFixedGroups(0, numBodies, GpuConfig::warpSize, groups);
+    computeFixedGroups(0, numBodies, GpuConfig::warpSize, groups, 0);
 
     T utot = 0;
     computeGravityEwaldGpu(makeVec3(centerMass), rootMultipole, groups.view(), rawPtr(d_x), rawPtr(d_y), rawPtr(d_z),

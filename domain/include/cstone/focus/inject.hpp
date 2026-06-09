@@ -74,7 +74,7 @@ void injectKeysGpu(DeviceVector<KeyType>& leaves,
                    DeviceVector<KeyType>& keyScratch,
                    DeviceVector<TreeNodeIndex>& spanOps,
                    DeviceVector<TreeNodeIndex>& spanOpsScan,
-                   cudaStream_t stream = 0)
+                   cudaStream_t stream)
 {
     reallocate(leaves, leaves.size() + keys.size(), 1.0);
     memcpyD2DAsync(keys.data(), keys.size(), leaves.data() + leaves.size() - keys.size(), stream);

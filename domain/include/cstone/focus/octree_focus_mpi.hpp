@@ -60,8 +60,7 @@ public:
      * @param numRanks      number of ranks
      * @param bucketSize    Maximum number of particles per leaf inside the focus area
      */
-    FocusedOctree(int myRank, int numRanks, unsigned bucketSize, MPI_Comm comm,
-                  Stream<Accelerator> stream = {})
+    FocusedOctree(int myRank, int numRanks, unsigned bucketSize, MPI_Comm comm, Stream<Accelerator> stream = {})
         : myRank_(myRank)
         , numRanks_(numRanks)
         , bucketSize_(bucketSize)
@@ -86,7 +85,10 @@ public:
 
             reallocate(geoCentersAcc_, 1, 1.0);
         }
-        else { updateInternalTree<KeyType>(leaves_, octreeAcc_.data()); }
+        else
+        {
+            updateInternalTree<KeyType>(leaves_, octreeAcc_.data());
+        }
     }
 
     /*! @brief Update the tree structure according to previously calculated criteria (MAC and particle counts)
@@ -375,7 +377,10 @@ public:
             {
                 upsweepCentersGpu(maxTreeLevel<KeyType>{}, levelRange.data(), childOffsets, centers, stream_);
             }
-            else { upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{}); }
+            else
+            {
+                upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{});
+            }
         };
 
         if constexpr (HaveGpu<Accelerator>{})
@@ -454,7 +459,10 @@ public:
         {
             setMacGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box_, stream_);
         }
-        else { setMac<RealType, KeyType>(octreeAcc_.prefixes, centersAcc_, invTheta, box_); }
+        else
+        {
+            setMac<RealType, KeyType>(octreeAcc_.prefixes, centersAcc_, invTheta, box_);
+        }
     }
 
     /*! @brief Update the MAC criteria based on given expansion centers and effective inverse theta
@@ -678,7 +686,10 @@ public:
     std::span<const KeyType> treeLeavesAcc() const
     {
         if constexpr (HaveGpu<Accelerator>{}) { return {rawPtr(leavesAcc_), leavesAcc_.size()}; }
-        else { return leaves_; }
+        else
+        {
+            return leaves_;
+        }
     }
 
     //! @brief the cornerstone leaf cell particle counts
@@ -703,7 +714,10 @@ private:
             computeGeoCentersGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(geoCentersAcc_),
                                  rawPtr(geoSizesAcc_), box_, stream_);
         }
-        else { nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_); }
+        else
+        {
+            nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_);
+        }
     }
 
     void downloadOctree()

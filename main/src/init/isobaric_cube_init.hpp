@@ -68,7 +68,6 @@ InitSettings IsobaricCubeConstants()
 template<class Dataset>
 void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
     using T            = typename Dataset::RealType;
     using HydroType    = typename Dataset::HydroType;
 

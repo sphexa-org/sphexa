@@ -32,7 +32,7 @@ __global__ void createBinaryTreeKernel(const KeyType* cstree, TreeNodeIndex numN
 //! @brief convenience kernel wrapper
 template<class KeyType>
 void createBinaryTreeGpu(const KeyType* cstree, TreeNodeIndex numNodes, BinaryNode<KeyType>* binaryTree,
-                         cudaStream_t stream = 0)
+                         cudaStream_t stream)
 {
     constexpr int numThreads = 256;
     createBinaryTreeKernel<<<iceil(numNodes, numThreads), numThreads, 0, stream>>>(cstree, numNodes, binaryTree);

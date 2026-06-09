@@ -67,13 +67,13 @@ TEST(CsArrayGpu, computeNodeCountsGpu)
     *refCounts.rbegin() = 0;
 
     computeNodeCountsGpu(rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree),
-                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), false);
+                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), false, 0);
     thrust::host_vector<unsigned> h_counts = d_counts;
     EXPECT_EQ(h_counts, refCounts);
 
     // check again, using previous counts as guesses
     computeNodeCountsGpu(rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree),
-                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), true);
+                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), true, 0);
     h_counts = d_counts;
     EXPECT_EQ(h_counts, refCounts);
 }
@@ -89,7 +89,7 @@ TEST(CsArrayGpu, rebalanceDecision)
     thrust::fill_n(counts.begin() + 8, 7, 0);
 
     thrust::device_vector<TreeNodeIndex> nodeOps(tree.size());
-    computeNodeOpsGpu(rawPtr(tree), nNodes(tree), rawPtr(counts), bucketSize, rawPtr(nodeOps));
+    computeNodeOpsGpu(rawPtr(tree), nNodes(tree), rawPtr(counts), bucketSize, rawPtr(nodeOps), 0);
 
     // regular level-3 cornerstone tree with 512 leaves
     thrust::host_vector<TreeNodeIndex> h_nodeOps = nodeOps;
@@ -110,7 +110,7 @@ TEST(CsArrayGpu, rebalanceTree)
         std::vector<TreeNodeIndex>{0, 1, 9, 10, 11, 12, 13, 14, 15, 15, 15, 15, 15, 15, 15, 15};
     thrust::device_vector<KeyType> newTree(*nodeOps.rbegin() + 1);
 
-    bool converged = rebalanceTreeGpu(rawPtr(tree), nNodes(tree), nNodes(newTree), rawPtr(nodeOps), rawPtr(newTree));
+    bool converged = rebalanceTreeGpu(rawPtr(tree), nNodes(tree), nNodes(newTree), rawPtr(nodeOps), rawPtr(newTree), 0);
 
     // download tree from host
     thrust::host_vector<KeyType> h_tree    = newTree;
@@ -200,16 +200,15 @@ TEST(CsArrayGpu, distributedMockUp)
     CodeType nodeKey1, nodeKey2;
     memcpyD2HAsync(fixt.d_tree.data() + firstNode, 1, &nodeKey1, 0);
     memcpyD2HAsync(fixt.d_tree.data() + lastNode, 1, &nodeKey2, 0);
-    syncGpu(0);
-    unsigned firstIdx = lowerBoundGpu(fixt.d_codes.data(), fixt.d_codes.data() + fixt.d_codes.size(), nodeKey1);
-    unsigned lastIdx  = lowerBoundGpu(fixt.d_codes.data(), fixt.d_codes.data() + fixt.d_codes.size(), nodeKey2);
+    unsigned firstIdx = lowerBoundGpu(fixt.d_codes.data(), fixt.d_codes.data() + fixt.d_codes.size(), nodeKey1, 0);
+    unsigned lastIdx  = lowerBoundGpu(fixt.d_codes.data(), fixt.d_codes.data() + fixt.d_codes.size(), nodeKey2, 0);
     std::cout << firstNode << " " << lastNode << std::endl;
     std::cout << firstIdx << " " << lastIdx << std::endl;
 
     bool useCountsAsGuess = true;
     computeNodeCountsGpu(fixt.d_tree.data(), fixt.d_counts.data(), nNodes(fixt.d_tree),
                          {fixt.d_codes.data() + firstIdx, fixt.d_codes.data() + lastIdx},
-                         std::numeric_limits<unsigned>::max(), useCountsAsGuess);
+                         std::numeric_limits<unsigned>::max(), useCountsAsGuess, 0);
 
     DeviceVector<CodeType> d_counts_ref = d_counts_orig;
     thrust::fill(thrust::device, d_counts_ref.data(), d_counts_ref.data() + firstNode, 0);
