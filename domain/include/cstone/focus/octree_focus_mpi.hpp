@@ -140,7 +140,7 @@ public:
         }
 
         translateAssignment<KeyType>(assignment, leaves_, assignment_);
-        auto extPeers = focusPeersAcc<useGpu, KeyType>(globDispl_, assignment_, myRank_, globalLeaves, leaves_, stream_);
+        auto extPeers = focusPeersAcc<KeyType>(globDispl_, assignment_, myRank_, globalLeaves, leaves_, stream_);
         auto intPeers = exchangePeers(extPeers, comm_);
         peerFlagsToList(extPeers, exteriorPeers_, PeerMask::focus);
         peerFlagsToList(intPeers, interiorPeers_, PeerMask::focus);

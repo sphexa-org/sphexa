@@ -49,7 +49,7 @@ TEST(GeneralFocusExchangeGpu, bareTreelet)
     std::vector<IndexPair<TreeNodeIndex>> scatterSubRangePerRank{{0, 2}, {0, 2}};
 
     ConcatVector<TreeNodeIndex, DeviceVector> d_gatherMaps;
-    copy(gatherMaps, d_gatherMaps);
+    copy(gatherMaps, d_gatherMaps, Stream<GpuTag>{});
     DeviceVector<TreeNodeIndex> d_scatterMap = scatterMap;
     DeviceVector<unsigned> d_counts          = counts;
     DeviceVector<char> scratch;

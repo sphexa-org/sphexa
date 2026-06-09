@@ -59,7 +59,16 @@ private:
 
 //! @brief copy src to dst
 template<class T, template<class...> class AccVec1, template<class...> class AccVec2, int A>
-void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, cudaStream_t stream = 0)
+void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, Stream<CpuTag>)
+{
+    std::vector<std::size_t> sizes(src.sizes().begin(), src.sizes().end());
+    auto dstView = dst.reindex(std::move(sizes));
+    T* dstBuffer = dstView.front().data();
+    std::copy_n(src.data().data(), src.data().size(), dstBuffer);
+}
+
+template<class T, template<class...> class AccVec1, template<class...> class AccVec2, int A>
+void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, Stream<GpuTag> stream)
 {
     std::vector<std::size_t> sizes(src.sizes().begin(), src.sizes().end());
     auto dstView = dst.reindex(std::move(sizes));
@@ -85,19 +94,6 @@ void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& d
     {
         syncGpu(stream);
     }
-}
-
-//! @brief Convenience overload for generic Stream<Accelerator> dispatch
-template<class T, template<class...> class AccVec1, template<class...> class AccVec2, int A>
-void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, Stream<CpuTag>)
-{
-    copy(src, dst, 0);
-}
-
-template<class T, template<class...> class AccVec1, template<class...> class AccVec2, int A>
-void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, Stream<GpuTag> stream)
-{
-    copy(src, dst, static_cast<cudaStream_t>(stream));
 }
 
 } // namespace cstone
