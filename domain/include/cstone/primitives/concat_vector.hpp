@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "cstone/cuda/cuda_stubs.h"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/util/pack_buffers.hpp"
 
 namespace cstone

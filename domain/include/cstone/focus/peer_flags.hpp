@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "cstone/cuda/cuda_utils.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 
 namespace cstone
 {

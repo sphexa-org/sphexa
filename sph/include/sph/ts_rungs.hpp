@@ -36,6 +36,7 @@
 #include <limits>
 #include <mpi.h>
 
+#include "cstone/cuda/cuda_utils.hpp"
 #include "cstone/primitives/math.hpp"
 #include "cstone/primitives/primitives_gpu.h"
 #include "cstone/util/pack_buffers.hpp"

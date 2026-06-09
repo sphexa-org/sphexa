@@ -21,6 +21,7 @@
 #include "cstone/domain/index_ranges.hpp"
 #include "cstone/halos/exchange_halos.hpp"
 #include "cstone/halos/halo_peers.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #ifdef USE_CUDA
 #include "cstone/halos/exchange_halos_gpu.cuh"
 #endif
