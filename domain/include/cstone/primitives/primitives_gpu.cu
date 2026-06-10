@@ -37,7 +37,7 @@ template<class T>
 void fill(execution::Gpu exec, T* first, T* last, T value)
 {
     if (last <= first) { return; }
-    thrust::fill(devicePar(exec), first, last, value);
+    thrust::fill(thrustExecPolicy(exec), first, last, value);
 }
 
 template void fill(execution::Gpu, double*, double*, double);
@@ -64,7 +64,7 @@ struct ScaleFunctor
 template<class T1, class T2, class T3>
 void scale(execution::Gpu exec, const T1* in1, const T1* in2, T2* out, T3 value)
 {
-    thrust::transform(devicePar(exec), in1, in2, out, ScaleFunctor<T3>(value));
+    thrust::transform(thrustExecPolicy(exec), in1, in2, out, ScaleFunctor<T3>(value));
 }
 
 template void scale(execution::Gpu, const double*, const double*, double*, double);
@@ -183,7 +183,7 @@ template void gatherScatter(
 template<class T>
 std::tuple<T, T> MinMax<execution::Gpu, T>::operator()(const T* first, const T* last)
 {
-    auto minMax = thrust::minmax_element(devicePar(exec), first, last);
+    auto minMax = thrust::minmax_element(thrustExecPolicy(exec), first, last);
 
     T theMinimum, theMaximum;
     checkGpuErrors(cudaMemcpyAsync(&theMinimum, minMax.first, sizeof(T), cudaMemcpyDeviceToHost, exec));
@@ -216,7 +216,7 @@ T maxNormSquare(execution::Gpu exec, const T* x, const T* y, const T* z, size_t 
 
     T init = 0;
 
-    return thrust::transform_reduce(devicePar(exec), it1, it2, NormSquare3D<T>{}, init, thrust::maximum<T>{});
+    return thrust::transform_reduce(thrustExecPolicy(exec), it1, it2, NormSquare3D<T>{}, init, thrust::maximum<T>{});
 }
 
 template float maxNormSquare(execution::Gpu, const float*, const float*, const float*, size_t);
@@ -225,7 +225,7 @@ template double maxNormSquare(execution::Gpu, const double*, const double*, cons
 template<class T>
 size_t lowerBound(execution::Gpu exec, const T* first, const T* last, T value)
 {
-    return thrust::lower_bound(devicePar(exec), first, last, value) - first;
+    return thrust::lower_bound(thrustExecPolicy(exec), first, last, value) - first;
 }
 
 template size_t lowerBound(execution::Gpu, const unsigned*, const unsigned*, unsigned);
@@ -238,7 +238,7 @@ template<class T, class IndexType>
 void lowerBound(
     execution::Gpu exec, const T* first, const T* last, const T* valueFirst, const T* valueLast, IndexType* result)
 {
-    thrust::lower_bound(devicePar(exec), first, last, valueFirst, valueLast, result);
+    thrust::lower_bound(thrustExecPolicy(exec), first, last, valueFirst, valueLast, result);
 }
 
 template void
@@ -253,7 +253,7 @@ lowerBound(execution::Gpu, const uint64_t*, const uint64_t*, const uint64_t*, co
 template<class T1, class T2, class Tout>
 void sequenceMax(execution::Gpu exec, const T1* i1_begin, const T1* i1_end, const T2* i2, Tout* output)
 {
-    thrust::transform(devicePar(exec), i1_begin, i1_end, i2, output, thrust::maximum<unsigned>{});
+    thrust::transform(thrustExecPolicy(exec), i1_begin, i1_end, i2, output, thrust::maximum<unsigned>{});
 }
 
 template void sequenceMax(execution::Gpu, const unsigned*, const unsigned*, const unsigned*, unsigned*);
@@ -261,7 +261,7 @@ template void sequenceMax(execution::Gpu, const unsigned*, const unsigned*, cons
 template<class Tin, class Tout>
 Tout reduce(execution::Gpu exec, const Tin* input, size_t numElements, Tout init)
 {
-    return thrust::reduce(devicePar(exec), input, input + numElements, init);
+    return thrust::reduce(thrustExecPolicy(exec), input, input + numElements, init);
 }
 
 template size_t reduce(execution::Gpu, const unsigned*, size_t, size_t);
@@ -269,7 +269,7 @@ template size_t reduce(execution::Gpu, const unsigned*, size_t, size_t);
 template<class IndexType>
 void sequence(execution::Gpu exec, IndexType* input, size_t numElements, IndexType init)
 {
-    thrust::sequence(devicePar(exec), input, input + numElements, init);
+    thrust::sequence(thrustExecPolicy(exec), input, input + numElements, init);
 }
 
 template void sequence(execution::Gpu, int*, size_t, int);
@@ -373,7 +373,7 @@ SORT_BY_KEY_GPU_DB(float, unsigned);
 template<class KeyType, class ValueType>
 void sortByKey(execution::Gpu exec, KeyType* first, KeyType* last, ValueType* values)
 {
-    thrust::sort_by_key(devicePar(exec), first, last, values);
+    thrust::sort_by_key(thrustExecPolicy(exec), first, last, values);
 }
 
 template void sortByKey(execution::Gpu, unsigned*, unsigned*, unsigned*);
@@ -385,7 +385,7 @@ template void sortByKey(execution::Gpu, uint64_t*, uint64_t*, uint64_t*);
 template<class IndexType, class SumType>
 void exclusiveScan(execution::Gpu exec, const IndexType* first, const IndexType* last, SumType* output, SumType init)
 {
-    thrust::exclusive_scan(devicePar(exec), first, last, output, init);
+    thrust::exclusive_scan(thrustExecPolicy(exec), first, last, output, init);
 }
 
 template void exclusiveScan(execution::Gpu, const int*, const int*, int*, int);
@@ -397,12 +397,12 @@ template void exclusiveScan(execution::Gpu, const unsigned*, const unsigned*, ui
 template<class IndexType, class SumType>
 void inclusiveScan(execution::Gpu exec, const IndexType* first, const IndexType* last, SumType* output)
 {
-    thrust::inclusive_scan(devicePar(exec), first, last, output);
+    thrust::inclusive_scan(thrustExecPolicy(exec), first, last, output);
 
     /*! Accumulation in 64-bit from 32-bit inputs only works by explicitly setting the type of the initial
      *  value, which is only supported in Thrust/CUB version shipped with CUDA 12.7 and later
      */
-    // thrust::inclusive_scan(devicePar(exec), first, last, output, SumType(0), thrust::plus<>{});
+    // thrust::inclusive_scan(thrustExecPolicy(exec), first, last, output, SumType(0), thrust::plus<>{});
     /*
     SumType init = 0;
     size_t temp_storage_bytes{};
@@ -431,7 +431,7 @@ template void inclusiveScan(execution::Gpu, const unsigned*, const unsigned*, un
 template<class ValueType>
 size_t count(execution::Gpu exec, const ValueType* first, const ValueType* last, ValueType v)
 {
-    return thrust::count(devicePar(exec), first, last, v);
+    return thrust::count(thrustExecPolicy(exec), first, last, v);
 }
 
 template size_t count(execution::Gpu, const int* first, const int* last, int v);

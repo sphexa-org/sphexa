@@ -160,7 +160,7 @@ void buildOctreeGpu(execution::Gpu exec,
                                    cudaMemcpyDeviceToHost, exec));
     syncGpu(exec);
 
-    thrust::fill(devicePar(exec), d.childOffsets, d.childOffsets + numNodes, 0);
+    thrust::fill(thrustExecPolicy(exec), d.childOffsets, d.childOffsets + numNodes, 0);
     if (d.numInternalNodes)
     {
         linkTree<<<iceil(d.numInternalNodes, numThreads), numThreads, 0, exec>>>(
