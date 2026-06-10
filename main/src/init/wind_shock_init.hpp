@@ -61,7 +61,7 @@ template<class Dataset>
 void initWindShockFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
     using Exec      = typename Dataset::Exec;
-    auto stream     = Exec::Default();
+    auto exec       = Exec::Default();
     using T         = Dataset::RealType;
     using HydroType = Dataset::HydroType;
 
@@ -79,7 +79,7 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     T hExt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoExt);
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
-    initFieldsAtRest(d, massPart, stream);
+    initFieldsAtRest(d, massPart, exec);
 
     T uInt = uExt / (rhoInt / rhoExt);
 
@@ -129,9 +129,9 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     d.vx = std::move(vx);
     d.vy = std::move(vy);
     d.vz = std::move(vz);
-    cstone::scaleGpuAcc(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"), stream);
-    cstone::scaleGpuAcc(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"), stream);
-    cstone::scaleGpuAcc(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"), stream);
+    cstone::scaleGpuAcc(exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
+    cstone::scaleGpuAcc(exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
+    cstone::scaleGpuAcc(exec, d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
 
     if (d.u.empty())
     {

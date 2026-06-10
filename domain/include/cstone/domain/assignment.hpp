@@ -123,8 +123,8 @@ public:
         {
             computeSfcKeys(x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numPart, box_);
         }
-        sequence(o1.start, numPart, reorderFunctor.getBuf(), growthRate_, exec_);
-        sortByKey(keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_, exec_);
+        sequence(exec_, o1.start, numPart, reorderFunctor.getBuf(), growthRate_);
+        sortByKey(exec_, keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_);
         if constexpr (gpu) { syncGpu(exec_); } // flush stream before entering MPI-involved updateOctreeGlobal
 
         auto maxCount = updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
@@ -223,8 +223,8 @@ public:
             computeSfcKeys(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv,
                            box_);
         }
-        sequence(recvStart, numRecv, reorderFunctor.getBuf(), growthRate_, exec_);
-        sortByKey(keyView, std::span{reorderFunctor.getMap() + newStart, keyView.size()}, s0, s1, growthRate_, exec_);
+        sequence(exec_, recvStart, numRecv, reorderFunctor.getBuf(), growthRate_);
+        sortByKey(exec_, keyView, std::span{reorderFunctor.getMap() + newStart, keyView.size()}, s0, s1, growthRate_);
 
         return std::make_tuple(newStart, keyView.subspan(numSendDown(), numAssigned()));
     }

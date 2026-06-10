@@ -77,19 +77,19 @@ InitSettings TurbulenceConstants()
 template<class Dataset>
 void initTurbulenceHydroFields(Dataset& d, const InitSettings& constants)
 {
-    using Exec    = typename Dataset::Exec;
-    auto   stream = Exec::Default();
-    double mPart  = constants.at("mTotal") / d.numParticlesGlobal;
-    double Lbox   = constants.at("Lbox");
-    double hInit  = std::cbrt(3.0 / (4. * M_PI) * d.ng0 * std::pow(Lbox, 3) / d.numParticlesGlobal) * 0.5;
+    using Exec           = typename Dataset::Exec;
+    constexpr auto exec  = Exec::Default();
+    double         mPart = constants.at("mTotal") / d.numParticlesGlobal;
+    double         Lbox  = constants.at("Lbox");
+    double         hInit = std::cbrt(3.0 / (4. * M_PI) * d.ng0 * std::pow(Lbox, 3) / d.numParticlesGlobal) * 0.5;
 
     auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
     auto temp0 = constants.at("u0") / cv;
 
-    initFieldsAtRest(d, mPart, stream);
-    cstone::fill(d.temp.begin(), d.temp.end(), temp0, stream);
-    cstone::fill(d.u.begin(), d.u.end(), constants.at("u0"), stream);
-    cstone::fill(d.h.begin(), d.h.end(), hInit, stream);
+    initFieldsAtRest(d, mPart, exec);
+    cstone::fill(exec, d.temp.begin(), d.temp.end(), temp0);
+    cstone::fill(exec, d.u.begin(), d.u.end(), constants.at("u0"));
+    cstone::fill(exec, d.h.begin(), d.h.end(), hInit);
 }
 
 template<class Dataset>

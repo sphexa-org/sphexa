@@ -465,7 +465,7 @@ private:
         lowMemReallocate(exchangeSize, allocGrowthRate_, distributedArrays, scratchBuffers);
 
         // Must zero new memory to exclude possibility of special value (removeKey) in uninitialized memory
-        fill(rawPtr(keys) + bufDesc_.size, rawPtr(keys) + exchangeSize, KeyType(0), exec_);
+        fill(exec_, rawPtr(keys) + bufDesc_.size, rawPtr(keys) + exchangeSize, KeyType(0));
 
         return std::apply(
             [exchangeSize, &sorter, &scratchBuffers, this](auto&... arrays)
@@ -520,10 +520,10 @@ private:
         auto& swapSpace = std::get<j>(scratchBuffers);
         size_t origSize = reallocateBytes(swapSpace, keyView.size() * sizeof(KeyType), allocGrowthRate_);
         auto* swapPtr   = reinterpret_cast<KeyType*>(swapSpace.data());
-        copy_n(keyView.data(), keyView.size(), swapPtr, exec_);
+        copy_n(exec_, keyView.data(), keyView.size(), swapPtr);
         reallocate(keys, newBufDesc.size, allocGrowthRate_);
-        fill(rawPtr(keys) + bufDesc_.size, rawPtr(keys) + newBufDesc.size, KeyType(0), exec_);
-        copy_n(swapPtr, keyView.size(), rawPtr(keys) + newBufDesc.start, exec_);
+        fill(exec_, rawPtr(keys) + bufDesc_.size, rawPtr(keys) + newBufDesc.size, KeyType(0));
+        copy_n(exec_, swapPtr, keyView.size(), rawPtr(keys) + newBufDesc.start);
         reallocate(swapSpace, origSize, 1.0);
 
         // relocate ordered buffer contents from offset 0 to offset newBufDesc.start
@@ -532,7 +532,7 @@ private:
         {
             static_assert(util::Contains<decltype(array), std::tuple<Arrays3&...>>{}, "No suitable scratch buffer");
             auto& swapSpace = util::pickType<decltype(array)>(scratch);
-            copy_n(rawPtr(array), size, rawPtr(swapSpace) + dest, exec);
+            copy_n(exec, rawPtr(array), size, rawPtr(swapSpace) + dest);
             swap(array, swapSpace);
         };
         util::for_each_tuple(relocate, orderedBuffers);

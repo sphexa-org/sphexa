@@ -427,8 +427,8 @@ void fillMassHalos(Vector& m, std::size_t first, std::size_t last, Exec exec)
         mass = m[first];
     }
 
-    cstone::fill(m.begin(), m.begin() + first, mass, exec);
-    cstone::fill(m.begin() + last, m.end(), mass, exec);
+    cstone::fill(exec, m.begin(), m.begin() + first, mass);
+    cstone::fill(exec, m.begin() + last, m.end(), mass);
 }
 
 } // namespace sphexa

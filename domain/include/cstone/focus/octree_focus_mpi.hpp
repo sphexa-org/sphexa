@@ -230,7 +230,7 @@ public:
 
             upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(octreeAcc_.levelRange), rawPtr(octreeAcc_.childOffsets),
                           rawPtr(countsAcc_), exec_);
-            gatherAcc(leafToInternal(octreeAcc_), rawPtr(countsAcc_), rawPtr(leafCountsAcc_), exec_);
+            gatherAcc(exec_, leafToInternal(octreeAcc_), rawPtr(countsAcc_), rawPtr(leafCountsAcc_));
         }
         else
         {
@@ -295,7 +295,7 @@ public:
             }
         }
 
-        gatherAcc(std::span<const int>(gmap), localQuantities.data(), globalQuantities.data(), exec_);
+        gatherAcc(exec_, std::span<const int>(gmap), localQuantities.data(), globalQuantities.data());
     }
 
     /*! @brief transfer missing cell quantities from global tree into localQuantities
@@ -544,7 +544,7 @@ public:
         size_t origSize                   = scratch.size();
         auto [searchCenters, searchSizes] = util::packAllocBuffer(
             scratch, util::TypeList<Vec3<RealType>, Vec3<RealType>>{}, {numLeafNodes, numLeafNodes}, 128);
-        gatherAcc(let.leafToInternalSpan(), geoCentersAcc_.data(), searchCenters.data(), exec_);
+        gatherAcc(exec_, let.leafToInternalSpan(), geoCentersAcc_.data(), searchCenters.data());
         if constexpr (execution::HaveGpu<Exec>{})
         {
             fillGpu(layout.data() + firstNode, layout.data() + firstNode + 1, LocalIndex{0}, exec_);
@@ -651,7 +651,7 @@ public:
         gatherGlobalLeaves<Q>(gLeafQLoc, gLeafQAll);
 
         auto globQuse = globQOut.data() ? globQOut : globQ;
-        scatterAcc(gOctree.leafToInternalSpan(), gLeafQAll.data(), globQuse.data(), exec_);
+        scatterAcc(exec_, gOctree.leafToInternalSpan(), gLeafQAll.data(), globQuse.data());
         //! upsweep with the global tree
         upsweepFunction(gOctree.levelRangeSpan(), gOctree.childOffsets, globQuse.data(), upsweepArgs...);
 

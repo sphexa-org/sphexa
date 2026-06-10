@@ -140,26 +140,26 @@ void generateParticleIDs(std::span<uint64_t> id, Exec exec)
 
     std::exclusive_scan(ranksLocalParticles.begin(), ranksLocalParticles.end(), ranksLocalParticles.begin(),
                         uint64_t(0));
-    cstone::sequenceAcc(id.data(), id.data() + id.size(), ranksLocalParticles[rank], exec);
+    cstone::sequenceAcc(exec, id.data(), id.data() + id.size(), ranksLocalParticles[rank]);
 }
 
 template<class Dataset>
 void initFieldsAtRest(Dataset& d, double m_part, typename Dataset::Exec exec)
 {
-    cstone::fill(d.m.begin(), d.m.end(), m_part, exec);
-    cstone::fill(d.du_m1.begin(), d.du_m1.end(), 0.0, exec);
-    cstone::fill(d.mui.begin(), d.mui.end(), d.muiConst, exec);
-    cstone::fill(d.alpha.begin(), d.alpha.end(), d.alphamin, exec);
+    cstone::fill(exec, d.m.begin(), d.m.end(), m_part);
+    cstone::fill(exec, d.du_m1.begin(), d.du_m1.end(), 0.0);
+    cstone::fill(exec, d.mui.begin(), d.mui.end(), d.muiConst);
+    cstone::fill(exec, d.alpha.begin(), d.alpha.end(), d.alphamin);
 
-    cstone::fill(d.vx.begin(), d.vx.end(), 0.0, exec);
-    cstone::fill(d.vy.begin(), d.vy.end(), 0.0, exec);
-    cstone::fill(d.vz.begin(), d.vz.end(), 0.0, exec);
-    cstone::fill(d.x_m1.begin(), d.x_m1.end(), 0.0, exec);
-    cstone::fill(d.y_m1.begin(), d.y_m1.end(), 0.0, exec);
-    cstone::fill(d.z_m1.begin(), d.z_m1.end(), 0.0, exec);
+    cstone::fill(exec, d.vx.begin(), d.vx.end(), 0.0);
+    cstone::fill(exec, d.vy.begin(), d.vy.end(), 0.0);
+    cstone::fill(exec, d.vz.begin(), d.vz.end(), 0.0);
+    cstone::fill(exec, d.x_m1.begin(), d.x_m1.end(), 0.0);
+    cstone::fill(exec, d.y_m1.begin(), d.y_m1.end(), 0.0);
+    cstone::fill(exec, d.z_m1.begin(), d.z_m1.end(), 0.0);
 
-    cstone::fill(d.u.begin(), d.u.end(), 0.0, exec);
-    cstone::fill(d.temp.begin(), d.temp.end(), 0.0, exec);
+    cstone::fill(exec, d.u.begin(), d.u.end(), 0.0);
+    cstone::fill(exec, d.temp.begin(), d.temp.end(), 0.0);
 
     generateParticleIDs(d.id, exec);
 }

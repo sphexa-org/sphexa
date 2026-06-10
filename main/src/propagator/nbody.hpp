@@ -131,9 +131,9 @@ public:
 
         computeGroups(first, last, d, domain.box(), groups_);
 
-        cstone::fill(d.ax.begin() + first, d.ax.begin() + last, HydroType(0), domain.exec());
-        cstone::fill(d.ay.begin() + first, d.ay.begin() + last, HydroType(0), domain.exec());
-        cstone::fill(d.az.begin() + first, d.az.begin() + last, HydroType(0), domain.exec());
+        cstone::fill(domain.exec(), d.ax.begin() + first, d.ax.begin() + last, HydroType(0));
+        cstone::fill(domain.exec(), d.ay.begin() + first, d.ay.begin() + last, HydroType(0));
+        cstone::fill(domain.exec(), d.az.begin() + first, d.az.begin() + last, HydroType(0));
 
         auto groups = mHolder_.computeSpatialGroups(d, domain);
         mHolder_.upsweep(d, domain);

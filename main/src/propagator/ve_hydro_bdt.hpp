@@ -189,7 +189,7 @@ public:
         activeRungs_ = groups_.view();
 
         reallocate(groups_.numGroups, d.getAllocGrowthRate(), groupDt_, groupIndices_);
-        cstone::fill(groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max(), domain.exec());
+        cstone::fill(domain.exec(), groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max());
     }
 
     void partialSync(DomainType& domain, DataType& simData)

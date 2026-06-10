@@ -251,7 +251,7 @@ void gatherArrays(std::span<const LocalIndex> ordering,
         {
             auto& swapSpace = util::pickType<decltype(array)>(scratchBuffers);
             assert(swapSpace.size() == array.size());
-            gatherAcc(ordering, rawPtr(array), rawPtr(swapSpace) + outputOffset, exec);
+            gatherAcc(exec, ordering, rawPtr(array), rawPtr(swapSpace) + outputOffset);
             swap(swapSpace, array);
         }
         else
@@ -261,8 +261,8 @@ void gatherArrays(std::span<const LocalIndex> ordering,
             assert(std::get<i>(scratchBuffers).size() == array.size());
 
             auto* scratch = reinterpret_cast<typename VectorType::value_type*>(rawPtr(std::get<i>(scratchBuffers)));
-            gatherAcc(ordering, rawPtr(array), scratch, exec);
-            copy_n(scratch, ordering.size(), rawPtr(array) + outputOffset, exec);
+            gatherAcc(exec, ordering, rawPtr(array), scratch);
+            copy_n(exec, scratch, ordering.size(), rawPtr(array) + outputOffset);
         }
     };
 

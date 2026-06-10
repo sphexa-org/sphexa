@@ -50,7 +50,7 @@ template<class Dataset>
 void initSedovFields(Dataset& d, const InitSettings& constants)
 {
     using Exec  = typename Dataset::Exec;
-    auto stream = Exec::Default();
+    auto exec = Exec::Default();
     using T     = Dataset::RealType;
 
     double r           = constants.at("r1");
@@ -66,8 +66,8 @@ void initSedovFields(Dataset& d, const InitSettings& constants)
     // ener0 is the constant that should multiply the Gaussian so that its integral equals energytotal
     double ener0 = constants.at("energyTotal") / std::pow(M_PI, 1.5) / width2 / width;
 
-    initFieldsAtRest(d, mPart, stream);
-    cstone::fill(d.h.begin(), d.h.end(), hInit, stream);
+    initFieldsAtRest(d, mPart, exec);
+    cstone::fill(exec, d.h.begin(), d.h.end(), hInit);
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
 

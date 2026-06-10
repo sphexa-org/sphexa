@@ -28,14 +28,14 @@ namespace cstone
 {
 
 template<class It, class T>
-void fill(It first, It last, T value, execution::Cpu)
+void fill(execution::Cpu, It first, It last, T value)
 {
     if (last <= first) { return; }
     std::fill(first, last, value);
 }
 
 template<class It, class T>
-void fill(It first, It last, T value, execution::Gpu exec)
+void fill(execution::Gpu exec, It first, It last, T value)
 {
     if (last <= first) { return; }
     using T1 = std::decay_t<decltype(*first)>;
@@ -43,55 +43,55 @@ void fill(It first, It last, T value, execution::Gpu exec)
 }
 
 template<class T>
-void copy_n(const T* src, std::size_t n, T* dest, execution::Cpu)
+void copy_n(execution::Cpu, const T* src, std::size_t n, T* dest)
 {
     omp_copy(src, src + n, dest);
 }
 
 template<class T>
-void copy_n(const T* src, std::size_t n, T* dest, execution::Gpu exec)
+void copy_n(execution::Gpu exec, const T* src, std::size_t n, T* dest)
 {
     memcpyD2DAsync(src, n, dest, exec);
 }
 
 template<class T1, class T2, class T3>
-void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value, execution::Cpu)
+void scaleGpuAcc(execution::Cpu, const T1* in1, const T1* in2, T2* out, T3 value)
 {
     std::transform(in1, in2, out, [value](auto v_) { return v_ * value; });
 }
 
 template<class T1, class T2, class T3>
-void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value, execution::Gpu exec)
+void scaleGpuAcc(execution::Gpu exec, const T1* in1, const T1* in2, T2* out, T3 value)
 {
     scaleGpu(in1, in2, out, value, exec);
 }
 
 template<class IndexType, class ValueType>
-void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, execution::Cpu)
+void gatherAcc(execution::Cpu, std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
 {
     gather(ordering, source, destination);
 }
 
 template<class IndexType, class ValueType>
-void gatherAcc(std::span<const IndexType> ordering,
+void gatherAcc(execution::Gpu exec,
+               std::span<const IndexType> ordering,
                const ValueType* source,
-               ValueType* destination,
-               execution::Gpu exec)
+               ValueType* destination)
 {
     gatherGpu(ordering.data(), ordering.size(), source, destination, exec);
 }
 
 template<class IndexType, class ValueType>
-void scatterAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, execution::Cpu)
+void scatterAcc(execution::Cpu, std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
 {
     scatter(ordering, source, destination);
 }
 
 template<class IndexType, class ValueType>
-void scatterAcc(std::span<const IndexType> ordering,
+void scatterAcc(execution::Gpu exec,
+                std::span<const IndexType> ordering,
                 const ValueType* source,
-                ValueType* destination,
-                execution::Gpu exec)
+                ValueType* destination)
 {
     scatterGpu(ordering.data(), ordering.size(), source, destination, exec);
 }
@@ -134,35 +134,35 @@ void sortByKeyGpu(std::span<KeyType> keys,
 }
 
 template<class T1, class T2>
-void sequenceAcc(T1* first, T1* last, T2 value, execution::Cpu)
+void sequenceAcc(execution::Cpu, T1* first, T1* last, T2 value)
 {
     std::iota(first, last, value);
 }
 
 template<class T1, class T2>
-void sequenceAcc(T1* first, T1* last, T2 value, execution::Gpu exec)
+void sequenceAcc(execution::Gpu exec, T1* first, T1* last, T2 value)
 {
     sequenceGpu(first, last - first, T1(value), exec);
 }
 
 template<class BufferType>
-void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate, execution::Cpu)
+void sequence(execution::Cpu exec, LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate)
 {
     reallocateBytes(buffer, sizeof(LocalIndex) * (first + n), growthRate);
     auto* seq = reinterpret_cast<LocalIndex*>(buffer.data());
-    sequenceAcc(seq + first, seq + first + n, first, execution::Cpu{});
+    sequenceAcc(exec, seq + first, seq + first + n, first);
 }
 
 template<class BufferType>
-void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate, execution::Gpu exec)
+void sequence(execution::Gpu exec, LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate)
 {
     reallocateBytes(buffer, sizeof(LocalIndex) * (first + n), growthRate);
     auto* seq = reinterpret_cast<LocalIndex*>(buffer.data());
-    sequenceAcc(seq + first, seq + first + n, first, exec);
+    sequenceAcc(exec, seq + first, seq + first + n, first);
 }
 
 template<class KeyType, class ValueType>
-void sortByKey(std::span<KeyType> keys, std::span<ValueType> values, execution::Cpu)
+void sortByKey(execution::Cpu, std::span<KeyType> keys, std::span<ValueType> values)
 {
     assert(keys.size() == values.size());
     sort_by_key(keys.begin(), keys.end(), values.begin());
@@ -170,24 +170,24 @@ void sortByKey(std::span<KeyType> keys, std::span<ValueType> values, execution::
 
 //! @brief CPU overload ignores scratch buffers and growth rate
 template<class KeyType, class ValueType, class KeyBuf, class ValueBuf>
-void sortByKey(std::span<KeyType> keys,
+void sortByKey(execution::Cpu,
+               std::span<KeyType> keys,
                std::span<ValueType> values,
                KeyBuf& /*keyBuf*/,
                ValueBuf& /*valueBuf*/,
-               double /*growth*/,
-               execution::Cpu)
+               double /*growth*/)
 {
     assert(keys.size() == values.size());
     sort_by_key(keys.begin(), keys.end(), values.begin());
 }
 
 template<class KeyType, class ValueType, class KeyBuf, class ValueBuf>
-void sortByKey(std::span<KeyType> keys,
+void sortByKey(execution::Gpu exec,
+               std::span<KeyType> keys,
                std::span<ValueType> values,
                KeyBuf& keyBuf,
                ValueBuf& valueBuf,
-               double growth,
-               execution::Gpu exec)
+               double growth)
 {
     assert(keys.size() == values.size());
     sortByKeyGpu(keys, values, keyBuf, valueBuf, growth, exec);
