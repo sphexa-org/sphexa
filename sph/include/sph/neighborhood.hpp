@@ -44,8 +44,7 @@ struct NeighborhoodData
             builder = cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder{d.ngmax};
 
         std::visit(
-            [&](auto const& nb)
-            {
+            [&](auto const& nb) {
                 neighborhood =
                     nb.build(d.treeView, box, d.size(), groups, d.x.data(), d.y.data(), d.z.data(), d.h.data());
             },

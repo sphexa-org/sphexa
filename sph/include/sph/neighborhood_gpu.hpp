@@ -76,14 +76,10 @@ struct DeviceNeighborhoodData::Impl
                 else
                     builder = ClusteredNeighborhoodBuilder<true>{ncmax};
             }
-            else
-            {
-                builder = cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder{d.ngmax};
-            }
+            else { builder = cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder{d.ngmax}; }
 
             std::visit(
-                [&](auto const& nb)
-                {
+                [&](auto const& nb) {
                     neighborhood =
                         nb.build(d.treeView, box, d.size(), groups, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h));
                 },
