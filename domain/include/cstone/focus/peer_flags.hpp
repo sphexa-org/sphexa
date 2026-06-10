@@ -72,7 +72,7 @@ std::vector<int> focusPeersAcc(std::span<const TreeNodeIndex> globalOffsets,
                                int myRank,
                                std::span<const KeyType> globalTree,
                                std::span<const KeyType> focusTree,
-                               Execution<CpuTag>)
+                               execution::Cpu)
 {
     return focusPeers<KeyType>(globalOffsets, focusOffsets, myRank, globalTree, focusTree);
 }
@@ -83,7 +83,7 @@ std::vector<int> focusPeersAcc(std::span<const TreeNodeIndex> globalOffsets,
                                int myRank,
                                std::span<const KeyType> globalTree,
                                std::span<const KeyType> focusTree,
-                               Execution<GpuTag> stream)
+                               execution::Gpu stream)
 {
     std::vector<KeyType> globalTreeBackingBuffer;
     globalTreeBackingBuffer.resize(globalTree.size());

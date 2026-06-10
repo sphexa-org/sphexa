@@ -51,11 +51,11 @@ template<class Execution, class T>
 struct MinMax;
 
 template<class T>
-struct MinMax<Execution<GpuTag>, T>
+struct MinMax<execution::Gpu, T>
 {
     std::tuple<T, T> operator()(const T* first, const T* last);
 
-    Execution<GpuTag> stream;
+    execution::Gpu stream;
 };
 
 template<class T>

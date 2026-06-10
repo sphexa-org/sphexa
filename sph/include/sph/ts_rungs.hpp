@@ -50,7 +50,7 @@ namespace sph
 template<class Dataset>
 void groupDivvTimestep(const GroupView& grp, float* groupDt, const Dataset& d)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         groupDivvTimestepGpu(d.Krho, grp, rawPtr(d.divv), groupDt);
     }
@@ -60,7 +60,7 @@ void groupDivvTimestep(const GroupView& grp, float* groupDt, const Dataset& d)
 template<class Dataset>
 void groupAccTimestep(const GroupView& grp, float* groupDt, const Dataset& d)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         groupAccTimestepGpu(d.etaAcc, grp, rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.h), groupDt);
     }
@@ -82,7 +82,7 @@ void sortGroupDt(float* groupDt, cstone::LocalIndex* groupIndices, cstone::Local
     void* tempStorage = buffers[2].data();
     cstone::sequenceGpu(groupIndices, numGroups, 0u, 0);
     cstone::sortByKeyGpu(groupDt, groupDt + numGroups, groupIndices, buffers[0].data(), valueBuf, tempStorage,
-                         tempElem * sizeof(float), cstone::Execution<cstone::GpuTag>{0});
+                         tempElem * sizeof(float), cstone::execution::Gpu{0});
     reallocate(oldSize, 1.0, scratch);
 };
 
@@ -106,7 +106,7 @@ auto computeMinTimestep(float* groupDt, LocalIndex* groupIndices, LocalIndex num
     {
         sortGroupDt(groupDt, groupIndices, numGroups, scratch);
         cstone::sequenceGpu(groupIndices + numGroups, numGroupsTot - numGroups, numGroups,
-                            cstone::Execution<cstone::GpuTag>{0});
+                            cstone::execution::Gpu{0});
         minGroupDt = timestepRangeGpu(groupDt, numGroups, fastFraction);
     }
 

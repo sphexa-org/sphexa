@@ -59,7 +59,7 @@ private:
 
 //! @brief copy src to dst
 template<class T, template<class...> class AccVec1, template<class...> class AccVec2, int A>
-void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, Execution<CpuTag>)
+void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, execution::Cpu)
 {
     std::vector<std::size_t> sizes(src.sizes().begin(), src.sizes().end());
     auto dstView = dst.reindex(std::move(sizes));
@@ -68,7 +68,7 @@ void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& d
 }
 
 template<class T, template<class...> class AccVec1, template<class...> class AccVec2, int A>
-void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, Execution<GpuTag> stream)
+void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, execution::Gpu stream)
 {
     std::vector<std::size_t> sizes(src.sizes().begin(), src.sizes().end());
     auto dstView = dst.reindex(std::move(sizes));

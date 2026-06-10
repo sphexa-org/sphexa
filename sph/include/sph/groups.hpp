@@ -40,7 +40,7 @@ namespace sph
 
 template<class Dataset>
 void computeSpatialGroups(cstone::LocalIndex startIndex, cstone::LocalIndex endIndex, Dataset& d,
-                          const cstone::Box<typename Dataset::RealType>& box, GroupData<cstone::GpuTag>& groups)
+                          const cstone::Box<typename Dataset::RealType>& box, GroupData<cstone::execution::Gpu>& groups)
 {
     float tolFactor = 2.0f;
     cstone::computeGroupSplits(startIndex, endIndex, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h),
@@ -59,7 +59,7 @@ template<typename Tc, class Dataset>
 void computeGroups(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box,
                    GroupData<typename Dataset::AcceleratorType>& groups)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         computeSpatialGroups(startIndex, endIndex, d, box, groups);
     }

@@ -111,7 +111,7 @@ struct IjLoopTest : testing::Test
         std::generate(v.begin(), v.end(), std::bind(std::uniform_real_distribution<double>(-100, 100), std::ref(gen)));
 
         auto [csTree, counts] = computeOctree(std::span<const KeyT>(rawPtr(leaves), leaves.size()), 8);
-        OctreeData<KeyT, CpuTag> octree;
+        OctreeData<KeyT, execution::Cpu> octree;
         octree.resize(nNodes(csTree));
         updateInternalTree<KeyT>(csTree, octree.data());
 

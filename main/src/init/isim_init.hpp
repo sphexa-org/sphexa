@@ -76,7 +76,7 @@ struct SimInitializers
     static InitPtr makeTDEOrbitInit(const std::string& filePath, int initStep, IFileReader* reader);
 };
 
-extern template struct SimInitializers<SimulationData<cstone::CpuTag>>;
-extern template struct SimInitializers<SimulationData<cstone::GpuTag>>;
+extern template struct SimInitializers<SimulationData<cstone::execution::Cpu>>;
+extern template struct SimInitializers<SimulationData<cstone::execution::Gpu>>;
 
 } // namespace sphexa

@@ -283,7 +283,7 @@ static void containingNodeTrav()
     std::vector<KeyType> cornerstones{0, 1, nodeRange<KeyType>(0) - 1, nodeRange<KeyType>(0)};
     std::vector<KeyType> spanningTree = computeSpanningTree<KeyType>(cornerstones);
 
-    OctreeData<KeyType, CpuTag> tree;
+    OctreeData<KeyType, execution::Cpu> tree;
     tree.resize(nNodes(spanningTree));
     updateInternalTree<KeyType>(spanningTree, tree.data());
 

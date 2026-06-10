@@ -35,14 +35,14 @@
 namespace cstone
 {
 
-template<class KeyType, class T, class Accelerator = CpuTag>
+template<class KeyType, class T, class Accelerator = execution::Cpu>
 class Domain
 {
     static_assert(std::is_unsigned<KeyType>{}, "SFC key type needs to be an unsigned integer\n");
 
     //! @brief A vector template that resides on the hardware specified as Accelerator
     template<class ValueType>
-    using AccVector = std::conditional_t<HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
+    using AccVector = std::conditional_t<execution::HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
 
 public:
     //! @brief floating point type used for the coordinate bounding box and geometric/mass centers of tree nodes
@@ -66,7 +66,7 @@ public:
            unsigned bucketSizeFocus,
            float theta,
            MPI_Comm comm,
-           Execution<Accelerator> stream,
+           Accelerator stream,
            const Box<T>& box = Box<T>{0, 1})
         : myRank_(rank)
         , numRanks_(nRanks)
@@ -311,7 +311,7 @@ public:
 
         auto* ord = reinterpret_cast<LocalIndex*>(rawPtr(ordering)) + envelope[0];
         std::vector<LocalIndex> orderingCpu;
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             static_assert(IsDeviceVector<OVec>{}, "Need ordering on GPU for GPU-accelerated domain");
             orderingCpu.resize(envelope[1] - envelope[0]);
@@ -325,7 +325,7 @@ public:
 
         lowMemReallocate(bufDesc_.size, allocGrowthRate_, arrays, std::tie(sendBuffer, receiveBuffer));
         gatherArrays({ord + global_.numSendDown(), global_.numAssigned()}, bufDesc_.start, arrays,
-                     std::tie(sendBuffer, receiveBuffer), Execution<CpuTag>{});
+                     std::tie(sendBuffer, receiveBuffer), execution::Cpu{});
     }
 
     //! @brief repeat the halo exchange pattern from the previous sync operation for a different set of arrays
@@ -391,7 +391,7 @@ public:
                 focusTree_.geoSizesAcc().data()};
     }
 
-    const Execution<Accelerator>& stream() const { return stream_; }
+    const Accelerator& stream() const { return stream_; }
 
 private:
     //! @brief bounds initialization on first call, use all particles
@@ -555,7 +555,7 @@ private:
 
         std::vector<KeyType> globalTreeBackingBuffer;
         std::vector<uint8_t> flagsBackingBuffer;
-        if constexpr (cstone::HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             globalTreeBackingBuffer.resize(globalTree.size());
             memcpyD2HAsync(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data(), stream_);
@@ -638,7 +638,7 @@ private:
     //! @brief MPI communicator for all collective and point-to-point operations
     MPI_Comm comm_;
     //! @brief CUDA stream for all GPU operations on this object and its children
-    Execution<Accelerator> stream_;
+    Accelerator stream_;
 
     bool convergeTrees{false};
     //! @brief Extra search factor for halo discovery, allowing multiple time integration steps between sync() calls

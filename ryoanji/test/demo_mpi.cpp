@@ -24,7 +24,7 @@
 #include "ryoanji/interface/multipole_holder.cuh"
 #include "ryoanji/nbody/cartesian_qpole.hpp"
 
-using AccType = cstone::GpuTag;
+using AccType = cstone::execution::Gpu;
 
 using namespace ryoanji;
 
@@ -51,7 +51,7 @@ void ryoanjiTest(int thisRank, int numRanks, size_t numParticlesGlobal)
     std::vector<T> m(numParticles, 1.0f / float(numParticlesGlobal));
 
     cstone::Domain<KeyType, T, AccType> domain(thisRank, numRanks, bucketSizeGlobal, bucketSizeFocus, theta,
-                                               MPI_COMM_WORLD, cstone::Execution<AccType>::Default(), box);
+                                               MPI_COMM_WORLD, AccType::Default(), box);
 
     // upload particles to GPU
     cstone::DeviceVector<KeyType> d_keys = std::vector<KeyType>(numParticles);
@@ -72,7 +72,7 @@ void ryoanjiTest(int thisRank, int numRanks, size_t numParticlesGlobal)
     cstone::DeviceVector<T> d_az = std::vector<T>(domain.nParticlesWithHalos());
 
     //! includes tree plus associated information, like nearby ranks, assignment, counts, MAC spheres, etc
-    const cstone::FocusedOctree<KeyType, T, cstone::GpuTag>& focusTree = domain.focusTree();
+    const cstone::FocusedOctree<KeyType, T, cstone::execution::Gpu>& focusTree = domain.focusTree();
 
     MultipoleHolder<T, T, T, T, T, KeyType, MultipoleType> multipoleHolder;
 

@@ -40,7 +40,7 @@ fixedGroupsKernel(LocalIndex first, LocalIndex last, unsigned groupSize, LocalIn
     }
 }
 
-void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<GpuTag>& groups,
+void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups,
                         cudaStream_t stream)
 {
     LocalIndex numBodies = last - first;

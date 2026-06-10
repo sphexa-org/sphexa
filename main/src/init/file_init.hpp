@@ -141,14 +141,14 @@ public:
     cstone::Box<typename Dataset::RealType> init(int /* rank */, int, size_t, Dataset& simData,
                                                  IFileReader* reader) const override
     {
-        constexpr auto stream = cstone::Execution<typename Dataset::AcceleratorType>::Default();
-        reader->setStep(h5_fname, -1, FileMode::collective);
+        using KeyType = typename Dataset::KeyType;
+        using T       = typename Dataset::RealType;
+        using AccType = typename Dataset::AcceleratorType;
+        auto stream   = AccType::Default();
 
         size_t numParticlesInFile = reader->localNumParticles();
         size_t numParticlesSplit  = numParticlesInFile * numSplits;
 
-        using KeyType = typename Dataset::KeyType;
-        using T       = typename Dataset::RealType;
         cstone::Box<T> box(0, 1);
         box.loadOrStore(reader);
 

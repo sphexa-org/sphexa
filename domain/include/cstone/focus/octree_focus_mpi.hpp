@@ -42,16 +42,16 @@ inline std::vector<int> exchangePeers(std::span<const int> exteriorPeers, MPI_Co
 }
 
 //! @brief A fully traversable octree with a local focus
-template<class KeyType, class RealType, class Accelerator = CpuTag>
+template<class KeyType, class RealType, class Accelerator = execution::Cpu>
 class FocusedOctree
 {
     //! @brief A vector template that resides on the hardware specified as Accelerator
     template<class ValueType>
-    using AccVector = std::conditional_t<HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
+    using AccVector = std::conditional_t<execution::HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
 
     using SType = SourceCenterType<RealType>;
 
-    constexpr static bool useGpu = HaveGpu<Accelerator>{};
+    constexpr static bool useGpu = execution::HaveGpu<Accelerator>{};
 
 public:
     /*! @brief constructor
@@ -60,7 +60,7 @@ public:
      * @param numRanks      number of ranks
      * @param bucketSize    Maximum number of particles per leaf inside the focus area
      */
-    FocusedOctree(int myRank, int numRanks, unsigned bucketSize, MPI_Comm comm, Execution<Accelerator> stream)
+    FocusedOctree(int myRank, int numRanks, unsigned bucketSize, MPI_Comm comm, Accelerator stream)
         : myRank_(myRank)
         , numRanks_(numRanks)
         , bucketSize_(bucketSize)
@@ -77,7 +77,7 @@ public:
         leafCountsAcc_ = std::vector<unsigned>{bucketSize + 1};
         countsAcc_     = leafCountsAcc_;
 
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             leavesAcc_ = leaves_;
             buildOctreeGpu(rawPtr(leavesAcc_), octreeAcc_.data(), stream_);
@@ -125,7 +125,7 @@ public:
         std::span enforcedKeys = globalLeaves.subspan(assignment.treeOffsetsConst()[myRank_],
                                                       assignment.numNodesPerRankConst()[myRank_] + 1);
         bool converged;
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             converged = CombinedUpdate<KeyType>::updateFocusGpu(
                 octreeAcc_, leavesAcc_, bucketSize_, focusStart, focusEnd, enforcedKeys,
@@ -148,7 +148,7 @@ public:
         peerFlagsToList(intPeers, interiorPeers_, PeerMask::focus);
         extractPeerRanges(exteriorPeers_, myRank_, assignment_, peerRanges_);
 
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             syncTreeletsGpu<KeyType>(exteriorPeers_, interiorPeers_, assignment_, leaves_, octreeAcc_, leavesAcc_,
                                      treelets_, scratch, comm_, stream_);
@@ -207,7 +207,7 @@ public:
         TreeNodeIndex numLeafNodes = octreeAcc_.numLeafNodes;
         auto idxFromGlob           = enumerateRanges(invertRanges(0, peerRanges_, numLeafNodes));
         reallocate(numLeafNodes, allocGrowthRate_, leafCountsAcc_);
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             computeNodeCountsGpu(rawPtr(leavesAcc_), rawPtr(leafCountsAcc_), numLeafNodes, particleKeys,
                                  std::numeric_limits<unsigned>::max(), false, stream_);
@@ -280,7 +280,7 @@ public:
     {
         auto gLeavesFoc = gLeaves.subspan(globDispl_[myRank_], globNumNodes_[myRank_] + 1);
 
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             locateNodesGpu(gLeavesFoc.data(), gLeavesFoc.data() + gLeavesFoc.size(), octreeAcc_.prefixes.data(),
                            octreeAcc_.d_levelRange.data(), gmap.data(), stream_);
@@ -324,7 +324,7 @@ public:
         const TreeNodeIndex* toInternal = leafToInternal(octreeAcc_).data();
         std::span letIdx{letIdxBuf, idxFromGlob.size()};
         std::span letToGlob{letToGlobBuf, idxFromGlob.size()};
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             memcpyH2DAsync(idxFromGlob.data(), idxFromGlob.size(), letIdx.data(), stream_);
             gatherGpu(letIdx.data(), idxFromGlob.size(), toInternal, letIdx.data(), stream_);
@@ -350,8 +350,8 @@ public:
     template<class T>
     void gatherGlobalLeaves(std::span<T> gLeafQLoc, std::span<T> gLeafQAll) const
     {
-        if constexpr (HaveGpu<Accelerator>{}) { syncGpu(stream_); }
-        mpiAllgathervGpuDirect<HaveGpu<Accelerator>{}>(gLeafQLoc.data(), globNumNodes_[myRank_], gLeafQAll.data(),
+        if constexpr (execution::HaveGpu<Accelerator>{}) { syncGpu(stream_); }
+        mpiAllgathervGpuDirect<execution::HaveGpu<Accelerator>{}>(gLeafQLoc.data(), globNumNodes_[myRank_], gLeafQAll.data(),
                                                        globNumNodes_.data(), globDispl_.data(), comm_);
     }
 
@@ -373,7 +373,7 @@ public:
 
         auto upsweepCenters = [this](auto levelRange, auto childOffsets, auto centers)
         {
-            if constexpr (HaveGpu<Accelerator>{})
+            if constexpr (execution::HaveGpu<Accelerator>{})
             {
                 upsweepCentersGpu(maxTreeLevel<KeyType>{}, levelRange.data(), childOffsets, centers, stream_);
             }
@@ -383,7 +383,7 @@ public:
             }
         };
 
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             static_assert(IsDeviceVector<std::decay_t<DevVec1>>{});
             size_t bytesLayout = (octree.numLeafNodes + 1) * sizeof(LocalIndex);
@@ -431,7 +431,7 @@ public:
      */
     void updateMinMac(const SfcAssignment<KeyType>& assignment, float invThetaEff, bool accumulate)
     {
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             reallocate(centersAcc_, octreeAcc_.numNodes, allocGrowthRate_);
             moveCenters(rawPtr(geoCentersAcc_), octreeAcc_.numNodes, rawPtr(centersAcc_), stream_);
@@ -455,7 +455,7 @@ public:
     //! @brief Compute MAC acceptance radius of each cell based on @p invTheta and previously computed expansion centers
     void setMacRadius(float invTheta)
     {
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             setMacGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box_, stream_);
         }
@@ -493,7 +493,7 @@ public:
         TreeNodeIndex fAssignStart = findNodeAbove(rawPtr(leaves_), nNodes(leaves_), assignment[myRank_]);
         TreeNodeIndex fAssignEnd   = findNodeAbove(rawPtr(leaves_), nNodes(leaves_), assignment[myRank_ + 1]);
 
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             if (not accumulate) { fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0), stream_); }
             markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(octreeAcc_.parents),
@@ -547,7 +547,7 @@ public:
         auto [searchCenters, searchSizes] = util::packAllocBuffer(
             scratch, util::TypeList<Vec3<RealType>, Vec3<RealType>>{}, {numLeafNodes, numLeafNodes}, 128);
         gatherAcc(let.leafToInternalSpan(), geoCentersAcc_.data(), searchCenters.data(), stream_);
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             fillGpu(layout.data() + firstNode, layout.data() + firstNode + 1, LocalIndex{0}, stream_);
             inclusiveScanGpu(leafCountsAcc_.data() + firstNode, leafCountsAcc_.data() + lastNode,
@@ -685,7 +685,7 @@ public:
     //! @brief the cornerstone leaf cell array on the accelerator
     std::span<const KeyType> treeLeavesAcc() const
     {
-        if constexpr (HaveGpu<Accelerator>{}) { return {rawPtr(leavesAcc_), leavesAcc_.size()}; }
+        if constexpr (execution::HaveGpu<Accelerator>{}) { return {rawPtr(leavesAcc_), leavesAcc_.size()}; }
         else
         {
             return leaves_;
@@ -709,7 +709,7 @@ private:
         reallocate(geoCentersAcc_, octreeAcc_.numNodes, allocGrowthRate_);
         reallocate(geoSizesAcc_, octreeAcc_.numNodes, allocGrowthRate_);
 
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             computeGeoCentersGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(geoCentersAcc_),
                                  rawPtr(geoSizesAcc_), box_, stream_);
@@ -722,7 +722,7 @@ private:
 
     void downloadOctree()
     {
-        if constexpr (HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Accelerator>{})
         {
             TreeNodeIndex numLeafNodes = octreeAcc_.numLeafNodes;
             TreeNodeIndex numNodes     = octreeAcc_.numNodes;
@@ -755,7 +755,7 @@ private:
     //! @brief MPI communicator for all collective and point-to-point operations
     MPI_Comm comm_;
     //! @brief CUDA stream for all GPU operations on this object
-    Execution<Accelerator> stream_;
+    Accelerator stream_;
 
     //! @brief allocation growth rate for focus tree arrays with length ~ numFocusNodes
     float allocGrowthRate_{1.05};

@@ -29,7 +29,7 @@ namespace cstone
  * @param[in]  groupSize  number of particles per group
  * @param[out] groups     groups with fixed size @p groupSize
  */
-void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<GpuTag>& groups,
+void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups,
                         cudaStream_t stream);
 
 /*!* @brief Compute groups of particles with a maximum size and distance between consecutive particles limited

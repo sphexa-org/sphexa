@@ -35,42 +35,29 @@ typedef struct CUstream_st* cudaStream_t;
 
 #endif
 
-namespace cstone
+namespace cstone::execution
 {
 
-struct CpuTag
+struct Cpu
 {
-};
-struct GpuTag
-{
+    constexpr static Cpu Default() { return {}; }
 };
 
-template<class AccType>
-struct HaveGpu : public std::integral_constant<int, std::is_same_v<AccType, GpuTag>>
-{
-};
-
-template<class Accelerator>
-struct Execution;
-
-template<>
-struct Execution<CpuTag>
-{
-    constexpr static Execution<CpuTag> Default() { return {}; }
-};
-
-template<>
-struct Execution<GpuTag>
+struct Gpu
 {
     cudaStream_t stream;
-    constexpr Execution(cudaStream_t s)
+
+    constexpr Gpu(cudaStream_t s)
         : stream(s)
     {
     }
 
-    constexpr static Execution<GpuTag> Default() { return {0}; }
+    constexpr static Gpu Default() { return {0}; }
 
     operator cudaStream_t() const { return stream; }
 };
 
-} // namespace cstone
+template<class Execution>
+using HaveGpu = std::is_same<Execution, Gpu>;
+
+} // namespace cstone::execution

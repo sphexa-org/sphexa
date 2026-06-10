@@ -53,9 +53,9 @@
 #include "insitu_viz.h"
 
 #ifdef USE_CUDA
-using AccType = cstone::GpuTag;
+using AccType = cstone::execution::Gpu;
 #else
-using AccType = cstone::CpuTag;
+using AccType = cstone::execution::Cpu;
 #endif
 
 namespace fs = std::filesystem;
@@ -141,7 +141,7 @@ int main(int argc, char** argv)
     // ~100 global nodes per rank to decompose the domain with +-1% accuracy
     uint64_t bucketSize = std::max(bucketSizeFocus, d.numParticlesGlobal / (100 * numRanks));
     Domain   domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                    cstone::Execution<AccType>::Default(), box);
+                    AccType::Default(), box);
     domain.setGrowthAllocRate(simData.hydro.getAllocGrowthRate());
 
     propagator->sync(domain, simData);

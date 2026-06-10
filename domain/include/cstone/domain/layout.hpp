@@ -154,9 +154,9 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
                        std::span<const TreeNodeIndex> leafToInternal,
                        TreeIndexPair idx,
                        std::span<LocalIndex> layout,
-                       Execution<Accelerator> stream)
+                       Accelerator stream)
 {
-    if constexpr (HaveGpu<Accelerator>{})
+    if constexpr (execution::HaveGpu<Accelerator>{})
     {
         cudaStream_t s = stream;
         memcpyD2DAsync(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start(), s);
@@ -190,8 +190,8 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
                        TreeIndexPair idx,
                        std::span<LocalIndex> layout)
 {
-    using Acc = std::conditional_t<useGpu, GpuTag, CpuTag>;
-    computeNodeLayout(focusLeafCounts, flags, leafToInternal, idx, layout, Execution<Acc>{});
+    using Acc = std::conditional_t<useGpu, execution::Gpu, execution::Cpu>;
+    computeNodeLayout(focusLeafCounts, flags, leafToInternal, idx, layout, Acc{});
 }
 
 //! @brief check halo discovery for sanity
@@ -242,7 +242,7 @@ void gatherArrays(std::span<const LocalIndex> ordering,
                   LocalIndex outputOffset,
                   std::tuple<Arrays1&...> arrays,
                   std::tuple<Arrays2&...> scratchBuffers,
-                  Execution<Accelerator> stream)
+                  Accelerator stream)
 {
     auto reorderArray = [ordering, outputOffset, &scratchBuffers, stream](auto& array)
     {

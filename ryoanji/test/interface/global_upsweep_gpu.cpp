@@ -57,8 +57,8 @@ static int multipoleHolderTest(int thisRank, int numRanks)
 
     std::vector<KeyType> particleKeys(x.size());
 
-    cstone::Domain<KeyType, T, cstone::GpuTag> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta,
-                                                      MPI_COMM_WORLD, cstone::Execution<cstone::GpuTag>{0}, box);
+    cstone::Domain<KeyType, T, cstone::execution::Gpu> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta,
+                                                       MPI_COMM_WORLD, cstone::execution::Gpu{0}, box);
 
     MultipoleHolder<T, T, T, T, T, KeyType, MultipoleType> multipoleHolder;
 
@@ -69,7 +69,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     domain.exchangeHalos(std::tie(d_m), s1, s2);
 
     //! includes tree plus associated information, like peer ranks, assignment, counts, centers, etc
-    const cstone::FocusedOctree<KeyType, T, cstone::GpuTag>& focusTree = domain.focusTree();
+    const cstone::FocusedOctree<KeyType, T, cstone::execution::Gpu>& focusTree = domain.focusTree();
     //! the focused octree, structure only
     auto octree = focusTree.octreeViewAcc();
 

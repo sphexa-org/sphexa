@@ -47,9 +47,9 @@ std::unique_ptr<IObservables<Dataset>> Observables<Dataset>::makeWindBubbleObs(s
 }
 
 #ifdef USE_CUDA
-template struct Observables<SimulationData<cstone::GpuTag>>;
+template struct Observables<SimulationData<cstone::execution::Gpu>>;
 #else
-template struct Observables<SimulationData<cstone::CpuTag>>;
+template struct Observables<SimulationData<cstone::execution::Cpu>>;
 #endif
 
 } // namespace sphexa

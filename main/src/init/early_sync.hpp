@@ -60,14 +60,14 @@ void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector&
                 const cstone::Box<T>& globalBox)
 {
     constexpr bool gpu = IsDeviceVector<Vector>{};
-    using AccType      = std::conditional_t<gpu, cstone::GpuTag, cstone::CpuTag>;
+    using AccType      = std::conditional_t<gpu, cstone::execution::Gpu, cstone::execution::Cpu>;
     using AccVectorKT  = std::conditional_t<gpu, cstone::DeviceVector<KeyType>, std::vector<KeyType>>;
 
     size_t                    bucketSize = std::max(64lu, numParticlesGlobal / (100 * numRanks));
     cstone::BufferDescription o1{0, cstone::LocalIndex(x.size()), cstone::LocalIndex(x.size())};
 
     cstone::GlobalAssignment<KeyType, T, AccType> distributor(rank, numRanks, bucketSize, globalBox, MPI_COMM_WORLD,
-                                                              cstone::Execution<AccType>::Default());
+                                                              AccType::Default());
 
     Vector            scratch1, scratch2, orderScratch;
     cstone::SfcSorter sorter(orderScratch);
@@ -82,7 +82,7 @@ void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector&
 
     scratch1.resize(x.size());
     cstone::gatherArrays({sorter.getMap() + distributor.postExchangeStart(o1), distributor.numAssigned()}, 0,
-                         std::tie(x, y, z), std::tie(scratch1), cstone::Execution<AccType>::Default());
+                         std::tie(x, y, z), std::tie(scratch1), AccType::Default());
     x.resize(keyView.size());
     y.resize(keyView.size());
     z.resize(keyView.size());

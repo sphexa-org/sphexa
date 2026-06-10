@@ -38,7 +38,7 @@ template<class Accelerator>
 class GroupData
 {
     template<class T>
-    using AccVector = std::conditional_t<HaveGpu<Accelerator>{}, DeviceVector<T>, std::vector<T>>;
+    using AccVector = std::conditional_t<execution::HaveGpu<Accelerator>{}, DeviceVector<T>, std::vector<T>>;
 
 public:
     GroupData()                 = default;

@@ -114,7 +114,7 @@ void computePolytropicEOS_HydroStd_Impl(size_t startIndex, size_t endIndex, Data
 template<class Dataset>
 void computeIdealGasEOS_HydroStd(size_t startIndex, size_t endIndex, Dataset& d)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         gpu::computeIdealGasEOS_HydroStd(startIndex, endIndex, d);
     }
@@ -124,7 +124,7 @@ void computeIdealGasEOS_HydroStd(size_t startIndex, size_t endIndex, Dataset& d)
 template<class Dataset>
 void computeIsothermalEOS_HydroStd(size_t startIndex, size_t endIndex, Dataset& d)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         gpu::computeIsothermalEOS_HydroStd(startIndex, endIndex, d);
     }
@@ -134,7 +134,7 @@ void computeIsothermalEOS_HydroStd(size_t startIndex, size_t endIndex, Dataset& 
 template<class Dataset>
 void computePolytropicEOS_HydroStd(size_t startIndex, size_t endIndex, Dataset& d)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         gpu::computePolytropicEOS_HydroStd(startIndex, endIndex, d);
     }

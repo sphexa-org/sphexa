@@ -35,7 +35,7 @@ template<class Execution, class T>
 struct MinMax;
 
 template <class T>
-struct MinMax<Execution<CpuTag>, T>
+struct MinMax<execution::Cpu, T>
 {
     std::tuple<T, T> operator()(const T* start, const T* end)
     {
@@ -55,7 +55,7 @@ struct MinMax<Execution<CpuTag>, T>
         return std::make_tuple(minimum, maximum);
     }
 
-    Execution<CpuTag> stream;
+    execution::Cpu stream;
 };
 
 /*! @brief compute global bounding box for local x,y,z arrays

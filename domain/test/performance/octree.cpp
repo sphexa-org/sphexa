@@ -57,7 +57,7 @@ std::tuple<std::vector<KeyType>, std::vector<unsigned>> build_tree(std::span<con
 template<class KeyType>
 void internal_tree(const std::vector<KeyType>& tree)
 {
-    OctreeData<KeyType, CpuTag> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     octree.resize(nNodes(tree));
     auto u0 = std::chrono::high_resolution_clock::now();
     updateInternalTree<KeyType>(tree, octree.data());

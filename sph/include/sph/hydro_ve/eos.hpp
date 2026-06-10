@@ -153,7 +153,7 @@ void computePolytropicEOS_Impl(size_t startIndex, size_t endIndex, Dataset& d)
 template<class Dataset>
 void computeIdealGasEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         gpu::computeIdealGasEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.temp), rawPtr(d.u),
                                 rawPtr(d.m), rawPtr(d.kx), rawPtr(d.xm),
@@ -166,7 +166,7 @@ void computeIdealGasEOS(size_t startIndex, size_t endIndex, Dataset& d)
 template<class Dataset>
 void computeIsothermalEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         gpu::computeIsothermalEOS(startIndex, endIndex, d.soundSpeedConst, rawPtr(d.c), rawPtr(d.rho),
                                   rawPtr(d.p), rawPtr(d.m), rawPtr(d.kx), rawPtr(d.xm),
@@ -178,7 +178,7 @@ void computeIsothermalEOS(size_t startIndex, size_t endIndex, Dataset& d)
 template<class Dataset>
 void computePolytropicEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         gpu::computePolytropicEOS(startIndex, endIndex, d.polytropic_const, d.polytropic_index, rawPtr(d.rho),
                                   rawPtr(d.p), rawPtr(d.m), rawPtr(d.kx), rawPtr(d.xm),

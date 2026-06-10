@@ -38,7 +38,7 @@ TEST(TargetGroups, t0)
 {
     LocalIndex groupSize = 8, first = 4, last = 34;
 
-    GroupData<GpuTag> groups;
+    GroupData<execution::Gpu> groups;
     computeFixedGroups(first, last, groupSize, groups, 0);
 
     std::vector<LocalIndex> hgroups = toHost(groups.data);

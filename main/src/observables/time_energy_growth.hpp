@@ -90,7 +90,7 @@ T computeKHGrowthRate(size_t startIndex, size_t endIndex, Dataset& d, const csto
         throw std::runtime_error("kx was empty. KHGrowthRate only supported with volume elements (--prop ve)\n");
     }
 
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         std::tie(localSum[0], localSum[1], localSum[2]) =
             gpuGrowthRate(rawPtr(d.x), rawPtr(d.y), rawPtr(d.vy), rawPtr(d.xm),

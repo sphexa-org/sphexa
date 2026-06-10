@@ -42,17 +42,17 @@ namespace cstone
  * the assignment of that tree to the ranks and performs the necessary point-2-point data exchanges
  * to send all particles to their owning ranks.
  */
-template<class KeyType, class T, class Accelerator = CpuTag>
+template<class KeyType, class T, class Accelerator = execution::Cpu>
 class GlobalAssignment
 {
     template<class ValueType>
-    using AccVector = std::conditional_t<HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
+    using AccVector = std::conditional_t<execution::HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
 
-    constexpr static bool gpu = HaveGpu<Accelerator>{};
+    constexpr static bool gpu = execution::HaveGpu<Accelerator>{};
 
 public:
     GlobalAssignment(
-        int rank, int nRanks, unsigned bucketSize, const Box<T>& box, MPI_Comm comm, Execution<Accelerator> stream)
+        int rank, int nRanks, unsigned bucketSize, const Box<T>& box, MPI_Comm comm, Accelerator stream)
         : myRank_(rank)
         , numRanks_(nRanks)
         , bucketSize_(bucketSize)
@@ -299,7 +299,7 @@ private:
 
     MPI_Comm comm_;
     //! @brief CUDA stream for all GPU operations on this object
-    Execution<Accelerator> stream_;
+    Accelerator stream_;
 
     SfcAssignment<KeyType> assignment_;
     SendRanges exchanges_;

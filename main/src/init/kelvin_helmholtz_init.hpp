@@ -54,7 +54,8 @@ InitSettings KelvinHelmholtzConstants()
 template<class T, class Dataset>
 void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T massPart)
 {
-    constexpr auto stream = cstone::Execution<typename Dataset::AcceleratorType>::Default();
+    using AccType      = typename Dataset::AcceleratorType;
+    auto stream        = AccType::Default();
     using HydroType       = Dataset::HydroType;
     T rhoInt              = constants.at("rhoInt");
     T rhoExt              = constants.at("rhoExt");

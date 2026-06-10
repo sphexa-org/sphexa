@@ -67,7 +67,7 @@ double calculateMachRMS(size_t first, size_t last, Dataset& d, MPI_Comm comm)
 {
     double localMachRms;
 
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         localMachRms = machSquareSumGpu(rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz),
                                         rawPtr(d.c), first, last);

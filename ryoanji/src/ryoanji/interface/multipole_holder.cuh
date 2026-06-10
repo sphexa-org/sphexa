@@ -34,7 +34,7 @@ public:
 
     cstone::GroupView computeSpatialGroups(LocalIndex first, LocalIndex last, const Tc* x, const Tc* y, const Tc* z,
                                            const Th*                                                 h,
-                                           const cstone::FocusedOctree<KeyType, Tf, cstone::GpuTag>& focusTree,
+                                           const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
                                            const cstone::LocalIndex* layout, const cstone::Box<Tc>& box);
 
     /*! @brief compute multipole moments with an upsweep from leaves to the tree root
@@ -45,7 +45,7 @@ public:
      * @param[in]  layout        for each leaf cell, stores the index of the first source body in cell, on GPU
      */
     void upsweep(const Tc* x, const Tc* y, const Tc* z, const Tm* m, cstone::OctreeView<const KeyType> gOctree,
-                 const cstone::FocusedOctree<KeyType, Tf, cstone::GpuTag>& focusTree, const cstone::LocalIndex* layout);
+                 const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree, const cstone::LocalIndex* layout);
 
     /*! @brief compute accelerations on target particles, assuming sources = targets
      *

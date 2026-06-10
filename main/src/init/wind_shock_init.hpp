@@ -60,7 +60,8 @@ InitSettings WindShockConstants()
 template<class Dataset>
 void initWindShockFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
-    constexpr auto stream = cstone::Execution<typename Dataset::AcceleratorType>::Default();
+    using AccType      = typename Dataset::AcceleratorType;
+    auto stream        = AccType::Default();
     using T               = Dataset::RealType;
     using HydroType       = Dataset::HydroType;
 

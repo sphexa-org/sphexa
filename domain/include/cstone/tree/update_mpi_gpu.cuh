@@ -55,12 +55,12 @@ inline void sumCapped(void* inP, void* inoutP, int* len, MPI_Datatype*)
 template<class KeyType, class DevKeyVec, class DevCountVec>
 unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
                                unsigned bucketSize,
-                               OctreeData<KeyType, GpuTag>& tree,
+                               OctreeData<KeyType, execution::Gpu>& tree,
                                DevKeyVec& d_csTree,
                                DevCountVec& d_countsBuf,
                                bool expectOverflows,
                                MPI_Comm comm,
-                               Execution<GpuTag> stream)
+                               execution::Gpu stream)
 {
     auto newNumNodes = computeNodeOpsGpu(d_csTree.data(), nNodes(d_csTree), d_countsBuf.data(), bucketSize,
                                          tree.childOffsets.data(), stream);
@@ -97,21 +97,21 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
     if (converged) { return 0; }
 
     auto [minCount, maxCount] =
-        MinMax<Execution<GpuTag>, unsigned>{stream}(d_counts.data(), d_counts.data() + d_counts.size());
+        MinMax<execution::Gpu, unsigned>{stream}(d_counts.data(), d_counts.data() + d_counts.size());
     return maxCount;
 }
 
 template<class KeyType, class DevKeyVec, class DevCountVec>
 unsigned updateOctreeGlobal(std::span<const KeyType> keys,
                             unsigned bucketSize,
-                            OctreeData<KeyType, CpuTag>& tree,
+                            OctreeData<KeyType, execution::Cpu>& tree,
                             std::vector<KeyType>& leaves,
                             DevKeyVec&,
                             std::vector<unsigned>& counts,
                             DevCountVec&,
                             bool,
                             MPI_Comm comm,
-                            Execution<CpuTag>)
+                            execution::Cpu)
 {
     return updateOctreeGlobal(keys, bucketSize, tree, leaves, counts, comm);
 }
@@ -119,14 +119,14 @@ unsigned updateOctreeGlobal(std::span<const KeyType> keys,
 template<class KeyType, class DevKeyVec, class DevCountVec>
 unsigned updateOctreeGlobal(std::span<const KeyType> keys,
                             unsigned bucketSize,
-                            OctreeData<KeyType, GpuTag>& tree,
+                            OctreeData<KeyType, execution::Gpu>& tree,
                             std::vector<KeyType>&,
                             DevKeyVec& d_csTree,
                             std::vector<unsigned>&,
                             DevCountVec& d_counts,
                             bool firstCall,
                             MPI_Comm comm,
-                            Execution<GpuTag> stream)
+                            execution::Gpu stream)
 {
     return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, d_counts, firstCall, comm, stream);
 }

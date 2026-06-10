@@ -97,7 +97,7 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
 }
 
 #define MOM_ENERGY(avc)                                                                                                \
-    template void computeMomentumEnergy<avc>(const GroupView& grp, float*, sphexa::ParticlesData<cstone::GpuTag>& d,   \
+    template void computeMomentumEnergy<avc>(const GroupView& grp, float*, sphexa::ParticlesData<cstone::execution::Gpu>& d,   \
                                              const cstone::Box<SphTypes::CoordinateType>&)
 
 MOM_ENERGY(true);

@@ -129,7 +129,7 @@ public:
         out << ")" << std::endl;
         out << "### Check ### Focus Tree Nodes: " << domain.focusTree().octreeViewAcc().numLeafNodes << ", maxDepth "
             << domain.focusTree().depth();
-        if constexpr (cstone::HaveGpu<typename ParticleDataType::AcceleratorType>{})
+        if constexpr (cstone::execution::HaveGpu<typename ParticleDataType::AcceleratorType>{})
         {
             out << ", maxStackNc " << d.stackUsedNc << ", maxStackGravity " << d.stackUsedGravity;
         }
@@ -191,7 +191,7 @@ protected:
         timer.logStatistics("hostCapSizeBytes", hostMem[2]);
 
         using AccType = ParticleDataType::AcceleratorType;
-        if constexpr (cstone::HaveGpu<AccType>{})
+        if constexpr (cstone::execution::HaveGpu<AccType>{})
         {
             auto devMem = simData.hydro.memStats();
             timer.logStatistics("devMemSizeBytes", devMem[1]);

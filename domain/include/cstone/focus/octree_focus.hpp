@@ -62,7 +62,7 @@ struct CombinedUpdate
      * @param[in] macs            MAC pass/fail results for each node, length = tree_.numTreeNodes()
      * @return                    true if the tree structure did not change
      */
-    static bool updateFocus(OctreeData<KeyType, CpuTag>& tree,
+    static bool updateFocus(OctreeData<KeyType, execution::Cpu>& tree,
                             std::vector<KeyType>& leaves,
                             unsigned bucketSize,
                             KeyType focusStart,
@@ -135,7 +135,7 @@ struct CombinedUpdate
      * @return                    true if the tree structure did not change
      */
     template<class Vector>
-    static bool updateFocusGpu(OctreeData<KeyType, GpuTag>& tree,
+    static bool updateFocusGpu(OctreeData<KeyType, execution::Gpu>& tree,
                                DeviceVector<KeyType>& leaves,
                                unsigned bucketSize,
                                KeyType focusStart,
@@ -280,7 +280,7 @@ private:
     float theta_;
     unsigned bucketSize_;
 
-    OctreeData<KeyType, CpuTag> tree_;
+    OctreeData<KeyType, execution::Cpu> tree_;
     std::vector<KeyType> leaves_;
 
     //! @brief particle counts of the focused tree leaves

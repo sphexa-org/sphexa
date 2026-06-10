@@ -57,7 +57,7 @@ TEST(Ewald, MatchCpu)
     thrust::device_vector<T> d_x = x, d_y = y, d_z = z, d_m = m, d_h = h;
     thrust::device_vector<T> p(numBodies), ax(numBodies), ay(numBodies), az(numBodies);
 
-    GroupData<GpuTag> groups;
+    GroupData<execution::Gpu> groups;
     computeFixedGroups(0, numBodies, GpuConfig::warpSize, groups, 0);
 
     T utot = 0;

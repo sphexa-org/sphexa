@@ -49,7 +49,8 @@ namespace sphexa
 template<class Dataset>
 void initSedovFields(Dataset& d, const InitSettings& constants)
 {
-    constexpr auto stream = cstone::Execution<typename Dataset::AcceleratorType>::Default();
+    using AccType      = typename Dataset::AcceleratorType;
+    auto stream        = AccType::Default();
     using T            = Dataset::RealType;
 
     double r           = constants.at("r1");

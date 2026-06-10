@@ -49,7 +49,7 @@ void computeVe(const GroupView&, Dataset& d, const cstone::Box<typename Dataset:
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeVe(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,
+template void computeVe(const GroupView&, sphexa::ParticlesData<cstone::execution::Gpu>& d,
                         const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace gpu

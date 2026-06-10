@@ -92,7 +92,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     // build the cornerstone octree on the CPU
     constexpr unsigned bucketSize = 64;
     const auto [csTree, counts]   = computeOctree(std::span(coords.particleKeys()), bucketSize);
-    OctreeData<KeyType, CpuTag> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     octree.resize(nNodes(csTree));
     updateInternalTree<KeyType>(csTree, octree.data());
 

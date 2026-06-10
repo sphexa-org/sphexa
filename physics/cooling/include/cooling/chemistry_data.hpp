@@ -50,7 +50,7 @@ public:
     template<class ValueType>
     using FieldVector     = std::vector<ValueType, std::allocator<ValueType>>;
     using RealType        = T;
-    using AcceleratorType = cstone::CpuTag;
+    using AcceleratorType = cstone::execution::Cpu;
     using FieldVariant =
         std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*, FieldVector<uint64_t>*>;
 

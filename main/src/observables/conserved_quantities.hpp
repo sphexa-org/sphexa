@@ -121,7 +121,7 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
     cstone::Vec3<double> linmom, angmom;
     size_t               ncsum = 0;
 
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         if (!d.nc.empty()) { ncsum = cstone::reduceGpu(rawPtr(d.nc) + startIndex, endIndex - startIndex, size_t(0), 0); }
         std::tie(eKin, eInt, linmom, angmom) = conservedQuantitiesGpu(

@@ -78,7 +78,7 @@ int main(int argc, char** argv)
     auto fullBuild = [&]()
     {
         while (!updateOctreeGpu<KeyType>({rawPtr(particleCodes), numParticles}, bucketSize, tree, counts, tmpTree,
-                                         workArray, Execution<GpuTag>{stream}))
+                                         workArray, execution::Gpu{stream}))
             ;
     };
 
@@ -89,7 +89,7 @@ int main(int argc, char** argv)
     auto updateTree = [&]()
     {
         updateOctreeGpu<KeyType>({rawPtr(particleCodes), numParticles}, bucketSize, tree, counts, tmpTree, workArray,
-                                 Execution<GpuTag>{stream});
+                                 execution::Gpu{stream});
     };
 
     float updateTime = timeGpu(updateTree);
@@ -98,7 +98,7 @@ int main(int argc, char** argv)
 
     // internal tree benchmark
 
-    OctreeData<KeyType, GpuTag> octree;
+    OctreeData<KeyType, execution::Gpu> octree;
     octree.resize(nNodes(tree));
     auto buildInternal = [&]()
     {
@@ -146,7 +146,7 @@ int main(int argc, char** argv)
               << " count: " << thrust::reduce(flags.begin(), flags.end(), 0) << std::endl;
 
     thrust::host_vector<KeyType> h_tree = tree;
-    OctreeData<KeyType, CpuTag> h_octreeHarness;
+    OctreeData<KeyType, execution::Cpu> h_octreeHarness;
     h_octreeHarness.resize(nNodes(h_tree));
     updateInternalTree<KeyType>({h_tree.data(), h_tree.size()}, h_octreeHarness.data());
     OctreeView<KeyType> h_octree = h_octreeHarness.data();

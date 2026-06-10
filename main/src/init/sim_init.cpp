@@ -180,9 +180,9 @@ std::unique_ptr<ISimInitializer<Dataset>> SimInitializers<Dataset>::makeTDEOrbit
 #endif
 
 #ifdef USE_CUDA
-template struct SimInitializers<SimulationData<cstone::GpuTag>>;
+template struct SimInitializers<SimulationData<cstone::execution::Gpu>>;
 #else
-template struct SimInitializers<SimulationData<cstone::CpuTag>>;
+template struct SimInitializers<SimulationData<cstone::execution::Cpu>>;
 #endif
 
 } // namespace sphexa

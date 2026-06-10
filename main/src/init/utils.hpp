@@ -125,7 +125,7 @@ void readFileAttributes(InitSettings& settings, const std::string& settingsFile,
 
 //! @brief generate particle IDs at the beginning of the simulation initialization
 template<class Accelerator>
-void generateParticleIDs(std::span<uint64_t> id, cstone::Execution<Accelerator> stream)
+void generateParticleIDs(std::span<uint64_t> id, Accelerator stream)
 {
     int rank = 0, numRanks = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -144,7 +144,7 @@ void generateParticleIDs(std::span<uint64_t> id, cstone::Execution<Accelerator> 
 }
 
 template<class Dataset>
-void initFieldsAtRest(Dataset& d, double m_part, cstone::Execution<typename Dataset::AcceleratorType> stream)
+void initFieldsAtRest(Dataset& d, double m_part, typename Dataset::AcceleratorType stream)
 {
     cstone::fill(d.m.begin(), d.m.end(), m_part, stream);
     cstone::fill(d.du_m1.begin(), d.du_m1.end(), 0.0, stream);

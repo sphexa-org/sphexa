@@ -36,7 +36,7 @@ TEST(Macs, limitSource4x4_matchCPU)
     float invTheta = sqrt(3.) / 2;
 
     thrust::device_vector<KeyType> leaves = makeUniformNLevelTree<KeyType>(64, 1);
-    OctreeData<KeyType, GpuTag> fullTree;
+    OctreeData<KeyType, execution::Gpu> fullTree;
     fullTree.resize(nNodes(leaves));
     cudaStream_t stream;
     cudaStreamCreate(&stream);

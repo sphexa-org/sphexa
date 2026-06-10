@@ -199,7 +199,7 @@ template<class KeyType>
 void syncTreelets(std::span<const int> exteriorPeers,
                   std::span<const int> interiorPeers,
                   std::span<const IndexPair<TreeNodeIndex>> assignment,
-                  OctreeData<KeyType, CpuTag>& octree,
+                  OctreeData<KeyType, execution::Cpu>& octree,
                   std::vector<KeyType>& leaves,
                   std::vector<std::vector<KeyType>>& treelets,
                   MPI_Comm comm)
@@ -225,7 +225,7 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
                      std::span<const int> interiorPeers,
                      std::span<const IndexPair<TreeNodeIndex>> assignment,
                      const std::vector<KeyType>& leaves,
-                     OctreeData<KeyType, GpuTag>& octreeAcc,
+                     OctreeData<KeyType, execution::Gpu>& octreeAcc,
                      DeviceVector<KeyType>& leavesAcc,
                      std::vector<std::vector<KeyType>>& treelets,
                      Vector& scratch,
@@ -317,10 +317,10 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
                             int commTag,
                             DevVec& scratch,
                             MPI_Comm comm,
-                            Execution<Accelerator> stream)
+                            Accelerator stream)
 {
     constexpr int alignmentBytes = 64;
-    constexpr bool useGpu        = HaveGpu<Accelerator>{};
+    constexpr bool useGpu        = execution::HaveGpu<Accelerator>{};
 
     std::vector<std::size_t> treeletSizes(interiorPeers.size() + exteriorPeers.size());
     for (size_t i = 0; i < interiorPeers.size(); ++i)

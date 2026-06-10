@@ -71,7 +71,7 @@ public:
 
     template<class ValueType>
     using FieldVector =
-        std::conditional_t<cstone::HaveGpu<AccType>{}, cstone::DeviceVector<ValueType>, std::vector<ValueType>>;
+        std::conditional_t<cstone::execution::HaveGpu<AccType>{}, cstone::DeviceVector<ValueType>, std::vector<ValueType>>;
 
     using FieldVariant = std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*,
                                       FieldVector<uint64_t>*, FieldVector<uint8_t>*>;
@@ -248,7 +248,7 @@ public:
     FieldVector<uint64_t>  id;                                 // unique particle id
     FieldVector<HydroType> dtCourant;                          // per-particle timestep restriction
 
-    std::conditional_t<cstone::HaveGpu<AccType>{}, sph::DeviceNeighborhoodData, sph::NeighborhoodData> neighborhood;
+    std::conditional_t<cstone::execution::HaveGpu<AccType>{}, sph::DeviceNeighborhoodData, sph::NeighborhoodData> neighborhood;
     cstone::OctreeNsView<RealType, KeyType>                                                            treeView;
 
     //! @brief lookup tables for the SPH-kernel and its derivative
@@ -409,7 +409,7 @@ void acquire(Dataset& d, const Fs&... fs)
 
 // TODO move this to a better place
 template<class Vector, class Accelerator>
-void fillMassHalos(Vector& m, std::size_t first, std::size_t last, cstone::Execution<Accelerator> stream)
+void fillMassHalos(Vector& m, std::size_t first, std::size_t last, Accelerator stream)
 {
     using T = std::decay_t<Vector>::value_type;
     T mass;
