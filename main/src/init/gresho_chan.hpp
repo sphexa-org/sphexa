@@ -48,8 +48,8 @@ InitSettings GreshoChanSettings()
 template<class Dataset, class T>
 void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& settings, T mPart)
 {
-    using AccType        = typename Dataset::AcceleratorType;
-    auto stream          = AccType::Default();
+    using Exec           = typename Dataset::Exec;
+    auto stream          = Exec::Default();
     using HydroType      = Dataset::HydroType;
     using RealType       = Dataset::RealType;
     double ng0           = settings.at("ng0");

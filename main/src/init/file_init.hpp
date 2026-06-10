@@ -143,8 +143,8 @@ public:
     {
         using KeyType = typename Dataset::KeyType;
         using T       = typename Dataset::RealType;
-        using AccType = typename Dataset::AcceleratorType;
-        auto stream   = AccType::Default();
+        using Exec    = typename Dataset::Exec;
+        auto stream   = Exec::Default();
 
         size_t numParticlesInFile = reader->localNumParticles();
         size_t numParticlesSplit  = numParticlesInFile * numSplits;

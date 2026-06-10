@@ -148,28 +148,27 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
  * @param[out] layout            size numLeafNodes + 1. The first element is zero, the last element is
  *                               equal to the sum of all present (assigned+halo) node counts.
  */
-template<class Accelerator>
+template<class Exec>
 void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
                        std::span<const uint8_t> flags,
                        std::span<const TreeNodeIndex> leafToInternal,
                        TreeIndexPair idx,
                        std::span<LocalIndex> layout,
-                       Accelerator stream)
+                       Exec exec)
 {
-    if constexpr (execution::HaveGpu<Accelerator>{})
+    if constexpr (execution::HaveGpu<Exec>{})
     {
-        cudaStream_t s = stream;
-        memcpyD2DAsync(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start(), s);
+        memcpyD2DAsync(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start(), exec);
 
-        gatherGpu(leafToInternal.data(), idx.start(), flags.data(), layout.data(), s);
-        selectCopyGpu(focusLeafCounts.data(), idx.start(), layout.data(), layout.data(), s);
+        gatherGpu(leafToInternal.data(), idx.start(), flags.data(), layout.data(), exec);
+        selectCopyGpu(focusLeafCounts.data(), idx.start(), layout.data(), layout.data(), exec);
 
         gatherGpu(leafToInternal.data() + idx.end(), leafToInternal.size() - idx.end(), flags.data(),
-                  layout.data() + idx.end(), s);
+                  layout.data() + idx.end(), exec);
         selectCopyGpu(focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(), layout.data() + idx.end(),
-                      layout.data() + idx.end(), s);
+                      layout.data() + idx.end(), exec);
 
-        exclusiveScanGpu(layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0}, s);
+        exclusiveScanGpu(layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0}, exec);
     }
     else
     {
@@ -237,14 +236,14 @@ struct SmallerElementSize
 };
 
 //! @brief reorder with state-less function object
-template<class... Arrays1, class... Arrays2, class Accelerator>
+template<class... Arrays1, class... Arrays2, class Exec>
 void gatherArrays(std::span<const LocalIndex> ordering,
                   LocalIndex outputOffset,
                   std::tuple<Arrays1&...> arrays,
                   std::tuple<Arrays2&...> scratchBuffers,
-                  Accelerator stream)
+                  Exec exec)
 {
-    auto reorderArray = [ordering, outputOffset, &scratchBuffers, stream](auto& array)
+    auto reorderArray = [ordering, outputOffset, &scratchBuffers, exec](auto& array)
     {
         using VectorRef  = decltype(array);
         using VectorType = std::decay_t<VectorRef>;
@@ -252,7 +251,7 @@ void gatherArrays(std::span<const LocalIndex> ordering,
         {
             auto& swapSpace = util::pickType<decltype(array)>(scratchBuffers);
             assert(swapSpace.size() == array.size());
-            gatherAcc(ordering, rawPtr(array), rawPtr(swapSpace) + outputOffset, stream);
+            gatherAcc(ordering, rawPtr(array), rawPtr(swapSpace) + outputOffset, exec);
             swap(swapSpace, array);
         }
         else
@@ -262,8 +261,8 @@ void gatherArrays(std::span<const LocalIndex> ordering,
             assert(std::get<i>(scratchBuffers).size() == array.size());
 
             auto* scratch = reinterpret_cast<typename VectorType::value_type*>(rawPtr(std::get<i>(scratchBuffers)));
-            gatherAcc(ordering, rawPtr(array), scratch, stream);
-            copy_n(scratch, ordering.size(), rawPtr(array) + outputOffset, stream);
+            gatherAcc(ordering, rawPtr(array), scratch, exec);
+            copy_n(scratch, ordering.size(), rawPtr(array) + outputOffset, exec);
         }
     };
 

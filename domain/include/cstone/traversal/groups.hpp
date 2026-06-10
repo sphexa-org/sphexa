@@ -34,11 +34,11 @@ struct GroupView
 };
 
 //! @brief Describes groups of spatially close particles that can be traversed through octrees in groups
-template<class Accelerator>
+template<class Exec>
 class GroupData
 {
     template<class T>
-    using AccVector = std::conditional_t<execution::HaveGpu<Accelerator>{}, DeviceVector<T>, std::vector<T>>;
+    using AccVector = std::conditional_t<execution::HaveGpu<Exec>{}, DeviceVector<T>, std::vector<T>>;
 
 public:
     GroupData()                 = default;

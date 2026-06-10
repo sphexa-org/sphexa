@@ -40,7 +40,7 @@ namespace sph
 template<class Tc, class Dataset>
 void computeIadDivvCurlvGradh(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
     {
         gpu::computeIadDivvCurlvGradh(grp, d, box);
     }

@@ -40,7 +40,7 @@ namespace sph
 template<typename Tc, class Dataset>
 void computeVe(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeVe(grp, d, box); }
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{}) { gpu::computeVe(grp, d, box); }
     else { veIjLoop(d.neighborhood, d.K, d.xm.data(), d.wh.data(), d.kx.data()); }
 }
 

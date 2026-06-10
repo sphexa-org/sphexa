@@ -57,11 +57,11 @@ namespace sphexa
 
 namespace lt = ::sph::lt;
 
-template<class AccType>
-class ParticlesData : public cstone::FieldStates<ParticlesData<AccType>>
+template<class Execution>
+class ParticlesData : public cstone::FieldStates<ParticlesData<Execution>>
 {
 public:
-    using AcceleratorType = AccType;
+    using Exec = Execution;
 
     using KeyType   = sph::SphTypes::KeyType;
     using RealType  = sph::SphTypes::CoordinateType;
@@ -70,7 +70,7 @@ public:
     using Tmass     = sph::SphTypes::Tmass;
 
     template<class ValueType>
-    using FieldVector = std::conditional_t<cstone::execution::HaveGpu<AccType>{}, cstone::DeviceVector<ValueType>,
+    using FieldVector = std::conditional_t<cstone::execution::HaveGpu<Execution>{}, cstone::DeviceVector<ValueType>,
                                            std::vector<ValueType>>;
 
     using FieldVariant = std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*,
@@ -162,7 +162,10 @@ public:
                     ar->stepAttribute(attribute, &tmp, attrSize);
                     *location = static_cast<EType>(tmp);
                 }
-                else { ar->stepAttribute(attribute, location, attrSize); }
+                else
+                {
+                    ar->stepAttribute(attribute, location, attrSize);
+                }
             }
             catch (std::out_of_range&)
             {
@@ -248,7 +251,7 @@ public:
     FieldVector<uint64_t>  id;                                 // unique particle id
     FieldVector<HydroType> dtCourant;                          // per-particle timestep restriction
 
-    std::conditional_t<cstone::execution::HaveGpu<AccType>{}, sph::DeviceNeighborhoodData, sph::NeighborhoodData>
+    std::conditional_t<cstone::execution::HaveGpu<Execution>{}, sph::DeviceNeighborhoodData, sph::NeighborhoodData>
                                             neighborhood;
     cstone::OctreeNsView<RealType, KeyType> treeView;
 
@@ -409,20 +412,23 @@ void acquire(Dataset& d, const Fs&... fs)
 }
 
 // TODO move this to a better place
-template<class Vector, class Accelerator>
-void fillMassHalos(Vector& m, std::size_t first, std::size_t last, Accelerator stream)
+template<class Vector, class Exec>
+void fillMassHalos(Vector& m, std::size_t first, std::size_t last, Exec exec)
 {
     using T = std::decay_t<Vector>::value_type;
     T mass;
     if constexpr (IsDeviceVector<Vector>{})
     {
-        memcpyD2HAsync(m.data() + first, 1, &mass, stream);
-        syncGpu(stream);
+        memcpyD2HAsync(m.data() + first, 1, &mass, exec);
+        syncGpu(exec);
     }
-    else { mass = m[first]; }
+    else
+    {
+        mass = m[first];
+    }
 
-    cstone::fill(m.begin(), m.begin() + first, mass, stream);
-    cstone::fill(m.begin() + last, m.end(), mass, stream);
+    cstone::fill(m.begin(), m.begin() + first, mass, exec);
+    cstone::fill(m.begin() + last, m.end(), mass, exec);
 }
 
 } // namespace sphexa

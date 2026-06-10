@@ -121,7 +121,7 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
     cstone::Vec3<double> linmom, angmom;
     size_t               ncsum = 0;
 
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
     {
         if (!d.nc.empty())
         {

@@ -307,7 +307,7 @@ void indexTreelets(std::span<const int> peerRanks,
 }
 
 //! @brief send cell properties, send to interior peers, recv from exterior peers
-template<class T, class DevVec, class Accelerator>
+template<class T, class DevVec, class Exec>
 void exchangeTreeletGeneral(std::span<const int> interiorPeers,
                             std::span<const int> exteriorPeers,
                             std::span<const std::span<const TreeNodeIndex>> treeletIdx,
@@ -317,10 +317,10 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
                             int commTag,
                             DevVec& scratch,
                             MPI_Comm comm,
-                            Accelerator stream)
+                            Exec exec)
 {
     constexpr int alignmentBytes = 64;
-    constexpr bool useGpu        = execution::HaveGpu<Accelerator>{};
+    constexpr bool useGpu        = execution::HaveGpu<Exec>{};
 
     std::vector<std::size_t> treeletSizes(interiorPeers.size() + exteriorPeers.size());
     for (size_t i = 0; i < interiorPeers.size(); ++i)
@@ -338,8 +338,8 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
     sendRequests.reserve(interiorPeers.size());
     for (size_t i = 0; i < interiorPeers.size(); ++i)
     {
-        gatherAcc(treeletIdx[interiorPeers[i]], quantities.data(), sendBuffers[i].data(), stream);
-        if constexpr (useGpu) { syncGpu(stream); }
+        gatherAcc(treeletIdx[interiorPeers[i]], quantities.data(), sendBuffers[i].data(), exec);
+        if constexpr (useGpu) { syncGpu(exec); }
         assert(sendBuffers[i].size() == treeletIdx[interiorPeers[i]].size());
         mpiSendAsyncAcc<useGpu>(sendBuffers[i].data(), treeletIdx[interiorPeers[i]].size(), interiorPeers[i], commTag,
                                 sendRequests, staging, comm);
@@ -359,9 +359,9 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
         mpiRecvSyncAcc<useGpu>(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE, comm);
 
         auto mapToInternal = csToInternalMap.subspan(focusAssignment[recvRank].start(), recvCount);
-        scatterAcc(mapToInternal, recvBuf, quantities.data(), stream);
+        scatterAcc(mapToInternal, recvBuf, quantities.data(), exec);
     }
-    if constexpr (useGpu) { syncGpu(stream); }
+    if constexpr (useGpu) { syncGpu(exec); }
 
     MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUS_IGNORE);
     reallocate(scratch, origSize, 1.0);

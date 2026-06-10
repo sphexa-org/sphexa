@@ -40,7 +40,7 @@ namespace sph
 template<bool avClean, class T, class Dataset>
 void computeMomentumEnergy(const GroupView& groups, float* groupDt, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
     {
         gpu::computeMomentumEnergy<avClean>(groups, groupDt, d, box);
     }

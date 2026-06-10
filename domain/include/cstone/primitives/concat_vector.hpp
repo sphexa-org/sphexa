@@ -68,7 +68,7 @@ void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& d
 }
 
 template<class T, template<class...> class AccVec1, template<class...> class AccVec2, int A>
-void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, execution::Gpu stream)
+void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst, execution::Gpu exec)
 {
     std::vector<std::size_t> sizes(src.sizes().begin(), src.sizes().end());
     auto dstView = dst.reindex(std::move(sizes));
@@ -76,21 +76,21 @@ void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& d
 
     if constexpr (!IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{})
     {
-        memcpyH2DAsync(src.data().data(), src.data().size(), dstBuffer, stream);
+        memcpyH2DAsync(src.data().data(), src.data().size(), dstBuffer, exec);
     }
     else if constexpr (IsDeviceVector<AccVec1<T>>{} && !IsDeviceVector<AccVec2<T>>{})
     {
-        memcpyD2HAsync(src.data().data(), src.data().size(), dstBuffer, stream);
+        memcpyD2HAsync(src.data().data(), src.data().size(), dstBuffer, exec);
     }
     else if constexpr (IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{})
     {
-        memcpyD2DAsync(src.data().data(), src.data().size(), dstBuffer, stream);
+        memcpyD2DAsync(src.data().data(), src.data().size(), dstBuffer, exec);
     }
     else if constexpr (!IsDeviceVector<AccVec1<T>>{} && !IsDeviceVector<AccVec2<T>>{})
     {
         std::copy_n(src.data().data(), src.data().size(), dstBuffer);
     }
-    if constexpr (IsDeviceVector<AccVec1<T>>{} || IsDeviceVector<AccVec2<T>>{}) { syncGpu(stream); }
+    if constexpr (IsDeviceVector<AccVec1<T>>{} || IsDeviceVector<AccVec2<T>>{}) { syncGpu(exec); }
 }
 
 } // namespace cstone

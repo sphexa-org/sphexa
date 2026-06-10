@@ -52,7 +52,7 @@ class TurbVeBdtProp final : public HydroVeBdtProp<avClean, DomainType, DataType>
     using Base = HydroVeBdtProp<avClean, DomainType, DataType>;
     using Base::rank_;
     using Base::timer;
-    TurbulenceData<typename DataType::RealType, typename DataType::AcceleratorType> turbulenceData;
+    TurbulenceData<typename DataType::RealType, typename DataType::Exec> turbulenceData;
 
 public:
     TurbVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings)

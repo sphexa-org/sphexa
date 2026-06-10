@@ -59,7 +59,7 @@ class NbodyProp final : public Propagator<DomainType, DataType>
     using Tmass         = typename DataType::HydroData::Tmass;
     using MultipoleType = ryoanji::CartesianQuadrupole<Tmass>;
 
-    using Acc       = typename DataType::AcceleratorType;
+    using Acc       = typename DataType::Exec;
     using MHolder_t = std::conditional_t<cstone::execution::HaveGpu<Acc>{},
                                          MultipoleHolderGpu<MultipoleType, DomainType, typename DataType::HydroData>,
                                          MultipoleHolderCpu<MultipoleType, DomainType, typename DataType::HydroData>>;
@@ -131,9 +131,9 @@ public:
 
         computeGroups(first, last, d, domain.box(), groups_);
 
-        cstone::fill(d.ax.begin() + first, d.ax.begin() + last, HydroType(0), domain.stream());
-        cstone::fill(d.ay.begin() + first, d.ay.begin() + last, HydroType(0), domain.stream());
-        cstone::fill(d.az.begin() + first, d.az.begin() + last, HydroType(0), domain.stream());
+        cstone::fill(d.ax.begin() + first, d.ax.begin() + last, HydroType(0), domain.exec());
+        cstone::fill(d.ay.begin() + first, d.ay.begin() + last, HydroType(0), domain.exec());
+        cstone::fill(d.az.begin() + first, d.az.begin() + last, HydroType(0), domain.exec());
 
         auto groups = mHolder_.computeSpatialGroups(d, domain);
         mHolder_.upsweep(d, domain);

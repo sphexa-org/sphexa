@@ -70,7 +70,7 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
 {
     using T         = typename Dataset::RealType;
     using HydroType = typename Dataset::HydroType;
-    using AccType   = typename Dataset::AcceleratorType;
+    using Exec      = typename Dataset::Exec;
 
     T r         = constants.at("r");
     T rhoInt    = constants.at("rhoInt");
@@ -84,7 +84,7 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
     T epsilon   = constants.at("epsilon");
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
-    initFieldsAtRest(d, massPart, AccType::Default());
+    initFieldsAtRest(d, massPart, Exec::Default());
 
     auto&&                 x = toHost(d.x);
     auto&&                 y = toHost(d.y);

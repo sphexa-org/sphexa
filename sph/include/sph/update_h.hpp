@@ -37,7 +37,7 @@ bool updateSmoothingLengthCpu(size_t startIndex, size_t endIndex, unsigned ng0, 
 template<class Dataset>
 bool updateSmoothingLength(const GroupView& grp, Dataset& d)
 {
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
     {
         bool keysRemoved = updateSmoothingLengthGpu(grp, d.ng0, rawPtr(d.nc), rawPtr(d.h), rawPtr(d.keys));
         syncGpu(0);
@@ -87,7 +87,7 @@ void updateSmoothingLengthIterativeCpu(const Tc* x, const Tc* y, const Tc* z, T*
 template<class T, class Dataset>
 void updateSmoothingLengthIterative(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
     {
         updateSmoothingLengthIterativeGpu(groups, d, box);
     }

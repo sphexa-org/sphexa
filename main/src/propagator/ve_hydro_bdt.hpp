@@ -61,7 +61,7 @@ protected:
     using Tmass         = typename DataType::HydroData::Tmass;
     using MultipoleType = ryoanji::CartesianQuadrupole<Tmass>;
 
-    using Acc       = typename DataType::AcceleratorType;
+    using Acc       = typename DataType::Exec;
     using MHolder_t = std::conditional_t<cstone::execution::HaveGpu<Acc>{},
                                          MultipoleHolderGpu<MultipoleType, DomainType, typename DataType::HydroData>,
                                          MultipoleHolderCpu<MultipoleType, DomainType, typename DataType::HydroData>>;
@@ -189,7 +189,7 @@ public:
         activeRungs_ = groups_.view();
 
         reallocate(groups_.numGroups, d.getAllocGrowthRate(), groupDt_, groupIndices_);
-        cstone::fill(groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max(), domain.stream());
+        cstone::fill(groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max(), domain.exec());
     }
 
     void partialSync(DomainType& domain, DataType& simData)
@@ -231,7 +231,7 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        fillMassHalos(get<"m">(d), first, last, domain.stream());
+        fillMassHalos(get<"m">(d), first, last, domain.exec());
 
         updateSmoothingLengthIterative(activeRungs_, d, domain.box());
         findNeighborsSfc(activeRungs_, d, domain.box(), true);

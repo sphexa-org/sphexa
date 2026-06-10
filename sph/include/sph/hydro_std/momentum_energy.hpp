@@ -41,7 +41,7 @@ namespace sph
 template<class T, class Dataset>
 void computeMomentumEnergySTD(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
     {
         computeMomentumEnergyStdGpu(groups, d, box);
     }
@@ -76,7 +76,7 @@ template<typename Dataset>
 void relaxSystem(size_t startIndex, size_t endIndex, Dataset& d, double relaxationTimescale)
 {
     if (relaxationTimescale <= 0.) return;
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
     {
         relaxSystemGPU(startIndex, endIndex, rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.vx), rawPtr(d.vy),
                        rawPtr(d.vz), relaxationTimescale);

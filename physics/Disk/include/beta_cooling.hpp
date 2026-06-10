@@ -58,7 +58,7 @@ void betaCooling(size_t startIndex, size_t endIndex, Dataset& d, const StarData&
     using T_beta = std::decay_t<decltype(star.beta)>;
     if (star.beta != std::numeric_limits<T_beta>::infinity())
     {
-        if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
+        if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
         {
             betaCoolingGPU(startIndex, endIndex, getPtr<"x">(d), getPtr<"y">(d), getPtr<"z">(d), getPtr<"u">(d),
                            getPtr<"rho">(d), getPtr<"du">(d), d.g, star);
@@ -78,7 +78,7 @@ void duTimestep(size_t startIndex, size_t endIndex, Dataset& d, StarData& star)
     }
     else
     {
-        if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
+        if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
         {
             star.t_du = star.K_u * duTimestepGPU(startIndex, endIndex, getPtr<"u">(d), getPtr<"du">(d));
         }

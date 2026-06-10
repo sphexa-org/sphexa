@@ -40,7 +40,7 @@ namespace sph
 template<class T, class Dataset>
 void computeAVswitches(const GroupView& grp, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
     {
         gpu::computeAVswitches(grp, d, box);
     }

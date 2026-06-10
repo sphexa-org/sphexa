@@ -42,7 +42,7 @@ namespace sph
 template<class T, class Dataset>
 void computeDensity(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
     {
         gpu::computeDensity(groups, d, box);
     }

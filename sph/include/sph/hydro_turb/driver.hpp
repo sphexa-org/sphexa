@@ -101,13 +101,13 @@ void updateNoise(std::vector<T>& phases, T stddev, T dt, T ts, std::mt19937& gen
  */
 template<class Dataset>
 void driveTurbulence(GroupView grp, Dataset& d,
-                     TurbulenceData<typename Dataset::RealType, typename Dataset::AcceleratorType>& turb)
+                     TurbulenceData<typename Dataset::RealType, typename Dataset::Exec>& turb)
 {
     updateNoise(turb.phases, turb.variance, d.minDt, turb.decayTime, turb.gen);
     computePhases(turb.numModes, turb.numDim, turb.phases, turb.solWeight, turb.modes, turb.phasesReal,
                   turb.phasesImag);
 
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
     {
         // upload mode data to the device
         turb.d_phasesReal = turb.phasesReal;

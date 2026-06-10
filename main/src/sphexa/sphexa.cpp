@@ -53,9 +53,9 @@
 #include "insitu_viz.h"
 
 #ifdef USE_CUDA
-using AccType = cstone::execution::Gpu;
+using Exec = cstone::execution::Gpu;
 #else
-using AccType = cstone::execution::Cpu;
+using Exec = cstone::execution::Cpu;
 #endif
 
 namespace fs = std::filesystem;
@@ -78,8 +78,8 @@ int main(int argc, char** argv)
         return exitSuccess();
     }
 
-    using Dataset = SimulationData<AccType>;
-    using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, AccType>;
+    using Dataset = SimulationData<Exec>;
+    using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, Exec>;
 
     const std::string        initCond     = parser.get("--init");
     const size_t             problemSize  = parser.get("-n", 50);
@@ -140,7 +140,7 @@ int main(int argc, char** argv)
     uint64_t bucketSizeFocus = 64;
     // ~100 global nodes per rank to decompose the domain with +-1% accuracy
     uint64_t bucketSize = std::max(bucketSizeFocus, d.numParticlesGlobal / (100 * numRanks));
-    Domain   domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, AccType::Default(), box);
+    Domain   domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, Exec::Default(), box);
     domain.setGrowthAllocRate(simData.hydro.getAllocGrowthRate());
 
     propagator->sync(domain, simData);

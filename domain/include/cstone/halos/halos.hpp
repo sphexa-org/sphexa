@@ -39,7 +39,7 @@ void haloExchangeGpu(int epoch,
                      cudaStream_t stream,
                      Arrays... arrays);
 
-template<class KeyType, class Accelerator>
+template<class KeyType, class Exec>
 class Halos
 {
 public:
@@ -99,14 +99,14 @@ public:
     void exchangeHalos(std::tuple<Vectors&...> arrays,
                        Scratch1& sendBuffer,
                        Scratch2& receiveBuffer,
-                       execution::Gpu stream) const
+                       execution::Gpu exec) const
     {
         static_assert(IsDeviceVector<Scratch1>{} && IsDeviceVector<Scratch2>{});
         std::apply(
-            [this, &sendBuffer, &receiveBuffer, stream](auto&... arrays)
+            [this, &sendBuffer, &receiveBuffer, exec](auto&... arrays)
             {
                 haloExchangeGpu(haloEpoch_++, incomingHaloIndices_, outgoingHaloIndices_, sendBuffer, receiveBuffer,
-                                comm_, stream, rawPtr(arrays)...);
+                                comm_, exec, rawPtr(arrays)...);
             },
             arrays);
     }

@@ -35,15 +35,14 @@
 namespace cstone
 {
 
-template<class KeyType, class T, class Accelerator = execution::Cpu>
+template<class KeyType, class T, class Exec = execution::Cpu>
 class Domain
 {
     static_assert(std::is_unsigned<KeyType>{}, "SFC key type needs to be an unsigned integer\n");
 
-    //! @brief A vector template that resides on the hardware specified as Accelerator
+    //! @brief A vector template that resides on the hardware specified as Exec
     template<class ValueType>
-    using AccVector =
-        std::conditional_t<execution::HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
+    using AccVector = std::conditional_t<execution::HaveGpu<Exec>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
 
 public:
     //! @brief floating point type used for the coordinate bounding box and geometric/mass centers of tree nodes
@@ -67,16 +66,16 @@ public:
            unsigned bucketSizeFocus,
            float theta,
            MPI_Comm comm,
-           Accelerator stream,
+           Exec exec,
            const Box<T>& box = Box<T>{0, 1})
         : myRank_(rank)
         , numRanks_(nRanks)
         , bucketSizeFocus_(bucketSizeFocus)
         , theta_(theta)
         , comm_(comm)
-        , stream_(stream)
-        , focusTree_(rank, numRanks_, bucketSizeFocus_, comm, stream_)
-        , global_(rank, nRanks, bucketSize, box, comm, stream_)
+        , exec_(exec)
+        , focusTree_(rank, numRanks_, bucketSizeFocus_, comm, exec_)
+        , global_(rank, nRanks, bucketSize, box, comm, exec_)
         , halos_(myRank_, comm)
     {
         if (bucketSize < bucketSizeFocus_)
@@ -186,7 +185,7 @@ public:
             distribute(sorter, particleKeys, x, y, z, std::tuple_cat(std::tie(h), particleProperties), scratch);
         // x,y,z,h is already reordered here for use in halo discovery
         gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
-                     std::tie(x, y, z, h), util::reverse(scratch), stream_);
+                     std::tie(x, y, z, h), util::reverse(scratch), exec_);
 
         float invThetaEff = invThetaMinMac(theta_);
         if (firstCall_)
@@ -237,7 +236,7 @@ public:
         auto [exchangeStart, keyView] =
             distribute(sorter, particleKeys, x, y, z, std::tuple_cat(std::tie(h, m), particleProperties), scratch);
         gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
-                     std::tie(x, y, z, h, m), util::reverse(scratch), stream_);
+                     std::tie(x, y, z, h, m), util::reverse(scratch), exec_);
 
         if (firstCall_)
         {
@@ -312,12 +311,12 @@ public:
 
         auto* ord = reinterpret_cast<LocalIndex*>(rawPtr(ordering)) + envelope[0];
         std::vector<LocalIndex> orderingCpu;
-        if constexpr (execution::HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Exec>{})
         {
             static_assert(IsDeviceVector<OVec>{}, "Need ordering on GPU for GPU-accelerated domain");
             orderingCpu.resize(envelope[1] - envelope[0]);
-            memcpyD2HAsync(ord, orderingCpu.size(), orderingCpu.data(), stream_);
-            syncGpu(stream_);
+            memcpyD2HAsync(ord, orderingCpu.size(), orderingCpu.data(), exec_);
+            syncGpu(exec_);
             ord = orderingCpu.data();
         }
 
@@ -334,7 +333,7 @@ public:
     void exchangeHalos(std::tuple<Vectors&...> arrays, SendBuffer& sendBuffer, ReceiveBuffer& receiveBuffer) const
     {
         std::apply([this](auto&... arrays) { this->checkSizesEqual(this->bufDesc_.size, arrays...); }, arrays);
-        this->halos_.exchangeHalos(arrays, sendBuffer, receiveBuffer, stream_);
+        this->halos_.exchangeHalos(arrays, sendBuffer, receiveBuffer, exec_);
     }
 
     //! @brief return the index of the first particle that's part of the local assignment
@@ -350,7 +349,7 @@ public:
     //! @brief read only visibility of the global octree in traversible layout
     OctreeView<const KeyType> globalTree() const { return global_.octree(); }
     //! @brief read only visibility of the focused octree
-    const FocusedOctree<KeyType, T, Accelerator>& focusTree() const { return focusTree_; }
+    const FocusedOctree<KeyType, T, Exec>& focusTree() const { return focusTree_; }
     //! @brief the index of the first locally assigned cell in focusTree()
     TreeNodeIndex startCell() const { return focusTree_.assignment()[myRank_].start(); }
     //! @brief the index of the last locally assigned cell in focusTree()
@@ -392,7 +391,7 @@ public:
                 focusTree_.geoSizesAcc().data()};
     }
 
-    const Accelerator& stream() const { return stream_; }
+    const Exec& exec() const { return exec_; }
 
 private:
     //! @brief bounds initialization on first call, use all particles
@@ -466,7 +465,7 @@ private:
         lowMemReallocate(exchangeSize, allocGrowthRate_, distributedArrays, scratchBuffers);
 
         // Must zero new memory to exclude possibility of special value (removeKey) in uninitialized memory
-        fill(rawPtr(keys) + bufDesc_.size, rawPtr(keys) + exchangeSize, KeyType(0), stream_);
+        fill(rawPtr(keys) + bufDesc_.size, rawPtr(keys) + exchangeSize, KeyType(0), exec_);
 
         return std::apply(
             [exchangeSize, &sorter, &scratchBuffers, this](auto&... arrays)
@@ -486,9 +485,9 @@ private:
         if constexpr (IsDeviceVector<KeyVec>{})
         {
             computeSfcKeysGpu(rawPtr(x), rawPtr(y), rawPtr(z), sfcKindPointer(rawPtr(keys)), bufDesc_.start, box(),
-                              stream_);
+                              exec_);
             computeSfcKeysGpu(rawPtr(x) + bufDesc_.end, rawPtr(y) + bufDesc_.end, rawPtr(z) + bufDesc_.end,
-                              sfcKindPointer(rawPtr(keys)) + bufDesc_.end, x.size() - bufDesc_.end, box(), stream_);
+                              sfcKindPointer(rawPtr(keys)) + bufDesc_.end, x.size() - bufDesc_.end, box(), exec_);
         }
         else
         {
@@ -521,26 +520,26 @@ private:
         auto& swapSpace = std::get<j>(scratchBuffers);
         size_t origSize = reallocateBytes(swapSpace, keyView.size() * sizeof(KeyType), allocGrowthRate_);
         auto* swapPtr   = reinterpret_cast<KeyType*>(swapSpace.data());
-        copy_n(keyView.data(), keyView.size(), swapPtr, stream_);
+        copy_n(keyView.data(), keyView.size(), swapPtr, exec_);
         reallocate(keys, newBufDesc.size, allocGrowthRate_);
-        fill(rawPtr(keys) + bufDesc_.size, rawPtr(keys) + newBufDesc.size, KeyType(0), stream_);
-        copy_n(swapPtr, keyView.size(), rawPtr(keys) + newBufDesc.start, stream_);
+        fill(rawPtr(keys) + bufDesc_.size, rawPtr(keys) + newBufDesc.size, KeyType(0), exec_);
+        copy_n(swapPtr, keyView.size(), rawPtr(keys) + newBufDesc.start, exec_);
         reallocate(swapSpace, origSize, 1.0);
 
         // relocate ordered buffer contents from offset 0 to offset newBufDesc.start
         auto relocate = [size = keyView.size(), dest = newBufDesc.start, scratch = util::reverse(scratchBuffers),
-                         stream = stream_](auto& array)
+                         exec = exec_](auto& array)
         {
             static_assert(util::Contains<decltype(array), std::tuple<Arrays3&...>>{}, "No suitable scratch buffer");
             auto& swapSpace = util::pickType<decltype(array)>(scratch);
-            copy_n(rawPtr(array), size, rawPtr(swapSpace) + dest, stream);
+            copy_n(rawPtr(array), size, rawPtr(swapSpace) + dest, exec);
             swap(array, swapSpace);
         };
         util::for_each_tuple(relocate, orderedBuffers);
 
         // reorder the unordered buffers
         gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, newBufDesc.start,
-                     unorderedBuffers, util::reverse(scratchBuffers), stream_);
+                     unorderedBuffers, util::reverse(scratchBuffers), exec_);
 
         // newBufDesc is now the valid buffer description
         prevBufDesc_ = bufDesc_;
@@ -556,16 +555,16 @@ private:
 
         std::vector<KeyType> globalTreeBackingBuffer;
         std::vector<uint8_t> flagsBackingBuffer;
-        if constexpr (execution::HaveGpu<Accelerator>{})
+        if constexpr (execution::HaveGpu<Exec>{})
         {
             globalTreeBackingBuffer.resize(globalTree.size());
-            memcpyD2HAsync(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data(), stream_);
+            memcpyD2HAsync(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data(), exec_);
             globalTree = std::span(globalTreeBackingBuffer);
 
             flagsBackingBuffer.resize(flags.size());
-            memcpyD2HAsync(flags.data(), flags.size(), flagsBackingBuffer.data(), stream_);
+            memcpyD2HAsync(flags.data(), flags.size(), flagsBackingBuffer.data(), exec_);
             flags = std::span(flagsBackingBuffer);
-            syncGpu(stream_);
+            syncGpu(exec_);
         }
 
         TreeNodeIndex numFocusPeers    = 0;
@@ -612,7 +611,10 @@ private:
                     {
                         bool isHalo = std::count(hPeers.begin(), hPeers.end(), r) == 1;
                         if (isHalo) { std::cout << r << " "; }
-                        else { std::cout << "*" << r << " "; }
+                        else
+                        {
+                            std::cout << "*" << r << " ";
+                        }
                     }
                     for (auto r : hPeers)
                     {
@@ -635,8 +637,7 @@ private:
 
     //! @brief MPI communicator for all collective and point-to-point operations
     MPI_Comm comm_;
-    //! @brief CUDA stream for all GPU operations on this object and its children
-    Accelerator stream_;
+    Exec exec_;
 
     bool convergeTrees{false};
     //! @brief Extra search factor for halo discovery, allowing multiple time integration steps between sync() calls
@@ -661,15 +662,15 @@ private:
      *  fulfills a MAC with theta as the opening parameter
      * -Also contains particle counts.
      */
-    FocusedOctree<KeyType, T, Accelerator> focusTree_;
+    FocusedOctree<KeyType, T, Exec> focusTree_;
 
     //! @brief particle offsets of each leaf node in focusedTree_, length = focusedTree_.treeLeaves().size()
     AccVector<LocalIndex> layoutAcc_;
     std::vector<LocalIndex> layout_;
 
-    GlobalAssignment<KeyType, T, Accelerator> global_;
+    GlobalAssignment<KeyType, T, Exec> global_;
 
-    Halos<KeyType, Accelerator> halos_;
+    Halos<KeyType, Exec> halos_;
 
     bool firstCall_{true};
 };

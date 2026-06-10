@@ -77,8 +77,8 @@ InitSettings TurbulenceConstants()
 template<class Dataset>
 void initTurbulenceHydroFields(Dataset& d, const InitSettings& constants)
 {
-    using AccType = typename Dataset::AcceleratorType;
-    auto   stream = AccType::Default();
+    using Exec    = typename Dataset::Exec;
+    auto   stream = Exec::Default();
     double mPart  = constants.at("mTotal") / d.numParticlesGlobal;
     double Lbox   = constants.at("Lbox");
     double hInit  = std::cbrt(3.0 / (4. * M_PI) * d.ng0 * std::pow(Lbox, 3) / d.numParticlesGlobal) * 0.5;

@@ -57,9 +57,9 @@ void computeSpatialGroups(cstone::LocalIndex startIndex, cstone::LocalIndex endI
 //! @brief Compute spatial (=SFC-consecutive) groups of particles with compact bounding boxes
 template<typename Tc, class Dataset>
 void computeGroups(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box,
-                   GroupData<typename Dataset::AcceleratorType>& groups)
+                   GroupData<typename Dataset::Exec>& groups)
 {
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
     {
         computeSpatialGroups(startIndex, endIndex, d, box, groups);
     }
@@ -74,9 +74,9 @@ void computeGroups(size_t startIndex, size_t endIndex, Dataset& d, const cstone:
 }
 
 //! @brief extract the specified subgroup [first:last] indexed through @p index from @p grp into @p outGroup
-template<class Accelerator>
+template<class Exec>
 inline void extractGroupGpu(const GroupView& grp, const cstone::LocalIndex* indices, cstone::LocalIndex first,
-                            cstone::LocalIndex last, GroupData<Accelerator>& out)
+                            cstone::LocalIndex last, GroupData<Exec>& out)
 {
     auto numOutGroups = last - first;
     reallocate(out.data, 2 * numOutGroups, 1.01);
