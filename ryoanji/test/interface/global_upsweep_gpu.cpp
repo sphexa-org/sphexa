@@ -110,10 +110,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     }
 
     if (passMultipole) { return EXIT_SUCCESS; }
-    else
-    {
-        return EXIT_FAILURE;
-    }
+    else { return EXIT_FAILURE; }
 }
 
 int main(int argc, char** argv)

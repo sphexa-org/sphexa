@@ -87,10 +87,7 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
         mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), limitSum, comm);
         MPI_Op_free(&limitSum);
     }
-    else
-    {
-        mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, comm);
-    }
+    else { mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, comm); }
     sequenceMax(exec, d_counts.data(), d_counts.data() + d_counts.size(), d_countsRed.data(), d_counts.data());
     d_countsBuf.resize(numLeafNodes);
 

@@ -116,13 +116,13 @@ TEST(FocusDomain, randomGaussianNeighborSum)
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                       execution::cpu, {-1, 1});
+        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, execution::cpu,
+                                       {-1, 1});
         randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                       execution::cpu, {-1, 1});
+        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, execution::cpu,
+                                       {-1, 1});
         randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
 }
@@ -149,13 +149,13 @@ TEST(FocusDomain, randomGaussianNeighborSumPbc)
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                       execution::cpu, {-1, 1, periodic});
+        Domain<unsigned, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, execution::cpu,
+                                       {-1, 1, periodic});
         randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                       execution::cpu, {-1, 1, periodic});
+        Domain<uint64_t, float> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, execution::cpu,
+                                       {-1, 1, periodic});
         randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
 }

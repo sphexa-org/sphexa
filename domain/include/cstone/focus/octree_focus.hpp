@@ -171,8 +171,8 @@ struct CombinedUpdate
 
         if (status == ResolutionStatus::cancelMerge)
         {
-            converged = count(exec, nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1) ==
-                        std::size_t(tree.numLeafNodes);
+            converged =
+                count(exec, nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1) == std::size_t(tree.numLeafNodes);
         }
         else if (status == ResolutionStatus::rebalance) { converged = false; }
 

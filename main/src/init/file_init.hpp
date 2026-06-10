@@ -144,7 +144,7 @@ public:
         using KeyType = typename Dataset::KeyType;
         using T       = typename Dataset::RealType;
         using Exec    = typename Dataset::Exec;
-        auto exec   = cstone::execution::defaultExec<Exec>;
+        auto exec     = cstone::execution::defaultExec<Exec>;
 
         size_t numParticlesInFile = reader->localNumParticles();
         size_t numParticlesSplit  = numParticlesInFile * numSplits;

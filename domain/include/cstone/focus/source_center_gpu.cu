@@ -199,7 +199,7 @@ void upsweepCentersGpu(int numLevels,
         if (numCellsLevel)
         {
             upsweepCentersKernel<<<numBlocks, numThreads, 0, exec>>>(levelRange[level], levelRange[level + 1],
-                                                                       childOffsets, centers);
+                                                                     childOffsets, centers);
         }
     }
 }

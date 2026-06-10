@@ -83,10 +83,7 @@ public:
 
             reallocate(geoCentersAcc_, 1, 1.0);
         }
-        else
-        {
-            updateInternalTree<KeyType>(leaves_, octreeAcc_.data());
-        }
+        else { updateInternalTree<KeyType>(leaves_, octreeAcc_.data()); }
     }
 
     /*! @brief Update the tree structure according to previously calculated criteria (MAC and particle counts)
@@ -220,8 +217,7 @@ public:
 
             // 1st upsweep with local and global data
             reallocateDestructive(countsAcc_, octreeAcc_.numNodes, allocGrowthRate_);
-            scatter(exec_, leafToInternal(octreeAcc_).data(), numLeafNodes, rawPtr(leafCountsAcc_),
-                       rawPtr(countsAcc_));
+            scatter(exec_, leafToInternal(octreeAcc_).data(), numLeafNodes, rawPtr(leafCountsAcc_), rawPtr(countsAcc_));
 
             upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(octreeAcc_.levelRange), rawPtr(octreeAcc_.childOffsets),
                           rawPtr(countsAcc_), exec_);
@@ -330,7 +326,7 @@ public:
             locateNodesGpu(octreeAcc_.prefixes.data(), letIdx.data(), idxFromGlob.size(), globalNodeKeys,
                            globalLevelRange, letToGlob.data(), exec_);
             gatherScatter(exec_, letToGlob.data(), letIdx.data(), idxFromGlob.size(), globalQuantities.data(),
-                             localQuantities.data());
+                          localQuantities.data());
         }
         else
         {
@@ -375,10 +371,7 @@ public:
             {
                 upsweepCentersGpu(maxTreeLevel<KeyType>{}, levelRange.data(), childOffsets, centers, exec_);
             }
-            else
-            {
-                upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{});
-            }
+            else { upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{}); }
         };
 
         if constexpr (execution::HaveGpu<Exec>{})
@@ -390,7 +383,7 @@ public:
 
             fill(exec_, d_layout, d_layout + octree.numLeafNodes + 1, LocalIndex(0));
             inclusiveScan(exec_, rawPtr(leafCountsAcc_) + firstIdx, rawPtr(leafCountsAcc_) + lastIdx,
-                             d_layout + firstIdx + 1);
+                          d_layout + firstIdx + 1);
             computeLeafSourceCenterGpu(x, y, z, m, octree.leafToInternal + octree.numInternalNodes, octree.numLeafNodes,
                                        d_layout, rawPtr(centersAcc_), exec_);
             reallocate(scratch1, osz1, 1.0);
@@ -457,10 +450,7 @@ public:
         {
             setMacGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box_, exec_);
         }
-        else
-        {
-            setMac<RealType, KeyType>(octreeAcc_.prefixes, centersAcc_, invTheta, box_);
-        }
+        else { setMac<RealType, KeyType>(octreeAcc_.prefixes, centersAcc_, invTheta, box_); }
     }
 
     /*! @brief Update the MAC criteria based on given expansion centers and effective inverse theta
@@ -549,7 +539,7 @@ public:
         {
             fill(exec_, layout.data() + firstNode, layout.data() + firstNode + 1, LocalIndex{0});
             inclusiveScan(exec_, leafCountsAcc_.data() + firstNode, leafCountsAcc_.data() + lastNode,
-                             layout.data() + firstNode + 1);
+                          layout.data() + firstNode + 1);
             computeBoundingBoxGpu(x, y, z, h, layout.data(), firstNode, lastNode, Th(2 * searchExtFact),
                                   searchCenters.data(), searchSizes.data(), exec_);
 
@@ -685,10 +675,7 @@ public:
     std::span<const KeyType> treeLeavesAcc() const
     {
         if constexpr (execution::HaveGpu<Exec>{}) { return {rawPtr(leavesAcc_), leavesAcc_.size()}; }
-        else
-        {
-            return leaves_;
-        }
+        else { return leaves_; }
     }
 
     //! @brief the cornerstone leaf cell particle counts
@@ -713,10 +700,7 @@ private:
             computeGeoCentersGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(geoCentersAcc_),
                                  rawPtr(geoSizesAcc_), box_, exec_);
         }
-        else
-        {
-            nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_);
-        }
+        else { nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_); }
     }
 
     void downloadOctree()

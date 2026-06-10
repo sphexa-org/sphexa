@@ -148,8 +148,7 @@ bool protectAncestorsGpu(const KeyType* prefixes,
     resetNodeOpSum<<<1, 1, 0, exec>>>();
 
     constexpr unsigned numThreads = 256;
-    protectAncestorsKernel<<<iceil(numNodes, numThreads), numThreads, 0, exec>>>(prefixes, parents, nodeOps,
-                                                                                   numNodes);
+    protectAncestorsKernel<<<iceil(numNodes, numThreads), numThreads, 0, exec>>>(prefixes, parents, nodeOps, numNodes);
 
     int numNodesModify;
     checkGpuErrors(cudaMemcpyFromSymbolAsync(&numNodesModify, GPU_SYMBOL(nodeOpSum), sizeof(int), 0,
@@ -241,8 +240,8 @@ void rangeCountGpu(std::span<const KeyType> leaves,
     unsigned numBlocks            = iceil(leavesFocusIdx.size(), numThreads);
     if (numBlocks == 0) { return; }
     rangeCountKernel<<<numBlocks, numThreads, 0, exec>>>(leaves.data(), leaves.size(), counts.data(),
-                                                           leavesFocus.data(), leavesFocusIdx.data(),
-                                                           leavesFocusIdx.size(), countsFocus.data());
+                                                         leavesFocus.data(), leavesFocusIdx.data(),
+                                                         leavesFocusIdx.size(), countsFocus.data());
 }
 
 #define RANGE_COUNT_GPU(KeyType)                                                                                       \

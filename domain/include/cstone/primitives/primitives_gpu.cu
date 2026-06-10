@@ -171,14 +171,14 @@ template void
 gatherScatter(execution::Gpu, const int*, const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
 template void
 gatherScatter(execution::Gpu, const int*, const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
-template void gatherScatter(
-    execution::Gpu, const int*, const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*);
-template void gatherScatter(
-    execution::Gpu, const int*, const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
-template void gatherScatter(
-    execution::Gpu, const int*, const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
-template void gatherScatter(
-    execution::Gpu, const int*, const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
+template void
+gatherScatter(execution::Gpu, const int*, const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*);
+template void
+gatherScatter(execution::Gpu, const int*, const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
+template void
+gatherScatter(execution::Gpu, const int*, const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
+template void
+gatherScatter(execution::Gpu, const int*, const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
 
 template<class T>
 std::tuple<T, T> MinMax<execution::Gpu, T>::operator()(const T* first, const T* last)
@@ -241,14 +241,10 @@ void lowerBound(
     thrust::lower_bound(thrustExecPolicy(exec), first, last, valueFirst, valueLast, result);
 }
 
-template void
-lowerBound(execution::Gpu, const unsigned*, const unsigned*, const unsigned*, const unsigned*, unsigned*);
-template void
-lowerBound(execution::Gpu, const uint64_t*, const uint64_t*, const uint64_t*, const uint64_t*, unsigned*);
-template void
-lowerBound(execution::Gpu, const unsigned*, const unsigned*, const unsigned*, const unsigned*, uint64_t*);
-template void
-lowerBound(execution::Gpu, const uint64_t*, const uint64_t*, const uint64_t*, const uint64_t*, uint64_t*);
+template void lowerBound(execution::Gpu, const unsigned*, const unsigned*, const unsigned*, const unsigned*, unsigned*);
+template void lowerBound(execution::Gpu, const uint64_t*, const uint64_t*, const uint64_t*, const uint64_t*, unsigned*);
+template void lowerBound(execution::Gpu, const unsigned*, const unsigned*, const unsigned*, const unsigned*, uint64_t*);
+template void lowerBound(execution::Gpu, const uint64_t*, const uint64_t*, const uint64_t*, const uint64_t*, uint64_t*);
 
 template<class T1, class T2, class Tout>
 void sequenceMax(execution::Gpu exec, const T1* i1_begin, const T1* i1_end, const T2* i2, Tout* output)
@@ -325,13 +321,13 @@ uint64_t sortByKeyTempStorage(uint64_t numElements)
 
 template<class KeyType, class ValueType>
 void sortByKey(execution::Gpu exec,
-                  KeyType* first,
-                  KeyType* last,
-                  ValueType* values,
-                  KeyType* keyBuf,
-                  ValueType* valueBuf,
-                  void* d_tempStorage,
-                  uint64_t tempStorageBytes)
+               KeyType* first,
+               KeyType* last,
+               ValueType* values,
+               KeyType* keyBuf,
+               ValueType* valueBuf,
+               void* d_tempStorage,
+               uint64_t tempStorageBytes)
 {
     size_t numElements = last - first;
 
@@ -360,7 +356,7 @@ void sortByKey(execution::Gpu exec,
 }
 
 #define SORT_BY_KEY_GPU_DB(KeyType, ValueType)                                                                         \
-    template void sortByKey(execution::Gpu, KeyType*, KeyType*, ValueType*, KeyType*, ValueType*, void*, uint64_t); \
+    template void sortByKey(execution::Gpu, KeyType*, KeyType*, ValueType*, KeyType*, ValueType*, void*, uint64_t);    \
     template uint64_t sortByKeyTempStorage<KeyType, ValueType>(uint64_t)
 
 SORT_BY_KEY_GPU_DB(unsigned, unsigned);

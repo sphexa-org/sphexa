@@ -107,7 +107,8 @@ void computeNodeCountsGpu(const KeyType* tree,
     constexpr unsigned nThreads = 256;
     if (useCountsAsGuess)
     {
-        thrust::exclusive_scan(thrustExecPolicy(exec), counts + popNodes[0], counts + popNodes[1], counts + popNodes[0]);
+        thrust::exclusive_scan(thrustExecPolicy(exec), counts + popNodes[0], counts + popNodes[1],
+                               counts + popNodes[0]);
         updateNodeCountsKernel<<<iceil(popNodes[1] - popNodes[0], nThreads), nThreads, 0, exec>>>(
             tree + popNodes[0], counts + popNodes[0], popNodes[1] - popNodes[0], keys.data(), keys.data() + keys.size(),
             maxCount);
@@ -190,7 +191,7 @@ TreeNodeIndex computeNodeOpsGpu(const KeyType* tree,
 
     constexpr unsigned nThreads = 512;
     rebalanceDecisionKernel<<<iceil(numNodes, nThreads), nThreads, 0, exec>>>(tree, counts, numNodes, bucketSize,
-                                                                                nodeOps);
+                                                                              nodeOps);
 
     size_t nodeOpsSize = numNodes + 1;
     thrust::exclusive_scan(thrustExecPolicy(exec), nodeOps, nodeOps + nodeOpsSize, nodeOps);
@@ -216,7 +217,8 @@ bool rebalanceTreeGpu(const KeyType* tree,
 {
     constexpr unsigned nThreads = 512;
     processNodes<<<iceil(numNodes, nThreads), nThreads, 0, exec>>>(tree, nodeOps, numNodes, newTree);
-    thrust::fill_n(thrustExecPolicy(exec), thrust::device_pointer_cast(newTree + newNumNodes), 1, nodeRange<KeyType>(0));
+    thrust::fill_n(thrustExecPolicy(exec), thrust::device_pointer_cast(newTree + newNumNodes), 1,
+                   nodeRange<KeyType>(0));
 
     int changeCounter;
     checkGpuErrors(cudaMemcpyFromSymbolAsync(&changeCounter, GPU_SYMBOL(rebalanceChangeCounter), sizeof(int), 0,

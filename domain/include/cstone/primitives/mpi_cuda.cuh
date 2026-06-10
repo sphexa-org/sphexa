@@ -51,10 +51,7 @@ auto mpiSendGpuDirect(T* data,
 
         return errCode;
     }
-    else
-    {
-        return mpiSendAsync(data, count, rank, tag, requests, comm);
-    }
+    else { return mpiSendAsync(data, count, rank, tag, requests, comm); }
 }
 
 //! @brief Send char buffers cast to a transfer type @p T to mitigate the 32-bit send count limitation of MPI
@@ -83,10 +80,7 @@ auto mpiRecvGpuDirect(T* data, int count, int rank, int tag, MPI_Status* status,
 
         return errCode;
     }
-    else
-    {
-        return mpiRecvSync(data, count, rank, tag, status, comm);
-    }
+    else { return mpiRecvSync(data, count, rank, tag, status, comm); }
 }
 
 //! @brief this wrapper is needed to support sending from GPU buffers with staging through host (no GPU-direct MPI)
@@ -100,10 +94,7 @@ auto mpiSendAsyncAcc(T* data,
                      MPI_Comm comm)
 {
     if constexpr (useGpu) { mpiSendGpuDirect(data, count, rank, tag, requests, buffers, comm); }
-    else
-    {
-        mpiSendAsync(data, count, rank, tag, requests, comm);
-    }
+    else { mpiSendAsync(data, count, rank, tag, requests, comm); }
 }
 
 //! @brief this wrapper is needed to support sending from GPU buffers with staging through host (no GPU-direct MPI)
@@ -111,10 +102,7 @@ template<bool useGpu, class T>
 auto mpiRecvSyncAcc(T* data, int count, int rank, int tag, MPI_Status* status, MPI_Comm comm)
 {
     if constexpr (useGpu) { mpiRecvGpuDirect(data, count, rank, tag, status, comm); }
-    else
-    {
-        mpiRecvSync(data, count, rank, tag, status, comm);
-    }
+    else { mpiRecvSync(data, count, rank, tag, status, comm); }
 }
 
 template<class T>
@@ -130,10 +118,7 @@ auto mpiAllreduceGpuDirect(const T* src, T* dest, size_t count, MPI_Op op, MPI_C
         memcpyH2DAsync(exec, destBuf.data(), count, dest);
         syncGpu(exec);
     }
-    else
-    {
-        mpiAllreduce(src, dest, count, op, comm);
-    }
+    else { mpiAllreduce(src, dest, count, op, comm); }
 }
 
 //! @brief adaptor to wrap compile-time size arrays into flattened arrays of the underlying type
@@ -170,10 +155,7 @@ auto mpiAllgathervGpuDirect(const Ts* src, int sendCount, Td* dest, const int* c
         memcpyH2DAsync(exec, destStage.data(), destStage.size(), dest);
         syncGpu(exec);
     }
-    else
-    {
-        mpiAllgatherv(src, sendCount, dest, counts, displ, comm);
-    }
+    else { mpiAllgatherv(src, sendCount, dest, counts, displ, comm); }
 }
 
 } // namespace cstone

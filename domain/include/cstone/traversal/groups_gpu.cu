@@ -46,8 +46,7 @@ void computeFixedGroups(
     LocalIndex numBodies = last - first;
     LocalIndex numGroups = iceil(numBodies, groupSize);
     groups.data.resize(numGroups + 1);
-    fixedGroupsKernel<<<iceil(numBodies, 256), 256, 0, exec>>>(first, last, groupSize, rawPtr(groups.data),
-                                                                 numGroups);
+    fixedGroupsKernel<<<iceil(numBodies, 256), 256, 0, exec>>>(first, last, groupSize, rawPtr(groups.data), numGroups);
 
     groups.firstBody  = first;
     groups.lastBody   = last;
@@ -102,7 +101,7 @@ void computeGroupSplitsImpl(
 
     if (numFixedGroups > 0)
         makeSplitsKernel<<<numFixedGroups, numThreads, 0, exec>>>(rawPtr(splitMasks), rawPtr(groups), numFixedGroups,
-                                                                    rawPtr(newGroupSizes));
+                                                                  rawPtr(newGroupSizes));
 
     groups.resize(newNumGroups + 1);
     exclusiveScan(exec, rawPtr(newGroupSizes), rawPtr(newGroupSizes) + newNumGroups + 1, rawPtr(groups), first);
@@ -138,10 +137,7 @@ void computeGroupSplits(LocalIndex first,
         computeGroupSplitsImpl<2 * GpuConfig::warpSize>(first, last, x, y, z, h, leaves, numLeaves, layout, box,
                                                         tolFactor, splitMasks, numSplitsPerGroup, groups, exec);
     }
-    else
-    {
-        throw std::runtime_error("Unsupported spatial group size\n");
-    }
+    else { throw std::runtime_error("Unsupported spatial group size\n"); }
 }
 
 #define COMPUTE_GROUP_SPLITS(Tc, T, KeyType)                                                                           \

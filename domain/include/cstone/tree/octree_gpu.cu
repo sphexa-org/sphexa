@@ -230,8 +230,8 @@ void upsweepSumGpu(int numLevels,
         int numBlocks     = (numCellsLevel - 1) / numThreads + 1;
         if (numCellsLevel)
         {
-            upsweepSumKernel<<<numBlocks, numThreads, 0, exec>>>(levelRange[level], levelRange[level + 1],
-                                                                   childOffsets, nodeCounts);
+            upsweepSumKernel<<<numBlocks, numThreads, 0, exec>>>(levelRange[level], levelRange[level + 1], childOffsets,
+                                                                 nodeCounts);
         }
     }
 }

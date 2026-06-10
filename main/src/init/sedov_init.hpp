@@ -49,9 +49,9 @@ namespace sphexa
 template<class Dataset>
 void initSedovFields(Dataset& d, const InitSettings& constants)
 {
-    using Exec  = typename Dataset::Exec;
-    auto exec = cstone::execution::defaultExec<Exec>;
-    using T     = Dataset::RealType;
+    using Exec = typename Dataset::Exec;
+    auto exec  = cstone::execution::defaultExec<Exec>;
+    using T    = Dataset::RealType;
 
     double r           = constants.at("r1");
     double totalVolume = std::pow(2 * r, 3);
@@ -90,10 +90,7 @@ void initSedovFields(Dataset& d, const InitSettings& constants)
         std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
         d.temp = std::move(u);
     }
-    else
-    {
-        d.u = std::move(u);
-    }
+    else { d.u = std::move(u); }
 }
 
 template<class Dataset>

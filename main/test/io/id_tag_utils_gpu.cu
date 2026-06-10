@@ -62,8 +62,8 @@ TEST(IO, taggedIdIdentificationWithRangeGPU)
     std::vector<uint64_t> ids(100);
     std::iota(ids.begin(), ids.end(), 0);
     cstone::DeviceVector<uint32_t> taggedIdPosDev;
-    uint32_t              first = 3;
-    uint32_t              last  = 10;
+    uint32_t                       first = 3;
+    uint32_t                       last  = 10;
 
     std::vector<uint32_t> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::vector<uint32_t> taggedIdPosRefRange;
@@ -83,8 +83,8 @@ TEST(IO, taggedIdIdentificationWithRangeStartGPU)
     std::vector<uint64_t> ids(100);
     std::iota(ids.begin(), ids.end(), 0);
     cstone::DeviceVector<uint32_t> taggedIdPosDev;
-    uint32_t              first = 0;
-    uint32_t              last  = 3;
+    uint32_t                       first = 0;
+    uint32_t                       last  = 3;
 
     std::vector<uint32_t> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::vector<uint32_t> taggedIdPosRefRange;
@@ -104,8 +104,8 @@ TEST(IO, taggedIdIdentificationWithRangeEndGPU)
     std::vector<uint64_t> ids(100);
     std::iota(ids.begin(), ids.end(), 0);
     cstone::DeviceVector<uint32_t> taggedIdPosDev;
-    uint32_t              first = 97;
-    uint32_t              last  = 100;
+    uint32_t                       first = 97;
+    uint32_t                       last  = 100;
 
     std::vector<uint32_t> taggedIdPosRef{0, 1, 2, 3, 6, 11, 13, 23, 71, 83, 91, 95, 99};
     std::vector<uint32_t> taggedIdPosRefRange;

@@ -181,7 +181,7 @@ HOST_DEVICE_FUN inline KeyType sfc3D(T x, T y, T z, const Box<T>& box)
 //! @brief decode a Morton key
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsMorton<KeyType>{}, util::tuple<unsigned, unsigned, unsigned>>
-    decodeSfc(KeyType key)
+decodeSfc(KeyType key)
 {
     return decodeMorton<typename KeyType::ValueType>(key);
 }
@@ -189,7 +189,7 @@ HOST_DEVICE_FUN inline std::enable_if_t<IsMorton<KeyType>{}, util::tuple<unsigne
 //! @brief decode a Hilbert key
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsHilbert<KeyType>{}, util::tuple<unsigned, unsigned, unsigned>>
-    decodeSfc(KeyType key)
+decodeSfc(KeyType key)
 {
     return decodeHilbert<typename KeyType::ValueType>(key);
 }

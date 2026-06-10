@@ -34,8 +34,8 @@ InitSettings evrardConstants()
 template<class Dataset>
 void initEvrardFields(Dataset& d, const InitSettings& constants)
 {
-    using Exec  = typename Dataset::Exec;
-    auto exec = cstone::execution::defaultExec<Exec>;
+    using Exec = typename Dataset::Exec;
+    auto exec  = cstone::execution::defaultExec<Exec>;
 
     initFieldsAtRest(d, constants.at("mTotal") / d.numParticlesGlobal, exec);
 
@@ -80,10 +80,7 @@ std::tuple<KeyType, KeyType> estimateEvrardSfcPartition(size_t cbrtNumPart, cons
     {
         T radius = std::max(std::sqrt(norm2(cstone::Vec3<T>{x, y, z})), eps);
         if (radius > r) { return 0.0; }
-        else
-        {
-            return T(numParticlesGlobal) / (2 * M_PI * radius);
-        }
+        else { return T(numParticlesGlobal) / (2 * M_PI * radius); }
     };
 
     auto [tree, counts] = cstone::computeContinuumCsarray<KeyType>(oneOverR, box, bucketSize);

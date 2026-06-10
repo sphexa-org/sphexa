@@ -162,10 +162,7 @@ public:
                     ar->stepAttribute(attribute, &tmp, attrSize);
                     *location = static_cast<EType>(tmp);
                 }
-                else
-                {
-                    ar->stepAttribute(attribute, location, attrSize);
-                }
+                else { ar->stepAttribute(attribute, location, attrSize); }
             }
             catch (std::out_of_range&)
             {
@@ -422,10 +419,7 @@ void fillMassHalos(Vector& m, std::size_t first, std::size_t last, Exec exec)
         cstone::memcpyD2HAsync(exec, m.data() + first, 1, &mass);
         cstone::syncGpu(exec);
     }
-    else
-    {
-        mass = m[first];
-    }
+    else { mass = m[first]; }
 
     cstone::fill(exec, m.begin(), m.begin() + first, mass);
     cstone::fill(exec, m.begin() + last, m.end(), mass);

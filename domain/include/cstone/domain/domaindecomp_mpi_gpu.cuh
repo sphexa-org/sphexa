@@ -135,10 +135,7 @@ void exchangeParticlesGpu(int epoch,
 
         LocalIndex receiveLocation = receiveStart;
         if (record) { receiveLog.addExchange(receiveRank, receiveStart); }
-        else
-        {
-            receiveLocation = receiveLog.lookup(receiveRank);
-        }
+        else { receiveLocation = receiveLog.lookup(receiveRank); }
 
         auto packTuple = util::packBufferPtrs<alignment>(receiveBuffer, receiveCount, (arrays + receiveLocation)...);
         auto scatterRanges = [receiveCount](auto arrayPair)

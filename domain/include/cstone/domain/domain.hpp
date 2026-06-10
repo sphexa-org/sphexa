@@ -601,10 +601,7 @@ private:
                     {
                         bool isHalo = std::count(hPeers.begin(), hPeers.end(), r) == 1;
                         if (isHalo) { std::cout << r << " "; }
-                        else
-                        {
-                            std::cout << "*" << r << " ";
-                        }
+                        else { std::cout << "*" << r << " "; }
                     }
                     for (auto r : hPeers)
                     {

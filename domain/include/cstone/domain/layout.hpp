@@ -164,9 +164,9 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
         selectCopy(exec, focusLeafCounts.data(), idx.start(), layout.data(), layout.data());
 
         gather(exec, leafToInternal.data() + idx.end(), leafToInternal.size() - idx.end(), flags.data(),
-                  layout.data() + idx.end());
+               layout.data() + idx.end());
         selectCopy(exec, focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(),
-                      layout.data() + idx.end(), layout.data() + idx.end());
+                   layout.data() + idx.end(), layout.data() + idx.end());
 
         exclusiveScan(exec, layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0});
     }
