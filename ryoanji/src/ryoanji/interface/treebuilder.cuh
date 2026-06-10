@@ -65,7 +65,7 @@ public:
         uint64_t                    tempStorageEle = sortByKeyTempStorage<KeyType, LocalIndex>(numBodies);
         thrust::device_vector<char> cubTmpStorage(tempStorageEle);
 
-        computeSfcKeysGpu(x, y, z, sfcKindPointer(rawPtr(d_keys)), numBodies, box, 0);
+        computeSfcKeys(execution::Gpu{0}, x, y, z, sfcKindPointer(rawPtr(d_keys)), numBodies, box);
 
         sequence(execution::Gpu{0}, rawPtr(d_ordering), d_ordering.size(), 0);
         sortByKey(execution::Gpu{0}, rawPtr(d_keys), rawPtr(d_keys) + d_keys.size(), rawPtr(d_ordering),
