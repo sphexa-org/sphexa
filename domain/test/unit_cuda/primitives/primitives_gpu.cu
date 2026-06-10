@@ -35,7 +35,7 @@ TEST(PrimitivesGpu, MinMax)
 
     cudaStream_t stream;
     cudaStreamCreate(&stream);
-    auto minMax = MinMax<Stream<GpuTag>, double>{stream}(raw_pointer_cast(v.data()), raw_pointer_cast(v.data()) + v.size());
+    auto minMax = MinMax<Execution<GpuTag>, double>{stream}(raw_pointer_cast(v.data()), raw_pointer_cast(v.data()) + v.size());
     cudaStreamDestroy(stream);
 
     EXPECT_EQ(std::get<0>(minMax), 1.);

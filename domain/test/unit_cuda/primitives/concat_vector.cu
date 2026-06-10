@@ -33,10 +33,10 @@ TEST(PrimitivesGpu, concatVector)
     std::iota(modView[2].begin(), modView[2].end(), 30);
 
     ConcatVector<int, DeviceVector> d_v;
-    cstone::copy(v, d_v, Stream<GpuTag>{0});
+    cstone::copy(v, d_v, Execution<GpuTag>{0});
 
     ConcatVector<int> probe;
-    cstone::copy(d_v, probe, Stream<GpuTag>{0});
+    cstone::copy(d_v, probe, Execution<GpuTag>{0});
 
     auto probeView = probe.view();
     EXPECT_EQ(probeView[2][0], 30);

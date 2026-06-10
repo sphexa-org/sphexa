@@ -67,7 +67,7 @@ void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector&
     cstone::BufferDescription o1{0, cstone::LocalIndex(x.size()), cstone::LocalIndex(x.size())};
 
     cstone::GlobalAssignment<KeyType, T, AccType> distributor(rank, numRanks, bucketSize, globalBox, MPI_COMM_WORLD,
-                                                              cstone::Stream<AccType>::Default());
+                                                              cstone::Execution<AccType>::Default());
 
     Vector            scratch1, scratch2, orderScratch;
     cstone::SfcSorter sorter(orderScratch);
@@ -82,7 +82,7 @@ void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector&
 
     scratch1.resize(x.size());
     cstone::gatherArrays({sorter.getMap() + distributor.postExchangeStart(o1), distributor.numAssigned()}, 0,
-                         std::tie(x, y, z), std::tie(scratch1), cstone::Stream<AccType>::Default());
+                         std::tie(x, y, z), std::tie(scratch1), cstone::Execution<AccType>::Default());
     x.resize(keyView.size());
     y.resize(keyView.size());
     z.resize(keyView.size());

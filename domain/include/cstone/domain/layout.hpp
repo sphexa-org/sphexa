@@ -154,7 +154,7 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
                        std::span<const TreeNodeIndex> leafToInternal,
                        TreeIndexPair idx,
                        std::span<LocalIndex> layout,
-                       Stream<Accelerator> stream)
+                       Execution<Accelerator> stream)
 {
     if constexpr (HaveGpu<Accelerator>{})
     {
@@ -191,7 +191,7 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
                        std::span<LocalIndex> layout)
 {
     using Acc = std::conditional_t<useGpu, GpuTag, CpuTag>;
-    computeNodeLayout(focusLeafCounts, flags, leafToInternal, idx, layout, Stream<Acc>{});
+    computeNodeLayout(focusLeafCounts, flags, leafToInternal, idx, layout, Execution<Acc>{});
 }
 
 //! @brief check halo discovery for sanity
@@ -242,7 +242,7 @@ void gatherArrays(std::span<const LocalIndex> ordering,
                   LocalIndex outputOffset,
                   std::tuple<Arrays1&...> arrays,
                   std::tuple<Arrays2&...> scratchBuffers,
-                  Stream<Accelerator> stream)
+                  Execution<Accelerator> stream)
 {
     auto reorderArray = [ordering, outputOffset, &scratchBuffers, stream](auto& array)
     {

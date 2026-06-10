@@ -141,7 +141,7 @@ int main(int argc, char** argv)
     // ~100 global nodes per rank to decompose the domain with +-1% accuracy
     uint64_t bucketSize = std::max(bucketSizeFocus, d.numParticlesGlobal / (100 * numRanks));
     Domain   domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                    cstone::Stream<AccType>::Default(), box);
+                    cstone::Execution<AccType>::Default(), box);
     domain.setGrowthAllocRate(simData.hydro.getAllocGrowthRate());
 
     propagator->sync(domain, simData);

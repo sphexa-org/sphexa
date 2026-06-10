@@ -47,15 +47,15 @@ template<class T, class IndexType>
 extern void gatherScatterGpu(const IndexType* gmap, const IndexType* smap, size_t numElements, const T* src, T* buffer,
                              cudaStream_t stream);
 
-template<class Stream, class T>
+template<class Execution, class T>
 struct MinMax;
 
 template<class T>
-struct MinMax<Stream<GpuTag>, T>
+struct MinMax<Execution<GpuTag>, T>
 {
     std::tuple<T, T> operator()(const T* first, const T* last);
 
-    Stream<GpuTag> stream;
+    Execution<GpuTag> stream;
 };
 
 template<class T>

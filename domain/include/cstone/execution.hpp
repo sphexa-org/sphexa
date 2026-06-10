@@ -51,24 +51,24 @@ struct HaveGpu : public std::integral_constant<int, std::is_same_v<AccType, GpuT
 };
 
 template<class Accelerator>
-struct Stream;
+struct Execution;
 
 template<>
-struct Stream<CpuTag>
+struct Execution<CpuTag>
 {
-    constexpr static Stream<CpuTag> Default() { return {}; }
+    constexpr static Execution<CpuTag> Default() { return {}; }
 };
 
 template<>
-struct Stream<GpuTag>
+struct Execution<GpuTag>
 {
     cudaStream_t stream;
-    constexpr Stream(cudaStream_t s)
+    constexpr Execution(cudaStream_t s)
         : stream(s)
     {
     }
 
-    constexpr static Stream<GpuTag> Default() { return {0}; }
+    constexpr static Execution<GpuTag> Default() { return {0}; }
 
     operator cudaStream_t() const { return stream; }
 };

@@ -52,7 +52,7 @@ class GlobalAssignment
 
 public:
     GlobalAssignment(
-        int rank, int nRanks, unsigned bucketSize, const Box<T>& box, MPI_Comm comm, Stream<Accelerator> stream)
+        int rank, int nRanks, unsigned bucketSize, const Box<T>& box, MPI_Comm comm, Execution<Accelerator> stream)
         : myRank_(rank)
         , numRanks_(nRanks)
         , bucketSize_(bucketSize)
@@ -299,7 +299,7 @@ private:
 
     MPI_Comm comm_;
     //! @brief CUDA stream for all GPU operations on this object
-    Stream<Accelerator> stream_;
+    Execution<Accelerator> stream_;
 
     SfcAssignment<KeyType> assignment_;
     SendRanges exchanges_;

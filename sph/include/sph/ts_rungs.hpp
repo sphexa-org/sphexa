@@ -82,7 +82,7 @@ void sortGroupDt(float* groupDt, cstone::LocalIndex* groupIndices, cstone::Local
     void* tempStorage = buffers[2].data();
     cstone::sequenceGpu(groupIndices, numGroups, 0u, 0);
     cstone::sortByKeyGpu(groupDt, groupDt + numGroups, groupIndices, buffers[0].data(), valueBuf, tempStorage,
-                         tempElem * sizeof(float), cstone::Stream<cstone::GpuTag>{0});
+                         tempElem * sizeof(float), cstone::Execution<cstone::GpuTag>{0});
     reallocate(oldSize, 1.0, scratch);
 };
 
@@ -106,7 +106,7 @@ auto computeMinTimestep(float* groupDt, LocalIndex* groupIndices, LocalIndex num
     {
         sortGroupDt(groupDt, groupIndices, numGroups, scratch);
         cstone::sequenceGpu(groupIndices + numGroups, numGroupsTot - numGroups, numGroups,
-                            cstone::Stream<cstone::GpuTag>{0});
+                            cstone::Execution<cstone::GpuTag>{0});
         minGroupDt = timestepRangeGpu(groupDt, numGroups, fastFraction);
     }
 

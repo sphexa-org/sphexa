@@ -38,7 +38,7 @@ TEST(GatherCpu, sortInvert)
 template<class ValueType, class KeyType>
 void CpuGatherTest()
 {
-    constexpr Stream<CpuTag> stream;
+    constexpr Execution<CpuTag> stream;
     std::vector<KeyType> keys{0, 50, 10, 60, 20, 70, 30, 80, 40, 90};
 
     std::vector<unsigned> obuf, s0, s1;

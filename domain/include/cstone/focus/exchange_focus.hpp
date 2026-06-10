@@ -317,7 +317,7 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
                             int commTag,
                             DevVec& scratch,
                             MPI_Comm comm,
-                            Stream<Accelerator> stream)
+                            Execution<Accelerator> stream)
 {
     constexpr int alignmentBytes = 64;
     constexpr bool useGpu        = HaveGpu<Accelerator>{};

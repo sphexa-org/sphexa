@@ -66,7 +66,7 @@ public:
            unsigned bucketSizeFocus,
            float theta,
            MPI_Comm comm,
-           Stream<Accelerator> stream,
+           Execution<Accelerator> stream,
            const Box<T>& box = Box<T>{0, 1})
         : myRank_(rank)
         , numRanks_(nRanks)
@@ -325,7 +325,7 @@ public:
 
         lowMemReallocate(bufDesc_.size, allocGrowthRate_, arrays, std::tie(sendBuffer, receiveBuffer));
         gatherArrays({ord + global_.numSendDown(), global_.numAssigned()}, bufDesc_.start, arrays,
-                     std::tie(sendBuffer, receiveBuffer), Stream<CpuTag>{});
+                     std::tie(sendBuffer, receiveBuffer), Execution<CpuTag>{});
     }
 
     //! @brief repeat the halo exchange pattern from the previous sync operation for a different set of arrays
@@ -391,7 +391,7 @@ public:
                 focusTree_.geoSizesAcc().data()};
     }
 
-    const Stream<Accelerator>& stream() const { return stream_; }
+    const Execution<Accelerator>& stream() const { return stream_; }
 
 private:
     //! @brief bounds initialization on first call, use all particles
@@ -638,7 +638,7 @@ private:
     //! @brief MPI communicator for all collective and point-to-point operations
     MPI_Comm comm_;
     //! @brief CUDA stream for all GPU operations on this object and its children
-    Stream<Accelerator> stream_;
+    Execution<Accelerator> stream_;
 
     bool convergeTrees{false};
     //! @brief Extra search factor for halo discovery, allowing multiple time integration steps between sync() calls

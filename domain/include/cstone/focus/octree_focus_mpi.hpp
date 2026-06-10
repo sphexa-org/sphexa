@@ -60,7 +60,7 @@ public:
      * @param numRanks      number of ranks
      * @param bucketSize    Maximum number of particles per leaf inside the focus area
      */
-    FocusedOctree(int myRank, int numRanks, unsigned bucketSize, MPI_Comm comm, Stream<Accelerator> stream)
+    FocusedOctree(int myRank, int numRanks, unsigned bucketSize, MPI_Comm comm, Execution<Accelerator> stream)
         : myRank_(myRank)
         , numRanks_(numRanks)
         , bucketSize_(bucketSize)
@@ -755,7 +755,7 @@ private:
     //! @brief MPI communicator for all collective and point-to-point operations
     MPI_Comm comm_;
     //! @brief CUDA stream for all GPU operations on this object
-    Stream<Accelerator> stream_;
+    Execution<Accelerator> stream_;
 
     //! @brief allocation growth rate for focus tree arrays with length ~ numFocusNodes
     float allocGrowthRate_{1.05};

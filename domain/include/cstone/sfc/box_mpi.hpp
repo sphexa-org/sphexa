@@ -31,11 +31,11 @@ namespace cstone
 {
 
 //! @brief compute minimum and maximum of an array range
-template<class Stream, class T>
+template<class Execution, class T>
 struct MinMax;
 
 template <class T>
-struct MinMax<Stream<CpuTag>, T>
+struct MinMax<Execution<CpuTag>, T>
 {
     std::tuple<T, T> operator()(const T* start, const T* end)
     {
@@ -55,7 +55,7 @@ struct MinMax<Stream<CpuTag>, T>
         return std::make_tuple(minimum, maximum);
     }
 
-    Stream<CpuTag> stream;
+    Execution<CpuTag> stream;
 };
 
 /*! @brief compute global bounding box for local x,y,z arrays
@@ -71,8 +71,8 @@ struct MinMax<Stream<CpuTag>, T>
  * For each periodic dimension, limits are fixed and will not be modified.
  * For non-periodic dimensions, limits are determined by global min/max.
  */
-template<class T, class Stream>
-auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, MPI_Comm comm, Stream stream,
+template<class T, class Execution>
+auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, MPI_Comm comm, Execution stream,
                    const Box<T>& previousBox = Box<T>(0, 1))
 {
     bool keepX = previousBox.boundaryX() == BoundaryType::periodic || previousBox.boundaryX() == BoundaryType::fixed;
@@ -83,7 +83,7 @@ auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, MPI_C
                              previousBox.ymax(), previousBox.zmin(), previousBox.zmax()};
     if (numElements)
     {
-        MinMax<Stream, T> op{stream};
+        MinMax<Execution, T> op{stream};
         std::tie(extrema[0], extrema[1]) =
             keepX ? std::make_tuple(previousBox.xmin(), previousBox.xmax()) : op(x, x + numElements);
         std::tie(extrema[2], extrema[3]) =

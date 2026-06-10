@@ -141,7 +141,7 @@ public:
     cstone::Box<typename Dataset::RealType> init(int /* rank */, int, size_t, Dataset& simData,
                                                  IFileReader* reader) const override
     {
-        constexpr auto stream = cstone::Stream<typename Dataset::AcceleratorType>::Default();
+        constexpr auto stream = cstone::Execution<typename Dataset::AcceleratorType>::Default();
         reader->setStep(h5_fname, -1, FileMode::collective);
 
         size_t numParticlesInFile = reader->localNumParticles();

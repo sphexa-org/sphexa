@@ -87,7 +87,7 @@ public:
      * Note that if the ScratchVectors are on device, all arrays need to be on the device too.
      */
     template<class Scratch1, class Scratch2, class... Vectors>
-    void exchangeHalos(std::tuple<Vectors&...> arrays, Scratch1&, Scratch2&, Stream<CpuTag>) const
+    void exchangeHalos(std::tuple<Vectors&...> arrays, Scratch1&, Scratch2&, Execution<CpuTag>) const
     {
         std::apply(
             [this](auto&... arrays)
@@ -99,7 +99,7 @@ public:
     void exchangeHalos(std::tuple<Vectors&...> arrays,
                        Scratch1& sendBuffer,
                        Scratch2& receiveBuffer,
-                       Stream<GpuTag> stream) const
+                       Execution<GpuTag> stream) const
     {
         static_assert(IsDeviceVector<Scratch1>{} && IsDeviceVector<Scratch2>{});
         std::apply(

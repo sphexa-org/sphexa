@@ -34,7 +34,7 @@ InitSettings evrardConstants()
 template<class Dataset>
 void initEvrardFields(Dataset& d, const InitSettings& constants)
 {
-    constexpr auto stream = cstone::Stream<typename Dataset::AcceleratorType>::Default();
+    constexpr auto stream = cstone::Execution<typename Dataset::AcceleratorType>::Default();
 
     initFieldsAtRest(d, constants.at("mTotal") / d.numParticlesGlobal, stream);
 

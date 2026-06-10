@@ -78,7 +78,7 @@ int main(int argc, char** argv)
     auto fullBuild = [&]()
     {
         while (!updateOctreeGpu<KeyType>({rawPtr(particleCodes), numParticles}, bucketSize, tree, counts, tmpTree,
-                                         workArray, Stream<GpuTag>{stream}))
+                                         workArray, Execution<GpuTag>{stream}))
             ;
     };
 
@@ -89,7 +89,7 @@ int main(int argc, char** argv)
     auto updateTree = [&]()
     {
         updateOctreeGpu<KeyType>({rawPtr(particleCodes), numParticles}, bucketSize, tree, counts, tmpTree, workArray,
-                                 Stream<GpuTag>{stream});
+                                 Execution<GpuTag>{stream});
     };
 
     float updateTime = timeGpu(updateTree);

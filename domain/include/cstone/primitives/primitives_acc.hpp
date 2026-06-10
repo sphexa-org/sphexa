@@ -28,14 +28,14 @@ namespace cstone
 {
 
 template<class It, class T>
-void fill(It first, It last, T value, Stream<CpuTag>)
+void fill(It first, It last, T value, Execution<CpuTag>)
 {
     if (last <= first) { return; }
     std::fill(first, last, value);
 }
 
 template<class It, class T>
-void fill(It first, It last, T value, Stream<GpuTag> stream)
+void fill(It first, It last, T value, Execution<GpuTag> stream)
 {
     if (last <= first) { return; }
     using T1 = std::decay_t<decltype(*first)>;
@@ -43,49 +43,49 @@ void fill(It first, It last, T value, Stream<GpuTag> stream)
 }
 
 template<class T>
-void copy_n(const T* src, std::size_t n, T* dest, Stream<CpuTag>)
+void copy_n(const T* src, std::size_t n, T* dest, Execution<CpuTag>)
 {
     omp_copy(src, src + n, dest);
 }
 
 template<class T>
-void copy_n(const T* src, std::size_t n, T* dest, Stream<GpuTag> stream)
+void copy_n(const T* src, std::size_t n, T* dest, Execution<GpuTag> stream)
 {
     memcpyD2DAsync(src, n, dest, stream);
 }
 
 template<class T1, class T2, class T3>
-void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value, Stream<CpuTag>)
+void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value, Execution<CpuTag>)
 {
     std::transform(in1, in2, out, [value](auto v_) { return v_ * value; });
 }
 
 template<class T1, class T2, class T3>
-void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value, Stream<GpuTag> stream)
+void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value, Execution<GpuTag> stream)
 {
     scaleGpu(in1, in2, out, value, stream);
 }
 
 template<class IndexType, class ValueType>
-void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, Stream<CpuTag>)
+void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, Execution<CpuTag>)
 {
     gather(ordering, source, destination);
 }
 
 template<class IndexType, class ValueType>
-void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, Stream<GpuTag> stream)
+void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, Execution<GpuTag> stream)
 {
     gatherGpu(ordering.data(), ordering.size(), source, destination, stream);
 }
 
 template<class IndexType, class ValueType>
-void scatterAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, Stream<CpuTag>)
+void scatterAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, Execution<CpuTag>)
 {
     scatter(ordering, source, destination);
 }
 
 template<class IndexType, class ValueType>
-void scatterAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, Stream<GpuTag> stream)
+void scatterAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, Execution<GpuTag> stream)
 {
     scatterGpu(ordering.data(), ordering.size(), source, destination, stream);
 }
@@ -97,7 +97,7 @@ void sortByKeyGpu(std::span<KeyType> keys,
                   KeyBuf& /*keyBuf*/,
                   ValueBuf& /*valueBuf*/,
                   float /*growthRate*/,
-                  Stream<CpuTag>)
+                  Execution<CpuTag>)
 {
     assert(keys.size() == values.size());
     sort_by_key(keys.begin(), keys.end(), values.begin());
@@ -110,7 +110,7 @@ void sortByKeyGpu(std::span<KeyType> keys,
                   KeyBuf& keyBuf,
                   ValueBuf& valueBuf,
                   float growthRate,
-                  Stream<GpuTag> stream)
+                  Execution<GpuTag> stream)
 {
     // temp storage for radix sort as multiples of IndexType
     uint64_t tempStorageEle = iceil(sortByKeyTempStorage<KeyType, ValueType>(keys.size()), sizeof(ValueType));
@@ -128,27 +128,27 @@ void sortByKeyGpu(std::span<KeyType> keys,
 }
 
 template<class T1, class T2>
-void sequenceAcc(T1* first, T1* last, T2 value, Stream<CpuTag>)
+void sequenceAcc(T1* first, T1* last, T2 value, Execution<CpuTag>)
 {
     std::iota(first, last, value);
 }
 
 template<class T1, class T2>
-void sequenceAcc(T1* first, T1* last, T2 value, Stream<GpuTag> stream)
+void sequenceAcc(T1* first, T1* last, T2 value, Execution<GpuTag> stream)
 {
     sequenceGpu(first, last - first, T1(value), stream);
 }
 
 template<class BufferType>
-void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate, Stream<CpuTag>)
+void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate, Execution<CpuTag>)
 {
     reallocateBytes(buffer, sizeof(LocalIndex) * (first + n), growthRate);
     auto* seq = reinterpret_cast<LocalIndex*>(buffer.data());
-    sequenceAcc(seq + first, seq + first + n, first, Stream<CpuTag>{});
+    sequenceAcc(seq + first, seq + first + n, first, Execution<CpuTag>{});
 }
 
 template<class BufferType>
-void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate, Stream<GpuTag> stream)
+void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate, Execution<GpuTag> stream)
 {
     reallocateBytes(buffer, sizeof(LocalIndex) * (first + n), growthRate);
     auto* seq = reinterpret_cast<LocalIndex*>(buffer.data());
@@ -156,7 +156,7 @@ void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthR
 }
 
 template<class KeyType, class ValueType>
-void sortByKey(std::span<KeyType> keys, std::span<ValueType> values, Stream<CpuTag>)
+void sortByKey(std::span<KeyType> keys, std::span<ValueType> values, Execution<CpuTag>)
 {
     assert(keys.size() == values.size());
     sort_by_key(keys.begin(), keys.end(), values.begin());
@@ -169,7 +169,7 @@ void sortByKey(std::span<KeyType> keys,
                KeyBuf& /*keyBuf*/,
                ValueBuf& /*valueBuf*/,
                double /*growth*/,
-               Stream<CpuTag>)
+               Execution<CpuTag>)
 {
     assert(keys.size() == values.size());
     sort_by_key(keys.begin(), keys.end(), values.begin());
@@ -181,7 +181,7 @@ void sortByKey(std::span<KeyType> keys,
                KeyBuf& keyBuf,
                ValueBuf& valueBuf,
                double growth,
-               Stream<GpuTag> stream)
+               Execution<GpuTag> stream)
 {
     assert(keys.size() == values.size());
     sortByKeyGpu(keys, values, keyBuf, valueBuf, growth, stream);

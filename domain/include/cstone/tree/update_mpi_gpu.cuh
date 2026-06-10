@@ -60,7 +60,7 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
                                DevCountVec& d_countsBuf,
                                bool expectOverflows,
                                MPI_Comm comm,
-                               Stream<GpuTag> stream)
+                               Execution<GpuTag> stream)
 {
     auto newNumNodes = computeNodeOpsGpu(d_csTree.data(), nNodes(d_csTree), d_countsBuf.data(), bucketSize,
                                          tree.childOffsets.data(), stream);
@@ -97,7 +97,7 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
     if (converged) { return 0; }
 
     auto [minCount, maxCount] =
-        MinMax<Stream<GpuTag>, unsigned>{stream}(d_counts.data(), d_counts.data() + d_counts.size());
+        MinMax<Execution<GpuTag>, unsigned>{stream}(d_counts.data(), d_counts.data() + d_counts.size());
     return maxCount;
 }
 
@@ -111,7 +111,7 @@ unsigned updateOctreeGlobal(std::span<const KeyType> keys,
                             DevCountVec&,
                             bool,
                             MPI_Comm comm,
-                            Stream<CpuTag>)
+                            Execution<CpuTag>)
 {
     return updateOctreeGlobal(keys, bucketSize, tree, leaves, counts, comm);
 }
@@ -126,7 +126,7 @@ unsigned updateOctreeGlobal(std::span<const KeyType> keys,
                             DevCountVec& d_counts,
                             bool firstCall,
                             MPI_Comm comm,
-                            Stream<GpuTag> stream)
+                            Execution<GpuTag> stream)
 {
     return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, d_counts, firstCall, comm, stream);
 }

@@ -58,7 +58,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     std::vector<KeyType> particleKeys(x.size());
 
     cstone::Domain<KeyType, T, cstone::GpuTag> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta,
-                                                      MPI_COMM_WORLD, cstone::Stream<cstone::GpuTag>{0}, box);
+                                                      MPI_COMM_WORLD, cstone::Execution<cstone::GpuTag>{0}, box);
 
     MultipoleHolder<T, T, T, T, T, KeyType, MultipoleType> multipoleHolder;
 

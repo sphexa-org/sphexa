@@ -67,7 +67,7 @@ std::map<std::string, double> nohConstants()
 template<class Dataset>
 void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
 {
-    constexpr auto stream = cstone::Stream<typename Dataset::AcceleratorType>::Default();
+    constexpr auto stream = cstone::Execution<typename Dataset::AcceleratorType>::Default();
     using T               = typename Dataset::RealType;
     using HydroType       = typename Dataset::HydroType;
 

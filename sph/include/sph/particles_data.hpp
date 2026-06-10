@@ -409,7 +409,7 @@ void acquire(Dataset& d, const Fs&... fs)
 
 // TODO move this to a better place
 template<class Vector, class Accelerator>
-void fillMassHalos(Vector& m, std::size_t first, std::size_t last, cstone::Stream<Accelerator> stream)
+void fillMassHalos(Vector& m, std::size_t first, std::size_t last, cstone::Execution<Accelerator> stream)
 {
     using T = std::decay_t<Vector>::value_type;
     T mass;

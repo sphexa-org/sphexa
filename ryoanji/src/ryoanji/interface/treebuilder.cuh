@@ -68,7 +68,7 @@ public:
         cstone::sequenceGpu(rawPtr(d_ordering), d_ordering.size(), 0, 0);
         cstone::sortByKeyGpu(rawPtr(d_keys), rawPtr(d_keys) + d_keys.size(), rawPtr(d_ordering), rawPtr(d_keys_tmp),
                              rawPtr(d_values_tmp), rawPtr(cubTmpStorage), tempStorageEle,
-                             cstone::Stream<cstone::GpuTag>{0});
+                             cstone::Execution<cstone::GpuTag>{0});
 
         thrust::gather(thrust::device, d_ordering.begin(), d_ordering.end(), x, tmp.begin());
         thrust::copy(tmp.begin(), tmp.end(), x);
@@ -85,7 +85,7 @@ public:
         }
 
         while (!cstone::updateOctreeGpu<KeyType>({rawPtr(d_keys), d_keys.size()}, bucketSize_, d_tree_, d_counts_,
-                                                 tmpTree_, workArray_, cstone::Stream<cstone::GpuTag>{0}))
+                                                 tmpTree_, workArray_, cstone::Execution<cstone::GpuTag>{0}))
             ;
 
         octreeGpuData_.resize(cstone::nNodes(d_tree_));
