@@ -167,16 +167,16 @@ struct CombinedUpdate
         // extract leaf decision, using childOffsets as temp storage
         assert(tree.childOffsets.size() >= size_t(tree.numLeafNodes + 1));
         std::span<TreeNodeIndex> nodeOps(rawPtr(tree.childOffsets), tree.numLeafNodes + 1);
-        gatherGpu(stream, leafToInternal(tree).data(), nNodes(leaves), nodeOpsAll.data(), nodeOps.data());
+        gather(stream, leafToInternal(tree).data(), nNodes(leaves), nodeOpsAll.data(), nodeOps.data());
 
         if (status == ResolutionStatus::cancelMerge)
         {
-            converged = countGpu(stream, nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1) ==
+            converged = count(stream, nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1) ==
                         std::size_t(tree.numLeafNodes);
         }
         else if (status == ResolutionStatus::rebalance) { converged = false; }
 
-        exclusiveScanGpu(stream, nodeOps.data(), nodeOps.data() + nodeOps.size(), nodeOps.data());
+        exclusiveScan(stream, nodeOps.data(), nodeOps.data() + nodeOps.size(), nodeOps.data());
         TreeNodeIndex newNumLeafNodes;
         memcpyD2HAsync(nodeOps.data() + nodeOps.size() - 1, 1, &newNumLeafNodes, stream);
         syncGpu(stream); // wait for D2H before using newNumLeafNodes on host

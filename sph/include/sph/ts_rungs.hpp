@@ -80,8 +80,8 @@ void sortGroupDt(float* groupDt, cstone::LocalIndex* groupIndices, cstone::Local
     auto  buffers     = util::packAllocBuffer<float>(scratch, {numElements, 3}, 128);
     auto* valueBuf    = reinterpret_cast<LocalIndex*>(buffers[1].data());
     void* tempStorage = buffers[2].data();
-    cstone::sequenceGpu(cstone::execution::Gpu{0}, groupIndices, numGroups, 0u);
-    cstone::sortByKeyGpu(cstone::execution::Gpu{0}, groupDt, groupDt + numGroups, groupIndices, buffers[0].data(),
+    cstone::sequence(cstone::execution::Gpu{0}, groupIndices, numGroups, 0u);
+    cstone::sortByKey(cstone::execution::Gpu{0}, groupDt, groupDt + numGroups, groupIndices, buffers[0].data(),
                          valueBuf, tempStorage, tempElem * sizeof(float));
     reallocate(oldSize, 1.0, scratch);
 };
@@ -105,7 +105,7 @@ auto computeMinTimestep(float* groupDt, LocalIndex* groupIndices, LocalIndex num
     if constexpr (IsDeviceVector<AccVec>{})
     {
         sortGroupDt(groupDt, groupIndices, numGroups, scratch);
-        cstone::sequenceGpu(cstone::execution::Gpu{0}, groupIndices + numGroups, numGroupsTot - numGroups, numGroups);
+        cstone::sequence(cstone::execution::Gpu{0}, groupIndices + numGroups, numGroupsTot - numGroups, numGroups);
         minGroupDt = timestepRangeGpu(groupDt, numGroups, fastFraction);
     }
 
@@ -133,7 +133,7 @@ auto findRungRanges(float minDt, const float* groupDt, LocalIndex numGroups, int
         float maxDtRung = (1 << rung) * minDt;
         if constexpr (useGpu)
             rungRanges[rung] =
-                cstone::lowerBoundGpu(cstone::execution::Gpu{0}, groupDt, groupDt + numGroups, maxDtRung);
+                cstone::lowerBound(cstone::execution::Gpu{0}, groupDt, groupDt + numGroups, maxDtRung);
         else
             rungRanges[rung] = std::lower_bound(groupDt, groupDt + numGroups, maxDtRung) - groupDt;
     }

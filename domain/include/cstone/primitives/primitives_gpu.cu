@@ -34,19 +34,19 @@ namespace cstone
 {
 
 template<class T>
-void fillGpu(execution::Gpu exec, T* first, T* last, T value)
+void fill(execution::Gpu exec, T* first, T* last, T value)
 {
     if (last <= first) { return; }
     thrust::fill(devicePar(exec), first, last, value);
 }
 
-template void fillGpu(execution::Gpu, double*, double*, double);
-template void fillGpu(execution::Gpu, float*, float*, float);
-template void fillGpu(execution::Gpu, int*, int*, int);
-template void fillGpu(execution::Gpu, uint8_t*, uint8_t*, uint8_t);
-template void fillGpu(execution::Gpu, char*, char*, char);
-template void fillGpu(execution::Gpu, unsigned*, unsigned*, unsigned);
-template void fillGpu(execution::Gpu, uint64_t*, uint64_t*, uint64_t);
+template void fill(execution::Gpu, double*, double*, double);
+template void fill(execution::Gpu, float*, float*, float);
+template void fill(execution::Gpu, int*, int*, int);
+template void fill(execution::Gpu, uint8_t*, uint8_t*, uint8_t);
+template void fill(execution::Gpu, char*, char*, char);
+template void fill(execution::Gpu, unsigned*, unsigned*, unsigned);
+template void fill(execution::Gpu, uint64_t*, uint64_t*, uint64_t);
 
 template<class T>
 struct ScaleFunctor
@@ -62,14 +62,14 @@ struct ScaleFunctor
 };
 
 template<class T1, class T2, class T3>
-void scaleGpu(execution::Gpu exec, const T1* in1, const T1* in2, T2* out, T3 value)
+void scale(execution::Gpu exec, const T1* in1, const T1* in2, T2* out, T3 value)
 {
     thrust::transform(devicePar(exec), in1, in2, out, ScaleFunctor<T3>(value));
 }
 
-template void scaleGpu(execution::Gpu, const double*, const double*, double*, double);
-template void scaleGpu(execution::Gpu, const float*, const float*, float*, double);
-template void scaleGpu(execution::Gpu, const float*, const float*, float*, float);
+template void scale(execution::Gpu, const double*, const double*, double*, double);
+template void scale(execution::Gpu, const float*, const float*, float*, double);
+template void scale(execution::Gpu, const float*, const float*, float*, float);
 
 template<class TS, class TD, class IndexType>
 __global__ void gatherGpuKernel(const IndexType* map, size_t n, const TS* source, TD* destination)
@@ -80,7 +80,7 @@ __global__ void gatherGpuKernel(const IndexType* map, size_t n, const TS* source
 }
 
 template<class TS, class TD, class IndexType>
-void gatherGpu(execution::Gpu exec, const IndexType* map, size_t n, const TS* source, TD* destination)
+void gather(execution::Gpu exec, const IndexType* map, size_t n, const TS* source, TD* destination)
 {
     int numThreads = 256;
     int numBlocks  = iceil(n, numThreads);
@@ -89,32 +89,32 @@ void gatherGpu(execution::Gpu exec, const IndexType* map, size_t n, const TS* so
     gatherGpuKernel<<<numBlocks, numThreads, 0, exec>>>(map, n, source, destination);
 }
 
-template void gatherGpu(execution::Gpu, const int*, size_t, const uint8_t*, uint32_t*);
-template void gatherGpu(execution::Gpu, const int*, size_t, const int*, int*);
-template void gatherGpu(execution::Gpu, const int*, size_t, const uint32_t*, uint32_t*);
-template void gatherGpu(execution::Gpu, const int*, size_t, const uint64_t*, uint64_t*);
-template void gatherGpu(execution::Gpu, const int*, size_t, const util::array<float, 3>*, util::array<float, 3>*);
-template void gatherGpu(execution::Gpu, const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
-template void gatherGpu(execution::Gpu, const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
-template void gatherGpu(execution::Gpu, const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*);
-template void gatherGpu(execution::Gpu, const int*, size_t, const util::array<double, 3>*, util::array<double, 3>*);
-template void gatherGpu(execution::Gpu, const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
-template void gatherGpu(execution::Gpu, const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
-template void gatherGpu(execution::Gpu, const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
+template void gather(execution::Gpu, const int*, size_t, const uint8_t*, uint32_t*);
+template void gather(execution::Gpu, const int*, size_t, const int*, int*);
+template void gather(execution::Gpu, const int*, size_t, const uint32_t*, uint32_t*);
+template void gather(execution::Gpu, const int*, size_t, const uint64_t*, uint64_t*);
+template void gather(execution::Gpu, const int*, size_t, const util::array<float, 3>*, util::array<float, 3>*);
+template void gather(execution::Gpu, const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+template void gather(execution::Gpu, const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
+template void gather(execution::Gpu, const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*);
+template void gather(execution::Gpu, const int*, size_t, const util::array<double, 3>*, util::array<double, 3>*);
+template void gather(execution::Gpu, const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
+template void gather(execution::Gpu, const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
+template void gather(execution::Gpu, const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
 
-template void gatherGpu(execution::Gpu, const unsigned*, size_t, const uint8_t*, uint8_t*);
-template void gatherGpu(execution::Gpu, const unsigned*, size_t, const double*, double*);
-template void gatherGpu(execution::Gpu, const unsigned*, size_t, const float*, float*);
-template void gatherGpu(execution::Gpu, const unsigned*, size_t, const char*, char*);
-template void gatherGpu(execution::Gpu, const unsigned*, size_t, const int*, int*);
-template void gatherGpu(execution::Gpu, const unsigned*, size_t, const long*, long*);
-template void gatherGpu(execution::Gpu, const unsigned*, size_t, const unsigned*, unsigned*);
-template void gatherGpu(execution::Gpu, const unsigned*, size_t, const unsigned long*, unsigned long*);
-template void gatherGpu(execution::Gpu, const unsigned*, size_t, const unsigned long long*, unsigned long long*);
-template void gatherGpu(execution::Gpu, const unsigned*, size_t, const util::array<float, 1>*, util::array<float, 1>*);
-template void gatherGpu(execution::Gpu, const unsigned*, size_t, const util::array<float, 2>*, util::array<float, 2>*);
-template void gatherGpu(execution::Gpu, const unsigned*, size_t, const util::array<float, 3>*, util::array<float, 3>*);
-template void gatherGpu(execution::Gpu, const unsigned*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+template void gather(execution::Gpu, const unsigned*, size_t, const uint8_t*, uint8_t*);
+template void gather(execution::Gpu, const unsigned*, size_t, const double*, double*);
+template void gather(execution::Gpu, const unsigned*, size_t, const float*, float*);
+template void gather(execution::Gpu, const unsigned*, size_t, const char*, char*);
+template void gather(execution::Gpu, const unsigned*, size_t, const int*, int*);
+template void gather(execution::Gpu, const unsigned*, size_t, const long*, long*);
+template void gather(execution::Gpu, const unsigned*, size_t, const unsigned*, unsigned*);
+template void gather(execution::Gpu, const unsigned*, size_t, const unsigned long*, unsigned long*);
+template void gather(execution::Gpu, const unsigned*, size_t, const unsigned long long*, unsigned long long*);
+template void gather(execution::Gpu, const unsigned*, size_t, const util::array<float, 1>*, util::array<float, 1>*);
+template void gather(execution::Gpu, const unsigned*, size_t, const util::array<float, 2>*, util::array<float, 2>*);
+template void gather(execution::Gpu, const unsigned*, size_t, const util::array<float, 3>*, util::array<float, 3>*);
+template void gather(execution::Gpu, const unsigned*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
 
 template<class T, class IndexType>
 __global__ void scatterGpuKernel(const IndexType* map, size_t n, const T* source, T* destination)
@@ -125,7 +125,7 @@ __global__ void scatterGpuKernel(const IndexType* map, size_t n, const T* source
 }
 
 template<class T, class IndexType>
-void scatterGpu(execution::Gpu exec, const IndexType* map, size_t n, const T* source, T* destination)
+void scatter(execution::Gpu exec, const IndexType* map, size_t n, const T* source, T* destination)
 {
     int numThreads = 256;
     int numBlocks  = iceil(n, numThreads);
@@ -134,15 +134,15 @@ void scatterGpu(execution::Gpu exec, const IndexType* map, size_t n, const T* so
     scatterGpuKernel<<<numBlocks, numThreads, 0, exec>>>(map, n, source, destination);
 }
 
-template void scatterGpu(execution::Gpu, const int*, size_t, const int*, int*);
-template void scatterGpu(execution::Gpu, const int*, size_t, const uint32_t*, uint32_t*);
-template void scatterGpu(execution::Gpu, const int*, size_t, const uint64_t*, uint64_t*);
-template void scatterGpu(execution::Gpu, const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
-template void scatterGpu(execution::Gpu, const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
-template void scatterGpu(execution::Gpu, const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*);
-template void scatterGpu(execution::Gpu, const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
-template void scatterGpu(execution::Gpu, const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
-template void scatterGpu(execution::Gpu, const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
+template void scatter(execution::Gpu, const int*, size_t, const int*, int*);
+template void scatter(execution::Gpu, const int*, size_t, const uint32_t*, uint32_t*);
+template void scatter(execution::Gpu, const int*, size_t, const uint64_t*, uint64_t*);
+template void scatter(execution::Gpu, const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+template void scatter(execution::Gpu, const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
+template void scatter(execution::Gpu, const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*);
+template void scatter(execution::Gpu, const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
+template void scatter(execution::Gpu, const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
+template void scatter(execution::Gpu, const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
 
 template<class T, class IndexType>
 __global__ void
@@ -154,7 +154,7 @@ gatherScatterGpuKernel(const IndexType* gmap, const IndexType* smap, size_t n, c
 }
 
 template<class T, class IndexType>
-void gatherScatterGpu(
+void gatherScatter(
     execution::Gpu exec, const IndexType* gmap, const IndexType* smap, size_t n, const T* source, T* destination)
 {
     int numThreads = 256;
@@ -164,20 +164,20 @@ void gatherScatterGpu(
     gatherScatterGpuKernel<<<numBlocks, numThreads, 0, exec>>>(gmap, smap, n, source, destination);
 }
 
-template void gatherScatterGpu(execution::Gpu, const int*, const int*, size_t, const int*, int*);
-template void gatherScatterGpu(execution::Gpu, const int*, const int*, size_t, const uint32_t*, uint32_t*);
-template void gatherScatterGpu(execution::Gpu, const int*, const int*, size_t, const uint64_t*, uint64_t*);
+template void gatherScatter(execution::Gpu, const int*, const int*, size_t, const int*, int*);
+template void gatherScatter(execution::Gpu, const int*, const int*, size_t, const uint32_t*, uint32_t*);
+template void gatherScatter(execution::Gpu, const int*, const int*, size_t, const uint64_t*, uint64_t*);
 template void
-gatherScatterGpu(execution::Gpu, const int*, const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
+gatherScatter(execution::Gpu, const int*, const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*);
 template void
-gatherScatterGpu(execution::Gpu, const int*, const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
-template void gatherScatterGpu(
+gatherScatter(execution::Gpu, const int*, const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*);
+template void gatherScatter(
     execution::Gpu, const int*, const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*);
-template void gatherScatterGpu(
+template void gatherScatter(
     execution::Gpu, const int*, const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*);
-template void gatherScatterGpu(
+template void gatherScatter(
     execution::Gpu, const int*, const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*);
-template void gatherScatterGpu(
+template void gatherScatter(
     execution::Gpu, const int*, const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
 
 template<class T>
@@ -209,7 +209,7 @@ struct NormSquare3D
 };
 
 template<class T>
-T maxNormSquareGpu(execution::Gpu exec, const T* x, const T* y, const T* z, size_t numElements)
+T maxNormSquare(execution::Gpu exec, const T* x, const T* y, const T* z, size_t numElements)
 {
     auto it1 = thrust::make_zip_iterator(x, y, z);
     auto it2 = thrust::make_zip_iterator(x + numElements, y + numElements, z + numElements);
@@ -219,36 +219,36 @@ T maxNormSquareGpu(execution::Gpu exec, const T* x, const T* y, const T* z, size
     return thrust::transform_reduce(devicePar(exec), it1, it2, NormSquare3D<T>{}, init, thrust::maximum<T>{});
 }
 
-template float maxNormSquareGpu(execution::Gpu, const float*, const float*, const float*, size_t);
-template double maxNormSquareGpu(execution::Gpu, const double*, const double*, const double*, size_t);
+template float maxNormSquare(execution::Gpu, const float*, const float*, const float*, size_t);
+template double maxNormSquare(execution::Gpu, const double*, const double*, const double*, size_t);
 
 template<class T>
-size_t lowerBoundGpu(execution::Gpu exec, const T* first, const T* last, T value)
+size_t lowerBound(execution::Gpu exec, const T* first, const T* last, T value)
 {
     return thrust::lower_bound(devicePar(exec), first, last, value) - first;
 }
 
-template size_t lowerBoundGpu(execution::Gpu, const unsigned*, const unsigned*, unsigned);
-template size_t lowerBoundGpu(execution::Gpu, const uint64_t*, const uint64_t*, uint64_t);
-template size_t lowerBoundGpu(execution::Gpu, const int*, const int*, int);
-template size_t lowerBoundGpu(execution::Gpu, const int64_t*, const int64_t*, int64_t);
-template size_t lowerBoundGpu(execution::Gpu, const float*, const float*, float);
+template size_t lowerBound(execution::Gpu, const unsigned*, const unsigned*, unsigned);
+template size_t lowerBound(execution::Gpu, const uint64_t*, const uint64_t*, uint64_t);
+template size_t lowerBound(execution::Gpu, const int*, const int*, int);
+template size_t lowerBound(execution::Gpu, const int64_t*, const int64_t*, int64_t);
+template size_t lowerBound(execution::Gpu, const float*, const float*, float);
 
 template<class T, class IndexType>
-void lowerBoundGpu(
+void lowerBound(
     execution::Gpu exec, const T* first, const T* last, const T* valueFirst, const T* valueLast, IndexType* result)
 {
     thrust::lower_bound(devicePar(exec), first, last, valueFirst, valueLast, result);
 }
 
 template void
-lowerBoundGpu(execution::Gpu, const unsigned*, const unsigned*, const unsigned*, const unsigned*, unsigned*);
+lowerBound(execution::Gpu, const unsigned*, const unsigned*, const unsigned*, const unsigned*, unsigned*);
 template void
-lowerBoundGpu(execution::Gpu, const uint64_t*, const uint64_t*, const uint64_t*, const uint64_t*, unsigned*);
+lowerBound(execution::Gpu, const uint64_t*, const uint64_t*, const uint64_t*, const uint64_t*, unsigned*);
 template void
-lowerBoundGpu(execution::Gpu, const unsigned*, const unsigned*, const unsigned*, const unsigned*, uint64_t*);
+lowerBound(execution::Gpu, const unsigned*, const unsigned*, const unsigned*, const unsigned*, uint64_t*);
 template void
-lowerBoundGpu(execution::Gpu, const uint64_t*, const uint64_t*, const uint64_t*, const uint64_t*, uint64_t*);
+lowerBound(execution::Gpu, const uint64_t*, const uint64_t*, const uint64_t*, const uint64_t*, uint64_t*);
 
 template<class T1, class T2, class Tout>
 void sequenceMax(execution::Gpu exec, const T1* i1_begin, const T1* i1_end, const T2* i2, Tout* output)
@@ -259,25 +259,25 @@ void sequenceMax(execution::Gpu exec, const T1* i1_begin, const T1* i1_end, cons
 template void sequenceMax(execution::Gpu, const unsigned*, const unsigned*, const unsigned*, unsigned*);
 
 template<class Tin, class Tout>
-Tout reduceGpu(execution::Gpu exec, const Tin* input, size_t numElements, Tout init)
+Tout reduce(execution::Gpu exec, const Tin* input, size_t numElements, Tout init)
 {
     return thrust::reduce(devicePar(exec), input, input + numElements, init);
 }
 
-template size_t reduceGpu(execution::Gpu, const unsigned*, size_t, size_t);
+template size_t reduce(execution::Gpu, const unsigned*, size_t, size_t);
 
 template<class IndexType>
-void sequenceGpu(execution::Gpu exec, IndexType* input, size_t numElements, IndexType init)
+void sequence(execution::Gpu exec, IndexType* input, size_t numElements, IndexType init)
 {
     thrust::sequence(devicePar(exec), input, input + numElements, init);
 }
 
-template void sequenceGpu(execution::Gpu, int*, size_t, int);
-template void sequenceGpu(execution::Gpu, unsigned*, size_t, unsigned);
-template void sequenceGpu(execution::Gpu, uint64_t*, uint64_t, uint64_t);
+template void sequence(execution::Gpu, int*, size_t, int);
+template void sequence(execution::Gpu, unsigned*, size_t, unsigned);
+template void sequence(execution::Gpu, uint64_t*, uint64_t, uint64_t);
 
 template<class KeyType>
-void sortGpu(execution::Gpu exec, KeyType* first, KeyType* last, KeyType* keyBuf)
+void sort(execution::Gpu exec, KeyType* first, KeyType* last, KeyType* keyBuf)
 {
     size_t numElements = last - first;
 
@@ -306,9 +306,9 @@ void sortGpu(execution::Gpu exec, KeyType* first, KeyType* last, KeyType* keyBuf
     checkGpuErrors(cudaFree(d_tempStorage));
 }
 
-template void sortGpu(execution::Gpu, uint32_t*, uint32_t*, uint32_t*);
-template void sortGpu(execution::Gpu, uint64_t*, uint64_t*, uint64_t*);
-template void sortGpu(execution::Gpu, float*, float*, float*);
+template void sort(execution::Gpu, uint32_t*, uint32_t*, uint32_t*);
+template void sort(execution::Gpu, uint64_t*, uint64_t*, uint64_t*);
+template void sort(execution::Gpu, float*, float*, float*);
 
 // Determine temporary device storage requirements
 template<class KeyType, class ValueType>
@@ -324,7 +324,7 @@ uint64_t sortByKeyTempStorage(uint64_t numElements)
 }
 
 template<class KeyType, class ValueType>
-void sortByKeyGpu(execution::Gpu exec,
+void sortByKey(execution::Gpu exec,
                   KeyType* first,
                   KeyType* last,
                   ValueType* values,
@@ -360,7 +360,7 @@ void sortByKeyGpu(execution::Gpu exec,
 }
 
 #define SORT_BY_KEY_GPU_DB(KeyType, ValueType)                                                                         \
-    template void sortByKeyGpu(execution::Gpu, KeyType*, KeyType*, ValueType*, KeyType*, ValueType*, void*, uint64_t); \
+    template void sortByKey(execution::Gpu, KeyType*, KeyType*, ValueType*, KeyType*, ValueType*, void*, uint64_t); \
     template uint64_t sortByKeyTempStorage<KeyType, ValueType>(uint64_t)
 
 SORT_BY_KEY_GPU_DB(unsigned, unsigned);
@@ -371,31 +371,31 @@ SORT_BY_KEY_GPU_DB(uint64_t, uint64_t);
 SORT_BY_KEY_GPU_DB(float, unsigned);
 
 template<class KeyType, class ValueType>
-void sortByKeyGpu(execution::Gpu exec, KeyType* first, KeyType* last, ValueType* values)
+void sortByKey(execution::Gpu exec, KeyType* first, KeyType* last, ValueType* values)
 {
     thrust::sort_by_key(devicePar(exec), first, last, values);
 }
 
-template void sortByKeyGpu(execution::Gpu, unsigned*, unsigned*, unsigned*);
-template void sortByKeyGpu(execution::Gpu, unsigned*, unsigned*, int*);
-template void sortByKeyGpu(execution::Gpu, uint64_t*, uint64_t*, unsigned*);
-template void sortByKeyGpu(execution::Gpu, uint64_t*, uint64_t*, int*);
-template void sortByKeyGpu(execution::Gpu, uint64_t*, uint64_t*, uint64_t*);
+template void sortByKey(execution::Gpu, unsigned*, unsigned*, unsigned*);
+template void sortByKey(execution::Gpu, unsigned*, unsigned*, int*);
+template void sortByKey(execution::Gpu, uint64_t*, uint64_t*, unsigned*);
+template void sortByKey(execution::Gpu, uint64_t*, uint64_t*, int*);
+template void sortByKey(execution::Gpu, uint64_t*, uint64_t*, uint64_t*);
 
 template<class IndexType, class SumType>
-void exclusiveScanGpu(execution::Gpu exec, const IndexType* first, const IndexType* last, SumType* output, SumType init)
+void exclusiveScan(execution::Gpu exec, const IndexType* first, const IndexType* last, SumType* output, SumType init)
 {
     thrust::exclusive_scan(devicePar(exec), first, last, output, init);
 }
 
-template void exclusiveScanGpu(execution::Gpu, const int*, const int*, int*, int);
-template void exclusiveScanGpu(execution::Gpu, const int*, const int*, unsigned*, unsigned);
-template void exclusiveScanGpu(execution::Gpu, const int*, const int*, uint64_t*, uint64_t);
-template void exclusiveScanGpu(execution::Gpu, const unsigned*, const unsigned*, unsigned*, unsigned);
-template void exclusiveScanGpu(execution::Gpu, const unsigned*, const unsigned*, uint64_t*, uint64_t);
+template void exclusiveScan(execution::Gpu, const int*, const int*, int*, int);
+template void exclusiveScan(execution::Gpu, const int*, const int*, unsigned*, unsigned);
+template void exclusiveScan(execution::Gpu, const int*, const int*, uint64_t*, uint64_t);
+template void exclusiveScan(execution::Gpu, const unsigned*, const unsigned*, unsigned*, unsigned);
+template void exclusiveScan(execution::Gpu, const unsigned*, const unsigned*, uint64_t*, uint64_t);
 
 template<class IndexType, class SumType>
-void inclusiveScanGpu(execution::Gpu exec, const IndexType* first, const IndexType* last, SumType* output)
+void inclusiveScan(execution::Gpu exec, const IndexType* first, const IndexType* last, SumType* output)
 {
     thrust::inclusive_scan(devicePar(exec), first, last, output);
 
@@ -422,21 +422,21 @@ void inclusiveScanGpu(execution::Gpu exec, const IndexType* first, const IndexTy
     */
 }
 
-template void inclusiveScanGpu(execution::Gpu, const int*, const int*, int*);
-template void inclusiveScanGpu(execution::Gpu, const int*, const int*, unsigned*);
-// template void inclusiveScanGpu(execution::Gpu, const int*, const int*, uint64_t*);
-template void inclusiveScanGpu(execution::Gpu, const unsigned*, const unsigned*, unsigned*);
-// template void inclusiveScanGpu(execution::Gpu, const unsigned*, const unsigned*, uint64_t*);
+template void inclusiveScan(execution::Gpu, const int*, const int*, int*);
+template void inclusiveScan(execution::Gpu, const int*, const int*, unsigned*);
+// template void inclusiveScan(execution::Gpu, const int*, const int*, uint64_t*);
+template void inclusiveScan(execution::Gpu, const unsigned*, const unsigned*, unsigned*);
+// template void inclusiveScan(execution::Gpu, const unsigned*, const unsigned*, uint64_t*);
 
 template<class ValueType>
-size_t countGpu(execution::Gpu exec, const ValueType* first, const ValueType* last, ValueType v)
+size_t count(execution::Gpu exec, const ValueType* first, const ValueType* last, ValueType v)
 {
     return thrust::count(devicePar(exec), first, last, v);
 }
 
-template size_t countGpu(execution::Gpu, const int* first, const int* last, int v);
-template size_t countGpu(execution::Gpu, const unsigned* first, const unsigned* last, unsigned v);
-template size_t countGpu(execution::Gpu, const uint64_t* first, const uint64_t* last, uint64_t v);
+template size_t count(execution::Gpu, const int* first, const int* last, int v);
+template size_t count(execution::Gpu, const unsigned* first, const unsigned* last, unsigned v);
+template size_t count(execution::Gpu, const uint64_t* first, const uint64_t* last, uint64_t v);
 
 template<class TS, class TD, class S>
 __global__ void selectCopyKernel(const TS* src, LocalIndex n, const S* selectFlags, TD* dest)
@@ -446,7 +446,7 @@ __global__ void selectCopyKernel(const TS* src, LocalIndex n, const S* selectFla
 }
 
 template<class TS, class TD, class S>
-void selectCopyGpu(execution::Gpu exec, const TS* src, LocalIndex n, const S* selectFlags, TD* dest)
+void selectCopy(execution::Gpu exec, const TS* src, LocalIndex n, const S* selectFlags, TD* dest)
 {
     int numThreads = 256;
     int numBlocks  = iceil(n, numThreads);
@@ -454,7 +454,7 @@ void selectCopyGpu(execution::Gpu exec, const TS* src, LocalIndex n, const S* se
     selectCopyKernel<<<numBlocks, numThreads, 0, exec>>>(src, n, selectFlags, dest);
 }
 
-template void selectCopyGpu(execution::Gpu, const int*, LocalIndex, const unsigned*, unsigned*);
-template void selectCopyGpu(execution::Gpu, const unsigned*, LocalIndex, const unsigned*, unsigned*);
+template void selectCopy(execution::Gpu, const int*, LocalIndex, const unsigned*, unsigned*);
+template void selectCopy(execution::Gpu, const unsigned*, LocalIndex, const unsigned*, unsigned*);
 
 } // namespace cstone

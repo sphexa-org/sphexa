@@ -122,8 +122,8 @@ int main(int argc, char** argv)
     thrust::host_vector<Vec3<T>> h_nc = nodeCenters, h_ns = nodeSizes;
 
     thrust::device_vector<Vec3<T>> searchCenters(octree.numLeafNodes), searchSizes(octree.numLeafNodes);
-    gatherGpu(stream, leafToInternal(octree).data(), octree.numLeafNodes, rawPtr(nodeCenters), rawPtr(searchCenters));
-    gatherGpu(stream, leafToInternal(octree).data(), octree.numLeafNodes, rawPtr(nodeSizes), rawPtr(searchSizes));
+    gather(stream, leafToInternal(octree).data(), octree.numLeafNodes, rawPtr(nodeCenters), rawPtr(searchCenters));
+    gather(stream, leafToInternal(octree).data(), octree.numLeafNodes, rawPtr(nodeSizes), rawPtr(searchSizes));
 
     thrust::host_vector<Vec3<T>> h_searchCenters = searchCenters, h_searchSizes = searchSizes;
     thrust::host_vector<float> h_radii = haloRadii;

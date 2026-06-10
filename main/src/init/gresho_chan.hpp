@@ -107,8 +107,8 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     }
     d.vx = std::move(vx);
     d.vy = std::move(vy);
-    cstone::scaleGpuAcc(exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), firstTimeStep);
-    cstone::scaleGpuAcc(exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), firstTimeStep);
+    cstone::scale(exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), firstTimeStep);
+    cstone::scale(exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), firstTimeStep);
 
     if (d.temp.empty()) { d.u = std::move(u); }
     else

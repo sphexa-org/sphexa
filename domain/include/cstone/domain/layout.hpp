@@ -160,15 +160,15 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
     {
         memcpyD2DAsync(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start(), exec);
 
-        gatherGpu(exec, leafToInternal.data(), idx.start(), flags.data(), layout.data());
-        selectCopyGpu(exec, focusLeafCounts.data(), idx.start(), layout.data(), layout.data());
+        gather(exec, leafToInternal.data(), idx.start(), flags.data(), layout.data());
+        selectCopy(exec, focusLeafCounts.data(), idx.start(), layout.data(), layout.data());
 
-        gatherGpu(exec, leafToInternal.data() + idx.end(), leafToInternal.size() - idx.end(), flags.data(),
+        gather(exec, leafToInternal.data() + idx.end(), leafToInternal.size() - idx.end(), flags.data(),
                   layout.data() + idx.end());
-        selectCopyGpu(exec, focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(),
+        selectCopy(exec, focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(),
                       layout.data() + idx.end(), layout.data() + idx.end());
 
-        exclusiveScanGpu(exec, layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0});
+        exclusiveScan(exec, layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0});
     }
     else
     {
@@ -251,7 +251,7 @@ void gatherArrays(std::span<const LocalIndex> ordering,
         {
             auto& swapSpace = util::pickType<decltype(array)>(scratchBuffers);
             assert(swapSpace.size() == array.size());
-            gatherAcc(exec, ordering, rawPtr(array), rawPtr(swapSpace) + outputOffset);
+            gather(exec, ordering, rawPtr(array), rawPtr(swapSpace) + outputOffset);
             swap(swapSpace, array);
         }
         else
@@ -261,7 +261,7 @@ void gatherArrays(std::span<const LocalIndex> ordering,
             assert(std::get<i>(scratchBuffers).size() == array.size());
 
             auto* scratch = reinterpret_cast<typename VectorType::value_type*>(rawPtr(std::get<i>(scratchBuffers)));
-            gatherAcc(exec, ordering, rawPtr(array), scratch);
+            gather(exec, ordering, rawPtr(array), scratch);
             copy_n(exec, scratch, ordering.size(), rawPtr(array) + outputOffset);
         }
     };

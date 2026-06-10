@@ -125,7 +125,7 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
     {
         if (!d.nc.empty())
         {
-            ncsum = cstone::reduceGpu(cstone::execution::Gpu{0}, rawPtr(d.nc) + startIndex, endIndex - startIndex,
+            ncsum = cstone::reduce(cstone::execution::Gpu{0}, rawPtr(d.nc) + startIndex, endIndex - startIndex,
                                       size_t(0));
         }
         std::tie(eKin, eInt, linmom, angmom) = conservedQuantitiesGpu(

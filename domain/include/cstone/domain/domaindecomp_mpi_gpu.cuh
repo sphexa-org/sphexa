@@ -93,6 +93,12 @@ void exchangeParticlesGpu(int epoch,
     std::vector<std::vector<TransferType, util::DefaultInitAdaptor<TransferType>>> sendBuffers;
     std::vector<MPI_Request> sendRequests;
 
+    const auto gatherGpu = [](std::span<const LocalIndex> ordering, const auto* src, auto* dest)
+    {
+        // TODO: remove usage of default stream
+        gather(execution::Gpu{0}, ordering.data(), ordering.size(), src, dest);
+    };
+
     char* sendPtr = sendBuffer;
     for (int destinationRank = 0; destinationRank < sends.numRanks(); ++destinationRank)
     {
@@ -101,7 +107,7 @@ void exchangeParticlesGpu(int epoch,
         size_t sendStart = sends[destinationRank];
 
         encodeSendCount(sendCount, sendPtr);
-        size_t numBytes = headerBytes + packArrays<alignment>(gatherGpuL, ordering + sendStart, sendCount,
+        size_t numBytes = headerBytes + packArrays<alignment>(gatherGpu, ordering + sendStart, sendCount,
                                                               sendPtr + headerBytes, arrays...);
         checkGpuErrors(cudaDeviceSynchronize());
         mpiSendGpuDirect(sendPtr, numBytes, destinationRank, domExTag, sendRequests, sendBuffers, comm);
@@ -129,7 +135,10 @@ void exchangeParticlesGpu(int epoch,
 
         LocalIndex receiveLocation = receiveStart;
         if (record) { receiveLog.addExchange(receiveRank, receiveStart); }
-        else { receiveLocation = receiveLog.lookup(receiveRank); }
+        else
+        {
+            receiveLocation = receiveLog.lookup(receiveRank);
+        }
 
         auto packTuple = util::packBufferPtrs<alignment>(receiveBuffer, receiveCount, (arrays + receiveLocation)...);
         auto scatterRanges = [receiveCount](auto arrayPair)

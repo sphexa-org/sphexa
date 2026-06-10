@@ -88,8 +88,8 @@ inline void extractGroupGpu(const GroupView& grp, const cstone::LocalIndex* indi
     out.groupEnd   = rawPtr(out.data) + numOutGroups;
 
     if (numOutGroups == 0) { return; }
-    cstone::gatherGpu(cstone::execution::Gpu{0}, indices + first, numOutGroups, grp.groupStart, out.groupStart);
-    cstone::gatherGpu(cstone::execution::Gpu{0}, indices + first, numOutGroups, grp.groupEnd, out.groupEnd);
+    cstone::gather(cstone::execution::Gpu{0}, indices + first, numOutGroups, grp.groupStart, out.groupStart);
+    cstone::gather(cstone::execution::Gpu{0}, indices + first, numOutGroups, grp.groupEnd, out.groupEnd);
 }
 
 //! @brief return a new GroupView that corresponds to a slice [first:last] of the input group @p grp

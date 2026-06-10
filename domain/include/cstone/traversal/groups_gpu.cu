@@ -92,7 +92,7 @@ void computeGroupSplitsImpl(
 
     groups.reserve(numFixedGroups * 1.1);
     groups.resize(numFixedGroups + 1);
-    exclusiveScanGpu(stream, rawPtr(numSplitsPerGroup), rawPtr(numSplitsPerGroup) + numFixedGroups + 1, rawPtr(groups));
+    exclusiveScan(stream, rawPtr(numSplitsPerGroup), rawPtr(numSplitsPerGroup) + numFixedGroups + 1, rawPtr(groups));
     LocalIndex newNumGroups;
     memcpyD2HAsync(rawPtr(groups) + groups.size() - 1, 1, &newNumGroups, stream);
     syncGpu(stream);
@@ -105,7 +105,7 @@ void computeGroupSplitsImpl(
                                                                     rawPtr(newGroupSizes));
 
     groups.resize(newNumGroups + 1);
-    exclusiveScanGpu(stream, rawPtr(newGroupSizes), rawPtr(newGroupSizes) + newNumGroups + 1, rawPtr(groups), first);
+    exclusiveScan(stream, rawPtr(newGroupSizes), rawPtr(newGroupSizes) + newNumGroups + 1, rawPtr(groups), first);
     memcpyH2DAsync(&last, 1, rawPtr(groups) + groups.size() - 1, stream);
 }
 

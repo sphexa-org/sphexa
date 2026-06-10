@@ -246,7 +246,7 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
         memcpyH2DAsync(rawPtr(nodeOps), nodeOps.size(), nops.data(), stream);
         syncGpu(stream);
 
-        exclusiveScanGpu(stream, nops.data(), nops.data() + nops.size(), nops.data());
+        exclusiveScan(stream, nops.data(), nops.data() + nops.size(), nops.data());
         TreeNodeIndex newNumLeafNodes;
         memcpyD2HAsync(nops.data() + nops.size() - 1, 1, &newNumLeafNodes, stream);
         syncGpu(stream);
@@ -338,7 +338,7 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
     sendRequests.reserve(interiorPeers.size());
     for (size_t i = 0; i < interiorPeers.size(); ++i)
     {
-        gatherAcc(exec, treeletIdx[interiorPeers[i]], quantities.data(), sendBuffers[i].data());
+        gather(exec, treeletIdx[interiorPeers[i]], quantities.data(), sendBuffers[i].data());
         if constexpr (useGpu) { syncGpu(exec); }
         assert(sendBuffers[i].size() == treeletIdx[interiorPeers[i]].size());
         mpiSendAsyncAcc<useGpu>(sendBuffers[i].data(), treeletIdx[interiorPeers[i]].size(), interiorPeers[i], commTag,
@@ -359,7 +359,7 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
         mpiRecvSyncAcc<useGpu>(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE, comm);
 
         auto mapToInternal = csToInternalMap.subspan(focusAssignment[recvRank].start(), recvCount);
-        scatterAcc(exec, mapToInternal, recvBuf, quantities.data());
+        scatter(exec, mapToInternal, recvBuf, quantities.data());
     }
     if constexpr (useGpu) { syncGpu(exec); }
 

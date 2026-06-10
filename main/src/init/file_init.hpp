@@ -248,9 +248,9 @@ public:
         else if (d.isAllocated("u")) { replicateField(reader, "u", d.u, T(1)); }
         cstone::fill(exec, d.du_m1.begin(), d.du_m1.end(), 0);
         cstone::fill(exec, d.rung.begin(), d.rung.end(), 0);
-        cstone::scaleGpuAcc(exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), d.minDt);
-        cstone::scaleGpuAcc(exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), d.minDt);
-        cstone::scaleGpuAcc(exec, d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), d.minDt);
+        cstone::scale(exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), d.minDt);
+        cstone::scale(exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), d.minDt);
+        cstone::scale(exec, d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), d.minDt);
 
         generateParticleIDs(d.id, exec);
 

@@ -140,7 +140,7 @@ void generateParticleIDs(std::span<uint64_t> id, Exec exec)
 
     std::exclusive_scan(ranksLocalParticles.begin(), ranksLocalParticles.end(), ranksLocalParticles.begin(),
                         uint64_t(0));
-    cstone::sequenceAcc(exec, id.data(), id.data() + id.size(), ranksLocalParticles[rank]);
+    cstone::sequence(exec, id.data(), id.data() + id.size(), ranksLocalParticles[rank]);
 }
 
 template<class Dataset>
