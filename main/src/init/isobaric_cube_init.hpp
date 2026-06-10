@@ -83,7 +83,7 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
     T epsilon   = constants.at("epsilon");
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
-    initFieldsAtRest(d, massPart);
+    initFieldsAtRest(d, massPart, cstone::Stream<typename Dataset::AcceleratorType>::Default());
 
     auto&&                 x = toHost(d.x);
     auto&&                 y = toHost(d.y);

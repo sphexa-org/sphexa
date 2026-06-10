@@ -49,7 +49,7 @@ namespace sphexa
 template<class Dataset>
 void initSedovFields(Dataset& d, const InitSettings& constants)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
+    constexpr auto stream = cstone::Stream<typename Dataset::AcceleratorType>::Default();
     using T            = Dataset::RealType;
 
     double r           = constants.at("r1");
@@ -65,8 +65,8 @@ void initSedovFields(Dataset& d, const InitSettings& constants)
     // ener0 is the constant that should multiply the Gaussian so that its integral equals energytotal
     double ener0 = constants.at("energyTotal") / std::pow(M_PI, 1.5) / width2 / width;
 
-    initFieldsAtRest(d, mPart);
-    cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
+    initFieldsAtRest(d, mPart, stream);
+    cstone::fill(d.h.begin(), d.h.end(), hInit, stream);
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
 

@@ -48,13 +48,13 @@ InitSettings GreshoChanSettings()
 template<class Dataset, class T>
 void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& settings, T mPart)
 {
-    constexpr bool gpu   = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using HydroType      = Dataset::HydroType;
-    using RealType       = Dataset::RealType;
-    double ng0           = settings.at("ng0");
-    double rho           = settings.at("rho");
-    double hInit         = 0.5 * std::cbrt(3. * ng0 * mPart / 4. / M_PI / rho);
-    double firstTimeStep = settings.at("minDt");
+    constexpr auto stream = cstone::Stream<typename Dataset::AcceleratorType>::Default();
+    using HydroType       = Dataset::HydroType;
+    using RealType        = Dataset::RealType;
+    double ng0            = settings.at("ng0");
+    double rho            = settings.at("rho");
+    double hInit          = 0.5 * std::cbrt(3. * ng0 * mPart / 4. / M_PI / rho);
+    double firstTimeStep  = settings.at("minDt");
 
     d.gamma    = settings.at("gamma");
     d.minDt    = firstTimeStep;
@@ -65,8 +65,8 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     double v0 = settings.at("v0");
     double P0 = settings.at("P0");
 
-    initFieldsAtRest(d, mPart);
-    cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
+    initFieldsAtRest(d, mPart, stream);
+    cstone::fill(d.h.begin(), d.h.end(), hInit, stream);
 
     auto&& x = toHost(d.x);
     auto&& y = toHost(d.y);
@@ -106,8 +106,8 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     }
     d.vx = std::move(vx);
     d.vy = std::move(vy);
-    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), firstTimeStep);
-    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), firstTimeStep);
+    cstone::scaleGpuAcc(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), firstTimeStep, stream);
+    cstone::scaleGpuAcc(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), firstTimeStep, stream);
 
     if (d.temp.empty()) { d.u = std::move(u); }
     else

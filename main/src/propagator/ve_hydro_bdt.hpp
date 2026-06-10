@@ -185,7 +185,7 @@ public:
         activeRungs_ = groups_.view();
 
         reallocate(groups_.numGroups, d.getAllocGrowthRate(), groupDt_, groupIndices_);
-        cstone::fill<cstone::HaveGpu<Acc>{}>(groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max());
+        cstone::fill(groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max(), domain.stream());
     }
 
     void partialSync(DomainType& domain, DataType& simData)
@@ -227,7 +227,7 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        fillMassHalos(get<"m">(d), first, last);
+        fillMassHalos(get<"m">(d), first, last, domain.stream());
 
         updateSmoothingLengthIterative(activeRungs_, d, domain.box());
         findNeighborsSfc(activeRungs_, d, domain.box(), true);

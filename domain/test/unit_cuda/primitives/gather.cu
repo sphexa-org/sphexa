@@ -31,14 +31,14 @@ TEST(SortByKey, minimal)
     DeviceVector<KeyType> keys = std::vector<KeyType>{2, 1, 5, 4};
     DeviceVector<IndexType> obuf, keyBuf, valBuf;
 
-    constexpr bool gpu = true;
+    constexpr Stream<GpuTag> stream{0};
 
     LocalIndex off = 1;
-    sequence<gpu>(off, keys.size(), obuf, 1.0);
-    sortByKey<gpu>(std::span{keys.data(), keys.size()}, std::span{obuf.data() + off, keys.size()}, keyBuf, valBuf, 1.0);
+    sequence(off, keys.size(), obuf, 1.0, stream);
+    sortByKey(std::span{keys.data(), keys.size()}, std::span{obuf.data() + off, keys.size()}, keyBuf, valBuf, 1.0, stream);
     // map is [. 2 1 4 3]
 
-    sequence<gpu>(0, off, obuf, 1.0);
+    sequence(0, off, obuf, 1.0, stream);
     {
         DeviceVector ref = std::vector<IndexType>{0, 2, 1, 4, 3};
         EXPECT_EQ(obuf, ref);

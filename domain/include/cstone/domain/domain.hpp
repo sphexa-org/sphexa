@@ -67,7 +67,7 @@ public:
            float theta,
            MPI_Comm comm,
            Stream<Accelerator> stream,
-           const Box<T>& box          = Box<T>{0, 1})
+           const Box<T>& box = Box<T>{0, 1})
         : myRank_(rank)
         , numRanks_(nRanks)
         , bucketSizeFocus_(bucketSizeFocus)
@@ -185,7 +185,7 @@ public:
             distribute(sorter, particleKeys, x, y, z, std::tuple_cat(std::tie(h), particleProperties), scratch);
         // x,y,z,h is already reordered here for use in halo discovery
         gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
-                     std::tie(x, y, z, h), util::reverse(scratch));
+                     std::tie(x, y, z, h), util::reverse(scratch), stream_);
 
         float invThetaEff = invThetaMinMac(theta_);
         if (firstCall_)
@@ -236,7 +236,7 @@ public:
         auto [exchangeStart, keyView] =
             distribute(sorter, particleKeys, x, y, z, std::tuple_cat(std::tie(h, m), particleProperties), scratch);
         gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
-                     std::tie(x, y, z, h, m), util::reverse(scratch));
+                     std::tie(x, y, z, h, m), util::reverse(scratch), stream_);
 
         if (firstCall_)
         {
@@ -325,7 +325,7 @@ public:
 
         lowMemReallocate(bufDesc_.size, allocGrowthRate_, arrays, std::tie(sendBuffer, receiveBuffer));
         gatherArrays({ord + global_.numSendDown(), global_.numAssigned()}, bufDesc_.start, arrays,
-                     std::tie(sendBuffer, receiveBuffer));
+                     std::tie(sendBuffer, receiveBuffer), Stream<CpuTag>{});
     }
 
     //! @brief repeat the halo exchange pattern from the previous sync operation for a different set of arrays
@@ -390,6 +390,8 @@ public:
                 focusTree_.geoCentersAcc().data(),
                 focusTree_.geoSizesAcc().data()};
     }
+
+    const Stream<Accelerator>& stream() const { return stream_; }
 
 private:
     //! @brief bounds initialization on first call, use all particles
@@ -537,7 +539,7 @@ private:
 
         // reorder the unordered buffers
         gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, newBufDesc.start,
-                     unorderedBuffers, util::reverse(scratchBuffers));
+                     unorderedBuffers, util::reverse(scratchBuffers), stream_);
 
         // newBufDesc is now the valid buffer description
         prevBufDesc_ = bufDesc_;

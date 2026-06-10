@@ -60,9 +60,9 @@ InitSettings WindShockConstants()
 template<class Dataset>
 void initWindShockFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T            = Dataset::RealType;
-    using HydroType    = Dataset::HydroType;
+    constexpr auto stream = cstone::Stream<typename Dataset::AcceleratorType>::Default();
+    using T               = Dataset::RealType;
+    using HydroType       = Dataset::HydroType;
 
     T r       = constants.at("r");
     T rSphere = constants.at("rSphere");
@@ -78,7 +78,7 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     T hExt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoExt);
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
-    initFieldsAtRest(d, massPart);
+    initFieldsAtRest(d, massPart, stream);
 
     T uInt = uExt / (rhoInt / rhoExt);
 
@@ -128,16 +128,19 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     d.vx = std::move(vx);
     d.vy = std::move(vy);
     d.vz = std::move(vz);
-    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
-    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
-    cstone::scaleGpuAcc<gpu>(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
+    cstone::scaleGpuAcc(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"), stream);
+    cstone::scaleGpuAcc(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"), stream);
+    cstone::scaleGpuAcc(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"), stream);
 
     if (d.u.empty())
     {
         std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
         d.temp = std::move(u);
     }
-    else { d.u = std::move(u); }
+    else
+    {
+        d.u = std::move(u);
+    }
 }
 
 template<class Dataset>

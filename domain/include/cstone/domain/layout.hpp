@@ -220,10 +220,7 @@ int checkLayout(int myRank,
                 {
                     if (peerRange.start() <= i && i < peerRange.end()) { peerFound = true; }
                 }
-                if (!peerFound)
-                {
-                    ret = 1;
-                }
+                if (!peerFound) { ret = 1; }
             }
             if (layout[i + 1] - layout[i] > maxParticles) { ret = -1; }
         }
@@ -240,13 +237,14 @@ struct SmallerElementSize
 };
 
 //! @brief reorder with state-less function object
-template<class... Arrays1, class... Arrays2>
+template<class... Arrays1, class... Arrays2, class Accelerator>
 void gatherArrays(std::span<const LocalIndex> ordering,
                   LocalIndex outputOffset,
                   std::tuple<Arrays1&...> arrays,
-                  std::tuple<Arrays2&...> scratchBuffers)
+                  std::tuple<Arrays2&...> scratchBuffers,
+                  Stream<Accelerator> stream)
 {
-    auto reorderArray = [ordering, outputOffset, &scratchBuffers](auto& array)
+    auto reorderArray = [ordering, outputOffset, &scratchBuffers, stream](auto& array)
     {
         using VectorRef  = decltype(array);
         using VectorType = std::decay_t<VectorRef>;
@@ -254,7 +252,7 @@ void gatherArrays(std::span<const LocalIndex> ordering,
         {
             auto& swapSpace = util::pickType<decltype(array)>(scratchBuffers);
             assert(swapSpace.size() == array.size());
-            gatherAcc<IsDeviceVector<VectorType>{}>(ordering, rawPtr(array), rawPtr(swapSpace) + outputOffset);
+            gatherAcc(ordering, rawPtr(array), rawPtr(swapSpace) + outputOffset, stream);
             swap(swapSpace, array);
         }
         else
@@ -264,8 +262,8 @@ void gatherArrays(std::span<const LocalIndex> ordering,
             assert(std::get<i>(scratchBuffers).size() == array.size());
 
             auto* scratch = reinterpret_cast<typename VectorType::value_type*>(rawPtr(std::get<i>(scratchBuffers)));
-            gatherAcc<IsDeviceVector<VectorType>{}>(ordering, rawPtr(array), scratch);
-            copy_n<IsDeviceVector<VectorType>{}>(scratch, ordering.size(), rawPtr(array) + outputOffset);
+            gatherAcc(ordering, rawPtr(array), scratch, stream);
+            copy_n(scratch, ordering.size(), rawPtr(array) + outputOffset, stream);
         }
     };
 

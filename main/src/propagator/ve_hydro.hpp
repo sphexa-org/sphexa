@@ -136,7 +136,7 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        fillMassHalos(get<"m">(d), first, last);
+        fillMassHalos(get<"m">(d), first, last, domain.stream());
 
         computeGroups(first, last, d, domain.box(), groups_);
         updateSmoothingLengthIterative(groups_.view(), d, domain.box());

@@ -54,15 +54,15 @@ InitSettings KelvinHelmholtzConstants()
 template<class T, class Dataset>
 void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T massPart)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using HydroType    = Dataset::HydroType;
-    T rhoInt           = constants.at("rhoInt");
-    T rhoExt           = constants.at("rhoExt");
-    T omega0           = constants.at("omega0");
-    T gamma            = constants.at("gamma");
-    T p                = constants.at("p");
-    T vxInt            = constants.at("vxInt");
-    T vxExt            = constants.at("vxExt");
+    constexpr auto stream = cstone::Stream<typename Dataset::AcceleratorType>::Default();
+    using HydroType       = Dataset::HydroType;
+    T rhoInt              = constants.at("rhoInt");
+    T rhoExt              = constants.at("rhoExt");
+    T omega0              = constants.at("omega0");
+    T gamma               = constants.at("gamma");
+    T p                   = constants.at("p");
+    T vxInt               = constants.at("vxInt");
+    T vxExt               = constants.at("vxExt");
 
     T uInt = p / ((gamma - 1.) * rhoInt);
     T uExt = p / ((gamma - 1.) * rhoExt);
@@ -72,9 +72,9 @@ void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T mass
     T hInt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoInt);
     T hExt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoExt);
 
-    initFieldsAtRest(d, massPart);
-    cstone::fill<gpu>(d.mue.begin(), d.mue.end(), 2.0);
-    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), 10.0);
+    initFieldsAtRest(d, massPart, stream);
+    cstone::fill(d.mue.begin(), d.mue.end(), 2.0, stream);
+    cstone::fill(d.mui.begin(), d.mui.end(), 10.0, stream);
 
     auto   cv = sph::idealGasCv(d.muiConst, gamma);
     auto&& x  = toHost(d.x);
@@ -95,7 +95,10 @@ void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T mass
             h[i] = hInt;
             u[i] = uInt;
             if (y[i] > 0.5) { vx[i] = vxInt + vDif * std::exp((y[i] - 0.75) / ls); }
-            else { vx[i] = vxInt + vDif * std::exp((0.25 - y[i]) / ls); }
+            else
+            {
+                vx[i] = vxInt + vDif * std::exp((0.25 - y[i]) / ls);
+            }
         }
         else
         {
@@ -113,21 +116,27 @@ void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T mass
 
             u[i] = uExt;
             if (y[i] < 0.25) { vx[i] = vxExt - vDif * std::exp((y[i] - 0.25) / ls); }
-            else { vx[i] = vxExt - vDif * std::exp((0.75 - y[i]) / ls); }
+            else
+            {
+                vx[i] = vxExt - vDif * std::exp((0.75 - y[i]) / ls);
+            }
         }
     }
     d.h  = std::move(h);
     d.vx = std::move(vx);
     d.vy = std::move(vy);
-    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
-    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
+    cstone::scaleGpuAcc(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"), stream);
+    cstone::scaleGpuAcc(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"), stream);
 
     if (d.u.empty())
     {
         std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
         d.temp = std::move(u);
     }
-    else { d.u = std::move(u); }
+    else
+    {
+        d.u = std::move(u);
+    }
 }
 
 template<class Dataset>

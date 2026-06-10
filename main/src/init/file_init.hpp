@@ -141,7 +141,7 @@ public:
     cstone::Box<typename Dataset::RealType> init(int /* rank */, int, size_t, Dataset& simData,
                                                  IFileReader* reader) const override
     {
-        constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
+        constexpr auto stream = cstone::Stream<typename Dataset::AcceleratorType>::Default();
         reader->setStep(h5_fname, -1, FileMode::collective);
 
         size_t numParticlesInFile = reader->localNumParticles();
@@ -246,13 +246,13 @@ public:
         replicateField(reader, "vz", d.vz, T(1));
         if (d.isAllocated("temp")) { replicateField(reader, "temp", d.temp, T(1)); }
         else if (d.isAllocated("u")) { replicateField(reader, "u", d.u, T(1)); }
-        cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0);
-        cstone::fill<gpu>(d.rung.begin(), d.rung.end(), 0);
-        cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), d.minDt);
-        cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), d.minDt);
-        cstone::scaleGpuAcc<gpu>(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), d.minDt);
+        cstone::fill(d.du_m1.begin(), d.du_m1.end(), 0, stream);
+        cstone::fill(d.rung.begin(), d.rung.end(), 0, stream);
+        cstone::scaleGpuAcc(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), d.minDt, stream);
+        cstone::scaleGpuAcc(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), d.minDt, stream);
+        cstone::scaleGpuAcc(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), d.minDt, stream);
 
-        generateParticleIDs<gpu>(d.id);
+        generateParticleIDs(d.id, stream);
 
         if (d.isAllocated("alpha"))
         {
@@ -262,7 +262,7 @@ public:
             }
             catch (std::runtime_error&)
             {
-                cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
+                cstone::fill(d.alpha.begin(), d.alpha.end(), d.alphamin, stream);
             }
         }
 

@@ -406,16 +406,16 @@ void acquire(Dataset& d, const Fs&... fs)
 }
 
 // TODO move this to a better place
-template<class Vector>
-void fillMassHalos(Vector& m, std::size_t first, std::size_t last)
+template<class Vector, class Accelerator>
+void fillMassHalos(Vector& m, std::size_t first, std::size_t last, cstone::Stream<Accelerator> stream)
 {
     using T = std::decay_t<Vector>::value_type;
     T mass;
-    if constexpr (IsDeviceVector<Vector>{}) { memcpyD2HAsync(m.data() + first, 1, &mass, 0); syncGpu(0); }
+    if constexpr (IsDeviceVector<Vector>{}) { memcpyD2HAsync(m.data() + first, 1, &mass, stream); syncGpu(stream); }
     else { mass = m[first]; }
 
-    cstone::fill<IsDeviceVector<Vector>{}>(m.begin(), m.begin() + first, mass);
-    cstone::fill<IsDeviceVector<Vector>{}>(m.begin() + last, m.end(), mass);
+    cstone::fill(m.begin(), m.begin() + first, mass, stream);
+    cstone::fill(m.begin() + last, m.end(), mass, stream);
 }
 
 } // namespace sphexa
