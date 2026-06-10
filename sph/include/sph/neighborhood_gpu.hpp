@@ -9,8 +9,6 @@
 
 #if defined(__CUDACC__) || defined(__HIP__)
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
-#include "cstone/traversal/ijloop/gpu_fullnblist.cuh"
-#include "cstone/traversal/ijloop/gpu_compressednblist.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
 #endif
 
@@ -22,7 +20,7 @@ struct DeviceNeighborhoodData
     DeviceNeighborhoodData();
     ~DeviceNeighborhoodData();
 
-    void setType(NeighborhoodType type);
+    void disableNeighborLists();
 
     template<class Dataset, class T>
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool subgroups);
@@ -41,9 +39,6 @@ using ClusteredNeighborhoodBuilder =
     cstone::ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, cstone::GpuConfig::warpSize / 8>::
         withSuperclusterSize<cstone::TravConfig::targetSize>::setSymmetry<Symmetric>::template withCompression<>;
 
-template<bool Symmetric>
-using CompressedNeighborhoodBuilder = cstone::ijloop::GpuCompressedNbListNeighborhoodBuilder<>::setSymmetry<Symmetric>;
-
 struct DeviceNeighborhoodData::Impl
 {
     template<class Dataset, class T>
@@ -56,10 +51,6 @@ struct DeviceNeighborhoodData::Impl
                 [&]<class Neighborhood>(Neighborhood const& nb)
                 {
                     if constexpr (std::is_same_v<Neighborhood,
-                                                 NeighborhoodDataType<CompressedNeighborhoodBuilder<false>>> ||
-                                  std::is_same_v<Neighborhood,
-                                                 NeighborhoodDataType<CompressedNeighborhoodBuilder<true>>> ||
-                                  std::is_same_v<Neighborhood,
                                                  NeighborhoodDataType<ClusteredNeighborhoodBuilder<true>>>)
                         throw std::runtime_error("neighborhood does not support local time stepping");
                     else
@@ -74,36 +65,25 @@ struct DeviceNeighborhoodData::Impl
 
             const unsigned ncmax = d.ngmax * 3;
 
-            std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder,
-                         cstone::ijloop::GpuFullNbListNeighborhoodBuilder, CompressedNeighborhoodBuilder<false>,
-                         CompressedNeighborhoodBuilder<true>, ClusteredNeighborhoodBuilder<false>,
+            std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder, ClusteredNeighborhoodBuilder<false>,
                          ClusteredNeighborhoodBuilder<true>>
                 builder;
-            switch (neighborhoodType)
+            if (useNeighborLists)
             {
-                case NeighborhoodType::alwaysTraverse:
-                    builder = cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder{d.ngmax};
-                    break;
-                case NeighborhoodType::fullNeighborList:
-                    builder = cstone::ijloop::GpuFullNbListNeighborhoodBuilder{d.ngmax};
-                    break;
-                case NeighborhoodType::compressedFullNeighborList:
-                    builder = CompressedNeighborhoodBuilder<false>{d.ngmax};
-                    break;
-                case NeighborhoodType::compressedHalfNeighborList:
-                    builder = CompressedNeighborhoodBuilder<true>{d.ngmax};
-                    break;
-                case NeighborhoodType::clusteredNeighborList:
-                    if (subgroups)
-                        builder = ClusteredNeighborhoodBuilder<false>{ncmax};
-                    else
-                        builder = ClusteredNeighborhoodBuilder<true>{ncmax};
-                    break;
-                default: throw std::runtime_error("invalid neighborhood type");
+
+                if (subgroups)
+                    builder = ClusteredNeighborhoodBuilder<false>{ncmax};
+                else
+                    builder = ClusteredNeighborhoodBuilder<true>{ncmax};
+            }
+            else
+            {
+                builder = cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder{d.ngmax};
             }
 
             std::visit(
-                [&](auto const& nb) {
+                [&](auto const& nb)
+                {
                     neighborhood =
                         nb.build(d.treeView, box, d.size(), groups, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h));
                 },
@@ -122,17 +102,13 @@ struct DeviceNeighborhoodData::Impl
     }
 
     std::variant<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder>,
-                 NeighborhoodDataType<cstone::ijloop::GpuFullNbListNeighborhoodBuilder>,
-                 NeighborhoodDataType<CompressedNeighborhoodBuilder<false>>,
-                 NeighborhoodDataType<CompressedNeighborhoodBuilder<true>>,
                  NeighborhoodDataType<ClusteredNeighborhoodBuilder<false>>,
                  NeighborhoodDataType<ClusteredNeighborhoodBuilder<true>>>
         neighborhood;
     std::optional<std::variant<NeighborhoodSubgroupType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder>,
-                               NeighborhoodSubgroupType<cstone::ijloop::GpuFullNbListNeighborhoodBuilder>,
                                NeighborhoodSubgroupType<ClusteredNeighborhoodBuilder<false>>>>
-                     subgroupNeighborhood;
-    NeighborhoodType neighborhoodType = NeighborhoodType::alwaysTraverse;
+         subgroupNeighborhood;
+    bool useNeighborLists = true;
 };
 
 template<class Dataset, class T>

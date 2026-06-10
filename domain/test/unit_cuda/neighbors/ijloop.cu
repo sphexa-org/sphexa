@@ -24,8 +24,6 @@
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
 #include "cstone/traversal/ijloop/cpu_fullnblist.hpp"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
-#include "cstone/traversal/ijloop/gpu_fullnblist.cuh"
-#include "cstone/traversal/ijloop/gpu_compressednblist.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
 
 #include "../../coord_samples/random.hpp"
@@ -346,9 +344,6 @@ using Neighborhoods = ::testing::Types<
     ijloop::CpuAlwaysTraverseNeighborhoodBuilder,
     ijloop::CpuFullNbListNeighborhoodBuilder,
     ijloop::GpuAlwaysTraverseNeighborhoodBuilder,
-    ijloop::GpuFullNbListNeighborhoodBuilder,
-    ijloop::GpuCompressedNbListNeighborhoodBuilder<>::withoutSymmetry,
-    ijloop::GpuCompressedNbListNeighborhoodBuilder<>::withSymmetry,
 #ifdef __CUDACC__
     ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withoutSymmetry::withoutCompression,
     ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withSymmetry::withoutCompression,
@@ -434,12 +429,6 @@ template<class Config>
 consteval bool supportsSubgroup(ijloop::GpuSuperclusterNbListNeighborhoodBuilder<Config>)
 {
     return !Config::symmetric;
-}
-
-template<class Config>
-consteval bool supportsSubgroup(ijloop::GpuCompressedNbListNeighborhoodBuilder<Config>)
-{
-    return false;
 }
 
 TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)

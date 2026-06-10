@@ -376,7 +376,7 @@ public:
 
     float getAllocGrowthRate() const { return allocGrowthRate_; }
 
-    void setNeighborhoodType(sph::NeighborhoodType type) { neighborhood.setType(type); }
+    void disableNeighborLists() { neighborhood.disableNeighborLists(); }
 
 private:
     void createTables()
