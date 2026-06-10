@@ -26,7 +26,6 @@ variables:
     - $TEST_INSTALL_DIR/hydro/sph_tests
     - $TEST_INSTALL_DIR/performance/octree_perf
     - $TEST_INSTALL_DIR/performance/peers_perf
-    - $TEST_INSTALL_DIR/performance/cluster_overhead
     - $TEST_INSTALL_DIR/ryoanji/cpu_unit_tests/ryoanji_cpu_unit_tests
     - $TEST_INSTALL_DIR/ryoanji/unit_tests/ryoanji_unit_tests
     # NOTE:slow    - $TEST_INSTALL_DIR/performance/hilbert_perf
