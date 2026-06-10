@@ -22,15 +22,21 @@ namespace cstone
 {
 
 template<class KeyType, class T>
-extern void computeSfcKeysGpu(const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box,
-                              cudaStream_t stream);
+extern void computeSfcKeysGpu(
+    const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box, cudaStream_t stream);
 
-template<bool useGpu, class KeyType, class T>
-void computeSfcKeys(const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box,
-                    cudaStream_t stream)
+template<class KeyType, class T>
+inline void computeSfcKeys(
+    execution::Gpu exec, const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box)
 {
-    if constexpr (useGpu) { computeSfcKeysGpu(x, y, z, keys, numKeys, box, stream); }
-    else { computeSfcKeys(x, y, z, keys, numKeys, box); }
+    computeSfcKeysGpu(x, y, z, keys, numKeys, box, exec);
+}
+
+template<class KeyType, class T>
+inline void
+computeSfcKeys(execution::Cpu, const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box)
+{
+    computeSfcKeys(x, y, z, keys, numKeys, box);
 }
 
 } // namespace cstone

@@ -114,18 +114,9 @@ public:
 
         // compute SFC particle keys only for particles participating in tree build
         std::span<KeyType> keyView(particleKeys + o1.start, numPart);
-        if constexpr (gpu)
-        {
-            computeSfcKeysGpu(x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numPart, box_,
-                              exec_);
-        }
-        else
-        {
-            computeSfcKeys(x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numPart, box_);
-        }
+        computeSfcKeys(exec_, x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numPart, box_);
         sequence(exec_, o1.start, numPart, reorderFunctor.getBuf(), growthRate_);
         sortByKey(exec_, keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_);
-        if constexpr (gpu) { syncGpu(exec_); } // flush stream before entering MPI-involved updateOctreeGlobal
 
         auto maxCount = updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
                                                     d_nodeCounts_, false, comm_, exec_);
@@ -213,16 +204,8 @@ public:
         LocalIndex envelopeSize = newEnd - newStart;
         std::span<KeyType> keyView(keys + newStart, envelopeSize);
 
-        if constexpr (gpu)
-        {
-            computeSfcKeysGpu(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv,
-                              box_, exec_);
-        }
-        else
-        {
-            computeSfcKeys(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv,
-                           box_);
-        }
+        computeSfcKeys(exec_, x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv,
+                       box_);
         sequence(exec_, recvStart, numRecv, reorderFunctor.getBuf(), growthRate_);
         sortByKey(exec_, keyView, std::span{reorderFunctor.getMap() + newStart, keyView.size()}, s0, s1, growthRate_);
 
