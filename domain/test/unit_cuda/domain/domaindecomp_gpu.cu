@@ -48,7 +48,8 @@ static void sendListMinimalGpu()
     std::span<const KeyType> d_keyView{rp(d_keys), d_keys.size()};
 
     // note: key input needs to be sorted
-    auto sendList = createSendRangesGpu(assignment, d_keyView, rp(d_searchKeys), rp(d_indices), 0);
+    auto sendList =
+        createSendRangesGpu(assignment, d_keyView, rp(d_searchKeys), rp(d_indices), execution::gpuDefaultStream);
 
     EXPECT_EQ(sendList.count(0), 6);
     EXPECT_EQ(sendList.count(1), 3);

@@ -75,7 +75,7 @@ void randomGaussianAssignment(int rank, int numRanks)
 
     int bucketSize = 20;
 
-    GlobalAssignment<KeyType, T> assignment(rank, numRanks, bucketSize, box, MPI_COMM_WORLD, execution::Cpu{});
+    GlobalAssignment<KeyType, T> assignment(rank, numRanks, bucketSize, box, MPI_COMM_WORLD, execution::cpu);
     BufferDescription bufDesc{0, numParticles, numParticles};
     std::vector<unsigned> sfcScratchCpu;
     SfcSorter cpuGather(sfcScratchCpu);
@@ -92,7 +92,7 @@ void randomGaussianAssignment(int rank, int numRanks)
     DeviceVector<T> d_z = z;
 
     GlobalAssignment<KeyType, T, execution::Gpu> assignmentGpu(rank, numRanks, bucketSize, box, MPI_COMM_WORLD,
-                                                               execution::Gpu{0});
+                                                               execution::gpuDefaultStream);
     DeviceVector<unsigned> sfcScratch;
     SfcSorter deviceSort(sfcScratch);
 
@@ -123,8 +123,8 @@ void randomGaussianAssignment(int rank, int numRanks)
 
     {
         std::vector<KeyType> keyDownload(devKeyView.size());
-        memcpyD2HAsync(execution::Gpu{0}, devKeyView.data(), devKeyView.size(), keyDownload.data());
-        syncGpu(0);
+        memcpyD2HAsync(execution::gpuDefaultStream, devKeyView.data(), devKeyView.size(), keyDownload.data());
+        syncGpu(execution::gpuDefaultStream);
         EXPECT_TRUE(std::equal(keyDownload.begin(), keyDownload.end(), cpuKeyView.begin()));
     }
 }

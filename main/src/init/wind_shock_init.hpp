@@ -61,7 +61,7 @@ template<class Dataset>
 void initWindShockFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
     using Exec      = typename Dataset::Exec;
-    auto exec       = Exec::Default();
+    auto exec       = cstone::execution::defaultExec<Exec>;
     using T         = Dataset::RealType;
     using HydroType = Dataset::HydroType;
 

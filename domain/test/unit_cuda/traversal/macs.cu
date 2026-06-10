@@ -40,7 +40,9 @@ TEST(Macs, limitSource4x4_matchCPU)
     fullTree.resize(nNodes(leaves));
     cudaStream_t stream;
     cudaStreamCreate(&stream);
-    buildOctreeGpu(stream, rawPtr(leaves), fullTree.data());
+    const auto exec = execution::gpuStream(stream);
+
+    buildOctreeGpu(exec, rawPtr(leaves), fullTree.data());
     OctreeView<KeyType> ov = fullTree.data();
 
     std::vector<KeyType> h_prefixes = toHost(fullTree.prefixes);
@@ -50,7 +52,7 @@ TEST(Macs, limitSource4x4_matchCPU)
     thrust::device_vector<SourceCenterType<T>> centers = h_centers;
 
     markMacsGpu(ov.prefixes, ov.childOffsets, ov.parents, rawPtr(centers), box, rawPtr(leaves) + 0, 32, true,
-                rawPtr(macs), stream);
+                rawPtr(macs), exec);
     cudaStreamSynchronize(stream);
     thrust::host_vector<uint8_t> h_macs = macs;
 
@@ -60,7 +62,7 @@ TEST(Macs, limitSource4x4_matchCPU)
 
     thrust::fill(macs.begin(), macs.end(), 0);
     markMacsGpu(ov.prefixes, ov.childOffsets, ov.parents, rawPtr(centers), box, rawPtr(leaves) + 0, 32, false,
-                rawPtr(macs), stream);
+                rawPtr(macs), exec);
     cudaStreamSynchronize(stream);
     h_macs      = macs;
     int numMacs = std::accumulate(h_macs.begin(), h_macs.end(), 0);

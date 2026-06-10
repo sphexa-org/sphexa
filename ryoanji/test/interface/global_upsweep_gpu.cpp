@@ -58,7 +58,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     std::vector<KeyType> particleKeys(x.size());
 
     cstone::Domain<KeyType, T, cstone::execution::Gpu> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta,
-                                                              MPI_COMM_WORLD, cstone::execution::Gpu{0}, box);
+                                                              MPI_COMM_WORLD, cstone::execution::gpuDefaultStream, box);
 
     MultipoleHolder<T, T, T, T, T, KeyType, MultipoleType> multipoleHolder;
 
@@ -80,15 +80,15 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     bool passMultipole = false;
     {
         std::vector<MultipoleType> multipoles(octree.numNodes);
-        cstone::memcpyD2HAsync(cstone::execution::Gpu{0}, multipoleHolder.deviceMultipoles(), multipoles.size(),
-                               multipoles.data());
+        cstone::memcpyD2HAsync(cstone::execution::gpuDefaultStream, multipoleHolder.deviceMultipoles(),
+                               multipoles.size(), multipoles.data());
 
         MultipoleType globalRootMultipole = multipoles[0];
 
         auto                                     d_centers = focusTree.expansionCentersAcc();
         std::vector<cstone::SourceCenterType<T>> centers(d_centers.size());
-        cstone::memcpyD2HAsync(cstone::execution::Gpu{0}, d_centers.data(), d_centers.size(), centers.data());
-        cstone::syncGpu(0);
+        cstone::memcpyD2HAsync(cstone::execution::gpuDefaultStream, d_centers.data(), d_centers.size(), centers.data());
+        cstone::syncGpu(cstone::execution::gpuDefaultStream);
 
         // compute reference root cell multipole from global particle data
         MultipoleType reference;

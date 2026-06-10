@@ -35,7 +35,7 @@ template<class Dataset>
 void initEvrardFields(Dataset& d, const InitSettings& constants)
 {
     using Exec  = typename Dataset::Exec;
-    auto exec = Exec::Default();
+    auto exec = cstone::execution::defaultExec<Exec>;
 
     initFieldsAtRest(d, constants.at("mTotal") / d.numParticlesGlobal, exec);
 

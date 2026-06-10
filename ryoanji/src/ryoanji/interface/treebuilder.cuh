@@ -65,10 +65,10 @@ public:
         uint64_t                    tempStorageEle = sortByKeyTempStorage<KeyType, LocalIndex>(numBodies);
         thrust::device_vector<char> cubTmpStorage(tempStorageEle);
 
-        computeSfcKeys(execution::Gpu{0}, x, y, z, sfcKindPointer(rawPtr(d_keys)), numBodies, box);
+        computeSfcKeys(execution::gpuDefaultStream, x, y, z, sfcKindPointer(rawPtr(d_keys)), numBodies, box);
 
-        sequence(execution::Gpu{0}, rawPtr(d_ordering), d_ordering.size(), 0);
-        sortByKey(execution::Gpu{0}, rawPtr(d_keys), rawPtr(d_keys) + d_keys.size(), rawPtr(d_ordering),
+        sequence(execution::gpuDefaultStream, rawPtr(d_ordering), d_ordering.size(), 0);
+        sortByKey(execution::gpuDefaultStream, rawPtr(d_keys), rawPtr(d_keys) + d_keys.size(), rawPtr(d_ordering),
                   rawPtr(d_keys_tmp), rawPtr(d_values_tmp), rawPtr(cubTmpStorage), tempStorageEle);
 
         thrust::gather(thrust::device, d_ordering.begin(), d_ordering.end(), x, tmp.begin());
@@ -86,15 +86,15 @@ public:
         }
 
         while (!updateOctreeGpu<KeyType>({rawPtr(d_keys), d_keys.size()}, bucketSize_, d_tree_, d_counts_, tmpTree_,
-                                         workArray_, execution::Gpu{0}))
+                                         workArray_, execution::gpuDefaultStream))
             ;
 
         octreeGpuData_.resize(nNodes(d_tree_));
-        buildOctreeGpu(execution::Gpu{0}, rawPtr(d_tree_), octreeGpuData_.data());
+        buildOctreeGpu(execution::gpuDefaultStream, rawPtr(d_tree_), octreeGpuData_.data());
 
         d_layout_.resize(d_counts_.size() + 1);
-        fill(execution::Gpu{0}, rawPtr(d_layout_), rawPtr(d_layout_) + 1, LocalIndex(0));
-        inclusiveScan(execution::Gpu{0}, rawPtr(d_counts_), rawPtr(d_counts_) + d_counts_.size(),
+        fill(execution::gpuDefaultStream, rawPtr(d_layout_), rawPtr(d_layout_) + 1, LocalIndex(0));
+        inclusiveScan(execution::gpuDefaultStream, rawPtr(d_counts_), rawPtr(d_counts_) + d_counts_.size(),
                       rawPtr(d_layout_) + 1);
 
         return octreeGpuData_.numInternalNodes + octreeGpuData_.numLeafNodes;

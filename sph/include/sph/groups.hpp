@@ -45,7 +45,7 @@ void computeSpatialGroups(cstone::LocalIndex startIndex, cstone::LocalIndex endI
     float tolFactor = 2.0f;
     cstone::computeGroupSplits(startIndex, endIndex, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h),
                                d.treeView.leaves, d.treeView.numLeafNodes, d.treeView.layout, box, nsGroupSize(),
-                               tolFactor, d.traversalStack, groups.data, 0);
+                               tolFactor, d.traversalStack, groups.data, cstone::execution::gpuDefaultStream);
 
     groups.firstBody  = startIndex;
     groups.lastBody   = endIndex;
@@ -88,8 +88,8 @@ inline void extractGroupGpu(const GroupView& grp, const cstone::LocalIndex* indi
     out.groupEnd   = rawPtr(out.data) + numOutGroups;
 
     if (numOutGroups == 0) { return; }
-    cstone::gather(cstone::execution::Gpu{0}, indices + first, numOutGroups, grp.groupStart, out.groupStart);
-    cstone::gather(cstone::execution::Gpu{0}, indices + first, numOutGroups, grp.groupEnd, out.groupEnd);
+    cstone::gather(cstone::execution::gpuDefaultStream, indices + first, numOutGroups, grp.groupStart, out.groupStart);
+    cstone::gather(cstone::execution::gpuDefaultStream, indices + first, numOutGroups, grp.groupEnd, out.groupEnd);
 }
 
 //! @brief return a new GroupView that corresponds to a slice [first:last] of the input group @p grp

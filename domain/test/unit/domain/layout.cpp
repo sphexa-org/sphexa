@@ -110,7 +110,7 @@ TEST(Layout, gatherArrays)
     std::vector<float> scratch(a.size());
 
     LocalIndex outOffset = 1;
-    gatherArrays({ordering.data(), ordering.size()}, outOffset, std::tie(a, b), std::tie(scratch), execution::Cpu{});
+    gatherArrays({ordering.data(), ordering.size()}, outOffset, std::tie(a, b), std::tie(scratch), execution::cpu);
 
     static_assert(not SmallerElementSize<0, std::vector<int>, std::tuple<std::vector<char>, std::vector<int>>>{});
     static_assert(SmallerElementSize<1, std::vector<int>, std::tuple<std::vector<char>, std::vector<int>>>{});

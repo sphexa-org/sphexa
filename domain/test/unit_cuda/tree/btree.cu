@@ -33,9 +33,10 @@ void internal4x4x4PrefixTest()
 
     cudaStream_t stream;
     cudaStreamCreate(&stream);
+    const auto exec = execution::gpuStream(stream);
     thrust::device_vector<BinaryNode<I>> d_internalTree(nNodes(tree));
     createBinaryTreeGpu(thrust::raw_pointer_cast(tree.data()), nNodes(tree),
-                        thrust::raw_pointer_cast(d_internalTree.data()), stream);
+                        thrust::raw_pointer_cast(d_internalTree.data()), exec);
     cudaStreamSynchronize(stream);
     cudaStreamDestroy(stream);
 

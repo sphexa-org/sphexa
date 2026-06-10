@@ -68,14 +68,14 @@ TEST(CsArrayGpu, computeNodeCountsGpu)
 
     computeNodeCountsGpu(rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree),
                          {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), false,
-                         0);
+                         execution::gpuDefaultStream);
     thrust::host_vector<unsigned> h_counts = d_counts;
     EXPECT_EQ(h_counts, refCounts);
 
     // check again, using previous counts as guesses
     computeNodeCountsGpu(rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree),
                          {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), true,
-                         0);
+                         execution::gpuDefaultStream);
     h_counts = d_counts;
     EXPECT_EQ(h_counts, refCounts);
 }
@@ -91,7 +91,8 @@ TEST(CsArrayGpu, rebalanceDecision)
     thrust::fill_n(counts.begin() + 8, 7, 0);
 
     thrust::device_vector<TreeNodeIndex> nodeOps(tree.size());
-    computeNodeOpsGpu(rawPtr(tree), nNodes(tree), rawPtr(counts), bucketSize, rawPtr(nodeOps), 0);
+    computeNodeOpsGpu(rawPtr(tree), nNodes(tree), rawPtr(counts), bucketSize, rawPtr(nodeOps),
+                      execution::gpuDefaultStream);
 
     // regular level-3 cornerstone tree with 512 leaves
     thrust::host_vector<TreeNodeIndex> h_nodeOps = nodeOps;
@@ -112,7 +113,8 @@ TEST(CsArrayGpu, rebalanceTree)
         std::vector<TreeNodeIndex>{0, 1, 9, 10, 11, 12, 13, 14, 15, 15, 15, 15, 15, 15, 15, 15};
     thrust::device_vector<KeyType> newTree(*nodeOps.rbegin() + 1);
 
-    bool converged = rebalanceTreeGpu(rawPtr(tree), nNodes(tree), nNodes(newTree), rawPtr(nodeOps), rawPtr(newTree), 0);
+    bool converged = rebalanceTreeGpu(rawPtr(tree), nNodes(tree), nNodes(newTree), rawPtr(nodeOps), rawPtr(newTree),
+                                      execution::gpuDefaultStream);
 
     // download tree from host
     thrust::host_vector<KeyType> h_tree    = newTree;
@@ -144,7 +146,7 @@ public:
         DeviceVector<TreeNodeIndex> workArray;
 
         while (!updateOctreeGpu<KeyType>({rawPtr(d_codes), d_codes.size()}, bucketSize, d_tree, d_counts, tmpTree,
-                                         workArray, execution::Gpu{0}))
+                                         workArray, execution::gpuDefaultStream))
             ;
     }
 
@@ -200,17 +202,19 @@ TEST(CsArrayGpu, distributedMockUp)
 
     // determine the part of the tree that will be empty
     CodeType nodeKey1, nodeKey2;
-    memcpyD2HAsync(execution::Gpu{0}, fixt.d_tree.data() + firstNode, 1, &nodeKey1);
-    memcpyD2HAsync(execution::Gpu{0}, fixt.d_tree.data() + lastNode, 1, &nodeKey2);
-    unsigned firstIdx = lowerBound(execution::Gpu{0}, fixt.d_codes.data(), fixt.d_codes.data() + fixt.d_codes.size(), nodeKey1);
-    unsigned lastIdx  = lowerBound(execution::Gpu{0}, fixt.d_codes.data(), fixt.d_codes.data() + fixt.d_codes.size(), nodeKey2);
+    memcpyD2HAsync(execution::gpuDefaultStream, fixt.d_tree.data() + firstNode, 1, &nodeKey1);
+    memcpyD2HAsync(execution::gpuDefaultStream, fixt.d_tree.data() + lastNode, 1, &nodeKey2);
+    unsigned firstIdx = lowerBound(execution::gpuDefaultStream, fixt.d_codes.data(),
+                                   fixt.d_codes.data() + fixt.d_codes.size(), nodeKey1);
+    unsigned lastIdx  = lowerBound(execution::gpuDefaultStream, fixt.d_codes.data(),
+                                   fixt.d_codes.data() + fixt.d_codes.size(), nodeKey2);
     std::cout << firstNode << " " << lastNode << std::endl;
     std::cout << firstIdx << " " << lastIdx << std::endl;
 
     bool useCountsAsGuess = true;
     computeNodeCountsGpu(fixt.d_tree.data(), fixt.d_counts.data(), nNodes(fixt.d_tree),
                          {fixt.d_codes.data() + firstIdx, fixt.d_codes.data() + lastIdx},
-                         std::numeric_limits<unsigned>::max(), useCountsAsGuess, 0);
+                         std::numeric_limits<unsigned>::max(), useCountsAsGuess, execution::gpuDefaultStream);
 
     DeviceVector<CodeType> d_counts_ref = d_counts_orig;
     thrust::fill(thrust::device, d_counts_ref.data(), d_counts_ref.data() + firstNode, 0);

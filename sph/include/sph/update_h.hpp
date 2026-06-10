@@ -41,7 +41,6 @@ bool updateSmoothingLength(const GroupView& grp, Dataset& d)
     if constexpr (execution::HaveGpu<typename Dataset::Exec>{})
     {
         bool keysRemoved = updateSmoothingLengthGpu(grp, d.ng0, rawPtr(d.nc), rawPtr(d.h), rawPtr(d.keys));
-        syncGpu(0);
         return keysRemoved;
     }
     else

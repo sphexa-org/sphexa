@@ -31,7 +31,7 @@ TEST(SortByKey, minimal)
     DeviceVector<KeyType> keys = std::vector<KeyType>{2, 1, 5, 4};
     DeviceVector<IndexType> obuf, keyBuf, valBuf;
 
-    constexpr execution::Gpu exec{0};
+    const auto exec = execution::gpuDefaultStream;
 
     LocalIndex off = 1;
     sequence(exec, off, keys.size(), obuf, 1.0);

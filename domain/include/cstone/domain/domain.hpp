@@ -325,7 +325,7 @@ public:
 
         lowMemReallocate(bufDesc_.size, allocGrowthRate_, arrays, std::tie(sendBuffer, receiveBuffer));
         gatherArrays({ord + global_.numSendDown(), global_.numAssigned()}, bufDesc_.start, arrays,
-                     std::tie(sendBuffer, receiveBuffer), execution::Cpu{});
+                     std::tie(sendBuffer, receiveBuffer), execution::cpu);
     }
 
     //! @brief repeat the halo exchange pattern from the previous sync operation for a different set of arrays

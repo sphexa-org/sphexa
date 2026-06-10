@@ -24,7 +24,8 @@
 #include "ryoanji/interface/multipole_holder.cuh"
 #include "ryoanji/nbody/cartesian_qpole.hpp"
 
-using Exec = cstone::execution::Gpu;
+using Exec          = cstone::execution::Gpu;
+constexpr Exec exec = cstone::execution::gpuDefaultStream;
 
 using namespace ryoanji;
 
@@ -51,7 +52,7 @@ void ryoanjiTest(int thisRank, int numRanks, size_t numParticlesGlobal)
     std::vector<T> m(numParticles, 1.0f / float(numParticlesGlobal));
 
     cstone::Domain<KeyType, T, Exec> domain(thisRank, numRanks, bucketSizeGlobal, bucketSizeFocus, theta,
-                                            MPI_COMM_WORLD, Exec::Default(), box);
+                                            MPI_COMM_WORLD, exec, box);
 
     // upload particles to GPU
     cstone::DeviceVector<KeyType> d_keys = std::vector<KeyType>(numParticles);

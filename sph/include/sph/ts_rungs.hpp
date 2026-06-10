@@ -80,9 +80,9 @@ void sortGroupDt(float* groupDt, cstone::LocalIndex* groupIndices, cstone::Local
     auto  buffers     = util::packAllocBuffer<float>(scratch, {numElements, 3}, 128);
     auto* valueBuf    = reinterpret_cast<LocalIndex*>(buffers[1].data());
     void* tempStorage = buffers[2].data();
-    cstone::sequence(cstone::execution::Gpu{0}, groupIndices, numGroups, 0u);
-    cstone::sortByKey(cstone::execution::Gpu{0}, groupDt, groupDt + numGroups, groupIndices, buffers[0].data(),
-                      valueBuf, tempStorage, tempElem * sizeof(float));
+    cstone::sequence(cstone::execution::gpuDefaultStream, groupIndices, numGroups, 0u);
+    cstone::sortByKey(cstone::execution::gpuDefaultStream, groupDt, groupDt + numGroups, groupIndices,
+                      buffers[0].data(), valueBuf, tempStorage, tempElem * sizeof(float));
     reallocate(oldSize, 1.0, scratch);
 };
 
@@ -90,10 +90,10 @@ void sortGroupDt(float* groupDt, cstone::LocalIndex* groupIndices, cstone::Local
 inline auto timestepRangeGpu(const float* groupDt, cstone::LocalIndex numGroups, float fastFraction)
 {
     std::array<float, 2> minGroupDt;
-    cstone::memcpyD2HAsync(cstone::execution::Gpu{0}, groupDt, 1, minGroupDt.data());
-    cstone::memcpyD2HAsync(cstone::execution::Gpu{0}, groupDt + cstone::LocalIndex(fastFraction * numGroups), 1,
-                           minGroupDt.data() + 1);
-    cstone::syncGpu(0);
+    cstone::memcpyD2HAsync(cstone::execution::gpuDefaultStream, groupDt, 1, minGroupDt.data());
+    cstone::memcpyD2HAsync(cstone::execution::gpuDefaultStream, groupDt + cstone::LocalIndex(fastFraction * numGroups),
+                           1, minGroupDt.data() + 1);
+    cstone::syncGpu(cstone::execution::gpuDefaultStream);
     return minGroupDt;
 }
 
@@ -106,7 +106,8 @@ auto computeMinTimestep(float* groupDt, LocalIndex* groupIndices, LocalIndex num
     if constexpr (cstone::IsDeviceVector<AccVec>{})
     {
         sortGroupDt(groupDt, groupIndices, numGroups, scratch);
-        cstone::sequence(cstone::execution::Gpu{0}, groupIndices + numGroups, numGroupsTot - numGroups, numGroups);
+        cstone::sequence(cstone::execution::gpuDefaultStream, groupIndices + numGroups, numGroupsTot - numGroups,
+                         numGroups);
         minGroupDt = timestepRangeGpu(groupDt, numGroups, fastFraction);
     }
 
@@ -133,7 +134,8 @@ auto findRungRanges(float minDt, const float* groupDt, LocalIndex numGroups, int
     {
         float maxDtRung = (1 << rung) * minDt;
         if constexpr (useGpu)
-            rungRanges[rung] = cstone::lowerBound(cstone::execution::Gpu{0}, groupDt, groupDt + numGroups, maxDtRung);
+            rungRanges[rung] =
+                cstone::lowerBound(cstone::execution::gpuDefaultStream, groupDt, groupDt + numGroups, maxDtRung);
         else
             rungRanges[rung] = std::lower_bound(groupDt, groupDt + numGroups, maxDtRung) - groupDt;
     }

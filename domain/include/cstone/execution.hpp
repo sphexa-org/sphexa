@@ -40,24 +40,50 @@ namespace cstone::execution
 
 struct Cpu
 {
-    constexpr static Cpu Default() { return {}; }
 };
 
 struct Gpu
 {
-    cudaStream_t stream;
+    operator cudaStream_t() const { return stream; }
 
-    constexpr Gpu(cudaStream_t s)
-        : stream(s)
+private:
+    constexpr explicit Gpu(cudaStream_t stream)
+        : stream(stream)
     {
     }
 
-    constexpr static Gpu Default() { return {0}; }
+    friend constexpr Gpu gpuStream(cudaStream_t stream);
 
-    operator cudaStream_t() const { return stream; }
+    cudaStream_t stream;
 };
 
 template<class Execution>
 using HaveGpu = std::is_same<Execution, Gpu>;
+
+constexpr inline Cpu cpu;
+
+constexpr inline Gpu gpuStream(cudaStream_t stream) { return Gpu(stream); }
+
+constexpr inline Gpu gpuDefaultStream = gpuStream(0);
+
+namespace detail
+{
+
+template<class Exec>
+struct DefaultExec
+{
+    static constexpr Exec value = {};
+};
+
+template<>
+struct DefaultExec<Gpu>
+{
+    static constexpr Gpu value = gpuDefaultStream;
+};
+
+} // namespace detail
+
+template<class T>
+constexpr T defaultExec = detail::DefaultExec<T>::value;
 
 } // namespace cstone::execution

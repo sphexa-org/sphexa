@@ -55,7 +55,7 @@ template<class T, class Dataset>
 void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T massPart)
 {
     using Exec      = typename Dataset::Exec;
-    auto exec     = Exec::Default();
+    auto exec     = cstone::execution::defaultExec<Exec>;
     using HydroType = Dataset::HydroType;
     T rhoInt        = constants.at("rhoInt");
     T rhoExt        = constants.at("rhoExt");

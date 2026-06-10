@@ -68,7 +68,7 @@ template<class Dataset>
 void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
 {
     using Exec      = typename Dataset::Exec;
-    auto exec     = Exec::Default();
+    auto exec     = cstone::execution::defaultExec<Exec>;
     using T         = typename Dataset::RealType;
     using HydroType = typename Dataset::HydroType;
 

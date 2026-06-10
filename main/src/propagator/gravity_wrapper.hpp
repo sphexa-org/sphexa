@@ -151,10 +151,11 @@ public:
         if (usePbc)
         {
             ryoanji::Vec4<Tf> rootCenter;
-            memcpyD2HAsync(execution::Gpu{0}, domain.focusTree().expansionCentersAcc().data(), 1, &rootCenter);
+            memcpyD2HAsync(execution::gpuDefaultStream, domain.focusTree().expansionCentersAcc().data(), 1,
+                           &rootCenter);
             MType rootM;
-            memcpyD2HAsync(execution::Gpu{0}, mHolder_.deviceMultipoles(), 1, &rootM);
-            syncGpu(0);
+            memcpyD2HAsync(execution::gpuDefaultStream, mHolder_.deviceMultipoles(), 1, &rootM);
+            syncGpu(execution::gpuDefaultStream);
 
             computeGravityEwaldGpu(makeVec3(rootCenter), rootM, grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m),
                                    box, d.g, rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), &d.egrav,

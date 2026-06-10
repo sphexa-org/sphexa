@@ -17,6 +17,7 @@
 
 #include <vector>
 
+#include "cstone/execution.hpp"
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/util/noinit_alloc.hpp"
 #include "cstone/cuda/cuda_stubs.h"
@@ -42,8 +43,9 @@ auto mpiSendGpuDirect(T* data,
     if constexpr (!useGpuDirect)
     {
         std::vector<T, util::DefaultInitAdaptor<T>> hostBuffer(count);
-        memcpyD2HAsync(0, data, count, hostBuffer.data());
-        syncGpu(0);
+        const auto exec = execution::gpuDefaultStream;
+        memcpyD2HAsync(exec, data, count, hostBuffer.data());
+        syncGpu(exec);
         auto errCode = mpiSendAsync(hostBuffer.data(), count, rank, tag, requests, comm);
         buffers.push_back(std::move(hostBuffer));
 
@@ -74,9 +76,10 @@ auto mpiRecvGpuDirect(T* data, int count, int rank, int tag, MPI_Status* status,
     if constexpr (!useGpuDirect)
     {
         std::vector<T, util::DefaultInitAdaptor<T>> hostBuffer(count);
-        auto errCode = mpiRecvSync(hostBuffer.data(), count, rank, tag, status, comm);
-        memcpyH2DAsync(0, hostBuffer.data(), count, data);
-        syncGpu(0);
+        auto errCode    = mpiRecvSync(hostBuffer.data(), count, rank, tag, status, comm);
+        const auto exec = execution::gpuDefaultStream;
+        memcpyH2DAsync(exec, hostBuffer.data(), count, data);
+        syncGpu(exec);
 
         return errCode;
     }
@@ -120,11 +123,12 @@ auto mpiAllreduceGpuDirect(const T* src, T* dest, size_t count, MPI_Op op, MPI_C
     if constexpr (!useGpuDirect)
     {
         std::vector<T> srcBuf(count), destBuf(count);
-        memcpyD2HAsync(0, src, count, srcBuf.data());
-        syncGpu(0);
+        const auto exec = execution::gpuDefaultStream;
+        memcpyD2HAsync(exec, src, count, srcBuf.data());
+        syncGpu(exec);
         mpiAllreduce(srcBuf.data(), destBuf.data(), count, op, comm);
-        memcpyH2DAsync(0, destBuf.data(), count, dest);
-        syncGpu(0);
+        memcpyH2DAsync(exec, destBuf.data(), count, dest);
+        syncGpu(exec);
     }
     else
     {
@@ -138,6 +142,7 @@ auto mpiAllgathervGpuDirect(const Ts* src, int sendCount, Td* dest, const int* c
 {
     if constexpr (useGpu && !useGpuDirect)
     {
+        const auto exec = execution::gpuDefaultStream;
         int numRanks;
         MPI_Comm_size(comm, &numRanks);
         std::size_t numElements = displ[numRanks - 1] + counts[numRanks - 1];
@@ -150,20 +155,20 @@ auto mpiAllgathervGpuDirect(const Ts* src, int sendCount, Td* dest, const int* c
             {
                 srcStage.resize(sizeof(Ts) * numElements);
                 srcUse = reinterpret_cast<Ts*>(srcStage.data());
-                memcpyD2HAsync(0, src, numElements, srcUse);
-                syncGpu(0);
+                memcpyD2HAsync(exec, src, numElements, srcUse);
+                syncGpu(exec);
             }
         }
 
         std::vector<Td> destStage(numElements);
         if (src == MPI_IN_PLACE)
         {
-            memcpyD2HAsync(execution::Gpu{0}, dest, numElements, destStage.data());
-            syncGpu(0);
+            memcpyD2HAsync(exec, dest, numElements, destStage.data());
+            syncGpu(exec);
         }
         mpiAllgatherv(srcUse, sendCount, destStage.data(), counts, displ, comm);
-        memcpyH2DAsync(0, destStage.data(), destStage.size(), dest);
-        syncGpu(0);
+        memcpyH2DAsync(exec, destStage.data(), destStage.size(), dest);
+        syncGpu(exec);
     }
     else
     {

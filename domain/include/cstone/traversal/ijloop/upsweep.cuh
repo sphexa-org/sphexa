@@ -104,7 +104,7 @@ void upsweep(const OctreeNsView<Tc, KeyType>& tree,
     }
 
     std::array<TreeNodeIndex, maxTreeLevel<KeyType>() + 2> levelRange;
-    memcpyD2HAsync(execution::Gpu::Default(), tree.levelRange, levelRange.size(), levelRange.data());
+    memcpyD2HAsync(execution::gpuDefaultStream, tree.levelRange, levelRange.size(), levelRange.data());
 
     for (int level = maxTreeLevel<KeyType>() - 1; level >= 0; --level)
     {

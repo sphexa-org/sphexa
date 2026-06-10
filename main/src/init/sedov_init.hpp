@@ -50,7 +50,7 @@ template<class Dataset>
 void initSedovFields(Dataset& d, const InitSettings& constants)
 {
     using Exec  = typename Dataset::Exec;
-    auto exec = Exec::Default();
+    auto exec = cstone::execution::defaultExec<Exec>;
     using T     = Dataset::RealType;
 
     double r           = constants.at("r1");

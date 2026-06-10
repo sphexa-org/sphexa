@@ -116,7 +116,7 @@ void driveTurbulence(GroupView grp, Dataset& d,
         computeStirringGpu(grp, turb.numDim, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.ax), rawPtr(d.ay),
                            rawPtr(d.az), turb.numModes, rawPtr(turb.d_modes), rawPtr(turb.d_phasesReal),
                            rawPtr(turb.d_phasesImag), rawPtr(turb.d_amplitudes), turb.solWeightNorm);
-        cstone::syncGpu(0);
+        cstone::syncGpu(cstone::execution::gpuDefaultStream);
     }
     else
     {

@@ -96,7 +96,7 @@ void exchangeParticlesGpu(int epoch,
     const auto gatherGpu = [](std::span<const LocalIndex> ordering, const auto* src, auto* dest)
     {
         // TODO: remove usage of default stream
-        gather(execution::Gpu{0}, ordering.data(), ordering.size(), src, dest);
+        gather(execution::gpuDefaultStream, ordering.data(), ordering.size(), src, dest);
     };
 
     char* sendPtr = sendBuffer;

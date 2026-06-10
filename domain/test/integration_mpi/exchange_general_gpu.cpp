@@ -49,7 +49,7 @@ TEST(GeneralFocusExchangeGpu, bareTreelet)
     std::vector<IndexPair<TreeNodeIndex>> scatterSubRangePerRank{{0, 2}, {0, 2}};
 
     ConcatVector<TreeNodeIndex, DeviceVector> d_gatherMaps;
-    copy(gatherMaps, d_gatherMaps, execution::Gpu{0});
+    copy(gatherMaps, d_gatherMaps, execution::gpuDefaultStream);
     DeviceVector<TreeNodeIndex> d_scatterMap = scatterMap;
     DeviceVector<unsigned> d_counts          = counts;
     DeviceVector<char> scratch;
@@ -58,7 +58,7 @@ TEST(GeneralFocusExchangeGpu, bareTreelet)
     exchangeTreeletGeneral<unsigned>(peers, peers, d_gatherMapsView,
                                      {rawPtr(scatterSubRangePerRank), scatterSubRangePerRank.size()},
                                      {rawPtr(d_scatterMap), d_scatterMap.size()}, {rawPtr(d_counts), d_counts.size()},
-                                     0, scratch, MPI_COMM_WORLD, execution::Gpu{0});
+                                     0, scratch, MPI_COMM_WORLD, execution::gpuDefaultStream);
 
     std::vector<unsigned> h_counts = toHost(d_counts);
 
@@ -129,17 +129,17 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
     std::span<const unsigned> d_globCountsView{rawPtr(d_globCounts), d_globCounts.size()};
 
     FocusedOctree<KeyType, T, execution::Gpu> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD,
-                                                        execution::Gpu{0});
+                                                        execution::gpuDefaultStream);
     focusTree.converge(box, d_keysView, assignment, d_globTreeView, d_globCountsView, invThetaEff, d_scratch);
 
     auto d_countsView = focusTree.countsAcc();
     std::vector<unsigned> testCounts(d_countsView.size());
-    memcpyD2HAsync(execution::Gpu{0}, d_countsView.data(), d_countsView.size(), testCounts.data());
+    memcpyD2HAsync(execution::gpuDefaultStream, d_countsView.data(), d_countsView.size(), testCounts.data());
 
     auto octreeView = focusTree.octreeViewAcc();
     std::vector<KeyType> prefixes(octreeView.numNodes);
-    memcpyD2HAsync(execution::Gpu{0}, octreeView.prefixes, octreeView.numNodes, prefixes.data());
-    syncGpu(0);
+    memcpyD2HAsync(execution::gpuDefaultStream, octreeView.prefixes, octreeView.numNodes, prefixes.data());
+    syncGpu(execution::gpuDefaultStream);
 
     {
         for (size_t i = 0; i < testCounts.size(); ++i)
