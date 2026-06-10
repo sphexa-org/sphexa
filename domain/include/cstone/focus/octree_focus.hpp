@@ -144,7 +144,7 @@ struct CombinedUpdate
                                std::span<const unsigned> counts,
                                std::span<const uint8_t> macs,
                                Vector& scratch,
-                               cudaStream_t stream)
+                               execution::Gpu exec)
     {
         TreeNodeIndex numNodes = tree.numLeafNodes + tree.numInternalNodes;
         assert(TreeNodeIndex(counts.size()) == numNodes);
@@ -155,35 +155,35 @@ struct CombinedUpdate
         std::span<TreeNodeIndex> nodeOpsAll(rawPtr(tree.internalToLeaf), numNodes);
         rebalanceDecisionEssentialGpu(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(tree.parents),
                                       counts.data(), macs.data(), focusStart, focusEnd, bucketSize, nodeOpsAll.data(),
-                                      numNodes, stream);
+                                      numNodes, exec);
 
         auto status = ResolutionStatus::converged;
 
         status = enforceKeysGpu(mandatoryKeys.data(), mandatoryKeys.size(), rawPtr(tree.prefixes),
-                                rawPtr(tree.childOffsets), rawPtr(tree.parents), nodeOpsAll.data(), stream);
+                                rawPtr(tree.childOffsets), rawPtr(tree.parents), nodeOpsAll.data(), exec);
         bool converged =
-            protectAncestorsGpu(rawPtr(tree.prefixes), rawPtr(tree.parents), nodeOpsAll.data(), numNodes, stream);
+            protectAncestorsGpu(rawPtr(tree.prefixes), rawPtr(tree.parents), nodeOpsAll.data(), numNodes, exec);
 
         // extract leaf decision, using childOffsets as temp storage
         assert(tree.childOffsets.size() >= size_t(tree.numLeafNodes + 1));
         std::span<TreeNodeIndex> nodeOps(rawPtr(tree.childOffsets), tree.numLeafNodes + 1);
-        gather(stream, leafToInternal(tree).data(), nNodes(leaves), nodeOpsAll.data(), nodeOps.data());
+        gather(exec, leafToInternal(tree).data(), nNodes(leaves), nodeOpsAll.data(), nodeOps.data());
 
         if (status == ResolutionStatus::cancelMerge)
         {
-            converged = count(stream, nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1) ==
+            converged = count(exec, nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1) ==
                         std::size_t(tree.numLeafNodes);
         }
         else if (status == ResolutionStatus::rebalance) { converged = false; }
 
-        exclusiveScan(stream, nodeOps.data(), nodeOps.data() + nodeOps.size(), nodeOps.data());
+        exclusiveScan(exec, nodeOps.data(), nodeOps.data() + nodeOps.size(), nodeOps.data());
         TreeNodeIndex newNumLeafNodes;
-        memcpyD2HAsync(stream, nodeOps.data() + nodeOps.size() - 1, 1, &newNumLeafNodes);
-        syncGpu(stream); // wait for D2H before using newNumLeafNodes on host
+        memcpyD2HAsync(exec, nodeOps.data() + nodeOps.size() - 1, 1, &newNumLeafNodes);
+        syncGpu(exec); // wait for D2H before using newNumLeafNodes on host
 
         auto& newLeaves = tree.prefixes;
         reallocateDestructive(newLeaves, newNumLeafNodes + 1, 1.05);
-        rebalanceTreeGpu(rawPtr(leaves), nNodes(leaves), newNumLeafNodes, nodeOps.data(), rawPtr(newLeaves), stream);
+        rebalanceTreeGpu(rawPtr(leaves), nNodes(leaves), newNumLeafNodes, nodeOps.data(), rawPtr(newLeaves), exec);
         swap(newLeaves, leaves);
 
         // if rebalancing couldn't introduce the mandatory keys, we force-inject them now into the tree
@@ -191,7 +191,7 @@ struct CombinedUpdate
         {
             converged = false;
             injectKeysGpu(leaves, {mandatoryKeys.data(), mandatoryKeys.size()}, tree.prefixes, tree.childOffsets,
-                          tree.internalToLeaf, stream);
+                          tree.internalToLeaf, exec);
         }
 
         tree.resize(nNodes(leaves));
@@ -205,7 +205,7 @@ struct CombinedUpdate
         auto [keyBuf, valueBuf, cubTmp] = util::packAllocBuffer(scratch, util::TypeList<KeyType, TreeNodeIndex, char>{},
                                                                 {newNumNodes, newNumNodes, cubTmpSize}, 128);
 
-        buildOctreeGpu(stream, rawPtr(leaves), tree.data(), keyBuf, valueBuf, cubTmp);
+        buildOctreeGpu(exec, rawPtr(leaves), tree.data(), keyBuf, valueBuf, cubTmp);
         scratch.resize(originalSize);
 
         return converged;

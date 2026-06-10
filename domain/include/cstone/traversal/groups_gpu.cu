@@ -41,12 +41,12 @@ fixedGroupsKernel(LocalIndex first, LocalIndex last, unsigned groupSize, LocalIn
 }
 
 void computeFixedGroups(
-    LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups, cudaStream_t stream)
+    LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups, execution::Gpu exec)
 {
     LocalIndex numBodies = last - first;
     LocalIndex numGroups = iceil(numBodies, groupSize);
     groups.data.resize(numGroups + 1);
-    fixedGroupsKernel<<<iceil(numBodies, 256), 256, 0, stream>>>(first, last, groupSize, rawPtr(groups.data),
+    fixedGroupsKernel<<<iceil(numBodies, 256), 256, 0, exec>>>(first, last, groupSize, rawPtr(groups.data),
                                                                  numGroups);
 
     groups.firstBody  = first;
@@ -73,7 +73,7 @@ void computeGroupSplitsImpl(
     DeviceVector<util::array<GpuConfig::ThreadMask, groupSize / GpuConfig::warpSize>>& splitMasks,
     DeviceVector<LocalIndex>& numSplitsPerGroup,
     DeviceVector<LocalIndex>& groups,
-    cudaStream_t stream)
+    execution::Gpu exec)
 {
     LocalIndex numParticles   = last - first;
     LocalIndex numFixedGroups = iceil(numParticles, groupSize);
@@ -86,27 +86,27 @@ void computeGroupSplitsImpl(
     numSplitsPerGroup.resize(numFixedGroups + 1);
 
     if (numFixedGroups > 0)
-        groupSplitsKernel<groupSize><<<iceil(gridSize, numThreads), numThreads, 0, stream>>>(
+        groupSplitsKernel<groupSize><<<iceil(gridSize, numThreads), numThreads, 0, exec>>>(
             first, last, x, y, z, h, leaves, numLeaves, layout, box, tolFactor, rawPtr(splitMasks),
             rawPtr(numSplitsPerGroup), numFixedGroups);
 
     groups.reserve(numFixedGroups * 1.1);
     groups.resize(numFixedGroups + 1);
-    exclusiveScan(stream, rawPtr(numSplitsPerGroup), rawPtr(numSplitsPerGroup) + numFixedGroups + 1, rawPtr(groups));
+    exclusiveScan(exec, rawPtr(numSplitsPerGroup), rawPtr(numSplitsPerGroup) + numFixedGroups + 1, rawPtr(groups));
     LocalIndex newNumGroups;
-    memcpyD2HAsync(stream, rawPtr(groups) + groups.size() - 1, 1, &newNumGroups);
-    syncGpu(stream);
+    memcpyD2HAsync(exec, rawPtr(groups) + groups.size() - 1, 1, &newNumGroups);
+    syncGpu(exec);
 
     auto& newGroupSizes = numSplitsPerGroup;
     newGroupSizes.resize(newNumGroups + 1);
 
     if (numFixedGroups > 0)
-        makeSplitsKernel<<<numFixedGroups, numThreads, 0, stream>>>(rawPtr(splitMasks), rawPtr(groups), numFixedGroups,
+        makeSplitsKernel<<<numFixedGroups, numThreads, 0, exec>>>(rawPtr(splitMasks), rawPtr(groups), numFixedGroups,
                                                                     rawPtr(newGroupSizes));
 
     groups.resize(newNumGroups + 1);
-    exclusiveScan(stream, rawPtr(newGroupSizes), rawPtr(newGroupSizes) + newNumGroups + 1, rawPtr(groups), first);
-    memcpyH2DAsync(stream, &last, 1, rawPtr(groups) + groups.size() - 1);
+    exclusiveScan(exec, rawPtr(newGroupSizes), rawPtr(newGroupSizes) + newNumGroups + 1, rawPtr(groups), first);
+    memcpyH2DAsync(exec, &last, 1, rawPtr(groups) + groups.size() - 1);
 }
 
 template<class Tc, class T, class KeyType>
@@ -124,19 +124,19 @@ void computeGroupSplits(LocalIndex first,
                         float tolFactor,
                         DeviceVector<LocalIndex>& numSplitsPerGroup,
                         DeviceVector<LocalIndex>& groups,
-                        cudaStream_t stream)
+                        execution::Gpu exec)
 {
     if (groupSize == GpuConfig::warpSize)
     {
         DeviceVector<util::array<GpuConfig::ThreadMask, 1>> splitMasks;
         computeGroupSplitsImpl<GpuConfig::warpSize>(first, last, x, y, z, h, leaves, numLeaves, layout, box, tolFactor,
-                                                    splitMasks, numSplitsPerGroup, groups, stream);
+                                                    splitMasks, numSplitsPerGroup, groups, exec);
     }
     else if (groupSize == 2 * GpuConfig::warpSize)
     {
         DeviceVector<util::array<GpuConfig::ThreadMask, 2>> splitMasks;
         computeGroupSplitsImpl<2 * GpuConfig::warpSize>(first, last, x, y, z, h, leaves, numLeaves, layout, box,
-                                                        tolFactor, splitMasks, numSplitsPerGroup, groups, stream);
+                                                        tolFactor, splitMasks, numSplitsPerGroup, groups, exec);
     }
     else
     {
@@ -148,7 +148,7 @@ void computeGroupSplits(LocalIndex first,
     template void computeGroupSplits(                                                                                  \
         LocalIndex first, LocalIndex last, const Tc* x, const Tc* y, const Tc* z, const T* h, const KeyType* leaves,   \
         TreeNodeIndex numLeaves, const LocalIndex* layout, const Box<Tc> box, unsigned groupSize, float tolFactor,     \
-        DeviceVector<LocalIndex>& numSplitsPerGroup, DeviceVector<LocalIndex>& groups, cudaStream_t)
+        DeviceVector<LocalIndex>& numSplitsPerGroup, DeviceVector<LocalIndex>& groups, execution::Gpu)
 
 COMPUTE_GROUP_SPLITS(double, double, uint64_t);
 COMPUTE_GROUP_SPLITS(double, float, uint64_t);

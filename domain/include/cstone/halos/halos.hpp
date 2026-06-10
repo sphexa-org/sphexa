@@ -36,7 +36,7 @@ void haloExchangeGpu(int epoch,
                      DevVec1& sendScratchBuffer,
                      DevVec2& receiveScratchBuffer,
                      MPI_Comm comm,
-                     cudaStream_t stream,
+                     execution::Gpu exec,
                      Arrays... arrays);
 
 template<class KeyType, class Exec>

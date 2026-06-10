@@ -126,9 +126,9 @@ unsigned updateOctreeGlobal(std::span<const KeyType> keys,
                             DevCountVec& d_counts,
                             bool firstCall,
                             MPI_Comm comm,
-                            execution::Gpu stream)
+                            execution::Gpu exec)
 {
-    return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, d_counts, firstCall, comm, stream);
+    return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, d_counts, firstCall, comm, exec);
 }
 
 } // namespace cstone

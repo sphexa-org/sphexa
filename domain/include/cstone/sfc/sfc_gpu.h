@@ -23,7 +23,7 @@ namespace cstone
 
 template<class KeyType, class T>
 extern void computeSfcKeysGpu(
-    const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box, cudaStream_t stream);
+    const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box, execution::Gpu exec);
 
 template<class KeyType, class T>
 inline void computeSfcKeys(

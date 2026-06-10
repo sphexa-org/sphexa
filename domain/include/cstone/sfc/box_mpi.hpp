@@ -55,7 +55,7 @@ struct MinMax<execution::Cpu, T>
         return std::make_tuple(minimum, maximum);
     }
 
-    execution::Cpu stream;
+    execution::Cpu exec;
 };
 
 /*! @brief compute global bounding box for local x,y,z arrays
@@ -77,7 +77,7 @@ auto makeGlobalBox(const T* x,
                    const T* z,
                    size_t numElements,
                    MPI_Comm comm,
-                   Execution stream,
+                   Execution exec,
                    const Box<T>& previousBox = Box<T>(0, 1))
 {
     bool keepX = previousBox.boundaryX() == BoundaryType::periodic || previousBox.boundaryX() == BoundaryType::fixed;
@@ -88,7 +88,7 @@ auto makeGlobalBox(const T* x,
                              previousBox.ymax(), previousBox.zmin(), previousBox.zmax()};
     if (numElements)
     {
-        MinMax<Execution, T> op{stream};
+        MinMax<Execution, T> op{exec};
         std::tie(extrema[0], extrema[1]) =
             keepX ? std::make_tuple(previousBox.xmin(), previousBox.xmax()) : op(x, x + numElements);
         std::tie(extrema[2], extrema[3]) =

@@ -35,7 +35,7 @@ extern void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
                                           unsigned bucketSize,
                                           TreeNodeIndex* nodeOps,
                                           TreeNodeIndex numNodes,
-                                          cudaStream_t stream);
+                                          execution::Gpu exec);
 
 /*! @brief Take decision how to refine nodes based on Macs
  *
@@ -53,10 +53,10 @@ extern void macRefineDecisionGpu(const KeyType* prefixes,
                                  TreeNodeIndex numLeafNodes,
                                  TreeIndexPair focus,
                                  TreeNodeIndex* nodeOps,
-                                 cudaStream_t stream);
+                                 execution::Gpu exec);
 
 template<class KeyType>
-extern bool protectAncestorsGpu(const KeyType*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex, cudaStream_t stream);
+extern bool protectAncestorsGpu(const KeyType*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex, execution::Gpu exec);
 
 template<class KeyType>
 extern ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
@@ -65,7 +65,7 @@ extern ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
                                        const TreeNodeIndex* childOffsets,
                                        const TreeNodeIndex* parents,
                                        TreeNodeIndex* nodeOps,
-                                       cudaStream_t stream);
+                                       execution::Gpu exec);
 
 //! @brief see CPU version
 template<class KeyType>
@@ -74,6 +74,6 @@ extern void rangeCountGpu(std::span<const KeyType> leaves,
                           std::span<const KeyType> leavesFocus,
                           std::span<const TreeNodeIndex> leavesFocusIdx,
                           std::span<unsigned> countsFocus,
-                          cudaStream_t stream);
+                          execution::Gpu exec);
 
 } // namespace cstone

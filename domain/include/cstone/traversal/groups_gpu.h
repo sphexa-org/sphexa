@@ -30,7 +30,7 @@ namespace cstone
  * @param[out] groups     groups with fixed size @p groupSize
  */
 void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups,
-                        cudaStream_t stream);
+                        execution::Gpu exec);
 
 /*!* @brief Compute groups of particles with a maximum size and distance between consecutive particles limited
  *
@@ -73,6 +73,6 @@ extern void computeGroupSplits(LocalIndex first,
                                float tolFactor,
                                DeviceVector<LocalIndex>& numSplitsPerGroup,
                                DeviceVector<LocalIndex>& groups,
-                               cudaStream_t stream);
+                               execution::Gpu exec);
 
 } // namespace cstone

@@ -46,22 +46,22 @@ bool updateOctreeGpu(std::span<const KeyType> keys,
                      DevCountVec& counts,
                      DevKeyVec& tmpTree,
                      DevIdxVec& workArray,
-                     execution::Gpu stream,
+                     execution::Gpu exec,
                      unsigned maxCount = std::numeric_limits<unsigned>::max())
 {
     workArray.resize(tree.size());
     TreeNodeIndex newNumNodes =
-        computeNodeOpsGpu(rawPtr(tree), nNodes(tree), rawPtr(counts), bucketSize, rawPtr(workArray), stream);
+        computeNodeOpsGpu(rawPtr(tree), nNodes(tree), rawPtr(counts), bucketSize, rawPtr(workArray), exec);
 
     tmpTree.resize(newNumNodes + 1);
     bool converged =
-        rebalanceTreeGpu(rawPtr(tree), nNodes(tree), newNumNodes, rawPtr(workArray), rawPtr(tmpTree), stream);
+        rebalanceTreeGpu(rawPtr(tree), nNodes(tree), newNumNodes, rawPtr(workArray), rawPtr(tmpTree), exec);
 
     swap(tree, tmpTree);
     counts.resize(nNodes(tree));
 
     // local node counts
-    computeNodeCountsGpu(rawPtr(tree), rawPtr(counts), nNodes(tree), keys, maxCount, true, stream);
+    computeNodeCountsGpu(rawPtr(tree), rawPtr(counts), nNodes(tree), keys, maxCount, true, exec);
 
     return converged;
 }

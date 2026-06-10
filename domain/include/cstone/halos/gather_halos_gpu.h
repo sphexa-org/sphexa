@@ -27,6 +27,6 @@ extern void gatherRanges(const IndexType* rangeScan,
                          const T* src,
                          T* buffer,
                          size_t bufferSize,
-                         cudaStream_t stream);
+                         execution::Gpu exec);
 
 } // namespace cstone

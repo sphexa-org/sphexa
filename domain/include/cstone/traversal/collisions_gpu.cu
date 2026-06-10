@@ -65,13 +65,13 @@ void findHalosGpu(const KeyType* prefixes,
                   TreeNodeIndex firstNode,
                   TreeNodeIndex lastNode,
                   uint8_t* collisionFlags,
-                  cudaStream_t stream)
+                  execution::Gpu exec)
 {
     constexpr unsigned numThreads = 128;
     unsigned numBlocks            = iceil(lastNode - firstNode, numThreads);
 
     if (numBlocks == 0) { return; }
-    findHalosKernel<<<numBlocks, numThreads, 0, stream>>>(prefixes, childOffsets, parents, nodeCenters, nodeSizes,
+    findHalosKernel<<<numBlocks, numThreads, 0, exec>>>(prefixes, childOffsets, parents, nodeCenters, nodeSizes,
                                                           leaves, searchCenters, searchSizes, box, firstNode, lastNode,
                                                           collisionFlags);
 }
@@ -81,7 +81,7 @@ void findHalosGpu(const KeyType* prefixes,
                                const TreeNodeIndex* parents, const Vec3<T>* nodeCenters, const Vec3<T>* nodeSizes,     \
                                const KeyType* leaves, const Vec3<T>* searchCenters, const Vec3<T>* searchSizes,        \
                                const Box<T>& box, TreeNodeIndex firstNode, TreeNodeIndex lastNode,                     \
-                               uint8_t* collisionFlags, cudaStream_t)
+                               uint8_t* collisionFlags, execution::Gpu)
 
 FIND_HALOS_GPU(uint32_t, float);
 FIND_HALOS_GPU(uint64_t, float);
@@ -127,14 +127,14 @@ void markMacsGpu(const KeyType* prefixes,
                  TreeNodeIndex numFocusNodes,
                  bool limitSource,
                  uint8_t* markings,
-                 cudaStream_t stream)
+                 execution::Gpu exec)
 {
     constexpr unsigned numThreads = 128;
     unsigned numBlocks            = iceil(numFocusNodes, numThreads);
 
     if (numFocusNodes)
     {
-        markMacsGpuKernel<<<numBlocks, numThreads, 0, stream>>>(prefixes, childOffsets, parents, centers, box,
+        markMacsGpuKernel<<<numBlocks, numThreads, 0, exec>>>(prefixes, childOffsets, parents, centers, box,
                                                                 focusNodes, numFocusNodes, limitSource, markings);
     }
 }
@@ -143,7 +143,7 @@ void markMacsGpu(const KeyType* prefixes,
     template void markMacsGpu(const KeyType* prefixes, const TreeNodeIndex* childOffsets,                              \
                               const TreeNodeIndex* parents, const Vec4<T>* centers, const Box<T>& box,                 \
                               const KeyType* focusNodes, TreeNodeIndex numFocusNodes, bool limitSource,                \
-                              uint8_t* markings, cudaStream_t)
+                              uint8_t* markings, execution::Gpu)
 
 MARK_MACS_GPU(uint64_t, double);
 MARK_MACS_GPU(uint64_t, float);

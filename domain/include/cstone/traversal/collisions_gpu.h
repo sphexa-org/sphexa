@@ -55,7 +55,7 @@ extern void findHalosGpu(const KeyType* prefixes,
                          TreeNodeIndex firstNode,
                          TreeNodeIndex lastNode,
                          uint8_t* collisionFlags,
-                         cudaStream_t stream);
+                         execution::Gpu exec);
 
 template<class T, class KeyType>
 extern void markMacsGpu(const KeyType* prefixes,
@@ -67,6 +67,6 @@ extern void markMacsGpu(const KeyType* prefixes,
                         TreeNodeIndex numFocusNodes,
                         bool limitSource,
                         uint8_t* markings,
-                        cudaStream_t stream);
+                        execution::Gpu exec);
 
 } // namespace cstone

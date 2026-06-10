@@ -74,26 +74,26 @@ void injectKeysGpu(DeviceVector<KeyType>& leaves,
                    DeviceVector<KeyType>& keyScratch,
                    DeviceVector<TreeNodeIndex>& spanOps,
                    DeviceVector<TreeNodeIndex>& spanOpsScan,
-                   cudaStream_t stream)
+                   execution::Gpu exec)
 {
     reallocate(leaves, leaves.size() + keys.size(), 1.0);
-    memcpyD2DAsync(stream, keys.data(), keys.size(), leaves.data() + leaves.size() - keys.size());
+    memcpyD2DAsync(exec, keys.data(), keys.size(), leaves.data() + leaves.size() - keys.size());
 
     reallocateDestructive(keyScratch, leaves.size(), 1.0);
-    sort(stream, rawPtr(leaves), rawPtr(leaves) + leaves.size(), rawPtr(keyScratch));
+    sort(exec, rawPtr(leaves), rawPtr(leaves) + leaves.size(), rawPtr(keyScratch));
 
     reallocateDestructive(spanOps, leaves.size(), 1.0);
     reallocateDestructive(spanOpsScan, leaves.size(), 1.0);
 
-    countSfcGapsGpu(leaves.data(), nNodes(leaves), spanOps.data(), stream);
-    exclusiveScan(stream, spanOps.data(), spanOps.data() + leaves.size(), spanOpsScan.data());
+    countSfcGapsGpu(leaves.data(), nNodes(leaves), spanOps.data(), exec);
+    exclusiveScan(exec, spanOps.data(), spanOps.data() + leaves.size(), spanOpsScan.data());
 
     TreeNodeIndex numNodesGap;
-    memcpyD2HAsync(stream, spanOpsScan.data() + leaves.size() - 1, 1, &numNodesGap);
-    syncGpu(stream);
+    memcpyD2HAsync(exec, spanOpsScan.data() + leaves.size() - 1, 1, &numNodesGap);
+    syncGpu(exec);
 
     reallocateDestructive(keyScratch, numNodesGap + 1, 1.0);
-    fillSfcGapsGpu(leaves.data(), nNodes(leaves), spanOpsScan.data(), keyScratch.data(), stream);
+    fillSfcGapsGpu(leaves.data(), nNodes(leaves), spanOpsScan.data(), keyScratch.data(), exec);
     swap(leaves, keyScratch);
 }
 

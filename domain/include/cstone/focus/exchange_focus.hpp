@@ -230,7 +230,7 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
                      std::vector<std::vector<KeyType>>& treelets,
                      Vector& scratch,
                      MPI_Comm comm,
-                     cudaStream_t stream)
+                     execution::Gpu exec)
 {
     exchangeTreelets<KeyType>(exteriorPeers, interiorPeers, assignment, leaves, treelets, comm);
     checkTreelets<KeyType>(interiorPeers, leaves, treelets);
@@ -243,17 +243,17 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
     {
         assert(octreeAcc.childOffsets.size() >= nodeOps.size());
         std::span<TreeNodeIndex> nops(rawPtr(octreeAcc.childOffsets), nodeOps.size());
-        memcpyH2DAsync(stream, rawPtr(nodeOps), nodeOps.size(), nops.data());
-        syncGpu(stream);
+        memcpyH2DAsync(exec, rawPtr(nodeOps), nodeOps.size(), nops.data());
+        syncGpu(exec);
 
-        exclusiveScan(stream, nops.data(), nops.data() + nops.size(), nops.data());
+        exclusiveScan(exec, nops.data(), nops.data() + nops.size(), nops.data());
         TreeNodeIndex newNumLeafNodes;
-        memcpyD2HAsync(stream, nops.data() + nops.size() - 1, 1, &newNumLeafNodes);
-        syncGpu(stream);
+        memcpyD2HAsync(exec, nops.data() + nops.size() - 1, 1, &newNumLeafNodes);
+        syncGpu(exec);
 
         auto& newLeaves = octreeAcc.prefixes;
         reallocateDestructive(newLeaves, newNumLeafNodes + 1, 1.05);
-        rebalanceTreeGpu(rawPtr(leavesAcc), nNodes(leavesAcc), newNumLeafNodes, nops.data(), rawPtr(newLeaves), stream);
+        rebalanceTreeGpu(rawPtr(leavesAcc), nNodes(leavesAcc), newNumLeafNodes, nops.data(), rawPtr(newLeaves), exec);
         swap(newLeaves, leavesAcc);
 
         octreeAcc.resize(nNodes(leavesAcc));
@@ -266,7 +266,7 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
         auto [keyBuf, valueBuf, cubTmp] = util::packAllocBuffer(scratch, util::TypeList<KeyType, TreeNodeIndex, char>{},
                                                                 {newNumNodes, newNumNodes, cubTmpSize}, 128);
 
-        buildOctreeGpu(stream, rawPtr(leavesAcc), octreeAcc.data(), keyBuf, valueBuf, cubTmp);
+        buildOctreeGpu(exec, rawPtr(leavesAcc), octreeAcc.data(), keyBuf, valueBuf, cubTmp);
         scratch.resize(originalSize);
     }
 }

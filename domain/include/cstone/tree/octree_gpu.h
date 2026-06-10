@@ -48,7 +48,7 @@ void upsweepSumGpu(int numLvl,
                    const TreeNodeIndex* lvlRange,
                    const TreeNodeIndex* childOffsets,
                    LocalIndex* counts,
-                   cudaStream_t stream);
+                   execution::Gpu exec);
 
 /*!  @brief locate all nodes between k1 and k2 in nodeKeys and store indices
  * @param[in]  k1        cornerstone leaf sequence start
@@ -63,7 +63,7 @@ extern void locateNodesGpu(const KeyType* k1,
                            const KeyType* nodeKeys,
                            const TreeNodeIndex* lvlRange,
                            TreeNodeIndex* indices,
-                           cudaStream_t stream);
+                           execution::Gpu exec);
 
 /*!  @brief locate all nodes between k1 and k2 in nodeKeys and store indices
  * @param[in]  queryKeys  SFC keys to look up in @nodeKeys, in WS-prefix-bit format
@@ -80,6 +80,6 @@ extern void locateNodesGpu(const KeyType* queryKeys,
                            const KeyType* nodeKeys,
                            const TreeNodeIndex* lvlRange,
                            TreeNodeIndex* indices,
-                           cudaStream_t stream);
+                           execution::Gpu exec);
 
 } // namespace cstone

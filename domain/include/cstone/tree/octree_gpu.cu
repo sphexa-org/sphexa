@@ -220,7 +220,7 @@ void upsweepSumGpu(int numLevels,
                    const TreeNodeIndex* levelRange,
                    const TreeNodeIndex* childOffsets,
                    LocalIndex* nodeCounts,
-                   cudaStream_t stream)
+                   execution::Gpu exec)
 {
     constexpr int numThreads = 128;
 
@@ -230,7 +230,7 @@ void upsweepSumGpu(int numLevels,
         int numBlocks     = (numCellsLevel - 1) / numThreads + 1;
         if (numCellsLevel)
         {
-            upsweepSumKernel<<<numBlocks, numThreads, 0, stream>>>(levelRange[level], levelRange[level + 1],
+            upsweepSumKernel<<<numBlocks, numThreads, 0, exec>>>(levelRange[level], levelRange[level + 1],
                                                                    childOffsets, nodeCounts);
         }
     }
@@ -254,12 +254,12 @@ void locateNodesGpu(const KeyType* k1,
                     const KeyType* nodeKeys,
                     const TreeNodeIndex* lvlRange,
                     TreeNodeIndex* indices,
-                    cudaStream_t stream)
+                    execution::Gpu exec)
 {
     int numThreads = 256;
     int numBlocks  = iceil(k2 - k1 - 1, numThreads);
     if (numBlocks == 0) { return; }
-    locateNodesKernel<<<numBlocks, numThreads, 0, stream>>>(k1, k2, nodeKeys, lvlRange, indices);
+    locateNodesKernel<<<numBlocks, numThreads, 0, exec>>>(k1, k2, nodeKeys, lvlRange, indices);
 }
 
 template void locateNodesGpu(const uint32_t* k1,
@@ -267,13 +267,13 @@ template void locateNodesGpu(const uint32_t* k1,
                              const uint32_t* nodeKeys,
                              const TreeNodeIndex* lvlRange,
                              TreeNodeIndex* indices,
-                             cudaStream_t);
+                             execution::Gpu);
 template void locateNodesGpu(const uint64_t* k1,
                              const uint64_t* k2,
                              const uint64_t* nodeKeys,
                              const TreeNodeIndex* lvlRange,
                              TreeNodeIndex* indices,
-                             cudaStream_t);
+                             execution::Gpu);
 
 template<class KeyType>
 __global__ void locateNodesKernel(const KeyType* k1,
@@ -294,12 +294,12 @@ void locateNodesGpu(const KeyType* k1,
                     const KeyType* nodeKeys,
                     const TreeNodeIndex* lvlRange,
                     TreeNodeIndex* indices,
-                    cudaStream_t stream)
+                    execution::Gpu exec)
 {
     int numThreads = 256;
     int numBlocks  = iceil(n, numThreads);
     if (numBlocks == 0) { return; }
-    locateNodesKernel<<<numBlocks, numThreads, 0, stream>>>(k1, map, n, nodeKeys, lvlRange, indices);
+    locateNodesKernel<<<numBlocks, numThreads, 0, exec>>>(k1, map, n, nodeKeys, lvlRange, indices);
 }
 
 template void locateNodesGpu(const uint32_t* k1,
@@ -308,13 +308,13 @@ template void locateNodesGpu(const uint32_t* k1,
                              const uint32_t* nodeKeys,
                              const TreeNodeIndex* lvlRange,
                              TreeNodeIndex* indices,
-                             cudaStream_t);
+                             execution::Gpu);
 template void locateNodesGpu(const uint64_t* k1,
                              const TreeNodeIndex* map,
                              size_t n,
                              const uint64_t* nodeKeys,
                              const TreeNodeIndex* lvlRange,
                              TreeNodeIndex* indices,
-                             cudaStream_t);
+                             execution::Gpu);
 
 } // namespace cstone

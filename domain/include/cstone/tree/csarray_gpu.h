@@ -43,7 +43,7 @@ extern void computeNodeCountsGpu(const KeyType* tree,
                                  std::span<const KeyType> keys,
                                  unsigned maxCount,
                                  bool useCountsAsGuess,
-                                 cudaStream_t stream);
+                                 execution::Gpu exec);
 
 /*! @brief split or fuse octree nodes based on node counts relative to bucketSize
  *
@@ -58,7 +58,7 @@ extern void computeNodeCountsGpu(const KeyType* tree,
 template<class KeyType>
 extern TreeNodeIndex computeNodeOpsGpu(
     const KeyType* tree, TreeNodeIndex numNodes, const unsigned* counts, unsigned bucketSize, TreeNodeIndex* nodeOps,
-    cudaStream_t stream);
+    execution::Gpu exec);
 
 template<class KeyType>
 extern bool rebalanceTreeGpu(const KeyType* tree,
@@ -66,14 +66,14 @@ extern bool rebalanceTreeGpu(const KeyType* tree,
                              TreeNodeIndex newNumNodes,
                              const TreeNodeIndex* nodeOps,
                              KeyType* newTree,
-                             cudaStream_t stream);
+                             execution::Gpu exec);
 
 template<class KeyType>
 extern void countSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps,
-                            cudaStream_t stream);
+                            execution::Gpu exec);
 
 template<class KeyType>
 extern void fillSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree,
-                           cudaStream_t stream);
+                           execution::Gpu exec);
 
 } // namespace cstone
