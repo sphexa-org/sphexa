@@ -103,10 +103,7 @@ public:
                 // so we explicitly broadcast the value of rank 0 to all ranks
                 using Type = std::decay_t<decltype(*argp)>;
                 std::vector<Type> arg(size);
-                if (size > 0 && rank_ == 0)
-                {
-                    std::copy(argp, argp + size, arg.data());
-                }
+                if (size > 0 && rank_ == 0) { std::copy(argp, argp + size, arg.data()); }
                 MPI_Bcast(arg.data(), size, MpiType<Type>{}, 0, comm_);
                 fileutils::H5WriteStepAttribT(h5File_, key.c_str(), arg.data(), size);
             },
@@ -430,16 +427,16 @@ public:
 private:
     int64_t stepAttributeIndex(const std::string& key)
     {
-        auto    attributes = fileutils::stepAttributeNames(h5File_);
-        int64_t attrIndex  = std::find(attributes.begin(), attributes.end(), key) - attributes.begin();
+        auto        attributes = fileutils::stepAttributeNames(h5File_);
+        std::size_t attrIndex  = std::find(attributes.begin(), attributes.end(), key) - attributes.begin();
         if (attrIndex == attributes.size()) { throw std::out_of_range("Attribute " + key + " does not exist\n"); }
         return attrIndex;
     }
 
     int64_t fileAttributeIndex(const std::string& key)
     {
-        auto    attributes = fileutils::fileAttributeNames(h5File_);
-        int64_t attrIndex  = std::find(attributes.begin(), attributes.end(), key) - attributes.begin();
+        auto        attributes = fileutils::fileAttributeNames(h5File_);
+        std::size_t attrIndex  = std::find(attributes.begin(), attributes.end(), key) - attributes.begin();
         if (attrIndex == attributes.size()) { throw std::out_of_range("Attribute " + key + " does not exist\n"); }
         return attrIndex;
     }

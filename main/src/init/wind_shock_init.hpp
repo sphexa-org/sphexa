@@ -61,9 +61,8 @@ template<class Dataset>
 void initWindShockFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
     constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T            = typename Dataset::RealType;
-    using HydroType    = typename Dataset::HydroType;
-    using XM1Type      = typename Dataset::XM1Type;
+    using T            = Dataset::RealType;
+    using HydroType    = Dataset::HydroType;
 
     T r       = constants.at("r");
     T rSphere = constants.at("rSphere");
@@ -79,13 +78,7 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     T hExt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoExt);
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
-
-    cstone::fill<gpu>(d.m.begin(), d.m.end(), massPart);
-    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
-    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
-
-    generateParticleIDs<gpu>(d.id);
+    initFieldsAtRest(d, massPart);
 
     T uInt = uExt / (rhoInt / rhoExt);
 

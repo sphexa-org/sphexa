@@ -44,6 +44,8 @@
 #include "cstone/util/reallocate.hpp"
 
 #include "sph/eos.hpp"
+#include "sph/neighborhood.hpp"
+#include "sph/neighborhood_gpu.hpp"
 #include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"
 #include "sph/types.hpp"
@@ -244,10 +246,10 @@ public:
     FieldVector<HydroType> dV11, dV12, dV13, dV22, dV23, dV33; // Velocity gradient components
     FieldVector<uint8_t>   rung;                               // rung per particle of previous timestep
     FieldVector<uint64_t>  id;                                 // unique particle id
+    FieldVector<HydroType> dtCourant;                          // per-particle timestep restriction
 
-    //! @brief Indices of neighbors for each particle, length is number of assigned particles * ngmax. CPU version only.
-    std::vector<cstone::LocalIndex>         neighbors;
-    cstone::OctreeNsView<RealType, KeyType> treeView;
+    std::conditional_t<cstone::HaveGpu<AccType>{}, sph::DeviceNeighborhoodData, sph::NeighborhoodData> neighborhood;
+    cstone::OctreeNsView<RealType, KeyType>                                                            treeView;
 
     //! @brief lookup tables for the SPH-kernel and its derivative
     FieldVector<HydroType> wh, whd;
@@ -260,10 +262,11 @@ public:
      * Name of each field as string for use e.g in HDF5 output. Order has to correspond to what's returned by data().
      */
     inline static constexpr std::array fieldNames{
-        "x",        "y",   "z",    "x_m1", "y_m1",  "z_m1", "vx",   "vy",   "vz",   "rho",   "u",     "p",     "prho",
-        "tdpdTrho", "h",   "m",    "c",    "ugrav", "ax",   "ay",   "az",   "du",   "du_m1", "c11",   "c12",   "c13",
-        "c22",      "c23", "c33",  "mue",  "mui",   "temp", "cv",   "xm",   "kx",   "divv",  "curlv", "alpha", "gradh",
-        "keys",     "nc",  "dV11", "dV12", "dV13",  "dV22", "dV23", "dV33", "rung", "id"};
+        "x",   "y",    "z",     "x_m1",     "y_m1", "z_m1", "vx",    "vy",    "vz",    "rho",
+        "u",   "p",    "prho",  "tdpdTrho", "h",    "m",    "c",     "ugrav", "ax",    "ay",
+        "az",  "du",   "du_m1", "c11",      "c12",  "c13",  "c22",   "c23",   "c33",   "mue",
+        "mui", "temp", "cv",    "xm",       "kx",   "divv", "curlv", "alpha", "gradh", "keys",
+        "nc",  "dV11", "dV12",  "dV13",     "dV22", "dV23", "dV33",  "rung",  "id",    "dtCourant"};
 
     //! @brief dataset prefix to be prepended to fieldNames for structured output
     static const inline std::string prefix{};
@@ -276,7 +279,7 @@ public:
     {
         auto ret = std::tie(x, y, z, x_m1, y_m1, z_m1, vx, vy, vz, rho, u, p, prho, tdpdTrho, h, m, c, ugrav, ax, ay,
                             az, du, du_m1, c11, c12, c13, c22, c23, c33, mue, mui, temp, cv, xm, kx, divv, curlv, alpha,
-                            gradh, keys, nc, dV11, dV12, dV13, dV22, dV23, dV33, rung, id);
+                            gradh, keys, nc, dV11, dV12, dV13, dV22, dV23, dV33, rung, id, dtCourant);
 
 #if defined(__clang__) || __GNUC__ > 11
         static_assert(std::tuple_size_v<decltype(ret)> == fieldNames.size());
@@ -378,6 +381,8 @@ public:
 
     float getAllocGrowthRate() const { return allocGrowthRate_; }
 
+    void setNeighborhoodType(sph::NeighborhoodType type) { neighborhood.setType(type); }
+
 private:
     void createTables()
     {
@@ -394,15 +399,6 @@ private:
     //! @brief buffer growth factor when reallocating
     float allocGrowthRate_{1.05};
 };
-
-//! @brief resizes the neighbors list, only used in the CPU version
-template<class Dataset>
-void resizeNeighbors(Dataset& d, size_t size)
-{
-    auto growthRate = d.getAllocGrowthRate();
-    //! If we have a GPU, neighbors are calculated on-the-fly, so we don't need space to store them
-    reallocate(d.neighbors, cstone::HaveGpu<typename Dataset::AcceleratorType>{} ? 0 : size, growthRate);
-}
 
 template<class Dataset, class... Fs>
 void release(Dataset& d, const Fs&... fs)

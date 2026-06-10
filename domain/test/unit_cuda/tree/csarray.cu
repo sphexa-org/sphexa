@@ -49,7 +49,7 @@ TEST(CsArrayGpu, computeNodeCountsGpu)
     thrust::device_vector<KeyType> d_cstree = h_cstree;
 
     thrust::host_vector<KeyType> h_particleKeys;
-    for (int nodeIdx = 1; nodeIdx < nNodes(h_cstree) - 1; ++nodeIdx)
+    for (std::size_t nodeIdx = 1; nodeIdx < nNodes(h_cstree) - 1; ++nodeIdx)
     {
         // put 2 particles in each tree node, except the first and last node
         h_particleKeys.push_back(h_cstree[nodeIdx]);

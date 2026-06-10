@@ -59,49 +59,37 @@ struct TravConfig
 
 __device__ __forceinline__ int ringAddr(const int i) { return i & (TravConfig::memPerWarp - 1); }
 
-/*! @brief count neighbors within a cutoff
+/*! @brief apply neighbor particle interaction within a cutoff
  *
- * @tparam       T             float or double
- * @param[in]    sourceBody    source body x,y,z
- * @param[in]    validLaneMask number of lanes that contain valid source bodies
- * @param[in]    pos_i         target body x,y,z,h
- * @param[in]    box           global coordinate bounding box
- * @param[in]    sourceBodyIdx index of source body of each lane
- * @param[in]    ngmax         maximum number of neighbors to store
- * @param[inout] nc_i          target neighbor count to add to
- * @param[out]   nidx_i        indices of neighbors of the target body to store
+ * @tparam       T                 float or double
+ * @param[in]    sourceBody        source body x,y,z
+ * @param[in]    validLaneMask     number of lanes that contain valid source bodies
+ * @param[in]    bodyIdx_i         target body index
+ * @param[in]    pos_i             target body x,y,z,h
+ * @param[in]    box               global coordinate bounding box
+ * @param[in]    sourceBodyIdx     index of source body of each lane
+ * @param[in]    handleInteraction interaction-handling functor
  *
  * Number of computed particle-particle pairs per call is GpuConfig::warpSize^2 * TravConfig::nwt
  */
-template<bool UsePbc, class Tc>
-__device__ void countNeighbors(Vec3<Tc> sourceBody,
-                               int numLanesValid,
-                               const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i,
-                               const Box<Tc>& box,
-                               cstone::LocalIndex sourceBodyIdx,
-                               unsigned ngmax,
-                               unsigned nc_i[TravConfig::nwt],
-                               unsigned* nidx_i)
+template<bool UsePbc, class Tc, class InteractionsHandler>
+__device__ void applyInteraction(Vec3<Tc> sourceBody,
+                                 int numLanesValid,
+                                 const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i,
+                                 const Box<Tc>& box,
+                                 cstone::LocalIndex sourceBodyIdx,
+                                 const InteractionsHandler& handleInteraction)
 {
-    unsigned laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
-
     for (int j = 0; j < numLanesValid; j++)
     {
         Vec3<Tc> pos_j{shflSync(sourceBody[0], j), shflSync(sourceBody[1], j), shflSync(sourceBody[2], j)};
         cstone::LocalIndex idx_j = shflSync(sourceBodyIdx, j);
 
 #pragma unroll
-        for (int k = 0; k < TravConfig::nwt; k++)
+        for (unsigned k = 0; k < TravConfig::nwt; k++)
         {
             Tc d2 = distanceSq<UsePbc>(pos_j[0], pos_j[1], pos_j[2], pos_i[k][0], pos_i[k][1], pos_i[k][2], box);
-            if (d2 < pos_i[k][3] && d2 > Tc(0.0))
-            {
-                if (nc_i[k] < ngmax)
-                {
-                    nidx_i[nc_i[k] * TravConfig::targetSize + laneIdx + k * GpuConfig::warpSize] = idx_j;
-                }
-                nc_i[k]++;
-            }
+            if (d2 < pos_i[k][3] && d2 > Tc(0.0)) { handleInteraction(k, idx_j); }
         }
     }
 }
@@ -137,7 +125,7 @@ __device__ __forceinline__ bool tightOverlap(int laneIdx,
     GpuConfig::ThreadMask closeLanes = ballotSync(isClose);
 
     bool isTightClose = isClose;
-    for (unsigned lane = 0; lane < GpuConfig::warpSize; ++lane)
+    for (int lane = 0; lane < GpuConfig::warpSize; ++lane)
     {
         // skip if this lane does not have a close source
         if (!((GpuConfig::ThreadMask(1) << lane) & closeLanes)) { continue; }
@@ -160,36 +148,32 @@ __device__ __forceinline__ bool tightOverlap(int laneIdx,
 
 /*! @brief traverse one warp with up to TravConfig::targetSize target bodies down the tree
  *
- * @param[inout] nc_i           output neighbor counts to add to, TravConfig::nwt per lane
- * @param[in]    nidx_i         output neighbor indices, up to @p ngmax * TravConfig::nwt per lane will be stored
- * @param[in]    ngmax          maximum number of neighbor particle indices to store in @p nidx_i
- * @param[in]    pos_i          target x,y,z,4h^2, TravConfig::nwt per lane
- * @param[in]    targetCenter   geometrical target center
- * @param[in]    targetSize     geometrical target bounding box size
- * @param[in]    x,y,z,h        source bodies as referenced by tree cells
- * @param[in]    tree           octree data view
- * @param[in]    initNodeIdx    traversal will be started with all children of the parent of @p initNodeIdx
- * @param[in]    box            global coordinate bounding box
- * @param[-]     tempQueue      shared mem int pointer to GpuConfig::warpSize ints, uninitialized
- * @param[-]     cellQueue      pointer to global memory, size defined by TravConfig::memPerWarp, uninitialized
- * @return                      Number of P2P interactions tested to the group of target particles.
- *                              The total for the warp is the numbers returned here times the number of valid
- *                              targets in the warp.
+ * @param[in]  handleInteraction interaction-handling function
+ * @param[in]  bodyIdx_i         target index, TravConfig::nwt per lane
+ * @param[in]  pos_i             target x,y,z,4h^2, TravConfig::nwt per lane
+ * @param[in]  targetCenter      geometrical target center
+ * @param[in]  targetSize        geometrical target bounding box size
+ * @param[in]  x,y,z             source bodies as referenced by tree cells
+ * @param[in]  tree              octree data view
+ * @param[in]  initNodeIdx       traversal will be started with all children of the parent of @p initNodeIdx
+ * @param[in]  box               global coordinate bounding box
+ * @param[-]   tempQueue         shared mem int pointer to GpuConfig::warpSize ints, uninitialized
+ * @param[-]   cellQueue         pointer to global memory, size defined by TravConfig::memPerWarp, uninitialized
+ * @return                       Number of P2P interactions tested to the group of target particles.
+ *                               The total for the warp is the numbers returned here times the number of valid
+ *                               targets in the warp.
  *
  * Constant input pointers are additionally marked __restrict__ to indicate to the compiler that loads
  * can be routed through the read-only/texture cache.
  */
-template<bool UsePbc, class Tc, class Th, class KeyType>
-__device__ uint2 traverseWarp(unsigned* nc_i,
-                              unsigned* nidx_i,
-                              unsigned ngmax,
+template<bool UsePbc, class InteractionHandler, class Tc, class KeyType>
+__device__ uint2 traverseWarp(const InteractionHandler& handleInteraction,
                               const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i,
                               const Vec3<Tc> targetCenter,
                               const Vec3<Tc> targetSize,
                               const Tc* __restrict__ x,
                               const Tc* __restrict__ y,
                               const Tc* __restrict__ z,
-                              const Th* __restrict__ /*h*/,
                               const OctreeNsView<Tc, KeyType>& tree,
                               int initNodeIdx,
                               const Box<Tc>& box,
@@ -277,7 +261,7 @@ __device__ uint2 traverseWarp(unsigned* nc_i,
             {
                 // Load source body coordinates
                 const Vec3<Tc> sourceBody = {x[bodyIdx], y[bodyIdx], z[bodyIdx]};
-                countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyIdx, ngmax, nc_i, nidx_i);
+                applyInteraction<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyIdx, handleInteraction);
                 numBodiesWarp -= GpuConfig::warpSize;
                 numBodiesLane -= GpuConfig::warpSize;
                 p2pCounter += GpuConfig::warpSize;
@@ -293,7 +277,7 @@ __device__ uint2 traverseWarp(unsigned* nc_i,
                 {
                     // Load source body coordinates
                     const Vec3<Tc> sourceBody = {x[bodyQueue], y[bodyQueue], z[bodyQueue]};
-                    countNeighbors<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyQueue, ngmax, nc_i, nidx_i);
+                    applyInteraction<UsePbc>(sourceBody, GpuConfig::warpSize, pos_i, box, bodyQueue, handleInteraction);
                     bdyFillLevel -= GpuConfig::warpSize;
                     // bodyQueue is now empty; put body indices that spilled into the queue
                     bodyQueue = shflDownSync(bodyIdx, numBodiesWarp - bdyFillLevel);
@@ -318,7 +302,7 @@ __device__ uint2 traverseWarp(unsigned* nc_i,
         // Load position of source bodies, with padding for invalid lanes
         const Vec3<Tc> sourceBody =
             laneHasBody ? Vec3<Tc>{x[bodyQueue], y[bodyQueue], z[bodyQueue]} : Vec3<Tc>{Tc(0), Tc(0), Tc(0)};
-        countNeighbors<UsePbc>(sourceBody, bdyFillLevel, pos_i, box, bodyQueue, ngmax, nc_i, nidx_i);
+        applyInteraction<UsePbc>(sourceBody, bdyFillLevel, pos_i, box, bodyQueue, handleInteraction);
         p2pCounter += bdyFillLevel;
     }
 
@@ -351,35 +335,39 @@ static __global__ void resetTraversalCounters()
     targetCounterGlob = 0;
 }
 
-template<class Tc, class Th, class Index>
+template<class Tc, class ThP, class Index>
 __device__ __forceinline__ util::array<Vec4<Tc>, TravConfig::nwt> loadTarget(Index bodyBegin,
                                                                              Index bodyEnd,
                                                                              unsigned lane,
                                                                              const Tc* __restrict__ x,
                                                                              const Tc* __restrict__ y,
                                                                              const Tc* __restrict__ z,
-                                                                             const Th* __restrict__ h)
+                                                                             const ThP h)
 {
     util::array<Vec4<Tc>, TravConfig::nwt> pos_i;
 #pragma unroll
-    for (int i = 0; i < TravConfig::nwt; i++)
+    for (unsigned i = 0; i < TravConfig::nwt; i++)
     {
         Index bodyIdx = imin(bodyBegin + i * GpuConfig::warpSize + lane, bodyEnd - 1);
-        pos_i[i]      = {x[bodyIdx], y[bodyIdx], z[bodyIdx], Tc(2) * h[bodyIdx]};
+        Tc hi;
+        if constexpr (std::is_pointer_v<ThP>)
+            hi = h[bodyIdx];
+        else
+            hi = h;
+        pos_i[i] = {x[bodyIdx], y[bodyIdx], z[bodyIdx], Tc(2) * hi};
     }
     return pos_i;
 }
 
 //! @brief determine the bounding box around all particles-2h spheres in the warp
 template<class Tc>
-__device__ __forceinline__ util::tuple<Vec3<Tc>, Vec3<Tc>>
-warpBbox(const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i)
+__device__ __forceinline__ util::tuple<Vec3<Tc>, Vec3<Tc>> warpBbox(const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i)
 {
     Tc r0 = pos_i[0][3];
     Vec3<Tc> Xmin{pos_i[0][0] - r0, pos_i[0][1] - r0, pos_i[0][2] - r0};
     Vec3<Tc> Xmax{pos_i[0][0] + r0, pos_i[0][1] + r0, pos_i[0][2] + r0};
 #pragma unroll
-    for (int i = 1; i < TravConfig::nwt; i++)
+    for (unsigned i = 1; i < TravConfig::nwt; i++)
     {
         Tc ri = pos_i[i][3];
         Vec3<Tc> iboxMin{pos_i[i][0] - ri, pos_i[i][1] - ri, pos_i[i][2] - ri};
@@ -415,18 +403,58 @@ warpBbox(const util::array<Vec4<Tc>, TravConfig::nwt>& pos_i)
  *
  * Note: Number of handled particles (bodyEnd - bodyBegin) should be GpuConfig::warpSize * TravConfig::nwt or smaller
  */
-template<class Tc, class Th, class KeyType>
+template<class Tc, class ThP, class KeyType>
 __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::LocalIndex bodyBegin,
                                                                     cstone::LocalIndex bodyEnd,
                                                                     const Tc* __restrict__ x,
                                                                     const Tc* __restrict__ y,
                                                                     const Tc* __restrict__ z,
-                                                                    const Th* __restrict__ h,
+                                                                    const ThP h,
                                                                     const OctreeNsView<Tc, KeyType>& tree,
                                                                     const Box<Tc>& box,
                                                                     cstone::LocalIndex* warpNidx,
                                                                     unsigned ngmax,
                                                                     TreeNodeIndex* globalPool)
+{
+    const unsigned laneIdx                      = threadIdx.x & (GpuConfig::warpSize - 1);
+    util::array<unsigned, TravConfig::nwt> nc_i = {};
+    auto handleInteraction                      = [&](int warpTarget, cstone::LocalIndex j)
+    {
+        if (nc_i[warpTarget] < ngmax)
+            warpNidx[nc_i[warpTarget] * TravConfig::targetSize + laneIdx + warpTarget * GpuConfig::warpSize] = j;
+        ++nc_i[warpTarget];
+    };
+    traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, handleInteraction, globalPool);
+
+    return nc_i;
+}
+
+/*! @brief Find neighbors of a group of given particles, does not count self reference
+ *
+ * @param[in]  bodyBegin         index of first particle in (x,y,z) to look for neighbors
+ * @param[in]  bodyEnd           last (excluding) index of particle to look for neighbors
+ * @param[in]  x                 particle x coordinates
+ * @param[in]  y                 particle y coordinates
+ * @param[in]  z                 particle z coordinates
+ * @param[in]  h                 particle smoothing lengths
+ * @param[in]  tree              octree connectivity and cell data
+ * @param[in]  box               global coordinate bounding box
+ * @param[in]  handleInteraction interaction-handling function
+ * @param[-]   globalPool        global memory for cell traversal stack
+ *
+ * Note: Number of handled particles (bodyEnd - bodyBegin) should be GpuConfig::warpSize * TravConfig::nwt or smaller
+ */
+template<class Tc, class ThP, class KeyType, class InteractionHandler>
+__device__ void traverseNeighbors(cstone::LocalIndex bodyBegin,
+                                  cstone::LocalIndex bodyEnd,
+                                  const Tc* __restrict__ x,
+                                  const Tc* __restrict__ y,
+                                  const Tc* __restrict__ z,
+                                  const ThP h,
+                                  const OctreeNsView<Tc, KeyType>& tree,
+                                  const Box<Tc>& box,
+                                  const InteractionHandler& handleInteraction,
+                                  TreeNodeIndex* globalPool)
 {
     const unsigned laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
     const unsigned warpIdx = threadIdx.x >> GpuConfig::warpSizeLog2;
@@ -445,7 +473,7 @@ __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::Loca
     targetSize *= Tc(tree.searchExtFactor);
 
 #pragma unroll
-    for (int k = 0; k < TravConfig::nwt; ++k)
+    for (unsigned k = 0; k < TravConfig::nwt; ++k)
     {
         auto r      = pos_i[k][3];
         pos_i[k][3] = r * r;
@@ -455,9 +483,6 @@ __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::Loca
     bool anyPbc = box.boundaryX() == pbc || box.boundaryY() == pbc || box.boundaryZ() == pbc;
     bool usePbc = anyPbc && !insideBox(targetCenter, targetSize, box);
 
-    util::array<unsigned, TravConfig::nwt> nc_i; // NOLINT
-    nc_i = 0;
-
     // start traversal with node 1 (first child of the root), implies siblings as well
     // if traversal should be started at node x, then initNode should be set to the first child of x
     int initNode = 1;
@@ -465,13 +490,13 @@ __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::Loca
     uint2 warpStats;
     if (usePbc)
     {
-        warpStats = traverseWarp<true>(nc_i.data(), warpNidx, ngmax, pos_i, targetCenter, targetSize, x, y, z, h, tree,
-                                       initNode, box, tempQueue, cellQueue);
+        warpStats = traverseWarp<true>(handleInteraction, pos_i, targetCenter, targetSize, x, y, z, tree, initNode, box,
+                                       tempQueue, cellQueue);
     }
     else
     {
-        warpStats = traverseWarp<false>(nc_i.data(), warpNidx, ngmax, pos_i, targetCenter, targetSize, x, y, z, h, tree,
-                                        initNode, box, tempQueue, cellQueue);
+        warpStats = traverseWarp<false>(handleInteraction, pos_i, targetCenter, targetSize, x, y, z, tree, initNode,
+                                        box, tempQueue, cellQueue);
     }
     unsigned numP2P   = warpStats.x;
     unsigned maxStack = warpStats.y;
@@ -484,8 +509,6 @@ __device__ util::array<unsigned, TravConfig::nwt> traverseNeighbors(cstone::Loca
         atomicMax(&ncStats[NcStats::maxP2P], NcStats::type(numP2P));
         atomicMax(&ncStats[NcStats::maxStack], NcStats::type(maxStack));
     }
-
-    return nc_i;
 }
 
 //! @brief combine temp space for tree traversal and neighbor search into a single allocation

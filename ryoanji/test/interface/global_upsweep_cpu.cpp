@@ -101,7 +101,7 @@ static int multipoleExchangeTest(int thisRank, int numRanks)
 
 int main(int argc, char** argv)
 {
-    MPI_Init(NULL, NULL);
+    MPI_Init(&argc, &argv);
 
     int rank = 0, numRanks = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);

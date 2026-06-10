@@ -74,7 +74,7 @@ TEST(Ewald, MatchCpu)
 
     EXPECT_NEAR(utotRef, utot, 1e-7);
 
-    for (int i = 0; i < numBodies; ++i)
+    for (std::size_t i = 0; i < numBodies; ++i)
     {
         EXPECT_NEAR(h_p[i], refP[i], 1e-6);
         EXPECT_NEAR(h_ax[i], refAx[i], 1e-6);

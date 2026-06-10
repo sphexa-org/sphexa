@@ -63,7 +63,7 @@ __global__ void directKernel(unsigned first, unsigned last, unsigned numSource, 
 
         __syncthreads();
 
-        for (int j = 0; j < blockDim.x; ++j)
+        for (unsigned j = 0; j < blockDim.x; ++j)
         {
             Vec3<T> pos_j{sm_bodytile[j][0], sm_bodytile[j][1], sm_bodytile[j][2]};
             T       q_j = sm_bodytile[j][3];

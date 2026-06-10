@@ -99,7 +99,7 @@ int main(int argc, char** argv)
     float internalBuildTime = timeGpu(buildInternal);
     std::cout << "internal build time " << internalBuildTime / 1000 << std::endl;
     std::cout << "level ranges: ";
-    for (int i = 0; i <= maxTreeLevel<KeyType>{}; ++i)
+    for (unsigned i = 0; i <= maxTreeLevel<KeyType>{}; ++i)
         std::cout << octree.levelRange[i] << " ";
     std::cout << std::endl;
 
@@ -166,7 +166,7 @@ int main(int argc, char** argv)
     float invTheta = 1.0 / 0.5;
     std::vector<SourceCenterType<double>> h_centers(octree.numNodes);
 #pragma omp parallel for schedule(static)
-    for (size_t i = 0; i < h_octree.numNodes; ++i)
+    for (TreeNodeIndex i = 0; i < h_octree.numNodes; ++i)
     {
         KeyType prefix   = h_octree.prefixes[i];
         KeyType startKey = decodePlaceholderBit(prefix);

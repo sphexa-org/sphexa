@@ -33,7 +33,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <vector>
+#include <limits>
 #include <mpi.h>
 
 #include "cstone/primitives/math.hpp"
@@ -61,8 +61,7 @@ void groupAccTimestep(const GroupView& grp, float* groupDt, const Dataset& d)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        groupAccTimestepGpu(d.etaAcc, grp, rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az),
-                            rawPtr(d.h), groupDt);
+        groupAccTimestepGpu(d.etaAcc, grp, rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.h), groupDt);
     }
 }
 
@@ -100,7 +99,7 @@ auto computeMinTimestep(float* groupDt, LocalIndex* groupIndices, LocalIndex num
                         AccVec& scratch)
 {
     float                fastFraction = 0.4;
-    std::array<float, 2> minGroupDt;
+    std::array<float, 2> minGroupDt   = {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
     if constexpr (IsDeviceVector<AccVec>{})
     {
         sortGroupDt(groupDt, groupIndices, numGroups, scratch);

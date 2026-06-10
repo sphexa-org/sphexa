@@ -144,11 +144,7 @@ void exchangeParticlesGpu(int epoch,
         receiveStart += receiveCount;
     }
 
-    if (not sendRequests.empty())
-    {
-        MPI_Status status[sendRequests.size()];
-        MPI_Waitall(int(sendRequests.size()), sendRequests.data(), status);
-    }
+    if (not sendRequests.empty()) { MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUSES_IGNORE); }
 
     reallocate(sendScratchBuffer, oldSendSize, 1.01);
     reallocate(recvScratchBuffer, oldRecvSize, 1.01);

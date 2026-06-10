@@ -5,9 +5,9 @@ variables:
   TEST_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/sbin'
   APP_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/bin'
 
-.sph-run-cuda12-sm90-1rank:
+.sph-run-cuda13-sm90-1rank:
   stage: sphexa_run
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     SLURM_TIMELIMIT: '01:00:00'
@@ -26,6 +26,7 @@ variables:
     - $TEST_INSTALL_DIR/hydro/sph_tests
     - $TEST_INSTALL_DIR/performance/octree_perf
     - $TEST_INSTALL_DIR/performance/peers_perf
+    - $TEST_INSTALL_DIR/performance/cluster_overhead
     - $TEST_INSTALL_DIR/ryoanji/cpu_unit_tests/ryoanji_cpu_unit_tests
     - $TEST_INSTALL_DIR/ryoanji/unit_tests/ryoanji_unit_tests
     # NOTE:slow    - $TEST_INSTALL_DIR/performance/hilbert_perf
@@ -41,14 +42,15 @@ variables:
     # GPU tests:
     - $TEST_INSTALL_DIR/hydro/sph_gpu_tests
     - $TEST_INSTALL_DIR/performance/hilbert_perf_gpu
-    - $TEST_INSTALL_DIR/performance/neighbors_test_gpu
+    - $TEST_INSTALL_DIR/performance/sph_density_test_gpu
+    - $TEST_INSTALL_DIR/performance/lennard_jones_test_gpu
     - $TEST_INSTALL_DIR/performance/octree_perf_gpu
     - $TEST_INSTALL_DIR/unit_cuda/component_units_cuda
     - date
 
-.sph-run-cuda12-sm90-2ranks:
+.sph-run-cuda13-sm90-2ranks:
   stage: sphexa_run
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -78,9 +80,9 @@ variables:
     - $TEST_INSTALL_DIR/integration_mpi/exchange_halos_gpu
     - date
 
-.sph-run-cuda12-sm90-4ranks:
+.sph-run-cuda13-sm90-4ranks:
   stage: sphexa_run
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -96,9 +98,9 @@ variables:
     - $TEST_INSTALL_DIR/ryoanji/global_upsweep_gpu
     - date
 
-.sph-run-cuda12-sm90-12ranks:
+.sph-run-cuda13-sm90-12ranks:
   stage: sphexa_run
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -116,9 +118,9 @@ variables:
     - $TEST_INSTALL_DIR/integration_mpi/domain_nranks
     - date
 
-.sph-run-cuda12-sm90-sphexa-cuda:
+.sph-run-cuda13-sm90-sphexa-cuda:
   stage: sphexa_run
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -147,9 +149,9 @@ variables:
       fi
     - date
 
-.sph-run-cuda12-sm90-sphexa-cpu:
+.sph-run-cuda13-sm90-sphexa-cpu:
   stage: sphexa_run
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -178,9 +180,9 @@ variables:
       fi
     - date
 
-.sph-compare-constants-cuda12-sm90-sphexa-cuda:
+.sph-compare-constants-cuda13-sm90-sphexa-cuda:
   stage: sphexa_run
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
@@ -196,13 +198,14 @@ variables:
     - bash ci/scripts/run_constants_comparison.sh "$APP_INSTALL_DIR/sphexa-cuda"
     - date
 
-.sph-compare-constants-cuda12-sm90-sphexa-cpu:
+.sph-compare-constants-cuda13-sm90-sphexa-cpu:
   stage: sphexa_run
-  image: prgenv-gnu/25.11:v1
+  image: $MYUENV
   extends: [.uenv-runner-daint-gh200]
   variables:
     WITH_UENV_VIEW: 'default'
     # SLURM_PARTITION: 'debug'
+    SLURM_TIMELIMIT: '00:30:00'
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 4
     SLURM_CPUS_PER_TASK: 71

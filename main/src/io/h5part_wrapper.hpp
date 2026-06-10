@@ -46,17 +46,17 @@
 namespace sphexa::fileutils
 {
 
-using H5Types = util::TypeList<double, float, std::int8_t, std::uint8_t, std::int16_t, std::uint16_t, std::int32_t,
-                               std::uint32_t, std::int64_t, std::uint64_t>;
+using H5Types = util::TypeList<double, float, char, std::int8_t, std::uint8_t, std::int16_t, std::uint16_t,
+                               std::int32_t, std::uint32_t, std::int64_t, std::uint64_t>;
 
-static constexpr h5_types_t H5TypeIDs[] = {H5_FLOAT64_T, H5_FLOAT32_T, H5_INT8_T,   H5_UINT8_T, H5_INT16_T,
+static constexpr h5_types_t H5TypeIDs[] = {H5_FLOAT64_T, H5_FLOAT32_T, H5_STRING_T, H5_INT8_T,  H5_UINT8_T, H5_INT16_T,
                                            H5_UINT16_T,  H5_INT32_T,   H5_UINT32_T, H5_INT64_T, H5_UINT64_T};
 
 static constexpr std::array H5TypeNames{
-    "C++ double / python np.float64",  "C++ float / python np.float32",   "C++ int8_t / python np.int8",
-    "C++ uint8_t / python np.uint8",   "C++ int16_t / python np.int16",   "C++ uint16_t / python np.uint16",
-    "C++ int32_t / python np.int32",   "C++ uint32_t / python np.uint32", "C++ int64_t / python np.int64",
-    "C++ uint64_t / python np.uint64",
+    "C++ double / python np.float64",  "C++ float / python np.float32",   "C++ char / python np.bytes",
+    "C++ int8_t / python np.int8",     "C++ uint8_t / python np.uint8",   "C++ int16_t / python np.int16",
+    "C++ uint16_t / python np.uint16", "C++ int32_t / python np.int32",   "C++ uint32_t / python np.uint32",
+    "C++ int64_t / python np.int64",   "C++ uint64_t / python np.uint64",
 };
 
 //! @brief Match type T with type of tuple_element_t<N, Tuple> if signedness and byte-width match and both are integral
@@ -75,10 +75,14 @@ struct MatchSignednessAndBytes
  * on Linux, Unix and macOS. Therefore, we must map them to fixed-width types suitable for serialization.
  */
 template<typename AppType>
-struct H5hutType
+class H5hutType
 {
-    constexpr static int         typeIndex = util::FindIndex<std::decay_t<AppType>, H5Types, MatchSignednessAndBytes>{};
-    constexpr static auto        value     = H5TypeIDs[typeIndex];
+    constexpr static int idxExact    = util::FindIndex<std::decay_t<AppType>, H5Types>{};
+    constexpr static int idxSignByte = util::FindIndex<std::decay_t<AppType>, H5Types, MatchSignednessAndBytes>{};
+
+public:
+    constexpr static int         typeIndex  = util::Contains<std::decay_t<AppType>, H5Types>{} ? idxExact : idxSignByte;
+    constexpr static auto        value      = H5TypeIDs[typeIndex];
     constexpr static const char* nameString = H5TypeNames[typeIndex];
 };
 
@@ -99,8 +103,8 @@ std::vector<std::string> datasetNames(h5_file_t h5_file)
     std::vector<std::string> setNames(numSets);
     for (int64_t fi = 0; fi < numSets; ++fi)
     {
-        int  maxlen = 256;
-        char fieldName[maxlen];
+        constexpr int maxlen = 256;
+        char          fieldName[maxlen];
         H5PartGetDatasetName(h5_file, fi, fieldName, maxlen);
         setNames[fi] = std::string(fieldName);
     }
@@ -116,10 +120,10 @@ std::vector<std::string> fileAttributeNames(h5_file_t h5_file)
     std::vector<std::string> setNames(numAttributes);
     for (int64_t fi = 0; fi < numAttributes; ++fi)
     {
-        int        maxlen = 256;
-        char       attrName[maxlen];
-        h5_int64_t typeId;
-        h5_size_t  attrSize;
+        constexpr int maxlen = 256;
+        char          attrName[maxlen];
+        h5_int64_t    typeId;
+        h5_size_t     attrSize;
 
         H5GetFileAttribInfo(h5_file, fi, attrName, maxlen, &typeId, &attrSize);
         setNames[fi] = std::string(attrName);
@@ -136,10 +140,10 @@ std::vector<std::string> stepAttributeNames(h5_file_t h5_file)
     std::vector<std::string> setNames(numAttributes);
     for (int64_t fi = 0; fi < numAttributes; ++fi)
     {
-        int        maxlen = 256;
-        char       attrName[maxlen];
-        h5_int64_t typeId;
-        h5_size_t  attrSize;
+        constexpr int maxlen = 256;
+        char          attrName[maxlen];
+        h5_int64_t    typeId;
+        h5_size_t     attrSize;
 
         H5GetStepAttribInfo(h5_file, fi, attrName, maxlen, &typeId, &attrSize);
         setNames[fi] = std::string(attrName);

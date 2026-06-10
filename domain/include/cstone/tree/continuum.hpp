@@ -48,7 +48,7 @@ template<class KeyType, class T, class F>
 void computeContinuumCounts(
     const KeyType* tree, unsigned* counts, TreeNodeIndex numNodes, const Box<T>& box, F&& concentration)
 {
-#pragma ompe parallel for schedule(static)
+#pragma omp parallel for schedule(static)
     for (TreeNodeIndex i = 0; i < numNodes; ++i)
     {
         counts[i] = continuumCount(tree[i], tree[i + 1], box, concentration);

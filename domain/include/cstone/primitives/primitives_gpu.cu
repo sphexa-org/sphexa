@@ -22,6 +22,7 @@
 #include <thrust/reduce.h>
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
+#include <thrust/tuple.h>
 
 #include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/errorcheck.cuh"
@@ -184,9 +185,9 @@ std::tuple<T, T> MinMaxGpu<T>::operator()(const T* first, const T* last)
     return std::make_tuple(theMinimum, theMaximum);
 }
 
-template class MinMaxGpu<double>;
-template class MinMaxGpu<float>;
-template class MinMaxGpu<unsigned>;
+template struct MinMaxGpu<double>;
+template struct MinMaxGpu<float>;
+template struct MinMaxGpu<unsigned>;
 
 using thrust::get;
 
@@ -272,7 +273,7 @@ void sortGpu(KeyType* first, KeyType* last, KeyType* keyBuf)
     // Determine temporary device storage requirements
     void* d_tempStorage     = nullptr;
     size_t tempStorageBytes = 0;
-    cub::DeviceRadixSort::SortKeys(d_tempStorage, tempStorageBytes, d_keys, numElements);
+    checkGpuErrors(cub::DeviceRadixSort::SortKeys(d_tempStorage, tempStorageBytes, d_keys, numElements));
 
     // Allocate temporary storage
     checkGpuErrors(cudaMalloc(&d_tempStorage, tempStorageBytes));
@@ -301,7 +302,7 @@ uint64_t sortByKeyTempStorage(uint64_t numElements)
     cub::DoubleBuffer<ValueType> d_values(nullptr, nullptr);
 
     uint64_t tempStorageBytes = 0;
-    cub::DeviceRadixSort::SortPairs(nullptr, tempStorageBytes, d_keys, d_values, numElements);
+    checkGpuErrors(cub::DeviceRadixSort::SortPairs(nullptr, tempStorageBytes, d_keys, d_values, numElements));
     return tempStorageBytes;
 }
 

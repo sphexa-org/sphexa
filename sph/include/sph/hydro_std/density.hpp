@@ -32,31 +32,18 @@
 
 #pragma once
 
-#include "sph/hydro_ve/xmass.hpp"
+#include "sph/neighborhood.hpp"
+#include "sph/hydro_ve/xmass_kern.hpp"
 #include "sph/sph_gpu.hpp"
 
 namespace sph
 {
 
-template<typename Tc, class Dataset>
-void computeDensityImpl(const GroupView& groups, Dataset& d, const cstone::Box<Tc>& box)
-{
-    swap(d.xm, d.rho);
-    computeXMass(groups, d, box);
-    swap(d.xm, d.rho);
-    // Convert XMass to density
-#pragma omp parallel for schedule(static)
-    for (size_t i = groups.firstBody; i < groups.lastBody; i++)
-    {
-        d.rho[i] = d.m[i] / d.rho[i];
-    }
-}
-
 template<class T, class Dataset>
 void computeDensity(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeDensity(groups, d, box); }
-    else { computeDensityImpl(groups, d, box); }
+    else { densityIjLoop(d.neighborhood, d.K, d.m.data(), d.wh.data(), d.rho.data()); }
 }
 
 } // namespace sph

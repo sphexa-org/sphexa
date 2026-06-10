@@ -32,72 +32,24 @@
 #pragma once
 
 #include "sph/sph_gpu.hpp"
-#include "divv_curlv_kern.hpp"
-#include "iad_gradh_kern.hpp"
+#include "iad_divv_curlv_kern.hpp"
 
 namespace sph
 {
 
 template<class Tc, class Dataset>
-void computeIadDivvCurlvGradhImpl(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box)
-{
-    const cstone::LocalIndex* neighbors      = d.neighbors.data();
-    const unsigned*           neighborsCount = d.nc.data();
-
-    const auto* x  = d.x.data();
-    const auto* y  = d.y.data();
-    const auto* z  = d.z.data();
-    const auto* vx = d.vx.data();
-    const auto* vy = d.vy.data();
-    const auto* vz = d.vz.data();
-    const auto* h  = d.h.data();
-    const auto* m = d.m.data();
-
-    auto* c11 = d.c11.data();
-    auto* c12 = d.c12.data();
-    auto* c13 = d.c13.data();
-    auto* c22 = d.c22.data();
-    auto* c23 = d.c23.data();
-    auto* c33 = d.c33.data();
-
-    auto* dV11 = d.dV11.data();
-    auto* dV12 = d.dV12.data();
-    auto* dV13 = d.dV13.data();
-    auto* dV22 = d.dV22.data();
-    auto* dV23 = d.dV23.data();
-    auto* dV33 = d.dV33.data();
-
-    bool doGradV = d.dV11.size() == d.x.size();
-
-    auto* divv  = d.divv.data();
-    auto* curlv = (d.x.size() == d.curlv.size()) ? d.curlv.data() : nullptr;
-
-    const auto* wh  = d.wh.data();
-    const auto* whd = d.whd.data();
-    const auto* kx  = d.kx.data();
-    const auto* xm  = d.xm.data();
-
-    auto* gradh = d.gradh.data();
-
-#pragma omp parallel for
-    for (size_t i = startIndex; i < endIndex; ++i)
-    {
-        size_t   ni       = i - startIndex;
-        unsigned ncCapped = std::min(neighborsCount[i] - 1, d.ngmax);
-
-        IAD_gradhJLoop(i, d.K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, h, m, wh, whd, xm, kx, c11, c12, c13,
-                       c22, c23, c33, gradh);
-
-        divV_curlVJLoop(i, d.K, box, neighbors + d.ngmax * ni, ncCapped, x, y, z, vx, vy, vz, h, c11, c12, c13, c22,
-                        c23, c33, wh, whd, kx, xm, divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33, doGradV);
-    }
-}
-
-template<class Tc, class Dataset>
 void computeIadDivvCurlvGradh(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
 {
     if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{}) { gpu::computeIadDivvCurlvGradh(grp, d, box); }
-    else { computeIadDivvCurlvGradhImpl(grp.firstBody, grp.lastBody, d, box); }
+    else
+    {
+        iadDivvCurlvGradhIjLoop(d.neighborhood, d.K, d.vx.data(), d.vy.data(), d.vz.data(), d.m.data(), d.xm.data(),
+                                d.kx.data(), d.nc.data(), d.c11.data(), d.c12.data(), d.c13.data(), d.c22.data(),
+                                d.c23.data(), d.c33.data(), d.wh.data(), d.whd.data(), d.gradh.data(), d.divv.data(),
+                                d.curlv.size() == d.x.size() ? d.curlv.data() : nullptr, d.dV11.data(), d.dV12.data(),
+                                d.dV13.data(), d.dV22.data(), d.dV23.data(), d.dV33.data(),
+                                d.dV11.size() == d.x.size());
+    }
 }
 
 } // namespace sph
