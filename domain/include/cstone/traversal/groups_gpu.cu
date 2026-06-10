@@ -92,7 +92,7 @@ void computeGroupSplitsImpl(
 
     groups.reserve(numFixedGroups * 1.1);
     groups.resize(numFixedGroups + 1);
-    exclusiveScanGpu(rawPtr(numSplitsPerGroup), rawPtr(numSplitsPerGroup) + numFixedGroups + 1, rawPtr(groups), stream);
+    exclusiveScanGpu(stream, rawPtr(numSplitsPerGroup), rawPtr(numSplitsPerGroup) + numFixedGroups + 1, rawPtr(groups));
     LocalIndex newNumGroups;
     memcpyD2HAsync(rawPtr(groups) + groups.size() - 1, 1, &newNumGroups, stream);
     syncGpu(stream);
@@ -105,7 +105,7 @@ void computeGroupSplitsImpl(
                                                                     rawPtr(newGroupSizes));
 
     groups.resize(newNumGroups + 1);
-    exclusiveScanGpu(rawPtr(newGroupSizes), rawPtr(newGroupSizes) + newNumGroups + 1, rawPtr(groups), first, stream);
+    exclusiveScanGpu(stream, rawPtr(newGroupSizes), rawPtr(newGroupSizes) + newNumGroups + 1, rawPtr(groups), first);
     memcpyH2DAsync(&last, 1, rawPtr(groups) + groups.size() - 1, stream);
 }
 
@@ -138,7 +138,10 @@ void computeGroupSplits(LocalIndex first,
         computeGroupSplitsImpl<2 * GpuConfig::warpSize>(first, last, x, y, z, h, leaves, numLeaves, layout, box,
                                                         tolFactor, splitMasks, numSplitsPerGroup, groups, stream);
     }
-    else { throw std::runtime_error("Unsupported spatial group size\n"); }
+    else
+    {
+        throw std::runtime_error("Unsupported spatial group size\n");
+    }
 }
 
 #define COMPUTE_GROUP_SPLITS(Tc, T, KeyType)                                                                           \

@@ -150,8 +150,8 @@ void buildOctreeGpu(const KeyType* cstoneTree,
         cstoneTree, d.numInternalNodes, d.numLeafNodes, d.prefixes, d.internalToLeaf);
 
     assert(keyBuf.size() == d.numNodes && valueBuf.size() == d.numNodes);
-    sortByKeyGpu(d.prefixes, d.prefixes + numNodes, d.internalToLeaf, keyBuf.data(), valueBuf.data(), cubTmp.data(),
-                 cubTmp.size(), stream);
+    sortByKeyGpu(stream, d.prefixes, d.prefixes + numNodes, d.internalToLeaf, keyBuf.data(), valueBuf.data(), cubTmp.data(),
+                 cubTmp.size());
 
     invertOrder<<<iceil(numNodes, numThreads), numThreads, 0, stream>>>(d.internalToLeaf, d.leafToInternal, numNodes,
                                                                         d.numInternalNodes);

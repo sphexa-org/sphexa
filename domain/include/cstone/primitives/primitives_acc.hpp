@@ -39,7 +39,7 @@ void fill(execution::Gpu exec, It first, It last, T value)
 {
     if (last <= first) { return; }
     using T1 = std::decay_t<decltype(*first)>;
-    fillGpu(first, last, T1(value), exec);
+    fillGpu(exec, first, last, T1(value));
 }
 
 template<class T>
@@ -63,7 +63,7 @@ void scaleGpuAcc(execution::Cpu, const T1* in1, const T1* in2, T2* out, T3 value
 template<class T1, class T2, class T3>
 void scaleGpuAcc(execution::Gpu exec, const T1* in1, const T1* in2, T2* out, T3 value)
 {
-    scaleGpu(in1, in2, out, value, exec);
+    scaleGpu(exec, in1, in2, out, value);
 }
 
 template<class IndexType, class ValueType>
@@ -78,7 +78,7 @@ void gatherAcc(execution::Gpu exec,
                const ValueType* source,
                ValueType* destination)
 {
-    gatherGpu(ordering.data(), ordering.size(), source, destination, exec);
+    gatherGpu(exec, ordering.data(), ordering.size(), source, destination);
 }
 
 template<class IndexType, class ValueType>
@@ -93,17 +93,17 @@ void scatterAcc(execution::Gpu exec,
                 const ValueType* source,
                 ValueType* destination)
 {
-    scatterGpu(ordering.data(), ordering.size(), source, destination, exec);
+    scatterGpu(exec, ordering.data(), ordering.size(), source, destination);
 }
 
 //! @brief sortByKey with temp buffer management
 template<class KeyType, class ValueType, class KeyBuf, class ValueBuf>
-void sortByKeyGpu(std::span<KeyType> keys,
+void sortByKeyGpu(execution::Cpu,
+                  std::span<KeyType> keys,
                   std::span<ValueType> values,
                   KeyBuf& /*keyBuf*/,
                   ValueBuf& /*valueBuf*/,
-                  float /*growthRate*/,
-                  execution::Cpu)
+                  float /*growthRate*/)
 {
     assert(keys.size() == values.size());
     sort_by_key(keys.begin(), keys.end(), values.begin());
@@ -111,12 +111,12 @@ void sortByKeyGpu(std::span<KeyType> keys,
 
 //! @brief sortByKey with temp buffer management
 template<class KeyType, class ValueType, class KeyBuf, class ValueBuf>
-void sortByKeyGpu(std::span<KeyType> keys,
+void sortByKeyGpu(execution::Gpu exec,
+                  std::span<KeyType> keys,
                   std::span<ValueType> values,
                   KeyBuf& keyBuf,
                   ValueBuf& valueBuf,
-                  float growthRate,
-                  execution::Gpu exec)
+                  float growthRate)
 {
     // temp storage for radix sort as multiples of IndexType
     uint64_t tempStorageEle = iceil(sortByKeyTempStorage<KeyType, ValueType>(keys.size()), sizeof(ValueType));
@@ -127,8 +127,8 @@ void sortByKeyGpu(std::span<KeyType> keys,
     uint64_t numElements[2] = {uint64_t(keys.size() * growthRate), tempStorageEle};
     auto tempBuffers        = util::packAllocBuffer<ValueType>(valueBuf, {numElements, 2}, 128);
 
-    sortByKeyGpu(keys.data(), keys.data() + keys.size(), values.data(), (KeyType*)rawPtr(keyBuf), tempBuffers[0].data(),
-                 tempBuffers[1].data(), tempStorageEle * sizeof(ValueType), exec);
+    sortByKeyGpu(exec, keys.data(), keys.data() + keys.size(), values.data(), (KeyType*)rawPtr(keyBuf),
+                 tempBuffers[0].data(), tempBuffers[1].data(), tempStorageEle * sizeof(ValueType));
     reallocate(keyBuf, s1, 1.0);
     reallocate(valueBuf, s2, 1.0);
 }
@@ -142,7 +142,7 @@ void sequenceAcc(execution::Cpu, T1* first, T1* last, T2 value)
 template<class T1, class T2>
 void sequenceAcc(execution::Gpu exec, T1* first, T1* last, T2 value)
 {
-    sequenceGpu(first, last - first, T1(value), exec);
+    sequenceGpu(exec, first, last - first, T1(value));
 }
 
 template<class BufferType>
@@ -190,7 +190,7 @@ void sortByKey(execution::Gpu exec,
                double growth)
 {
     assert(keys.size() == values.size());
-    sortByKeyGpu(keys, values, keyBuf, valueBuf, growth, exec);
+    sortByKeyGpu(exec, keys, values, keyBuf, valueBuf, growth);
 }
 
 } // namespace cstone

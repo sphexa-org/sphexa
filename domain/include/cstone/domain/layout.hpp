@@ -160,15 +160,15 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
     {
         memcpyD2DAsync(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start(), exec);
 
-        gatherGpu(leafToInternal.data(), idx.start(), flags.data(), layout.data(), exec);
-        selectCopyGpu(focusLeafCounts.data(), idx.start(), layout.data(), layout.data(), exec);
+        gatherGpu(exec, leafToInternal.data(), idx.start(), flags.data(), layout.data());
+        selectCopyGpu(exec, focusLeafCounts.data(), idx.start(), layout.data(), layout.data());
 
-        gatherGpu(leafToInternal.data() + idx.end(), leafToInternal.size() - idx.end(), flags.data(),
-                  layout.data() + idx.end(), exec);
-        selectCopyGpu(focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(), layout.data() + idx.end(),
-                      layout.data() + idx.end(), exec);
+        gatherGpu(exec, leafToInternal.data() + idx.end(), leafToInternal.size() - idx.end(), flags.data(),
+                  layout.data() + idx.end());
+        selectCopyGpu(exec, focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(),
+                      layout.data() + idx.end(), layout.data() + idx.end());
 
-        exclusiveScanGpu(layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0}, exec);
+        exclusiveScanGpu(exec, layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0});
     }
     else
     {

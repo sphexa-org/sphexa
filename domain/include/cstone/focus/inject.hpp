@@ -80,13 +80,13 @@ void injectKeysGpu(DeviceVector<KeyType>& leaves,
     memcpyD2DAsync(keys.data(), keys.size(), leaves.data() + leaves.size() - keys.size(), stream);
 
     reallocateDestructive(keyScratch, leaves.size(), 1.0);
-    sortGpu(rawPtr(leaves), rawPtr(leaves) + leaves.size(), rawPtr(keyScratch), stream);
+    sortGpu(stream, rawPtr(leaves), rawPtr(leaves) + leaves.size(), rawPtr(keyScratch));
 
     reallocateDestructive(spanOps, leaves.size(), 1.0);
     reallocateDestructive(spanOpsScan, leaves.size(), 1.0);
 
     countSfcGapsGpu(leaves.data(), nNodes(leaves), spanOps.data(), stream);
-    exclusiveScanGpu(spanOps.data(), spanOps.data() + leaves.size(), spanOpsScan.data(), stream);
+    exclusiveScanGpu(stream, spanOps.data(), spanOps.data() + leaves.size(), spanOpsScan.data());
 
     TreeNodeIndex numNodesGap;
     memcpyD2HAsync(spanOpsScan.data() + leaves.size() - 1, 1, &numNodesGap, stream);

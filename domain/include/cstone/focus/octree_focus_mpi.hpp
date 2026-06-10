@@ -220,8 +220,8 @@ public:
 
             // 1st upsweep with local and global data
             reallocateDestructive(countsAcc_, octreeAcc_.numNodes, allocGrowthRate_);
-            scatterGpu(leafToInternal(octreeAcc_).data(), numLeafNodes, rawPtr(leafCountsAcc_), rawPtr(countsAcc_),
-                       exec_);
+            scatterGpu(exec_, leafToInternal(octreeAcc_).data(), numLeafNodes, rawPtr(leafCountsAcc_),
+                       rawPtr(countsAcc_));
 
             upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(octreeAcc_.levelRange), rawPtr(octreeAcc_.childOffsets),
                           rawPtr(countsAcc_), exec_);
@@ -325,12 +325,12 @@ public:
         if constexpr (execution::HaveGpu<Exec>{})
         {
             memcpyH2DAsync(idxFromGlob.data(), idxFromGlob.size(), letIdx.data(), exec_);
-            gatherGpu(letIdx.data(), idxFromGlob.size(), toInternal, letIdx.data(), exec_);
+            gatherGpu(exec_, letIdx.data(), idxFromGlob.size(), toInternal, letIdx.data());
 
             locateNodesGpu(octreeAcc_.prefixes.data(), letIdx.data(), idxFromGlob.size(), globalNodeKeys,
                            globalLevelRange, letToGlob.data(), exec_);
-            gatherScatterGpu(letToGlob.data(), letIdx.data(), idxFromGlob.size(), globalQuantities.data(),
-                             localQuantities.data(), exec_);
+            gatherScatterGpu(exec_, letToGlob.data(), letIdx.data(), idxFromGlob.size(), globalQuantities.data(),
+                             localQuantities.data());
         }
         else
         {
@@ -388,9 +388,9 @@ public:
             size_t osz1        = reallocateBytes(scratch1, bytesLayout, allocGrowthRate_);
             auto* d_layout     = reinterpret_cast<LocalIndex*>(rawPtr(scratch1));
 
-            fillGpu(d_layout, d_layout + octree.numLeafNodes + 1, LocalIndex(0), exec_);
-            inclusiveScanGpu(rawPtr(leafCountsAcc_) + firstIdx, rawPtr(leafCountsAcc_) + lastIdx,
-                             d_layout + firstIdx + 1, exec_);
+            fillGpu(exec_, d_layout, d_layout + octree.numLeafNodes + 1, LocalIndex(0));
+            inclusiveScanGpu(exec_, rawPtr(leafCountsAcc_) + firstIdx, rawPtr(leafCountsAcc_) + lastIdx,
+                             d_layout + firstIdx + 1);
             computeLeafSourceCenterGpu(x, y, z, m, octree.leafToInternal + octree.numInternalNodes, octree.numLeafNodes,
                                        d_layout, rawPtr(centersAcc_), exec_);
             reallocate(scratch1, osz1, 1.0);
@@ -493,7 +493,7 @@ public:
 
         if constexpr (execution::HaveGpu<Exec>{})
         {
-            if (not accumulate) { fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0), exec_); }
+            if (not accumulate) { fillGpu(exec_, rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
             markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(octreeAcc_.parents),
                         rawPtr(centersAcc_), box_, rawPtr(leavesAcc_) + fAssignStart, fAssignEnd - fAssignStart, false,
                         rawPtr(macsAcc_), exec_);
@@ -547,13 +547,13 @@ public:
         gatherAcc(exec_, let.leafToInternalSpan(), geoCentersAcc_.data(), searchCenters.data());
         if constexpr (execution::HaveGpu<Exec>{})
         {
-            fillGpu(layout.data() + firstNode, layout.data() + firstNode + 1, LocalIndex{0}, exec_);
-            inclusiveScanGpu(leafCountsAcc_.data() + firstNode, leafCountsAcc_.data() + lastNode,
-                             layout.data() + firstNode + 1, exec_);
+            fillGpu(exec_, layout.data() + firstNode, layout.data() + firstNode + 1, LocalIndex{0});
+            inclusiveScanGpu(exec_, leafCountsAcc_.data() + firstNode, leafCountsAcc_.data() + lastNode,
+                             layout.data() + firstNode + 1);
             computeBoundingBoxGpu(x, y, z, h, layout.data(), firstNode, lastNode, Th(2 * searchExtFact),
                                   searchCenters.data(), searchSizes.data(), exec_);
 
-            if (not accumulate) { fillGpu(rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0), exec_); }
+            if (not accumulate) { fillGpu(exec_, rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
             findHalosGpu(let.prefixes, let.childOffsets, let.parents, geoCentersAcc_.data(), geoSizesAcc_.data(),
                          leavesAcc_.data(), searchCenters.data(), searchSizes.data(), box_, firstNode, lastNode,
                          macsAcc_.data(), exec_);

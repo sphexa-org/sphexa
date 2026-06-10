@@ -60,26 +60,26 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
                                DevCountVec& d_countsBuf,
                                bool expectOverflows,
                                MPI_Comm comm,
-                               execution::Gpu stream)
+                               execution::Gpu exec)
 {
     auto newNumNodes = computeNodeOpsGpu(d_csTree.data(), nNodes(d_csTree), d_countsBuf.data(), bucketSize,
-                                         tree.childOffsets.data(), stream);
+                                         tree.childOffsets.data(), exec);
     reallocate(tree.prefixes, newNumNodes + 1, 1.01);
     bool converged = rebalanceTreeGpu(d_csTree.data(), nNodes(d_csTree), newNumNodes, tree.childOffsets.data(),
-                                      tree.prefixes.data(), stream);
+                                      tree.prefixes.data(), exec);
     swap(d_csTree, tree.prefixes);
 
     tree.resize(newNumNodes);
-    buildOctreeGpu(d_csTree.data(), tree.data(), stream);
+    buildOctreeGpu(d_csTree.data(), tree.data(), exec);
 
     size_t numLeafNodes = tree.numLeafNodes;
     auto [d_counts, d_countsRed] =
         util::packAllocBuffer(d_countsBuf, util::TypeList<unsigned, unsigned>{}, {numLeafNodes, numLeafNodes}, 128);
 
     computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys, std::numeric_limits<unsigned>::max(),
-                         true, stream);
+                         true, exec);
 
-    syncGpu(stream);
+    syncGpu(exec);
     if (expectOverflows)
     {
         MPI_Op limitSum;
@@ -87,14 +87,17 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
         mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), limitSum, comm);
         MPI_Op_free(&limitSum);
     }
-    else { mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, comm); }
-    sequenceMax(d_counts.data(), d_counts.data() + d_counts.size(), d_countsRed.data(), d_counts.data(), stream);
+    else
+    {
+        mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, comm);
+    }
+    sequenceMax(exec, d_counts.data(), d_counts.data() + d_counts.size(), d_countsRed.data(), d_counts.data());
     d_countsBuf.resize(numLeafNodes);
 
     if (converged) { return 0; }
 
     auto [minCount, maxCount] =
-        MinMax<execution::Gpu, unsigned>{stream}(d_counts.data(), d_counts.data() + d_counts.size());
+        MinMax<execution::Gpu, unsigned>{exec}(d_counts.data(), d_counts.data() + d_counts.size());
     return maxCount;
 }
 

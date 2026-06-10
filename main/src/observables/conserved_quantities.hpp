@@ -125,7 +125,8 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
     {
         if (!d.nc.empty())
         {
-            ncsum = cstone::reduceGpu(rawPtr(d.nc) + startIndex, endIndex - startIndex, size_t(0), 0);
+            ncsum = cstone::reduceGpu(cstone::execution::Gpu{0}, rawPtr(d.nc) + startIndex, endIndex - startIndex,
+                                      size_t(0));
         }
         std::tie(eKin, eInt, linmom, angmom) = conservedQuantitiesGpu(
             sph::idealGasCv(d.muiConst, d.gamma), rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy),

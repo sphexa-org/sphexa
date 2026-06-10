@@ -246,7 +246,7 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
         memcpyH2DAsync(rawPtr(nodeOps), nodeOps.size(), nops.data(), stream);
         syncGpu(stream);
 
-        exclusiveScanGpu(nops.data(), nops.data() + nops.size(), nops.data(), stream);
+        exclusiveScanGpu(stream, nops.data(), nops.data() + nops.size(), nops.data());
         TreeNodeIndex newNumLeafNodes;
         memcpyD2HAsync(nops.data() + nops.size() - 1, 1, &newNumLeafNodes, stream);
         syncGpu(stream);
