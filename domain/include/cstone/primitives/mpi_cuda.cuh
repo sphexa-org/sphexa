@@ -147,8 +147,5 @@ auto mpiAllgathervGpuDirect(const Ts* src, int sendCount, Td* dest, const int* c
         memcpyH2DAsync(destStage.data(), destStage.size(), dest, 0);
         syncGpu(0);
     }
-    else
-    {
-        mpiAllgatherv(src, sendCount, dest, counts, displ, comm);
-    }
+    else { mpiAllgatherv(src, sendCount, dest, counts, displ, comm); }
 }

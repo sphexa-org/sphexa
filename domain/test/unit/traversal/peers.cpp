@@ -107,7 +107,7 @@ static void findPeers()
     int numRanks      = 50;
     float invThetaEff = invThetaMinToVec(0.5f);
 
-    auto particleKeys   = makeRandomGaussianKeys<KeyType>(nParticles);
+    auto particleKeys     = makeRandomGaussianKeys<KeyType>(nParticles);
     auto [leaves, counts] = computeOctree<KeyType>(particleKeys, bucketSize);
 
     OctreeData<KeyType, execution::Cpu> octree;

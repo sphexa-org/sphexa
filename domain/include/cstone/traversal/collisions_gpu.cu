@@ -71,8 +71,9 @@ void findHalosGpu(const KeyType* prefixes,
     unsigned numBlocks            = iceil(lastNode - firstNode, numThreads);
 
     if (numBlocks == 0) { return; }
-    findHalosKernel<<<numBlocks, numThreads, 0, stream>>>(prefixes, childOffsets, parents, nodeCenters, nodeSizes, leaves,
-                                               searchCenters, searchSizes, box, firstNode, lastNode, collisionFlags);
+    findHalosKernel<<<numBlocks, numThreads, 0, stream>>>(prefixes, childOffsets, parents, nodeCenters, nodeSizes,
+                                                          leaves, searchCenters, searchSizes, box, firstNode, lastNode,
+                                                          collisionFlags);
 }
 
 #define FIND_HALOS_GPU(KeyType, T)                                                                                     \
@@ -133,8 +134,8 @@ void markMacsGpu(const KeyType* prefixes,
 
     if (numFocusNodes)
     {
-        markMacsGpuKernel<<<numBlocks, numThreads, 0, stream>>>(prefixes, childOffsets, parents, centers, box, focusNodes,
-                                                     numFocusNodes, limitSource, markings);
+        markMacsGpuKernel<<<numBlocks, numThreads, 0, stream>>>(prefixes, childOffsets, parents, centers, box,
+                                                                focusNodes, numFocusNodes, limitSource, markings);
     }
 }
 

@@ -128,7 +128,8 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
     DeviceVector<unsigned> d_globCounts = counts;
     std::span<const unsigned> d_globCountsView{rawPtr(d_globCounts), d_globCounts.size()};
 
-    FocusedOctree<KeyType, T, execution::Gpu> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD, execution::Gpu{0});
+    FocusedOctree<KeyType, T, execution::Gpu> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD,
+                                                        execution::Gpu{0});
     focusTree.converge(box, d_keysView, assignment, d_globTreeView, d_globCountsView, invThetaEff, d_scratch);
 
     auto d_countsView = focusTree.countsAcc();

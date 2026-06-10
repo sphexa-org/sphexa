@@ -34,7 +34,7 @@ namespace cstone
 template<class Execution, class T>
 struct MinMax;
 
-template <class T>
+template<class T>
 struct MinMax<execution::Cpu, T>
 {
     std::tuple<T, T> operator()(const T* start, const T* end)
@@ -72,7 +72,12 @@ struct MinMax<execution::Cpu, T>
  * For non-periodic dimensions, limits are determined by global min/max.
  */
 template<class T, class Execution>
-auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, MPI_Comm comm, Execution stream,
+auto makeGlobalBox(const T* x,
+                   const T* y,
+                   const T* z,
+                   size_t numElements,
+                   MPI_Comm comm,
+                   Execution stream,
                    const Box<T>& previousBox = Box<T>(0, 1))
 {
     bool keepX = previousBox.boundaryX() == BoundaryType::periodic || previousBox.boundaryX() == BoundaryType::fixed;

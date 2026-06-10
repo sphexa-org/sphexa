@@ -47,7 +47,8 @@ class FocusedOctree
 {
     //! @brief A vector template that resides on the hardware specified as Accelerator
     template<class ValueType>
-    using AccVector = std::conditional_t<execution::HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
+    using AccVector =
+        std::conditional_t<execution::HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
 
     using SType = SourceCenterType<RealType>;
 
@@ -85,10 +86,7 @@ public:
 
             reallocate(geoCentersAcc_, 1, 1.0);
         }
-        else
-        {
-            updateInternalTree<KeyType>(leaves_, octreeAcc_.data());
-        }
+        else { updateInternalTree<KeyType>(leaves_, octreeAcc_.data()); }
     }
 
     /*! @brief Update the tree structure according to previously calculated criteria (MAC and particle counts)
@@ -351,8 +349,8 @@ public:
     void gatherGlobalLeaves(std::span<T> gLeafQLoc, std::span<T> gLeafQAll) const
     {
         if constexpr (execution::HaveGpu<Accelerator>{}) { syncGpu(stream_); }
-        mpiAllgathervGpuDirect<execution::HaveGpu<Accelerator>{}>(gLeafQLoc.data(), globNumNodes_[myRank_], gLeafQAll.data(),
-                                                       globNumNodes_.data(), globDispl_.data(), comm_);
+        mpiAllgathervGpuDirect<execution::HaveGpu<Accelerator>{}>(
+            gLeafQLoc.data(), globNumNodes_[myRank_], gLeafQAll.data(), globNumNodes_.data(), globDispl_.data(), comm_);
     }
 
     template<class Tm, class DevVec1 = std::vector<LocalIndex>, class DevVec2 = std::vector<LocalIndex>>
@@ -377,10 +375,7 @@ public:
             {
                 upsweepCentersGpu(maxTreeLevel<KeyType>{}, levelRange.data(), childOffsets, centers, stream_);
             }
-            else
-            {
-                upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{});
-            }
+            else { upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{}); }
         };
 
         if constexpr (execution::HaveGpu<Accelerator>{})
@@ -459,10 +454,7 @@ public:
         {
             setMacGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box_, stream_);
         }
-        else
-        {
-            setMac<RealType, KeyType>(octreeAcc_.prefixes, centersAcc_, invTheta, box_);
-        }
+        else { setMac<RealType, KeyType>(octreeAcc_.prefixes, centersAcc_, invTheta, box_); }
     }
 
     /*! @brief Update the MAC criteria based on given expansion centers and effective inverse theta
@@ -686,10 +678,7 @@ public:
     std::span<const KeyType> treeLeavesAcc() const
     {
         if constexpr (execution::HaveGpu<Accelerator>{}) { return {rawPtr(leavesAcc_), leavesAcc_.size()}; }
-        else
-        {
-            return leaves_;
-        }
+        else { return leaves_; }
     }
 
     //! @brief the cornerstone leaf cell particle counts
@@ -714,10 +703,7 @@ private:
             computeGeoCentersGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(geoCentersAcc_),
                                  rawPtr(geoSizesAcc_), box_, stream_);
         }
-        else
-        {
-            nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_);
-        }
+        else { nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_); }
     }
 
     void downloadOctree()

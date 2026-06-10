@@ -67,8 +67,7 @@ public:
 
         cstone::sequenceGpu(rawPtr(d_ordering), d_ordering.size(), 0, 0);
         cstone::sortByKeyGpu(rawPtr(d_keys), rawPtr(d_keys) + d_keys.size(), rawPtr(d_ordering), rawPtr(d_keys_tmp),
-                             rawPtr(d_values_tmp), rawPtr(cubTmpStorage), tempStorageEle,
-                             cstone::execution::Gpu{0});
+                             rawPtr(d_values_tmp), rawPtr(cubTmpStorage), tempStorageEle, cstone::execution::Gpu{0});
 
         thrust::gather(thrust::device, d_ordering.begin(), d_ordering.end(), x, tmp.begin());
         thrust::copy(tmp.begin(), tmp.end(), x);
@@ -119,7 +118,7 @@ private:
     thrust::device_vector<cstone::TreeNodeIndex> workArray_;
 
     cstone::OctreeData<KeyType, cstone::execution::Gpu> octreeGpuData_;
-    thrust::device_vector<cstone::LocalIndex>   d_layout_;
+    thrust::device_vector<cstone::LocalIndex>           d_layout_;
 };
 
 } // namespace ryoanji

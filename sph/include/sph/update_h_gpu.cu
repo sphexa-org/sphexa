@@ -149,7 +149,8 @@ void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d,
     if (maxP2P == 0xFFFFFFFF) { throw std::runtime_error("GPU traversal stack exhausted in neighbor search\n"); }
 }
 
-template void updateSmoothingLengthIterativeGpu(const cstone::GroupView&, sphexa::ParticlesData<cstone::execution::Gpu>&,
+template void updateSmoothingLengthIterativeGpu(const cstone::GroupView&,
+                                                sphexa::ParticlesData<cstone::execution::Gpu>&,
                                                 const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace sph

@@ -105,8 +105,7 @@ auto computeMinTimestep(float* groupDt, LocalIndex* groupIndices, LocalIndex num
     if constexpr (IsDeviceVector<AccVec>{})
     {
         sortGroupDt(groupDt, groupIndices, numGroups, scratch);
-        cstone::sequenceGpu(groupIndices + numGroups, numGroupsTot - numGroups, numGroups,
-                            cstone::execution::Gpu{0});
+        cstone::sequenceGpu(groupIndices + numGroups, numGroupsTot - numGroups, numGroups, cstone::execution::Gpu{0});
         minGroupDt = timestepRangeGpu(groupDt, numGroups, fastFraction);
     }
 

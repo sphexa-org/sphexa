@@ -174,7 +174,7 @@ util::array<Tc, 5> computeAcceleration(size_t firstBody, size_t lastBody, const 
                                        const TreeNodeIndex* internalToLeaf, const LocalIndex* layout,
                                        const Vec4<Tf>* sourceCenter, const MType* Multipole)
 {
-    auto                              numBodies = lastBody - firstBody;
+    auto                                      numBodies = lastBody - firstBody;
     cstone::GroupData<cstone::execution::Gpu> groups;
     cstone::computeFixedGroups(firstBody, lastBody, bhMaxTargetSize(), groups, 0);
     thrust::device_vector<int> globalPool(stackSize(groups.numGroups));

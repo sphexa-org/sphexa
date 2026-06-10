@@ -97,10 +97,7 @@ static int multipoleExchangeTest(int thisRank, int numRanks)
     }
 
     if (numPassed[0] == numRanks && numPassed[1] == numRanks) { return EXIT_SUCCESS; }
-    else
-    {
-        return EXIT_FAILURE;
-    }
+    else { return EXIT_FAILURE; }
 }
 
 int main(int argc, char** argv)

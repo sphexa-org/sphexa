@@ -47,7 +47,8 @@ namespace sph
 template<class T, class Accelerator>
 class TurbulenceData
 {
-    using AccVector = std::conditional_t<cstone::execution::HaveGpu<Accelerator>{}, cstone::DeviceVector<T>, std::vector<T>>;
+    using AccVector =
+        std::conditional_t<cstone::execution::HaveGpu<Accelerator>{}, cstone::DeviceVector<T>, std::vector<T>>;
 
 public:
     using RealType = T;

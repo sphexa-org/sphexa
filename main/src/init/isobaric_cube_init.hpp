@@ -68,9 +68,9 @@ InitSettings IsobaricCubeConstants()
 template<class Dataset>
 void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
-    using T            = typename Dataset::RealType;
-    using HydroType    = typename Dataset::HydroType;
-    using AccType      = typename Dataset::AcceleratorType;
+    using T         = typename Dataset::RealType;
+    using HydroType = typename Dataset::HydroType;
+    using AccType   = typename Dataset::AcceleratorType;
 
     T r         = constants.at("r");
     T rhoInt    = constants.at("rhoInt");

@@ -264,7 +264,7 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
 
         auto originalSize               = scratch.size();
         auto [keyBuf, valueBuf, cubTmp] = util::packAllocBuffer(scratch, util::TypeList<KeyType, TreeNodeIndex, char>{},
-                                                                 {newNumNodes, newNumNodes, cubTmpSize}, 128);
+                                                                {newNumNodes, newNumNodes, cubTmpSize}, 128);
 
         buildOctreeGpu(rawPtr(leavesAcc), octreeAcc.data(), keyBuf, valueBuf, cubTmp, stream);
         scratch.resize(originalSize);
@@ -338,8 +338,7 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
     sendRequests.reserve(interiorPeers.size());
     for (size_t i = 0; i < interiorPeers.size(); ++i)
     {
-        gatherAcc(treeletIdx[interiorPeers[i]], quantities.data(), sendBuffers[i].data(),
-                  stream);
+        gatherAcc(treeletIdx[interiorPeers[i]], quantities.data(), sendBuffers[i].data(), stream);
         if constexpr (useGpu) { syncGpu(stream); }
         assert(sendBuffers[i].size() == treeletIdx[interiorPeers[i]].size());
         mpiSendAsyncAcc<useGpu>(sendBuffers[i].data(), treeletIdx[interiorPeers[i]].size(), interiorPeers[i], commTag,

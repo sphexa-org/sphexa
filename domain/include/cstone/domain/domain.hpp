@@ -42,7 +42,8 @@ class Domain
 
     //! @brief A vector template that resides on the hardware specified as Accelerator
     template<class ValueType>
-    using AccVector = std::conditional_t<execution::HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
+    using AccVector =
+        std::conditional_t<execution::HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
 
 public:
     //! @brief floating point type used for the coordinate bounding box and geometric/mass centers of tree nodes
@@ -611,10 +612,7 @@ private:
                     {
                         bool isHalo = std::count(hPeers.begin(), hPeers.end(), r) == 1;
                         if (isHalo) { std::cout << r << " "; }
-                        else
-                        {
-                            std::cout << "*" << r << " ";
-                        }
+                        else { std::cout << "*" << r << " "; }
                     }
                     for (auto r : hPeers)
                     {

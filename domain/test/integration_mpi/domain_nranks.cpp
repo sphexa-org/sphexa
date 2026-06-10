@@ -368,7 +368,7 @@ void randomGaussianGrav(int thisRank, int numRanks)
     std::vector<KeyType> keys(x.size());
 
     Domain<KeyType, T, execution::Cpu> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta, MPI_COMM_WORLD,
-                                      execution::Cpu{}, box);
+                                              execution::Cpu{}, box);
 
     std::vector<T> s1, s2, s3;
     domain.syncGrav(keys, x, y, z, h, m, std::tuple{}, std::tie(s1, s2, s3));

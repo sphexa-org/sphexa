@@ -33,8 +33,8 @@ computeSfcKeysKernel(KeyType* keys, const T* x, const T* y, const T* z, size_t n
 }
 
 template<class KeyType, class T>
-void computeSfcKeysGpu(const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box,
-                       cudaStream_t stream)
+void computeSfcKeysGpu(
+    const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box, cudaStream_t stream)
 {
     if (numKeys == 0) { return; }
 
@@ -43,22 +43,22 @@ void computeSfcKeysGpu(const T* x, const T* y, const T* z, KeyType* keys, size_t
     checkGpuErrors(cudaGetLastError());
 }
 
-template void
-computeSfcKeysGpu(const float*, const float*, const float*, MortonKey<unsigned>*, size_t, const Box<float>&, cudaStream_t);
-template void
-computeSfcKeysGpu(const double*, const double*, const double*, MortonKey<unsigned>*, size_t, const Box<double>&, cudaStream_t);
-template void
-computeSfcKeysGpu(const float*, const float*, const float*, MortonKey<uint64_t>*, size_t, const Box<float>&, cudaStream_t);
-template void
-computeSfcKeysGpu(const double*, const double*, const double*, MortonKey<uint64_t>*, size_t, const Box<double>&, cudaStream_t);
+template void computeSfcKeysGpu(
+    const float*, const float*, const float*, MortonKey<unsigned>*, size_t, const Box<float>&, cudaStream_t);
+template void computeSfcKeysGpu(
+    const double*, const double*, const double*, MortonKey<unsigned>*, size_t, const Box<double>&, cudaStream_t);
+template void computeSfcKeysGpu(
+    const float*, const float*, const float*, MortonKey<uint64_t>*, size_t, const Box<float>&, cudaStream_t);
+template void computeSfcKeysGpu(
+    const double*, const double*, const double*, MortonKey<uint64_t>*, size_t, const Box<double>&, cudaStream_t);
 
-template void
-computeSfcKeysGpu(const float*, const float*, const float*, HilbertKey<unsigned>*, size_t, const Box<float>&, cudaStream_t);
-template void
-computeSfcKeysGpu(const double*, const double*, const double*, HilbertKey<unsigned>*, size_t, const Box<double>&, cudaStream_t);
-template void
-computeSfcKeysGpu(const float*, const float*, const float*, HilbertKey<uint64_t>*, size_t, const Box<float>&, cudaStream_t);
-template void
-computeSfcKeysGpu(const double*, const double*, const double*, HilbertKey<uint64_t>*, size_t, const Box<double>&, cudaStream_t);
+template void computeSfcKeysGpu(
+    const float*, const float*, const float*, HilbertKey<unsigned>*, size_t, const Box<float>&, cudaStream_t);
+template void computeSfcKeysGpu(
+    const double*, const double*, const double*, HilbertKey<unsigned>*, size_t, const Box<double>&, cudaStream_t);
+template void computeSfcKeysGpu(
+    const float*, const float*, const float*, HilbertKey<uint64_t>*, size_t, const Box<float>&, cudaStream_t);
+template void computeSfcKeysGpu(
+    const double*, const double*, const double*, HilbertKey<uint64_t>*, size_t, const Box<double>&, cudaStream_t);
 
 } // namespace cstone

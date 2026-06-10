@@ -92,9 +92,8 @@ T computeKHGrowthRate(size_t startIndex, size_t endIndex, Dataset& d, const csto
 
     if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        std::tie(localSum[0], localSum[1], localSum[2]) =
-            gpuGrowthRate(rawPtr(d.x), rawPtr(d.y), rawPtr(d.vy), rawPtr(d.xm),
-                          rawPtr(d.kx), box, startIndex, endIndex);
+        std::tie(localSum[0], localSum[1], localSum[2]) = gpuGrowthRate(
+            rawPtr(d.x), rawPtr(d.y), rawPtr(d.vy), rawPtr(d.xm), rawPtr(d.kx), box, startIndex, endIndex);
     }
     else
     {

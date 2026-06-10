@@ -146,15 +146,15 @@ void buildOctreeGpu(const KeyType* cstoneTree,
     constexpr unsigned numThreads = 256;
 
     TreeNodeIndex numNodes = d.numInternalNodes + d.numLeafNodes;
-    createUnsortedLayout<<<iceil(numNodes, numThreads), numThreads, 0, stream>>>(cstoneTree, d.numInternalNodes, d.numLeafNodes,
-                                                                      d.prefixes, d.internalToLeaf);
+    createUnsortedLayout<<<iceil(numNodes, numThreads), numThreads, 0, stream>>>(
+        cstoneTree, d.numInternalNodes, d.numLeafNodes, d.prefixes, d.internalToLeaf);
 
     assert(keyBuf.size() == d.numNodes && valueBuf.size() == d.numNodes);
     sortByKeyGpu(d.prefixes, d.prefixes + numNodes, d.internalToLeaf, keyBuf.data(), valueBuf.data(), cubTmp.data(),
                  cubTmp.size(), stream);
 
     invertOrder<<<iceil(numNodes, numThreads), numThreads, 0, stream>>>(d.internalToLeaf, d.leafToInternal, numNodes,
-                                                             d.numInternalNodes);
+                                                                        d.numInternalNodes);
     getLevelRange<<<maxTreeLevel<KeyType>{} + 2, 1, 0, stream>>>(d.prefixes, numNodes, d.d_levelRange);
     checkGpuErrors(cudaMemcpyAsync(d.levelRange, d.d_levelRange, (maxTreeLevel<KeyType>{} + 2) * sizeof(TreeNodeIndex),
                                    cudaMemcpyDeviceToHost, stream));
@@ -168,10 +168,18 @@ void buildOctreeGpu(const KeyType* cstoneTree,
     }
 }
 
-template void
-buildOctreeGpu(const uint32_t*, OctreeView<uint32_t>, std::span<uint32_t>, std::span<TreeNodeIndex>, std::span<char>, cudaStream_t);
-template void
-buildOctreeGpu(const uint64_t*, OctreeView<uint64_t>, std::span<uint64_t>, std::span<TreeNodeIndex>, std::span<char>, cudaStream_t);
+template void buildOctreeGpu(const uint32_t*,
+                             OctreeView<uint32_t>,
+                             std::span<uint32_t>,
+                             std::span<TreeNodeIndex>,
+                             std::span<char>,
+                             cudaStream_t);
+template void buildOctreeGpu(const uint64_t*,
+                             OctreeView<uint64_t>,
+                             std::span<uint64_t>,
+                             std::span<TreeNodeIndex>,
+                             std::span<char>,
+                             cudaStream_t);
 
 template<class KeyType>
 void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d, cudaStream_t stream)
@@ -184,7 +192,8 @@ void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d, cudaStream
     checkGpuErrors(cudaMalloc(&valueBuf, sizeof(TreeNodeIndex) * d.numNodes));
     checkGpuErrors(cudaMalloc(&cubTmp, tmpStorage));
 
-    buildOctreeGpu(cstoneTree, d, {keyBuf, size_t(d.numNodes)}, {valueBuf, size_t(d.numNodes)}, {cubTmp, tmpStorage}, stream);
+    buildOctreeGpu(cstoneTree, d, {keyBuf, size_t(d.numNodes)}, {valueBuf, size_t(d.numNodes)}, {cubTmp, tmpStorage},
+                   stream);
 
     checkGpuErrors(cudaFree(keyBuf));
     checkGpuErrors(cudaFree(valueBuf));
@@ -221,8 +230,8 @@ void upsweepSumGpu(int numLevels,
         int numBlocks     = (numCellsLevel - 1) / numThreads + 1;
         if (numCellsLevel)
         {
-            upsweepSumKernel<<<numBlocks, numThreads, 0, stream>>>(levelRange[level], levelRange[level + 1], childOffsets,
-                                                         nodeCounts);
+            upsweepSumKernel<<<numBlocks, numThreads, 0, stream>>>(levelRange[level], levelRange[level + 1],
+                                                                   childOffsets, nodeCounts);
         }
     }
 }

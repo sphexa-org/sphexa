@@ -198,14 +198,16 @@ void upsweepCentersGpu(int numLevels,
         int numBlocks     = (numCellsLevel - 1) / numThreads + 1;
         if (numCellsLevel)
         {
-            upsweepCentersKernel<<<numBlocks, numThreads, 0, stream>>>(levelRange[level], levelRange[level + 1], childOffsets,
-                                                             centers);
+            upsweepCentersKernel<<<numBlocks, numThreads, 0, stream>>>(levelRange[level], levelRange[level + 1],
+                                                                       childOffsets, centers);
         }
     }
 }
 
-template void upsweepCentersGpu(int, const TreeNodeIndex*, const TreeNodeIndex*, SourceCenterType<float>*, cudaStream_t);
-template void upsweepCentersGpu(int, const TreeNodeIndex*, const TreeNodeIndex*, SourceCenterType<double>*, cudaStream_t);
+template void
+upsweepCentersGpu(int, const TreeNodeIndex*, const TreeNodeIndex*, SourceCenterType<float>*, cudaStream_t);
+template void
+upsweepCentersGpu(int, const TreeNodeIndex*, const TreeNodeIndex*, SourceCenterType<double>*, cudaStream_t);
 
 template<class KeyType, class T>
 __global__ void computeGeoCentersKernel(
@@ -222,9 +224,12 @@ __global__ void computeGeoCentersKernel(
 }
 
 template<class KeyType, class T>
-void computeGeoCentersGpu(
-    const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box,
-    cudaStream_t stream)
+void computeGeoCentersGpu(const KeyType* prefixes,
+                          TreeNodeIndex numNodes,
+                          Vec3<T>* centers,
+                          Vec3<T>* sizes,
+                          const Box<T>& box,
+                          cudaStream_t stream)
 {
     unsigned numThreads = 256;
     unsigned numBlocks  = iceil(numNodes, numThreads);
@@ -250,9 +255,12 @@ __global__ void geoMacSpheresKernel(
 
 //! @brief set @p centers to geometric node centers with Mac radius l * invTheta
 template<class KeyType, class T>
-void geoMacSpheresGpu(
-    const KeyType* prefixes, TreeNodeIndex numNodes, SourceCenterType<T>* centers, float invTheta, const Box<T>& box,
-    cudaStream_t stream)
+void geoMacSpheresGpu(const KeyType* prefixes,
+                      TreeNodeIndex numNodes,
+                      SourceCenterType<T>* centers,
+                      float invTheta,
+                      const Box<T>& box,
+                      cudaStream_t stream)
 {
     unsigned numThreads = 256;
     unsigned numBlocks  = iceil(numNodes, numThreads);
@@ -280,7 +288,11 @@ setMacKernel(const KeyType* prefixes, TreeNodeIndex numNodes, Vec4<T>* macSphere
 }
 
 template<class KeyType, class T>
-void setMacGpu(const KeyType* prefixes, TreeNodeIndex numNodes, Vec4<T>* macSpheres, float invTheta, const Box<T>& box,
+void setMacGpu(const KeyType* prefixes,
+               TreeNodeIndex numNodes,
+               Vec4<T>* macSpheres,
+               float invTheta,
+               const Box<T>& box,
                cudaStream_t stream)
 {
     unsigned numThreads = 256;

@@ -40,13 +40,14 @@ fixedGroupsKernel(LocalIndex first, LocalIndex last, unsigned groupSize, LocalIn
     }
 }
 
-void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups,
-                        cudaStream_t stream)
+void computeFixedGroups(
+    LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups, cudaStream_t stream)
 {
     LocalIndex numBodies = last - first;
     LocalIndex numGroups = iceil(numBodies, groupSize);
     groups.data.resize(numGroups + 1);
-    fixedGroupsKernel<<<iceil(numBodies, 256), 256, 0, stream>>>(first, last, groupSize, rawPtr(groups.data), numGroups);
+    fixedGroupsKernel<<<iceil(numBodies, 256), 256, 0, stream>>>(first, last, groupSize, rawPtr(groups.data),
+                                                                 numGroups);
 
     groups.firstBody  = first;
     groups.lastBody   = last;
@@ -85,9 +86,9 @@ void computeGroupSplitsImpl(
     numSplitsPerGroup.resize(numFixedGroups + 1);
 
     if (numFixedGroups > 0)
-    groupSplitsKernel<groupSize><<<iceil(gridSize, numThreads), numThreads, 0, stream>>>(
-        first, last, x, y, z, h, leaves, numLeaves, layout, box, tolFactor, rawPtr(splitMasks),
-        rawPtr(numSplitsPerGroup), numFixedGroups);
+        groupSplitsKernel<groupSize><<<iceil(gridSize, numThreads), numThreads, 0, stream>>>(
+            first, last, x, y, z, h, leaves, numLeaves, layout, box, tolFactor, rawPtr(splitMasks),
+            rawPtr(numSplitsPerGroup), numFixedGroups);
 
     groups.reserve(numFixedGroups * 1.1);
     groups.resize(numFixedGroups + 1);
@@ -100,8 +101,8 @@ void computeGroupSplitsImpl(
     newGroupSizes.resize(newNumGroups + 1);
 
     if (numFixedGroups > 0)
-    makeSplitsKernel<<<numFixedGroups, numThreads, 0, stream>>>(rawPtr(splitMasks), rawPtr(groups), numFixedGroups,
-                                                     rawPtr(newGroupSizes));
+        makeSplitsKernel<<<numFixedGroups, numThreads, 0, stream>>>(rawPtr(splitMasks), rawPtr(groups), numFixedGroups,
+                                                                    rawPtr(newGroupSizes));
 
     groups.resize(newNumGroups + 1);
     exclusiveScanGpu(rawPtr(newGroupSizes), rawPtr(newGroupSizes) + newNumGroups + 1, rawPtr(groups), first, stream);
@@ -141,11 +142,10 @@ void computeGroupSplits(LocalIndex first,
 }
 
 #define COMPUTE_GROUP_SPLITS(Tc, T, KeyType)                                                                           \
-    template void computeGroupSplits(LocalIndex first, LocalIndex last, const Tc* x, const Tc* y, const Tc* z,         \
-                                     const T* h, const KeyType* leaves, TreeNodeIndex numLeaves,                       \
-                                     const LocalIndex* layout, const Box<Tc> box, unsigned groupSize, float tolFactor, \
-                                     DeviceVector<LocalIndex>& numSplitsPerGroup, DeviceVector<LocalIndex>& groups,    \
-                                     cudaStream_t)
+    template void computeGroupSplits(                                                                                  \
+        LocalIndex first, LocalIndex last, const Tc* x, const Tc* y, const Tc* z, const T* h, const KeyType* leaves,   \
+        TreeNodeIndex numLeaves, const LocalIndex* layout, const Box<Tc> box, unsigned groupSize, float tolFactor,     \
+        DeviceVector<LocalIndex>& numSplitsPerGroup, DeviceVector<LocalIndex>& groups, cudaStream_t)
 
 COMPUTE_GROUP_SPLITS(double, double, uint64_t);
 COMPUTE_GROUP_SPLITS(double, float, uint64_t);

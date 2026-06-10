@@ -90,10 +90,7 @@ void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& d
     {
         std::copy_n(src.data().data(), src.data().size(), dstBuffer);
     }
-    if constexpr (IsDeviceVector<AccVec1<T>>{} || IsDeviceVector<AccVec2<T>>{})
-    {
-        syncGpu(stream);
-    }
+    if constexpr (IsDeviceVector<AccVec1<T>>{} || IsDeviceVector<AccVec2<T>>{}) { syncGpu(stream); }
 }
 
 } // namespace cstone

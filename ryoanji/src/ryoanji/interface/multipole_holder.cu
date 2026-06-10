@@ -34,7 +34,8 @@ public:
     Impl() {}
 
     GroupView computeSpatialGroups(LocalIndex first, LocalIndex last, const Tc* x, const Tc* y, const Tc* z,
-                                   const Th* h,                                    const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
+                                   const Th*                                                         h,
+                                   const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
                                    const cstone::LocalIndex* layout, const cstone::Box<Tc>& box)
     {
         auto  d_leaves  = focusTree.treeLeavesAcc();
@@ -51,7 +52,8 @@ public:
     }
 
     void upsweep(const Tc* x, const Tc* y, const Tc* z, const Tm* m, cstone::OctreeView<const KeyType> gOctree,
-                 const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree, const cstone::LocalIndex* layout)
+                 const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
+                 const cstone::LocalIndex*                                         layout)
     {
         octree_ = focusTree.octreeViewAcc();
         resize(octree_.numLeafNodes);

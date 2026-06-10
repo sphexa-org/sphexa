@@ -70,8 +70,8 @@ public:
     using Tmass     = sph::SphTypes::Tmass;
 
     template<class ValueType>
-    using FieldVector =
-        std::conditional_t<cstone::execution::HaveGpu<AccType>{}, cstone::DeviceVector<ValueType>, std::vector<ValueType>>;
+    using FieldVector = std::conditional_t<cstone::execution::HaveGpu<AccType>{}, cstone::DeviceVector<ValueType>,
+                                           std::vector<ValueType>>;
 
     using FieldVariant = std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*,
                                       FieldVector<uint64_t>*, FieldVector<uint8_t>*>;
@@ -248,8 +248,9 @@ public:
     FieldVector<uint64_t>  id;                                 // unique particle id
     FieldVector<HydroType> dtCourant;                          // per-particle timestep restriction
 
-    std::conditional_t<cstone::execution::HaveGpu<AccType>{}, sph::DeviceNeighborhoodData, sph::NeighborhoodData> neighborhood;
-    cstone::OctreeNsView<RealType, KeyType>                                                            treeView;
+    std::conditional_t<cstone::execution::HaveGpu<AccType>{}, sph::DeviceNeighborhoodData, sph::NeighborhoodData>
+                                            neighborhood;
+    cstone::OctreeNsView<RealType, KeyType> treeView;
 
     //! @brief lookup tables for the SPH-kernel and its derivative
     FieldVector<HydroType> wh, whd;
@@ -413,7 +414,11 @@ void fillMassHalos(Vector& m, std::size_t first, std::size_t last, Accelerator s
 {
     using T = std::decay_t<Vector>::value_type;
     T mass;
-    if constexpr (IsDeviceVector<Vector>{}) { memcpyD2HAsync(m.data() + first, 1, &mass, stream); syncGpu(stream); }
+    if constexpr (IsDeviceVector<Vector>{})
+    {
+        memcpyD2HAsync(m.data() + first, 1, &mass, stream);
+        syncGpu(stream);
+    }
     else { mass = m[first]; }
 
     cstone::fill(m.begin(), m.begin() + first, mass, stream);

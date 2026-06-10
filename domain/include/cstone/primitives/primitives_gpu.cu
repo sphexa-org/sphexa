@@ -154,8 +154,8 @@ gatherScatterGpuKernel(const IndexType* gmap, const IndexType* smap, size_t n, c
 }
 
 template<class T, class IndexType>
-void gatherScatterGpu(const IndexType* gmap, const IndexType* smap, size_t n, const T* source, T* destination,
-                      cudaStream_t stream)
+void gatherScatterGpu(
+    const IndexType* gmap, const IndexType* smap, size_t n, const T* source, T* destination, cudaStream_t stream)
 {
     int numThreads = 256;
     int numBlocks  = iceil(n, numThreads);
@@ -167,18 +167,18 @@ void gatherScatterGpu(const IndexType* gmap, const IndexType* smap, size_t n, co
 template void gatherScatterGpu(const int*, const int*, size_t, const int*, int*, cudaStream_t);
 template void gatherScatterGpu(const int*, const int*, size_t, const uint32_t*, uint32_t*, cudaStream_t);
 template void gatherScatterGpu(const int*, const int*, size_t, const uint64_t*, uint64_t*, cudaStream_t);
-template void gatherScatterGpu(const int*, const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*,
-                               cudaStream_t);
-template void gatherScatterGpu(const int*, const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*,
-                               cudaStream_t);
-template void gatherScatterGpu(const int*, const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*,
-                               cudaStream_t);
-template void gatherScatterGpu(const int*, const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*,
-                               cudaStream_t);
-template void gatherScatterGpu(const int*, const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*,
-                               cudaStream_t);
 template void
-gatherScatterGpu(const int*, const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*, cudaStream_t);
+gatherScatterGpu(const int*, const int*, size_t, const util::array<float, 4>*, util::array<float, 4>*, cudaStream_t);
+template void
+gatherScatterGpu(const int*, const int*, size_t, const util::array<float, 8>*, util::array<float, 8>*, cudaStream_t);
+template void
+gatherScatterGpu(const int*, const int*, size_t, const util::array<float, 12>*, util::array<float, 12>*, cudaStream_t);
+template void
+gatherScatterGpu(const int*, const int*, size_t, const util::array<double, 4>*, util::array<double, 4>*, cudaStream_t);
+template void
+gatherScatterGpu(const int*, const int*, size_t, const util::array<double, 8>*, util::array<double, 8>*, cudaStream_t);
+template void gatherScatterGpu(
+    const int*, const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*, cudaStream_t);
 
 template<class T>
 std::tuple<T, T> MinMax<execution::Gpu, T>::operator()(const T* first, const T* last)
@@ -235,16 +235,20 @@ template size_t lowerBoundGpu(const int64_t*, const int64_t*, int64_t, cudaStrea
 template size_t lowerBoundGpu(const float*, const float*, float, cudaStream_t);
 
 template<class T, class IndexType>
-void lowerBoundGpu(const T* first, const T* last, const T* valueFirst, const T* valueLast, IndexType* result,
-                   cudaStream_t stream)
+void lowerBoundGpu(
+    const T* first, const T* last, const T* valueFirst, const T* valueLast, IndexType* result, cudaStream_t stream)
 {
     thrust::lower_bound(devicePar(stream), first, last, valueFirst, valueLast, result);
 }
 
-template void lowerBoundGpu(const unsigned*, const unsigned*, const unsigned*, const unsigned*, unsigned*, cudaStream_t);
-template void lowerBoundGpu(const uint64_t*, const uint64_t*, const uint64_t*, const uint64_t*, unsigned*, cudaStream_t);
-template void lowerBoundGpu(const unsigned*, const unsigned*, const unsigned*, const unsigned*, uint64_t*, cudaStream_t);
-template void lowerBoundGpu(const uint64_t*, const uint64_t*, const uint64_t*, const uint64_t*, uint64_t*, cudaStream_t);
+template void
+lowerBoundGpu(const unsigned*, const unsigned*, const unsigned*, const unsigned*, unsigned*, cudaStream_t);
+template void
+lowerBoundGpu(const uint64_t*, const uint64_t*, const uint64_t*, const uint64_t*, unsigned*, cudaStream_t);
+template void
+lowerBoundGpu(const unsigned*, const unsigned*, const unsigned*, const unsigned*, uint64_t*, cudaStream_t);
+template void
+lowerBoundGpu(const uint64_t*, const uint64_t*, const uint64_t*, const uint64_t*, uint64_t*, cudaStream_t);
 
 template<class T1, class T2, class Tout>
 void sequenceMax(const T1* i1_begin, const T1* i1_end, const T2* i2, Tout* output, cudaStream_t stream)
@@ -282,18 +286,21 @@ void sortGpu(KeyType* first, KeyType* last, KeyType* keyBuf, cudaStream_t stream
     // Determine temporary device storage requirements
     void* d_tempStorage     = nullptr;
     size_t tempStorageBytes = 0;
-    checkGpuErrors(cub::DeviceRadixSort::SortKeys(d_tempStorage, tempStorageBytes, d_keys, numElements, 0, sizeof(KeyType) * 8, stream));
+    checkGpuErrors(cub::DeviceRadixSort::SortKeys(d_tempStorage, tempStorageBytes, d_keys, numElements, 0,
+                                                  sizeof(KeyType) * 8, stream));
 
     // Allocate temporary storage
     checkGpuErrors(cudaMalloc(&d_tempStorage, tempStorageBytes));
 
     // Run sorting operation
-    checkGpuErrors(cub::DeviceRadixSort::SortKeys(d_tempStorage, tempStorageBytes, d_keys, numElements, 0, sizeof(KeyType) * 8, stream));
+    checkGpuErrors(cub::DeviceRadixSort::SortKeys(d_tempStorage, tempStorageBytes, d_keys, numElements, 0,
+                                                  sizeof(KeyType) * 8, stream));
 
     auto* curValues = d_keys.Current();
     if (curValues != first)
     {
-        checkGpuErrors(cudaMemcpyAsync(first, curValues, numElements * sizeof(KeyType), cudaMemcpyDeviceToDevice, stream));
+        checkGpuErrors(
+            cudaMemcpyAsync(first, curValues, numElements * sizeof(KeyType), cudaMemcpyDeviceToDevice, stream));
     }
 
     checkGpuErrors(cudaFree(d_tempStorage));
@@ -311,7 +318,8 @@ uint64_t sortByKeyTempStorage(uint64_t numElements)
     cub::DoubleBuffer<ValueType> d_values(nullptr, nullptr);
 
     uint64_t tempStorageBytes = 0;
-    checkGpuErrors(cub::DeviceRadixSort::SortPairs(nullptr, tempStorageBytes, d_keys, d_values, numElements, 0, sizeof(KeyType) * 8));
+    checkGpuErrors(cub::DeviceRadixSort::SortPairs(nullptr, tempStorageBytes, d_keys, d_values, numElements, 0,
+                                                   sizeof(KeyType) * 8));
     return tempStorageBytes;
 }
 
@@ -334,18 +342,21 @@ void sortByKeyGpu(KeyType* first,
     if (tempStorageBytes < tempBytesCheck) { throw std::runtime_error("temp storage too small\n"); };
 
     // Run sorting operation
-    checkGpuErrors(cub::DeviceRadixSort::SortPairs(d_tempStorage, tempStorageBytes, d_keys, d_values, numElements, 0, sizeof(KeyType) * 8, stream));
+    checkGpuErrors(cub::DeviceRadixSort::SortPairs(d_tempStorage, tempStorageBytes, d_keys, d_values, numElements, 0,
+                                                   sizeof(KeyType) * 8, stream));
 
     auto* curKeys = d_keys.Current();
     if (curKeys != first)
     {
-        checkGpuErrors(cudaMemcpyAsync(first, curKeys, numElements * sizeof(KeyType), cudaMemcpyDeviceToDevice, stream));
+        checkGpuErrors(
+            cudaMemcpyAsync(first, curKeys, numElements * sizeof(KeyType), cudaMemcpyDeviceToDevice, stream));
     }
 
     auto* curValues = d_values.Current();
     if (curValues != values)
     {
-        checkGpuErrors(cudaMemcpyAsync(values, curValues, numElements * sizeof(ValueType), cudaMemcpyDeviceToDevice, stream));
+        checkGpuErrors(
+            cudaMemcpyAsync(values, curValues, numElements * sizeof(ValueType), cudaMemcpyDeviceToDevice, stream));
     }
 }
 

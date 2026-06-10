@@ -73,7 +73,10 @@ void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, Val
 }
 
 template<class IndexType, class ValueType>
-void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, execution::Gpu stream)
+void gatherAcc(std::span<const IndexType> ordering,
+               const ValueType* source,
+               ValueType* destination,
+               execution::Gpu stream)
 {
     gatherGpu(ordering.data(), ordering.size(), source, destination, stream);
 }
@@ -85,7 +88,10 @@ void scatterAcc(std::span<const IndexType> ordering, const ValueType* source, Va
 }
 
 template<class IndexType, class ValueType>
-void scatterAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination, execution::Gpu stream)
+void scatterAcc(std::span<const IndexType> ordering,
+                const ValueType* source,
+                ValueType* destination,
+                execution::Gpu stream)
 {
     scatterGpu(ordering.data(), ordering.size(), source, destination, stream);
 }

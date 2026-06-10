@@ -66,7 +66,8 @@ protected:
                                          MultipoleHolderGpu<MultipoleType, DomainType, typename DataType::HydroData>,
                                          MultipoleHolderCpu<MultipoleType, DomainType, typename DataType::HydroData>>;
     template<class VType>
-    using AccVector = std::conditional_t<cstone::execution::HaveGpu<Acc>{}, cstone::DeviceVector<VType>, std::vector<VType>>;
+    using AccVector =
+        std::conditional_t<cstone::execution::HaveGpu<Acc>{}, cstone::DeviceVector<VType>, std::vector<VType>>;
 
     MHolder_t mHolder_;
 
@@ -116,7 +117,10 @@ public:
     HydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings)
         : Base(output, rank)
     {
-        if (not cstone::execution::HaveGpu<Acc>{}) { throw std::runtime_error("This propagator is not supported on CPUs\n"); }
+        if (not cstone::execution::HaveGpu<Acc>{})
+        {
+            throw std::runtime_error("This propagator is not supported on CPUs\n");
+        }
         if (avClean && rank == 0) { std::cout << "AV cleaning is activated" << std::endl; }
         try
         {

@@ -196,11 +196,10 @@ void driftPositions(const GroupView& grp, Dataset& d, float dt_forward, float dt
         auto  constCv = d.mui.empty() ? idealGasCv(d.muiConst, d.gamma) : -1.0;
         auto* d_mui   = d.mui.empty() ? nullptr : rawPtr(d.mui);
 
-        driftPositionsGpu(grp, dt_forward, dt_backward, dt_prevRung, rawPtr(d.x), rawPtr(d.y),
-                          rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz),
-                          rawPtr(d.x_m1), rawPtr(d.y_m1), rawPtr(d.z_m1), rawPtr(d.ax),
-                          rawPtr(d.ay), rawPtr(d.az), rung, rawPtr(d.temp), rawPtr(d.u),
-                          rawPtr(d.du), rawPtr(d.du_m1), d_mui, d.gamma, constCv);
+        driftPositionsGpu(grp, dt_forward, dt_backward, dt_prevRung, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z),
+                          rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.x_m1), rawPtr(d.y_m1), rawPtr(d.z_m1),
+                          rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rung, rawPtr(d.temp), rawPtr(d.u), rawPtr(d.du),
+                          rawPtr(d.du_m1), d_mui, d.gamma, constCv);
     }
 }
 
@@ -213,12 +212,10 @@ void computePositions(const GroupView& grp, Dataset& d, const cstone::Box<T>& bo
         T     constCv = d.mui.empty() ? idealGasCv(d.muiConst, d.gamma) : -1.0;
         auto* d_mui   = d.mui.empty() ? nullptr : rawPtr(d.mui);
 
-        computePositionsGpu(grp, dt_forward, dt_m1, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z),
-                            rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.x_m1),
-                            rawPtr(d.y_m1), rawPtr(d.z_m1), rawPtr(d.ax), rawPtr(d.ay),
-                            rawPtr(d.az), rung, rawPtr(d.temp), rawPtr(d.u),
-                            rawPtr(d.du), rawPtr(d.du_m1), rawPtr(d.h), d_mui, d.gamma, constCv,
-                            box);
+        computePositionsGpu(grp, dt_forward, dt_m1, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy),
+                            rawPtr(d.vz), rawPtr(d.x_m1), rawPtr(d.y_m1), rawPtr(d.z_m1), rawPtr(d.ax), rawPtr(d.ay),
+                            rawPtr(d.az), rung, rawPtr(d.temp), rawPtr(d.u), rawPtr(d.du), rawPtr(d.du_m1), rawPtr(d.h),
+                            d_mui, d.gamma, constCv, box);
     }
     else
     {

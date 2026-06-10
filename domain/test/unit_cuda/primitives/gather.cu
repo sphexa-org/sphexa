@@ -35,7 +35,8 @@ TEST(SortByKey, minimal)
 
     LocalIndex off = 1;
     sequence(off, keys.size(), obuf, 1.0, stream);
-    sortByKey(std::span{keys.data(), keys.size()}, std::span{obuf.data() + off, keys.size()}, keyBuf, valBuf, 1.0, stream);
+    sortByKey(std::span{keys.data(), keys.size()}, std::span{obuf.data() + off, keys.size()}, keyBuf, valBuf, 1.0,
+              stream);
     // map is [. 2 1 4 3]
 
     sequence(0, off, obuf, 1.0, stream);

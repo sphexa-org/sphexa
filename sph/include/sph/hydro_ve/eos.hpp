@@ -155,10 +155,9 @@ void computeIdealGasEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        gpu::computeIdealGasEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.temp), rawPtr(d.u),
-                                rawPtr(d.m), rawPtr(d.kx), rawPtr(d.xm),
-                                rawPtr(d.gradh), rawPtr(d.prho), rawPtr(d.c),
-                                rawPtr(d.rho), rawPtr(d.p));
+        gpu::computeIdealGasEOS(startIndex, endIndex, d.muiConst, d.gamma, rawPtr(d.temp), rawPtr(d.u), rawPtr(d.m),
+                                rawPtr(d.kx), rawPtr(d.xm), rawPtr(d.gradh), rawPtr(d.prho), rawPtr(d.c), rawPtr(d.rho),
+                                rawPtr(d.p));
     }
     else { computeIdealGasEOS_Impl(startIndex, endIndex, d); }
 }
@@ -168,9 +167,9 @@ void computeIsothermalEOS(size_t startIndex, size_t endIndex, Dataset& d)
 {
     if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
-        gpu::computeIsothermalEOS(startIndex, endIndex, d.soundSpeedConst, rawPtr(d.c), rawPtr(d.rho),
-                                  rawPtr(d.p), rawPtr(d.m), rawPtr(d.kx), rawPtr(d.xm),
-                                  rawPtr(d.gradh), rawPtr(d.prho), rawPtr(d.temp));
+        gpu::computeIsothermalEOS(startIndex, endIndex, d.soundSpeedConst, rawPtr(d.c), rawPtr(d.rho), rawPtr(d.p),
+                                  rawPtr(d.m), rawPtr(d.kx), rawPtr(d.xm), rawPtr(d.gradh), rawPtr(d.prho),
+                                  rawPtr(d.temp));
     }
     else { computeIsothermalEOS_Impl(startIndex, endIndex, d); }
 }
@@ -181,9 +180,8 @@ void computePolytropicEOS(size_t startIndex, size_t endIndex, Dataset& d)
     if constexpr (cstone::execution::HaveGpu<typename Dataset::AcceleratorType>{})
     {
         gpu::computePolytropicEOS(startIndex, endIndex, d.polytropic_const, d.polytropic_index, rawPtr(d.rho),
-                                  rawPtr(d.p), rawPtr(d.m), rawPtr(d.kx), rawPtr(d.xm),
-                                  rawPtr(d.gradh), rawPtr(d.prho), rawPtr(d.temp),
-                                  rawPtr(d.c));
+                                  rawPtr(d.p), rawPtr(d.m), rawPtr(d.kx), rawPtr(d.xm), rawPtr(d.gradh), rawPtr(d.prho),
+                                  rawPtr(d.temp), rawPtr(d.c));
     }
     else { computePolytropicEOS_Impl(startIndex, endIndex, d); }
 }

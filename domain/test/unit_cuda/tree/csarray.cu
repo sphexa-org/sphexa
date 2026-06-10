@@ -67,13 +67,15 @@ TEST(CsArrayGpu, computeNodeCountsGpu)
     *refCounts.rbegin() = 0;
 
     computeNodeCountsGpu(rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree),
-                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), false, 0);
+                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), false,
+                         0);
     thrust::host_vector<unsigned> h_counts = d_counts;
     EXPECT_EQ(h_counts, refCounts);
 
     // check again, using previous counts as guesses
     computeNodeCountsGpu(rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree),
-                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), true, 0);
+                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), true,
+                         0);
     h_counts = d_counts;
     EXPECT_EQ(h_counts, refCounts);
 }
@@ -141,7 +143,7 @@ public:
         DeviceVector<KeyType> tmpTree;
         DeviceVector<TreeNodeIndex> workArray;
 
-        while (!updateOctreeGpu<KeyType>({rawPtr(d_codes), d_codes.size()}, bucketSize, d_tree, d_counts, tmpTree, 
+        while (!updateOctreeGpu<KeyType>({rawPtr(d_codes), d_codes.size()}, bucketSize, d_tree, d_counts, tmpTree,
                                          workArray, execution::Gpu{0}))
             ;
     }

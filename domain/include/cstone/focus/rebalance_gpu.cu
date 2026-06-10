@@ -65,11 +65,10 @@ void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
 }
 
 #define REBA_DEC_ESS_GPU(KeyType)                                                                                      \
-    template void rebalanceDecisionEssentialGpu(const KeyType* prefixes, const TreeNodeIndex* childOffsets,            \
-                                                const TreeNodeIndex* parents, const unsigned* counts,                  \
-                                                const uint8_t* macs, KeyType focusStart, KeyType focusEnd,             \
-                                                unsigned bucketSize, TreeNodeIndex* nodeOps, TreeNodeIndex numNodes,   \
-                                                cudaStream_t)
+    template void rebalanceDecisionEssentialGpu(                                                                       \
+        const KeyType* prefixes, const TreeNodeIndex* childOffsets, const TreeNodeIndex* parents,                      \
+        const unsigned* counts, const uint8_t* macs, KeyType focusStart, KeyType focusEnd, unsigned bucketSize,        \
+        TreeNodeIndex* nodeOps, TreeNodeIndex numNodes, cudaStream_t)
 REBA_DEC_ESS_GPU(uint32_t);
 REBA_DEC_ESS_GPU(uint64_t);
 
@@ -98,8 +97,8 @@ void macRefineDecisionGpu(const KeyType* prefixes,
                           cudaStream_t stream)
 {
     constexpr unsigned numThreads = 256;
-    macRefineDecisionKernel<<<iceil(numLeafNodes, numThreads), numThreads, 0, stream>>>(prefixes, macs, l2i, numLeafNodes,
-                                                                             {focus.start(), focus.end()}, nodeOps);
+    macRefineDecisionKernel<<<iceil(numLeafNodes, numThreads), numThreads, 0, stream>>>(
+        prefixes, macs, l2i, numLeafNodes, {focus.start(), focus.end()}, nodeOps);
 }
 
 #define MAC_REF_DEC_GPU(KeyType)                                                                                       \
@@ -149,10 +148,12 @@ bool protectAncestorsGpu(const KeyType* prefixes,
     resetNodeOpSum<<<1, 1, 0, stream>>>();
 
     constexpr unsigned numThreads = 256;
-    protectAncestorsKernel<<<iceil(numNodes, numThreads), numThreads, 0, stream>>>(prefixes, parents, nodeOps, numNodes);
+    protectAncestorsKernel<<<iceil(numNodes, numThreads), numThreads, 0, stream>>>(prefixes, parents, nodeOps,
+                                                                                   numNodes);
 
     int numNodesModify;
-    checkGpuErrors(cudaMemcpyFromSymbolAsync(&numNodesModify, GPU_SYMBOL(nodeOpSum), sizeof(int), 0, cudaMemcpyDeviceToHost, stream));
+    checkGpuErrors(cudaMemcpyFromSymbolAsync(&numNodesModify, GPU_SYMBOL(nodeOpSum), sizeof(int), 0,
+                                             cudaMemcpyDeviceToHost, stream));
     checkGpuErrors(cudaStreamSynchronize(stream));
 
     return numNodesModify == 0;
@@ -192,7 +193,8 @@ ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
     }
 
     int status;
-    checkGpuErrors(cudaMemcpyFromSymbolAsync(&status, GPU_SYMBOL(enforceKeyStatus_device), sizeof(ResolutionStatus), 0, cudaMemcpyDeviceToHost, stream));
+    checkGpuErrors(cudaMemcpyFromSymbolAsync(&status, GPU_SYMBOL(enforceKeyStatus_device), sizeof(ResolutionStatus), 0,
+                                             cudaMemcpyDeviceToHost, stream));
     checkGpuErrors(cudaStreamSynchronize(stream));
     return static_cast<ResolutionStatus>(status);
 }
@@ -238,8 +240,9 @@ void rangeCountGpu(std::span<const KeyType> leaves,
     constexpr unsigned numThreads = 64;
     unsigned numBlocks            = iceil(leavesFocusIdx.size(), numThreads);
     if (numBlocks == 0) { return; }
-    rangeCountKernel<<<numBlocks, numThreads, 0, stream>>>(leaves.data(), leaves.size(), counts.data(), leavesFocus.data(),
-                                                  leavesFocusIdx.data(), leavesFocusIdx.size(), countsFocus.data());
+    rangeCountKernel<<<numBlocks, numThreads, 0, stream>>>(leaves.data(), leaves.size(), counts.data(),
+                                                           leavesFocus.data(), leavesFocusIdx.data(),
+                                                           leavesFocusIdx.size(), countsFocus.data());
 }
 
 #define RANGE_COUNT_GPU(KeyType)                                                                                       \

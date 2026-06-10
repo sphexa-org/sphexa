@@ -49,9 +49,9 @@ namespace sphexa
 template<class Dataset>
 void initSedovFields(Dataset& d, const InitSettings& constants)
 {
-    using AccType      = typename Dataset::AcceleratorType;
-    auto stream        = AccType::Default();
-    using T            = Dataset::RealType;
+    using AccType = typename Dataset::AcceleratorType;
+    auto stream   = AccType::Default();
+    using T       = Dataset::RealType;
 
     double r           = constants.at("r1");
     double totalVolume = std::pow(2 * r, 3);

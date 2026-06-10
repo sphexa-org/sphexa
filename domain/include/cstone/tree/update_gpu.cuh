@@ -54,7 +54,8 @@ bool updateOctreeGpu(std::span<const KeyType> keys,
         computeNodeOpsGpu(rawPtr(tree), nNodes(tree), rawPtr(counts), bucketSize, rawPtr(workArray), stream);
 
     tmpTree.resize(newNumNodes + 1);
-    bool converged = rebalanceTreeGpu(rawPtr(tree), nNodes(tree), newNumNodes, rawPtr(workArray), rawPtr(tmpTree), stream);
+    bool converged =
+        rebalanceTreeGpu(rawPtr(tree), nNodes(tree), newNumNodes, rawPtr(workArray), rawPtr(tmpTree), stream);
 
     swap(tree, tmpTree);
     counts.resize(nNodes(tree));

@@ -91,7 +91,8 @@ void randomGaussianAssignment(int rank, int numRanks)
     DeviceVector<T> d_y = y;
     DeviceVector<T> d_z = z;
 
-    GlobalAssignment<KeyType, T, execution::Gpu> assignmentGpu(rank, numRanks, bucketSize, box, MPI_COMM_WORLD, execution::Gpu{0});
+    GlobalAssignment<KeyType, T, execution::Gpu> assignmentGpu(rank, numRanks, bucketSize, box, MPI_COMM_WORLD,
+                                                               execution::Gpu{0});
     DeviceVector<unsigned> sfcScratch;
     SfcSorter deviceSort(sfcScratch);
 
