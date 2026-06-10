@@ -40,6 +40,8 @@
 #include "gtest/gtest.h"
 #include "io/id_tag_utils.hpp"
 
+using namespace cstone;
+
 TEST(IO, taggedIdIdentificationGPU)
 {
     std::vector<uint64_t> ids(100);

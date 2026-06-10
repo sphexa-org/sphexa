@@ -178,7 +178,7 @@ struct CombinedUpdate
 
         exclusiveScan(stream, nodeOps.data(), nodeOps.data() + nodeOps.size(), nodeOps.data());
         TreeNodeIndex newNumLeafNodes;
-        memcpyD2HAsync(nodeOps.data() + nodeOps.size() - 1, 1, &newNumLeafNodes, stream);
+        memcpyD2HAsync(stream, nodeOps.data() + nodeOps.size() - 1, 1, &newNumLeafNodes);
         syncGpu(stream); // wait for D2H before using newNumLeafNodes on host
 
         auto& newLeaves = tree.prefixes;
@@ -205,7 +205,7 @@ struct CombinedUpdate
         auto [keyBuf, valueBuf, cubTmp] = util::packAllocBuffer(scratch, util::TypeList<KeyType, TreeNodeIndex, char>{},
                                                                 {newNumNodes, newNumNodes, cubTmpSize}, 128);
 
-        buildOctreeGpu(rawPtr(leaves), tree.data(), keyBuf, valueBuf, cubTmp, stream);
+        buildOctreeGpu(stream, rawPtr(leaves), tree.data(), keyBuf, valueBuf, cubTmp);
         scratch.resize(originalSize);
 
         return converged;

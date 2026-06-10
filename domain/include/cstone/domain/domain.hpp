@@ -315,7 +315,7 @@ public:
         {
             static_assert(IsDeviceVector<OVec>{}, "Need ordering on GPU for GPU-accelerated domain");
             orderingCpu.resize(envelope[1] - envelope[0]);
-            memcpyD2HAsync(ord, orderingCpu.size(), orderingCpu.data(), exec_);
+            memcpyD2HAsync(exec_, ord, orderingCpu.size(), orderingCpu.data());
             syncGpu(exec_);
             ord = orderingCpu.data();
         }
@@ -548,11 +548,11 @@ private:
         if constexpr (execution::HaveGpu<Exec>{})
         {
             globalTreeBackingBuffer.resize(globalTree.size());
-            memcpyD2HAsync(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data(), exec_);
+            memcpyD2HAsync(exec_, globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data());
             globalTree = std::span(globalTreeBackingBuffer);
 
             flagsBackingBuffer.resize(flags.size());
-            memcpyD2HAsync(flags.data(), flags.size(), flagsBackingBuffer.data(), exec_);
+            memcpyD2HAsync(exec_, flags.data(), flags.size(), flagsBackingBuffer.data());
             flags = std::span(flagsBackingBuffer);
             syncGpu(exec_);
         }

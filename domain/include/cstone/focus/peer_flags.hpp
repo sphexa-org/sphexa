@@ -51,7 +51,10 @@ std::vector<int> focusPeers(std::span<const TreeNodeIndex> globalOffsets,
 
         bool isPeer = false;
         if (focEnd - focStart > globEnd - globStart) { isPeer = true; }
-        else { isPeer = not std::includes(globStart, globEnd, focStart, focEnd); }
+        else
+        {
+            isPeer = not std::includes(globStart, globEnd, focStart, focEnd);
+        }
         if (isPeer) { peerFlags[rank] |= static_cast<int>(PeerMask::focus); }
     }
     return peerFlags;
@@ -83,12 +86,12 @@ std::vector<int> focusPeersAcc(std::span<const TreeNodeIndex> globalOffsets,
                                int myRank,
                                std::span<const KeyType> globalTree,
                                std::span<const KeyType> focusTree,
-                               execution::Gpu stream)
+                               execution::Gpu exec)
 {
     std::vector<KeyType> globalTreeBackingBuffer;
     globalTreeBackingBuffer.resize(globalTree.size());
-    memcpyD2HAsync(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data(), stream);
-    syncGpu(stream);
+    memcpyD2HAsync(exec, globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data());
+    syncGpu(exec);
     auto globalTreeHost = std::span(globalTreeBackingBuffer);
     return focusPeers<KeyType>(globalOffsets, focusOffsets, myRank, globalTreeHost, focusTree);
 }

@@ -78,8 +78,8 @@ void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T mass
     cstone::fill(exec, d.mui.begin(), d.mui.end(), 10.0);
 
     auto   cv = sph::idealGasCv(d.muiConst, gamma);
-    auto&& x  = toHost(d.x);
-    auto&& y  = toHost(d.y);
+    auto&& x  = cstone::toHost(d.x);
+    auto&& y  = cstone::toHost(d.y);
 
     cstone::LocalIndex     numPartLocal = d.x.size();
     std::vector<HydroType> h(numPartLocal);

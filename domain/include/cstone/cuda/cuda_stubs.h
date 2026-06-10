@@ -19,6 +19,9 @@
 
 #include "cstone/execution.hpp"
 
+namespace cstone
+{
+
 template<class T, class Alloc>
 T* rawPtr(std::vector<T, Alloc>& p)
 {
@@ -32,15 +35,15 @@ const T* rawPtr(const std::vector<T, Alloc>& p)
 }
 
 template<class T>
-void memcpyH2DAsync(const T* src, std::size_t n, T* dest, cudaStream_t stream);
+void memcpyH2DAsync(execution::Gpu exec, const T* src, std::size_t n, T* dest);
 
 template<class T>
-void memcpyD2HAsync(const T* src, std::size_t n, T* dest, cudaStream_t stream);
+void memcpyD2HAsync(execution::Gpu exec, const T* src, std::size_t n, T* dest);
 
 template<class T>
-void memcpyD2DAsync(const T* src, std::size_t n, T* dest, cudaStream_t stream);
+void memcpyD2DAsync(execution::Gpu exec, const T* src, std::size_t n, T* dest);
 
-void syncGpu(cudaStream_t stream);
+void syncGpu(execution::Gpu exec);
 
 /*! @brief detection trait to determine whether a template parameter is a device vector
  *
@@ -58,3 +61,5 @@ const std::vector<T>& toHost(const std::vector<T>& v)
 {
     return v;
 }
+
+} // namespace cstone

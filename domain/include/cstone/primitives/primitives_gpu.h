@@ -38,7 +38,7 @@ inline void fill(execution::Gpu exec, T1* first, T1* last, T2 value)
 template<class T>
 void copy_n(execution::Gpu exec, const T* src, std::size_t n, T* dest)
 {
-    memcpyD2DAsync(src, n, dest, exec);
+    memcpyD2DAsync(exec, src, n, dest);
 }
 
 template<class T1, class T2, class T3>

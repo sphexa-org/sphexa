@@ -82,7 +82,7 @@ void sortGroupDt(float* groupDt, cstone::LocalIndex* groupIndices, cstone::Local
     void* tempStorage = buffers[2].data();
     cstone::sequence(cstone::execution::Gpu{0}, groupIndices, numGroups, 0u);
     cstone::sortByKey(cstone::execution::Gpu{0}, groupDt, groupDt + numGroups, groupIndices, buffers[0].data(),
-                         valueBuf, tempStorage, tempElem * sizeof(float));
+                      valueBuf, tempStorage, tempElem * sizeof(float));
     reallocate(oldSize, 1.0, scratch);
 };
 
@@ -90,9 +90,10 @@ void sortGroupDt(float* groupDt, cstone::LocalIndex* groupIndices, cstone::Local
 inline auto timestepRangeGpu(const float* groupDt, cstone::LocalIndex numGroups, float fastFraction)
 {
     std::array<float, 2> minGroupDt;
-    memcpyD2HAsync(groupDt, 1, minGroupDt.data(), 0);
-    memcpyD2HAsync(groupDt + cstone::LocalIndex(fastFraction * numGroups), 1, minGroupDt.data() + 1, 0);
-    syncGpu(0);
+    cstone::memcpyD2HAsync(cstone::execution::Gpu{0}, groupDt, 1, minGroupDt.data());
+    cstone::memcpyD2HAsync(cstone::execution::Gpu{0}, groupDt + cstone::LocalIndex(fastFraction * numGroups), 1,
+                           minGroupDt.data() + 1);
+    cstone::syncGpu(0);
     return minGroupDt;
 }
 
@@ -102,7 +103,7 @@ auto computeMinTimestep(float* groupDt, LocalIndex* groupIndices, LocalIndex num
 {
     float                fastFraction = 0.4;
     std::array<float, 2> minGroupDt   = {std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
-    if constexpr (IsDeviceVector<AccVec>{})
+    if constexpr (cstone::IsDeviceVector<AccVec>{})
     {
         sortGroupDt(groupDt, groupIndices, numGroups, scratch);
         cstone::sequence(cstone::execution::Gpu{0}, groupIndices + numGroups, numGroupsTot - numGroups, numGroups);
@@ -132,8 +133,7 @@ auto findRungRanges(float minDt, const float* groupDt, LocalIndex numGroups, int
     {
         float maxDtRung = (1 << rung) * minDt;
         if constexpr (useGpu)
-            rungRanges[rung] =
-                cstone::lowerBound(cstone::execution::Gpu{0}, groupDt, groupDt + numGroups, maxDtRung);
+            rungRanges[rung] = cstone::lowerBound(cstone::execution::Gpu{0}, groupDt, groupDt + numGroups, maxDtRung);
         else
             rungRanges[rung] = std::lower_bound(groupDt, groupDt + numGroups, maxDtRung) - groupDt;
     }
@@ -146,7 +146,7 @@ Timestep rungTimestep(float* groupDt, LocalIndex* groupIndices, LocalIndex numGr
 {
     auto minDtGlobal = computeMinTimestep(groupDt, groupIndices, numGroups, numGroups, scratch);
     int  numRungs    = std::min(int(log2(minDtGlobal[1] / minDtGlobal[0])) + 1, Timestep::maxNumRungs);
-    auto rungRanges  = findRungRanges<IsDeviceVector<AccVec>{}>(minDtGlobal[0], groupDt, numGroups, numRungs);
+    auto rungRanges  = findRungRanges<cstone::IsDeviceVector<AccVec>{}>(minDtGlobal[0], groupDt, numGroups, numRungs);
 
     minDtGlobal[0]   = std::min(maxDt, minDtGlobal[0]);
     float    totalDt = minDtGlobal[0] * (1 << numRungs);
@@ -159,7 +159,8 @@ template<class AccVec>
 auto minimumGroupDt(Timestep ts, float* groupDt, LocalIndex* groupIndices, LocalIndex numGroups, AccVec& scratch)
 {
     float minDtGlobal = computeMinTimestep(groupDt, groupIndices, numGroups, ts.rungRanges.back(), scratch)[0];
-    auto  rungRanges = findRungRanges<IsDeviceVector<AccVec>{}>(minDtGlobal, groupDt, numGroups, Timestep::maxNumRungs);
+    auto  rungRanges =
+        findRungRanges<cstone::IsDeviceVector<AccVec>{}>(minDtGlobal, groupDt, numGroups, Timestep::maxNumRungs);
 
     float timeLeft     = ts.totDt - ts.elapsedDt;
     int   substepsLeft = (1 << ts.numRungs) - ts.substep;

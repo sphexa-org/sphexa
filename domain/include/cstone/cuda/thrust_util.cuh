@@ -24,6 +24,8 @@
 
 #include "cuda_runtime.hpp"
 
+namespace cstone {
+
 template<class T, class Alloc>
 T* rawPtr(thrust::device_vector<T, Alloc>& p)
 {
@@ -59,4 +61,6 @@ inline auto devicePar(cudaStream_t stream)
 #else
     return thrust::cuda::par.on(stream);
 #endif
+}
+
 }

@@ -158,7 +158,7 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
 {
     if constexpr (execution::HaveGpu<Exec>{})
     {
-        memcpyD2DAsync(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start(), exec);
+        memcpyD2DAsync(exec, focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start());
 
         gather(exec, leafToInternal.data(), idx.start(), flags.data(), layout.data());
         selectCopy(exec, focusLeafCounts.data(), idx.start(), layout.data(), layout.data());

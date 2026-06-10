@@ -94,8 +94,8 @@ void exchangeAllToAll(int thisRank, int numRanks)
                          MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y));
 
     reallocate(bufDesc.size, 1.01, x, y);
-    memcpyD2HAsync(d_x.data(), d_x.size(), x.data(), 0);
-    memcpyD2HAsync(d_y.data(), d_y.size(), y.data(), 0);
+    memcpyD2HAsync(execution::Gpu{0}, d_x.data(), d_x.size(), x.data());
+    memcpyD2HAsync(execution::Gpu{0}, d_y.data(), d_y.size(), y.data());
     syncGpu(0);
 
     ex::extractLocallyOwned(bufDesc, numPartPresent, numPartAssigned, ordering.data() + sends[thisRank], x, y);
@@ -184,10 +184,10 @@ void exchangeCyclicNeighbors(int thisRank, int numRanks)
                          MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y), rawPtr(d_uint8Array), rawPtr(d_testArray));
 
     reallocate(bufDesc.size, 1.01, x, y, testArray, uint8Array);
-    memcpyD2HAsync(d_x.data(), d_x.size(), x.data(), 0);
-    memcpyD2HAsync(d_y.data(), d_y.size(), y.data(), 0);
-    memcpyD2HAsync(d_testArray.data(), d_testArray.size(), testArray.data(), 0);
-    memcpyD2HAsync(d_uint8Array.data(), d_uint8Array.size(), uint8Array.data(), 0);
+    memcpyD2HAsync(execution::Gpu{0}, d_x.data(), d_x.size(), x.data());
+    memcpyD2HAsync(execution::Gpu{0}, d_y.data(), d_y.size(), y.data());
+    memcpyD2HAsync(execution::Gpu{0}, d_testArray.data(), d_testArray.size(), testArray.data());
+    memcpyD2HAsync(execution::Gpu{0}, d_uint8Array.data(), d_uint8Array.size(), uint8Array.data());
     syncGpu(0);
 
     ex::extractLocallyOwned(bufDesc, numPartPresent, numPartAssigned, ordering.data() + sends[thisRank], x, y,

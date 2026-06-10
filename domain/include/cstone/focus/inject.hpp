@@ -77,7 +77,7 @@ void injectKeysGpu(DeviceVector<KeyType>& leaves,
                    cudaStream_t stream)
 {
     reallocate(leaves, leaves.size() + keys.size(), 1.0);
-    memcpyD2DAsync(keys.data(), keys.size(), leaves.data() + leaves.size() - keys.size(), stream);
+    memcpyD2DAsync(stream, keys.data(), keys.size(), leaves.data() + leaves.size() - keys.size());
 
     reallocateDestructive(keyScratch, leaves.size(), 1.0);
     sort(stream, rawPtr(leaves), rawPtr(leaves) + leaves.size(), rawPtr(keyScratch));
@@ -89,7 +89,7 @@ void injectKeysGpu(DeviceVector<KeyType>& leaves,
     exclusiveScan(stream, spanOps.data(), spanOps.data() + leaves.size(), spanOpsScan.data());
 
     TreeNodeIndex numNodesGap;
-    memcpyD2HAsync(spanOpsScan.data() + leaves.size() - 1, 1, &numNodesGap, stream);
+    memcpyD2HAsync(stream, spanOpsScan.data() + leaves.size() - 1, 1, &numNodesGap);
     syncGpu(stream);
 
     reallocateDestructive(keyScratch, numNodesGap + 1, 1.0);

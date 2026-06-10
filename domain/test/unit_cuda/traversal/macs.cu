@@ -40,7 +40,7 @@ TEST(Macs, limitSource4x4_matchCPU)
     fullTree.resize(nNodes(leaves));
     cudaStream_t stream;
     cudaStreamCreate(&stream);
-    buildOctreeGpu(rawPtr(leaves), fullTree.data(), stream);
+    buildOctreeGpu(stream, rawPtr(leaves), fullTree.data());
     OctreeView<KeyType> ov = fullTree.data();
 
     std::vector<KeyType> h_prefixes = toHost(fullTree.prefixes);

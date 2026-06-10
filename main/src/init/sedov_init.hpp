@@ -74,9 +74,9 @@ void initSedovFields(Dataset& d, const InitSettings& constants)
     // If temperature is not allocated, we can still use this initializer for just the coordinates
     if (d.temp.empty() && d.u.empty()) { return; }
 
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
-    auto&& z = toHost(d.z);
+    auto&& x = cstone::toHost(d.x);
+    auto&& y = cstone::toHost(d.y);
+    auto&& z = cstone::toHost(d.z);
 
     std::vector<T> u(d.x.size());
 #pragma omp parallel for schedule(static)

@@ -50,9 +50,9 @@ void initEvrardFields(Dataset& d, const InitSettings& constants)
     // c(r) = 2/3 * 1/r * Ntot / Vtot
     double c0 = 2. / 3. * d.numParticlesGlobal / totalVolume;
 
-    auto&&                                   x = toHost(d.x);
-    auto&&                                   y = toHost(d.y);
-    auto&&                                   z = toHost(d.z);
+    auto&&                                   x = cstone::toHost(d.x);
+    auto&&                                   y = cstone::toHost(d.y);
+    auto&&                                   z = cstone::toHost(d.z);
     std::vector<typename Dataset::HydroType> h(d.x.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)

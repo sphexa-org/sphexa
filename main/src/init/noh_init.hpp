@@ -90,9 +90,9 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
 
     generateParticleIDs(d.id, exec);
 
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
-    auto&& z = toHost(d.z);
+    auto&& x = cstone::toHost(d.x);
+    auto&& y = cstone::toHost(d.y);
+    auto&& z = cstone::toHost(d.z);
 
     std::vector<HydroType> vx(d.vx.size()), vy(d.vy.size()), vz(d.vz.size());
 

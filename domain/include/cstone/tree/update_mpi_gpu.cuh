@@ -70,7 +70,7 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
     swap(d_csTree, tree.prefixes);
 
     tree.resize(newNumNodes);
-    buildOctreeGpu(d_csTree.data(), tree.data(), exec);
+    buildOctreeGpu(exec, d_csTree.data(), tree.data());
 
     size_t numLeafNodes = tree.numLeafNodes;
     auto [d_counts, d_countsRed] =

@@ -32,7 +32,7 @@ void compareAgainstCpu(const std::vector<KeyType>& tree)
     OctreeData<KeyType, execution::Gpu> gpuTree;
     gpuTree.resize(nNodes(tree));
 
-    buildOctreeGpu(rawPtr(d_leaves), gpuTree.data(), stream);
+    buildOctreeGpu(stream, rawPtr(d_leaves), gpuTree.data());
     cudaStreamSynchronize(stream);
     cudaStreamDestroy(stream);
 

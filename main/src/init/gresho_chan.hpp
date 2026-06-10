@@ -69,8 +69,8 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     initFieldsAtRest(d, mPart, exec);
     cstone::fill(exec, d.h.begin(), d.h.end(), hInit);
 
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
+    auto&& x = cstone::toHost(d.x);
+    auto&& y = cstone::toHost(d.y);
 
     cstone::LocalIndex     numPartLoc = d.x.size();
     std::vector<RealType>  u(numPartLoc);

@@ -155,7 +155,7 @@ protected:
                     std::visit(
                         [writer, c = column, key = namesDone[i]](auto field)
                         {
-                            auto&& tmp = toHost(*field);
+                            auto&& tmp = cstone::toHost(*field);
                             writeField(writer, key, tmp.data(), c);
                         },
                         fieldPointers[fidx]);

@@ -78,8 +78,9 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     domain.exchangeHalos(std::tie(d_m), s1, s2);
 
     h_keys.resize(domain.nParticles());
-    memcpyD2HAsync(d_keys.data() + domain.startIndex(), domain.nParticles(), h_keys.data(), 0);
-    syncGpu(0);
+    cstone::memcpyD2HAsync(cstone::execution::Gpu{0}, d_keys.data() + domain.startIndex(), domain.nParticles(),
+                           h_keys.data());
+    cstone::syncGpu(0);
 
     /*! The range [firstGlobalIdx:lastGlobalIdx] of the global set @a coords is identical to the locally
      *  present particles contained in the range [domain.startIndex():domain.endIndex()] of arrays (d_x, d_y, d_z)
@@ -108,8 +109,8 @@ static int multipoleHolderTest(int thisRank, int numRanks)
         auto cpToHost = []<class X>(const X* ptr, int n)
         {
             std::vector<X> ret(n);
-            memcpyD2HAsync(ptr, n, ret.data(), 0);
-            syncGpu(0);
+            cstone::memcpyD2HAsync(cstone::execution::Gpu{0}, ptr, n, ret.data());
+            cstone::syncGpu(0);
             return ret;
         };
 
@@ -156,8 +157,8 @@ static int multipoleHolderTest(int thisRank, int numRanks)
         auto dl = [](auto* p1, auto* p2)
         {
             std::vector<std::remove_pointer_t<decltype(p1)>> ret(p2 - p1);
-            memcpyD2HAsync(p1, p2 - p1, ret.data(), 0);
-            syncGpu(0);
+            cstone::memcpyD2HAsync(cstone::execution::Gpu{0}, p1, p2 - p1, ret.data());
+            cstone::syncGpu(0);
             return ret;
         };
 
@@ -243,8 +244,8 @@ static int multipoleHolderTest(int thisRank, int numRanks)
             auto extract = [](cstone::DeviceVector<T>& dv, LocalIndex a, LocalIndex b)
             {
                 cstone::DeviceVector<T> ret(b - a);
-                memcpyD2DAsync(dv.data() + a, ret.size(), ret.data(), 0);
-                syncGpu(0);
+                cstone::memcpyD2DAsync(cstone::execution::Gpu{0}, dv.data() + a, ret.size(), ret.data());
+                cstone::syncGpu(0);
                 return ret;
             };
 
@@ -294,7 +295,10 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     }
 
     if (pass) { return EXIT_SUCCESS; }
-    else { return EXIT_FAILURE; }
+    else
+    {
+        return EXIT_FAILURE;
+    }
 }
 
 int main(int argc, char** argv)

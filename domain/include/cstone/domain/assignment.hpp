@@ -70,7 +70,7 @@ public:
             reallocate(numRanks_ + 1, 1.0, d_boundaryKeys_, d_boundaryIndices_);
             d_csTree_     = leaves_;
             d_nodeCounts_ = nodeCounts_;
-            buildOctreeGpu(d_csTree_.data(), tree_.data(), exec_);
+            buildOctreeGpu(exec_, d_csTree_.data(), tree_.data());
         }
         else
         {
@@ -132,8 +132,8 @@ public:
         {
             reallocate(leaves_, d_csTree_.size(), growthRate_);
             reallocate(nodeCounts_, d_nodeCounts_.size(), growthRate_);
-            memcpyD2HAsync(d_csTree_.data(), d_csTree_.size(), leaves_.data(), exec_);
-            memcpyD2HAsync(d_nodeCounts_.data(), d_nodeCounts_.size(), nodeCounts_.data(), exec_);
+            memcpyD2HAsync(exec_, d_csTree_.data(), d_csTree_.size(), leaves_.data());
+            memcpyD2HAsync(exec_, d_nodeCounts_.data(), d_nodeCounts_.size(), nodeCounts_.data());
             syncGpu(exec_);
         }
 

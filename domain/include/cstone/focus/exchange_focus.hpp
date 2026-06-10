@@ -243,12 +243,12 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
     {
         assert(octreeAcc.childOffsets.size() >= nodeOps.size());
         std::span<TreeNodeIndex> nops(rawPtr(octreeAcc.childOffsets), nodeOps.size());
-        memcpyH2DAsync(rawPtr(nodeOps), nodeOps.size(), nops.data(), stream);
+        memcpyH2DAsync(stream, rawPtr(nodeOps), nodeOps.size(), nops.data());
         syncGpu(stream);
 
         exclusiveScan(stream, nops.data(), nops.data() + nops.size(), nops.data());
         TreeNodeIndex newNumLeafNodes;
-        memcpyD2HAsync(nops.data() + nops.size() - 1, 1, &newNumLeafNodes, stream);
+        memcpyD2HAsync(stream, nops.data() + nops.size() - 1, 1, &newNumLeafNodes);
         syncGpu(stream);
 
         auto& newLeaves = octreeAcc.prefixes;
@@ -266,7 +266,7 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
         auto [keyBuf, valueBuf, cubTmp] = util::packAllocBuffer(scratch, util::TypeList<KeyType, TreeNodeIndex, char>{},
                                                                 {newNumNodes, newNumNodes, cubTmpSize}, 128);
 
-        buildOctreeGpu(rawPtr(leavesAcc), octreeAcc.data(), keyBuf, valueBuf, cubTmp, stream);
+        buildOctreeGpu(stream, rawPtr(leavesAcc), octreeAcc.data(), keyBuf, valueBuf, cubTmp);
         scratch.resize(originalSize);
     }
 }

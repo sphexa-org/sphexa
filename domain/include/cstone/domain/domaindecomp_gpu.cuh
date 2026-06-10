@@ -45,10 +45,10 @@ SendRanges createSendRangesGpu(const SfcAssignment<KeyType>& assignment,
     size_t numSearchKeys = assignment.numRanks() + 1;
     SendRanges ret(numSearchKeys);
 
-    memcpyH2DAsync(assignment.data(), numSearchKeys, d_searchKeys, stream);
+    memcpyH2DAsync(stream, assignment.data(), numSearchKeys, d_searchKeys);
     lowerBound(stream, particleKeys.data(), particleKeys.data() + particleKeys.size(), d_searchKeys,
                   d_searchKeys + numSearchKeys, d_indices);
-    memcpyD2HAsync(d_indices, numSearchKeys, ret.data(), stream);
+    memcpyD2HAsync(stream, d_indices, numSearchKeys, ret.data());
     syncGpu(stream);
 
     return ret;

@@ -31,9 +31,9 @@ InitSettings polytropeConstants()
 template<typename Dataset>
 void estimateSmoothingLengths(auto rhoAtRadius, Dataset& d, double m_part, size_t ng0, double r_total)
 {
-    auto x = toHost(d.x);
-    auto y = toHost(d.y);
-    auto z = toHost(d.z);
+    auto x = cstone::toHost(d.x);
+    auto y = cstone::toHost(d.y);
+    auto z = cstone::toHost(d.z);
 
     using Th = decltype(d.h)::value_type;
     std::vector<Th> h(x.size());

@@ -76,15 +76,15 @@ void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& d
 
     if constexpr (!IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{})
     {
-        memcpyH2DAsync(src.data().data(), src.data().size(), dstBuffer, exec);
+        memcpyH2DAsync(exec, src.data().data(), src.data().size(), dstBuffer);
     }
     else if constexpr (IsDeviceVector<AccVec1<T>>{} && !IsDeviceVector<AccVec2<T>>{})
     {
-        memcpyD2HAsync(src.data().data(), src.data().size(), dstBuffer, exec);
+        memcpyD2HAsync(exec, src.data().data(), src.data().size(), dstBuffer);
     }
     else if constexpr (IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{})
     {
-        memcpyD2DAsync(src.data().data(), src.data().size(), dstBuffer, exec);
+        memcpyD2DAsync(exec, src.data().data(), src.data().size(), dstBuffer);
     }
     else if constexpr (!IsDeviceVector<AccVec1<T>>{} && !IsDeviceVector<AccVec2<T>>{})
     {

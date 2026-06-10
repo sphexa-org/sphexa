@@ -104,7 +104,7 @@ void haloExchangeGpu(int epoch,
 
         auto unpack = [start = inHalos.start(), receiveCount, stream](auto arrayPair)
         {
-            memcpyD2HAsync(arrayPair[1], receiveCount, arrayPair[0] + start, stream);
+            memcpyD2HAsync(stream, arrayPair[1], receiveCount, arrayPair[0] + start);
             syncGpu(stream);
         };
 

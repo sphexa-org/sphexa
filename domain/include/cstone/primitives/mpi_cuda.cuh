@@ -21,6 +21,9 @@
 #include "cstone/util/noinit_alloc.hpp"
 #include "cstone/cuda/cuda_stubs.h"
 
+namespace cstone
+{
+
 #ifdef CSTONE_HAVE_GPU_AWARE_MPI
 constexpr inline bool useGpuDirect = true;
 #else
@@ -39,14 +42,17 @@ auto mpiSendGpuDirect(T* data,
     if constexpr (!useGpuDirect)
     {
         std::vector<T, util::DefaultInitAdaptor<T>> hostBuffer(count);
-        memcpyD2HAsync(data, count, hostBuffer.data(), 0);
+        memcpyD2HAsync(0, data, count, hostBuffer.data());
         syncGpu(0);
         auto errCode = mpiSendAsync(hostBuffer.data(), count, rank, tag, requests, comm);
         buffers.push_back(std::move(hostBuffer));
 
         return errCode;
     }
-    else { return mpiSendAsync(data, count, rank, tag, requests, comm); }
+    else
+    {
+        return mpiSendAsync(data, count, rank, tag, requests, comm);
+    }
 }
 
 //! @brief Send char buffers cast to a transfer type @p T to mitigate the 32-bit send count limitation of MPI
@@ -69,12 +75,15 @@ auto mpiRecvGpuDirect(T* data, int count, int rank, int tag, MPI_Status* status,
     {
         std::vector<T, util::DefaultInitAdaptor<T>> hostBuffer(count);
         auto errCode = mpiRecvSync(hostBuffer.data(), count, rank, tag, status, comm);
-        memcpyH2DAsync(hostBuffer.data(), count, data, 0);
+        memcpyH2DAsync(0, hostBuffer.data(), count, data);
         syncGpu(0);
 
         return errCode;
     }
-    else { return mpiRecvSync(data, count, rank, tag, status, comm); }
+    else
+    {
+        return mpiRecvSync(data, count, rank, tag, status, comm);
+    }
 }
 
 //! @brief this wrapper is needed to support sending from GPU buffers with staging through host (no GPU-direct MPI)
@@ -88,7 +97,10 @@ auto mpiSendAsyncAcc(T* data,
                      MPI_Comm comm)
 {
     if constexpr (useGpu) { mpiSendGpuDirect(data, count, rank, tag, requests, buffers, comm); }
-    else { mpiSendAsync(data, count, rank, tag, requests, comm); }
+    else
+    {
+        mpiSendAsync(data, count, rank, tag, requests, comm);
+    }
 }
 
 //! @brief this wrapper is needed to support sending from GPU buffers with staging through host (no GPU-direct MPI)
@@ -96,7 +108,10 @@ template<bool useGpu, class T>
 auto mpiRecvSyncAcc(T* data, int count, int rank, int tag, MPI_Status* status, MPI_Comm comm)
 {
     if constexpr (useGpu) { mpiRecvGpuDirect(data, count, rank, tag, status, comm); }
-    else { mpiRecvSync(data, count, rank, tag, status, comm); }
+    else
+    {
+        mpiRecvSync(data, count, rank, tag, status, comm);
+    }
 }
 
 template<class T>
@@ -105,13 +120,16 @@ auto mpiAllreduceGpuDirect(const T* src, T* dest, size_t count, MPI_Op op, MPI_C
     if constexpr (!useGpuDirect)
     {
         std::vector<T> srcBuf(count), destBuf(count);
-        memcpyD2HAsync(src, count, srcBuf.data(), 0);
+        memcpyD2HAsync(0, src, count, srcBuf.data());
         syncGpu(0);
         mpiAllreduce(srcBuf.data(), destBuf.data(), count, op, comm);
-        memcpyH2DAsync(destBuf.data(), count, dest, 0);
+        memcpyH2DAsync(0, destBuf.data(), count, dest);
         syncGpu(0);
     }
-    else { mpiAllreduce(src, dest, count, op, comm); }
+    else
+    {
+        mpiAllreduce(src, dest, count, op, comm);
+    }
 }
 
 //! @brief adaptor to wrap compile-time size arrays into flattened arrays of the underlying type
@@ -132,7 +150,7 @@ auto mpiAllgathervGpuDirect(const Ts* src, int sendCount, Td* dest, const int* c
             {
                 srcStage.resize(sizeof(Ts) * numElements);
                 srcUse = reinterpret_cast<Ts*>(srcStage.data());
-                memcpyD2HAsync(src, numElements, srcUse, 0);
+                memcpyD2HAsync(0, src, numElements, srcUse);
                 syncGpu(0);
             }
         }
@@ -140,12 +158,17 @@ auto mpiAllgathervGpuDirect(const Ts* src, int sendCount, Td* dest, const int* c
         std::vector<Td> destStage(numElements);
         if (src == MPI_IN_PLACE)
         {
-            memcpyD2HAsync(dest, numElements, destStage.data(), 0);
+            memcpyD2HAsync(execution::Gpu{0}, dest, numElements, destStage.data());
             syncGpu(0);
         }
         mpiAllgatherv(srcUse, sendCount, destStage.data(), counts, displ, comm);
-        memcpyH2DAsync(destStage.data(), destStage.size(), dest, 0);
+        memcpyH2DAsync(0, destStage.data(), destStage.size(), dest);
         syncGpu(0);
     }
-    else { mpiAllgatherv(src, sendCount, dest, counts, displ, comm); }
+    else
+    {
+        mpiAllgatherv(src, sendCount, dest, counts, displ, comm);
+    }
 }
+
+} // namespace cstone

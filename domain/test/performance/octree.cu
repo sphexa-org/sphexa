@@ -102,7 +102,7 @@ int main(int argc, char** argv)
     octree.resize(nNodes(tree));
     auto buildInternal = [&]()
     {
-        buildOctreeGpu(rawPtr(tree), octree.data(), stream);
+        buildOctreeGpu(stream, rawPtr(tree), octree.data());
         cudaStreamSynchronize(stream);
     };
 

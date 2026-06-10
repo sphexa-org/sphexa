@@ -94,7 +94,7 @@ void computeGroupSplitsImpl(
     groups.resize(numFixedGroups + 1);
     exclusiveScan(stream, rawPtr(numSplitsPerGroup), rawPtr(numSplitsPerGroup) + numFixedGroups + 1, rawPtr(groups));
     LocalIndex newNumGroups;
-    memcpyD2HAsync(rawPtr(groups) + groups.size() - 1, 1, &newNumGroups, stream);
+    memcpyD2HAsync(stream, rawPtr(groups) + groups.size() - 1, 1, &newNumGroups);
     syncGpu(stream);
 
     auto& newGroupSizes = numSplitsPerGroup;
@@ -106,7 +106,7 @@ void computeGroupSplitsImpl(
 
     groups.resize(newNumGroups + 1);
     exclusiveScan(stream, rawPtr(newGroupSizes), rawPtr(newGroupSizes) + newNumGroups + 1, rawPtr(groups), first);
-    memcpyH2DAsync(&last, 1, rawPtr(groups) + groups.size() - 1, stream);
+    memcpyH2DAsync(stream, &last, 1, rawPtr(groups) + groups.size() - 1);
 }
 
 template<class Tc, class T, class KeyType>

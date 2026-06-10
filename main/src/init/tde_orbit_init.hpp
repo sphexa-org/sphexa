@@ -161,12 +161,12 @@ public:
     void displaceSystem(Dataset& simData, const cstone::Vec3<double>& X, const cstone::Vec3<double>& V) const
     {
         auto& d    = simData.hydro;
-        auto  x    = toHost(d.x);
-        auto  y    = toHost(d.y);
-        auto  z    = toHost(d.z);
-        auto  vx   = toHost(d.vx);
-        auto  vy   = toHost(d.vy);
-        auto  vz   = toHost(d.vz);
+        auto  x    = cstone::toHost(d.x);
+        auto  y    = cstone::toHost(d.y);
+        auto  z    = cstone::toHost(d.z);
+        auto  vx   = cstone::toHost(d.vx);
+        auto  vy   = cstone::toHost(d.vy);
+        auto  vz   = cstone::toHost(d.vz);
         using Tx_m1 = typename decltype(d.x_m1)::value_type;
         std::vector<Tx_m1> x_m1(x.size());
         std::vector<Tx_m1> y_m1(x.size());

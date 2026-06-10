@@ -78,7 +78,7 @@ public:
         if constexpr (execution::HaveGpu<Exec>{})
         {
             leavesAcc_ = leaves_;
-            buildOctreeGpu(rawPtr(leavesAcc_), octreeAcc_.data(), exec_);
+            buildOctreeGpu(exec_, rawPtr(leavesAcc_), octreeAcc_.data());
             downloadOctree();
 
             reallocate(geoCentersAcc_, 1, 1.0);
@@ -130,7 +130,7 @@ public:
                 {rawPtr(countsAcc_), countsAcc_.size()}, {rawPtr(macsAcc_), macsAcc_.size()}, scratch, exec_);
 
             reallocateDestructive(leaves_, leavesAcc_.size(), allocGrowthRate_);
-            memcpyD2HAsync(rawPtr(leavesAcc_), leavesAcc_.size(), rawPtr(leaves_), exec_);
+            memcpyD2HAsync(exec_, rawPtr(leavesAcc_), leavesAcc_.size(), rawPtr(leaves_));
             syncGpu(exec_);
         }
         else
@@ -212,7 +212,7 @@ public:
 
             std::size_t numIndices = idxFromGlob.size();
             auto* d_indices        = util::packAllocBuffer<TreeNodeIndex>(scratch, {&numIndices, 1}, 64)[0].data();
-            memcpyH2DAsync(idxFromGlob.data(), idxFromGlob.size(), d_indices, exec_);
+            memcpyH2DAsync(exec_, idxFromGlob.data(), idxFromGlob.size(), d_indices);
 
             std::span<const KeyType> leavesAcc{rawPtr(leavesAcc_), leavesAcc_.size()};
             rangeCountGpu<KeyType>(globalTreeLeaves, globalCounts, leavesAcc, {d_indices, idxFromGlob.size()},
@@ -324,7 +324,7 @@ public:
         std::span letToGlob{letToGlobBuf, idxFromGlob.size()};
         if constexpr (execution::HaveGpu<Exec>{})
         {
-            memcpyH2DAsync(idxFromGlob.data(), idxFromGlob.size(), letIdx.data(), exec_);
+            memcpyH2DAsync(exec_, idxFromGlob.data(), idxFromGlob.size(), letIdx.data());
             gather(exec_, letIdx.data(), idxFromGlob.size(), toInternal, letIdx.data());
 
             locateNodesGpu(octreeAcc_.prefixes.data(), letIdx.data(), idxFromGlob.size(), globalNodeKeys,
@@ -585,7 +585,7 @@ public:
                           leafToInternal(octreeAcc_), assignment_[myRank_], useGpu ? layoutAcc : layout, exec_);
         if constexpr (useGpu)
         {
-            memcpyD2HAsync(layoutAcc.data(), layoutAcc.size(), layout.data(), exec_);
+            memcpyD2HAsync(exec_, layoutAcc.data(), layoutAcc.size(), layout.data());
             syncGpu(exec_);
         }
 
@@ -727,10 +727,10 @@ private:
             TreeNodeIndex numNodes     = octreeAcc_.numNodes;
 
             reallocate(numNodes, allocGrowthRate_, hostPrefixes_);
-            memcpyD2HAsync(rawPtr(octreeAcc_.prefixes), numNodes, hostPrefixes_.data(), exec_);
+            memcpyD2HAsync(exec_, rawPtr(octreeAcc_.prefixes), numNodes, hostPrefixes_.data());
 
             reallocateDestructive(leaves_, numLeafNodes + 1, allocGrowthRate_);
-            memcpyD2HAsync(rawPtr(leavesAcc_), numLeafNodes + 1, leaves_.data(), exec_);
+            memcpyD2HAsync(exec_, rawPtr(leavesAcc_), numLeafNodes + 1, leaves_.data());
             syncGpu(exec_);
         }
     }

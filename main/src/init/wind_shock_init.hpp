@@ -86,9 +86,9 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     T k = d.ngmax / r;
 
     util::array<T, 3> blobCenter{r, r, r};
-    auto&&            x = toHost(d.x);
-    auto&&            y = toHost(d.y);
-    auto&&            z = toHost(d.z);
+    auto&&            x = cstone::toHost(d.x);
+    auto&&            y = cstone::toHost(d.y);
+    auto&&            z = cstone::toHost(d.z);
 
     std::vector<HydroType> h(d.h.size());
     std::vector<T>         u(d.x.size());

@@ -175,7 +175,10 @@ public:
             domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "prho", "alpha">(d), get<"ax">(d),
                                  get<"keys">(d));
         }
-        else { domain.exchangeHalos(get<"prho", "alpha">(d), get<"ax">(d), get<"keys">(d)); }
+        else
+        {
+            domain.exchangeHalos(get<"prho", "alpha">(d), get<"ax">(d), get<"keys">(d));
+        }
         timer.step("mpi::synchronizeHalos");
 
         release(d, "divv", "gradh");
@@ -237,7 +240,7 @@ public:
                     std::visit(
                         [writer, c = column, key = namesDone[i]](auto field)
                         {
-                            auto&& tmp = toHost(*field);
+                            auto&& tmp = cstone::toHost(*field);
                             writeField(writer, key, tmp.data(), c);
                         },
                         fieldPointers[fidx]);

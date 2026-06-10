@@ -32,19 +32,22 @@ namespace cstone
  * This does not allocate memory on the GPU, (except thrust temp buffers for scans and sorting)
  */
 template<class KeyType>
-extern void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d, cudaStream_t stream);
+extern void buildOctreeGpu(execution::Gpu exec, const KeyType* cstoneTree, OctreeView<KeyType> d);
 
 //! @brief same as above, but using existing buffers to avoid temporary memory allocation
 template<class KeyType>
-extern void buildOctreeGpu(const KeyType* cstoneTree,
+extern void buildOctreeGpu(execution::Gpu exec,
+                           const KeyType* cstoneTree,
                            OctreeView<KeyType> d,
                            std::span<KeyType> keyBuf,
                            std::span<TreeNodeIndex> valueBuf,
-                           std::span<char> cubTmp,
-                           cudaStream_t stream);
+                           std::span<char> cubTmp);
 
 //! @brief Upsweep by summing up child nodes, e.g. to compute particle node counts
-void upsweepSumGpu(int numLvl, const TreeNodeIndex* lvlRange, const TreeNodeIndex* childOffsets, LocalIndex* counts,
+void upsweepSumGpu(int numLvl,
+                   const TreeNodeIndex* lvlRange,
+                   const TreeNodeIndex* childOffsets,
+                   LocalIndex* counts,
                    cudaStream_t stream);
 
 /*!  @brief locate all nodes between k1 and k2 in nodeKeys and store indices

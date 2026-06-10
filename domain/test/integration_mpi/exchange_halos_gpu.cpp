@@ -128,9 +128,9 @@ void simpleTest(int thisRank, int numRanks)
                     rawPtr(d_y), rawPtr(d_z));
 
     //! download from device
-    memcpyD2HAsync(d_x.data(), d_x.size(), x.data(), 0);
-    memcpyD2HAsync(d_y.data(), d_y.size(), y.data(), 0);
-    memcpyD2HAsync(d_z.data(), d_z.size(), z.data(), 0);
+    memcpyD2HAsync(execution::Gpu{0}, d_x.data(), d_x.size(), x.data());
+    memcpyD2HAsync(execution::Gpu{0}, d_y.data(), d_y.size(), y.data());
+    memcpyD2HAsync(execution::Gpu{0}, d_z.data(), d_z.size(), z.data());
     syncGpu(0);
 
     EXPECT_EQ(xRef, x);

@@ -59,7 +59,7 @@ template<class KeyType, class T, class Vector>
 void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector& x, Vector& y, Vector& z,
                 const cstone::Box<T>& globalBox)
 {
-    constexpr bool gpu = IsDeviceVector<Vector>{};
+    constexpr bool gpu = cstone::IsDeviceVector<Vector>{};
     using Exec         = std::conditional_t<gpu, cstone::execution::Gpu, cstone::execution::Cpu>;
     using AccVectorKT  = std::conditional_t<gpu, cstone::DeviceVector<KeyType>, std::vector<KeyType>>;
 

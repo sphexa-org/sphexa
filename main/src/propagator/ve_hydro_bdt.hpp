@@ -110,7 +110,10 @@ protected:
     static int activeRung(int substep, int numRungs)
     {
         if (substep == 0 || substep >= (1 << (numRungs - 1))) { return 0; }
-        else { return cstone::butterfly(substep); }
+        else
+        {
+            return cstone::butterfly(substep);
+        }
     }
 
 public:
@@ -214,13 +217,18 @@ public:
         domain.setHaloFactor(1.0 + float(timestep_.numRungs) / 40);
 
         if (activeRung(timestep_.substep, timestep_.numRungs) == 0) { fullSync(domain, simData); }
-        else { partialSync(domain, simData); }
+        else
+        {
+            partialSync(domain, simData);
+        }
     }
 
     bool isSynced() override { return activeRung(timestep_.substep, timestep_.numRungs) == 0; }
 
     void computeForces(DomainType& domain, DataType& simData) override
     {
+        using namespace cstone;
+
         timer.start();
         pmReader.start();
         sync(domain, simData);
@@ -270,7 +278,10 @@ public:
             domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "alpha">(d), get<"keys">(d),
                                  haloRecvScratch);
         }
-        else { domain.exchangeHalos(std::tie(get<"alpha">(d)), get<"keys">(d), haloRecvScratch); }
+        else
+        {
+            domain.exchangeHalos(std::tie(get<"alpha">(d)), get<"keys">(d), haloRecvScratch);
+        }
         timer.step("mpi::synchronizeHalos");
 
         computeMomentumEnergy<avClean>(activeRungs_, rawPtr(groupDt_), d, domain.box());
@@ -298,6 +309,8 @@ public:
 
     void computeRungs(DataType& simData)
     {
+        using namespace cstone;
+
         auto& d        = simData.hydro;
         int   highRung = activeRung(timestep_.substep, timestep_.numRungs);
 
@@ -325,7 +338,7 @@ public:
         if (highRung == 0 || highRung > 1)
         {
             if (highRung > 1) { swap(groups_, tsGroups_); }
-            if constexpr (cstone::execution::HaveGpu<Acc>{})
+            if constexpr (execution::HaveGpu<Acc>{})
             {
                 extractGroupGpu(groups_.view(), rawPtr(groupIndices_), 0, timestep_.rungRanges.back(), tsGroups_);
             }
@@ -339,6 +352,8 @@ public:
 
     void integrate(DomainType& domain, DataType& simData) override
     {
+        using namespace cstone;
+
         computeRungs(simData);
         printTimestepStats(timestep_);
         timer.step("Timestep");
@@ -364,7 +379,7 @@ public:
                 computePositions(rungs_[i], d, substepBox, timestep_.dt_drift[i] + dt, dt_m1, rung);
                 timestep_.dt_m1[i]    = timestep_.dt_drift[i] + dt;
                 timestep_.dt_drift[i] = 0;
-                if constexpr (cstone::execution::HaveGpu<Acc>{}) { storeRungGpu(rungs_[i], i, rawPtr(get<"rung">(d))); }
+                if constexpr (execution::HaveGpu<Acc>{}) { storeRungGpu(rungs_[i], i, rawPtr(get<"rung">(d))); }
             }
             else
             {
@@ -408,7 +423,7 @@ public:
                     std::visit(
                         [writer, c = column, key = namesDone[i]](auto field)
                         {
-                            auto&& tmp = toHost(*field);
+                            auto&& tmp = cstone::toHost(*field);
                             writeField(writer, key, tmp.data(), c);
                         },
                         fieldPointers[fidx]);

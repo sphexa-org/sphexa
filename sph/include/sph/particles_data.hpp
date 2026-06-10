@@ -417,10 +417,10 @@ void fillMassHalos(Vector& m, std::size_t first, std::size_t last, Exec exec)
 {
     using T = std::decay_t<Vector>::value_type;
     T mass;
-    if constexpr (IsDeviceVector<Vector>{})
+    if constexpr (cstone::IsDeviceVector<Vector>{})
     {
-        memcpyD2HAsync(m.data() + first, 1, &mass, exec);
-        syncGpu(exec);
+        cstone::memcpyD2HAsync(exec, m.data() + first, 1, &mass);
+        cstone::syncGpu(exec);
     }
     else
     {

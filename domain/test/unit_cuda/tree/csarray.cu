@@ -200,8 +200,8 @@ TEST(CsArrayGpu, distributedMockUp)
 
     // determine the part of the tree that will be empty
     CodeType nodeKey1, nodeKey2;
-    memcpyD2HAsync(fixt.d_tree.data() + firstNode, 1, &nodeKey1, 0);
-    memcpyD2HAsync(fixt.d_tree.data() + lastNode, 1, &nodeKey2, 0);
+    memcpyD2HAsync(execution::Gpu{0}, fixt.d_tree.data() + firstNode, 1, &nodeKey1);
+    memcpyD2HAsync(execution::Gpu{0}, fixt.d_tree.data() + lastNode, 1, &nodeKey2);
     unsigned firstIdx = lowerBound(execution::Gpu{0}, fixt.d_codes.data(), fixt.d_codes.data() + fixt.d_codes.size(), nodeKey1);
     unsigned lastIdx  = lowerBound(execution::Gpu{0}, fixt.d_codes.data(), fixt.d_codes.data() + fixt.d_codes.size(), nodeKey2);
     std::cout << firstNode << " " << lastNode << std::endl;

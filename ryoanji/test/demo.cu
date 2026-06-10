@@ -51,6 +51,7 @@ void upsweep(int numSources, int numLeaves, int numLevels, float theta, const Tr
 
 int main(int argc, char** argv)
 {
+    using cstone::rawPtr;
     using T             = float;
     using MultipoleType = CartesianQuadrupole<T>;
 
