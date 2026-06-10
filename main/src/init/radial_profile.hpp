@@ -72,7 +72,6 @@ size_t syncAndLoadAttributes(int rank, int numRanks, Dataset& d, MPI_Comm comm, 
     if (rank == 0) std::cout << "earlySync " << std::chrono::duration<float>(t1 - t0).count() << std::endl;
 
     d.resize(d.x.size());
-    printf("number of particles: %zu\n", numParticlesGlobal);
     return numParticlesGlobal;
 }
 
@@ -105,7 +104,8 @@ protected:
 public:
     explicit RadialProfile(std::string initBlock, const InitSettings& testCaseSettings, std::string settingsFile,
                            IFileReader* reader)
-        : glassBlock_(std::move(initBlock))
+        : ISimInitializer<Dataset>(settingsFile)
+        , glassBlock_(std::move(initBlock))
     {
         Dataset d;
         settings_ = buildSettings(d, testCaseSettings, settingsFile, reader);

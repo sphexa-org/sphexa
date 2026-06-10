@@ -133,12 +133,15 @@ void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T mass
 template<class Dataset>
 class KelvinHelmholtzGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     std::string          glassBlock;
     mutable InitSettings settings_;
 
 public:
     KelvinHelmholtzGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(initBlock)
+        , Base(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, KelvinHelmholtzConstants(), settingsFile, reader);
@@ -216,6 +219,8 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initKelvinHelmholtzFields(d, settings_, particleMass);
+
+        Base::runTagging(reader, rank == 0, d);
 
         return globalBox;
     }

@@ -95,17 +95,20 @@ void initSedovFields(Dataset& d, const InitSettings& constants)
 template<class Dataset>
 class SedovGrid : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     mutable InitSettings settings_;
 
 public:
-    SedovGrid()
+    SedovGrid(std::string settingsFile)
+        : ISimInitializer<Dataset>(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, sedovConstants(), {}, nullptr);
     }
 
     cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cubeSide, Dataset& simData,
-                                                 IFileReader*) const override
+                                                 IFileReader* reader) const override
     {
         auto& d                   = simData.hydro;
         using KeyType             = typename Dataset::KeyType;
@@ -131,6 +134,8 @@ public:
 
         initSedovFields(d, settings_);
 
+        Base::runTagging(reader, rank == 0, d);
+
         return globalBox;
     }
 
@@ -140,12 +145,15 @@ public:
 template<class Dataset>
 class SedovGlass : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     std::string          glassBlock;
     mutable InitSettings settings_;
 
 public:
     SedovGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , Base(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, sedovConstants(), settingsFile, reader);
@@ -191,6 +199,8 @@ public:
         d.loadOrStoreAttributes(&attributeSetter);
 
         initSedovFields(d, settings_);
+
+        Base::runTagging(reader, rank == 0, d);
 
         return globalBox;
     }

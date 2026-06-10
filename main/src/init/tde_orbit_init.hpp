@@ -84,7 +84,8 @@ class TDEOrbitInit : public ISimInitializer<Dataset>
 
 public:
     explicit TDEOrbitInit(const std::string& filename, int initStep, IFileReader* reader)
-        : h5_fname(filename)
+        : ISimInitializer<Dataset>(std::string{})
+        , h5_fname(filename)
         , initStep(initStep)
     {
         BuiltinReader extractor(settings_);

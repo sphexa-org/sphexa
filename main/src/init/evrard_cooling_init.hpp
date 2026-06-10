@@ -78,6 +78,9 @@ public:
         auto globalBox = Base::init(rank, numRanks, cbrtNumPart, simData, reader, settings_.at("r"), radialTransform);
         initEvrardFields(simData.hydro, settings_);
         cooling::initChemistryData(simData.chem, simData.hydro.x.size());
+
+        Base::runTagging(reader, rank == 0, simData.hydro);
+
         return globalBox;
     }
 };

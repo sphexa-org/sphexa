@@ -72,7 +72,7 @@ bool isOutputStep(size_t step, const std::string& frequencyStr);
 
 std::string strBeforeSign(const std::string& str, const std::string& sign);
 
-//! @brief If the input string ends with @p sign followed by an integer, return the integer, otherwise return -1
+//! @brief Return the substring after the first occurrence of @p sign in @p str
 std::string strAfterSign(const std::string& str, const std::string& sign);
 
 //! @brief If the input string ends with @p sign followed by an integer, return the integer, otherwise return -1

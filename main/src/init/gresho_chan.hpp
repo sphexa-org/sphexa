@@ -120,12 +120,15 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
 template<class Dataset>
 class GreshoChan : public ISimInitializer<Dataset>
 {
+    using Base = ISimInitializer<Dataset>;
+
     std::string          glassBlock;
     mutable InitSettings settings_;
 
 public:
     GreshoChan(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , Base(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, GreshoChanSettings(), settingsFile, reader);
@@ -166,6 +169,8 @@ public:
 
         T massPart = globalBox.lx() * globalBox.ly() * globalBox.lz() * settings_.at("rho") / d.numParticlesGlobal;
         initGreshoChanFields(d, settings_, massPart);
+
+        Base::runTagging(reader, rank == 0, d);
 
         return globalBox;
     }

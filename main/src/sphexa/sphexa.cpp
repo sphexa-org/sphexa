@@ -112,6 +112,11 @@ int main(int argc, char** argv)
     auto propagator  = propagatorFactory<Domain, Dataset>(propChoice, avClean, output, rank, simInit->constants());
     auto observables = observablesFactory<Dataset>(simInit->constants(), constantsFile);
 
+    // ! @brief check if id tagging is requested (tagging setup check is done in simInit initialization)
+    IdTaggingOutputSetup taggingOutputSetup;
+    const bool writeEnabledSubset = readFileTaggingOutputAttributes(initCond, fileReader.get(), fileWriter->suffix(),
+                                                                    taggingOutputSetup);
+
     Dataset simData;
     simData.comm = MPI_COMM_WORLD;
 
@@ -126,6 +131,8 @@ int main(int argc, char** argv)
 
     auto& d = simData.hydro;
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
+    if (writeEnabledSubset) { simData.setOutputFields(taggingOutputSetup.outputFields.empty() ?
+        propagator->conservedFields() : taggingOutputSetup.outputFields, true); }
 
     d.setNeighborhoodType(nbChoice);
 
@@ -134,7 +141,7 @@ int main(int argc, char** argv)
     float theta    = parser.get("--theta", haveGrav ? 0.5f : 1.0f);
 
     if (!parser.exists("-o")) { outFile += fileWriter->suffix(); }
-    if (writeEnabled) { writeSettings(simInit->constants(), outFile, fileWriter.get()); }
+    if (writeEnabled) { writeSettings(simInit->constants(), simInit->taggingSetup(), taggingOutputSetup, outFile, fileWriter.get()); }
     if (rank == 0) { std::cout << "Data generated for " << d.numParticlesGlobal << " global particles\n"; }
 
     uint64_t bucketSizeFocus = 64;

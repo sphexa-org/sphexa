@@ -3,6 +3,7 @@ set(UNIT_TESTS
         init/grid.cpp
         io/arg_parser.cpp
         io/h5part_wrapper.cpp
+        io/id_tag_init.cpp
         io/id_tag_utils.cpp
         observables/gravitational_waves.cpp
         sphexa/particles_data.cpp

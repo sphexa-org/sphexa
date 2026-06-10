@@ -283,6 +283,7 @@ public:
         }
         timer.step("FileOutput");
     }
+
 };
 
 } // namespace sphexa
