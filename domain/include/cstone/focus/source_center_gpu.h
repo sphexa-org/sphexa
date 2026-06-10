@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include "cstone/cuda/stream.hpp"
+#include "cstone/execution.hpp"
 #include "cstone/focus/source_center.hpp"
 #include "cstone/tree/definitions.h"
 

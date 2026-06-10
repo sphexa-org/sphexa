@@ -15,7 +15,7 @@
 
 #pragma once
 
-#include "cstone/cuda/stream.hpp"
+#include "cstone/execution.hpp"
 #include "cstone/traversal/collisions.hpp"
 
 namespace cstone

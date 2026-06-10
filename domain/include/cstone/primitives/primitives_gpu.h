@@ -18,7 +18,7 @@
 #include <span>
 #include <tuple>
 
-#include "cstone/cuda/stream.hpp"
+#include "cstone/execution.hpp"
 #include "cstone/tree/definitions.h"
 
 namespace cstone

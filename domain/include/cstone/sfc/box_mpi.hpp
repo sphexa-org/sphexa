@@ -24,7 +24,7 @@
 #include <cmath>
 
 #include "cstone/primitives/mpi_wrappers.hpp"
-#include "cstone/cuda/stream.hpp"
+#include "cstone/execution.hpp"
 #include "box.hpp"
 
 namespace cstone

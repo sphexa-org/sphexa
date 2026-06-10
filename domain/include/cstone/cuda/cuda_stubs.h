@@ -16,7 +16,8 @@
 
 #include <type_traits>
 #include <vector>
-#include "stream.hpp"
+
+#include "cstone/execution.hpp"
 
 template<class T, class Alloc>
 T* rawPtr(std::vector<T, Alloc>& p)

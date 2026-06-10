@@ -17,7 +17,7 @@
 
 #include <span>
 
-#include "cstone/cuda/stream.hpp"
+#include "cstone/execution.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/domain/index_ranges.hpp"
 

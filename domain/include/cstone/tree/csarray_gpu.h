@@ -19,7 +19,7 @@
 
 #include <span>
 
-#include "cstone/cuda/stream.hpp"
+#include "cstone/execution.hpp"
 #include "csarray.hpp"
 
 namespace cstone
