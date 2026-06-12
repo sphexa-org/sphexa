@@ -47,5 +47,5 @@ where file, depending on the catalyst implementation chosen at runtime, can be e
 
 In 0.9.6 some fixes have been added:
 
-- add support for implicit topology in GPU expressions (https://github.com/Alpine-DAV/ascent/pull/1677)
+- add support for implicit topology in GPU expressions (https://github.com/Alpine-DAV/ascent/pull/1677); with 0.9.5 use `INSITU_FORCE_EXPLICIT_CONNECTIVITY_LIST=ON`
 - fix performance problem with unstructured topology (https://github.com/Alpine-DAV/ascent/pull/1679)
