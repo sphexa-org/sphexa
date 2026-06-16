@@ -22,6 +22,7 @@
 #include <thrust/reduce.h>
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
+#include <thrust/tuple.h>
 
 #include "cstone/cuda/cub.hpp"
 #include "cstone/cuda/errorcheck.cuh"

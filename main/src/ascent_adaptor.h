@@ -37,71 +37,72 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     }
     else
     { // create a default actions file valid for the wind-shock test
-        conduit::Node trigger_actions;
+    conduit::Node trigger_actions;
 
-        conduit::Node queries;
-        queries["q1/params/expression"] = "field('kx') * field('m') / field('xm')";
-        queries["q1/params/name"]       = "density";
-        conduit::Node& add_queries      = trigger_actions.append();
-        add_queries["action"]           = "add_queries";
-        add_queries["queries"]          = queries;
+    conduit::Node queries;
+    queries["q1/params/expression"] = "field('kx') * field('m') / field('xm')";
+    queries["q1/params/name"] = "density";
+    conduit::Node &add_queries = trigger_actions.append();
+    add_queries["action"] = "add_queries";
+    add_queries["queries"] = queries;
 
-        conduit::Node pipelines;
-        pipelines["pl_threshold_thin_clip_z/f1/type"] = "threshold";
-        conduit::Node& params1                        = pipelines["pl_threshold_thin_clip_z/f1/params"];
-        params1["field"]                              = "z";
-        params1["min_value"]                          = 0.12425;
-        params1["max_value"]                          = 0.12575;
+    conduit::Node pipelines;
+    pipelines["pl_threshold_thin_clip_z/f1/type"] = "threshold";
+    conduit::Node &params1 = pipelines["pl_threshold_thin_clip_z/f1/params"];
+    params1["field"] = "z";
+    params1["min_value"] = 0.12425;
+    params1["max_value"] = 0.12575;
 
-        pipelines["pl_threshold_thin_clip_y/f1/type"] = "threshold";
-        conduit::Node& params2                        = pipelines["pl_threshold_thin_clip_y/f1/params"];
-        params2["field"]                              = "y";
-        params2["min_value"]                          = 0.12425;
-        params2["max_value"]                          = 0.12575;
+    pipelines["pl_threshold_thin_clip_y/f1/type"] = "threshold";
+    conduit::Node &params2 = pipelines["pl_threshold_thin_clip_y/f1/params"];
+    params2["field"] = "y";
+    params2["min_value"] = 0.12425;
+    params2["max_value"] = 0.12575;
 
-        conduit::Node& add_pipelines = trigger_actions.append();
-        add_pipelines["action"]      = "add_pipelines";
-        add_pipelines["pipelines"]   = pipelines;
+    conduit::Node &add_pipelines = trigger_actions.append();
+    add_pipelines["action"] = "add_pipelines";
+    add_pipelines["pipelines"] = pipelines;
 
-        conduit::Node scenes;
-        scenes["s1/plots/p1/type"]                   = "pseudocolor";
-        scenes["s1/plots/p1/field"]                  = "density";
-        scenes["s1/plots/p1/pipeline"]               = "pl_threshold_thin_clip_z";
-        scenes["s1/plots/p1/min_value"]              = 1;
-        scenes["s1/plots/p1/max_value"]              = 10;
-        scenes["s1/plots/p1/color_table/name"]       = "Yellow - Gray - Blue";
-        scenes["s1/plots/p1/color_table/annotation"] = "false";
-        scenes["s1/plots/p1/points/radius"]          = 0.001;
+    conduit::Node scenes;
+    scenes["s1/plots/p1/type"]         = "pseudocolor";
+    scenes["s1/plots/p1/field"] = "density";
+    scenes["s1/plots/p1/pipeline"] = "pl_threshold_thin_clip_z";
+    scenes["s1/plots/p1/min_value"] = 1;
+    scenes["s1/plots/p1/max_value"] = 10;
+    scenes["s1/plots/p1/color_table/name"] = "Yellow - Gray - Blue";
+    scenes["s1/plots/p1/color_table/annotation"] = "false";
+    scenes["s1/plots/p1/points/radius"] = 0.001;
 
-        scenes["s1/plots/p2/type"]                   = "pseudocolor";
-        scenes["s1/plots/p2/field"]                  = "density";
-        scenes["s1/plots/p2/pipeline"]               = "pl_threshold_thin_clip_y";
-        scenes["s1/plots/p2/min_value"]              = 1;
-        scenes["s1/plots/p2/max_value"]              = 10;
-        scenes["s1/plots/p2/color_table/name"]       = "Yellow - Gray - Blue";
-        scenes["s1/plots/p2/color_table/annotation"] = "true";
-        scenes["s1/plots/p2/points/radius"]          = 0.001;
+    scenes["s1/plots/p2/type"]         = "pseudocolor";
+    scenes["s1/plots/p2/field"] = "density";
+    scenes["s1/plots/p2/pipeline"] = "pl_threshold_thin_clip_y";
+    scenes["s1/plots/p2/min_value"] = 1;
+    scenes["s1/plots/p2/max_value"] = 10;
+    scenes["s1/plots/p2/color_table/name"] = "Yellow - Gray - Blue";
+    scenes["s1/plots/p2/color_table/annotation"] = "true";
+    scenes["s1/plots/p2/points/radius"] = 0.001;
 
-        scenes["s1/renders/r1/image_prefix"] = output_path + "density.%05d";
-        scenes["s1/renders/r1/image_width"]  = 1920;
-        scenes["s1/renders/r1/image_height"] = 1080;
+    scenes["s1/renders/r1/image_prefix"] = output_path + "density.%05d";
+    scenes["s1/renders/r1/image_width"] = 1920;
+    scenes["s1/renders/r1/image_height"] = 1080;
+    scenes["s1/renders/r1/tiled_rendering"] = "false";
+    
+    scenes["s1/renders/r1/camera/look_at"].set({0.5, 0.125, 0.125});
+    scenes["s1/renders/r1/camera/position"].set({0.5, 0.125, 3.0});
+    scenes["s1/renders/r1/camera/up"].set({0.0, 1.0, 0.0});
 
-        scenes["s1/renders/r1/camera/look_at"].set({0.5, 0.125, 0.125});
-        scenes["s1/renders/r1/camera/position"].set({0.5, 0.125, 3.0});
-        scenes["s1/renders/r1/camera/up"].set({0.0, 1.0, 0.0});
+    scenes["s1/renders/r1/camera/azimuth"] = -35.0;
+    scenes["s1/renders/r1/camera/elevation"] = 25.0;
+    scenes["s1/renders/r1/camera/zoom"] = 5.25;
 
-        scenes["s1/renders/r1/camera/azimuth"]   = -35.0;
-        scenes["s1/renders/r1/camera/elevation"] = 25.0;
-        scenes["s1/renders/r1/camera/zoom"]      = 5.25;
+    scenes["s1/renders/r1/dataset_bounds"].set({0.0, 1.0, 0.0, 0.25, 0.0, 0.25});
+    scenes["s1/renders/r1/color_bar_position"].set({0.2, 0.9, -0.9, -0.75});
 
-        scenes["s1/renders/r1/dataset_bounds"].set({0.0, 1.0, 0.0, 0.25, 0.0, 0.25});
-        scenes["s1/renders/r1/color_bar_position"].set({0.2, 0.9, -0.9, -0.75});
-
-        conduit::Node& add_scenes = trigger_actions.append();
-        add_scenes["action"]      = "add_scenes";
-        add_scenes["scenes"]      = scenes;
-        std::cout << "creating a new actions file " << trigger_file << std::endl;
-        trigger_actions.save(trigger_file);
+    conduit::Node &add_scenes= trigger_actions.append();
+    add_scenes["action"] = "add_scenes";
+    add_scenes["scenes"] = scenes;
+    std::cout << "creating a new actions file "<< trigger_file<<std::endl;
+    trigger_actions.save(trigger_file);
     }
 
     std::string   condition = "cycle() % 200 == 0";

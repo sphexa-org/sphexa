@@ -53,7 +53,9 @@
 #define cudaMemGetInfo hipMemGetInfo
 #define cudaMemoryTypeDevice hipMemoryTypeDevice
 #define cudaMemoryTypeManaged hipMemoryTypeManaged
+#define cudaMemPrefetchAsync hipMemPrefetchAsync_v2
 #define cudaMemset hipMemset
+#define cudaMemsetAsync hipMemsetAsync
 #define cudaPointerAttributes hipPointerAttribute_t
 #define cudaPointerGetAttributes hipPointerGetAttributes
 #define cudaSetDevice hipSetDevice

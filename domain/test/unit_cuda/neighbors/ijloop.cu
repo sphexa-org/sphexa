@@ -21,8 +21,12 @@
 
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
+#include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
 #include "cstone/traversal/ijloop/cpu_fullnblist.hpp"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
+#include "cstone/traversal/ijloop/gpu_fullnblist.cuh"
+#include "cstone/traversal/ijloop/gpu_compressednblist.cuh"
+#include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
 
 #include "../../coord_samples/random.hpp"
 
@@ -338,8 +342,23 @@ struct IjLoopTest : testing::Test
     thrust::universal_vector<LocalIndex> groups, subgroupStart, subgroupEnd;
 };
 
-using Neighborhoods =
-    ::testing::Types<ijloop::CpuFullNbListNeighborhoodBuilder, ijloop::GpuAlwaysTraverseNeighborhoodBuilder>;
+using Neighborhoods = ::testing::Types<
+    ijloop::CpuAlwaysTraverseNeighborhoodBuilder,
+    ijloop::CpuFullNbListNeighborhoodBuilder,
+    ijloop::GpuAlwaysTraverseNeighborhoodBuilder,
+    ijloop::GpuFullNbListNeighborhoodBuilder,
+    ijloop::GpuCompressedNbListNeighborhoodBuilder<>::withoutSymmetry,
+    ijloop::GpuCompressedNbListNeighborhoodBuilder<>::withSymmetry,
+#ifdef __CUDACC__
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withoutSymmetry::withoutCompression,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withSymmetry::withoutCompression,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withoutSymmetry::withCompression<>,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withSymmetry::withCompression<>,
+#endif
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withoutSymmetry::withoutCompression,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withSymmetry::withoutCompression,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withoutSymmetry::withCompression<>,
+    ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 8>::withSymmetry::withCompression<>>;
 
 TYPED_TEST_SUITE(IjLoopTest, Neighborhoods);
 
@@ -409,6 +428,18 @@ template<ijloop::NeighborhoodBuilder NeighborhoodBuilder>
 consteval bool supportsSubgroup(NeighborhoodBuilder)
 {
     return true;
+}
+
+template<class Config>
+consteval bool supportsSubgroup(ijloop::GpuSuperclusterNbListNeighborhoodBuilder<Config>)
+{
+    return !Config::symmetric;
+}
+
+template<class Config>
+consteval bool supportsSubgroup(ijloop::GpuCompressedNbListNeighborhoodBuilder<Config>)
+{
+    return false;
 }
 
 TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
