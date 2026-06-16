@@ -318,11 +318,10 @@ using FBox = SimpleBox<T>;
  * @return           the geometrical center and the vector from the center to the box corner farthest from the origin
  */
 template<class KeyType, class T>
-constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>>
-centerAndSize(const IBox& ibox, const Box<T>& box)
+constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox& ibox, const Box<T>& box)
 {
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
+    const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                           mixDBits.bz != maxTreeLevel<KeyType>{});
     if (useMixD) { return centerAndSize<KeyType>(ibox, box, mixDBits.bx, mixDBits.by, mixDBits.bz); }
     constexpr int maxCoord = 1u << maxTreeLevel<KeyType>{};

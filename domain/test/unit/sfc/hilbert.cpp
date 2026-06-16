@@ -213,7 +213,8 @@ void makeHilbertIBox()
         KeyType start                 = pad(KeyType(03), 3);
         KeyType end                   = pad(KeyType(04), 3);
 
-        IBox box = hilbertIBox(start, maxTreeLevel<KeyType>{} - treeLevel(end - start), maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{});
+        IBox box = hilbertIBox(start, maxTreeLevel<KeyType>{} - treeLevel(end - start), maxTreeLevel<KeyType>{},
+                               maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{});
 
         IBox reference(0, cubeLength / 2, cubeLength / 2, cubeLength, 0, cubeLength / 2);
 
@@ -232,7 +233,9 @@ void makeHilbertIBox()
                     {
                         IBox reference(ix, ix + L, iy, iy + L, iz, iz + L);
                         auto [start, end] = findMinMaxKey<KeyType>(reference);
-                        IBox testBox      = hilbertIBox(start, maxTreeLevel<KeyType>{} - treeLevel(end - start), maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{});
+                        IBox testBox =
+                            hilbertIBox(start, maxTreeLevel<KeyType>{} - treeLevel(end - start),
+                                        maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{});
                         EXPECT_EQ(testBox, reference);
                     }
                     {
@@ -240,7 +243,9 @@ void makeHilbertIBox()
                         auto [start, end] = findMinMaxKey<KeyType>(reference);
                         EXPECT_EQ(start + 1, end);
 
-                        IBox testBox = hilbertIBox(start, maxTreeLevel<KeyType>{} - treeLevel(end - start), maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{});
+                        IBox testBox =
+                            hilbertIBox(start, maxTreeLevel<KeyType>{} - treeLevel(end - start),
+                                        maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{});
                         EXPECT_EQ(testBox, reference);
                     }
                 }

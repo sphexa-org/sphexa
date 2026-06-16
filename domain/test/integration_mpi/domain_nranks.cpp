@@ -512,7 +512,8 @@ void randomGaussianGrav(int thisRank, int numRanks)
         std::vector<uint8_t> marks(let_full.numNodes, 0);
         for (std::size_t i = 0; i < nNodes(spanningKeys); ++i)
         {
-            IBox target                     = sfcIBox(sfcKey(spanningKeys[i]), sfcKey(spanningKeys[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz);
+            IBox target =
+                sfcIBox(sfcKey(spanningKeys[i]), sfcKey(spanningKeys[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz);
             auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
             unsigned maxLevel               = maxTreeLevel<KeyType>{};
 

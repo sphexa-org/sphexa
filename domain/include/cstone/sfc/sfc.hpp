@@ -126,7 +126,8 @@ struct IsHilbert : std::bool_constant<std::is_same_v<KeyType, HilbertKey<typenam
 
 //! @brief Key encode overload for Morton keys
 template<class KeyType>
-HOST_DEVICE_FUN inline std::enable_if_t<IsMorton<KeyType>{}, KeyType> iSfcKey(unsigned ix, unsigned iy, unsigned iz, unsigned, unsigned, unsigned)
+HOST_DEVICE_FUN inline std::enable_if_t<IsMorton<KeyType>{}, KeyType>
+iSfcKey(unsigned ix, unsigned iy, unsigned iz, unsigned, unsigned, unsigned)
 {
     return KeyType{iMorton<typename KeyType::ValueType>(ix, iy, iz)};
 }
@@ -184,9 +185,8 @@ HOST_DEVICE_FUN inline KeyType sfc3D(T x, T y, T z, const Box<T>& box)
     const unsigned cubeLength_y = (1u << mixDBits.by);
     const unsigned cubeLength_z = (1u << mixDBits.bz);
 
-
-    return sfc3D<KeyType>(x, y, z, box.xmin(), box.ymin(), box.zmin(), cubeLength_x * box.ilx(), cubeLength_y * box.ily(),
-                          cubeLength_z * box.ilz(), mixDBits.bx, mixDBits.by, mixDBits.bz);
+    return sfc3D<KeyType>(x, y, z, box.xmin(), box.ymin(), box.zmin(), cubeLength_x * box.ilx(),
+                          cubeLength_y * box.ily(), cubeLength_z * box.ilz(), mixDBits.bx, mixDBits.by, mixDBits.bz);
 }
 
 //! @brief decode a Morton key
@@ -301,20 +301,12 @@ void computeSfcKeys(const T* x, const T* y, const T* z, KeyType* particleKeys, s
  * @param[in]  bz         number of bits to encode in z dimension
  */
 template<class T, class KeyType>
-void computeSfcMixDKeys(const T* x,
-                        const T* y,
-                        const T* z,
-                        KeyType* particleKeys,
-                        size_t n,
-                        const Box<T>& box)
+void computeSfcMixDKeys(const T* x, const T* y, const T* z, KeyType* particleKeys, size_t n, const Box<T>& box)
 {
 #pragma omp parallel for schedule(static)
     for (std::size_t i = 0; i < n; ++i)
     {
-        if (particleKeys[i] != removeKey<KeyType>::value)
-        {
-            particleKeys[i] = sfc3D<KeyType>(x[i], y[i], z[i], box);
-        }
+        if (particleKeys[i] != removeKey<KeyType>::value) { particleKeys[i] = sfc3D<KeyType>(x[i], y[i], z[i], box); }
     }
 }
 

@@ -92,10 +92,7 @@ void findHalos(const KeyType* prefixes,
 #pragma omp parallel for
     for (TreeNodeIndex leafIdx = firstNode; leafIdx < lastNode; ++leafIdx)
     {
-        if (containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box))
-        {
-            continue;
-        }
+        if (containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box)) { continue; }
         findCollisions(prefixes, childOffsets, parents, nodeCenters, nodeSizes, searchCenters[leafIdx],
                        searchSizes[leafIdx], box, lowestKey, highestKey, collisionFlags);
     }

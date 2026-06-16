@@ -86,8 +86,7 @@ NB_MODULE(cstone_sfc, m)
             {
                 case KeyKind::uint64:
                     return static_cast<unsigned>(cstone::maxTreeLevel<cstone::HilbertKey<KeyType64>>{});
-                case KeyKind::u32:
-                    return static_cast<unsigned>(cstone::maxTreeLevel<cstone::HilbertKey<KeyType32>>{});
+                case KeyKind::u32: return static_cast<unsigned>(cstone::maxTreeLevel<cstone::HilbertKey<KeyType32>>{});
             }
             return 0;
         },
@@ -105,15 +104,13 @@ NB_MODULE(cstone_sfc, m)
                 case KeyKind::uint64:
                 {
                     const auto bits =
-                        cstone::getBoxMixDimensionBits<double, cstone::HilbertKey<KeyType64>, cstone::Box<double>>(
-                            box);
+                        cstone::getBoxMixDimensionBits<double, cstone::HilbertKey<KeyType64>, cstone::Box<double>>(box);
                     return std::array<unsigned, 3>{bits.bx, bits.by, bits.bz};
                 }
                 case KeyKind::u32:
                 {
                     const auto bits =
-                        cstone::getBoxMixDimensionBits<double, cstone::HilbertKey<KeyType32>, cstone::Box<double>>(
-                            box);
+                        cstone::getBoxMixDimensionBits<double, cstone::HilbertKey<KeyType32>, cstone::Box<double>>(box);
                     return std::array<unsigned, 3>{bits.bx, bits.by, bits.bz};
                 }
             }

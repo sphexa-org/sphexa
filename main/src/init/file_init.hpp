@@ -208,7 +208,8 @@ public:
 
                 for (int j = 1; j < numSplits; ++j)
                 {
-                    auto [ixj, iyj, izj] = cstone::decodeSfc(cstone::sfcKey(keys[i] + j * keyDelta), mixDBits.bx, mixDBits.by, mixDBits.bz);
+                    auto [ixj, iyj, izj] = cstone::decodeSfc(cstone::sfcKey(keys[i] + j * keyDelta), mixDBits.bx,
+                                                             mixDBits.by, mixDBits.bz);
 
                     x[sIdx + j] = box.xmin() + (ixj * box.lx()) / cstone::maxCoord<KeyType>{};
                     y[sIdx + j] = box.ymin() + (iyj * box.ly()) / cstone::maxCoord<KeyType>{};

@@ -74,15 +74,13 @@ std::vector<int> findPeersMac(int myRank,
         // node a has to overlap/be contained in the focus, while b must not be inside it
         if (!aFocusOverlap || bInFocus) { return false; }
 
-        IBox aBox = sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1), mixDBits.bx,
-                            mixDBits.by, mixDBits.bz);
+        IBox aBox = sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1), mixDBits.bx, mixDBits.by, mixDBits.bz);
         if (aBox.xmax() == 0 && aBox.xmin() == 0 && aBox.ymax() == 0 && aBox.ymin() == 0 && aBox.zmax() == 0 &&
             aBox.zmin() == 0)
         {
             return false; // skip empty boxes
         }
-        IBox bBox = sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1), mixDBits.bx,
-                            mixDBits.by, mixDBits.bz);
+        IBox bBox = sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1), mixDBits.bx, mixDBits.by, mixDBits.bz);
         if (bBox.xmax() == 0 && bBox.xmin() == 0 && bBox.ymax() == 0 && bBox.ymin() == 0 && bBox.zmax() == 0 &&
             bBox.zmin() == 0)
         {
@@ -165,8 +163,8 @@ std::vector<int> findPeersMacStt(int myRank,
             // if the tree node with index idx is fully contained in the focus, we stop traversal
             if (containedIn(nodeStart, nodeEnd, domainStart, domainEnd)) { return false; }
 
-            IBox source = sfcIBox(sfcKey(nodeStart), treeLevel(nodeEnd - nodeStart),
-                                        mixDBits.bx, mixDBits.by, mixDBits.bz);
+            IBox source =
+                sfcIBox(sfcKey(nodeStart), treeLevel(nodeEnd - nodeStart), mixDBits.bx, mixDBits.by, mixDBits.bz);
             if (source.xmax() == 0 && source.xmin() == 0 && source.ymax() == 0 && source.ymin() == 0 &&
                 source.zmax() == 0 && source.zmin() == 0)
             {

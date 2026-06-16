@@ -89,9 +89,12 @@ HOST_DEVICE_FUN inline Vec3<int> boxSeparation(IBox a, IBox b, Vec3<int> pbc)
  * @param codeStart  Morton code range start
  * @param codeEnd    Morton code range end
  * @param box        3D box with x,y,z integer coordinates in [0,2^maxTreeLevel<KeyType>{}-1]
- * @param bx         number of bits to encode in x dimension (this is based on the original box the codeStart and codeEnd were encoded)
- * @param by         number of bits to encode in y dimension (this is based on the original box the codeStart and codeEnd were encoded)
- * @param bz         number of bits to encode in z dimension (this is based on the original box the codeStart and codeEnd were encoded)
+ * @param bx         number of bits to encode in x dimension (this is based on the original box the codeStart and
+ * codeEnd were encoded)
+ * @param by         number of bits to encode in y dimension (this is based on the original box the codeStart and
+ * codeEnd were encoded)
+ * @param bz         number of bits to encode in z dimension (this is based on the original box the codeStart and
+ * codeEnd were encoded)
  * @return           true if the box is fully contained within the specified Morton code range
  */
 template<class KeyType>
@@ -123,7 +126,8 @@ containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box, unsigned bx, un
 
 template<class KeyType>
 HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
-containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box) {
+containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box)
+{
     const auto mixDBits = getBoxMixDimensionBits<int, KeyType, IBox>(box);
     return containedIn(codeStart, codeEnd, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
 }
@@ -137,11 +141,8 @@ containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box) {
  * @return           true if the box is fully contained within the specified Morton code range
  */
 template<class KeyType, class Tc>
-HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool> containedIn(KeyType codeStart,
-                                                                                KeyType codeEnd,
-                                                                                const Vec3<Tc>& center,
-                                                                                const Vec3<Tc>& size,
-                                                                                const Box<Tc>& box)
+HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
+containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Vec3<Tc>& size, const Box<Tc>& box)
 {
     auto boxMin   = center - size;
     auto boxMax   = center + size;
