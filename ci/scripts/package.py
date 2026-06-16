@@ -4,13 +4,10 @@
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
 
-# from spack.lib.spack.spack import variant
 from spack_repo.builtin.build_systems.cmake import CMakePackage
 from spack_repo.builtin.build_systems.cuda import CudaPackage
 from spack_repo.builtin.build_systems.rocm import ROCmPackage
 
-# from spack.lib.spack.spack.directives import depends_on
-# from spack.package import CMakePackage, CudaPackage, ROCmPackage
 from spack.package import *
 
 
@@ -24,10 +21,11 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
 
     license("MIT")
 
+    version("0.96.2", sha256="2ff6edb422eadf47634f98d20258458c82374efe617de0d0c3d5bb3d7945be23")
     version("0.95", sha256="1007ffa97eb2085d50173676ec5e6387d1da7a8b78f204308223fbdbbecc60a1")
-    version("ci_fake_version", git="ci_git", commit="ci_sha", submodules=True)
     version("0.93.1", sha256="95a93d0063ac8857b9be12c1aca24f5b2eef9dd4ffe8cf3f6b552a4dd54b940f")
     version("develop", branch="develop")
+    version("ci_fake_version", git="ci_git", commit="ci_sha", submodules=True)
 
     variant("testing", default=True, description="Enable unit and integration tests")
     variant("analytical", default=True, description="Enable analytical tests")
@@ -36,7 +34,6 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
 
     variant("hdf5", default=True, description="Enable support for HDF5 I/O")
     variant("gpu_aware_mpi", default=True, description="GPU aware MPI")
-
     variant("ascent", default=False, description="Enable Ascent in situ visualization")
 
     depends_on("cmake@3.22:", type="build")
@@ -45,12 +42,11 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
 
     depends_on("mpi")
     depends_on("cuda@12:", when="@0.95: +cuda")
-    depends_on("cuda@11.2:", when="@0.93: +cuda")
     depends_on("hip", when="+rocm")
     depends_on("rocthrust", when="+rocm")
     depends_on("hipcub", when="+rocm")
     depends_on("hdf5 +mpi", when="+hdf5")
-    # depends_on("h5hut@master", when="@0.95: +hdf5")
+    depends_on("h5hut@master", when="@0.95: +hdf5")
     depends_on("ascent", when="+ascent")
 
     # Build MPI with GPU support when GPU aware MPI is requested.
@@ -59,14 +55,11 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
         depends_on("openmpi +cuda", when="+cuda ^[virtuals=mpi] openmpi")
         depends_on("mpich +cuda", when="+cuda ^[virtuals=mpi] mpich")
         depends_on("mvapich-plus +cuda", when="+cuda ^[virtuals=mpi] mvapich-plus")
-        # depends_on("mvapich +cuda", when="+cuda ^[virtuals=mpi] mvapich")
-        # depends_on("mvapich2 +cuda", when="+cuda ^[virtuals=mpi] mvapich2")
 
         depends_on("mpich +rocm", when="+rocm ^[virtuals=mpi] mpich")
 
     conflicts("%gcc@:11", when="@0.95:")
     conflicts("%gcc@:10", when="@:0.93.1")
-    # conflicts("%gcc@:10")
     conflicts("cuda_arch=none", when="+cuda", msg="CUDA architecture is required")
     conflicts("amdgpu_target=none", when="+rocm", msg="HIP architecture is required")
     conflicts("+cuda", when="+rocm", msg="CUDA and HIP cannot both be enabled")
@@ -92,8 +85,8 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
             self.define_from_variant("RYOANJI_WITH_HIP", "rocm"),
             self.define_from_variant("CSTONE_WITH_HIP", "rocm"),
         ]
-        # args.append('-DCMAKE_C_COMPILER=mpicc')
-        # args.append('-DCMAKE_CXX_COMPILER=mpicxx')
+        args.append('-DCMAKE_C_COMPILER=mpicc')
+        args.append('-DCMAKE_CXX_COMPILER=mpicxx')
 
         # INSITU backend: Ascent
         if "+ascent" in spec:
