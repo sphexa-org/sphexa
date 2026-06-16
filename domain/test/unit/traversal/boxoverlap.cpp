@@ -155,55 +155,8 @@ TEST(BoxOverlap, pbcOverlaps)
 }
 
 template<class I>
-void haloBoxContainedIn()
+void haloBoxContainedIn(const AxesBits axesBits)
 {
-    {
-        IBox haloBox{0, 1, 0, 1, 0, 1};
-        EXPECT_TRUE(containedIn(I(0), I(1), haloBox));
-    }
-    {
-        IBox haloBox{0, 1, 0, 1, 0, 2};
-        EXPECT_FALSE(containedIn(I(0), I(1), haloBox));
-    }
-    {
-        IBox haloBox{0, 1, 0, 1, 0, 2};
-        EXPECT_TRUE(containedIn(I(0), I(8), haloBox));
-    }
-    {
-        IBox haloBox{0, 1, 0, 2, 0, 2};
-        EXPECT_FALSE(containedIn(I(0), I(3), haloBox));
-    }
-    {
-        IBox haloBox{0, 1, 0, 2, 0, 2};
-        EXPECT_TRUE(containedIn(I(0), I(8), haloBox));
-    }
-    {
-        IBox haloBox{0, 2, 0, 2, 0, 2};
-        EXPECT_FALSE(containedIn(I(0), I(7), haloBox));
-    }
-    {
-        IBox haloBox{0, 2, 0, 2, 0, 2};
-        EXPECT_TRUE(containedIn(I(0), I(8), haloBox));
-    }
-
-    /// PBC
-    {
-        IBox haloBox{-1, 1, 0, 1, 0, 1};
-        EXPECT_FALSE(containedIn(I(0), I(1), haloBox));
-    }
-}
-
-//! @brief test containment of a box within a Morton code range
-TEST(BoxOverlap, haloBoxContainedIn)
-{
-    haloBoxContainedIn<unsigned>();
-    haloBoxContainedIn<uint64_t>();
-}
-
-template<class I>
-void haloBoxContainedInMixD()
-{
-    const AxesBits axesBits{10, 4, 2};
     {
         IBox haloBox{0, 1, 0, 1, 0, 1};
         EXPECT_TRUE(containedIn(I(0), I(1), haloBox, axesBits));
@@ -232,7 +185,6 @@ void haloBoxContainedInMixD()
         IBox haloBox{0, 2, 0, 2, 0, 2};
         EXPECT_TRUE(containedIn(I(0), I(8), haloBox, axesBits));
     }
-
     /// PBC
     {
         IBox haloBox{-1, 1, 0, 1, 0, 1};
@@ -240,11 +192,16 @@ void haloBoxContainedInMixD()
     }
 }
 
+template<class KeyType>
+constexpr AxesBits uniformAxesBits{maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}};
+
 //! @brief test containment of a box within a Morton code range
-TEST(BoxOverlap, haloBoxContainedInMixD)
+TEST(BoxOverlap, haloBoxContainedIn)
 {
-    haloBoxContainedInMixD<unsigned>();
-    haloBoxContainedInMixD<uint64_t>();
+    haloBoxContainedIn<unsigned>(uniformAxesBits<unsigned>);
+    haloBoxContainedIn<uint64_t>(uniformAxesBits<uint64_t>);
+    haloBoxContainedIn<unsigned>({10, 4, 2});
+    haloBoxContainedIn<uint64_t>({10, 4, 2});
 }
 
 template<class KeyType>
@@ -397,41 +354,6 @@ TEST(BoxOverlap, minDistance)
     }
     {
         Box<T> boxPbc(0, 2, 0, 3, 0, 4, BoundaryType::periodic, BoundaryType::periodic, BoundaryType::periodic);
-
-        Vec3<T> aCenter{0.1, 0.1, 0.1};
-        Vec3<T> bCenter{1.9, 2.9, 3.9};
-
-        Vec3<T> aSize{0.1, 0.1, 0.1};
-        Vec3<T> bSize{0.1, 0.1, 0.1};
-
-        Vec3<T> dist = minDistance(aCenter, aSize, bCenter, bSize, boxPbc);
-        EXPECT_NEAR(dist[0], 0., 1e-10);
-        EXPECT_NEAR(dist[1], 0., 1e-10);
-        EXPECT_NEAR(dist[2], 0., 1e-10);
-    }
-}
-
-TEST(BoxOverlap, minDistanceMixD)
-{
-    using T = double;
-
-    {
-        Box<T> box(0, 1.0, 0, 0.015625, 0, 0.00390625);
-
-        Vec3<T> aCenter{1., 1., 1.};
-        Vec3<T> bCenter{1., 2., 3.};
-
-        Vec3<T> aSize{0.1, 0.1, 0.1};
-        Vec3<T> bSize{0.1, 0.1, 0.1};
-
-        Vec3<T> dist = minDistance(aCenter, aSize, bCenter, bSize, box);
-        EXPECT_NEAR(dist[0], 0., 1e-10);
-        EXPECT_NEAR(dist[1], 0.8, 1e-10);
-        EXPECT_NEAR(dist[2], 1.8, 1e-10);
-    }
-    {
-        Box<T> boxPbc(0, 1.0, 0, 0.015625, 0, 0.0039062, BoundaryType::periodic, BoundaryType::periodic,
-                      BoundaryType::periodic);
 
         Vec3<T> aCenter{0.1, 0.1, 0.1};
         Vec3<T> bCenter{1.9, 2.9, 3.9};
