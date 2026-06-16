@@ -129,7 +129,7 @@ HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
 containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box)
 {
     const auto mixDBits = getBoxMixDimensionBits<int, KeyType, IBox>(box);
-    return containedIn(codeStart, codeEnd, box, mixDBits.bx, mixDBits.by, mixDBits.bz);
+    return containedIn(codeStart, codeEnd, box, mixDBits[0], mixDBits[1], mixDBits[2]);
 }
 
 /*! @brief Check whether a coordinate box is fully contained in a SFC key range
@@ -159,9 +159,9 @@ containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Ve
     const auto mixDBits = getBoxMixDimensionBits<Tc, KeyType, Box<Tc>>(box);
 
     // increase maximum by a grid-unit to ensure we round up
-    const auto gridUnitX = box.lx() * (Tc(1) / (1u << mixDBits.bx));
-    const auto gridUnitY = box.ly() * (Tc(1) / (1u << mixDBits.by));
-    const auto gridUnitZ = box.lz() * (Tc(1) / (1u << mixDBits.bz));
+    const auto gridUnitX = box.lx() * (Tc(1) / (1u << mixDBits[0]));
+    const auto gridUnitY = box.ly() * (Tc(1) / (1u << mixDBits[1]));
+    const auto gridUnitZ = box.lz() * (Tc(1) / (1u << mixDBits[2]));
     boxMax += Vec3<Tc>{gridUnitX, gridUnitY, gridUnitZ};
 
     KeyType lowCode  = sfc3D<SfcKind<KeyType>>(boxMin[0], boxMin[1], boxMin[2], box);

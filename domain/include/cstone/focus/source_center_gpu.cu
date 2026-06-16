@@ -210,7 +210,7 @@ __global__ void computeGeoCentersKernel(const KeyType* prefixes,
                                         Vec3<T>* centers,
                                         Vec3<T>* sizes,
                                         const Box<T> box,
-                                        const AxisMixDBits mixDBits)
+                                        const AxesBits mixDBits)
 {
     TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numNodes) { return; }
@@ -219,7 +219,7 @@ __global__ void computeGeoCentersKernel(const KeyType* prefixes,
     KeyType startKey = decodePlaceholderBit(prefix);
     unsigned level   = decodePrefixLength(prefix) / 3;
     auto nodeBox =
-        sfcIBox(sfcKey<KeyType>(startKey), level, mixDBits.bx, mixDBits.by, mixDBits.bz);
+        sfcIBox(sfcKey<KeyType>(startKey), level, mixDBits[0], mixDBits[1], mixDBits[2]);
     util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box);
 }
 

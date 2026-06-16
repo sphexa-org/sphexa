@@ -172,7 +172,7 @@ int main(int argc, char** argv)
         KeyType prefix   = h_octree.prefixes[i];
         KeyType startKey = decodePlaceholderBit(prefix);
         unsigned level   = decodePrefixLength(prefix) / 3;
-        auto nodeBox     = sfcIBox(sfcKey(startKey), level, mixDBits.bx, mixDBits.by, mixDBits.bz);
+        auto nodeBox     = sfcIBox(sfcKey(startKey), level, mixDBits[0], mixDBits[1], mixDBits[2]);
         Vec3<T> center_i;
         util::tie(center_i, std::ignore) = centerAndSize<KeyType>(nodeBox, box);
 

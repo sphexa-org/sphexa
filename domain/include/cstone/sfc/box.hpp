@@ -321,9 +321,9 @@ template<class KeyType, class T>
 constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox& ibox, const Box<T>& box)
 {
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD  = (mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                          mixDBits.bz != maxTreeLevel<KeyType>{});
-    if (useMixD) { return centerAndSize<KeyType>(ibox, box, mixDBits.bx, mixDBits.by, mixDBits.bz); }
+    const bool useMixD  = (mixDBits[0] != maxTreeLevel<KeyType>{} || mixDBits[1] != maxTreeLevel<KeyType>{} ||
+                          mixDBits[2] != maxTreeLevel<KeyType>{});
+    if (useMixD) { return centerAndSize<KeyType>(ibox, box, mixDBits[0], mixDBits[1], mixDBits[2]); }
     constexpr int maxCoord = 1u << maxTreeLevel<KeyType>{};
     // smallest octree cell edge length in unit cube
     constexpr T uL = T(1.) / maxCoord;
@@ -436,15 +436,10 @@ Box<T> limitBoxShrinking(const Box<T>& fittingBox, const Box<T>& previousBox, co
                   previousBox.boundaryZ()};
 }
 
-struct AxisMixDBits
-{
-    unsigned bx = 0;
-    unsigned by = 0;
-    unsigned bz = 0;
-};
+using AxesBits = util::array<unsigned, 3>;
 
 template<typename T, typename KeyType, typename BoxType>
-HOST_DEVICE_FUN AxisMixDBits getBoxMixDimensionBits(const BoxType& box)
+HOST_DEVICE_FUN AxesBits getBoxMixDimensionBits(const BoxType& box)
 {
     const T dx                  = box.xmax() - box.xmin();
     const T dy                  = box.ymax() - box.ymin();

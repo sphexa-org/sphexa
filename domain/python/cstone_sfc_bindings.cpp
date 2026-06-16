@@ -105,13 +105,13 @@ NB_MODULE(cstone_sfc, m)
                 {
                     const auto bits =
                         cstone::getBoxMixDimensionBits<double, cstone::HilbertKey<KeyType64>, cstone::Box<double>>(box);
-                    return std::array<unsigned, 3>{bits.bx, bits.by, bits.bz};
+                    return std::array<unsigned, 3>{bits[0], bits[1], bits[2]};
                 }
                 case KeyKind::u32:
                 {
                     const auto bits =
                         cstone::getBoxMixDimensionBits<double, cstone::HilbertKey<KeyType32>, cstone::Box<double>>(box);
-                    return std::array<unsigned, 3>{bits.bx, bits.by, bits.bz};
+                    return std::array<unsigned, 3>{bits[0], bits[1], bits[2]};
                 }
             }
             return std::array<unsigned, 3>{0, 0, 0};

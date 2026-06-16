@@ -82,8 +82,8 @@ void sortBySfcKey(std::vector<T>& x, std::vector<T>& y, std::vector<T>& z, cston
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, cstone::Box<T>>(globalBox);
     const bool useMixD =
-        (mixDBits.bx != cstone::maxTreeLevel<KeyType>{} || mixDBits.by != cstone::maxTreeLevel<KeyType>{} ||
-         mixDBits.bz != cstone::maxTreeLevel<KeyType>{});
+        (mixDBits[0] != cstone::maxTreeLevel<KeyType>{} || mixDBits[1] != cstone::maxTreeLevel<KeyType>{} ||
+         mixDBits[2] != cstone::maxTreeLevel<KeyType>{});
 
     std::vector<KeyType> keys(blockSize);
     if (useMixD)

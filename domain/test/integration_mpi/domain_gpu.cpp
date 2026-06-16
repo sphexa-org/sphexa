@@ -64,8 +64,8 @@ void randomGaussianAssignment(int rank, int numRanks, Box<T> box)
 
     const auto originalBoxMixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
     const auto isOriginalBoxMixD =
-        (originalBoxMixDBits.bx != maxTreeLevel<KeyType>{} || originalBoxMixDBits.by != maxTreeLevel<KeyType>{} ||
-         originalBoxMixDBits.bz != maxTreeLevel<KeyType>{});
+        (originalBoxMixDBits[0] != maxTreeLevel<KeyType>{} || originalBoxMixDBits[1] != maxTreeLevel<KeyType>{} ||
+         originalBoxMixDBits[2] != maxTreeLevel<KeyType>{});
 
     Domain<KeyType, T, CpuTag> domainCpu(rank, numRanks, bucketSize, bucketSizeFocus, 1.0, MPI_COMM_WORLD, box);
     std::vector<T> hs1, hs2, hs3;
@@ -74,8 +74,8 @@ void randomGaussianAssignment(int rank, int numRanks, Box<T> box)
     // Make sure that small box shrinking doesn't change the MixD bits compared to the original box
     const auto cpuDomainBoxMixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(domainCpu.box());
     const auto isCpuDomainBoxMixD =
-        (cpuDomainBoxMixDBits.bx != maxTreeLevel<KeyType>{} || cpuDomainBoxMixDBits.by != maxTreeLevel<KeyType>{} ||
-         cpuDomainBoxMixDBits.bz != maxTreeLevel<KeyType>{});
+        (cpuDomainBoxMixDBits[0] != maxTreeLevel<KeyType>{} || cpuDomainBoxMixDBits[1] != maxTreeLevel<KeyType>{} ||
+         cpuDomainBoxMixDBits[2] != maxTreeLevel<KeyType>{});
     EXPECT_EQ(isOriginalBoxMixD, isCpuDomainBoxMixD);
 
     Domain<KeyType, T, GpuTag> domainGpu(rank, numRanks, bucketSize, bucketSizeFocus, 1.0, MPI_COMM_WORLD, box);
@@ -85,8 +85,8 @@ void randomGaussianAssignment(int rank, int numRanks, Box<T> box)
     // Make sure that small box shrinking doesn't change the MixD bits compared to the original box on GPU as well
     const auto gpuDomainBoxMixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(domainGpu.box());
     const auto isGpuDomainBoxMixD =
-        (gpuDomainBoxMixDBits.bx != maxTreeLevel<KeyType>{} || gpuDomainBoxMixDBits.by != maxTreeLevel<KeyType>{} ||
-         gpuDomainBoxMixDBits.bz != maxTreeLevel<KeyType>{});
+        (gpuDomainBoxMixDBits[0] != maxTreeLevel<KeyType>{} || gpuDomainBoxMixDBits[1] != maxTreeLevel<KeyType>{} ||
+         gpuDomainBoxMixDBits[2] != maxTreeLevel<KeyType>{});
     EXPECT_EQ(isOriginalBoxMixD, isGpuDomainBoxMixD);
 
     std::cout << "[Rank " << rank << "] numHalos GPU: " << domainGpu.nParticlesWithHalos() - domainGpu.nParticles()

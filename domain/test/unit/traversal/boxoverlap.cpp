@@ -353,14 +353,14 @@ TEST(BoxOverlap, minPointDistanceMixD)
         Box<T> box(0, 1.0, 0, 0.015625, 0, 0.00390625);
         const auto mixDBits = getBoxMixDimensionBits<double, KeyType, Box<double>>(box);
         const auto expectedMixDBits =
-            (std::is_same<KeyType, unsigned>::value) ? AxisMixDBits{10, 4, 2} : AxisMixDBits{21, 15, 13};
-        EXPECT_EQ(mixDBits.bx, expectedMixDBits.bx);
-        EXPECT_EQ(mixDBits.by, expectedMixDBits.by);
-        EXPECT_EQ(mixDBits.bz, expectedMixDBits.bz);
+            (std::is_same<KeyType, unsigned>::value) ? AxesBits{10, 4, 2} : AxesBits{21, 15, 13};
+        EXPECT_EQ(mixDBits[0], expectedMixDBits[0]);
+        EXPECT_EQ(mixDBits[1], expectedMixDBits[1]);
+        EXPECT_EQ(mixDBits[2], expectedMixDBits[2]);
 
-        const unsigned mcX = 1u << mixDBits.bx;
-        const unsigned mcY = 1u << mixDBits.by;
-        const unsigned mcZ = 1u << mixDBits.bz;
+        const unsigned mcX = 1u << mixDBits[0];
+        const unsigned mcY = 1u << mixDBits[1];
+        const unsigned mcZ = 1u << mixDBits[2];
 
         IBox ibox(0, mcX / 2, 0, mcY / 2, 0, mcZ / 2);
 

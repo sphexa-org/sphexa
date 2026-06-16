@@ -157,7 +157,7 @@ void nodeFpCenters(std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>*
         KeyType startKey = decodePlaceholderBit(prefix);
         unsigned level   = decodePrefixLength(prefix) / 3;
 
-        IBox nodeBox = sfcIBox(sfcKey<KeyType>(startKey), level, mixDBits.bx, mixDBits.by, mixDBits.bz);
+        IBox nodeBox = sfcIBox(sfcKey<KeyType>(startKey), level, mixDBits[0], mixDBits[1], mixDBits[2]);
         util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box);
     }
 }

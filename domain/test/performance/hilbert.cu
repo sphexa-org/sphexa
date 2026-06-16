@@ -100,9 +100,9 @@ int main()
         thrust::device_vector<unsigned> dz = iz;
 
         auto computeHilbert = [&]()
-        { computeSfcKeys(rawPtr(hilbertKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, mixDBits.bx, mixDBits.by, mixDBits.bz); };
+        { computeSfcKeys(rawPtr(hilbertKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, mixDBits[0], mixDBits[1], mixDBits[2]); };
 
-        auto computeMorton = [&]() { computeSfcKeys(rawPtr(mortonKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, mixDBits.bx, mixDBits.by, mixDBits.bz); };
+        auto computeMorton = [&]() { computeSfcKeys(rawPtr(mortonKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, mixDBits[0], mixDBits[1], mixDBits[2]); };
 
         float t_hilbert = timeGpu(computeHilbert);
         float t_morton  = timeGpu(computeMorton);
@@ -114,7 +114,7 @@ int main()
         thrust::device_vector<unsigned> dz2(numKeys);
 
         auto decodeHilbert = [&]()
-        { decodeSfcKeys(rawPtr(hilbertKeys), rawPtr(dx2), rawPtr(dy2), rawPtr(dz2), numKeys, mixDBits.bx, mixDBits.by, mixDBits.bz); };
+        { decodeSfcKeys(rawPtr(hilbertKeys), rawPtr(dx2), rawPtr(dy2), rawPtr(dz2), numKeys, mixDBits[0], mixDBits[1], mixDBits[2]); };
 
         float t_decode  = timeGpu(decodeHilbert);
         bool passDecode = thrust::equal(dx.begin(), dx.end(), dx2.begin()) &&

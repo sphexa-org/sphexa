@@ -178,15 +178,15 @@ HOST_DEVICE_FUN inline KeyType sfc3D(T x, T y, T z, const Box<T>& box)
 {
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
 
-    assert(mixDBits.bx <= maxTreeLevel<typename KeyType::ValueType>{});
-    assert(mixDBits.by <= maxTreeLevel<typename KeyType::ValueType>{});
-    assert(mixDBits.bz <= maxTreeLevel<typename KeyType::ValueType>{});
-    const unsigned cubeLength_x = (1u << mixDBits.bx);
-    const unsigned cubeLength_y = (1u << mixDBits.by);
-    const unsigned cubeLength_z = (1u << mixDBits.bz);
+    assert(mixDBits[0] <= maxTreeLevel<typename KeyType::ValueType>{});
+    assert(mixDBits[1] <= maxTreeLevel<typename KeyType::ValueType>{});
+    assert(mixDBits[2] <= maxTreeLevel<typename KeyType::ValueType>{});
+    const unsigned cubeLength_x = (1u << mixDBits[0]);
+    const unsigned cubeLength_y = (1u << mixDBits[1]);
+    const unsigned cubeLength_z = (1u << mixDBits[2]);
 
     return sfc3D<KeyType>(x, y, z, box.xmin(), box.ymin(), box.zmin(), cubeLength_x * box.ilx(),
-                          cubeLength_y * box.ily(), cubeLength_z * box.ilz(), mixDBits.bx, mixDBits.by, mixDBits.bz);
+                          cubeLength_y * box.ily(), cubeLength_z * box.ilz(), mixDBits[0], mixDBits[1], mixDBits[2]);
 }
 
 //! @brief decode a Morton key

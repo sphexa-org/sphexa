@@ -99,7 +99,7 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
                                   TreeNodeIndex numFocusNodes,
                                   bool limitSource,
                                   uint8_t* markings,
-                                  const AxisMixDBits mixDBits)
+                                  const AxesBits mixDBits)
 {
     TreeNodeIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -109,11 +109,11 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
     KeyType focusEnd   = focusNodes[numFocusNodes];
 
     IBox target =
-        sfcIBox(sfcKey(focusNodes[tid]), sfcKey(focusNodes[tid + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz);
+        sfcIBox(sfcKey(focusNodes[tid]), sfcKey(focusNodes[tid + 1]), mixDBits[0], mixDBits[1], mixDBits[2]);
     if (target == IBox{}) { return; }
     IBox targetExt = IBox(target.xmin() - 1, target.xmax() + 1, target.ymin() - 1, target.ymax() + 1, target.zmin() - 1,
                           target.zmax() + 1);
-    if (containedIn(focusStart, focusEnd, targetExt, mixDBits.bx, mixDBits.by, mixDBits.bz)) { return; }
+    if (containedIn(focusStart, focusEnd, targetExt, mixDBits[0], mixDBits[1], mixDBits[2])) { return; }
 
     auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
     unsigned maxLevel               = maxTreeLevel<KeyType>{};

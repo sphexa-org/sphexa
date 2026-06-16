@@ -31,13 +31,13 @@ static std::vector<int> findPeersAll2All(int myRank,
                                          float invThetaEff)
 {
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool mixD     = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                      mixDBits.bz != maxTreeLevel<KeyType>{};
+    const bool mixD     = mixDBits[0] != maxTreeLevel<KeyType>{} || mixDBits[1] != maxTreeLevel<KeyType>{} ||
+                      mixDBits[2] != maxTreeLevel<KeyType>{};
 
     TreeNodeIndex firstIdx = findNodeAbove(tree.data(), nNodes(tree), assignment[myRank]);
     TreeNodeIndex lastIdx  = findNodeAbove(tree.data(), nNodes(tree), assignment[myRank + 1]);
 
-    const Vec3<int> maxCoords = {(1 << mixDBits.bx), (1 << mixDBits.by), (1 << mixDBits.bz)};
+    const Vec3<int> maxCoords = {(1 << mixDBits[0]), (1 << mixDBits[1]), (1 << mixDBits[2])};
     const Vec3<T> gridStep    = {box.lx() / maxCoords[0], box.ly() / maxCoords[1], box.lz() / maxCoords[2]};
     const T maxGridStep       = *std::max_element(gridStep.begin(), gridStep.end());
     const auto ellipse =
@@ -49,7 +49,7 @@ static std::vector<int> findPeersAll2All(int myRank,
     std::vector<IBox> boxes(nNodes(tree));
     for (TreeNodeIndex i = 0; i < TreeNodeIndex(nNodes(tree)); ++i)
     {
-        boxes[i] = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz);
+        boxes[i] = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]), mixDBits[0], mixDBits[1], mixDBits[2]);
     }
 
     std::vector<int> peers(assignment.numRanks());
@@ -132,10 +132,10 @@ static void findPeers(Box<double> box)
     float invThetaEff = invThetaMinToVec(0.5f);
 
     const auto mixDBits = getBoxMixDimensionBits<double, KeyType, Box<double>>(box);
-    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{};
+    const bool useMixD  = mixDBits[0] != maxTreeLevel<KeyType>{} || mixDBits[1] != maxTreeLevel<KeyType>{} ||
+                         mixDBits[2] != maxTreeLevel<KeyType>{};
     auto particleKeys =
-        useMixD ? makeRandomGaussianKeys<KeyType>(nParticles, 42, useMixD, mixDBits.bx, mixDBits.by, mixDBits.bz)
+        useMixD ? makeRandomGaussianKeys<KeyType>(nParticles, 42, useMixD, mixDBits[0], mixDBits[1], mixDBits[2])
                 : makeRandomGaussianKeys<KeyType>(nParticles);
     auto [leaves, counts] = computeOctree<KeyType>(particleKeys, bucketSize);
 
