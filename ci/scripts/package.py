@@ -88,7 +88,6 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
         args.append('-DCMAKE_C_COMPILER=mpicc')
         args.append('-DCMAKE_CXX_COMPILER=mpicxx')
 
-        # INSITU backend: Ascent
         if "+ascent" in spec:
             args.append(self.define("INSITU", "Ascent"))
 
