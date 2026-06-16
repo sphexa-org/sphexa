@@ -108,7 +108,6 @@ public:
 
         // compute SFC particle keys only for particles participating in tree build
         std::span<KeyType> keyView(particleKeys + o1.start, numPart);
-        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box_);
         computeSfcKeys<gpu>(x + o1.start, y + o1.start, z + o1.start, sfcKindPointer(keyView.data()), numPart, box_);
         sequence<gpu>(o1.start, numPart, reorderFunctor.getBuf(), growthRate_);
         sortByKey<gpu>(keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_);
@@ -193,8 +192,6 @@ public:
         auto [newStart, newEnd] = domain_exchange::assignedEnvelope(o1e, numAssigned() - numPresent());
         LocalIndex envelopeSize = newEnd - newStart;
         std::span<KeyType> keyView(keys + newStart, envelopeSize);
-
-        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box_);
 
         computeSfcKeys<gpu>(x + recvStart, y + recvStart, z + recvStart, sfcKindPointer(keys + recvStart), numRecv,
                             box_);

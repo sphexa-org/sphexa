@@ -45,7 +45,7 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
 
         if (tS[0] == 0 && tS[0] == 0 && tS[0] == 0) { return; }
 
-        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+        const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
 
         // if the halo box is fully inside the assigned SFC range, we skip collision detection
         if (containedIn(lowestKey, highestKey, tC, tS, box)) { return; }
@@ -99,7 +99,7 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
                                   TreeNodeIndex numFocusNodes,
                                   bool limitSource,
                                   uint8_t* markings,
-                                  const AxesBits mixDBits)
+                                  const AxesBits axesBits)
 {
     TreeNodeIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -109,11 +109,11 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
     KeyType focusEnd   = focusNodes[numFocusNodes];
 
     IBox target =
-        sfcIBox(sfcKey(focusNodes[tid]), sfcKey(focusNodes[tid + 1]), mixDBits[0], mixDBits[1], mixDBits[2]);
+        sfcIBox(sfcKey(focusNodes[tid]), sfcKey(focusNodes[tid + 1]), axesBits);
     if (target == IBox{}) { return; }
     IBox targetExt = IBox(target.xmin() - 1, target.xmax() + 1, target.ymin() - 1, target.ymax() + 1, target.zmin() - 1,
                           target.zmax() + 1);
-    if (containedIn(focusStart, focusEnd, targetExt, mixDBits[0], mixDBits[1], mixDBits[2])) { return; }
+    if (containedIn(focusStart, focusEnd, targetExt, axesBits)) { return; }
 
     auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
     unsigned maxLevel               = maxTreeLevel<KeyType>{};
@@ -136,11 +136,11 @@ void markMacsGpu(const KeyType* prefixes,
     constexpr unsigned numThreads = 128;
     unsigned numBlocks            = iceil(numFocusNodes, numThreads);
 
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
     if (numFocusNodes)
     {
         markMacsGpuKernel<<<numBlocks, numThreads>>>(prefixes, childOffsets, parents, centers, box, focusNodes,
-                                                     numFocusNodes, limitSource, markings, mixDBits);
+                                                     numFocusNodes, limitSource, markings, axesBits);
     }
 }
 

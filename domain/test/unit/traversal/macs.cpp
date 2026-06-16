@@ -107,12 +107,12 @@ static std::vector<uint8_t> markVecMacAll2All(const KeyType* leaves,
 {
     std::vector<uint8_t> markings(prefixes.size(), 0);
 
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
 
     // loop over target cells
     for (TreeNodeIndex i = firstLeaf; i < lastLeaf; ++i)
     {
-        IBox targetBox = sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]), mixDBits[0], mixDBits[1], mixDBits[2]);
+        IBox targetBox                  = sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]), axesBits);
         auto [targetCenter, targetSize] = centerAndSize<KeyType>(targetBox, box);
 
         // loop over source cells

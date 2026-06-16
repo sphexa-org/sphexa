@@ -476,8 +476,6 @@ private:
     {
         exchangeHalos(std::tie(x, y, z, h), std::get<0>(scratch), std::get<1>(scratch));
 
-        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box());
-
         // compute SFC keys of received halo particles
         if constexpr (IsDeviceVector<KeyVec>{})
         {

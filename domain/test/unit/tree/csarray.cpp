@@ -390,8 +390,8 @@ TEST(CornerstoneOctree, NodeDebug)
     KeyType s0 = 0164640000000000000000lu;
     KeyType s1 = 0164650000000000000000lu;
     Box<T> box(0, 1, BoundaryType::periodic);
-    const auto mixDBits             = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    IBox source                     = sfcIBox(sfcKey(s0), sfcKey(s1), mixDBits[0], mixDBits[1], mixDBits[2]);
+    const auto axesBits             = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    IBox source                     = sfcIBox(sfcKey(s0), sfcKey(s1), axesBits);
     auto [sourceCenter, sourceSize] = centerAndSize<KeyType>(source, box);
     unsigned prefixLength           = 3 * treeLevel(s1 - s0);
     KeyType sourcePrefix            = encodePlaceholderBit(s0, prefixLength);
@@ -405,8 +405,7 @@ TEST(CornerstoneOctree, NodeDebug)
     T domainVol = 0;
     for (size_t i = 0; i < nNodes(spanningTree); ++i)
     {
-        IBox target =
-            sfcIBox(sfcKey(spanningTree[i]), sfcKey(spanningTree[i + 1]), mixDBits[0], mixDBits[1], mixDBits[2]);
+        IBox target                     = sfcIBox(sfcKey(spanningTree[i]), sfcKey(spanningTree[i + 1]), axesBits);
         auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
 
         auto distVec = minDistance(sourceCenter, sourceSize, targetCenter, targetSize, box);

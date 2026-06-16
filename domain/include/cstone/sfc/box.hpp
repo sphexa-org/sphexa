@@ -28,6 +28,8 @@
 namespace cstone
 {
 
+using AxesBits = util::array<unsigned, 3>;
+
 /*! @brief normalize a spatial length w.r.t. to a min/max range
  *
  * @tparam T
@@ -320,10 +322,10 @@ using FBox = SimpleBox<T>;
 template<class KeyType, class T>
 constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox& ibox, const Box<T>& box)
 {
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD  = (mixDBits[0] != maxTreeLevel<KeyType>{} || mixDBits[1] != maxTreeLevel<KeyType>{} ||
-                          mixDBits[2] != maxTreeLevel<KeyType>{});
-    if (useMixD) { return centerAndSize<KeyType>(ibox, box, mixDBits[0], mixDBits[1], mixDBits[2]); }
+    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    const bool useMixD  = (axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
+                          axesBits[2] != maxTreeLevel<KeyType>{});
+    if (useMixD) { return centerAndSize<KeyType>(ibox, box, axesBits); }
     constexpr int maxCoord = 1u << maxTreeLevel<KeyType>{};
     // smallest octree cell edge length in unit cube
     constexpr T uL = T(1.) / maxCoord;
@@ -342,11 +344,11 @@ constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox
 
 template<class KeyType, class T>
 constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>>
-centerAndSize(const IBox& ibox, const Box<T>& box, unsigned bx, unsigned by, unsigned bz)
+centerAndSize(const IBox& ibox, const Box<T>& box, const AxesBits& axesBits)
 {
-    T halfUnitLengthX = T(0.5) * box.lx() / (1u << bx);
-    T halfUnitLengthY = T(0.5) * box.ly() / (1u << by);
-    T halfUnitLengthZ = T(0.5) * box.lz() / (1u << bz);
+    T halfUnitLengthX = T(0.5) * box.lx() / (1u << axesBits[0]);
+    T halfUnitLengthY = T(0.5) * box.ly() / (1u << axesBits[1]);
+    T halfUnitLengthZ = T(0.5) * box.lz() / (1u << axesBits[2]);
     Vec3<T> boxCenter = {box.xmin() + (ibox.xmax() + ibox.xmin()) * halfUnitLengthX,
                          box.ymin() + (ibox.ymax() + ibox.ymin()) * halfUnitLengthY,
                          box.zmin() + (ibox.zmax() + ibox.zmin()) * halfUnitLengthZ};
@@ -436,10 +438,8 @@ Box<T> limitBoxShrinking(const Box<T>& fittingBox, const Box<T>& previousBox, co
                   previousBox.boundaryZ()};
 }
 
-using AxesBits = util::array<unsigned, 3>;
-
 template<typename T, typename KeyType, typename BoxType>
-HOST_DEVICE_FUN AxesBits getBoxMixDimensionBits(const BoxType& box)
+HOST_DEVICE_FUN AxesBits getBoxDimensionBits(const BoxType& box)
 {
     const T dx                  = box.xmax() - box.xmin();
     const T dy                  = box.ymax() - box.ymin();

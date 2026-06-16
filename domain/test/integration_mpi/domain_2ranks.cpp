@@ -300,9 +300,9 @@ void multiStepSync(int rank, int numRanks, Box<T> box = Box<T>{0, 1})
 
     Domain<KeyType, T> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, box);
 
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD  = (mixDBits[0] != maxTreeLevel<KeyType>{} || mixDBits[1] != maxTreeLevel<KeyType>{} ||
-                          mixDBits[2] != maxTreeLevel<KeyType>{});
+    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    const bool useMixD  = (axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
+                          axesBits[2] != maxTreeLevel<KeyType>{});
 
     std::vector<T> xGlobal, yGlobal, zGlobal, hGlobal;
     if (useMixD)

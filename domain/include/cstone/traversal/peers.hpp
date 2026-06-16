@@ -53,10 +53,10 @@ std::vector<int> findPeersMac(int myRank,
     KeyType domainStart = assignment[myRank];
     KeyType domainEnd   = assignment[myRank + 1];
 
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
 
     constexpr float roundOff  = 1 + 1e-6; // ensure that peers are picked up in case of a numerical tie
-    const Vec3<int> maxCoords = {(1 << mixDBits[0]), (1 << mixDBits[1]), (1 << mixDBits[2])};
+    const Vec3<int> maxCoords = {(1 << axesBits[0]), (1 << axesBits[1]), (1 << axesBits[2])};
     const Vec3<T> gridStep    = {box.lx() / maxCoords[0], box.ly() / maxCoords[1], box.lz() / maxCoords[2]};
     const T maxGridStep       = *std::max_element(gridStep.begin(), gridStep.end());
     const auto ellipse = Vec3<T>{maxGridStep / gridStep[0], maxGridStep / gridStep[1], maxGridStep / gridStep[2]} *
@@ -74,13 +74,13 @@ std::vector<int> findPeersMac(int myRank,
         // node a has to overlap/be contained in the focus, while b must not be inside it
         if (!aFocusOverlap || bInFocus) { return false; }
 
-        IBox aBox = sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1), mixDBits[0], mixDBits[1], mixDBits[2]);
+        IBox aBox = sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1), axesBits);
         if (aBox.xmax() == 0 && aBox.xmin() == 0 && aBox.ymax() == 0 && aBox.ymin() == 0 && aBox.zmax() == 0 &&
             aBox.zmin() == 0)
         {
             return false; // skip empty boxes
         }
-        IBox bBox = sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1), mixDBits[0], mixDBits[1], mixDBits[2]);
+        IBox bBox = sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1), axesBits);
         if (bBox.xmax() == 0 && bBox.xmin() == 0 && bBox.ymax() == 0 && bBox.ymin() == 0 && bBox.zmax() == 0 &&
             bBox.zmin() == 0)
         {
@@ -134,9 +134,9 @@ std::vector<int> findPeersMacStt(int myRank,
     TreeNodeIndex firstLeaf = findNodeAbove(leaves, octree.numLeafNodes, domainStart);
     TreeNodeIndex lastLeaf  = findNodeAbove(leaves, octree.numLeafNodes, domainEnd);
 
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
 
-    const Vec3<int> maxCoords = {(1 << mixDBits[0]), (1 << mixDBits[1]), (1 << mixDBits[2])};
+    const Vec3<int> maxCoords = {(1 << axesBits[0]), (1 << axesBits[1]), (1 << axesBits[2])};
     const Vec3<T> gridStep    = {box.lx() / maxCoords[0], box.ly() / maxCoords[1], box.lz() / maxCoords[2]};
     const T maxGridStep       = *std::max_element(gridStep.begin(), gridStep.end());
     const auto ellipse =
@@ -150,21 +150,20 @@ std::vector<int> findPeersMacStt(int myRank,
 #pragma omp parallel for
     for (TreeNodeIndex i = firstLeaf; i < lastLeaf; ++i)
     {
-        IBox target = sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]), mixDBits[0], mixDBits[1], mixDBits[2]);
+        IBox target = sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]), axesBits);
         if (target.xmax() - target.xmin() == 0 && target.ymax() - target.ymin() == 0 &&
             target.zmax() - target.zmin() == 0)
         {
             continue; // skip empty boxes
         }
 
-        auto violatesMac = [target, ellipse, pbc, &octree, domainStart, domainEnd, mixDBits](TreeNodeIndex idx)
+        auto violatesMac = [target, ellipse, pbc, &octree, domainStart, domainEnd, &axesBits](TreeNodeIndex idx)
         {
             auto [nodeStart, nodeEnd] = decodePlaceholderBit2K(octree.prefixes[idx]);
             // if the tree node with index idx is fully contained in the focus, we stop traversal
             if (containedIn(nodeStart, nodeEnd, domainStart, domainEnd)) { return false; }
 
-            IBox source =
-                sfcIBox(sfcKey(nodeStart), treeLevel(nodeEnd - nodeStart), mixDBits[0], mixDBits[1], mixDBits[2]);
+            IBox source = sfcIBox(sfcKey(nodeStart), treeLevel(nodeEnd - nodeStart), axesBits);
             if (source.xmax() == 0 && source.xmin() == 0 && source.ymax() == 0 && source.ymin() == 0 &&
                 source.zmax() == 0 && source.zmin() == 0)
             {

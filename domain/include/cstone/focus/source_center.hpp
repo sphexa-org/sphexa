@@ -148,7 +148,7 @@ void setMac(std::span<const KeyType> nodeKeys,
 template<class KeyType, class T>
 void nodeFpCenters(std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box)
 {
-    auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
 
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < prefixes.size(); ++i)
@@ -157,7 +157,7 @@ void nodeFpCenters(std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>*
         KeyType startKey = decodePlaceholderBit(prefix);
         unsigned level   = decodePrefixLength(prefix) / 3;
 
-        IBox nodeBox = sfcIBox(sfcKey<KeyType>(startKey), level, mixDBits[0], mixDBits[1], mixDBits[2]);
+        IBox nodeBox                    = sfcIBox(sfcKey<KeyType>(startKey), level, axesBits);
         util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box);
     }
 }

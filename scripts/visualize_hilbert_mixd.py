@@ -127,7 +127,7 @@ def main() -> None:
     increase_key_pos = tree_height - args.level  # adjust for level-from-right
 
     if args.bits is None:
-        bx_full, by_full, bz_full = map(int, cstone_sfc.getBoxMixDimensionBits(box_limits, args.key_type))
+        bx_full, by_full, bz_full = map(int, cstone_sfc.getBoxDimensionBits(box_limits, args.key_type))
         downshift = max_level - tree_height
         bx, by, bz = bx_full - downshift, by_full - downshift, bz_full - downshift
         print(f"Derived bits from box dimensions: (bx, by, bz)=({bx}, {by}, {bz}), key_type={args.key_type}")

@@ -93,11 +93,11 @@ public:
         auto bType       = static_cast<BoundaryType>(std::get<3>(GetParam()));
         Box<T> box(0, std::get<0>(GetParam()), 0, std::get<1>(GetParam()), 0, std::get<2>(GetParam()), bType);
 
-        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-        bool useMixD        = (mixDBits[0] < maxTreeLevel<KeyType>{} || mixDBits[1] < maxTreeLevel<KeyType>{} ||
-                        mixDBits[2] < maxTreeLevel<KeyType>{});
+        const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+        bool useMixD        = (axesBits[0] < maxTreeLevel<KeyType>{} || axesBits[1] < maxTreeLevel<KeyType>{} ||
+                        axesBits[2] < maxTreeLevel<KeyType>{});
         std::vector<KeyType> keys =
-            makeRandomGaussianKeys<KeyType>(numParticles, 42, useMixD, mixDBits[0], mixDBits[1], mixDBits[2]);
+            makeRandomGaussianKeys<KeyType>(numParticles, 42, useMixD, axesBits[0], axesBits[1], axesBits[2]);
         auto [tree, counts] = computeOctree<KeyType>(keys, 4);
 
         OctreeData<KeyType, CpuTag> octree;

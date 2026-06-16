@@ -203,39 +203,40 @@ TEST(BoxOverlap, haloBoxContainedIn)
 template<class I>
 void haloBoxContainedInMixD()
 {
+    const AxesBits axesBits{10, 4, 2};
     {
         IBox haloBox{0, 1, 0, 1, 0, 1};
-        EXPECT_TRUE(containedIn(I(0), I(1), haloBox, 10, 4, 2));
+        EXPECT_TRUE(containedIn(I(0), I(1), haloBox, axesBits));
     }
     {
         IBox haloBox{0, 1, 0, 1, 0, 2};
-        EXPECT_FALSE(containedIn(I(0), I(1), haloBox, 10, 4, 2));
+        EXPECT_FALSE(containedIn(I(0), I(1), haloBox, axesBits));
     }
     {
         IBox haloBox{0, 1, 0, 1, 0, 2};
-        EXPECT_TRUE(containedIn(I(0), I(8), haloBox, 10, 4, 2));
+        EXPECT_TRUE(containedIn(I(0), I(8), haloBox, axesBits));
     }
     {
         IBox haloBox{0, 1, 0, 2, 0, 2};
-        EXPECT_FALSE(containedIn(I(0), I(3), haloBox, 10, 4, 2));
+        EXPECT_FALSE(containedIn(I(0), I(3), haloBox, axesBits));
     }
     {
         IBox haloBox{0, 1, 0, 2, 0, 2};
-        EXPECT_TRUE(containedIn(I(0), I(8), haloBox, 10, 4, 2));
+        EXPECT_TRUE(containedIn(I(0), I(8), haloBox, axesBits));
     }
     {
         IBox haloBox{0, 2, 0, 2, 0, 2};
-        EXPECT_FALSE(containedIn(I(0), I(7), haloBox, 10, 4, 2));
+        EXPECT_FALSE(containedIn(I(0), I(7), haloBox, axesBits));
     }
     {
         IBox haloBox{0, 2, 0, 2, 0, 2};
-        EXPECT_TRUE(containedIn(I(0), I(8), haloBox, 10, 4, 2));
+        EXPECT_TRUE(containedIn(I(0), I(8), haloBox, axesBits));
     }
 
     /// PBC
     {
         IBox haloBox{-1, 1, 0, 1, 0, 1};
-        EXPECT_FALSE(containedIn(I(0), I(1), haloBox, 10, 4, 2));
+        EXPECT_FALSE(containedIn(I(0), I(1), haloBox, axesBits));
     }
 }
 
@@ -351,16 +352,16 @@ TEST(BoxOverlap, minPointDistanceMixD)
 
     {
         Box<T> box(0, 1.0, 0, 0.015625, 0, 0.00390625);
-        const auto mixDBits = getBoxMixDimensionBits<double, KeyType, Box<double>>(box);
+        const auto axesBits = getBoxDimensionBits<double, KeyType, Box<double>>(box);
         const auto expectedMixDBits =
             (std::is_same<KeyType, unsigned>::value) ? AxesBits{10, 4, 2} : AxesBits{21, 15, 13};
-        EXPECT_EQ(mixDBits[0], expectedMixDBits[0]);
-        EXPECT_EQ(mixDBits[1], expectedMixDBits[1]);
-        EXPECT_EQ(mixDBits[2], expectedMixDBits[2]);
+        EXPECT_EQ(axesBits[0], expectedMixDBits[0]);
+        EXPECT_EQ(axesBits[1], expectedMixDBits[1]);
+        EXPECT_EQ(axesBits[2], expectedMixDBits[2]);
 
-        const unsigned mcX = 1u << mixDBits[0];
-        const unsigned mcY = 1u << mixDBits[1];
-        const unsigned mcZ = 1u << mixDBits[2];
+        const unsigned mcX = 1u << axesBits[0];
+        const unsigned mcY = 1u << axesBits[1];
+        const unsigned mcZ = 1u << axesBits[2];
 
         IBox ibox(0, mcX / 2, 0, mcY / 2, 0, mcZ / 2);
 

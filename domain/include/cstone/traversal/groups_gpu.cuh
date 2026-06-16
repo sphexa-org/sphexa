@@ -181,15 +181,15 @@ __global__ void groupSplitsKernel(LocalIndex first,
         leafIdx[k] = stl::upper_bound(layout, layout + numLeaves, bodyIdx[k]) - layout - 1;
     }
 
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType>(box);
-    Box<T> unitBox(0, 1 / (1 << (maxTreeLevel<KeyType>{} - mixDBits[0])), 0,
-                   1 / (1 << (maxTreeLevel<KeyType>{} - mixDBits[1])), 0,
-                   1 / (1 << (maxTreeLevel<KeyType>{} - mixDBits[2])));
+    const auto axesBits = getBoxDimensionBits<T, KeyType>(box);
+    Box<T> unitBox(0, 1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[0])), 0,
+                   1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[1])), 0,
+                   1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[2])));
     T nodeVolume = 1;
     for (LocalIndex k = 0; k < nwt; ++k)
     {
         auto nodeIBox = sfcIBox(sfcKey<KeyType>(leaves[leafIdx[0]]), sfcKey<KeyType>(leaves[leafIdx[0] + 1]),
-                                mixDBits[0], mixDBits[1], mixDBits[2]);
+                                axesBits);
         auto [nodeCenter, nodeSize] = centerAndSize<KeyType>(nodeIBox, unitBox);
         T vol                       = 8 * nodeSize[0] * nodeSize[1] * nodeSize[2];
         nodeVolume                  = vol > 0 ? min(vol, nodeVolume) : nodeVolume;

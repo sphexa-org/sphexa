@@ -26,8 +26,8 @@ namespace cstone
 template<class KeyType, class T, class F>
 HOST_DEVICE_FUN unsigned continuumCount(KeyType nodeStart, KeyType nodeEnd, const Box<T>& box, F&& concentration)
 {
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    IBox nodeBox        = sfcIBox(sfcKey(nodeStart), sfcKey(nodeEnd), mixDBits[0], mixDBits[1], mixDBits[2]);
+    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    IBox nodeBox        = sfcIBox(sfcKey(nodeStart), sfcKey(nodeEnd), axesBits);
     auto [center, size] = centerAndSize<KeyType>(nodeBox, box);
 
     T volume = size[0] * size[1] * size[2];

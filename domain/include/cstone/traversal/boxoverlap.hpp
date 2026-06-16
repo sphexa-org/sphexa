@@ -99,16 +99,16 @@ HOST_DEVICE_FUN inline Vec3<int> boxSeparation(IBox a, IBox b, Vec3<int> pbc)
  */
 template<class KeyType>
 HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
-containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box, unsigned bx, unsigned by, unsigned bz)
+containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box, const AxesBits& axesBits)
 {
     // volume 0 boxes are not possible if makeHaloBox was used to generate it
     assert(box.xmin() < box.xmax());
     assert(box.ymin() < box.ymax());
     assert(box.zmin() < box.zmax());
 
-    const int pbcRangeX = 1 << bx;
-    const int pbcRangeY = 1 << by;
-    const int pbcRangeZ = 1 << bz;
+    const int pbcRangeX = 1 << axesBits[0];
+    const int pbcRangeY = 1 << axesBits[1];
+    const int pbcRangeZ = 1 << axesBits[2];
     if (stl::min(stl::min(box.xmin(), box.ymin()), box.zmin()) < 0 || box.xmax() > pbcRangeX ||
         box.ymax() > pbcRangeY || box.zmax() > pbcRangeZ)
     {
@@ -117,8 +117,8 @@ containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box, unsigned bx, un
         return codeStart == 0 && codeEnd == nodeRange<KeyType>(0);
     }
 
-    KeyType lowCode  = iSfcKey<SfcKind<KeyType>>(box.xmin(), box.ymin(), box.zmin(), bx, by, bz);
-    KeyType highCode = iSfcKey<SfcKind<KeyType>>(box.xmax() - 1, box.ymax() - 1, box.zmax() - 1, bx, by, bz);
+    KeyType lowCode  = iSfcKey<SfcKind<KeyType>>(box.xmin(), box.ymin(), box.zmin(), axesBits);
+    KeyType highCode = iSfcKey<SfcKind<KeyType>>(box.xmax() - 1, box.ymax() - 1, box.zmax() - 1, axesBits);
     auto envelope    = smallestCommonBox(lowCode, highCode);
 
     return (util::get<0>(envelope) >= codeStart) && (util::get<1>(envelope) <= codeEnd);
@@ -128,8 +128,8 @@ template<class KeyType>
 HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
 containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box)
 {
-    const auto mixDBits = getBoxMixDimensionBits<int, KeyType, IBox>(box);
-    return containedIn(codeStart, codeEnd, box, mixDBits[0], mixDBits[1], mixDBits[2]);
+    const auto axesBits = getBoxDimensionBits<int, KeyType, IBox>(box);
+    return containedIn(codeStart, codeEnd, box, axesBits);
 }
 
 /*! @brief Check whether a coordinate box is fully contained in a SFC key range
@@ -156,12 +156,12 @@ containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Ve
         return codeStart == 0 && codeEnd == nodeRange<KeyType>(0);
     }
 
-    const auto mixDBits = getBoxMixDimensionBits<Tc, KeyType, Box<Tc>>(box);
+    const auto axesBits = getBoxDimensionBits<Tc, KeyType, Box<Tc>>(box);
 
     // increase maximum by a grid-unit to ensure we round up
-    const auto gridUnitX = box.lx() * (Tc(1) / (1u << mixDBits[0]));
-    const auto gridUnitY = box.ly() * (Tc(1) / (1u << mixDBits[1]));
-    const auto gridUnitZ = box.lz() * (Tc(1) / (1u << mixDBits[2]));
+    const auto gridUnitX = box.lx() * (Tc(1) / (1u << axesBits[0]));
+    const auto gridUnitY = box.ly() * (Tc(1) / (1u << axesBits[1]));
+    const auto gridUnitZ = box.lz() * (Tc(1) / (1u << axesBits[2]));
     boxMax += Vec3<Tc>{gridUnitX, gridUnitY, gridUnitZ};
 
     KeyType lowCode  = sfc3D<SfcKind<KeyType>>(boxMin[0], boxMin[1], boxMin[2], box);

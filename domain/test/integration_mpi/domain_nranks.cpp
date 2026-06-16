@@ -39,7 +39,7 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks)
     LocalIndex numParticles = (1000 / nRanks) * nRanks;
     Box<T> box              = domain.box();
 
-    const auto mixDBitsInit = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const auto mixDBitsInit = getBoxDimensionBits<T, KeyType, Box<T>>(box);
     const bool useMixD0 = mixDBitsInit[0] != maxTreeLevel<KeyType>{} || mixDBitsInit[1] != maxTreeLevel<KeyType>{} ||
                           mixDBitsInit[2] != maxTreeLevel<KeyType>{};
 
@@ -68,9 +68,9 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks)
         // box got updated if not using PBC
         box = domain.box();
         std::vector<KeyType> keysRef(x.size());
-        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-        const bool useMixD  = mixDBits[0] != maxTreeLevel<KeyType>{} || mixDBits[1] != maxTreeLevel<KeyType>{} ||
-                             mixDBits[2] != maxTreeLevel<KeyType>{};
+        const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+        const bool useMixD  = axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
+                             axesBits[2] != maxTreeLevel<KeyType>{};
         EXPECT_EQ(useMixD0, useMixD);
         computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysRef.data()), x.size(), box);
 
@@ -224,9 +224,9 @@ void testAssignmentShift(const Box<double>& box)
     unsigned bucketSizeFocus       = 8;
     float theta                    = 0.5;
 
-    const auto mixDBits = getBoxMixDimensionBits<Real, KeyType, Box<Real>>(box);
-    const bool useMixD  = (mixDBits[0] != maxTreeLevel<KeyType>{} || mixDBits[1] != maxTreeLevel<KeyType>{} ||
-                          mixDBits[2] != maxTreeLevel<KeyType>{});
+    const auto axesBits = getBoxDimensionBits<Real, KeyType, Box<Real>>(box);
+    const bool useMixD  = (axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
+                          axesBits[2] != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, static_cast<std::size_t>(rank)};
 
@@ -284,9 +284,9 @@ void removeParticle(const Box<double>& box)
     unsigned bucketSizeFocus       = 8;
     float theta                    = 0.5;
 
-    const auto mixDBits = getBoxMixDimensionBits<Real, KeyType, Box<Real>>(box);
-    const bool useMixD  = (mixDBits[0] != maxTreeLevel<KeyType>{} || mixDBits[1] != maxTreeLevel<KeyType>{} ||
-                          mixDBits[2] != maxTreeLevel<KeyType>{});
+    const auto axesBits = getBoxDimensionBits<Real, KeyType, Box<Real>>(box);
+    const bool useMixD  = (axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
+                          axesBits[2] != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, static_cast<std::size_t>(rank)};
 
@@ -348,9 +348,9 @@ void testReapplySync(const Box<double>& box)
     float theta                    = 0.5;
 
     // Note: rank used as seed, so each rank will get different coordinates
-    const auto mixDBits = getBoxMixDimensionBits<Real, KeyType, Box<Real>>(box);
-    const bool useMixD  = (mixDBits[0] != maxTreeLevel<KeyType>{} || mixDBits[1] != maxTreeLevel<KeyType>{} ||
-                          mixDBits[2] != maxTreeLevel<KeyType>{});
+    const auto axesBits = getBoxDimensionBits<Real, KeyType, Box<Real>>(box);
+    const bool useMixD  = (axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
+                          axesBits[2] != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, static_cast<std::size_t>(rank)};
 
@@ -507,13 +507,12 @@ void randomGaussianGrav(int thisRank, int numRanks)
         spanSfcRange(focusStart, focusEnd, spanningKeys.data());
         spanningKeys.back() = focusEnd;
 
-        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(domain.box());
+        const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(domain.box());
 
         std::vector<uint8_t> marks(let_full.numNodes, 0);
         for (std::size_t i = 0; i < nNodes(spanningKeys); ++i)
         {
-            IBox target =
-                sfcIBox(sfcKey(spanningKeys[i]), sfcKey(spanningKeys[i + 1]), mixDBits[0], mixDBits[1], mixDBits[2]);
+            IBox target                     = sfcIBox(sfcKey(spanningKeys[i]), sfcKey(spanningKeys[i + 1]), axesBits);
             auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
             unsigned maxLevel               = maxTreeLevel<KeyType>{};
 

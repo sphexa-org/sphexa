@@ -127,7 +127,7 @@ struct IsHilbert : std::bool_constant<std::is_same_v<KeyType, HilbertKey<typenam
 //! @brief Key encode overload for Morton keys
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsMorton<KeyType>{}, KeyType>
-iSfcKey(unsigned ix, unsigned iy, unsigned iz, unsigned, unsigned, unsigned)
+iSfcKey(unsigned ix, unsigned iy, unsigned iz, const AxesBits&)
 {
     return KeyType{iMorton<typename KeyType::ValueType>(ix, iy, iz)};
 }
@@ -135,18 +135,17 @@ iSfcKey(unsigned ix, unsigned iy, unsigned iz, unsigned, unsigned, unsigned)
 //! @brief Key encode overload for Mixed Hilbert keys
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsHilbert<KeyType>{}, KeyType>
-iSfcKey(unsigned ix, unsigned iy, unsigned iz, unsigned bx, unsigned by, unsigned bz)
+iSfcKey(unsigned ix, unsigned iy, unsigned iz, const AxesBits& axesBits)
 {
-    return KeyType{iHilbert<typename KeyType::ValueType>(ix, iy, iz, bx, by, bz)};
+    return KeyType{iHilbert<typename KeyType::ValueType>(ix, iy, iz, axesBits[0], axesBits[1], axesBits[2])};
 }
 
 template<class KeyType, class T>
-HOST_DEVICE_FUN inline KeyType
-sfc3D(T x, T y, T z, T xmin, T ymin, T zmin, T mx, T my, T mz, unsigned bx, unsigned by, unsigned bz)
+HOST_DEVICE_FUN inline KeyType sfc3D(T x, T y, T z, T xmin, T ymin, T zmin, T mx, T my, T mz, const AxesBits& axesBits)
 {
-    const int mcoord_x = (1u << bx) - 1;
-    const int mcoord_y = (1u << by) - 1;
-    const int mcoord_z = (1u << bz) - 1;
+    const int mcoord_x = (1u << axesBits[0]) - 1;
+    const int mcoord_y = (1u << axesBits[1]) - 1;
+    const int mcoord_z = (1u << axesBits[2]) - 1;
 
     int ix = std::floor(x * mx) - xmin * mx;
     int iy = std::floor(y * my) - ymin * my;
@@ -160,7 +159,7 @@ sfc3D(T x, T y, T z, T xmin, T ymin, T zmin, T mx, T my, T mz, unsigned bx, unsi
     assert(iy >= 0);
     assert(iz >= 0);
 
-    return iSfcKey<KeyType>(ix, iy, iz, bx, by, bz);
+    return iSfcKey<KeyType>(ix, iy, iz, axesBits);
 }
 
 /*! @brief Calculates a Hilbert key for a 3D point within the specified box
@@ -176,23 +175,23 @@ sfc3D(T x, T y, T z, T xmin, T ymin, T zmin, T mx, T my, T mz, unsigned bx, unsi
 template<class KeyType, class T>
 HOST_DEVICE_FUN inline KeyType sfc3D(T x, T y, T z, const Box<T>& box)
 {
-    const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
 
-    assert(mixDBits[0] <= maxTreeLevel<typename KeyType::ValueType>{});
-    assert(mixDBits[1] <= maxTreeLevel<typename KeyType::ValueType>{});
-    assert(mixDBits[2] <= maxTreeLevel<typename KeyType::ValueType>{});
-    const unsigned cubeLength_x = (1u << mixDBits[0]);
-    const unsigned cubeLength_y = (1u << mixDBits[1]);
-    const unsigned cubeLength_z = (1u << mixDBits[2]);
+    assert(axesBits[0] <= maxTreeLevel<typename KeyType::ValueType>{});
+    assert(axesBits[1] <= maxTreeLevel<typename KeyType::ValueType>{});
+    assert(axesBits[2] <= maxTreeLevel<typename KeyType::ValueType>{});
+    const unsigned cubeLength_x = (1u << axesBits[0]);
+    const unsigned cubeLength_y = (1u << axesBits[1]);
+    const unsigned cubeLength_z = (1u << axesBits[2]);
 
     return sfc3D<KeyType>(x, y, z, box.xmin(), box.ymin(), box.zmin(), cubeLength_x * box.ilx(),
-                          cubeLength_y * box.ily(), cubeLength_z * box.ilz(), mixDBits[0], mixDBits[1], mixDBits[2]);
+                          cubeLength_y * box.ily(), cubeLength_z * box.ilz(), axesBits);
 }
 
 //! @brief decode a Morton key
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsMorton<KeyType>{}, util::tuple<unsigned, unsigned, unsigned>>
-decodeSfc(KeyType key, unsigned, unsigned, unsigned)
+decodeSfc(KeyType key, const AxesBits&)
 {
     return decodeMorton<typename KeyType::ValueType>(key);
 }
@@ -200,9 +199,9 @@ decodeSfc(KeyType key, unsigned, unsigned, unsigned)
 //! @brief decode a Hilbert key
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsHilbert<KeyType>{}, util::tuple<unsigned, unsigned, unsigned>>
-decodeSfc(KeyType key, unsigned bx, unsigned by, unsigned bz)
+decodeSfc(KeyType key, const AxesBits& axesBits)
 {
-    return decodeHilbert<typename KeyType::ValueType>(key, bx, by, bz);
+    return decodeHilbert<typename KeyType::ValueType>(key, axesBits[0], axesBits[1], axesBits[2]);
 }
 
 //! @brief create and integer box from Morton keys
@@ -214,16 +213,17 @@ HOST_DEVICE_FUN inline std::enable_if_t<IsMorton<KeyType>{}, IBox> sfcIBox(KeyTy
 
 template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsHilbert<KeyType>{}, IBox>
-sfcIBox(KeyType keyStart, unsigned level, unsigned bx, unsigned by, unsigned bz) noexcept
+sfcIBox(KeyType keyStart, unsigned level, const AxesBits& axesBits) noexcept
 {
-    return hilbertIBox<typename KeyType::ValueType>(keyStart, maxTreeLevel<KeyType>{} - level, bx, by, bz);
+    return hilbertIBox<typename KeyType::ValueType>(keyStart, maxTreeLevel<KeyType>{} - level, axesBits[0], axesBits[1],
+                                                    axesBits[2]);
 }
 
 //! @brief convenience overload
 template<class KeyType>
-HOST_DEVICE_FUN inline IBox sfcIBox(KeyType keyStart, KeyType keyEnd, unsigned bx, unsigned by, unsigned bz) noexcept
+HOST_DEVICE_FUN inline IBox sfcIBox(KeyType keyStart, KeyType keyEnd, const AxesBits& axesBits) noexcept
 {
-    return sfcIBox(keyStart, treeLevel(keyEnd - keyStart), bx, by, bz);
+    return sfcIBox(keyStart, treeLevel(keyEnd - keyStart), axesBits);
 }
 
 //! @brief Compute the smallest octree node in placeholder-bit format that contains the given floating point box
@@ -260,7 +260,8 @@ HOST_DEVICE_FUN inline KeyType sfcNeighbor(const IBox& ibox, unsigned level, int
     int y = pbcAdjust<pbcRange>(ibox.ymin() + dy * shiftValue);
     int z = pbcAdjust<pbcRange>(ibox.zmin() + dz * shiftValue);
 
-    KeyType key = iSfcKey<KeyType>(x, y, z, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{});
+    const AxesBits axesBits{maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}};
+    KeyType key = iSfcKey<KeyType>(x, y, z, axesBits);
 
     return KeyType(enclosingBoxCode(key, level));
 }

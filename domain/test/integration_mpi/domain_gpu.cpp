@@ -62,7 +62,7 @@ void randomGaussianAssignment(int rank, int numRanks, Box<T> box)
     DeviceVector<T> d_m           = m;
     DeviceVector<uint8_t> d_rungs = rungs;
 
-    const auto originalBoxMixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
+    const auto originalBoxMixDBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
     const auto isOriginalBoxMixD =
         (originalBoxMixDBits[0] != maxTreeLevel<KeyType>{} || originalBoxMixDBits[1] != maxTreeLevel<KeyType>{} ||
          originalBoxMixDBits[2] != maxTreeLevel<KeyType>{});
@@ -72,7 +72,7 @@ void randomGaussianAssignment(int rank, int numRanks, Box<T> box)
     domainCpu.sync(keys, x, y, z, h, std::tie(m, rungs), std::tie(hs1, hs2, hs3));
 
     // Make sure that small box shrinking doesn't change the MixD bits compared to the original box
-    const auto cpuDomainBoxMixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(domainCpu.box());
+    const auto cpuDomainBoxMixDBits = getBoxDimensionBits<T, KeyType, Box<T>>(domainCpu.box());
     const auto isCpuDomainBoxMixD =
         (cpuDomainBoxMixDBits[0] != maxTreeLevel<KeyType>{} || cpuDomainBoxMixDBits[1] != maxTreeLevel<KeyType>{} ||
          cpuDomainBoxMixDBits[2] != maxTreeLevel<KeyType>{});
@@ -83,7 +83,7 @@ void randomGaussianAssignment(int rank, int numRanks, Box<T> box)
     domainGpu.sync(d_keys, d_x, d_y, d_z, d_h, std::tie(d_m, d_rungs), std::tie(s1, s2, s3));
 
     // Make sure that small box shrinking doesn't change the MixD bits compared to the original box on GPU as well
-    const auto gpuDomainBoxMixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(domainGpu.box());
+    const auto gpuDomainBoxMixDBits = getBoxDimensionBits<T, KeyType, Box<T>>(domainGpu.box());
     const auto isGpuDomainBoxMixD =
         (gpuDomainBoxMixDBits[0] != maxTreeLevel<KeyType>{} || gpuDomainBoxMixDBits[1] != maxTreeLevel<KeyType>{} ||
          gpuDomainBoxMixDBits[2] != maxTreeLevel<KeyType>{});
