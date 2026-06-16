@@ -1,0 +1,38 @@
+- 
+  action: "add_pipelines"
+  pipelines: 
+    pl_threshold_kx: 
+      f1: 
+        type: "threshold"
+        params: 
+          field: "kx"
+          min_value: 1.01
+          max_value: 10000
+- 
+  action: "add_scenes"
+  scenes: 
+    s1: 
+      plots: 
+        p1: 
+          type: "pseudocolor"
+          field: "kx"
+          pipeline: "pl_threshold_kx"
+          #min_value: 1.
+          #max_value: 1.
+          color_table: 
+            name: "Yellow - Gray - Blue"
+            annotation: "true"
+          points: 
+            radius: 0.002
+      renders:
+        r1:
+          image_prefix: "datasets/kx.%05d"
+          image_width: 2048
+          image_height: 2048
+          camera:
+            look_at: [0.133, -0.095, -0.1739]
+            position: [-1.718, 1.22, 2.236]
+            up: [0.25733648452829405, 0.9174809855134223, -0.303325856055725]
+            zoom: 2
+          dataset_bounds: [-0.5, 0.5, -0.5, 0.5, -0.5, 0.5]
+          color_bar_position: [0.2, 0.9, -0.9, -0.75]
