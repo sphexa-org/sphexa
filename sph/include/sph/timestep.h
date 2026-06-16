@@ -23,7 +23,7 @@ struct Timestep
     int   substep{0};
 
     std::array<cstone::LocalIndex, maxNumRungs + 1> rungRanges;
-    util::array<float, maxNumRungs>                 dt_m1, dt_drift;
+    util::array<float, maxNumRungs>                 dt_m1 = {}, dt_drift = {};
 
     template<class Archive>
     void loadOrStore(Archive* ar, const std::string& prefix)

@@ -169,7 +169,8 @@ struct CombinedUpdate
 
         if (status == ResolutionStatus::cancelMerge)
         {
-            converged = countGpu(nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1) == tree.numLeafNodes;
+            converged =
+                countGpu(nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1) == std::size_t(tree.numLeafNodes);
         }
         else if (status == ResolutionStatus::rebalance) { converged = false; }
 

@@ -92,6 +92,26 @@ std::unique_ptr<ISimInitializer<Dataset>> initializerFactory(std::string testCas
         if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block for evrard-cooling\n"); }
         return SimInitializers<Dataset>::makeEvrardCooling(glassBlock, settingsFile, reader);
     }
+    if (testNamedBase == "polytrope")
+    {
+        if (glassBlock.empty()) { throw std::runtime_error("need a valid glass block to create polytrope\n"); }
+        else { return SimInitializers<Dataset>::makePolytrope(glassBlock, settingsFile, reader); }
+    }
+    if (testCase.starts_with("tde-orbit"))
+    {
+        // use as: --init tde-orbit:file.h5:2 to read from step 2 of file.h5
+        const std::string filePathAndStep = strAfterSign(testCase, ":");
+        const std::string filePath        = strBeforeSign(filePathAndStep, ":");
+        const int         step            = numberAfterSign(filePathAndStep, ":");
+        std::printf("%s\n", testCase.c_str());
+        std::printf("%s\n", filePath.c_str());
+        std::printf("step: %d\n", step);
+        if (std::filesystem::exists(filePath))
+        {
+            return SimInitializers<Dataset>::makeTDEOrbitInit(filePath, step, reader);
+        }
+    }
+
     if (std::filesystem::exists(strBeforeSign(testCase, ":")))
     {
         return SimInitializers<Dataset>::makeFile(strBeforeSign(testCase, ":"), numberAfterSign(testCase, ":"), reader);

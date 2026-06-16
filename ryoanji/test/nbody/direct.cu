@@ -54,7 +54,7 @@ TEST(DirectSum, MatchCpu)
     directSum(x.data(), y.data(), z.data(), h.data(), m.data(), numBodies, G, box, numShells, refAx.data(),
               refAy.data(), refAz.data(), refP.data());
 
-    for (int i = 0; i < numBodies; ++i)
+    for (std::size_t i = 0; i < numBodies; ++i)
     {
         EXPECT_NEAR(h_ax[i], refAx[i], 1e-6);
         EXPECT_NEAR(h_ay[i], refAy[i], 1e-6);

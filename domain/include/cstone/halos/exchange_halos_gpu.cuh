@@ -37,6 +37,7 @@ void haloExchangeGpu(int epoch,
                      const SendList& outgoingHalos,
                      DevVec1& sendScratchBuffer,
                      DevVec2& receiveScratchBuffer,
+                     MPI_Comm comm,
                      Arrays... arrays)
 {
     using TransferType          = uint64_t;
@@ -75,7 +76,8 @@ void haloExchangeGpu(int epoch,
         checkGpuErrors(cudaDeviceSynchronize());
 
         size_t numElementsSend = util::computeByteOffsets(sendCount, alignment, arrays...).back() / alignment;
-        mpiSendGpuDirect(sendPtr, numElementsSend, int(destinationRank), haloExchangeTag, sendRequests, sendBuffers);
+        mpiSendGpuDirect(sendPtr, numElementsSend, int(destinationRank), haloExchangeTag, sendRequests, sendBuffers,
+                         comm);
         sendPtr += numElementsSend;
     }
 
@@ -94,7 +96,7 @@ void haloExchangeGpu(int epoch,
     while (numMessages--)
     {
         MPI_Status status;
-        mpiRecvGpuDirect(receiveBuffer, maxReceiveBytes / alignment, MPI_ANY_SOURCE, haloExchangeTag, &status);
+        mpiRecvGpuDirect(receiveBuffer, maxReceiveBytes / alignment, MPI_ANY_SOURCE, haloExchangeTag, &status, comm);
         int receiveRank         = status.MPI_SOURCE;
         const auto& inHalos     = incomingHalos[receiveRank];
         LocalIndex receiveCount = inHalos.count();
@@ -106,11 +108,7 @@ void haloExchangeGpu(int epoch,
         checkGpuErrors(cudaDeviceSynchronize());
     }
 
-    if (not sendRequests.empty())
-    {
-        MPI_Status status[sendRequests.size()];
-        MPI_Waitall(int(sendRequests.size()), sendRequests.data(), status);
-    }
+    if (not sendRequests.empty()) { MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUSES_IGNORE); }
 
     checkGpuErrors(cudaFree(d_range));
     reallocate(sendScratchBuffer, oldSendSize, 1.0);

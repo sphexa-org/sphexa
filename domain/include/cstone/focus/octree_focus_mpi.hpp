@@ -60,10 +60,11 @@ public:
      * @param numRanks      number of ranks
      * @param bucketSize    Maximum number of particles per leaf inside the focus area
      */
-    FocusedOctree(int myRank, int numRanks, unsigned bucketSize)
+    FocusedOctree(int myRank, int numRanks, unsigned bucketSize, MPI_Comm comm)
         : myRank_(myRank)
         , numRanks_(numRanks)
         , bucketSize_(bucketSize)
+        , comm_(comm)
         , treelets_(numRanks_)
         , macsAcc_(1, 1)
         , centersAcc_(1)
@@ -137,7 +138,7 @@ public:
 
         translateAssignment<KeyType>(assignment, leaves_, assignment_);
         auto extPeers = focusPeersAcc<useGpu, KeyType>(globDispl_, assignment_, myRank_, globalLeaves, leaves_);
-        auto intPeers = exchangePeers(extPeers, MPI_COMM_WORLD);
+        auto intPeers = exchangePeers(extPeers, comm_);
         peerFlagsToList(extPeers, exteriorPeers_, PeerMask::focus);
         peerFlagsToList(intPeers, interiorPeers_, PeerMask::focus);
         extractPeerRanges(exteriorPeers_, myRank_, assignment_, peerRanges_);
@@ -145,12 +146,12 @@ public:
         if constexpr (HaveGpu<Accelerator>{})
         {
             syncTreeletsGpu<KeyType>(exteriorPeers_, interiorPeers_, assignment_, leaves_, octreeAcc_, leavesAcc_,
-                                     treelets_, scratch);
+                                     treelets_, scratch, comm_);
             downloadOctree();
         }
         else
         {
-            syncTreelets(exteriorPeers_, interiorPeers_, assignment_, octreeAcc_, leaves_, treelets_);
+            syncTreelets(exteriorPeers_, interiorPeers_, assignment_, octreeAcc_, leaves_, treelets_, comm_);
             hostPrefixes_ = octreeAcc_.prefixes;
         }
 
@@ -254,7 +255,7 @@ public:
     void peerExchange(std::span<T> q, int tag, DevVec& s) const
     {
         exchangeTreeletGeneral<T>(interiorPeers_, exteriorPeers_, treeletIdxAcc_.view(), assignment_,
-                                  leafToInternal(octreeAcc_), q, tag, s);
+                                  leafToInternal(octreeAcc_), q, tag, s, comm_);
     }
 
     /*! @brief transfer quantities of leaf cells inside the focus into a global array
@@ -331,7 +332,7 @@ public:
         {
             gather<TreeNodeIndex>(idxFromGlob, toInternal, idxFromGlob.data());
 #pragma omp parallel for schedule(static)
-            for (TreeNodeIndex i = 0; i < idxFromGlob.size(); ++i)
+            for (std::size_t i = 0; i < idxFromGlob.size(); ++i)
             {
                 letToGlob[i] = locateNode(octreeAcc_.prefixes[idxFromGlob[i]], globalNodeKeys, globalLevelRange);
             }
@@ -345,7 +346,7 @@ public:
     {
         if constexpr (HaveGpu<Accelerator>{}) { syncGpu(); }
         mpiAllgathervGpuDirect<HaveGpu<Accelerator>{}>(gLeafQLoc.data(), globNumNodes_[myRank_], gLeafQAll.data(),
-                                                       globNumNodes_.data(), globDispl_.data(), MPI_COMM_WORLD);
+                                                       globNumNodes_.data(), globDispl_.data(), comm_);
     }
 
     template<class Tm, class DevVec1 = std::vector<LocalIndex>, class DevVec2 = std::vector<LocalIndex>>
@@ -354,8 +355,7 @@ public:
                        const RealType* z,
                        const Tm* m,
                        OctreeView<const KeyType> gOctree,
-                       DevVec1&& scratch1 = std::vector<LocalIndex>{},
-                       DevVec2&& scratch2 = std::vector<LocalIndex>{})
+                       DevVec1&& scratch1 = std::vector<LocalIndex>{})
     {
         assert(gOctree.leaves != nullptr);
         TreeNodeIndex firstIdx           = assignment_[myRank_].start();
@@ -376,7 +376,7 @@ public:
 
         if constexpr (HaveGpu<Accelerator>{})
         {
-            static_assert(IsDeviceVector<std::decay_t<DevVec1>>{} && IsDeviceVector<std::decay_t<DevVec2>>{});
+            static_assert(IsDeviceVector<std::decay_t<DevVec1>>{});
             size_t bytesLayout = (octree.numLeafNodes + 1) * sizeof(LocalIndex);
             size_t osz1        = reallocateBytes(scratch1, bytesLayout, allocGrowthRate_);
             auto* d_layout     = reinterpret_cast<LocalIndex*>(rawPtr(scratch1));
@@ -594,7 +594,7 @@ public:
             converged = updateTree(assignment, globalTreeLeaves, box, scratch);
             updateCounts(particleKeys, globalTreeLeaves, globalCounts, scratch);
             updateGeoCenters();
-            MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+            MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, comm_);
         }
     }
 
@@ -729,6 +729,8 @@ private:
     int numRanks_;
     //! @brief bucket size (ncrit) inside the focus are
     unsigned bucketSize_;
+    //! @brief MPI communicator for all collective and point-to-point operations
+    MPI_Comm comm_;
 
     //! @brief allocation growth rate for focus tree arrays with length ~ numFocusNodes
     float allocGrowthRate_{1.05};

@@ -37,7 +37,7 @@ __global__ void rebalanceDecisionEssentialKernel(const KeyType* prefixes,
                                                  TreeNodeIndex* nodeOps,
                                                  TreeNodeIndex numNodes)
 {
-    unsigned tid = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < numNodes)
     {
         nodeOps[tid] =
@@ -78,7 +78,7 @@ __global__ void macRefineDecisionKernel(const KeyType* prefixes,
                                         int2 focus,
                                         TreeNodeIndex* nodeOps)
 {
-    unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numLeafNodes) { return; }
 
     if (i < focus.x || i >= focus.y) { nodeOps[i] = macRefineOp(prefixes[l2i[i]], macs[l2i[i]]); }
@@ -115,7 +115,7 @@ __global__ void protectAncestorsKernel(const KeyType* prefixes,
 {
     int nodeOp = 1;
 
-    unsigned tid = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < numNodes)
     {
         nodeOp = nzAncestorOp(tid, prefixes, parents, nodeOps);
@@ -128,7 +128,7 @@ __global__ void protectAncestorsKernel(const KeyType* prefixes,
     __shared__ typename BlockReduce::TempStorage temp_storage;
 
     BlockReduce reduce(temp_storage);
-    int blockMin = reduce.Reduce(int(nodeOp != 1), cub::Sum());
+    int blockMin = reduce.Sum(int(nodeOp != 1));
     __syncthreads();
 
     if (threadIdx.x == 0) { atomicAdd(&nodeOpSum, blockMin); }
@@ -204,7 +204,7 @@ __global__ void rangeCountKernel(const KeyType* leaves,
                                  TreeNodeIndex leavesFocusIdxSize,
                                  unsigned* countsFocus)
 {
-    unsigned i = blockIdx.x * blockDim.x + threadIdx.x;
+    TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= leavesFocusIdxSize) { return; }
 
     TreeNodeIndex leafIdx = leavesFocusIdx[i];

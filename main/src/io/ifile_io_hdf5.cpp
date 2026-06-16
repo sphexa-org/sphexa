@@ -61,7 +61,7 @@ public:
         MPI_Comm_size(comm, &numRanks_);
     }
 
-    ~H5PartWriter() override { closeStep(); }
+    ~H5PartWriter() override { H5PartWriter::closeStep(); }
 
     [[nodiscard]] int rank() const override { return rank_; }
     [[nodiscard]] int numRanks() const override { return numRanks_; }
@@ -98,8 +98,14 @@ public:
     void stepAttribute(const std::string& key, FieldType val, int64_t size) override
     {
         std::visit(
-            [this, &key, size](auto arg) { //
-                fileutils::H5WriteStepAttribT(h5File_, key.c_str(), arg, size);
+            [this, &key, size](auto argp) { //
+                // if val differs between rank it's a data race, if we only call on rank 0 it hangs
+                // so we explicitly broadcast the value of rank 0 to all ranks
+                using Type = std::decay_t<decltype(*argp)>;
+                std::vector<Type> arg(size);
+                if (size > 0 && rank_ == 0) { std::copy(argp, argp + size, arg.data()); }
+                MPI_Bcast(arg.data(), size, MpiType<Type>{}, 0, comm_);
+                fileutils::H5WriteStepAttribT(h5File_, key.c_str(), arg.data(), size);
             },
             val);
     }
@@ -176,7 +182,7 @@ public:
 
     ~H5PartWriterSeq() override
     {
-        if (rank_ == 0) { closeStep(); }
+        if (rank_ == 0) { H5PartWriter::closeStep(); }
         MPI_Comm_free(&comm_);
     }
 
@@ -208,7 +214,14 @@ public:
 
     void stepAttribute(const std::string& key, FieldType val, int64_t size) override
     {
-        if (rank_ == 0) { Base::stepAttribute(key, val, size); }
+        if (rank_ == 0)
+        {
+            std::visit(
+                [this, &key, size](auto arg) { //
+                    fileutils::H5WriteStepAttribT(h5File_, key.c_str(), arg, size);
+                },
+                val);
+        }
     }
 
     void stepAttribute(const std::string& key, const std::string& val) override
@@ -413,16 +426,16 @@ public:
 private:
     int64_t stepAttributeIndex(const std::string& key)
     {
-        auto    attributes = fileutils::stepAttributeNames(h5File_);
-        int64_t attrIndex  = std::find(attributes.begin(), attributes.end(), key) - attributes.begin();
+        auto        attributes = fileutils::stepAttributeNames(h5File_);
+        std::size_t attrIndex  = std::find(attributes.begin(), attributes.end(), key) - attributes.begin();
         if (attrIndex == attributes.size()) { throw std::out_of_range("Attribute " + key + " does not exist\n"); }
         return attrIndex;
     }
 
     int64_t fileAttributeIndex(const std::string& key)
     {
-        auto    attributes = fileutils::fileAttributeNames(h5File_);
-        int64_t attrIndex  = std::find(attributes.begin(), attributes.end(), key) - attributes.begin();
+        auto        attributes = fileutils::fileAttributeNames(h5File_);
+        std::size_t attrIndex  = std::find(attributes.begin(), attributes.end(), key) - attributes.begin();
         if (attrIndex == attributes.size()) { throw std::out_of_range("Attribute " + key + " does not exist\n"); }
         return attrIndex;
     }

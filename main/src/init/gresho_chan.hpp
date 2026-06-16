@@ -29,9 +29,11 @@
  * @author Lukas Schmidt
  */
 
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/sfc/box.hpp"
 #include "isim_init.hpp"
 #include "grid.hpp"
+#include "utils.hpp"
 #include "sph/eos.hpp"
 
 namespace sphexa
@@ -39,23 +41,18 @@ namespace sphexa
 
 InitSettings GreshoChanSettings()
 {
-    return {{"R1", 0.2},         {"v0", 1.}, {"P0", 5.},     {"gamma", 5. / 3.}, {"mTotal", 1.}, {"minDt", 1e-7},
-            {"minDt_m1", 1e-7},  {"rho", 1}, {"Kcour", 0.2}, {"ng0", 100},       {"ngmax", 150}, {"gravConstant", 0.0},
-            {"gresho-chan", 1.0}};
-}
-
-template<class T>
-double twoDimRadius(T x, T y)
-{
-    return std::sqrt(x * x + y * y);
+    return {{"R1", 0.2}, {"v0", 1.},     {"P0", 5.},   {"gamma", 5. / 3.}, {"minDt", 1e-7},       {"minDt_m1", 1e-7},
+            {"rho", 1},  {"Kcour", 0.2}, {"ng0", 100}, {"ngmax", 150},     {"gravConstant", 0.0}, {"gresho-chan", 1.0}};
 }
 
 template<class Dataset, class T>
 void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& settings, T mPart)
 {
-    double ng0 = settings.at("ng0");
-    double rho = settings.at("rho");
-    // double mPart         = settings.at("mTotal") / d.numParticlesGlobal;
+    constexpr bool gpu   = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
+    using HydroType      = Dataset::HydroType;
+    using RealType       = Dataset::RealType;
+    double ng0           = settings.at("ng0");
+    double rho           = settings.at("rho");
     double hInit         = 0.5 * std::cbrt(3. * ng0 * mPart / 4. / M_PI / rho);
     double firstTimeStep = settings.at("minDt");
 
@@ -68,23 +65,23 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     double v0 = settings.at("v0");
     double P0 = settings.at("P0");
 
-    std::fill(d.m.begin(), d.m.end(), mPart);
-    std::fill(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    std::fill(d.h.begin(), d.h.end(), hInit);
-    std::fill(d.mui.begin(), d.mui.end(), d.muiConst);
-    std::fill(d.alpha.begin(), d.alpha.end(), d.alphamin);
+    initFieldsAtRest(d, mPart);
+    cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
 
-    std::fill(d.z_m1.begin(), d.z_m1.end(), 0.0);
+    auto&& x = toHost(d.x);
+    auto&& y = toHost(d.y);
 
-    generateParticleIDs(d.id);
+    cstone::LocalIndex     numPartLoc = d.x.size();
+    std::vector<RealType>  u(numPartLoc);
+    std::vector<HydroType> vx(numPartLoc), vy(numPartLoc);
 
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); ++i)
     {
         T vi, pi;
-        T xi    = d.x[i];
-        T yi    = d.y[i];
-        T psi   = twoDimRadius(xi, yi) / R1;
+        T xi    = x[i];
+        T yi    = y[i];
+        T psi   = std::sqrt(norm2(util::array<T, 2>{xi, yi})) / R1;
         T theta = std::atan2(yi, xi);
 
         if (psi <= 1.)
@@ -103,15 +100,20 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
             vi = 0.0;
         }
 
-        auto ui = pi / ((d.gamma - 1.) * rho);
-        if (d.u.empty()) { d.temp[i] = ui / cv; }
-        else { d.u[i] = ui; }
-        d.vx[i] = -1.0 * vi * std::sin(theta);
-        d.vy[i] = vi * std::cos(theta);
-        d.vz[i] = 0.0;
+        u[i]  = pi / ((d.gamma - 1.) * rho);
+        vx[i] = -1.0 * vi * std::sin(theta);
+        vy[i] = vi * std::cos(theta);
+    }
+    d.vx = std::move(vx);
+    d.vy = std::move(vy);
+    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), firstTimeStep);
+    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), firstTimeStep);
 
-        d.x_m1[i] = d.vx[i] * firstTimeStep;
-        d.y_m1[i] = d.vy[i] * firstTimeStep;
+    if (d.temp.empty()) { d.u = std::move(u); }
+    else
+    {
+        std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; }); // convert to temperature
+        d.temp = std::move(u);
     }
 }
 
@@ -151,7 +153,11 @@ public:
         KeyType  keyStart          = initialBoundaries[rank];
         KeyType  keyEnd            = initialBoundaries[rank + 1];
 
-        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, d.x, d.y, d.z);
+        std::vector<T> x, y, z;
+        assembleCuboid<T>(keyStart, keyEnd, globalBox, multiplicity, xBlock, yBlock, zBlock, x, y, z);
+        d.x = x; // uploads to GPU if active
+        d.y = y;
+        d.z = z;
         d.resize(d.x.size());
 
         settings_["numParticlesGlobal"] = double(numParticlesGlobal);

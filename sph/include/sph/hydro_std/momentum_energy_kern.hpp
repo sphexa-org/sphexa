@@ -1,7 +1,8 @@
 #pragma once
 
-#include "cstone/cuda/annotation.hpp"
-#include "cstone/sfc/box.hpp"
+#include <type_traits>
+
+#include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/kernels.hpp"
 #include "sph/table_lookup.hpp"
@@ -9,62 +10,35 @@
 namespace sph
 {
 
-template<size_t stride = 1, class Tc, class Tm, class T, class Tm1>
-HOST_DEVICE_FUN inline void
-momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
-                       unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy,
-                       const T* vz, const T* h, const Tm* m, const T* rho, const T* p, const T* c, const T* c11,
-                       const T* c12, const T* c13, const T* c22, const T* c23, const T* c33, const T* wh,
-                       const T* /*whd*/, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, T* maxvsignal)
+template<class T, class Tm1>
+struct MomentumAndEnergyInteractionStd
 {
-    constexpr T gradh_i = 1.0;
-    constexpr T gradh_j = 1.0;
+    const T* wh;
 
-    auto xi  = x[i];
-    auto yi  = y[i];
-    auto zi  = z[i];
-    auto vxi = vx[i];
-    auto vyi = vy[i];
-    auto vzi = vz[i];
-
-    auto hi  = h[i];
-    auto roi = rho[i];
-    auto pri = p[i];
-    auto ci  = c[i];
-
-    auto mi_roi = m[i] / rho[i];
-
-    T hiInv  = T(1) / hi;
-    T hiInv3 = hiInv * hiInv * hiInv;
-
-    T maxvsignali = 0.0;
-    T momentum_x = 0.0, momentum_y = 0.0, momentum_z = 0.0, energy = 0.0;
-
-    auto c11i = c11[i];
-    auto c12i = c12[i];
-    auto c13i = c13[i];
-    auto c22i = c22[i];
-    auto c23i = c23[i];
-    auto c33i = c33[i];
-
-    for (unsigned pj = 0; pj < neighborsCount; ++pj)
+    template<class ParticleData, class Tc>
+    constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
+                              T r2) const
     {
-        cstone::LocalIndex j = neighbors[stride * pj];
+        constexpr T gradh_i = 1.0;
+        constexpr T gradh_j = 1.0;
 
-        T rx = xi - x[j];
-        T ry = yi - y[j];
-        T rz = zi - z[j];
+        const auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
+        const auto [j, jPos, hj, mj, roj, ncj, vxj, vyj, vzj, prj, cj, c11j, c12j, c13j, c22j, c23j, c33j] = jData;
 
-        applyPBC(box, T(2) * hi, rx, ry, rz);
+        T rx = r_ij[0];
+        T ry = r_ij[1];
+        T rz = r_ij[2];
 
-        T r2   = rx * rx + ry * ry + rz * rz;
+        T    hiInv  = T(1) / hi;
+        T    hiInv3 = hiInv * hiInv * hiInv;
+        auto mi_roi = mi / roi;
+
         T dist = std::sqrt(r2);
 
-        T vx_ij = vxi - vx[j];
-        T vy_ij = vyi - vy[j];
-        T vz_ij = vzi - vz[j];
+        T vx_ij = vxi - vxj;
+        T vy_ij = vyi - vyj;
+        T vz_ij = vzi - vzj;
 
-        T hj    = h[j];
         T hjInv = T(1) / hj;
 
         T v1 = dist * hiInv;
@@ -80,57 +54,104 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
         T termA2_i = c12i * rx + c22i * ry + c23i * rz;
         T termA3_i = c13i * rx + c23i * ry + c33i * rz;
 
-        auto c11j = c11[j];
-        auto c12j = c12[j];
-        auto c13j = c13[j];
-        auto c22j = c22[j];
-        auto c23j = c23[j];
-        auto c33j = c33[j];
-
         T termA1_j = c11j * rx + c12j * ry + c13j * rz;
         T termA2_j = c12j * rx + c22j * ry + c23j * rz;
         T termA3_j = c13j * rx + c23j * ry + c33j * rz;
 
-        auto roj = rho[j];
-        auto cj  = c[j];
-
-        T           wij          = rv / dist;
+        T           wij          = i == j ? 0 : rv / dist;
         constexpr T av_alpha     = T(1);
         T           viscosity_ij = T(0.5) * artificial_viscosity(av_alpha, av_alpha, ci, cj, wij);
 
         // For time-step calculations
-        T vijsignal = ci + cj - T(3) * wij;
-        maxvsignali = (vijsignal > maxvsignali) ? vijsignal : maxvsignali;
+        T vijsignal = i == j ? 0 : ci + cj - T(3) * wij;
 
-        auto mj        = m[j];
         auto mj_roj_Wj = mj / roj * Wj;
 
         T mj_pro_i = mj * pri / (gradh_i * roi * roi);
 
+        T momentum_x, momentum_y, momentum_z;
         {
             T a = Wi * (mj_pro_i + viscosity_ij * mi_roi);
-            T b = mj_roj_Wj * (p[j] / (roj * gradh_j) + viscosity_ij);
+            T b = mj_roj_Wj * (prj / (roj * gradh_j) + viscosity_ij);
 
-            momentum_x += a * termA1_i + b * termA1_j;
-            momentum_y += a * termA2_i + b * termA2_j;
-            momentum_z += a * termA3_i + b * termA3_j;
+            momentum_x = a * termA1_i + b * termA1_j;
+            momentum_y = a * termA2_i + b * termA2_j;
+            momentum_z = a * termA3_i + b * termA3_j;
         }
+        Tm1 energy;
         {
             T a = Wi * (T(2) * mj_pro_i + viscosity_ij * mi_roi);
             T b = viscosity_ij * mj_roj_Wj;
 
-            energy += vx_ij * (a * termA1_i + b * termA1_j) + vy_ij * (a * termA2_i + b * termA2_j) +
-                      vz_ij * (a * termA3_i + b * termA3_j);
+            energy = vx_ij * (a * termA1_i + b * termA1_j) + vy_ij * (a * termA2_i + b * termA2_j) +
+                     vz_ij * (a * termA3_i + b * termA3_j);
         }
+        return std::make_tuple(energy, momentum_x, momentum_y, momentum_z,
+                               cstone::ijloop::symmetric::even(cstone::ijloop::reduction::max(vijsignal)));
+    }
+};
+
+template<class Tc, class Tm1>
+struct MomentumAndEnergyPostambleStd
+{
+    Tc K;
+
+    template<class ParticleData, class Result>
+    constexpr auto operator()(const ParticleData& iData, const Result& result) const
+    {
+        const auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
+        auto [energy, momentum_x, momentum_y, momentum_z, maxvsignal]                                      = result;
+
+        if (nci <= 1)
+        {
+            energy     = 0;
+            momentum_x = 0;
+            momentum_y = 0;
+            momentum_z = 0;
+            maxvsignal = 0;
+        }
+
+        // with the choice of calculating coordinate (r) and velocity (v_ij) differences as i - j,
+        // we add the negative sign only here at the end instead of to termA123_ij in each interaction
+        using T = std::remove_cvref_t<decltype(momentum_x)>;
+        return std::make_tuple(Tm1(-K * Tm1(0.5) * energy), T(K * momentum_x), T(K * momentum_y), T(K * momentum_z),
+                               maxvsignal);
+    }
+};
+
+template<class Tc, class Tm1>
+struct MomentumAndEnergyPostambleStdWithDt : MomentumAndEnergyPostambleStd<Tc, Tm1>
+{
+    Tc Kcour;
+
+    MomentumAndEnergyPostambleStdWithDt(Tc K, Tc Kcour)
+        : MomentumAndEnergyPostambleStd<Tc, Tm1>{K}
+        , Kcour(Kcour)
+    {
     }
 
-    // with the choice of calculating coordinate (r) and velocity (v_ij) differences as i - j,
-    // we add the negative sign only here at the end instead of to termA123_ij in each iteration
-    du[i]       = -K * Tm1(0.5) * energy;
-    grad_P_x[i] = K * momentum_x;
-    grad_P_y[i] = K * momentum_y;
-    grad_P_z[i] = K * momentum_z;
-    *maxvsignal = maxvsignali;
+    template<class ParticleData, class Result>
+    constexpr auto operator()(const ParticleData& iData, const Result& result) const
+    {
+        const auto [du, grad_P_x, grad_P_y, grad_P_z, maxvsignal] =
+            MomentumAndEnergyPostambleStd<Tc, Tm1>::operator()(iData, result);
+        const auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
+
+        auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
+        return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
+    }
+};
+
+template<class Neighborhood, class Tc, class T, class Tm, class Tm1>
+void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, const Tm* m, const T* rho,
+                             const unsigned* nc, const T* vx, const T* vy, const T* vz, const T* p, const T* c,
+                             const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
+                             const T* wh, Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z, T* dt)
+{
+    neighborhood.ijLoop(std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
+                        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt),
+                        MomentumAndEnergyInteractionStd<T, Tm1>{wh},
+                        MomentumAndEnergyPostambleStdWithDt<Tc, Tm1>{K, Kcour});
 }
 
 } // namespace sph

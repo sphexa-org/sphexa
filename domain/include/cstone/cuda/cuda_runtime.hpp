@@ -41,16 +41,21 @@
 #define cudaMallocHost hipMallocHost
 #define cudaMallocManaged hipMallocManaged
 #define cudaMemAttachGlobal hipMemAttachGlobal
+#define cudaMemLocationTypeDevice hipMemLocationTypeDevice
 #define cudaMemcpy hipMemcpy
+#define cudaMemcpyAsync hipMemcpyAsync
 #define cudaMemcpyDeviceToDevice hipMemcpyDeviceToDevice
 #define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define cudaMemcpyFromSymbol hipMemcpyFromSymbol
 #define cudaMemcpyHostToDevice hipMemcpyHostToDevice
 #define cudaMemcpyToSymbol hipMemcpyToSymbol
+#define cudaMemcpyToSymbolAsync hipMemcpyToSymbol // hipMemcpyToSymbolAsync does not exist
 #define cudaMemGetInfo hipMemGetInfo
 #define cudaMemoryTypeDevice hipMemoryTypeDevice
 #define cudaMemoryTypeManaged hipMemoryTypeManaged
+#define cudaMemPrefetchAsync hipMemPrefetchAsync_v2
 #define cudaMemset hipMemset
+#define cudaMemsetAsync hipMemsetAsync
 #define cudaPointerAttributes hipPointerAttribute_t
 #define cudaPointerGetAttributes hipPointerGetAttributes
 #define cudaSetDevice hipSetDevice
@@ -61,6 +66,8 @@
 #define cudaSuccess hipSuccess
 
 #define GPU_SYMBOL HIP_SYMBOL
+
+#define __grid_constant__
 
 #else
 

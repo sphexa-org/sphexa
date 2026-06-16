@@ -74,6 +74,7 @@ void exchangeParticles(int epoch,
                        LocalIndex receiveStart,
                        LocalIndex receiveEnd,
                        const LocalIndex* ordering,
+                       MPI_Comm comm,
                        Arrays... arrays)
 {
     using TransferType        = uint64_t;
@@ -103,7 +104,8 @@ void exchangeParticles(int epoch,
             packArrays<alignment>(gatherCpu, ordering + sends[destinationRank] + numSent, nextSendCount,
                                   sendBuffer.data() + headerBytes, arrays...);
 
-            mpiSendAsyncAs<TransferType>(sendBuffer.data(), sendBuffer.size(), destinationRank, domExTag, sendRequests);
+            mpiSendAsyncAs<TransferType>(sendBuffer.data(), sendBuffer.size(), destinationRank, domExTag, sendRequests,
+                                         comm);
             numSent += nextSendCount;
             sendBuffers.push_back(std::move(sendBuffer));
         }
@@ -114,13 +116,13 @@ void exchangeParticles(int epoch,
     while (receiveStart != receiveEnd)
     {
         MPI_Status status;
-        MPI_Probe(MPI_ANY_SOURCE, domExTag, MPI_COMM_WORLD, &status);
+        MPI_Probe(MPI_ANY_SOURCE, domExTag, comm, &status);
         int receiveRank = status.MPI_SOURCE;
         int receiveCountTransfer;
         MPI_Get_count(&status, MpiType<TransferType>{}, &receiveCountTransfer);
 
         receiveBuffer.resize(receiveCountTransfer * sizeof(TransferType));
-        mpiRecvSyncAs<TransferType>(receiveBuffer.data(), receiveBuffer.size(), receiveRank, domExTag, &status);
+        mpiRecvSyncAs<TransferType>(receiveBuffer.data(), receiveBuffer.size(), receiveRank, domExTag, &status, comm);
 
         size_t receiveCount = decodeSendCountCpu(receiveBuffer.data());
         assert(receiveStart + receiveCount <= receiveEnd);
@@ -137,11 +139,7 @@ void exchangeParticles(int epoch,
         receiveStart += receiveCount;
     }
 
-    if (not sendRequests.empty())
-    {
-        MPI_Status status[sendRequests.size()];
-        MPI_Waitall(int(sendRequests.size()), sendRequests.data(), status);
-    }
+    if (not sendRequests.empty()) { MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUSES_IGNORE); }
 
     // If this process is going to send messages with rank/tag combinations
     // already sent in this function, this can lead to messages being mixed up

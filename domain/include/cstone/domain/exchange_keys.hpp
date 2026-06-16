@@ -47,7 +47,8 @@ SendList exchangeRequestKeys(std::span<const KeyType> treeLeaves,
                              std::span<const TreeIndexPair> assignment,
                              std::span<const int> exteriorRanks,
                              std::span<const int> interiorRanks,
-                             std::span<const LocalIndex> layout)
+                             std::span<const LocalIndex> layout,
+                             MPI_Comm comm)
 {
     std::vector<std::vector<KeyType>> sendBuffers;
     sendBuffers.reserve(exteriorRanks.size());
@@ -59,7 +60,7 @@ SendList exchangeRequestKeys(std::span<const KeyType> treeLeaves,
     for (int peer : exteriorRanks)
     {
         auto requestKeys = extractMarkedElements(treeLeaves, layout, assignment[peer].start(), assignment[peer].end());
-        mpiSendAsync(requestKeys.data(), int(requestKeys.size()), peer, haloRequestKeyTag, sendRequests);
+        mpiSendAsync(requestKeys.data(), int(requestKeys.size()), peer, haloRequestKeyTag, sendRequests, comm);
         sendBuffers.push_back(std::move(requestKeys));
     }
 
@@ -71,7 +72,7 @@ SendList exchangeRequestKeys(std::span<const KeyType> treeLeaves,
     while (numMessages--)
     {
         MPI_Status status;
-        mpiRecvSync(receiveBuffer.data(), receiveBuffer.size(), MPI_ANY_SOURCE, haloRequestKeyTag, &status);
+        mpiRecvSync(receiveBuffer.data(), receiveBuffer.size(), MPI_ANY_SOURCE, haloRequestKeyTag, &status, comm);
         int receiveRank = status.MPI_SOURCE;
         TreeNodeIndex numKeys;
         MPI_Get_count(&status, MpiType<KeyType>{}, &numKeys);
@@ -88,8 +89,7 @@ SendList exchangeRequestKeys(std::span<const KeyType> treeLeaves,
         }
     }
 
-    MPI_Status status[sendRequests.size()];
-    MPI_Waitall(int(sendRequests.size()), sendRequests.data(), status);
+    MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUSES_IGNORE);
 
     // MUST call MPI_Barrier or any other collective MPI operation that enforces synchronization
     // across all ranks before calling this function again

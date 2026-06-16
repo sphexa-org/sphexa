@@ -24,7 +24,8 @@ namespace cstone
 {
 
 template<class... Arrays>
-void haloexchange(int epoch, const RecvList& incomingHalos, const SendList& outgoingHalos, Arrays... arrays)
+void haloexchange(
+    int epoch, const RecvList& incomingHalos, const SendList& outgoingHalos, MPI_Comm comm, Arrays... arrays)
 {
     using TransferType      = uint64_t;
     constexpr int alignment = sizeof(TransferType);
@@ -52,7 +53,7 @@ void haloexchange(int epoch, const RecvList& incomingHalos, const SendList& outg
         auto packTuple = util::packBufferPtrs<alignment>(buffer.data(), sendCount, arrays...);
         for_each_tuple(packSendBuffer, packTuple);
 
-        mpiSendAsync(buffer.data(), buffer.size(), destinationRank, haloExchangeTag, sendRequests);
+        mpiSendAsync(buffer.data(), buffer.size(), destinationRank, haloExchangeTag, sendRequests, comm);
         sendBuffers.push_back(std::move(buffer));
     }
 
@@ -70,7 +71,7 @@ void haloexchange(int epoch, const RecvList& incomingHalos, const SendList& outg
     while (numMessages--)
     {
         MPI_Status status;
-        mpiRecvSync(receiveBuffer.data(), receiveBuffer.size(), MPI_ANY_SOURCE, haloExchangeTag, &status);
+        mpiRecvSync(receiveBuffer.data(), receiveBuffer.size(), MPI_ANY_SOURCE, haloExchangeTag, &status, comm);
         int receiveRank     = status.MPI_SOURCE;
         size_t receiveCount = incomingHalos[receiveRank].count();
 
@@ -81,11 +82,7 @@ void haloexchange(int epoch, const RecvList& incomingHalos, const SendList& outg
         for_each_tuple(unpack, packTuple);
     }
 
-    if (not sendRequests.empty())
-    {
-        MPI_Status status[sendRequests.size()];
-        MPI_Waitall(int(sendRequests.size()), sendRequests.data(), status);
-    }
+    if (not sendRequests.empty()) { MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUSES_IGNORE); }
 
     // MUST call MPI_Barrier or any other collective MPI operation that enforces synchronization
     // across all ranks before calling this function again.

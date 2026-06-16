@@ -34,13 +34,14 @@
 
 #include "gtest/gtest.h"
 
+#include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/util/tuple_util.hpp"
 
 #include "sph/hydro_ve/av_switches_kern.hpp"
 #include "sph/hydro_ve/divv_curlv_kern.hpp"
-#include "sph/hydro_ve/iad_kern.hpp"
+#include "sph/hydro_ve/iad_gradh_kern.hpp"
 #include "sph/hydro_ve/momentum_energy_kern.hpp"
-#include "sph/hydro_ve/ve_def_gradh_kern.hpp"
+#include "sph/hydro_ve/ve_kern.hpp"
 #include "sph/hydro_ve/xmass_kern.hpp"
 #include "sph/sph_kernel_tables.hpp"
 #include "sph/table_lookup.hpp"
@@ -73,14 +74,13 @@ protected:
         std::apply([this](auto&&... vecs)
                    { sphexa::fileutils::readAscii("example_data.txt", npart, std::vector<T*>{vecs.data()...}); },
                    std::tie(x, y, z, vx, vy, vz, h, c, c11, c12, c13, c22, c23, c33, p, gradh, rho0, sumwhrho0, sumwh,
-                            dvxdx, dvxdy, dvxdz, dvydx, dvydy, dvydz, dvzdx, dvzdy, dvzdz, alpha, u, divv));
+                            dvxdx, dvxdy, dvxdz, dvydx, dvydy, dvydz, dvzdx, dvzdy, dvzdz, alpha, u, divv, kx));
 
         std::fill(m.begin(), m.end(), mpart);
 
         for (unsigned i = 0; i < npart; i++)
         {
             xm[i]   = mpart / rho0[i];
-            kx[i]   = K * xm[i] / std::pow(h[i], 3);
             prho[i] = p[i] / (kx[i] * m[i] * m[i] * gradh[i]);
         }
     }
@@ -109,14 +109,108 @@ protected:
         c33, dvxdx, dvxdy, dvxdz, dvydx, dvydy, dvydz, dvzdx, dvzdy, dvzdz, sumwh, xm, kx, prho;
 };
 
+template<size_t stride = 1, class Tc, class T>
+HOST_DEVICE_FUN inline T
+AVswitchesJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
+                unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy, const T* vz,
+                const T* h, const T* c, const T* c11, const T* c12, const T* c13, const T* c22, const T* c23,
+                const T* c33, const T* wh, const T* /*whd*/, const T* kx, const T* xm, const T* divv, const T* alpha,
+                const Tc dt, const T alphamin, const T alphamax, const T decay_constant)
+{
+    AVswitchesInteraction<T, Tc> interaction{wh, K};
+    AVswitchesPostamble<T, Tc>   postamble{alphamin, alphamax, decay_constant, dt};
+
+    const auto input   = std::make_tuple(xm, kx, divv, alpha, vx, vy, vz, c, c11, c12, c13, c22, c23, c33);
+    T          alpha_i = 0;
+    const auto output  = std::make_tuple((&alpha_i) - i);
+
+    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
+    const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
+
+    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
+    for (unsigned pj = 0; pj < neighborsCount; ++pj)
+    {
+        cstone::LocalIndex j = neighbors[stride * pj];
+
+        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
+
+        const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
+
+        cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
+    }
+
+    auto presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
+
+    cstone::ijloop::storeParticleData(output, i, presult);
+
+    return alpha_i;
+}
+
 TEST_F(SphKernelTests, AVSwitches)
 {
     T newAlpha = AVswitchesJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), vx.data(),
                                  vy.data(), vz.data(), h.data(), c.data(), c11.data(), c12.data(), c13.data(),
                                  c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), kx.data(), xm.data(),
-                                 divv.data(), dt, alphamin, alphamax, decay_constant, alpha[0]);
+                                 divv.data(), alpha.data(), dt, alphamin, alphamax, decay_constant);
 
-    EXPECT_NEAR(newAlpha, 0.93941905320351171, 2e-9);
+    EXPECT_NEAR(newAlpha, 0.34425163896226968, 2e-9);
+}
+
+template<size_t stride = 1, typename Tc, class T>
+HOST_DEVICE_FUN inline void
+divV_curlVJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
+                unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy, const T* vz,
+                const T* h, const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
+                const T* wh, const T* /*whd*/, const T* kx, const T* xm, T* divv, T* curlv, T* dV11, T* dV12, T* dV13,
+                T* dV22, T* dV23, T* dV33, bool doGradV)
+{
+    DivVCurlVInteraction<T> interaction{wh};
+
+    const auto input = std::make_tuple(vx, vy, vz, xm, kx, c11, c12, c13, c22, c23, c33);
+
+    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
+    const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
+
+    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
+    for (unsigned pj = 0; pj < neighborsCount; ++pj)
+    {
+        cstone::LocalIndex j = neighbors[stride * pj];
+
+        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
+
+        const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
+
+        cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
+    }
+
+    if (curlv && doGradV)
+    {
+        DivVCurlVPostamble<true, true, T, Tc> postamble{K};
+        const auto                            presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
+        const auto                            output = std::make_tuple(divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33);
+        cstone::ijloop::storeParticleData(output, i, presult);
+    }
+    else if (curlv)
+    {
+        DivVCurlVPostamble<true, false, T, Tc> postamble{K};
+        const auto                             presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
+        const auto                             output  = std::make_tuple(divv, curlv);
+        cstone::ijloop::storeParticleData(output, i, presult);
+    }
+    else if (doGradV)
+    {
+        DivVCurlVPostamble<false, true, T, Tc> postamble{K};
+        const auto                             presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
+        const auto                             output  = std::make_tuple(divv, dV11, dV12, dV13, dV22, dV23, dV33);
+        cstone::ijloop::storeParticleData(output, i, presult);
+    }
+    else
+    {
+        DivVCurlVPostamble<false, false, T, Tc> postamble{K};
+        const auto                              presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
+        const auto                              output  = std::make_tuple(divv);
+        cstone::ijloop::storeParticleData(output, i, presult);
+    }
 }
 
 TEST_F(SphKernelTests, Divv_Curlv)
@@ -128,24 +222,60 @@ TEST_F(SphKernelTests, Divv_Curlv)
                     wh.data(), whd.data(), kx.data(), xm.data(), &divv, &curlv, &dV11, &dV12, &dV13, &dV22, &dV23,
                     &dV33, true);
 
-    EXPECT_NEAR(divv, 3.3760353440920682e-2, 2e-9);
-    EXPECT_NEAR(curlv, 3.7836647734377962e-2, 2e-9);
-    EXPECT_NEAR(dV11, 0.0013578323369918166, 2e-9);
-    EXPECT_NEAR(dV12, 0.02465266861727711, 2e-9);
-    EXPECT_NEAR(dV13, -0.0046604174274769167, 2e-9);
-    EXPECT_NEAR(dV22, 0.022556438947324862, 2e-9);
-    EXPECT_NEAR(dV23, 0.0097704904179710741, 2e-9);
-    EXPECT_NEAR(dV33, 0.0098460821566040066, 2e-9);
+    EXPECT_NEAR(divv, 8.9647658450583111e-3, 2e-9);
+    EXPECT_NEAR(curlv, 1.0047189924410768e-2, 2e-9);
+    EXPECT_NEAR(dV11, 3.605605379030074e-4, 2e-9);
+    EXPECT_NEAR(dV12, 6.5462998887902994e-3, 2e-9);
+    EXPECT_NEAR(dV13, -1.2375328303458487e-3, 2e-9);
+    EXPECT_NEAR(dV22, 5.9896645443181197e-3, 2e-9);
+    EXPECT_NEAR(dV23, 2.5944680841419438e-3, 2e-9);
+    EXPECT_NEAR(dV33, 2.6145407628371843e-3, 2e-9);
+}
+
+template<size_t stride = 1, class Tc, class T>
+HOST_DEVICE_FUN inline void IAD_gradhJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
+                                           const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
+                                           const Tc* y, const Tc* z, const T* h, const T* m, const T* wh, const T* whd,
+                                           const T* xm, const T* kx, const unsigned* nc, T* c11, T* c12, T* c13, T* c22,
+                                           T* c23, T* c33, T* gradh)
+{
+    IADGradhInteraction      interaction{wh, whd};
+    IADGradhPostamble<T, Tc> postamble{K};
+
+    const auto input  = std::make_tuple(m, xm, kx, nc);
+    const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh);
+
+    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
+    const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
+
+    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
+    for (unsigned pj = 0; pj < neighborsCount; ++pj)
+    {
+        cstone::LocalIndex j = neighbors[stride * pj];
+
+        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
+
+        const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
+
+        cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
+    }
+
+    auto presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
+
+    cstone::ijloop::storeParticleData(output, i, presult);
 }
 
 TEST_F(SphKernelTests, IAD)
 {
     // fill with invalid initial value to make sure that the kernel overwrites it instead of add to it
-    std::vector<T> iad(6, -1);
+    std::vector<T>        iad(6, -1);
+    T                     gradh = -1;
+    std::vector<unsigned> nc(x.size(), neighborsCount + 1);
 
     // compute the 6 tensor components for particle 0
-    IADJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), wh.data(),
-             whd.data(), xm.data(), kx.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5]);
+    IAD_gradhJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), m.data(),
+                   wh.data(), whd.data(), xm.data(), kx.data(), nc.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4],
+                   &iad[5], &gradh);
 
     EXPECT_NEAR(iad[0], 1.9296619855715329e-18, 1e-10);
     EXPECT_NEAR(iad[1], -1.7838691836843698e-20, 1e-10);
@@ -153,6 +283,7 @@ TEST_F(SphKernelTests, IAD)
     EXPECT_NEAR(iad[3], 1.9482845913025683e-18, 1e-10);
     EXPECT_NEAR(iad[4], 1.635410357476855e-20, 1e-10);
     EXPECT_NEAR(iad[5], 1.9246939006338132e-18, 1e-10);
+    EXPECT_NEAR(gradh, 0.99783225455705071, 5e-7);
 }
 
 template<class T>
@@ -169,6 +300,53 @@ void symmetrizeGradV(util::array<const T*, 9> dV, util::array<T*, 6> sdV, size_t
     }
 }
 
+template<bool avClean, size_t stride = 1, class Tc, class Tm, class T, class Tm1>
+HOST_DEVICE_FUN inline void
+momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
+                       unsigned neighborsCount, const unsigned* nc, const Tc* x, const Tc* y, const Tc* z, const T* vx,
+                       const T* vy, const T* vz, const T* h, const Tm* m, const T* prho, const T* tdpdTrho, const T* c,
+                       const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
+                       const T Atmin, const T Atmax, const T ramp, const T* wh, const T* kx, const T* xm,
+                       const T* alpha, const T* dV11, const T* dV12, const T* dV13, const T* dV22, const T* dV23,
+                       const T* dV33, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, T* maxvsignal)
+{
+    MomentumAndEnergyInteraction<avClean, T> interaction{wh, Atmin, Atmax, ramp};
+
+    if constexpr (!avClean) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
+    const auto input =
+        std::make_tuple(vx, vy, vz, m, c, kx, alpha, xm, prho, c11, c12, c13, c22, c23, c33, nc, dV11, dV12, dV13, dV22,
+                        dV23, dV33, tdpdTrho ? tdpdTrho : vx /* pass random derefable array if tdpdTrho is null */);
+    const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, maxvsignal - i);
+
+    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
+    const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
+
+    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
+    for (unsigned pj = 0; pj < neighborsCount; ++pj)
+    {
+        cstone::LocalIndex j = neighbors[stride * pj];
+
+        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
+
+        const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
+
+        cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
+    }
+
+    if (tdpdTrho)
+    {
+        MomentumAndEnergyPostamble<true, T, Tc> postamble{K};
+        auto                                    presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
+        cstone::ijloop::storeParticleData(output, i, presult);
+    }
+    else
+    {
+        MomentumAndEnergyPostamble<false, T, Tc> postamble{K};
+        auto                                     presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
+        cstone::ijloop::storeParticleData(output, i, presult);
+    }
+}
+
 TEST_F(SphKernelTests, MomentumEnergy)
 {
     std::vector<T> dV11(npart), dV12(npart), dV13(npart), dV22(npart), dV23(npart), dV33(npart);
@@ -177,46 +355,49 @@ TEST_F(SphKernelTests, MomentumEnergy)
                        {dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(), dV33.data()}, npart);
 
     { // test with AV cleaning
+        std::vector<unsigned> nc(x.size(), neighborsCount + 1);
         auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
-        momentumAndEnergyJLoop<true>(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(),
-                                     vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
+        momentumAndEnergyJLoop<true>(0, K, box(), neighbors.data(), neighborsCount, nc.data(), x.data(), y.data(),
+                                     z.data(), vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
                                      (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
                                      c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
                                      alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
                                      dV33.data(), &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
-        EXPECT_NEAR(grad_Px, -505548.68073726865, 0.023);
-        EXPECT_NEAR(grad_Py, 303384.91384746187, 0.053);
-        EXPECT_NEAR(grad_Pz, -1767463.9739728321, 0.043);
-        EXPECT_NEAR(du, 8.5525242525359648e12, 7.1e5);
+        EXPECT_NEAR(grad_Px, -23175.29155183331, 0.023);
+        EXPECT_NEAR(grad_Py, 13564.560025399775, 0.053);
+        EXPECT_NEAR(grad_Pz, -80978.279574341461, 0.043);
+        EXPECT_NEAR(du, -2.6643381633458105e11, 7.1e5);
         EXPECT_NEAR(maxvsignal, 26490876.319252387, 1e-6);
     }
     { // test without AV cleaning
+        std::vector<unsigned> nc(x.size(), neighborsCount + 1);
         auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
-        momentumAndEnergyJLoop<false>(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(),
-                                      vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
+        momentumAndEnergyJLoop<false>(0, K, box(), neighbors.data(), neighborsCount, nc.data(), x.data(), y.data(),
+                                      z.data(), vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
                                       (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
                                       c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
                                       alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
                                       dV33.data(), &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
-        EXPECT_NEAR(grad_Px, -521261.07791667967, 0.022);
-        EXPECT_NEAR(grad_Py, -74471.016515749841, 0.064);
-        EXPECT_NEAR(grad_Pz, -1730426.827721074, 0.042);
-        EXPECT_NEAR(du, 7.1838438980436924e12, 3.1e5);
+        EXPECT_NEAR(grad_Px, -23599.138813909038, 0.022);
+        EXPECT_NEAR(grad_Py, 335.48616557085978, 0.064);
+        EXPECT_NEAR(grad_Pz, -79670.116695894292, 0.042);
+        EXPECT_NEAR(du, -3.1273454967721649e11, 3.1e5);
         EXPECT_NEAR(maxvsignal, 26490876.319252387, 1e-6);
     }
     { // test zero neighbors
+        std::vector<unsigned> nc(x.size(), 1);
         auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
-        momentumAndEnergyJLoop<false>(0, K, box(), neighbors.data(), 0, x.data(), y.data(), z.data(), vx.data(),
-                                      vy.data(), vz.data(), h.data(), m.data(), prho.data(), (const T*)nullptr,
-                                      c.data(), c11.data(), c12.data(), c13.data(), c22.data(), c23.data(), c33.data(),
-                                      Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(), alpha.data(), dV11.data(),
-                                      dV12.data(), dV13.data(), dV22.data(), dV23.data(), dV33.data(), &grad_Px,
-                                      &grad_Py, &grad_Pz, &du, &maxvsignal);
+        momentumAndEnergyJLoop<false>(0, K, box(), neighbors.data(), 0, nc.data(), x.data(), y.data(), z.data(),
+                                      vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
+                                      (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
+                                      c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
+                                      alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
+                                      dV33.data(), &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
         EXPECT_EQ(grad_Px, 0.0);
         EXPECT_EQ(grad_Py, 0.0);
@@ -226,15 +407,81 @@ TEST_F(SphKernelTests, MomentumEnergy)
     }
 }
 
+template<size_t stride = 1, class Tc, class T>
+HOST_DEVICE_FUN inline T veJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
+                                 const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x, const Tc* y,
+                                 const Tc* z, const T* h, const T* wh, const T* xm)
+{
+    VeInteraction      interaction{wh};
+    VePostamble<T, Tc> postamble{K};
+
+    const auto input = std::make_tuple(xm);
+    T          kxi;
+    const auto output = std::make_tuple(&kxi - i);
+
+    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
+    const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
+
+    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
+    for (unsigned pj = 0; pj < neighborsCount; ++pj)
+    {
+        cstone::LocalIndex j = neighbors[stride * pj];
+
+        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
+
+        const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
+
+        cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
+    }
+
+    auto presult = postamble(iData, result);
+
+    cstone::ijloop::storeParticleData(output, i, presult);
+    return kxi;
+}
+
 TEST_F(SphKernelTests, VeDefGradh)
 {
-    auto [kx, gradh] = veDefGradhJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(),
-                                       h.data(), m.data(), wh.data(), whd.data(), xm.data());
+    T kxx = veJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), wh.data(),
+                    xm.data());
 
-    T density = kx * m[0] / xm[0];
+    T density = kxx * m[0] / xm[0];
     EXPECT_NEAR(density, 3.4662283566584293e1, 8e-7);
-    EXPECT_NEAR(gradh, 0.98699067585409861, 5e-7);
-    EXPECT_NEAR(kx, 1.0042661134076782, 3e-7);
+    EXPECT_NEAR(kxx, 1.0042661134076782, 3e-7);
+}
+
+template<size_t stride = 1, class Tc, class Tm, class T>
+HOST_DEVICE_FUN inline T xmassJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
+                                    const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
+                                    const Tc* y, const Tc* z, const T* h, const Tm* m, const T* wh, const T* /*whd*/)
+{
+    XmassInteraction      interaction{wh};
+    XmassPostamble<T, Tc> postamble{K};
+
+    const auto input  = std::make_tuple(m);
+    T          xmassi = 0;
+    const auto output = std::make_tuple((&xmassi) - i);
+
+    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
+    const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
+
+    auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
+    for (unsigned pj = 0; pj < neighborsCount; ++pj)
+    {
+        cstone::LocalIndex j = neighbors[stride * pj];
+
+        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
+
+        const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
+
+        cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
+    }
+
+    auto presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
+
+    cstone::ijloop::storeParticleData(output, i, presult);
+
+    return xmassi;
 }
 
 TEST_F(SphKernelTests, XMass)

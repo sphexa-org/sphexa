@@ -73,8 +73,8 @@ protected:
     using ConservedFields = FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "id">;
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
-    using DependentFields_ =
-        FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33", "xm", "kx", "nc">;
+    using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
+                                       "xm", "kx", "nc", "dtCourant">;
 
     //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
@@ -105,11 +105,6 @@ public:
         d.setDependent("keys");
         std::apply([&d](auto... f) { d.setConserved(f.value...); }, make_tuple(ConservedFields{}));
         std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
-
-        d.devData.setConserved("x", "y", "z", "h", "m");
-        d.devData.setDependent("keys");
-        std::apply([&d](auto... f) { d.devData.setConserved(f.value...); }, make_tuple(ConservedFields{}));
-        std::apply([&d](auto... f) { d.devData.setDependent(f.value...); }, make_tuple(DependentFields{}));
     }
 
     void sync(DomainType& domain, DataType& simData) override
@@ -137,15 +132,15 @@ public:
         Base::logDomainStats(domain, simData);
 
         auto& d = simData.hydro;
-        d.resizeAcc(domain.nParticlesWithHalos());
-        resizeNeighbors(d, domain.nParticles() * d.ngmax);
+        d.resize(domain.nParticlesWithHalos());
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
         fillMassHalos(get<"m">(d), first, last);
 
-        findNeighborsSfc(first, last, d, domain.box());
         computeGroups(first, last, d, domain.box(), groups_);
+        updateSmoothingLengthIterative(groups_.view(), d, domain.box());
+        findNeighborsSfc(groups_.view(), d, domain.box());
         timer.step("FindNeighbors");
         pmReader.step();
 
@@ -154,24 +149,22 @@ public:
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        release(d, "ay");
-        acquire(d, "gradh");
-        computeVeDefGradh(groups_.view(), d, domain.box());
-        timer.step("Normalization & Gradh");
+        computeVe(groups_.view(), d, domain.box());
+        timer.step("Generalized Volume Elements");
+        domain.exchangeHalos(get<"vx", "vy", "vz", "kx">(d), get<"ax">(d), get<"keys">(d));
+        timer.step("mpi::synchronizeHalos");
+
+        release(d, "ay", "az");
+        acquire(d, "divv", "gradh");
+        computeIadDivvCurlvGradh(groups_.view(), d, domain.box());
+        d.minDtRho = rhoTimestep(first, last, d);
+        timer.step("IadVelocityDivCurlGradh");
 
         computeEOS(first, last, d);
         timer.step("EquationOfState");
 
-        domain.exchangeHalos(get<"vx", "vy", "vz", "prho", "c", "kx">(d), get<"ax">(d), get<"keys">(d));
-        timer.step("mpi::synchronizeHalos");
-
-        release(d, "gradh", "az");
-        acquire(d, "divv", "curlv");
-        computeIadDivvCurlv(groups_.view(), d, domain.box());
-        d.minDtRho = rhoTimestep(first, last, d);
-        timer.step("IadVelocityDivCurl");
-
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv">(d), get<"ax">(d), get<"keys">(d));
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "c">(d), get<"ax">(d),
+                             get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
         computeAVswitches(groups_.view(), d, domain.box());
@@ -179,13 +172,13 @@ public:
 
         if (avClean)
         {
-            domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "alpha">(d), get<"ax">(d),
+            domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "prho", "alpha">(d), get<"ax">(d),
                                  get<"keys">(d));
         }
-        else { domain.exchangeHalos(std::tie(get<"alpha">(d)), get<"ax">(d), get<"keys">(d)); }
+        else { domain.exchangeHalos(get<"prho", "alpha">(d), get<"ax">(d), get<"keys">(d)); }
         timer.step("mpi::synchronizeHalos");
 
-        release(d, "divv", "curlv");
+        release(d, "divv", "gradh");
         acquire(d, "ay", "az");
         computeMomentumEnergy<avClean>(groups_.view(), nullptr, d, domain.box());
         timer.step("MomentumAndEnergy");
@@ -241,10 +234,13 @@ public:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    transferToHost(d, first, last, {d.fieldNames[fidx]});
-                    std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
-                    deallocateField(d, fidx);
+                    std::visit(
+                        [writer, c = column, key = namesDone[i]](auto field)
+                        {
+                            auto&& tmp = toHost(*field);
+                            writeField(writer, key, tmp.data(), c);
+                        },
+                        fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
@@ -266,7 +262,7 @@ public:
         release(d, "prho", "c");
         acquire(d, "divv", "curlv");
         // partial recovery of cij in range [first:last] without halos, which are not needed for divv and curlv
-        if (!indicesDone.empty()) { computeIadDivvCurlv(groups_.view(), d, box); }
+        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
         output();
         release(d, "divv", "curlv");
         acquire(d, "prho", "c");
@@ -279,7 +275,7 @@ public:
         if (!indicesDone.empty() && Base::rank_ == 0)
         {
             std::cout << "WARNING: the following fields are not in use and therefore not output: ";
-            for (int fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
+            for (std::size_t fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
             {
                 std::cout << d.fieldNames[fidx] << ",";
             }

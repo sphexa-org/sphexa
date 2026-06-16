@@ -96,7 +96,7 @@ protected:
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
-                                       "xm", "kx", "nc", "divv", "gradh">;
+                                       "xm", "kx", "nc", "divv", "gradh", "dtCourant">;
 
     //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
@@ -144,11 +144,6 @@ public:
         d.setDependent("keys");
         std::apply([&d](auto... f) { d.setConserved(f.value...); }, make_tuple(ConservedFields{}));
         std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
-
-        d.devData.setConserved("x", "y", "z", "h", "m");
-        d.devData.setDependent("keys");
-        std::apply([&d](auto... f) { d.devData.setConserved(f.value...); }, make_tuple(ConservedFields{}));
-        std::apply([&d](auto... f) { d.devData.setDependent(f.value...); }, make_tuple(DependentFields{}));
     }
 
     void save(IFileWriter* writer) override { timestep_.loadOrStore(writer, "ts::"); }
@@ -184,14 +179,13 @@ public:
         }
         d.treeView = domain.octreeProperties();
 
-        d.resizeAcc(domain.nParticlesWithHalos());
-        resizeNeighbors(d, domain.nParticles() * d.ngmax);
+        d.resize(domain.nParticlesWithHalos());
 
         computeGroups(domain.startIndex(), domain.endIndex(), d, domain.box(), groups_);
         activeRungs_ = groups_.view();
 
         reallocate(groups_.numGroups, d.getAllocGrowthRate(), groupDt_, groupIndices_);
-        fill(groupDt_, 0, groupDt_.size(), std::numeric_limits<float>::max());
+        cstone::fill<cstone::HaveGpu<Acc>{}>(groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max());
     }
 
     void partialSync(DomainType& domain, DataType& simData)
@@ -200,8 +194,7 @@ public:
         domain.exchangeHalos(get<"x", "y", "z", "h">(d), get<"keys">(d), haloRecvScratch);
         if (d.g != 0.0)
         {
-            domain.updateExpansionCenters(get<"x">(d), get<"y">(d), get<"z">(d), get<"m">(d), get<"keys">(d),
-                                          haloRecvScratch);
+            domain.updateExpansionCenters(get<"x">(d), get<"y">(d), get<"z">(d), get<"m">(d), get<"keys">(d));
         }
 
         //! @brief increase tree-cell search radius for each substep to account for particles drifting out of cells
@@ -236,7 +229,8 @@ public:
 
         fillMassHalos(get<"m">(d), first, last);
 
-        findNeighborsSfc(first, last, d, domain.box());
+        updateSmoothingLengthIterative(activeRungs_, d, domain.box());
+        findNeighborsSfc(activeRungs_, d, domain.box(), true);
         timer.step("FindNeighbors");
         pmReader.step();
 
@@ -245,20 +239,23 @@ public:
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
-        computeVeDefGradh(activeRungs_, d, domain.box());
-        timer.step("Normalization & Gradh");
+        computeVe(activeRungs_, d, domain.box());
+        timer.step("Generalized Volume Elements");
+        domain.exchangeHalos(get<"kx", "vx", "vy", "vz">(d), get<"keys">(d), haloRecvScratch);
+        timer.step("mpi::synchronizeHalos");
+
+        computeIadDivvCurlvGradh(activeRungs_, d, domain.box());
+        groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
+        timer.step("IadVelocityDivCurlGradh");
+
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "gradh">(d), get<"keys">(d),
+                             haloRecvScratch);
+        timer.step("mpi::synchronizeHalos");
 
         computeEOS(first, last, d);
         timer.step("EquationOfState");
 
-        domain.exchangeHalos(get<"vx", "vy", "vz", "prho", "c", "kx">(d), get<"keys">(d), haloRecvScratch);
-        timer.step("mpi::synchronizeHalos");
-
-        computeIadDivvCurlv(activeRungs_, d, domain.box());
-        groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
-        timer.step("IadVelocityDivCurl");
-
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv">(d), get<"keys">(d), haloRecvScratch);
+        domain.exchangeHalos(get<"prho", "c">(d), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
         computeAVswitches(activeRungs_, d, domain.box());
@@ -404,10 +401,13 @@ public:
                 {
                     int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
                                  d.outputFieldIndices.begin();
-                    transferToHost(d, first, last, {d.fieldNames[fidx]});
-                    std::visit([writer, c = column, key = namesDone[i]](auto field)
-                               { writeField(writer, key, field->data(), c); }, fieldPointers[fidx]);
-                    deallocateField(d, fidx);
+                    std::visit(
+                        [writer, c = column, key = namesDone[i]](auto field)
+                        {
+                            auto&& tmp = toHost(*field);
+                            writeField(writer, key, tmp.data(), c);
+                        },
+                        fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
                     namesDone.erase(namesDone.begin() + i);
                 }
@@ -426,7 +426,7 @@ public:
 
         // third output pass: recover temporary curlv and divv quantities
         acquire(d, "curlv");
-        if (!indicesDone.empty()) { computeIadDivvCurlv(groups_.view(), d, box); }
+        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
         output();
         release(d, "curlv");
         acquire(d, "ay", "az");
@@ -437,7 +437,7 @@ public:
         if (!indicesDone.empty() && Base::rank_ == 0)
         {
             std::cout << "WARNING: the following fields are not in use and therefore not output: ";
-            for (int fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
+            for (std::size_t fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
             {
                 std::cout << d.fieldNames[fidx] << ",";
             }

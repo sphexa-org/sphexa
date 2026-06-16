@@ -123,10 +123,10 @@ public:
         std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
         std::apply([&simData](auto... f) { simData.chem.setConserved(f.value...); }, make_tuple(CoolingFields{}));
 
-        d.devData.setConserved("x", "y", "z", "h", "m");
-        d.devData.setDependent("keys");
-        std::apply([&d](auto... f) { d.devData.setConserved(f.value...); }, make_tuple(ConservedFields{}));
-        std::apply([&d](auto... f) { d.devData.setDependent(f.value...); }, make_tuple(DependentFields{}));
+        d.setConserved("x", "y", "z", "h", "m");
+        d.setDependent("keys");
+        std::apply([&d](auto... f) { d.setConserved(f.value...); }, make_tuple(ConservedFields{}));
+        std::apply([&d](auto... f) { d.setDependent(f.value...); }, make_tuple(DependentFields{}));
     }
 
     void sync(DomainType& domain, DataType& simData) override
@@ -163,18 +163,15 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        resizeNeighbors(d, domain.nParticles() * d.ngmax);
-        findNeighborsSfc(first, last, d, domain.box());
         computeGroups(first, last, d, domain.box(), groups_);
+        updateSmoothingLengthIterative(groups_.view(), d, domain.box());
+        findNeighborsSfc(groups_.view(), d, domain.box());
         timer.step("FindNeighbors");
 
         computeDensity(groups_.view(), d, domain.box());
         timer.step("Density");
 
-        transferToHost(d, first, last, {"rho", "u"});
-
         eos_cooling(first, last, d, simData.chem, cooling_data);
-        transferToDevice(d, first, last, {"p", "c"});
         timer.step("EquationOfState");
 
         domain.exchangeHalos(get<"vx", "vy", "vz", "rho", "p", "c">(d), get<"ax">(d), get<"ay">(d));
@@ -205,21 +202,27 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        auto minDtCooling = cooling::coolingTimestep(first, last, d, cooling_data, simData.chem);
+        auto&& rho = toHost(d.rho);
+        auto&& u   = toHost(d.u);
+
+        auto minDtCooling = cooling::coolingTimestep(first, last, rho.data(), u.data(), cooling_data, simData.chem);
         computeTimestep(first, last, d, minDtCooling);
         timer.step("Timestep");
 
-        transferToHost(d, first, last, {"du"});
+        auto du = toHost(d.du);
+        cooling_data.cool_particles(T(d.minDt), rho.data(), u.data(),
+                                    cstone::getPointers(get<CoolingFields>(simData.chem), 0), du.data(), first, last);
 
-        cooling_data.cool_particles(T(d.minDt), d.rho.data(), d.u.data(),
-                                    cstone::getPointers(get<CoolingFields>(simData.chem), 0), d.du.data(), first, last);
-
-        transferToDevice(d, first, last, {"du"});
+        d.du = std::move(du);
         timer.step("GRACKLE chemistry and cooling");
 
         computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
         timer.step("UpdateQuantities");
-        updateSmoothingLength(groups_.view(), d);
+        bool haveUnconvergedParticles = updateSmoothingLength(groups_.view(), d);
+        if (haveUnconvergedParticles && not d.removeUnconvergedParticles)
+        {
+            throw std::runtime_error("Neighbor search did not converge\n");
+        }
         timer.step("UpdateSmoothingLength");
     }
 };

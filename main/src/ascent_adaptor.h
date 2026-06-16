@@ -89,7 +89,8 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
     scenes["s1/renders/r1/image_prefix"] = output_path + "density.%05d";
     scenes["s1/renders/r1/image_width"] = 1920;
     scenes["s1/renders/r1/image_height"] = 1080;
-
+    scenes["s1/renders/r1/tiled_rendering"] = "false";
+    
     scenes["s1/renders/r1/camera/look_at"].set({0.5, 0.125, 0.125});
     scenes["s1/renders/r1/camera/position"].set({0.5, 0.125, 3.0});
     scenes["s1/renders/r1/camera/up"].set({0.0, 1.0, 0.0});

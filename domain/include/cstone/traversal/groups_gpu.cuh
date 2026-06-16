@@ -40,19 +40,19 @@ __device__ util::array<GpuConfig::ThreadMask, N> findSplits(util::array<Vec4<T>,
     unsigned laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
 
     util::array<Vec3<T>, N> Xlane;
-    for (int k = 0; k < N; ++k)
+    for (std::size_t k = 0; k < N; ++k)
     {
         Xlane[k] = {pos[k][0], pos[k][1], pos[k][2]};
     }
 
     util::array<Vec3<T>, N> Xnext = Xlane;
-    for (int k = 0; k < N; ++k)
+    for (std::size_t k = 0; k < N; ++k)
     {
         for (int j = 0; j < 3; ++j)
         {
             Xnext[k][j] = shflDownSync(Xlane[k][j], 1);
         }
-        if (k < N - 1)
+        if (k + 1 < N)
         {
             Vec3<T> spill;
             for (int j = 0; j < 3; ++j)
@@ -66,7 +66,7 @@ __device__ util::array<GpuConfig::ThreadMask, N> findSplits(util::array<Vec4<T>,
     // The last difference in the warp (last lane of last segment N-1) will always be zero,
     // therefore the MSB of the return value will always be zero.
     util::array<GpuConfig::ThreadMask, N> splits;
-    for (int k = 0; k < N; ++k)
+    for (std::size_t k = 0; k < N; ++k)
     {
         T distSq   = norm2(Xnext[k] - Xlane[k]);
         bool split = distSq > stl::min(distCritSq, pos[k][3] * pos[k][3]);
@@ -88,7 +88,7 @@ __device__ util::array<GpuConfig::ThreadMask, N> findSplits(util::array<Vec4<T>,
  *    split = 0x2 --> splitLengths = {2, 62}
  *    split = 0x3 --> splitLengths = {1, 1, 61}
  */
-template<size_t N>
+template<std::size_t N>
 __device__ void makeSplits(util::array<GpuConfig::ThreadMask, N> split, LocalIndex* splitLengths)
 {
     auto readSegment = [&splitLengths](GpuConfig::ThreadMask mask, int carry)
@@ -106,7 +106,7 @@ __device__ void makeSplits(util::array<GpuConfig::ThreadMask, N> split, LocalInd
     };
 
     int carry = 0;
-    for (int k = 0; k < N; ++k)
+    for (std::size_t k = 0; k < N; ++k)
     {
         carry = readSegment(split[k], carry);
     }
@@ -170,20 +170,20 @@ __global__ void groupSplitsKernel(LocalIndex first,
     if (warpIdx * groupSize >= last - first) { return; }
 
     LocalIndex bodyIdx[nwt];
-    for (int k = 0; k < nwt; ++k)
+    for (LocalIndex k = 0; k < nwt; ++k)
     {
         bodyIdx[k] = imin(first + warpIdx * groupSize + k * GpuConfig::warpSize + laneIdx, last - 1);
     }
 
     TreeNodeIndex leafIdx[nwt];
-    for (int k = 0; k < nwt; ++k)
+    for (LocalIndex k = 0; k < nwt; ++k)
     {
         leafIdx[k] = stl::upper_bound(layout, layout + numLeaves, bodyIdx[k]) - layout - 1;
     }
 
     Box<T> unitBox(0, 1);
     T nodeVolume = 1;
-    for (int k = 0; k < nwt; ++k)
+    for (LocalIndex k = 0; k < nwt; ++k)
     {
         auto [nodeCenter, nodeSize] =
             centerAndSize<KeyType>(sfcIBox(sfcKey(leaves[leafIdx[0]]), sfcKey(leaves[leafIdx[0] + 1])), unitBox);
@@ -195,7 +195,7 @@ __global__ void groupSplitsKernel(LocalIndex first,
 
     // load target coordinates
     util::array<Vec4<Tc>, nwt> pos_i;
-    for (int k = 0; k < nwt; k++)
+    for (LocalIndex k = 0; k < nwt; k++)
     {
         pos_i[k] = {x[bodyIdx[k]] * box.ilx(), y[bodyIdx[k]] * box.ily(), z[bodyIdx[k]] * box.ilz(),
                     h ? Tc(2) * h[bodyIdx[k]] / box.minExtent() : Tc(1)};
@@ -207,7 +207,7 @@ __global__ void groupSplitsKernel(LocalIndex first,
     {
         splitMasks[warpIdx] = splitMask;
         int numSubGroups    = 1;
-        for (int k = 0; k < nwt; ++k)
+        for (LocalIndex k = 0; k < nwt; ++k)
         {
             numSubGroups += popCount(splitMask[k]);
         }

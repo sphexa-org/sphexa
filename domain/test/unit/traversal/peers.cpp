@@ -108,17 +108,20 @@ static void findPeers()
     float invThetaEff = invThetaMinToVec(0.5f);
 
     auto particleKeys   = makeRandomGaussianKeys<KeyType>(nParticles);
-    auto [tree, counts] = computeOctree<KeyType>(particleKeys, bucketSize);
+    auto [leaves, counts] = computeOctree<KeyType>(particleKeys, bucketSize);
 
-    Octree<KeyType> octree;
-    octree.update(tree.data(), nNodes(tree));
+    OctreeData<KeyType, CpuTag> octree;
+    octree.resize(nNodes(leaves));
+    updateInternalTree<KeyType>(leaves, octree.data());
+    auto octreeView   = octree.cdata();
+    octreeView.leaves = leaves.data();
 
-    auto assignment = makeSfcAssignment(numRanks, counts, tree.data());
+    auto assignment = makeSfcAssignment(numRanks, counts, leaves.data());
 
     int probeRank             = numRanks / 2;
-    std::vector<int> peersDtt = findPeersMac(probeRank, assignment, octree.cdata(), box, invThetaEff);
-    std::vector<int> peersStt = findPeersMacStt(probeRank, assignment, octree, box, invThetaEff);
-    std::vector<int> peersA2A = findPeersAll2All<KeyType>(probeRank, assignment, tree, box, invThetaEff);
+    std::vector<int> peersDtt = findPeersMac(probeRank, assignment, octreeView, box, invThetaEff);
+    std::vector<int> peersStt = findPeersMacStt(probeRank, assignment, octreeView, box, invThetaEff);
+    std::vector<int> peersA2A = findPeersAll2All<KeyType>(probeRank, assignment, leaves, box, invThetaEff);
     EXPECT_EQ(peersDtt, peersStt);
     EXPECT_EQ(peersDtt, peersA2A);
 
@@ -129,7 +132,7 @@ static void findPeers()
 
         // std::vector<int> peersOfPeerStt = findPeersMacStt(peerRank, assignment, octree, box, invThetaEff);
         // EXPECT_EQ(peersDtt, peersStt);
-        std::vector<int> peersOfPeerA2A = findPeersAll2All<KeyType>(peerRank, assignment, tree, box, invThetaEff);
+        std::vector<int> peersOfPeerA2A = findPeersAll2All<KeyType>(peerRank, assignment, leaves, box, invThetaEff);
         EXPECT_EQ(peersOfPeerDtt, peersOfPeerA2A);
 
         // the peers of the peers of the probeRank have to have probeRank as peer
