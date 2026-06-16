@@ -215,8 +215,7 @@ template<class KeyType>
 HOST_DEVICE_FUN inline std::enable_if_t<IsHilbert<KeyType>{}, IBox>
 sfcIBox(KeyType keyStart, unsigned level, const AxesBits& axesBits) noexcept
 {
-    return hilbertIBox<typename KeyType::ValueType>(keyStart, maxTreeLevel<KeyType>{} - level, axesBits[0], axesBits[1],
-                                                    axesBits[2]);
+    return hilbertIBox<typename KeyType::ValueType>(keyStart, level, axesBits[0], axesBits[1], axesBits[2]);
 }
 
 //! @brief convenience overload

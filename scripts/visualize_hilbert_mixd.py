@@ -45,7 +45,7 @@ def parse_args() -> argparse.Namespace:
         "--level",
         type=int,
         default=0,
-        help="Tree level from right for hilbertMixDIBox (0 = leaves, default: 0).",
+        help="Oct number level from right for hilbertMixDIBox (0 = leaves, default: 0).",
     )
     parser.add_argument(
         "--save",
@@ -124,7 +124,7 @@ def main() -> None:
         raise SystemExit(f"--level must be <= tree_height ({tree_height})")
     print(f"Using maxTreeLevel={max_level} for key_type={args.key_type}, effective tree_height={tree_height}")
 
-    increase_key_pos = tree_height - args.level  # adjust for level-from-right
+    octree_level = tree_height - args.level  # adjust for level-from-right
 
     if args.bits is None:
         bx_full, by_full, bz_full = map(int, cstone_sfc.getBoxDimensionBits(box_limits, args.key_type))
@@ -149,7 +149,7 @@ def main() -> None:
     key = 0
     for node_idx in range(total_nodes):
         print(f"Visiting key {key} (octal: {oct(key)})...")
-        ibox_arr = cstone_sfc.hilbertIBox(key, args.level, bx, by, bz, args.key_type)
+        ibox_arr = cstone_sfc.hilbertIBox(key, octree_level, bx, by, bz, args.key_type)
         ibox = (int(ibox_arr[0]), int(ibox_arr[1]), int(ibox_arr[2]), int(ibox_arr[3]), int(ibox_arr[4]), int(ibox_arr[5]))
         center, size = cstone_sfc.centerAndSize(ibox, box_limits, args.key_type)
         if not (size[0] <= 0 and size[1] <= 0 and size[2] <= 0):
@@ -166,7 +166,7 @@ def main() -> None:
                 print(f"Processed {len(xs)} points...")
 
         # increaseKey position is counted from the left (0..max_level), while args.level is from the right.
-        next_key = int(cstone_sfc.increaseKey(key, increase_key_pos, bx, by, bz, args.key_type))
+        next_key = int(cstone_sfc.increaseKey(key, octree_level, bx, by, bz, args.key_type))
         if node_idx == total_nodes - 1:
             break
         if next_key <= key:

@@ -499,7 +499,7 @@ HOST_DEVICE_FUN bool isValidHilbertMixDKey(KeyType key, unsigned bx, unsigned by
 /*! @brief compute the 3D integer coordinate box that contains the key range
  *
  * @tparam KeyType   32- or 64-bit unsigned integer
- * @param  level     level from the right
+ * @param  level     octree level
  * @param  keyStart  lower Hilbert key
  * @param  keyEnd    upper Hilbert key
  * @return           the integer box that contains the given key range
@@ -508,14 +508,15 @@ template<class KeyType>
 HOST_DEVICE_FUN IBox hilbertIBox(KeyType keyStart, unsigned level, unsigned bx, unsigned by, unsigned bz) noexcept
 {
     assert(level <= maxTreeLevel<KeyType>{});
-    auto isValidKey = isValidHilbertMixDKey(keyStart, bx, by, bz);
+    const auto levelFromRight = maxTreeLevel<KeyType>{} - level;
+    auto isValidKey           = isValidHilbertMixDKey(keyStart, bx, by, bz);
     if (!isValidKey)
     {
         return IBox(0, 0, 0, 0, 0, 0); // return empty box
     }
-    unsigned cubeLengthX = 1u << std::min(bx, level);
-    unsigned cubeLengthY = 1u << std::min(by, level);
-    unsigned cubeLengthZ = 1u << std::min(bz, level);
+    unsigned cubeLengthX = 1u << std::min(bx, levelFromRight);
+    unsigned cubeLengthY = 1u << std::min(by, levelFromRight);
+    unsigned cubeLengthZ = 1u << std::min(bz, levelFromRight);
     unsigned maskX       = ~(cubeLengthX - 1);
     unsigned maskY       = ~(cubeLengthY - 1);
     unsigned maskZ       = ~(cubeLengthZ - 1);
