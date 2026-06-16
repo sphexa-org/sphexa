@@ -136,73 +136,12 @@ TEST(Traversal, dualTraversalAllPairs)
  * a inside the focus and b outside.
  */
 template<class KeyType>
-void dualTraversalNeighbors()
+void dualTraversalNeighbors(const Box<float>& box, unsigned expectedPairs, unsigned expectedMultipolePairs)
 {
     Octree<KeyType> octree;
     auto leaves = makeUniformNLevelTree<KeyType>(64, 1);
     octree.update(leaves.data(), nNodes(leaves));
 
-    Box<float> box(0, 1);
-    const auto axesBits = getBoxDimensionBits<float, KeyType, Box<float>>(box);
-
-    KeyType focusStart = octree.codeStart(octree.toInternal(0));
-    KeyType focusEnd   = octree.codeStart(octree.toInternal(8));
-
-    auto crossFocusSurfacePairs =
-        [focusStart, focusEnd, &tree = octree, &box, &axesBits](TreeNodeIndex a, TreeNodeIndex b)
-    {
-        bool aFocusOverlap = overlapTwoRanges(focusStart, focusEnd, tree.codeStart(a), tree.codeEnd(a));
-        bool bInFocus      = containedIn(tree.codeStart(b), tree.codeEnd(b), focusStart, focusEnd);
-        if (!aFocusOverlap || bInFocus) { return false; }
-
-        IBox aBox = sfcIBox(sfcKey(tree.codeStart(a)), tree.level(a), axesBits);
-        IBox bBox = sfcIBox(sfcKey(tree.codeStart(b)), tree.level(b), axesBits);
-        return minDistanceSq<KeyType>(aBox, bBox, box) == 0.0;
-    };
-
-    std::vector<util::array<TreeNodeIndex, 2>> pairs;
-    auto p2p = [&pairs](TreeNodeIndex a, TreeNodeIndex b) { pairs.push_back({a, b}); };
-
-    auto m2l = [](TreeNodeIndex, TreeNodeIndex) {};
-
-    dualTraversal(octree.childOffsets().data(), 0, 0, crossFocusSurfacePairs, m2l, p2p);
-
-    EXPECT_EQ(pairs.size(), 61);
-    std::sort(begin(pairs), end(pairs));
-    for (auto p : pairs)
-    {
-        auto a = p[0];
-        auto b = p[1];
-        // a in focus
-        EXPECT_TRUE(octree.codeStart(a) >= focusStart && octree.codeEnd(a) <= focusEnd);
-        // b outside focus
-        EXPECT_TRUE(octree.codeStart(b) >= focusEnd || octree.codeEnd(a) <= focusStart);
-        // a and be touch each other
-        IBox aBox = sfcIBox(sfcKey(octree.codeStart(a)), octree.level(a), axesBits);
-        IBox bBox = sfcIBox(sfcKey(octree.codeStart(b)), octree.level(b), axesBits);
-        EXPECT_FLOAT_EQ((minDistanceSq<KeyType>(aBox, bBox, box)), 0.0);
-    }
-}
-
-TEST(Traversal, dualTraversalNeighbors)
-{
-    dualTraversalNeighbors<unsigned>();
-    dualTraversalNeighbors<uint64_t>();
-}
-
-/*! @brief dual traversal with A, B across a focus range and touching each other
- *
- * This finds all pairs of leaves (a,b) that touch each other and with
- * a inside the focus and b outside.
- */
-template<class KeyType>
-void dualTraversalNeighborsMixD()
-{
-    Octree<KeyType> octree;
-    auto leaves = makeUniformNLevelTree<KeyType>(64, 1);
-    octree.update(leaves.data(), nNodes(leaves));
-
-    Box<float> box{0, 1, 0, 0.015625, 0, 0.00390625};
     const auto axesBits = getBoxDimensionBits<float, KeyType, Box<float>>(box);
 
     for (TreeNodeIndex i = 0; i < octree.numTreeNodes(); ++i)
@@ -241,7 +180,7 @@ void dualTraversalNeighborsMixD()
 
     dualTraversal(octree.childOffsets().data(), 0, 0, crossFocusSurfacePairs, m2l, p2p);
 
-    EXPECT_EQ(peer_pairs.size(), 1);
+    EXPECT_EQ(peer_pairs.size(), expectedPairs);
     std::sort(begin(peer_pairs), end(peer_pairs));
     for (auto p : peer_pairs)
     {
@@ -256,13 +195,15 @@ void dualTraversalNeighborsMixD()
         IBox bBox = sfcIBox(sfcKey(octree.codeStart(b)), octree.level(b), axesBits);
         EXPECT_FLOAT_EQ((minDistanceSq<KeyType>(aBox, bBox, box)), 0.0);
     }
-    EXPECT_EQ(multipole_pairs.size(), 2);
+    EXPECT_EQ(multipole_pairs.size(), expectedMultipolePairs);
 }
 
-TEST(Traversal, dualTraversalNeighborsMixD)
+TEST(Traversal, dualTraversalNeighbors)
 {
-    dualTraversalNeighborsMixD<unsigned>();
-    dualTraversalNeighborsMixD<uint64_t>();
+    dualTraversalNeighbors<unsigned>({0, 1}, 61, 50);
+    dualTraversalNeighbors<uint64_t>({0, 1}, 61, 50);
+    dualTraversalNeighbors<unsigned>({0, 1, 0, 0.015625, 0, 0.00390625}, 1, 2);
+    dualTraversalNeighbors<uint64_t>({0, 1, 0, 0.015625, 0, 0.00390625}, 1, 2);
 }
 
 } // namespace cstone
