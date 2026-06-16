@@ -215,8 +215,6 @@ void markMacs(const KeyType* prefixes,
     KeyType focusEnd   = focusNodes[numFocusNodes];
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{};
 
 #pragma omp parallel for schedule(dynamic)
     for (TreeNodeIndex i = 0; i < numFocusNodes; ++i)
@@ -227,11 +225,7 @@ void markMacs(const KeyType* prefixes,
 
         IBox targetExt = IBox(target.xmin() - 1, target.xmax() + 1, target.ymin() - 1, target.ymax() + 1,
                               target.zmin() - 1, target.zmax() + 1);
-        if (useMixD && containedIn(focusStart, focusEnd, targetExt, mixDBits.bx, mixDBits.by, mixDBits.bz))
-        {
-            continue;
-        }
-        if (!useMixD && containedIn(focusStart, focusEnd, targetExt)) { continue; }
+        if (containedIn(focusStart, focusEnd, targetExt, mixDBits.bx, mixDBits.by, mixDBits.bz)) { continue; }
 
         auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
         assert(targetSize[0] != 0 && targetSize[1] != 0 && targetSize[2] != 0);
