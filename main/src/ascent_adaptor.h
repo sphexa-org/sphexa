@@ -68,7 +68,6 @@ void Initialize([[maybe_unused]] DataType& d, [[maybe_unused]] long startIndex)
 
     conduit::Node scenes;
     scenes["s1/plots/p1/type"] = "pseudocolor";
-    // scenes["s1/plots/p1/field"] = "p";
     scenes["s1/plots/p1/field"] = "density";
     scenes["s1/plots/p1/pipeline"] = "pl_threshold_thin_clip_z";
     scenes["s1/plots/p1/min_value"] = 1;
