@@ -88,8 +88,7 @@ void sortBySfcKey(std::vector<T>& x, std::vector<T>& y, std::vector<T>& z, cston
     std::vector<KeyType> keys(blockSize);
     if (useMixD)
     {
-        computeSfcMixDKeys(x.data(), y.data(), z.data(), cstone::SfcMixDKindPointer(keys.data()), blockSize, globalBox,
-                           mixDBits.bx, mixDBits.by, mixDBits.bz);
+        computeSfcMixDKeys(x.data(), y.data(), z.data(), cstone::sfcKindPointer(keys.data()), blockSize, globalBox);
     }
     else { computeSfcKeys(x.data(), y.data(), z.data(), cstone::sfcKindPointer(keys.data()), blockSize, globalBox); }
 

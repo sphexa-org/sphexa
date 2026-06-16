@@ -152,6 +152,8 @@ public:
         cstone::Box<T> box(0, 1);
         box.loadOrStore(reader);
 
+        const auto mixDBits = cstone::getBoxMixDimensionBits<T, KeyType, cstone::Box<T>>(box);
+
         auto& d = simData.hydro;
         d.loadOrStoreAttributes(reader);
 
@@ -206,7 +208,7 @@ public:
 
                 for (int j = 1; j < numSplits; ++j)
                 {
-                    auto [ixj, iyj, izj] = cstone::decodeSfc(cstone::sfcKey(keys[i] + j * keyDelta));
+                    auto [ixj, iyj, izj] = cstone::decodeSfc(cstone::sfcKey(keys[i] + j * keyDelta), mixDBits.bx, mixDBits.by, mixDBits.bz);
 
                     x[sIdx + j] = box.xmin() + (ixj * box.lx()) / cstone::maxCoord<KeyType>{};
                     y[sIdx + j] = box.ymin() + (iyj * box.ly()) / cstone::maxCoord<KeyType>{};

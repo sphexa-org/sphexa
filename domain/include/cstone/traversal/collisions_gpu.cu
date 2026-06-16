@@ -48,7 +48,7 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
         const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
 
         // if the halo box is fully inside the assigned SFC range, we skip collision detection
-        if (containedIn(lowestKey, highestKey, tC, tS, box, mixDBits.bx, mixDBits.by, mixDBits.bz)) { return; }
+        if (containedIn(lowestKey, highestKey, tC, tS, box)) { return; }
 
         // mark all colliding node indices outside [lowestKey:highestKey]
         findCollisions(nodePrefixes, childOffsets, parents, nodeCenters, nodeSizes, tC, tS, box, lowestKey, highestKey,
@@ -109,7 +109,7 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
     KeyType focusEnd   = focusNodes[numFocusNodes];
 
     IBox target =
-        sfcIBox(sfcMixDKey(focusNodes[tid]), sfcMixDKey(focusNodes[tid + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz);
+        sfcIBox(sfcKey(focusNodes[tid]), sfcKey(focusNodes[tid + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz);
     if (target == IBox{}) { return; }
     IBox targetExt = IBox(target.xmin() - 1, target.xmax() + 1, target.ymin() - 1, target.ymax() + 1, target.zmin() - 1,
                           target.zmax() + 1);

@@ -82,7 +82,7 @@ std::vector<Integer> makeRandomGaussianKeys(size_t numKeys,
             unsigned px = randCoord(distX, (1u << bx) - 1);
             unsigned py = randCoord(distY, (1u << by) - 1);
             unsigned pz = randCoord(distZ, (1u << bz) - 1);
-            ret[i]      = iHilbertMixD<Integer>(px, py, pz, bx, by, bz);
+            ret[i]      = iHilbert<Integer>(px, py, pz, bx, by, bz);
         }
     }
     else
@@ -215,13 +215,8 @@ protected:
     {
         std::size_t n = x_.size();
         auto keyData  = (KeyType*)(codes_.data());
-        if constexpr (std::is_same_v<KeyType, SfcMixDKind<Integer>>)
-        {
-            const auto mixDBits = getBoxMixDimensionBits<T, Integer>(box_);
-            computeSfcMixDKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_, mixDBits.bx, mixDBits.by,
-                               mixDBits.bz);
-        }
-        else { computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_); }
+
+        computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_);
 
         std::vector<LocalIndex> sfcOrder(n);
         std::iota(begin(sfcOrder), end(sfcOrder), LocalIndex(0));

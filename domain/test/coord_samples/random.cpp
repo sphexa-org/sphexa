@@ -41,12 +41,11 @@ TEST(CoordinateSamples, randomMixDContainerIsSorted)
     int n             = 100;
 
     Box<real> box{-240, 480, 0, 512, 0, 1};
-    RandomCoordinates<real, SfcMixDKind<IntegerType>> c(n, box);
+    RandomCoordinates<real, SfcKind<IntegerType>> c(n, box);
 
     const auto mixDBits = getBoxMixDimensionBits<real, IntegerType>(box);
     std::vector<IntegerType> testCodes(n);
-    computeSfcMixDKeys(c.x().data(), c.y().data(), c.z().data(), SfcMixDKindPointer(testCodes.data()), n, box,
-                       mixDBits.bx, mixDBits.by, mixDBits.bz);
+    computeSfcKeys(c.x().data(), c.y().data(), c.z().data(), sfcKindPointer(testCodes.data()), n, box);
 
     EXPECT_TRUE(std::is_sorted(testCodes.begin(), testCodes.end()));
 }

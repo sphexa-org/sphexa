@@ -48,11 +48,12 @@ void surfaceDetection()
     fullTree.update(tree.data(), nNodes(tree));
 
     IBox targetBox = makeLevelBox<KeyType>(0, 0, 1, level);
+    const auto mixDBits = getBoxMixDimensionBits<int, KeyType, IBox>(targetBox);
 
     std::vector<IBox> treeBoxes(fullTree.numTreeNodes());
     for (TreeNodeIndex i = 0; i < fullTree.numTreeNodes(); ++i)
     {
-        treeBoxes[i] = sfcIBox(sfcKey(fullTree.codeStart(i)), fullTree.level(i));
+        treeBoxes[i] = sfcIBox(sfcKey(fullTree.codeStart(i)), fullTree.level(i), mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
 
     auto isSurface = [targetBox, bbox = Box<double>(0, 1), boxes = treeBoxes.data()](TreeNodeIndex idx)
@@ -106,7 +107,7 @@ void surfaceDetectionMixDUniform()
     std::vector<IBox> treeBoxes(fullTree.numTreeNodes());
     for (TreeNodeIndex i = 0; i < fullTree.numTreeNodes(); ++i)
     {
-        treeBoxes[i] = sfcIBox(sfcMixDKey(fullTree.codeStart(i)), maxTreeLevel<KeyType>() - fullTree.level(i),
+        treeBoxes[i] = sfcIBox(sfcKey(fullTree.codeStart(i)), fullTree.level(i),
                                mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
 
@@ -161,7 +162,7 @@ void surfaceDetectionMixDNonUniform()
     std::vector<IBox> treeBoxes(fullTree.numTreeNodes());
     for (TreeNodeIndex i = 0; i < fullTree.numTreeNodes(); ++i)
     {
-        treeBoxes[i] = sfcIBox(sfcMixDKey(fullTree.codeStart(i)), maxTreeLevel<KeyType>() - fullTree.level(i),
+        treeBoxes[i] = sfcIBox(sfcKey(fullTree.codeStart(i)), fullTree.level(i),
                                mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
 
@@ -247,18 +248,19 @@ void dualTraversalNeighbors()
     octree.update(leaves.data(), nNodes(leaves));
 
     Box<float> box(0, 1);
+    const auto mixDBits = getBoxMixDimensionBits<float, KeyType, Box<float>>(box);
 
     KeyType focusStart = octree.codeStart(octree.toInternal(0));
     KeyType focusEnd   = octree.codeStart(octree.toInternal(8));
 
-    auto crossFocusSurfacePairs = [focusStart, focusEnd, &tree = octree, &box](TreeNodeIndex a, TreeNodeIndex b)
+    auto crossFocusSurfacePairs = [focusStart, focusEnd, &tree = octree, &box, &mixDBits](TreeNodeIndex a, TreeNodeIndex b)
     {
         bool aFocusOverlap = overlapTwoRanges(focusStart, focusEnd, tree.codeStart(a), tree.codeEnd(a));
         bool bInFocus      = containedIn(tree.codeStart(b), tree.codeEnd(b), focusStart, focusEnd);
         if (!aFocusOverlap || bInFocus) { return false; }
 
-        IBox aBox = sfcIBox(sfcKey(tree.codeStart(a)), tree.level(a));
-        IBox bBox = sfcIBox(sfcKey(tree.codeStart(b)), tree.level(b));
+        IBox aBox = sfcIBox(sfcKey(tree.codeStart(a)), tree.level(a), mixDBits.bx, mixDBits.by, mixDBits.bz);
+        IBox bBox = sfcIBox(sfcKey(tree.codeStart(b)), tree.level(b), mixDBits.bx, mixDBits.by, mixDBits.bz);
         return minDistanceSq<KeyType>(aBox, bBox, box) == 0.0;
     };
 
@@ -280,8 +282,8 @@ void dualTraversalNeighbors()
         // b outside focus
         EXPECT_TRUE(octree.codeStart(b) >= focusEnd || octree.codeEnd(a) <= focusStart);
         // a and be touch each other
-        IBox aBox = sfcIBox(sfcKey(octree.codeStart(a)), octree.level(a));
-        IBox bBox = sfcIBox(sfcKey(octree.codeStart(b)), octree.level(b));
+        IBox aBox = sfcIBox(sfcKey(octree.codeStart(a)), octree.level(a), mixDBits.bx, mixDBits.by, mixDBits.bz);
+        IBox bBox = sfcIBox(sfcKey(octree.codeStart(b)), octree.level(b), mixDBits.bx, mixDBits.by, mixDBits.bz);
         EXPECT_FLOAT_EQ((minDistanceSq<KeyType>(aBox, bBox, box)), 0.0);
     }
 }
@@ -309,7 +311,7 @@ void dualTraversalNeighborsMixD()
 
     for (TreeNodeIndex i = 0; i < octree.numTreeNodes(); ++i)
     {
-        const auto box = sfcIBox(sfcMixDKey(octree.codeStart(i)), maxTreeLevel<KeyType>() - octree.level(i),
+        const auto box = sfcIBox(sfcKey(octree.codeStart(i)), octree.level(i),
                                  mixDBits.bx, mixDBits.by, mixDBits.bz);
         if (box == IBox(0, 0, 0, 0, 0, 0)) { continue; }
     }
@@ -324,9 +326,9 @@ void dualTraversalNeighborsMixD()
         bool bInFocus      = containedIn(tree.codeStart(b), tree.codeEnd(b), focusStart, focusEnd);
         if (!aFocusOverlap || bInFocus) { return false; }
 
-        IBox aBox = sfcIBox(sfcMixDKey(tree.codeStart(a)), maxTreeLevel<KeyType>() - tree.level(a), mixDBits.bx,
+        IBox aBox = sfcIBox(sfcKey(tree.codeStart(a)), tree.level(a), mixDBits.bx,
                             mixDBits.by, mixDBits.bz);
-        IBox bBox = sfcIBox(sfcMixDKey(tree.codeStart(b)), maxTreeLevel<KeyType>() - tree.level(b), mixDBits.bx,
+        IBox bBox = sfcIBox(sfcKey(tree.codeStart(b)), tree.level(b), mixDBits.bx,
                             mixDBits.by, mixDBits.bz);
         const auto distance{minDistanceSq<KeyType>(aBox, bBox, box)};
         return std::abs(distance) < 1e-6;
@@ -338,9 +340,9 @@ void dualTraversalNeighborsMixD()
     std::vector<util::array<TreeNodeIndex, 2>> multipole_pairs;
     auto m2l = [&multipole_pairs, &tree = octree, &mixDBits, &box](TreeNodeIndex a, TreeNodeIndex b)
     {
-        IBox aBox = sfcIBox(sfcMixDKey(tree.codeStart(a)), maxTreeLevel<KeyType>() - tree.level(a), mixDBits.bx,
+        IBox aBox = sfcIBox(sfcKey(tree.codeStart(a)), tree.level(a), mixDBits.bx,
                             mixDBits.by, mixDBits.bz);
-        IBox bBox = sfcIBox(sfcMixDKey(tree.codeStart(b)), maxTreeLevel<KeyType>() - tree.level(b), mixDBits.bx,
+        IBox bBox = sfcIBox(sfcKey(tree.codeStart(b)), tree.level(b), mixDBits.bx,
                             mixDBits.by, mixDBits.bz);
         const auto distance{minDistanceSq<KeyType>(aBox, bBox, box)};
         if (std::abs(distance) < 1e-6) { multipole_pairs.push_back({a, b}); }
@@ -359,9 +361,9 @@ void dualTraversalNeighborsMixD()
         // b outside focus
         EXPECT_TRUE(octree.codeStart(b) >= focusEnd || octree.codeEnd(a) <= focusStart);
         // a and be touch each other
-        IBox aBox = sfcIBox(sfcMixDKey(octree.codeStart(a)), maxTreeLevel<KeyType>() - octree.level(a), mixDBits.bx,
+        IBox aBox = sfcIBox(sfcKey(octree.codeStart(a)), octree.level(a), mixDBits.bx,
                             mixDBits.by, mixDBits.bz);
-        IBox bBox = sfcIBox(sfcMixDKey(octree.codeStart(b)), maxTreeLevel<KeyType>() - octree.level(b), mixDBits.bx,
+        IBox bBox = sfcIBox(sfcKey(octree.codeStart(b)), octree.level(b), mixDBits.bx,
                             mixDBits.by, mixDBits.bz);
         EXPECT_FLOAT_EQ((minDistanceSq<KeyType>(aBox, bBox, box)), 0.0);
     }

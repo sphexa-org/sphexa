@@ -54,8 +54,6 @@ std::vector<int> findPeersMac(int myRank,
     KeyType domainEnd   = assignment[myRank + 1];
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{};
 
     constexpr float roundOff  = 1 + 1e-6; // ensure that peers are picked up in case of a numerical tie
     const Vec3<int> maxCoords = {(1 << mixDBits.bx), (1 << mixDBits.by), (1 << mixDBits.bz)};
@@ -76,17 +74,15 @@ std::vector<int> findPeersMac(int myRank,
         // node a has to overlap/be contained in the focus, while b must not be inside it
         if (!aFocusOverlap || bInFocus) { return false; }
 
-        IBox aBox = useMixD ? sfcIBox(sfcMixDKey(ka1), maxTreeLevel<KeyType>{} - treeLevel(ka2 - ka1), mixDBits.bx,
-                                      mixDBits.by, mixDBits.bz)
-                            : sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1));
+        IBox aBox = sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1), mixDBits.bx,
+                            mixDBits.by, mixDBits.bz);
         if (aBox.xmax() == 0 && aBox.xmin() == 0 && aBox.ymax() == 0 && aBox.ymin() == 0 && aBox.zmax() == 0 &&
             aBox.zmin() == 0)
         {
             return false; // skip empty boxes
         }
-        IBox bBox = useMixD ? sfcIBox(sfcMixDKey(kb1), maxTreeLevel<KeyType>{} - treeLevel(kb2 - kb1), mixDBits.bx,
-                                      mixDBits.by, mixDBits.bz)
-                            : sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1));
+        IBox bBox = sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1), mixDBits.bx,
+                            mixDBits.by, mixDBits.bz);
         if (bBox.xmax() == 0 && bBox.xmin() == 0 && bBox.ymax() == 0 && bBox.ymin() == 0 && bBox.zmax() == 0 &&
             bBox.zmin() == 0)
         {
@@ -141,8 +137,6 @@ std::vector<int> findPeersMacStt(int myRank,
     TreeNodeIndex lastLeaf  = findNodeAbove(leaves, octree.numLeafNodes, domainEnd);
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
-                         mixDBits.bz != maxTreeLevel<KeyType>{};
 
     const Vec3<int> maxCoords = {(1 << mixDBits.bx), (1 << mixDBits.by), (1 << mixDBits.bz)};
     const Vec3<T> gridStep    = {box.lx() / maxCoords[0], box.ly() / maxCoords[1], box.lz() / maxCoords[2]};
@@ -158,25 +152,21 @@ std::vector<int> findPeersMacStt(int myRank,
 #pragma omp parallel for
     for (TreeNodeIndex i = firstLeaf; i < lastLeaf; ++i)
     {
-        IBox target =
-            useMixD ? sfcIBox(sfcMixDKey(leaves[i]), sfcMixDKey(leaves[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz)
-                    : sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]));
+        IBox target = sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz);
         if (target.xmax() - target.xmin() == 0 && target.ymax() - target.ymin() == 0 &&
             target.zmax() - target.zmin() == 0)
         {
             continue; // skip empty boxes
         }
 
-        auto violatesMac = [target, ellipse, pbc, &octree, domainStart, domainEnd, mixDBits, useMixD](TreeNodeIndex idx)
+        auto violatesMac = [target, ellipse, pbc, &octree, domainStart, domainEnd, mixDBits](TreeNodeIndex idx)
         {
             auto [nodeStart, nodeEnd] = decodePlaceholderBit2K(octree.prefixes[idx]);
             // if the tree node with index idx is fully contained in the focus, we stop traversal
             if (containedIn(nodeStart, nodeEnd, domainStart, domainEnd)) { return false; }
 
-            IBox source = useMixD
-                              ? sfcIBox(sfcMixDKey(nodeStart), maxTreeLevel<KeyType>{} - treeLevel(nodeEnd - nodeStart),
-                                        mixDBits.bx, mixDBits.by, mixDBits.bz)
-                              : sfcIBox(sfcKey(nodeStart), treeLevel(nodeEnd - nodeStart));
+            IBox source = sfcIBox(sfcKey(nodeStart), treeLevel(nodeEnd - nodeStart),
+                                        mixDBits.bx, mixDBits.by, mixDBits.bz);
             if (source.xmax() == 0 && source.xmin() == 0 && source.ymax() == 0 && source.ymin() == 0 &&
                 source.zmax() == 0 && source.zmin() == 0)
             {

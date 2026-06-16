@@ -93,8 +93,8 @@ TEST(FocusedOctree, sourceCenterUpsweep)
 {
     computeSourceCenter<unsigned, SfcKind>(Box<double>(-1, 1));
     computeSourceCenter<uint64_t, SfcKind>(Box<double>(-1, 1));
-    computeSourceCenter<unsigned, SfcMixDKind>(Box<double>(0, 1, 0, 0.015625, 0, 0.00390625));
-    computeSourceCenter<uint64_t, SfcMixDKind>(Box<double>(0, 1, 0, 0.015625, 0, 0.00390625));
+    computeSourceCenter<unsigned, SfcKind>(Box<double>(0, 1, 0, 0.015625, 0, 0.00390625));
+    computeSourceCenter<uint64_t, SfcKind>(Box<double>(0, 1, 0, 0.015625, 0, 0.00390625));
 }
 
 } // namespace cstone

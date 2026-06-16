@@ -418,7 +418,7 @@ static void computeEssentialTreeMixD()
     int nParticles        = 200000;
     unsigned csBucketSize = 16;
 
-    auto coords = RandomCoordinates<double, SfcMixDKind<KeyType>>(nParticles, box);
+    auto coords = RandomCoordinates<double, SfcKind<KeyType>>(nParticles, box);
     auto keys   = coords.particleKeys();
 
     auto [csTree, csCounts] = computeOctree<KeyType>(keys, csBucketSize);

@@ -45,7 +45,7 @@ HOST_DEVICE_FUN Vec4<T> computeMinMacR2(KeyType prefix, float invThetaEff, const
     KeyType nodeKey     = decodePlaceholderBit(prefix);
     int prefixLength    = decodePrefixLength(prefix);
 
-    IBox cellBox = sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - (prefixLength / 3), mixDBits.bx, mixDBits.by,
+    IBox cellBox = sfcIBox(sfcKey(nodeKey), prefixLength / 3, mixDBits.bx, mixDBits.by,
                            mixDBits.bz);
     auto [geoCenter, geoSize] = centerAndSize<KeyType>(cellBox, box);
 
@@ -71,7 +71,7 @@ HOST_DEVICE_FUN T computeVecMacR2(KeyType prefix, Vec3<T> expCenter, float invTh
 
     const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(box);
 
-    IBox cellBox = sfcIBox(sfcMixDKey(nodeKey), maxTreeLevel<KeyType>{} - (prefixLength / 3), mixDBits.bx, mixDBits.by,
+    IBox cellBox = sfcIBox(sfcKey(nodeKey), prefixLength / 3, mixDBits.bx, mixDBits.by,
                            mixDBits.bz);
     auto [geoCenter, geoSize] = centerAndSize<KeyType>(cellBox, box);
 
@@ -222,7 +222,7 @@ void markMacs(const KeyType* prefixes,
     for (TreeNodeIndex i = 0; i < numFocusNodes; ++i)
     {
         IBox target =
-            sfcIBox(sfcMixDKey(focusNodes[i]), sfcMixDKey(focusNodes[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz);
+            sfcIBox(sfcKey(focusNodes[i]), sfcKey(focusNodes[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz);
         if (target == IBox{}) { continue; }
 
         IBox targetExt = IBox(target.xmin() - 1, target.xmax() + 1, target.ymin() - 1, target.ymax() + 1,

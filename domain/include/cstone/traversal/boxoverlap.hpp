@@ -109,8 +109,10 @@ containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box)
         return codeStart == 0 && codeEnd == nodeRange<KeyType>(0);
     }
 
-    KeyType lowCode  = iSfcKey<SfcKind<KeyType>>(box.xmin(), box.ymin(), box.zmin());
-    KeyType highCode = iSfcKey<SfcKind<KeyType>>(box.xmax() - 1, box.ymax() - 1, box.zmax() - 1);
+    const auto mixDBits = getBoxMixDimensionBits<int, KeyType, IBox>(box);
+
+    KeyType lowCode  = iSfcKey<SfcKind<KeyType>>(box.xmin(), box.ymin(), box.zmin(), mixDBits.bx, mixDBits.by, mixDBits.bz);
+    KeyType highCode = iSfcKey<SfcKind<KeyType>>(box.xmax() - 1, box.ymax() - 1, box.zmax() - 1, mixDBits.bx, mixDBits.by, mixDBits.bz);
     auto envelope    = smallestCommonBox(lowCode, highCode);
 
     return (util::get<0>(envelope) >= codeStart) && (util::get<1>(envelope) <= codeEnd);
@@ -136,8 +138,8 @@ containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box, unsigned bx, un
         return codeStart == 0 && codeEnd == nodeRange<KeyType>(0);
     }
 
-    KeyType lowCode  = iSfcMixDKey<SfcMixDKind<KeyType>>(box.xmin(), box.ymin(), box.zmin(), bx, by, bz);
-    KeyType highCode = iSfcMixDKey<SfcMixDKind<KeyType>>(box.xmax() - 1, box.ymax() - 1, box.zmax() - 1, bx, by, bz);
+    KeyType lowCode  = iSfcKey<SfcKind<KeyType>>(box.xmin(), box.ymin(), box.zmin(), bx, by, bz);
+    KeyType highCode = iSfcKey<SfcKind<KeyType>>(box.xmax() - 1, box.ymax() - 1, box.zmax() - 1, bx, by, bz);
     auto envelope    = smallestCommonBox(lowCode, highCode);
 
     return (util::get<0>(envelope) >= codeStart) && (util::get<1>(envelope) <= codeEnd);
@@ -207,8 +209,8 @@ HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool> containedIn(
     const auto gridUnitZ = box.lz() * (Tc(1) / (1u << mixDBits.bz));
     boxMax += Vec3<Tc>{gridUnitX, gridUnitY, gridUnitZ};
 
-    KeyType lowCode  = sfcMixD<SfcMixDKind<KeyType>>(boxMin[0], boxMin[1], boxMin[2], box, bx, by, bz);
-    KeyType highCode = sfcMixD<SfcMixDKind<KeyType>>(boxMax[0], boxMax[1], boxMax[2], box, bx, by, bz);
+    KeyType lowCode  = sfc3D<SfcKind<KeyType>>(boxMin[0], boxMin[1], boxMin[2], box);
+    KeyType highCode = sfc3D<SfcKind<KeyType>>(boxMax[0], boxMax[1], boxMax[2], box);
     auto envelope    = smallestCommonBox(lowCode, highCode);
 
     return (util::get<0>(envelope) >= codeStart) && (util::get<1>(envelope) <= codeEnd);

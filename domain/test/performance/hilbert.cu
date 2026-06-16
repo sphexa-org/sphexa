@@ -32,31 +32,31 @@ using namespace cstone;
 
 template<class KeyType>
 __global__ void
-computeSfcKeysKernel(KeyType* keys, const unsigned* x, const unsigned* y, const unsigned* z, size_t numKeys)
+computeSfcKeysKernel(KeyType* keys, const unsigned* x, const unsigned* y, const unsigned* z, size_t numKeys, unsigned bx, unsigned by, unsigned bz)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < numKeys) { keys[tid] = iSfcKey<KeyType>(x[tid], y[tid], z[tid]); }
+    if (tid < numKeys) { keys[tid] = iSfcKey<KeyType>(x[tid], y[tid], z[tid], bx, by, bz); }
 }
 
 template<class KeyType>
-inline void computeSfcKeys(KeyType* keys, const unsigned* x, const unsigned* y, const unsigned* z, size_t numKeys)
+inline void computeSfcKeys(KeyType* keys, const unsigned* x, const unsigned* y, const unsigned* z, size_t numKeys, unsigned bx, unsigned by, unsigned bz)
 {
     constexpr int threadsPerBlock = 256;
-    computeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock>>>(keys, x, y, z, numKeys);
+    computeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock>>>(keys, x, y, z, numKeys, bx, by, bz);
 }
 
 template<class KeyType>
-__global__ void decodeSfcKeysKernel(const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, size_t numKeys)
+__global__ void decodeSfcKeysKernel(const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, size_t numKeys, unsigned bx, unsigned by, unsigned bz)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < numKeys) { util::tie(x[tid], y[tid], z[tid]) = decodeSfc(keys[tid]); }
+    if (tid < numKeys) { util::tie(x[tid], y[tid], z[tid]) = decodeSfc(keys[tid], bx, by, bz); }
 }
 
 template<class KeyType>
-inline void decodeSfcKeys(const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, size_t numKeys)
+inline void decodeSfcKeys(const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, size_t numKeys, unsigned bx, unsigned by, unsigned bz)
 {
     constexpr int threadsPerBlock = 256;
-    decodeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock>>>(keys, x, y, z, numKeys);
+    decodeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock>>>(keys, x, y, z, numKeys, bx, by, bz);
 }
 
 int main()
@@ -66,6 +66,7 @@ int main()
 
     using Real = double;
     Box<Real> box(-1, 1);
+    const auto mixDBits = getBoxMixDimensionBits<Real, IntegerType, Box<Real>>(box);
 
     std::mt19937 gen;
     std::uniform_real_distribution<Real> distribution(box.xmin(), box.xmax());
@@ -99,9 +100,9 @@ int main()
         thrust::device_vector<unsigned> dz = iz;
 
         auto computeHilbert = [&]()
-        { computeSfcKeys(rawPtr(hilbertKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys); };
+        { computeSfcKeys(rawPtr(hilbertKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, mixDBits.bx, mixDBits.by, mixDBits.bz); };
 
-        auto computeMorton = [&]() { computeSfcKeys(rawPtr(mortonKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys); };
+        auto computeMorton = [&]() { computeSfcKeys(rawPtr(mortonKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, mixDBits.bx, mixDBits.by, mixDBits.bz); };
 
         float t_hilbert = timeGpu(computeHilbert);
         float t_morton  = timeGpu(computeMorton);
@@ -113,7 +114,7 @@ int main()
         thrust::device_vector<unsigned> dz2(numKeys);
 
         auto decodeHilbert = [&]()
-        { decodeSfcKeys(rawPtr(hilbertKeys), rawPtr(dx2), rawPtr(dy2), rawPtr(dz2), numKeys); };
+        { decodeSfcKeys(rawPtr(hilbertKeys), rawPtr(dx2), rawPtr(dy2), rawPtr(dz2), numKeys, mixDBits.bx, mixDBits.by, mixDBits.bz); };
 
         float t_decode  = timeGpu(decodeHilbert);
         bool passDecode = thrust::equal(dx.begin(), dx.end(), dx2.begin()) &&

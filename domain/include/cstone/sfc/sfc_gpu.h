@@ -23,37 +23,11 @@ namespace cstone
 template<class KeyType, class T>
 extern void computeSfcKeysGpu(const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box);
 
-template<class KeyType, class T>
-extern void computeSfcMixDKeysGpu(const T* x,
-                                  const T* y,
-                                  const T* z,
-                                  KeyType* keys,
-                                  size_t numKeys,
-                                  const Box<T>& box,
-                                  unsigned bx,
-                                  unsigned by,
-                                  unsigned bz);
-
 template<bool useGpu, class KeyType, class T>
 void computeSfcKeys(const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box)
 {
     if constexpr (useGpu) { computeSfcKeysGpu(x, y, z, keys, numKeys, box); }
     else { computeSfcKeys(x, y, z, keys, numKeys, box); }
-}
-
-template<bool useGpu, class KeyType, class T>
-void computeSfcMixDKeys(const T* x,
-                        const T* y,
-                        const T* z,
-                        KeyType* keys,
-                        size_t numKeys,
-                        const Box<T>& box,
-                        unsigned bx,
-                        unsigned by,
-                        unsigned bz)
-{
-    if constexpr (useGpu) { computeSfcMixDKeysGpu(x, y, z, keys, numKeys, box, bx, by, bz); }
-    else { computeSfcMixDKeys(x, y, z, keys, numKeys, box, bx, by, bz); }
 }
 
 } // namespace cstone

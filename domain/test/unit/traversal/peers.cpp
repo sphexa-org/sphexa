@@ -49,8 +49,7 @@ static std::vector<int> findPeersAll2All(int myRank,
     std::vector<IBox> boxes(nNodes(tree));
     for (TreeNodeIndex i = 0; i < TreeNodeIndex(nNodes(tree)); ++i)
     {
-        boxes[i] = mixD ? sfcIBox(sfcMixDKey(tree[i]), sfcMixDKey(tree[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz)
-                        : sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]));
+        boxes[i] = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz);
     }
 
     std::vector<int> peers(assignment.numRanks());

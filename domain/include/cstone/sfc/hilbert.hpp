@@ -118,7 +118,7 @@ iHilbert2D(unsigned px, unsigned py, int order = maxTreeLevel<KeyType>{}) noexce
  */
 template<class KeyType>
 constexpr HOST_DEVICE_FUN inline std::enable_if_t<std::is_unsigned_v<KeyType>, KeyType>
-iHilbertMixD(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, unsigned bz) noexcept
+iHilbert(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, unsigned bz) noexcept
 {
     assert(px < (1u << bx));
     assert(py < (1u << by));
@@ -254,7 +254,7 @@ iHilbert2D(unsigned px, unsigned py, int order) noexcept
 //! @brief inverse function of iHilbert3D
 template<class KeyType>
 HOST_DEVICE_FUN inline util::tuple<unsigned, unsigned, unsigned>
-decodeHilbert(KeyType key, unsigned order = maxTreeLevel<KeyType>{}) noexcept
+decodeHilbert3D(KeyType key, unsigned order = maxTreeLevel<KeyType>{}) noexcept
 {
     unsigned px = 0;
     unsigned py = 0;
@@ -335,7 +335,7 @@ decodeHilbert2D(KeyType key, unsigned order = maxTreeLevel<KeyType>{}) noexcept
 //! @brief inverse function of iHilbertMixD
 template<class KeyType>
 HOST_DEVICE_FUN inline util::tuple<unsigned, unsigned, unsigned>
-decodeHilbertMixD(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
+decodeHilbert(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
 {
     // Sort bits[] descending while tracking permutation[] — 3-element sort network (GPU-friendly)
     unsigned bits[3]   = {bx, by, bz};
@@ -400,7 +400,7 @@ decodeHilbertMixD(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
         key &= (static_cast<KeyType>(1) << (3 * bits[2])) - 1;
     }
 
-    const auto pair3D = decodeHilbert<KeyType>(key);
+    const auto pair3D = decodeHilbert3D<KeyType>(key);
     coordinates[0] |= get<0>(pair3D);
     coordinates[1] |= get<1>(pair3D);
     coordinates[2] |= get<2>(pair3D);
@@ -456,39 +456,6 @@ HOST_DEVICE_FUN inline util::tuple<unsigned, unsigned> decodeHilbert2DConstant(K
     return {px, py};
 }
 
-/*! @brief compute the 3D integer coordinate box that contains the key range
- *
- * @tparam KeyType   32- or 64-bit unsigned integer
- * @param  keyStart  lower Hilbert key
- * @param  keyEnd    upper Hilbert key
- * @return           the integer box that contains the given key range
- */
-template<class KeyType>
-HOST_DEVICE_FUN IBox hilbertIBox(KeyType keyStart, unsigned level) noexcept
-{
-    assert(level <= maxTreeLevel<KeyType>{});
-    constexpr unsigned maxCoord = 1u << maxTreeLevel<KeyType>{};
-    unsigned cubeLength         = maxCoord >> level;
-    unsigned mask               = ~(cubeLength - 1);
-
-    auto [ix, iy, iz] = decodeHilbert(keyStart);
-
-    // round integer coordinates down to corner closest to origin
-    ix &= mask;
-    iy &= mask;
-    iz &= mask;
-
-    return IBox(ix, ix + cubeLength, iy, iy + cubeLength, iz, iz + cubeLength);
-}
-
-//! @brief convenience wrapper
-template<class KeyType>
-HOST_DEVICE_FUN IBox hilbertIBoxKeys(KeyType keyStart, KeyType keyEnd) noexcept
-{
-    assert(keyStart <= keyEnd);
-    return hilbertIBox(keyStart, treeLevel(keyEnd - keyStart));
-}
-
 template<class KeyType>
 HOST_DEVICE_FUN bool isValidHilbertMixDKey(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
 {
@@ -538,7 +505,7 @@ HOST_DEVICE_FUN bool isValidHilbertMixDKey(KeyType key, unsigned bx, unsigned by
  * @return           the integer box that contains the given key range
  */
 template<class KeyType>
-HOST_DEVICE_FUN IBox hilbertMixDIBox(KeyType keyStart, unsigned level, unsigned bx, unsigned by, unsigned bz) noexcept
+HOST_DEVICE_FUN IBox hilbertIBox(KeyType keyStart, unsigned level, unsigned bx, unsigned by, unsigned bz) noexcept
 {
     assert(level <= maxTreeLevel<KeyType>{});
     auto isValidKey = isValidHilbertMixDKey(keyStart, bx, by, bz);
@@ -552,7 +519,7 @@ HOST_DEVICE_FUN IBox hilbertMixDIBox(KeyType keyStart, unsigned level, unsigned 
     unsigned maskX       = ~(cubeLengthX - 1);
     unsigned maskY       = ~(cubeLengthY - 1);
     unsigned maskZ       = ~(cubeLengthZ - 1);
-    auto [ix, iy, iz]    = decodeHilbertMixD<KeyType>(keyStart, bx, by, bz);
+    auto [ix, iy, iz]    = decodeHilbert<KeyType>(keyStart, bx, by, bz);
 
     // round integer coordinates down to corner closest to origin
     ix &= maskX;

@@ -85,9 +85,9 @@ NB_MODULE(cstone_sfc, m)
             switch (parseKeyKind(keyType))
             {
                 case KeyKind::uint64:
-                    return static_cast<unsigned>(cstone::maxTreeLevel<cstone::HilbertMixDKey<KeyType64>>{});
+                    return static_cast<unsigned>(cstone::maxTreeLevel<cstone::HilbertKey<KeyType64>>{});
                 case KeyKind::u32:
-                    return static_cast<unsigned>(cstone::maxTreeLevel<cstone::HilbertMixDKey<KeyType32>>{});
+                    return static_cast<unsigned>(cstone::maxTreeLevel<cstone::HilbertKey<KeyType32>>{});
             }
             return 0;
         },
@@ -105,14 +105,14 @@ NB_MODULE(cstone_sfc, m)
                 case KeyKind::uint64:
                 {
                     const auto bits =
-                        cstone::getBoxMixDimensionBits<double, cstone::HilbertMixDKey<KeyType64>, cstone::Box<double>>(
+                        cstone::getBoxMixDimensionBits<double, cstone::HilbertKey<KeyType64>, cstone::Box<double>>(
                             box);
                     return std::array<unsigned, 3>{bits.bx, bits.by, bits.bz};
                 }
                 case KeyKind::u32:
                 {
                     const auto bits =
-                        cstone::getBoxMixDimensionBits<double, cstone::HilbertMixDKey<KeyType32>, cstone::Box<double>>(
+                        cstone::getBoxMixDimensionBits<double, cstone::HilbertKey<KeyType32>, cstone::Box<double>>(
                             box);
                     return std::array<unsigned, 3>{bits.bx, bits.by, bits.bz};
                 }
@@ -130,10 +130,10 @@ NB_MODULE(cstone_sfc, m)
             {
                 case KeyKind::uint64:
                     validateBits<KeyType64>(bx, by, bz);
-                    return std::uint64_t(cstone::iHilbertMixD<KeyType64>(px, py, pz, bx, by, bz));
+                    return std::uint64_t(cstone::iHilbert<KeyType64>(px, py, pz, bx, by, bz));
                 case KeyKind::u32:
                     validateBits<KeyType32>(bx, by, bz);
-                    return std::uint64_t(cstone::iHilbertMixD<KeyType32>(px, py, pz, bx, by, bz));
+                    return std::uint64_t(cstone::iHilbert<KeyType32>(px, py, pz, bx, by, bz));
             }
             return std::uint64_t(0);
         },
@@ -188,7 +188,7 @@ NB_MODULE(cstone_sfc, m)
                 case KeyKind::uint64:
                 {
                     validateBits<KeyType64>(bx, by, bz);
-                    auto [px, py, pz] = cstone::decodeHilbertMixD<KeyType64>(KeyType64(key), bx, by, bz);
+                    auto [px, py, pz] = cstone::decodeHilbert<KeyType64>(KeyType64(key), bx, by, bz);
                     return std::array<unsigned, 3>{px, py, pz};
                 }
                 case KeyKind::u32:
@@ -198,7 +198,7 @@ NB_MODULE(cstone_sfc, m)
                     {
                         throw std::invalid_argument("key does not fit in selected key_type 'unsigned'");
                     }
-                    auto [px, py, pz] = cstone::decodeHilbertMixD<KeyType32>(KeyType32(key), bx, by, bz);
+                    auto [px, py, pz] = cstone::decodeHilbert<KeyType32>(KeyType32(key), bx, by, bz);
                     return std::array<unsigned, 3>{px, py, pz};
                 }
             }
@@ -208,7 +208,7 @@ NB_MODULE(cstone_sfc, m)
         "Decode a mixed-dimension Hilbert key into (px, py, pz) for the selected key type");
 
     m.def(
-        "hilbertMixDIBox",
+        "hilbertIBox",
         [](std::uint64_t key, unsigned level, unsigned bx, unsigned by, unsigned bz, const std::string& keyType)
         {
             switch (parseKeyKind(keyType))
@@ -220,7 +220,7 @@ NB_MODULE(cstone_sfc, m)
                     {
                         throw std::invalid_argument("level must be <= maxTreeLevel for the selected key_type");
                     }
-                    auto ibox = cstone::hilbertMixDIBox<KeyType64>(KeyType64(key), level, bx, by, bz);
+                    auto ibox = cstone::hilbertIBox<KeyType64>(KeyType64(key), level, bx, by, bz);
                     return std::array<int, 6>{ibox.xmin(), ibox.xmax(), ibox.ymin(),
                                               ibox.ymax(), ibox.zmin(), ibox.zmax()};
                 }
@@ -235,7 +235,7 @@ NB_MODULE(cstone_sfc, m)
                     {
                         throw std::invalid_argument("key does not fit in selected key_type 'unsigned'");
                     }
-                    auto ibox = cstone::hilbertMixDIBox<KeyType32>(KeyType32(key), level, bx, by, bz);
+                    auto ibox = cstone::hilbertIBox<KeyType32>(KeyType32(key), level, bx, by, bz);
                     return std::array<int, 6>{ibox.xmin(), ibox.xmax(), ibox.ymin(),
                                               ibox.ymax(), ibox.zmin(), ibox.zmax()};
                 }

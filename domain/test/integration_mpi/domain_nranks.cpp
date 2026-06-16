@@ -72,12 +72,7 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks)
         const bool useMixD  = mixDBits.bx != maxTreeLevel<KeyType>{} || mixDBits.by != maxTreeLevel<KeyType>{} ||
                              mixDBits.bz != maxTreeLevel<KeyType>{};
         EXPECT_EQ(useMixD0, useMixD);
-        if (useMixD)
-        {
-            computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(keysRef.data()), x.size(), box,
-                               mixDBits.bx, mixDBits.by, mixDBits.bz);
-        }
-        else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysRef.data()), x.size(), box); }
+        computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysRef.data()), x.size(), box);
 
         // check that particles are SFC order sorted and the keys are in sync with the x,y,z arrays
         EXPECT_EQ(keys, keysRef);
@@ -108,7 +103,7 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks)
         }
     };
 
-    if (useMixD0) { run(RandomGaussianCoordinates<T, SfcMixDKind<KeyType>>{numParticles, box, 5}); }
+    if (useMixD0) { run(RandomGaussianCoordinates<T, SfcKind<KeyType>>{numParticles, box, 5}); }
     else { run(RandomGaussianCoordinates<T, SfcKind<KeyType>>{numParticles, box, 5}); }
 }
 
@@ -272,7 +267,7 @@ void testAssignmentShift(const Box<double>& box)
 TEST(FocusDomain, assignmentShift)
 {
     testAssignmentShift<unsigned, SfcKind>(Box<double>{0, 1});
-    testAssignmentShift<unsigned, SfcMixDKind>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
+    testAssignmentShift<unsigned, SfcKind>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
 }
 
 template<class KeyType, template<class> class sfcKeyType>
@@ -335,7 +330,7 @@ void removeParticle(const Box<double>& box)
 TEST(FocusDomain, removeParticle)
 {
     removeParticle<unsigned, SfcKind>(Box<double>{0, 1});
-    removeParticle<unsigned, SfcMixDKind>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
+    removeParticle<unsigned, SfcKind>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
 }
 
 template<class KeyType, template<class> class sfcKeyType>
@@ -416,7 +411,7 @@ void testReapplySync(const Box<double>& box)
 TEST(FocusDomain, reapplySync)
 {
     testReapplySync<unsigned, SfcKind>(Box<double>{0, 1});
-    testReapplySync<unsigned, SfcMixDKind>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
+    testReapplySync<unsigned, SfcKind>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
 }
 
 template<class KeyType, class T>
@@ -512,10 +507,12 @@ void randomGaussianGrav(int thisRank, int numRanks)
         spanSfcRange(focusStart, focusEnd, spanningKeys.data());
         spanningKeys.back() = focusEnd;
 
+        const auto mixDBits = getBoxMixDimensionBits<T, KeyType, Box<T>>(domain.box());
+
         std::vector<uint8_t> marks(let_full.numNodes, 0);
         for (std::size_t i = 0; i < nNodes(spanningKeys); ++i)
         {
-            IBox target                     = sfcIBox(sfcKey(spanningKeys[i]), sfcKey(spanningKeys[i + 1]));
+            IBox target                     = sfcIBox(sfcKey(spanningKeys[i]), sfcKey(spanningKeys[i + 1]), mixDBits.bx, mixDBits.by, mixDBits.bz);
             auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
             unsigned maxLevel               = maxTreeLevel<KeyType>{};
 

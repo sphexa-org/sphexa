@@ -111,10 +111,10 @@ public:
     }
 };
 
-TEST_P(FindNeighborsRandom, HilbertUniform32) { check<HilbertMixDKey<uint32_t>, RandomCoordinates>(); }
-TEST_P(FindNeighborsRandom, HilbertUniform64) { check<HilbertMixDKey<uint64_t>, RandomCoordinates>(); }
-TEST_P(FindNeighborsRandom, HilbertGaussian32) { check<HilbertMixDKey<uint32_t>, RandomGaussianCoordinates>(); }
-TEST_P(FindNeighborsRandom, HilbertGaussian64) { check<HilbertMixDKey<uint64_t>, RandomGaussianCoordinates>(); }
+TEST_P(FindNeighborsRandom, HilbertUniform32) { check<HilbertKey<uint32_t>, RandomCoordinates>(); }
+TEST_P(FindNeighborsRandom, HilbertUniform64) { check<HilbertKey<uint64_t>, RandomCoordinates>(); }
+TEST_P(FindNeighborsRandom, HilbertGaussian32) { check<HilbertKey<uint32_t>, RandomGaussianCoordinates>(); }
+TEST_P(FindNeighborsRandom, HilbertGaussian64) { check<HilbertKey<uint64_t>, RandomGaussianCoordinates>(); }
 
 std::array<double, 2> radii{0.124, 0.0624};
 std::array<int, 1> nParticles{2500};

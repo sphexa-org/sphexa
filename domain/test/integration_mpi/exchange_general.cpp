@@ -83,12 +83,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
 
     // Now build the focused tree using distributed algorithms. Each rank only uses its slice.
     std::vector<KeyType> particleKeys(lastAssignedIndex - firstAssignedIndex);
-    if (useMixD)
-    {
-        computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(particleKeys.data()), x.size(), box,
-                           mixDBits.bx, mixDBits.by, mixDBits.bz);
-    }
-    else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box); }
+    computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box);
 
     FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD);
     focusTree.converge(box, particleKeys, assignment, tree, counts, invThetaEff);
@@ -147,10 +142,10 @@ TEST(GeneralFocusExchange, randomGaussian)
     generalExchangeRandomGaussian<uint64_t, double, SfcKind>(rank, nRanks, {-1, 1});
     generalExchangeRandomGaussian<unsigned, float, SfcKind>(rank, nRanks, {-1, 1});
     generalExchangeRandomGaussian<uint64_t, float, SfcKind>(rank, nRanks, {-1, 1});
-    generalExchangeRandomGaussian<unsigned, double, SfcMixDKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
-    generalExchangeRandomGaussian<uint64_t, double, SfcMixDKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
-    generalExchangeRandomGaussian<unsigned, float, SfcMixDKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
-    generalExchangeRandomGaussian<uint64_t, float, SfcMixDKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
+    generalExchangeRandomGaussian<unsigned, double, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
+    generalExchangeRandomGaussian<uint64_t, double, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
+    generalExchangeRandomGaussian<unsigned, float, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
+    generalExchangeRandomGaussian<uint64_t, float, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
 }
 
 template<class KeyType, class T, template<class> class sfcKeyType>
@@ -202,12 +197,7 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>
 
     // Now build the focused tree using distributed algorithms. Each rank only uses its slice.
     std::vector<KeyType> particleKeys(lastAssignedIndex - firstAssignedIndex);
-    if (useMixD)
-    {
-        computeSfcMixDKeys(x.data(), y.data(), z.data(), SfcMixDKindPointer(particleKeys.data()), x.size(), box,
-                           mixDBits.bx, mixDBits.by, mixDBits.bz);
-    }
-    else { computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box); }
+    computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box);
 
     FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD);
     focusTree.converge(box, particleKeys, assignment, tree, counts, invThetaEff);
@@ -247,6 +237,6 @@ TEST(GeneralFocusExchange, sourceCenter)
 
     generalExchangeSourceCenter<uint64_t, double, SfcKind>(rank, nRanks, {-1, 1});
     generalExchangeSourceCenter<unsigned, float, SfcKind>(rank, nRanks, {-1, 1});
-    generalExchangeSourceCenter<uint64_t, double, SfcMixDKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
-    generalExchangeSourceCenter<unsigned, float, SfcMixDKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
+    generalExchangeSourceCenter<uint64_t, double, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
+    generalExchangeSourceCenter<unsigned, float, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
 }

@@ -94,8 +94,7 @@ void findHalos(const KeyType* prefixes,
 #pragma omp parallel for
     for (TreeNodeIndex leafIdx = firstNode; leafIdx < lastNode; ++leafIdx)
     {
-        if (containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box, mixDBits.bx,
-                        mixDBits.by, mixDBits.bz))
+        if (containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box))
         {
             continue;
         }

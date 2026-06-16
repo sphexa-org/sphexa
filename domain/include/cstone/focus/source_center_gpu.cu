@@ -219,7 +219,7 @@ __global__ void computeGeoCentersKernel(const KeyType* prefixes,
     KeyType startKey = decodePlaceholderBit(prefix);
     unsigned level   = decodePrefixLength(prefix) / 3;
     auto nodeBox =
-        sfcIBox(sfcMixDKey<KeyType>(startKey), maxTreeLevel<KeyType>{} - level, mixDBits.bx, mixDBits.by, mixDBits.bz);
+        sfcIBox(sfcKey<KeyType>(startKey), level, mixDBits.bx, mixDBits.by, mixDBits.bz);
     util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box);
 }
 
