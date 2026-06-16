@@ -8,13 +8,16 @@ function(enableInSituViz exename)
                 SPH_EXA_USE_CATALYST2)
         target_link_libraries(${exename} PRIVATE catalyst::catalyst)
     elseif (INSITU STREQUAL "Ascent")
-        target_include_directories(${exename} PRIVATE ..)
+        target_include_directories(${exename} PRIVATE .. ${ASCENT_INCLUDE_DIRS})
         target_compile_definitions(${exename}
                 PRIVATE
                 SPH_EXA_USE_ASCENT)
         target_link_libraries(${exename} PRIVATE ascent::ascent_mpi)
+        set_property(TARGET ${exename} PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+        set_property(TARGET ${exename} PROPERTY CUDA_ARCHITECTURES "90")
     endif ()
 endfunction()
+
 
 set(exename sphexa)
 add_executable(${exename} sphexa.cpp)

@@ -1,208 +1,117 @@
-<details><summary>Piz Daint</summary>
-<p>
-# Piz Daint
-## build with ParaView Catalyst on Piz Daint
+# Ascent
 
-- prgenv:
+<details><summary>Alps/Daint</summary><p>
 
-```
-module load daint-gpu CMake cudatoolkit/11.2.0_3.39-2.1__gf93aa1c
-module load ParaView/5.10.1-CrayGNU-21.09-EGL
-```
+<details><summary>Setup</summary>
 
-- build:
-
-```
-  mkdir buildCatalystDaint
-  cd buildCatalystDaint
-  cmake -S .. \
-    -DCMAKE_CXX_COMPILER=CC \
-    -DINSITU=Catalyst \
-    -DBUILD_ANALYTICAL:BOOL=OFF \
-    -DBUILD_TESTING:BOOL=OFF \
-    -DSPH_EXA_WITH_H5HUT:BOOL=OFF \
-
-  make -j
+```bash
+# git clone https://github.com/sphexa-org/sphexa sphexa.git
+# uenv image pull ascent/0.9.5:v1
+uenv start -v default ascent/0.9.5:v1
 ```
 
-## build with ASCENT on Piz Daint
+⚠️ Ascent will generate images based on the ascent actions (and `cycle`) defined in ascent_adaptor.h, check that file before building:
 
-- prgenv:
-```
-  module load daint-gpu CMake cray-hdf5-parallel Ascent cudatoolkit/11.2.0_3.39-2.1__gf93aa1c
-```
+```bash
+grep -m1 trigger_file sphexa.git/main/src/ascent_adaptor.h  
+  std::string trigger_file = conduit::utils::join_file_path("./","sphexa_Ascent_actions.yaml");
 
-- build:
-
-```
-  mkdir buildAscentDaint
-  cd buildAscentDaint
-  cmake -S .. \
-    -DHDF5_INCLUDE_DIR=$HDF5_DIR/include \
-    -DBUILD_ANALYTICAL:BOOL=OFF \
-    -DBUILD_TESTING:BOOL=OFF \
-    -DSPH_EXA_WITH_H5HUT:BOOL=OFF \
-    -DCMAKE_CXX_COMPILER=CC \
-    -DINSITU=Ascent
-
-  make -j
+grep -m1 cycle sphexa.git/main/src/ascent_adaptor.h
+  std::string condition = "cycle() % 200 == 0";
 ```
 
-</p>
+```bash
+grep addField sphexa.git/main/src/ascent_adaptor.h |grep -v // |cat -n
+     1	void addField(conduit::Node& mesh, const std::string& name, FieldType* field, size_t start, size_t end)
+     2	    addField(mesh, "x", get<"x">(d).data(), startIndex, endIndex);
+     3	    addField(mesh, "y", get<"y">(d).data(), startIndex, endIndex);
+     4	    addField(mesh, "z", get<"z">(d).data(), startIndex, endIndex);
+     5	    addField(mesh, "vx", get<"vx">(d).data(), startIndex, endIndex);
+     6	    addField(mesh, "vy", get<"vy">(d).data(), startIndex, endIndex);
+     7	    addField(mesh, "vz", get<"vz">(d).data(), startIndex, endIndex);
+     8	    addField(mesh, "kx", get<"kx">(d).data(), startIndex, endIndex);
+     9	    addField(mesh, "xm", get<"xm">(d).data(), startIndex, endIndex);
+    10	    addField(mesh, "alpha", get<"alpha">(d).data(), startIndex, endIndex);
+    11	    addField(mesh, "m", get<"m">(d).data(), startIndex, endIndex);
+```    
+
 </details>
 
-<details><summary>Eiger</summary>
-<p>
-# Eiger
-## build with ParaView Catalyst on Eiger
+<details><summary>Build with Ascent in a uenv (cmake)</summary>
 
-- prgenv:
-```
-  module load cpeCray CMake ParaView
-```
-
-- build
-```
-  export GCC_X86_64=/opt/cray/pe/gcc/9.3.0/snos
-  mkdir buildCatalystEiger
-  cd buildCatalystEiger
-  cmake -S .. \
-    -DCMAKE_CXX_COMPILER=CC \
-    -DINSITU=Catalyst \
-    -DBUILD_ANALYTICAL:BOOL=OFF \
-    -DBUILD_TESTING:BOOL=OFF \
-    -DSPH_EXA_WITH_H5HUT:BOOL=OFF
-
-  make sphexa
+```bash
+CC=mpicc CXX=mpicxx \
+cmake \
+-S sphexa.git \
+-B build \
+-DINSITU="Ascent" \
+-DAscent_DIR=$(find /user-tools/ -name ascent | grep ascent- | grep cmake) \
+-DCMAKE_BUILD_TYPE="Debug" \
+-DCMAKE_CUDA_ARCHITECTURES="90" \
+-DCSTONE_WITH_GPU_AWARE_MPI="ON" \
+-DBUILD_TESTING="OFF" -DBUILD_ANALYTICAL="OFF" -DSPH_EXA_WITH_HIP="OFF" -DSPH_EXA_WITH_GRACKLE="OFF" -DSPH_EXA_WITH_DISKS="OFF"
 ```
 
-## build with ASCENT on Eiger
+and then
 
-- prgenv:
-```
-  module load cpeGNU CMake cray-hdf5-parallel Ascent
-```
-
-- build:
-```
-  mkdir buildAscentEiger
-  cd buildAscentEiger
-  cmake -S .. \
-    -DHDF5_INCLUDE_DIR=$HDF5_DIR/include \
-    -DBUILD_ANALYTICAL:BOOL=OFF \
-    -DBUILD_TESTING:BOOL=OFF \
-    -DSPH_EXA_WITH_H5HUT:BOOL=OFF \
-    -DCMAKE_CXX_COMPILER=CC \
-    -DINSITU=Ascent
-
-  make sphexa
+```bash
+cmake --build build -t sphexa-cuda -j
 ```
 
-
-</p>
 </details>
 
+<details><summary>Build with Ascent in a uenv (spack) WIP</summary>
 
-<details><summary>Build and run using Singularity</summary>
-<p>
-
-## Ascent on Piz Daint (Singularity)
-
-It is possible to build and run sphexa with [Singularity](https://user.cscs.ch/tools/containers/singularity/).
-We show here 2 methods (singularity shell and singularity exec).
-Read the other part of this readme file to build and run without Singularity.
-
-### Prg. Environment
 ```bash
-daint101> cd $SCRATCH
-daint101> rm -fr build
-daint101> mkdir build
-daint101> git clone https://github.com/unibas-dmi-hpc/SPH-EXA.git SPH-EXA.git
-daint101> module load singularity/3.8.0
-daint101> singularity pull docker://sphexa/ascent:latest
-# -> ascent_latest.sif
-# NOTE: this .sif image has not been optimized for performance (yet).
+uenv start -v default ascent/0.9.5:rc2
+source spack.git/share/spack/setup-env.sh
+spack env create -d .
+spack -e . config add 'include:[/user-tools/config]'
+spack find -lvp ascent
+
+spack -e . spec sphexa ^ascent+occa+fortran+python # OK
+spack -e . install --add sphexa ^ascent+occa+fortran+python # OK
 ```
 
-### Build
+</details>
+
+<details><summary>Test</summary>
+
 ```bash
-daint101> singularity shell --nv \
---bind $PWD/SPH-EXA.git:/usr/local/games/SPH-EXA.git \
---bind build:/usr/local/games/build \
-./ascent_latest.sif
+rm -fr datasets
+cp ./sphexa.git/scripts/ascent/sphexa_Ascent_actions.yaml .
 
-Singularity> cd /usr/local/games/
-Singularity> cmake -S SPH-EXA.git -B build \
--DINSITU=Ascent \
--DCMAKE_BUILD_TYPE=Debug \
--DCMAKE_CXX_COMPILER=mpicxx \
--DCMAKE_CXX_FLAGS_DEBUG="-g -w" \
--DCMAKE_CUDA_FLAGS='-arch=sm_60' \
--DHDF5_INCLUDE_DIR=/usr/local/HDF_Group/HDF5/1.13.0/include \
--DSPH_EXA_WITH_H5HUT=OFF \
--DBUILD_ANALYTICAL=OFF \
--DBUILD_TESTING=OFF
-
-Singularity> cmake --build build -t sphexa-cuda -j
-
-> [100%] Linking CXX executable sphexa-cuda
-> [100%] Built target sphexa-cuda
-
-Singularity> exit
-```
-The executable can be found in `./build/main/src/sphexa/sphexa-cuda`
-
-### Run
-It is possible to generate an ascent file with a simple job:
-```bash
-init0='cd /usr/local/games/build/main/src/sphexa/'
-init1='ln -fs /usr/local/games/SPH-EXA.git/scripts/trigger_binning_actions.yaml .'
-init2='ln -fs /usr/local/games/SPH-EXA.git/scripts/binning_actions.yaml ascent_actions.yaml'
-args='--init sedov -s 101 -n 30 --prop std --quiet'
-
-daint101> srun -n1 -t10 -Cgpu -A`id -gn` \
-singularity exec --nv \
---bind $PWD/SPH-EXA.git:/usr/local/games/SPH-EXA.git \
---bind build:/usr/local/games/build \
-./ascent_latest.sif \
-bash -c "$init0;$init1;$init2;./sphexa-cuda $args"
+OMP_NUM_THREADS=64 srun \
+-N1 -n4 --ntasks-per-node=4 -t5 -A $(id -gn) \
+./sphexa.git/ci/scripts/cuda-vars.sh \
+./build/main/src/sphexa/sphexa-cuda --init sedov -s 200 -n 100 --quiet
 ```
 
-A typical output is:
+- A succesfull job will generate an image inside `datasets/`
+
+<img src="scripts/ascent/kx.00200.png" alt="ascent_kx_200" width="300"/>
+
+</details>
+
+<details><summary>Troubleshooting</summary>
+
+⚠️ Ascent outputs will be empty when the number of particles per gpu is too small:
+
 ```bash
-# SPHEXA: ascent/bdfec8bd
-# 1 MPI-3.0 process(es) with 24 OpenMP-201511 thread(s)/process
-Data generated for 27000 global particles
+AscentInitialize
 ...
-### Check ### Focus Tree Nodes: 680
+s1/p1 pseudocolor plot yielded no data, i.e., no cells remains
+s1/p2 pseudocolor plot yielded no data, i.e., no cells remains
 ```
-The ascent file can be found in `./build/main/src/sphexa/ascent_session.yaml`.
-It is possible to modify the srun flags in order to run with more gpus.
 
-### Postprocess (with or without singularity)
-Now that `ascent_session.yaml` was created, we can do some plots:
-
+⚠️ Expressions support requires occa:
 ```bash
-daint101> singularity shell --nv \
---bind $PWD/SPH-EXA.git:/usr/local/games/SPH-EXA.git \
---bind build:/usr/local/games/build \
-./ascent_latest.sif
-
-Singularity> cd /usr/local/games/build/main/src/sphexa/
-Singularity> ls -l ascent_session.yaml
-Singularity> ln -s /usr/local/games/SPH-EXA.git/scripts/plot_binning_results.py
-Singularity> export PYTHONPATH=/usr/local/python-modules:$PYTHONPATH
-Singularity> python -c 'import matplotlib ;print(matplotlib.__version__)'
-# 3.1.2
-Singularity> python -c 'import conduit ;print(conduit.__path__)'
-# ['/usr/local/python-modules/conduit']
-Singularity> python plot_binning_results.py
-Singularity> ls -l pdf.png min_max_avg.png
-Singularity> exit
+/user-tools/linux-neoverse_v2/occa-2.0.0-v5z3xa4m7eqt6w4g25qldl26dltxrlyp/bin/occa env |grep ": 1"
+    - OCCA_OPENMP_ENABLED        : 1
+    - OCCA_CUDA_ENABLED          : 1
 ```
-The same script can be run without Singularity.
+
+</details>
 
 </p>
 </details>
-
-

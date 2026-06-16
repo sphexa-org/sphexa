@@ -104,7 +104,7 @@ set_property(CACHE INSITU PROPERTY STRINGS None Catalyst Ascent)
 if(INSITU STREQUAL "Catalyst")
     find_package(catalyst REQUIRED PATHS "$ENV{EBROOTPARAVIEW}/lib/cmake/paraview-5.10")
 elseif(INSITU STREQUAL "Ascent")
-	find_package(Ascent REQUIRED PATHS "$ENV{EBROOTASCENT}/lib/cmake/ascent")
+	find_package(Ascent REQUIRED)
 endif()
 
 option(SPH_EXA_WITH_GRACKLE "Enable radiative cooling with GRACKLE" OFF)

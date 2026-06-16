@@ -10,6 +10,11 @@ if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     endif()
     message(STATUS "MPI include is " ${MPI_CXX_INCLUDE_PATH})
 
+    if (INSITU STREQUAL "Ascent")
+        message(STATUS "Adding MPI include path for Ascent")
+        set(MPI_CXX_INCLUDE_PATH "/user-tools/env/default/include")
+    endif()
+
     # intermdiate object to prevent --hip-link from hipcub to propagate to the final link line
     add_library(ryoanji_obj OBJECT ewald.cu multipole_holder.cu)
     # link to cstone_gpu because of its INTERFACE compile definition
