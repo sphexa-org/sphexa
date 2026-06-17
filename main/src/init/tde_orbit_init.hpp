@@ -126,8 +126,8 @@ public:
 
     [[nodiscard]] const InitSettings& constants() const override { return settings_; }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t n, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t n, Dataset& simData,
+                                                     IFileReader* reader) const override
     {
         BuiltinWriter attributeSetter(settings_);
         simData.hydro.loadOrStoreAttributes(&attributeSetter);

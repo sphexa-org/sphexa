@@ -71,8 +71,8 @@ public:
     {
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                     IFileReader* reader) const override
     {
         auto radialTransform = [](auto r) { return std::sqrt(r); };
         auto globalBox = Base::init(rank, numRanks, cbrtNumPart, simData, reader, settings_.at("r"), radialTransform);

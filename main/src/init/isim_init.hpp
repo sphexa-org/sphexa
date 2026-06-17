@@ -47,12 +47,21 @@ template<class Dataset>
 class ISimInitializer
 {
 public:
-    virtual cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t, Dataset& d,
-                                                         IFileReader*) const = 0;
+    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& d,
+                                                 IFileReader* reader) const
+    {
+        auto box = initImpl(rank, numRanks, cbrtNumPart, d, reader);
+        // runTagging(); do common stuff
+        return box;
+    }
 
     virtual const InitSettings& constants() const = 0;
 
     virtual ~ISimInitializer() = default;
+
+protected:
+    virtual cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t, Dataset& d,
+                                                             IFileReader*) const = 0;
 };
 
 template<class Dataset>
