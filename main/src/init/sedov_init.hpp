@@ -99,6 +99,7 @@ class SedovGrid : public ISimInitializer<Dataset>
 
 public:
     SedovGrid()
+        : ISimInitializer<Dataset>({})
     {
         Dataset d;
         settings_ = buildSettings(d, sedovConstants(), {}, nullptr);
@@ -146,6 +147,7 @@ class SedovGlass : public ISimInitializer<Dataset>
 public:
     SedovGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , ISimInitializer<Dataset>(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, sedovConstants(), settingsFile, reader);

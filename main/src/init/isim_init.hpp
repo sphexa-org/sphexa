@@ -39,6 +39,7 @@
 #include "sphexa/simulation_data.hpp"
 
 #include "settings.hpp"
+#include "io/id_tag_utils.hpp"
 
 namespace sphexa
 {
@@ -47,11 +48,16 @@ template<class Dataset>
 class ISimInitializer
 {
 public:
+    ISimInitializer(std::string settingsFile)
+        : settingsFile_(settingsFile)
+    {
+    }
+
     cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& d,
                                                  IFileReader* reader) const
     {
         auto box = initImpl(rank, numRanks, cbrtNumPart, d, reader);
-        // runTagging(); do common stuff
+        runTagging(reader, d);
         return box;
     }
 
@@ -62,6 +68,65 @@ public:
 protected:
     virtual cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t, Dataset& d,
                                                              IFileReader*) const = 0;
+
+private:
+    std::string settingsFile_;
+
+    void runTagging(IFileReader* reader, Dataset& simData) const
+    {
+        if (settingsFile_.empty()) { return; }
+        auto ids = toHost(simData.hydro.id);
+        auto x   = toHost(simData.hydro.x);
+        auto y   = toHost(simData.hydro.y);
+        auto z   = toHost(simData.hydro.z);
+
+        reader->setStep(settingsFile_, -1, FileMode::independent);
+
+        try
+        {
+            std::vector<IdSelectionSphere> selSpheres;
+            std::vector<unsigned>          sphereGroupIds;
+            auto                           numSpheres4 = reader->fileAttributeSize(idTagFsStrings[0]);
+            selSpheres.resize(numSpheres4 / IdSelectionSphere{}.size());
+            reader->fileAttribute(idTagFsStrings[0], selSpheres.data()->data(), numSpheres4);
+
+            if (reader->fileAttributeSize(idTagFsStrings[1]) != selSpheres.size())
+                throw std::runtime_error("number of selection spheres != number of sphere ids");
+            sphereGroupIds.resize(selSpheres.size());
+            reader->fileAttribute(std::string(idTagFsStrings[1]), sphereGroupIds.data(), selSpheres.size());
+
+            tagIdsInSphere(ids, x, y, z, 0, ids.size(), selSpheres, sphereGroupIds);
+            if (reader->rank() == 0)
+                std::cout << "Tagged particles in " << std::to_string(selSpheres.size()) << " spheres\n";
+        }
+        catch (std::exception& e)
+        {
+            if (reader->rank() == 0) std::cout << "No selection spheres applied because: " << e.what();
+        }
+
+        try
+        {
+            std::vector<uint64_t> selList;
+            std::vector<unsigned> selListGroupIds;
+            auto                  attr_size = reader->fileAttributeSize(idTagFsStrings[2]);
+            selList.resize(attr_size);
+            reader->fileAttribute(std::string(idTagFsStrings[2]), selList.data(), attr_size);
+            if (reader->fileAttributeSize(idTagFsStrings[3]) != attr_size)
+                throw std::runtime_error("id_selection_list size != group_ids size");
+            selListGroupIds.resize(attr_size);
+            reader->fileAttribute(std::string(idTagFsStrings[3]), selListGroupIds.data(), attr_size);
+
+            tagIdsInList(ids, 0, ids.size(), selList, selListGroupIds);
+            if (reader->rank() == 0) std::cout << "Tagged " << std::to_string(attr_size) << " particles from list\n";
+        }
+        catch (std::exception& e)
+        {
+            if (reader->rank() == 0) std::cout << "No selection IDs from list applied because: " << e.what();
+        }
+
+        reader->closeStep();
+        simData.hydro.id = std::move(ids);
+    }
 };
 
 template<class Dataset>

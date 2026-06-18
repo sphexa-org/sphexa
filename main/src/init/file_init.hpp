@@ -100,6 +100,7 @@ public:
     explicit FileInit(const std::string& fname, int initStep_, IFileReader* reader)
         : h5_fname(fname)
         , initStep(initStep_)
+        , ISimInitializer<Dataset>(fname)
     {
         // Read file attributes and put them in settings_ such that they propagate to the new output after a restart
         readFileAttributes(settings_, h5_fname, reader, false);
@@ -128,6 +129,7 @@ public:
     explicit FileSplitInit(const std::string& fname, int numSplits_, IFileReader* reader)
         : h5_fname(fname)
         , numSplits(numSplits_)
+        , ISimInitializer<Dataset>(fname)
     {
         if (numSplits < 1)
         {

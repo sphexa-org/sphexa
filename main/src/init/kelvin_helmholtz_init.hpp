@@ -139,6 +139,7 @@ class KelvinHelmholtzGlass : public ISimInitializer<Dataset>
 public:
     KelvinHelmholtzGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(initBlock)
+        , ISimInitializer<Dataset>(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, KelvinHelmholtzConstants(), settingsFile, reader);
