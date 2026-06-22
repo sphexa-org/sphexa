@@ -87,8 +87,8 @@ public:
         settings_["polytropic_const"] = polytropic_const;
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                     IFileReader* reader) const override
     {
         const double m_total = settings_.at("polytrope::mTotal");
         const double r_total = settings_.at("polytrope::r");
