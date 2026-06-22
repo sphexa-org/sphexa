@@ -56,7 +56,8 @@ extern void macRefineDecisionGpu(const KeyType* prefixes,
                                  execution::Gpu exec);
 
 template<class KeyType>
-extern bool protectAncestorsGpu(const KeyType*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex, execution::Gpu exec);
+extern bool
+protectAncestorsGpu(const KeyType*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex, execution::Gpu exec);
 
 template<class KeyType>
 extern ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,

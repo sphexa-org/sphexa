@@ -56,9 +56,12 @@ extern void computeNodeCountsGpu(const KeyType* tree,
  * @return                 number of nodes in the future rebalanced tree
  */
 template<class KeyType>
-extern TreeNodeIndex computeNodeOpsGpu(
-    const KeyType* tree, TreeNodeIndex numNodes, const unsigned* counts, unsigned bucketSize, TreeNodeIndex* nodeOps,
-    execution::Gpu exec);
+extern TreeNodeIndex computeNodeOpsGpu(const KeyType* tree,
+                                       TreeNodeIndex numNodes,
+                                       const unsigned* counts,
+                                       unsigned bucketSize,
+                                       TreeNodeIndex* nodeOps,
+                                       execution::Gpu exec);
 
 template<class KeyType>
 extern bool rebalanceTreeGpu(const KeyType* tree,
@@ -69,11 +72,10 @@ extern bool rebalanceTreeGpu(const KeyType* tree,
                              execution::Gpu exec);
 
 template<class KeyType>
-extern void countSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps,
-                            execution::Gpu exec);
+extern void countSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps, execution::Gpu exec);
 
 template<class KeyType>
-extern void fillSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree,
-                           execution::Gpu exec);
+extern void fillSfcGapsGpu(
+    const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree, execution::Gpu exec);
 
 } // namespace cstone

@@ -88,20 +88,29 @@ extern void upsweepCentersGpu(int numLevels,
 
 //! @brief compute geometric node center and sizes based on node SFC keys
 template<class KeyType, class T>
-extern void computeGeoCentersGpu(
-    const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box,
-    execution::Gpu exec);
+extern void computeGeoCentersGpu(const KeyType* prefixes,
+                                 TreeNodeIndex numNodes,
+                                 Vec3<T>* centers,
+                                 Vec3<T>* sizes,
+                                 const Box<T>& box,
+                                 execution::Gpu exec);
 
 //! @brief set @p centers to geometric node centers with Mac radius l * invTheta
 template<class KeyType, class T>
-extern void geoMacSpheresGpu(
-    const KeyType* prefixes, TreeNodeIndex numNodes, SourceCenterType<T>* centers, float invTheta, const Box<T>& box,
-    execution::Gpu exec);
+extern void geoMacSpheresGpu(const KeyType* prefixes,
+                             TreeNodeIndex numNodes,
+                             SourceCenterType<T>* centers,
+                             float invTheta,
+                             const Box<T>& box,
+                             execution::Gpu exec);
 
 template<class KeyType, class T>
-extern void
-setMacGpu(const KeyType* prefixes, TreeNodeIndex numNodes, Vec4<T>* macSpheres, float invTheta, const Box<T>& box,
-          execution::Gpu exec);
+extern void setMacGpu(const KeyType* prefixes,
+                      TreeNodeIndex numNodes,
+                      Vec4<T>* macSpheres,
+                      float invTheta,
+                      const Box<T>& box,
+                      execution::Gpu exec);
 
 template<class T>
 extern void moveCenters(const Vec3<T>* src, TreeNodeIndex numNodes, Vec4<T>* dest, execution::Gpu exec);

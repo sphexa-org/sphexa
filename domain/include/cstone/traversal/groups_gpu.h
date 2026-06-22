@@ -29,8 +29,8 @@ namespace cstone
  * @param[in]  groupSize  number of particles per group
  * @param[out] groups     groups with fixed size @p groupSize
  */
-void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups,
-                        execution::Gpu exec);
+void computeFixedGroups(
+    LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups, execution::Gpu exec);
 
 /*!* @brief Compute groups of particles with a maximum size and distance between consecutive particles limited
  *
