@@ -90,8 +90,8 @@ void exchangeAllToAll(int thisRank, int numRanks)
     ExchangeLog log;
     auto recvStart = domain_exchange::receiveStart(bufDesc, numPartAssigned - numPartPresent);
     auto recvEnd   = recvStart + numPartAssigned - numPartPresent;
-    exchangeParticlesGpu(0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch, rawPtr(d_ordering),
-                         MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y));
+    exchangeParticlesGpu(execution::gpuDefaultStream, 0, log, sends, thisRank, recvStart, recvEnd, sendScratch,
+                         receiveScratch, rawPtr(d_ordering), MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y));
 
     reallocate(bufDesc.size, 1.01, x, y);
     memcpyD2HAsync(execution::gpuDefaultStream, d_x.data(), d_x.size(), x.data());
@@ -180,8 +180,9 @@ void exchangeCyclicNeighbors(int thisRank, int numRanks)
     ExchangeLog log;
     auto recvStart = domain_exchange::receiveStart(bufDesc, numPartAssigned - numPartPresent);
     auto recvEnd   = recvStart + numPartAssigned - numPartPresent;
-    exchangeParticlesGpu(0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch, rawPtr(d_ordering),
-                         MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y), rawPtr(d_uint8Array), rawPtr(d_testArray));
+    exchangeParticlesGpu(execution::gpuDefaultStream, 0, log, sends, thisRank, recvStart, recvEnd, sendScratch,
+                         receiveScratch, rawPtr(d_ordering), MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y),
+                         rawPtr(d_uint8Array), rawPtr(d_testArray));
 
     reallocate(bufDesc.size, 1.01, x, y, testArray, uint8Array);
     memcpyD2HAsync(execution::gpuDefaultStream, d_x.data(), d_x.size(), x.data());

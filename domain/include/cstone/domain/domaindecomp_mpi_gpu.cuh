@@ -17,6 +17,7 @@
 
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/errorcheck.cuh"
+#include "cstone/execution.hpp"
 #include "cstone/primitives/mpi_cuda.cuh"
 #include "cstone/primitives/primitives_gpu.h"
 #include "cstone/util/reallocate.hpp"
@@ -27,15 +28,16 @@ namespace cstone
 {
 
 //! @brief copy the value of @a count to the start the provided GPU-buffer
-inline void encodeSendCount(size_t count, char* sendPtr)
+inline void encodeSendCount(execution::Gpu exec, size_t count, char* sendPtr)
 {
-    checkGpuErrors(cudaMemcpy(sendPtr, &count, sizeof(size_t), cudaMemcpyHostToDevice));
+    checkGpuErrors(cudaMemcpyAsync(sendPtr, &count, sizeof(size_t), cudaMemcpyHostToDevice, exec));
 }
 
 //! @brief extract message length count from head of received GPU buffer and advance the buffer pointer by alignment
-inline char* decodeSendCount(char* recvPtr, size_t* count, size_t alignment)
+inline char* decodeSendCount(execution::Gpu exec, char* recvPtr, size_t* count, size_t alignment)
 {
-    checkGpuErrors(cudaMemcpy(count, recvPtr, sizeof(size_t), cudaMemcpyDeviceToHost));
+    checkGpuErrors(cudaMemcpyAsync(count, recvPtr, sizeof(size_t), cudaMemcpyDeviceToHost, exec));
+    checkGpuErrors(cudaStreamSynchronize(exec));
     return recvPtr + alignment;
 }
 
@@ -65,7 +67,8 @@ inline char* decodeSendCount(char* recvPtr, size_t* count, size_t alignment)
  *           already present on @p thisRank.
  */
 template<class DeviceVector, class... Arrays>
-void exchangeParticlesGpu(int epoch,
+void exchangeParticlesGpu(execution::Gpu exec,
+                          int epoch,
                           ExchangeLog& receiveLog,
                           const SendRanges& sends,
                           int thisRank,
@@ -93,11 +96,8 @@ void exchangeParticlesGpu(int epoch,
     std::vector<std::vector<TransferType, util::DefaultInitAdaptor<TransferType>>> sendBuffers;
     std::vector<MPI_Request> sendRequests;
 
-    const auto gatherGpu = [](std::span<const LocalIndex> ordering, const auto* src, auto* dest)
-    {
-        // TODO: remove usage of default stream
-        gather(execution::gpuDefaultStream, ordering.data(), ordering.size(), src, dest);
-    };
+    const auto gatherGpu = [exec](std::span<const LocalIndex> ordering, const auto* src, auto* dest)
+    { gather(exec, ordering.data(), ordering.size(), src, dest); };
 
     char* sendPtr = sendBuffer;
     for (int destinationRank = 0; destinationRank < sends.numRanks(); ++destinationRank)
@@ -106,10 +106,10 @@ void exchangeParticlesGpu(int epoch,
         if (destinationRank == thisRank || sendCount == 0) { continue; }
         size_t sendStart = sends[destinationRank];
 
-        encodeSendCount(sendCount, sendPtr);
+        encodeSendCount(exec, sendCount, sendPtr);
         size_t numBytes = headerBytes + packArrays<alignment>(gatherGpu, ordering + sendStart, sendCount,
                                                               sendPtr + headerBytes, arrays...);
-        checkGpuErrors(cudaDeviceSynchronize());
+        checkGpuErrors(cudaStreamSynchronize(exec));
         mpiSendGpuDirect(sendPtr, numBytes, destinationRank, domExTag, sendRequests, sendBuffers, comm);
         sendPtr += numBytes;
     }
@@ -130,22 +130,25 @@ void exchangeParticlesGpu(int epoch,
                          &status, comm);
 
         size_t receiveCount;
-        receiveBuffer = decodeSendCount(receiveBuffer, &receiveCount, alignment);
+        receiveBuffer = decodeSendCount(exec, receiveBuffer, &receiveCount, alignment);
         assert(receiveStart + receiveCount <= receiveEnd);
 
         LocalIndex receiveLocation = receiveStart;
         if (record) { receiveLog.addExchange(receiveRank, receiveStart); }
-        else { receiveLocation = receiveLog.lookup(receiveRank); }
+        else
+        {
+            receiveLocation = receiveLog.lookup(receiveRank);
+        }
 
         auto packTuple = util::packBufferPtrs<alignment>(receiveBuffer, receiveCount, (arrays + receiveLocation)...);
-        auto scatterRanges = [receiveCount](auto arrayPair)
+        auto scatterRanges = [exec, receiveCount](auto arrayPair)
         {
-            checkGpuErrors(cudaMemcpy(arrayPair[0], arrayPair[1],
-                                      receiveCount * sizeof(std::decay_t<decltype(*arrayPair[0])>),
-                                      cudaMemcpyDeviceToDevice));
+            checkGpuErrors(cudaMemcpyAsync(arrayPair[0], arrayPair[1],
+                                           receiveCount * sizeof(std::decay_t<decltype(*arrayPair[0])>),
+                                           cudaMemcpyDeviceToDevice, exec));
         };
         util::for_each_tuple(scatterRanges, packTuple);
-        checkGpuErrors(cudaDeviceSynchronize());
+        checkGpuErrors(cudaStreamSynchronize(exec));
 
         receiveStart += receiveCount;
     }

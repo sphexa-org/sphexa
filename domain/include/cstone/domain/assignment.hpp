@@ -179,10 +179,9 @@ public:
 
         auto numRecv   = numAssigned() - numPresent();
         auto recvStart = domain_exchange::receiveStart(o1e, numRecv);
-        if constexpr (gpu) { syncGpu(exec_); } // flush stream_ before MPI-involved exchangeParticlesGpu
         if constexpr (gpu)
         {
-            exchangeParticlesGpu(0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, s0, s1,
+            exchangeParticlesGpu(exec_, 0, recvLog_, exchanges_, myRank_, recvStart, recvStart + numRecv, s0, s1,
                                  reorderFunctor.getMap() + o1e.start, comm_, x, y, z, properties...);
         }
         else
