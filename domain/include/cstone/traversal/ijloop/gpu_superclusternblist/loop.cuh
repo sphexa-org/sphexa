@@ -124,7 +124,10 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
                 util::for_each_tuple([index](auto* ptr, auto const& t) { atomicUpdatePtr(&ptr[index], t); }, ptrs,
                                      tuple);
             }
-            else { storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple))); }
+            else
+            {
+                storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple)));
+            }
         }
     }
 }
@@ -190,7 +193,10 @@ inline constexpr auto loadParticleDataWithRadiusSq(
         const auto hi = loadAtIndexIfPtr(h, index);
         return std::tuple_cat(std::move(iPos), std::make_tuple(hi, 4 * hi * hi), std::move(iInput));
     }
-    else { return std::tuple_cat(std::move(iPos), std::move(iInput)); }
+    else
+    {
+        return std::tuple_cat(std::move(iPos), std::move(iInput));
+    }
 }
 
 template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
@@ -226,7 +232,8 @@ inline constexpr auto splitParticleDataWithRadiusSq(std::tuple<Tc, Tc, Tc, Ts...
     }
 
     constexpr std::size_t skip = std::is_pointer_v<ThP> ? 2 : 0;
-    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>)
+    {
         return std::make_tuple(index, iPos, hi, std::get<Is + 3 + skip>(particleDataWithRadiusSq)...);
     }(std::make_index_sequence<sizeof...(Ts) - skip>());
 
@@ -476,7 +483,8 @@ template<class Config,
          class Interaction,
          class Postamble,
          class Mask = void>
-void runIjLoop(const Box<Tc>& box,
+void runIjLoop(const execution::Gpu exec,
+               const Box<Tc>& box,
                const LocalIndex firstValidBody,
                const LocalIndex totalBodies,
                const LocalIndex firstBody,
@@ -499,7 +507,7 @@ void runIjLoop(const Box<Tc>& box,
     const unsigned numBlocks                    = iceil(numISuperclusters, numSuperclustersPerBlock);
     const auto run                              = [&](auto usePbc)
     {
-        runIjLoopKernel<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize>>>(
+        runIjLoopKernel<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, 0, exec>>>(
             box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, std::forward<Input>(input),
             std::forward<Output>(output), std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
             neighborData, superclusterInfo, numISuperclusters, activeMasks);
@@ -543,19 +551,20 @@ __global__ void computeActiveMasksKernel(const LocalIndex firstISupercluster,
 
 template<class Config>
 util::UniqueDevicePtr<typename Config::SuperclusterParticleMask[]>
-computeActiveMasks(const LocalIndex firstISupercluster,
+computeActiveMasks(const execution::Gpu exec,
+                   const LocalIndex firstISupercluster,
                    const LocalIndex numISuperclusters,
                    const LocalIndex firstValidBody,
                    const GroupView& groups)
 {
     auto activeMasks = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(numISuperclusters);
-    checkGpuErrors(
-        cudaMemsetAsync(activeMasks.get(), 0, sizeof(typename Config::SuperclusterParticleMask) * numISuperclusters));
+    checkGpuErrors(cudaMemsetAsync(activeMasks.get(), 0,
+                                   sizeof(typename Config::SuperclusterParticleMask) * numISuperclusters, exec));
 
     constexpr unsigned numThreads = 256;
     const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
     computeActiveMasksKernel<Config>
-        <<<numBlocks, numThreads>>>(firstISupercluster, firstValidBody, groups, activeMasks.get());
+        <<<numBlocks, numThreads, 0, exec>>>(firstISupercluster, firstValidBody, groups, activeMasks.get());
     checkGpuErrors(cudaGetLastError());
     return activeMasks;
 }

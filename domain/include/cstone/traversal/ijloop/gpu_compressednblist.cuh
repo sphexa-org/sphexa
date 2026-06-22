@@ -25,6 +25,7 @@
 #include <tuple>
 
 #include "cstone/cuda/memory.cuh"
+#include "cstone/execution.hpp"
 #include "cstone/primitives/math.hpp"
 #include "cstone/primitives/warpscan.cuh"
 #include "cstone/traversal/boxoverlap.hpp"
@@ -319,13 +320,17 @@ __launch_bounds__(GpuConfig::warpSize* WarpsPerBlock) void runIjLoop(const Box<T
         {
             util::for_each_tuple([i](auto* ptr, auto const& v) { atomicUpdatePtr(&ptr[i], v); }, output, result);
         }
-        else { storeParticleData(output, i, postamble(iData, unwrapModifiers(result))); }
+        else
+        {
+            storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
+        }
     }
 }
 
 template<class Config, class Tc, class ThP>
 struct GpuCompressedNbListNeighborhood
 {
+    execution::Gpu exec  = execution::gpuDefaultStream;
     Box<Tc> box          = {0, 0};
     LocalIndex firstBody = 0, lastBody = 0;
     const Tc *x = nullptr, *y = nullptr, *z = nullptr;
@@ -354,14 +359,14 @@ struct GpuCompressedNbListNeighborhood
         {
             // in the symmetric case, the output arrays need to be initialized beforehand due to the unordered atomic
             // updates in the main loop
-            initResult<Config>(firstBody, lastBody, x, y, z, h, makeConst(input), tmpOrOutput,
+            initResult<Config>(exec, firstBody, lastBody, x, y, z, h, makeConst(input), tmpOrOutput,
                                std::forward<Interaction>(interaction));
         }
 
         constexpr unsigned warpsPerBlock = 4;
         const unsigned numBlocks         = iceil(numGroups, warpsPerBlock);
         constexpr dim3 blockSize         = {GpuConfig::warpSize, warpsPerBlock, 1};
-        runIjLoop<Config, warpsPerBlock><<<numBlocks, blockSize>>>(
+        runIjLoop<Config, warpsPerBlock><<<numBlocks, blockSize, 0, exec>>>(
             box, firstBody, lastBody, x, y, z, h, makeConst(input), tmpOrOutput, std::forward<Interaction>(interaction),
             std::forward<Postamble>(postamble), neighborData.get(), groupDataIndex.get());
         checkGpuErrors(cudaGetLastError());
@@ -369,11 +374,11 @@ struct GpuCompressedNbListNeighborhood
         if constexpr (Config::symmetric)
         {
             // the postamble has to be applied in a separate step for symmetric neighborhoods
-            applyPostamble<Config>(firstBody, lastBody, 0, x, y, z, h, makeConst(input), makeConst(tmpOrOutput), output,
-                                   std::forward<Postamble>(postamble));
+            applyPostamble<Config>(exec, firstBody, lastBody, 0, x, y, z, h, makeConst(input), makeConst(tmpOrOutput),
+                                   output, std::forward<Postamble>(postamble));
 
-            // device sync required due to possible use of allocated temporaries
-            checkGpuErrors(cudaDeviceSynchronize());
+            // sync required due to possible use of allocated temporaries
+            checkGpuErrors(cudaStreamSynchronize(exec));
         }
     }
 
@@ -401,7 +406,8 @@ struct GpuCompressedNbListNeighborhoodBuilder
 
     template<class Tc, class KeyType, class ThP>
     gpu_compressed_nb_list_neighborhood_detail::GpuCompressedNbListNeighborhood<Config, Tc, ThP>
-    build(OctreeNsView<Tc, KeyType> tree,
+    build(execution::Gpu exec,
+          OctreeNsView<Tc, KeyType> tree,
           const Box<Tc>& box,
           const LocalIndex /*totalBodies*/,
           const GroupView& groups,
@@ -417,7 +423,10 @@ struct GpuCompressedNbListNeighborhoodBuilder
         using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
 
         util::UniqueDevicePtr<Th[]> nodeRMax;
-        if constexpr (Config::symmetric && std::is_pointer_v<ThP>) { nodeRMax = computeNodeRMax<Config>(tree, h); }
+        if constexpr (Config::symmetric && std::is_pointer_v<ThP>)
+        {
+            nodeRMax = computeNodeRMax<Config>(exec, tree, h);
+        }
 
         const unsigned numGroups = iceil(groups.lastBody - groups.firstBody, GpuConfig::warpSize);
 
@@ -434,16 +443,19 @@ struct GpuCompressedNbListNeighborhoodBuilder
         auto neighborData                         = util::deviceAllocVirtual<std::uint32_t[]>(neighborDataVirtualSize);
         auto groupDataIndex                       = util::deviceAlloc<std::size_t[]>(numGroups);
         auto globalBuildData                      = util::deviceAlloc<GlobalBuildData>();
-        checkGpuErrors(cudaMemsetAsync(globalBuildData.get(), 0, sizeof(GlobalBuildData)));
+        checkGpuErrors(cudaMemsetAsync(globalBuildData.get(), 0, sizeof(GlobalBuildData), exec));
 
         constexpr dim3 blockSize = {GpuConfig::warpSize, warpsPerBlock, 1};
-        gpuCompressedNbListNeighborhoodBuild<Config, warpsPerBlock, Tc, ThP, KeyType><<<numBlocks, blockSize>>>(
-            tree, box, groups.firstBody, groups.lastBody, numGroups, ngmax, x, y, z, h, nodeRMax.get(),
-            globalPool.get(), neighborData.get(), groupDataIndex.get(), globalBuildData.get(), neighborDataVirtualSize);
+        gpuCompressedNbListNeighborhoodBuild<Config, warpsPerBlock, Tc, ThP, KeyType>
+            <<<numBlocks, blockSize, 0, exec>>>(tree, box, groups.firstBody, groups.lastBody, numGroups, ngmax, x, y, z,
+                                                h, nodeRMax.get(), globalPool.get(), neighborData.get(),
+                                                groupDataIndex.get(), globalBuildData.get(), neighborDataVirtualSize);
         checkGpuErrors(cudaGetLastError());
 
         GlobalBuildData buildData;
-        checkGpuErrors(cudaMemcpy(&buildData, globalBuildData.get(), sizeof(GlobalBuildData), cudaMemcpyDeviceToHost));
+        checkGpuErrors(
+            cudaMemcpyAsync(&buildData, globalBuildData.get(), sizeof(GlobalBuildData), cudaMemcpyDeviceToHost, exec));
+        checkGpuErrors(cudaStreamSynchronize(exec));
         switch (buildData.status)
         {
             case BuildStatus::success: break;
@@ -457,7 +469,8 @@ struct GpuCompressedNbListNeighborhoodBuilder
         }
         assert(buildData.neighborDataSize < neighborDataVirtualSize);
 
-        return {box,
+        return {exec,
+                box,
                 groups.firstBody,
                 groups.lastBody,
                 x,

@@ -19,6 +19,7 @@
 #include <tuple>
 #include <memory>
 
+#include "cstone/execution.hpp"
 #include "cstone/findneighbors.hpp"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/ijloop/common.hpp"
@@ -122,7 +123,8 @@ struct CpuAlwaysTraverseNeighborhoodBuilder
 
     template<class Tc, class KeyType, class ThP>
     cpu_always_traverse_neighborhood_detail::CpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP>
-    build(const OctreeNsView<Tc, KeyType>& tree,
+    build(execution::Cpu,
+          const OctreeNsView<Tc, KeyType>& tree,
           const Box<Tc>& box,
           const LocalIndex /* totalBodies */,
           const GroupView& groups,

@@ -20,6 +20,7 @@
 #include <thrust/universal_vector.h>
 
 #include "cstone/cuda/thrust_util.cuh"
+#include "cstone/execution.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
 #include "cstone/traversal/ijloop/cpu_fullnblist.hpp"
@@ -362,6 +363,27 @@ using Neighborhoods = ::testing::Types<
 
 TYPED_TEST_SUITE(IjLoopTest, Neighborhoods);
 
+constexpr auto executionForNeighborhood(ijloop::CpuAlwaysTraverseNeighborhoodBuilder) { return execution::cpu; }
+constexpr auto executionForNeighborhood(ijloop::CpuFullNbListNeighborhoodBuilder) { return execution::cpu; }
+constexpr auto executionForNeighborhood(ijloop::GpuAlwaysTraverseNeighborhoodBuilder)
+{
+    return execution::gpuDefaultStream;
+}
+constexpr auto executionForNeighborhood(ijloop::GpuFullNbListNeighborhoodBuilder)
+{
+    return execution::gpuDefaultStream;
+}
+template<class Config>
+constexpr auto executionForNeighborhood(ijloop::GpuCompressedNbListNeighborhoodBuilder<Config>)
+{
+    return execution::gpuDefaultStream;
+}
+template<class Config>
+constexpr auto executionForNeighborhood(ijloop::GpuSuperclusterNbListNeighborhoodBuilder<Config>)
+{
+    return execution::gpuDefaultStream;
+}
+
 TYPED_TEST(IjLoopTest, IjLoop)
 {
     using NeighborhoodBuilder = TypeParam;
@@ -370,9 +392,10 @@ TYPED_TEST(IjLoopTest, IjLoop)
     {
         this->setBoundaryType(boundaryType);
 
-        const auto nb =
-            NeighborhoodBuilder{1024}.build(this->treeView(), this->box, this->totalBodies, this->groupView(),
-                                            rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
+        const auto nbBuilder = NeighborhoodBuilder{1024};
+        const auto exec      = executionForNeighborhood(nbBuilder);
+        const auto nb        = nbBuilder.build(exec, this->treeView(), this->box, this->totalBodies, this->groupView(),
+                                               rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
 
         Result result;
         util::for_each_tuple([&](auto& v) { v.resize(this->totalBodies); }, result);
@@ -397,9 +420,11 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
     {
         this->setBoundaryType(boundaryType);
 
-        const auto nb = NeighborhoodBuilder{1024}.build(this->treeView(searchExtFactor), this->box, this->totalBodies,
-                                                        this->groupView(), rawPtr(this->x), rawPtr(this->y),
-                                                        rawPtr(this->z), rawPtr(this->h));
+        const auto nbBuilder = NeighborhoodBuilder{1024};
+        const auto exec      = executionForNeighborhood(nbBuilder);
+        const auto nb =
+            nbBuilder.build(exec, this->treeView(searchExtFactor), this->box, this->totalBodies, this->groupView(),
+                            rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
 
         Result result;
         util::for_each_tuple([&](auto& v) { v.resize(this->totalBodies); }, result);
@@ -452,9 +477,10 @@ TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
         {
             this->setBoundaryType(boundaryType);
 
-            const auto nb =
-                NeighborhoodBuilder{1024}.build(this->treeView(), this->box, this->totalBodies, this->groupView(),
-                                                rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
+            const auto nbBuilder = NeighborhoodBuilder{1024};
+            const auto exec      = executionForNeighborhood(nbBuilder);
+            const auto nb = nbBuilder.build(exec, this->treeView(), this->box, this->totalBodies, this->groupView(),
+                                            rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
 
             const auto subgroupNb = nb.subgroup(this->subgroupView());
 
@@ -471,5 +497,8 @@ TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
             this->validate(reference, result);
         }
     }
-    else { GTEST_SKIP() << "subgroups not supported"; }
+    else
+    {
+        GTEST_SKIP() << "subgroups not supported";
+    }
 }

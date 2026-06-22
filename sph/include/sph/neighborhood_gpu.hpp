@@ -56,11 +56,12 @@ struct DeviceNeighborhoodData::Impl
                 [&]<class Neighborhood>(Neighborhood const& nb)
                 {
                     if constexpr (std::is_same_v<Neighborhood,
-                                                 NeighborhoodDataType<CompressedNeighborhoodBuilder<false>>> ||
-                                  std::is_same_v<Neighborhood,
-                                                 NeighborhoodDataType<CompressedNeighborhoodBuilder<true>>> ||
-                                  std::is_same_v<Neighborhood,
-                                                 NeighborhoodDataType<ClusteredNeighborhoodBuilder<true>>>)
+                                                 NeighborhoodDataType<CompressedNeighborhoodBuilder<false>,
+                                                                      cstone::execution::Gpu>> ||
+                                  std::is_same_v<Neighborhood, NeighborhoodDataType<CompressedNeighborhoodBuilder<true>,
+                                                                                    cstone::execution::Gpu>> ||
+                                  std::is_same_v<Neighborhood, NeighborhoodDataType<ClusteredNeighborhoodBuilder<true>,
+                                                                                    cstone::execution::Gpu>>)
                         throw std::runtime_error("neighborhood does not support local time stepping");
                     else
                         subgroupNeighborhood.emplace(nb.subgroup(groups));
@@ -103,9 +104,10 @@ struct DeviceNeighborhoodData::Impl
             }
 
             std::visit(
-                [&](auto const& nb) {
-                    neighborhood =
-                        nb.build(d.treeView, box, d.size(), groups, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h));
+                [&](auto const& nb)
+                {
+                    neighborhood = nb.build(cstone::execution::gpuDefaultStream, d.treeView, box, d.size(), groups,
+                                            rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h));
                 },
                 builder);
         }
@@ -121,16 +123,17 @@ struct DeviceNeighborhoodData::Impl
             std::visit(runIjLoop, neighborhood);
     }
 
-    std::variant<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder>,
-                 NeighborhoodDataType<cstone::ijloop::GpuFullNbListNeighborhoodBuilder>,
-                 NeighborhoodDataType<CompressedNeighborhoodBuilder<false>>,
-                 NeighborhoodDataType<CompressedNeighborhoodBuilder<true>>,
-                 NeighborhoodDataType<ClusteredNeighborhoodBuilder<false>>,
-                 NeighborhoodDataType<ClusteredNeighborhoodBuilder<true>>>
+    std::variant<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder, cstone::execution::Gpu>,
+                 NeighborhoodDataType<cstone::ijloop::GpuFullNbListNeighborhoodBuilder, cstone::execution::Gpu>,
+                 NeighborhoodDataType<CompressedNeighborhoodBuilder<false>, cstone::execution::Gpu>,
+                 NeighborhoodDataType<CompressedNeighborhoodBuilder<true>, cstone::execution::Gpu>,
+                 NeighborhoodDataType<ClusteredNeighborhoodBuilder<false>, cstone::execution::Gpu>,
+                 NeighborhoodDataType<ClusteredNeighborhoodBuilder<true>, cstone::execution::Gpu>>
         neighborhood;
-    std::optional<std::variant<NeighborhoodSubgroupType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder>,
-                               NeighborhoodSubgroupType<cstone::ijloop::GpuFullNbListNeighborhoodBuilder>,
-                               NeighborhoodSubgroupType<ClusteredNeighborhoodBuilder<false>>>>
+    std::optional<std::variant<
+        NeighborhoodSubgroupType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder, cstone::execution::Gpu>,
+        NeighborhoodSubgroupType<cstone::ijloop::GpuFullNbListNeighborhoodBuilder, cstone::execution::Gpu>,
+        NeighborhoodSubgroupType<ClusteredNeighborhoodBuilder<false>, cstone::execution::Gpu>>>
                      subgroupNeighborhood;
     NeighborhoodType neighborhoodType = NeighborhoodType::alwaysTraverse;
 };

@@ -124,7 +124,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     const std::tuple<std::vector<InputTs>...> inputs = util::tupleMap(allocVec, inputValues);
     std::tuple<std::vector<OutputTs>...> outputs     = util::tupleMap(allocVec, initialOutputValues);
     ijloop::CpuAlwaysTraverseNeighborhoodBuilder{ngmax}
-        .build(nsView, box, n, groupView, x, y, z, hVal)
+        .build(execution::cpu, nsView, box, n, groupView, x, y, z, hVal)
         .ijLoop(util::tupleMap([](auto const& v) { return v.data(); }, inputs),
                 util::tupleMap([](auto& v) { return v.data(); }, outputs), interaction, ijloop::empty_postamble);
 
@@ -205,10 +205,10 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     checkGpuErrors(cudaDeviceSynchronize());
 
     // build neighborhood, measure CPU time
-    using Clock     = std::chrono::high_resolution_clock;
-    auto buildStart = Clock::now();
-    const auto neighborhood =
-        neighborhoodBuilder.build(dNsView, box, n, dGroupView, rawPtr(dX), rawPtr(dY), rawPtr(dZ), hVal);
+    using Clock             = std::chrono::high_resolution_clock;
+    auto buildStart         = Clock::now();
+    const auto neighborhood = neighborhoodBuilder.build(execution::gpuDefaultStream, dNsView, box, n, dGroupView,
+                                                        rawPtr(dX), rawPtr(dY), rawPtr(dZ), hVal);
     checkGpuErrors(cudaDeviceSynchronize());
     auto buildEnd         = Clock::now();
     const float buildTime = std::chrono::duration<float>(buildEnd - buildStart).count();

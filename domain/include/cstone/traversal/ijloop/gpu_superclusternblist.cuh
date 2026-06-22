@@ -66,6 +66,8 @@
 #include <thrust/functional.h>
 #include <thrust/sort.h>
 
+#include "cstone/cuda/thrust_util.cuh"
+#include "cstone/execution.hpp"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/build.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/loop.cuh"
 #include "cstone/traversal/ijloop/temporaries.cuh"
@@ -80,6 +82,7 @@ namespace gpu_supercluster_nb_list_neighborhood_detail
 template<class Config, class Tc, class ThP>
 struct GpuSuperclusterNbListNeighborhood
 {
+    execution::Gpu exec       = execution::gpuDefaultStream;
     Box<Tc> box               = {0, 0};
     LocalIndex firstValidBody = 0, totalBodies = 0, firstBody = 0, lastBody = 0;
     const Tc *x = nullptr, *y = nullptr, *z = nullptr;
@@ -136,7 +139,8 @@ struct GpuSuperclusterNbListNeighborhood
         const LocalIndex lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
         const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
 
-        auto activeMasks = computeActiveMasks<Config>(firstISupercluster, numISuperclusters, firstValidBody, groups);
+        auto activeMasks =
+            computeActiveMasks<Config>(exec, firstISupercluster, numISuperclusters, firstValidBody, groups);
 
         const auto superclusterIsActive =
             [activeMasksPtr = activeMasks.get(), firstISupercluster] __device__(const SuperclusterInfo& info)
@@ -144,7 +148,7 @@ struct GpuSuperclusterNbListNeighborhood
 
         auto activeSuperclusterInfo = util::deviceAlloc<SuperclusterInfo[]>(numISuperclusters);
         SuperclusterInfo* lastCopied =
-            thrust::copy_if(thrust::device, superclusterInfo.get(), superclusterInfo.get() + numISuperclusters,
+            thrust::copy_if(thrustExecPolicy(exec), superclusterInfo.get(), superclusterInfo.get() + numISuperclusters,
                             activeSuperclusterInfo.get(), superclusterIsActive);
         const LocalIndex activeNumISuperclusters = lastCopied - activeSuperclusterInfo.get();
 
@@ -177,22 +181,22 @@ protected:
         {
             // in the symmetric case, the output arrays need to be initialized beforehand due to the unordered atomic
             // updates in the main loop
-            initResult<Config>(firstBody, lastBody, x, y, z, h, makeConst(input), tmpOrOutput,
+            initResult<Config>(exec, firstBody, lastBody, x, y, z, h, makeConst(input), tmpOrOutput,
                                std::forward<Interaction>(interaction));
         }
 
-        runIjLoop<Config>(box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConst(input),
+        runIjLoop<Config>(exec, box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConst(input),
                           tmpOrOutput, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
                           neighborData.get(), superclusterInfo, numISuperclusters, activeMasks);
 
         if constexpr (Config::symmetric)
         {
             // the postamble has to be applied in a separate step for symmetric neighborhoods
-            applyPostamble<Config>(firstBody, lastBody, firstValidBody, x, y, z, h, makeConst(input),
+            applyPostamble<Config>(exec, firstBody, lastBody, firstValidBody, x, y, z, h, makeConst(input),
                                    makeConst(tmpOrOutput), output, std::forward<Postamble>(postamble));
 
-            // device sync required due to possible use of allocated temporaries
-            checkGpuErrors(cudaDeviceSynchronize());
+            // sync required due to possible use of allocated temporaries
+            checkGpuErrors(cudaStreamSynchronize(exec));
         }
     }
 };
@@ -270,7 +274,8 @@ struct GpuSuperclusterNbListNeighborhoodBuilder
 
     template<class Tc, class KeyType, class ThP>
     gpu_supercluster_nb_list_neighborhood_detail::GpuSuperclusterNbListNeighborhood<Config, Tc, ThP>
-    build(const OctreeNsView<Tc, KeyType>& tree,
+    build(execution::Gpu exec,
+          const OctreeNsView<Tc, KeyType>& tree,
           const Box<Tc>& box,
           LocalIndex totalBodies,
           GroupView groups,
@@ -315,29 +320,33 @@ struct GpuSuperclusterNbListNeighborhoodBuilder
         auto superclusterInfo = util::deviceAlloc<SuperclusterInfo[]>(numISuperclusters);
 
         // temporary data arrays, only used during build
-        auto jClusterBboxes = computeJClusterBboxes<Config>(firstValidBody, totalBodies, x, y, z, h);
+        auto jClusterBboxes = computeJClusterBboxes<Config>(exec, firstValidBody, totalBodies, x, y, z, h);
 
         using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
         util::UniqueDevicePtr<Th[]> nodeRMax;
         ThP nodeRMaxData;
         if constexpr (std::is_pointer_v<ThP>)
         {
-            nodeRMax     = computeNodeRMax<Config>(tree, h + firstValidBody);
+            nodeRMax     = computeNodeRMax<Config>(exec, tree, h + firstValidBody);
             nodeRMaxData = nodeRMax.get();
         }
-        else { nodeRMaxData = h; }
+        else
+        {
+            nodeRMaxData = h;
+        }
 
         // main build with octree traversal
         std::size_t neighborDataSize = buildNbList<Config>(
-            tree, box, totalBodies, groups, x, y, z, h, firstValidBody, numISuperclusters, jClusterBboxes.get(),
+            exec, tree, box, totalBodies, groups, x, y, z, h, firstValidBody, numISuperclusters, jClusterBboxes.get(),
             nodeRMaxData, ncmax, neighborData.get(), neighborDataVirtualSize, superclusterInfo.get());
 
         // sort supercluster array by descending neighbor count for load balancing (schedule large work packages first)
-        thrust::stable_sort(thrust::device, superclusterInfo.get(), superclusterInfo.get() + numISuperclusters);
+        thrust::stable_sort(thrustExecPolicy(exec), superclusterInfo.get(), superclusterInfo.get() + numISuperclusters);
 
         std::size_t numBytes = sizeof(std::uint32_t) * neighborDataSize + sizeof(SuperclusterInfo) * numISuperclusters;
 
-        return {box,
+        return {exec,
+                box,
                 firstValidBody,
                 totalBodies,
                 groups.firstBody,
