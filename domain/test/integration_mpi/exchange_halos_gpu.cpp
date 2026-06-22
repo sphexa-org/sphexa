@@ -123,19 +123,25 @@ void simpleTest(int thisRank, int numRanks)
     DeviceVector<char> sendBuffer    = std::vector<char>(7 * 24);
     DeviceVector<char> receiveBuffer = std::vector<char>(7 * 24);
 
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
+    const auto exec = execution::gpuStream(stream);
+
     //! Perform exchange with GPU buffers
-    haloExchangeGpu(0, incomingHalos, outgoingHalos, sendBuffer, receiveBuffer, MPI_COMM_WORLD,
-                    execution::gpuDefaultStream, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z));
+    haloExchangeGpu(0, incomingHalos, outgoingHalos, sendBuffer, receiveBuffer, MPI_COMM_WORLD, exec, rawPtr(d_x),
+                    rawPtr(d_y), rawPtr(d_z));
 
     //! download from device
-    memcpyD2HAsync(execution::gpuDefaultStream, d_x.data(), d_x.size(), x.data());
-    memcpyD2HAsync(execution::gpuDefaultStream, d_y.data(), d_y.size(), y.data());
-    memcpyD2HAsync(execution::gpuDefaultStream, d_z.data(), d_z.size(), z.data());
-    syncGpu(execution::gpuDefaultStream);
+    memcpyD2HAsync(exec, d_x.data(), d_x.size(), x.data());
+    memcpyD2HAsync(exec, d_y.data(), d_y.size(), y.data());
+    memcpyD2HAsync(exec, d_z.data(), d_z.size(), z.data());
+    syncGpu(exec);
 
     EXPECT_EQ(xRef, x);
     EXPECT_EQ(yRef, y);
     EXPECT_EQ(zRef, z);
+
+    checkGpuErrors(cudaStreamDestroy(stream));
 }
 
 TEST(HaloExchange, simpleTest)

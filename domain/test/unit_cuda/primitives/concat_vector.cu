@@ -32,11 +32,18 @@ TEST(PrimitivesGpu, concatVector)
     std::iota(modView[1].begin(), modView[1].end(), 20);
     std::iota(modView[2].begin(), modView[2].end(), 30);
 
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
+    const auto exec = execution::gpuStream(stream);
+
     ConcatVector<int, DeviceVector> d_v;
-    cstone::copy(v, d_v, execution::gpuDefaultStream);
+    cstone::copy(v, d_v, exec);
 
     ConcatVector<int> probe;
-    cstone::copy(d_v, probe, execution::gpuDefaultStream);
+    cstone::copy(d_v, probe, exec);
+
+    checkGpuErrors(cudaStreamSynchronize(stream));
+    checkGpuErrors(cudaStreamDestroy(stream));
 
     auto probeView = probe.view();
     EXPECT_EQ(probeView[2][0], 30);

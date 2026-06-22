@@ -116,12 +116,11 @@ __global__ void testSharedMemAlloc(bool* failed)
 
 TEST(Memory, SharedMemAllocator)
 {
-    auto failedDevice = util::deviceAlloc<bool>(execution::gpuDefaultStream);
-    checkGpuErrors(cudaMemset(failedDevice.get(), 0, sizeof(bool)));
-    testSharedMemAlloc<<<1, 2 * GpuConfig::warpSize, (1 + GpuConfig::warpSize) * sizeof(double) * 2>>>(
-        failedDevice.get());
-    checkGpuErrors(cudaDeviceSynchronize());
+    bool* failedDevice;
+    checkGpuErrors(cudaMalloc(&failedDevice, sizeof(bool)));
+    checkGpuErrors(cudaMemset(failedDevice, 0, sizeof(bool)));
+    testSharedMemAlloc<<<1, 2 * GpuConfig::warpSize, (1 + GpuConfig::warpSize) * sizeof(double) * 2>>>(failedDevice);
     bool failedHost;
-    checkGpuErrors(cudaMemcpy(&failedHost, failedDevice.get(), sizeof(bool), cudaMemcpyDeviceToHost));
+    checkGpuErrors(cudaMemcpy(&failedHost, failedDevice, sizeof(bool), cudaMemcpyDeviceToHost));
     ASSERT_FALSE(failedHost);
 }

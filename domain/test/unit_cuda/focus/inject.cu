@@ -32,8 +32,14 @@ TEST(FocusGpu, injectKeysGpu)
     DeviceVector<KeyType> keyScratch;
     DeviceVector<TreeNodeIndex> s1, s2;
 
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
+
     injectKeysGpu(leaves, {mandatoryKeys.data(), mandatoryKeys.size()}, keyScratch, s1, s2,
-                  execution::gpuDefaultStream);
+                  execution::gpuStream(stream));
+
+    checkGpuErrors(cudaStreamSynchronize(stream));
+    checkGpuErrors(cudaStreamDestroy(stream));
 
     DeviceVector<KeyType> ref = std::vector<KeyType>{0, 8, 16, 24, 32, 40, 48, 56, 64};
 

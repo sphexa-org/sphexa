@@ -45,7 +45,7 @@ auto benchmarkMacsCpu(const OctreeView<KeyType>& octree,
                  lastFocusNode - firstFocusNode, false, macs.data());
     };
 
-    float macCpuTime = timeGpu(findMacsLambda);
+    float macCpuTime = timeCpu(findMacsLambda);
     std::cout << "CPU mac eval " << macCpuTime / 1000 << " nNodes(tree): " << nNodes(leaves)
               << " count: " << std::accumulate(macs.begin(), macs.end(), 0) << std::endl;
     return macs;
@@ -70,16 +70,12 @@ int main(int argc, char** argv)
 
     thrust::device_vector<KeyType> particleCodes(randomBox.particleKeys().begin(), randomBox.particleKeys().end());
 
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
-    const auto exec = execution::gpuStream(stream);
-
     // cornerstone build benchmark
 
-    auto fullBuild = [&]()
+    auto fullBuild = [&](cudaStream_t stream)
     {
         while (!updateOctreeGpu<KeyType>({rawPtr(particleCodes), numParticles}, bucketSize, tree, counts, tmpTree,
-                                         workArray, exec))
+                                         workArray, execution::gpuStream(stream)))
             ;
     };
 
@@ -87,10 +83,10 @@ int main(int argc, char** argv)
     std::cout << "build time from scratch " << buildTime / 1000 << " nNodes(tree): " << nNodes(tree)
               << " count: " << thrust::reduce(counts.begin(), counts.end(), 0) << std::endl;
 
-    auto updateTree = [&]()
+    auto updateTree = [&](cudaStream_t stream)
     {
         updateOctreeGpu<KeyType>({rawPtr(particleCodes), numParticles}, bucketSize, tree, counts, tmpTree, workArray,
-                                 exec);
+                                 execution::gpuStream(stream));
     };
 
     float updateTime = timeGpu(updateTree);
@@ -101,11 +97,8 @@ int main(int argc, char** argv)
 
     OctreeData<KeyType, execution::Gpu> octree;
     octree.resize(nNodes(tree));
-    auto buildInternal = [&]()
-    {
-        buildOctreeGpu(exec, rawPtr(tree), octree.data());
-        syncGpu(exec);
-    };
+    auto buildInternal = [&](cudaStream_t stream)
+    { buildOctreeGpu(execution::gpuStream(stream), rawPtr(tree), octree.data()); };
 
     float internalBuildTime = timeGpu(buildInternal);
     std::cout << "internal build time " << internalBuildTime / 1000 << std::endl;
@@ -119,12 +112,15 @@ int main(int argc, char** argv)
     thrust::device_vector<float> haloRadii(octree.numLeafNodes, 0.01);
     thrust::device_vector<uint8_t> flags(octree.numNodes, 0);
     thrust::device_vector<Vec3<T>> nodeCenters(octree.numNodes), nodeSizes(octree.numNodes);
-    computeGeoCentersGpu(octree.prefixes.data(), octree.numNodes, rawPtr(nodeCenters), rawPtr(nodeSizes), box, exec);
+    computeGeoCentersGpu(octree.prefixes.data(), octree.numNodes, rawPtr(nodeCenters), rawPtr(nodeSizes), box,
+                         execution::gpuDefaultStream);
     thrust::host_vector<Vec3<T>> h_nc = nodeCenters, h_ns = nodeSizes;
 
     thrust::device_vector<Vec3<T>> searchCenters(octree.numLeafNodes), searchSizes(octree.numLeafNodes);
-    gather(exec, leafToInternal(octree).data(), octree.numLeafNodes, rawPtr(nodeCenters), rawPtr(searchCenters));
-    gather(exec, leafToInternal(octree).data(), octree.numLeafNodes, rawPtr(nodeSizes), rawPtr(searchSizes));
+    gather(execution::gpuDefaultStream, leafToInternal(octree).data(), octree.numLeafNodes, rawPtr(nodeCenters),
+           rawPtr(searchCenters));
+    gather(execution::gpuDefaultStream, leafToInternal(octree).data(), octree.numLeafNodes, rawPtr(nodeSizes),
+           rawPtr(searchSizes));
 
     thrust::host_vector<Vec3<T>> h_searchCenters = searchCenters, h_searchSizes = searchSizes;
     thrust::host_vector<float> h_radii = haloRadii;
@@ -135,11 +131,11 @@ int main(int argc, char** argv)
     searchSizes = h_searchSizes;
 
     auto od              = octree.data();
-    auto findHalosLambda = [&]()
+    auto findHalosLambda = [&](cudaStream_t stream)
     {
         findHalosGpu(od.prefixes, od.childOffsets, od.parents, rawPtr(nodeCenters), rawPtr(nodeSizes), rawPtr(tree),
-                     rawPtr(searchCenters), rawPtr(searchSizes), box, 0, od.numLeafNodes / 4, rawPtr(flags), exec);
-        syncGpu(exec);
+                     rawPtr(searchCenters), rawPtr(searchSizes), box, 0, od.numLeafNodes / 4, rawPtr(flags),
+                     execution::gpuStream(stream));
     };
 
     float findTime = timeGpu(findHalosLambda);
@@ -194,11 +190,10 @@ int main(int argc, char** argv)
     }
     centers = h_centers;
 
-    auto findMacsLambda = [od, &centers, &box, &tree, &macs, firstFocusNode, lastFocusNode, exec]()
+    auto findMacsLambda = [od, &centers, &box, &tree, &macs, firstFocusNode, lastFocusNode](cudaStream_t stream)
     {
         markMacsGpu(od.prefixes, od.childOffsets, od.parents, rawPtr(centers), box, rawPtr(tree) + firstFocusNode,
-                    lastFocusNode - firstFocusNode, false, rawPtr(macs), exec);
-        syncGpu(exec);
+                    lastFocusNode - firstFocusNode, false, rawPtr(macs), execution::gpuStream(stream));
     };
 
     float macTime = timeGpu(findMacsLambda);
@@ -209,5 +204,4 @@ int main(int argc, char** argv)
 
     thrust::host_vector<uint8_t> macsGpuDl = macs;
     std::cout << "GPU matches CPU " << std::equal(macsCpu.begin(), macsCpu.end(), macsGpuDl.begin()) << std::endl;
-    cudaStreamDestroy(stream);
 }

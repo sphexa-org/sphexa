@@ -144,10 +144,13 @@ TEST(IjLoop, Upsweep)
                      std::tuple(rawPtr(reference)));
 
     thrust::universal_vector<long> result(octree.numNodes);
-    const auto exec = execution::gpuDefaultStream;
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
+    const auto exec = execution::gpuStream(stream);
     ijloop::upsweep(exec, view, std::tuple(0l), TransformOp(), BinaryOp(),
                     std::tuple(rawPtr(dataLong), rawPtr(dataBool)), std::tuple(rawPtr(result)));
-    checkGpuErrors(cudaStreamSynchronize(exec));
+    checkGpuErrors(cudaStreamSynchronize(stream));
+    checkGpuErrors(cudaStreamDestroy(stream));
 
     EXPECT_EQ(result, reference);
 }

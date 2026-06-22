@@ -68,8 +68,12 @@ void randomGaussianAssignment(int rank, int numRanks)
     std::vector<T> hs1, hs2, hs3;
     domainCpu.sync(keys, x, y, z, h, std::tie(m, rungs), std::tie(hs1, hs2, hs3));
 
-    Domain<KeyType, T, execution::Gpu> domainGpu(rank, numRanks, bucketSize, bucketSizeFocus, 1.0, MPI_COMM_WORLD,
-                                                 execution::gpuDefaultStream, box);
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
+    const auto exec = execution::gpuStream(stream);
+
+    Domain<KeyType, T, execution::Gpu> domainGpu(rank, numRanks, bucketSize, bucketSizeFocus, 1.0, MPI_COMM_WORLD, exec,
+                                                 box);
     DeviceVector<T> s1, s2, s3;
     domainGpu.sync(d_keys, d_x, d_y, d_z, d_h, std::tie(d_m, d_rungs), std::tie(s1, s2, s3));
 
@@ -97,6 +101,8 @@ void randomGaussianAssignment(int rank, int numRanks)
     std::vector<uint8_t> rung_dl = toHost(d_rungs);
     EXPECT_TRUE(std::equal(rung_dl.begin() + domainGpu.startIndex(), rung_dl.begin() + domainGpu.endIndex(),
                            rungs.begin() + domainGpu.startIndex()));
+
+    checkGpuErrors(cudaStreamDestroy(stream));
 }
 
 TEST(DomainGpu, matchTreeCpu)
@@ -142,8 +148,12 @@ TEST(FocusDomain, removeParticle)
     DeviceVector<KeyType> d_keys = keys;
     DeviceVector<uint64_t> d_id  = id;
 
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
+    const auto exec = execution::gpuStream(stream);
+
     Domain<KeyType, Real, execution::Gpu> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                                 execution::gpuDefaultStream, box);
+                                                 exec, box);
 
     DeviceVector<Real> s1, s2, s3;
     domain.sync(d_keys, d_x, d_y, d_z, d_h, std::tie(d_id), std::tie(s1, s2, s3));
@@ -152,10 +162,10 @@ TEST(FocusDomain, removeParticle)
     LocalIndex removeIndex = domain.startIndex() + domain.nParticles() / 2;
     assert(removeIndex < domain.endIndex());
     auto rmKey = removeKey<KeyType>::value;
-    memcpyH2DAsync(execution::gpuDefaultStream, &rmKey, 1, rawPtr(d_keys) + removeIndex);
+    memcpyH2DAsync(exec, &rmKey, 1, rawPtr(d_keys) + removeIndex);
     uint64_t removeID;
-    memcpyD2HAsync(execution::gpuDefaultStream, rawPtr(d_id) + removeIndex, 1, &removeID);
-    syncGpu(execution::gpuDefaultStream);
+    memcpyD2HAsync(exec, rawPtr(d_id) + removeIndex, 1, &removeID);
+    syncGpu(exec);
 
     domain.sync(d_keys, d_x, d_y, d_z, d_h, std::tie(d_id), std::tie(s1, s2, s3));
 
@@ -172,6 +182,8 @@ TEST(FocusDomain, removeParticle)
         auto h_id = toHost(d_id);
         EXPECT_EQ(std::count(h_id.begin() + domain.startIndex(), h_id.begin() + domain.endIndex(), rid), 0);
     }
+
+    checkGpuErrors(cudaStreamDestroy(stream));
 }
 
 TEST(DomainGpu, reapplySync)
@@ -204,8 +216,12 @@ TEST(DomainGpu, reapplySync)
     DeviceVector<Real> d_h       = h;
     DeviceVector<KeyType> d_keys = keys;
 
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
+    const auto exec = execution::gpuStream(stream);
+
     Domain<KeyType, Real, execution::Gpu> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                                 execution::gpuDefaultStream, box);
+                                                 exec, box);
 
     DeviceVector<Real> s1, s2, gpuOrdering;
     domain.sync(d_keys, d_x, d_y, d_z, d_h, std::tuple{}, std::tie(s1, s2, gpuOrdering));
@@ -213,13 +229,10 @@ TEST(DomainGpu, reapplySync)
     // modify coordinates
     {
         RandomCoordinates<Real, SfcKind<KeyType>> scord(domain.nParticles(), box, numRanks + rank);
-        memcpyH2DAsync(execution::gpuDefaultStream, scord.x().data(), scord.x().size(),
-                       d_x.data() + domain.startIndex());
-        memcpyH2DAsync(execution::gpuDefaultStream, scord.y().data(), scord.y().size(),
-                       d_y.data() + domain.startIndex());
-        memcpyH2DAsync(execution::gpuDefaultStream, scord.z().data(), scord.z().size(),
-                       d_z.data() + domain.startIndex());
-        syncGpu(execution::gpuDefaultStream);
+        memcpyH2DAsync(exec, scord.x().data(), scord.x().size(), d_x.data() + domain.startIndex());
+        memcpyH2DAsync(exec, scord.y().data(), scord.y().size(), d_y.data() + domain.startIndex());
+        memcpyH2DAsync(exec, scord.z().data(), scord.z().size(), d_z.data() + domain.startIndex());
+        syncGpu(exec);
     }
 
     std::vector<Real> host_property(d_x.size());
@@ -256,6 +269,8 @@ TEST(DomainGpu, reapplySync)
         int numCommon = it - s.begin();
         EXPECT_EQ(numCommon, domain.nParticles());
     }
+
+    checkGpuErrors(cudaStreamDestroy(stream));
 }
 
 TEST(DomainGpu, Allgatherv)
@@ -274,8 +289,11 @@ TEST(DomainGpu, Allgatherv)
     std::vector<int> displ(numRanks);
     std::iota(displ.begin(), displ.end(), 0);
 
-    mpiAllgathervGpuDirect(execution::gpuDefaultStream, MPI_IN_PLACE, 0, dst.data(), counts.data(), displ.data(),
-                           MPI_COMM_WORLD);
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
+    const auto exec = execution::gpuStream(stream);
+
+    mpiAllgathervGpuDirect(exec, MPI_IN_PLACE, 0, dst.data(), counts.data(), displ.data(), MPI_COMM_WORLD);
 
     std::vector dstDl = toHost(dst);
     std::vector<T> ref(numRanks);
@@ -283,6 +301,8 @@ TEST(DomainGpu, Allgatherv)
     std::iota(ref.begin(), ref.end(), 100);
 
     EXPECT_EQ(dstDl, ref);
+
+    checkGpuErrors(cudaStreamDestroy(stream));
 }
 
 template<class KeyType, class T>
@@ -320,11 +340,14 @@ void randomGaussianGrav(int thisRank, int numRanks)
     DeviceVector<T> d_m          = m;
     DeviceVector<KeyType> d_keys = keys;
 
-    auto cpToHost = []<class X>(const X* ptr, int n)
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
+    const auto exec = execution::gpuStream(stream);
+
+    auto cpToHost = [exec]<class X>(const X* ptr, int n)
     {
         std::vector<X> ret(n);
-        memcpyD2HAsync(execution::gpuDefaultStream, ptr, n, ret.data());
-        syncGpu(execution::gpuDefaultStream);
+        memcpyD2HAsync(exec, ptr, n, ret.data());
         return ret;
     };
 
@@ -342,7 +365,7 @@ void randomGaussianGrav(int thisRank, int numRanks)
     }
     {
         Domain<KeyType, T, execution::Gpu> domainGpu(thisRank, numRanks, bucketSize, bucketSizeLocal, theta,
-                                                     MPI_COMM_WORLD, execution::gpuDefaultStream, box);
+                                                     MPI_COMM_WORLD, exec, box);
         DeviceVector<T> ds1, ds2, gpuOrdering;
         domainGpu.syncGrav(d_keys, d_x, d_y, d_z, d_h, d_m, std::tuple{}, std::tie(ds1, ds2, gpuOrdering));
         domainGpu.exchangeHalos(std::tie(d_m), ds1, ds2);
@@ -350,6 +373,7 @@ void randomGaussianGrav(int thisRank, int numRanks)
         h_layout  = cpToHost(domainGpu.layout().data(), domainGpu.layout().size());
         h_centers = cpToHost(domainGpu.focusTree().expansionCentersAcc().data(),
                              domainGpu.focusTree().expansionCentersAcc().size());
+        syncGpu(exec);
     }
 
     EXPECT_EQ(layout, h_layout);
@@ -369,6 +393,8 @@ void randomGaussianGrav(int thisRank, int numRanks)
     EXPECT_EQ(h_z, z);
     EXPECT_EQ(h_h, h);
     EXPECT_EQ(h_m, m);
+
+    checkGpuErrors(cudaStreamDestroy(stream));
 }
 
 TEST(DomainGpu, gravMatchCpu)

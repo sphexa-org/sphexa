@@ -186,15 +186,19 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
                                .groupStart = rawPtr(groups),
                                .groupEnd   = rawPtr(groups) + 1};
 
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
+
     // prefetch vectors to device memory, required on some AMD hardware/software for reasonable performance
     int device;
     checkGpuErrors(cudaGetDevice(&device));
     auto const prefetchToDevice = [&]<class Tv>(const thrust::universal_vector<Tv>& v)
     {
 #if defined(__HIPCC__) && (HIP_VERSION_MAJOR < 7 || (HIP_VERSION_MAJOR == 7 && HIP_VERSION_MINOR == 0))
-        checkGpuErrors(hipMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), device));
+        checkGpuErrors(hipMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), device, stream));
 #else
-        checkGpuErrors(cudaMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), {cudaMemLocationTypeDevice, device}, 0));
+        checkGpuErrors(
+            cudaMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), {cudaMemLocationTypeDevice, device}, 0, stream));
 #endif
     };
     util::for_each_tuple(prefetchToDevice, std::tie(dX, dY, dZ, dH));
@@ -202,14 +206,14 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     util::for_each_tuple(prefetchToDevice, dOutputs);
     util::for_each_tuple(prefetchToDevice, std::tie(dPrefixes, dChildOffsets, dParents, dInternalToLeaf,
                                                     dLeafToInternal, dLevelRange, dLayout, dCenters, dSizes, groups));
-    checkGpuErrors(cudaDeviceSynchronize());
+    checkGpuErrors(cudaStreamSynchronize(stream));
 
     // build neighborhood, measure CPU time
     using Clock             = std::chrono::high_resolution_clock;
     auto buildStart         = Clock::now();
-    const auto neighborhood = neighborhoodBuilder.build(execution::gpuDefaultStream, dNsView, box, n, dGroupView,
+    const auto neighborhood = neighborhoodBuilder.build(execution::gpuStream(stream), dNsView, box, n, dGroupView,
                                                         rawPtr(dX), rawPtr(dY), rawPtr(dZ), hVal);
-    checkGpuErrors(cudaDeviceSynchronize());
+    checkGpuErrors(cudaStreamSynchronize(stream));
     auto buildEnd         = Clock::now();
     const float buildTime = std::chrono::duration<float>(buildEnd - buildStart).count();
     printf("Neighborhood build time (CPU time): %7.6f s\n", buildTime);
@@ -223,13 +227,13 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     std::vector<cudaEvent_t> events(times.size() + 1);
     for (auto& event : events)
         checkGpuErrors(cudaEventCreate(&event));
-    checkGpuErrors(cudaEventRecord(events[0]));
+    checkGpuErrors(cudaEventRecord(events[0], stream));
     for (std::size_t i = 1; i < events.size(); ++i)
     {
         neighborhood.ijLoop(util::tupleMap([](auto const& v) { return rawPtr(v); }, dInputs),
                             util::tupleMap([](auto& v) { return rawPtr(v); }, dOutputs), interaction,
                             ijloop::empty_postamble);
-        checkGpuErrors(cudaEventRecord(events[i]));
+        checkGpuErrors(cudaEventRecord(events[i], stream));
     }
     checkGpuErrors(cudaEventSynchronize(events.back()));
 
@@ -241,6 +245,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
         times[i] = millisecs / 1000.0;
     }
     checkGpuErrors(cudaEventDestroy(events.back()));
+    checkGpuErrors(cudaStreamDestroy(stream));
 
     // compute and print mean and standard deviation of performance measurements
     std::vector<double> gigaParticleUpdates(times.size());

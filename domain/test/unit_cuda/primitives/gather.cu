@@ -18,7 +18,8 @@
 
 #include "gtest/gtest.h"
 
-#include <cstone/cuda/device_vector.h>
+#include "cstone/cuda/device_vector.h"
+#include "cstone/cuda/errorcheck.cuh"
 #include "cstone/primitives/primitives_acc.hpp"
 
 using namespace cstone;
@@ -31,7 +32,9 @@ TEST(SortByKey, minimal)
     DeviceVector<KeyType> keys = std::vector<KeyType>{2, 1, 5, 4};
     DeviceVector<IndexType> obuf, keyBuf, valBuf;
 
-    const auto exec = execution::gpuDefaultStream;
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
+    const auto exec = execution::gpuStream(stream);
 
     LocalIndex off = 1;
     sequence(exec, off, keys.size(), obuf, 1.0);
@@ -44,4 +47,6 @@ TEST(SortByKey, minimal)
         DeviceVector ref = std::vector<IndexType>{0, 2, 1, 4, 3};
         EXPECT_EQ(obuf, ref);
     }
+
+    checkGpuErrors(cudaStreamDestroy(stream));
 }

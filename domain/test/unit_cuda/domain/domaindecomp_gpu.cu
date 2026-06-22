@@ -47,9 +47,15 @@ static void sendListMinimalGpu()
 
     std::span<const KeyType> d_keyView{rp(d_keys), d_keys.size()};
 
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
+
     // note: key input needs to be sorted
     auto sendList =
-        createSendRangesGpu(assignment, d_keyView, rp(d_searchKeys), rp(d_indices), execution::gpuDefaultStream);
+        createSendRangesGpu(assignment, d_keyView, rp(d_searchKeys), rp(d_indices), execution::gpuStream(stream));
+
+    checkGpuErrors(cudaStreamSynchronize(stream));
+    checkGpuErrors(cudaStreamDestroy(stream));
 
     EXPECT_EQ(sendList.count(0), 6);
     EXPECT_EQ(sendList.count(1), 3);

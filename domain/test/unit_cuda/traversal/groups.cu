@@ -38,8 +38,14 @@ TEST(TargetGroups, t0)
 {
     LocalIndex groupSize = 8, first = 4, last = 34;
 
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
+
     GroupData<execution::Gpu> groups;
-    computeFixedGroups(first, last, groupSize, groups, execution::gpuDefaultStream);
+    computeFixedGroups(first, last, groupSize, groups, execution::gpuStream(stream));
+
+    checkGpuErrors(cudaStreamSynchronize(stream));
+    checkGpuErrors(cudaStreamDestroy(stream));
 
     std::vector<LocalIndex> hgroups = toHost(groups.data);
     std::vector<LocalIndex> ref{4, 12, 20, 28, 34};
@@ -126,7 +132,10 @@ TEST(TargetGroups, makeSplits)
             ret[1] = b;
             return ret;
         }
-        else { return SplitType{(uint64_t(b) << 32) + a}; } // NOLINT
+        else
+        {
+            return SplitType{(uint64_t(b) << 32) + a};
+        } // NOLINT
     };
 
     {
@@ -189,7 +198,10 @@ TEST(TargetGroups, makeSplits)
         for (std::size_t i = 0; i < targetSize - 1; ++i)
         {
             if (i == 60) { EXPECT_EQ(splitLengths[i], 2); }
-            else { EXPECT_EQ(splitLengths[i], 1); }
+            else
+            {
+                EXPECT_EQ(splitLengths[i], 1);
+            }
         }
     }
     {
@@ -275,9 +287,16 @@ TEST(TargetGroups, groupVolumes)
         //                            because of distance ^    ^ because of interaction radius
         DeviceVector<LocalIndex> temp, groups;
 
+        cudaStream_t stream;
+        checkGpuErrors(cudaStreamCreate(&stream));
+        const auto exec = execution::gpuStream(stream);
+
         float tolFactor = std::sqrt(3.0) / distCrit * 1.01;
         computeGroupSplits(first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves), nNodes(leaves),
-                           rawPtr(d_layout), box, groupSize, tolFactor, temp, groups, execution::gpuDefaultStream);
+                           rawPtr(d_layout), box, groupSize, tolFactor, temp, groups, execution::gpuStream(stream));
+
+        checkGpuErrors(cudaStreamSynchronize(stream));
+        checkGpuErrors(cudaStreamDestroy(stream));
 
         std::vector<LocalIndex> h_groups = toHost(groups);
         std::vector<LocalIndex> ref{4, 6, 68, 75, 128};
