@@ -498,10 +498,7 @@ struct GromacsLikeNeighborhoodBuilder
                 hExt[i] = h[i] * tree.searchExtFactor;
             tree.searchExtFactor = 1;
         }
-        else
-        {
-            hExtData = h * tree.searchExtFactor;
-        }
+        else { hExtData = h * tree.searchExtFactor; }
 
 #pragma omp parallel
         {

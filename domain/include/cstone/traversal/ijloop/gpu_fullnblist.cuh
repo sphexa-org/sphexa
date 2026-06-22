@@ -294,10 +294,7 @@ struct GpuFullNbListNeighborhoodBuilder
                                   { return hi * searchExtFactor; });
                 hExt = hExtData.get();
             }
-            else
-            {
-                hExt = h * tree.searchExtFactor;
-            }
+            else { hExt = h * tree.searchExtFactor; }
             tree.searchExtFactor = 1;
         }
 

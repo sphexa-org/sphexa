@@ -156,10 +156,7 @@ struct CpuFullNbListNeighborhoodBuilder
                     hExtData[i] = h[i] * tree.searchExtFactor;
                 hExt = hExtData.get();
             }
-            else
-            {
-                hExt = h * tree.searchExtFactor;
-            }
+            else { hExt = h * tree.searchExtFactor; }
             tree.searchExtFactor = 1;
         }
 

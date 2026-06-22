@@ -320,10 +320,7 @@ __launch_bounds__(GpuConfig::warpSize* WarpsPerBlock) void runIjLoop(const Box<T
         {
             util::for_each_tuple([i](auto* ptr, auto const& v) { atomicUpdatePtr(&ptr[i], v); }, output, result);
         }
-        else
-        {
-            storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
-        }
+        else { storeParticleData(output, i, postamble(iData, unwrapModifiers(result))); }
     }
 }
 
