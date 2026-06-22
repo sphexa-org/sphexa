@@ -512,8 +512,5 @@ TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
             this->validate(reference, result);
         }
     }
-    else
-    {
-        GTEST_SKIP() << "subgroups not supported";
-    }
+    else { GTEST_SKIP() << "subgroups not supported"; }
 }

@@ -231,10 +231,8 @@ TEST(CsArrayGpu, distributedMockUp)
     CodeType nodeKey1, nodeKey2;
     memcpyD2HAsync(exec, fixt.d_tree.data() + firstNode, 1, &nodeKey1);
     memcpyD2HAsync(exec, fixt.d_tree.data() + lastNode, 1, &nodeKey2);
-    unsigned firstIdx = lowerBound(exec, fixt.d_codes.data(),
-                                   fixt.d_codes.data() + fixt.d_codes.size(), nodeKey1);
-    unsigned lastIdx  = lowerBound(exec, fixt.d_codes.data(),
-                                   fixt.d_codes.data() + fixt.d_codes.size(), nodeKey2);
+    unsigned firstIdx = lowerBound(exec, fixt.d_codes.data(), fixt.d_codes.data() + fixt.d_codes.size(), nodeKey1);
+    unsigned lastIdx  = lowerBound(exec, fixt.d_codes.data(), fixt.d_codes.data() + fixt.d_codes.size(), nodeKey2);
     std::cout << firstNode << " " << lastNode << std::endl;
     std::cout << firstIdx << " " << lastIdx << std::endl;
 
