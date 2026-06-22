@@ -32,6 +32,7 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -50,7 +51,14 @@
 #include "util/utils.hpp"
 
 #include "simulation_data.hpp"
-#include "insitu_viz.h"
+
+#ifdef SPH_EXA_USE_CATALYST2
+#include "catalyst_adaptor.h"
+using VizAdaptor = viz::CatalystAdaptor;
+#elif SPH_EXA_USE_ASCENT
+#include "ascent_adaptor.h"
+using VizAdaptor = viz::AscentAdaptor;
+#endif
 
 #ifdef USE_CUDA
 using AccType = cstone::GpuTag;
@@ -69,13 +77,15 @@ sph::NeighborhoodType nbTypeFromName(const std::string_view nbType);
 
 int main(int argc, char** argv)
 {
-    auto [rank, numRanks] = initMpi();
+    MPIScope mpi;
+    auto [rank, numRanks] = mpi.info();
+
     const ArgParser parser(argc, (const char**)argv);
 
     if (parser.exists("-h") || parser.exists("--h") || parser.exists("-help") || parser.exists("--help"))
     {
         printHelp(argv[0], rank);
-        return exitSuccess();
+        return EXIT_SUCCESS;
     }
 
     using Dataset = SimulationData<AccType>;
@@ -146,8 +156,7 @@ int main(int argc, char** argv)
     propagator->sync(domain, simData);
     if (rank == 0) std::cout << "Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
 
-    viz::init_catalyst(argc, argv);
-    viz::init_ascent(d, domain.startIndex());
+    VizAdaptor viz(argc, argv);
 
     size_t startIteration    = d.iteration;
     bool   isOutputTriggered = false;
@@ -183,7 +192,7 @@ int main(int argc, char** argv)
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
 
-        viz::execute(d, domain.startIndex(), domain.endIndex());
+        viz.execute(d, domain.startIndex(), domain.endIndex());
 
         propagator->integrate(domain, simData);
         propagator->printIterationTimings(domain, simData);
@@ -199,8 +208,8 @@ int main(int argc, char** argv)
                     initCond + " up to t = " + std::to_string(d.ttot));
 
     constantsFile.close();
-    viz::finalize();
-    return exitSuccess();
+
+    return EXIT_SUCCESS;
 }
 
 //! @brief check whether the stop conditions based on evolved time (not wall-clock) or iteration count are reached
