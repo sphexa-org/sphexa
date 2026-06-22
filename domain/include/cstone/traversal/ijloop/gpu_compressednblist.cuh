@@ -333,7 +333,7 @@ struct GpuCompressedNbListNeighborhood
     const Tc *x = nullptr, *y = nullptr, *z = nullptr;
     ThP h = {};
 
-    util::UniqueDevicePtr<std::uint32_t[]> neighborData;
+    util::UniqueManagedPtr<std::uint32_t[]> neighborData;
     util::UniqueDevicePtr<std::size_t[]> groupDataIndex;
     std::size_t numBytesUsed = 0;
 
@@ -350,7 +350,7 @@ struct GpuCompressedNbListNeighborhood
         // for symmetric neighborhoods where the reduction returns more values than the postamble, temporary arrays have
         // to be allocated; in all other cases, this functions just returns the output data pointers
         auto [tmpOrOutput, tmpHolder] = allocateTemporaries<Config, Tc, ThP>(
-            firstBody, lastBody, makeConst(input), output, std::forward<Interaction>(interaction));
+            exec, firstBody, lastBody, makeConst(input), output, std::forward<Interaction>(interaction));
 
         if constexpr (Config::symmetric)
         {
@@ -433,13 +433,13 @@ struct GpuCompressedNbListNeighborhoodBuilder
         const unsigned numBlocks         = GpuConfig::smCount * 32;
         const std::size_t totalWarps     = numBlocks * warpsPerBlock;
         const std::size_t poolSize       = totalWarps * 2 * GpuConfig::warpSize * ngmax;
-        auto globalPool                  = util::deviceAlloc<std::uint32_t[]>(poolSize);
+        auto globalPool                  = util::deviceAlloc<std::uint32_t[]>(exec, poolSize);
 
         const std::size_t maxNeighborsPerGroup    = GpuConfig::warpSize * ngmax;
         const std::size_t neighborDataVirtualSize = maxNeighborsPerGroup * numGroups;
         auto neighborData                         = util::deviceAllocVirtual<std::uint32_t[]>(neighborDataVirtualSize);
-        auto groupDataIndex                       = util::deviceAlloc<std::size_t[]>(numGroups);
-        auto globalBuildData                      = util::deviceAlloc<GlobalBuildData>();
+        auto groupDataIndex                       = util::deviceAlloc<std::size_t[]>(exec, numGroups);
+        auto globalBuildData                      = util::deviceAlloc<GlobalBuildData>(exec);
         checkGpuErrors(cudaMemsetAsync(globalBuildData.get(), 0, sizeof(GlobalBuildData), exec));
 
         constexpr dim3 blockSize = {GpuConfig::warpSize, warpsPerBlock, 1};

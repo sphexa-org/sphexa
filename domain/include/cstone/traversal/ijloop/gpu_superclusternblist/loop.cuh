@@ -550,7 +550,7 @@ computeActiveMasks(const execution::Gpu exec,
                    const LocalIndex firstValidBody,
                    const GroupView& groups)
 {
-    auto activeMasks = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(numISuperclusters);
+    auto activeMasks = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(exec, numISuperclusters);
     checkGpuErrors(cudaMemsetAsync(activeMasks.get(), 0,
                                    sizeof(typename Config::SuperclusterParticleMask) * numISuperclusters, exec));
 

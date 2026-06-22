@@ -20,6 +20,7 @@
 #include <type_traits>
 
 #include "cstone/cuda/errorcheck.cuh"
+#include "cstone/execution.hpp"
 
 namespace util
 {
@@ -36,37 +37,51 @@ struct CudaFreeDeleter
     }
 };
 
+struct CudaFreeAsyncDeleter
+{
+    cudaStream_t stream;
+
+    template<class T>
+    void operator()(T* ptr) const
+    {
+        checkGpuErrors(cudaFreeAsync(ptr, stream));
+    }
+};
+
 } // namespace detail
 
 template<class T>
-using UniqueDevicePtr = std::unique_ptr<T, detail::CudaFreeDeleter>;
+using UniqueDevicePtr = std::unique_ptr<T, detail::CudaFreeAsyncDeleter>;
+
+template<class T>
+using UniqueManagedPtr = std::unique_ptr<T, detail::CudaFreeDeleter>;
 
 template<class T, std::enable_if_t<!std::is_array_v<T>, int> = 0>
-inline UniqueDevicePtr<T> deviceAlloc()
+inline UniqueDevicePtr<T> deviceAlloc(cstone::execution::Gpu exec)
 {
     T* ptr;
-    checkGpuErrors(cudaMalloc(&ptr, sizeof(T)));
-    return UniqueDevicePtr<T>(ptr);
+    checkGpuErrors(cudaMallocAsync(&ptr, sizeof(T), exec));
+    return UniqueDevicePtr<T>(ptr, detail::CudaFreeAsyncDeleter{exec});
 }
 
 template<class T, std::enable_if_t<std::is_array_v<T>, int> = 0>
-inline UniqueDevicePtr<T> deviceAlloc(std::size_t size)
+inline UniqueDevicePtr<T> deviceAlloc(cstone::execution::Gpu exec, std::size_t size)
 {
     using ValueType = std::remove_extent_t<T>;
     ValueType* ptr;
-    checkGpuErrors(cudaMalloc(&ptr, size * sizeof(ValueType)));
-    return UniqueDevicePtr<T>(ptr);
+    checkGpuErrors(cudaMallocAsync(&ptr, size * sizeof(ValueType), exec));
+    return UniqueDevicePtr<T>(ptr, detail::CudaFreeAsyncDeleter{exec});
 }
 
 template<class T, std::enable_if_t<std::is_array_v<T>, int> = 0>
-inline UniqueDevicePtr<T> deviceAllocVirtual(std::size_t size)
+inline UniqueManagedPtr<T> deviceAllocVirtual(std::size_t size)
 {
     using ValueType = std::remove_extent_t<T>;
     ValueType* ptr;
     // cudaMallocManaged is the easiest way to reserve a virtual address range without physical page backing or reserved
     // swap space, similar to mmap with MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE
     checkGpuErrors(cudaMallocManaged(&ptr, size * sizeof(ValueType)));
-    return UniqueDevicePtr<T>(ptr);
+    return UniqueManagedPtr<T>(ptr);
 }
 
 struct SharedMemAllocator

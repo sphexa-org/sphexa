@@ -156,7 +156,7 @@ util::UniqueDevicePtr<JClusterBbox<Config, Tc>[]> computeJClusterBboxes(const ex
                                                                         const ThP h)
 {
     const LocalIndex numJClusters = jClusterIndex<Config>(totalBodies - 1) + 1;
-    auto jClusterBboxes           = util::deviceAlloc<JClusterBbox<Config, Tc>[]>(numJClusters);
+    auto jClusterBboxes           = util::deviceAlloc<JClusterBbox<Config, Tc>[]>(exec, numJClusters);
     constexpr unsigned numThreads = 256;
     unsigned numBlocks            = iceil(numJClusters * Config::jSize, numThreads);
     computeJClusterBboxesKernel<Config>
@@ -577,7 +577,7 @@ std::size_t buildNbList(const execution::Gpu exec,
                         const std::size_t neighborDataVirtualSize,
                         SuperclusterInfo* const superclusterInfo)
 {
-    auto globalBuildData = util::deviceAlloc<GlobalBuildData>();
+    auto globalBuildData = util::deviceAlloc<GlobalBuildData>(exec);
 
     constexpr unsigned numSuperclustersPerBlock = 2;
     const dim3 blockSize                        = {GpuConfig::warpSize, 1, numSuperclustersPerBlock};

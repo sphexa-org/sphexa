@@ -276,10 +276,10 @@ struct GpuFullNbListNeighborhoodBuilder
 
         if (numBodies == 0) return {};
 
-        auto neighbors      = util::deviceAlloc<LocalIndex[]>(ngmax * numBodies);
-        auto neighborsCount = util::deviceAlloc<unsigned[]>(numBodies);
-        auto globalPool     = util::deviceAlloc<int[]>(TravConfig::poolSize());
-        auto maxNeighbors   = util::deviceAlloc<unsigned>();
+        auto neighbors      = util::deviceAlloc<LocalIndex[]>(exec, ngmax * numBodies);
+        auto neighborsCount = util::deviceAlloc<unsigned[]>(exec, numBodies);
+        auto globalPool     = util::deviceAlloc<int[]>(exec, TravConfig::poolSize());
+        auto maxNeighbors   = util::deviceAlloc<unsigned>(exec);
 
         using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
         ThP hExt = h;
@@ -288,7 +288,7 @@ struct GpuFullNbListNeighborhoodBuilder
         {
             if constexpr (std::is_pointer_v<ThP>)
             {
-                hExtData = util::deviceAlloc<Th[]>(totalBodies);
+                hExtData = util::deviceAlloc<Th[]>(exec, totalBodies);
                 thrust::transform(thrustExecPolicy(exec), h, h + totalBodies, hExtData.get(),
                                   [searchExtFactor = tree.searchExtFactor] __device__(Th hi)
                                   { return hi * searchExtFactor; });

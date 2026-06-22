@@ -87,7 +87,7 @@ struct GpuSuperclusterNbListNeighborhood
     LocalIndex firstValidBody = 0, totalBodies = 0, firstBody = 0, lastBody = 0;
     const Tc *x = nullptr, *y = nullptr, *z = nullptr;
     ThP h;
-    util::UniqueDevicePtr<std::uint32_t[]> neighborData;
+    util::UniqueManagedPtr<std::uint32_t[]> neighborData;
     util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo;
     unsigned ncmax       = 0;
     std::size_t numBytes = 0;
@@ -146,7 +146,7 @@ struct GpuSuperclusterNbListNeighborhood
             [activeMasksPtr = activeMasks.get(), firstISupercluster] __device__(const SuperclusterInfo& info)
         { return activeMasksPtr[info.index - firstISupercluster] != 0; };
 
-        auto activeSuperclusterInfo = util::deviceAlloc<SuperclusterInfo[]>(numISuperclusters);
+        auto activeSuperclusterInfo = util::deviceAlloc<SuperclusterInfo[]>(exec, numISuperclusters);
         SuperclusterInfo* lastCopied =
             thrust::copy_if(thrustExecPolicy(exec), superclusterInfo.get(), superclusterInfo.get() + numISuperclusters,
                             activeSuperclusterInfo.get(), superclusterIsActive);
@@ -175,7 +175,7 @@ protected:
         // for symmetric neighborhoods where the reduction returns more values than the postamble, temporary arrays have
         // to be allocated; in all other cases, this functions just returns the output data pointers
         auto [tmpOrOutput, tmpHolder] = allocateTemporaries<Config, Tc, ThP>(
-            firstBody, lastBody, makeConst(input), output, std::forward<Interaction>(interaction));
+            exec, firstBody, lastBody, makeConst(input), output, std::forward<Interaction>(interaction));
 
         if constexpr (Config::symmetric)
         {
@@ -317,7 +317,7 @@ struct GpuSuperclusterNbListNeighborhoodBuilder
         auto neighborData                         = util::deviceAllocVirtual<std::uint32_t[]>(neighborDataVirtualSize);
 
         // second main data array: storing some data for each supercluster
-        auto superclusterInfo = util::deviceAlloc<SuperclusterInfo[]>(numISuperclusters);
+        auto superclusterInfo = util::deviceAlloc<SuperclusterInfo[]>(exec, numISuperclusters);
 
         // temporary data arrays, only used during build
         auto jClusterBboxes = computeJClusterBboxes<Config>(exec, firstValidBody, totalBodies, x, y, z, h);

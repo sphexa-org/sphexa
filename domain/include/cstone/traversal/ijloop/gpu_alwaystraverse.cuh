@@ -197,8 +197,9 @@ struct GpuAlwaysTraverseNeighborhoodBuilder
                 z,
                 h,
                 ngmax,
-                util::deviceAlloc<LocalIndex[]>(GpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP>::neighborsSize(ngmax)),
-                util::deviceAlloc<int[]>(TravConfig::poolSize())};
+                util::deviceAlloc<LocalIndex[]>(exec,
+                                                GpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP>::neighborsSize(ngmax)),
+                util::deviceAlloc<int[]>(exec, TravConfig::poolSize())};
     }
 };
 
