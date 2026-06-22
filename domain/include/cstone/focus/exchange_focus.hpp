@@ -339,10 +339,9 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
     for (size_t i = 0; i < interiorPeers.size(); ++i)
     {
         gather(exec, treeletIdx[interiorPeers[i]], quantities.data(), sendBuffers[i].data());
-        if constexpr (useGpu) { syncGpu(exec); }
         assert(sendBuffers[i].size() == treeletIdx[interiorPeers[i]].size());
-        mpiSendAsyncAcc<useGpu>(sendBuffers[i].data(), treeletIdx[interiorPeers[i]].size(), interiorPeers[i], commTag,
-                                sendRequests, staging, comm);
+        mpiSendAsyncAcc(exec, sendBuffers[i].data(), treeletIdx[interiorPeers[i]].size(), interiorPeers[i], commTag,
+                        sendRequests, staging, comm);
     }
 
     int numMessages = exteriorPeers.size();
@@ -356,7 +355,7 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
 
         int peerIdx = std::find(exteriorPeers.begin(), exteriorPeers.end(), recvRank) - exteriorPeers.begin();
         T* recvBuf  = recvBuffers[peerIdx].data();
-        mpiRecvSyncAcc<useGpu>(recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE, comm);
+        mpiRecvSyncAcc(exec, recvBuf, recvCount, recvRank, commTag, MPI_STATUS_IGNORE, comm);
 
         auto mapToInternal = csToInternalMap.subspan(focusAssignment[recvRank].start(), recvCount);
         scatter(exec, mapToInternal, recvBuf, quantities.data());

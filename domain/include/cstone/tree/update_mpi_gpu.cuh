@@ -79,15 +79,17 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
     computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys, std::numeric_limits<unsigned>::max(),
                          true, exec);
 
-    syncGpu(exec);
     if (expectOverflows)
     {
         MPI_Op limitSum;
         MPI_Op_create(&sumCapped, true, &limitSum);
-        mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), limitSum, comm);
+        mpiAllreduceGpuDirect(exec, d_counts.data(), d_countsRed.data(), d_counts.size(), limitSum, comm);
         MPI_Op_free(&limitSum);
     }
-    else { mpiAllreduceGpuDirect(d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, comm); }
+    else
+    {
+        mpiAllreduceGpuDirect(exec, d_counts.data(), d_countsRed.data(), d_counts.size(), MPI_SUM, comm);
+    }
     sequenceMax(exec, d_counts.data(), d_counts.data() + d_counts.size(), d_countsRed.data(), d_counts.data());
     d_countsBuf.resize(numLeafNodes);
 

@@ -109,8 +109,7 @@ void exchangeParticlesGpu(execution::Gpu exec,
         encodeSendCount(exec, sendCount, sendPtr);
         size_t numBytes = headerBytes + packArrays<alignment>(gatherGpu, ordering + sendStart, sendCount,
                                                               sendPtr + headerBytes, arrays...);
-        checkGpuErrors(cudaStreamSynchronize(exec));
-        mpiSendGpuDirect(sendPtr, numBytes, destinationRank, domExTag, sendRequests, sendBuffers, comm);
+        mpiSendGpuDirect(exec, sendPtr, numBytes, destinationRank, domExTag, sendRequests, sendBuffers, comm);
         sendPtr += numBytes;
     }
 
@@ -126,7 +125,7 @@ void exchangeParticlesGpu(execution::Gpu exec,
         size_t receiveCountBytes = receiveCountTransfer * sizeof(TransferType);
         reallocateBytes(recvScratchBuffer, receiveCountBytes, allocGrowthRate);
         char* receiveBuffer = reinterpret_cast<char*>(rawPtr(recvScratchBuffer));
-        mpiRecvGpuDirect(reinterpret_cast<TransferType*>(receiveBuffer), receiveCountTransfer, receiveRank, domExTag,
+        mpiRecvGpuDirect(exec, reinterpret_cast<TransferType*>(receiveBuffer), receiveCountTransfer, receiveRank, domExTag,
                          &status, comm);
 
         size_t receiveCount;

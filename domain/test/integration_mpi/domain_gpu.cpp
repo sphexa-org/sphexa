@@ -274,7 +274,8 @@ TEST(DomainGpu, Allgatherv)
     std::vector<int> displ(numRanks);
     std::iota(displ.begin(), displ.end(), 0);
 
-    mpiAllgathervGpuDirect<true>(MPI_IN_PLACE, 0, dst.data(), counts.data(), displ.data(), MPI_COMM_WORLD);
+    mpiAllgathervGpuDirect(execution::gpuDefaultStream, MPI_IN_PLACE, 0, dst.data(), counts.data(), displ.data(),
+                           MPI_COMM_WORLD);
 
     std::vector dstDl = toHost(dst);
     std::vector<T> ref(numRanks);
