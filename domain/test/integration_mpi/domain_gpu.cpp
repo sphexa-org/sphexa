@@ -71,8 +71,8 @@ void randomGaussianAssignment(int rank, int numRanks)
 
     StreamHolder stream;
 
-    Domain<KeyType, T, execution::Gpu> domainGpu(rank, numRanks, bucketSize, bucketSizeFocus, 1.0, MPI_COMM_WORLD, stream.exec(),
-                                                 box);
+    Domain<KeyType, T, execution::Gpu> domainGpu(rank, numRanks, bucketSize, bucketSizeFocus, 1.0, MPI_COMM_WORLD,
+                                                 stream.exec(), box);
     DeviceVector<T> s1, s2, s3;
     domainGpu.sync(d_keys, d_x, d_y, d_z, d_h, std::tie(d_m, d_rungs), std::tie(s1, s2, s3));
 
@@ -177,7 +177,6 @@ TEST(FocusDomain, removeParticle)
         auto h_id = toHost(d_id);
         EXPECT_EQ(std::count(h_id.begin() + domain.startIndex(), h_id.begin() + domain.endIndex(), rid), 0);
     }
-
 }
 
 TEST(DomainGpu, reapplySync)

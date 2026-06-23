@@ -130,10 +130,7 @@ TEST(TargetGroups, makeSplits)
             ret[1] = b;
             return ret;
         }
-        else
-        {
-            return SplitType{(uint64_t(b) << 32) + a};
-        } // NOLINT
+        else { return SplitType{(uint64_t(b) << 32) + a}; } // NOLINT
     };
 
     {
@@ -196,10 +193,7 @@ TEST(TargetGroups, makeSplits)
         for (std::size_t i = 0; i < targetSize - 1; ++i)
         {
             if (i == 60) { EXPECT_EQ(splitLengths[i], 2); }
-            else
-            {
-                EXPECT_EQ(splitLengths[i], 1);
-            }
+            else { EXPECT_EQ(splitLengths[i], 1); }
         }
     }
     {

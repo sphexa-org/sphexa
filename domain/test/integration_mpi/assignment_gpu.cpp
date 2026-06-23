@@ -94,7 +94,8 @@ void randomGaussianAssignment(int rank, int numRanks)
 
     StreamHolder stream;
 
-    GlobalAssignment<KeyType, T, execution::Gpu> assignmentGpu(rank, numRanks, bucketSize, box, MPI_COMM_WORLD, stream.exec());
+    GlobalAssignment<KeyType, T, execution::Gpu> assignmentGpu(rank, numRanks, bucketSize, box, MPI_COMM_WORLD,
+                                                               stream.exec());
     DeviceVector<unsigned> sfcScratch;
     SfcSorter deviceSort(sfcScratch);
 
