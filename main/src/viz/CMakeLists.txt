@@ -21,6 +21,7 @@ target_include_directories(
 target_compile_definitions(
   viz
   INTERFACE
+    $<$<NOT:$<STREQUAL:${INSITU},None>>:SPHEXA_WITH_VISUALIZATION>
     $<$<BOOL:${INSITU_FORCE_EXPLICIT_CONNECTIVITY_LIST}>:FORCE_EXPLICIT_CONNECTIVITY_LIST>
 )
 
