@@ -50,10 +50,7 @@ namespace sph
 template<class Dataset>
 void groupDivvTimestep(const GroupView& grp, float* groupDt, const Dataset& d)
 {
-    if constexpr (d.useGpu)
-    {
-        groupDivvTimestepGpu(d.Krho, grp, rawPtr(d.divv), groupDt);
-    }
+    if constexpr (d.useGpu) { groupDivvTimestepGpu(d.Krho, grp, rawPtr(d.divv), groupDt); }
 }
 
 //! @brief compute acceleration-limited timestep for each group when block time-steps are active

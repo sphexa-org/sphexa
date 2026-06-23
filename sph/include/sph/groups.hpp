@@ -59,10 +59,7 @@ template<typename Tc, class Dataset>
 void computeGroups(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box,
                    GroupData<typename Dataset::Exec>& groups)
 {
-    if constexpr (d.useGpu)
-    {
-        computeSpatialGroups(startIndex, endIndex, d, box, groups);
-    }
+    if constexpr (d.useGpu) { computeSpatialGroups(startIndex, endIndex, d, box, groups); }
     else
     {
         groups.firstBody  = startIndex;
