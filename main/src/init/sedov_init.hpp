@@ -99,13 +99,14 @@ class SedovGrid : public ISimInitializer<Dataset>
 
 public:
     SedovGrid()
+        : ISimInitializer<Dataset>({})
     {
         Dataset d;
         settings_ = buildSettings(d, sedovConstants(), {}, nullptr);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cubeSide, Dataset& simData,
-                                                 IFileReader*) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t cubeSide, Dataset& simData,
+                                                     IFileReader*) const override
     {
         auto& d                   = simData.hydro;
         using KeyType             = typename Dataset::KeyType;
@@ -146,6 +147,7 @@ class SedovGlass : public ISimInitializer<Dataset>
 public:
     SedovGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , ISimInitializer<Dataset>(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, sedovConstants(), settingsFile, reader);
@@ -156,11 +158,12 @@ public:
      * @param[in]    rank             MPI rank ID
      * @param[in]    numRanks         number of MPI ranks
      * @param[in]    cbrtNumPart      the cubic root of the global number of particles to generate
-     * @param[inout] d                particle dataset
+     * @param[inout] simData          particle dataset
+     * @param[in]    reader           loads input files
      * @return                        the global coordinate bounding box
      */
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                     IFileReader* reader) const override
     {
         auto& d       = simData.hydro;
         using KeyType = typename Dataset::KeyType;
