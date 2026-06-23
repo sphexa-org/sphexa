@@ -53,7 +53,7 @@ auto accelerationTimestep(size_t first, size_t last, const Dataset& d)
 
     //! @brief minimum value of all {h_i^2 / a_i^2}
     T minH2_A2 = std::numeric_limits<T>::infinity();
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
+    if constexpr (d.useGpu)
     {
         minH2_A2 = accelerationTimestepGPU(first, last, rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.h));
     }
@@ -77,7 +77,7 @@ auto rhoTimestep(size_t first, size_t last, const Dataset& d)
     using T = std::decay_t<decltype(*d.divv.data())>;
 
     T maxDivv = -INFINITY;
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
+    if constexpr (d.useGpu)
     {
         if (d.divv.empty()) { throw std::runtime_error("Divv needs to be available in rhoTimestep\n"); }
         auto minmax = cstone::MinMax<cstone::execution::Gpu, T>{cstone::execution::gpuDefaultStream}(
@@ -107,14 +107,14 @@ void computeTimestep(size_t first, size_t last, Dataset& d, Ts... extraTimesteps
     T minDtLoc = std::min({minDtAcc, d.minDtCourant, d.minDtRho, d.maxDtIncrease * d.minDt, extraTimesteps...});
 
     util::array<T, 4> varsIn{minDtLoc, 0, 0, -T(d.size() - last + first)}, varsOut;
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
+    if constexpr (d.useGpu)
     {
         varsIn[1] = -int(d.stackUsedNc);
         varsIn[2] = -int(d.stackUsedGravity);
     }
     MPI_Allreduce(varsIn.data(), varsOut.data(), varsIn.size(), MpiType<T>{}, MPI_MIN, MPI_COMM_WORLD);
     T minDtGlobal = varsOut[0];
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
+    if constexpr (d.useGpu)
     {
         d.stackUsedNc      = int(-varsOut[1]);
         d.stackUsedGravity = int(-varsOut[2]);

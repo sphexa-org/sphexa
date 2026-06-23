@@ -191,7 +191,7 @@ template<class Dataset>
 void driftPositions(const GroupView& grp, Dataset& d, float dt_forward, float dt_backward,
                     util::array<float, Timestep::maxNumRungs> dt_prevRung, const uint8_t* rung)
 {
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
+    if constexpr (d.useGpu)
     {
         auto  constCv = d.mui.empty() ? idealGasCv(d.muiConst, d.gamma) : -1.0;
         auto* d_mui   = d.mui.empty() ? nullptr : rawPtr(d.mui);
@@ -207,7 +207,7 @@ template<class T, class Dataset>
 void computePositions(const GroupView& grp, Dataset& d, const cstone::Box<T>& box, float dt_forward,
                       util::array<float, Timestep::maxNumRungs> dt_m1, const uint8_t* rung = nullptr)
 {
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
+    if constexpr (d.useGpu)
     {
         T     constCv = d.mui.empty() ? idealGasCv(d.muiConst, d.gamma) : -1.0;
         auto* d_mui   = d.mui.empty() ? nullptr : rawPtr(d.mui);

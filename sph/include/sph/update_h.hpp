@@ -38,7 +38,7 @@ template<class Dataset>
 bool updateSmoothingLength(const GroupView& grp, Dataset& d)
 {
     using namespace cstone;
-    if constexpr (execution::HaveGpu<typename Dataset::Exec>{})
+    if constexpr (d.useGpu)
     {
         bool keysRemoved = updateSmoothingLengthGpu(grp, d.ng0, rawPtr(d.nc), rawPtr(d.h), rawPtr(d.keys));
         return keysRemoved;
@@ -87,10 +87,7 @@ void updateSmoothingLengthIterativeCpu(const Tc* x, const Tc* y, const Tc* z, T*
 template<class T, class Dataset>
 void updateSmoothingLengthIterative(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
-    {
-        updateSmoothingLengthIterativeGpu(groups, d, box);
-    }
+    if constexpr (d.useGpu) { updateSmoothingLengthIterativeGpu(groups, d, box); }
     else
     {
         updateSmoothingLengthIterativeCpu(d.x.data(), d.y.data(), d.z.data(), d.h.data(), d.nc.data(), groups.firstBody,

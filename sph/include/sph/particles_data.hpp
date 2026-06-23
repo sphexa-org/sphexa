@@ -61,7 +61,8 @@ template<class Execution>
 class ParticlesData : public cstone::FieldStates<ParticlesData<Execution>>
 {
 public:
-    using Exec = Execution;
+    using Exec                   = Execution;
+    static constexpr bool useGpu = cstone::execution::HaveGpu<Execution>();
 
     using KeyType   = sph::SphTypes::KeyType;
     using RealType  = sph::SphTypes::CoordinateType;
@@ -70,8 +71,7 @@ public:
     using Tmass     = sph::SphTypes::Tmass;
 
     template<class ValueType>
-    using FieldVector = std::conditional_t<cstone::execution::HaveGpu<Execution>{}, cstone::DeviceVector<ValueType>,
-                                           std::vector<ValueType>>;
+    using FieldVector = std::conditional_t<useGpu, cstone::DeviceVector<ValueType>, std::vector<ValueType>>;
 
     using FieldVariant = std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*,
                                       FieldVector<uint64_t>*, FieldVector<uint8_t>*>;
@@ -248,9 +248,8 @@ public:
     FieldVector<uint64_t>  id;                                 // unique particle id
     FieldVector<HydroType> dtCourant;                          // per-particle timestep restriction
 
-    std::conditional_t<cstone::execution::HaveGpu<Execution>{}, sph::DeviceNeighborhoodData, sph::NeighborhoodData>
-                                            neighborhood;
-    cstone::OctreeNsView<RealType, KeyType> treeView;
+    std::conditional_t<useGpu, sph::DeviceNeighborhoodData, sph::NeighborhoodData> neighborhood;
+    cstone::OctreeNsView<RealType, KeyType>                                        treeView;
 
     //! @brief lookup tables for the SPH-kernel and its derivative
     FieldVector<HydroType> wh, whd;

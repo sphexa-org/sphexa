@@ -107,7 +107,7 @@ void driveTurbulence(GroupView grp, Dataset& d,
     computePhases(turb.numModes, turb.numDim, turb.phases, turb.solWeight, turb.modes, turb.phasesReal,
                   turb.phasesImag);
 
-    if constexpr (cstone::execution::HaveGpu<typename Dataset::Exec>{})
+    if constexpr (d.useGpu)
     {
         // upload mode data to the device
         turb.d_phasesReal = turb.phasesReal;

@@ -129,7 +129,7 @@ public:
         out << ")" << std::endl;
         out << "### Check ### Focus Tree Nodes: " << domain.focusTree().octreeViewAcc().numLeafNodes << ", maxDepth "
             << domain.focusTree().depth();
-        if constexpr (cstone::execution::HaveGpu<typename ParticleDataType::Exec>{})
+        if constexpr (d.useGpu)
         {
             out << ", maxStackNc " << d.stackUsedNc << ", maxStackGravity " << d.stackUsedGravity;
         }
