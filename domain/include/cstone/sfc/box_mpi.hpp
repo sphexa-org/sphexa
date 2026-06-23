@@ -61,10 +61,13 @@ struct MinMax<execution::Cpu, T>
 /*! @brief compute global bounding box for local x,y,z arrays
  *
  * @tparam     T            float or double
+ * @tparam     Execution    execution policy (Cpu or Gpu)
  * @param[in]  x            x coordinate array start
  * @param[in]  y            y coordinate array start
  * @param[in]  z            z coordinate array start
  * @param[in]  numElements  length of @a x,y,z arrays
+ * @param[in]  comm         MPI communicator
+ * @param[in]  exec         execution policy
  * @param[in]  previousBox  previous coordinate bounding box, default open-boundary box with limits ignored
  * @return                  the new bounding box
  *

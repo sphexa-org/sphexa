@@ -41,6 +41,7 @@ namespace cstone
  *                               with a non-zero value.
  *                               Note: does NOT reset non-colliding indices to 0, so @p collisionFlags
  *                               should be zero-initialized prior to calling this function.
+ * @param[in]  exec              execution policy
  */
 template<class KeyType, class T>
 extern void findHalosGpu(const KeyType* prefixes,

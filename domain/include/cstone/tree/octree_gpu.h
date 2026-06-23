@@ -25,6 +25,7 @@ namespace cstone
 /*! @brief construct the internal octree part of a given octree leaf cell array on the GPU
  *
  * @tparam       KeyType     unsigned 32- or 64-bit integer
+ * @param[in]    exec        execution policy
  * @param[in]    cstoneTree  GPU buffer with the SFC leaf cell keys
  * @param[inout] d           input:  pointers to pre-allocated GPU buffers for octree cells
  *                           output: fully linked octree

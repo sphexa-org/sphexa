@@ -45,6 +45,7 @@ extern void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
  * @param[in]  numLeafNodes   number of leaf nodes
  * @param[in]  focus          index range within [0:numLeafNodes] that corresponds to nodes in focus
  * @param[out] nodeOps        output refinement decision per leaf node
+ * @param[in]  exec           execution policy
  */
 template<class KeyType>
 extern void macRefineDecisionGpu(const KeyType* prefixes,

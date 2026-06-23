@@ -118,7 +118,7 @@ auto mpiSendAsyncAcc(execution::Gpu exec,
     mpiSendGpuDirect(exec, data, count, rank, tag, requests, buffers, comm);
 }
 
-//! @brief this wrapper is needed to support sending from GPU buffers with staging through host (no GPU-direct MPI)
+//! @brief this wrapper is needed to support receiving into GPU buffers with staging through host (no GPU-direct MPI)
 template<class T>
 auto mpiRecvSyncAcc(execution::Cpu, T* data, int count, int rank, int tag, MPI_Status* status, MPI_Comm comm)
 {

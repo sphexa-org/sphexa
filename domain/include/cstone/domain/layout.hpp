@@ -144,9 +144,11 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
  *
  * @param[in]  focusLeafCounts   node counts of the focus leaves, size numLeafNodes
  * @param[in]  flags             flag for each node, with a non-zero value if present as halo node, size numNodes
+ * @param[in]  leafToInternal    maps leaf node index to internal node index
  * @param[in]  idx               first and last focus leaf idx of the assigned nodes on the executing rank
  * @param[out] layout            size numLeafNodes + 1. The first element is zero, the last element is
  *                               equal to the sum of all present (assigned+halo) node counts.
+ * @param[in]  exec              execution policy
  */
 template<class Exec>
 void computeNodeLayout(std::span<const unsigned> focusLeafCounts,

@@ -35,6 +35,7 @@ namespace cstone
  * @param[in]    scale     scaling factor to compute interaction radius from smoothing length
  * @param[inout] centers   bounding box center per leaf cell, size = numLeafNodes, initialized to geometric cell center
  * @param[out]   sizes     bounding box size per leaf cell, size = numLeafNodes
+ * @param[in]    exec      execution policy
  */
 template<class Tc, class Th>
 extern void computeBoundingBoxGpu(const Tc* x,
@@ -59,6 +60,7 @@ extern void computeBoundingBoxGpu(const Tc* x,
  * @param[in]  numLeaves        number of leaf nodes
  * @param[in]  layout           particle location of each node, length @a numLeaves + 1
  * @param[out] centers          output mass centers, in internal node layout, length >= max(leafToInternal)
+ * @param[in]  exec             execution policy
  */
 template<class Tc, class Tm, class Tf>
 extern void computeLeafSourceCenterGpu(const Tc* x,
@@ -78,6 +80,7 @@ extern void computeLeafSourceCenterGpu(const Tc* x,
  * @param[in]    levelRange    first node index per tree level
  * @param[in]    childOffsets  indices of first child node of each node
  * @param[inout] centers       center of mass coordinates with leaf node centers set
+ * @param[in]    exec          execution policy
  */
 template<class T>
 extern void upsweepCentersGpu(int numLevels,

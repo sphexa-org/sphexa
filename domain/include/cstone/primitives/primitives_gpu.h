@@ -114,9 +114,10 @@ inline void sequence(execution::Gpu exec, LocalIndex first, LocalIndex n, Buffer
 
 /*! @brief sort range [first:last], using @p keyBuf as temporary storage
  *
- * @param[inout] first   pointer to first element in range
- * @param[inout] last    pointer to last element in range
- * @param[-]     keyBuf  buffer of length last-first for temporary usage
+ * @param[in]    exec     execution policy
+ * @param[inout] first    pointer to first element in range
+ * @param[inout] last     pointer to last element in range
+ * @param[-]     keyBuf   buffer of length last-first for temporary usage
  */
 template<class KeyType>
 extern void sort(execution::Gpu exec, KeyType* first, KeyType* last, KeyType* keyBuf);
