@@ -28,7 +28,7 @@ namespace cstone
 {
 
 //! @brief copy the value of @a count to the start the provided GPU-buffer
-inline void encodeSendCount(execution::Gpu exec, size_t count, char* sendPtr)
+inline void encodeSendCount(execution::Gpu exec, const size_t& count, char* sendPtr)
 {
     checkGpuErrors(cudaMemcpyAsync(sendPtr, &count, sizeof(size_t), cudaMemcpyHostToDevice, exec));
 }
