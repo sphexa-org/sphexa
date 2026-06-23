@@ -107,6 +107,7 @@ void haloExchangeGpu(int epoch,
 
         for_each_tuple(unpack, util::packBufferPtrs<alignment>(receiveBuffer, receiveCount, arrays...));
     }
+    checkGpuErrors(cudaStreamSynchronize(exec));
 
     if (not sendRequests.empty()) { MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUSES_IGNORE); }
 
