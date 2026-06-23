@@ -103,7 +103,7 @@ void haloExchangeGpu(int epoch,
         LocalIndex receiveCount = inHalos.count();
 
         auto unpack = [start = inHalos.start(), receiveCount, exec](auto arrayPair)
-        { memcpyD2HAsync(exec, arrayPair[1], receiveCount, arrayPair[0] + start); };
+        { memcpyD2DAsync(exec, arrayPair[1], receiveCount, arrayPair[0] + start); };
 
         for_each_tuple(unpack, util::packBufferPtrs<alignment>(receiveBuffer, receiveCount, arrays...));
     }
