@@ -47,12 +47,12 @@ struct Gpu
     operator cudaStream_t() const { return stream; }
 
 private:
-    constexpr explicit Gpu(cudaStream_t stream)
+    constexpr explicit Gpu(cudaStream_t stream) noexcept
         : stream(stream)
     {
     }
 
-    friend constexpr Gpu gpuStream(cudaStream_t stream);
+    friend constexpr Gpu gpuStream(cudaStream_t stream) noexcept;
 
     cudaStream_t stream;
 };
@@ -62,7 +62,7 @@ using HaveGpu = std::is_same<Execution, Gpu>;
 
 constexpr inline Cpu cpu;
 
-constexpr inline Gpu gpuStream(cudaStream_t stream) { return Gpu(stream); }
+constexpr inline Gpu gpuStream(cudaStream_t stream) noexcept { return Gpu(stream); }
 
 constexpr inline Gpu gpuDefaultStream = gpuStream(0);
 
