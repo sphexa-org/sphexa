@@ -90,17 +90,4 @@ void sortByKey(execution::Cpu, std::span<KeyType> keys, std::span<ValueType> val
     sort_by_key(keys.begin(), keys.end(), values.begin());
 }
 
-//! @brief CPU overload ignores scratch buffers and growth rate
-template<class KeyType, class ValueType, class KeyBuf, class ValueBuf>
-void sortByKey(execution::Cpu,
-               std::span<KeyType> keys,
-               std::span<ValueType> values,
-               KeyBuf& /*keyBuf*/,
-               ValueBuf& /*valueBuf*/,
-               double /*growth*/)
-{
-    assert(keys.size() == values.size());
-    sort_by_key(keys.begin(), keys.end(), values.begin());
-}
-
 } // namespace cstone
