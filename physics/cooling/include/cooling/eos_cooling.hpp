@@ -26,8 +26,8 @@ void eos_cooling(size_t startIndex, size_t endIndex, HydroData& d, ChemData& che
     using T              = typename HydroData::HydroType;
     const auto chemistry = cstone::getPointers(get<CoolingFields>(chem), 0);
 
-    auto&& rho = toHost(d.rho);
-    auto&& u   = toHost(d.u);
+    auto&& rho = cstone::toHost(d.rho);
+    auto&& u   = cstone::toHost(d.u);
 
     std::vector<T> p(rho.size()), c(rho.size());
     cooler.computePressures(rho.data(), u.data(), chemistry, p.data(), startIndex, endIndex);
