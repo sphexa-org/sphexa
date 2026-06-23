@@ -30,6 +30,7 @@
 #include <thrust/universal_vector.h>
 
 #include "cstone/cuda/cuda_runtime.hpp"
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
@@ -186,8 +187,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
                                .groupStart = rawPtr(groups),
                                .groupEnd   = rawPtr(groups) + 1};
 
-    cudaStream_t stream;
-    checkGpuErrors(cudaStreamCreate(&stream));
+    StreamHolder stream;
 
     // prefetch vectors to device memory, required on some AMD hardware/software for reasonable performance
     int device;
@@ -206,14 +206,14 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     util::for_each_tuple(prefetchToDevice, dOutputs);
     util::for_each_tuple(prefetchToDevice, std::tie(dPrefixes, dChildOffsets, dParents, dInternalToLeaf,
                                                     dLeafToInternal, dLevelRange, dLayout, dCenters, dSizes, groups));
-    checkGpuErrors(cudaStreamSynchronize(stream));
+    stream.sync();
 
     // build neighborhood, measure CPU time
-    using Clock             = std::chrono::high_resolution_clock;
-    auto buildStart         = Clock::now();
-    const auto neighborhood = neighborhoodBuilder.build(execution::gpuStream(stream), dNsView, box, n, dGroupView,
-                                                        rawPtr(dX), rawPtr(dY), rawPtr(dZ), hVal);
-    checkGpuErrors(cudaStreamSynchronize(stream));
+    using Clock     = std::chrono::high_resolution_clock;
+    auto buildStart = Clock::now();
+    const auto neighborhood =
+        neighborhoodBuilder.build(stream.exec(), dNsView, box, n, dGroupView, rawPtr(dX), rawPtr(dY), rawPtr(dZ), hVal);
+    stream.sync();
     auto buildEnd         = Clock::now();
     const float buildTime = std::chrono::duration<float>(buildEnd - buildStart).count();
     printf("Neighborhood build time (CPU time): %7.6f s\n", buildTime);
@@ -245,7 +245,6 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
         times[i] = millisecs / 1000.0;
     }
     checkGpuErrors(cudaEventDestroy(events.back()));
-    checkGpuErrors(cudaStreamDestroy(stream));
 
     // compute and print mean and standard deviation of performance measurements
     std::vector<double> gigaParticleUpdates(times.size());

@@ -15,6 +15,7 @@
 
 #include "gtest/gtest.h"
 
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/tree/octree_gpu.h"
 #include "cstone/tree/octree.hpp"
 #include "cstone/tree/cs_util.hpp"
@@ -27,16 +28,13 @@ void compareAgainstCpu(const std::vector<KeyType>& tree)
     // upload cornerstone tree to device
     DeviceVector<KeyType> d_leaves = tree;
 
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
-    const auto exec = execution::gpuStream(stream);
+    StreamHolder stream;
 
     OctreeData<KeyType, execution::Gpu> gpuTree;
     gpuTree.resize(nNodes(tree));
 
-    buildOctreeGpu(exec, rawPtr(d_leaves), gpuTree.data());
-    cudaStreamSynchronize(stream);
-    cudaStreamDestroy(stream);
+    buildOctreeGpu(stream.exec(), rawPtr(d_leaves), gpuTree.data());
+    stream.sync();
 
     Octree<KeyType> cpuTree;
     cpuTree.update(tree.data(), nNodes(tree));

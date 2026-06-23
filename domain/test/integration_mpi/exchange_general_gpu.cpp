@@ -19,6 +19,7 @@
 #define USE_CUDA
 
 #include "cstone/cuda/device_vector.h"
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/focus/octree_focus_mpi.hpp"
 #include "cstone/traversal/peers.hpp"
 
@@ -48,12 +49,10 @@ TEST(GeneralFocusExchangeGpu, bareTreelet)
     std::vector<TreeNodeIndex> scatterMap{8, 9};
     std::vector<IndexPair<TreeNodeIndex>> scatterSubRangePerRank{{0, 2}, {0, 2}};
 
-    cudaStream_t stream;
-    checkGpuErrors(cudaStreamCreate(&stream));
-    const auto exec = execution::gpuStream(stream);
+    StreamHolder stream;
 
     ConcatVector<TreeNodeIndex, DeviceVector> d_gatherMaps;
-    copy(gatherMaps, d_gatherMaps, exec);
+    copy(gatherMaps, d_gatherMaps, stream.exec());
     DeviceVector<TreeNodeIndex> d_scatterMap = scatterMap;
     DeviceVector<unsigned> d_counts          = counts;
     DeviceVector<char> scratch;
@@ -62,7 +61,7 @@ TEST(GeneralFocusExchangeGpu, bareTreelet)
     exchangeTreeletGeneral<unsigned>(peers, peers, d_gatherMapsView,
                                      {rawPtr(scatterSubRangePerRank), scatterSubRangePerRank.size()},
                                      {rawPtr(d_scatterMap), d_scatterMap.size()}, {rawPtr(d_counts), d_counts.size()},
-                                     0, scratch, MPI_COMM_WORLD, exec);
+                                     0, scratch, MPI_COMM_WORLD, stream.exec());
 
     std::vector<unsigned> h_counts = toHost(d_counts);
 
@@ -77,8 +76,6 @@ TEST(GeneralFocusExchangeGpu, bareTreelet)
         EXPECT_EQ(h_counts[8], 1);
         EXPECT_EQ(h_counts[9], 3);
     }
-
-    checkGpuErrors(cudaStreamDestroy(stream));
 }
 
 //! @brief see test description of CPU version
@@ -134,9 +131,7 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
     DeviceVector<unsigned> d_globCounts = counts;
     std::span<const unsigned> d_globCountsView{rawPtr(d_globCounts), d_globCounts.size()};
 
-    cudaStream_t stream;
-    checkGpuErrors(cudaStreamCreate(&stream));
-    const auto exec = execution::gpuStream(stream);
+    StreamHolder stream;
 
     FocusedOctree<KeyType, T, execution::Gpu> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD,
                                                         execution::gpuStream(stream));
@@ -144,12 +139,12 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
 
     auto d_countsView = focusTree.countsAcc();
     std::vector<unsigned> testCounts(d_countsView.size());
-    memcpyD2HAsync(exec, d_countsView.data(), d_countsView.size(), testCounts.data());
+    memcpyD2HAsync(stream.exec(), d_countsView.data(), d_countsView.size(), testCounts.data());
 
     auto octreeView = focusTree.octreeViewAcc();
     std::vector<KeyType> prefixes(octreeView.numNodes);
-    memcpyD2HAsync(exec, octreeView.prefixes, octreeView.numNodes, prefixes.data());
-    syncGpu(exec);
+    memcpyD2HAsync(stream.exec(), octreeView.prefixes, octreeView.numNodes, prefixes.data());
+    syncGpu(stream.exec());
 
     {
         for (size_t i = 0; i < testCounts.size(); ++i)
@@ -165,8 +160,6 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
     }
 
     EXPECT_EQ(testCounts[0], numRanks * numParticles);
-
-    checkGpuErrors(cudaStreamDestroy(stream));
 }
 
 TEST(GeneralFocusExchangeGpu, randomGaussian)

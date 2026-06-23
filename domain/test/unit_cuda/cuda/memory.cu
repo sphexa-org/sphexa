@@ -17,6 +17,7 @@
 
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/cuda/memory.cuh"
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/execution.hpp"
 
 using namespace cstone;
@@ -29,28 +30,20 @@ __global__ void deviceAccess(T* ptr, T value)
 
 TEST(Memory, DeviceAllocScalar)
 {
-    cudaStream_t stream;
-    checkGpuErrors(cudaStreamCreate(&stream));
-    {
-        auto data = util::deviceAlloc<int>(execution::gpuStream(stream));
-        ASSERT_TRUE(data);
-        deviceAccess<<<1, 1, 0, stream>>>(data.get(), 42);
-        checkGpuErrors(cudaStreamSynchronize(stream));
-    }
-    checkGpuErrors(cudaStreamDestroy(stream));
+    StreamHolder stream;
+    auto data = util::deviceAlloc<int>(stream.exec());
+    ASSERT_TRUE(data);
+    deviceAccess<<<1, 1, 0, stream>>>(data.get(), 42);
+    stream.sync();
 }
 
 TEST(Memory, DeviceAllocArray)
 {
-    cudaStream_t stream;
-    checkGpuErrors(cudaStreamCreate(&stream));
-    {
-        auto data = util::deviceAlloc<float[]>(execution::gpuStream(stream), 10);
-        ASSERT_TRUE(data);
-        deviceAccess<<<1, 10, 0, stream>>>(data.get(), 37.5f);
-        checkGpuErrors(cudaStreamSynchronize(stream));
-    }
-    checkGpuErrors(cudaStreamDestroy(stream));
+    StreamHolder stream;
+    auto data = util::deviceAlloc<float[]>(stream.exec(), 10);
+    ASSERT_TRUE(data);
+    deviceAccess<<<1, 10, 0, stream>>>(data.get(), 37.5f);
+    stream.sync();
 }
 
 TEST(Memory, DeviceAllocVirtual)

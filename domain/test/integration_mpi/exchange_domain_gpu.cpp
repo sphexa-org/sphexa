@@ -17,6 +17,7 @@
 
 #include <gtest/gtest.h>
 
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/domain/layout.hpp"
 #include "cstone/domain/domaindecomp_mpi_gpu.cuh"
 
@@ -87,20 +88,18 @@ void exchangeAllToAll(int thisRank, int numRanks)
     reallocate(d_x, bufDesc.size, 1.0);
     reallocate(d_y, bufDesc.size, 1.0);
 
-    cudaStream_t stream;
-    checkGpuErrors(cudaStreamCreate(&stream));
-    const auto exec = execution::gpuStream(stream);
+    StreamHolder stream;
 
     ExchangeLog log;
     auto recvStart = domain_exchange::receiveStart(bufDesc, numPartAssigned - numPartPresent);
     auto recvEnd   = recvStart + numPartAssigned - numPartPresent;
-    exchangeParticlesGpu(exec, 0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch,
+    exchangeParticlesGpu(stream.exec(), 0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch,
                          rawPtr(d_ordering), MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y));
 
     reallocate(bufDesc.size, 1.01, x, y);
-    memcpyD2HAsync(exec, d_x.data(), d_x.size(), x.data());
-    memcpyD2HAsync(exec, d_y.data(), d_y.size(), y.data());
-    syncGpu(exec);
+    memcpyD2HAsync(stream.exec(), d_x.data(), d_x.size(), x.data());
+    memcpyD2HAsync(stream.exec(), d_y.data(), d_y.size(), y.data());
+    syncGpu(stream.exec());
 
     ex::extractLocallyOwned(bufDesc, numPartPresent, numPartAssigned, ordering.data() + sends[thisRank], x, y);
 
@@ -124,8 +123,6 @@ void exchangeAllToAll(int thisRank, int numRanks)
 
     EXPECT_EQ(refX, x);
     EXPECT_EQ(refY, y);
-
-    checkGpuErrors(cudaStreamDestroy(stream));
 }
 
 TEST(GlobalDomain, exchangeAllToAll)
@@ -183,23 +180,21 @@ void exchangeCyclicNeighbors(int thisRank, int numRanks)
     reallocate(d_uint8Array, bufDesc.size, 1.0);
     reallocate(bufDesc.size * 10, 1.01, sendScratch, receiveScratch);
 
-    cudaStream_t stream;
-    checkGpuErrors(cudaStreamCreate(&stream));
-    const auto exec = execution::gpuStream(stream);
+    StreamHolder stream;
 
     ExchangeLog log;
     auto recvStart = domain_exchange::receiveStart(bufDesc, numPartAssigned - numPartPresent);
     auto recvEnd   = recvStart + numPartAssigned - numPartPresent;
-    exchangeParticlesGpu(exec, 0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch,
+    exchangeParticlesGpu(stream.exec(), 0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch,
                          rawPtr(d_ordering), MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y), rawPtr(d_uint8Array),
                          rawPtr(d_testArray));
 
     reallocate(bufDesc.size, 1.01, x, y, testArray, uint8Array);
-    memcpyD2HAsync(exec, d_x.data(), d_x.size(), x.data());
-    memcpyD2HAsync(exec, d_y.data(), d_y.size(), y.data());
-    memcpyD2HAsync(exec, d_testArray.data(), d_testArray.size(), testArray.data());
-    memcpyD2HAsync(exec, d_uint8Array.data(), d_uint8Array.size(), uint8Array.data());
-    syncGpu(exec);
+    memcpyD2HAsync(stream.exec(), d_x.data(), d_x.size(), x.data());
+    memcpyD2HAsync(stream.exec(), d_y.data(), d_y.size(), y.data());
+    memcpyD2HAsync(stream.exec(), d_testArray.data(), d_testArray.size(), testArray.data());
+    memcpyD2HAsync(stream.exec(), d_uint8Array.data(), d_uint8Array.size(), uint8Array.data());
+    syncGpu(stream.exec());
 
     ex::extractLocallyOwned(bufDesc, numPartPresent, numPartAssigned, ordering.data() + sends[thisRank], x, y,
                             testArray, uint8Array);
@@ -222,8 +217,6 @@ void exchangeCyclicNeighbors(int thisRank, int numRanks)
     EXPECT_EQ(refY, y);
     EXPECT_EQ(testArrayRef, testArray);
     EXPECT_EQ(uint8Array, refUint8);
-
-    checkGpuErrors(cudaStreamDestroy(stream));
 }
 
 TEST(GlobalDomain, exchangeCyclicNeighbors)

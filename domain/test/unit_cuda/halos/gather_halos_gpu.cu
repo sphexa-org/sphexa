@@ -21,6 +21,7 @@
 #include <thrust/host_vector.h>
 
 #include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/halos/gather_halos_gpu.h"
 
@@ -39,13 +40,10 @@ TEST(Halos, gatherRanges)
 
     thrust::device_vector<int> buffer = std::vector<int>(totalCount);
 
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
-    auto exec = execution::gpuStream(stream);
+    StreamHolder stream;
     gatherRanges(rawPtr(rangeScan), rawPtr(rangeOffsets), rangeScan.size(), rawPtr(src), rawPtr(buffer), totalCount,
-                 exec);
-    syncGpu(exec);
-    cudaStreamDestroy(stream);
+                 stream.exec());
+    stream.sync();
 
     thrust::host_vector<int> h_buffer = buffer;
     thrust::host_vector<int> ref      = std::vector<int>{4, 5, 6, 7, 12, 13, 14, 22, 23, 24};

@@ -28,6 +28,7 @@
 
 #define USE_CUDA
 #include "coord_samples/random.hpp"
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/domain/assignment.hpp"
 
 using namespace cstone;
@@ -91,11 +92,9 @@ void randomGaussianAssignment(int rank, int numRanks)
     DeviceVector<T> d_y = y;
     DeviceVector<T> d_z = z;
 
-    cudaStream_t stream;
-    checkGpuErrors(cudaStreamCreate(&stream));
-    const auto exec = execution::gpuStream(stream);
+    StreamHolder stream;
 
-    GlobalAssignment<KeyType, T, execution::Gpu> assignmentGpu(rank, numRanks, bucketSize, box, MPI_COMM_WORLD, exec);
+    GlobalAssignment<KeyType, T, execution::Gpu> assignmentGpu(rank, numRanks, bucketSize, box, MPI_COMM_WORLD, stream.exec());
     DeviceVector<unsigned> sfcScratch;
     SfcSorter deviceSort(sfcScratch);
 
@@ -126,12 +125,10 @@ void randomGaussianAssignment(int rank, int numRanks)
 
     {
         std::vector<KeyType> keyDownload(devKeyView.size());
-        memcpyD2HAsync(exec, devKeyView.data(), devKeyView.size(), keyDownload.data());
-        syncGpu(exec);
+        memcpyD2HAsync(stream.exec(), devKeyView.data(), devKeyView.size(), keyDownload.data());
+        syncGpu(stream.exec());
         EXPECT_TRUE(std::equal(keyDownload.begin(), keyDownload.end(), cpuKeyView.begin()));
     }
-
-    checkGpuErrors(cudaStreamDestroy(stream));
 }
 
 TEST(AssignmentGpu, matchTreeCpu)

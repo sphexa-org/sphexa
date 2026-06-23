@@ -17,6 +17,7 @@
 
 #include <thrust/universal_vector.h>
 
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/traversal/ijloop/upsweep.cuh"
 #include "cstone/util/tuple_util.hpp"
@@ -144,13 +145,10 @@ TEST(IjLoop, Upsweep)
                      std::tuple(rawPtr(reference)));
 
     thrust::universal_vector<long> result(octree.numNodes);
-    cudaStream_t stream;
-    checkGpuErrors(cudaStreamCreate(&stream));
-    const auto exec = execution::gpuStream(stream);
-    ijloop::upsweep(exec, view, std::tuple(0l), TransformOp(), BinaryOp(),
+    StreamHolder stream;
+    ijloop::upsweep(stream.exec(), view, std::tuple(0l), TransformOp(), BinaryOp(),
                     std::tuple(rawPtr(dataLong), rawPtr(dataBool)), std::tuple(rawPtr(result)));
-    checkGpuErrors(cudaStreamSynchronize(stream));
-    checkGpuErrors(cudaStreamDestroy(stream));
+    stream.sync();
 
     EXPECT_EQ(result, reference);
 }
