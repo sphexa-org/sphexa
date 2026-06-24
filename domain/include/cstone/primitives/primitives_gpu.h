@@ -18,6 +18,7 @@
 #include <span>
 #include <tuple>
 
+#include "cstone/cuda/cuda_stubs.h"
 #include "cstone/cuda/device_vector.h"
 #include "cstone/execution.hpp"
 #include "cstone/tree/definitions.h"
