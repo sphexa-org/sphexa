@@ -24,6 +24,7 @@ namespace cstone
 {
 
 /*! @brief set up fixed-size particle groups
+ * @param[in]  exec       execution policy
  * @param[in]  first      first local particle index
  * @param[in]  last       last local particle index
  * @param[in]  groupSize  number of particles per group
@@ -38,6 +39,7 @@ void computeFixedGroups(
  * @tparam Tc                       float or double
  * @tparam T
  * @tparam KeyType
+ * @param[in]  exec                 execution policy
  * @param[in]  first                index of first particle in @p x,y,z,h buffers assigned to local domain
  * @param[in]  last                 index of ilast particle in @p x,y,z,h buffers assigned to local domain
  * @param[in]  x                    x coordinates
