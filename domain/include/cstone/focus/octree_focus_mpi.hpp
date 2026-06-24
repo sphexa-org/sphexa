@@ -58,12 +58,12 @@ public:
      * @param numRanks      number of ranks
      * @param bucketSize    Maximum number of particles per leaf inside the focus area
      */
-    FocusedOctree(int myRank, int numRanks, unsigned bucketSize, MPI_Comm comm, Exec exec)
-        : myRank_(myRank)
+    FocusedOctree(Exec exec, int myRank, int numRanks, unsigned bucketSize, MPI_Comm comm)
+        : exec_(exec)
+        , myRank_(myRank)
         , numRanks_(numRanks)
         , bucketSize_(bucketSize)
         , comm_(comm)
-        , exec_(exec)
         , treelets_(numRanks_)
         , macsAcc_(1, 1)
         , centersAcc_(1)
@@ -492,9 +492,9 @@ public:
         if constexpr (execution::HaveGpu<Exec>{})
         {
             if (not accumulate) { fill(exec_, rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
-            markMacsGpu(rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(octreeAcc_.parents),
+            markMacsGpu(exec_, rawPtr(octreeAcc_.prefixes), rawPtr(octreeAcc_.childOffsets), rawPtr(octreeAcc_.parents),
                         rawPtr(centersAcc_), box_, rawPtr(leavesAcc_) + fAssignStart, fAssignEnd - fAssignStart, false,
-                        rawPtr(macsAcc_), exec_);
+                        rawPtr(macsAcc_));
         }
         else
         {
@@ -552,9 +552,9 @@ public:
                                   searchCenters.data(), searchSizes.data());
 
             if (not accumulate) { fill(exec_, rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
-            findHalosGpu(let.prefixes, let.childOffsets, let.parents, geoCentersAcc_.data(), geoSizesAcc_.data(),
+            findHalosGpu(exec_, let.prefixes, let.childOffsets, let.parents, geoCentersAcc_.data(), geoSizesAcc_.data(),
                          leavesAcc_.data(), searchCenters.data(), searchSizes.data(), box_, firstNode, lastNode,
-                         macsAcc_.data(), exec_);
+                         macsAcc_.data());
         }
         else
         {
@@ -743,6 +743,8 @@ private:
         valid = countsCriterion | macCriterion
     };
 
+    Exec exec_;
+
     //! @brief the executing rank
     int myRank_;
     //! @brief the total number of ranks
@@ -751,7 +753,6 @@ private:
     unsigned bucketSize_;
     //! @brief MPI communicator for all collective and point-to-point operations
     MPI_Comm comm_;
-    Exec exec_;
 
     //! @brief allocation growth rate for focus tree arrays with length ~ numFocusNodes
     float allocGrowthRate_{1.05};

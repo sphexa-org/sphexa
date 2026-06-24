@@ -133,8 +133,8 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
 
     StreamHolder stream;
 
-    FocusedOctree<KeyType, T, execution::Gpu> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD,
-                                                        execution::gpuStream(stream));
+    FocusedOctree<KeyType, T, execution::Gpu> focusTree(stream.exec(), thisRank, numRanks, bucketSizeLocal,
+                                                        MPI_COMM_WORLD);
     focusTree.converge(box, d_keysView, assignment, d_globTreeView, d_globCountsView, invThetaEff, d_scratch);
 
     auto d_countsView = focusTree.countsAcc();

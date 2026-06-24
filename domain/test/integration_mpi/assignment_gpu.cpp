@@ -76,7 +76,7 @@ void randomGaussianAssignment(int rank, int numRanks)
 
     int bucketSize = 20;
 
-    GlobalAssignment<KeyType, T> assignment(rank, numRanks, bucketSize, box, MPI_COMM_WORLD, execution::cpu);
+    GlobalAssignment<KeyType, T> assignment(execution::cpu, rank, numRanks, bucketSize, box, MPI_COMM_WORLD);
     BufferDescription bufDesc{0, numParticles, numParticles};
     std::vector<unsigned> sfcScratchCpu;
     SfcSorter cpuGather(sfcScratchCpu);
@@ -94,8 +94,8 @@ void randomGaussianAssignment(int rank, int numRanks)
 
     StreamHolder stream;
 
-    GlobalAssignment<KeyType, T, execution::Gpu> assignmentGpu(rank, numRanks, bucketSize, box, MPI_COMM_WORLD,
-                                                               stream.exec());
+    GlobalAssignment<KeyType, T, execution::Gpu> assignmentGpu(stream.exec(), rank, numRanks, bucketSize, box,
+                                                               MPI_COMM_WORLD);
     DeviceVector<unsigned> sfcScratch;
     SfcSorter deviceSort(sfcScratch);
 

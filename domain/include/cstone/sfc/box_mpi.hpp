@@ -74,13 +74,13 @@ struct MinMax<execution::Cpu, T>
  * For each periodic dimension, limits are fixed and will not be modified.
  * For non-periodic dimensions, limits are determined by global min/max.
  */
-template<class T, execution::Policy Exec>
-auto makeGlobalBox(const T* x,
+template<execution::Policy Exec, class T>
+auto makeGlobalBox(Exec exec,
+                   const T* x,
                    const T* y,
                    const T* z,
                    size_t numElements,
                    MPI_Comm comm,
-                   Exec exec,
                    const Box<T>& previousBox = Box<T>(0, 1))
 {
     bool keepX = previousBox.boundaryX() == BoundaryType::periodic || previousBox.boundaryX() == BoundaryType::fixed;

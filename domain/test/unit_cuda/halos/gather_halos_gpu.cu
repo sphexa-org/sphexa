@@ -41,8 +41,8 @@ TEST(Halos, gatherRanges)
     thrust::device_vector<int> buffer = std::vector<int>(totalCount);
 
     StreamHolder stream;
-    gatherRanges(rawPtr(rangeScan), rawPtr(rangeOffsets), rangeScan.size(), rawPtr(src), rawPtr(buffer), totalCount,
-                 stream.exec());
+    gatherRanges(stream.exec(), rawPtr(rangeScan), rawPtr(rangeOffsets), rangeScan.size(), rawPtr(src), rawPtr(buffer),
+                 totalCount);
     stream.sync();
 
     thrust::host_vector<int> h_buffer = buffer;

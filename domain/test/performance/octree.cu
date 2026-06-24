@@ -133,9 +133,9 @@ int main(int argc, char** argv)
     auto od              = octree.data();
     auto findHalosLambda = [&](cudaStream_t stream)
     {
-        findHalosGpu(od.prefixes, od.childOffsets, od.parents, rawPtr(nodeCenters), rawPtr(nodeSizes), rawPtr(tree),
-                     rawPtr(searchCenters), rawPtr(searchSizes), box, 0, od.numLeafNodes / 4, rawPtr(flags),
-                     execution::gpuStream(stream));
+        findHalosGpu(execution::gpuStream(stream), od.prefixes, od.childOffsets, od.parents, rawPtr(nodeCenters),
+                     rawPtr(nodeSizes), rawPtr(tree), rawPtr(searchCenters), rawPtr(searchSizes), box, 0,
+                     od.numLeafNodes / 4, rawPtr(flags));
     };
 
     float findTime = timeGpu(findHalosLambda);
@@ -192,8 +192,8 @@ int main(int argc, char** argv)
 
     auto findMacsLambda = [od, &centers, &box, &tree, &macs, firstFocusNode, lastFocusNode](cudaStream_t stream)
     {
-        markMacsGpu(od.prefixes, od.childOffsets, od.parents, rawPtr(centers), box, rawPtr(tree) + firstFocusNode,
-                    lastFocusNode - firstFocusNode, false, rawPtr(macs), execution::gpuStream(stream));
+        markMacsGpu(execution::gpuStream(stream), od.prefixes, od.childOffsets, od.parents, rawPtr(centers), box,
+                    rawPtr(tree) + firstFocusNode, lastFocusNode - firstFocusNode, false, rawPtr(macs));
     };
 
     float macTime = timeGpu(findMacsLambda);

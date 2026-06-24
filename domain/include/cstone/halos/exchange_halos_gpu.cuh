@@ -71,7 +71,7 @@ void haloExchangeGpu(int epoch,
                                        cudaMemcpyHostToDevice, exec));
 
         auto gatherArray = [d_range, d_rangeScan, numRanges = outHalos.nRanges(), sendCount, exec](auto arrayPtr)
-        { gatherRanges(d_rangeScan, d_range, numRanges, arrayPtr[0], arrayPtr[1], sendCount, exec); };
+        { gatherRanges(exec, d_rangeScan, d_range, numRanges, arrayPtr[0], arrayPtr[1], sendCount); };
 
         for_each_tuple(gatherArray, util::packBufferPtrs<alignment>(sendPtr, sendCount, arrays...));
 

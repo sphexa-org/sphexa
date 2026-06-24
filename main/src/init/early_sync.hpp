@@ -72,8 +72,8 @@ void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector&
     size_t                    bucketSize = std::max(64lu, numParticlesGlobal / (100 * numRanks));
     cstone::BufferDescription o1{0, cstone::LocalIndex(x.size()), cstone::LocalIndex(x.size())};
 
-    cstone::GlobalAssignment<KeyType, T, std::decay_t<decltype(exec)>> distributor(rank, numRanks, bucketSize,
-                                                                                   globalBox, MPI_COMM_WORLD, exec);
+    cstone::GlobalAssignment<KeyType, T, std::decay_t<decltype(exec)>> distributor(exec, rank, numRanks, bucketSize,
+                                                                                   globalBox, MPI_COMM_WORLD);
 
     Vector            scratch1, scratch2, orderScratch;
     cstone::SfcSorter sorter(orderScratch);

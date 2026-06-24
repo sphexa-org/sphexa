@@ -21,12 +21,12 @@ namespace cstone
 {
 
 template<class T, class IndexType>
-extern void gatherRanges(const IndexType* rangeScan,
+extern void gatherRanges(execution::Gpu exec,
+                         const IndexType* rangeScan,
                          const IndexType* rangeOffsets,
                          int numRanges,
                          const T* src,
                          T* buffer,
-                         size_t bufferSize,
-                         execution::Gpu exec);
+                         size_t bufferSize);
 
 } // namespace cstone

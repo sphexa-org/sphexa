@@ -51,13 +51,13 @@ class GlobalAssignment
     constexpr static bool gpu = execution::HaveGpu<Exec>{};
 
 public:
-    GlobalAssignment(int rank, int nRanks, unsigned bucketSize, const Box<T>& box, MPI_Comm comm, Exec exec)
-        : myRank_(rank)
+    GlobalAssignment(Exec exec, int rank, int nRanks, unsigned bucketSize, const Box<T>& box, MPI_Comm comm)
+        : exec_(exec)
+        , myRank_(rank)
         , numRanks_(nRanks)
         , bucketSize_(bucketSize)
         , box_(box)
         , comm_(comm)
-        , exec_(exec)
     {
         unsigned level         = log8ceil<KeyType>(100 * nRanks);
         auto initialBoundaries = initialDomainSplits<KeyType>(nRanks, level);
@@ -72,7 +72,10 @@ public:
             d_nodeCounts_ = nodeCounts_;
             buildOctreeGpu(exec_, d_csTree_.data(), tree_.data());
         }
-        else { updateInternalTree<KeyType>(leaves_, tree_.data()); }
+        else
+        {
+            updateInternalTree<KeyType>(leaves_, tree_.data());
+        }
     }
 
     /*! @brief Update the global tree
@@ -102,9 +105,12 @@ public:
         // number of locally assigned particles to consider for global tree building
         LocalIndex numPart = o1.end - o1.start;
 
-        auto fittingBox = makeGlobalBox(x + o1.start, y + o1.start, z + o1.start, numPart, comm_, exec_, box_);
+        auto fittingBox = makeGlobalBox(exec_, x + o1.start, y + o1.start, z + o1.start, numPart, comm_, box_);
         if (firstCall_) { box_ = fittingBox; }
-        else { box_ = limitBoxShrinking(fittingBox, box_); }
+        else
+        {
+            box_ = limitBoxShrinking(fittingBox, box_);
+        }
 
         // compute SFC particle keys only for particles participating in tree build
         std::span<KeyType> keyView(particleKeys + o1.start, numPart);
@@ -138,7 +144,10 @@ public:
             exchanges_ = createSendRangesGpu<KeyType>(exec_, assignment_, keyView, rawPtr(d_boundaryKeys_),
                                                       rawPtr(d_boundaryIndices_));
         }
-        else { exchanges_ = createSendRanges<KeyType>(assignment_, keyView); }
+        else
+        {
+            exchanges_ = createSendRanges<KeyType>(assignment_, keyView);
+        }
 
         return domain_exchange::exchangeBufferSize(o1, numPresent(), numAssigned());
     }
@@ -218,14 +227,20 @@ public:
     std::span<const KeyType> treeLeaves() const
     {
         if (gpu) { return {rawPtr(d_csTree_), d_csTree_.size()}; }
-        else { return leaves_; }
+        else
+        {
+            return leaves_;
+        }
     }
 
     //! @brief read only visibility of the global octree leaf counts to the outside
     std::span<const unsigned> nodeCounts() const
     {
         if (gpu) { return {rawPtr(d_nodeCounts_), d_nodeCounts_.size()}; }
-        else { return nodeCounts_; }
+        else
+        {
+            return nodeCounts_;
+        }
     }
 
     //! @brief the octree, internal part and leaves. All data is on the GPU, when gpu == true
@@ -256,6 +271,8 @@ public:
     LocalIndex numAssigned() const { return assignment_.totalCount(myRank_); }
 
 private:
+    Exec exec_;
+
     int myRank_;
     int numRanks_;
     unsigned bucketSize_;
@@ -264,7 +281,6 @@ private:
     Box<T> box_;
 
     MPI_Comm comm_;
-    Exec exec_;
 
     SfcAssignment<KeyType> assignment_;
     SendRanges exchanges_;

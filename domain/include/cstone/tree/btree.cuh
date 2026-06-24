@@ -32,10 +32,10 @@ __global__ void createBinaryTreeKernel(const KeyType* cstree, TreeNodeIndex numN
 
 //! @brief convenience kernel wrapper
 template<class KeyType>
-void createBinaryTreeGpu(const KeyType* cstree,
+void createBinaryTreeGpu(execution::Gpu exec,
+                         const KeyType* cstree,
                          TreeNodeIndex numNodes,
-                         BinaryNode<KeyType>* binaryTree,
-                         execution::Gpu exec)
+                         BinaryNode<KeyType>* binaryTree)
 {
     constexpr int numThreads = 256;
     createBinaryTreeKernel<<<iceil(numNodes, numThreads), numThreads, 0, exec>>>(cstree, numNodes, binaryTree);

@@ -140,7 +140,7 @@ template<class KeyType>
 class OctreeFixtureGpu
 {
 public:
-    OctreeFixtureGpu(unsigned numParticles, unsigned bucketSize, execution::Gpu exec)
+    OctreeFixtureGpu(execution::Gpu exec, unsigned numParticles, unsigned bucketSize)
     {
         d_codes = makeRandomGaussianKeys<KeyType>(numParticles);
 
@@ -173,7 +173,7 @@ TEST(CsArrayGpu, computeOctreeRandom)
     auto [treeCpu, countsCpu] = computeOctree<KeyType>(particleKeys, bucketSize);
 
     StreamHolder stream;
-    OctreeFixtureGpu<KeyType> fixt(nParticles, bucketSize, stream.exec());
+    OctreeFixtureGpu<KeyType> fixt(stream.exec(), nParticles, bucketSize);
     stream.sync();
 
     // upload CPU reference to GPU
@@ -200,7 +200,7 @@ TEST(CsArrayGpu, distributedMockUp)
 
     StreamHolder stream;
 
-    OctreeFixtureGpu<CodeType> fixt(nParticles, bucketSize, stream.exec());
+    OctreeFixtureGpu<CodeType> fixt(stream.exec(), nParticles, bucketSize);
 
     DeviceVector<CodeType> d_counts_orig = fixt.d_counts;
 

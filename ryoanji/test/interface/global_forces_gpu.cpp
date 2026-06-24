@@ -64,8 +64,8 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     std::vector<T>       m(globalMasses.begin() + firstIndex, globalMasses.begin() + lastIndex);
     std::vector<KeyType> h_keys(x.size());
 
-    cstone::Domain<KeyType, T, cstone::execution::Gpu> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta,
-                                                              MPI_COMM_WORLD, cstone::execution::gpuDefaultStream, box);
+    cstone::Domain<KeyType, T, cstone::execution::Gpu> domain(cstone::execution::gpuDefaultStream, thisRank, numRanks,
+                                                              bucketSize, bucketSizeLocal, theta, MPI_COMM_WORLD, box);
 
     MultipoleHolder<T, T, T, T, T, KeyType, MultipoleType> multipoleHolder;
 
@@ -295,7 +295,10 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     }
 
     if (pass) { return EXIT_SUCCESS; }
-    else { return EXIT_FAILURE; }
+    else
+    {
+        return EXIT_FAILURE;
+    }
 }
 
 int main(int argc, char** argv)

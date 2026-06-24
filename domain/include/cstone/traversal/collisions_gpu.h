@@ -44,7 +44,8 @@ namespace cstone
  * @param[in]  exec              execution policy
  */
 template<class KeyType, class T>
-extern void findHalosGpu(const KeyType* prefixes,
+extern void findHalosGpu(execution::Gpu exec,
+                         const KeyType* prefixes,
                          const TreeNodeIndex* childOffsets,
                          const TreeNodeIndex* parents,
                          const Vec3<T>* nodeCenters,
@@ -55,11 +56,11 @@ extern void findHalosGpu(const KeyType* prefixes,
                          const Box<T>& box,
                          TreeNodeIndex firstNode,
                          TreeNodeIndex lastNode,
-                         uint8_t* collisionFlags,
-                         execution::Gpu exec);
+                         uint8_t* collisionFlags);
 
 template<class T, class KeyType>
-extern void markMacsGpu(const KeyType* prefixes,
+extern void markMacsGpu(execution::Gpu exec,
+                        const KeyType* prefixes,
                         const TreeNodeIndex* childOffsets,
                         const TreeNodeIndex* parents,
                         const Vec4<T>* centers,
@@ -67,7 +68,6 @@ extern void markMacsGpu(const KeyType* prefixes,
                         const KeyType* focusNodes,
                         TreeNodeIndex numFocusNodes,
                         bool limitSource,
-                        uint8_t* markings,
-                        execution::Gpu exec);
+                        uint8_t* markings);
 
 } // namespace cstone

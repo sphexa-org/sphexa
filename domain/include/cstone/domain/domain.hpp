@@ -60,22 +60,22 @@ public:
      *                        limits will never be changed for the lifetime of the Domain
      *
      */
-    Domain(int rank,
+    Domain(Exec exec,
+           int rank,
            int nRanks,
            unsigned bucketSize,
            unsigned bucketSizeFocus,
            float theta,
            MPI_Comm comm,
-           Exec exec,
            const Box<T>& box = Box<T>{0, 1})
-        : myRank_(rank)
+        : exec_(exec)
+        , myRank_(rank)
         , numRanks_(nRanks)
         , bucketSizeFocus_(bucketSizeFocus)
         , theta_(theta)
         , comm_(comm)
-        , exec_(exec)
-        , focusTree_(rank, numRanks_, bucketSizeFocus_, comm, exec_)
-        , global_(rank, nRanks, bucketSize, box, comm, exec_)
+        , focusTree_(exec_, rank, numRanks_, bucketSizeFocus_, comm)
+        , global_(exec_, rank, nRanks, bucketSize, box, comm)
         , halos_(myRank_, comm)
     {
         if (bucketSize < bucketSizeFocus_)
@@ -601,7 +601,10 @@ private:
                     {
                         bool isHalo = std::count(hPeers.begin(), hPeers.end(), r) == 1;
                         if (isHalo) { std::cout << r << " "; }
-                        else { std::cout << "*" << r << " "; }
+                        else
+                        {
+                            std::cout << "*" << r << " ";
+                        }
                     }
                     for (auto r : hPeers)
                     {
@@ -615,6 +618,8 @@ private:
         }
     }
 
+    Exec exec_;
+
     int myRank_;
     int numRanks_;
     unsigned bucketSizeFocus_;
@@ -624,7 +629,6 @@ private:
 
     //! @brief MPI communicator for all collective and point-to-point operations
     MPI_Comm comm_;
-    Exec exec_;
 
     bool convergeTrees{false};
     //! @brief Extra search factor for halo discovery, allowing multiple time integration steps between sync() calls

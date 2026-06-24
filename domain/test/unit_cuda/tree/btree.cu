@@ -34,8 +34,8 @@ void internal4x4x4PrefixTest()
 
     StreamHolder stream;
     thrust::device_vector<BinaryNode<I>> d_internalTree(nNodes(tree));
-    createBinaryTreeGpu(thrust::raw_pointer_cast(tree.data()), nNodes(tree),
-                        thrust::raw_pointer_cast(d_internalTree.data()), stream.exec());
+    createBinaryTreeGpu(stream.exec(), thrust::raw_pointer_cast(tree.data()), nNodes(tree),
+                        thrust::raw_pointer_cast(d_internalTree.data()));
     stream.sync();
 
     thrust::host_vector<BinaryNode<I>> internalTree = d_internalTree;
