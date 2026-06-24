@@ -79,16 +79,15 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     // Check the root multipole of the distributed tree
     bool passMultipole = false;
     {
-        std::vector<MultipoleType> multipoles(octree.numNodes);
-        cstone::memcpyD2HAsync(cstone::execution::gpuDefaultStream, multipoleHolder.deviceMultipoles(),
-                               multipoles.size(), multipoles.data());
-
-        MultipoleType globalRootMultipole = multipoles[0];
-
+        std::vector<MultipoleType>               multipoles(octree.numNodes);
         auto                                     d_centers = focusTree.expansionCentersAcc();
         std::vector<cstone::SourceCenterType<T>> centers(d_centers.size());
+        cstone::memcpyD2HAsync(cstone::execution::gpuDefaultStream, multipoleHolder.deviceMultipoles(),
+                               multipoles.size(), multipoles.data());
         cstone::memcpyD2HAsync(cstone::execution::gpuDefaultStream, d_centers.data(), d_centers.size(), centers.data());
         cstone::syncGpu(cstone::execution::gpuDefaultStream);
+
+        MultipoleType globalRootMultipole = multipoles[0];
 
         // compute reference root cell multipole from global particle data
         MultipoleType reference;
