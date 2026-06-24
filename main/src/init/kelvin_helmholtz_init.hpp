@@ -54,8 +54,6 @@ InitSettings KelvinHelmholtzConstants()
 template<class T, class Dataset>
 void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T massPart)
 {
-    using Exec      = typename Dataset::Exec;
-    auto exec       = cstone::execution::defaultExec<Exec>;
     using HydroType = Dataset::HydroType;
     T rhoInt        = constants.at("rhoInt");
     T rhoExt        = constants.at("rhoExt");
@@ -73,9 +71,9 @@ void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T mass
     T hInt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoInt);
     T hExt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoExt);
 
-    initFieldsAtRest(d, massPart, exec);
-    cstone::fill(exec, d.mue.begin(), d.mue.end(), 2.0);
-    cstone::fill(exec, d.mui.begin(), d.mui.end(), 10.0);
+    initFieldsAtRest(d, massPart);
+    cstone::fill(d.exec, d.mue.begin(), d.mue.end(), 2.0);
+    cstone::fill(d.exec, d.mui.begin(), d.mui.end(), 10.0);
 
     auto   cv = sph::idealGasCv(d.muiConst, gamma);
     auto&& x  = cstone::toHost(d.x);
@@ -120,8 +118,8 @@ void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T mass
     d.h  = std::move(h);
     d.vx = std::move(vx);
     d.vy = std::move(vy);
-    cstone::scale(exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
-    cstone::scale(exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
 
     if (d.u.empty())
     {

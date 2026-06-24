@@ -57,24 +57,4 @@ constexpr inline Gpu gpuStream(cudaStream_t stream) noexcept { return Gpu(stream
 
 constexpr inline Gpu gpuDefaultStream = gpuStream(0);
 
-namespace detail
-{
-
-template<class Exec>
-struct DefaultExec
-{
-    static constexpr Exec value = {};
-};
-
-template<>
-struct DefaultExec<Gpu>
-{
-    static constexpr Gpu value = gpuDefaultStream;
-};
-
-} // namespace detail
-
-template<class T>
-constexpr T defaultExec = detail::DefaultExec<T>::value;
-
 } // namespace cstone::execution

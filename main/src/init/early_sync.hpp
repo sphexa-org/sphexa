@@ -59,15 +59,21 @@ template<class KeyType, class T, class Vector>
 void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector& x, Vector& y, Vector& z,
                 const cstone::Box<T>& globalBox)
 {
-    constexpr bool gpu = cstone::IsDeviceVector<Vector>{};
-    using Exec         = std::conditional_t<gpu, cstone::execution::Gpu, cstone::execution::Cpu>;
-    using AccVectorKT  = std::conditional_t<gpu, cstone::DeviceVector<KeyType>, std::vector<KeyType>>;
+    constexpr bool gpu  = cstone::IsDeviceVector<Vector>{};
+    constexpr auto exec = []
+    {
+        if constexpr (gpu)
+            return cstone::execution::gpuDefaultStream;
+        else
+            return cstone::execution::cpu;
+    }();
+    using AccVectorKT = std::conditional_t<gpu, cstone::DeviceVector<KeyType>, std::vector<KeyType>>;
 
     size_t                    bucketSize = std::max(64lu, numParticlesGlobal / (100 * numRanks));
     cstone::BufferDescription o1{0, cstone::LocalIndex(x.size()), cstone::LocalIndex(x.size())};
 
-    cstone::GlobalAssignment<KeyType, T, Exec> distributor(rank, numRanks, bucketSize, globalBox, MPI_COMM_WORLD,
-                                                           cstone::execution::defaultExec<Exec>);
+    cstone::GlobalAssignment<KeyType, T, std::decay_t<decltype(exec)>> distributor(rank, numRanks, bucketSize,
+                                                                                   globalBox, MPI_COMM_WORLD, exec);
 
     Vector            scratch1, scratch2, orderScratch;
     cstone::SfcSorter sorter(orderScratch);
@@ -81,8 +87,7 @@ void syncCoords(size_t rank, size_t numRanks, size_t numParticlesGlobal, Vector&
                                                            particleKeys.data(), x.data(), y.data(), z.data());
 
     scratch1.resize(x.size());
-    cstone::gatherArrays(cstone::execution::defaultExec<Exec>,
-                         {sorter.getMap() + distributor.postExchangeStart(o1), distributor.numAssigned()}, 0,
+    cstone::gatherArrays(exec, {sorter.getMap() + distributor.postExchangeStart(o1), distributor.numAssigned()}, 0,
                          std::tie(x, y, z), std::tie(scratch1));
     x.resize(keyView.size());
     y.resize(keyView.size());

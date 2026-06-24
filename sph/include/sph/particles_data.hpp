@@ -63,6 +63,13 @@ class ParticlesData : public cstone::FieldStates<ParticlesData<Execution>>
 public:
     using Exec                   = Execution;
     static constexpr bool useGpu = cstone::execution::HaveGpu<Execution>();
+    static constexpr Exec exec   = []
+    {
+        if constexpr (useGpu)
+            return cstone::execution::gpuDefaultStream;
+        else
+            return cstone::execution::cpu;
+    }();
 
     using KeyType   = sph::SphTypes::KeyType;
     using RealType  = sph::SphTypes::CoordinateType;

@@ -67,8 +67,6 @@ std::map<std::string, double> nohConstants()
 template<class Dataset>
 void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
 {
-    using Exec      = typename Dataset::Exec;
-    auto exec       = cstone::execution::defaultExec<Exec>;
     using T         = typename Dataset::RealType;
     using HydroType = typename Dataset::HydroType;
 
@@ -80,15 +78,15 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
     auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
     auto temp0 = constants.at("u0") / cv;
 
-    cstone::fill(exec, d.m.begin(), d.m.end(), mPart);
-    cstone::fill(exec, d.h.begin(), d.h.end(), hInit);
-    cstone::fill(exec, d.du_m1.begin(), d.du_m1.end(), 0.0);
-    cstone::fill(exec, d.mui.begin(), d.mui.end(), d.muiConst);
-    cstone::fill(exec, d.temp.begin(), d.temp.end(), temp0);
-    cstone::fill(exec, d.u.begin(), d.u.end(), constants.at("u0"));
-    cstone::fill(exec, d.alpha.begin(), d.alpha.end(), d.alphamin);
+    cstone::fill(d.exec, d.m.begin(), d.m.end(), mPart);
+    cstone::fill(d.exec, d.h.begin(), d.h.end(), hInit);
+    cstone::fill(d.exec, d.du_m1.begin(), d.du_m1.end(), 0.0);
+    cstone::fill(d.exec, d.mui.begin(), d.mui.end(), d.muiConst);
+    cstone::fill(d.exec, d.temp.begin(), d.temp.end(), temp0);
+    cstone::fill(d.exec, d.u.begin(), d.u.end(), constants.at("u0"));
+    cstone::fill(d.exec, d.alpha.begin(), d.alpha.end(), d.alphamin);
 
-    generateParticleIDs(d.id, exec);
+    generateParticleIDs(d.exec, d.id);
 
     auto&& x = cstone::toHost(d.x);
     auto&& y = cstone::toHost(d.y);
@@ -109,9 +107,9 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
     d.vx = std::move(vx);
     d.vy = std::move(vy);
     d.vz = std::move(vz);
-    cstone::scale(exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
-    cstone::scale(exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
-    cstone::scale(exec, d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
 }
 
 template<class Dataset>

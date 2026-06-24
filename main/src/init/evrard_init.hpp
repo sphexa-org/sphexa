@@ -34,15 +34,12 @@ InitSettings evrardConstants()
 template<class Dataset>
 void initEvrardFields(Dataset& d, const InitSettings& constants)
 {
-    using Exec = typename Dataset::Exec;
-    auto exec  = cstone::execution::defaultExec<Exec>;
-
-    initFieldsAtRest(d, constants.at("mTotal") / d.numParticlesGlobal, exec);
+    initFieldsAtRest(d, constants.at("mTotal") / d.numParticlesGlobal);
 
     auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
     auto temp0 = constants.at("u0") / cv;
-    cstone::fill(exec, d.temp.begin(), d.temp.end(), temp0);
-    cstone::fill(exec, d.u.begin(), d.u.end(), constants.at("u0"));
+    cstone::fill(d.exec, d.temp.begin(), d.temp.end(), temp0);
+    cstone::fill(d.exec, d.u.begin(), d.u.end(), constants.at("u0"));
 
     double totalVolume = 4 * M_PI / 3 * std::pow(constants.at("r"), 3);
     // before the contraction with sqrt(r), the sphere has a constant particle concentration of Ntot / Vtot

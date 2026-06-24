@@ -49,8 +49,6 @@ namespace sphexa
 template<class Dataset>
 void initSedovFields(Dataset& d, const InitSettings& constants)
 {
-    using Exec = typename Dataset::Exec;
-    auto exec  = cstone::execution::defaultExec<Exec>;
     using T    = Dataset::RealType;
 
     double r           = constants.at("r1");
@@ -66,8 +64,8 @@ void initSedovFields(Dataset& d, const InitSettings& constants)
     // ener0 is the constant that should multiply the Gaussian so that its integral equals energytotal
     double ener0 = constants.at("energyTotal") / std::pow(M_PI, 1.5) / width2 / width;
 
-    initFieldsAtRest(d, mPart, exec);
-    cstone::fill(exec, d.h.begin(), d.h.end(), hInit);
+    initFieldsAtRest(d, mPart);
+    cstone::fill(d.exec, d.h.begin(), d.h.end(), hInit);
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
 

@@ -145,8 +145,6 @@ public:
     {
         using KeyType = typename Dataset::KeyType;
         using T       = typename Dataset::RealType;
-        using Exec    = typename Dataset::Exec;
-        auto exec     = cstone::execution::defaultExec<Exec>;
 
         size_t numParticlesInFile = reader->localNumParticles();
         size_t numParticlesSplit  = numParticlesInFile * numSplits;
@@ -248,13 +246,13 @@ public:
         replicateField(reader, "vz", d.vz, T(1));
         if (d.isAllocated("temp")) { replicateField(reader, "temp", d.temp, T(1)); }
         else if (d.isAllocated("u")) { replicateField(reader, "u", d.u, T(1)); }
-        cstone::fill(exec, d.du_m1.begin(), d.du_m1.end(), 0);
-        cstone::fill(exec, d.rung.begin(), d.rung.end(), 0);
-        cstone::scale(exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), d.minDt);
-        cstone::scale(exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), d.minDt);
-        cstone::scale(exec, d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), d.minDt);
+        cstone::fill(d.exec, d.du_m1.begin(), d.du_m1.end(), 0);
+        cstone::fill(d.exec, d.rung.begin(), d.rung.end(), 0);
+        cstone::scale(d.exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), d.minDt);
+        cstone::scale(d.exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), d.minDt);
+        cstone::scale(d.exec, d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), d.minDt);
 
-        generateParticleIDs(d.id, exec);
+        generateParticleIDs(d.exec, d.id);
 
         if (d.isAllocated("alpha"))
         {
@@ -264,7 +262,7 @@ public:
             }
             catch (std::runtime_error&)
             {
-                cstone::fill(exec, d.alpha.begin(), d.alpha.end(), d.alphamin);
+                cstone::fill(d.exec, d.alpha.begin(), d.alpha.end(), d.alphamin);
             }
         }
 

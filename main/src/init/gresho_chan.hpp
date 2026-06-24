@@ -48,8 +48,6 @@ InitSettings GreshoChanSettings()
 template<class Dataset, class T>
 void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& settings, T mPart)
 {
-    using Exec           = typename Dataset::Exec;
-    auto exec            = cstone::execution::defaultExec<Exec>;
     using HydroType      = Dataset::HydroType;
     using RealType       = Dataset::RealType;
     double ng0           = settings.at("ng0");
@@ -66,8 +64,8 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     double v0 = settings.at("v0");
     double P0 = settings.at("P0");
 
-    initFieldsAtRest(d, mPart, exec);
-    cstone::fill(exec, d.h.begin(), d.h.end(), hInit);
+    initFieldsAtRest(d, mPart);
+    cstone::fill(d.exec, d.h.begin(), d.h.end(), hInit);
 
     auto&& x = cstone::toHost(d.x);
     auto&& y = cstone::toHost(d.y);
@@ -107,8 +105,8 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     }
     d.vx = std::move(vx);
     d.vy = std::move(vy);
-    cstone::scale(exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), firstTimeStep);
-    cstone::scale(exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), firstTimeStep);
+    cstone::scale(d.exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), firstTimeStep);
+    cstone::scale(d.exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), firstTimeStep);
 
     if (d.temp.empty()) { d.u = std::move(u); }
     else

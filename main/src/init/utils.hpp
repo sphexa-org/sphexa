@@ -126,7 +126,7 @@ void readFileAttributes(InitSettings& settings, const std::string& settingsFile,
 
 //! @brief generate particle IDs at the beginning of the simulation initialization
 template<class Exec>
-void generateParticleIDs(std::span<uint64_t> id, Exec exec)
+void generateParticleIDs(Exec exec, std::span<uint64_t> id)
 {
     int rank = 0, numRanks = 0;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -145,24 +145,24 @@ void generateParticleIDs(std::span<uint64_t> id, Exec exec)
 }
 
 template<class Dataset>
-void initFieldsAtRest(Dataset& d, double m_part, typename Dataset::Exec exec)
+void initFieldsAtRest(Dataset& d, double m_part)
 {
-    cstone::fill(exec, d.m.begin(), d.m.end(), m_part);
-    cstone::fill(exec, d.du_m1.begin(), d.du_m1.end(), 0.0);
-    cstone::fill(exec, d.mui.begin(), d.mui.end(), d.muiConst);
-    cstone::fill(exec, d.alpha.begin(), d.alpha.end(), d.alphamin);
+    cstone::fill(d.exec, d.m.begin(), d.m.end(), m_part);
+    cstone::fill(d.exec, d.du_m1.begin(), d.du_m1.end(), 0.0);
+    cstone::fill(d.exec, d.mui.begin(), d.mui.end(), d.muiConst);
+    cstone::fill(d.exec, d.alpha.begin(), d.alpha.end(), d.alphamin);
 
-    cstone::fill(exec, d.vx.begin(), d.vx.end(), 0.0);
-    cstone::fill(exec, d.vy.begin(), d.vy.end(), 0.0);
-    cstone::fill(exec, d.vz.begin(), d.vz.end(), 0.0);
-    cstone::fill(exec, d.x_m1.begin(), d.x_m1.end(), 0.0);
-    cstone::fill(exec, d.y_m1.begin(), d.y_m1.end(), 0.0);
-    cstone::fill(exec, d.z_m1.begin(), d.z_m1.end(), 0.0);
+    cstone::fill(d.exec, d.vx.begin(), d.vx.end(), 0.0);
+    cstone::fill(d.exec, d.vy.begin(), d.vy.end(), 0.0);
+    cstone::fill(d.exec, d.vz.begin(), d.vz.end(), 0.0);
+    cstone::fill(d.exec, d.x_m1.begin(), d.x_m1.end(), 0.0);
+    cstone::fill(d.exec, d.y_m1.begin(), d.y_m1.end(), 0.0);
+    cstone::fill(d.exec, d.z_m1.begin(), d.z_m1.end(), 0.0);
 
-    cstone::fill(exec, d.u.begin(), d.u.end(), 0.0);
-    cstone::fill(exec, d.temp.begin(), d.temp.end(), 0.0);
+    cstone::fill(d.exec, d.u.begin(), d.u.end(), 0.0);
+    cstone::fill(d.exec, d.temp.begin(), d.temp.end(), 0.0);
 
-    generateParticleIDs(d.id, exec);
+    generateParticleIDs(d.exec, d.id);
 }
 
 //! @brief Used to read the default values of dataset attributes
