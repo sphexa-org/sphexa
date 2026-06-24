@@ -69,7 +69,7 @@ template<class T, class IndexType>
 extern void gatherScatter(
     execution::Gpu exec, const IndexType* gmap, const IndexType* smap, size_t numElements, const T* src, T* buffer);
 
-template <class T>
+template<class T>
 extern std::tuple<T, T> minMax(execution::Gpu exec, const T* first, const T* last);
 
 template<class T>
