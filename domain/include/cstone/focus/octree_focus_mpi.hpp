@@ -83,10 +83,7 @@ public:
 
             reallocate(geoCentersAcc_, 1, 1.0);
         }
-        else
-        {
-            updateInternalTree<KeyType>(leaves_, octreeAcc_.data());
-        }
+        else { updateInternalTree<KeyType>(leaves_, octreeAcc_.data()); }
     }
 
     /*! @brief Update the tree structure according to previously calculated criteria (MAC and particle counts)
@@ -373,10 +370,7 @@ public:
             {
                 upsweepCentersGpu(exec_, maxTreeLevel<KeyType>{}, levelRange.data(), childOffsets, centers);
             }
-            else
-            {
-                upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{});
-            }
+            else { upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{}); }
         };
 
         if constexpr (execution::HaveGpu<Exec>{})
@@ -455,10 +449,7 @@ public:
         {
             setMacGpu(exec_, rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box_);
         }
-        else
-        {
-            setMac<RealType, KeyType>(octreeAcc_.prefixes, centersAcc_, invTheta, box_);
-        }
+        else { setMac<RealType, KeyType>(octreeAcc_.prefixes, centersAcc_, invTheta, box_); }
     }
 
     /*! @brief Update the MAC criteria based on given expansion centers and effective inverse theta
@@ -683,10 +674,7 @@ public:
     std::span<const KeyType> treeLeavesAcc() const
     {
         if constexpr (execution::HaveGpu<Exec>{}) { return {rawPtr(leavesAcc_), leavesAcc_.size()}; }
-        else
-        {
-            return leaves_;
-        }
+        else { return leaves_; }
     }
 
     //! @brief the cornerstone leaf cell particle counts
@@ -711,10 +699,7 @@ private:
             computeGeoCentersGpu(exec_, rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(geoCentersAcc_),
                                  rawPtr(geoSizesAcc_), box_);
         }
-        else
-        {
-            nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_);
-        }
+        else { nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_); }
     }
 
     void downloadOctree()

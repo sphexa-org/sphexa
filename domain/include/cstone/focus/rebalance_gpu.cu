@@ -84,10 +84,7 @@ __global__ void macRefineDecisionKernel(const KeyType* prefixes,
     if (i >= numLeafNodes) { return; }
 
     if (i < focus.x || i >= focus.y) { nodeOps[i] = macRefineOp(prefixes[l2i[i]], macs[l2i[i]]); }
-    else
-    {
-        nodeOps[i] = 1;
-    }
+    else { nodeOps[i] = 1; }
 }
 
 template<class KeyType>

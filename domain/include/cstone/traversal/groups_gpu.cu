@@ -137,10 +137,7 @@ void computeGroupSplits(execution::Gpu exec,
         computeGroupSplitsImpl<2 * GpuConfig::warpSize>(exec, first, last, x, y, z, h, leaves, numLeaves, layout, box,
                                                         tolFactor, splitMasks, numSplitsPerGroup, groups);
     }
-    else
-    {
-        throw std::runtime_error("Unsupported spatial group size\n");
-    }
+    else { throw std::runtime_error("Unsupported spatial group size\n"); }
 }
 
 #define COMPUTE_GROUP_SPLITS(Tc, T, KeyType)                                                                           \

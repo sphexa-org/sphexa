@@ -51,10 +51,7 @@ std::vector<int> focusPeers(std::span<const TreeNodeIndex> globalOffsets,
 
         bool isPeer = false;
         if (focEnd - focStart > globEnd - globStart) { isPeer = true; }
-        else
-        {
-            isPeer = not std::includes(globStart, globEnd, focStart, focEnd);
-        }
+        else { isPeer = not std::includes(globStart, globEnd, focStart, focEnd); }
         if (isPeer) { peerFlags[rank] |= static_cast<int>(PeerMask::focus); }
     }
     return peerFlags;
