@@ -10,6 +10,7 @@ target_include_directories(${testname} PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE_DI
 
 target_link_libraries(${testname} PRIVATE grackle)
 target_link_libraries(${testname} PRIVATE cooler)
+target_link_libraries(${testname} PRIVATE OpenMP::OpenMP_CXX)
 target_link_libraries(${testname} PRIVATE GTest::gtest_main)
 target_compile_definitions(${testname} PRIVATE PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_compile_definitions(${testname} PRIVATE CMAKE_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
