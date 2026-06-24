@@ -30,7 +30,7 @@ namespace cstone
  * @param[out] groups     groups with fixed size @p groupSize
  */
 void computeFixedGroups(
-    LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups, execution::Gpu exec);
+    execution::Gpu exec, LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups);
 
 /*!* @brief Compute groups of particles with a maximum size and distance between consecutive particles limited
  *
@@ -59,7 +59,8 @@ void computeFixedGroups(
  * leaf cell of any particle in the group. Edge length is computed as the cubic root of the cell volume.
  */
 template<class Tc, class T, class KeyType>
-extern void computeGroupSplits(LocalIndex first,
+extern void computeGroupSplits(execution::Gpu exec,
+                               LocalIndex first,
                                LocalIndex last,
                                const Tc* x,
                                const Tc* y,
@@ -72,7 +73,6 @@ extern void computeGroupSplits(LocalIndex first,
                                unsigned groupSize,
                                float tolFactor,
                                DeviceVector<LocalIndex>& numSplitsPerGroup,
-                               DeviceVector<LocalIndex>& groups,
-                               execution::Gpu exec);
+                               DeviceVector<LocalIndex>& groups);
 
 } // namespace cstone

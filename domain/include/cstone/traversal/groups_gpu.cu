@@ -41,7 +41,7 @@ fixedGroupsKernel(LocalIndex first, LocalIndex last, unsigned groupSize, LocalIn
 }
 
 void computeFixedGroups(
-    LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups, execution::Gpu exec)
+    execution::Gpu exec, LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups)
 {
     LocalIndex numBodies = last - first;
     LocalIndex numGroups = iceil(numBodies, groupSize);
@@ -58,6 +58,7 @@ void computeFixedGroups(
 //! @brief convenience wrapper for groupSplitsKernel
 template<unsigned groupSize, class Tc, class T, class KeyType>
 void computeGroupSplitsImpl(
+    execution::Gpu exec,
     LocalIndex first,
     LocalIndex last,
     const Tc* x,
@@ -71,8 +72,7 @@ void computeGroupSplitsImpl(
     float tolFactor,
     DeviceVector<util::array<GpuConfig::ThreadMask, groupSize / GpuConfig::warpSize>>& splitMasks,
     DeviceVector<LocalIndex>& numSplitsPerGroup,
-    DeviceVector<LocalIndex>& groups,
-    execution::Gpu exec)
+    DeviceVector<LocalIndex>& groups)
 {
     LocalIndex numParticles   = last - first;
     LocalIndex numFixedGroups = iceil(numParticles, groupSize);
@@ -109,7 +109,8 @@ void computeGroupSplitsImpl(
 }
 
 template<class Tc, class T, class KeyType>
-void computeGroupSplits(LocalIndex first,
+void computeGroupSplits(execution::Gpu exec,
+                        LocalIndex first,
                         LocalIndex last,
                         const Tc* x,
                         const Tc* y,
@@ -122,29 +123,31 @@ void computeGroupSplits(LocalIndex first,
                         unsigned groupSize,
                         float tolFactor,
                         DeviceVector<LocalIndex>& numSplitsPerGroup,
-                        DeviceVector<LocalIndex>& groups,
-                        execution::Gpu exec)
+                        DeviceVector<LocalIndex>& groups)
 {
     if (groupSize == GpuConfig::warpSize)
     {
         DeviceVector<util::array<GpuConfig::ThreadMask, 1>> splitMasks;
-        computeGroupSplitsImpl<GpuConfig::warpSize>(first, last, x, y, z, h, leaves, numLeaves, layout, box, tolFactor,
-                                                    splitMasks, numSplitsPerGroup, groups, exec);
+        computeGroupSplitsImpl<GpuConfig::warpSize>(exec, first, last, x, y, z, h, leaves, numLeaves, layout, box,
+                                                    tolFactor, splitMasks, numSplitsPerGroup, groups);
     }
     else if (groupSize == 2 * GpuConfig::warpSize)
     {
         DeviceVector<util::array<GpuConfig::ThreadMask, 2>> splitMasks;
-        computeGroupSplitsImpl<2 * GpuConfig::warpSize>(first, last, x, y, z, h, leaves, numLeaves, layout, box,
-                                                        tolFactor, splitMasks, numSplitsPerGroup, groups, exec);
+        computeGroupSplitsImpl<2 * GpuConfig::warpSize>(exec, first, last, x, y, z, h, leaves, numLeaves, layout, box,
+                                                        tolFactor, splitMasks, numSplitsPerGroup, groups);
     }
-    else { throw std::runtime_error("Unsupported spatial group size\n"); }
+    else
+    {
+        throw std::runtime_error("Unsupported spatial group size\n");
+    }
 }
 
 #define COMPUTE_GROUP_SPLITS(Tc, T, KeyType)                                                                           \
-    template void computeGroupSplits(                                                                                  \
-        LocalIndex first, LocalIndex last, const Tc* x, const Tc* y, const Tc* z, const T* h, const KeyType* leaves,   \
-        TreeNodeIndex numLeaves, const LocalIndex* layout, const Box<Tc> box, unsigned groupSize, float tolFactor,     \
-        DeviceVector<LocalIndex>& numSplitsPerGroup, DeviceVector<LocalIndex>& groups, execution::Gpu)
+    template void computeGroupSplits(execution::Gpu, LocalIndex first, LocalIndex last, const Tc* x, const Tc* y,      \
+                                     const Tc* z, const T* h, const KeyType* leaves, TreeNodeIndex numLeaves,          \
+                                     const LocalIndex* layout, const Box<Tc> box, unsigned groupSize, float tolFactor, \
+                                     DeviceVector<LocalIndex>& numSplitsPerGroup, DeviceVector<LocalIndex>& groups)
 
 COMPUTE_GROUP_SPLITS(double, double, uint64_t);
 COMPUTE_GROUP_SPLITS(double, float, uint64_t);

@@ -42,7 +42,7 @@ TEST(TargetGroups, t0)
     StreamHolder stream;
 
     GroupData<execution::Gpu> groups;
-    computeFixedGroups(first, last, groupSize, groups, stream.exec());
+    computeFixedGroups(stream.exec(), first, last, groupSize, groups);
     stream.sync();
 
     std::vector<LocalIndex> hgroups = toHost(groups.data);
@@ -282,8 +282,8 @@ TEST(TargetGroups, groupVolumes)
         StreamHolder stream;
 
         float tolFactor = std::sqrt(3.0) / distCrit * 1.01;
-        computeGroupSplits(first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves), nNodes(leaves),
-                           rawPtr(d_layout), box, groupSize, tolFactor, temp, groups, stream.exec());
+        computeGroupSplits(stream.exec(), first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves),
+                           nNodes(leaves), rawPtr(d_layout), box, groupSize, tolFactor, temp, groups);
         stream.sync();
 
         std::vector<LocalIndex> h_groups = toHost(groups);
