@@ -8,7 +8,7 @@
  */
 
 /*! @file
- * @brief  CUDA/Thrust stubs to provide declarations without definitions for use in non-CUDA builds
+ * @brief  CUDA stubs to provide declarations without definitions for use in non-CUDA builds
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
