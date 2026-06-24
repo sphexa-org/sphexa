@@ -159,10 +159,7 @@ struct AccretionTest : public ::testing::Test
             bool has_to_be_removed = (dist < inner_limit) || (data.h[i] > star.removal_limit_h);
 
             if (data.keys[i] == cstone::removeKey<KeyType>::value) { EXPECT_TRUE(has_to_be_removed); }
-            else
-            {
-                EXPECT_TRUE(!has_to_be_removed);
-            }
+            else { EXPECT_TRUE(!has_to_be_removed); }
         }
     }
 

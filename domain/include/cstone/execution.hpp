@@ -55,7 +55,7 @@ constexpr inline Gpu gpuStream(cudaStream_t stream) noexcept { return Gpu(stream
 
 constexpr inline Gpu gpuDefaultStream = gpuStream(0);
 
-template <class T>
+template<class T>
 concept Policy = std::same_as<std::decay_t<T>, Cpu> || std::same_as<std::decay_t<T>, Gpu>;
 
 template<Policy Exec>
