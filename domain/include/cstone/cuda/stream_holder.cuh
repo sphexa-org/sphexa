@@ -34,16 +34,16 @@ public:
     }
 
     StreamHolder(const StreamHolder&) = delete;
-    StreamHolder(StreamHolder&& other) noexcept
-        : stream(other.stream)
-    {
-        other.stream = 0;
-    }
+    StreamHolder(StreamHolder&& other) { *this = std::move(other); }
     StreamHolder& operator=(const StreamHolder&) = delete;
-    StreamHolder& operator=(StreamHolder&& other) noexcept
+    StreamHolder& operator=(StreamHolder&& other)
     {
-        stream       = other.stream;
-        other.stream = 0;
+        if (this != &other)
+        {
+            if (stream) checkGpuErrors(cudaStreamDestroy(stream));
+            stream       = other.stream;
+            other.stream = 0;
+        }
         return *this;
     }
 
