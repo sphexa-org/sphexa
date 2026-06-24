@@ -56,6 +56,25 @@ void scatter(execution::Cpu, std::span<const IndexType> ordering, const ValueTyp
     scatter(ordering, source, destination);
 }
 
+template<class T>
+std::tuple<T, T> minMax(execution::Cpu, const T* first, const T* last)
+{
+    assert(last >= first);
+
+    T minimum = INFINITY;
+    T maximum = -INFINITY;
+
+#pragma omp parallel for reduction(min : minimum) reduction(max : maximum)
+    for (size_t pi = 0; pi < std::size_t(last - first); pi++)
+    {
+        T value = first[pi];
+        minimum = std::min(minimum, value);
+        maximum = std::max(maximum, value);
+    }
+
+    return std::make_tuple(minimum, maximum);
+}
+
 //! @brief sortByKey with temp buffer management
 template<class KeyType, class ValueType, class KeyBuf, class ValueBuf>
 void sortByKey(execution::Cpu,

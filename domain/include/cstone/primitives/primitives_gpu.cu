@@ -181,21 +181,21 @@ template void
 gatherScatter(execution::Gpu, const int*, const int*, size_t, const util::array<double, 12>*, util::array<double, 12>*);
 
 template<class T>
-std::tuple<T, T> MinMax<execution::Gpu, T>::operator()(const T* first, const T* last)
+std::tuple<T, T> minMax(execution::Gpu exec, const T* first, const T* last)
 {
-    auto minMax = thrust::minmax_element(thrustExecPolicy(exec), first, last);
+    auto minMaxElements = thrust::minmax_element(thrustExecPolicy(exec), first, last);
 
     T theMinimum, theMaximum;
-    checkGpuErrors(cudaMemcpyAsync(&theMinimum, minMax.first, sizeof(T), cudaMemcpyDeviceToHost, exec));
-    checkGpuErrors(cudaMemcpyAsync(&theMaximum, minMax.second, sizeof(T), cudaMemcpyDeviceToHost, exec));
+    checkGpuErrors(cudaMemcpyAsync(&theMinimum, minMaxElements.first, sizeof(T), cudaMemcpyDeviceToHost, exec));
+    checkGpuErrors(cudaMemcpyAsync(&theMaximum, minMaxElements.second, sizeof(T), cudaMemcpyDeviceToHost, exec));
     checkGpuErrors(cudaStreamSynchronize(exec));
 
     return std::make_tuple(theMinimum, theMaximum);
 }
 
-template struct MinMax<execution::Gpu, double>;
-template struct MinMax<execution::Gpu, float>;
-template struct MinMax<execution::Gpu, unsigned>;
+template std::tuple<double, double> minMax(execution::Gpu, const double*, const double*);
+template std::tuple<float, float> minMax(execution::Gpu, const float*, const float*);
+template std::tuple<unsigned, unsigned> minMax(execution::Gpu, const unsigned*, const unsigned*);
 
 using thrust::get;
 

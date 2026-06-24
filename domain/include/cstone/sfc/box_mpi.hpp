@@ -24,39 +24,13 @@
 #include <cmath>
 
 #include "cstone/primitives/mpi_wrappers.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
+#include "cstone/primitives/primitives_gpu.h"
 #include "cstone/execution.hpp"
 #include "box.hpp"
 
 namespace cstone
 {
-
-//! @brief compute minimum and maximum of an array range
-template<execution::Policy Exec, class T>
-struct MinMax;
-
-template<class T>
-struct MinMax<execution::Cpu, T>
-{
-    std::tuple<T, T> operator()(const T* start, const T* end)
-    {
-        assert(end >= start);
-
-        T minimum = INFINITY;
-        T maximum = -INFINITY;
-
-#pragma omp parallel for reduction(min : minimum) reduction(max : maximum)
-        for (size_t pi = 0; pi < std::size_t(end - start); pi++)
-        {
-            T value = start[pi];
-            minimum = std::min(minimum, value);
-            maximum = std::max(maximum, value);
-        }
-
-        return std::make_tuple(minimum, maximum);
-    }
-
-    execution::Cpu exec;
-};
 
 /*! @brief compute global bounding box for local x,y,z arrays
  *
@@ -91,13 +65,12 @@ auto makeGlobalBox(Exec exec,
                              previousBox.ymax(), previousBox.zmin(), previousBox.zmax()};
     if (numElements)
     {
-        MinMax<Exec, T> op{exec};
         std::tie(extrema[0], extrema[1]) =
-            keepX ? std::make_tuple(previousBox.xmin(), previousBox.xmax()) : op(x, x + numElements);
+            keepX ? std::make_tuple(previousBox.xmin(), previousBox.xmax()) : minMax(exec, x, x + numElements);
         std::tie(extrema[2], extrema[3]) =
-            keepY ? std::make_tuple(previousBox.ymin(), previousBox.ymax()) : op(y, y + numElements);
+            keepY ? std::make_tuple(previousBox.ymin(), previousBox.ymax()) : minMax(exec, y, y + numElements);
         std::tie(extrema[4], extrema[5]) =
-            keepZ ? std::make_tuple(previousBox.zmin(), previousBox.zmax()) : op(z, z + numElements);
+            keepZ ? std::make_tuple(previousBox.zmin(), previousBox.zmax()) : minMax(exec, z, z + numElements);
     }
 
     if (!keepX || !keepY || !keepZ)

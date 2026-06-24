@@ -96,8 +96,7 @@ unsigned updateOctreeGlobalGpu(execution::Gpu exec,
 
     if (converged) { return 0; }
 
-    auto [minCount, maxCount] =
-        MinMax<execution::Gpu, unsigned>{exec}(d_counts.data(), d_counts.data() + d_counts.size());
+    auto [minCount, maxCount] = minMax(exec, d_counts.data(), d_counts.data() + d_counts.size());
     return maxCount;
 }
 

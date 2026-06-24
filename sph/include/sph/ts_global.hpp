@@ -80,8 +80,8 @@ auto rhoTimestep(size_t first, size_t last, const Dataset& d)
     if constexpr (d.useGpu)
     {
         if (d.divv.empty()) { throw std::runtime_error("Divv needs to be available in rhoTimestep\n"); }
-        auto minmax = cstone::MinMax<cstone::execution::Gpu, T>{cstone::execution::gpuDefaultStream}(
-            rawPtr(d.divv) + first, rawPtr(d.divv) + last);
+        auto minmax =
+            cstone::minMax(cstone::execution::gpuDefaultStream, rawPtr(d.divv) + first, rawPtr(d.divv) + last);
         maxDivv = std::get<1>(minmax);
     }
     else

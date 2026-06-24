@@ -35,9 +35,8 @@ TEST(PrimitivesGpu, MinMax)
     thrust::device_vector<double> v = std::vector<double>{1., 2., 3., 4., 5., 6., 7., 8., 9., 10.};
 
     StreamHolder stream;
-    auto minMax = MinMax<execution::Gpu, double>{stream.exec()}(raw_pointer_cast(v.data()),
-                                                                raw_pointer_cast(v.data()) + v.size());
+    auto [min, max] = minMax(stream.exec(), raw_pointer_cast(v.data()), raw_pointer_cast(v.data()) + v.size());
 
-    EXPECT_EQ(std::get<0>(minMax), 1.);
-    EXPECT_EQ(std::get<1>(minMax), 10.);
+    EXPECT_EQ(min, 1.);
+    EXPECT_EQ(max, 10.);
 }
