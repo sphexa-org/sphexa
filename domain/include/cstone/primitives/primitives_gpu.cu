@@ -286,7 +286,7 @@ void sort(execution::Gpu exec, KeyType* first, KeyType* last, KeyType* keyBuf)
                                                   sizeof(KeyType) * 8, exec));
 
     // Allocate temporary storage
-    checkGpuErrors(cudaMalloc(&d_tempStorage, tempStorageBytes));
+    checkGpuErrors(cudaMallocAsync(&d_tempStorage, tempStorageBytes, exec));
 
     // Run sorting operation
     checkGpuErrors(cub::DeviceRadixSort::SortKeys(d_tempStorage, tempStorageBytes, d_keys, numElements, 0,
@@ -299,7 +299,7 @@ void sort(execution::Gpu exec, KeyType* first, KeyType* last, KeyType* keyBuf)
             cudaMemcpyAsync(first, curValues, numElements * sizeof(KeyType), cudaMemcpyDeviceToDevice, exec));
     }
 
-    checkGpuErrors(cudaFree(d_tempStorage));
+    checkGpuErrors(cudaFreeAsync(d_tempStorage, exec));
 }
 
 template void sort(execution::Gpu, uint32_t*, uint32_t*, uint32_t*);
