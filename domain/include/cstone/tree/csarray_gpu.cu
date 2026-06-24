@@ -198,6 +198,7 @@ TreeNodeIndex computeNodeOpsGpu(const KeyType* tree,
 
     TreeNodeIndex newNumNodes;
     thrust::copy_n(thrustExecPolicy(exec), thrust::device_pointer_cast(nodeOps) + nodeOpsSize - 1, 1, &newNumNodes);
+    checkGpuErrors(cudaStreamSynchronize(exec));
 
     return newNumNodes;
 }

@@ -108,6 +108,7 @@ void upsweep(const execution::Gpu exec,
     std::array<TreeNodeIndex, maxTreeLevel<KeyType>() + 2> levelRange;
     checkGpuErrors(cudaMemcpyAsync(levelRange.data(), tree.levelRange, levelRange.size() * sizeof(TreeNodeIndex),
                                    cudaMemcpyDeviceToHost, exec));
+    checkGpuErrors(cudaStreamSynchronize(exec));
 
     for (int level = maxTreeLevel<KeyType>() - 1; level >= 0; --level)
     {

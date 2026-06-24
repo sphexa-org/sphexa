@@ -156,6 +156,7 @@ inline void sortByKey(execution::Gpu exec,
 
     sortByKey(exec, keys.data(), keys.data() + keys.size(), values.data(), (KeyType*)rawPtr(keyBuf),
               tempBuffers[0].data(), tempBuffers[1].data(), tempStorageEle * sizeof(ValueType));
+    syncGpu(exec);
     reallocate(keyBuf, s1, 1.0);
     reallocate(valueBuf, s2, 1.0);
 }
