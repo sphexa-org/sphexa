@@ -604,7 +604,9 @@ std::size_t buildNbList(const execution::Gpu exec,
         run(std::false_type());
 
     GlobalBuildData buildData;
-    checkGpuErrors(cudaMemcpy(&buildData, globalBuildData.get(), sizeof(GlobalBuildData), cudaMemcpyDeviceToHost));
+    checkGpuErrors(
+        cudaMemcpyAsync(&buildData, globalBuildData.get(), sizeof(GlobalBuildData), cudaMemcpyDeviceToHost, exec));
+    checkGpuErrors(cudaStreamSynchronize(exec));
     switch (buildData.status)
     {
         case BuildStatus::success: break;
