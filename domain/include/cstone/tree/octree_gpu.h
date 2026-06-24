@@ -45,11 +45,11 @@ extern void buildOctreeGpu(execution::Gpu exec,
                            std::span<char> cubTmp);
 
 //! @brief Upsweep by summing up child nodes, e.g. to compute particle node counts
-void upsweepSumGpu(int numLvl,
+void upsweepSumGpu(execution::Gpu exec,
+                   int numLvl,
                    const TreeNodeIndex* lvlRange,
                    const TreeNodeIndex* childOffsets,
-                   LocalIndex* counts,
-                   execution::Gpu exec);
+                   LocalIndex* counts);
 
 /*!  @brief locate all nodes between k1 and k2 in nodeKeys and store indices
  * @param[in]  k1        cornerstone leaf sequence start
@@ -59,12 +59,12 @@ void upsweepSumGpu(int numLvl,
  * @param[out] indices   node index locations to store
  */
 template<class KeyType>
-extern void locateNodesGpu(const KeyType* k1,
+extern void locateNodesGpu(execution::Gpu exec,
+                           const KeyType* k1,
                            const KeyType* k2,
                            const KeyType* nodeKeys,
                            const TreeNodeIndex* lvlRange,
-                           TreeNodeIndex* indices,
-                           execution::Gpu exec);
+                           TreeNodeIndex* indices);
 
 /*!  @brief locate all nodes between k1 and k2 in nodeKeys and store indices
  * @param[in]  queryKeys  SFC keys to look up in @nodeKeys, in WS-prefix-bit format
@@ -75,12 +75,12 @@ extern void locateNodesGpu(const KeyType* k1,
  * @param[out] indices    node index locations to store
  */
 template<class KeyType>
-extern void locateNodesGpu(const KeyType* queryKeys,
+extern void locateNodesGpu(execution::Gpu exec,
+                           const KeyType* queryKeys,
                            const TreeNodeIndex* map,
                            size_t n,
                            const KeyType* nodeKeys,
                            const TreeNodeIndex* lvlRange,
-                           TreeNodeIndex* indices,
-                           execution::Gpu exec);
+                           TreeNodeIndex* indices);
 
 } // namespace cstone

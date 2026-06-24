@@ -222,13 +222,13 @@ public:
             reallocateDestructive(countsAcc_, octreeAcc_.numNodes, allocGrowthRate_);
             scatter(exec_, leafToInternal(octreeAcc_).data(), numLeafNodes, rawPtr(leafCountsAcc_), rawPtr(countsAcc_));
 
-            upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(octreeAcc_.levelRange), rawPtr(octreeAcc_.childOffsets),
-                          rawPtr(countsAcc_), exec_);
+            upsweepSumGpu(exec_, maxTreeLevel<KeyType>{}, rawPtr(octreeAcc_.levelRange),
+                          rawPtr(octreeAcc_.childOffsets), rawPtr(countsAcc_));
             std::span<unsigned> countsAccView{rawPtr(countsAcc_), countsAcc_.size()};
             peerExchange(countsAccView, static_cast<int>(P2pTags::focusPeerCounts), scratch);
 
-            upsweepSumGpu(maxTreeLevel<KeyType>{}, rawPtr(octreeAcc_.levelRange), rawPtr(octreeAcc_.childOffsets),
-                          rawPtr(countsAcc_), exec_);
+            upsweepSumGpu(exec_, maxTreeLevel<KeyType>{}, rawPtr(octreeAcc_.levelRange),
+                          rawPtr(octreeAcc_.childOffsets), rawPtr(countsAcc_));
             gather(exec_, leafToInternal(octreeAcc_), rawPtr(countsAcc_), rawPtr(leafCountsAcc_));
         }
         else
@@ -279,8 +279,8 @@ public:
 
         if constexpr (execution::HaveGpu<Exec>{})
         {
-            locateNodesGpu(gLeavesFoc.data(), gLeavesFoc.data() + gLeavesFoc.size(), octreeAcc_.prefixes.data(),
-                           octreeAcc_.d_levelRange.data(), gmap.data(), exec_);
+            locateNodesGpu(exec_, gLeavesFoc.data(), gLeavesFoc.data() + gLeavesFoc.size(), octreeAcc_.prefixes.data(),
+                           octreeAcc_.d_levelRange.data(), gmap.data());
         }
         else
         {
@@ -326,8 +326,8 @@ public:
             memcpyH2DAsync(exec_, idxFromGlob.data(), idxFromGlob.size(), letIdx.data());
             gather(exec_, letIdx.data(), idxFromGlob.size(), toInternal, letIdx.data());
 
-            locateNodesGpu(octreeAcc_.prefixes.data(), letIdx.data(), idxFromGlob.size(), globalNodeKeys,
-                           globalLevelRange, letToGlob.data(), exec_);
+            locateNodesGpu(exec_, octreeAcc_.prefixes.data(), letIdx.data(), idxFromGlob.size(), globalNodeKeys,
+                           globalLevelRange, letToGlob.data());
             gatherScatter(exec_, letToGlob.data(), letIdx.data(), idxFromGlob.size(), globalQuantities.data(),
                           localQuantities.data());
         }

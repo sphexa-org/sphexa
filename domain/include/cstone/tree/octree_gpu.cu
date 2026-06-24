@@ -215,11 +215,11 @@ __global__ void upsweepSumKernel(TreeNodeIndex firstCell,
     if (firstChild) { nodeCounts[cellIdx] = NodeCount<LocalIndex>{}(cellIdx, firstChild, nodeCounts); }
 }
 
-void upsweepSumGpu(int numLevels,
+void upsweepSumGpu(execution::Gpu exec,
+                   int numLevels,
                    const TreeNodeIndex* levelRange,
                    const TreeNodeIndex* childOffsets,
-                   LocalIndex* nodeCounts,
-                   execution::Gpu exec)
+                   LocalIndex* nodeCounts)
 {
     constexpr int numThreads = 128;
 
@@ -248,12 +248,12 @@ __global__ void locateNodesKernel(const KeyType* k1,
 }
 
 template<class KeyType>
-void locateNodesGpu(const KeyType* k1,
+void locateNodesGpu(execution::Gpu exec,
+                    const KeyType* k1,
                     const KeyType* k2,
                     const KeyType* nodeKeys,
                     const TreeNodeIndex* lvlRange,
-                    TreeNodeIndex* indices,
-                    execution::Gpu exec)
+                    TreeNodeIndex* indices)
 {
     int numThreads = 256;
     int numBlocks  = iceil(k2 - k1 - 1, numThreads);
@@ -261,18 +261,18 @@ void locateNodesGpu(const KeyType* k1,
     locateNodesKernel<<<numBlocks, numThreads, 0, exec>>>(k1, k2, nodeKeys, lvlRange, indices);
 }
 
-template void locateNodesGpu(const uint32_t* k1,
+template void locateNodesGpu(execution::Gpu,
+                             const uint32_t* k1,
                              const uint32_t* k2,
                              const uint32_t* nodeKeys,
                              const TreeNodeIndex* lvlRange,
-                             TreeNodeIndex* indices,
-                             execution::Gpu);
-template void locateNodesGpu(const uint64_t* k1,
+                             TreeNodeIndex* indices);
+template void locateNodesGpu(execution::Gpu,
+                             const uint64_t* k1,
                              const uint64_t* k2,
                              const uint64_t* nodeKeys,
                              const TreeNodeIndex* lvlRange,
-                             TreeNodeIndex* indices,
-                             execution::Gpu);
+                             TreeNodeIndex* indices);
 
 template<class KeyType>
 __global__ void locateNodesKernel(const KeyType* k1,
@@ -287,13 +287,13 @@ __global__ void locateNodesKernel(const KeyType* k1,
 }
 
 template<class KeyType>
-void locateNodesGpu(const KeyType* k1,
+void locateNodesGpu(execution::Gpu exec,
+                    const KeyType* k1,
                     const TreeNodeIndex* map,
                     size_t n,
                     const KeyType* nodeKeys,
                     const TreeNodeIndex* lvlRange,
-                    TreeNodeIndex* indices,
-                    execution::Gpu exec)
+                    TreeNodeIndex* indices)
 {
     int numThreads = 256;
     int numBlocks  = iceil(n, numThreads);
@@ -301,19 +301,19 @@ void locateNodesGpu(const KeyType* k1,
     locateNodesKernel<<<numBlocks, numThreads, 0, exec>>>(k1, map, n, nodeKeys, lvlRange, indices);
 }
 
-template void locateNodesGpu(const uint32_t* k1,
+template void locateNodesGpu(execution::Gpu,
+                             const uint32_t* k1,
                              const TreeNodeIndex* map,
                              size_t n,
                              const uint32_t* nodeKeys,
                              const TreeNodeIndex* lvlRange,
-                             TreeNodeIndex* indices,
-                             execution::Gpu);
-template void locateNodesGpu(const uint64_t* k1,
+                             TreeNodeIndex* indices);
+template void locateNodesGpu(execution::Gpu,
+                             const uint64_t* k1,
                              const TreeNodeIndex* map,
                              size_t n,
                              const uint64_t* nodeKeys,
                              const TreeNodeIndex* lvlRange,
-                             TreeNodeIndex* indices,
-                             execution::Gpu);
+                             TreeNodeIndex* indices);
 
 } // namespace cstone
