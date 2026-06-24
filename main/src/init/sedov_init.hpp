@@ -49,7 +49,7 @@ namespace sphexa
 template<class Dataset>
 void initSedovFields(Dataset& d, const InitSettings& constants)
 {
-    using T    = Dataset::RealType;
+    using T = Dataset::RealType;
 
     double r           = constants.at("r1");
     double totalVolume = std::pow(2 * r, 3);
