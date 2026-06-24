@@ -74,8 +74,8 @@ int main(int argc, char** argv)
 
     auto fullBuild = [&](cudaStream_t stream)
     {
-        while (!updateOctreeGpu<KeyType>({rawPtr(particleCodes), numParticles}, bucketSize, tree, counts, tmpTree,
-                                         workArray, execution::gpuStream(stream)))
+        while (!updateOctreeGpu<KeyType>(execution::gpuStream(stream), {rawPtr(particleCodes), numParticles},
+                                         bucketSize, tree, counts, tmpTree, workArray))
             ;
     };
 
@@ -85,8 +85,8 @@ int main(int argc, char** argv)
 
     auto updateTree = [&](cudaStream_t stream)
     {
-        updateOctreeGpu<KeyType>({rawPtr(particleCodes), numParticles}, bucketSize, tree, counts, tmpTree, workArray,
-                                 execution::gpuStream(stream));
+        updateOctreeGpu<KeyType>(execution::gpuStream(stream), {rawPtr(particleCodes), numParticles}, bucketSize, tree,
+                                 counts, tmpTree, workArray);
     };
 
     float updateTime = timeGpu(updateTree);
@@ -112,8 +112,8 @@ int main(int argc, char** argv)
     thrust::device_vector<float> haloRadii(octree.numLeafNodes, 0.01);
     thrust::device_vector<uint8_t> flags(octree.numNodes, 0);
     thrust::device_vector<Vec3<T>> nodeCenters(octree.numNodes), nodeSizes(octree.numNodes);
-    computeGeoCentersGpu(octree.prefixes.data(), octree.numNodes, rawPtr(nodeCenters), rawPtr(nodeSizes), box,
-                         execution::gpuDefaultStream);
+    computeGeoCentersGpu(execution::gpuDefaultStream, octree.prefixes.data(), octree.numNodes, rawPtr(nodeCenters),
+                         rawPtr(nodeSizes), box);
     thrust::host_vector<Vec3<T>> h_nc = nodeCenters, h_ns = nodeSizes;
 
     thrust::device_vector<Vec3<T>> searchCenters(octree.numLeafNodes), searchSizes(octree.numLeafNodes);

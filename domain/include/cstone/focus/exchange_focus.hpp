@@ -221,7 +221,8 @@ void syncTreelets(std::span<const int> exteriorPeers,
 }
 
 template<class KeyType, class Vector>
-void syncTreeletsGpu(std::span<const int> exteriorPeers,
+void syncTreeletsGpu(execution::Gpu exec,
+                     std::span<const int> exteriorPeers,
                      std::span<const int> interiorPeers,
                      std::span<const IndexPair<TreeNodeIndex>> assignment,
                      const std::vector<KeyType>& leaves,
@@ -229,8 +230,7 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
                      DeviceVector<KeyType>& leavesAcc,
                      std::vector<std::vector<KeyType>>& treelets,
                      Vector& scratch,
-                     MPI_Comm comm,
-                     execution::Gpu exec)
+                     MPI_Comm comm)
 {
     exchangeTreelets<KeyType>(exteriorPeers, interiorPeers, assignment, leaves, treelets, comm);
     checkTreelets<KeyType>(interiorPeers, leaves, treelets);
@@ -253,7 +253,7 @@ void syncTreeletsGpu(std::span<const int> exteriorPeers,
 
         auto& newLeaves = octreeAcc.prefixes;
         reallocateDestructive(newLeaves, newNumLeafNodes + 1, 1.05);
-        rebalanceTreeGpu(rawPtr(leavesAcc), nNodes(leavesAcc), newNumLeafNodes, nops.data(), rawPtr(newLeaves), exec);
+        rebalanceTreeGpu(exec, rawPtr(leavesAcc), nNodes(leavesAcc), newNumLeafNodes, nops.data(), rawPtr(newLeaves));
         swap(newLeaves, leavesAcc);
 
         octreeAcc.resize(nNodes(leavesAcc));
@@ -308,7 +308,8 @@ void indexTreelets(std::span<const int> peerRanks,
 
 //! @brief send cell properties, send to interior peers, recv from exterior peers
 template<class T, class DevVec, class Exec>
-void exchangeTreeletGeneral(std::span<const int> interiorPeers,
+void exchangeTreeletGeneral(Exec exec,
+                            std::span<const int> interiorPeers,
                             std::span<const int> exteriorPeers,
                             std::span<const std::span<const TreeNodeIndex>> treeletIdx,
                             std::span<const IndexPair<TreeNodeIndex>> focusAssignment,
@@ -316,8 +317,7 @@ void exchangeTreeletGeneral(std::span<const int> interiorPeers,
                             std::span<T> quantities,
                             int commTag,
                             DevVec& scratch,
-                            MPI_Comm comm,
-                            Exec exec)
+                            MPI_Comm comm)
 {
     constexpr int alignmentBytes = 64;
     constexpr bool useGpu        = execution::HaveGpu<Exec>{};

@@ -25,7 +25,8 @@ namespace cstone
 {
 
 template<class KeyType>
-extern void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
+extern void rebalanceDecisionEssentialGpu(execution::Gpu exec,
+                                          const KeyType* prefixes,
                                           const TreeNodeIndex* childOffsets,
                                           const TreeNodeIndex* parents,
                                           const unsigned* counts,
@@ -34,8 +35,7 @@ extern void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
                                           KeyType focusEnd,
                                           unsigned bucketSize,
                                           TreeNodeIndex* nodeOps,
-                                          TreeNodeIndex numNodes,
-                                          execution::Gpu exec);
+                                          TreeNodeIndex numNodes);
 
 /*! @brief Take decision how to refine nodes based on Macs
  *
@@ -48,34 +48,34 @@ extern void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
  * @param[in]  exec           execution policy
  */
 template<class KeyType>
-extern void macRefineDecisionGpu(const KeyType* prefixes,
+extern void macRefineDecisionGpu(execution::Gpu exec,
+                                 const KeyType* prefixes,
                                  const uint8_t* macs,
                                  const TreeNodeIndex* l2i,
                                  TreeNodeIndex numLeafNodes,
                                  TreeIndexPair focus,
-                                 TreeNodeIndex* nodeOps,
-                                 execution::Gpu exec);
+                                 TreeNodeIndex* nodeOps);
 
 template<class KeyType>
 extern bool
-protectAncestorsGpu(const KeyType*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex, execution::Gpu exec);
+protectAncestorsGpu(execution::Gpu exec, const KeyType*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex);
 
 template<class KeyType>
-extern ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
+extern ResolutionStatus enforceKeysGpu(execution::Gpu exec,
+                                       const KeyType* forcedKeys,
                                        TreeNodeIndex numForcedKeys,
                                        const KeyType* nodeKeys,
                                        const TreeNodeIndex* childOffsets,
                                        const TreeNodeIndex* parents,
-                                       TreeNodeIndex* nodeOps,
-                                       execution::Gpu exec);
+                                       TreeNodeIndex* nodeOps);
 
 //! @brief see CPU version
 template<class KeyType>
-extern void rangeCountGpu(std::span<const KeyType> leaves,
+extern void rangeCountGpu(execution::Gpu exec,
+                          std::span<const KeyType> leaves,
                           std::span<const unsigned> counts,
                           std::span<const KeyType> leavesFocus,
                           std::span<const TreeNodeIndex> leavesFocusIdx,
-                          std::span<unsigned> countsFocus,
-                          execution::Gpu exec);
+                          std::span<unsigned> countsFocus);
 
 } // namespace cstone

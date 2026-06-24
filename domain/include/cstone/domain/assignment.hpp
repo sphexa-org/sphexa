@@ -72,7 +72,10 @@ public:
             d_nodeCounts_ = nodeCounts_;
             buildOctreeGpu(exec_, d_csTree_.data(), tree_.data());
         }
-        else { updateInternalTree<KeyType>(leaves_, tree_.data()); }
+        else
+        {
+            updateInternalTree<KeyType>(leaves_, tree_.data());
+        }
     }
 
     /*! @brief Update the global tree
@@ -104,7 +107,10 @@ public:
 
         auto fittingBox = makeGlobalBox(x + o1.start, y + o1.start, z + o1.start, numPart, comm_, exec_, box_);
         if (firstCall_) { box_ = fittingBox; }
-        else { box_ = limitBoxShrinking(fittingBox, box_); }
+        else
+        {
+            box_ = limitBoxShrinking(fittingBox, box_);
+        }
 
         // compute SFC particle keys only for particles participating in tree build
         std::span<KeyType> keyView(particleKeys + o1.start, numPart);
@@ -112,13 +118,13 @@ public:
         sequence(exec_, o1.start, numPart, reorderFunctor.getBuf(), growthRate_);
         sortByKey(exec_, keyView, std::span{reorderFunctor.getMap() + o1.start, keyView.size()}, s0, s1, growthRate_);
 
-        auto maxCount = updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
-                                                    d_nodeCounts_, false, comm_, exec_);
+        auto maxCount = updateOctreeGlobal<KeyType>(exec_, keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
+                                                    d_nodeCounts_, false, comm_);
         if (firstCall_ || maxCount >= 8 * bucketSize_)
         {
             firstCall_ = false;
-            while (updateOctreeGlobal<KeyType>(keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
-                                               d_nodeCounts_, true, comm_, exec_) > bucketSize_)
+            while (updateOctreeGlobal<KeyType>(exec_, keyView, bucketSize_, tree_, leaves_, d_csTree_, nodeCounts_,
+                                               d_nodeCounts_, true, comm_) > bucketSize_)
                 ;
         }
 
@@ -135,10 +141,13 @@ public:
 
         if constexpr (gpu)
         {
-            exchanges_ = createSendRangesGpu<KeyType>(assignment_, keyView, rawPtr(d_boundaryKeys_),
-                                                      rawPtr(d_boundaryIndices_), exec_);
+            exchanges_ = createSendRangesGpu<KeyType>(exec_, assignment_, keyView, rawPtr(d_boundaryKeys_),
+                                                      rawPtr(d_boundaryIndices_));
         }
-        else { exchanges_ = createSendRanges<KeyType>(assignment_, keyView); }
+        else
+        {
+            exchanges_ = createSendRanges<KeyType>(assignment_, keyView);
+        }
 
         return domain_exchange::exchangeBufferSize(o1, numPresent(), numAssigned());
     }
@@ -218,14 +227,20 @@ public:
     std::span<const KeyType> treeLeaves() const
     {
         if (gpu) { return {rawPtr(d_csTree_), d_csTree_.size()}; }
-        else { return leaves_; }
+        else
+        {
+            return leaves_;
+        }
     }
 
     //! @brief read only visibility of the global octree leaf counts to the outside
     std::span<const unsigned> nodeCounts() const
     {
         if (gpu) { return {rawPtr(d_nodeCounts_), d_nodeCounts_.size()}; }
-        else { return nodeCounts_; }
+        else
+        {
+            return nodeCounts_;
+        }
     }
 
     //! @brief the octree, internal part and leaves. All data is on the GPU, when gpu == true

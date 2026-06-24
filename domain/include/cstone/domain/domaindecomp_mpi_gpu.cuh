@@ -44,6 +44,7 @@ inline char* decodeSendCount(execution::Gpu exec, char* recvPtr, size_t* count, 
 /*! @brief exchange array elements with other ranks according to the specified ranges
  *
  * @tparam Arrays                 pointers to particles buffers
+ * @param[in] exec                execution policy
  * @param[in] epoch               MPI tag offset to avoid mix-ups of message from consecutive function calls
  * @param[in] receiveLog          List of received messages in previous calls to replicate resulting buffer layout
  * @param[in] sends               List of index ranges to be sent to each rank, indices

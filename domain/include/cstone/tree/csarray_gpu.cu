@@ -84,13 +84,13 @@ findPopulatedNodes(const KeyType* tree, TreeNodeIndex nNodes, const KeyType* cod
 }
 
 template<class KeyType>
-void computeNodeCountsGpu(const KeyType* tree,
+void computeNodeCountsGpu(execution::Gpu exec,
+                          const KeyType* tree,
                           unsigned* counts,
                           TreeNodeIndex numNodes,
                           std::span<const KeyType> keys,
                           unsigned maxCount,
-                          bool useCountsAsGuess,
-                          execution::Gpu exec)
+                          bool useCountsAsGuess)
 {
     TreeNodeIndex popNodes[2];
 
@@ -122,9 +122,9 @@ void computeNodeCountsGpu(const KeyType* tree,
 }
 
 template void computeNodeCountsGpu(
-    const unsigned*, unsigned*, TreeNodeIndex, std::span<const unsigned>, unsigned, bool, execution::Gpu);
+    execution::Gpu, const unsigned*, unsigned*, TreeNodeIndex, std::span<const unsigned>, unsigned, bool);
 template void computeNodeCountsGpu(
-    const uint64_t*, unsigned*, TreeNodeIndex, std::span<const uint64_t>, unsigned, bool, execution::Gpu);
+    execution::Gpu, const uint64_t*, unsigned*, TreeNodeIndex, std::span<const uint64_t>, unsigned, bool);
 
 //! @brief this symbol is used to keep track of octree structure changes and detect convergence
 __device__ int rebalanceChangeCounter;
@@ -180,12 +180,12 @@ processNodes(const KeyType* oldTree, const TreeNodeIndex* nodeOps, TreeNodeIndex
 __global__ void resetRebalanceCounter() { rebalanceChangeCounter = 0; }
 
 template<class KeyType>
-TreeNodeIndex computeNodeOpsGpu(const KeyType* tree,
+TreeNodeIndex computeNodeOpsGpu(execution::Gpu exec,
+                                const KeyType* tree,
                                 TreeNodeIndex numNodes,
                                 const unsigned* counts,
                                 unsigned bucketSize,
-                                TreeNodeIndex* nodeOps,
-                                execution::Gpu exec)
+                                TreeNodeIndex* nodeOps)
 {
     resetRebalanceCounter<<<1, 1, 0, exec>>>();
 
@@ -204,17 +204,17 @@ TreeNodeIndex computeNodeOpsGpu(const KeyType* tree,
 }
 
 template TreeNodeIndex
-computeNodeOpsGpu(const unsigned*, TreeNodeIndex, const unsigned*, unsigned, TreeNodeIndex*, execution::Gpu);
+computeNodeOpsGpu(execution::Gpu, const unsigned*, TreeNodeIndex, const unsigned*, unsigned, TreeNodeIndex*);
 template TreeNodeIndex
-computeNodeOpsGpu(const uint64_t*, TreeNodeIndex, const unsigned*, unsigned, TreeNodeIndex*, execution::Gpu);
+computeNodeOpsGpu(execution::Gpu, const uint64_t*, TreeNodeIndex, const unsigned*, unsigned, TreeNodeIndex*);
 
 template<class KeyType>
-bool rebalanceTreeGpu(const KeyType* tree,
+bool rebalanceTreeGpu(execution::Gpu exec,
+                      const KeyType* tree,
                       TreeNodeIndex numNodes,
                       TreeNodeIndex newNumNodes,
                       const TreeNodeIndex* nodeOps,
-                      KeyType* newTree,
-                      execution::Gpu exec)
+                      KeyType* newTree)
 {
     constexpr unsigned nThreads = 512;
     processNodes<<<iceil(numNodes, nThreads), nThreads, 0, exec>>>(tree, nodeOps, numNodes, newTree);
@@ -230,9 +230,9 @@ bool rebalanceTreeGpu(const KeyType* tree,
 }
 
 template bool
-rebalanceTreeGpu(const unsigned*, TreeNodeIndex, TreeNodeIndex, const TreeNodeIndex*, unsigned*, execution::Gpu);
+rebalanceTreeGpu(execution::Gpu, const unsigned*, TreeNodeIndex, TreeNodeIndex, const TreeNodeIndex*, unsigned*);
 template bool
-rebalanceTreeGpu(const uint64_t*, TreeNodeIndex, TreeNodeIndex, const TreeNodeIndex*, uint64_t*, execution::Gpu);
+rebalanceTreeGpu(execution::Gpu, const uint64_t*, TreeNodeIndex, TreeNodeIndex, const TreeNodeIndex*, uint64_t*);
 
 template<class KeyType>
 __global__ void countSfcGapsKernel(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps)
@@ -242,14 +242,14 @@ __global__ void countSfcGapsKernel(const KeyType* tree, TreeNodeIndex numNodes, 
 }
 
 template<class KeyType>
-void countSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps, execution::Gpu exec)
+void countSfcGapsGpu(execution::Gpu exec, const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps)
 {
     constexpr unsigned nThreads = 512;
     countSfcGapsKernel<<<iceil(numNodes, nThreads), nThreads, 0, exec>>>(tree, numNodes, nodeOps);
 }
 
-template void countSfcGapsGpu(const uint32_t*, TreeNodeIndex, TreeNodeIndex*, execution::Gpu);
-template void countSfcGapsGpu(const uint64_t*, TreeNodeIndex, TreeNodeIndex*, execution::Gpu);
+template void countSfcGapsGpu(execution::Gpu, const uint32_t*, TreeNodeIndex, TreeNodeIndex*);
+template void countSfcGapsGpu(execution::Gpu, const uint64_t*, TreeNodeIndex, TreeNodeIndex*);
 
 template<class KeyType>
 __global__ void
@@ -262,13 +262,13 @@ fillSfcGapsKernel(const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeInd
 
 template<class KeyType>
 void fillSfcGapsGpu(
-    const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree, execution::Gpu exec)
+    execution::Gpu exec, const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree)
 {
     constexpr unsigned nThreads = 128;
     fillSfcGapsKernel<<<iceil(numNodes + 1, nThreads), nThreads, 0, exec>>>(tree, numNodes, nodeOps, newTree);
 }
 
-template void fillSfcGapsGpu(const uint32_t*, TreeNodeIndex, const TreeNodeIndex*, uint32_t*, execution::Gpu);
-template void fillSfcGapsGpu(const uint64_t*, TreeNodeIndex, const TreeNodeIndex*, uint64_t*, execution::Gpu);
+template void fillSfcGapsGpu(execution::Gpu, const uint32_t*, TreeNodeIndex, const TreeNodeIndex*, uint32_t*);
+template void fillSfcGapsGpu(execution::Gpu, const uint64_t*, TreeNodeIndex, const TreeNodeIndex*, uint64_t*);
 
 } // namespace cstone

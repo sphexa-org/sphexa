@@ -47,7 +47,8 @@ __global__ void rebalanceDecisionEssentialKernel(const KeyType* prefixes,
 }
 
 template<class KeyType>
-void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
+void rebalanceDecisionEssentialGpu(execution::Gpu exec,
+                                   const KeyType* prefixes,
                                    const TreeNodeIndex* childOffsets,
                                    const TreeNodeIndex* parents,
                                    const unsigned* counts,
@@ -56,8 +57,7 @@ void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
                                    KeyType focusEnd,
                                    unsigned bucketSize,
                                    TreeNodeIndex* nodeOps,
-                                   TreeNodeIndex numNodes,
-                                   execution::Gpu exec)
+                                   TreeNodeIndex numNodes)
 {
     constexpr unsigned numThreads = 256;
     rebalanceDecisionEssentialKernel<<<iceil(numNodes, numThreads), numThreads, 0, exec>>>(
@@ -66,9 +66,9 @@ void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
 
 #define REBA_DEC_ESS_GPU(KeyType)                                                                                      \
     template void rebalanceDecisionEssentialGpu(                                                                       \
-        const KeyType* prefixes, const TreeNodeIndex* childOffsets, const TreeNodeIndex* parents,                      \
+        execution::Gpu, const KeyType* prefixes, const TreeNodeIndex* childOffsets, const TreeNodeIndex* parents,      \
         const unsigned* counts, const uint8_t* macs, KeyType focusStart, KeyType focusEnd, unsigned bucketSize,        \
-        TreeNodeIndex* nodeOps, TreeNodeIndex numNodes, execution::Gpu)
+        TreeNodeIndex* nodeOps, TreeNodeIndex numNodes)
 REBA_DEC_ESS_GPU(uint32_t);
 REBA_DEC_ESS_GPU(uint64_t);
 
@@ -84,17 +84,20 @@ __global__ void macRefineDecisionKernel(const KeyType* prefixes,
     if (i >= numLeafNodes) { return; }
 
     if (i < focus.x || i >= focus.y) { nodeOps[i] = macRefineOp(prefixes[l2i[i]], macs[l2i[i]]); }
-    else { nodeOps[i] = 1; }
+    else
+    {
+        nodeOps[i] = 1;
+    }
 }
 
 template<class KeyType>
-void macRefineDecisionGpu(const KeyType* prefixes,
+void macRefineDecisionGpu(execution::Gpu exec,
+                          const KeyType* prefixes,
                           const uint8_t* macs,
                           const TreeNodeIndex* l2i,
                           TreeNodeIndex numLeafNodes,
                           TreeIndexPair focus,
-                          TreeNodeIndex* nodeOps,
-                          execution::Gpu exec)
+                          TreeNodeIndex* nodeOps)
 {
     constexpr unsigned numThreads = 256;
     macRefineDecisionKernel<<<iceil(numLeafNodes, numThreads), numThreads, 0, exec>>>(
@@ -102,9 +105,9 @@ void macRefineDecisionGpu(const KeyType* prefixes,
 }
 
 #define MAC_REF_DEC_GPU(KeyType)                                                                                       \
-    template void macRefineDecisionGpu(const KeyType* prefixes, const uint8_t* macs, const TreeNodeIndex* l2i,         \
-                                       TreeNodeIndex numLeafNodes, TreeIndexPair focus, TreeNodeIndex* nodeOps,        \
-                                       execution::Gpu)
+    template void macRefineDecisionGpu(execution::Gpu, const KeyType* prefixes, const uint8_t* macs,                   \
+                                       const TreeNodeIndex* l2i, TreeNodeIndex numLeafNodes, TreeIndexPair focus,      \
+                                       TreeNodeIndex* nodeOps)
 MAC_REF_DEC_GPU(uint32_t);
 MAC_REF_DEC_GPU(uint64_t);
 
@@ -139,11 +142,11 @@ __global__ void protectAncestorsKernel(const KeyType* prefixes,
 }
 
 template<class KeyType>
-bool protectAncestorsGpu(const KeyType* prefixes,
+bool protectAncestorsGpu(execution::Gpu exec,
+                         const KeyType* prefixes,
                          const TreeNodeIndex* parents,
                          TreeNodeIndex* nodeOps,
-                         TreeNodeIndex numNodes,
-                         execution::Gpu exec)
+                         TreeNodeIndex numNodes)
 {
     resetNodeOpSum<<<1, 1, 0, exec>>>();
 
@@ -158,8 +161,8 @@ bool protectAncestorsGpu(const KeyType* prefixes,
     return numNodesModify == 0;
 }
 
-template bool protectAncestorsGpu(const uint32_t*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex, execution::Gpu);
-template bool protectAncestorsGpu(const uint64_t*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex, execution::Gpu);
+template bool protectAncestorsGpu(execution::Gpu, const uint32_t*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex);
+template bool protectAncestorsGpu(execution::Gpu, const uint64_t*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex);
 
 __device__ int enforceKeyStatus_device;
 __global__ void resetEnforceKeyStatus() { enforceKeyStatus_device = static_cast<int>(ResolutionStatus::converged); }
@@ -177,13 +180,13 @@ __global__ void enforceKeysKernel(const KeyType* forcedKeys,
 }
 
 template<class KeyType>
-ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
+ResolutionStatus enforceKeysGpu(execution::Gpu exec,
+                                const KeyType* forcedKeys,
                                 TreeNodeIndex numForcedKeys,
                                 const KeyType* nodeKeys,
                                 const TreeNodeIndex* childOffsets,
                                 const TreeNodeIndex* parents,
-                                TreeNodeIndex* nodeOps,
-                                execution::Gpu exec)
+                                TreeNodeIndex* nodeOps)
 {
     resetEnforceKeyStatus<<<1, 1, 0, exec>>>();
     if (numForcedKeys)
@@ -199,9 +202,9 @@ ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
 }
 
 #define ENFORCE_KEYS_GPU(KeyType)                                                                                      \
-    template ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys, TreeNodeIndex numForcedKeys,                   \
+    template ResolutionStatus enforceKeysGpu(execution::Gpu, const KeyType* forcedKeys, TreeNodeIndex numForcedKeys,   \
                                              const KeyType* nodeKeys, const TreeNodeIndex* childOffsets,               \
-                                             const TreeNodeIndex* parents, TreeNodeIndex* nodeOps, execution::Gpu)
+                                             const TreeNodeIndex* parents, TreeNodeIndex* nodeOps)
 ENFORCE_KEYS_GPU(uint32_t);
 ENFORCE_KEYS_GPU(uint64_t);
 
@@ -229,12 +232,12 @@ __global__ void rangeCountKernel(const KeyType* leaves,
 }
 
 template<class KeyType>
-void rangeCountGpu(std::span<const KeyType> leaves,
+void rangeCountGpu(execution::Gpu exec,
+                   std::span<const KeyType> leaves,
                    std::span<const unsigned> counts,
                    std::span<const KeyType> leavesFocus,
                    std::span<const TreeNodeIndex> leavesFocusIdx,
-                   std::span<unsigned> countsFocus,
-                   execution::Gpu exec)
+                   std::span<unsigned> countsFocus)
 {
     constexpr unsigned numThreads = 64;
     unsigned numBlocks            = iceil(leavesFocusIdx.size(), numThreads);
@@ -245,9 +248,9 @@ void rangeCountGpu(std::span<const KeyType> leaves,
 }
 
 #define RANGE_COUNT_GPU(KeyType)                                                                                       \
-    template void rangeCountGpu(std::span<const KeyType> leaves, std::span<const unsigned> counts,                     \
+    template void rangeCountGpu(execution::Gpu, std::span<const KeyType> leaves, std::span<const unsigned> counts,     \
                                 std::span<const KeyType> leavesFocus, std::span<const TreeNodeIndex> leavesFocusIdx,   \
-                                std::span<unsigned> countsFocus, execution::Gpu)
+                                std::span<unsigned> countsFocus)
 RANGE_COUNT_GPU(uint32_t);
 RANGE_COUNT_GPU(uint64_t);
 

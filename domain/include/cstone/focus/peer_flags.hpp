@@ -51,7 +51,10 @@ std::vector<int> focusPeers(std::span<const TreeNodeIndex> globalOffsets,
 
         bool isPeer = false;
         if (focEnd - focStart > globEnd - globStart) { isPeer = true; }
-        else { isPeer = not std::includes(globStart, globEnd, focStart, focEnd); }
+        else
+        {
+            isPeer = not std::includes(globStart, globEnd, focStart, focEnd);
+        }
         if (isPeer) { peerFlags[rank] |= static_cast<int>(PeerMask::focus); }
     }
     return peerFlags;
@@ -67,23 +70,23 @@ std::vector<int> focusPeers(std::span<const TreeNodeIndex> globalOffsets,
  * @return               see focusPeers
  */
 template<class KeyType>
-std::vector<int> focusPeersAcc(std::span<const TreeNodeIndex> globalOffsets,
+std::vector<int> focusPeersAcc(execution::Cpu,
+                               std::span<const TreeNodeIndex> globalOffsets,
                                std::span<const TreeIndexPair> focusOffsets,
                                int myRank,
                                std::span<const KeyType> globalTree,
-                               std::span<const KeyType> focusTree,
-                               execution::Cpu)
+                               std::span<const KeyType> focusTree)
 {
     return focusPeers<KeyType>(globalOffsets, focusOffsets, myRank, globalTree, focusTree);
 }
 
 template<class KeyType>
-std::vector<int> focusPeersAcc(std::span<const TreeNodeIndex> globalOffsets,
+std::vector<int> focusPeersAcc(execution::Gpu exec,
+                               std::span<const TreeNodeIndex> globalOffsets,
                                std::span<const TreeIndexPair> focusOffsets,
                                int myRank,
                                std::span<const KeyType> globalTree,
-                               std::span<const KeyType> focusTree,
-                               execution::Gpu exec)
+                               std::span<const KeyType> focusTree)
 {
     std::vector<KeyType> globalTreeBackingBuffer;
     globalTreeBackingBuffer.resize(globalTree.size());

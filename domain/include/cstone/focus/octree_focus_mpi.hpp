@@ -83,7 +83,10 @@ public:
 
             reallocate(geoCentersAcc_, 1, 1.0);
         }
-        else { updateInternalTree<KeyType>(leaves_, octreeAcc_.data()); }
+        else
+        {
+            updateInternalTree<KeyType>(leaves_, octreeAcc_.data());
+        }
     }
 
     /*! @brief Update the tree structure according to previously calculated criteria (MAC and particle counts)
@@ -123,8 +126,8 @@ public:
         if constexpr (execution::HaveGpu<Exec>{})
         {
             converged = CombinedUpdate<KeyType>::updateFocusGpu(
-                octreeAcc_, leavesAcc_, bucketSize_, focusStart, focusEnd, enforcedKeys,
-                {rawPtr(countsAcc_), countsAcc_.size()}, {rawPtr(macsAcc_), macsAcc_.size()}, scratch, exec_);
+                exec_, octreeAcc_, leavesAcc_, bucketSize_, focusStart, focusEnd, enforcedKeys,
+                {rawPtr(countsAcc_), countsAcc_.size()}, {rawPtr(macsAcc_), macsAcc_.size()}, scratch);
 
             reallocateDestructive(leaves_, leavesAcc_.size(), allocGrowthRate_);
             memcpyD2HAsync(exec_, rawPtr(leavesAcc_), leavesAcc_.size(), rawPtr(leaves_));
@@ -137,7 +140,7 @@ public:
         }
 
         translateAssignment<KeyType>(assignment, leaves_, assignment_);
-        auto extPeers = focusPeersAcc<KeyType>(globDispl_, assignment_, myRank_, globalLeaves, leaves_, exec_);
+        auto extPeers = focusPeersAcc<KeyType>(exec_, globDispl_, assignment_, myRank_, globalLeaves, leaves_);
         auto intPeers = exchangePeers(extPeers, comm_);
         peerFlagsToList(extPeers, exteriorPeers_, PeerMask::focus);
         peerFlagsToList(intPeers, interiorPeers_, PeerMask::focus);
@@ -145,8 +148,8 @@ public:
 
         if constexpr (execution::HaveGpu<Exec>{})
         {
-            syncTreeletsGpu<KeyType>(exteriorPeers_, interiorPeers_, assignment_, leaves_, octreeAcc_, leavesAcc_,
-                                     treelets_, scratch, comm_, exec_);
+            syncTreeletsGpu<KeyType>(exec_, exteriorPeers_, interiorPeers_, assignment_, leaves_, octreeAcc_,
+                                     leavesAcc_, treelets_, scratch, comm_);
             downloadOctree();
         }
         else
@@ -161,7 +164,7 @@ public:
         extractPeerRanges(exteriorPeers_, myRank_, assignment_, peerRanges_);
         std::copy_n(assignment.numNodesPerRankConst().begin(), numRanks_, globNumNodes_.begin());
         std::copy_n(assignment.treeOffsetsConst().begin(), numRanks_ + 1, globDispl_.begin());
-        copy(treeletIdx_, treeletIdxAcc_, exec_);
+        copy(exec_, treeletIdx_, treeletIdxAcc_);
 
         /*! Store box for use in all property updates (counts, centers, MACs, etc) until updateTree() is called again.
          *  We store it here in order to disallow calling updateMacs with a changed bounding box, because changing
@@ -204,16 +207,16 @@ public:
         reallocate(numLeafNodes, allocGrowthRate_, leafCountsAcc_);
         if constexpr (execution::HaveGpu<Exec>{})
         {
-            computeNodeCountsGpu(rawPtr(leavesAcc_), rawPtr(leafCountsAcc_), numLeafNodes, particleKeys,
-                                 std::numeric_limits<unsigned>::max(), false, exec_);
+            computeNodeCountsGpu(exec_, rawPtr(leavesAcc_), rawPtr(leafCountsAcc_), numLeafNodes, particleKeys,
+                                 std::numeric_limits<unsigned>::max(), false);
 
             std::size_t numIndices = idxFromGlob.size();
             auto* d_indices        = util::packAllocBuffer<TreeNodeIndex>(scratch, {&numIndices, 1}, 64)[0].data();
             memcpyH2DAsync(exec_, idxFromGlob.data(), idxFromGlob.size(), d_indices);
 
             std::span<const KeyType> leavesAcc{rawPtr(leavesAcc_), leavesAcc_.size()};
-            rangeCountGpu<KeyType>(globalTreeLeaves, globalCounts, leavesAcc, {d_indices, idxFromGlob.size()},
-                                   {rawPtr(leafCountsAcc_), leafCountsAcc_.size()}, exec_);
+            rangeCountGpu<KeyType>(exec_, globalTreeLeaves, globalCounts, leavesAcc, {d_indices, idxFromGlob.size()},
+                                   {rawPtr(leafCountsAcc_), leafCountsAcc_.size()});
 
             // 1st upsweep with local and global data
             reallocateDestructive(countsAcc_, octreeAcc_.numNodes, allocGrowthRate_);
@@ -254,8 +257,8 @@ public:
     template<class T, class DevVec>
     void peerExchange(std::span<T> q, int tag, DevVec& s) const
     {
-        exchangeTreeletGeneral<T>(interiorPeers_, exteriorPeers_, treeletIdxAcc_.view(), assignment_,
-                                  leafToInternal(octreeAcc_), q, tag, s, comm_, exec_);
+        exchangeTreeletGeneral<T>(exec_, interiorPeers_, exteriorPeers_, treeletIdxAcc_.view(), assignment_,
+                                  leafToInternal(octreeAcc_), q, tag, s, comm_);
     }
 
     /*! @brief transfer quantities of leaf cells inside the focus into a global array
@@ -368,9 +371,12 @@ public:
         {
             if constexpr (execution::HaveGpu<Exec>{})
             {
-                upsweepCentersGpu(maxTreeLevel<KeyType>{}, levelRange.data(), childOffsets, centers, exec_);
+                upsweepCentersGpu(exec_, maxTreeLevel<KeyType>{}, levelRange.data(), childOffsets, centers);
             }
-            else { upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{}); }
+            else
+            {
+                upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{});
+            }
         };
 
         if constexpr (execution::HaveGpu<Exec>{})
@@ -383,8 +389,8 @@ public:
             fill(exec_, d_layout, d_layout + octree.numLeafNodes + 1, LocalIndex(0));
             inclusiveScan(exec_, rawPtr(leafCountsAcc_) + firstIdx, rawPtr(leafCountsAcc_) + lastIdx,
                           d_layout + firstIdx + 1);
-            computeLeafSourceCenterGpu(x, y, z, m, octree.leafToInternal + octree.numInternalNodes, octree.numLeafNodes,
-                                       d_layout, rawPtr(centersAcc_), exec_);
+            computeLeafSourceCenterGpu(exec_, x, y, z, m, octree.leafToInternal + octree.numInternalNodes,
+                                       octree.numLeafNodes, d_layout, rawPtr(centersAcc_));
             reallocate(scratch1, osz1, 1.0);
         }
         else
@@ -424,7 +430,7 @@ public:
         if constexpr (execution::HaveGpu<Exec>{})
         {
             reallocate(centersAcc_, octreeAcc_.numNodes, allocGrowthRate_);
-            moveCenters(rawPtr(geoCentersAcc_), octreeAcc_.numNodes, rawPtr(centersAcc_), exec_);
+            moveCenters(exec_, rawPtr(geoCentersAcc_), octreeAcc_.numNodes, rawPtr(centersAcc_));
         }
         else
         {
@@ -447,9 +453,12 @@ public:
     {
         if constexpr (execution::HaveGpu<Exec>{})
         {
-            setMacGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box_, exec_);
+            setMacGpu(exec_, rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box_);
         }
-        else { setMac<RealType, KeyType>(octreeAcc_.prefixes, centersAcc_, invTheta, box_); }
+        else
+        {
+            setMac<RealType, KeyType>(octreeAcc_.prefixes, centersAcc_, invTheta, box_);
+        }
     }
 
     /*! @brief Update the MAC criteria based on given expansion centers and effective inverse theta
@@ -539,8 +548,8 @@ public:
             fill(exec_, layout.data() + firstNode, layout.data() + firstNode + 1, LocalIndex{0});
             inclusiveScan(exec_, leafCountsAcc_.data() + firstNode, leafCountsAcc_.data() + lastNode,
                           layout.data() + firstNode + 1);
-            computeBoundingBoxGpu(x, y, z, h, layout.data(), firstNode, lastNode, Th(2 * searchExtFact),
-                                  searchCenters.data(), searchSizes.data(), exec_);
+            computeBoundingBoxGpu(exec_, x, y, z, h, layout.data(), firstNode, lastNode, Th(2 * searchExtFact),
+                                  searchCenters.data(), searchSizes.data());
 
             if (not accumulate) { fill(exec_, rawPtr(macsAcc_), rawPtr(macsAcc_) + macsAcc_.size(), uint8_t(0)); }
             findHalosGpu(let.prefixes, let.childOffsets, let.parents, geoCentersAcc_.data(), geoSizesAcc_.data(),
@@ -570,8 +579,8 @@ public:
     int computeLayout(std::span<LocalIndex> layoutAcc, std::span<LocalIndex> layout) const
     {
         constexpr bool useGpu = execution::HaveGpu<Exec>{};
-        computeNodeLayout({leafCountsAcc_.data(), leafCountsAcc().size()}, {macsAcc_.data(), macsAcc_.size()},
-                          leafToInternal(octreeAcc_), assignment_[myRank_], useGpu ? layoutAcc : layout, exec_);
+        computeNodeLayout(exec_, {leafCountsAcc_.data(), leafCountsAcc().size()}, {macsAcc_.data(), macsAcc_.size()},
+                          leafToInternal(octreeAcc_), assignment_[myRank_], useGpu ? layoutAcc : layout);
         if constexpr (useGpu)
         {
             memcpyD2HAsync(exec_, layoutAcc.data(), layoutAcc.size(), layout.data());
@@ -674,7 +683,10 @@ public:
     std::span<const KeyType> treeLeavesAcc() const
     {
         if constexpr (execution::HaveGpu<Exec>{}) { return {rawPtr(leavesAcc_), leavesAcc_.size()}; }
-        else { return leaves_; }
+        else
+        {
+            return leaves_;
+        }
     }
 
     //! @brief the cornerstone leaf cell particle counts
@@ -696,10 +708,13 @@ private:
 
         if constexpr (execution::HaveGpu<Exec>{})
         {
-            computeGeoCentersGpu(rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(geoCentersAcc_),
-                                 rawPtr(geoSizesAcc_), box_, exec_);
+            computeGeoCentersGpu(exec_, rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(geoCentersAcc_),
+                                 rawPtr(geoSizesAcc_), box_);
         }
-        else { nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_); }
+        else
+        {
+            nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_);
+        }
     }
 
     void downloadOctree()

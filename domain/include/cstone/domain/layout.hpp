@@ -142,21 +142,21 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
 
 /*! @brief calculate the location (offset) of each focus tree leaf node in the particle arrays
  *
+ * @param[in]  exec              execution policy
  * @param[in]  focusLeafCounts   node counts of the focus leaves, size numLeafNodes
  * @param[in]  flags             flag for each node, with a non-zero value if present as halo node, size numNodes
  * @param[in]  leafToInternal    maps leaf node index to internal node index
  * @param[in]  idx               first and last focus leaf idx of the assigned nodes on the executing rank
  * @param[out] layout            size numLeafNodes + 1. The first element is zero, the last element is
  *                               equal to the sum of all present (assigned+halo) node counts.
- * @param[in]  exec              execution policy
  */
 template<class Exec>
-void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
+void computeNodeLayout(Exec exec,
+                       std::span<const unsigned> focusLeafCounts,
                        std::span<const uint8_t> flags,
                        std::span<const TreeNodeIndex> leafToInternal,
                        TreeIndexPair idx,
-                       std::span<LocalIndex> layout,
-                       Exec exec)
+                       std::span<LocalIndex> layout)
 {
     if constexpr (execution::HaveGpu<Exec>{})
     {
@@ -182,17 +182,6 @@ void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
         }
         std::exclusive_scan(layout.begin(), layout.end(), layout.begin(), LocalIndex{0});
     }
-}
-
-template<bool useGpu>
-void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
-                       std::span<const uint8_t> flags,
-                       std::span<const TreeNodeIndex> leafToInternal,
-                       TreeIndexPair idx,
-                       std::span<LocalIndex> layout)
-{
-    using Acc = std::conditional_t<useGpu, execution::Gpu, execution::Cpu>;
-    computeNodeLayout(focusLeafCounts, flags, leafToInternal, idx, layout, Acc{});
 }
 
 //! @brief check halo discovery for sanity
@@ -239,11 +228,11 @@ struct SmallerElementSize
 
 //! @brief reorder with state-less function object
 template<class... Arrays1, class... Arrays2, class Exec>
-void gatherArrays(std::span<const LocalIndex> ordering,
+void gatherArrays(Exec exec,
+                  std::span<const LocalIndex> ordering,
                   LocalIndex outputOffset,
                   std::tuple<Arrays1&...> arrays,
-                  std::tuple<Arrays2&...> scratchBuffers,
-                  Exec exec)
+                  std::tuple<Arrays2&...> scratchBuffers)
 {
     auto reorderArray = [ordering, outputOffset, &scratchBuffers, exec](auto& array)
     {

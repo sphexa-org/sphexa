@@ -36,10 +36,10 @@ TEST(PrimitivesGpu, concatVector)
     StreamHolder stream;
 
     ConcatVector<int, DeviceVector> d_v;
-    cstone::copy(v, d_v, stream.exec());
+    cstone::copy(stream.exec(), v, d_v);
 
     ConcatVector<int> probe;
-    cstone::copy(d_v, probe, stream.exec());
+    cstone::copy(stream.exec(), d_v, probe);
 
     stream.sync();
 

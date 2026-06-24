@@ -35,7 +35,7 @@ TEST(FocusGpu, injectKeysGpu)
 
     StreamHolder stream;
 
-    injectKeysGpu(leaves, {mandatoryKeys.data(), mandatoryKeys.size()}, keyScratch, s1, s2, stream.exec());
+    injectKeysGpu(stream.exec(), leaves, {mandatoryKeys.data(), mandatoryKeys.size()}, keyScratch, s1, s2);
 
     stream.sync();
 

@@ -68,17 +68,15 @@ TEST(CsArrayGpu, computeNodeCountsGpu)
     *refCounts.rbegin() = 0;
 
     StreamHolder stream;
-    computeNodeCountsGpu(rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree),
-                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), false,
-                         stream.exec());
+    computeNodeCountsGpu(stream.exec(), rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree),
+                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), false);
     stream.sync();
     thrust::host_vector<unsigned> h_counts = d_counts;
     EXPECT_EQ(h_counts, refCounts);
 
     // check again, using previous counts as guesses
-    computeNodeCountsGpu(rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree),
-                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), true,
-                         stream.exec());
+    computeNodeCountsGpu(stream.exec(), rawPtr(d_cstree), rawPtr(d_counts), nNodes(d_cstree),
+                         {rawPtr(d_particleKeys), d_particleKeys.size()}, std::numeric_limits<unsigned>::max(), true);
     stream.sync();
     h_counts = d_counts;
     EXPECT_EQ(h_counts, refCounts);
@@ -96,7 +94,7 @@ TEST(CsArrayGpu, rebalanceDecision)
 
     StreamHolder stream;
     thrust::device_vector<TreeNodeIndex> nodeOps(tree.size());
-    computeNodeOpsGpu(rawPtr(tree), nNodes(tree), rawPtr(counts), bucketSize, rawPtr(nodeOps), stream.exec());
+    computeNodeOpsGpu(stream.exec(), rawPtr(tree), nNodes(tree), rawPtr(counts), bucketSize, rawPtr(nodeOps));
     stream.sync();
 
     // regular level-3 cornerstone tree with 512 leaves
@@ -120,7 +118,7 @@ TEST(CsArrayGpu, rebalanceTree)
 
     StreamHolder stream;
     bool converged =
-        rebalanceTreeGpu(rawPtr(tree), nNodes(tree), nNodes(newTree), rawPtr(nodeOps), rawPtr(newTree), stream.exec());
+        rebalanceTreeGpu(stream.exec(), rawPtr(tree), nNodes(tree), nNodes(newTree), rawPtr(nodeOps), rawPtr(newTree));
     stream.sync();
 
     // download tree from host
@@ -152,8 +150,8 @@ public:
         DeviceVector<KeyType> tmpTree;
         DeviceVector<TreeNodeIndex> workArray;
 
-        while (!updateOctreeGpu<KeyType>({rawPtr(d_codes), d_codes.size()}, bucketSize, d_tree, d_counts, tmpTree,
-                                         workArray, exec))
+        while (!updateOctreeGpu<KeyType>(exec, {rawPtr(d_codes), d_codes.size()}, bucketSize, d_tree, d_counts, tmpTree,
+                                         workArray))
             ;
     }
 
@@ -223,9 +221,9 @@ TEST(CsArrayGpu, distributedMockUp)
     std::cout << firstIdx << " " << lastIdx << std::endl;
 
     bool useCountsAsGuess = true;
-    computeNodeCountsGpu(fixt.d_tree.data(), fixt.d_counts.data(), nNodes(fixt.d_tree),
+    computeNodeCountsGpu(stream.exec(), fixt.d_tree.data(), fixt.d_counts.data(), nNodes(fixt.d_tree),
                          {fixt.d_codes.data() + firstIdx, fixt.d_codes.data() + lastIdx},
-                         std::numeric_limits<unsigned>::max(), useCountsAsGuess, stream.exec());
+                         std::numeric_limits<unsigned>::max(), useCountsAsGuess);
 
     DeviceVector<CodeType> d_counts_ref = d_counts_orig;
     thrust::fill(thrustExecPolicy(stream.exec()), d_counts_ref.data(), d_counts_ref.data() + firstNode, 0);

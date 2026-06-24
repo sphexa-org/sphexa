@@ -27,6 +27,7 @@ namespace cstone
 /*! @brief Based on global assignment, create the list of local particle index ranges to send to each rank
  *
  * @tparam    KeyType        32- or 64-bit integer
+ * @param[in] exec           execution policy
  * @param[in] assignment     global space curve assignment to ranks
  * @param[in] particleKeys   sorted list of SFC keys of local particles present on this rank, ON DEVICE
  * @param[-]  d_searchKeys   array of length assignment.numRanks() to store search keys, uninitialized, ON DEVICE
@@ -36,11 +37,11 @@ namespace cstone
  * Converts the global assignment particle keys ranges into particle indices with binary search
  */
 template<class KeyType>
-SendRanges createSendRangesGpu(const SfcAssignment<KeyType>& assignment,
+SendRanges createSendRangesGpu(execution::Gpu exec,
+                               const SfcAssignment<KeyType>& assignment,
                                std::span<const KeyType> particleKeys,
                                KeyType* d_searchKeys,
-                               LocalIndex* d_indices,
-                               execution::Gpu exec)
+                               LocalIndex* d_indices)
 {
     size_t numSearchKeys = assignment.numRanks() + 1;
     SendRanges ret(numSearchKeys);

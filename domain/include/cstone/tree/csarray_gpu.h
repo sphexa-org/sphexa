@@ -39,13 +39,13 @@ namespace cstone
  * @param[in]  exec              execution policy
  */
 template<class KeyType>
-extern void computeNodeCountsGpu(const KeyType* tree,
+extern void computeNodeCountsGpu(execution::Gpu exec,
+                                 const KeyType* tree,
                                  unsigned* counts,
                                  TreeNodeIndex numNodes,
                                  std::span<const KeyType> keys,
                                  unsigned maxCount,
-                                 bool useCountsAsGuess,
-                                 execution::Gpu exec);
+                                 bool useCountsAsGuess);
 
 /*! @brief split or fuse octree nodes based on node counts relative to bucketSize
  *
@@ -59,26 +59,26 @@ extern void computeNodeCountsGpu(const KeyType* tree,
  * @return                 number of nodes in the future rebalanced tree
  */
 template<class KeyType>
-extern TreeNodeIndex computeNodeOpsGpu(const KeyType* tree,
+extern TreeNodeIndex computeNodeOpsGpu(execution::Gpu exec,
+                                       const KeyType* tree,
                                        TreeNodeIndex numNodes,
                                        const unsigned* counts,
                                        unsigned bucketSize,
-                                       TreeNodeIndex* nodeOps,
-                                       execution::Gpu exec);
+                                       TreeNodeIndex* nodeOps);
 
 template<class KeyType>
-extern bool rebalanceTreeGpu(const KeyType* tree,
+extern bool rebalanceTreeGpu(execution::Gpu exec,
+                             const KeyType* tree,
                              TreeNodeIndex numNodes,
                              TreeNodeIndex newNumNodes,
                              const TreeNodeIndex* nodeOps,
-                             KeyType* newTree,
-                             execution::Gpu exec);
+                             KeyType* newTree);
 
 template<class KeyType>
-extern void countSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps, execution::Gpu exec);
+extern void countSfcGapsGpu(execution::Gpu exec, const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps);
 
 template<class KeyType>
 extern void fillSfcGapsGpu(
-    const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree, execution::Gpu exec);
+    execution::Gpu exec, const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree);
 
 } // namespace cstone

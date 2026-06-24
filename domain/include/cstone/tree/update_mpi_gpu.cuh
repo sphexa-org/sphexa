@@ -43,30 +43,31 @@ inline void sumCapped(void* inP, void* inoutP, int* len, MPI_Datatype*)
 
 /*! @brief global update step of an octree, including regeneration of the internal node structure
  *
- * @tparam        KeyType     unsigned 32- or 64-bit integer
- * @param[in]     keys        first particle key, on device
- * @param[in]     bucketSize  max number of particles per leaf
- * @param[out]    tree        output fully linked octree built on top of updated leaves
- * @param[inout]  d_csTree    leaf nodes
- * @param[out]    d_countsBuf leaf node particle counts
+ * @tparam        KeyType          unsigned 32- or 64-bit integer
+ * @param[in]     exec             execution policy
+ * @param[in]     keys             first particle key, on device
+ * @param[in]     bucketSize       max number of particles per leaf
+ * @param[out]    tree             output fully linked octree built on top of updated leaves
+ * @param[inout]  d_csTree         leaf nodes
+ * @param[out]    d_countsBuf      leaf node particle counts
  * @param[in]     expectOverflows  use sum-reduction that guards against integer overflow if true
  * @return                         maximum number of particles per cell capped to 2^32-1 or 0 if tree has max depth
  */
 template<class KeyType, class DevKeyVec, class DevCountVec>
-unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
+unsigned updateOctreeGlobalGpu(execution::Gpu exec,
+                               std::span<const KeyType> keys,
                                unsigned bucketSize,
                                OctreeData<KeyType, execution::Gpu>& tree,
                                DevKeyVec& d_csTree,
                                DevCountVec& d_countsBuf,
                                bool expectOverflows,
-                               MPI_Comm comm,
-                               execution::Gpu exec)
+                               MPI_Comm comm)
 {
-    auto newNumNodes = computeNodeOpsGpu(d_csTree.data(), nNodes(d_csTree), d_countsBuf.data(), bucketSize,
-                                         tree.childOffsets.data(), exec);
+    auto newNumNodes = computeNodeOpsGpu(exec, d_csTree.data(), nNodes(d_csTree), d_countsBuf.data(), bucketSize,
+                                         tree.childOffsets.data());
     reallocate(tree.prefixes, newNumNodes + 1, 1.01);
-    bool converged = rebalanceTreeGpu(d_csTree.data(), nNodes(d_csTree), newNumNodes, tree.childOffsets.data(),
-                                      tree.prefixes.data(), exec);
+    bool converged = rebalanceTreeGpu(exec, d_csTree.data(), nNodes(d_csTree), newNumNodes, tree.childOffsets.data(),
+                                      tree.prefixes.data());
     swap(d_csTree, tree.prefixes);
 
     tree.resize(newNumNodes);
@@ -76,8 +77,8 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
     auto [d_counts, d_countsRed] =
         util::packAllocBuffer(d_countsBuf, util::TypeList<unsigned, unsigned>{}, {numLeafNodes, numLeafNodes}, 128);
 
-    computeNodeCountsGpu(rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys, std::numeric_limits<unsigned>::max(),
-                         true, exec);
+    computeNodeCountsGpu(exec, rawPtr(d_csTree), d_counts.data(), numLeafNodes, keys,
+                         std::numeric_limits<unsigned>::max(), true);
 
     if (expectOverflows)
     {
@@ -101,7 +102,8 @@ unsigned updateOctreeGlobalGpu(std::span<const KeyType> keys,
 }
 
 template<class KeyType, class DevKeyVec, class DevCountVec>
-unsigned updateOctreeGlobal(std::span<const KeyType> keys,
+unsigned updateOctreeGlobal(execution::Cpu,
+                            std::span<const KeyType> keys,
                             unsigned bucketSize,
                             OctreeData<KeyType, execution::Cpu>& tree,
                             std::vector<KeyType>& leaves,
@@ -109,14 +111,14 @@ unsigned updateOctreeGlobal(std::span<const KeyType> keys,
                             std::vector<unsigned>& counts,
                             DevCountVec&,
                             bool,
-                            MPI_Comm comm,
-                            execution::Cpu)
+                            MPI_Comm comm)
 {
     return updateOctreeGlobal(keys, bucketSize, tree, leaves, counts, comm);
 }
 
 template<class KeyType, class DevKeyVec, class DevCountVec>
-unsigned updateOctreeGlobal(std::span<const KeyType> keys,
+unsigned updateOctreeGlobal(execution::Gpu exec,
+                            std::span<const KeyType> keys,
                             unsigned bucketSize,
                             OctreeData<KeyType, execution::Gpu>& tree,
                             std::vector<KeyType>&,
@@ -124,10 +126,9 @@ unsigned updateOctreeGlobal(std::span<const KeyType> keys,
                             std::vector<unsigned>&,
                             DevCountVec& d_counts,
                             bool firstCall,
-                            MPI_Comm comm,
-                            execution::Gpu exec)
+                            MPI_Comm comm)
 {
-    return updateOctreeGlobalGpu(keys, bucketSize, tree, d_csTree, d_counts, firstCall, comm, exec);
+    return updateOctreeGlobalGpu(exec, keys, bucketSize, tree, d_csTree, d_counts, firstCall, comm);
 }
 
 } // namespace cstone

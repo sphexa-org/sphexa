@@ -51,7 +51,7 @@ static void sendListMinimalGpu()
     StreamHolder stream;
 
     // note: key input needs to be sorted
-    auto sendList = createSendRangesGpu(assignment, d_keyView, rp(d_searchKeys), rp(d_indices), stream.exec());
+    auto sendList = createSendRangesGpu(stream.exec(), assignment, d_keyView, rp(d_searchKeys), rp(d_indices));
 
     stream.sync();
 

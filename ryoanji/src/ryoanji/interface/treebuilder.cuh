@@ -85,8 +85,8 @@ public:
             d_counts_ = std::vector<unsigned>{unsigned(numBodies)};
         }
 
-        while (!updateOctreeGpu<KeyType>({rawPtr(d_keys), d_keys.size()}, bucketSize_, d_tree_, d_counts_, tmpTree_,
-                                         workArray_, execution::gpuDefaultStream))
+        while (!updateOctreeGpu<KeyType>(execution::gpuDefaultStream, {rawPtr(d_keys), d_keys.size()}, bucketSize_,
+                                         d_tree_, d_counts_, tmpTree_, workArray_))
             ;
 
         octreeGpuData_.resize(nNodes(d_tree_));

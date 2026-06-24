@@ -38,7 +38,8 @@ namespace cstone
  * @param[in]    exec      execution policy
  */
 template<class Tc, class Th>
-extern void computeBoundingBoxGpu(const Tc* x,
+extern void computeBoundingBoxGpu(execution::Gpu exec,
+                                  const Tc* x,
                                   const Tc* y,
                                   const Tc* z,
                                   const Th* h,
@@ -47,8 +48,7 @@ extern void computeBoundingBoxGpu(const Tc* x,
                                   TreeNodeIndex last,
                                   Th scale,
                                   Vec3<Tc>* centers,
-                                  Vec3<Tc>* sizes,
-                                  execution::Gpu exec);
+                                  Vec3<Tc>* sizes);
 
 /*! @brief compute mass centers of leaf cells
  *
@@ -63,15 +63,15 @@ extern void computeBoundingBoxGpu(const Tc* x,
  * @param[in]  exec             execution policy
  */
 template<class Tc, class Tm, class Tf>
-extern void computeLeafSourceCenterGpu(const Tc* x,
+extern void computeLeafSourceCenterGpu(execution::Gpu exec,
+                                       const Tc* x,
                                        const Tc* y,
                                        const Tc* z,
                                        const Tm* m,
                                        const TreeNodeIndex* leafToInternal,
                                        TreeNodeIndex numLeaves,
                                        const LocalIndex* layout,
-                                       Vec4<Tf>* centers,
-                                       execution::Gpu exec);
+                                       Vec4<Tf>* centers);
 
 /*! @brief compute center of gravity for internal nodes with an upsweep
  *
@@ -83,39 +83,39 @@ extern void computeLeafSourceCenterGpu(const Tc* x,
  * @param[in]    exec          execution policy
  */
 template<class T>
-extern void upsweepCentersGpu(int numLevels,
+extern void upsweepCentersGpu(execution::Gpu exec,
+                              int numLevels,
                               const TreeNodeIndex* levelRange,
                               const TreeNodeIndex* childOffsets,
-                              SourceCenterType<T>* centers,
-                              execution::Gpu exec);
+                              SourceCenterType<T>* centers);
 
 //! @brief compute geometric node center and sizes based on node SFC keys
 template<class KeyType, class T>
-extern void computeGeoCentersGpu(const KeyType* prefixes,
+extern void computeGeoCentersGpu(execution::Gpu exec,
+                                 const KeyType* prefixes,
                                  TreeNodeIndex numNodes,
                                  Vec3<T>* centers,
                                  Vec3<T>* sizes,
-                                 const Box<T>& box,
-                                 execution::Gpu exec);
+                                 const Box<T>& box);
 
 //! @brief set @p centers to geometric node centers with Mac radius l * invTheta
 template<class KeyType, class T>
-extern void geoMacSpheresGpu(const KeyType* prefixes,
+extern void geoMacSpheresGpu(execution::Gpu exec,
+                             const KeyType* prefixes,
                              TreeNodeIndex numNodes,
                              SourceCenterType<T>* centers,
                              float invTheta,
-                             const Box<T>& box,
-                             execution::Gpu exec);
+                             const Box<T>& box);
 
 template<class KeyType, class T>
-extern void setMacGpu(const KeyType* prefixes,
+extern void setMacGpu(execution::Gpu exec,
+                      const KeyType* prefixes,
                       TreeNodeIndex numNodes,
                       Vec4<T>* macSpheres,
                       float invTheta,
-                      const Box<T>& box,
-                      execution::Gpu exec);
+                      const Box<T>& box);
 
 template<class T>
-extern void moveCenters(const Vec3<T>* src, TreeNodeIndex numNodes, Vec4<T>* dest, execution::Gpu exec);
+extern void moveCenters(execution::Gpu exec, const Vec3<T>* src, TreeNodeIndex numNodes, Vec4<T>* dest);
 
 } // namespace cstone

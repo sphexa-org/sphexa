@@ -184,8 +184,8 @@ public:
         auto [exchangeStart, keyView] =
             distribute(sorter, particleKeys, x, y, z, std::tuple_cat(std::tie(h), particleProperties), scratch);
         // x,y,z,h is already reordered here for use in halo discovery
-        gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
-                     std::tie(x, y, z, h), util::reverse(scratch), exec_);
+        gatherArrays(exec_, {sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
+                     std::tie(x, y, z, h), util::reverse(scratch));
 
         float invThetaEff = invThetaMinMac(theta_);
         if (firstCall_)
@@ -235,8 +235,8 @@ public:
 
         auto [exchangeStart, keyView] =
             distribute(sorter, particleKeys, x, y, z, std::tuple_cat(std::tie(h, m), particleProperties), scratch);
-        gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
-                     std::tie(x, y, z, h, m), util::reverse(scratch), exec_);
+        gatherArrays(exec_, {sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, 0,
+                     std::tie(x, y, z, h, m), util::reverse(scratch));
 
         if (firstCall_)
         {
@@ -324,8 +324,8 @@ public:
                    { global_.redoExchange(exDesc, ord, sendBuffer, receiveBuffer, rawPtr(a)...); }, arrays);
 
         lowMemReallocate(bufDesc_.size, allocGrowthRate_, arrays, std::tie(sendBuffer, receiveBuffer));
-        gatherArrays({ord + global_.numSendDown(), global_.numAssigned()}, bufDesc_.start, arrays,
-                     std::tie(sendBuffer, receiveBuffer), execution::cpu);
+        gatherArrays(execution::cpu, {ord + global_.numSendDown(), global_.numAssigned()}, bufDesc_.start, arrays,
+                     std::tie(sendBuffer, receiveBuffer));
     }
 
     //! @brief repeat the halo exchange pattern from the previous sync operation for a different set of arrays
@@ -333,7 +333,7 @@ public:
     void exchangeHalos(std::tuple<Vectors&...> arrays, SendBuffer& sendBuffer, ReceiveBuffer& receiveBuffer) const
     {
         std::apply([this](auto&... arrays) { this->checkSizesEqual(this->bufDesc_.size, arrays...); }, arrays);
-        this->halos_.exchangeHalos(arrays, sendBuffer, receiveBuffer, exec_);
+        this->halos_.exchangeHalos(exec_, arrays, sendBuffer, receiveBuffer);
     }
 
     //! @brief return the index of the first particle that's part of the local assignment
@@ -528,8 +528,8 @@ private:
         util::for_each_tuple(relocate, orderedBuffers);
 
         // reorder the unordered buffers
-        gatherArrays({sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()}, newBufDesc.start,
-                     unorderedBuffers, util::reverse(scratchBuffers), exec_);
+        gatherArrays(exec_, {sorter.getMap() + global_.postExchangeStart(bufDesc_), global_.numAssigned()},
+                     newBufDesc.start, unorderedBuffers, util::reverse(scratchBuffers));
 
         // newBufDesc is now the valid buffer description
         prevBufDesc_ = bufDesc_;

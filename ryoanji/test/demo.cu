@@ -198,10 +198,10 @@ void upsweep(int numSources, int numLeaves, int numLevels, float theta, const Tr
     cstone::syncGpu(cstone::execution::gpuDefaultStream);
     auto t0 = std::chrono::high_resolution_clock::now();
 
-    cstone::computeLeafSourceCenterGpu(x, y, z, m, leafToInternal, numLeaves, layout, centers,
-                                       cstone::execution::gpuDefaultStream);
-    cstone::upsweepCentersGpu(cstone::maxTreeLevel<KeyType>{}, levelRange, childOffsets, centers,
-                              cstone::execution::gpuDefaultStream);
+    cstone::computeLeafSourceCenterGpu(cstone::execution::gpuDefaultStream, x, y, z, m, leafToInternal, numLeaves,
+                                       layout, centers);
+    cstone::upsweepCentersGpu(cstone::execution::gpuDefaultStream, cstone::maxTreeLevel<KeyType>{}, levelRange,
+                              childOffsets, centers);
 
     computeLeafMultipoles(x, y, z, m, leafToInternal, numLeaves, layout, centers, Multipole);
     for (int level = numLevels - 1; level >= 1; level--)
@@ -209,7 +209,7 @@ void upsweep(int numSources, int numLeaves, int numLevels, float theta, const Tr
         upsweepMultipoles(levelRange[level], levelRange[level + 1], childOffsets, centers, Multipole);
     }
 
-    cstone::setMacGpu(prefixes, numSources, centers, 1.f / theta, box, cstone::execution::gpuDefaultStream);
+    cstone::setMacGpu(cstone::execution::gpuDefaultStream, prefixes, numSources, centers, 1.f / theta, box);
     cstone::syncGpu(cstone::execution::gpuDefaultStream);
 
     auto   t1 = std::chrono::high_resolution_clock::now();

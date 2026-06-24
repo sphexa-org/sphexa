@@ -69,12 +69,12 @@ void injectKeys(std::vector<KeyType, Alloc>& tree, std::span<const KeyType> keys
  * between consecutive keys.
  */
 template<class KeyType>
-void injectKeysGpu(DeviceVector<KeyType>& leaves,
+void injectKeysGpu(execution::Gpu exec,
+                   DeviceVector<KeyType>& leaves,
                    std::span<const KeyType> keys,
                    DeviceVector<KeyType>& keyScratch,
                    DeviceVector<TreeNodeIndex>& spanOps,
-                   DeviceVector<TreeNodeIndex>& spanOpsScan,
-                   execution::Gpu exec)
+                   DeviceVector<TreeNodeIndex>& spanOpsScan)
 {
     reallocate(leaves, leaves.size() + keys.size(), 1.0);
     memcpyD2DAsync(exec, keys.data(), keys.size(), leaves.data() + leaves.size() - keys.size());
@@ -85,7 +85,7 @@ void injectKeysGpu(DeviceVector<KeyType>& leaves,
     reallocateDestructive(spanOps, leaves.size(), 1.0);
     reallocateDestructive(spanOpsScan, leaves.size(), 1.0);
 
-    countSfcGapsGpu(leaves.data(), nNodes(leaves), spanOps.data(), exec);
+    countSfcGapsGpu(exec, leaves.data(), nNodes(leaves), spanOps.data());
     exclusiveScan(exec, spanOps.data(), spanOps.data() + leaves.size(), spanOpsScan.data());
 
     TreeNodeIndex numNodesGap;
@@ -93,7 +93,7 @@ void injectKeysGpu(DeviceVector<KeyType>& leaves,
     syncGpu(exec);
 
     reallocateDestructive(keyScratch, numNodesGap + 1, 1.0);
-    fillSfcGapsGpu(leaves.data(), nNodes(leaves), spanOpsScan.data(), keyScratch.data(), exec);
+    fillSfcGapsGpu(exec, leaves.data(), nNodes(leaves), spanOpsScan.data(), keyScratch.data());
     swap(leaves, keyScratch);
 }
 
