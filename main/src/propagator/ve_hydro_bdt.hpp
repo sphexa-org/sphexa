@@ -233,7 +233,7 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        fillMassHalos(get<"m">(d), first, last, domain.exec());
+        fillMassHalos(domain.exec(), get<"m">(d), first, last);
 
         updateSmoothingLengthIterative(activeRungs_, d, domain.box());
         findNeighborsSfc(activeRungs_, d, domain.box(), true);

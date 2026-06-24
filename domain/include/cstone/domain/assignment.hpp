@@ -42,7 +42,7 @@ namespace cstone
  * the assignment of that tree to the ranks and performs the necessary point-2-point data exchanges
  * to send all particles to their owning ranks.
  */
-template<class KeyType, class T, class Exec = execution::Cpu>
+template<class KeyType, class T, execution::Policy Exec = execution::Cpu>
 class GlobalAssignment
 {
     template<class ValueType>

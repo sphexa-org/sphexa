@@ -34,7 +34,7 @@ struct GroupView
 };
 
 //! @brief Describes groups of spatially close particles that can be traversed through octrees in groups
-template<class Exec>
+template<execution::Policy Exec>
 class GroupData
 {
     template<class T>

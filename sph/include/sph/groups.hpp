@@ -71,7 +71,7 @@ void computeGroups(size_t startIndex, size_t endIndex, Dataset& d, const cstone:
 }
 
 //! @brief extract the specified subgroup [first:last] indexed through @p index from @p grp into @p outGroup
-template<class Exec>
+template<cstone::execution::Policy Exec>
 inline void extractGroupGpu(const GroupView& grp, const cstone::LocalIndex* indices, cstone::LocalIndex first,
                             cstone::LocalIndex last, GroupData<Exec>& out)
 {

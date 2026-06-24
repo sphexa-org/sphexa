@@ -31,7 +31,7 @@ namespace cstone
 {
 
 //! @brief compute minimum and maximum of an array range
-template<class Execution, class T>
+template<execution::Policy Exec, class T>
 struct MinMax;
 
 template<class T>
@@ -74,13 +74,13 @@ struct MinMax<execution::Cpu, T>
  * For each periodic dimension, limits are fixed and will not be modified.
  * For non-periodic dimensions, limits are determined by global min/max.
  */
-template<class T, class Execution>
+template<class T, execution::Policy Exec>
 auto makeGlobalBox(const T* x,
                    const T* y,
                    const T* z,
                    size_t numElements,
                    MPI_Comm comm,
-                   Execution exec,
+                   Exec exec,
                    const Box<T>& previousBox = Box<T>(0, 1))
 {
     bool keepX = previousBox.boundaryX() == BoundaryType::periodic || previousBox.boundaryX() == BoundaryType::fixed;
@@ -91,7 +91,7 @@ auto makeGlobalBox(const T* x,
                              previousBox.ymax(), previousBox.zmin(), previousBox.zmax()};
     if (numElements)
     {
-        MinMax<Execution, T> op{exec};
+        MinMax<Exec, T> op{exec};
         std::tie(extrema[0], extrema[1]) =
             keepX ? std::make_tuple(previousBox.xmin(), previousBox.xmax()) : op(x, x + numElements);
         std::tie(extrema[2], extrema[3]) =

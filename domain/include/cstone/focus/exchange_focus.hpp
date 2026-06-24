@@ -307,7 +307,7 @@ void indexTreelets(std::span<const int> peerRanks,
 }
 
 //! @brief send cell properties, send to interior peers, recv from exterior peers
-template<class T, class DevVec, class Exec>
+template<execution::Policy Exec, class T, class DevVec>
 void exchangeTreeletGeneral(Exec exec,
                             std::span<const int> interiorPeers,
                             std::span<const int> exteriorPeers,

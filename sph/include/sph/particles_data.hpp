@@ -57,7 +57,7 @@ namespace sphexa
 
 namespace lt = ::sph::lt;
 
-template<class Execution>
+template<cstone::execution::Policy Execution>
 class ParticlesData : public cstone::FieldStates<ParticlesData<Execution>>
 {
 public:
@@ -415,8 +415,8 @@ void acquire(Dataset& d, const Fs&... fs)
 }
 
 // TODO move this to a better place
-template<class Vector, class Exec>
-void fillMassHalos(Vector& m, std::size_t first, std::size_t last, Exec exec)
+template<class Vector, cstone::execution::Policy Exec>
+void fillMassHalos(Exec exec, Vector& m, std::size_t first, std::size_t last)
 {
     using T = std::decay_t<Vector>::value_type;
     T mass;

@@ -125,7 +125,7 @@ void readFileAttributes(InitSettings& settings, const std::string& settingsFile,
 }
 
 //! @brief generate particle IDs at the beginning of the simulation initialization
-template<class Exec>
+template<cstone::execution::Policy Exec>
 void generateParticleIDs(Exec exec, std::span<uint64_t> id)
 {
     int rank = 0, numRanks = 0;

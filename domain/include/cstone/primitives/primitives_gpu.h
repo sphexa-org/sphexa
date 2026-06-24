@@ -69,7 +69,7 @@ template<class T, class IndexType>
 extern void gatherScatter(
     execution::Gpu exec, const IndexType* gmap, const IndexType* smap, size_t numElements, const T* src, T* buffer);
 
-template<class Execution, class T>
+template<execution::Policy Exec, class T>
 struct MinMax;
 
 template<class T>

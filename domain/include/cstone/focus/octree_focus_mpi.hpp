@@ -42,7 +42,7 @@ inline std::vector<int> exchangePeers(std::span<const int> exteriorPeers, MPI_Co
 }
 
 //! @brief A fully traversable octree with a local focus
-template<class KeyType, class RealType, class Exec = execution::Cpu>
+template<class KeyType, class RealType, execution::Policy Exec = execution::Cpu>
 class FocusedOctree
 {
     //! @brief A vector template that resides on the hardware specified as Exec
@@ -83,7 +83,10 @@ public:
 
             reallocate(geoCentersAcc_, 1, 1.0);
         }
-        else { updateInternalTree<KeyType>(leaves_, octreeAcc_.data()); }
+        else
+        {
+            updateInternalTree<KeyType>(leaves_, octreeAcc_.data());
+        }
     }
 
     /*! @brief Update the tree structure according to previously calculated criteria (MAC and particle counts)
@@ -254,8 +257,8 @@ public:
     template<class T, class DevVec>
     void peerExchange(std::span<T> q, int tag, DevVec& s) const
     {
-        exchangeTreeletGeneral<T>(exec_, interiorPeers_, exteriorPeers_, treeletIdxAcc_.view(), assignment_,
-                                  leafToInternal(octreeAcc_), q, tag, s, comm_);
+        exchangeTreeletGeneral(exec_, interiorPeers_, exteriorPeers_, treeletIdxAcc_.view(), assignment_,
+                               leafToInternal(octreeAcc_), q, tag, s, comm_);
     }
 
     /*! @brief transfer quantities of leaf cells inside the focus into a global array
@@ -370,7 +373,10 @@ public:
             {
                 upsweepCentersGpu(exec_, maxTreeLevel<KeyType>{}, levelRange.data(), childOffsets, centers);
             }
-            else { upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{}); }
+            else
+            {
+                upsweep(levelRange, childOffsets, centers, CombineSourceCenter<RealType>{});
+            }
         };
 
         if constexpr (execution::HaveGpu<Exec>{})
@@ -449,7 +455,10 @@ public:
         {
             setMacGpu(exec_, rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(centersAcc_), invTheta, box_);
         }
-        else { setMac<RealType, KeyType>(octreeAcc_.prefixes, centersAcc_, invTheta, box_); }
+        else
+        {
+            setMac<RealType, KeyType>(octreeAcc_.prefixes, centersAcc_, invTheta, box_);
+        }
     }
 
     /*! @brief Update the MAC criteria based on given expansion centers and effective inverse theta
@@ -674,7 +683,10 @@ public:
     std::span<const KeyType> treeLeavesAcc() const
     {
         if constexpr (execution::HaveGpu<Exec>{}) { return {rawPtr(leavesAcc_), leavesAcc_.size()}; }
-        else { return leaves_; }
+        else
+        {
+            return leaves_;
+        }
     }
 
     //! @brief the cornerstone leaf cell particle counts
@@ -699,7 +711,10 @@ private:
             computeGeoCentersGpu(exec_, rawPtr(octreeAcc_.prefixes), octreeAcc_.numNodes, rawPtr(geoCentersAcc_),
                                  rawPtr(geoSizesAcc_), box_);
         }
-        else { nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_); }
+        else
+        {
+            nodeFpCenters<KeyType>(octreeAcc_.prefixes, geoCentersAcc_.data(), geoSizesAcc_.data(), box_);
+        }
     }
 
     void downloadOctree()

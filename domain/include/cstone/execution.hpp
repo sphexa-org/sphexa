@@ -13,6 +13,7 @@
 
 #pragma once
 
+#include <concepts>
 #include <type_traits>
 
 // Forward declare CUDA/HIP stream type without including cuda_runtime.h
@@ -48,13 +49,16 @@ private:
     cudaStream_t stream;
 };
 
-template<class Execution>
-using HaveGpu = std::is_same<Execution, Gpu>;
-
 constexpr inline Cpu cpu;
 
 constexpr inline Gpu gpuStream(cudaStream_t stream) noexcept { return Gpu(stream); }
 
 constexpr inline Gpu gpuDefaultStream = gpuStream(0);
+
+template <class T>
+concept Policy = std::same_as<std::decay_t<T>, Cpu> || std::same_as<std::decay_t<T>, Gpu>;
+
+template<Policy Exec>
+using HaveGpu = std::is_same<std::decay_t<Exec>, Gpu>;
 
 } // namespace cstone::execution

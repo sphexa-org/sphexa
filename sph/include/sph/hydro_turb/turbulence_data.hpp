@@ -44,7 +44,7 @@
 namespace sph
 {
 
-template<class T, class Exec>
+template<class T, cstone::execution::Policy Exec>
 class TurbulenceData
 {
     using AccVector = std::conditional_t<cstone::execution::HaveGpu<Exec>{}, cstone::DeviceVector<T>, std::vector<T>>;

@@ -35,7 +35,7 @@
 namespace cstone
 {
 
-template<class KeyType, class T, class Exec = execution::Cpu>
+template<class KeyType, class T, execution::Policy Exec = execution::Cpu>
 class Domain
 {
     static_assert(std::is_unsigned<KeyType>{}, "SFC key type needs to be an unsigned integer\n");

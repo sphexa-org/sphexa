@@ -282,7 +282,7 @@ struct OctreeNsView
     float searchExtFactor{1.0};
 };
 
-template<class KeyType, class Exec>
+template<class KeyType, execution::Policy Exec>
 class OctreeData
 {
     //! @brief A vector template that resides on the hardware specified as Exec
@@ -368,7 +368,7 @@ void updateInternalTree(std::span<const KeyType> leaves, OctreeView<KeyType> o)
     std::copy(o.levelRangeSpan().begin(), o.levelRangeSpan().end(), o.d_levelRange);
 }
 
-template<class KeyType, class Exec>
+template<class KeyType, execution::Policy Exec>
 std::span<const TreeNodeIndex> leafToInternal(const OctreeData<KeyType, Exec>& octree)
 {
     return {rawPtr(octree.leafToInternal) + octree.numInternalNodes, size_t(octree.numLeafNodes)};

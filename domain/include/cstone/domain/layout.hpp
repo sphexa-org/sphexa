@@ -150,7 +150,7 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
  * @param[out] layout            size numLeafNodes + 1. The first element is zero, the last element is
  *                               equal to the sum of all present (assigned+halo) node counts.
  */
-template<class Exec>
+template<execution::Policy Exec>
 void computeNodeLayout(Exec exec,
                        std::span<const unsigned> focusLeafCounts,
                        std::span<const uint8_t> flags,
@@ -227,7 +227,7 @@ struct SmallerElementSize
 };
 
 //! @brief reorder with state-less function object
-template<class... Arrays1, class... Arrays2, class Exec>
+template<execution::Policy Exec, class... Arrays1, class... Arrays2>
 void gatherArrays(Exec exec,
                   std::span<const LocalIndex> ordering,
                   LocalIndex outputOffset,

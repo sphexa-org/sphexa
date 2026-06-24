@@ -39,7 +39,7 @@ namespace sphexa
 {
 
 //! @brief the place to store hydro, chemistry, nuclear and other simulation data
-template<class Execution>
+template<cstone::execution::Policy Execution>
 class SimulationData
 {
 public:
