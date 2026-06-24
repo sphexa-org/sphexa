@@ -298,7 +298,7 @@ struct GpuFullNbListNeighborhoodBuilder
             tree.searchExtFactor = 1;
         }
 
-        checkGpuErrors(cudaMemsetAsync(maxNeighbors.get(), 0, sizeof(unsigned)));
+        checkGpuErrors(cudaMemsetAsync(maxNeighbors.get(), 0, sizeof(unsigned), exec));
 
         resetTraversalCounters<<<1, 1, 0, exec>>>();
         gpuFullNbListNeighborhoodBuild<<<TravConfig::numBlocks(), TravConfig::numThreads, 0, exec>>>(
