@@ -24,7 +24,7 @@ namespace cstone
 
 class StreamHolder final
 {
-    cudaStream_t stream;
+    cudaStream_t stream = 0;
 
 public:
     StreamHolder() { checkGpuErrors(cudaStreamCreate(&stream)); }
