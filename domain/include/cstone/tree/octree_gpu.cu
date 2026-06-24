@@ -158,7 +158,6 @@ void buildOctreeGpu(execution::Gpu exec,
     getLevelRange<<<maxTreeLevel<KeyType>{} + 2, 1, 0, exec>>>(d.prefixes, numNodes, d.d_levelRange);
     checkGpuErrors(cudaMemcpyAsync(d.levelRange, d.d_levelRange, (maxTreeLevel<KeyType>{} + 2) * sizeof(TreeNodeIndex),
                                    cudaMemcpyDeviceToHost, exec));
-    syncGpu(exec);
 
     thrust::fill(thrustExecPolicy(exec), d.childOffsets, d.childOffsets + numNodes, 0);
     if (d.numInternalNodes)
