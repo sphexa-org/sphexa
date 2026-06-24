@@ -187,16 +187,16 @@ void buildOctreeGpu(execution::Gpu exec, const KeyType* cstoneTree, OctreeView<K
     TreeNodeIndex* valueBuf;
     char* cubTmp;
     uint64_t tmpStorage = sortByKeyTempStorage<KeyType, TreeNodeIndex>(d.numNodes);
-    checkGpuErrors(cudaMalloc(&keyBuf, sizeof(KeyType) * d.numNodes));
-    checkGpuErrors(cudaMalloc(&valueBuf, sizeof(TreeNodeIndex) * d.numNodes));
-    checkGpuErrors(cudaMalloc(&cubTmp, tmpStorage));
+    checkGpuErrors(cudaMallocAsync(&keyBuf, sizeof(KeyType) * d.numNodes, exec));
+    checkGpuErrors(cudaMallocAsync(&valueBuf, sizeof(TreeNodeIndex) * d.numNodes, exec));
+    checkGpuErrors(cudaMallocAsync(&cubTmp, tmpStorage, exec));
 
     buildOctreeGpu(exec, cstoneTree, d, {keyBuf, size_t(d.numNodes)}, {valueBuf, size_t(d.numNodes)},
                    {cubTmp, tmpStorage});
 
-    checkGpuErrors(cudaFree(keyBuf));
-    checkGpuErrors(cudaFree(valueBuf));
-    checkGpuErrors(cudaFree(cubTmp));
+    checkGpuErrors(cudaFreeAsync(keyBuf, exec));
+    checkGpuErrors(cudaFreeAsync(valueBuf, exec));
+    checkGpuErrors(cudaFreeAsync(cubTmp, exec));
 }
 
 template void buildOctreeGpu(execution::Gpu, const uint32_t*, OctreeView<uint32_t>);
