@@ -20,8 +20,6 @@ sph-build-cuda13-sm90-debug:
     - echo "CI_PROJECT_URL=$CI_PROJECT_URL"
     - echo "CI_COMMIT_SHORT_SHA=$CI_COMMIT_SHORT_SHA"
     - echo "CI_COMMIT_SHA=$CI_COMMIT_SHA"
-    - git log --oneline -n1
-    - git branch
     - 'uenv_dir=`echo $UENV_VIEW |cut -d: -f1`'
     - 'uenv_view=`echo $UENV_VIEW |cut -d: -f3`'
     - echo "uenv_dir=$uenv_dir uenv_view=$uenv_view / UENV_VIEW=$UENV_VIEW"

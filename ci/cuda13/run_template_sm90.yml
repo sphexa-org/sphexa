@@ -193,7 +193,7 @@ variables:
     - date
     - export OMP_NUM_THREADS=71
   script:
-    - bash ci/scripts/run_constants_comparison.sh "$APP_INSTALL_DIR/sphexa-cuda"
+    - ./ci/scripts/run_constants_comparison.sh "$APP_INSTALL_DIR/sphexa-cuda"
     - date
 
 .sph-compare-constants-cuda13-sm90-sphexa-cpu:
@@ -212,5 +212,5 @@ variables:
     - date
     - export OMP_NUM_THREADS=71
   script:
-    - bash ci/scripts/run_constants_comparison.sh "$APP_INSTALL_DIR/sphexa"
+    - ./ci/scripts/run_constants_comparison.sh "$APP_INSTALL_DIR/sphexa"
     - date
