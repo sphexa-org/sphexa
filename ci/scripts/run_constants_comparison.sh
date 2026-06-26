@@ -2,12 +2,13 @@
 
 set -euo pipefail
 
-if [ "$#" -ne 1 ]; then
-  echo "Usage: $0 <sphexa_executable>" >&2
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 <sphexa_executable> <pythonpath>" >&2
   exit 1
 fi
 
 binary_path="$1"
+export PYTHONPATH="$2"
 # Expand possible wildcards in binary path
 shopt -s nullglob
 matches=( $binary_path )
