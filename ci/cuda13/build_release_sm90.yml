@@ -29,7 +29,7 @@ sph-build-cuda13-sm90-release:
     - 'export SPACK_SYSTEM_CONFIG_PATH=$UENV_SPACK_CONFIG_PATH'
     - echo "SPACK_SYSTEM_CONFIG_PATH=$SPACK_SYSTEM_CONFIG_PATH"
     - pwd
-    - 'uenv-spack --uarch=gh200 --specs="py-numpy, sphexa@git.$CI_COMMIT_SHORT_SHA +disks +cuda +grackle cuda_arch=90 build_type=Release" --name=sphexa sphexa+spack'
+    - 'uenv-spack --uarch=gh200 --specs="py-numpy, sphexa@git.$CI_COMMIT_SHORT_SHA +cuda cuda_arch=90 build_type=Release" --name=sphexa sphexa+spack'
   script:
     - cd sphexa+spack
 #    - mkdir -p ./env/repo/packages/sphexa
