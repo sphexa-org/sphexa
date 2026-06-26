@@ -21,26 +21,26 @@ sph-run-cuda13-sm90-release-sphexa-cuda:
   extends: [.sph-run-cuda13-sm90-sphexa-cuda]
   needs:
     - job: sph-build-cuda13-sm90-release
-    - job: sph-test-venv-setup
-      artifacts: true
+#    - job: sph-test-venv-setup
+#      artifacts: true
 
 sph-run-cuda13-sm90-release-sphexa-cpu:
   extends: [.sph-run-cuda13-sm90-sphexa-cpu]
   needs:
     - job: sph-build-cuda13-sm90-release
-    - job: sph-test-venv-setup
-      artifacts: true
+#    - job: sph-test-venv-setup
+#      artifacts: true
 
 sph-compare-constants-cuda13-sm90-release-sphexa-cuda:
   extends: [.sph-compare-constants-cuda13-sm90-sphexa-cuda]
   needs:
     - job: sph-build-cuda13-sm90-release
-    - job: sph-test-venv-setup
-      artifacts: true
+#    - job: sph-test-venv-setup
+#      artifacts: true
 
 sph-compare-constants-cuda13-sm90-release-sphexa-cpu:
   extends: [.sph-compare-constants-cuda13-sm90-sphexa-cpu]
   needs:
     - job: sph-build-cuda13-sm90-release
-    - job: sph-test-venv-setup
-      artifacts: true
+#    - job: sph-test-venv-setup
+#      artifacts: true
