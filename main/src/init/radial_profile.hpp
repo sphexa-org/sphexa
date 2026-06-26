@@ -106,6 +106,7 @@ public:
     explicit RadialProfile(std::string initBlock, const InitSettings& testCaseSettings, std::string settingsFile,
                            IFileReader* reader)
         : glassBlock_(std::move(initBlock))
+        , ISimInitializer<Dataset>(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, testCaseSettings, settingsFile, reader);

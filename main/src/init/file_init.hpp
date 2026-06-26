@@ -100,13 +100,14 @@ public:
     explicit FileInit(const std::string& fname, int initStep_, IFileReader* reader)
         : h5_fname(fname)
         , initStep(initStep_)
+        , ISimInitializer<Dataset>(fname)
     {
         // Read file attributes and put them in settings_ such that they propagate to the new output after a restart
         readFileAttributes(settings_, h5_fname, reader, false);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int /* rank */, int /* numRanks */, size_t /* n */, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int /* rank */, int /* numRanks */, size_t /* n */,
+                                                     Dataset& simData, IFileReader* reader) const override
     {
         reader->setStep(h5_fname, initStep, FileMode::collective);
         auto box = restoreData(reader, simData);
@@ -128,6 +129,7 @@ public:
     explicit FileSplitInit(const std::string& fname, int numSplits_, IFileReader* reader)
         : h5_fname(fname)
         , numSplits(numSplits_)
+        , ISimInitializer<Dataset>(fname)
     {
         if (numSplits < 1)
         {
@@ -138,8 +140,8 @@ public:
         readFileAttributes(settings_, h5_fname, reader, false);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int /* rank */, int, size_t, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int /* rank */, int, size_t, Dataset& simData,
+                                                     IFileReader* reader) const override
     {
         constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
         reader->setStep(h5_fname, -1, FileMode::collective);

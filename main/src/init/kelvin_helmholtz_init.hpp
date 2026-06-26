@@ -139,13 +139,14 @@ class KelvinHelmholtzGlass : public ISimInitializer<Dataset>
 public:
     KelvinHelmholtzGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(initBlock)
+        , ISimInitializer<Dataset>(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, KelvinHelmholtzConstants(), settingsFile, reader);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                     IFileReader* reader) const override
     {
         using KeyType = typename Dataset::KeyType;
         using T       = typename Dataset::RealType;

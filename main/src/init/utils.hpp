@@ -132,6 +132,7 @@ void readFileAttributes(InitSettings& settings, const std::string& settingsFile,
         auto fileAttributes = reader->fileAttributes();
         for (const auto& attr : fileAttributes)
         {
+            if (std::find(idTagFsStrings.begin(), idTagFsStrings.end(), attr) != idTagFsStrings.end()) { continue; }
             int64_t sz = reader->fileAttributeSize(attr);
             if (sz == 1)
             {

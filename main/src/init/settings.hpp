@@ -41,6 +41,10 @@ namespace sphexa
 
 using InitSettings = std::map<std::string, double>;
 
+//! @brief the file attributes strings to set for subset output tagging selection
+inline constexpr std::array idTagFsStrings = {"id_selection_spheres", "id_selection_spheres_group_ids",
+                                              "id_selection_list", "id_selection_list_group_ids"};
+
 //! @brief write @p InitSettings as file attributes of a new file @p path
 inline void writeSettings(const InitSettings& settings, const std::string& path, IFileWriter* writer)
 {
