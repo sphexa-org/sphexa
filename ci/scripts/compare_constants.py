@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import numpy as np
 import sys
 from pathlib import Path
@@ -64,7 +66,7 @@ def main(
         above_tolerance_kind = np.empty((0,), dtype='<U3')
 
     if above_tolerance.shape[0] > 0:
-        print("Rows exceeding tolerances (row, col, ref, new, abs, rel, error type):")
+        print("Rows exceeding tolerances (row, col, ref, new, abs, rel, error type):")  # noqa:E501
         for entry, kind in zip(above_tolerance, above_tolerance_kind):
             row, col, ref_val, new_val, abs_val, rel_val = entry
             print((

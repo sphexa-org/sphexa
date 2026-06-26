@@ -3,7 +3,6 @@ variables:
 
 include:
   # NVIDIA/GH200:
-  - local: 'ci/test_venv_setup.yml'
   - local: 'ci/cuda13/build_debug_sm90.yml'
   - local: 'ci/cuda13/run_debug_sm90.yml'
   - local: 'ci/cuda13/build_release_sm90.yml'
