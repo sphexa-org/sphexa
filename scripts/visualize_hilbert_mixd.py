@@ -166,6 +166,7 @@ def main() -> None:
                 print(f"Processed {len(xs)} points...")
 
         # increaseKey position is counted from the left (0..max_level), while args.level is from the right.
+        # increaseKey is used to create the keys of the leaf nodes of the octree at the specified level.
         next_key = int(cstone_sfc.increaseKey(key, octree_level, bx, by, bz, args.key_type))
         if node_idx == total_nodes - 1:
             break

@@ -58,10 +58,6 @@ void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
     LocalIndex numParticles = 1000;
     unsigned bucketSize     = 64;
 
-    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD  = (axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
-                          axesBits[2] != maxTreeLevel<KeyType>{});
-
     RandomCoordinates<T, sfcKeyType<KeyType>> coords{numParticles, box, static_cast<std::size_t>(thisRank)};
 
     std::vector<KeyType> tree = makeRootNodeTree<KeyType>();

@@ -471,7 +471,7 @@ static void computeEssentialTreeMixD()
 
     focusStart = pad(KeyType(7), 3);
     focusEnd   = nodeRange<KeyType>(0) - 1;
-    // std::cout << "Focusing on octant 7, range [" << std::oct << focusStart << ", " << focusEnd << std::dec << "]\n";
+
     while (!tree.update(box, keys, focusStart, focusEnd, {})) {}
 
     {
@@ -547,21 +547,5 @@ TEST(FocusedOctree, extractFocusPeers)
     std::vector<int> ref{2, 4};
     EXPECT_EQ(probe, ref);
 }
-
-// TEST_F(MacRefinement, partialSurfaceMixD)
-// {
-//     Box<T> box(0, 1, 0, 0.015625, 0, 0.00390625);
-//     float invTheta              = sqrt(3) / 2 + 1e-6;
-//     TreeNodeIndex numNodesStart = octree.numLeafNodes;
-
-//     KeyType oldFStart =
-//         0; // TODO(iomaganaris): probably those need to be set properly but I don't know what surface means atm
-//     KeyType oldFEnd    = decodePlaceholderBit(KeyType(0107));
-//     KeyType focusStart = 0;
-//     KeyType focusEnd   = decodePlaceholderBit(KeyType(011));
-//     while (!macRefine(octree, leaves, centers, macs, oldFStart, oldFEnd, focusStart, focusEnd, invTheta, box)) {}
-
-//     EXPECT_EQ(nNodes(leaves), numNodesStart);
-// }
 
 } // namespace cstone

@@ -83,19 +83,14 @@ HOST_DEVICE_FUN inline Vec3<int> boxSeparation(IBox a, IBox b, Vec3<int> pbc)
     return {dx, dy, dz};
 }
 
-/*! @brief Check whether a coordinate box is fully contained in a Morton code range
+/*! @brief Check whether a coordinate box is fully contained in a SFC key range
  *
  * @tparam KeyType   32- or 64-bit unsigned integer
- * @param codeStart  Morton code range start
- * @param codeEnd    Morton code range end
+ * @param codeStart  SFC key range start
+ * @param codeEnd    SFC key range end
  * @param box        3D box with x,y,z integer coordinates in [0,2^maxTreeLevel<KeyType>{}-1]
- * @param bx         number of bits to encode in x dimension (this is based on the original box the codeStart and
- * codeEnd were encoded)
- * @param by         number of bits to encode in y dimension (this is based on the original box the codeStart and
- * codeEnd were encoded)
- * @param bz         number of bits to encode in z dimension (this is based on the original box the codeStart and
- * codeEnd were encoded)
- * @return           true if the box is fully contained within the specified Morton code range
+ * @param axesBits   per-axis bit depths {bx, by, bz} used to encode codeStart and codeEnd
+ * @return           true if the box is fully contained within the specified SFC key range
  */
 template<class KeyType>
 HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
@@ -135,10 +130,16 @@ containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box)
 /*! @brief Check whether a coordinate box is fully contained in a SFC key range
  *
  * @tparam KeyType   32- or 64-bit unsigned integer
- * @param codeStart  Morton code range start
- * @param codeEnd    Morton code range end
- * @param box        3D box with x,y,z integer coordinates in [0,2^maxTreeLevel<KeyType>{}-1]
- * @return           true if the box is fully contained within the specified Morton code range
+ * @param codeStart  SFC key range start
+ * @param codeEnd    SFC key range end
+ * @param center     floating point box center
+ * @param size       floating point box half-size
+ * @param box        coordinate bounding box
+ * @return           true if the box is fully contained within the specified SFC key range
+ *
+ * The maximum corner is expanded by one MixD grid unit along each axis before computing the high
+ * SFC key. This compensates for floating-point quantization when physical coordinates are converted
+ * back to integer grid cells and guarantees a conservative envelope that fully covers the input box.
  */
 template<class KeyType, class Tc>
 HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
@@ -158,7 +159,9 @@ containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Ve
 
     const auto axesBits = getBoxDimensionBits<Tc, KeyType, Box<Tc>>(box);
 
-    // increase maximum by a grid-unit to ensure we round up
+    // Add one grid unit to the maximum corner before quantization. Due to round-off the physical
+    // coordinate of boxMax can map to the integer cell just below the intended one; shifting it by
+    // a full grid unit makes the SFC envelope conservative (slightly larger, never smaller).
     const auto gridUnitX = box.lx() * (Tc(1) / (1u << axesBits[0]));
     const auto gridUnitY = box.ly() * (Tc(1) / (1u << axesBits[1]));
     const auto gridUnitZ = box.lz() * (Tc(1) / (1u << axesBits[2]));

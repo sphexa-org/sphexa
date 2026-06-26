@@ -43,7 +43,8 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
         KeyType lowestKey  = leaves[firstNode];
         KeyType highestKey = leaves[lastNode];
 
-        if (tS[0] == 0 && tS[0] == 0 && tS[0] == 0) { return; }
+        // A zero search size means this leaf does not have a valid MixD SFC key so it doesn't include any particles
+        if (tS[0] == 0 && tS[1] == 0 && tS[2] == 0) { return; }
 
         const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
 

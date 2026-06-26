@@ -80,17 +80,8 @@ void sortBySfcKey(std::vector<T>& x, std::vector<T>& y, std::vector<T>& z, cston
     assert(x.size() == y.size() && x.size() == z.size());
     size_t blockSize = x.size();
 
-    const auto axesBits = getBoxDimensionBits<T, KeyType, cstone::Box<T>>(globalBox);
-    const bool useMixD =
-        (axesBits[0] != cstone::maxTreeLevel<KeyType>{} || axesBits[1] != cstone::maxTreeLevel<KeyType>{} ||
-         axesBits[2] != cstone::maxTreeLevel<KeyType>{});
-
     std::vector<KeyType> keys(blockSize);
-    if (useMixD)
-    {
-        computeSfcMixDKeys(x.data(), y.data(), z.data(), cstone::sfcKindPointer(keys.data()), blockSize, globalBox);
-    }
-    else { computeSfcKeys(x.data(), y.data(), z.data(), cstone::sfcKindPointer(keys.data()), blockSize, globalBox); }
+    computeSfcKeys(x.data(), y.data(), z.data(), cstone::sfcKindPointer(keys.data()), blockSize, globalBox);
 
     std::vector<cstone::LocalIndex> sfcOrder(blockSize);
     std::iota(begin(sfcOrder), end(sfcOrder), cstone::LocalIndex(0));

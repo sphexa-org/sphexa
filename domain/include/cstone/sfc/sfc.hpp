@@ -286,28 +286,4 @@ void computeSfcKeys(const T* x, const T* y, const T* z, KeyType* particleKeys, s
     }
 }
 
-/*! @brief compute the mixed bit SFC keys for the input coordinate arrays
- *
- * @tparam     T          float or double
- * @tparam     KeyType    HilbertKey or MortonKey
- * @param[in]  x          coordinate input arrays
- * @param[in]  y
- * @param[in]  z
- * @param[out] codeBegin  output for SFC keys
- * @param[in]  n          number of particles, size of input and output arrays
- * @param[in]  box        coordinate bounding box
- * @param[in]  bx         number of bits to encode in x dimension
- * @param[in]  by         number of bits to encode in y dimension
- * @param[in]  bz         number of bits to encode in z dimension
- */
-template<class T, class KeyType>
-void computeSfcMixDKeys(const T* x, const T* y, const T* z, KeyType* particleKeys, size_t n, const Box<T>& box)
-{
-#pragma omp parallel for schedule(static)
-    for (std::size_t i = 0; i < n; ++i)
-    {
-        if (particleKeys[i] != removeKey<KeyType>::value) { particleKeys[i] = sfc3D<KeyType>(x[i], y[i], z[i], box); }
-    }
-}
-
 } // namespace cstone

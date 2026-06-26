@@ -311,7 +311,7 @@ using IBox = SimpleBox<int>;
 template<class T>
 using FBox = SimpleBox<T>;
 
-/*! @brief calculate floating point 3D center and radius of a and integer box and bounding box pair
+/*! @brief calculate floating point 3D center and radius of an integer box and bounding box pair
  *
  * @tparam T         float or double
  * @tparam KeyType   32- or 64-bit unsigned integer
@@ -328,6 +328,11 @@ constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox
     // smallest octree cell edge length in unit cube
     constexpr T uL = T(1.) / maxCoord;
 
+    // For mixed-dimension boxes, axesBits[i] can be smaller than maxTreeLevel for short axes.
+    // Integer coordinates along such axes are shifted left by (maxTreeLevel - axesBits[i]) bits
+    // during key encoding, so one integer unit covers 2^(maxTreeLevel - axesBits[i]) times the
+    // full-resolution physical length. halfUnitLength[i] scales the unit-cube length uL
+    // accordingly for each axis.
     T halfUnitLengthX = T(0.5) * uL * box.lx() * (1u << (maxTreeLevel<KeyType>{} - axesBits[0]));
     T halfUnitLengthY = T(0.5) * uL * box.ly() * (1u << (maxTreeLevel<KeyType>{} - axesBits[1]));
     T halfUnitLengthZ = T(0.5) * uL * box.lz() * (1u << (maxTreeLevel<KeyType>{} - axesBits[2]));
@@ -420,6 +425,19 @@ Box<T> limitBoxShrinking(const Box<T>& fittingBox, const Box<T>& previousBox, co
                   previousBox.boundaryZ()};
 }
 
+/*! @brief Compute per-axis SFC bit depths for mixed-dimension (MixD) boxes
+ *
+ * @tparam T         float or double
+ * @tparam KeyType   32- or 64-bit unsigned integer SFC key type
+ * @tparam BoxType   box type with x/y/z limits (e.g., Box<T> or IBox)
+ * @param box        bounding box
+ * @return           axis bit depths {bx, by, bz}
+ *
+ * Determines how many bits of the SFC key are effectively used along each spatial dimension.
+ * The longest box dimension is assigned the full key depth (@p maxTreeLevel<KeyType>), while
+ * shorter dimensions receive fewer bits according to the base-2 logarithm of the aspect ratio.
+ *
+ */
 template<typename T, typename KeyType, typename BoxType>
 HOST_DEVICE_FUN AxesBits getBoxDimensionBits(const BoxType& box)
 {

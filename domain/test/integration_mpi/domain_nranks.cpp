@@ -233,10 +233,6 @@ void testAssignmentShift(const Box<double>& box)
     unsigned bucketSizeFocus       = 8;
     float theta                    = 0.5;
 
-    const auto axesBits = getBoxDimensionBits<Real, KeyType, Box<Real>>(box);
-    const bool useMixD  = (axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
-                          axesBits[2] != maxTreeLevel<KeyType>{});
-
     RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, static_cast<std::size_t>(rank)};
 
     std::vector<Real> x(coordinates.x().begin(), coordinates.x().end());
@@ -301,10 +297,6 @@ void removeParticle(const Box<double>& box)
     unsigned bucketSize            = 64;
     unsigned bucketSizeFocus       = 8;
     float theta                    = 0.5;
-
-    const auto axesBits = getBoxDimensionBits<Real, KeyType, Box<Real>>(box);
-    const bool useMixD  = (axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
-                          axesBits[2] != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, static_cast<std::size_t>(rank)};
 
@@ -373,11 +365,6 @@ void testReapplySync(const Box<double>& box)
     unsigned bucketSize            = 1024;
     unsigned bucketSizeFocus       = 8;
     float theta                    = 0.5;
-
-    // Note: rank used as seed, so each rank will get different coordinates
-    const auto axesBits = getBoxDimensionBits<Real, KeyType, Box<Real>>(box);
-    const bool useMixD  = (axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
-                          axesBits[2] != maxTreeLevel<KeyType>{});
 
     RandomCoordinates<Real, sfcKeyType<KeyType>> coordinates{numParticlesPerRank, box, static_cast<std::size_t>(rank)};
 

@@ -46,10 +46,6 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<
     float theta                   = 10.0;
     float invThetaEff             = invThetaMinMac(theta);
 
-    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
-    const bool useMixD  = (axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
-                          axesBits[2] != maxTreeLevel<KeyType>{});
-
     // ******************************
     // identical data on all ranks
 
@@ -168,10 +164,6 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>
     unsigned bucketSizeLocal      = 16;
     float theta                   = 10.0;
     float invThetaEff             = invThetaMinMac(theta);
-
-    const auto axesBits = getBoxDimensionBits<T, KeyType>(box);
-    const bool useMixD  = (axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
-                          axesBits[2] != maxTreeLevel<KeyType>{});
 
     /*******************************/
     /* identical data on all ranks */
