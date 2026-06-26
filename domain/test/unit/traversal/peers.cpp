@@ -78,6 +78,16 @@ static std::vector<int> findPeersAll2All(int myRank,
     return ret;
 }
 
+/*! @brief Test MAC peer detection on a 64-leaf uniform grid with mixed-dimension support
+ *
+ * @tparam     KeyType          32-bit or 64-bit SFC key type
+ * @param[in]  rank             MPI rank (used as probe rank)
+ * @param[in]  box              simulation bounding box (supports non-cubic MixD boxes)
+ * @param[in]  theta            opening angle for MAC criterion
+ * @param[in]  refNumPeers      expected number of peers (unused, serves as documentation)
+ *
+ * Compares findPeersMac output against an all-to-all reference on a uniform 64-leaf tree.
+ */
 template<class KeyType>
 static void findMacPeers64grid(int rank, Box<double> box, float theta, int /*refNumPeers*/)
 {
@@ -123,6 +133,15 @@ TEST(Peers, findMacGrid64PBC)
     findMacPeers64grid<uint64_t>(0, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625, BoundaryType::periodic}, 1.1, 26);
 }
 
+/*! @brief Test peer rank detection on an irregular octree with mixed-dimension support
+ *
+ * @tparam     KeyType   32-bit or 64-bit SFC key type
+ * @param[in]  box       simulation bounding box (supports non-cubic MixD boxes)
+ *
+ * Builds an irregular octree from random Gaussian keys, computes SFC assignment for 50 ranks,
+ * and checks that both findPeersMac and findPeersMacStt agree with the all-to-all reference.
+ * Also verifies peer mutuality.
+ */
 template<class KeyType>
 static void findPeers(Box<double> box)
 {

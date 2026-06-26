@@ -210,6 +210,15 @@ TEST(FocusDomain, randomGaussianNeighborSumPbc)
     }
 }
 
+/*! @brief Test domain re-assignment after large particle displacement with mixed-dimension boxes
+ *
+ * @tparam     KeyType         32-bit or 64-bit SFC key type
+ * @tparam     sfcKeyType      SFC key wrapper template (e.g. SfcKind)
+ * @param[in]  box             simulation bounding box (supports non-cubic MixD boxes)
+ *
+ * Initial domain sync, shifts particles on rank 2, resyncs, and verifies that halo exchange
+ * correctly delivers all rank properties without gaps.
+ */
 template<class KeyType, template<class> class sfcKeyType>
 void testAssignmentShift(const Box<double>& box)
 {
@@ -270,6 +279,15 @@ TEST(FocusDomain, assignmentShift)
     testAssignmentShift<unsigned, SfcKind>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
 }
 
+/*! @brief Test particle removal in a CPU domain with mixed-dimension boxes
+ *
+ * @tparam     KeyType         32-bit or 64-bit SFC key type
+ * @tparam     sfcKeyType      SFC key wrapper template (e.g. SfcKind)
+ * @param[in]  box             simulation bounding box (supports non-cubic MixD boxes)
+ *
+ * Particles are assigned to a domain, one particle per rank is marked with removeKey and removed.
+ * Verifies the global count decreases by one per rank and removed IDs are gone.
+ */
 template<class KeyType, template<class> class sfcKeyType>
 void removeParticle(const Box<double>& box)
 {
@@ -333,6 +351,15 @@ TEST(FocusDomain, removeParticle)
     removeParticle<unsigned, SfcKind>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
 }
 
+/*! @brief Test domain::reapplySync for CPU property exchange with mixed-dimension boxes
+ *
+ * @tparam     KeyType         32-bit or 64-bit SFC key type
+ * @tparam     sfcKeyType      SFC key wrapper template (e.g. SfcKind)
+ * @param[in]  box             simulation bounding box (supports non-cubic MixD boxes)
+ *
+ * Particles are assigned, coordinates are modified, and a property array is exchanged via sync.
+ * reapplySync is used on a copy of the property array, and both are compared for correctness.
+ */
 template<class KeyType, template<class> class sfcKeyType>
 void testReapplySync(const Box<double>& box)
 {

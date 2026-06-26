@@ -49,6 +49,14 @@ std::vector<uint8_t> findHalosAll2All(std::span<const KeyType> nodeKeys,
     return flags;
 }
 
+/*! @brief Test halo discovery flags on a uniform tree, optionally with mixed-dimension boxes
+ *
+ * @tparam     KeyType   32-bit or 64-bit SFC key type
+ * @param[in]  useMixD   if true, use a non-cubic box (0,1)x(0,0.015625)x(0,0.00390625) and a 512-leaf tree
+ *
+ * Compares findHalos results against an all-to-all reference for both standard uniform and
+ * mixed-dimension configurations. Adjust expected surface node counts for MixD geometry.
+ */
 template<class KeyType>
 void findHalosFlags(bool useMixD = false)
 {

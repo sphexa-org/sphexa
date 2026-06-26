@@ -377,7 +377,12 @@ TEST(Upsweep, sumIrregularL3)
     upsweepSumIrregularL3<uint64_t>();
 }
 
-// function that takes as input a string which is an octal number and returns this number in decimal of type unsinged
+/*! @brief Convert an octal string into a decimal integer key value
+ *
+ * @tparam     KeyType   unsigned integer type (unsigned or uint64_t)
+ * @param[in]  octal     string representation of an octal number (e.g. "1003027")
+ * @return              decimal value of the octal string
+ */
 template<class KeyType>
 KeyType octalToDecimal(std::string octal)
 {
@@ -392,6 +397,15 @@ KeyType octalToDecimal(std::string octal)
     return decimal;
 }
 
+/*! @brief Build a cornerstone leaf tree from a single split key for MixD testing
+ *
+ * @tparam     KeyType   unsigned integer type (unsigned or uint64_t)
+ * @param[in]  key       octal key representing the split point (e.g. 0o1003027)
+ * @return              a cornerstone leaf tree spanning [0, key) and [key, range_max)
+ *
+ * Uses spanSfcRange to generate the leaf keys on both sides of the split, producing a tree
+ * suitable for testing mixed-dimension octree connectivity.
+ */
 template<class KeyType>
 std::vector<KeyType> create_octree_from_key(KeyType key)
 {

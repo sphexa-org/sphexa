@@ -148,6 +148,18 @@ TEST(GeneralFocusExchange, randomGaussian)
     generalExchangeRandomGaussian<uint64_t, float, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
 }
 
+/*! @brief Test focused octree source center exchange for mixed-dimension boxes
+ *
+ * @tparam     KeyType         32-bit or 64-bit SFC key type
+ * @tparam     T               float or double
+ * @tparam     sfcKeyType      SFC key wrapper template (e.g. SfcKind)
+ * @param[in]  thisRank        MPI rank
+ * @param[in]  numRanks        total number of MPI ranks
+ * @param[in]  box             simulation bounding box (supports non-cubic MixD boxes)
+ *
+ * Verifies that octree source centers from a distributed build match the reference computed
+ * from a common pool of Gaussian particle coordinates with global equal masses.
+ */
 template<class KeyType, class T, template<class> class sfcKeyType>
 static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>& box)
 {

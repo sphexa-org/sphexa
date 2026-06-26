@@ -154,6 +154,14 @@ TEST(BoxOverlap, pbcOverlaps)
     pbcOverlaps<uint64_t>();
 }
 
+/*! @brief Test containment of a halo box within a Morton key range with per-axis bit depths
+ *
+ * @tparam I          integer type for key range
+ * @param  axesBits   mixed-dimension bit depth per axis (controls effective maxCoord per dimension)
+ *
+ * Verifies that containedIn behaves correctly for both regular and periodic (PBC) halo boxes
+ * when dimensions are allowed to use different bit depths.
+ */
 template<class I>
 void haloBoxContainedIn(const AxesBits axesBits)
 {

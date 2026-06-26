@@ -30,6 +30,16 @@
 
 using namespace cstone;
 
+/*! @brief CUDA kernel to compute SFC (Hilbert/Morton) keys from integer coordinates
+ *
+ * @tparam     KeyType    32-bit or 64-bit SFC key type
+ * @param[out] keys       output array of SFC keys
+ * @param[in]  x          input integer x-coordinates
+ * @param[in]  y          input integer y-coordinates
+ * @param[in]  z          input integer z-coordinates
+ * @param[in]  numKeys    number of keys to compute
+ * @param[in]  axesBits   mixed-dimension bit depth per axis (for non-cubic boxes)
+ */
 template<class KeyType>
 __global__ void
 computeSfcKeysKernel(KeyType* keys, const unsigned* x, const unsigned* y, const unsigned* z, size_t numKeys, const AxesBits axesBits)
@@ -45,6 +55,16 @@ inline void computeSfcKeys(KeyType* keys, const unsigned* x, const unsigned* y, 
     computeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock>>>(keys, x, y, z, numKeys, axesBits);
 }
 
+/*! @brief CUDA kernel to decode SFC (Hilbert/Morton) keys into integer coordinates
+ *
+ * @tparam     KeyType    32-bit or 64-bit SFC key type
+ * @param[in]  keys       input array of SFC keys
+ * @param[out] x          output integer x-coordinates
+ * @param[out] y          output integer y-coordinates
+ * @param[out] z          output integer z-coordinates
+ * @param[in]  numKeys    number of keys to decode
+ * @param[in]  axesBits   mixed-dimension bit depth per axis (for non-cubic boxes)
+ */
 template<class KeyType>
 __global__ void decodeSfcKeysKernel(const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, size_t numKeys, const AxesBits axesBits)
 {
@@ -52,6 +72,16 @@ __global__ void decodeSfcKeysKernel(const KeyType* keys, unsigned* x, unsigned* 
     if (tid < numKeys) { util::tie(x[tid], y[tid], z[tid]) = decodeSfc(keys[tid], axesBits); }
 }
 
+/*! @brief Host wrapper to launch decodeSfcKeysKernel on the GPU
+ *
+ * @tparam     KeyType    32-bit or 64-bit SFC key type
+ * @param[in]  keys       device pointer to input SFC keys
+ * @param[out] x          device pointer to output x-coordinates
+ * @param[out] y          device pointer to output y-coordinates
+ * @param[out] z          device pointer to output z-coordinates
+ * @param[in]  numKeys    number of keys to decode
+ * @param[in]  axesBits   mixed-dimension bit depth per axis (for non-cubic boxes)
+ */
 template<class KeyType>
 inline void decodeSfcKeys(const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, size_t numKeys, const AxesBits& axesBits)
 {

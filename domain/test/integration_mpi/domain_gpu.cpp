@@ -125,6 +125,17 @@ TEST(DomainGpu, matchTreeCpu)
     randomGaussianAssignment<uint64_t, double>(rank, numRanks, Box<double>(0, 1, 0, 0.015625, 0, 0.00390625));
 }
 
+/*! @brief Test particle removal in a focused GPU domain with mixed-dimension boxes
+ *
+ * @tparam     KeyType         32-bit or 64-bit SFC key type
+ * @tparam     T               float or double
+ * @param[in]  rank            MPI rank
+ * @param[in]  numRanks        total number of MPI ranks
+ * @param[in]  box             simulation bounding box (supports non-cubic MixD boxes)
+ *
+ * Assigns particles, marks one particle per rank for removal using removeKey, resyncs, and verifies
+ * that the global particle count is reduced by exactly one per rank.
+ */
 template<class KeyType, class T>
 void focusDomainRemoveParticle(int rank, int numRanks, Box<T> box)
 {
@@ -192,6 +203,18 @@ TEST(FocusDomain, removeParticle)
     focusDomainRemoveParticle<uint64_t, double>(rank, numRanks, Box<double>(0, 1, 0, 0.015625, 0, 0.00390625));
 }
 
+/*! @brief Test domain::reapplySync for GPU property exchange with mixed-dimension boxes
+ *
+ * @tparam     KeyType         32-bit or 64-bit SFC key type
+ * @tparam     T               float or double
+ * @param[in]  rank            MPI rank
+ * @param[in]  numRanks        total number of MPI ranks
+ * @param[in]  box             simulation bounding box (supports non-cubic MixD boxes)
+ *
+ * Runs a full domain sync, modifies coordinates, then runs a second sync with a device-side property
+ * array. Applies reapplySync to a host-side copy of the property using the GPU sync ordering and
+ * verifies that the host-side and device-side properties match.
+ */
 template<class KeyType, class T>
 void domainReapplySync(int rank, int numRanks, Box<T> box)
 {
@@ -300,6 +323,18 @@ TEST(DomainGpu, Allgatherv)
     EXPECT_EQ(dstDl, ref);
 }
 
+/*! @brief Compare CPU and GPU gravity domain sync results for mixed-dimension boxes
+ *
+ * @tparam     KeyType         32-bit or 64-bit SFC key type
+ * @tparam     T               float or double
+ * @param[in]  thisRank        MPI rank
+ * @param[in]  numRanks        total number of MPI ranks
+ * @param[in]  box             simulation bounding box (supports non-cubic MixD boxes)
+ *
+ * Uses a common Gaussian coordinate pool across all ranks. Compares CPU and GPU domain layouts and
+ * source centers after syncGrav and halo exchange, and verifies that GPU particle coordinates,
+ * smoothing lengths, and masses match the original input slice.
+ */
 template<class KeyType, class T>
 void randomGaussianGrav(int thisRank, int numRanks, Box<T> box)
 {

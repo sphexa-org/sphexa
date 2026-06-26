@@ -74,6 +74,13 @@ void validateBox(const std::array<double, 6>& box)
 
 } // namespace
 
+/*! @brief Nanobind module definition for cstone_sfc Python bindings
+ *
+ * @param m  nanobind module handle
+ *
+ * Provides Python bindings for cstone mixed-dimension (MixD) Hilbert curve and box geometry helpers,
+ * including key encoding/decoding, SFC box queries, and dimension bit calculation.
+ */
 NB_MODULE(cstone_sfc, m)
 {
     m.doc() = "Python bindings for cstone MixD Hilbert and box geometry helpers";
