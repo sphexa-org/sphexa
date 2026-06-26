@@ -39,7 +39,7 @@ void haloExchangeGpu(int epoch,
                      execution::Gpu exec,
                      Arrays... arrays);
 
-template<class KeyType, execution::Policy Exec>
+template<class KeyType>
 class Halos
 {
 public:
