@@ -4,6 +4,7 @@ include:
 variables:
   TEST_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/sbin'
   APP_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/bin'
+  PYTHONPATH: '$PYTHONPATH:sphexa+spack/store/env/sphexa/lib/python3.14/site-packages'
 
 .sph-run-cuda13-sm90-1rank:
   stage: sphexa_run

@@ -54,7 +54,7 @@ ics=(
   kelvin-helmholtz
 )
 
-# Exaclty conserved observables to be compared by absolute value (not relative error) in compare_constants.py.
+# Exactly conserved observables to be compared by absolute value (not relative error) in compare_constants.py.
 declare -A abs_columns_for_ic=(
   # TimeAndEnergy: egrav/linmom/angmom (if not changed in CLI, gravConstant = 0.0)
   [sedov]="6,7,8"
