@@ -31,7 +31,7 @@ sph-build-cuda13-sm90-debug:
     - pwd
     - 'uenv-spack --uarch=gh200 --specs="py-numpy, sphexa@git.$CI_COMMIT_SHORT_SHA +disks +cuda +grackle cuda_arch=90 build_type=Debug" --name=sphexa sphexa+spack'
   script:
-#    - cd sphexa+spack
+    - cd sphexa+spack
 #    - mkdir -p ./env/repo/packages/sphexa
 #    # match pull request's branch:
 #    - 'sed -e "s/ci_fake_version/$CI_COMMIT_SHORT_SHA/" -e "s/ci_sha/$CI_COMMIT_SHA/" -e "s!ci_git!$CI_PROJECT_URL.git!" ../ci/scripts/package.py > env/repo/packages/sphexa/package.py'
