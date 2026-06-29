@@ -130,10 +130,13 @@ concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
                                                                   const float* h)
 {
     nb.build(exec, tree, box, totalBodies, groups, x, y, z, h);
-    {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h).stats()}->std::same_as<Statistics>;
-    {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
-         .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble)}
-        ->std::same_as<void>;
+    {
+        nb.build(exec, tree, box, totalBodies, groups, x, y, z, h).stats()
+    } -> std::same_as<Statistics>;
+    {
+        nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
+            .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble)
+    } -> std::same_as<void>;
 };
 
 } // namespace detail

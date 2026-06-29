@@ -126,8 +126,8 @@ void exchangeParticlesGpu(execution::Gpu exec,
         size_t receiveCountBytes = receiveCountTransfer * sizeof(TransferType);
         reallocateBytes(recvScratchBuffer, receiveCountBytes, allocGrowthRate);
         char* receiveBuffer = reinterpret_cast<char*>(rawPtr(recvScratchBuffer));
-        mpiRecvGpuDirect(exec, reinterpret_cast<TransferType*>(receiveBuffer), receiveCountTransfer, receiveRank, domExTag,
-                         &status, comm);
+        mpiRecvGpuDirect(exec, reinterpret_cast<TransferType*>(receiveBuffer), receiveCountTransfer, receiveRank,
+                         domExTag, &status, comm);
 
         size_t receiveCount;
         receiveBuffer = decodeSendCount(exec, receiveBuffer, &receiveCount, alignment);
@@ -135,10 +135,7 @@ void exchangeParticlesGpu(execution::Gpu exec,
 
         LocalIndex receiveLocation = receiveStart;
         if (record) { receiveLog.addExchange(receiveRank, receiveStart); }
-        else
-        {
-            receiveLocation = receiveLog.lookup(receiveRank);
-        }
+        else { receiveLocation = receiveLog.lookup(receiveRank); }
 
         auto packTuple = util::packBufferPtrs<alignment>(receiveBuffer, receiveCount, (arrays + receiveLocation)...);
         auto scatterRanges = [exec, receiveCount](auto arrayPair)
