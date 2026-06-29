@@ -82,15 +82,12 @@ void copy(execution::Gpu exec, const ConcatVector<T, AccVec1, A>& src, ConcatVec
     {
         memcpyD2HAsync(exec, src.data().data(), src.data().size(), dstBuffer);
     }
-    else if constexpr (IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{})
+    else
     {
+        static_assert(IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{});
         memcpyD2DAsync(exec, src.data().data(), src.data().size(), dstBuffer);
     }
-    else if constexpr (!IsDeviceVector<AccVec1<T>>{} && !IsDeviceVector<AccVec2<T>>{})
-    {
-        std::copy_n(src.data().data(), src.data().size(), dstBuffer);
-    }
-    if constexpr (IsDeviceVector<AccVec1<T>>{} || IsDeviceVector<AccVec2<T>>{}) { syncGpu(exec); }
+    syncGpu(exec);
 }
 
 } // namespace cstone
