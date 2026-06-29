@@ -117,32 +117,29 @@ struct ConceptTestInteraction
     }
 };
 
-} // namespace detail
-
 template<class T, class Exec>
-concept NeighborhoodBuilderWithExec = execution::Policy<Exec> && requires(Exec exec,
-                                                                          T nb,
-                                                                          OctreeNsView<double, unsigned> tree,
-                                                                          Box<double> box,
-                                                                          LocalIndex totalBodies,
-                                                                          GroupView groups,
-                                                                          const double* x,
-                                                                          const double* y,
-                                                                          const double* z,
-                                                                          const float* h)
+concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
+                                                                  T nb,
+                                                                  OctreeNsView<double, unsigned> tree,
+                                                                  Box<double> box,
+                                                                  LocalIndex totalBodies,
+                                                                  GroupView groups,
+                                                                  const double* x,
+                                                                  const double* y,
+                                                                  const double* z,
+                                                                  const float* h)
 {
     nb.build(exec, tree, box, totalBodies, groups, x, y, z, h);
-    {
-        nb.build(exec, tree, box, totalBodies, groups, x, y, z, h).stats()
-    } -> std::same_as<Statistics>;
-    {
-        nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
-            .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble)
-    } -> std::same_as<void>;
+    {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h).stats()}->std::same_as<Statistics>;
+    {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
+         .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble)}
+        ->std::same_as<void>;
 };
+
+} // namespace detail
 
 template<class T>
 concept NeighborhoodBuilder =
-    NeighborhoodBuilderWithExec<T, execution::Cpu> || NeighborhoodBuilderWithExec<T, execution::Gpu>;
+    detail::NeighborhoodBuilder<T, execution::Cpu> || detail::NeighborhoodBuilder<T, execution::Gpu>;
 
 } // namespace cstone::ijloop
