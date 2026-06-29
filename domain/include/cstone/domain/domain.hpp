@@ -658,7 +658,7 @@ private:
 
     GlobalAssignment<KeyType, T, Exec> global_;
 
-    Halos<KeyType, Exec> halos_;
+    Halos<KeyType> halos_;
 
     bool firstCall_{true};
 };
