@@ -102,11 +102,4 @@ void sequence(execution::Cpu exec, LocalIndex first, LocalIndex n, BufferType& b
     sequence(exec, seq + first, seq + first + n, first);
 }
 
-template<class KeyType, class ValueType>
-void sortByKey(execution::Cpu, std::span<KeyType> keys, std::span<ValueType> values)
-{
-    assert(keys.size() == values.size());
-    sort_by_key(keys.begin(), keys.end(), values.begin());
-}
-
 } // namespace cstone

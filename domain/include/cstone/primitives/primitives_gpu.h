@@ -154,9 +154,6 @@ inline void sortByKey(execution::Gpu exec,
     reallocate(valueBuf, s2, 1.0);
 }
 
-template<class KeyType, class ValueType>
-extern void sortByKey(execution::Gpu exec, KeyType* first, KeyType* last, ValueType* values);
-
 template<class IndexType, class SumType>
 extern void
 exclusiveScan(execution::Gpu exec, const IndexType* first, const IndexType* last, SumType* output, SumType init);

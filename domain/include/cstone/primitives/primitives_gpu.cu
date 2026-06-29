@@ -366,18 +366,6 @@ SORT_BY_KEY_GPU_DB(uint64_t, int);
 SORT_BY_KEY_GPU_DB(uint64_t, uint64_t);
 SORT_BY_KEY_GPU_DB(float, unsigned);
 
-template<class KeyType, class ValueType>
-void sortByKey(execution::Gpu exec, KeyType* first, KeyType* last, ValueType* values)
-{
-    thrust::sort_by_key(thrustExecPolicy(exec), first, last, values);
-}
-
-template void sortByKey(execution::Gpu, unsigned*, unsigned*, unsigned*);
-template void sortByKey(execution::Gpu, unsigned*, unsigned*, int*);
-template void sortByKey(execution::Gpu, uint64_t*, uint64_t*, unsigned*);
-template void sortByKey(execution::Gpu, uint64_t*, uint64_t*, int*);
-template void sortByKey(execution::Gpu, uint64_t*, uint64_t*, uint64_t*);
-
 template<class IndexType, class SumType>
 void exclusiveScan(execution::Gpu exec, const IndexType* first, const IndexType* last, SumType* output, SumType init)
 {
