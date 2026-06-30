@@ -93,7 +93,7 @@ public:
         std::vector<KeyType> keys = makeRandomGaussianKeys<KeyType>(numParticles);
         auto [tree, counts]       = computeOctree<KeyType>(keys, 4);
 
-        OctreeData<KeyType, CpuTag> octree;
+        OctreeData<KeyType, execution::Cpu> octree;
         octree.resize(nNodes(tree));
         updateInternalTree<KeyType>(tree, octree.data());
 

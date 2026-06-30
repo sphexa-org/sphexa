@@ -60,7 +60,7 @@ void neighborCheck(const Coordinates& coords, T radius, const Box<T>& box)
 
     unsigned bucketSize   = 64;
     auto [csTree, counts] = computeOctree<KeyType>(coords.particleKeys(), bucketSize);
-    OctreeData<KeyType, CpuTag> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     octree.resize(nNodes(csTree));
     updateInternalTree<KeyType>(csTree, octree.data());
 

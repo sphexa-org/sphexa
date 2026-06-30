@@ -66,7 +66,7 @@ static void computeSourceCenter()
     RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box);
 
     auto [csTree, csCounts] = computeOctree<KeyType>(coords.particleKeys(), csBucketSize);
-    OctreeData<KeyType, CpuTag> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     octree.resize(nNodes(csTree));
     updateInternalTree<KeyType>(csTree, octree.data());
 

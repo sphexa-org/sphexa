@@ -62,7 +62,7 @@ struct CombinedUpdate
      * @param[in] macs            MAC pass/fail results for each node, length = tree_.numTreeNodes()
      * @return                    true if the tree structure did not change
      */
-    static bool updateFocus(OctreeData<KeyType, CpuTag>& tree,
+    static bool updateFocus(OctreeData<KeyType, execution::Cpu>& tree,
                             std::vector<KeyType>& leaves,
                             unsigned bucketSize,
                             KeyType focusStart,
@@ -135,7 +135,8 @@ struct CombinedUpdate
      * @return                    true if the tree structure did not change
      */
     template<class Vector>
-    static bool updateFocusGpu(OctreeData<KeyType, GpuTag>& tree,
+    static bool updateFocusGpu(execution::Gpu exec,
+                               OctreeData<KeyType, execution::Gpu>& tree,
                                DeviceVector<KeyType>& leaves,
                                unsigned bucketSize,
                                KeyType focusStart,
@@ -152,42 +153,44 @@ struct CombinedUpdate
 
         // take op decision per node
         std::span<TreeNodeIndex> nodeOpsAll(rawPtr(tree.internalToLeaf), numNodes);
-        rebalanceDecisionEssentialGpu(rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(tree.parents),
+        rebalanceDecisionEssentialGpu(exec, rawPtr(tree.prefixes), rawPtr(tree.childOffsets), rawPtr(tree.parents),
                                       counts.data(), macs.data(), focusStart, focusEnd, bucketSize, nodeOpsAll.data(),
                                       numNodes);
 
         auto status = ResolutionStatus::converged;
 
-        status         = enforceKeysGpu(mandatoryKeys.data(), mandatoryKeys.size(), rawPtr(tree.prefixes),
-                                        rawPtr(tree.childOffsets), rawPtr(tree.parents), nodeOpsAll.data());
-        bool converged = protectAncestorsGpu(rawPtr(tree.prefixes), rawPtr(tree.parents), nodeOpsAll.data(), numNodes);
+        status = enforceKeysGpu(exec, mandatoryKeys.data(), mandatoryKeys.size(), rawPtr(tree.prefixes),
+                                rawPtr(tree.childOffsets), rawPtr(tree.parents), nodeOpsAll.data());
+        bool converged =
+            protectAncestorsGpu(exec, rawPtr(tree.prefixes), rawPtr(tree.parents), nodeOpsAll.data(), numNodes);
 
         // extract leaf decision, using childOffsets as temp storage
         assert(tree.childOffsets.size() >= size_t(tree.numLeafNodes + 1));
         std::span<TreeNodeIndex> nodeOps(rawPtr(tree.childOffsets), tree.numLeafNodes + 1);
-        gatherGpu(leafToInternal(tree).data(), nNodes(leaves), nodeOpsAll.data(), nodeOps.data());
+        gather(exec, leafToInternal(tree).data(), nNodes(leaves), nodeOpsAll.data(), nodeOps.data());
 
         if (status == ResolutionStatus::cancelMerge)
         {
             converged =
-                countGpu(nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1) == std::size_t(tree.numLeafNodes);
+                count(exec, nodeOps.data(), nodeOps.data() + nodeOps.size() - 1, 1) == std::size_t(tree.numLeafNodes);
         }
         else if (status == ResolutionStatus::rebalance) { converged = false; }
 
-        exclusiveScanGpu(nodeOps.data(), nodeOps.data() + nodeOps.size(), nodeOps.data());
+        exclusiveScan(exec, nodeOps.data(), nodeOps.data() + nodeOps.size(), nodeOps.data());
         TreeNodeIndex newNumLeafNodes;
-        memcpyD2H(nodeOps.data() + nodeOps.size() - 1, 1, &newNumLeafNodes);
+        memcpyD2HAsync(exec, nodeOps.data() + nodeOps.size() - 1, 1, &newNumLeafNodes);
+        syncGpu(exec); // wait for D2H before using newNumLeafNodes on host
 
         auto& newLeaves = tree.prefixes;
         reallocateDestructive(newLeaves, newNumLeafNodes + 1, 1.05);
-        rebalanceTreeGpu(rawPtr(leaves), nNodes(leaves), newNumLeafNodes, nodeOps.data(), rawPtr(newLeaves));
+        rebalanceTreeGpu(exec, rawPtr(leaves), nNodes(leaves), newNumLeafNodes, nodeOps.data(), rawPtr(newLeaves));
         swap(newLeaves, leaves);
 
         // if rebalancing couldn't introduce the mandatory keys, we force-inject them now into the tree
         if (status == ResolutionStatus::failed)
         {
             converged = false;
-            injectKeysGpu(leaves, {mandatoryKeys.data(), mandatoryKeys.size()}, tree.prefixes, tree.childOffsets,
+            injectKeysGpu(exec, leaves, {mandatoryKeys.data(), mandatoryKeys.size()}, tree.prefixes, tree.childOffsets,
                           tree.internalToLeaf);
         }
 
@@ -202,7 +205,7 @@ struct CombinedUpdate
         auto [keyBuf, valueBuf, cubTmp] = util::packAllocBuffer(scratch, util::TypeList<KeyType, TreeNodeIndex, char>{},
                                                                 {newNumNodes, newNumNodes, cubTmpSize}, 128);
 
-        buildOctreeGpu(rawPtr(leaves), tree.data(), keyBuf, valueBuf, cubTmp);
+        buildOctreeGpu(exec, rawPtr(leaves), tree.data(), keyBuf, valueBuf, cubTmp);
         scratch.resize(originalSize);
 
         return converged;
@@ -277,7 +280,7 @@ private:
     float theta_;
     unsigned bucketSize_;
 
-    OctreeData<KeyType, CpuTag> tree_;
+    OctreeData<KeyType, execution::Cpu> tree_;
     std::vector<KeyType> leaves_;
 
     //! @brief particle counts of the focused tree leaves

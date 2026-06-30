@@ -26,10 +26,7 @@ struct CatalystAdaptor
                 const auto path = "catalyst/scripts/" + script_filepath.stem().string();
                 node[path + "/filename"].set_string(script_filepath);
             }
-            else
-            {
-                node["adios/config_filepath"] = script_filepath;
-            }
+            else { node["adios/config_filepath"] = script_filepath; }
             std::cout << "Catalyst script using " << script_filepath << std::endl;
         }
 

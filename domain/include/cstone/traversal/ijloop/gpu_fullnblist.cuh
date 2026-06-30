@@ -21,6 +21,8 @@
 #include <thrust/execution_policy.h>
 
 #include "cstone/cuda/memory.cuh"
+#include "cstone/cuda/thrust_util.cuh"
+#include "cstone/execution.hpp"
 #include "cstone/primitives/math.hpp"
 #include "cstone/primitives/warpscan.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
@@ -196,7 +198,8 @@ struct ScaleFunctor
 template<class Tc, class ThP>
 struct GpuFullNbListNeighborhood
 {
-    Box<Tc> box = {0, 0};
+    execution::Gpu exec = execution::gpuDefaultStream;
+    Box<Tc> box         = {0, 0};
     LocalIndex firstBody, lastBody;
     const Tc *x, *y, *z;
     ThP h;
@@ -213,7 +216,7 @@ struct GpuFullNbListNeighborhood
         const LocalIndex numBodies = lastBody - firstBody;
         if (numBodies == 0) return;
         constexpr int numThreads = 128;
-        runIjLoop<numThreads><<<iceil(numBodies, numThreads), numThreads>>>(
+        runIjLoop<numThreads><<<iceil(numBodies, numThreads), numThreads, 0, exec>>>(
             box, firstBody, lastBody, x, y, z, h, makeConst(input), output, std::forward<Interaction>(interaction),
             std::forward<Postamble>(postamble), ngmax, neighbors.get(), neighborsCount.get());
         checkGpuErrors(cudaGetLastError());
@@ -239,10 +242,12 @@ struct GpuFullNbListNeighborhood
         {
             if (groups.numGroups == 0) return;
             constexpr int numThreads = 128;
-            runIjLoopGrouped<numThreads><<<iceil(groups.numGroups * GpuConfig::warpSize, numThreads), numThreads>>>(
-                parent.box, parent.firstBody, parent.lastBody, parent.x, parent.y, parent.z, parent.h, makeConst(input),
-                output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), parent.ngmax,
-                parent.neighbors.get(), parent.neighborsCount.get(), groups);
+            runIjLoopGrouped<numThreads>
+                <<<iceil(groups.numGroups * GpuConfig::warpSize, numThreads), numThreads, 0, parent.exec>>>(
+                    parent.box, parent.firstBody, parent.lastBody, parent.x, parent.y, parent.z, parent.h,
+                    makeConst(input), output, std::forward<Interaction>(interaction),
+                    std::forward<Postamble>(postamble), parent.ngmax, parent.neighbors.get(),
+                    parent.neighborsCount.get(), groups);
             checkGpuErrors(cudaGetLastError());
         }
     };
@@ -256,7 +261,8 @@ struct GpuFullNbListNeighborhoodBuilder
     unsigned ngmax;
 
     template<class Tc, class KeyType, class ThP>
-    gpu_full_nb_list_neighborhood_detail::GpuFullNbListNeighborhood<Tc, ThP> build(OctreeNsView<Tc, KeyType> tree,
+    gpu_full_nb_list_neighborhood_detail::GpuFullNbListNeighborhood<Tc, ThP> build(execution::Gpu exec,
+                                                                                   OctreeNsView<Tc, KeyType> tree,
                                                                                    const Box<Tc>& box,
                                                                                    const LocalIndex totalBodies,
                                                                                    const GroupView& groups,
@@ -270,10 +276,10 @@ struct GpuFullNbListNeighborhoodBuilder
 
         if (numBodies == 0) return {};
 
-        auto neighbors      = util::deviceAlloc<LocalIndex[]>(ngmax * numBodies);
-        auto neighborsCount = util::deviceAlloc<unsigned[]>(numBodies);
-        auto globalPool     = util::deviceAlloc<int[]>(TravConfig::poolSize());
-        auto maxNeighbors   = util::deviceAlloc<unsigned>();
+        auto neighbors      = util::deviceAlloc<LocalIndex[]>(exec, ngmax * numBodies);
+        auto neighborsCount = util::deviceAlloc<unsigned[]>(exec, numBodies);
+        auto globalPool     = util::deviceAlloc<int[]>(exec, TravConfig::poolSize());
+        auto maxNeighbors   = util::deviceAlloc<unsigned>(exec);
 
         using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
         ThP hExt = h;
@@ -282,8 +288,8 @@ struct GpuFullNbListNeighborhoodBuilder
         {
             if constexpr (std::is_pointer_v<ThP>)
             {
-                hExtData = util::deviceAlloc<Th[]>(totalBodies);
-                thrust::transform(thrust::device, h, h + totalBodies, hExtData.get(),
+                hExtData = util::deviceAlloc<Th[]>(exec, totalBodies);
+                thrust::transform(thrustExecPolicy(exec), h, h + totalBodies, hExtData.get(),
                                   [searchExtFactor = tree.searchExtFactor] __device__(Th hi)
                                   { return hi * searchExtFactor; });
                 hExt = hExtData.get();
@@ -292,16 +298,18 @@ struct GpuFullNbListNeighborhoodBuilder
             tree.searchExtFactor = 1;
         }
 
-        checkGpuErrors(cudaMemsetAsync(maxNeighbors.get(), 0, sizeof(unsigned)));
+        checkGpuErrors(cudaMemsetAsync(maxNeighbors.get(), 0, sizeof(unsigned), exec));
 
-        resetTraversalCounters<<<1, 1>>>();
-        gpuFullNbListNeighborhoodBuild<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
+        resetTraversalCounters<<<1, 1, 0, exec>>>();
+        gpuFullNbListNeighborhoodBuild<<<TravConfig::numBlocks(), TravConfig::numThreads, 0, exec>>>(
             tree, box, groups, x, y, z, hExt, ngmax, neighbors.get(), neighborsCount.get(), globalPool.get(),
             maxNeighbors.get());
         checkGpuErrors(cudaGetLastError());
 
         unsigned maxNeighborsHost;
-        checkGpuErrors(cudaMemcpy(&maxNeighborsHost, maxNeighbors.get(), sizeof(unsigned), cudaMemcpyDeviceToHost));
+        checkGpuErrors(
+            cudaMemcpyAsync(&maxNeighborsHost, maxNeighbors.get(), sizeof(unsigned), cudaMemcpyDeviceToHost, exec));
+        checkGpuErrors(cudaStreamSynchronize(exec));
         if (maxNeighborsHost > ngmax)
         {
             std::cerr
@@ -309,8 +317,8 @@ struct GpuFullNbListNeighborhoodBuilder
                 << ngmax << ", but found up to " << maxNeighborsHost << " neighbor particles." << std::endl;
         }
 
-        return {box,   groups.firstBody,     groups.lastBody,          x, y, z, h,
-                ngmax, std::move(neighbors), std::move(neighborsCount)};
+        return {exec, box,   groups.firstBody,     groups.lastBody,          x, y, z,
+                h,    ngmax, std::move(neighbors), std::move(neighborsCount)};
     }
 };
 

@@ -19,6 +19,7 @@
 #define USE_CUDA
 
 #include "cstone/cuda/device_vector.h"
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/focus/octree_focus_mpi.hpp"
 #include "cstone/traversal/peers.hpp"
 
@@ -48,16 +49,19 @@ TEST(GeneralFocusExchangeGpu, bareTreelet)
     std::vector<TreeNodeIndex> scatterMap{8, 9};
     std::vector<IndexPair<TreeNodeIndex>> scatterSubRangePerRank{{0, 2}, {0, 2}};
 
+    StreamHolder stream;
+
     ConcatVector<TreeNodeIndex, DeviceVector> d_gatherMaps;
-    copy(gatherMaps, d_gatherMaps);
+    copy(stream.exec(), gatherMaps, d_gatherMaps);
     DeviceVector<TreeNodeIndex> d_scatterMap = scatterMap;
     DeviceVector<unsigned> d_counts          = counts;
     DeviceVector<char> scratch;
 
     auto d_gatherMapsView = static_cast<const ConcatVector<TreeNodeIndex, DeviceVector>&>(d_gatherMaps).view();
-    exchangeTreeletGeneral<unsigned>(
-        peers, peers, d_gatherMapsView, {rawPtr(scatterSubRangePerRank), scatterSubRangePerRank.size()},
-        {rawPtr(d_scatterMap), d_scatterMap.size()}, {rawPtr(d_counts), d_counts.size()}, 0, scratch, MPI_COMM_WORLD);
+    exchangeTreeletGeneral(stream.exec(), peers, peers, d_gatherMapsView,
+                           {rawPtr(scatterSubRangePerRank), scatterSubRangePerRank.size()},
+                           {rawPtr(d_scatterMap), d_scatterMap.size()},
+                           std::span<unsigned>{rawPtr(d_counts), d_counts.size()}, 0, scratch, MPI_COMM_WORLD);
 
     std::vector<unsigned> h_counts = toHost(d_counts);
 
@@ -127,16 +131,20 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
     DeviceVector<unsigned> d_globCounts = counts;
     std::span<const unsigned> d_globCountsView{rawPtr(d_globCounts), d_globCounts.size()};
 
-    FocusedOctree<KeyType, T, GpuTag> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD);
+    StreamHolder stream;
+
+    FocusedOctree<KeyType, T, execution::Gpu> focusTree(stream.exec(), thisRank, numRanks, bucketSizeLocal,
+                                                        MPI_COMM_WORLD);
     focusTree.converge(box, d_keysView, assignment, d_globTreeView, d_globCountsView, invThetaEff, d_scratch);
 
     auto d_countsView = focusTree.countsAcc();
     std::vector<unsigned> testCounts(d_countsView.size());
-    memcpyD2H(d_countsView.data(), d_countsView.size(), testCounts.data());
+    memcpyD2HAsync(stream.exec(), d_countsView.data(), d_countsView.size(), testCounts.data());
 
     auto octreeView = focusTree.octreeViewAcc();
     std::vector<KeyType> prefixes(octreeView.numNodes);
-    memcpyD2H(octreeView.prefixes, octreeView.numNodes, prefixes.data());
+    memcpyD2HAsync(stream.exec(), octreeView.prefixes, octreeView.numNodes, prefixes.data());
+    syncGpu(stream.exec());
 
     {
         for (size_t i = 0; i < testCounts.size(); ++i)

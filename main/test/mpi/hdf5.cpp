@@ -219,7 +219,7 @@ TEST(HDF5IO, particleData)
     if (rank == 0 && std::filesystem::exists(testfile)) { std::filesystem::remove(testfile); }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    using Dataset = sphexa::ParticlesData<cstone::CpuTag>;
+    using Dataset = sphexa::ParticlesData<cstone::execution::Cpu>;
 
     {
         Dataset data;
@@ -256,7 +256,7 @@ TEST(HDF5IO, particleDataSeq)
     if (rank == 0 && std::filesystem::exists(testfile)) { std::filesystem::remove(testfile); }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    using Dataset = sphexa::ParticlesData<cstone::CpuTag>;
+    using Dataset = sphexa::ParticlesData<cstone::execution::Cpu>;
 
     {
         Dataset data;
@@ -343,7 +343,7 @@ TEST(HDF5IO, turbulenceData)
     if (rank == 0 && std::filesystem::exists(testfile)) { std::filesystem::remove(testfile); }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    using Data = sph::TurbulenceData<double, cstone::CpuTag>;
+    using Data = sph::TurbulenceData<double, cstone::execution::Cpu>;
 
     InitSettings constants{{"solWeight", 0.5},  {"stEnergyPrefac", 5.0e-3}, {"stMaxModes", 100000},
                            {"Lbox", 1.0},       {"stMachVelocity", 0.3e0},  {"epsilon", 1e-15},

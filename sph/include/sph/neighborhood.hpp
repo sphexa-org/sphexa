@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <variant>
 
+#include "cstone/execution.hpp"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
 #include "cstone/traversal/ijloop/cpu_fullnblist.hpp"
@@ -21,16 +22,16 @@ enum class NeighborhoodType
     clusteredNeighborList
 };
 
-template<class NeighborhoodBuilder>
+template<class NeighborhoodBuilder, cstone::execution::Policy Exec>
 using NeighborhoodDataType = decltype(std::declval<NeighborhoodBuilder>().build(
-    std::declval<cstone::OctreeNsView<sph::SphTypes::CoordinateType, sph::SphTypes::KeyType>>(),
+    std::declval<Exec>(), std::declval<cstone::OctreeNsView<sph::SphTypes::CoordinateType, sph::SphTypes::KeyType>>(),
     std::declval<cstone::Box<sph::SphTypes::CoordinateType>>(), 0, std::declval<cstone::GroupView>(),
     std::declval<sph::SphTypes::CoordinateType*>(), std::declval<sph::SphTypes::CoordinateType*>(),
     std::declval<sph::SphTypes::CoordinateType*>(), std::declval<sph::SphTypes::HydroType*>()));
 
-template<class NeighborhoodBuilder>
-using NeighborhoodSubgroupType =
-    decltype(std::declval<NeighborhoodDataType<NeighborhoodBuilder>>().subgroup(std::declval<cstone::GroupView>()));
+template<class NeighborhoodBuilder, cstone::execution::Policy Exec>
+using NeighborhoodSubgroupType = decltype(std::declval<NeighborhoodDataType<NeighborhoodBuilder, Exec>>().subgroup(
+    std::declval<cstone::GroupView>()));
 
 struct NeighborhoodData
 {
@@ -66,9 +67,10 @@ struct NeighborhoodData
         }
 
         std::visit(
-            [&](auto const& nb) {
-                neighborhood =
-                    nb.build(d.treeView, box, d.size(), groups, d.x.data(), d.y.data(), d.z.data(), d.h.data());
+            [&](auto const& nb)
+            {
+                neighborhood = nb.build(cstone::execution::cpu, d.treeView, box, d.size(), groups, d.x.data(),
+                                        d.y.data(), d.z.data(), d.h.data());
             },
             builder);
     }
@@ -80,8 +82,8 @@ struct NeighborhoodData
     }
 
 private:
-    std::variant<NeighborhoodDataType<cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder>,
-                 NeighborhoodDataType<cstone::ijloop::CpuFullNbListNeighborhoodBuilder>>
+    std::variant<NeighborhoodDataType<cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder, cstone::execution::Cpu>,
+                 NeighborhoodDataType<cstone::ijloop::CpuFullNbListNeighborhoodBuilder, cstone::execution::Cpu>>
                      neighborhood;
     NeighborhoodType neighborhoodType = NeighborhoodType::alwaysTraverse;
 };

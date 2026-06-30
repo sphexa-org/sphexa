@@ -19,7 +19,7 @@ namespace disk
 template<typename Dataset, typename StarData>
 void computeAccretionCondition(size_t first, size_t last, Dataset& d, StarData& star)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (d.useGpu)
     {
         computeAccretionConditionGPU(first, last, getPtr<"x">(d), getPtr<"y">(d), getPtr<"z">(d), getPtr<"h">(d),
                                      getPtr<"keys">(d), getPtr<"m">(d), getPtr<"vx">(d), getPtr<"vy">(d),

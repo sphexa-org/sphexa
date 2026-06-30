@@ -37,7 +37,7 @@ TEST(PackBuffers, concatVector)
     EXPECT_EQ(constView[2][0], 30);
 
     ConcatVector<int> v_cpy;
-    copy(v, v_cpy);
+    cstone::copy(execution::cpu, v, v_cpy);
     auto cpyView = v_cpy.view();
     EXPECT_TRUE(std::equal(modView[0].begin(), modView[0].end(), cpyView[0].begin()));
     EXPECT_TRUE(std::equal(modView[1].begin(), modView[1].end(), cpyView[1].begin()));

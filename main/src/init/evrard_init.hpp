@@ -34,14 +34,12 @@ InitSettings evrardConstants()
 template<class Dataset>
 void initEvrardFields(Dataset& d, const InitSettings& constants)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-
     initFieldsAtRest(d, constants.at("mTotal") / d.numParticlesGlobal);
 
     auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
     auto temp0 = constants.at("u0") / cv;
-    cstone::fill<gpu>(d.temp.begin(), d.temp.end(), temp0);
-    cstone::fill<gpu>(d.u.begin(), d.u.end(), constants.at("u0"));
+    cstone::fill(d.exec, d.temp.begin(), d.temp.end(), temp0);
+    cstone::fill(d.exec, d.u.begin(), d.u.end(), constants.at("u0"));
 
     double totalVolume = 4 * M_PI / 3 * std::pow(constants.at("r"), 3);
     // before the contraction with sqrt(r), the sphere has a constant particle concentration of Ntot / Vtot
@@ -49,9 +47,9 @@ void initEvrardFields(Dataset& d, const InitSettings& constants)
     // c(r) = 2/3 * 1/r * Ntot / Vtot
     double c0 = 2. / 3. * d.numParticlesGlobal / totalVolume;
 
-    auto&&                                   x = toHost(d.x);
-    auto&&                                   y = toHost(d.y);
-    auto&&                                   z = toHost(d.z);
+    auto&&                                   x = cstone::toHost(d.x);
+    auto&&                                   y = cstone::toHost(d.y);
+    auto&&                                   z = cstone::toHost(d.z);
     std::vector<typename Dataset::HydroType> h(d.x.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)

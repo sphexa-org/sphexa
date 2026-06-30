@@ -24,6 +24,7 @@
 
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/cuda/thrust_util.cuh"
+#include "cstone/execution.hpp"
 #include "cstone/primitives/math.hpp"
 #include "cstone/reducearray.cuh"
 #include "cstone/traversal/ijloop/ijloop.hpp"
@@ -373,6 +374,7 @@ __launch_bounds__(clusterSize* clusterSize) void gromacsLikeNeighborhoodKernel(c
 template<class Tc, class ThP>
 struct GromacsLikeNeighborhood
 {
+    execution::Gpu exec = execution::gpuDefaultStream;
     thrust::universal_vector<Sci> sciSorted;
     thrust::universal_vector<CjPacked> cjPacked;
     thrust::universal_vector<Excl> excl;
@@ -391,8 +393,8 @@ struct GromacsLikeNeighborhood
 
         const LocalIndex numBodies = lastBody - firstBody;
         util::for_each_tuple(
-            [&](auto* ptr) { checkGpuErrors(cudaMemsetAsync(ptr + firstBody, 0, sizeof(decltype(*ptr)) * numBodies)); },
-            output);
+            [&](auto* ptr)
+            { checkGpuErrors(cudaMemsetAsync(ptr + firstBody, 0, sizeof(decltype(*ptr)) * numBodies, exec)); }, output);
 
         using ParticleData = decltype(loadParticleData(x, y, z, h, constInput, 0));
 
@@ -402,13 +404,13 @@ struct GromacsLikeNeighborhood
         if (box.boundaryX() == BoundaryType::periodic || box.boundaryY() == BoundaryType::periodic ||
             box.boundaryZ() == BoundaryType::periodic)
         {
-            gromacsLikeNeighborhoodKernel<true><<<numBlocks, blockSize, sharedMemSize>>>(
+            gromacsLikeNeighborhoodKernel<true><<<numBlocks, blockSize, sharedMemSize, exec>>>(
                 box, firstBody, lastBody, x, y, z, h, constInput, output, std::forward<Interaction>(interaction),
                 rawPtr(sciSorted), rawPtr(cjPacked), rawPtr(excl));
         }
         else
         {
-            gromacsLikeNeighborhoodKernel<false><<<numBlocks, blockSize, sharedMemSize>>>(
+            gromacsLikeNeighborhoodKernel<false><<<numBlocks, blockSize, sharedMemSize, exec>>>(
                 box, firstBody, lastBody, x, y, z, h, constInput, output, std::forward<Interaction>(interaction),
                 rawPtr(sciSorted), rawPtr(cjPacked), rawPtr(excl));
         }
@@ -430,7 +432,8 @@ struct GromacsLikeNeighborhoodBuilder
     unsigned ngmax;
 
     template<class Tc, class KeyType, class ThP>
-    gromacs_like_neighborhood_detail::GromacsLikeNeighborhood<Tc, ThP> build(OctreeNsView<Tc, KeyType> tree,
+    gromacs_like_neighborhood_detail::GromacsLikeNeighborhood<Tc, ThP> build(execution::Gpu exec,
+                                                                             OctreeNsView<Tc, KeyType> tree,
                                                                              const Box<Tc>& box,
                                                                              const LocalIndex totalBodies,
                                                                              const GroupView& groups,
@@ -444,7 +447,8 @@ struct GromacsLikeNeighborhoodBuilder
         assert(groups.firstBody == 0 && totalBodies == groups.lastBody);
         const unsigned numSuperclusters = iceil(groups.lastBody, superClusterSize);
 
-        GromacsLikeNeighborhood<Tc, ThP> nbList{thrust::universal_vector<Sci>(numSuperclusters),
+        GromacsLikeNeighborhood<Tc, ThP> nbList{exec,
+                                                thrust::universal_vector<Sci>(numSuperclusters),
                                                 thrust::universal_vector<CjPacked>(0),
                                                 thrust::universal_vector<Excl>(1),
                                                 box,
@@ -543,7 +547,7 @@ struct GromacsLikeNeighborhoodBuilder
                 nbList.sciSorted[sci] = {sci, cjPackedBegin, cjPackedEnd};
             }
         }
-        thrust::stable_sort(thrust::device, nbList.sciSorted.begin(), nbList.sciSorted.end());
+        thrust::stable_sort(thrustExecPolicy(exec), nbList.sciSorted.begin(), nbList.sciSorted.end());
         return nbList;
     }
 };

@@ -57,8 +57,8 @@ static int multipoleHolderTest(int thisRank, int numRanks)
 
     std::vector<KeyType> particleKeys(x.size());
 
-    cstone::Domain<KeyType, T, cstone::GpuTag> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta,
-                                                      MPI_COMM_WORLD, box);
+    cstone::Domain<KeyType, T, cstone::execution::Gpu> domain(cstone::execution::gpuDefaultStream, thisRank, numRanks,
+                                                              bucketSize, bucketSizeLocal, theta, MPI_COMM_WORLD, box);
 
     MultipoleHolder<T, T, T, T, T, KeyType, MultipoleType> multipoleHolder;
 
@@ -69,7 +69,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     domain.exchangeHalos(std::tie(d_m), s1, s2);
 
     //! includes tree plus associated information, like peer ranks, assignment, counts, centers, etc
-    const cstone::FocusedOctree<KeyType, T, cstone::GpuTag>& focusTree = domain.focusTree();
+    const cstone::FocusedOctree<KeyType, T, cstone::execution::Gpu>& focusTree = domain.focusTree();
     //! the focused octree, structure only
     auto octree = focusTree.octreeViewAcc();
 
@@ -79,14 +79,15 @@ static int multipoleHolderTest(int thisRank, int numRanks)
     // Check the root multipole of the distributed tree
     bool passMultipole = false;
     {
-        std::vector<MultipoleType> multipoles(octree.numNodes);
-        memcpyD2H(multipoleHolder.deviceMultipoles(), multipoles.size(), multipoles.data());
-
-        MultipoleType globalRootMultipole = multipoles[0];
-
+        std::vector<MultipoleType>               multipoles(octree.numNodes);
         auto                                     d_centers = focusTree.expansionCentersAcc();
         std::vector<cstone::SourceCenterType<T>> centers(d_centers.size());
-        memcpyD2H(d_centers.data(), d_centers.size(), centers.data());
+        cstone::memcpyD2HAsync(cstone::execution::gpuDefaultStream, multipoleHolder.deviceMultipoles(),
+                               multipoles.size(), multipoles.data());
+        cstone::memcpyD2HAsync(cstone::execution::gpuDefaultStream, d_centers.data(), d_centers.size(), centers.data());
+        cstone::syncGpu(cstone::execution::gpuDefaultStream);
+
+        MultipoleType globalRootMultipole = multipoles[0];
 
         // compute reference root cell multipole from global particle data
         MultipoleType reference;

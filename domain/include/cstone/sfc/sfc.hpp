@@ -19,6 +19,7 @@
 
 #include "cstone/util/strong_type.hpp"
 
+#include "cstone/execution.hpp"
 #include "box.hpp"
 #include "morton.hpp"
 #include "hilbert.hpp"
@@ -272,6 +273,13 @@ void computeSfcKeys(const T* x, const T* y, const T* z, KeyType* particleKeys, s
     {
         if (particleKeys[i] != removeKey<KeyType>::value) { particleKeys[i] = sfc3D<KeyType>(x[i], y[i], z[i], box); }
     }
+}
+
+template<class KeyType, class T>
+inline void
+computeSfcKeys(execution::Cpu, const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box)
+{
+    computeSfcKeys(x, y, z, keys, numKeys, box);
 }
 
 } // namespace cstone

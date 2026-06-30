@@ -19,6 +19,7 @@
 
 #include <span>
 
+#include "cstone/execution.hpp"
 #include "csarray.hpp"
 
 namespace cstone
@@ -26,48 +27,58 @@ namespace cstone
 
 /*! @brief count number of particles in each octree node
  *
- * @tparam KeyType          32- or 64-bit unsigned integer type
- * @param[in]  tree         octree nodes given as Morton codes of length @a nNodes+1
- *                          needs to satisfy the octree invariants
- * @param[out] counts       output particle counts per node, length = @a nNodes
- * @param[in]  numNodes     number of nodes in tree
- * @param[in]  keys         sorted particle SFC keys
- * @param[in]  maxCount     maximum particle count per node to store, this is used
- *                          to prevent overflow in MPI_Allreduce
+ * @tparam KeyType               32- or 64-bit unsigned integer type
+ * @param[in]  tree              octree nodes given as Morton codes of length @a numNodes+1
+ *                               needs to satisfy the octree invariants
+ * @param[out] counts            output particle counts per node, length = @a numNodes
+ * @param[in]  numNodes          number of nodes in tree
+ * @param[in]  keys              sorted particle SFC keys
+ * @param[in]  maxCount          maximum particle count per node to store, this is used
+ *                               to prevent overflow in MPI_Allreduce
+ * @param[in]  useCountsAsGuess  if true, use existing @p counts as starting point for the search
+ * @param[in]  exec              execution policy
  */
 template<class KeyType>
-extern void computeNodeCountsGpu(const KeyType* tree,
+extern void computeNodeCountsGpu(execution::Gpu exec,
+                                 const KeyType* tree,
                                  unsigned* counts,
                                  TreeNodeIndex numNodes,
                                  std::span<const KeyType> keys,
                                  unsigned maxCount,
-                                 bool useCountsAsGuess = false);
+                                 bool useCountsAsGuess);
 
 /*! @brief split or fuse octree nodes based on node counts relative to bucketSize
  *
  * @tparam KeyType         32- or 64-bit unsigned integer type
  * @param[in] tree         vector of octree nodes in cornerstone format, length = @p numNodes + 1
  * @param[in] numNodes     number of nodes in @p tree
- * @param[in] counts       output particle counts per node, length = @p tree.size() - 1
- * @param[in] bucketSize   maximum particle count per (leaf) node and
+ * @param[in] counts       input particle counts per node, length = @p numNodes
+ * @param[in] bucketSize   maximum particle count per (leaf) node
  * @param[out] nodeOps     node transformation codes, length = @p numNodes + 1
+ * @param[in] exec         execution policy
  * @return                 number of nodes in the future rebalanced tree
  */
 template<class KeyType>
-extern TreeNodeIndex computeNodeOpsGpu(
-    const KeyType* tree, TreeNodeIndex numNodes, const unsigned* counts, unsigned bucketSize, TreeNodeIndex* nodeOps);
+extern TreeNodeIndex computeNodeOpsGpu(execution::Gpu exec,
+                                       const KeyType* tree,
+                                       TreeNodeIndex numNodes,
+                                       const unsigned* counts,
+                                       unsigned bucketSize,
+                                       TreeNodeIndex* nodeOps);
 
 template<class KeyType>
-extern bool rebalanceTreeGpu(const KeyType* tree,
+extern bool rebalanceTreeGpu(execution::Gpu exec,
+                             const KeyType* tree,
                              TreeNodeIndex numNodes,
                              TreeNodeIndex newNumNodes,
                              const TreeNodeIndex* nodeOps,
                              KeyType* newTree);
 
 template<class KeyType>
-extern void countSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps);
+extern void countSfcGapsGpu(execution::Gpu exec, const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps);
 
 template<class KeyType>
-extern void fillSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree);
+extern void fillSfcGapsGpu(
+    execution::Gpu exec, const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree);
 
 } // namespace cstone

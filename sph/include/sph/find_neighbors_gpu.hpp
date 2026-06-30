@@ -8,7 +8,7 @@
 namespace sph
 {
 
-void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cstone::GpuTag>& d,
+void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cstone::execution::Gpu>& d,
                       const cstone::Box<SphTypes::CoordinateType>& box, bool subgroups = false);
 
 }

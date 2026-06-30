@@ -54,7 +54,7 @@ void globalRandomGaussian(int thisRank, int numRanks)
 
     auto [leaves, counts] = computeOctree(std::span(coords.particleKeys()), bucketSize);
 
-    OctreeData<KeyType, CpuTag> domainTree;
+    OctreeData<KeyType, execution::Cpu> domainTree;
     domainTree.resize(nNodes(leaves));
     updateInternalTree<KeyType>(leaves, domainTree.data());
 
@@ -95,7 +95,7 @@ void globalRandomGaussian(int thisRank, int numRanks)
     std::vector<KeyType> particleKeys(lastAssignedIndex - firstAssignedIndex);
     computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(particleKeys.data()), x.size(), box);
 
-    FocusedOctree<KeyType, T> focusTree(thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD);
+    FocusedOctree<KeyType, T> focusTree(execution::cpu, thisRank, numRanks, bucketSizeLocal, MPI_COMM_WORLD);
     std::vector<int, util::DefaultInitAdaptor<int>> scratch;
 
     int converged = 0;

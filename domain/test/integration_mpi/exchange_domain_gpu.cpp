@@ -17,6 +17,7 @@
 
 #include <gtest/gtest.h>
 
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/domain/layout.hpp"
 #include "cstone/domain/domaindecomp_mpi_gpu.cuh"
 
@@ -87,15 +88,18 @@ void exchangeAllToAll(int thisRank, int numRanks)
     reallocate(d_x, bufDesc.size, 1.0);
     reallocate(d_y, bufDesc.size, 1.0);
 
+    StreamHolder stream;
+
     ExchangeLog log;
     auto recvStart = domain_exchange::receiveStart(bufDesc, numPartAssigned - numPartPresent);
     auto recvEnd   = recvStart + numPartAssigned - numPartPresent;
-    exchangeParticlesGpu(0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch, rawPtr(d_ordering),
-                         MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y));
+    exchangeParticlesGpu(stream.exec(), 0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch,
+                         rawPtr(d_ordering), MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y));
 
     reallocate(bufDesc.size, 1.01, x, y);
-    memcpyD2H(d_x.data(), d_x.size(), x.data());
-    memcpyD2H(d_y.data(), d_y.size(), y.data());
+    memcpyD2HAsync(stream.exec(), d_x.data(), d_x.size(), x.data());
+    memcpyD2HAsync(stream.exec(), d_y.data(), d_y.size(), y.data());
+    syncGpu(stream.exec());
 
     ex::extractLocallyOwned(bufDesc, numPartPresent, numPartAssigned, ordering.data() + sends[thisRank], x, y);
 
@@ -176,17 +180,21 @@ void exchangeCyclicNeighbors(int thisRank, int numRanks)
     reallocate(d_uint8Array, bufDesc.size, 1.0);
     reallocate(bufDesc.size * 10, 1.01, sendScratch, receiveScratch);
 
+    StreamHolder stream;
+
     ExchangeLog log;
     auto recvStart = domain_exchange::receiveStart(bufDesc, numPartAssigned - numPartPresent);
     auto recvEnd   = recvStart + numPartAssigned - numPartPresent;
-    exchangeParticlesGpu(0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch, rawPtr(d_ordering),
-                         MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y), rawPtr(d_uint8Array), rawPtr(d_testArray));
+    exchangeParticlesGpu(stream.exec(), 0, log, sends, thisRank, recvStart, recvEnd, sendScratch, receiveScratch,
+                         rawPtr(d_ordering), MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y), rawPtr(d_uint8Array),
+                         rawPtr(d_testArray));
 
     reallocate(bufDesc.size, 1.01, x, y, testArray, uint8Array);
-    memcpyD2H(d_x.data(), d_x.size(), x.data());
-    memcpyD2H(d_y.data(), d_y.size(), y.data());
-    memcpyD2H(d_testArray.data(), d_testArray.size(), testArray.data());
-    memcpyD2H(d_uint8Array.data(), d_uint8Array.size(), uint8Array.data());
+    memcpyD2HAsync(stream.exec(), d_x.data(), d_x.size(), x.data());
+    memcpyD2HAsync(stream.exec(), d_y.data(), d_y.size(), y.data());
+    memcpyD2HAsync(stream.exec(), d_testArray.data(), d_testArray.size(), testArray.data());
+    memcpyD2HAsync(stream.exec(), d_uint8Array.data(), d_uint8Array.size(), uint8Array.data());
+    syncGpu(stream.exec());
 
     ex::extractLocallyOwned(bufDesc, numPartPresent, numPartAssigned, ordering.data() + sends[thisRank], x, y,
                             testArray, uint8Array);

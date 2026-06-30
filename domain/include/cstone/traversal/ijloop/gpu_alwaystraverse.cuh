@@ -17,6 +17,7 @@
 
 #include <tuple>
 
+#include "cstone/execution.hpp"
 #include "cstone/cuda/memory.cuh"
 #include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/ijloop/common.hpp"
@@ -92,6 +93,7 @@ __launch_bounds__(TravConfig::numThreads) void runIjLoop(const OctreeNsView<Tc, 
 template<class Tc, class KeyType, class ThP>
 struct GpuAlwaysTraverseNeighborhood
 {
+    execution::Gpu exec = execution::gpuDefaultStream;
     OctreeNsView<Tc, KeyType> tree;
     Box<Tc> box = {0, 0};
     GroupView groups;
@@ -149,18 +151,18 @@ protected:
                 GroupView const& groups) const
     {
         if (groups.numGroups == 0) return;
-        resetTraversalCounters<<<1, 1>>>();
+        resetTraversalCounters<<<1, 1, 0, exec>>>();
 
         if (box.boundaryX() == BoundaryType::periodic || box.boundaryY() == BoundaryType::periodic ||
             box.boundaryZ() == BoundaryType::periodic)
         {
-            runIjLoop<true><<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
+            runIjLoop<true><<<TravConfig::numBlocks(), TravConfig::numThreads, 0, exec>>>(
                 tree, box, groups, x, y, z, h, makeConst(input), output, std::forward<Interaction>(interaction),
                 std::forward<Postamble>(postamble), ngmax, neighbors.get(), globalPool.get());
         }
         else
         {
-            runIjLoop<false><<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
+            runIjLoop<false><<<TravConfig::numBlocks(), TravConfig::numThreads, 0, exec>>>(
                 tree, box, groups, x, y, z, h, makeConst(input), output, std::forward<Interaction>(interaction),
                 std::forward<Postamble>(postamble), ngmax, neighbors.get(), globalPool.get());
         }
@@ -175,7 +177,8 @@ struct GpuAlwaysTraverseNeighborhoodBuilder
 
     template<class Tc, class KeyType, class ThP>
     gpu_always_traverse_neighborhood_detail::GpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP>
-    build(const OctreeNsView<Tc, KeyType>& tree,
+    build(execution::Gpu exec,
+          const OctreeNsView<Tc, KeyType>& tree,
           const Box<Tc>& box,
           const LocalIndex /* totalBodies */,
           const GroupView& groups,
@@ -185,7 +188,8 @@ struct GpuAlwaysTraverseNeighborhoodBuilder
           ThP h) const
     {
         using namespace gpu_always_traverse_neighborhood_detail;
-        return {tree,
+        return {exec,
+                tree,
                 box,
                 groups,
                 x,
@@ -193,8 +197,9 @@ struct GpuAlwaysTraverseNeighborhoodBuilder
                 z,
                 h,
                 ngmax,
-                util::deviceAlloc<LocalIndex[]>(GpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP>::neighborsSize(ngmax)),
-                util::deviceAlloc<int[]>(TravConfig::poolSize())};
+                util::deviceAlloc<LocalIndex[]>(exec,
+                                                GpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP>::neighborsSize(ngmax)),
+                util::deviceAlloc<int[]>(exec, TravConfig::poolSize())};
     }
 };
 

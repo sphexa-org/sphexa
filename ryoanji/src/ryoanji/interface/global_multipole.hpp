@@ -26,7 +26,7 @@ namespace ryoanji
 //! @brief compute local multipoles and perform communication to build LET multipoles on each rank
 template<class Tc, class Tm, class Tf, class KeyType, class MType>
 void computeMultipoles(const Tc* x, const Tc* y, const Tc* z, const Tm* m, cstone::OctreeView<const KeyType> gOctree,
-                       const cstone::FocusedOctree<KeyType, Tf, cstone::CpuTag>& focusTree,
+                       const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Cpu>& focusTree,
                        const cstone::LocalIndex* layout, MType* multipoles)
 {
     auto let           = focusTree.octreeViewAcc(); // locally essential octree

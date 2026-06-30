@@ -17,6 +17,7 @@
 
 #include <span>
 
+#include "cstone/execution.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/domain/index_ranges.hpp"
 
@@ -24,7 +25,8 @@ namespace cstone
 {
 
 template<class KeyType>
-extern void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
+extern void rebalanceDecisionEssentialGpu(execution::Gpu exec,
+                                          const KeyType* prefixes,
                                           const TreeNodeIndex* childOffsets,
                                           const TreeNodeIndex* parents,
                                           const unsigned* counts,
@@ -43,9 +45,11 @@ extern void rebalanceDecisionEssentialGpu(const KeyType* prefixes,
  * @param[in]  numLeafNodes   number of leaf nodes
  * @param[in]  focus          index range within [0:numLeafNodes] that corresponds to nodes in focus
  * @param[out] nodeOps        output refinement decision per leaf node
+ * @param[in]  exec           execution policy
  */
 template<class KeyType>
-extern void macRefineDecisionGpu(const KeyType* prefixes,
+extern void macRefineDecisionGpu(execution::Gpu exec,
+                                 const KeyType* prefixes,
                                  const uint8_t* macs,
                                  const TreeNodeIndex* l2i,
                                  TreeNodeIndex numLeafNodes,
@@ -53,10 +57,12 @@ extern void macRefineDecisionGpu(const KeyType* prefixes,
                                  TreeNodeIndex* nodeOps);
 
 template<class KeyType>
-extern bool protectAncestorsGpu(const KeyType*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex);
+extern bool
+protectAncestorsGpu(execution::Gpu exec, const KeyType*, const TreeNodeIndex*, TreeNodeIndex*, TreeNodeIndex);
 
 template<class KeyType>
-extern ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
+extern ResolutionStatus enforceKeysGpu(execution::Gpu exec,
+                                       const KeyType* forcedKeys,
                                        TreeNodeIndex numForcedKeys,
                                        const KeyType* nodeKeys,
                                        const TreeNodeIndex* childOffsets,
@@ -65,7 +71,8 @@ extern ResolutionStatus enforceKeysGpu(const KeyType* forcedKeys,
 
 //! @brief see CPU version
 template<class KeyType>
-extern void rangeCountGpu(std::span<const KeyType> leaves,
+extern void rangeCountGpu(execution::Gpu exec,
+                          std::span<const KeyType> leaves,
                           std::span<const unsigned> counts,
                           std::span<const KeyType> leavesFocus,
                           std::span<const TreeNodeIndex> leavesFocusIdx,

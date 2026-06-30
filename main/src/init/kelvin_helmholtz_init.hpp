@@ -54,15 +54,14 @@ InitSettings KelvinHelmholtzConstants()
 template<class T, class Dataset>
 void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T massPart)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using HydroType    = Dataset::HydroType;
-    T rhoInt           = constants.at("rhoInt");
-    T rhoExt           = constants.at("rhoExt");
-    T omega0           = constants.at("omega0");
-    T gamma            = constants.at("gamma");
-    T p                = constants.at("p");
-    T vxInt            = constants.at("vxInt");
-    T vxExt            = constants.at("vxExt");
+    using HydroType = Dataset::HydroType;
+    T rhoInt        = constants.at("rhoInt");
+    T rhoExt        = constants.at("rhoExt");
+    T omega0        = constants.at("omega0");
+    T gamma         = constants.at("gamma");
+    T p             = constants.at("p");
+    T vxInt         = constants.at("vxInt");
+    T vxExt         = constants.at("vxExt");
 
     T uInt = p / ((gamma - 1.) * rhoInt);
     T uExt = p / ((gamma - 1.) * rhoExt);
@@ -73,12 +72,12 @@ void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T mass
     T hExt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoExt);
 
     initFieldsAtRest(d, massPart);
-    cstone::fill<gpu>(d.mue.begin(), d.mue.end(), 2.0);
-    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), 10.0);
+    cstone::fill(d.exec, d.mue.begin(), d.mue.end(), 2.0);
+    cstone::fill(d.exec, d.mui.begin(), d.mui.end(), 10.0);
 
     auto   cv = sph::idealGasCv(d.muiConst, gamma);
-    auto&& x  = toHost(d.x);
-    auto&& y  = toHost(d.y);
+    auto&& x  = cstone::toHost(d.x);
+    auto&& y  = cstone::toHost(d.y);
 
     cstone::LocalIndex     numPartLocal = d.x.size();
     std::vector<HydroType> h(numPartLocal);
@@ -119,8 +118,8 @@ void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T mass
     d.h  = std::move(h);
     d.vx = std::move(vx);
     d.vy = std::move(vy);
-    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
-    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
 
     if (d.u.empty())
     {
