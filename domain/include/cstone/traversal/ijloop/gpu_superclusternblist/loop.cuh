@@ -476,7 +476,8 @@ template<class Config,
          class Interaction,
          class Postamble,
          class Mask = void>
-void runIjLoop(const Box<Tc>& box,
+void runIjLoop(const execution::Gpu exec,
+               const Box<Tc>& box,
                const LocalIndex firstValidBody,
                const LocalIndex totalBodies,
                const LocalIndex firstBody,
@@ -499,7 +500,7 @@ void runIjLoop(const Box<Tc>& box,
     const unsigned numBlocks                    = iceil(numISuperclusters, numSuperclustersPerBlock);
     const auto run                              = [&](auto usePbc)
     {
-        runIjLoopKernel<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize>>>(
+        runIjLoopKernel<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, 0, exec>>>(
             box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, std::forward<Input>(input),
             std::forward<Output>(output), std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
             neighborData, superclusterInfo, numISuperclusters, activeMasks);
@@ -543,19 +544,20 @@ __global__ void computeActiveMasksKernel(const LocalIndex firstISupercluster,
 
 template<class Config>
 util::UniqueDevicePtr<typename Config::SuperclusterParticleMask[]>
-computeActiveMasks(const LocalIndex firstISupercluster,
+computeActiveMasks(const execution::Gpu exec,
+                   const LocalIndex firstISupercluster,
                    const LocalIndex numISuperclusters,
                    const LocalIndex firstValidBody,
                    const GroupView& groups)
 {
-    auto activeMasks = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(numISuperclusters);
-    checkGpuErrors(
-        cudaMemsetAsync(activeMasks.get(), 0, sizeof(typename Config::SuperclusterParticleMask) * numISuperclusters));
+    auto activeMasks = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(exec, numISuperclusters);
+    checkGpuErrors(cudaMemsetAsync(activeMasks.get(), 0,
+                                   sizeof(typename Config::SuperclusterParticleMask) * numISuperclusters, exec));
 
     constexpr unsigned numThreads = 256;
     const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
     computeActiveMasksKernel<Config>
-        <<<numBlocks, numThreads>>>(firstISupercluster, firstValidBody, groups, activeMasks.get());
+        <<<numBlocks, numThreads, 0, exec>>>(firstISupercluster, firstValidBody, groups, activeMasks.get());
     checkGpuErrors(cudaGetLastError());
     return activeMasks;
 }

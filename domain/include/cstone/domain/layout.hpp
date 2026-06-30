@@ -142,32 +142,35 @@ std::vector<IntegralType> extractMarkedElements(std::span<const IntegralType> so
 
 /*! @brief calculate the location (offset) of each focus tree leaf node in the particle arrays
  *
+ * @param[in]  exec              execution policy
  * @param[in]  focusLeafCounts   node counts of the focus leaves, size numLeafNodes
  * @param[in]  flags             flag for each node, with a non-zero value if present as halo node, size numNodes
+ * @param[in]  leafToInternal    maps leaf node index to internal node index
  * @param[in]  idx               first and last focus leaf idx of the assigned nodes on the executing rank
  * @param[out] layout            size numLeafNodes + 1. The first element is zero, the last element is
  *                               equal to the sum of all present (assigned+halo) node counts.
  */
-template<bool useGpu>
-void computeNodeLayout(std::span<const unsigned> focusLeafCounts,
+template<execution::Policy Exec>
+void computeNodeLayout(Exec exec,
+                       std::span<const unsigned> focusLeafCounts,
                        std::span<const uint8_t> flags,
                        std::span<const TreeNodeIndex> leafToInternal,
                        TreeIndexPair idx,
                        std::span<LocalIndex> layout)
 {
-    if constexpr (useGpu)
+    if constexpr (execution::HaveGpu<Exec>{})
     {
-        memcpyD2D(focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start());
+        memcpyD2DAsync(exec, focusLeafCounts.data() + idx.start(), idx.count(), layout.data() + idx.start());
 
-        gatherGpu(leafToInternal.data(), idx.start(), flags.data(), layout.data());
-        selectCopyGpu(focusLeafCounts.data(), idx.start(), layout.data(), layout.data());
+        gather(exec, leafToInternal.data(), idx.start(), flags.data(), layout.data());
+        selectCopy(exec, focusLeafCounts.data(), idx.start(), layout.data(), layout.data());
 
-        gatherGpu(leafToInternal.data() + idx.end(), leafToInternal.size() - idx.end(), flags.data(),
-                  layout.data() + idx.end());
-        selectCopyGpu(focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(), layout.data() + idx.end(),
-                      layout.data() + idx.end());
+        gather(exec, leafToInternal.data() + idx.end(), leafToInternal.size() - idx.end(), flags.data(),
+               layout.data() + idx.end());
+        selectCopy(exec, focusLeafCounts.data() + idx.end(), focusLeafCounts.size() - idx.end(),
+                   layout.data() + idx.end(), layout.data() + idx.end());
 
-        exclusiveScanGpu(layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0});
+        exclusiveScan(exec, layout.data(), layout.data() + layout.size(), layout.data(), LocalIndex{0});
     }
     else
     {
@@ -207,10 +210,7 @@ int checkLayout(int myRank,
                 {
                     if (peerRange.start() <= i && i < peerRange.end()) { peerFound = true; }
                 }
-                if (!peerFound)
-                {
-                    ret = 1;
-                }
+                if (!peerFound) { ret = 1; }
             }
             if (layout[i + 1] - layout[i] > maxParticles) { ret = -1; }
         }
@@ -227,13 +227,14 @@ struct SmallerElementSize
 };
 
 //! @brief reorder with state-less function object
-template<class... Arrays1, class... Arrays2>
-void gatherArrays(std::span<const LocalIndex> ordering,
+template<execution::Policy Exec, class... Arrays1, class... Arrays2>
+void gatherArrays(Exec exec,
+                  std::span<const LocalIndex> ordering,
                   LocalIndex outputOffset,
                   std::tuple<Arrays1&...> arrays,
                   std::tuple<Arrays2&...> scratchBuffers)
 {
-    auto reorderArray = [ordering, outputOffset, &scratchBuffers](auto& array)
+    auto reorderArray = [ordering, outputOffset, &scratchBuffers, exec](auto& array)
     {
         using VectorRef  = decltype(array);
         using VectorType = std::decay_t<VectorRef>;
@@ -241,7 +242,7 @@ void gatherArrays(std::span<const LocalIndex> ordering,
         {
             auto& swapSpace = util::pickType<decltype(array)>(scratchBuffers);
             assert(swapSpace.size() == array.size());
-            gatherAcc<IsDeviceVector<VectorType>{}>(ordering, rawPtr(array), rawPtr(swapSpace) + outputOffset);
+            gather(exec, ordering, rawPtr(array), rawPtr(swapSpace) + outputOffset);
             swap(swapSpace, array);
         }
         else
@@ -251,8 +252,8 @@ void gatherArrays(std::span<const LocalIndex> ordering,
             assert(std::get<i>(scratchBuffers).size() == array.size());
 
             auto* scratch = reinterpret_cast<typename VectorType::value_type*>(rawPtr(std::get<i>(scratchBuffers)));
-            gatherAcc<IsDeviceVector<VectorType>{}>(ordering, rawPtr(array), scratch);
-            copy_n<IsDeviceVector<VectorType>{}>(scratch, ordering.size(), rawPtr(array) + outputOffset);
+            gather(exec, ordering, rawPtr(array), scratch);
+            copy_n(exec, scratch, ordering.size(), rawPtr(array) + outputOffset);
         }
     };
 

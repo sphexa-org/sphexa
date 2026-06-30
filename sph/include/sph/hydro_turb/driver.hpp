@@ -101,13 +101,13 @@ void updateNoise(std::vector<T>& phases, T stddev, T dt, T ts, std::mt19937& gen
  */
 template<class Dataset>
 void driveTurbulence(GroupView grp, Dataset& d,
-                     TurbulenceData<typename Dataset::RealType, typename Dataset::AcceleratorType>& turb)
+                     TurbulenceData<typename Dataset::RealType, typename Dataset::Exec>& turb)
 {
     updateNoise(turb.phases, turb.variance, d.minDt, turb.decayTime, turb.gen);
     computePhases(turb.numModes, turb.numDim, turb.phases, turb.solWeight, turb.modes, turb.phasesReal,
                   turb.phasesImag);
 
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (d.useGpu)
     {
         // upload mode data to the device
         turb.d_phasesReal = turb.phasesReal;
@@ -116,7 +116,7 @@ void driveTurbulence(GroupView grp, Dataset& d,
         computeStirringGpu(grp, turb.numDim, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.ax), rawPtr(d.ay),
                            rawPtr(d.az), turb.numModes, rawPtr(turb.d_modes), rawPtr(turb.d_phasesReal),
                            rawPtr(turb.d_phasesImag), rawPtr(turb.d_amplitudes), turb.solWeightNorm);
-        syncGpu();
+        cstone::syncGpu(cstone::execution::gpuDefaultStream);
     }
     else
     {

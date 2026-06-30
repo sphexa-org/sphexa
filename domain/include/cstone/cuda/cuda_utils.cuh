@@ -17,11 +17,14 @@
 
 #include <type_traits>
 #include <vector>
-#include "cuda_runtime.hpp"
 
-#include "device_vector.h"
+#include "cuda_runtime.hpp"
 #include "cuda_stubs.h"
+#include "device_vector.h"
 #include "errorcheck.cuh"
+
+namespace cstone
+{
 
 //! @brief detection of thrust device vectors
 template<class T>
@@ -30,30 +33,32 @@ struct IsDeviceVector<cstone::DeviceVector<T>> : public std::true_type
 };
 
 template<class T>
-void memcpyH2D(const T* src, std::size_t n, T* dest)
+void memcpyH2DAsync(execution::Gpu exec, const T* src, std::size_t n, T* dest)
 {
-    checkGpuErrors(cudaMemcpy(dest, src, sizeof(T) * n, cudaMemcpyHostToDevice));
+    checkGpuErrors(cudaMemcpyAsync(dest, src, sizeof(T) * n, cudaMemcpyHostToDevice, exec));
 }
 
 template<class T>
-void memcpyD2H(const T* src, std::size_t n, T* dest)
+void memcpyD2HAsync(execution::Gpu exec, const T* src, std::size_t n, T* dest)
 {
-    checkGpuErrors(cudaMemcpy(dest, src, sizeof(T) * n, cudaMemcpyDeviceToHost));
+    checkGpuErrors(cudaMemcpyAsync(dest, src, sizeof(T) * n, cudaMemcpyDeviceToHost, exec));
 }
 
 template<class T>
-void memcpyD2D(const T* src, std::size_t n, T* dest)
+void memcpyD2DAsync(execution::Gpu exec, const T* src, std::size_t n, T* dest)
 {
-    checkGpuErrors(cudaMemcpy(dest, src, sizeof(T) * n, cudaMemcpyDeviceToDevice));
+    checkGpuErrors(cudaMemcpyAsync(dest, src, sizeof(T) * n, cudaMemcpyDeviceToDevice, exec));
 }
 
-inline void syncGpu() { checkGpuErrors(cudaDeviceSynchronize()); }
+inline void syncGpu(execution::Gpu exec) { checkGpuErrors(cudaStreamSynchronize(exec)); }
 
 //! @brief Download DeviceVector to a host vector. Convenience function for use in testing.
 template<class T>
 std::vector<T> toHost(const cstone::DeviceVector<T>& v)
 {
     std::vector<T> ret(v.size());
-    memcpyD2H(v.data(), v.size(), ret.data());
+    checkGpuErrors(cudaMemcpy(ret.data(), v.data(), sizeof(T) * v.size(), cudaMemcpyDeviceToHost));
     return ret;
 }
+
+} // namespace cstone

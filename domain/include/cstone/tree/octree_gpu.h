@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include "cstone/execution.hpp"
 #include "cstone/tree/octree.hpp"
 
 namespace cstone
@@ -24,6 +25,7 @@ namespace cstone
 /*! @brief construct the internal octree part of a given octree leaf cell array on the GPU
  *
  * @tparam       KeyType     unsigned 32- or 64-bit integer
+ * @param[in]    exec        execution policy
  * @param[in]    cstoneTree  GPU buffer with the SFC leaf cell keys
  * @param[inout] d           input:  pointers to pre-allocated GPU buffers for octree cells
  *                           output: fully linked octree
@@ -31,18 +33,23 @@ namespace cstone
  * This does not allocate memory on the GPU, (except thrust temp buffers for scans and sorting)
  */
 template<class KeyType>
-extern void buildOctreeGpu(const KeyType* cstoneTree, OctreeView<KeyType> d);
+extern void buildOctreeGpu(execution::Gpu exec, const KeyType* cstoneTree, OctreeView<KeyType> d);
 
 //! @brief same as above, but using existing buffers to avoid temporary memory allocation
 template<class KeyType>
-extern void buildOctreeGpu(const KeyType* cstoneTree,
+extern void buildOctreeGpu(execution::Gpu exec,
+                           const KeyType* cstoneTree,
                            OctreeView<KeyType> d,
                            std::span<KeyType> keyBuf,
                            std::span<TreeNodeIndex> valueBuf,
                            std::span<char> cubTmp);
 
 //! @brief Upsweep by summing up child nodes, e.g. to compute particle node counts
-void upsweepSumGpu(int numLvl, const TreeNodeIndex* lvlRange, const TreeNodeIndex* childOffsets, LocalIndex* counts);
+void upsweepSumGpu(execution::Gpu exec,
+                   int numLvl,
+                   const TreeNodeIndex* lvlRange,
+                   const TreeNodeIndex* childOffsets,
+                   LocalIndex* counts);
 
 /*!  @brief locate all nodes between k1 and k2 in nodeKeys and store indices
  * @param[in]  k1        cornerstone leaf sequence start
@@ -52,7 +59,8 @@ void upsweepSumGpu(int numLvl, const TreeNodeIndex* lvlRange, const TreeNodeInde
  * @param[out] indices   node index locations to store
  */
 template<class KeyType>
-extern void locateNodesGpu(const KeyType* k1,
+extern void locateNodesGpu(execution::Gpu exec,
+                           const KeyType* k1,
                            const KeyType* k2,
                            const KeyType* nodeKeys,
                            const TreeNodeIndex* lvlRange,
@@ -67,7 +75,8 @@ extern void locateNodesGpu(const KeyType* k1,
  * @param[out] indices    node index locations to store
  */
 template<class KeyType>
-extern void locateNodesGpu(const KeyType* queryKeys,
+extern void locateNodesGpu(execution::Gpu exec,
+                           const KeyType* queryKeys,
                            const TreeNodeIndex* map,
                            size_t n,
                            const KeyType* nodeKeys,

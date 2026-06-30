@@ -18,6 +18,7 @@
 
 #include "gtest/gtest.h"
 
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/focus/inject.hpp"
 
 using namespace cstone;
@@ -32,7 +33,11 @@ TEST(FocusGpu, injectKeysGpu)
     DeviceVector<KeyType> keyScratch;
     DeviceVector<TreeNodeIndex> s1, s2;
 
-    injectKeysGpu(leaves, {mandatoryKeys.data(), mandatoryKeys.size()}, keyScratch, s1, s2);
+    StreamHolder stream;
+
+    injectKeysGpu(stream.exec(), leaves, {mandatoryKeys.data(), mandatoryKeys.size()}, keyScratch, s1, s2);
+
+    stream.sync();
 
     DeviceVector<KeyType> ref = std::vector<KeyType>{0, 8, 16, 24, 32, 40, 48, 56, 64};
 

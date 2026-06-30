@@ -15,11 +15,14 @@
 
 #pragma once
 
+#include "cstone/execution.hpp"
+
 namespace cstone
 {
 
 template<class T, class IndexType>
-extern void gatherRanges(const IndexType* rangeScan,
+extern void gatherRanges(execution::Gpu exec,
+                         const IndexType* rangeScan,
                          const IndexType* rangeOffsets,
                          int numRanges,
                          const T* src,

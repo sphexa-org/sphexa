@@ -40,12 +40,13 @@ fixedGroupsKernel(LocalIndex first, LocalIndex last, unsigned groupSize, LocalIn
     }
 }
 
-void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<GpuTag>& groups)
+void computeFixedGroups(
+    execution::Gpu exec, LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups)
 {
     LocalIndex numBodies = last - first;
     LocalIndex numGroups = iceil(numBodies, groupSize);
     groups.data.resize(numGroups + 1);
-    fixedGroupsKernel<<<iceil(numBodies, 256), 256>>>(first, last, groupSize, rawPtr(groups.data), numGroups);
+    fixedGroupsKernel<<<iceil(numBodies, 256), 256, 0, exec>>>(first, last, groupSize, rawPtr(groups.data), numGroups);
 
     groups.firstBody  = first;
     groups.lastBody   = last;
@@ -57,6 +58,7 @@ void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, G
 //! @brief convenience wrapper for groupSplitsKernel
 template<unsigned groupSize, class Tc, class T, class KeyType>
 void computeGroupSplitsImpl(
+    execution::Gpu exec,
     LocalIndex first,
     LocalIndex last,
     const Tc* x,
@@ -83,30 +85,32 @@ void computeGroupSplitsImpl(
     numSplitsPerGroup.resize(numFixedGroups + 1);
 
     if (numFixedGroups > 0)
-    groupSplitsKernel<groupSize><<<iceil(gridSize, numThreads), numThreads>>>(
-        first, last, x, y, z, h, leaves, numLeaves, layout, box, tolFactor, rawPtr(splitMasks),
-        rawPtr(numSplitsPerGroup), numFixedGroups);
+        groupSplitsKernel<groupSize><<<iceil(gridSize, numThreads), numThreads, 0, exec>>>(
+            first, last, x, y, z, h, leaves, numLeaves, layout, box, tolFactor, rawPtr(splitMasks),
+            rawPtr(numSplitsPerGroup), numFixedGroups);
 
     groups.reserve(numFixedGroups * 1.1);
     groups.resize(numFixedGroups + 1);
-    exclusiveScanGpu(rawPtr(numSplitsPerGroup), rawPtr(numSplitsPerGroup) + numFixedGroups + 1, rawPtr(groups));
+    exclusiveScan(exec, rawPtr(numSplitsPerGroup), rawPtr(numSplitsPerGroup) + numFixedGroups + 1, rawPtr(groups));
     LocalIndex newNumGroups;
-    memcpyD2H(rawPtr(groups) + groups.size() - 1, 1, &newNumGroups);
+    memcpyD2HAsync(exec, rawPtr(groups) + groups.size() - 1, 1, &newNumGroups);
+    syncGpu(exec);
 
     auto& newGroupSizes = numSplitsPerGroup;
     newGroupSizes.resize(newNumGroups + 1);
 
     if (numFixedGroups > 0)
-    makeSplitsKernel<<<numFixedGroups, numThreads>>>(rawPtr(splitMasks), rawPtr(groups), numFixedGroups,
-                                                     rawPtr(newGroupSizes));
+        makeSplitsKernel<<<numFixedGroups, numThreads, 0, exec>>>(rawPtr(splitMasks), rawPtr(groups), numFixedGroups,
+                                                                  rawPtr(newGroupSizes));
 
     groups.resize(newNumGroups + 1);
-    exclusiveScanGpu(rawPtr(newGroupSizes), rawPtr(newGroupSizes) + newNumGroups + 1, rawPtr(groups), first);
-    memcpyH2D(&last, 1, rawPtr(groups) + groups.size() - 1);
+    exclusiveScan(exec, rawPtr(newGroupSizes), rawPtr(newGroupSizes) + newNumGroups + 1, rawPtr(groups), first);
+    memcpyH2DAsync(exec, &last, 1, rawPtr(groups) + groups.size() - 1);
 }
 
 template<class Tc, class T, class KeyType>
-void computeGroupSplits(LocalIndex first,
+void computeGroupSplits(execution::Gpu exec,
+                        LocalIndex first,
                         LocalIndex last,
                         const Tc* x,
                         const Tc* y,
@@ -124,23 +128,23 @@ void computeGroupSplits(LocalIndex first,
     if (groupSize == GpuConfig::warpSize)
     {
         DeviceVector<util::array<GpuConfig::ThreadMask, 1>> splitMasks;
-        computeGroupSplitsImpl<GpuConfig::warpSize>(first, last, x, y, z, h, leaves, numLeaves, layout, box, tolFactor,
-                                                    splitMasks, numSplitsPerGroup, groups);
+        computeGroupSplitsImpl<GpuConfig::warpSize>(exec, first, last, x, y, z, h, leaves, numLeaves, layout, box,
+                                                    tolFactor, splitMasks, numSplitsPerGroup, groups);
     }
     else if (groupSize == 2 * GpuConfig::warpSize)
     {
         DeviceVector<util::array<GpuConfig::ThreadMask, 2>> splitMasks;
-        computeGroupSplitsImpl<2 * GpuConfig::warpSize>(first, last, x, y, z, h, leaves, numLeaves, layout, box,
+        computeGroupSplitsImpl<2 * GpuConfig::warpSize>(exec, first, last, x, y, z, h, leaves, numLeaves, layout, box,
                                                         tolFactor, splitMasks, numSplitsPerGroup, groups);
     }
     else { throw std::runtime_error("Unsupported spatial group size\n"); }
 }
 
 #define COMPUTE_GROUP_SPLITS(Tc, T, KeyType)                                                                           \
-    template void computeGroupSplits(LocalIndex first, LocalIndex last, const Tc* x, const Tc* y, const Tc* z,         \
-                                     const T* h, const KeyType* leaves, TreeNodeIndex numLeaves,                       \
+    template void computeGroupSplits(execution::Gpu, LocalIndex first, LocalIndex last, const Tc* x, const Tc* y,      \
+                                     const Tc* z, const T* h, const KeyType* leaves, TreeNodeIndex numLeaves,          \
                                      const LocalIndex* layout, const Box<Tc> box, unsigned groupSize, float tolFactor, \
-                                     DeviceVector<LocalIndex>& numSplitsPerGroup, DeviceVector<LocalIndex>& groups);
+                                     DeviceVector<LocalIndex>& numSplitsPerGroup, DeviceVector<LocalIndex>& groups)
 
 COMPUTE_GROUP_SPLITS(double, double, uint64_t);
 COMPUTE_GROUP_SPLITS(double, float, uint64_t);

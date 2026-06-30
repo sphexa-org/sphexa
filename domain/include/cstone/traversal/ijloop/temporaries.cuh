@@ -20,6 +20,7 @@
 #include <type_traits>
 #include <utility>
 
+#include "cstone/execution.hpp"
 #include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/util/type_list.hpp"
 
@@ -64,15 +65,19 @@ consteval auto mapTemporarySizes(Result, Output)
 }
 
 template<class IndexMap, class Result, class Output>
-auto allocateOrMapTemporaries(
-    const LocalIndex firstBody, const LocalIndex lastBody, IndexMap, Result, const Output& output)
+auto allocateOrMapTemporaries(const execution::Gpu exec,
+                              const LocalIndex firstBody,
+                              const LocalIndex lastBody,
+                              IndexMap,
+                              Result,
+                              const Output& output)
 {
     return util::tupleMap(
         [&]<class Index, class T>(Index, T)
         {
             if constexpr (Index::value < 0)
             {
-                auto holder = util::deviceAlloc<T[]>(lastBody - firstBody);
+                auto holder = util::deviceAlloc<T[]>(exec, lastBody - firstBody);
                 return std::make_tuple(holder.get() - firstBody, std::move(holder));
             }
             else { return std::make_tuple(std::get<Index::value>(output), nullptr); }
@@ -96,7 +101,8 @@ auto allocateOrMapTemporaries(
  * it is destructed
  */
 template<class Config, class Tc, class ThP, class Input, class... Out, class Interaction>
-auto allocateTemporaries(LocalIndex firstBody,
+auto allocateTemporaries(execution::Gpu exec,
+                         LocalIndex firstBody,
                          LocalIndex lastBody,
                          Input const&,
                          std::tuple<Out*...> const& output,
@@ -114,7 +120,7 @@ auto allocateTemporaries(LocalIndex firstBody,
 
         constexpr auto ptrMap = mapTemporarySizes(Result{}, std::tuple<Out...>());
 
-        auto ptrsAndHolders = allocateOrMapTemporaries(firstBody, lastBody, ptrMap, Result{}, output);
+        auto ptrsAndHolders = allocateOrMapTemporaries(exec, firstBody, lastBody, ptrMap, Result{}, output);
 
         auto ptrs = util::tupleMap([](auto const& alloc) { return std::get<0>(alloc); }, ptrsAndHolders);
         auto holders =

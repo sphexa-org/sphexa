@@ -61,9 +61,11 @@ using VizAdaptor = viz::AscentAdaptor;
 #endif
 
 #ifdef USE_CUDA
-using AccType = cstone::GpuTag;
+using Exec          = cstone::execution::Gpu;
+constexpr Exec exec = cstone::execution::gpuDefaultStream;
 #else
-using AccType = cstone::CpuTag;
+using Exec          = cstone::execution::Cpu;
+constexpr Exec exec = cstone::execution::cpu;
 #endif
 
 namespace fs = std::filesystem;
@@ -87,8 +89,8 @@ int main(int argc, char** argv)
         return EXIT_SUCCESS;
     }
 
-    using Dataset = SimulationData<AccType>;
-    using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, AccType>;
+    using Dataset = SimulationData<Exec>;
+    using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, Exec>;
 
     const std::string        initCond             = parser.get("--init");
     const size_t             problemSize          = parser.get("-n", 50);
@@ -149,7 +151,7 @@ int main(int argc, char** argv)
     uint64_t bucketSizeFocus = 64;
     // ~100 global nodes per rank to decompose the domain with +-1% accuracy
     uint64_t bucketSize = std::max(bucketSizeFocus, d.numParticlesGlobal / (100 * numRanks));
-    Domain   domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, box);
+    Domain   domain(exec, rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, box);
     domain.setGrowthAllocRate(simData.hydro.getAllocGrowthRate());
 
     propagator->sync(domain, simData);

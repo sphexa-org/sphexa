@@ -33,7 +33,7 @@ static void fillGrid(auto& x, auto& y, auto& z, double start, double end, size_t
 
 struct AccretionTest : public ::testing::Test
 {
-    using KeyType         = typename sphexa::ParticlesData<cstone::CpuTag>::KeyType;
+    using KeyType         = typename sphexa::ParticlesData<cstone::execution::Cpu>::KeyType;
     using T               = double;
     using ConservedFields = util::FieldList<"vx", "vy", "vz", "m">;
     using DependentFields = util::FieldList<"keys", "u", "rho">;
@@ -44,8 +44,8 @@ struct AccretionTest : public ::testing::Test
     inline constexpr static double initial_star_mass = 1.;
     inline constexpr static double dt                = 1.;
 
-    sphexa::ParticlesData<cstone::CpuTag>       data;
-    std::unique_ptr<cstone::Domain<KeyType, T>> domain_ptr = nullptr;
+    sphexa::ParticlesData<cstone::execution::Cpu> data;
+    std::unique_ptr<cstone::Domain<KeyType, T>>   domain_ptr = nullptr;
 
     disk::StarData star;
     double         momentum_inside_x = 0.;
@@ -66,7 +66,8 @@ struct AccretionTest : public ::testing::Test
         int   bucketSize = 8;
         float theta      = 1.0;
 
-        domain_ptr = std::make_unique<cstone::Domain<KeyType, T>>(rank, numRanks, bucketSize, bucketSize, theta, MPI_COMM_WORLD);
+        domain_ptr = std::make_unique<cstone::Domain<KeyType, T>>(cstone::execution::cpu, rank, numRanks, bucketSize,
+                                                                  bucketSize, theta, MPI_COMM_WORLD);
 
         star.inner_size      = inner_limit;
         star.removal_limit_h = INFINITY;

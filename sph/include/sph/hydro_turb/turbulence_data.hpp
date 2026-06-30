@@ -44,10 +44,10 @@
 namespace sph
 {
 
-template<class T, class Accelerator>
+template<class T, cstone::execution::Policy Exec>
 class TurbulenceData
 {
-    using AccVector = std::conditional_t<cstone::HaveGpu<Accelerator>{}, cstone::DeviceVector<T>, std::vector<T>>;
+    using AccVector = std::conditional_t<cstone::execution::HaveGpu<Exec>{}, cstone::DeviceVector<T>, std::vector<T>>;
 
 public:
     using RealType = T;
@@ -131,7 +131,7 @@ private:
 
     void uploadModes()
     {
-        if constexpr (cstone::HaveGpu<Accelerator>{})
+        if constexpr (cstone::execution::HaveGpu<Exec>{})
         {
             // upload data to the GPU
             d_modes      = modes;

@@ -50,8 +50,8 @@ struct DeviceNeighborhoodData::Impl
             std::visit(
                 [&]<class Neighborhood>(Neighborhood const& nb)
                 {
-                    if constexpr (std::is_same_v<Neighborhood,
-                                                 NeighborhoodDataType<ClusteredNeighborhoodBuilder<true>>>)
+                    if constexpr (std::is_same_v<Neighborhood, NeighborhoodDataType<ClusteredNeighborhoodBuilder<true>,
+                                                                                    cstone::execution::Gpu>>)
                         throw std::runtime_error("neighborhood does not support local time stepping");
                     else
                         subgroupNeighborhood.emplace(nb.subgroup(groups));
@@ -76,12 +76,16 @@ struct DeviceNeighborhoodData::Impl
                 else
                     builder = ClusteredNeighborhoodBuilder<true>{ncmax};
             }
-            else { builder = cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder{d.ngmax}; }
+            else
+            {
+                builder = cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder{d.ngmax};
+            }
 
             std::visit(
-                [&](auto const& nb) {
-                    neighborhood =
-                        nb.build(d.treeView, box, d.size(), groups, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h));
+                [&](auto const& nb)
+                {
+                    neighborhood = nb.build(cstone::execution::gpuDefaultStream, d.treeView, box, d.size(), groups,
+                                            rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h));
                 },
                 builder);
         }
@@ -97,12 +101,13 @@ struct DeviceNeighborhoodData::Impl
             std::visit(runIjLoop, neighborhood);
     }
 
-    std::variant<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder>,
-                 NeighborhoodDataType<ClusteredNeighborhoodBuilder<false>>,
-                 NeighborhoodDataType<ClusteredNeighborhoodBuilder<true>>>
+    std::variant<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder, cstone::execution::Gpu>,
+                 NeighborhoodDataType<ClusteredNeighborhoodBuilder<false>, cstone::execution::Gpu>,
+                 NeighborhoodDataType<ClusteredNeighborhoodBuilder<true>, cstone::execution::Gpu>>
         neighborhood;
-    std::optional<std::variant<NeighborhoodSubgroupType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder>,
-                               NeighborhoodSubgroupType<ClusteredNeighborhoodBuilder<false>>>>
+    std::optional<std::variant<
+        NeighborhoodSubgroupType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder, cstone::execution::Gpu>,
+        NeighborhoodSubgroupType<ClusteredNeighborhoodBuilder<false>, cstone::execution::Gpu>>>
          subgroupNeighborhood;
     bool useNeighborLists = true;
 };
