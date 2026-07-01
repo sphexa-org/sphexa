@@ -30,15 +30,71 @@
 #include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
-#include "cstone/traversal/ijloop/gpu_fullnblist.cuh"
-#include "cstone/traversal/ijloop/gpu_compressednblist.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
-#include "cstone/util/fastmath.hpp"
 
 #include "../coord_samples/random.hpp"
-#include "./csv.hpp"
-#include "./gromacs_ijloop.cuh"
 #include "./nbbenchmark.cuh"
+
+/* some fast math functions to reach good performance at -O3 */
+
+constexpr float fast_sin(float x)
+{
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+    return __sinf(x);
+#else
+    return std::sin(x);
+#endif
+}
+
+constexpr double fast_sin(double x) { return std::sin(x); }
+
+constexpr float fast_rcp(float x)
+{
+#ifdef __CUDA_ARCH__
+    // __frcp_rn might not flush to zero and thus can be significantly slower
+    asm("rcp.approx.ftz.f32 %0,%0;" : "+f"(x) :);
+    return x;
+#elif defined(__HIP_DEVICE_COMPILE__)
+    return __frcp_rn(x);
+#else
+    return 1.0f / x;
+#endif
+}
+
+constexpr double fast_rcp(double x)
+{
+#ifdef __CUDA_ARCH__
+    // __drcp_rn might not flush to zero and thus can be significantly slower
+    asm("rcp.approx.ftz.f64 %0,%0;" : "+d"(x) :);
+    return x;
+#elif defined(__HIP_DEVICE_COMPILE__)
+    return __drcp_rn(x);
+#else
+    return 1.0 / x;
+#endif
+}
+
+constexpr float fast_sqrt(float x)
+{
+#if defined(__CUDA_ARCH__)
+    // __fsqrt_rn might not flush to zero and thus can be significantly slower
+    asm("sqrt.approx.ftz.f32 %0,%0;" : "+f"(x) :);
+    return x;
+#elif defined(__HIP_DEVICE_COMPILE__)
+    return __fsqrt_rn(x);
+#else
+    return std::sqrt(x);
+#endif
+}
+
+constexpr double fast_sqrt(double x)
+{
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+    return __dsqrt_rn(x);
+#else
+    return std::sqrt(x);
+#endif
+}
 
 /* smoothing kernel evaluation functionality borrowed from SPH-EXA */
 
@@ -51,7 +107,7 @@ constexpr inline T wharmonicStd(T v)
 
     constexpr T halfPi = std::numbers::pi_v<T> / T(2);
     const T Pv         = halfPi * v;
-    return util::fastmath::sin(Pv) * util::fastmath::rcp(Pv);
+    return fast_sin(Pv) * fast_rcp(Pv);
 }
 
 template<class T, class F>
@@ -118,8 +174,8 @@ struct DensityKernelFun
     {
         const auto [i, iPos, hi, mi] = iData;
         const auto [j, jPos, hj, mj] = jData;
-        const T dist                 = util::fastmath::sqrt(distSq);
-        const T vloc                 = dist * util::fastmath::rcp(hi);
+        const T dist                 = fast_sqrt(distSq);
+        const T vloc                 = dist * fast_rcp(hi);
         const T w                    = i == j ? T(1) : table_lookup<UseKernelTable>(wh, vloc);
         return std::make_tuple(cstone::ijloop::symmetric::even(w * mj));
     }
@@ -143,24 +199,15 @@ void benchmarkMain()
     const auto inputValues         = std::tuple(T(1));
     const auto initialOutputValues = std::tuple(std::numeric_limits<T>::quiet_NaN());
 
-    std::map<std::string, std::vector<float>> times, buildTimes, bytesPerParticle;
-
     const auto runBenchmark = [&](const char* name, auto const& neighborhood)
     {
         printf("--- %s ---\n", name);
         const auto result = benchmarkNeighborhood<Tc, T, StrongKeyType>(coords, neighborhood, h, 1, ngmax, kernelFun,
                                                                         inputValues, initialOutputValues);
-        times[name]       = std::move(result.runTimes);
-        buildTimes[name]  = {result.buildTime};
-        bytesPerParticle[name] = {result.numBytesPerParticle};
         printf("\n");
     };
 
     runBenchmark("DIRECT TREE TRAVERSAL", ijloop::GpuAlwaysTraverseNeighborhoodBuilder{ngmax});
-    runBenchmark("FULL NB LIST", ijloop::GpuFullNbListNeighborhoodBuilder{ngmax});
-    runBenchmark("COMPRESSED FULL NB LIST", ijloop::GpuCompressedNbListNeighborhoodBuilder<>::withoutSymmetry{ngmax});
-    runBenchmark("COMPRESSED HALF NB LIST", ijloop::GpuCompressedNbListNeighborhoodBuilder<>::withSymmetry{ngmax});
-    runBenchmark("GROMACS SUPERCLUSTERED", ijloop::GromacsLikeNeighborhoodBuilder{ngmax});
 
     using SuperclusterNb = ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<
         8, GpuConfig::warpSize / 8>::withSuperclusterSize<64>::withoutSymmetry;
@@ -172,16 +219,12 @@ void benchmarkMain()
                  SuperclusterNb::withCompression<NibbleWarpCompression<false>>{ncmax});
 
     using SymmetricSuperclusterNb     = SuperclusterNb::withSymmetry;
-    constexpr unsigned ncmaxSymmetric = 320;
+    constexpr unsigned ncmaxSymmetric = 360;
     runBenchmark("SUPERCLUSTERED SYMMETRIC", SymmetricSuperclusterNb::withoutCompression{ncmaxSymmetric});
     runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC (Band et al. Compression)",
                  SuperclusterNb::withCompression<BandEtAlWarpCompression<false>>{ncmaxSymmetric});
     runBenchmark("COMPRESSED SUPERCLUSTERED SYMMETRIC (Nibble-based Compression)",
                  SuperclusterNb::withCompression<NibbleWarpCompression<false>>{ncmaxSymmetric});
-
-    saveCsv(std::format("sph_density_results_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), times);
-    saveCsv(std::format("sph_density_buildtime_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), buildTimes);
-    saveCsv(std::format("sph_density_bytespp_{}_{}.csv", typeid(Tc).name(), typeid(T).name()), bytesPerParticle);
 }
 
 int main()

@@ -3,7 +3,7 @@
 namespace sph
 {
 
-void DeviceNeighborhoodData::setType(NeighborhoodType type) { impl->neighborhoodType = type; }
+void DeviceNeighborhoodData::disableNeighborLists() { impl->useNeighborLists = false; }
 
 DeviceNeighborhoodData::DeviceNeighborhoodData()
     : impl(std::make_unique<Impl>())

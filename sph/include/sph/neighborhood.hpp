@@ -13,15 +13,6 @@
 namespace sph
 {
 
-enum class NeighborhoodType
-{
-    alwaysTraverse,
-    fullNeighborList,
-    compressedFullNeighborList,
-    compressedHalfNeighborList,
-    clusteredNeighborList
-};
-
 template<class NeighborhoodBuilder, cstone::execution::Policy Exec>
 using NeighborhoodDataType = decltype(std::declval<NeighborhoodBuilder>().build(
     std::declval<Exec>(), std::declval<cstone::OctreeNsView<sph::SphTypes::CoordinateType, sph::SphTypes::KeyType>>(),
@@ -37,12 +28,7 @@ struct NeighborhoodData
 {
     NeighborhoodData() {}
 
-    void setType(NeighborhoodType type)
-    {
-        if (type != NeighborhoodType::alwaysTraverse && type != NeighborhoodType::fullNeighborList)
-            throw std::runtime_error("only always-traverse and full-neighbor-list are available on CPUs");
-        neighborhoodType = type;
-    }
+    void disableNeighborLists() { useNeighborLists = false; }
 
     template<class Dataset, class T>
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool /* subgroups */)
@@ -53,18 +39,10 @@ struct NeighborhoodData
                      cstone::ijloop::CpuFullNbListNeighborhoodBuilder>
             builder;
 
-        switch (neighborhoodType)
-        {
-            case NeighborhoodType::alwaysTraverse:
-                builder = cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder{d.ngmax};
-                break;
-            case NeighborhoodType::fullNeighborList:
-                builder = cstone::ijloop::CpuFullNbListNeighborhoodBuilder{d.ngmax};
-                break;
-            default:
-                throw std::runtime_error("only always-traverse and full-neighbor-list are available on CPUs");
-                break;
-        }
+        if (useNeighborLists)
+            builder = cstone::ijloop::CpuFullNbListNeighborhoodBuilder{d.ngmax};
+        else
+            builder = cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder{d.ngmax};
 
         std::visit(
             [&](auto const& nb)
@@ -84,8 +62,8 @@ struct NeighborhoodData
 private:
     std::variant<NeighborhoodDataType<cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder, cstone::execution::Cpu>,
                  NeighborhoodDataType<cstone::ijloop::CpuFullNbListNeighborhoodBuilder, cstone::execution::Cpu>>
-                     neighborhood;
-    NeighborhoodType neighborhoodType = NeighborhoodType::alwaysTraverse;
+         neighborhood;
+    bool useNeighborLists = true;
 };
 
 } // namespace sph
