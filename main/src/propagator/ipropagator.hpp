@@ -144,7 +144,8 @@ protected:
     template<class HydroData>
     void printIadRegularizationStats(const HydroData& d, size_t first, size_t last, const char* label)
     {
-        auto&& flags = toHost(d.iadRegularized);
+//        auto&& flags = toHost(d.iadRegularized);
+        auto&& flags = toHost(d.ids);
         last         = std::min(last, flags.size());
 
         uint64_t localCount = 0;
@@ -161,6 +162,8 @@ protected:
             out << "### IAD regularization ### " << label << ": " << globalCount << " / " << d.numParticlesGlobal
                 << " particles, target " << d.condition_quality_target << std::endl;
         }
+
+        d.ids = std::move(flags);
     }
 
     static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData)

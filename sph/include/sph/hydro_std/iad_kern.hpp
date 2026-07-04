@@ -10,6 +10,12 @@
 namespace sph
 {
 
+template<typename Id_type>
+struct RegularizationFlag
+{
+    inline static constexpr Id_type value = Id_type(1) << (std::numeric_limits<Id_type>::digits - 1);
+};
+
 template<class T>
 struct IADInteractionSTD
 {
@@ -46,12 +52,12 @@ struct IADInteractionSTD
     }
 };
 
-template<class T, class Tc>
+template<class T, class Tc, class TRegFlag>
 struct IADPostambleSTD
 {
-    Tc K;
-    T        condition_quality_target{};
-    uint8_t* iadRegularized{nullptr};
+    Tc        K;
+    T         condition_quality_target{};
+    TRegFlag* iadRegularized{nullptr};
 
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
@@ -74,7 +80,8 @@ struct IADPostambleSTD
         bool wasRegularized = false;
         T    det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, condition_quality_target,
                                              &wasRegularized);
-        if (iadRegularized) { iadRegularized[i] = wasRegularized; }
+        if (iadRegularized) { iadRegularized[i] |= RegularizationFlag<TRegFlag>::value * wasRegularized; }
+        //        if (iadRegularized) { iadRegularized[i] = wasRegularized; }
 
         // Note normalization factor: cij have units of 1/tau because det is proportional to tau^3 so we have to
         // divide by K/h^3.
@@ -94,10 +101,9 @@ struct IADPostambleSTD
     }
 };
 
-template<class Neighborhood, class Tc, class Tm, class T>
+template<class Neighborhood, class Tc, class Tm, class T, class TId>
 void IADIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* rho, const unsigned* nc, const T* wh,
-               T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, T condition_quality_target,
-               uint8_t* iadRegularized)
+               T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, T condition_quality_target, TId* iadRegularized)
 {
     neighborhood.ijLoop(std::make_tuple(m, rho, nc), std::make_tuple(c11, c12, c13, c22, c23, c33),
                         IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K, condition_quality_target, iadRegularized});
