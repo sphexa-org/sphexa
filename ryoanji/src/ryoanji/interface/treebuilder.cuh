@@ -36,7 +36,10 @@ class TreeBuilder
 {
 public:
     //! @brief initialize with the desired maximum particles per leaf cell
-    TreeBuilder(unsigned ncrit) : bucketSize_(ncrit) {}
+    TreeBuilder(unsigned ncrit)
+        : bucketSize_(ncrit)
+    {
+    }
 
     /*! @brief construct an octree from body coordinates
      *
@@ -53,18 +56,20 @@ public:
     template<class T>
     int update(T* x, T* y, T* z, size_t numBodies, const cstone::Box<T>& box)
     {
+        using namespace cstone;
+
         thrust::device_vector<KeyType> d_keys(numBodies), d_keys_tmp(numBodies);
         thrust::device_vector<int>     d_ordering(numBodies), d_values_tmp(numBodies);
         thrust::device_vector<T>       tmp(numBodies);
 
-        uint64_t                    tempStorageEle = cstone::sortByKeyTempStorage<KeyType, LocalIndex>(numBodies);
+        uint64_t                    tempStorageEle = sortByKeyTempStorage<KeyType, LocalIndex>(numBodies);
         thrust::device_vector<char> cubTmpStorage(tempStorageEle);
 
-        cstone::computeSfcKeysGpu(x, y, z, cstone::sfcKindPointer(rawPtr(d_keys)), numBodies, box);
+        computeSfcKeys(execution::gpuDefaultStream, x, y, z, sfcKindPointer(rawPtr(d_keys)), numBodies, box);
 
-        cstone::sequenceGpu(rawPtr(d_ordering), d_ordering.size(), 0);
-        cstone::sortByKeyGpu(rawPtr(d_keys), rawPtr(d_keys) + d_keys.size(), rawPtr(d_ordering), rawPtr(d_keys_tmp),
-                             rawPtr(d_values_tmp), rawPtr(cubTmpStorage), tempStorageEle);
+        sequence(execution::gpuDefaultStream, rawPtr(d_ordering), d_ordering.size(), 0);
+        sortByKey(execution::gpuDefaultStream, rawPtr(d_keys), rawPtr(d_keys) + d_keys.size(), rawPtr(d_ordering),
+                  rawPtr(d_keys_tmp), rawPtr(d_values_tmp), rawPtr(cubTmpStorage), tempStorageEle);
 
         thrust::gather(thrust::device, d_ordering.begin(), d_ordering.end(), x, tmp.begin());
         thrust::copy(tmp.begin(), tmp.end(), x);
@@ -76,32 +81,30 @@ public:
         if (d_tree_.size() == 0)
         {
             // initial guess on first call. use previous tree as guess on subsequent calls
-            d_tree_   = std::vector<KeyType>{0, cstone::nodeRange<KeyType>(0)};
+            d_tree_   = std::vector<KeyType>{0, nodeRange<KeyType>(0)};
             d_counts_ = std::vector<unsigned>{unsigned(numBodies)};
         }
 
-        while (!cstone::updateOctreeGpu<KeyType>({rawPtr(d_keys), d_keys.size()}, bucketSize_, d_tree_, d_counts_,
-                                                 tmpTree_, workArray_))
+        while (!updateOctreeGpu<KeyType>(execution::gpuDefaultStream, {rawPtr(d_keys), d_keys.size()}, bucketSize_,
+                                         d_tree_, d_counts_, tmpTree_, workArray_))
             ;
 
-        octreeGpuData_.resize(cstone::nNodes(d_tree_));
-        cstone::buildOctreeGpu(rawPtr(d_tree_), octreeGpuData_.data());
+        octreeGpuData_.resize(nNodes(d_tree_));
+        buildOctreeGpu(execution::gpuDefaultStream, rawPtr(d_tree_), octreeGpuData_.data());
 
         d_layout_.resize(d_counts_.size() + 1);
-        cstone::fillGpu(rawPtr(d_layout_), rawPtr(d_layout_) + 1, LocalIndex(0));
-        cstone::inclusiveScanGpu(rawPtr(d_counts_), rawPtr(d_counts_) + d_counts_.size(), rawPtr(d_layout_) + 1);
+        fill(execution::gpuDefaultStream, rawPtr(d_layout_), rawPtr(d_layout_) + 1, LocalIndex(0));
+        inclusiveScan(execution::gpuDefaultStream, rawPtr(d_counts_), rawPtr(d_counts_) + d_counts_.size(),
+                      rawPtr(d_layout_) + 1);
 
         return octreeGpuData_.numInternalNodes + octreeGpuData_.numLeafNodes;
     }
 
-    const LocalIndex*    layout() const { return rawPtr(d_layout_); }
-    const KeyType*       nodeKeys() const { return rawPtr(octreeGpuData_.prefixes); }
-    const TreeNodeIndex* childOffsets() const { return rawPtr(octreeGpuData_.childOffsets); }
-    const TreeNodeIndex* leafToInternal() const
-    {
-        return cstone::leafToInternal(octreeGpuData_).data();
-    }
-    const TreeNodeIndex* internalToLeaf() const { return rawPtr(octreeGpuData_.internalToLeaf); }
+    const LocalIndex*    layout() const { return cstone::rawPtr(d_layout_); }
+    const KeyType*       nodeKeys() const { return cstone::rawPtr(octreeGpuData_.prefixes); }
+    const TreeNodeIndex* childOffsets() const { return cstone::rawPtr(octreeGpuData_.childOffsets); }
+    const TreeNodeIndex* leafToInternal() const { return cstone::leafToInternal(octreeGpuData_).data(); }
+    const TreeNodeIndex* internalToLeaf() const { return cstone::rawPtr(octreeGpuData_.internalToLeaf); }
     //! @brief return host-resident octree level cell ranges
     const TreeNodeIndex* levelRange() const { return octreeGpuData_.levelRange.data(); }
 
@@ -117,8 +120,8 @@ private:
     thrust::device_vector<KeyType>               tmpTree_;
     thrust::device_vector<cstone::TreeNodeIndex> workArray_;
 
-    cstone::OctreeData<KeyType, cstone::GpuTag> octreeGpuData_;
-    thrust::device_vector<cstone::LocalIndex>   d_layout_;
+    cstone::OctreeData<KeyType, cstone::execution::Gpu> octreeGpuData_;
+    thrust::device_vector<cstone::LocalIndex>           d_layout_;
 };
 
 } // namespace ryoanji

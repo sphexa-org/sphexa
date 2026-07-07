@@ -64,7 +64,7 @@ void findHalosFlags(bool useMixD = false)
     auto box = useMixD ? Box<double>(0, 1, 0, 0.015625, 0, 0.00390625) : Box<double>(0, 1);
 
     std::vector<KeyType> tree = makeUniformNLevelTree<KeyType>(useMixD ? 512 : 64, 1);
-    OctreeData<KeyType, CpuTag> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     octree.resize(nNodes(tree));
     updateInternalTree<KeyType>(tree, octree.data());
 

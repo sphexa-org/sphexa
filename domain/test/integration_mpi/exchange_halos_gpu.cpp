@@ -19,6 +19,7 @@
 
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/device_vector.h"
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/halos/exchange_halos_gpu.cuh"
 
 using namespace cstone;
@@ -123,13 +124,17 @@ void simpleTest(int thisRank, int numRanks)
     DeviceVector<char> sendBuffer    = std::vector<char>(7 * 24);
     DeviceVector<char> receiveBuffer = std::vector<char>(7 * 24);
 
+    StreamHolder stream;
+
     //! Perform exchange with GPU buffers
-    haloExchangeGpu(0, incomingHalos, outgoingHalos, sendBuffer, receiveBuffer, MPI_COMM_WORLD, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z));
+    haloExchangeGpu(0, incomingHalos, outgoingHalos, sendBuffer, receiveBuffer, MPI_COMM_WORLD, stream.exec(),
+                    rawPtr(d_x), rawPtr(d_y), rawPtr(d_z));
 
     //! download from device
-    memcpyD2H(d_x.data(), d_x.size(), x.data());
-    memcpyD2H(d_y.data(), d_y.size(), y.data());
-    memcpyD2H(d_z.data(), d_z.size(), z.data());
+    memcpyD2HAsync(stream.exec(), d_x.data(), d_x.size(), x.data());
+    memcpyD2HAsync(stream.exec(), d_y.data(), d_y.size(), y.data());
+    memcpyD2HAsync(stream.exec(), d_z.data(), d_z.size(), z.data());
+    syncGpu(stream.exec());
 
     EXPECT_EQ(xRef, x);
     EXPECT_EQ(yRef, y);

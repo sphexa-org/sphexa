@@ -144,7 +144,7 @@ static void markMacVector(Box<double> box)
     std::vector<T> masses(numParticles, 1.0 / numParticles);
 
     auto [leaves, counts] = computeOctree<KeyType>(coords.particleKeys(), bucketSize);
-    OctreeData<KeyType, CpuTag> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     octree.resize(nNodes(leaves));
     updateInternalTree<KeyType>(leaves, octree.data());
 
@@ -189,7 +189,7 @@ void limitSource4x4(Box<double> box, std::vector<uint8_t> macRef, unsigned numMa
     float invTheta = sqrt(3.) / 2;
 
     std::vector<KeyType> leaves = makeUniformNLevelTree<KeyType>(64, 1);
-    OctreeData<KeyType, CpuTag> fullTree;
+    OctreeData<KeyType, execution::Cpu> fullTree;
     fullTree.resize(nNodes(leaves));
     OctreeView<KeyType> ov = fullTree.data();
     updateInternalTree<KeyType>(leaves, ov);

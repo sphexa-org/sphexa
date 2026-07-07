@@ -57,11 +57,19 @@ namespace sphexa
 
 namespace lt = ::sph::lt;
 
-template<class AccType>
-class ParticlesData : public cstone::FieldStates<ParticlesData<AccType>>
+template<cstone::execution::Policy Execution>
+class ParticlesData : public cstone::FieldStates<ParticlesData<Execution>>
 {
 public:
-    using AcceleratorType = AccType;
+    using Exec                   = Execution;
+    static constexpr bool useGpu = cstone::execution::HaveGpu<Execution>();
+    static constexpr Exec exec   = []
+    {
+        if constexpr (useGpu)
+            return cstone::execution::gpuDefaultStream;
+        else
+            return cstone::execution::cpu;
+    }();
 
     using KeyType   = sph::SphTypes::KeyType;
     using RealType  = sph::SphTypes::CoordinateType;
@@ -70,8 +78,7 @@ public:
     using Tmass     = sph::SphTypes::Tmass;
 
     template<class ValueType>
-    using FieldVector =
-        std::conditional_t<cstone::HaveGpu<AccType>{}, cstone::DeviceVector<ValueType>, std::vector<ValueType>>;
+    using FieldVector = std::conditional_t<useGpu, cstone::DeviceVector<ValueType>, std::vector<ValueType>>;
 
     using FieldVariant = std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*,
                                       FieldVector<uint64_t>*, FieldVector<uint8_t>*>;
@@ -248,8 +255,8 @@ public:
     FieldVector<uint64_t>  id;                                 // unique particle id
     FieldVector<HydroType> dtCourant;                          // per-particle timestep restriction
 
-    std::conditional_t<cstone::HaveGpu<AccType>{}, sph::DeviceNeighborhoodData, sph::NeighborhoodData> neighborhood;
-    cstone::OctreeNsView<RealType, KeyType>                                                            treeView;
+    std::conditional_t<useGpu, sph::DeviceNeighborhoodData, sph::NeighborhoodData> neighborhood;
+    cstone::OctreeNsView<RealType, KeyType>                                        treeView;
 
     //! @brief lookup tables for the SPH-kernel and its derivative
     FieldVector<HydroType> wh, whd;
@@ -376,7 +383,7 @@ public:
 
     float getAllocGrowthRate() const { return allocGrowthRate_; }
 
-    void setNeighborhoodType(sph::NeighborhoodType type) { neighborhood.setType(type); }
+    void disableNeighborLists() { neighborhood.disableNeighborLists(); }
 
 private:
     void createTables()
@@ -408,16 +415,20 @@ void acquire(Dataset& d, const Fs&... fs)
 }
 
 // TODO move this to a better place
-template<class Vector>
-void fillMassHalos(Vector& m, std::size_t first, std::size_t last)
+template<class Vector, cstone::execution::Policy Exec>
+void fillMassHalos(Exec exec, Vector& m, std::size_t first, std::size_t last)
 {
     using T = std::decay_t<Vector>::value_type;
     T mass;
-    if constexpr (IsDeviceVector<Vector>{}) { memcpyD2H(m.data() + first, 1, &mass); }
+    if constexpr (cstone::IsDeviceVector<Vector>{})
+    {
+        cstone::memcpyD2HAsync(exec, m.data() + first, 1, &mass);
+        cstone::syncGpu(exec);
+    }
     else { mass = m[first]; }
 
-    cstone::fill<IsDeviceVector<Vector>{}>(m.begin(), m.begin() + first, mass);
-    cstone::fill<IsDeviceVector<Vector>{}>(m.begin() + last, m.end(), mass);
+    cstone::fill(exec, m.begin(), m.begin() + first, mass);
+    cstone::fill(exec, m.begin() + last, m.end(), mass);
 }
 
 } // namespace sphexa

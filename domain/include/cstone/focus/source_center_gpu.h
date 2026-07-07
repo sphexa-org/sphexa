@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include "cstone/execution.hpp"
 #include "cstone/focus/source_center.hpp"
 #include "cstone/tree/definitions.h"
 
@@ -34,9 +35,11 @@ namespace cstone
  * @param[in]    scale     scaling factor to compute interaction radius from smoothing length
  * @param[inout] centers   bounding box center per leaf cell, size = numLeafNodes, initialized to geometric cell center
  * @param[out]   sizes     bounding box size per leaf cell, size = numLeafNodes
+ * @param[in]    exec      execution policy
  */
 template<class Tc, class Th>
-extern void computeBoundingBoxGpu(const Tc* x,
+extern void computeBoundingBoxGpu(execution::Gpu exec,
+                                  const Tc* x,
                                   const Tc* y,
                                   const Tc* z,
                                   const Th* h,
@@ -57,9 +60,11 @@ extern void computeBoundingBoxGpu(const Tc* x,
  * @param[in]  numLeaves        number of leaf nodes
  * @param[in]  layout           particle location of each node, length @a numLeaves + 1
  * @param[out] centers          output mass centers, in internal node layout, length >= max(leafToInternal)
+ * @param[in]  exec             execution policy
  */
 template<class Tc, class Tm, class Tf>
-extern void computeLeafSourceCenterGpu(const Tc* x,
+extern void computeLeafSourceCenterGpu(execution::Gpu exec,
+                                       const Tc* x,
                                        const Tc* y,
                                        const Tc* z,
                                        const Tm* m,
@@ -75,28 +80,42 @@ extern void computeLeafSourceCenterGpu(const Tc* x,
  * @param[in]    levelRange    first node index per tree level
  * @param[in]    childOffsets  indices of first child node of each node
  * @param[inout] centers       center of mass coordinates with leaf node centers set
+ * @param[in]    exec          execution policy
  */
 template<class T>
-extern void upsweepCentersGpu(int numLevels,
+extern void upsweepCentersGpu(execution::Gpu exec,
+                              int numLevels,
                               const TreeNodeIndex* levelRange,
                               const TreeNodeIndex* childOffsets,
                               SourceCenterType<T>* centers);
 
 //! @brief compute geometric node center and sizes based on node SFC keys
 template<class KeyType, class T>
-extern void computeGeoCentersGpu(
-    const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box);
+extern void computeGeoCentersGpu(execution::Gpu exec,
+                                 const KeyType* prefixes,
+                                 TreeNodeIndex numNodes,
+                                 Vec3<T>* centers,
+                                 Vec3<T>* sizes,
+                                 const Box<T>& box);
 
 //! @brief set @p centers to geometric node centers with Mac radius l * invTheta
 template<class KeyType, class T>
-extern void geoMacSpheresGpu(
-    const KeyType* prefixes, TreeNodeIndex numNodes, SourceCenterType<T>* centers, float invTheta, const Box<T>& box);
+extern void geoMacSpheresGpu(execution::Gpu exec,
+                             const KeyType* prefixes,
+                             TreeNodeIndex numNodes,
+                             SourceCenterType<T>* centers,
+                             float invTheta,
+                             const Box<T>& box);
 
 template<class KeyType, class T>
-extern void
-setMacGpu(const KeyType* prefixes, TreeNodeIndex numNodes, Vec4<T>* macSpheres, float invTheta, const Box<T>& box);
+extern void setMacGpu(execution::Gpu exec,
+                      const KeyType* prefixes,
+                      TreeNodeIndex numNodes,
+                      Vec4<T>* macSpheres,
+                      float invTheta,
+                      const Box<T>& box);
 
 template<class T>
-extern void moveCenters(const Vec3<T>* src, TreeNodeIndex numNodes, Vec4<T>* dest);
+extern void moveCenters(execution::Gpu exec, const Vec3<T>* src, TreeNodeIndex numNodes, Vec4<T>* dest);
 
 } // namespace cstone

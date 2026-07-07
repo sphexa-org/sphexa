@@ -49,8 +49,7 @@ namespace sphexa
 template<class Dataset>
 void initSedovFields(Dataset& d, const InitSettings& constants)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T            = Dataset::RealType;
+    using T = Dataset::RealType;
 
     double r           = constants.at("r1");
     double totalVolume = std::pow(2 * r, 3);
@@ -66,16 +65,16 @@ void initSedovFields(Dataset& d, const InitSettings& constants)
     double ener0 = constants.at("energyTotal") / std::pow(M_PI, 1.5) / width2 / width;
 
     initFieldsAtRest(d, mPart);
-    cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
+    cstone::fill(d.exec, d.h.begin(), d.h.end(), hInit);
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
 
     // If temperature is not allocated, we can still use this initializer for just the coordinates
     if (d.temp.empty() && d.u.empty()) { return; }
 
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
-    auto&& z = toHost(d.z);
+    auto&& x = cstone::toHost(d.x);
+    auto&& y = cstone::toHost(d.y);
+    auto&& z = cstone::toHost(d.z);
 
     std::vector<T> u(d.x.size());
 #pragma omp parallel for schedule(static)

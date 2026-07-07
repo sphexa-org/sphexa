@@ -58,8 +58,8 @@ protected:
     using Tmass         = typename DataType::HydroData::Tmass;
     using MultipoleType = ryoanji::CartesianQuadrupole<Tmass>;
 
-    using Acc       = typename DataType::AcceleratorType;
-    using MHolder_t = std::conditional_t<cstone::HaveGpu<Acc>{},
+    using Acc       = typename DataType::Exec;
+    using MHolder_t = std::conditional_t<cstone::execution::HaveGpu<Acc>{},
                                          MultipoleHolderGpu<MultipoleType, DomainType, typename DataType::HydroData>,
                                          MultipoleHolderCpu<MultipoleType, DomainType, typename DataType::HydroData>>;
 
@@ -136,7 +136,7 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        fillMassHalos(get<"m">(d), first, last);
+        fillMassHalos(domain.exec(), get<"m">(d), first, last);
 
         computeGroups(first, last, d, domain.box(), groups_);
         timer.step("computeGroups");
@@ -239,7 +239,7 @@ public:
                     std::visit(
                         [writer, c = column, key = namesDone[i]](auto field)
                         {
-                            auto&& tmp = toHost(*field);
+                            auto&& tmp = cstone::toHost(*field);
                             writeField(writer, key, tmp.data(), c);
                         },
                         fieldPointers[fidx]);

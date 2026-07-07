@@ -57,7 +57,7 @@ void computeAVswitches(const GroupView&, Dataset& d, const cstone::Box<typename 
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeAVswitches(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
+template void computeAVswitches(const GroupView& grp, sphexa::ParticlesData<cstone::execution::Gpu>& d,
                                 const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace sph::gpu

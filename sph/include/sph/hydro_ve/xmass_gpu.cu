@@ -59,7 +59,7 @@ void computeXMass(const GroupView&, Dataset& d, const cstone::Box<typename Datas
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeXMass(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
+template void computeXMass(const GroupView& grp, sphexa::ParticlesData<cstone::execution::Gpu>& d,
                            const cstone::Box<SphTypes::CoordinateType>&);
 
 template<class Dataset>
@@ -69,7 +69,7 @@ void computeDensity(const GroupView&, Dataset& d, const cstone::Box<typename Dat
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeDensity(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,
+template void computeDensity(const GroupView&, sphexa::ParticlesData<cstone::execution::Gpu>& d,
                              const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace gpu

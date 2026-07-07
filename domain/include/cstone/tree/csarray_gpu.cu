@@ -22,6 +22,7 @@
 
 #include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/cuda/errorcheck.cuh"
+#include "cstone/cuda/thrust_util.cuh"
 #include "cstone/primitives/math.hpp"
 #include "csarray.hpp"
 
@@ -83,7 +84,8 @@ findPopulatedNodes(const KeyType* tree, TreeNodeIndex nNodes, const KeyType* cod
 }
 
 template<class KeyType>
-void computeNodeCountsGpu(const KeyType* tree,
+void computeNodeCountsGpu(execution::Gpu exec,
+                          const KeyType* tree,
                           unsigned* counts,
                           TreeNodeIndex numNodes,
                           std::span<const KeyType> keys,
@@ -92,34 +94,37 @@ void computeNodeCountsGpu(const KeyType* tree,
 {
     TreeNodeIndex popNodes[2];
 
-    findPopulatedNodes<<<1, 1>>>(tree, numNodes, keys.data(), keys.data() + keys.size());
-    checkGpuErrors(cudaMemcpyFromSymbol(popNodes, populatedNodes, 2 * sizeof(TreeNodeIndex)));
+    findPopulatedNodes<<<1, 1, 0, exec>>>(tree, numNodes, keys.data(), keys.data() + keys.size());
+    checkGpuErrors(cudaMemcpyFromSymbolAsync(popNodes, GPU_SYMBOL(populatedNodes), 2 * sizeof(TreeNodeIndex), 0,
+                                             cudaMemcpyDeviceToHost, exec));
+    checkGpuErrors(cudaStreamSynchronize(exec));
 
-    checkGpuErrors(cudaMemset(counts, 0, popNodes[0] * sizeof(unsigned)));
-    checkGpuErrors(cudaMemset(counts + popNodes[1], 0, (numNodes - popNodes[1]) * sizeof(unsigned)));
+    checkGpuErrors(cudaMemsetAsync(counts, 0, popNodes[0] * sizeof(unsigned), exec));
+    checkGpuErrors(cudaMemsetAsync(counts + popNodes[1], 0, (numNodes - popNodes[1]) * sizeof(unsigned), exec));
 
     if (popNodes[1] <= popNodes[0]) { return; }
 
     constexpr unsigned nThreads = 256;
     if (useCountsAsGuess)
     {
-        thrust::exclusive_scan(thrust::device, counts + popNodes[0], counts + popNodes[1], counts + popNodes[0]);
-        updateNodeCountsKernel<<<iceil(popNodes[1] - popNodes[0], nThreads), nThreads>>>(
+        thrust::exclusive_scan(thrustExecPolicy(exec), counts + popNodes[0], counts + popNodes[1],
+                               counts + popNodes[0]);
+        updateNodeCountsKernel<<<iceil(popNodes[1] - popNodes[0], nThreads), nThreads, 0, exec>>>(
             tree + popNodes[0], counts + popNodes[0], popNodes[1] - popNodes[0], keys.data(), keys.data() + keys.size(),
             maxCount);
     }
     else
     {
-        computeNodeCountsKernel<<<iceil(popNodes[1] - popNodes[0], nThreads), nThreads>>>(
+        computeNodeCountsKernel<<<iceil(popNodes[1] - popNodes[0], nThreads), nThreads, 0, exec>>>(
             tree + popNodes[0], counts + popNodes[0], popNodes[1] - popNodes[0], keys.data(), keys.data() + keys.size(),
             maxCount);
     }
 }
 
-template void
-computeNodeCountsGpu(const unsigned*, unsigned*, TreeNodeIndex, std::span<const unsigned>, unsigned, bool);
-template void
-computeNodeCountsGpu(const uint64_t*, unsigned*, TreeNodeIndex, std::span<const uint64_t>, unsigned, bool);
+template void computeNodeCountsGpu(
+    execution::Gpu, const unsigned*, unsigned*, TreeNodeIndex, std::span<const unsigned>, unsigned, bool);
+template void computeNodeCountsGpu(
+    execution::Gpu, const uint64_t*, unsigned*, TreeNodeIndex, std::span<const uint64_t>, unsigned, bool);
 
 //! @brief this symbol is used to keep track of octree structure changes and detect convergence
 __device__ int rebalanceChangeCounter;
@@ -175,45 +180,60 @@ processNodes(const KeyType* oldTree, const TreeNodeIndex* nodeOps, TreeNodeIndex
 __global__ void resetRebalanceCounter() { rebalanceChangeCounter = 0; }
 
 template<class KeyType>
-TreeNodeIndex computeNodeOpsGpu(
-    const KeyType* tree, TreeNodeIndex numNodes, const unsigned* counts, unsigned bucketSize, TreeNodeIndex* nodeOps)
+TreeNodeIndex computeNodeOpsGpu(execution::Gpu exec,
+                                const KeyType* tree,
+                                TreeNodeIndex numNodes,
+                                const unsigned* counts,
+                                unsigned bucketSize,
+                                TreeNodeIndex* nodeOps)
 {
-    resetRebalanceCounter<<<1, 1>>>();
+    resetRebalanceCounter<<<1, 1, 0, exec>>>();
 
     constexpr unsigned nThreads = 512;
-    rebalanceDecisionKernel<<<iceil(numNodes, nThreads), nThreads>>>(tree, counts, numNodes, bucketSize, nodeOps);
+    rebalanceDecisionKernel<<<iceil(numNodes, nThreads), nThreads, 0, exec>>>(tree, counts, numNodes, bucketSize,
+                                                                              nodeOps);
 
     size_t nodeOpsSize = numNodes + 1;
-    thrust::exclusive_scan(thrust::device, nodeOps, nodeOps + nodeOpsSize, nodeOps);
+    thrust::exclusive_scan(thrustExecPolicy(exec), nodeOps, nodeOps + nodeOpsSize, nodeOps);
 
     TreeNodeIndex newNumNodes;
-    thrust::copy_n(thrust::device_pointer_cast(nodeOps) + nodeOpsSize - 1, 1, &newNumNodes);
+    checkGpuErrors(
+        cudaMemcpyAsync(&newNumNodes, nodeOps + nodeOpsSize - 1, sizeof(TreeNodeIndex), cudaMemcpyDeviceToHost, exec));
+    checkGpuErrors(cudaStreamSynchronize(exec));
 
     return newNumNodes;
 }
 
-template TreeNodeIndex computeNodeOpsGpu(const unsigned*, TreeNodeIndex, const unsigned*, unsigned, TreeNodeIndex*);
-template TreeNodeIndex computeNodeOpsGpu(const uint64_t*, TreeNodeIndex, const unsigned*, unsigned, TreeNodeIndex*);
+template TreeNodeIndex
+computeNodeOpsGpu(execution::Gpu, const unsigned*, TreeNodeIndex, const unsigned*, unsigned, TreeNodeIndex*);
+template TreeNodeIndex
+computeNodeOpsGpu(execution::Gpu, const uint64_t*, TreeNodeIndex, const unsigned*, unsigned, TreeNodeIndex*);
 
 template<class KeyType>
-bool rebalanceTreeGpu(const KeyType* tree,
+bool rebalanceTreeGpu(execution::Gpu exec,
+                      const KeyType* tree,
                       TreeNodeIndex numNodes,
                       TreeNodeIndex newNumNodes,
                       const TreeNodeIndex* nodeOps,
                       KeyType* newTree)
 {
     constexpr unsigned nThreads = 512;
-    processNodes<<<iceil(numNodes, nThreads), nThreads>>>(tree, nodeOps, numNodes, newTree);
-    thrust::fill_n(thrust::device_pointer_cast(newTree + newNumNodes), 1, nodeRange<KeyType>(0));
+    processNodes<<<iceil(numNodes, nThreads), nThreads, 0, exec>>>(tree, nodeOps, numNodes, newTree);
+    thrust::fill_n(thrustExecPolicy(exec), thrust::device_pointer_cast(newTree + newNumNodes), 1,
+                   nodeRange<KeyType>(0));
 
     int changeCounter;
-    checkGpuErrors(cudaMemcpyFromSymbol(&changeCounter, rebalanceChangeCounter, sizeof(int)));
+    checkGpuErrors(cudaMemcpyFromSymbolAsync(&changeCounter, GPU_SYMBOL(rebalanceChangeCounter), sizeof(int), 0,
+                                             cudaMemcpyDeviceToHost, exec));
+    checkGpuErrors(cudaStreamSynchronize(exec));
 
     return changeCounter == 0;
 }
 
-template bool rebalanceTreeGpu(const unsigned*, TreeNodeIndex, TreeNodeIndex, const TreeNodeIndex*, unsigned*);
-template bool rebalanceTreeGpu(const uint64_t*, TreeNodeIndex, TreeNodeIndex, const TreeNodeIndex*, uint64_t*);
+template bool
+rebalanceTreeGpu(execution::Gpu, const unsigned*, TreeNodeIndex, TreeNodeIndex, const TreeNodeIndex*, unsigned*);
+template bool
+rebalanceTreeGpu(execution::Gpu, const uint64_t*, TreeNodeIndex, TreeNodeIndex, const TreeNodeIndex*, uint64_t*);
 
 template<class KeyType>
 __global__ void countSfcGapsKernel(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps)
@@ -223,14 +243,14 @@ __global__ void countSfcGapsKernel(const KeyType* tree, TreeNodeIndex numNodes, 
 }
 
 template<class KeyType>
-void countSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps)
+void countSfcGapsGpu(execution::Gpu exec, const KeyType* tree, TreeNodeIndex numNodes, TreeNodeIndex* nodeOps)
 {
     constexpr unsigned nThreads = 512;
-    countSfcGapsKernel<<<iceil(numNodes, nThreads), nThreads>>>(tree, numNodes, nodeOps);
+    countSfcGapsKernel<<<iceil(numNodes, nThreads), nThreads, 0, exec>>>(tree, numNodes, nodeOps);
 }
 
-template void countSfcGapsGpu(const uint32_t*, TreeNodeIndex, TreeNodeIndex*);
-template void countSfcGapsGpu(const uint64_t*, TreeNodeIndex, TreeNodeIndex*);
+template void countSfcGapsGpu(execution::Gpu, const uint32_t*, TreeNodeIndex, TreeNodeIndex*);
+template void countSfcGapsGpu(execution::Gpu, const uint64_t*, TreeNodeIndex, TreeNodeIndex*);
 
 template<class KeyType>
 __global__ void
@@ -242,13 +262,14 @@ fillSfcGapsKernel(const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeInd
 }
 
 template<class KeyType>
-void fillSfcGapsGpu(const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree)
+void fillSfcGapsGpu(
+    execution::Gpu exec, const KeyType* tree, TreeNodeIndex numNodes, const TreeNodeIndex* nodeOps, KeyType* newTree)
 {
     constexpr unsigned nThreads = 128;
-    fillSfcGapsKernel<<<iceil(numNodes + 1, nThreads), nThreads>>>(tree, numNodes, nodeOps, newTree);
+    fillSfcGapsKernel<<<iceil(numNodes + 1, nThreads), nThreads, 0, exec>>>(tree, numNodes, nodeOps, newTree);
 }
 
-template void fillSfcGapsGpu(const uint32_t*, TreeNodeIndex, const TreeNodeIndex*, uint32_t*);
-template void fillSfcGapsGpu(const uint64_t*, TreeNodeIndex, const TreeNodeIndex*, uint64_t*);
+template void fillSfcGapsGpu(execution::Gpu, const uint32_t*, TreeNodeIndex, const TreeNodeIndex*, uint32_t*);
+template void fillSfcGapsGpu(execution::Gpu, const uint64_t*, TreeNodeIndex, const TreeNodeIndex*, uint64_t*);
 
 } // namespace cstone

@@ -59,7 +59,7 @@ struct Observables
     static ObsPtr makeWindBubbleObs(std::ostream& out, double rhoI, double uE, double r);
 };
 
-extern template struct Observables<SimulationData<cstone::CpuTag>>;
-extern template struct Observables<SimulationData<cstone::GpuTag>>;
+extern template struct Observables<SimulationData<cstone::execution::Cpu>>;
+extern template struct Observables<SimulationData<cstone::execution::Gpu>>;
 
 } // namespace sphexa

@@ -158,7 +158,7 @@ static void findPeers(Box<double> box)
                 : makeRandomGaussianKeys<KeyType>(nParticles);
     auto [leaves, counts] = computeOctree<KeyType>(particleKeys, bucketSize);
 
-    OctreeData<KeyType, CpuTag> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     octree.resize(nNodes(leaves));
     updateInternalTree<KeyType>(leaves, octree.data());
     auto octreeView   = octree.cdata();

@@ -100,7 +100,7 @@ public:
             makeRandomGaussianKeys<KeyType>(numParticles, 42, useMixD, axesBits[0], axesBits[1], axesBits[2]);
         auto [tree, counts] = computeOctree<KeyType>(keys, 4);
 
-        OctreeData<KeyType, CpuTag> octree;
+        OctreeData<KeyType, execution::Cpu> octree;
         octree.resize(nNodes(tree));
         updateInternalTree<KeyType>(tree, octree.data());
 

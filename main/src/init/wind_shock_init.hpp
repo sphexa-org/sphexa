@@ -60,9 +60,8 @@ InitSettings WindShockConstants()
 template<class Dataset>
 void initWindShockFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T            = Dataset::RealType;
-    using HydroType    = Dataset::HydroType;
+    using T         = Dataset::RealType;
+    using HydroType = Dataset::HydroType;
 
     T r       = constants.at("r");
     T rSphere = constants.at("rSphere");
@@ -85,9 +84,9 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     T k = d.ngmax / r;
 
     util::array<T, 3> blobCenter{r, r, r};
-    auto&&            x = toHost(d.x);
-    auto&&            y = toHost(d.y);
-    auto&&            z = toHost(d.z);
+    auto&&            x = cstone::toHost(d.x);
+    auto&&            y = cstone::toHost(d.y);
+    auto&&            z = cstone::toHost(d.z);
 
     std::vector<HydroType> h(d.h.size());
     std::vector<T>         u(d.x.size());
@@ -128,9 +127,9 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     d.vx = std::move(vx);
     d.vy = std::move(vy);
     d.vz = std::move(vz);
-    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
-    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
-    cstone::scaleGpuAcc<gpu>(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
 
     if (d.u.empty())
     {

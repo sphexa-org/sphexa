@@ -18,54 +18,33 @@
 #include <chrono>
 #include "cstone/cuda/errorcheck.cuh"
 
-#ifdef __CUDACC__
+#if defined(__CUDACC__) || defined(__HIP__)
+
+#include "cstone/cuda/cuda_runtime.hpp"
 
 //! @brief time a generic unary function
 template<class F>
 float timeGpu(F&& f)
 {
     cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    checkGpuErrors(cudaEventCreate(&start));
+    checkGpuErrors(cudaEventCreate(&stop));
+    cudaStream_t stream;
+    checkGpuErrors(cudaStreamCreate(&stream));
 
-    cudaEventRecord(start, cudaStreamDefault);
+    checkGpuErrors(cudaEventRecord(start, stream));
 
-    f();
+    f(stream);
 
-    cudaEventRecord(stop, cudaStreamDefault);
-    cudaEventSynchronize(stop);
-
-    float t0;
-    cudaEventElapsedTime(&t0, start, stop);
-
-    cudaEventDestroy(start);
-    cudaEventDestroy(stop);
-
-    return t0;
-}
-
-#elif defined(__HIPCC__)
-
-//! @brief time a generic unary function
-template<class F>
-float timeGpu(F&& f)
-{
-    hipEvent_t start, stop;
-    checkGpuErrors(hipEventCreate(&start));
-    checkGpuErrors(hipEventCreate(&stop));
-
-    checkGpuErrors(hipEventRecord(start, hipStreamDefault));
-
-    f();
-
-    checkGpuErrors(hipEventRecord(stop, hipStreamDefault));
-    checkGpuErrors(hipEventSynchronize(stop));
+    checkGpuErrors(cudaEventRecord(stop, stream));
+    checkGpuErrors(cudaEventSynchronize(stop));
 
     float t0;
-    checkGpuErrors(hipEventElapsedTime(&t0, start, stop));
+    checkGpuErrors(cudaEventElapsedTime(&t0, start, stop));
 
-    checkGpuErrors(hipEventDestroy(start));
-    checkGpuErrors(hipEventDestroy(stop));
+    checkGpuErrors(cudaStreamDestroy(stream));
+    checkGpuErrors(cudaEventDestroy(start));
+    checkGpuErrors(cudaEventDestroy(stop));
 
     return t0;
 }

@@ -67,7 +67,7 @@ void computeIdealGasEOS_HydroStd(size_t firstParticle, size_t lastParticle, Data
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeIdealGasEOS_HydroStd(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>&);
+template void computeIdealGasEOS_HydroStd(size_t, size_t, sphexa::ParticlesData<cstone::execution::Gpu>&);
 
 template<typename Th, typename Tu>
 __global__ void cudaComputeIsothermalEOS_HydroStd(size_t first, size_t last, Th cConst, Th* c, Th* rho, Th* p, Tu* temp)
@@ -93,7 +93,7 @@ void computeIsothermalEOS_HydroStd(size_t first, size_t last, Dataset& d)
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeIsothermalEOS_HydroStd(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>& d);
+template void computeIsothermalEOS_HydroStd(size_t, size_t, sphexa::ParticlesData<cstone::execution::Gpu>& d);
 
 template<typename Th, typename Tt>
 __global__ void cudaComputePolytropicEOS_HydroStd(size_t first, size_t last, Tt polytropic_const, Tt polytropic_index,
@@ -119,7 +119,7 @@ void computePolytropicEOS_HydroStd(size_t first, size_t last, Dataset& d)
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computePolytropicEOS_HydroStd(size_t, size_t, sphexa::ParticlesData<cstone::GpuTag>&);
+template void computePolytropicEOS_HydroStd(size_t, size_t, sphexa::ParticlesData<cstone::execution::Gpu>&);
 
 } // namespace gpu
 } // namespace sph

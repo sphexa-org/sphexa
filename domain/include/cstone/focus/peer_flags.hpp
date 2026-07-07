@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "cstone/cuda/cuda_utils.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 
 namespace cstone
 {
@@ -61,26 +62,35 @@ std::vector<int> focusPeers(std::span<const TreeNodeIndex> globalOffsets,
  * @param globalOffsets  rank assignment of index ranges in the global tree
  * @param focusOffsets   rank assignment of index ranges in the focus tree (LET)
  * @param myRank
- * @param globalTree     SFC leaves of global tree, on GPU if @p useGpu == true
+ * @param globalTree     SFC leaves of global tree
  * @param focusTree      SFC leaves of the focus tree, on host
  * @return               see focusPeers
  */
-template<bool useGpu, class KeyType>
-std::vector<int> focusPeersAcc(std::span<const TreeNodeIndex> globalOffsets,
+template<class KeyType>
+std::vector<int> focusPeersAcc(execution::Cpu,
+                               std::span<const TreeNodeIndex> globalOffsets,
                                std::span<const TreeIndexPair> focusOffsets,
                                int myRank,
                                std::span<const KeyType> globalTree,
                                std::span<const KeyType> focusTree)
 {
-    if constexpr (useGpu)
-    {
-        std::vector<KeyType> globalTreeBackingBuffer;
-        globalTreeBackingBuffer.resize(globalTree.size());
-        memcpyD2H(globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data());
-        auto globalTreeHost = std::span(globalTreeBackingBuffer);
-        return focusPeers<KeyType>(globalOffsets, focusOffsets, myRank, globalTreeHost, focusTree);
-    }
     return focusPeers<KeyType>(globalOffsets, focusOffsets, myRank, globalTree, focusTree);
+}
+
+template<class KeyType>
+std::vector<int> focusPeersAcc(execution::Gpu exec,
+                               std::span<const TreeNodeIndex> globalOffsets,
+                               std::span<const TreeIndexPair> focusOffsets,
+                               int myRank,
+                               std::span<const KeyType> globalTree,
+                               std::span<const KeyType> focusTree)
+{
+    std::vector<KeyType> globalTreeBackingBuffer;
+    globalTreeBackingBuffer.resize(globalTree.size());
+    memcpyD2HAsync(exec, globalTree.data(), globalTree.size(), globalTreeBackingBuffer.data());
+    syncGpu(exec);
+    auto globalTreeHost = std::span(globalTreeBackingBuffer);
+    return focusPeers<KeyType>(globalOffsets, focusOffsets, myRank, globalTreeHost, focusTree);
 }
 
 inline void peerFlagsToList(std::span<const int> peerFlags, std::vector<int>& peersList, PeerMask mask)

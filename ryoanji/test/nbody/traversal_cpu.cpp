@@ -56,7 +56,7 @@ TEST(Gravity, TreeWalk)
     auto [treeLeaves, counts] = computeOctree(std::span(coordinates.particleKeys()), bucketSize);
 
     // fully linked octree, including internal part
-    OctreeData<KeyType, CpuTag> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     octree.resize(nNodes(treeLeaves));
     updateInternalTree<KeyType>(treeLeaves, octree.data());
 

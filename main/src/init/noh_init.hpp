@@ -67,9 +67,8 @@ std::map<std::string, double> nohConstants()
 template<class Dataset>
 void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T            = typename Dataset::RealType;
-    using HydroType    = typename Dataset::HydroType;
+    using T         = typename Dataset::RealType;
+    using HydroType = typename Dataset::HydroType;
 
     double r           = constants.at("r1");
     double totalVolume = 4. * M_PI / 3. * r * r * r;
@@ -79,19 +78,19 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
     auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
     auto temp0 = constants.at("u0") / cv;
 
-    cstone::fill<gpu>(d.m.begin(), d.m.end(), mPart);
-    cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
-    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
-    cstone::fill<gpu>(d.temp.begin(), d.temp.end(), temp0);
-    cstone::fill<gpu>(d.u.begin(), d.u.end(), constants.at("u0"));
-    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
+    cstone::fill(d.exec, d.m.begin(), d.m.end(), mPart);
+    cstone::fill(d.exec, d.h.begin(), d.h.end(), hInit);
+    cstone::fill(d.exec, d.du_m1.begin(), d.du_m1.end(), 0.0);
+    cstone::fill(d.exec, d.mui.begin(), d.mui.end(), d.muiConst);
+    cstone::fill(d.exec, d.temp.begin(), d.temp.end(), temp0);
+    cstone::fill(d.exec, d.u.begin(), d.u.end(), constants.at("u0"));
+    cstone::fill(d.exec, d.alpha.begin(), d.alpha.end(), d.alphamin);
 
-    generateParticleIDs<gpu>(d.id);
+    generateParticleIDs(d.exec, d.id);
 
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
-    auto&& z = toHost(d.z);
+    auto&& x = cstone::toHost(d.x);
+    auto&& y = cstone::toHost(d.y);
+    auto&& z = cstone::toHost(d.z);
 
     std::vector<HydroType> vx(d.vx.size()), vy(d.vy.size()), vz(d.vz.size());
 
@@ -108,9 +107,9 @@ void initNohFields(Dataset& d, const std::map<std::string, double>& constants)
     d.vx = std::move(vx);
     d.vy = std::move(vy);
     d.vz = std::move(vz);
-    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
-    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
-    cstone::scaleGpuAcc<gpu>(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
 }
 
 template<class Dataset>

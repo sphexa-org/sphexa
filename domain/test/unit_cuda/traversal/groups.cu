@@ -22,6 +22,7 @@
 #include <thrust/host_vector.h>
 #include <thrust/sequence.h>
 
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/traversal/groups_gpu.cuh"
@@ -38,8 +39,11 @@ TEST(TargetGroups, t0)
 {
     LocalIndex groupSize = 8, first = 4, last = 34;
 
-    GroupData<GpuTag> groups;
-    computeFixedGroups(first, last, groupSize, groups);
+    StreamHolder stream;
+
+    GroupData<execution::Gpu> groups;
+    computeFixedGroups(stream.exec(), first, last, groupSize, groups);
+    stream.sync();
 
     std::vector<LocalIndex> hgroups = toHost(groups.data);
     std::vector<LocalIndex> ref{4, 12, 20, 28, 34};
@@ -275,9 +279,12 @@ TEST(TargetGroups, groupVolumes)
         //                            because of distance ^    ^ because of interaction radius
         DeviceVector<LocalIndex> temp, groups;
 
+        StreamHolder stream;
+
         float tolFactor = std::sqrt(3.0) / distCrit * 1.01;
-        computeGroupSplits(first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves), nNodes(leaves),
-                           rawPtr(d_layout), box, groupSize, tolFactor, temp, groups);
+        computeGroupSplits(stream.exec(), first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves),
+                           nNodes(leaves), rawPtr(d_layout), box, groupSize, tolFactor, temp, groups);
+        stream.sync();
 
         std::vector<LocalIndex> h_groups = toHost(groups);
         std::vector<LocalIndex> ref{4, 6, 68, 75, 128};

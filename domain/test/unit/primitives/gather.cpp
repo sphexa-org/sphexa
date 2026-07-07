@@ -38,12 +38,12 @@ TEST(GatherCpu, sortInvert)
 template<class ValueType, class KeyType>
 void CpuGatherTest()
 {
-    constexpr bool gpu = false;
+    constexpr execution::Cpu exec;
     std::vector<KeyType> keys{0, 50, 10, 60, 20, 70, 30, 80, 40, 90};
 
     std::vector<unsigned> obuf, s0, s1;
-    sequence<gpu>(0, keys.size(), obuf, 1.0);
-    sortByKey<gpu>(std::span(keys), std::span(obuf), s0, s1, 1.0);
+    sequence(exec, 0, keys.size(), obuf, 1.0);
+    sortByKey(exec, std::span(keys), std::span(obuf), s0, s1, 1.0);
 
     {
         std::vector<KeyType> refCodes{0, 10, 20, 30, 40, 50, 60, 70, 80, 90};

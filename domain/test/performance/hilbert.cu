@@ -49,10 +49,11 @@ computeSfcKeysKernel(KeyType* keys, const unsigned* x, const unsigned* y, const 
 }
 
 template<class KeyType>
-inline void computeSfcKeys(KeyType* keys, const unsigned* x, const unsigned* y, const unsigned* z, size_t numKeys, const AxesBits& axesBits)
+inline void computeSfcKeys(
+    cudaStream_t stream, KeyType* keys, const unsigned* x, const unsigned* y, const unsigned* z, size_t numKeys, const AxesBits& axesBits)
 {
     constexpr int threadsPerBlock = 256;
-    computeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock>>>(keys, x, y, z, numKeys, axesBits);
+    computeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock, 0, stream>>>(keys, x, y, z, numKeys, axesBits);
 }
 
 /*! @brief CUDA kernel to decode SFC (Hilbert/Morton) keys into integer coordinates
@@ -83,10 +84,11 @@ __global__ void decodeSfcKeysKernel(const KeyType* keys, unsigned* x, unsigned* 
  * @param[in]  axesBits   mixed-dimension bit depth per axis (for non-cubic boxes)
  */
 template<class KeyType>
-inline void decodeSfcKeys(const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, size_t numKeys, const AxesBits& axesBits)
+inline void
+decodeSfcKeys(cudaStream_t stream, const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, size_t numKeys, const AxesBits& axesBits)
 {
     constexpr int threadsPerBlock = 256;
-    decodeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock>>>(keys, x, y, z, numKeys, axesBits);
+    decodeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock, 0, stream>>>(keys, x, y, z, numKeys, axesBits);
 }
 
 int main()
@@ -129,10 +131,18 @@ int main()
         thrust::device_vector<unsigned> dy = iy;
         thrust::device_vector<unsigned> dz = iz;
 
+<<<<<<< HEAD
         auto computeHilbert = [&]()
         { computeSfcKeys(rawPtr(hilbertKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, axesBits); };
 
         auto computeMorton = [&]() { computeSfcKeys(rawPtr(mortonKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, axesBits); };
+=======
+        auto computeHilbert = [&](cudaStream_t stream)
+        { computeSfcKeys(stream, rawPtr(hilbertKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys); };
+
+        auto computeMorton = [&](cudaStream_t stream)
+        { computeSfcKeys(stream, rawPtr(mortonKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys); };
+>>>>>>> origin/develop
 
         float t_hilbert = timeGpu(computeHilbert);
         float t_morton  = timeGpu(computeMorton);
@@ -143,8 +153,13 @@ int main()
         thrust::device_vector<unsigned> dy2(numKeys);
         thrust::device_vector<unsigned> dz2(numKeys);
 
+<<<<<<< HEAD
         auto decodeHilbert = [&]()
         { decodeSfcKeys(rawPtr(hilbertKeys), rawPtr(dx2), rawPtr(dy2), rawPtr(dz2), numKeys, axesBits); };
+=======
+        auto decodeHilbert = [&](cudaStream_t stream)
+        { decodeSfcKeys(stream, rawPtr(hilbertKeys), rawPtr(dx2), rawPtr(dy2), rawPtr(dz2), numKeys); };
+>>>>>>> origin/develop
 
         float t_decode  = timeGpu(decodeHilbert);
         bool passDecode = thrust::equal(dx.begin(), dx.end(), dx2.begin()) &&
@@ -163,11 +178,17 @@ int main()
         thrust::device_vector<Real> dy = y;
         thrust::device_vector<Real> dz = z;
 
-        auto computeHilbert = [&]()
-        { computeSfcKeysGpu(rawPtr(dx), rawPtr(dy), rawPtr(dz), rawPtr(hilbertKeys2), numKeys, box); };
+        auto computeHilbert = [&](cudaStream_t stream)
+        {
+            computeSfcKeys(execution::gpuStream(stream), rawPtr(dx), rawPtr(dy), rawPtr(dz), rawPtr(hilbertKeys2),
+                           numKeys, box);
+        };
 
-        auto computeMorton = [&]()
-        { computeSfcKeysGpu(rawPtr(dx), rawPtr(dy), rawPtr(dz), rawPtr(mortonKeys2), numKeys, box); };
+        auto computeMorton = [&](cudaStream_t stream)
+        {
+            computeSfcKeys(execution::gpuStream(stream), rawPtr(dx), rawPtr(dy), rawPtr(dz), rawPtr(mortonKeys2),
+                           numKeys, box);
+        };
 
         float t_hilbert = timeGpu(computeHilbert);
         float t_morton  = timeGpu(computeMorton);
@@ -184,9 +205,9 @@ int main()
         thrust::device_vector<unsigned> ordering(numKeys);
         thrust::sequence(ordering.begin(), ordering.end(), 0);
 
-        auto radixSort = [&]()
+        auto radixSort = [&](cudaStream_t stream)
         {
-            thrust::sort_by_key(thrust::device, (IntegerType*)rawPtr(hilbertKeys),
+            thrust::sort_by_key(thrustExecPolicy(execution::gpuStream(stream)), (IntegerType*)rawPtr(hilbertKeys),
                                 (IntegerType*)rawPtr(hilbertKeys) + numKeys, ordering.begin());
         };
         float t_radixSort = timeGpu(radixSort);

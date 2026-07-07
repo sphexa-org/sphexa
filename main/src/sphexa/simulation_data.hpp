@@ -39,15 +39,15 @@ namespace sphexa
 {
 
 //! @brief the place to store hydro, chemistry, nuclear and other simulation data
-template<class AccType>
+template<cstone::execution::Policy Execution>
 class SimulationData
 {
 public:
-    using AcceleratorType = AccType;
-    using KeyType         = sph::SphTypes::KeyType;
-    using RealType        = sph::SphTypes::CoordinateType;
+    using Exec     = Execution;
+    using KeyType  = sph::SphTypes::KeyType;
+    using RealType = sph::SphTypes::CoordinateType;
 
-    using HydroData = ParticlesData<AccType>;
+    using HydroData = ParticlesData<Exec>;
     using ChemData  = cooling::ChemistryData<RealType>;
 
     //! @brief spacially distributed data for hydrodynamics and gravity

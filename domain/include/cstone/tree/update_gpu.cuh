@@ -21,6 +21,7 @@
 
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/tree/csarray_gpu.h"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "csarray.hpp"
 
 namespace cstone
@@ -29,6 +30,7 @@ namespace cstone
 /*! @brief update the octree with a single rebalance/count step
  *
  * @tparam KeyType           32- or 64-bit unsigned integer for morton code
+ * @param[in]    exec        execution policy
  * @param[in]    keys        local particle SFC keys
  * @param[in]    bucketSize  maximum number of particles per node
  * @param[inout] tree        the octree leaf nodes (cornerstone format)
@@ -39,7 +41,8 @@ namespace cstone
  * @return                   true if converged, false otherwise
  */
 template<class KeyType, class DevKeyVec, class DevCountVec, class DevIdxVec>
-bool updateOctreeGpu(std::span<const KeyType> keys,
+bool updateOctreeGpu(execution::Gpu exec,
+                     std::span<const KeyType> keys,
                      unsigned bucketSize,
                      DevKeyVec& tree,
                      DevCountVec& counts,
@@ -49,16 +52,17 @@ bool updateOctreeGpu(std::span<const KeyType> keys,
 {
     workArray.resize(tree.size());
     TreeNodeIndex newNumNodes =
-        computeNodeOpsGpu(rawPtr(tree), nNodes(tree), rawPtr(counts), bucketSize, rawPtr(workArray));
+        computeNodeOpsGpu(exec, rawPtr(tree), nNodes(tree), rawPtr(counts), bucketSize, rawPtr(workArray));
 
     tmpTree.resize(newNumNodes + 1);
-    bool converged = rebalanceTreeGpu(rawPtr(tree), nNodes(tree), newNumNodes, rawPtr(workArray), rawPtr(tmpTree));
+    bool converged =
+        rebalanceTreeGpu(exec, rawPtr(tree), nNodes(tree), newNumNodes, rawPtr(workArray), rawPtr(tmpTree));
 
     swap(tree, tmpTree);
     counts.resize(nNodes(tree));
 
     // local node counts
-    computeNodeCountsGpu(rawPtr(tree), rawPtr(counts), nNodes(tree), keys, maxCount, true);
+    computeNodeCountsGpu(exec, rawPtr(tree), rawPtr(counts), nNodes(tree), keys, maxCount, true);
 
     return converged;
 }

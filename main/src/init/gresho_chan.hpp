@@ -48,7 +48,6 @@ InitSettings GreshoChanSettings()
 template<class Dataset, class T>
 void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& settings, T mPart)
 {
-    constexpr bool gpu   = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
     using HydroType      = Dataset::HydroType;
     using RealType       = Dataset::RealType;
     double ng0           = settings.at("ng0");
@@ -66,10 +65,10 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     double P0 = settings.at("P0");
 
     initFieldsAtRest(d, mPart);
-    cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
+    cstone::fill(d.exec, d.h.begin(), d.h.end(), hInit);
 
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
+    auto&& x = cstone::toHost(d.x);
+    auto&& y = cstone::toHost(d.y);
 
     cstone::LocalIndex     numPartLoc = d.x.size();
     std::vector<RealType>  u(numPartLoc);
@@ -106,8 +105,8 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     }
     d.vx = std::move(vx);
     d.vy = std::move(vy);
-    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), firstTimeStep);
-    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), firstTimeStep);
+    cstone::scale(d.exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), firstTimeStep);
+    cstone::scale(d.exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), firstTimeStep);
 
     if (d.temp.empty()) { d.u = std::move(u); }
     else

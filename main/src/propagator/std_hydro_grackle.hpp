@@ -204,14 +204,14 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        auto&& rho = toHost(d.rho);
-        auto&& u   = toHost(d.u);
+        auto&& rho = cstone::toHost(d.rho);
+        auto&& u   = cstone::toHost(d.u);
 
         auto minDtCooling = cooling::coolingTimestep(first, last, rho.data(), u.data(), cooling_data, simData.chem);
         computeTimestep(first, last, d, minDtCooling);
         timer.step("Timestep");
 
-        auto du = toHost(d.du);
+        auto du = cstone::toHost(d.du);
         cooling_data.cool_particles(T(d.minDt), rho.data(), u.data(),
                                     cstone::getPointers(get<CoolingFields>(simData.chem), 0), du.data(), first, last);
 

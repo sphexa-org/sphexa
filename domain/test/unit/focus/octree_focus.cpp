@@ -71,7 +71,7 @@ static void rebalanceDecision()
 
     {
         std::vector<KeyType> cstree = OctreeMaker<KeyType>{}.divide().divide(0).divide(7).makeTree();
-        OctreeData<KeyType, CpuTag> octree;
+        OctreeData<KeyType, execution::Cpu> octree;
         octree.resize(nNodes(cstree));
         updateInternalTree<KeyType>(cstree, octree.data());
 
@@ -93,7 +93,7 @@ static void rebalanceDecision()
     }
     {
         std::vector<KeyType> cstree = OctreeMaker<KeyType>{}.divide().divide(0).divide(7).makeTree();
-        OctreeData<KeyType, CpuTag> octree;
+        OctreeData<KeyType, execution::Cpu> octree;
         octree.resize(nNodes(cstree));
         updateInternalTree<KeyType>(cstree, octree.data());
 
@@ -115,7 +115,7 @@ static void rebalanceDecision()
     }
     {
         std::vector<KeyType> cstree = OctreeMaker<KeyType>{}.divide().divide(0).divide(7).makeTree();
-        OctreeData<KeyType, CpuTag> octree;
+        OctreeData<KeyType, execution::Cpu> octree;
         octree.resize(nNodes(cstree));
         updateInternalTree<KeyType>(cstree, octree.data());
 
@@ -137,7 +137,7 @@ static void rebalanceDecision()
     {
         // this example has a focus area that cuts through sets of 8 neighboring sibling nodes
         std::vector<KeyType> cstree = OctreeMaker<KeyType>{}.divide().divide(0).divide(1).makeTree();
-        OctreeData<KeyType, CpuTag> octree;
+        OctreeData<KeyType, execution::Cpu> octree;
         octree.resize(nNodes(cstree));
         updateInternalTree<KeyType>(cstree, octree.data());
 
@@ -164,7 +164,7 @@ static void rebalanceDecision()
     }
     {
         std::vector<KeyType> cstree = OctreeMaker<KeyType>{}.divide().divide(6).divide(7).makeTree();
-        OctreeData<KeyType, CpuTag> octree;
+        OctreeData<KeyType, execution::Cpu> octree;
         octree.resize(nNodes(cstree));
         updateInternalTree<KeyType>(cstree, octree.data());
 
@@ -197,7 +197,7 @@ static void nodeOpsKeepAlive()
 {
     {
         std::vector<KeyType> cstree = OctreeMaker<KeyType>{}.divide().divide(0).divide(7).makeTree();
-        OctreeData<KeyType, CpuTag> octree;
+        OctreeData<KeyType, execution::Cpu> octree;
         octree.resize(nNodes(cstree));
         updateInternalTree<KeyType>(cstree, octree.data());
 
@@ -232,7 +232,7 @@ TEST(FocusedOctree, keyEnforcement)
 
     {
         auto cstree = OctreeMaker<KeyType>{}.divide().divide(1).makeTree();
-        OctreeData<KeyType, CpuTag> octree_;
+        OctreeData<KeyType, execution::Cpu> octree_;
         octree_.resize(nNodes(cstree));
         updateInternalTree<KeyType>(cstree, octree_.data());
         auto octree = octree_.data();
@@ -521,7 +521,7 @@ protected:
     }
 
     std::vector<KeyType> leaves;
-    OctreeData<KeyType, CpuTag> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     OctreeView<KeyType> ov;
     std::vector<SourceCenterType<T>> centers;
     std::vector<uint8_t> macs;

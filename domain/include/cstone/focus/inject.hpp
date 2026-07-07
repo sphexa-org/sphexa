@@ -69,29 +69,31 @@ void injectKeys(std::vector<KeyType, Alloc>& tree, std::span<const KeyType> keys
  * between consecutive keys.
  */
 template<class KeyType>
-void injectKeysGpu(DeviceVector<KeyType>& leaves,
+void injectKeysGpu(execution::Gpu exec,
+                   DeviceVector<KeyType>& leaves,
                    std::span<const KeyType> keys,
                    DeviceVector<KeyType>& keyScratch,
                    DeviceVector<TreeNodeIndex>& spanOps,
                    DeviceVector<TreeNodeIndex>& spanOpsScan)
 {
     reallocate(leaves, leaves.size() + keys.size(), 1.0);
-    memcpyD2D(keys.data(), keys.size(), leaves.data() + leaves.size() - keys.size());
+    memcpyD2DAsync(exec, keys.data(), keys.size(), leaves.data() + leaves.size() - keys.size());
 
     reallocateDestructive(keyScratch, leaves.size(), 1.0);
-    sortGpu(rawPtr(leaves), rawPtr(leaves) + leaves.size(), rawPtr(keyScratch));
+    sort(exec, rawPtr(leaves), rawPtr(leaves) + leaves.size(), rawPtr(keyScratch));
 
     reallocateDestructive(spanOps, leaves.size(), 1.0);
     reallocateDestructive(spanOpsScan, leaves.size(), 1.0);
 
-    countSfcGapsGpu(leaves.data(), nNodes(leaves), spanOps.data());
-    exclusiveScanGpu(spanOps.data(), spanOps.data() + leaves.size(), spanOpsScan.data());
+    countSfcGapsGpu(exec, leaves.data(), nNodes(leaves), spanOps.data());
+    exclusiveScan(exec, spanOps.data(), spanOps.data() + leaves.size(), spanOpsScan.data());
 
     TreeNodeIndex numNodesGap;
-    memcpyD2H(spanOpsScan.data() + leaves.size() - 1, 1, &numNodesGap);
+    memcpyD2HAsync(exec, spanOpsScan.data() + leaves.size() - 1, 1, &numNodesGap);
+    syncGpu(exec);
 
     reallocateDestructive(keyScratch, numNodesGap + 1, 1.0);
-    fillSfcGapsGpu(leaves.data(), nNodes(leaves), spanOpsScan.data(), keyScratch.data());
+    fillSfcGapsGpu(exec, leaves.data(), nNodes(leaves), spanOpsScan.data(), keyScratch.data());
     swap(leaves, keyScratch);
 }
 

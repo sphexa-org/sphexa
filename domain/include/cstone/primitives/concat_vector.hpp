@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "cstone/cuda/cuda_stubs.h"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/util/pack_buffers.hpp"
 
 namespace cstone
@@ -58,7 +59,16 @@ private:
 
 //! @brief copy src to dst
 template<class T, template<class...> class AccVec1, template<class...> class AccVec2, int A>
-void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst)
+void copy(execution::Cpu, const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst)
+{
+    std::vector<std::size_t> sizes(src.sizes().begin(), src.sizes().end());
+    auto dstView = dst.reindex(std::move(sizes));
+    T* dstBuffer = dstView.front().data();
+    std::copy_n(src.data().data(), src.data().size(), dstBuffer);
+}
+
+template<class T, template<class...> class AccVec1, template<class...> class AccVec2, int A>
+void copy(execution::Gpu exec, const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& dst)
 {
     std::vector<std::size_t> sizes(src.sizes().begin(), src.sizes().end());
     auto dstView = dst.reindex(std::move(sizes));
@@ -66,20 +76,18 @@ void copy(const ConcatVector<T, AccVec1, A>& src, ConcatVector<T, AccVec2, A>& d
 
     if constexpr (!IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{})
     {
-        memcpyH2D(src.data().data(), src.data().size(), dstBuffer);
+        memcpyH2DAsync(exec, src.data().data(), src.data().size(), dstBuffer);
     }
     else if constexpr (IsDeviceVector<AccVec1<T>>{} && !IsDeviceVector<AccVec2<T>>{})
     {
-        memcpyD2H(src.data().data(), src.data().size(), dstBuffer);
+        memcpyD2HAsync(exec, src.data().data(), src.data().size(), dstBuffer);
     }
-    else if constexpr (IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{})
+    else
     {
-        memcpyD2D(src.data().data(), src.data().size(), dstBuffer);
+        static_assert(IsDeviceVector<AccVec1<T>>{} && IsDeviceVector<AccVec2<T>>{});
+        memcpyD2DAsync(exec, src.data().data(), src.data().size(), dstBuffer);
     }
-    else if constexpr (!IsDeviceVector<AccVec1<T>>{} && !IsDeviceVector<AccVec2<T>>{})
-    {
-        std::copy_n(src.data().data(), src.data().size(), dstBuffer);
-    }
+    syncGpu(exec);
 }
 
 } // namespace cstone

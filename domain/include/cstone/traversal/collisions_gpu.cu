@@ -58,7 +58,8 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
 }
 
 template<class KeyType, class T>
-void findHalosGpu(const KeyType* prefixes,
+void findHalosGpu(execution::Gpu exec,
+                  const KeyType* prefixes,
                   const TreeNodeIndex* childOffsets,
                   const TreeNodeIndex* parents,
                   const Vec3<T>* nodeCenters,
@@ -75,12 +76,13 @@ void findHalosGpu(const KeyType* prefixes,
     unsigned numBlocks            = iceil(lastNode - firstNode, numThreads);
 
     if (numBlocks == 0) { return; }
-    findHalosKernel<<<numBlocks, numThreads>>>(prefixes, childOffsets, parents, nodeCenters, nodeSizes, leaves,
-                                               searchCenters, searchSizes, box, firstNode, lastNode, collisionFlags);
+    findHalosKernel<<<numBlocks, numThreads, 0, exec>>>(prefixes, childOffsets, parents, nodeCenters, nodeSizes, leaves,
+                                                        searchCenters, searchSizes, box, firstNode, lastNode,
+                                                        collisionFlags);
 }
 
 #define FIND_HALOS_GPU(KeyType, T)                                                                                     \
-    template void findHalosGpu(const KeyType* prefixes, const TreeNodeIndex* childOffsets,                             \
+    template void findHalosGpu(execution::Gpu, const KeyType* prefixes, const TreeNodeIndex* childOffsets,             \
                                const TreeNodeIndex* parents, const Vec3<T>* nodeCenters, const Vec3<T>* nodeSizes,     \
                                const KeyType* leaves, const Vec3<T>* searchCenters, const Vec3<T>* searchSizes,        \
                                const Box<T>& box, TreeNodeIndex firstNode, TreeNodeIndex lastNode,                     \
@@ -124,7 +126,8 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
 }
 
 template<class T, class KeyType>
-void markMacsGpu(const KeyType* prefixes,
+void markMacsGpu(execution::Gpu exec,
+                 const KeyType* prefixes,
                  const TreeNodeIndex* childOffsets,
                  const TreeNodeIndex* parents,
                  const Vec4<T>* centers,
@@ -140,13 +143,13 @@ void markMacsGpu(const KeyType* prefixes,
     const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
     if (numFocusNodes)
     {
-        markMacsGpuKernel<<<numBlocks, numThreads>>>(prefixes, childOffsets, parents, centers, box, focusNodes,
-                                                     numFocusNodes, limitSource, markings, axesBits);
+        markMacsGpuKernel<<<numBlocks, numThreads, 0, exec>>>(prefixes, childOffsets, parents, centers, box, focusNodes,
+                                                              numFocusNodes, limitSource, markings, axesBits);
     }
 }
 
 #define MARK_MACS_GPU(KeyType, T)                                                                                      \
-    template void markMacsGpu(const KeyType* prefixes, const TreeNodeIndex* childOffsets,                              \
+    template void markMacsGpu(execution::Gpu, const KeyType* prefixes, const TreeNodeIndex* childOffsets,              \
                               const TreeNodeIndex* parents, const Vec4<T>* centers, const Box<T>& box,                 \
                               const KeyType* focusNodes, TreeNodeIndex numFocusNodes, bool limitSource,                \
                               uint8_t* markings)
