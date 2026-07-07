@@ -75,7 +75,7 @@ protected:
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
-                                       "xm", "kx", "nc", "dtCourant", "divv", "curlv", "gradh">;
+                                       "xm", "kx", "nc", "dtCourant", "divv", "curlv">;
 
     //! @brief velocity gradient fields will only be allocated when SLR is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
@@ -157,8 +157,8 @@ public:
         domain.exchangeHalos(get<"vx", "vy", "vz", "kx">(d), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        //release(d, "ay", "az");
-        //acquire(d, "divv", "gradh");
+        release(d, "az");
+        acquire(d, "gradh");
         computeIadDivvCurlvGradh(groups_.view(), d, domain.box());
         d.minDtRho = rhoTimestep(first, last, d);
         timer.step("IadVelocityDivCurlGradh");
@@ -184,8 +184,8 @@ public:
         else { domain.exchangeHalos(get<"prho", "alpha">(d), get<"ax">(d), get<"keys">(d)); }
         timer.step("mpi::synchronizeHalos");
 
-        //release(d, "divv", "gradh");
-        //acquire(d, "ay", "az");
+        release(d, "gradh");
+        acquire(d, "az");
         computeMomentumEnergy<SLR>(groups_.view(), nullptr, d, domain.box());
         timer.step("MomentumAndEnergy");
         pmReader.step();
@@ -257,12 +257,12 @@ public:
         output();
 
         // second output pass: write temporary quantities produced by the EOS
-        release(d, "c11", "c12"); //, "c13");
-        acquire(d, "rho", "p"); //, "gradh");
+        release(d, "c11", "c12", "c13");
+        acquire(d, "rho", "p", "gradh");
         computeEOS(first, last, d);
         output();
-        release(d, "rho", "p");//, "gradh");
-        acquire(d, "c11", "c12");//, "c13");
+        release(d, "rho", "p", "gradh");
+        acquire(d, "c11", "c12", "c13");
 
         // third output pass: recover temporary curlv and divv quantities
         //release(d, "prho", "c");
