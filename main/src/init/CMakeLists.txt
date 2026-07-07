@@ -14,7 +14,7 @@ endfunction()
 enableTDEInit(sim_init)
 enableGrackle(sim_init)
 
-if ((CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER) AND (SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP))
+if (SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP)
     add_library(sim_init_gpu sim_init.cpp)
     target_compile_definitions(sim_init_gpu PRIVATE USE_CUDA)
     target_include_directories(sim_init_gpu PRIVATE ${PROJECT_SOURCE_DIR}/main/src ${COOLING_DIR} ${CSTONE_DIR}
@@ -24,11 +24,11 @@ if ((CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER) AND (SPH_EXA_WITH_CUDA OR SPH_EX
     enableTDEInit(sim_init_gpu)
 endif ()
 
-if (CMAKE_CUDA_COMPILER AND SPH_EXA_WITH_CUDA)
+if (SPH_EXA_WITH_CUDA)
     target_link_libraries(sim_init_gpu PRIVATE CUDA::cudart)
 endif ()
 
-if (CMAKE_HIP_COMPILER AND SPH_EXA_WITH_HIP)
+if (SPH_EXA_WITH_HIP)
     target_link_libraries(sim_init_gpu PRIVATE hip::host)
     target_compile_definitions(sim_init_gpu PRIVATE THRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)
     set_target_properties(sim_init_gpu PROPERTIES LINKER_LANGUAGE CXX)
