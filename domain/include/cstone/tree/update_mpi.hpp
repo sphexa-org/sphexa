@@ -64,7 +64,7 @@ bool updateOctreeGlobal(std::span<const KeyType> keys,
 template<class KeyType>
 unsigned updateOctreeGlobal(std::span<const KeyType> keys,
                             unsigned bucketSize,
-                            OctreeData<KeyType, CpuTag>& tree,
+                            OctreeData<KeyType, execution::Cpu>& tree,
                             std::vector<KeyType>& leaves,
                             std::vector<unsigned>& counts,
                             MPI_Comm comm)

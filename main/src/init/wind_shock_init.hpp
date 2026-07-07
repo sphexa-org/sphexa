@@ -60,9 +60,8 @@ InitSettings WindShockConstants()
 template<class Dataset>
 void initWindShockFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T            = typename Dataset::RealType;
-    using HydroType    = typename Dataset::HydroType;
+    using T         = Dataset::RealType;
+    using HydroType = Dataset::HydroType;
 
     T r       = constants.at("r");
     T rSphere = constants.at("rSphere");
@@ -78,22 +77,16 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     T hExt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoExt);
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
-
-    cstone::fill<gpu>(d.m.begin(), d.m.end(), massPart);
-    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
-    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
-
-    generateParticleIDs<gpu>(d.id);
+    initFieldsAtRest(d, massPart);
 
     T uInt = uExt / (rhoInt / rhoExt);
 
     T k = d.ngmax / r;
 
     util::array<T, 3> blobCenter{r, r, r};
-    auto&&            x = toHost(d.x);
-    auto&&            y = toHost(d.y);
-    auto&&            z = toHost(d.z);
+    auto&&            x = cstone::toHost(d.x);
+    auto&&            y = cstone::toHost(d.y);
+    auto&&            z = cstone::toHost(d.z);
 
     std::vector<HydroType> h(d.h.size());
     std::vector<T>         u(d.x.size());
@@ -134,9 +127,9 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     d.vx = std::move(vx);
     d.vy = std::move(vy);
     d.vz = std::move(vz);
-    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
-    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
-    cstone::scaleGpuAcc<gpu>(d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
+    cstone::scale(d.exec, d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
 
     if (d.u.empty()) //if there is no u ASSUMES that temp is allocated so it divides by cv
     {
@@ -155,13 +148,14 @@ class WindShockGlass : public ISimInitializer<Dataset>
 public:
     WindShockGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , ISimInitializer<Dataset>(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, WindShockConstants(), settingsFile, reader);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                     IFileReader* reader) const override
     {
         auto& d       = simData.hydro;
         using KeyType = typename Dataset::KeyType;

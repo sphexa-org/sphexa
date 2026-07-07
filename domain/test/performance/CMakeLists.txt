@@ -10,6 +10,7 @@ if(CMAKE_CUDA_COMPILER)
 endif ()
 
 if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
+    cstone_add_cuda_performance_test(sph_density_driver.cu sph_density_test_gpu)
     cstone_add_cuda_performance_test(octree.cu octree_perf_gpu)
     cstone_add_cuda_performance_test(hilbert.cu hilbert_perf_gpu)
 endif()

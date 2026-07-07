@@ -54,7 +54,8 @@ static int multipoleExchangeTest(int thisRank, int numRanks)
 
     std::vector<KeyType> particleKeys(x.size());
 
-    cstone::Domain<KeyType, T> domain(thisRank, numRanks, bucketSize, bucketSizeLocal, theta, MPI_COMM_WORLD, box);
+    cstone::Domain<KeyType, T> domain(cstone::execution::cpu, thisRank, numRanks, bucketSize, bucketSizeLocal, theta,
+                                      MPI_COMM_WORLD, box);
 
     std::vector<T> s1, s2, s3;
     domain.syncGrav(particleKeys, x, y, z, h, m, std::tuple{}, std::tie(s1, s2, s3));

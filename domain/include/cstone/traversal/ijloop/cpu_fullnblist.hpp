@@ -20,6 +20,7 @@
 #include <tuple>
 #include <memory>
 
+#include "cstone/execution.hpp"
 #include "cstone/findneighbors.hpp"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/ijloop/common.hpp"
@@ -115,7 +116,8 @@ struct CpuFullNbListNeighborhoodBuilder
 
     template<class Tc, class KeyType, class ThP>
     cpu_full_nb_list_neighborhood_detail::CpuFullNbListNeighborhood<Tc, KeyType, ThP>
-    build(OctreeNsView<Tc, KeyType> tree,
+    build(execution::Cpu,
+          OctreeNsView<Tc, KeyType> tree,
           const Box<Tc>& box,
           const LocalIndex totalBodies,
           const GroupView& groups,

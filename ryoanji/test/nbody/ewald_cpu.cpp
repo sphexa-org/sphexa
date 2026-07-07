@@ -122,12 +122,12 @@ private:
  * When random masses are not requested, all particles are assigned equal mass such that the sum equals one.
  */
 template<class T, class KeyType, class MultipoleType, class Coords>
-util::tuple<std::vector<LocalIndex>,          // layout
-            OctreeData<KeyType, CpuTag>,      // octree
-            std::vector<MultipoleType>,       // multipoles
-            std::vector<SourceCenterType<T>>, // centers
-            std::vector<T>,                   // masses
-            std::vector<T>                    // h
+util::tuple<std::vector<LocalIndex>,             // layout
+            OctreeData<KeyType, execution::Cpu>, // octree
+            std::vector<MultipoleType>,          // multipoles
+            std::vector<SourceCenterType<T>>,    // centers
+            std::vector<T>,                      // masses
+            std::vector<T>                       // h
             >
 makeTestTree(Coords& coordinates, cstone::Box<T> box, float mass_scale, float theta = 0.6, bool randomMasses = true,
              unsigned bucketSize = 64)
@@ -159,7 +159,7 @@ makeTestTree(Coords& coordinates, cstone::Box<T> box, float mass_scale, float th
     auto [treeLeaves, counts] = computeOctree(std::span(coordinates.particleKeys()), bucketSize);
 
     // fully linked octree, including internal part
-    OctreeData<KeyType, CpuTag> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     octree.resize(nNodes(treeLeaves));
     updateInternalTree<KeyType>(treeLeaves, octree.data());
 

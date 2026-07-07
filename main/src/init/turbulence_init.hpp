@@ -75,32 +75,19 @@ InitSettings TurbulenceConstants()
 
 //! @brief init particle data fields. Note: Dataset attributes must be initialized
 template<class Dataset>
-void initTurbulenceHydroFields(Dataset& d, const std::map<std::string, double>& constants)
+void initTurbulenceHydroFields(Dataset& d, const InitSettings& constants)
 {
-    constexpr bool gpu   = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    double         mPart = constants.at("mTotal") / d.numParticlesGlobal;
-    double         Lbox  = constants.at("Lbox");
-    double         hInit = std::cbrt(3.0 / (4. * M_PI) * d.ng0 * std::pow(Lbox, 3) / d.numParticlesGlobal) * 0.5;
+    double mPart = constants.at("mTotal") / d.numParticlesGlobal;
+    double Lbox  = constants.at("Lbox");
+    double hInit = std::cbrt(3.0 / (4. * M_PI) * d.ng0 * std::pow(Lbox, 3) / d.numParticlesGlobal) * 0.5;
 
     auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
     auto temp0 = constants.at("u0") / cv;
 
-    cstone::fill<gpu>(d.m.begin(), d.m.end(), mPart);
-    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
-    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
-    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
-    cstone::fill<gpu>(d.temp.begin(), d.temp.end(), temp0);
-    cstone::fill<gpu>(d.u.begin(), d.u.end(), constants.at("u0"));
-
-    cstone::fill<gpu>(d.vx.begin(), d.vx.end(), 0.);
-    cstone::fill<gpu>(d.vy.begin(), d.vy.end(), 0.);
-    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.);
-    cstone::fill<gpu>(d.x_m1.begin(), d.x_m1.end(), 0.);
-    cstone::fill<gpu>(d.y_m1.begin(), d.y_m1.end(), 0.);
-    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.);
-
-    generateParticleIDs<gpu>(d.id);
+    initFieldsAtRest(d, mPart);
+    cstone::fill(d.exec, d.temp.begin(), d.temp.end(), temp0);
+    cstone::fill(d.exec, d.u.begin(), d.u.end(), constants.at("u0"));
+    cstone::fill(d.exec, d.h.begin(), d.h.end(), hInit);
 }
 
 template<class Dataset>
@@ -112,13 +99,14 @@ class TurbulenceGlass : public ISimInitializer<Dataset>
 public:
     explicit TurbulenceGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , ISimInitializer<Dataset>(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, TurbulenceConstants(), settingsFile, reader);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                     IFileReader* reader) const override
     {
         auto& d       = simData.hydro;
         using KeyType = typename Dataset::KeyType;

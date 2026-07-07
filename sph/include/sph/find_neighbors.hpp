@@ -9,7 +9,7 @@
 namespace sph
 {
 
-inline void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cstone::CpuTag>& d,
+inline void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cstone::execution::Cpu>& d,
                              const cstone::Box<SphTypes::CoordinateType>& box, bool subgroups = false)
 {
     if (d.ng0 > d.ngmax) { throw std::runtime_error("ng0 should be smaller than ngmax\n"); }

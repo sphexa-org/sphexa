@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include "cstone/execution.hpp"
 #include "cstone/cuda/device_vector.h"
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/groups.hpp"
@@ -23,12 +24,14 @@ namespace cstone
 {
 
 /*! @brief set up fixed-size particle groups
+ * @param[in]  exec       execution policy
  * @param[in]  first      first local particle index
  * @param[in]  last       last local particle index
  * @param[in]  groupSize  number of particles per group
  * @param[out] groups     groups with fixed size @p groupSize
  */
-void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<GpuTag>& groups);
+void computeFixedGroups(
+    execution::Gpu exec, LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups);
 
 /*!* @brief Compute groups of particles with a maximum size and distance between consecutive particles limited
  *
@@ -36,6 +39,7 @@ void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, G
  * @tparam Tc                       float or double
  * @tparam T
  * @tparam KeyType
+ * @param[in]  exec                 execution policy
  * @param[in]  first                index of first particle in @p x,y,z,h buffers assigned to local domain
  * @param[in]  last                 index of ilast particle in @p x,y,z,h buffers assigned to local domain
  * @param[in]  x                    x coordinates
@@ -57,7 +61,8 @@ void computeFixedGroups(LocalIndex first, LocalIndex last, unsigned groupSize, G
  * leaf cell of any particle in the group. Edge length is computed as the cubic root of the cell volume.
  */
 template<class Tc, class T, class KeyType>
-extern void computeGroupSplits(LocalIndex first,
+extern void computeGroupSplits(execution::Gpu exec,
+                               LocalIndex first,
                                LocalIndex last,
                                const Tc* x,
                                const Tc* y,

@@ -40,12 +40,12 @@ namespace sph
 
 template<class Dataset>
 void computeSpatialGroups(cstone::LocalIndex startIndex, cstone::LocalIndex endIndex, Dataset& d,
-                          const cstone::Box<typename Dataset::RealType>& box, GroupData<cstone::GpuTag>& groups)
+                          const cstone::Box<typename Dataset::RealType>& box, GroupData<cstone::execution::Gpu>& groups)
 {
     float tolFactor = 2.0f;
-    cstone::computeGroupSplits(startIndex, endIndex, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z),
-                               rawPtr(d.h), d.treeView.leaves, d.treeView.numLeafNodes, d.treeView.layout, box,
-                               nsGroupSize(), tolFactor, d.traversalStack, groups.data);
+    cstone::computeGroupSplits(cstone::execution::gpuDefaultStream, startIndex, endIndex, rawPtr(d.x), rawPtr(d.y),
+                               rawPtr(d.z), rawPtr(d.h), d.treeView.leaves, d.treeView.numLeafNodes, d.treeView.layout,
+                               box, nsGroupSize(), tolFactor, d.traversalStack, groups.data);
 
     groups.firstBody  = startIndex;
     groups.lastBody   = endIndex;
@@ -57,12 +57,9 @@ void computeSpatialGroups(cstone::LocalIndex startIndex, cstone::LocalIndex endI
 //! @brief Compute spatial (=SFC-consecutive) groups of particles with compact bounding boxes
 template<typename Tc, class Dataset>
 void computeGroups(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box,
-                   GroupData<typename Dataset::AcceleratorType>& groups)
+                   GroupData<typename Dataset::Exec>& groups)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
-    {
-        computeSpatialGroups(startIndex, endIndex, d, box, groups);
-    }
+    if constexpr (d.useGpu) { computeSpatialGroups(startIndex, endIndex, d, box, groups); }
     else
     {
         groups.firstBody  = startIndex;
@@ -74,9 +71,9 @@ void computeGroups(size_t startIndex, size_t endIndex, Dataset& d, const cstone:
 }
 
 //! @brief extract the specified subgroup [first:last] indexed through @p index from @p grp into @p outGroup
-template<class Accelerator>
+template<cstone::execution::Policy Exec>
 inline void extractGroupGpu(const GroupView& grp, const cstone::LocalIndex* indices, cstone::LocalIndex first,
-                            cstone::LocalIndex last, GroupData<Accelerator>& out)
+                            cstone::LocalIndex last, GroupData<Exec>& out)
 {
     auto numOutGroups = last - first;
     reallocate(out.data, 2 * numOutGroups, 1.01);
@@ -88,8 +85,8 @@ inline void extractGroupGpu(const GroupView& grp, const cstone::LocalIndex* indi
     out.groupEnd   = rawPtr(out.data) + numOutGroups;
 
     if (numOutGroups == 0) { return; }
-    cstone::gatherGpu(indices + first, numOutGroups, grp.groupStart, out.groupStart);
-    cstone::gatherGpu(indices + first, numOutGroups, grp.groupEnd, out.groupEnd);
+    cstone::gather(cstone::execution::gpuDefaultStream, indices + first, numOutGroups, grp.groupStart, out.groupStart);
+    cstone::gather(cstone::execution::gpuDefaultStream, indices + first, numOutGroups, grp.groupEnd, out.groupEnd);
 }
 
 //! @brief return a new GroupView that corresponds to a slice [first:last] of the input group @p grp

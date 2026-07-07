@@ -47,10 +47,9 @@ namespace sphexa
 {
 
 template<class Dataset>
-void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
+void initSedovFields(Dataset& d, const InitSettings& constants)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T            = typename Dataset::RealType;
+    using T = Dataset::RealType;
 
     double r           = constants.at("r1");
     double totalVolume = std::pow(2 * r, 3);
@@ -63,34 +62,19 @@ void initSedovFields(Dataset& d, const std::map<std::string, double>& constants)
     // We distribute energy as exp(-r2 / width2), with width taken as the current 2h, so that the enery
     // is deposited in about ng0 neighbors.
     // ener0 is the constant that should multiply the Gaussian so that its integral equals energytotal
-    double ener0  = constants.at("energyTotal") / std::pow(M_PI, 1.5) / width2 / width;
+    double ener0 = constants.at("energyTotal") / std::pow(M_PI, 1.5) / width2 / width;
 
-
-    cstone::fill<gpu>(d.m.begin(), d.m.end(), mPart);
-    cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
-    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
-    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
-
-    cstone::fill<gpu>(d.vx.begin(), d.vx.end(), 0.0);
-    cstone::fill<gpu>(d.vy.begin(), d.vy.end(), 0.0);
-    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
-
-    // general form: d.x_m1[i] = d.vx[i] * firstTimeStep;
-    cstone::fill<gpu>(d.x_m1.begin(), d.x_m1.end(), 0.0);
-    cstone::fill<gpu>(d.y_m1.begin(), d.y_m1.end(), 0.0);
-    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
-
-    generateParticleIDs<gpu>(d.id);
+    initFieldsAtRest(d, mPart);
+    cstone::fill(d.exec, d.h.begin(), d.h.end(), hInit);
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
 
     // If temperature is not allocated, we can still use this initializer for just the coordinates
     if (d.temp.empty() && d.u.empty()) { return; }
 
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
-    auto&& z = toHost(d.z);
+    auto&& x = cstone::toHost(d.x);
+    auto&& y = cstone::toHost(d.y);
+    auto&& z = cstone::toHost(d.z);
 
     std::vector<T> u(d.x.size());
 #pragma omp parallel for schedule(static)
@@ -114,13 +98,14 @@ class SedovGrid : public ISimInitializer<Dataset>
 
 public:
     SedovGrid()
+        : ISimInitializer<Dataset>({})
     {
         Dataset d;
         settings_ = buildSettings(d, sedovConstants(), {}, nullptr);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cubeSide, Dataset& simData,
-                                                 IFileReader*) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t cubeSide, Dataset& simData,
+                                                     IFileReader*) const override
     {
         auto& d                   = simData.hydro;
         using KeyType             = typename Dataset::KeyType;
@@ -161,6 +146,7 @@ class SedovGlass : public ISimInitializer<Dataset>
 public:
     SedovGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , ISimInitializer<Dataset>(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, sedovConstants(), settingsFile, reader);
@@ -171,11 +157,12 @@ public:
      * @param[in]    rank             MPI rank ID
      * @param[in]    numRanks         number of MPI ranks
      * @param[in]    cbrtNumPart      the cubic root of the global number of particles to generate
-     * @param[inout] d                particle dataset
+     * @param[inout] simData          particle dataset
+     * @param[in]    reader           loads input files
      * @return                        the global coordinate bounding box
      */
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                     IFileReader* reader) const override
     {
         auto& d       = simData.hydro;
         using KeyType = typename Dataset::KeyType;

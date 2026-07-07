@@ -32,9 +32,11 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 #include "cstone/domain/domain.hpp"
@@ -49,12 +51,21 @@
 #include "util/utils.hpp"
 
 #include "simulation_data.hpp"
-#include "insitu_viz.h"
+
+#ifdef SPH_EXA_USE_CATALYST2
+#include "catalyst_adaptor.h"
+using VizAdaptor = viz::CatalystAdaptor;
+#elif SPH_EXA_USE_ASCENT
+#include "ascent_adaptor.h"
+using VizAdaptor = viz::AscentAdaptor;
+#endif
 
 #ifdef USE_CUDA
-using AccType = cstone::GpuTag;
+using Exec          = cstone::execution::Gpu;
+constexpr Exec exec = cstone::execution::gpuDefaultStream;
 #else
-using AccType = cstone::CpuTag;
+using Exec          = cstone::execution::Cpu;
+constexpr Exec exec = cstone::execution::cpu;
 #endif
 
 namespace fs = std::filesystem;
@@ -67,17 +78,19 @@ int  getNumLocalRanks(int);
 
 int main(int argc, char** argv)
 {
-    auto [rank, numRanks] = initMpi();
+    MPIScope mpi;
+    auto [rank, numRanks] = mpi.info();
+
     const ArgParser parser(argc, (const char**)argv);
 
     if (parser.exists("-h") || parser.exists("--h") || parser.exists("-help") || parser.exists("--help"))
     {
         printHelp(argv[0], rank);
-        return exitSuccess();
+        return EXIT_SUCCESS;
     }
 
-    using Dataset = SimulationData<AccType>;
-    using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, AccType>;
+    using Dataset = SimulationData<Exec>;
+    using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, Exec>;
 
     const std::string        initCond     = parser.get("--init");
     const size_t             problemSize  = parser.get("-n", 50);
@@ -100,6 +113,7 @@ int main(int argc, char** argv)
     std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
     std::string              profFile     = parser.get("-op", std::string("profile"));
     const bool               initFromFile = fs::exists(strBeforeSign(initCond, ":")) || fs::exists(strBeforeSign(initCond, ","));
+    const bool               disableNeighborLists = parser.exists("--disable-neighbor-lists");
 
     std::ofstream nullOutput("/dev/null");
     std::ostream& output = (quiet || rank) ? nullOutput : std::cout;
@@ -127,20 +141,20 @@ int main(int argc, char** argv)
     auto& d = simData.hydro;
     if (AVswitches)
     {
-        constexpr bool gpu        = cstone::HaveGpu<AccType>{};
         const bool     resetAlpha = !initFromFile || d.alphamin == 1.0;
         d.alphamin                = 0.05;
-        if (resetAlpha) { cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin); }
+        if (resetAlpha) { cstone::fill(exec, d.alpha.begin(), d.alpha.end(), d.alphamin); }
     }
     if (haveAvFloor) { d.avFloor = parser.get<double>("--avfloor"); }
     if (!AVswitches && initFromFile)
     {
-        constexpr bool gpu = cstone::HaveGpu<AccType>{};
         d.alphamin         = 1.0;
         d.alphamax         = 1.0;
-        cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
+        cstone::fill(exec, d.alpha.begin(), d.alpha.end(), d.alphamin);
     }
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
+
+    if (disableNeighborLists) d.disableNeighborLists();
 
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
     bool  haveGrav = (d.g != 0.0);
@@ -153,14 +167,15 @@ int main(int argc, char** argv)
     uint64_t bucketSizeFocus = 64;
     // ~100 global nodes per rank to decompose the domain with +-1% accuracy
     uint64_t bucketSize = std::max(bucketSizeFocus, d.numParticlesGlobal / (100 * numRanks));
-    Domain   domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, box);
+    Domain   domain(exec, rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, box);
     domain.setGrowthAllocRate(simData.hydro.getAllocGrowthRate());
 
     propagator->sync(domain, simData);
     if (rank == 0) std::cout << "Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
 
-    viz::init_catalyst(argc, argv);
-    viz::init_ascent(d, domain.startIndex());
+#ifdef SPHEXA_WITH_VISUALIZATION
+    VizAdaptor viz(argc, argv);
+#endif
 
     size_t startIteration    = d.iteration;
     bool   isOutputTriggered = false;
@@ -196,7 +211,9 @@ int main(int argc, char** argv)
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
 
-        viz::execute(d, domain.startIndex(), domain.endIndex());
+#ifdef SPHEXA_WITH_VISUALIZATION
+        viz.execute(d, domain.startIndex(), domain.endIndex());
+#endif
 
         propagator->integrate(domain, simData);
         propagator->printIterationTimings(domain, simData);
@@ -212,8 +229,8 @@ int main(int argc, char** argv)
                     initCond + " up to t = " + std::to_string(d.ttot));
 
     constantsFile.close();
-    viz::finalize();
-    return exitSuccess();
+
+    return EXIT_SUCCESS;
 }
 
 //! @brief check whether the stop conditions based on evolved time (not wall-clock) or iteration count are reached
@@ -306,5 +323,8 @@ void printHelp(char* name, int rank)
                 \t NUM<=0:    Disable profiling output,\n\
                 \t int(NUM):  Dump profiling data every NUM iteration steps,\n\
                 \t real(NUM): Dump profiling data every NUM seconds of simulation (not wall-clock) time \n\n");
+
+        printf("\t--disable-neighbor-lists \t Disable neighbor lists and instead always traverse the full octree\n\
+                \t for finding particle-particle interactions\n\n");
     }
 }

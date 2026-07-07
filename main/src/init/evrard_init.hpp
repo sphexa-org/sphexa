@@ -32,49 +32,31 @@ InitSettings evrardConstants()
 }
 
 template<class Dataset>
-void initEvrardFields(Dataset& d, const std::map<std::string, double>& constants)
+void initEvrardFields(Dataset& d, const InitSettings& constants)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T            = typename Dataset::RealType;
-
-    double mPart = constants.at("mTotal") / d.numParticlesGlobal;
-
-    cstone::fill<gpu>(d.m.begin(), d.m.end(), mPart);
-    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
-    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
-
-    cstone::fill<gpu>(d.vx.begin(), d.vx.end(), 0.0);
-    cstone::fill<gpu>(d.vy.begin(), d.vy.end(), 0.0);
-    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
-
-    cstone::fill<gpu>(d.x_m1.begin(), d.x_m1.end(), 0.0);
-    cstone::fill<gpu>(d.y_m1.begin(), d.y_m1.end(), 0.0);
-    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
-
-    generateParticleIDs<gpu>(d.id);
+    initFieldsAtRest(d, constants.at("mTotal") / d.numParticlesGlobal);
 
     auto cv    = sph::idealGasCv(d.muiConst, d.gamma);
     auto temp0 = constants.at("u0") / cv;
-    cstone::fill<gpu>(d.temp.begin(), d.temp.end(), temp0);
-    cstone::fill<gpu>(d.u.begin(), d.u.end(), constants.at("u0"));
+    cstone::fill(d.exec, d.temp.begin(), d.temp.end(), temp0);
+    cstone::fill(d.exec, d.u.begin(), d.u.end(), constants.at("u0"));
 
-    T totalVolume = 4 * M_PI / 3 * std::pow(constants.at("r"), 3);
+    double totalVolume = 4 * M_PI / 3 * std::pow(constants.at("r"), 3);
     // before the contraction with sqrt(r), the sphere has a constant particle concentration of Ntot / Vtot
     // after shifting particles towards the center by factor sqrt(r), the local concentration becomes
     // c(r) = 2/3 * 1/r * Ntot / Vtot
-    T c0 = 2. / 3. * d.numParticlesGlobal / totalVolume;
+    double c0 = 2. / 3. * d.numParticlesGlobal / totalVolume;
 
-    auto&&                                   x = toHost(d.x);
-    auto&&                                   y = toHost(d.y);
-    auto&&                                   z = toHost(d.z);
+    auto&&                                   x = cstone::toHost(d.x);
+    auto&&                                   y = cstone::toHost(d.y);
+    auto&&                                   z = cstone::toHost(d.z);
     std::vector<typename Dataset::HydroType> h(d.x.size());
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < d.x.size(); i++)
     {
-        T radius        = std::sqrt(x[i] * x[i] + y[i] * y[i] + z[i] * z[i]);
-        T concentration = c0 / radius;
-        h[i]            = std::cbrt(3 / (4 * M_PI) * d.ng0 / concentration) * 0.5;
+        auto radius        = std::sqrt(x[i] * x[i] + y[i] * y[i] + z[i] * z[i]);
+        auto concentration = c0 / radius;
+        h[i]               = std::cbrt(3 / (4 * M_PI) * d.ng0 / concentration) * 0.5;
     }
 
     d.h = std::move(h);
@@ -116,8 +98,8 @@ public:
     {
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                     IFileReader* reader) const override
     {
         auto radialTransform = [](auto r) { return std::sqrt(r); };
         auto globalBox = Base::init(rank, numRanks, cbrtNumPart, simData, reader, settings_.at("r"), radialTransform);

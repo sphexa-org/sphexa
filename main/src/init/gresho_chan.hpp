@@ -33,6 +33,7 @@
 #include "cstone/sfc/box.hpp"
 #include "isim_init.hpp"
 #include "grid.hpp"
+#include "utils.hpp"
 #include "sph/eos.hpp"
 
 namespace sphexa
@@ -44,18 +45,11 @@ InitSettings GreshoChanSettings()
             {"rho", 1},  {"Kcour", 0.2}, {"ng0", 100}, {"ngmax", 150},     {"gravConstant", 0.0}, {"gresho-chan", 1.0}};
 }
 
-template<class T>
-double twoDimRadius(T x, T y)
-{
-    return std::sqrt(x * x + y * y);
-}
-
 template<class Dataset, class T>
 void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& settings, T mPart)
 {
-    constexpr bool gpu   = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using HydroType      = typename Dataset::HydroType;
-    using RealType       = typename Dataset::RealType;
+    using HydroType      = Dataset::HydroType;
+    using RealType       = Dataset::RealType;
     double ng0           = settings.at("ng0");
     double rho           = settings.at("rho");
     double hInit         = 0.5 * std::cbrt(3. * ng0 * mPart / 4. / M_PI / rho);
@@ -70,18 +64,11 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     double v0 = settings.at("v0");
     double P0 = settings.at("P0");
 
-    cstone::fill<gpu>(d.m.begin(), d.m.end(), mPart);
-    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    cstone::fill<gpu>(d.h.begin(), d.h.end(), hInit);
-    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
-    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
-    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
-    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
+    initFieldsAtRest(d, mPart);
+    cstone::fill(d.exec, d.h.begin(), d.h.end(), hInit);
 
-    generateParticleIDs<gpu>(d.id);
-
-    auto&& x = toHost(d.x);
-    auto&& y = toHost(d.y);
+    auto&& x = cstone::toHost(d.x);
+    auto&& y = cstone::toHost(d.y);
 
     cstone::LocalIndex     numPartLoc = d.x.size();
     std::vector<RealType>  u(numPartLoc);
@@ -93,7 +80,7 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
         T vi, pi;
         T xi    = x[i];
         T yi    = y[i];
-        T psi   = twoDimRadius(xi, yi) / R1;
+        T psi   = std::sqrt(norm2(util::array<T, 2>{xi, yi})) / R1;
         T theta = std::atan2(yi, xi);
 
         if (psi <= 1.)
@@ -118,8 +105,8 @@ void initGreshoChanFields(Dataset& d, const std::map<std::string, double>& setti
     }
     d.vx = std::move(vx);
     d.vy = std::move(vy);
-    cstone::scaleGpuAcc<gpu>(d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), firstTimeStep);
-    cstone::scaleGpuAcc<gpu>(d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), firstTimeStep);
+    cstone::scale(d.exec, d.vx.data(), d.vx.data() + d.vx.size(), d.x_m1.data(), firstTimeStep);
+    cstone::scale(d.exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), firstTimeStep);
 
     if (d.temp.empty()) { d.u = std::move(u); }
     else
@@ -138,13 +125,14 @@ class GreshoChan : public ISimInitializer<Dataset>
 public:
     GreshoChan(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , ISimInitializer<Dataset>(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, GreshoChanSettings(), settingsFile, reader);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                     IFileReader* reader) const override
     {
         using KeyType = typename Dataset::KeyType;
         using T       = typename Dataset::RealType;

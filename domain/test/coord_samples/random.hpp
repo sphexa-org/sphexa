@@ -85,7 +85,7 @@ void adjustSmoothingLength(LocalIndex numParticles,
 
     unsigned bucketSize   = 16;
     auto [csTree, counts] = computeOctree<KeyType>(std::span(sfcKeys), bucketSize);
-    OctreeData<KeyType, CpuTag> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     octree.resize(nNodes(csTree));
     updateInternalTree<KeyType>(csTree, octree.data());
 
@@ -158,7 +158,7 @@ public:
 
         std::vector<T> s1(x_.size());
         std::vector<Integer> s2(x_.size());
-        gatherArrays(permutation, 0, std::tie(x_, y_, z_, h_, codes_), std::tie(s1, s2));
+        gatherArrays(execution::cpu, permutation, 0, std::tie(x_, y_, z_, h_, codes_), std::tie(s1, s2));
         isSfcOrdered_ = false;
     }
 
@@ -181,7 +181,7 @@ protected:
         sort_by_key(begin(codes_), end(codes_), begin(sfcOrder));
 
         std::vector<T> temp(x_.size());
-        gatherArrays(sfcOrder, 0, std::tie(x_, y_, z_, h_), std::tie(temp));
+        gatherArrays(execution::cpu, sfcOrder, 0, std::tie(x_, y_, z_, h_), std::tie(temp));
         isSfcOrdered_ = true;
     }
 

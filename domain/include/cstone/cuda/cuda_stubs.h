@@ -8,7 +8,7 @@
  */
 
 /*! @file
- * @brief  CUDA/Thrust stubs to provide declarations without definitions for use in non-CUDA builds
+ * @brief  CUDA stubs to provide declarations without definitions for use in non-CUDA builds
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
@@ -16,6 +16,11 @@
 
 #include <type_traits>
 #include <vector>
+
+#include "cstone/execution.hpp"
+
+namespace cstone
+{
 
 template<class T, class Alloc>
 T* rawPtr(std::vector<T, Alloc>& p)
@@ -30,15 +35,15 @@ const T* rawPtr(const std::vector<T, Alloc>& p)
 }
 
 template<class T>
-void memcpyH2D(const T* src, std::size_t n, T* dest);
+void memcpyH2DAsync(execution::Gpu exec, const T* src, std::size_t n, T* dest);
 
 template<class T>
-void memcpyD2H(const T* src, std::size_t n, T* dest);
+void memcpyD2HAsync(execution::Gpu exec, const T* src, std::size_t n, T* dest);
 
 template<class T>
-void memcpyD2D(const T* src, std::size_t n, T* dest);
+void memcpyD2DAsync(execution::Gpu exec, const T* src, std::size_t n, T* dest);
 
-void syncGpu();
+void syncGpu(execution::Gpu exec);
 
 /*! @brief detection trait to determine whether a template parameter is a device vector
  *
@@ -56,3 +61,5 @@ const std::vector<T>& toHost(const std::vector<T>& v)
 {
     return v;
 }
+
+} // namespace cstone

@@ -17,6 +17,7 @@
 #include "gtest/gtest.h"
 
 #include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/cuda/device_vector.h"
 #include "cstone/primitives/concat_vector.hpp"
 
@@ -32,11 +33,15 @@ TEST(PrimitivesGpu, concatVector)
     std::iota(modView[1].begin(), modView[1].end(), 20);
     std::iota(modView[2].begin(), modView[2].end(), 30);
 
+    StreamHolder stream;
+
     ConcatVector<int, DeviceVector> d_v;
-    copy(v, d_v);
+    cstone::copy(stream.exec(), v, d_v);
 
     ConcatVector<int> probe;
-    copy(d_v, probe);
+    cstone::copy(stream.exec(), d_v, probe);
+
+    stream.sync();
 
     auto probeView = probe.view();
     EXPECT_EQ(probeView[2][0], 30);

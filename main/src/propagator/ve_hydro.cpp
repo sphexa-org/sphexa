@@ -62,10 +62,10 @@ PropLib<DomainType, ParticleDataType>::makeTurbVeProp(std::ostream& output, size
 }
 
 #ifdef USE_CUDA
-template struct PropLib<cstone::Domain<SphTypes::KeyType, SphTypes::CoordinateType, cstone::GpuTag>,
-                        SimulationData<cstone::GpuTag>>;
+template struct PropLib<cstone::Domain<SphTypes::KeyType, SphTypes::CoordinateType, cstone::execution::Gpu>,
+                        SimulationData<cstone::execution::Gpu>>;
 #else
-template struct PropLib<cstone::Domain<SphTypes::KeyType, SphTypes::CoordinateType, cstone::CpuTag>,
-                        SimulationData<cstone::CpuTag>>;
+template struct PropLib<cstone::Domain<SphTypes::KeyType, SphTypes::CoordinateType, cstone::execution::Cpu>,
+                        SimulationData<cstone::execution::Cpu>>;
 #endif
 } // namespace sphexa

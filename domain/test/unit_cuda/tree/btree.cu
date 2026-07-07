@@ -19,6 +19,7 @@
 
 #include "gtest/gtest.h"
 
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/tree/btree.cuh"
 #include "cstone/tree/cs_util.hpp"
 
@@ -31,9 +32,11 @@ void internal4x4x4PrefixTest()
     // a tree with 4 subdivisions along each dimension, 64 nodes
     thrust::device_vector<I> tree = makeUniformNLevelTree<I>(64, 1);
 
+    StreamHolder stream;
     thrust::device_vector<BinaryNode<I>> d_internalTree(nNodes(tree));
-    createBinaryTreeGpu(thrust::raw_pointer_cast(tree.data()), nNodes(tree),
+    createBinaryTreeGpu(stream.exec(), thrust::raw_pointer_cast(tree.data()), nNodes(tree),
                         thrust::raw_pointer_cast(d_internalTree.data()));
+    stream.sync();
 
     thrust::host_vector<BinaryNode<I>> internalTree = d_internalTree;
 

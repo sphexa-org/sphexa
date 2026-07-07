@@ -68,9 +68,8 @@ InitSettings IsobaricCubeConstants()
 template<class Dataset>
 void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T            = typename Dataset::RealType;
-    using HydroType    = typename Dataset::HydroType;
+    using T         = typename Dataset::RealType;
+    using HydroType = typename Dataset::HydroType;
 
     T r         = constants.at("r");
     T rhoInt    = constants.at("rhoInt");
@@ -84,23 +83,11 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
     T epsilon   = constants.at("epsilon");
 
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
+    initFieldsAtRest(d, massPart);
 
-    cstone::fill<gpu>(d.m.begin(), d.m.end(), massPart);
-    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
-    cstone::fill<gpu>(d.mui.begin(), d.mui.end(), d.muiConst);
-    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamin);
-    cstone::fill<gpu>(d.vx.begin(), d.vx.end(), 0.0);
-    cstone::fill<gpu>(d.vy.begin(), d.vy.end(), 0.0);
-    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
-    cstone::fill<gpu>(d.x_m1.begin(), d.x_m1.end(), 0.0);
-    cstone::fill<gpu>(d.y_m1.begin(), d.y_m1.end(), 0.0);
-    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
-
-    generateParticleIDs<gpu>(d.id);
-
-    auto&&                 x = toHost(d.x);
-    auto&&                 y = toHost(d.y);
-    auto&&                 z = toHost(d.z);
+    auto&&                 x = cstone::toHost(d.x);
+    auto&&                 y = cstone::toHost(d.y);
+    auto&&                 z = cstone::toHost(d.z);
     std::vector<T>         u(d.x.size());
     std::vector<HydroType> h(d.h.size());
 
@@ -178,13 +165,14 @@ class IsobaricCubeGlass : public ISimInitializer<Dataset>
 public:
     explicit IsobaricCubeGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(std::move(initBlock))
+        , ISimInitializer<Dataset>(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, IsobaricCubeConstants(), settingsFile, reader);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                     IFileReader* reader) const override
     {
         auto& d       = simData.hydro;
         using KeyType = typename Dataset::KeyType;

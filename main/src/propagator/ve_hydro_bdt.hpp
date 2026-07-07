@@ -61,12 +61,13 @@ protected:
     using Tmass         = typename DataType::HydroData::Tmass;
     using MultipoleType = ryoanji::CartesianQuadrupole<Tmass>;
 
-    using Acc       = typename DataType::AcceleratorType;
-    using MHolder_t = std::conditional_t<cstone::HaveGpu<Acc>{},
+    using Acc       = typename DataType::Exec;
+    using MHolder_t = std::conditional_t<cstone::execution::HaveGpu<Acc>{},
                                          MultipoleHolderGpu<MultipoleType, DomainType, typename DataType::HydroData>,
                                          MultipoleHolderCpu<MultipoleType, DomainType, typename DataType::HydroData>>;
     template<class VType>
-    using AccVector = std::conditional_t<cstone::HaveGpu<Acc>{}, cstone::DeviceVector<VType>, std::vector<VType>>;
+    using AccVector =
+        std::conditional_t<cstone::execution::HaveGpu<Acc>{}, cstone::DeviceVector<VType>, std::vector<VType>>;
 
     MHolder_t mHolder_;
 
@@ -118,7 +119,10 @@ public:
         : Base(output, rank)
         , AVswitches_(AVswitches)
     {
-        if (not cstone::HaveGpu<Acc>{}) { throw std::runtime_error("This propagator is not supported on CPUs\n"); }
+        if (not cstone::execution::HaveGpu<Acc>{})
+        {
+            throw std::runtime_error("This propagator is not supported on CPUs\n");
+        }
         if (SLR && rank == 0) { std::cout << "SLR is activated" << std::endl; }
         if (AVswitches_ && rank == 0) { std::cout << "AV switches are activated" << std::endl; }
         try
@@ -188,7 +192,7 @@ public:
         activeRungs_ = groups_.view();
 
         reallocate(groups_.numGroups, d.getAllocGrowthRate(), groupDt_, groupIndices_);
-        cstone::fill<cstone::HaveGpu<Acc>{}>(groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max());
+        cstone::fill(domain.exec(), groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max());
     }
 
     void partialSync(DomainType& domain, DataType& simData)
@@ -220,6 +224,8 @@ public:
 
     void computeForces(DomainType& domain, DataType& simData) override
     {
+        using namespace cstone;
+
         timer.start();
         pmReader.start();
         sync(domain, simData);
@@ -230,7 +236,7 @@ public:
         size_t first = domain.startIndex();
         size_t last  = domain.endIndex();
 
-        fillMassHalos(get<"m">(d), first, last);
+        fillMassHalos(domain.exec(), get<"m">(d), first, last);
 
         updateSmoothingLengthIterative(activeRungs_, d, domain.box());
         findNeighborsSfc(activeRungs_, d, domain.box(), true);
@@ -300,6 +306,8 @@ public:
 
     void computeRungs(DataType& simData)
     {
+        using namespace cstone;
+
         auto& d        = simData.hydro;
         int   highRung = activeRung(timestep_.substep, timestep_.numRungs);
 
@@ -327,7 +335,7 @@ public:
         if (highRung == 0 || highRung > 1)
         {
             if (highRung > 1) { swap(groups_, tsGroups_); }
-            if constexpr (cstone::HaveGpu<Acc>{})
+            if constexpr (execution::HaveGpu<Acc>{})
             {
                 extractGroupGpu(groups_.view(), rawPtr(groupIndices_), 0, timestep_.rungRanges.back(), tsGroups_);
             }
@@ -341,6 +349,8 @@ public:
 
     void integrate(DomainType& domain, DataType& simData) override
     {
+        using namespace cstone;
+
         computeRungs(simData);
         printTimestepStats(timestep_);
         timer.step("Timestep");
@@ -366,7 +376,7 @@ public:
                 computePositions(rungs_[i], d, substepBox, timestep_.dt_drift[i] + dt, dt_m1, rung);
                 timestep_.dt_m1[i]    = timestep_.dt_drift[i] + dt;
                 timestep_.dt_drift[i] = 0;
-                if constexpr (cstone::HaveGpu<Acc>{}) { storeRungGpu(rungs_[i], i, rawPtr(get<"rung">(d))); }
+                if constexpr (execution::HaveGpu<Acc>{}) { storeRungGpu(rungs_[i], i, rawPtr(get<"rung">(d))); }
             }
             else
             {
@@ -410,7 +420,7 @@ public:
                     std::visit(
                         [writer, c = column, key = namesDone[i]](auto field)
                         {
-                            auto&& tmp = toHost(*field);
+                            auto&& tmp = cstone::toHost(*field);
                             writeField(writer, key, tmp.data(), c);
                         },
                         fieldPointers[fidx]);

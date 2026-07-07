@@ -40,10 +40,7 @@ namespace sph
 template<bool SLR, class T, class Dataset>
 void computeMomentumEnergy(const GroupView& groups, float* groupDt, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
-    {
-        gpu::computeMomentumEnergy<SLR>(groups, groupDt, d, box);
-    }
+    if constexpr (d.useGpu) { gpu::computeMomentumEnergy<SLR>(groups, groupDt, d, box); }
     else
     {
         momentumAndEnergyIjLoop<SLR>(

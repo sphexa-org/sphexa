@@ -116,7 +116,7 @@ struct MomentumAndEnergyPostambleStd
         using T = std::remove_cvref_t<decltype(momentum_x)>;
         return std::make_tuple(Tm1(-K * Tm1(0.5) * energy), T(K * momentum_x), T(K * momentum_y), T(K * momentum_z),
                                maxvsignal);
-    };
+    }
 };
 
 template<class Tc, class Tm1>
@@ -139,7 +139,7 @@ struct MomentumAndEnergyPostambleStdWithDt : MomentumAndEnergyPostambleStd<Tc, T
 
         auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
         return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
-    };
+    }
 };
 
 template<class Neighborhood, class Tc, class T, class Tm, class Tm1>

@@ -30,6 +30,7 @@
 #define cudaEventSynchronize hipEventSynchronize
 #define cudaEvent_t hipEvent_t
 #define cudaFree hipFree
+#define cudaFreeAsync hipFreeAsync
 #define cudaFreeHost hipFreeHost
 #define cudaGetDevice hipGetDevice
 #define cudaGetDeviceCount hipGetDeviceCount
@@ -38,6 +39,7 @@
 #define cudaGetErrorString hipGetErrorString
 #define cudaGetLastError hipGetLastError
 #define cudaMalloc hipMalloc
+#define cudaMallocAsync hipMallocAsync
 #define cudaMallocHost hipMallocHost
 #define cudaMallocManaged hipMallocManaged
 #define cudaMemAttachGlobal hipMemAttachGlobal
@@ -47,13 +49,16 @@
 #define cudaMemcpyDeviceToDevice hipMemcpyDeviceToDevice
 #define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define cudaMemcpyFromSymbol hipMemcpyFromSymbol
+#define cudaMemcpyFromSymbolAsync hipMemcpyFromSymbolAsync
 #define cudaMemcpyHostToDevice hipMemcpyHostToDevice
 #define cudaMemcpyToSymbol hipMemcpyToSymbol
-#define cudaMemcpyToSymbolAsync hipMemcpyToSymbol // hipMemcpyToSymbolAsync does not exist
+#define cudaMemcpyToSymbolAsync hipMemcpyToSymbolAsync
 #define cudaMemGetInfo hipMemGetInfo
 #define cudaMemoryTypeDevice hipMemoryTypeDevice
 #define cudaMemoryTypeManaged hipMemoryTypeManaged
+#define cudaMemPrefetchAsync hipMemPrefetchAsync_v2
 #define cudaMemset hipMemset
+#define cudaMemsetAsync hipMemsetAsync
 #define cudaPointerAttributes hipPointerAttribute_t
 #define cudaPointerGetAttributes hipPointerGetAttributes
 #define cudaSetDevice hipSetDevice

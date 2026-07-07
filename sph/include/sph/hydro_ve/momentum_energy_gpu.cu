@@ -87,7 +87,8 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
         rawPtr(d.dtCourant));
 
     float minDt = std::numeric_limits<float>::infinity();
-    checkGpuErrors(cudaMemcpyToSymbolAsync(GPU_SYMBOL(minDt_ve_device), &minDt, sizeof(minDt)));
+    checkGpuErrors(
+        cudaMemcpyToSymbolAsync(GPU_SYMBOL(minDt_ve_device), &minDt, sizeof(minDt), 0, cudaMemcpyHostToDevice, 0));
 
     constexpr LocalIndex threads = 256;
     const LocalIndex     blocks  = cstone::iceil(grp.numGroups, threads / GpuConfig::warpSize);
@@ -98,7 +99,8 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
 }
 
 #define MOM_ENERGY(slr)                                                                                                \
-    template void computeMomentumEnergy<slr>(const GroupView& grp, float*, sphexa::ParticlesData<cstone::GpuTag>& d,   \
+    template void computeMomentumEnergy<slr>(const GroupView&                               grp, float*,               \
+                                             sphexa::ParticlesData<cstone::execution::Gpu>& d,                         \
                                              const cstone::Box<SphTypes::CoordinateType>&)
 
 MOM_ENERGY(true);

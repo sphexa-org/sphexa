@@ -28,7 +28,7 @@ void noHalos(int rank, int numRanks)
 {
     int bucketSize = 1;
     float theta    = 1.0;
-    Domain<KeyType, T> domain(rank, numRanks, bucketSize, bucketSize, theta, MPI_COMM_WORLD);
+    Domain<KeyType, T> domain(execution::cpu, rank, numRanks, bucketSize, bucketSize, theta, MPI_COMM_WORLD);
 
     std::vector<T> x{0.5, 0.6};
     std::vector<T> y{0.5, 0.6};
@@ -79,7 +79,7 @@ void withHalos(int rank, int numRanks)
 {
     int bucketSize = 1;
     float theta    = 1.0;
-    Domain<KeyType, T> domain(rank, numRanks, bucketSize, bucketSize, theta, MPI_COMM_WORLD);
+    Domain<KeyType, T> domain(execution::cpu, rank, numRanks, bucketSize, bucketSize, theta, MPI_COMM_WORLD);
 
     std::vector<T> x{0.5, 0.6};
     std::vector<T> y{0.5, 0.6};
@@ -134,7 +134,7 @@ void moreHalos(int rank, int numRanks)
 {
     int bucketSize = 4;
     float theta    = 1.0;
-    Domain<KeyType, T> domain(rank, numRanks, bucketSize, bucketSize, theta, MPI_COMM_WORLD);
+    Domain<KeyType, T> domain(execution::cpu, rank, numRanks, bucketSize, bucketSize, theta, MPI_COMM_WORLD);
 
     // node boundaries     |--(0,0)----|---------(0,7)-------------|-----(7,0)----------|-------(7,7)------|
     // indices             0    1      2      3      4      5      6      7      8      9      10     11
@@ -224,7 +224,7 @@ void particleProperty(int rank, int numRanks)
 {
     int bucketSize = 4;
     float theta    = 1.0;
-    Domain<KeyType, T> domain(rank, numRanks, bucketSize, bucketSize, theta, MPI_COMM_WORLD);
+    Domain<KeyType, T> domain(execution::cpu, rank, numRanks, bucketSize, bucketSize, theta, MPI_COMM_WORLD);
 
     // node boundaries     |--(0,0)----|---------(0,7)-------------|-----(7,0)----------|-------(7,7)------|
     // indices             0    1      2      3      4      5      6      7      8      9      10     11
@@ -297,7 +297,7 @@ void multiStepSync(int rank, int numRanks)
     int bucketSize      = 4;
     int bucketSizeFocus = 1;
     float theta         = 1.0;
-    Domain<KeyType, T> domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD);
+    Domain<KeyType, T> domain(execution::cpu, rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD);
 
     // node boundaries     |--(0,0)----|---------(0,7)-------------|-----(7,0)----------|-------(7,7)------|
     // indices             0    1      2      3      4      5      6      7      8      9      10     11
@@ -423,7 +423,7 @@ void domainHaloRadii(int rank, int nRanks)
     int bucketSize      = 4;
     int bucketSizeFocus = 1;
     float theta         = 1.0;
-    Domain<KeyType, T> domain(rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD);
+    Domain<KeyType, T> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD);
 
     std::vector<T> x, y, z, h;
     std::vector<KeyType> keys;
