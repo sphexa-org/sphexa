@@ -42,6 +42,8 @@ if(CSTONE_WITH_CUDA)
         find_package(CUDAToolkit)
         # Thrust and CUB are part of CUDAToolkit
         set(CSTONE_THRUST_LIBS "")
+        find_package(Thrust REQUIRED CONFIG)
+        thrust_create_target(ThrustOMP HOST OMP DEVICE OMP)
         set(CMAKE_CUDA_STANDARD 20)
     else()
         message(STATUS "No CUDA support")

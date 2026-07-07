@@ -2,11 +2,10 @@ include(cstone_add_performance_test)
 
 cstone_add_performance_test(octree.cpp octree_perf)
 cstone_add_performance_test(peers.cpp peers_perf)
-cstone_add_performance_test(hilbert.cpp hilbert_perf)
 
-if(CMAKE_CUDA_COMPILER)
-    # link to cudart to get thrust includes
-    target_link_libraries(hilbert_perf PRIVATE CUDA::cudart)
+if (CMAKE_CUDA_COMPILER)
+    cstone_add_performance_test(hilbert.cpp hilbert_perf)
+    target_link_libraries(hilbert_perf PRIVATE ThrustOMP)
 endif ()
 
 if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
