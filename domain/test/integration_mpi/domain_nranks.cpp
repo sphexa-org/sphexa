@@ -140,13 +140,13 @@ TEST(FocusDomain, randomGaussianNeighborSum)
         randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                        {0, 1, 0, 0.015625, 0, 0.00390625});
+        Domain<unsigned, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
+                                        MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625});
         randomGaussianDomain<unsigned, double>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                        {0, 1, 0, 0.015625, 0, 0.00390625});
+        Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
+                                        MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625});
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
@@ -193,13 +193,13 @@ TEST(FocusDomain, randomGaussianNeighborSumPbc)
         randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                        {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
+        Domain<unsigned, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
+                                        MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
         randomGaussianDomain<unsigned, double>(domain, rank, nRanks);
     }
     {
-        Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                        {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
+        Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
+                                        MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {

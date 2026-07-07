@@ -41,19 +41,25 @@ using namespace cstone;
  * @param[in]  axesBits   mixed-dimension bit depth per axis (for non-cubic boxes)
  */
 template<class KeyType>
-__global__ void
-computeSfcKeysKernel(KeyType* keys, const unsigned* x, const unsigned* y, const unsigned* z, size_t numKeys, const AxesBits axesBits)
+__global__ void computeSfcKeysKernel(
+    KeyType* keys, const unsigned* x, const unsigned* y, const unsigned* z, size_t numKeys, const AxesBits axesBits)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < numKeys) { keys[tid] = iSfcKey<KeyType>(x[tid], y[tid], z[tid], axesBits); }
 }
 
 template<class KeyType>
-inline void computeSfcKeys(
-    cudaStream_t stream, KeyType* keys, const unsigned* x, const unsigned* y, const unsigned* z, size_t numKeys, const AxesBits& axesBits)
+inline void computeSfcKeys(cudaStream_t stream,
+                           KeyType* keys,
+                           const unsigned* x,
+                           const unsigned* y,
+                           const unsigned* z,
+                           size_t numKeys,
+                           const AxesBits& axesBits)
 {
     constexpr int threadsPerBlock = 256;
-    computeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock, 0, stream>>>(keys, x, y, z, numKeys, axesBits);
+    computeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock, 0, stream>>>(keys, x, y, z, numKeys,
+                                                                                          axesBits);
 }
 
 /*! @brief CUDA kernel to decode SFC (Hilbert/Morton) keys into integer coordinates
@@ -67,7 +73,8 @@ inline void computeSfcKeys(
  * @param[in]  axesBits   mixed-dimension bit depth per axis (for non-cubic boxes)
  */
 template<class KeyType>
-__global__ void decodeSfcKeysKernel(const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, size_t numKeys, const AxesBits axesBits)
+__global__ void
+decodeSfcKeysKernel(const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, size_t numKeys, const AxesBits axesBits)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < numKeys) { util::tie(x[tid], y[tid], z[tid]) = decodeSfc(keys[tid], axesBits); }
@@ -84,11 +91,17 @@ __global__ void decodeSfcKeysKernel(const KeyType* keys, unsigned* x, unsigned* 
  * @param[in]  axesBits   mixed-dimension bit depth per axis (for non-cubic boxes)
  */
 template<class KeyType>
-inline void
-decodeSfcKeys(cudaStream_t stream, const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, size_t numKeys, const AxesBits& axesBits)
+inline void decodeSfcKeys(cudaStream_t stream,
+                          const KeyType* keys,
+                          unsigned* x,
+                          unsigned* y,
+                          unsigned* z,
+                          size_t numKeys,
+                          const AxesBits& axesBits)
 {
     constexpr int threadsPerBlock = 256;
-    decodeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock, 0, stream>>>(keys, x, y, z, numKeys, axesBits);
+    decodeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock, 0, stream>>>(keys, x, y, z, numKeys,
+                                                                                         axesBits);
 }
 
 int main()
@@ -131,18 +144,11 @@ int main()
         thrust::device_vector<unsigned> dy = iy;
         thrust::device_vector<unsigned> dz = iz;
 
-<<<<<<< HEAD
-        auto computeHilbert = [&]()
-        { computeSfcKeys(rawPtr(hilbertKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, axesBits); };
-
-        auto computeMorton = [&]() { computeSfcKeys(rawPtr(mortonKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, axesBits); };
-=======
         auto computeHilbert = [&](cudaStream_t stream)
         { computeSfcKeys(stream, rawPtr(hilbertKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys); };
 
         auto computeMorton = [&](cudaStream_t stream)
         { computeSfcKeys(stream, rawPtr(mortonKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys); };
->>>>>>> origin/develop
 
         float t_hilbert = timeGpu(computeHilbert);
         float t_morton  = timeGpu(computeMorton);
@@ -153,13 +159,8 @@ int main()
         thrust::device_vector<unsigned> dy2(numKeys);
         thrust::device_vector<unsigned> dz2(numKeys);
 
-<<<<<<< HEAD
-        auto decodeHilbert = [&]()
-        { decodeSfcKeys(rawPtr(hilbertKeys), rawPtr(dx2), rawPtr(dy2), rawPtr(dz2), numKeys, axesBits); };
-=======
         auto decodeHilbert = [&](cudaStream_t stream)
         { decodeSfcKeys(stream, rawPtr(hilbertKeys), rawPtr(dx2), rawPtr(dy2), rawPtr(dz2), numKeys); };
->>>>>>> origin/develop
 
         float t_decode  = timeGpu(decodeHilbert);
         bool passDecode = thrust::equal(dx.begin(), dx.end(), dx2.begin()) &&

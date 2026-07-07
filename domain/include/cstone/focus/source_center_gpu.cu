@@ -220,11 +220,10 @@ __global__ void computeGeoCentersKernel(const KeyType* prefixes,
     TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numNodes) { return; }
 
-    KeyType prefix   = prefixes[i];
-    KeyType startKey = decodePlaceholderBit(prefix);
-    unsigned level   = decodePrefixLength(prefix) / 3;
-    auto nodeBox =
-        sfcIBox(sfcKey<KeyType>(startKey), level, axesBits);
+    KeyType prefix                  = prefixes[i];
+    KeyType startKey                = decodePlaceholderBit(prefix);
+    unsigned level                  = decodePrefixLength(prefix) / 3;
+    auto nodeBox                    = sfcIBox(sfcKey<KeyType>(startKey), level, axesBits);
     util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box);
 }
 

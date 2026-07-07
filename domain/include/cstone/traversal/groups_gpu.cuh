@@ -189,8 +189,7 @@ __global__ void groupSplitsKernel(LocalIndex first,
     T nodeVolume = 1;
     for (LocalIndex k = 0; k < nwt; ++k)
     {
-        auto nodeIBox = sfcIBox(sfcKey<KeyType>(leaves[leafIdx[0]]), sfcKey<KeyType>(leaves[leafIdx[0] + 1]),
-                                axesBits);
+        auto nodeIBox = sfcIBox(sfcKey<KeyType>(leaves[leafIdx[0]]), sfcKey<KeyType>(leaves[leafIdx[0] + 1]), axesBits);
         auto [nodeCenter, nodeSize] = centerAndSize<KeyType>(nodeIBox, unitBox);
         T vol                       = 8 * nodeSize[0] * nodeSize[1] * nodeSize[2];
         nodeVolume                  = vol > 0 ? min(vol, nodeVolume) : nodeVolume;
