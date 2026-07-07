@@ -83,6 +83,7 @@ decodeSfcKeysKernel(const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, 
 /*! @brief Host wrapper to launch decodeSfcKeysKernel on the GPU
  *
  * @tparam     KeyType    32-bit or 64-bit SFC key type
+ * @param[in]  stream     CUDA stream to launch kernel on
  * @param[in]  keys       device pointer to input SFC keys
  * @param[out] x          device pointer to output x-coordinates
  * @param[out] y          device pointer to output y-coordinates
