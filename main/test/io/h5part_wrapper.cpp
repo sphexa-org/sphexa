@@ -163,7 +163,7 @@ TEST(H5PartCpp, typesafeFileAttrRead)
         }
         {
             std::vector<char> a(charAttr.size());
-            readH5PartStepAttribute(a.data(), a.size(), 3, h5File);
+            readH5PartFileAttribute(a.data(), a.size(), 3, h5File);
             EXPECT_EQ(a[0], 'a');
             EXPECT_EQ(a[1], 'b');
         }
