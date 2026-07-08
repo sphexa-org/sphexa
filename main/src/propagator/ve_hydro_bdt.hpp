@@ -97,15 +97,9 @@ protected:
     using ConservedFields = FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "rung", "id">;
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
-    using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
-                                       "xm", "kx", "nc", "divv", "curlv", "gradh", "dtCourant">;
-
-    //! @brief velocity gradient fields will only be allocated when SLR is true
-    using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
-
-    //! @brief what will be allocated based on SLR choice
     using DependentFields =
-        std::conditional_t<SLR, decltype(DependentFields_{} + GradVFields{}), decltype(DependentFields_{})>;
+        FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33", "xm", "kx", "nc",
+                  "divv", "curlv", "gradh", "dtCourant", "dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
 
     //! @brief Return rung of current block time-step
     static int activeRung(int substep, int numRungs)
