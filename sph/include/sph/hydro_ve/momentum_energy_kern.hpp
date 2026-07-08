@@ -135,7 +135,6 @@ struct MomentumAndEnergyInteraction
                                {dV11i, dV12i, dV13i, dV22i, dV23i, dV33i}, {dV11j, dV12j, dV13j, dV22j, dV23j, dV33j});
         }
 
-        T wij          = i == j ? 0 : rv / dist;
         T wij_slr      = i == j ? 0 : rv_slr / dist;
         T viscosity_ij = artificial_viscosity(alpha_i, alpha_j, ci, cj, wij_slr, wij_slr, Lij);
 
