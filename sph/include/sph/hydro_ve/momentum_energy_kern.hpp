@@ -31,6 +31,8 @@
 
 #pragma once
 
+#include <bit>
+
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
@@ -40,9 +42,99 @@
 namespace sph
 {
 
+static constexpr uint32_t floatBits(float f) { return std::bit_cast<uint32_t>(f); }
+
+static constexpr uint32_t biasedExponent(uint32_t bits) { return (bits >> 23) & 0xFF; }
+
+static constexpr uint16_t encodeValue(float v, uint32_t maxExpField)
+{
+    const uint32_t bits = floatBits(v);
+
+    const uint16_t sign = (bits >> 31) & 1;
+
+    const uint32_t expField = (bits >> 23) & 0xFF;
+    const uint32_t frac     = bits & 0x7FFFFF;
+
+    if ((bits & 0x7FFFFFFF) == 0) return static_cast<uint16_t>(sign << 8);
+
+    const uint32_t significand = (expField == 0) ? frac : ((1u << 23) | frac);
+
+    const int shift = static_cast<int>(maxExpField) - static_cast<int>(expField);
+
+    const uint32_t aligned = (shift >= 24) ? 0u : (significand >> shift);
+
+    // Store the 8 MSBs of the aligned 24-bit significand.
+    const uint8_t mant8 = static_cast<uint8_t>(aligned >> 16);
+
+    return static_cast<uint16_t>((sign << 8) | mant8);
+}
+
+/*
+Bit layout of the returned uint64_t:
+
+63                                               10  9       0
++---------+---------+---------+---------+---------+---------+--------+
+| v1 (9)  | v2 (9)  | v3 (9)  | v4 (9)  | v5 (9)  | v6 (9)  | exp   |
++---------+---------+---------+---------+---------+---------+--------+
+
+Each vN field:
+    bit 8    : sign
+    bits 7:0 : 8 most-significant bits of the significand
+               after alignment to the largest exponent
+
+exp:
+    largest IEEE-754 biased exponent (0..255)
+*/
+static constexpr uint64_t packFloats(float v1, float v2, float v3, float v4, float v5, float v6)
+{
+    const float values[6] = {v1, v2, v3, v4, v5, v6};
+
+    uint32_t maxExpField = 0;
+
+    for (float v : values)
+    {
+        maxExpField = std::max(maxExpField, biasedExponent(floatBits(v)));
+    }
+
+    uint64_t result = maxExpField;
+
+    for (int i = 0; i < 6; ++i)
+    {
+        const uint64_t field = encodeValue(values[i], maxExpField);
+
+        result |= field << (10 + (5 - i) * 9);
+    }
+
+    return result;
+}
+
+static constexpr float bitsToFloat(uint32_t bits) { return std::bit_cast<float>(bits); }
+
+static constexpr util::array<float, 6> unpackFloats(uint64_t packed)
+{
+    util::array<float, 6> result;
+
+    const uint32_t maxExpField = packed & 0xFF;
+
+    for (int i = 0; i < 6; ++i)
+    {
+        const uint16_t field = (packed >> (10 + (5 - i) * 9)) & 0x1FF;
+
+        const bool     sign  = (field >> 8) & 1;
+        const uint32_t mant8 = field & 0xFF;
+
+        // Reconstruct aligned value.
+        float value = std::ldexp(static_cast<float>(mant8) + 0.5f, static_cast<int>(maxExpField) - 127 - 7);
+
+        result[i] = sign ? -value : value;
+    }
+
+    return result;
+}
+
 template<class Tc, class T>
 HOST_DEVICE_FUN T avRvCorrection(util::array<Tc, 3> R, Tc eta_ab, T eta_crit, T balsi, T balsj,
-                                  const util::array<T, 6>& gradV_i, const util::array<const T, 6>& gradV_j)
+                                 const util::array<T, 6>& gradV_i, const util::array<T, 6>& gradV_j)
 {
     T dmy1 = dot(R, symv(gradV_i, R));
     T dmy2 = dot(R, symv(gradV_j, R));
@@ -119,6 +211,12 @@ struct MomentumAndEnergyInteraction
 
         if constexpr (SLR)
         {
+            auto dvi_pack = packFloats(dV11i, dV12i, dV13i, dV22i, dV23i, dV33i);
+            auto dvj_pack = packFloats(dV11j, dV12j, dV13j, dV22j, dV23j, dV33j);
+
+            auto dVi = unpackFloats(dvi_pack);
+            auto dVj = unpackFloats(dvj_pack);
+
             T eps_i   = T(1e-4) * ci * hiInv;
             T eps_j   = T(1e-4) * cj * hjInv;
             T divvi   = std::abs(dV11i + dV22i + dV33i);
@@ -130,9 +228,7 @@ struct MomentumAndEnergyInteraction
             Lij       = stl::max(avFloor, T(0.5) * (f_i + f_j));
             T balsi   = T(1) - f_i * f_i;
             T balsj   = T(1) - f_j * f_j;
-            rv_slr +=
-                avRvCorrection({rx, ry, rz}, stl::min(v1, v2), eta_crit, balsi, balsj,
-                               {dV11i, dV12i, dV13i, dV22i, dV23i, dV33i}, {dV11j, dV12j, dV13j, dV22j, dV23j, dV33j});
+            rv_slr += avRvCorrection({rx, ry, rz}, stl::min(v1, v2), eta_crit, balsi, balsj, dVi, dVj);
         }
 
         T wij_slr      = i == j ? 0 : rv_slr / dist;
