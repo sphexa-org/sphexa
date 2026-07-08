@@ -75,7 +75,7 @@ protected:
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
-                                       "xm", "kx", "nc", "dtCourant", "divv", "curlv">;
+                                       "xm", "kx", "nc", "dtCourant", "curlv">;
 
     //! @brief velocity gradient fields will only be allocated when SLR is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
@@ -157,8 +157,8 @@ public:
         domain.exchangeHalos(get<"vx", "vy", "vz", "kx">(d), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        release(d, "az");
-        acquire(d, "gradh");
+        release(d, "ay", "az");
+        acquire(d, "divv", "gradh");
         computeIadDivvCurlvGradh(groups_.view(), d, domain.box());
         d.minDtRho = rhoTimestep(first, last, d);
         timer.step("IadVelocityDivCurlGradh");
@@ -166,7 +166,7 @@ public:
         computeEOS(first, last, d);
         timer.step("EquationOfState");
 
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "curlv", "c">(d), get<"ax">(d),
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "curlv", "c">(d), get<"ax">(d),
                              get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
@@ -184,8 +184,8 @@ public:
         else { domain.exchangeHalos(get<"prho", "alpha">(d), get<"ax">(d), get<"keys">(d)); }
         timer.step("mpi::synchronizeHalos");
 
-        release(d, "gradh");
-        acquire(d, "az");
+        release(d, "divv", "gradh");
+        acquire(d, "ay", "az");
         computeMomentumEnergy<SLR>(groups_.view(), nullptr, d, domain.box());
         timer.step("MomentumAndEnergy");
         pmReader.step();
@@ -264,14 +264,14 @@ public:
         release(d, "rho", "p", "gradh");
         acquire(d, "c11", "c12", "c13");
 
-        // third output pass: recover temporary curlv and divv quantities
-        //release(d, "prho", "c");
-        //acquire(d, "divv", "curlv");
-        // partial recovery of cij in range [first:last] without halos, which are not needed for divv and curlv
+        // third output pass: recover temporary divv
+        release(d, "prho");
+        acquire(d, "divv");
+        // partial recovery of cij in range [first:last] without halos, which are not needed for divv
         if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
         output();
-        //release(d, "divv", "curlv");
-        //acquire(d, "prho", "c");
+        release(d, "divv");
+        acquire(d, "prho");
 
         /* The following data is now lost and no longer available in the integration step
          *  c11, c12, c12: halos invalidated

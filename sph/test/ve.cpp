@@ -309,16 +309,15 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
                        const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
                        const T Atmin, const T Atmax, const T ramp, const T* wh, const T* kx, const T* xm,
                        const T* alpha, const T* dV11, const T* dV12, const T* dV13, const T* dV22, const T* dV23,
-                       const T* dV33, const T* divv, const T* curlv, const T avFloor, T* grad_P_x, T* grad_P_y,
+                       const T* dV33, const T* curlv, const T avFloor, T* grad_P_x, T* grad_P_y,
                        T* grad_P_z, Tm1* du, T* maxvsignal)
 {
     MomentumAndEnergyInteraction<SLR, T> interaction{wh, Atmin, Atmax, ramp, avFloor};
 
     if constexpr (!SLR) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
-    const auto input =
-        std::make_tuple(vx, vy, vz, m, c, kx, alpha, xm, prho, c11, c12, c13, c22, c23, c33, nc, dV11, dV12, dV13, dV22,
-                        dV23, dV33, tdpdTrho ? tdpdTrho : vx /* pass random derefable array if tdpdTrho is null */,
-                        divv, curlv);
+    const auto input = std::make_tuple(
+        vx, vy, vz, m, c, kx, alpha, xm, prho, c11, c12, c13, c22, c23, c33, nc, dV11, dV12, dV13, dV22, dV23, dV33,
+        tdpdTrho ? tdpdTrho : vx /* pass random derefable array if tdpdTrho is null */, curlv);
     const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, maxvsignal - i);
 
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
@@ -361,13 +360,12 @@ TEST_F(SphKernelTests, MomentumEnergy)
         std::vector<unsigned> nc(x.size(), neighborsCount + 1);
         auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
-        momentumAndEnergyJLoop<true>(0, K, box(), neighbors.data(), neighborsCount, nc.data(), x.data(), y.data(),
-                                     z.data(), vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
-                                     (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
-                                     c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
-                                     alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
-                                     dV33.data(), divv.data(), curlv.data(), avFloor, &grad_Px, &grad_Py, &grad_Pz, &du,
-                                     &maxvsignal);
+        momentumAndEnergyJLoop<true>(
+            0, K, box(), neighbors.data(), neighborsCount, nc.data(), x.data(), y.data(), z.data(), vx.data(),
+            vy.data(), vz.data(), h.data(), m.data(), prho.data(), (const T*)nullptr, c.data(), c11.data(), c12.data(),
+            c13.data(), c22.data(), c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
+            alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(), dV33.data(), curlv.data(),
+            avFloor, &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
         EXPECT_NEAR(grad_Px, -23175.29155183331, 0.023);
         EXPECT_NEAR(grad_Py, 13564.560025399775, 0.053);
@@ -384,7 +382,7 @@ TEST_F(SphKernelTests, MomentumEnergy)
                                       (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
                                       c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
                                       alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
-                                      dV33.data(), divv.data(), curlv.data(), avFloor, &grad_Px, &grad_Py, &grad_Pz, &du,
+                                      dV33.data(), curlv.data(), avFloor, &grad_Px, &grad_Py, &grad_Pz, &du,
                                       &maxvsignal);
 
         EXPECT_NEAR(grad_Px, -23599.138813909038, 0.022);
@@ -397,13 +395,12 @@ TEST_F(SphKernelTests, MomentumEnergy)
         std::vector<unsigned> nc(x.size(), 1);
         auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
-        momentumAndEnergyJLoop<false>(0, K, box(), neighbors.data(), 0, nc.data(), x.data(), y.data(), z.data(),
-                                      vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
-                                      (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
-                                      c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
-                                      alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
-                                      dV33.data(), divv.data(), curlv.data(), avFloor, &grad_Px, &grad_Py, &grad_Pz, &du,
-                                      &maxvsignal);
+        momentumAndEnergyJLoop<false>(
+            0, K, box(), neighbors.data(), 0, nc.data(), x.data(), y.data(), z.data(), vx.data(), vy.data(), vz.data(),
+            h.data(), m.data(), prho.data(), (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(),
+            c22.data(), c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(), alpha.data(),
+            dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(), dV33.data(), curlv.data(), avFloor,
+            &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
         EXPECT_EQ(grad_Px, 0.0);
         EXPECT_EQ(grad_Py, 0.0);
@@ -421,7 +418,7 @@ TEST_F(SphKernelTests, MomentumEnergyAvFloor)
     {
         return std::make_tuple(id, Vec3{0, 0, 0}, T(1), vx, T(0), T(0), T(1), T(1), T(1), T(1), T(1), T(0),
                                T(1), T(0), T(0), T(1), T(0), T(1), unsigned(2), T(0), T(0), T(0), T(0),
-                               T(0), T(0), T(0), T(0), T(1));
+                               T(0), T(0), T(0), T(1));
     };
 
     const auto iData = makeParticle(0, T(0));

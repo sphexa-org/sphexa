@@ -73,9 +73,9 @@ struct MomentumAndEnergyInteraction
                               T r2) const
     {
         const auto [i, iPos, hi, vxi, vyi, vzi, mi, ci, kxi, alpha_i, xmassi, prhoi, c11i, c12i, c13i, c22i, c23i, c33i,
-                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi, divvi, curlvi] = iData;
+                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi, curlvi] = iData;
         const auto [j, jPos, hj, vxj, vyj, vzj, mj, cj, kxj, alpha_j, xmassj, prhoj, c11j, c12j, c13j, c22j, c23j, c33j,
-                    ncj, dV11j, dV12j, dV13j, dV22j, dV23j, dV33j, tdpdTrhoj, divvj, curlvj] = jData;
+                    ncj, dV11j, dV12j, dV13j, dV22j, dV23j, dV33j, tdpdTrhoj, curlvj] = jData;
 
         auto rhoi = kxi * mi / xmassi;
 
@@ -121,16 +121,18 @@ struct MomentumAndEnergyInteraction
         {
             T eps_i   = T(1e-4) * ci * hiInv;
             T eps_j   = T(1e-4) * cj * hjInv;
-            T denom_i = std::abs(divvi) + std::abs(curlvi) + eps_i;
-            T denom_j = std::abs(divvj) + std::abs(curlvj) + eps_j;
-            T f_i     = (denom_i > T(0)) ? std::abs(divvi) / denom_i : T(0);
-            T f_j     = (denom_j > T(0)) ? std::abs(divvj) / denom_j : T(0);
+            T divvi   = std::abs(dV11i + dV22i + dV33i);
+            T divvj   = std::abs(dV11j + dV22j + dV33j);
+            T denom_i = divvi + std::abs(curlvi) + eps_i;
+            T denom_j = divvj + std::abs(curlvj) + eps_j;
+            T f_i     = divvi / denom_i;
+            T f_j     = divvj / denom_j;
             Lij       = stl::max(avFloor, T(0.5) * (f_i + f_j));
             T balsi   = T(1) - f_i * f_i;
             T balsj   = T(1) - f_j * f_j;
-            rv_slr += avRvCorrection({rx, ry, rz}, stl::min(v1, v2), eta_crit, balsi, balsj,
-                                       {dV11i, dV12i, dV13i, dV22i, dV23i, dV33i},
-                                       {dV11j, dV12j, dV13j, dV22j, dV23j, dV33j});
+            rv_slr +=
+                avRvCorrection({rx, ry, rz}, stl::min(v1, v2), eta_crit, balsi, balsj,
+                               {dV11i, dV12i, dV13i, dV22i, dV23i, dV33i}, {dV11j, dV12j, dV13j, dV22j, dV23j, dV33j});
         }
 
         T wij          = i == j ? 0 : rv / dist;
@@ -188,10 +190,10 @@ struct MomentumAndEnergyPostamble
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
         const auto [i, iPos, hi, vxi, vyi, vzi, mi, ci, kxi, alpha_i, xmassi, prhoi, c11i, c12i, c13i, c22i, c23i, c33i,
-                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi, divvi, curlvi] = iData;
-        auto [a_visc_energy, energy, momentum_x, momentum_y, momentum_z, maxvsignal] = result;
-        a_visc_energy                                                                = stl::max(T(0), a_visc_energy);
-        T eCoeff                                                                     = UseTdpdTrho ? tdpdTrhoi : prhoi;
+                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi, curlvi] = iData;
+        auto [a_visc_energy, energy, momentum_x, momentum_y, momentum_z, maxvsignal]  = result;
+        a_visc_energy                                                                 = stl::max(T(0), a_visc_energy);
+        T eCoeff                                                                      = UseTdpdTrho ? tdpdTrhoi : prhoi;
         T dui = K * (eCoeff * energy + T(0.5) * a_visc_energy); // factor of 2 already removed from 2P/rho
         if (nci <= 1)
         {
@@ -221,7 +223,7 @@ struct MomentumAndEnergyPostambleWithDt : MomentumAndEnergyPostamble<UseTdpdTrho
         const auto [du, grad_P_x, grad_P_y, grad_P_z, maxvsignal] =
             MomentumAndEnergyPostamble<UseTdpdTrho, T, Tc>::operator()(iData, result);
         const auto [i, iPos, hi, vxi, vyi, vzi, mi, ci, kxi, alpha_i, xmassi, prhoi, c11i, c12i, c13i, c22i, c23i, c33i,
-                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi, divvi, curlvi] = iData;
+                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi, curlvi] = iData;
 
         auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
         return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
@@ -234,14 +236,13 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T
                              const T* xm, const T* prho, const T* c11, const T* c12, const T* c13, const T* c22,
                              const T* c23, const T* c33, const unsigned* nc, const T* dV11, const T* dV12,
                              const T* dV13, const T* dV22, const T* dV23, const T* dV33, const T* tdpdTrho, const T* wh,
-                             T avFloor, Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z, const T* divv, const T* curlv,
-                             T* dt)
+                             T avFloor, Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z, const T* curlv, T* dt)
 {
     if constexpr (!SLR) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
-    const auto input =
-        std::make_tuple(vx, vy, vz, m, c, kx, alpha, xm, prho, c11, c12, c13, c22, c23, c33, nc, dV11, dV12, dV13, dV22,
-                        dV23, dV33, tdpdTrho ? tdpdTrho : vx /* pass random derefable array if tdpdTrho is null */,
-                        divv, curlv);
+    const auto input = std::make_tuple(
+        vx, vy, vz, m, c, kx, alpha, xm, prho, c11, c12, c13, c22, c23, c33, nc, dV11, dV12, dV13, dV22, dV23, dV33,
+        tdpdTrho ? tdpdTrho : vx /* pass random derefable array if tdpdTrho is null */, curlv);
+
     const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
     if (tdpdTrho)
     {
