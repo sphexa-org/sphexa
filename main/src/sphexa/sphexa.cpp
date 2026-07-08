@@ -296,9 +296,6 @@ void printHelp(char* name, int rank)
 
         printf("\t--avswitches \t Enable artificial-viscosity switches [disabled by default]\n\n");
 
-        printf("\t--avfloor NUM \t Set the floor F in the SLR/Balsara AV amplitude clamp.\n"
-               "\t\t\t F=1 disables the floor [default], F=0.5 is useful for subsonic turbulence.\n\n");
-
         printf("\t--duration \t Maximum wall-clock run time of the simulation in seconds.[MAX_INT]\n\n");
 
         printf("\t--profile \t\t Enable profiling output,\n\
