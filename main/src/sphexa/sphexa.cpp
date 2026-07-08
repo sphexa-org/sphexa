@@ -103,7 +103,6 @@ int main(int argc, char** argv)
     const bool               quiet        = parser.exists("--quiet");
     const bool               SLR          = !parser.exists("--no-slr");
     const bool               AVswitches   = parser.exists("--avswitches");
-    const bool               haveAvFloor  = parser.exists("--avfloor");
     const int                simDuration  = parser.get("--duration", std::numeric_limits<int>::max());
     const std::string        writeFreqStr = parser.get("-w", std::string("0"));
     const bool               writeEnabled = writeFreqStr != "0" || !writeExtra.empty();
@@ -145,7 +144,6 @@ int main(int argc, char** argv)
         d.alphamin                = 0.05;
         if (resetAlpha) { cstone::fill(exec, d.alpha.begin(), d.alpha.end(), d.alphamin); }
     }
-    if (haveAvFloor) { d.avFloor = parser.get<double>("--avfloor"); }
     if (!AVswitches && initFromFile)
     {
         d.alphamin         = 1.0;
