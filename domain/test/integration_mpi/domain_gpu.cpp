@@ -169,8 +169,8 @@ void focusDomainRemoveParticle(int rank, int numRanks, Box<T> box)
 
     StreamHolder stream;
 
-    Domain<KeyType, Real, execution::Gpu> domain(stream.exec(), rank, numRanks, bucketSize, bucketSizeFocus, theta,
-                                                 MPI_COMM_WORLD, box);
+    Domain<KeyType, T, execution::Gpu> domain(stream.exec(), rank, numRanks, bucketSize, bucketSizeFocus, theta,
+                                              MPI_COMM_WORLD, box);
 
     DeviceVector<T> s1, s2, s3;
     domain.sync(d_keys, d_x, d_y, d_z, d_h, std::tie(d_id), std::tie(s1, s2, s3));
@@ -248,7 +248,7 @@ void domainReapplySync(int rank, int numRanks, Box<T> box)
 
     StreamHolder stream;
 
-    Domain<KeyType, Real, execution::Gpu> domain(stream.exec(), rank, numRanks, bucketSize, bucketSizeFocus, theta,
+    Domain<KeyType, T, execution::Gpu> domain(stream.exec(), rank, numRanks, bucketSize, bucketSizeFocus, theta,
                                                  MPI_COMM_WORLD, box);
 
     DeviceVector<T> s1, s2, gpuOrdering;
@@ -256,7 +256,7 @@ void domainReapplySync(int rank, int numRanks, Box<T> box)
 
     // modify coordinates
     {
-        RandomCoordinates<Real, SfcKind<KeyType>> scord(domain.nParticles(), box, numRanks + rank);
+        RandomCoordinates<T, SfcKind<KeyType>> scord(domain.nParticles(), box, numRanks + rank);
         memcpyH2DAsync(stream.exec(), scord.x().data(), scord.x().size(), d_x.data() + domain.startIndex());
         memcpyH2DAsync(stream.exec(), scord.y().data(), scord.y().size(), d_y.data() + domain.startIndex());
         memcpyH2DAsync(stream.exec(), scord.z().data(), scord.z().size(), d_z.data() + domain.startIndex());
