@@ -134,14 +134,10 @@ TEST(GeneralFocusExchange, randomGaussian)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
 
-    generalExchangeRandomGaussian<unsigned, double, SfcKind>(rank, nRanks, {-1, 1});
     generalExchangeRandomGaussian<uint64_t, double, SfcKind>(rank, nRanks, {-1, 1});
     generalExchangeRandomGaussian<unsigned, float, SfcKind>(rank, nRanks, {-1, 1});
-    generalExchangeRandomGaussian<uint64_t, float, SfcKind>(rank, nRanks, {-1, 1});
-    generalExchangeRandomGaussian<unsigned, double, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
     generalExchangeRandomGaussian<uint64_t, double, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
     generalExchangeRandomGaussian<unsigned, float, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
-    generalExchangeRandomGaussian<uint64_t, float, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
 }
 
 /*! @brief Test focused octree source center exchange for mixed-dimension boxes

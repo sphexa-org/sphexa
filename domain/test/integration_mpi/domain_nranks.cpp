@@ -39,7 +39,7 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks)
     LocalIndex numParticles = (1000 / nRanks) * nRanks;
     Box<T> box              = domain.box();
 
-    // numParticles identical coordinates on each rankk
+    // numParticles identical coordinates on each rank
     RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box, 5);
 
     coords.adjustH(10, 20);
