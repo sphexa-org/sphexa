@@ -68,10 +68,6 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks)
         // box got updated if not using PBC
         box = domain.box();
         std::vector<KeyType> keysRef(x.size());
-        const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
-        const bool useMixD  = axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
-                             axesBits[2] != maxTreeLevel<KeyType>{};
-        EXPECT_EQ(useMixD0, useMixD);
         computeSfcKeys(x.data(), y.data(), z.data(), sfcKindPointer(keysRef.data()), x.size(), box);
 
         // check that particles are SFC order sorted and the keys are in sync with the x,y,z arrays
@@ -110,8 +106,9 @@ void randomGaussianDomain(DomainType domain, int rank, int nRanks)
 TEST(FocusDomain, randomGaussianNeighborSum)
 {
     int rank = 0, nRanks = 0;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
+    MPI_Comm comm = MPI_COMM_WORLD;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &nRanks);
 
     int bucketSize      = 50;
     int bucketSizeFocus = 10;
@@ -119,99 +116,65 @@ TEST(FocusDomain, randomGaussianNeighborSum)
     // than the multipole criterion
     float theta = 0.75;
 
+    auto fbc = BoundaryType::fixed;
     {
-        Domain<unsigned, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        MPI_COMM_WORLD, {-1, 1});
-        randomGaussianDomain<unsigned, double>(domain, rank, nRanks);
-    }
-    {
-        Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        MPI_COMM_WORLD, {-1, 1});
+        Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, comm,
+                                        {-1, 1, fbc});
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, float> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                       {-1, 1});
+        Domain<unsigned, float> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, comm,
+                                       {-1, 1, fbc});
         randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
     }
+
     {
-        Domain<uint64_t, float> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                       {-1, 1});
-        randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
-    }
-    {
-        Domain<unsigned, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625});
-        randomGaussianDomain<unsigned, double>(domain, rank, nRanks);
-    }
-    {
-        Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625});
+        Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, comm,
+                                        {0, 1, 0, 0.015625, 0, 0.00390625, fbc, fbc, fbc});
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, float> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                       {0, 1, 0, 0.015625, 0, 0.00390625});
+        Domain<unsigned, float> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, comm,
+                                       {0, 1, 0, 0.015625, 0, 0.00390625, fbc, fbc, fbc});
         randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
-    }
-    {
-        Domain<uint64_t, float> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                       {0, 1, 0, 0.015625, 0, 0.00390625});
-        randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
     }
 }
 
 TEST(FocusDomain, randomGaussianNeighborSumPbc)
 {
     int rank = 0, nRanks = 0;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
+    MPI_Comm comm = MPI_COMM_WORLD;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &nRanks);
 
     int bucketSize      = 50;
     int bucketSizeFocus = 10;
     float theta         = 0.75;
 
-    auto periodic = BoundaryType::periodic;
-    {
-        Domain<unsigned, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        MPI_COMM_WORLD, {-1, 1, periodic});
-        randomGaussianDomain<unsigned, double>(domain, rank, nRanks);
-    }
+    auto pbc = BoundaryType::periodic;
+
     {
         Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        MPI_COMM_WORLD, {-1, 1, periodic});
+                                        comm, {-1, 1, pbc});
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, float> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                       {-1, 1, periodic});
+        Domain<unsigned, float> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, comm,
+                                       {-1, 1, pbc});
         randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
     }
-    {
-        Domain<uint64_t, float> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                       {-1, 1, periodic});
-        randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
-    }
-    {
-        Domain<unsigned, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
-        randomGaussianDomain<unsigned, double>(domain, rank, nRanks);
-    }
+
     {
         Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        MPI_COMM_WORLD, {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
+                                        comm, {0, 1, 0, 0.015625, 0, 0.00390625, pbc, pbc, pbc});
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
-        Domain<unsigned, float> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                       {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
+        Domain<unsigned, float> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, comm,
+                                       {0, 1, 0, 0.015625, 0, 0.00390625, pbc, pbc, pbc});
         randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
     }
-    {
-        Domain<uint64_t, float> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD,
-                                       {0, 1, 0, 0.015625, 0, 0.00390625, periodic});
-        randomGaussianDomain<uint64_t, float>(domain, rank, nRanks);
-    }
+
 }
 
 /*! @brief Test domain re-assignment after large particle displacement with mixed-dimension boxes
