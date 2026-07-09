@@ -21,7 +21,7 @@
 #include <thrust/sequence.h>
 #include <thrust/sort.h>
 
-#include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/execution.hpp"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/sfc/sfc_gpu.h"
@@ -146,10 +146,10 @@ int main()
         thrust::device_vector<unsigned> dz = iz;
 
         auto computeHilbert = [&](cudaStream_t stream)
-        { computeSfcKeys(stream, rawPtr(hilbertKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys); };
+        { computeSfcKeys(stream, rawPtr(hilbertKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, axesBits); };
 
         auto computeMorton = [&](cudaStream_t stream)
-        { computeSfcKeys(stream, rawPtr(mortonKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys); };
+        { computeSfcKeys(stream, rawPtr(mortonKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, axesBits); };
 
         float t_hilbert = timeGpu(computeHilbert);
         float t_morton  = timeGpu(computeMorton);
@@ -161,7 +161,7 @@ int main()
         thrust::device_vector<unsigned> dz2(numKeys);
 
         auto decodeHilbert = [&](cudaStream_t stream)
-        { decodeSfcKeys(stream, rawPtr(hilbertKeys), rawPtr(dx2), rawPtr(dy2), rawPtr(dz2), numKeys); };
+        { decodeSfcKeys(stream, rawPtr(hilbertKeys), rawPtr(dx2), rawPtr(dy2), rawPtr(dz2), numKeys, axesBits); };
 
         float t_decode  = timeGpu(decodeHilbert);
         bool passDecode = thrust::equal(dx.begin(), dx.end(), dx2.begin()) &&
