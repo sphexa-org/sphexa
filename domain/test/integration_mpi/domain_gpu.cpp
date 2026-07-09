@@ -63,35 +63,16 @@ void randomGaussianAssignment(int rank, int numRanks, Box<T> box)
     DeviceVector<T> d_m           = m;
     DeviceVector<uint8_t> d_rungs = rungs;
 
-    const auto originalBoxMixDBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
-    const auto isOriginalBoxMixD =
-        (originalBoxMixDBits[0] != maxTreeLevel<KeyType>{} || originalBoxMixDBits[1] != maxTreeLevel<KeyType>{} ||
-         originalBoxMixDBits[2] != maxTreeLevel<KeyType>{});
     Domain<KeyType, T, execution::Cpu> domainCpu(execution::cpu, rank, numRanks, bucketSize, bucketSizeFocus, 1.0,
                                                  MPI_COMM_WORLD, box);
     std::vector<T> hs1, hs2, hs3;
     domainCpu.sync(keys, x, y, z, h, std::tie(m, rungs), std::tie(hs1, hs2, hs3));
 
-    // Make sure that small box shrinking doesn't change the MixD bits compared to the original box
-    const auto cpuDomainBoxMixDBits = getBoxDimensionBits<T, KeyType, Box<T>>(domainCpu.box());
-    const auto isCpuDomainBoxMixD =
-        (cpuDomainBoxMixDBits[0] != maxTreeLevel<KeyType>{} || cpuDomainBoxMixDBits[1] != maxTreeLevel<KeyType>{} ||
-         cpuDomainBoxMixDBits[2] != maxTreeLevel<KeyType>{});
-    EXPECT_EQ(isOriginalBoxMixD, isCpuDomainBoxMixD);
-
     StreamHolder stream;
-
     Domain<KeyType, T, execution::Gpu> domainGpu(stream.exec(), rank, numRanks, bucketSize, bucketSizeFocus, 1.0,
                                                  MPI_COMM_WORLD, box);
     DeviceVector<T> s1, s2, s3;
     domainGpu.sync(d_keys, d_x, d_y, d_z, d_h, std::tie(d_m, d_rungs), std::tie(s1, s2, s3));
-
-    // Make sure that small box shrinking doesn't change the MixD bits compared to the original box on GPU as well
-    const auto gpuDomainBoxMixDBits = getBoxDimensionBits<T, KeyType, Box<T>>(domainGpu.box());
-    const auto isGpuDomainBoxMixD =
-        (gpuDomainBoxMixDBits[0] != maxTreeLevel<KeyType>{} || gpuDomainBoxMixDBits[1] != maxTreeLevel<KeyType>{} ||
-         gpuDomainBoxMixDBits[2] != maxTreeLevel<KeyType>{});
-    EXPECT_EQ(isOriginalBoxMixD, isGpuDomainBoxMixD);
 
     std::cout << "[Rank " << rank << "] numHalos GPU: " << domainGpu.nParticlesWithHalos() - domainGpu.nParticles()
               << " CPU: " << domainCpu.nParticlesWithHalos() - domainCpu.nParticles() << std::endl;
@@ -125,8 +106,10 @@ TEST(DomainGpu, matchTreeCpu)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &numRanks);
 
-    randomGaussianAssignment<uint64_t, double>(rank, numRanks, Box<double>(0, 1));
-    randomGaussianAssignment<uint64_t, double>(rank, numRanks, Box<double>(0, 1, 0, 0.015625, 0, 0.00390625));
+    auto fbc = BoundaryType::fixed; // Make sure that box fitting doesn't change the MixD bits
+    randomGaussianAssignment<uint64_t, double>(rank, numRanks, Box<double>(0, 1, fbc));
+    randomGaussianAssignment<uint64_t, double>(rank, numRanks,
+                                               Box<double>(0, 1, 0, 0.015625, 0, 0.00390625, fbc, fbc, fbc));
 }
 
 /*! @brief Test particle removal in a focused GPU domain with mixed-dimension boxes
