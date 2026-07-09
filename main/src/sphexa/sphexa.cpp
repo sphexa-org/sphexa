@@ -157,33 +157,6 @@ int main(int argc, char** argv)
     propagator->sync(domain, simData);
     if (rank == 0) std::cout << "Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
 
-    // Write assigned (non-halo) particle coordinates for this rank to its own file
-    {
-        std::ofstream rankFile(fs::path(outFile).parent_path() / ("coords_rank" + std::to_string(rank) + ".txt"));
-        rankFile << std::scientific;
-
-        size_t start = domain.startIndex();
-        size_t count = domain.endIndex() - start;
-
-#ifdef USE_CUDA
-        // GPU: copy assigned slice from device to host, then write
-        std::vector<double> hx(count), hy(count), hz(count);
-        memcpyD2H(d.x.data() + start, count, hx.data());
-        memcpyD2H(d.y.data() + start, count, hy.data());
-        memcpyD2H(d.z.data() + start, count, hz.data());
-        for (size_t i = 0; i < count; ++i)
-        {
-            rankFile << hx[i] << " " << hy[i] << " " << hz[i] << "\n";
-        }
-#else
-        // CPU: host vectors, write directly
-        for (size_t i = 0; i < count; ++i)
-        {
-            rankFile << d.x[start + i] << " " << d.y[start + i] << " " << d.z[start + i] << "\n";
-        }
-#endif
-    }
-
 #ifdef SPHEXA_WITH_VISUALIZATION
     VizAdaptor viz(argc, argv);
 #endif
