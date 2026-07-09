@@ -296,7 +296,7 @@ public:
         numInternalNodes = (numLeafNodes - 1) / 7;
         numNodes         = numLeafNodes + numInternalNodes;
 
-        lowMemReallocate(numNodes, 1.01, {}, std::tie(prefixes, internalToLeaf, leafToInternal, childOffsets, empty));
+        lowMemReallocate(numNodes, 1.01, {}, std::tie(prefixes, internalToLeaf, leafToInternal, childOffsets));
         // +1 to accommodate nodeOffsets in FocusedOctreeCore::update when numNodes == 1
         reallocate(childOffsets, numNodes + 1, 1.01);
 
@@ -359,7 +359,6 @@ public:
     AccVector<TreeNodeIndex> internalToLeaf;
     //! @brief maps leaf (cstone) order to internal level-sorted order
     AccVector<TreeNodeIndex> leafToInternal;
-    AccVector<uint8_t> empty;
 };
 
 template<class KeyType>
