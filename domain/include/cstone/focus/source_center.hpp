@@ -146,7 +146,7 @@ void setMac(std::span<const KeyType> nodeKeys,
 template<class KeyType, class T>
 void nodeFpCenters(std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box)
 {
-    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
 
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < prefixes.size(); ++i)

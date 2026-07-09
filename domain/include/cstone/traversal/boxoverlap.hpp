@@ -123,7 +123,7 @@ template<class KeyType>
 HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
 containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box)
 {
-    const auto axesBits = getBoxDimensionBits<int, KeyType, IBox>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
     return containedIn(codeStart, codeEnd, box, axesBits);
 }
 
@@ -157,7 +157,7 @@ containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Ve
         return codeStart == 0 && codeEnd == nodeRange<KeyType>(0);
     }
 
-    const auto axesBits = getBoxDimensionBits<Tc, KeyType, Box<Tc>>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
 
     // Add one grid unit to the maximum corner before quantization. Due to round-off the physical
     // coordinate of boxMax can map to the integer cell just below the intended one; shifting it by

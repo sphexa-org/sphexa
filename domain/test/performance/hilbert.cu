@@ -112,7 +112,7 @@ int main()
 
     using Real = double;
     Box<Real> box(-1, 1);
-    const auto axesBits = getBoxDimensionBits<Real, IntegerType, Box<Real>>(box);
+    const auto axesBits = getBoxDimBits<IntegerType>(box);
 
     std::mt19937 gen;
     std::uniform_real_distribution<Real> distribution(box.xmin(), box.xmax());

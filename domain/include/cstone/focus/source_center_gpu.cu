@@ -237,7 +237,7 @@ void computeGeoCentersGpu(execution::Gpu exec,
 {
     unsigned numThreads = 256;
     unsigned numBlocks  = iceil(numNodes, numThreads);
-    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
     computeGeoCentersKernel<<<numBlocks, numThreads, 0, exec>>>(prefixes, numNodes, centers, sizes, box, axesBits);
 }
 

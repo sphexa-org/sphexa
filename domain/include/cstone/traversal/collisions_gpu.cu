@@ -44,9 +44,7 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
         KeyType highestKey = leaves[lastNode];
 
         // A zero search size means this leaf does not have a valid MixD SFC key so it doesn't include any particles
-        if (tS[0] == 0 && tS[1] == 0 && tS[2] == 0) { return; }
-
-        const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+        if (tS == Vec3<T>{0, 0, 0}) { return; }
 
         // if the halo box is fully inside the assigned SFC range, we skip collision detection
         if (containedIn(lowestKey, highestKey, tC, tS, box)) { return; }
@@ -139,7 +137,7 @@ void markMacsGpu(execution::Gpu exec,
     constexpr unsigned numThreads = 128;
     unsigned numBlocks            = iceil(numFocusNodes, numThreads);
 
-    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
     if (numFocusNodes)
     {
         markMacsGpuKernel<<<numBlocks, numThreads, 0, exec>>>(prefixes, childOffsets, parents, centers, box, focusNodes,

@@ -73,29 +73,6 @@ void sortBySfcKey(std::vector<T>& x, std::vector<T>& y, std::vector<T>& z)
     std::swap(z, buffer);
 }
 
-//! @brief sort x,y,z coordinates in the unit cube by SFC keys
-template<class KeyType, class T>
-void sortBySfcKey(std::vector<T>& x, std::vector<T>& y, std::vector<T>& z, cstone::Box<T> globalBox)
-{
-    assert(x.size() == y.size() && x.size() == z.size());
-    size_t blockSize = x.size();
-
-    std::vector<KeyType> keys(blockSize);
-    computeSfcKeys(x.data(), y.data(), z.data(), cstone::sfcKindPointer(keys.data()), blockSize, globalBox);
-
-    std::vector<cstone::LocalIndex> sfcOrder(blockSize);
-    std::iota(begin(sfcOrder), end(sfcOrder), cstone::LocalIndex(0));
-    cstone::sort_by_key(begin(keys), end(keys), begin(sfcOrder));
-
-    std::vector<T> buffer(blockSize);
-    cstone::gather<cstone::LocalIndex>(sfcOrder, x.data(), buffer.data());
-    std::swap(x, buffer);
-    cstone::gather<cstone::LocalIndex>(sfcOrder, y.data(), buffer.data());
-    std::swap(y, buffer);
-    cstone::gather<cstone::LocalIndex>(sfcOrder, z.data(), buffer.data());
-    std::swap(z, buffer);
-}
-
 //! @brief read x,y,z coordinates from an H5Part file (at step 0)
 template<class Vector>
 void readTemplateBlock(const std::string& block, IFileReader* reader, Vector& x, Vector& y, Vector& z)

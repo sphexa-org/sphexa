@@ -51,7 +51,7 @@ std::vector<IBox> makeUniformReference(unsigned level)
 template<class KeyType>
 void surfaceDetection(IBox targetBox, std::vector<IBox> reference, unsigned numLeaves)
 {
-    const auto axesBits = getBoxDimensionBits<int, KeyType, IBox>(targetBox);
+    const auto axesBits = getBoxDimBits<KeyType>(targetBox);
 
     std::vector<KeyType> tree = makeUniformNLevelTree<KeyType>(numLeaves, 1);
 
@@ -89,8 +89,8 @@ TEST(Traversal, surfaceDetection)
                                makeUniformReference<uint64_t>(uniformLevel), 64);
 
     const IBox nonUniformTargetBox{0, 512, 0, 8, 0, 2};
-    const auto nonUniformAxesBitsU32 = getBoxDimensionBits<int, unsigned, IBox>(nonUniformTargetBox);
-    const auto nonUniformAxesBitsU64 = getBoxDimensionBits<int, uint64_t, IBox>(nonUniformTargetBox);
+    const auto nonUniformAxesBitsU32 = getBoxDimBits<unsigned>(nonUniformTargetBox);
+    const auto nonUniformAxesBitsU64 = getBoxDimBits<uint64_t>(nonUniformTargetBox);
     surfaceDetection<unsigned>(nonUniformTargetBox,
                                {makeLevelBox<unsigned>(0, 0, 0, 3, nonUniformAxesBitsU32),
                                 makeLevelBox<unsigned>(1, 0, 0, 3, nonUniformAxesBitsU32),
@@ -142,7 +142,7 @@ void dualTraversalNeighbors(const Box<float>& box, unsigned expectedPairs, unsig
     auto leaves = makeUniformNLevelTree<KeyType>(64, 1);
     octree.update(leaves.data(), nNodes(leaves));
 
-    const auto axesBits = getBoxDimensionBits<float, KeyType, Box<float>>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
 
     for (TreeNodeIndex i = 0; i < octree.numTreeNodes(); ++i)
     {

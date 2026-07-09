@@ -43,7 +43,7 @@ TEST(CoordinateSamples, randomMixDContainerIsSorted)
     Box<real> box{-240, 480, 0, 512, 0, 1};
     RandomCoordinates<real, SfcKind<IntegerType>> c(n, box);
 
-    const auto axesBits = getBoxDimensionBits<real, IntegerType>(box);
+    const auto axesBits = getBoxDimBits<IntegerType>(box);
     std::vector<IntegerType> testCodes(n);
     computeSfcKeys(c.x().data(), c.y().data(), c.z().data(), sfcKindPointer(testCodes.data()), n, box);
 

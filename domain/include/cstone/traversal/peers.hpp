@@ -53,7 +53,7 @@ std::vector<int> findPeersMac(int myRank,
     KeyType domainStart = assignment[myRank];
     KeyType domainEnd   = assignment[myRank + 1];
 
-    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
 
     constexpr float roundOff  = 1 + 1e-6; // ensure that peers are picked up in case of a numerical tie
     const Vec3<int> maxCoords = {(1 << axesBits[0]), (1 << axesBits[1]), (1 << axesBits[2])};
@@ -134,7 +134,7 @@ std::vector<int> findPeersMacStt(int myRank,
     TreeNodeIndex firstLeaf = findNodeAbove(leaves, octree.numLeafNodes, domainStart);
     TreeNodeIndex lastLeaf  = findNodeAbove(leaves, octree.numLeafNodes, domainEnd);
 
-    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
 
     const Vec3<int> maxCoords = {(1 << axesBits[0]), (1 << axesBits[1]), (1 << axesBits[2])};
     const Vec3<T> gridStep    = {box.lx() / maxCoords[0], box.ly() / maxCoords[1], box.lz() / maxCoords[2]};

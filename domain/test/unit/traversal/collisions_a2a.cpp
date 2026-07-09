@@ -93,7 +93,7 @@ public:
         auto bType       = static_cast<BoundaryType>(std::get<3>(GetParam()));
         Box<T> box(0, std::get<0>(GetParam()), 0, std::get<1>(GetParam()), 0, std::get<2>(GetParam()), bType);
 
-        const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+        const auto axesBits = getBoxDimBits<KeyType>(box);
         bool useMixD        = (axesBits[0] < maxTreeLevel<KeyType>{} || axesBits[1] < maxTreeLevel<KeyType>{} ||
                         axesBits[2] < maxTreeLevel<KeyType>{});
         std::vector<KeyType> keys =

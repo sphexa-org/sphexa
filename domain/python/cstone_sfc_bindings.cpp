@@ -101,7 +101,7 @@ NB_MODULE(cstone_sfc, m)
         "Max octree depth supported by the selected key type ('uint64_t' or 'unsigned')");
 
     m.def(
-        "getBoxDimensionBits",
+        "getBoxDimBits",
         [](const std::array<double, 6>& boxLimits, const std::string& keyType)
         {
             validateBox(boxLimits);
@@ -110,14 +110,12 @@ NB_MODULE(cstone_sfc, m)
             {
                 case KeyKind::uint64:
                 {
-                    const auto bits =
-                        cstone::getBoxDimensionBits<double, cstone::HilbertKey<KeyType64>, cstone::Box<double>>(box);
+                    const auto bits = cstone::getBoxDimBits<cstone::HilbertKey<KeyType64>>(box);
                     return std::array<unsigned, 3>{bits[0], bits[1], bits[2]};
                 }
                 case KeyKind::u32:
                 {
-                    const auto bits =
-                        cstone::getBoxDimensionBits<double, cstone::HilbertKey<KeyType32>, cstone::Box<double>>(box);
+                    const auto bits = cstone::getBoxDimBits<cstone::HilbertKey<KeyType32>>(box);
                     return std::array<unsigned, 3>{bits[0], bits[1], bits[2]};
                 }
             }

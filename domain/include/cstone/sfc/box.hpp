@@ -322,7 +322,7 @@ using FBox = SimpleBox<T>;
 template<class KeyType, class T>
 constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox& ibox, const Box<T>& box)
 {
-    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
 
     constexpr int maxCoord = 1u << maxTreeLevel<KeyType>{};
     // smallest octree cell edge length in unit cube
@@ -427,7 +427,6 @@ Box<T> limitBoxShrinking(const Box<T>& fittingBox, const Box<T>& previousBox, co
 
 /*! @brief Compute per-axis SFC bit depths for mixed-dimension (MixD) boxes
  *
- * @tparam T         float or double
  * @tparam KeyType   32- or 64-bit unsigned integer SFC key type
  * @tparam BoxType   box type with x/y/z limits (e.g., Box<T> or IBox)
  * @param box        bounding box
@@ -436,15 +435,14 @@ Box<T> limitBoxShrinking(const Box<T>& fittingBox, const Box<T>& previousBox, co
  * Determines how many bits of the SFC key are effectively used along each spatial dimension.
  * The longest box dimension is assigned the full key depth (@p maxTreeLevel<KeyType>), while
  * shorter dimensions receive fewer bits according to the base-2 logarithm of the aspect ratio.
- *
  */
-template<typename T, typename KeyType, typename BoxType>
-HOST_DEVICE_FUN AxesBits getBoxDimensionBits(const BoxType& box)
+template<typename KeyType, typename BoxType>
+HOST_DEVICE_FUN AxesBits getBoxDimBits(const BoxType& box)
 {
-    const T dx                  = box.xmax() - box.xmin();
-    const T dy                  = box.ymax() - box.ymin();
-    const T dz                  = box.zmax() - box.zmin();
-    const T maxDim              = stl::max(stl::max(dx, dy), dz);
+    const auto dx               = box.xmax() - box.xmin();
+    const auto dy               = box.ymax() - box.ymin();
+    const auto dz               = box.zmax() - box.zmin();
+    const auto maxDim           = stl::max(stl::max(dx, dy), dz);
     constexpr unsigned maxLevel = maxTreeLevel<KeyType>{};
 
     const unsigned bx = dx == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::floor(std::log2(maxDim / dx)));

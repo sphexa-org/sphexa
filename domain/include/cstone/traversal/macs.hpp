@@ -41,7 +41,7 @@ HOST_DEVICE_FUN inline float invThetaMinToVec(float theta) { return 1.0f / theta
 template<class T, class KeyType>
 HOST_DEVICE_FUN Vec4<T> computeMinMacR2(KeyType prefix, float invThetaEff, const Box<T>& box)
 {
-    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
     KeyType nodeKey     = decodePlaceholderBit(prefix);
     int prefixLength    = decodePrefixLength(prefix);
 
@@ -68,7 +68,7 @@ HOST_DEVICE_FUN T computeVecMacR2(KeyType prefix, Vec3<T> expCenter, float invTh
     KeyType nodeKey  = decodePlaceholderBit(prefix);
     int prefixLength = decodePrefixLength(prefix);
 
-    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
 
     IBox cellBox              = sfcIBox(sfcKey(nodeKey), prefixLength / 3, axesBits);
     auto [geoCenter, geoSize] = centerAndSize<KeyType>(cellBox, box);
@@ -212,7 +212,7 @@ void markMacs(const KeyType* prefixes,
     KeyType focusStart = focusNodes[0];
     KeyType focusEnd   = focusNodes[numFocusNodes];
 
-    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
 
 #pragma omp parallel for schedule(dynamic)
     for (TreeNodeIndex i = 0; i < numFocusNodes; ++i)

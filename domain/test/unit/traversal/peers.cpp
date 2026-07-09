@@ -30,7 +30,7 @@ static std::vector<int> findPeersAll2All(int myRank,
                                          const Box<T>& box,
                                          float invThetaEff)
 {
-    const auto axesBits = getBoxDimensionBits<T, KeyType, Box<T>>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
     const bool mixD     = axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
                       axesBits[2] != maxTreeLevel<KeyType>{};
 
@@ -150,7 +150,7 @@ static void findPeers(Box<double> box)
     int numRanks      = 50;
     float invThetaEff = invThetaMinToVec(0.5f);
 
-    const auto axesBits = getBoxDimensionBits<double, KeyType, Box<double>>(box);
+    const auto axesBits = getBoxDimBits<KeyType>(box);
     const bool useMixD  = axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
                          axesBits[2] != maxTreeLevel<KeyType>{};
     auto particleKeys =
