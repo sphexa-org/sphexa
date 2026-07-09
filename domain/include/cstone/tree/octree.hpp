@@ -309,20 +309,18 @@ public:
 
     OctreeView<KeyType> data()
     {
-        return {
-            numLeafNodes,
-            numInternalNodes,
-            numNodes,
-            TreeNodeIndex(parents.size()),
-            rawPtr(prefixes),
-            rawPtr(childOffsets),
-            rawPtr(parents),
-            rawPtr(levelRange),
-            rawPtr(d_levelRange),
-            rawPtr(internalToLeaf),
-            rawPtr(leafToInternal),
-            nullptr,
-        };
+        return {numLeafNodes,
+                numInternalNodes,
+                numNodes,
+                TreeNodeIndex(parents.size()),
+                rawPtr(prefixes),
+                rawPtr(childOffsets),
+                rawPtr(parents),
+                rawPtr(levelRange),
+                rawPtr(d_levelRange),
+                rawPtr(internalToLeaf),
+                rawPtr(leafToInternal),
+                nullptr};
     }
 
     OctreeView<const KeyType> cdata() const
