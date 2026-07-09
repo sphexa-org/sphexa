@@ -428,7 +428,7 @@ Box<T> limitBoxShrinking(const Box<T>& fittingBox, const Box<T>& previousBox, co
 /*! @brief Compute per-axis SFC bit depths for mixed-dimension (MixD) boxes
  *
  * @tparam KeyType   32- or 64-bit unsigned integer SFC key type
- * @tparam BoxType   box type with x/y/z limits (e.g., Box<T> or IBox)
+ * @tparam T         float or double
  * @param box        bounding box
  * @return           axis bit depths {bx, by, bz}
  *
@@ -436,20 +436,15 @@ Box<T> limitBoxShrinking(const Box<T>& fittingBox, const Box<T>& previousBox, co
  * The longest box dimension is assigned the full key depth (@p maxTreeLevel<KeyType>), while
  * shorter dimensions receive fewer bits according to the base-2 logarithm of the aspect ratio.
  */
-template<typename KeyType, typename BoxType>
-HOST_DEVICE_FUN AxesBits getBoxDimBits(const BoxType& box)
+template<typename KeyType, typename T>
+HOST_DEVICE_FUN AxesBits getBoxDimBits(const Box<T>& box)
 {
-    const auto dx               = box.xmax() - box.xmin();
-    const auto dy               = box.ymax() - box.ymin();
-    const auto dz               = box.zmax() - box.zmin();
-    const auto maxDim           = stl::max(stl::max(dx, dy), dz);
-    constexpr unsigned maxLevel = maxTreeLevel<KeyType>{};
+    const T maxDim   = box.maxExtent();
+    constexpr T bias = 0.5849625007211563; // 1 - std::log2(1.0 / 0.75);
 
-    const unsigned bx = dx == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::floor(std::log2(maxDim / dx)));
-    const unsigned by = dy == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::floor(std::log2(maxDim / dy)));
-    const unsigned bz = dz == maxDim ? maxLevel : maxLevel - static_cast<unsigned>(std::floor(std::log2(maxDim / dz)));
-
-    return {bx, by, bz};
+    return {maxTreeLevel<KeyType>{} - static_cast<unsigned>(std::floor(std::log2(maxDim / box.lx()) + bias)),
+            maxTreeLevel<KeyType>{} - static_cast<unsigned>(std::floor(std::log2(maxDim / box.ly()) + bias)),
+            maxTreeLevel<KeyType>{} - static_cast<unsigned>(std::floor(std::log2(maxDim / box.lz()) + bias))};
 }
 
 } // namespace cstone

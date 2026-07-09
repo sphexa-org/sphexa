@@ -188,3 +188,39 @@ TEST(SfcBox, limitBoxShrinking)
 
     EXPECT_TRUE(contains(limitedBox, currentBox));
 }
+
+TEST(SfcBox, getBoxDimBits)
+{
+    using T = double;
+
+    using KeyType               = uint64_t;
+    constexpr unsigned maxLevel = maxTreeLevel<KeyType>{};
+    {
+        Box<T> cube(0, 1);
+        auto axesBits = getBoxDimBits<KeyType>(cube);
+        EXPECT_EQ(axesBits[0], maxLevel);
+        EXPECT_EQ(axesBits[1], maxLevel);
+        EXPECT_EQ(axesBits[2], maxLevel);
+    }
+    {
+        Box<T> mixDBox(0, 1, 0, 0.015625, 0, 0.00390625);
+        auto axesBits = getBoxDimBits<KeyType>(mixDBox);
+        EXPECT_EQ(axesBits[0], 21);
+        EXPECT_EQ(axesBits[1], 15);
+        EXPECT_EQ(axesBits[2], 13);
+    }
+    {
+        Box<T> mixDBox = Box<T>(0, 1, 0, 0.76, 0, 1);
+        auto axesBits  = getBoxDimBits<KeyType>(mixDBox);
+        EXPECT_EQ(axesBits[0], 21);
+        EXPECT_EQ(axesBits[1], 21);
+        EXPECT_EQ(axesBits[2], 21);
+    }
+    {
+        Box<T> mixDBox = Box<T>(0, 1, 0, 0.74, 0, 1);
+        auto axesBits  = getBoxDimBits<KeyType>(mixDBox);
+        EXPECT_EQ(axesBits[0], 21);
+        EXPECT_EQ(axesBits[1], 20);
+        EXPECT_EQ(axesBits[2], 21);
+    }
+}
