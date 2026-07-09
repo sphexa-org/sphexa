@@ -119,14 +119,6 @@ containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box, const AxesBits&
     return (util::get<0>(envelope) >= codeStart) && (util::get<1>(envelope) <= codeEnd);
 }
 
-template<class KeyType>
-HOST_DEVICE_FUN std::enable_if_t<std::is_unsigned_v<KeyType>, bool>
-containedIn(KeyType codeStart, KeyType codeEnd, const IBox& box)
-{
-    const auto axesBits = getBoxDimBits<KeyType>(box);
-    return containedIn(codeStart, codeEnd, box, axesBits);
-}
-
 /*! @brief Check whether a coordinate box is fully contained in a SFC key range
  *
  * @tparam KeyType   32- or 64-bit unsigned integer

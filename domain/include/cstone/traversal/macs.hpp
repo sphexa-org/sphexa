@@ -17,7 +17,6 @@
 #pragma once
 
 #include "boxoverlap.hpp"
-#include "cstone/primitives/math.hpp"
 #include "cstone/traversal/traversal.hpp"
 #include "cstone/tree/octree.hpp"
 
