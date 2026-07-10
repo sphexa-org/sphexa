@@ -180,7 +180,6 @@ __device__ uint2 traverseWarp(const InteractionHandler& handleInteraction,
                               volatile int* tempQueue,
                               int* cellQueue)
 {
-    // TODO(iomaganaris): Find a way to stop traversal when tree nodes are empty
     const TreeNodeIndex* __restrict__ childOffsets   = tree.childOffsets;
     const TreeNodeIndex* __restrict__ internalToLeaf = tree.internalToLeaf;
     const LocalIndex* __restrict__ layout            = tree.layout;

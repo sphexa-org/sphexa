@@ -16,4 +16,4 @@ RANKS=1
 CORES=1
 
 SCRIPT_DIR="$(git rev-parse --show-toplevel)"
-source "${SCRIPT_DIR}/run_common.sh"
+source "${SCRIPT_DIR}/scripts/benchmark/run_common.sh"

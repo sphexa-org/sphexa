@@ -149,7 +149,7 @@ containedIn(KeyType codeStart, KeyType codeEnd, const Vec3<Tc>& center, const Ve
         return codeStart == 0 && codeEnd == nodeRange<KeyType>(0);
     }
 
-    const auto axesBits = box.template getBoxDimBits<KeyType>();
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
 
     // Add one grid unit to the maximum corner before quantization. Due to round-off the physical
     // coordinate of boxMax can map to the integer cell just below the intended one; shifting it by

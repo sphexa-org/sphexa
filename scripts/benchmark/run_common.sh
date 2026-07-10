@@ -112,13 +112,15 @@ DEV_RUN_DIR="${DEV_ROOT}/build_${BACKEND}/${RUN_DIR_NAME}"
 run_sim "MixD branch"    "${MIXD_BIN}" "${MIXD_RUN_DIR}" "MixD"
 run_sim "develop branch" "${DEV_BIN}"  "${DEV_RUN_DIR}" "develop"
 
-echo "Done. Run compare_sphexa_tests.py to generate the comparison plot."
+echo "Done. Run scripts/analysis/compare_sphexa_tests.py to generate the comparison plot."
+
+source ${MIXD_ROOT}/venv_sphexa2/bin/activate
 
 # ── numHalos comparison ───────────────────────────────────────────────────────
-python3 "${MIXD_ROOT}/scripts/compare_num_halos.py" \
+python "${MIXD_ROOT}/scripts/analysis/compare_num_halos.py" \
     --test "${TEST}" --backend "${BACKEND}" --steps "${STEPS}" \
     --ranks "${RANKS}" --cores "${CORES}" --n "${N}"
 
 # ── Timing comparison ─────────────────────────────────────────────────────────
-python3 "${MIXD_ROOT}/scripts/timing_summary.py" \
+python "${MIXD_ROOT}/scripts/analysis/timing_summary.py" \
     "${MIXD_RUN_DIR}/timing.log" "${DEV_RUN_DIR}/timing.log" "${TEST}" "${BACKEND}"

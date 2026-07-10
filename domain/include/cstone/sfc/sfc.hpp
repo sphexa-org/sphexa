@@ -176,7 +176,7 @@ HOST_DEVICE_FUN inline KeyType sfc3D(T x, T y, T z, T xmin, T ymin, T zmin, T mx
 template<class KeyType, class T>
 HOST_DEVICE_FUN inline KeyType sfc3D(T x, T y, T z, const Box<T>& box)
 {
-    const auto axesBits = box.template getBoxDimBits<typename KeyType::ValueType>();
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<typename KeyType::ValueType>{});
 
     assert(axesBits[0] <= maxTreeLevel<typename KeyType::ValueType>{});
     assert(axesBits[1] <= maxTreeLevel<typename KeyType::ValueType>{});

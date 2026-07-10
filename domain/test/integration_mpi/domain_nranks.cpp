@@ -481,7 +481,7 @@ void randomGaussianGrav(int thisRank, int numRanks)
         spanSfcRange(focusStart, focusEnd, spanningKeys.data());
         spanningKeys.back() = focusEnd;
 
-        const auto axesBits = domain.box().template getBoxDimBits<KeyType>();
+        const auto axesBits = domain.box().getBoxDimBits(maxTreeLevel<KeyType>{});
 
         std::vector<uint8_t> marks(let_full.numNodes, 0);
         for (std::size_t i = 0; i < nNodes(spanningKeys); ++i)
