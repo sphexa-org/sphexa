@@ -1,0 +1,78 @@
+#pragma once
+
+#include <cstdint>
+#include <numeric>
+#include <filesystem>
+#include <vector>
+
+auto extract_arg_values(const std::string& arg_name, int argc, char** argv)
+{
+    std::vector<std::filesystem::path> arg_values;
+    for (auto arg_index = 1; arg_index < argc; ++arg_index)
+    {
+        if (arg_name == argv[arg_index] && (arg_index + 1) < argc) { arg_values.push_back(argv[arg_index + 1]); }
+    }
+
+    return arg_values;
+}
+
+/*! @brief Add a volume-independent vertex field to a mesh
+ *
+ * @tparam       FieldType  and elementary type like float, double, int, ...
+ * @param[inout] mesh       the mesh to add the field to
+ * @param[in]    name       the name of the field to use within the mesh
+ * @param[in]    field      field base pointer to publish to the mesh as external (zero-copy)
+ * @param[in]    start      first element of @p field to reveal to the mesh
+ * @param[in]    end        last element of @p field to reveal to the meash
+ */
+template<class Node, class FieldType>
+void addField(Node&& mesh, const std::string& name, FieldType* field, size_t startIndex, size_t endIndex)
+{
+    mesh["fields/" + name + "/association"] = "vertex";
+    mesh["fields/" + name + "/topology"]    = "mesh";
+    mesh["fields/" + name + "/values"].set_external(field + startIndex, endIndex - startIndex);
+    mesh["fields/" + name + "/volume_dependent"].set("false");
+}
+
+template<class Node, class ParticleData>
+void define_mesh(Node& mesh, ParticleData& d, const std::size_t begin, const std::size_t end)
+{
+    mesh["coordsets/coords/type"] = "explicit";
+    mesh["coordsets/coords/values/x"].set_external(get<"x">(d).data() + begin, end - begin);
+    mesh["coordsets/coords/values/y"].set_external(get<"y">(d).data() + begin, end - begin);
+    mesh["coordsets/coords/values/z"].set_external(get<"z">(d).data() + begin, end - begin);
+
+#if !defined(FORCE_EXPLICIT_CONNECTIVITY_LIST)
+    mesh["topologies/mesh/type"] = "points";
+#else
+    mesh["topologies/mesh/type"]           = "unstructured";
+    mesh["topologies/mesh/elements/shape"] = "point";
+
+    // Note: it cannot be set as external because it goes out of scope on return
+    std::vector<std::int32_t> conn(end - begin);
+    std::iota(conn.begin(), conn.end(), 0);
+    mesh["topologies/mesh/elements/connectivity"].set(conn);
+#endif
+    mesh["topologies/mesh/coordset"] = "coords";
+
+    addField(mesh, "x", get<"x">(d).data(), begin, end);
+    addField(mesh, "y", get<"y">(d).data(), begin, end);
+    addField(mesh, "z", get<"z">(d).data(), begin, end);
+    addField(mesh, "vx", get<"vx">(d).data(), begin, end);
+    addField(mesh, "vy", get<"vy">(d).data(), begin, end);
+    addField(mesh, "vz", get<"vz">(d).data(), begin, end);
+    addField(mesh, "kx", get<"kx">(d).data(), begin, end);
+    addField(mesh, "xm", get<"xm">(d).data(), begin, end);
+    addField(mesh, "temperature", get<"temp">(d).data(), begin, end);
+    addField(mesh, "alpha", get<"alpha">(d).data(), begin, end);
+    addField(mesh, "m", get<"m">(d).data(), begin, end);
+
+    // addField(mesh, "Smoothing Length", get<"h">(d).data(), begin, end);
+    // addField(mesh, "Density", get<"rho">(d).data(), begin, end);
+    // addField(mesh, "Internal Energy", get<"u">(d).data(), begin, end);
+    // addField(mesh, "Pressure", get<"p">(d).data(), begin, end);
+    // addField(mesh, "Speed of Sound", get<"c">(d).data(), begin, end);
+    // addField(mesh, "ax", get<"ax">(d).data(), begin, end);
+    // addField(mesh, "ay", get<"ay">(d).data(), begin, end);
+    // addField(mesh, "az", get<"az">(d).data(), begin, end);
+}

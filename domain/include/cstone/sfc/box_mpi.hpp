@@ -66,8 +66,8 @@ struct MinMax
  * For non-periodic dimensions, limits are determined by global min/max.
  */
 template<class T, class Op = MinMax<T>>
-auto makeGlobalBox(const T* x, const T* y, const T* z, size_t numElements, MPI_Comm comm,
-                   const Box<T>& previousBox = Box<T>(0, 1))
+auto makeGlobalBox(
+    const T* x, const T* y, const T* z, size_t numElements, MPI_Comm comm, const Box<T>& previousBox = Box<T>(0, 1))
 {
     bool keepX = previousBox.boundaryX() == BoundaryType::periodic || previousBox.boundaryX() == BoundaryType::fixed;
     bool keepY = previousBox.boundaryY() == BoundaryType::periodic || previousBox.boundaryY() == BoundaryType::fixed;

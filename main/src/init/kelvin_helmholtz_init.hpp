@@ -52,10 +52,10 @@ InitSettings KelvinHelmholtzConstants()
 }
 
 template<class T, class Dataset>
-void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& constants, T massPart)
+void initKelvinHelmholtzFields(Dataset& d, const InitSettings& constants, T massPart)
 {
     constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using HydroType    = typename Dataset::HydroType;
+    using HydroType    = Dataset::HydroType;
     T rhoInt           = constants.at("rhoInt");
     T rhoExt           = constants.at("rhoExt");
     T omega0           = constants.at("omega0");
@@ -72,15 +72,9 @@ void initKelvinHelmholtzFields(Dataset& d, const std::map<std::string, double>& 
     T hInt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoInt);
     T hExt = 0.5 * std::cbrt(3. * d.ng0 * massPart / 4. / M_PI / rhoExt);
 
-    cstone::fill<gpu>(d.m.begin(), d.m.end(), massPart);
-    cstone::fill<gpu>(d.du_m1.begin(), d.du_m1.end(), 0.0);
+    initFieldsAtRest(d, massPart);
     cstone::fill<gpu>(d.mue.begin(), d.mue.end(), 2.0);
     cstone::fill<gpu>(d.mui.begin(), d.mui.end(), 10.0);
-    cstone::fill<gpu>(d.alpha.begin(), d.alpha.end(), d.alphamax);
-    cstone::fill<gpu>(d.vz.begin(), d.vz.end(), 0.0);
-    cstone::fill<gpu>(d.z_m1.begin(), d.z_m1.end(), 0.0);
-
-    generateParticleIDs<gpu>(d.id);
 
     auto   cv = sph::idealGasCv(d.muiConst, gamma);
     auto&& x  = toHost(d.x);
@@ -145,13 +139,14 @@ class KelvinHelmholtzGlass : public ISimInitializer<Dataset>
 public:
     KelvinHelmholtzGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
         : glassBlock(initBlock)
+        , ISimInitializer<Dataset>(settingsFile)
     {
         Dataset d;
         settings_ = buildSettings(d, KelvinHelmholtzConstants(), settingsFile, reader);
     }
 
-    cstone::Box<typename Dataset::RealType> init(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
-                                                 IFileReader* reader) const override
+    cstone::Box<typename Dataset::RealType> initImpl(int rank, int numRanks, size_t cbrtNumPart, Dataset& simData,
+                                                     IFileReader* reader) const override
     {
         using KeyType = typename Dataset::KeyType;
         using T       = typename Dataset::RealType;

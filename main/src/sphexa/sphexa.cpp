@@ -32,9 +32,11 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <string>
 
 #include "cstone/domain/domain.hpp"
@@ -49,7 +51,14 @@
 #include "util/utils.hpp"
 
 #include "simulation_data.hpp"
-#include "insitu_viz.h"
+
+#ifdef SPH_EXA_USE_CATALYST2
+#include "catalyst_adaptor.h"
+using VizAdaptor = viz::CatalystAdaptor;
+#elif SPH_EXA_USE_ASCENT
+#include "ascent_adaptor.h"
+using VizAdaptor = viz::AscentAdaptor;
+#endif
 
 #ifdef USE_CUDA
 using AccType = cstone::GpuTag;
@@ -60,20 +69,23 @@ using AccType = cstone::CpuTag;
 namespace fs = std::filesystem;
 using namespace sphexa;
 
-bool stopConditionReached(size_t iteration, double time, const std::string& maxStepStr);
-bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float dt);
-void printHelp(char* binName, int rank);
-int  getNumLocalRanks(int);
+bool                  stopConditionReached(size_t iteration, double time, const std::string& maxStepStr);
+bool                  syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float dt);
+void                  printHelp(char* binName, int rank);
+int                   getNumLocalRanks(int);
+sph::NeighborhoodType nbTypeFromName(const std::string_view nbType);
 
 int main(int argc, char** argv)
 {
-    auto [rank, numRanks] = initMpi();
+    MPIScope mpi;
+    auto [rank, numRanks] = mpi.info();
+
     const ArgParser parser(argc, (const char**)argv);
 
     if (parser.exists("-h") || parser.exists("--h") || parser.exists("-help") || parser.exists("--help"))
     {
         printHelp(argv[0], rank);
-        return exitSuccess();
+        return EXIT_SUCCESS;
     }
 
     using Dataset = SimulationData<AccType>;
@@ -97,6 +109,7 @@ int main(int argc, char** argv)
     const std::string        pmroot       = parser.get("--pmroot", std::string("")); // /sys/cray/pm_counters
     std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
     std::string              profFile     = parser.get("-op", std::string("profile"));
+    sph::NeighborhoodType    nbChoice = nbTypeFromName(parser.get("--neighbor-search", std::string("always-traverse")));
 
     std::ofstream nullOutput("/dev/null");
     std::ostream& output = (quiet || rank) ? nullOutput : std::cout;
@@ -124,6 +137,8 @@ int main(int argc, char** argv)
     auto& d = simData.hydro;
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
 
+    d.setNeighborhoodType(nbChoice);
+
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
     bool  haveGrav = (d.g != 0.0);
     float theta    = parser.get("--theta", haveGrav ? 0.5f : 1.0f);
@@ -141,8 +156,9 @@ int main(int argc, char** argv)
     propagator->sync(domain, simData);
     if (rank == 0) std::cout << "Domain synchronized, nLocalParticles " << d.x.size() << std::endl;
 
-    viz::init_catalyst(argc, argv);
-    viz::init_ascent(d, domain.startIndex());
+#ifdef SPHEXA_WITH_VISUALIZATION
+    VizAdaptor viz(argc, argv);
+#endif
 
     size_t startIteration    = d.iteration;
     bool   isOutputTriggered = false;
@@ -178,7 +194,9 @@ int main(int argc, char** argv)
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
 
-        viz::execute(d, domain.startIndex(), domain.endIndex());
+#ifdef SPHEXA_WITH_VISUALIZATION
+        viz.execute(d, domain.startIndex(), domain.endIndex());
+#endif
 
         propagator->integrate(domain, simData);
         propagator->printIterationTimings(domain, simData);
@@ -194,8 +212,8 @@ int main(int argc, char** argv)
                     initCond + " up to t = " + std::to_string(d.ttot));
 
     constantsFile.close();
-    viz::finalize();
-    return exitSuccess();
+
+    return EXIT_SUCCESS;
 }
 
 //! @brief check whether the stop conditions based on evolved time (not wall-clock) or iteration count are reached
@@ -227,6 +245,20 @@ bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float 
 int getNumLocalRanks(int defValue)
 {
     return getenv("SLURM_NTASKS_PER_NODE") == nullptr ? defValue : std::stoi(getenv("SLURM_NTASKS_PER_NODE"));
+}
+
+sph::NeighborhoodType nbTypeFromName(const std::string_view nbType)
+{
+    if (nbType == "always-traverse" || nbType == "t") return sph::NeighborhoodType::alwaysTraverse;
+    if (nbType == "full-neighbor-list" || nbType == "f") return sph::NeighborhoodType::fullNeighborList;
+    if (nbType == "compressed-full-neighbor-list" || nbType == "fc")
+        return sph::NeighborhoodType::compressedFullNeighborList;
+    if (nbType == "compressed-half-neighbor-list" || nbType == "hc")
+        return sph::NeighborhoodType::compressedHalfNeighborList;
+    if (nbType == "clustered-neighbor-list" || nbType == "c") return sph::NeighborhoodType::clusteredNeighborList;
+    throw std::invalid_argument(
+        "neighbor-search argument must be one of 'always-traverse', 'full-neighbor-list', "
+        " 'compressed-full-neighbor-list', 'compressed-half-neighbor-list', or 'clustered-neighbor-list'");
 }
 
 void printHelp(char* name, int rank)
@@ -281,5 +313,12 @@ void printHelp(char* name, int rank)
                 \t NUM<=0:    Disable profiling output,\n\
                 \t int(NUM):  Dump profiling data every NUM iteration steps,\n\
                 \t real(NUM): Dump profiling data every NUM seconds of simulation (not wall-clock) time \n\n");
+
+        printf("\t--neighbor-search STRING \t Choice of neighborhood search algorithm [always-traverse]\n\
+                \t always-traverse:               Do not use neighbor lists; Always traverse the full tree for particle-particle interactions.\n\
+                \t full-neighbor-list:            Use a full neighbor list; Expect excessive memory usage. \n\
+                \t compressed-full-neighbor-list: Use a compressed full neighbor list; Significantly lower memory usage.\n\
+                \t compressed-half-neighbor-list: Use a compressed half (symmetric) neighbor list; Even lower memory usage, but uses atomic ops.\n\
+                \t clustered-neighbor-list:       Use a clustered neighbor list; Minimal memory usage.\n\n");
     }
 }
