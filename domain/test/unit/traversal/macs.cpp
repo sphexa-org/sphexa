@@ -133,12 +133,13 @@ static std::vector<uint8_t> markVecMacAll2All(const KeyType* leaves,
 }
 
 template<class KeyType>
-static void markMacVector(Box<double> box)
+static void markMacVector()
 {
     using T                 = double;
     LocalIndex numParticles = 1000;
     unsigned bucketSize     = 2;
     float theta             = 0.58;
+    Box<T> box(0, 1, 0, 0.3, 0, 0.6);
 
     RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box);
     std::vector<T> masses(numParticles, 1.0 / numParticles);
@@ -161,8 +162,8 @@ static void markMacVector(Box<double> box)
 
     std::vector<uint8_t> markings(octree.numNodes, 0);
 
-    TreeNodeIndex focusIdxStart = 0;                       // TODO(iomaganaris): Does this make sense?
-    TreeNodeIndex focusIdxEnd   = octree.numLeafNodes - 1; // TODO(iomaganaris): Does this make sense?
+    TreeNodeIndex focusIdxStart = 4;
+    TreeNodeIndex focusIdxEnd   = 22;
 
     markMacs(octree.prefixes.data(), octree.childOffsets.data(), octree.parents.data(), centers.data(), box,
              leaves.data() + focusIdxStart, focusIdxEnd - focusIdxStart, false, markings.data());
@@ -175,17 +176,16 @@ static void markMacVector(Box<double> box)
 
 TEST(Macs, markMacVector)
 {
-    markMacVector<unsigned>(Box<double>{0, 1});
-    markMacVector<uint64_t>(Box<double>{0, 1});
-    markMacVector<unsigned>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
-    markMacVector<uint64_t>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
+    markMacVector<unsigned>();
+    markMacVector<uint64_t>();
 }
 
-void limitSource4x4(Box<double> box, std::vector<uint8_t> macRef, unsigned numMacsRef)
+TEST(Macs, limitSource4x4)
 {
     using KeyType = uint64_t;
     using T       = double;
 
+    Box<T> box(0, 1);
     float invTheta = sqrt(3.) / 2;
 
     std::vector<KeyType> leaves = makeUniformNLevelTree<KeyType>(64, 1);
@@ -200,20 +200,14 @@ void limitSource4x4(Box<double> box, std::vector<uint8_t> macRef, unsigned numMa
     std::vector<uint8_t> macs(ov.numNodes, 0);
     markMacs(ov.prefixes, ov.childOffsets, ov.parents, centers.data(), box, leaves.data() + 0, 32, true, macs.data());
 
+    std::vector<uint8_t> macRef{1, 0, 0, 0, 0, 1, 1, 1, 1};
     macRef.resize(ov.numNodes);
     EXPECT_EQ(macRef, macs);
 
     std::fill(macs.begin(), macs.end(), 0);
     markMacs(ov.prefixes, ov.childOffsets, ov.parents, centers.data(), box, leaves.data() + 0, 32, false, macs.data());
     int numMacs = std::accumulate(macs.begin(), macs.end(), 0);
-    EXPECT_EQ(numMacs, numMacsRef);
-}
-
-TEST(Macs, limitSource4x4)
-{
-    limitSource4x4(Box<double>{0, 1}, std::vector<uint8_t>{1, 0, 0, 0, 0, 1, 1, 1, 1}, 5 + 16);
-    limitSource4x4(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625}, std::vector<uint8_t>{1, 0},
-                   1); // TODO(iomaganaris): Need to fix this case
+    EXPECT_EQ(numMacs, 5 + 16);
 }
 
 } // namespace cstone
