@@ -79,7 +79,6 @@ void findHalosFlags(bool useMixD = false)
     for (size_t i = 0; i < size_t(octree.numLeafNodes); ++i)
     {
         tC[i] = nodeCenters[leaf2int[i]];
-        auto si = nodeSizes[leaf2int[i]];
         tS[i] = nodeSizes[leaf2int[i]] + Vec3<T>{searchRadii[i], searchRadii[i], searchRadii[i]};
     }
 
