@@ -39,11 +39,7 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
     auto overlaps = [&](TreeNodeIndex idx)
     {
         auto [nk1, nk2] = decodePlaceholderBit2K(nodePrefixes[idx]);
-        if (nodeSizes[idx][0] == 0 && nodeSizes[idx][1] == 0 && nodeSizes[idx][2] == 0)
-        {
-            // if the cell is empty, we return no overlap
-            return false;
-        }
+        if (nodeSizes[idx] == Vec3<T>{0, 0, 0}) { return false; } // if the cell is empty, we return no overlap
 
         bool bOverlap = !containedIn(nk1, nk2, excludeStart, excludeEnd) &&
                         overlap(nodeCenters[idx], nodeSizes[idx], targetCenter, targetSize, box);
