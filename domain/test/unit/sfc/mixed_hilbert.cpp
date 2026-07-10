@@ -227,3 +227,22 @@ TEST(MixedHilbertDecoding, SpecialCases)
         EXPECT_EQ(pz, 65536);
     }
 }
+
+TEST(MixedHilbertEncoding, validMixDKey)
+{
+    using KeyType = uint64_t;
+    auto l        = maxTreeLevel<KeyType>{};
+
+    EXPECT_TRUE(isValidHilbertMixDKey(decodePlaceholderBit(KeyType(017)), l, l, l));
+
+    EXPECT_TRUE(isValidHilbertMixDKey(decodePlaceholderBit(KeyType(0137)), l, l, l - 1));
+    EXPECT_FALSE(isValidHilbertMixDKey(decodePlaceholderBit(KeyType(0147)), l, l, l - 1));
+
+    EXPECT_TRUE(isValidHilbertMixDKey(decodePlaceholderBit(KeyType(0117)), l, l - 1, l - 1));
+    EXPECT_FALSE(isValidHilbertMixDKey(decodePlaceholderBit(KeyType(0127)), l, l - 1, l - 1));
+
+    EXPECT_TRUE(isValidHilbertMixDKey(decodePlaceholderBit(KeyType(01137)), l, l - 1, l - 2));
+    EXPECT_FALSE(isValidHilbertMixDKey(decodePlaceholderBit(KeyType(01147)), l, l - 1, l - 2));
+    EXPECT_FALSE(isValidHilbertMixDKey(decodePlaceholderBit(KeyType(01237)), l, l - 1, l - 2));
+}
+

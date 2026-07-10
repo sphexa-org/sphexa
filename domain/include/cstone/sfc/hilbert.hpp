@@ -479,18 +479,16 @@ HOST_DEVICE_FUN bool isValidHilbertMixDKey(KeyType key, unsigned bx, unsigned by
         bits[1]    = bits[2];
         bits[2]    = t;
     }
-    for (unsigned i{1}; i <= maxTreeLevel<KeyType>(); ++i)
+    for (unsigned i = bits[0] + 1; i <= maxTreeLevel<KeyType>(); ++i)
     {
-        const KeyType shiftedKey               = key >> (3 * (i - 1));
-        const KeyType lastKeyDigitOfShiftedKey = shiftedKey & 7u;
-        if (i <= bits[0]) { continue; }
-        else if (i <= bits[1])
+        const unsigned digit_i = (key >> (3 * (i - 1))) & 7u;
+        if (i <= bits[1])
         {
-            if (lastKeyDigitOfShiftedKey > 3u) { return false; }
+            if (digit_i > 3u) { return false; }
         }
         else if (i <= bits[2])
         {
-            if (lastKeyDigitOfShiftedKey > 1u) { return false; }
+            if (digit_i > 1u) { return false; }
         }
     }
     return true;
