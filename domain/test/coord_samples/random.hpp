@@ -45,64 +45,37 @@ std::vector<Integer> makeRandomUniformKeys(size_t numKeys, int seed = 42)
 
 template<class Integer>
 std::vector<Integer> makeRandomGaussianKeys(size_t numKeys,
-                                            int seed     = 42,
-                                            bool useMixD = false,
-                                            unsigned bx  = maxTreeLevel<Integer>{},
-                                            unsigned by  = maxTreeLevel<Integer>{},
-                                            unsigned bz  = maxTreeLevel<Integer>{})
+                                            int seed          = 42,
+                                            AxesBits axesBits = {maxTreeLevel<Integer>{}, maxTreeLevel<Integer>{},
+                                                                 maxTreeLevel<Integer>{}})
 {
+
     std::mt19937 gen(seed);
     std::vector<Integer> ret(numKeys);
 
-    if (useMixD)
+    auto maxCoordX = double((1u << axesBits[0]) - 1);
+    auto maxCoordY = double((1u << axesBits[1]) - 1);
+    auto maxCoordZ = double((1u << axesBits[2]) - 1);
+    std::normal_distribution<double> distX(maxCoordX / 2, maxCoordX / 5);
+    std::normal_distribution<double> distY(maxCoordY / 2, maxCoordY / 5);
+    std::normal_distribution<double> distZ(maxCoordZ / 2, maxCoordZ / 5);
+
+    auto randCoord = [&gen](std::normal_distribution<double>& dist, unsigned maxC) -> unsigned
     {
-        // Generate Gaussian-distributed integer coordinates per dimension and encode directly.
-        // Rejection-sampling on raw key values is O(N / acceptance_rate) and the acceptance rate
-        // equals 2^(bx+by+bz) / 2^(3*maxTreeLevel), which can be astronomically small for
-        // anisotropic boxes (e.g. ~1/16384 for bx=10, by=4, bz=2 with 32-bit keys).
-        auto maxCoordX = double((1u << bx) - 1);
-        auto maxCoordY = double((1u << by) - 1);
-        auto maxCoordZ = double((1u << bz) - 1);
-        std::normal_distribution<double> distX(maxCoordX / 2, maxCoordX / 5);
-        std::normal_distribution<double> distY(maxCoordY / 2, maxCoordY / 5);
-        std::normal_distribution<double> distZ(maxCoordZ / 2, maxCoordZ / 5);
-
-        auto randCoord = [&gen](std::normal_distribution<double>& dist, unsigned maxC) -> unsigned
+        double x = dist(gen);
+        while (x < 0.0 || x > double(maxC))
         {
-            double x = dist(gen);
-            while (x < 0.0 || x > double(maxC))
-            {
-                x = dist(gen);
-            }
-            return unsigned(x);
-        };
-
-        for (size_t i = 0; i < numKeys; ++i)
-        {
-            unsigned px = randCoord(distX, (1u << bx) - 1);
-            unsigned py = randCoord(distY, (1u << by) - 1);
-            unsigned pz = randCoord(distZ, (1u << bz) - 1);
-            ret[i]      = iHilbert<Integer>(px, py, pz, bx, by, bz);
+            x = dist(gen);
         }
-    }
-    else
+        return unsigned(x);
+    };
+
+    for (size_t i = 0; i < numKeys; ++i)
     {
-        Integer maxCoord = nodeRange<Integer>(0) - 1;
-        std::normal_distribution<double> distribution(double(maxCoord) / 2, double(maxCoord) / 5);
-
-        auto randInt = [&distribution, &gen, maxCoord]()
-        {
-            double x = distribution(gen);
-            // we can't cut down x to maxCoord in case it's too big, otherwise there will be too many keys in the last
-            // cell
-            while (x < 0.0 || x > maxCoord)
-            {
-                x = distribution(gen);
-            }
-            return Integer(x);
-        };
-
-        std::generate(ret.begin(), ret.end(), randInt);
+        unsigned px = randCoord(distX, (1u << axesBits[0]) - 1);
+        unsigned py = randCoord(distY, (1u << axesBits[1]) - 1);
+        unsigned pz = randCoord(distZ, (1u << axesBits[2]) - 1);
+        ret[i]      = iHilbert<Integer>(px, py, pz, axesBits[0], axesBits[1], axesBits[2]);
     }
 
     std::sort(ret.begin(), ret.end());
