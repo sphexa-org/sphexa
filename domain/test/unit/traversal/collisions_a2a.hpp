@@ -20,17 +20,8 @@
 
 namespace cstone
 {
-/*! @brief to-all implementation of findCollisions
- *
- * @tparam     KeyType        32- or 64-bit unsigned integer
- * @param[in]  tree           octree leaf nodes in cornerstone format
- * @param[out] collisionList  output list of indices of colliding nodes
- * @param[in]  collisionBox   query box to look for collisions
- *                            with leaf nodes
- *
- * Naive implementation without tree traversal for reference
- * and testing purposes
- */
+
+//! @brief to-all implementation of findCollisions
 template<class KeyType, class T>
 void findCollisions2All(std::span<const KeyType> nodeKeys,
                         const Vec3<T>* nodeCenters,
@@ -40,18 +31,11 @@ void findCollisions2All(std::span<const KeyType> nodeKeys,
                         Vec3<T> targetSize,
                         std::vector<TreeNodeIndex>& collisionList)
 {
-    if (targetSize[0] == 0 && targetSize[1] == 0 && targetSize[2] == 0)
-    {
-        // if the target is empty, we return no overlap
-        return;
-    }
+    if (targetSize == Vec3<T>{0, 0, 0}) { return; } // if the target is empty, we return no overlap
+
     for (TreeNodeIndex idx = 0; idx < TreeNodeIndex(nodeKeys.size()); ++idx)
     {
-        if (nodeSizes[idx][0] == 0 && nodeSizes[idx][1] == 0 && nodeSizes[idx][2] == 0)
-        {
-            // if the cell is empty, we return no overlap
-            continue;
-        }
+        if (nodeSizes[idx] == Vec3<T>{0, 0, 0}) { continue; } // if the cell is empty, we return no overlap
         if (norm2(minDistance(targetCenter, targetSize, nodeCenters[idx], nodeSizes[idx], box)) == 0.0)
         {
             collisionList.push_back(idx);
