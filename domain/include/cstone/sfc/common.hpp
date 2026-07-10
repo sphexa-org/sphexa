@@ -399,22 +399,20 @@ HOST_DEVICE_FUN constexpr KeyType octalPower(int pos)
 template<class KeyType>
 HOST_DEVICE_FUN constexpr KeyType increaseKey(KeyType key, int pos, unsigned b0, unsigned b1, unsigned b2)
 {
-    if (pos <= 0) return key; // base case: overflow, no more carry
-
-    const auto posFromLeft = maxTreeLevel<KeyType>{} - pos;
-
-    unsigned max{};
-    if (posFromLeft >= b0) { return key; }   // digit inactive
-    else if (posFromLeft >= b1) { max = 1; } // 1-bit digit
-    else if (posFromLeft >= b2) { max = 3; } // 2-bit digit
-    else { max = 7; }                        // 3-bit digit
-
-    auto digit = octalDigit(key, pos);
-    if (digit + 1 <= max) { key += octalPower<KeyType>(pos); }
-    else
+    while (pos > 0)
     {
-        key &= ~(static_cast<KeyType>(7) << (3 * posFromLeft));
-        key = increaseKey(key, pos - 1, b0, b1, b2);
+        const auto posFromRight = maxTreeLevel<KeyType>{} - pos;
+
+        if (posFromRight >= b0) { return key; } // inactive digit, carry stops / overflow
+
+        unsigned max = (posFromRight >= b1) ? 1 : (posFromRight >= b2) ? 3 : 7;
+
+        auto digit = octalDigit(key, pos);
+        key &= ~(static_cast<KeyType>(7) << (3 * posFromRight)); // clear current digit
+
+        if (digit < max) { return key | (static_cast<KeyType>(digit + 1) << (3 * posFromRight)); }
+
+        --pos; // digit was at max: wrap to 0 (already cleared) and carry to next position
     }
     return key;
 }
