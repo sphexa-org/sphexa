@@ -137,6 +137,8 @@ evaluateMacPbc(Vec3<T> sourceCenter, T macSq, Vec3<T> targetCenter, Vec3<T> targ
 template<class T>
 HOST_DEVICE_FUN bool minMacMutualInt(IBox a, IBox b, Vec3<T> ellipse, Vec3<int> pbc)
 {
+    if (a == IBox{} || b == IBox{}) { return true; } // pass empty boxes from mixed-dim global boxes
+
     T l_max = std::max({a.xmax() - a.xmin(), a.ymax() - a.ymin(), a.zmax() - a.zmin(), b.xmax() - b.xmin(),
                         b.ymax() - b.ymin(), b.zmax() - b.zmin()});
 

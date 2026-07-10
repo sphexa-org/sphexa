@@ -13,6 +13,8 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
+#include <fstream>
+
 #include "gtest/gtest.h"
 
 #include "cstone/traversal/peers.hpp"
@@ -30,46 +32,24 @@ static std::vector<int> findPeersAll2All(int myRank,
                                          const Box<T>& box,
                                          float invThetaEff)
 {
-    const auto axesBits = getBoxDimBits<KeyType>(box);
-    const bool mixD     = axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
-                      axesBits[2] != maxTreeLevel<KeyType>{};
-
     TreeNodeIndex firstIdx = findNodeAbove(tree.data(), nNodes(tree), assignment[myRank]);
     TreeNodeIndex lastIdx  = findNodeAbove(tree.data(), nNodes(tree), assignment[myRank + 1]);
 
-    const Vec3<int> maxCoords = {(1 << axesBits[0]), (1 << axesBits[1]), (1 << axesBits[2])};
-    const Vec3<T> gridStep    = {box.lx() / maxCoords[0], box.ly() / maxCoords[1], box.lz() / maxCoords[2]};
-    const T maxGridStep       = *std::max_element(gridStep.begin(), gridStep.end());
-    const auto ellipse =
-        Vec3<T>{maxGridStep / gridStep[0], maxGridStep / gridStep[1], maxGridStep / gridStep[2]} * invThetaEff;
-    constexpr auto pbc_t = BoundaryType::periodic;
-    const auto pbc = Vec3<int>{(box.boundaryX() == pbc_t) * maxCoords[0], (box.boundaryY() == pbc_t) * maxCoords[1],
-                               (box.boundaryZ() == pbc_t) * maxCoords[2]};
+    int maxCoord = 1u << maxTreeLevel<KeyType>{};
+    auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invThetaEff;
+    auto pbc_t   = BoundaryType::periodic;
+    auto pbc     = Vec3<int>{box.boundaryX() == pbc_t, box.boundaryY() == pbc_t, box.boundaryZ() == pbc_t} * maxCoord;
 
     std::vector<IBox> boxes(nNodes(tree));
     for (TreeNodeIndex i = 0; i < TreeNodeIndex(nNodes(tree)); ++i)
     {
-        boxes[i] = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]), axesBits);
+        boxes[i] = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]), getBoxDimBits<KeyType>(box));
     }
 
     std::vector<int> peers(assignment.numRanks());
     for (TreeNodeIndex i = firstIdx; i < lastIdx; ++i)
-    {
-        if (mixD && (boxes[i].xmax() == 0 && boxes[i].xmin() == 0 && boxes[i].ymax() == 0 && boxes[i].ymin() == 0 &&
-                     boxes[i].zmax() == 0 && boxes[i].zmin() == 0))
-        {
-            continue; // skip empty boxes
-        }
         for (TreeNodeIndex j = 0; j < TreeNodeIndex(nNodes(tree)); ++j)
-        {
-            if (mixD && (boxes[j].xmax() == 0 && boxes[j].xmin() == 0 && boxes[j].ymax() == 0 && boxes[j].ymin() == 0 &&
-                         boxes[j].zmax() == 0 && boxes[j].zmin() == 0))
-            {
-                continue; // skip empty boxes
-            }
             if (!minMacMutualInt(boxes[i], boxes[j], ellipse, pbc)) { peers[assignment.findRank(tree[j])] = 1; }
-        }
-    }
 
     std::vector<int> ret;
     for (int i = 0; i < int(peers.size()); ++i)
@@ -78,19 +58,10 @@ static std::vector<int> findPeersAll2All(int myRank,
     return ret;
 }
 
-/*! @brief Test MAC peer detection on a 64-leaf uniform grid with mixed-dimension support
- *
- * @tparam     KeyType          32-bit or 64-bit SFC key type
- * @param[in]  rank             MPI rank (used as probe rank)
- * @param[in]  box              simulation bounding box (supports non-cubic MixD boxes)
- * @param[in]  theta            opening angle for MAC criterion
- * @param[in]  refNumPeers      expected number of peers (unused, serves as documentation)
- *
- * Compares findPeersMac output against an all-to-all reference on a uniform 64-leaf tree.
- */
 template<class KeyType>
-static void findMacPeers64grid(int rank, Box<double> box, float theta, int /*refNumPeers*/)
+static void findMacPeers64grid(int rank, float theta, BoundaryType pbc, int /*refNumPeers*/)
 {
+    Box<double> box{-1, 1, pbc};
     Octree<KeyType> octree;
     auto leaves = makeUniformNLevelTree<KeyType>(64, 1);
     octree.update(leaves.data(), nNodes(leaves));
@@ -110,52 +81,33 @@ static void findMacPeers64grid(int rank, Box<double> box, float theta, int /*ref
 TEST(Peers, findMacGrid64)
 {
     // just the surface
-    findMacPeers64grid<unsigned>(0, Box<double>{-1, 1, BoundaryType::open}, 1.1, 7);
-    findMacPeers64grid<uint64_t>(0, Box<double>{-1, 1, BoundaryType::open}, 1.1, 7);
-    findMacPeers64grid<unsigned>(0, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625, BoundaryType::open}, 1.1, 7);
-    findMacPeers64grid<uint64_t>(0, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625, BoundaryType::open}, 1.1, 7);
+    findMacPeers64grid<unsigned>(0, 1.1, BoundaryType::open, 7);
+    findMacPeers64grid<uint64_t>(0, 1.1, BoundaryType::open, 7);
 }
 
 TEST(Peers, findMacGrid64Narrow)
 {
-    findMacPeers64grid<unsigned>(0, Box<double>{-1, 1, BoundaryType::open}, 1.0, 19);
-    findMacPeers64grid<uint64_t>(0, Box<double>{-1, 1, BoundaryType::open}, 1.0, 19);
-    findMacPeers64grid<unsigned>(0, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625, BoundaryType::open}, 1.0, 19);
-    findMacPeers64grid<uint64_t>(0, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625, BoundaryType::open}, 1.0, 19);
+    findMacPeers64grid<unsigned>(0, 1.0, BoundaryType::open, 19);
+    findMacPeers64grid<uint64_t>(0, 1.0, BoundaryType::open, 19);
 }
 
 TEST(Peers, findMacGrid64PBC)
 {
     // just the surface + PBC, 26 six peers at the surface
-    findMacPeers64grid<unsigned>(0, Box<double>{-1, 1, BoundaryType::periodic}, 1.1, 26);
-    findMacPeers64grid<uint64_t>(0, Box<double>{-1, 1, BoundaryType::periodic}, 1.1, 26);
-    findMacPeers64grid<unsigned>(0, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625, BoundaryType::periodic}, 1.1, 26);
-    findMacPeers64grid<uint64_t>(0, Box<double>{0, 1, 0, 0.015625, 0, 0.00390625, BoundaryType::periodic}, 1.1, 26);
+    findMacPeers64grid<unsigned>(0, 1.1, BoundaryType::periodic, 26);
+    findMacPeers64grid<uint64_t>(0, 1.1, BoundaryType::periodic, 26);
 }
 
-/*! @brief Test peer rank detection on an irregular octree with mixed-dimension support
- *
- * @tparam     KeyType   32-bit or 64-bit SFC key type
- * @param[in]  box       simulation bounding box (supports non-cubic MixD boxes)
- *
- * Builds an irregular octree from random Gaussian keys, computes SFC assignment for 50 ranks,
- * and checks that both findPeersMac and findPeersMacStt agree with the all-to-all reference.
- * Also verifies peer mutuality.
- */
 template<class KeyType>
-static void findPeers(Box<double> box)
+static void findPeers()
 {
+    Box<double> box{-1, 1};
     int nParticles    = 100000;
     int bucketSize    = 64;
     int numRanks      = 50;
     float invThetaEff = invThetaMinToVec(0.5f);
 
-    const auto axesBits = getBoxDimBits<KeyType>(box);
-    const bool useMixD  = axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
-                         axesBits[2] != maxTreeLevel<KeyType>{};
-    auto particleKeys =
-        useMixD ? makeRandomGaussianKeys<KeyType>(nParticles, 42, useMixD, axesBits[0], axesBits[1], axesBits[2])
-                : makeRandomGaussianKeys<KeyType>(nParticles);
+    auto particleKeys     = makeRandomGaussianKeys<KeyType>(nParticles);
     auto [leaves, counts] = computeOctree<KeyType>(particleKeys, bucketSize);
 
     OctreeData<KeyType, execution::Cpu> octree;
@@ -190,10 +142,8 @@ static void findPeers(Box<double> box)
 
 TEST(Peers, find)
 {
-    findPeers<unsigned>(Box<double>{-1, 1});
-    findPeers<uint64_t>(Box<double>{-1, 1});
-    findPeers<unsigned>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
-    findPeers<uint64_t>(Box<double>{0, 1, 0, 0.015625, 0, 0.00390625});
+    findPeers<unsigned>();
+    findPeers<uint64_t>();
 }
 
 // A few harder tests to catch the FP-round-off asymmetric case
@@ -286,7 +236,7 @@ auto vecMacMatrix(const std::vector<KeyType>& leaves,
         c4[i][0] = centers[i][0] + randCorner() * sizes[i][0];
         c4[i][1] = centers[i][1] + randCorner() * sizes[i][1];
         c4[i][2] = centers[i][2] + randCorner() * sizes[i][2];
-        c4[i][3] = sizes[i][0] == 0 && sizes[i][1] == 0 && sizes[i][2] == 0 ? 0 : 1;
+        c4[i][3] = 1;
     }
     setMac<T, KeyType>(octree.nodeKeys(), c4, invTheta, box);
 

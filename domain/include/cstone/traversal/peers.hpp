@@ -75,18 +75,7 @@ std::vector<int> findPeersMac(int myRank,
         if (!aFocusOverlap || bInFocus) { return false; }
 
         IBox aBox = sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1), axesBits);
-        if (aBox.xmax() == 0 && aBox.xmin() == 0 && aBox.ymax() == 0 && aBox.ymin() == 0 && aBox.zmax() == 0 &&
-            aBox.zmin() == 0)
-        {
-            return false; // skip empty boxes
-        }
         IBox bBox = sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1), axesBits);
-        if (bBox.xmax() == 0 && bBox.xmin() == 0 && bBox.ymax() == 0 && bBox.ymin() == 0 && bBox.zmax() == 0 &&
-            bBox.zmin() == 0)
-        {
-            return false; // skip empty boxes
-        }
-
         return !minMacMutualInt(aBox, bBox, ellipse, pbc);
     };
 
@@ -151,11 +140,6 @@ std::vector<int> findPeersMacStt(int myRank,
     for (TreeNodeIndex i = firstLeaf; i < lastLeaf; ++i)
     {
         IBox target = sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]), axesBits);
-        if (target.xmax() - target.xmin() == 0 && target.ymax() - target.ymin() == 0 &&
-            target.zmax() - target.zmin() == 0)
-        {
-            continue; // skip empty boxes
-        }
 
         auto violatesMac = [target, ellipse, pbc, &octree, domainStart, domainEnd, &axesBits](TreeNodeIndex idx)
         {
@@ -164,11 +148,6 @@ std::vector<int> findPeersMacStt(int myRank,
             if (containedIn(nodeStart, nodeEnd, domainStart, domainEnd)) { return false; }
 
             IBox source = sfcIBox(sfcKey(nodeStart), treeLevel(nodeEnd - nodeStart), axesBits);
-            if (source.xmax() == 0 && source.xmin() == 0 && source.ymax() == 0 && source.ymin() == 0 &&
-                source.zmax() == 0 && source.zmin() == 0)
-            {
-                return false; // skip empty boxes
-            }
             return !minMacMutualInt(target, source, ellipse, pbc);
         };
 
