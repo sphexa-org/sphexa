@@ -106,9 +106,9 @@ public:
         , lengths_{xyzMax - xyzMin, xyzMax - xyzMin, xyzMax - xyzMin}
         , inverseLengths_{T(1.) / (xyzMax - xyzMin), T(1.) / (xyzMax - xyzMin), T(1.) / (xyzMax - xyzMin)}
         , boundaries{b, b, b}
+        , axesBits_32b{computeBoxDimBits<uint32_t>()}
+        , axesBits_64b{computeBoxDimBits<uint64_t>()}
     {
-        axesBits_32b = computeBoxDimBits<uint32_t>();
-        axesBits_64b = computeBoxDimBits<uint64_t>();
     }
 
     HOST_DEVICE_FUN constexpr Box(T xmin,
@@ -124,9 +124,9 @@ public:
         , lengths_{xmax - xmin, ymax - ymin, zmax - zmin}
         , inverseLengths_{T(1.) / (xmax - xmin), T(1.) / (ymax - ymin), T(1.) / (zmax - zmin)}
         , boundaries{bx, by, bz}
+        , axesBits_32b{computeBoxDimBits<uint32_t>()}
+        , axesBits_64b{computeBoxDimBits<uint64_t>()}
     {
-        axesBits_32b = computeBoxDimBits<uint32_t>();
-        axesBits_64b = computeBoxDimBits<uint64_t>();
     }
 
     HOST_DEVICE_FUN constexpr T xmin() const { return limits[0]; }
@@ -195,7 +195,7 @@ private:
      * of the aspect ratio.
      */
     template<class KeyType>
-    HOST_DEVICE_FUN constexpr AxesBits computeBoxDimBits() const
+    constexpr const AxesBits computeBoxDimBits() const
     {
         const T maxDim   = maxExtent();
         constexpr T bias = 0.5849625007211563; // 1 - std::log2(1.0 / 0.75);
