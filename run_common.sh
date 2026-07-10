@@ -71,7 +71,7 @@ run_sim() {
   PROFILE_EXEC=""
   if [ "$BACKEND" = "gpu" ] && [ "$NSYS_ENABLED" = "1" ]; then
     NSYS_OUTPUT_FILE="nsys_${TEST}_r${RANKS}_${suffix}"
-    PROFILE_EXEC="nsys profile --trace=cuda,nvtx,osrt -o ${NSYS_OUTPUT_FILE} -f true"
+    PROFILE_EXEC="nsys profile --trace=cuda,nvtx,osrt -o ${NSYS_OUTPUT_FILE} -f true --stats true"
   fi
 
   MPS_WRAP=""
