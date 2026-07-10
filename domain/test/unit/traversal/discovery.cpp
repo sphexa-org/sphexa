@@ -61,9 +61,9 @@ template<class KeyType>
 void findHalosFlags(bool useMixD = false)
 {
     using T  = double;
-    auto box = useMixD ? Box<double>(0, 1, 0, 0.015625, 0, 0.00390625) : Box<double>(0, 1);
+    auto box = useMixD ? Box<double>(0, 1, 0, 1, 0, 0.5) : Box<double>(0, 1);
 
-    std::vector<KeyType> tree = makeUniformNLevelTree<KeyType>(useMixD ? 512 : 64, 1);
+    std::vector<KeyType> tree = makeUniformNLevelTree<KeyType>(64, 1);
     OctreeData<KeyType, execution::Cpu> octree;
     octree.resize(nNodes(tree));
     updateInternalTree<KeyType>(tree, octree.data());
@@ -79,33 +79,38 @@ void findHalosFlags(bool useMixD = false)
     for (size_t i = 0; i < size_t(octree.numLeafNodes); ++i)
     {
         tC[i] = nodeCenters[leaf2int[i]];
+        auto si = nodeSizes[leaf2int[i]];
         tS[i] = nodeSizes[leaf2int[i]] + Vec3<T>{searchRadii[i], searchRadii[i], searchRadii[i]};
     }
+
+    // leaf ranges [0:a] [a:b] bipartition leaf nodes with non-zero volume
+    TreeNodeIndex a = useMixD ? 16 : 32;
+    TreeNodeIndex b = useMixD ? 32 : 64;
 
     auto od = octree.data();
     {
         std::vector<uint8_t> collisionFlags(octree.numNodes, 0);
         findHalos(od.prefixes, od.childOffsets, od.parents, nodeCenters.data(), nodeSizes.data(), tree.data(),
-                  tC.data(), tS.data(), box, 0, 32, collisionFlags.data());
+                  tC.data(), tS.data(), box, 0, a, collisionFlags.data());
 
         std::vector<uint8_t> reference = findHalosAll2All<KeyType>(octree.prefixes, leaf2int, tC.data(), tS.data(),
-                                                                   octree.numLeafNodes, box, tree[0], tree[32]);
+                                                                   octree.numLeafNodes, box, tree[0], tree[a]);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes (+5 internal nodes)
-        EXPECT_EQ(useMixD ? 5 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
-        EXPECT_EQ(useMixD ? 5 : 21, std::accumulate(reference.begin(), reference.end(), 0));
+        EXPECT_EQ(useMixD ? 11 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
+        EXPECT_EQ(useMixD ? 11 : 21, std::accumulate(reference.begin(), reference.end(), 0));
         EXPECT_EQ(collisionFlags, reference);
     }
     {
         std::vector<uint8_t> collisionFlags(octree.numNodes, 0);
         findHalos(od.prefixes, od.childOffsets, od.parents, nodeCenters.data(), nodeSizes.data(), tree.data(),
-                  tC.data(), tS.data(), box, 32, 64, collisionFlags.data());
+                  tC.data(), tS.data(), box, a, b, collisionFlags.data());
 
         std::vector<uint8_t> reference = findHalosAll2All<KeyType>(octree.prefixes, leaf2int, tC.data(), tS.data(),
-                                                                   octree.numLeafNodes, box, tree[32], tree[64]);
+                                                                   octree.numLeafNodes, box, tree[a], tree[b]);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes
-        EXPECT_EQ(useMixD ? 4 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
+        EXPECT_EQ(useMixD ? 11 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
         EXPECT_EQ(collisionFlags, reference);
     }
 }
@@ -114,6 +119,6 @@ TEST(HaloDiscovery, findHalosFlags)
 {
     findHalosFlags<unsigned>();
     findHalosFlags<uint64_t>();
-    findHalosFlags<unsigned>(true); // TODO(iomaganaris): Not sure if the result makes sense
-    findHalosFlags<uint64_t>(true); // TODO(iomaganaris): Not sure if the result makes sense
+    findHalosFlags<unsigned>(true);
+    findHalosFlags<uint64_t>(true);
 }
