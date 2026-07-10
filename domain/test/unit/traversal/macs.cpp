@@ -107,7 +107,7 @@ static std::vector<uint8_t> markVecMacAll2All(const KeyType* leaves,
 {
     std::vector<uint8_t> markings(prefixes.size(), 0);
 
-    const auto axesBits = getBoxDimBits<KeyType>(box);
+    const auto axesBits = box.template getBoxDimBits<KeyType>();
 
     // loop over target cells
     for (TreeNodeIndex i = firstLeaf; i < lastLeaf; ++i)

@@ -214,8 +214,7 @@ __global__ void computeGeoCentersKernel(const KeyType* prefixes,
                                         TreeNodeIndex numNodes,
                                         Vec3<T>* centers,
                                         Vec3<T>* sizes,
-                                        const Box<T> box,
-                                        const AxesBits axesBits)
+                                        __grid_constant__ const Box<T> box)
 {
     TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numNodes) { return; }
@@ -223,7 +222,7 @@ __global__ void computeGeoCentersKernel(const KeyType* prefixes,
     KeyType prefix                  = prefixes[i];
     KeyType startKey                = decodePlaceholderBit(prefix);
     unsigned level                  = decodePrefixLength(prefix) / 3;
-    auto nodeBox                    = sfcIBox(sfcKey<KeyType>(startKey), level, axesBits);
+    auto nodeBox                    = sfcIBox(sfcKey<KeyType>(startKey), level, box.template getBoxDimBits<KeyType>());
     util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box);
 }
 
@@ -237,8 +236,7 @@ void computeGeoCentersGpu(execution::Gpu exec,
 {
     unsigned numThreads = 256;
     unsigned numBlocks  = iceil(numNodes, numThreads);
-    const auto axesBits = getBoxDimBits<KeyType>(box);
-    computeGeoCentersKernel<<<numBlocks, numThreads, 0, exec>>>(prefixes, numNodes, centers, sizes, box, axesBits);
+    computeGeoCentersKernel<<<numBlocks, numThreads, 0, exec>>>(prefixes, numNodes, centers, sizes, box);
 }
 
 #define GEO_CENTERS_GPU(KeyType, T)                                                                                    \

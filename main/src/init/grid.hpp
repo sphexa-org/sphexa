@@ -266,7 +266,7 @@ void assembleCuboid(KeyType keyStart, KeyType keyEnd, const cstone::Box<T>& glob
     }
 
     // span the assigned SFC range with valid octree cells
-    auto                 gridSfcBits = getBoxDimBits<KeyType>(globalBox);
+    auto                 gridSfcBits = globalBox.template getBoxDimBits<KeyType>();
     int                  numCells    = cstone::spanSfcRange(keyStart, keyEnd);
     std::vector<KeyType> cells(numCells + 1);
     cstone::spanSfcRange(keyStart, keyEnd, cells.data());

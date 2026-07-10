@@ -56,7 +56,7 @@ int main(int argc, char** argv)
     using KeyType = uint64_t;
     using T       = double;
     Box<T> box{-1, 1};
-    const auto axesBits = getBoxDimBits<KeyType>(box);
+    const auto axesBits = box.template getBoxDimBits<KeyType>();
 
     unsigned numParticles = argc > 1 ? std::stoi(argv[1]) : 2000000;
     unsigned bucketSize   = 16;

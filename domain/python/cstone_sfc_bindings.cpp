@@ -110,12 +110,12 @@ NB_MODULE(cstone_sfc, m)
             {
                 case KeyKind::uint64:
                 {
-                    const auto bits = cstone::getBoxDimBits<cstone::HilbertKey<KeyType64>>(box);
+                    const auto bits = box.getBoxDimBits<KeyType64>();
                     return std::array<unsigned, 3>{bits[0], bits[1], bits[2]};
                 }
                 case KeyKind::u32:
                 {
-                    const auto bits = cstone::getBoxDimBits<cstone::HilbertKey<KeyType32>>(box);
+                    const auto bits = box.getBoxDimBits<KeyType32>();
                     return std::array<unsigned, 3>{bits[0], bits[1], bits[2]};
                 }
             }

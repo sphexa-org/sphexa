@@ -152,7 +152,7 @@ public:
         cstone::Box<T> box(0, 1);
         box.loadOrStore(reader);
 
-        const auto axesBits = cstone::getBoxDimBits<KeyType>(box);
+        const auto axesBits = box.template getBoxDimBits<KeyType>();
 
         auto& d = simData.hydro;
         d.loadOrStoreAttributes(reader);

@@ -107,6 +107,8 @@ public:
         , inverseLengths_{T(1.) / (xyzMax - xyzMin), T(1.) / (xyzMax - xyzMin), T(1.) / (xyzMax - xyzMin)}
         , boundaries{b, b, b}
     {
+        axesBits_32b = computeBoxDimBits<uint32_t>();
+        axesBits_64b = computeBoxDimBits<uint64_t>();
     }
 
     HOST_DEVICE_FUN constexpr Box(T xmin,
@@ -123,6 +125,8 @@ public:
         , inverseLengths_{T(1.) / (xmax - xmin), T(1.) / (ymax - ymin), T(1.) / (zmax - zmin)}
         , boundaries{bx, by, bz}
     {
+        axesBits_32b = computeBoxDimBits<uint32_t>();
+        axesBits_64b = computeBoxDimBits<uint64_t>();
     }
 
     HOST_DEVICE_FUN constexpr T xmin() const { return limits[0]; }
@@ -146,6 +150,24 @@ public:
     HOST_DEVICE_FUN constexpr BoundaryType boundaryY() const { return boundaries[1]; } // NOLINT
     HOST_DEVICE_FUN constexpr BoundaryType boundaryZ() const { return boundaries[2]; } // NOLINT
 
+    /*! @brief return cached per-axis SFC bit depths for the given key type
+     *
+     * @tparam KeyType   32- or 64-bit unsigned integer SFC key type
+     * @return           axis bit depths {bx, by, bz}
+     *
+     * The values are computed once in the constructor from the box aspect ratio.
+     * The longest dimension gets the full key depth (@p maxTreeLevel<KeyType>),
+     * while shorter dimensions receive fewer bits.
+     */
+    template<class KeyType>
+    HOST_DEVICE_FUN constexpr const AxesBits& getBoxDimBits() const
+    {
+        if constexpr (sizeof(KeyType) <= 4)
+            return axesBits_32b;
+        else
+            return axesBits_64b;
+    }
+
     //! @brief return the shortest coordinate range in any dimension
     HOST_DEVICE_FUN constexpr T minExtent() const { return stl::min(stl::min(lengths_[0], lengths_[1]), lengths_[2]); }
 
@@ -163,6 +185,26 @@ public:
     }
 
 private:
+    /*! @brief compute per-axis SFC bit depths for mixed-dimension (MixD) boxes
+     *
+     * @tparam KeyType   32- or 64-bit unsigned integer SFC key type
+     * @return           axis bit depths {bx, by, bz}
+     *
+     * The longest box dimension is assigned the full key depth (@p maxTreeLevel<KeyType>),
+     * while shorter dimensions receive fewer bits according to the base-2 logarithm
+     * of the aspect ratio.
+     */
+    template<class KeyType>
+    HOST_DEVICE_FUN constexpr AxesBits computeBoxDimBits() const
+    {
+        const T maxDim   = maxExtent();
+        constexpr T bias = 0.5849625007211563; // 1 - std::log2(1.0 / 0.75);
+
+        return {maxTreeLevel<KeyType>{} - static_cast<unsigned>(std::floor(std::log2(maxDim / lx()) + bias)),
+                maxTreeLevel<KeyType>{} - static_cast<unsigned>(std::floor(std::log2(maxDim / ly()) + bias)),
+                maxTreeLevel<KeyType>{} - static_cast<unsigned>(std::floor(std::log2(maxDim / lz()) + bias))};
+    }
+
     HOST_DEVICE_FUN
     friend constexpr bool operator==(const Box<T>& a, const Box<T>& b)
     {
@@ -176,6 +218,8 @@ private:
     T lengths_[3];
     T inverseLengths_[3];
     BoundaryType boundaries[3];
+    AxesBits axesBits_32b;
+    AxesBits axesBits_64b;
 };
 
 //! @brief Compute the shortest periodic distance dX = A - B between two points,
@@ -322,7 +366,7 @@ using FBox = SimpleBox<T>;
 template<class KeyType, class T>
 constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox& ibox, const Box<T>& box)
 {
-    const auto axesBits = getBoxDimBits<KeyType>(box);
+    const auto axesBits = box.template getBoxDimBits<KeyType>();
 
     constexpr int maxCoord = 1u << maxTreeLevel<KeyType>{};
     // smallest octree cell edge length in unit cube
@@ -423,28 +467,6 @@ Box<T> limitBoxShrinking(const Box<T>& fittingBox, const Box<T>& previousBox, co
                   previousBox.boundaryX(),
                   previousBox.boundaryY(),
                   previousBox.boundaryZ()};
-}
-
-/*! @brief Compute per-axis SFC bit depths for mixed-dimension (MixD) boxes
- *
- * @tparam KeyType   32- or 64-bit unsigned integer SFC key type
- * @tparam T         float or double
- * @param box        bounding box
- * @return           axis bit depths {bx, by, bz}
- *
- * Determines how many bits of the SFC key are effectively used along each spatial dimension.
- * The longest box dimension is assigned the full key depth (@p maxTreeLevel<KeyType>), while
- * shorter dimensions receive fewer bits according to the base-2 logarithm of the aspect ratio.
- */
-template<typename KeyType, typename T>
-HOST_DEVICE_FUN AxesBits getBoxDimBits(const Box<T>& box)
-{
-    const T maxDim   = box.maxExtent();
-    constexpr T bias = 0.5849625007211563; // 1 - std::log2(1.0 / 0.75);
-
-    return {maxTreeLevel<KeyType>{} - static_cast<unsigned>(std::floor(std::log2(maxDim / box.lx()) + bias)),
-            maxTreeLevel<KeyType>{} - static_cast<unsigned>(std::floor(std::log2(maxDim / box.ly()) + bias)),
-            maxTreeLevel<KeyType>{} - static_cast<unsigned>(std::floor(std::log2(maxDim / box.lz()) + bias))};
 }
 
 } // namespace cstone

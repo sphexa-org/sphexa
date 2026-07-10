@@ -137,7 +137,7 @@ void markMacsGpu(execution::Gpu exec,
     constexpr unsigned numThreads = 128;
     unsigned numBlocks            = iceil(numFocusNodes, numThreads);
 
-    const auto axesBits = getBoxDimBits<KeyType>(box);
+    const auto axesBits = box.template getBoxDimBits<KeyType>();
     if (numFocusNodes)
     {
         markMacsGpuKernel<<<numBlocks, numThreads, 0, exec>>>(prefixes, childOffsets, parents, centers, box, focusNodes,

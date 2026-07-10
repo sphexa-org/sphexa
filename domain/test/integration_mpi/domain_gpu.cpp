@@ -232,7 +232,7 @@ void domainReapplySync(int rank, int numRanks, Box<T> box)
     StreamHolder stream;
 
     Domain<KeyType, T, execution::Gpu> domain(stream.exec(), rank, numRanks, bucketSize, bucketSizeFocus, theta,
-                                                 MPI_COMM_WORLD, box);
+                                              MPI_COMM_WORLD, box);
 
     DeviceVector<T> s1, s2, gpuOrdering;
     domain.sync(d_keys, d_x, d_y, d_z, d_h, std::tuple{}, std::tie(s1, s2, gpuOrdering));

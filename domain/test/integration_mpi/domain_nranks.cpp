@@ -144,8 +144,8 @@ TEST(FocusDomain, randomGaussianNeighborSumPbc)
     auto pbc = BoundaryType::periodic;
 
     {
-        Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        comm, {-1, 1, pbc});
+        Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, comm,
+                                        {-1, 1, pbc});
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
@@ -155,8 +155,8 @@ TEST(FocusDomain, randomGaussianNeighborSumPbc)
     }
 
     {
-        Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta,
-                                        comm, {0, 1, 0, 0.015625, 0, 0.00390625, pbc, pbc, pbc});
+        Domain<uint64_t, double> domain(execution::cpu, rank, nRanks, bucketSize, bucketSizeFocus, theta, comm,
+                                        {0, 1, 0, 0.015625, 0, 0.00390625, pbc, pbc, pbc});
         randomGaussianDomain<uint64_t, double>(domain, rank, nRanks);
     }
     {
@@ -164,7 +164,6 @@ TEST(FocusDomain, randomGaussianNeighborSumPbc)
                                        {0, 1, 0, 0.015625, 0, 0.00390625, pbc, pbc, pbc});
         randomGaussianDomain<unsigned, float>(domain, rank, nRanks);
     }
-
 }
 
 /*! @brief Test domain re-assignment after large particle displacement with mixed-dimension boxes
@@ -482,7 +481,7 @@ void randomGaussianGrav(int thisRank, int numRanks)
         spanSfcRange(focusStart, focusEnd, spanningKeys.data());
         spanningKeys.back() = focusEnd;
 
-        const auto axesBits = getBoxDimBits<KeyType>(domain.box());
+        const auto axesBits = domain.box().template getBoxDimBits<KeyType>();
 
         std::vector<uint8_t> marks(let_full.numNodes, 0);
         for (std::size_t i = 0; i < nNodes(spanningKeys); ++i)

@@ -390,7 +390,7 @@ TEST(CornerstoneOctree, NodeDebug)
     KeyType s0 = 0164640000000000000000lu;
     KeyType s1 = 0164650000000000000000lu;
     Box<T> box(0, 1, BoundaryType::periodic);
-    const auto axesBits             = getBoxDimBits<KeyType>(box);
+    const auto axesBits             = box.template getBoxDimBits<KeyType>();
     IBox source                     = sfcIBox(sfcKey(s0), sfcKey(s1), axesBits);
     auto [sourceCenter, sourceSize] = centerAndSize<KeyType>(source, box);
     unsigned prefixLength           = 3 * treeLevel(s1 - s0);

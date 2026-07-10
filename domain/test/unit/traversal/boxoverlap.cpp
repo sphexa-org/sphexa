@@ -317,7 +317,7 @@ TEST(BoxOverlap, minPointDistanceMixD)
 
     {
         Box<T> box(0, 1.0, 0, 0.015625, 0, 0.00390625);
-        const auto axesBits = getBoxDimBits<KeyType>(box);
+        const auto axesBits = box.getBoxDimBits<KeyType>();
         const auto expectedMixDBits =
             (std::is_same<KeyType, unsigned>::value) ? AxesBits{10, 4, 2} : AxesBits{21, 15, 13};
         EXPECT_EQ(axesBits[0], expectedMixDBits[0]);
