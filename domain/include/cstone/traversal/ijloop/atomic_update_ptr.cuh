@@ -47,6 +47,24 @@ __device__ __forceinline__ void atomicMinPtr(T* ptr, T value)
 
 __device__ __forceinline__ void atomicMinPtr(float* ptr, float value) { atomicMinFloat(ptr, value); }
 
+__device__ __forceinline__ void atomicMinPtr(double* ptr, double value)
+{
+    auto* address = reinterpret_cast<unsigned long long int*>(ptr);
+    unsigned long long int old = *address;
+    unsigned long long int assumed;
+
+    do
+    {
+        assumed = old;
+        double current = __longlong_as_double(static_cast<long long int>(assumed));
+
+        if (current <= value) { break; }
+
+        old = atomicCAS(address, assumed,
+                        static_cast<unsigned long long int>(__double_as_longlong(value)));
+    } while (assumed != old);
+}
+
 template<class T, std::size_t N>
 __device__ __forceinline__ void atomicMinPtr(util::array<T, N>* ptr, util::array<T, N> const& value)
 {
@@ -62,6 +80,24 @@ __device__ __forceinline__ void atomicMaxPtr(T* ptr, T value)
 }
 
 __device__ __forceinline__ void atomicMaxPtr(float* ptr, float value) { atomicMaxFloat(ptr, value); }
+
+__device__ __forceinline__ void atomicMaxPtr(double* ptr, double value)
+{
+    auto* address = reinterpret_cast<unsigned long long int*>(ptr);
+    unsigned long long int old = *address;
+    unsigned long long int assumed;
+
+    do
+    {
+        assumed = old;
+        double current = __longlong_as_double(static_cast<long long int>(assumed));
+
+        if (current >= value) { break; }
+
+        old = atomicCAS(address, assumed,
+                        static_cast<unsigned long long int>(__double_as_longlong(value)));
+    } while (assumed != old);
+}
 
 template<class T, std::size_t N>
 __device__ __forceinline__ void atomicMaxPtr(util::array<T, N>* ptr, util::array<T, N> const& value)
