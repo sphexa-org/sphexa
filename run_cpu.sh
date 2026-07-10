@@ -6,6 +6,8 @@
 #SBATCH --time=00:30:00
 #SBATCH --partition=debug
 #SBATCH -A csstaff
+#SBATCH --uenv=prgenv-gnu/26.3:v1
+#SBATCH --view=default
 
 set -euo pipefail
 
