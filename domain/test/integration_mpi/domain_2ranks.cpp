@@ -299,7 +299,7 @@ void multiStepSync(int rank, int numRanks, Box<T> box = Box<T>{0, 1})
     float theta         = 1.0;
     Domain<KeyType, T> domain(execution::cpu, rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, box);
 
-    const auto axesBits = box.template getBoxDimBits<KeyType>();
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
     const bool useMixD  = (axesBits[0] != maxTreeLevel<KeyType>{} || axesBits[1] != maxTreeLevel<KeyType>{} ||
                           axesBits[2] != maxTreeLevel<KeyType>{});
 

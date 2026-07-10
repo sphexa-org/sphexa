@@ -182,7 +182,7 @@ __global__ void groupSplitsKernel(LocalIndex first,
         leafIdx[k] = stl::upper_bound(layout, layout + numLeaves, bodyIdx[k]) - layout - 1;
     }
 
-    const auto axesBits = box.template getBoxDimBits<KeyType>();
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
     Box<T> unitBox(0, 1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[0])), 0,
                    1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[1])), 0,
                    1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[2])));
