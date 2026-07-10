@@ -1,3 +1,4 @@
+conduit
 h5py
 matplotlib
 numpy
