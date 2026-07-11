@@ -19,16 +19,16 @@ namespace sph
 std::size_t countAndCleanRegTagGPU(std::span<std::uint64_t> id, std::size_t firstIndex, std::size_t lastIndex,
                                    bool clear)
 {
-    auto first = thrust::device_pointer_cast(id.data() + firstIndex);
-    auto last  = thrust::device_pointer_cast(id.data() + lastIndex);
+    auto begin = id.data() + firstIndex;
+    auto end   = id.data() + lastIndex;
 
     auto              check_mask = [] __device__(std::uint64_t value) { return (value & iadRegularizationMask) != 0; };
-    const std::size_t count      = thrust::count_if(thrust::device, first, last, check_mask);
+    const std::size_t count      = thrust::count_if(thrust::device, begin, end, check_mask);
 
     if (clear)
     {
         auto clear_mask = [] __device__(std::uint64_t value) { return value & ~iadRegularizationMask; };
-        thrust::transform(thrust::device, first, last, first, clear_mask);
+        thrust::transform(thrust::device, begin, end, begin, clear_mask);
     }
     return count;
 }
