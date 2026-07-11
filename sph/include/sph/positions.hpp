@@ -191,16 +191,15 @@ template<class Dataset>
 void driftPositions(const GroupView& grp, Dataset& d, float dt_forward, float dt_backward,
                     util::array<float, Timestep::maxNumRungs> dt_prevRung, const uint8_t* rung)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (d.useGpu)
     {
         auto  constCv = d.mui.empty() ? idealGasCv(d.muiConst, d.gamma) : -1.0;
         auto* d_mui   = d.mui.empty() ? nullptr : rawPtr(d.mui);
 
-        driftPositionsGpu(grp, dt_forward, dt_backward, dt_prevRung, rawPtr(d.x), rawPtr(d.y),
-                          rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz),
-                          rawPtr(d.x_m1), rawPtr(d.y_m1), rawPtr(d.z_m1), rawPtr(d.ax),
-                          rawPtr(d.ay), rawPtr(d.az), rung, rawPtr(d.temp), rawPtr(d.u),
-                          rawPtr(d.du), rawPtr(d.du_m1), d_mui, d.gamma, constCv);
+        driftPositionsGpu(grp, dt_forward, dt_backward, dt_prevRung, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z),
+                          rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.x_m1), rawPtr(d.y_m1), rawPtr(d.z_m1),
+                          rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rung, rawPtr(d.temp), rawPtr(d.u), rawPtr(d.du),
+                          rawPtr(d.du_m1), d_mui, d.gamma, constCv);
     }
 }
 
@@ -208,17 +207,15 @@ template<class T, class Dataset>
 void computePositions(const GroupView& grp, Dataset& d, const cstone::Box<T>& box, float dt_forward,
                       util::array<float, Timestep::maxNumRungs> dt_m1, const uint8_t* rung = nullptr)
 {
-    if constexpr (cstone::HaveGpu<typename Dataset::AcceleratorType>{})
+    if constexpr (d.useGpu)
     {
         T     constCv = d.mui.empty() ? idealGasCv(d.muiConst, d.gamma) : -1.0;
         auto* d_mui   = d.mui.empty() ? nullptr : rawPtr(d.mui);
 
-        computePositionsGpu(grp, dt_forward, dt_m1, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z),
-                            rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.x_m1),
-                            rawPtr(d.y_m1), rawPtr(d.z_m1), rawPtr(d.ax), rawPtr(d.ay),
-                            rawPtr(d.az), rung, rawPtr(d.temp), rawPtr(d.u),
-                            rawPtr(d.du), rawPtr(d.du_m1), rawPtr(d.h), d_mui, d.gamma, constCv,
-                            box);
+        computePositionsGpu(grp, dt_forward, dt_m1, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.vx), rawPtr(d.vy),
+                            rawPtr(d.vz), rawPtr(d.x_m1), rawPtr(d.y_m1), rawPtr(d.z_m1), rawPtr(d.ax), rawPtr(d.ay),
+                            rawPtr(d.az), rung, rawPtr(d.temp), rawPtr(d.u), rawPtr(d.du), rawPtr(d.du_m1), rawPtr(d.h),
+                            d_mui, d.gamma, constCv, box);
     }
     else
     {

@@ -48,7 +48,7 @@ void computeIADGpu(const GroupView&, Dataset& d, const cstone::Box<typename Data
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeIADGpu(const GroupView&, sphexa::ParticlesData<cstone::GpuTag>& d,
+template void computeIADGpu(const GroupView&, sphexa::ParticlesData<cstone::execution::Gpu>& d,
                             const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace sph

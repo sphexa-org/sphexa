@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include "cstone/execution.hpp"
 #include "cstone/traversal/collisions.hpp"
 
 namespace cstone
@@ -40,9 +41,11 @@ namespace cstone
  *                               with a non-zero value.
  *                               Note: does NOT reset non-colliding indices to 0, so @p collisionFlags
  *                               should be zero-initialized prior to calling this function.
+ * @param[in]  exec              execution policy
  */
 template<class KeyType, class T>
-extern void findHalosGpu(const KeyType* prefixes,
+extern void findHalosGpu(execution::Gpu exec,
+                         const KeyType* prefixes,
                          const TreeNodeIndex* childOffsets,
                          const TreeNodeIndex* parents,
                          const Vec3<T>* nodeCenters,
@@ -56,7 +59,8 @@ extern void findHalosGpu(const KeyType* prefixes,
                          uint8_t* collisionFlags);
 
 template<class T, class KeyType>
-extern void markMacsGpu(const KeyType* prefixes,
+extern void markMacsGpu(execution::Gpu exec,
+                        const KeyType* prefixes,
                         const TreeNodeIndex* childOffsets,
                         const TreeNodeIndex* parents,
                         const Vec4<T>* centers,

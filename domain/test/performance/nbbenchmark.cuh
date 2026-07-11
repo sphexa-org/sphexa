@@ -30,6 +30,7 @@
 #include <thrust/universal_vector.h>
 
 #include "cstone/cuda/cuda_runtime.hpp"
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
@@ -92,7 +93,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     // build the cornerstone octree on the CPU
     constexpr unsigned bucketSize = 64;
     const auto [csTree, counts]   = computeOctree(std::span(coords.particleKeys()), bucketSize);
-    OctreeData<KeyType, CpuTag> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     octree.resize(nNodes(csTree));
     updateInternalTree<KeyType>(csTree, octree.data());
 
@@ -124,7 +125,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     const std::tuple<std::vector<InputTs>...> inputs = util::tupleMap(allocVec, inputValues);
     std::tuple<std::vector<OutputTs>...> outputs     = util::tupleMap(allocVec, initialOutputValues);
     ijloop::CpuAlwaysTraverseNeighborhoodBuilder{ngmax}
-        .build(nsView, box, n, groupView, x, y, z, hVal)
+        .build(execution::cpu, nsView, box, n, groupView, x, y, z, hVal)
         .ijLoop(util::tupleMap([](auto const& v) { return v.data(); }, inputs),
                 util::tupleMap([](auto& v) { return v.data(); }, outputs), interaction, ijloop::empty_postamble);
 
@@ -186,15 +187,18 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
                                .groupStart = rawPtr(groups),
                                .groupEnd   = rawPtr(groups) + 1};
 
+    StreamHolder stream;
+
     // prefetch vectors to device memory, required on some AMD hardware/software for reasonable performance
     int device;
     checkGpuErrors(cudaGetDevice(&device));
     auto const prefetchToDevice = [&]<class Tv>(const thrust::universal_vector<Tv>& v)
     {
 #if defined(__HIPCC__) && (HIP_VERSION_MAJOR < 7 || (HIP_VERSION_MAJOR == 7 && HIP_VERSION_MINOR == 0))
-        checkGpuErrors(hipMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), device));
+        checkGpuErrors(hipMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), device, stream));
 #else
-        checkGpuErrors(cudaMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), {cudaMemLocationTypeDevice, device}, 0));
+        checkGpuErrors(
+            cudaMemPrefetchAsync(rawPtr(v), sizeof(Tv) * v.size(), {cudaMemLocationTypeDevice, device}, 0, stream));
 #endif
     };
     util::for_each_tuple(prefetchToDevice, std::tie(dX, dY, dZ, dH));
@@ -202,14 +206,14 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     util::for_each_tuple(prefetchToDevice, dOutputs);
     util::for_each_tuple(prefetchToDevice, std::tie(dPrefixes, dChildOffsets, dParents, dInternalToLeaf,
                                                     dLeafToInternal, dLevelRange, dLayout, dCenters, dSizes, groups));
-    checkGpuErrors(cudaDeviceSynchronize());
+    stream.sync();
 
     // build neighborhood, measure CPU time
     using Clock     = std::chrono::high_resolution_clock;
     auto buildStart = Clock::now();
     const auto neighborhood =
-        neighborhoodBuilder.build(dNsView, box, n, dGroupView, rawPtr(dX), rawPtr(dY), rawPtr(dZ), hVal);
-    checkGpuErrors(cudaDeviceSynchronize());
+        neighborhoodBuilder.build(stream.exec(), dNsView, box, n, dGroupView, rawPtr(dX), rawPtr(dY), rawPtr(dZ), hVal);
+    stream.sync();
     auto buildEnd         = Clock::now();
     const float buildTime = std::chrono::duration<float>(buildEnd - buildStart).count();
     printf("Neighborhood build time (CPU time): %7.6f s\n", buildTime);
@@ -223,13 +227,13 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     std::vector<cudaEvent_t> events(times.size() + 1);
     for (auto& event : events)
         checkGpuErrors(cudaEventCreate(&event));
-    checkGpuErrors(cudaEventRecord(events[0]));
+    checkGpuErrors(cudaEventRecord(events[0], stream));
     for (std::size_t i = 1; i < events.size(); ++i)
     {
         neighborhood.ijLoop(util::tupleMap([](auto const& v) { return rawPtr(v); }, dInputs),
                             util::tupleMap([](auto& v) { return rawPtr(v); }, dOutputs), interaction,
                             ijloop::empty_postamble);
-        checkGpuErrors(cudaEventRecord(events[i]));
+        checkGpuErrors(cudaEventRecord(events[i], stream));
     }
     checkGpuErrors(cudaEventSynchronize(events.back()));
 

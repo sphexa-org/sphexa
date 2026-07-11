@@ -61,19 +61,20 @@ using VizAdaptor = viz::AscentAdaptor;
 #endif
 
 #ifdef USE_CUDA
-using AccType = cstone::GpuTag;
+using Exec          = cstone::execution::Gpu;
+constexpr Exec exec = cstone::execution::gpuDefaultStream;
 #else
-using AccType = cstone::CpuTag;
+using Exec          = cstone::execution::Cpu;
+constexpr Exec exec = cstone::execution::cpu;
 #endif
 
 namespace fs = std::filesystem;
 using namespace sphexa;
 
-bool                  stopConditionReached(size_t iteration, double time, const std::string& maxStepStr);
-bool                  syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float dt);
-void                  printHelp(char* binName, int rank);
-int                   getNumLocalRanks(int);
-sph::NeighborhoodType nbTypeFromName(const std::string_view nbType);
+bool stopConditionReached(size_t iteration, double time, const std::string& maxStepStr);
+bool syncedWallClockElapsed(float totalTimeElapsed, float wallClockLimit, float dt);
+void printHelp(char* binName, int rank);
+int  getNumLocalRanks(int);
 
 int main(int argc, char** argv)
 {
@@ -88,28 +89,28 @@ int main(int argc, char** argv)
         return EXIT_SUCCESS;
     }
 
-    using Dataset = SimulationData<AccType>;
-    using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, AccType>;
+    using Dataset = SimulationData<Exec>;
+    using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, Exec>;
 
-    const std::string        initCond     = parser.get("--init");
-    const size_t             problemSize  = parser.get("-n", 50);
-    const std::string        glassBlock   = parser.get("--glass");
-    const std::string        propChoice   = parser.get("--prop", std::string("ve"));
-    const std::string        maxStepStr   = parser.get("-s", std::string("200"));
-    std::vector<std::string> writeExtra   = parser.getCommaList("--wextra");
-    std::vector<std::string> outputFields = parser.getCommaList("-f");
-    const bool               ascii        = parser.exists("--ascii");
-    const bool               quiet        = parser.exists("--quiet");
-    const bool               avClean      = parser.exists("--avclean");
-    const int                simDuration  = parser.get("--duration", std::numeric_limits<int>::max());
-    const std::string        writeFreqStr = parser.get("-w", std::string("0"));
-    const bool               writeEnabled = writeFreqStr != "0" || !writeExtra.empty();
-    const std::string        profFreqStr  = parser.get("--profile", maxStepStr);
-    const bool               profEnabled  = parser.exists("--profile") || writeEnabled;
-    const std::string        pmroot       = parser.get("--pmroot", std::string("")); // /sys/cray/pm_counters
-    std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
-    std::string              profFile     = parser.get("-op", std::string("profile"));
-    sph::NeighborhoodType    nbChoice = nbTypeFromName(parser.get("--neighbor-search", std::string("always-traverse")));
+    const std::string        initCond             = parser.get("--init");
+    const size_t             problemSize          = parser.get("-n", 50);
+    const std::string        glassBlock           = parser.get("--glass");
+    const std::string        propChoice           = parser.get("--prop", std::string("ve"));
+    const std::string        maxStepStr           = parser.get("-s", std::string("200"));
+    std::vector<std::string> writeExtra           = parser.getCommaList("--wextra");
+    std::vector<std::string> outputFields         = parser.getCommaList("-f");
+    const bool               ascii                = parser.exists("--ascii");
+    const bool               quiet                = parser.exists("--quiet");
+    const bool               avClean              = parser.exists("--avclean");
+    const int                simDuration          = parser.get("--duration", std::numeric_limits<int>::max());
+    const std::string        writeFreqStr         = parser.get("-w", std::string("0"));
+    const bool               writeEnabled         = writeFreqStr != "0" || !writeExtra.empty();
+    const std::string        profFreqStr          = parser.get("--profile", maxStepStr);
+    const bool               profEnabled          = parser.exists("--profile") || writeEnabled;
+    const std::string        pmroot               = parser.get("--pmroot", std::string("")); // /sys/cray/pm_counters
+    std::string              outFile              = parser.get("-o", "dump_" + removeModifiers(initCond));
+    std::string              profFile             = parser.get("-op", std::string("profile"));
+    const bool               disableNeighborLists = parser.exists("--disable-neighbor-lists");
 
     std::ofstream nullOutput("/dev/null");
     std::ostream& output = (quiet || rank) ? nullOutput : std::cout;
@@ -137,7 +138,7 @@ int main(int argc, char** argv)
     auto& d = simData.hydro;
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
 
-    d.setNeighborhoodType(nbChoice);
+    if (disableNeighborLists) d.disableNeighborLists();
 
     if (parser.exists("--G")) { d.g = parser.get<double>("--G"); }
     bool  haveGrav = (d.g != 0.0);
@@ -150,7 +151,7 @@ int main(int argc, char** argv)
     uint64_t bucketSizeFocus = 64;
     // ~100 global nodes per rank to decompose the domain with +-1% accuracy
     uint64_t bucketSize = std::max(bucketSizeFocus, d.numParticlesGlobal / (100 * numRanks));
-    Domain   domain(rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, box);
+    Domain   domain(exec, rank, numRanks, bucketSize, bucketSizeFocus, theta, MPI_COMM_WORLD, box);
     domain.setGrowthAllocRate(simData.hydro.getAllocGrowthRate());
 
     propagator->sync(domain, simData);
@@ -247,20 +248,6 @@ int getNumLocalRanks(int defValue)
     return getenv("SLURM_NTASKS_PER_NODE") == nullptr ? defValue : std::stoi(getenv("SLURM_NTASKS_PER_NODE"));
 }
 
-sph::NeighborhoodType nbTypeFromName(const std::string_view nbType)
-{
-    if (nbType == "always-traverse" || nbType == "t") return sph::NeighborhoodType::alwaysTraverse;
-    if (nbType == "full-neighbor-list" || nbType == "f") return sph::NeighborhoodType::fullNeighborList;
-    if (nbType == "compressed-full-neighbor-list" || nbType == "fc")
-        return sph::NeighborhoodType::compressedFullNeighborList;
-    if (nbType == "compressed-half-neighbor-list" || nbType == "hc")
-        return sph::NeighborhoodType::compressedHalfNeighborList;
-    if (nbType == "clustered-neighbor-list" || nbType == "c") return sph::NeighborhoodType::clusteredNeighborList;
-    throw std::invalid_argument(
-        "neighbor-search argument must be one of 'always-traverse', 'full-neighbor-list', "
-        " 'compressed-full-neighbor-list', 'compressed-half-neighbor-list', or 'clustered-neighbor-list'");
-}
-
 void printHelp(char* name, int rank)
 {
     if (rank == 0)
@@ -314,11 +301,7 @@ void printHelp(char* name, int rank)
                 \t int(NUM):  Dump profiling data every NUM iteration steps,\n\
                 \t real(NUM): Dump profiling data every NUM seconds of simulation (not wall-clock) time \n\n");
 
-        printf("\t--neighbor-search STRING \t Choice of neighborhood search algorithm [always-traverse]\n\
-                \t always-traverse:               Do not use neighbor lists; Always traverse the full tree for particle-particle interactions.\n\
-                \t full-neighbor-list:            Use a full neighbor list; Expect excessive memory usage. \n\
-                \t compressed-full-neighbor-list: Use a compressed full neighbor list; Significantly lower memory usage.\n\
-                \t compressed-half-neighbor-list: Use a compressed half (symmetric) neighbor list; Even lower memory usage, but uses atomic ops.\n\
-                \t clustered-neighbor-list:       Use a clustered neighbor list; Minimal memory usage.\n\n");
+        printf("\t--disable-neighbor-lists \t Disable neighbor lists and instead always traverse the full octree\n\
+                \t for finding particle-particle interactions\n\n");
     }
 }

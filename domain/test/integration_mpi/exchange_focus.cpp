@@ -73,7 +73,7 @@ void exchangeFocusIrregular(int myRank, int numRanks)
 
     std::vector<KeyType> treeLeaves = treeLeavesInitial[myRank];
 
-    OctreeData<KeyType, CpuTag> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     octree.resize(nNodes(treeLeaves));
     updateInternalTree<KeyType>(treeLeaves, octree.data());
 

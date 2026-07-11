@@ -29,6 +29,7 @@ using namespace ryoanji;
 
 TEST(DirectSum, MatchCpu)
 {
+    using cstone::rawPtr;
     using T          = double;
     size_t numBodies = 1000;
     T      boxLength = 3;

@@ -19,6 +19,7 @@
 
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/memory.cuh"
+#include "cstone/execution.hpp"
 #include "cstone/primitives/math.hpp"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/tuple_util.hpp"
@@ -85,7 +86,8 @@ __global__ void upsweepAccumulateInternalNodes(const TreeNodeIndex firstNode,
  * @param[out] output      tuple of output pointers for accumulated results
  */
 template<class Tc, class KeyType, class TransformOp, class BinaryOp, class... In, class... Out>
-void upsweep(const OctreeNsView<Tc, KeyType>& tree,
+void upsweep(const execution::Gpu exec,
+             const OctreeNsView<Tc, KeyType>& tree,
              const std::tuple<Out...>& init,
              TransformOp&& transformOp,
              BinaryOp&& binaryOp,
@@ -97,23 +99,20 @@ void upsweep(const OctreeNsView<Tc, KeyType>& tree,
     if (tree.numLeafNodes)
     {
         auto numInternalNodes = tree.numNodes - tree.numLeafNodes;
-        detail::upsweepAccumulateLeafNodes<<<iceil(tree.numLeafNodes, numThreads), numThreads>>>(
+        detail::upsweepAccumulateLeafNodes<<<iceil(tree.numLeafNodes, numThreads), numThreads, 0, exec>>>(
             tree.leafToInternal + numInternalNodes, tree.numLeafNodes, tree.layout, init,
             std::forward<TransformOp>(transformOp), std::forward<BinaryOp>(binaryOp), input, output);
         checkGpuErrors(cudaGetLastError());
     }
 
-    std::array<TreeNodeIndex, maxTreeLevel<KeyType>() + 2> levelRange;
-    memcpyD2H(tree.levelRange, levelRange.size(), levelRange.data());
-
     for (int level = maxTreeLevel<KeyType>() - 1; level >= 0; --level)
     {
-        const TreeNodeIndex firstNode = levelRange[level];
-        const TreeNodeIndex lastNode  = levelRange[level + 1];
+        const TreeNodeIndex firstNode = tree.levelRange[level];
+        const TreeNodeIndex lastNode  = tree.levelRange[level + 1];
         const TreeNodeIndex numNodes  = lastNode - firstNode;
         if (numNodes)
         {
-            detail::upsweepAccumulateInternalNodes<<<iceil(numNodes, numThreads), numThreads>>>(
+            detail::upsweepAccumulateInternalNodes<<<iceil(numNodes, numThreads), numThreads, 0, exec>>>(
                 firstNode, lastNode, tree.childOffsets, init, std::forward<BinaryOp>(binaryOp), output);
             checkGpuErrors(cudaGetLastError());
         }
@@ -129,14 +128,15 @@ void upsweep(const OctreeNsView<Tc, KeyType>& tree,
  * @return device array of size tree.numNodes, or empty ptr when !Config::symmetric
  */
 template<class Config, class Tc, class KeyType, class Th>
-util::UniqueDevicePtr<Th[]> computeNodeRMax(const OctreeNsView<Tc, KeyType>& tree, const Th* h)
+util::UniqueDevicePtr<Th[]>
+computeNodeRMax(const execution::Gpu exec, const OctreeNsView<Tc, KeyType>& tree, const Th* h)
 {
     util::UniqueDevicePtr<Th[]> nodeRMax;
     if constexpr (Config::symmetric)
     {
-        nodeRMax = util::deviceAlloc<Th[]>(tree.numNodes);
+        nodeRMax = util::deviceAlloc<Th[]>(exec, tree.numNodes);
         upsweep(
-            tree, std::tuple(Th(0)), [] __device__(auto h) { return std::make_tuple(2 * std::get<0>(h)); },
+            exec, tree, std::tuple(Th(0)), [] __device__(auto h) { return std::make_tuple(2 * std::get<0>(h)); },
             [] __device__(auto accum, auto r) { return std::make_tuple(std::max(std::get<0>(accum), std::get<0>(r))); },
             std::tuple(h), std::tuple(nodeRMax.get()));
     }

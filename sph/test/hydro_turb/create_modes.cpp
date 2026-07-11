@@ -31,7 +31,7 @@ TEST(Turbulence, spectForm1_unifdimensions)
     // T      amplitudes[st_maxmodes];
     bool verbose = true;
 
-    sph::TurbulenceData<T, cstone::CpuTag> turbulenceData(TurbulenceConstants(), verbose);
+    sph::TurbulenceData<T, cstone::execution::Cpu> turbulenceData(TurbulenceConstants(), verbose);
     sph::createStirringModes(turbulenceData, Lx, Ly, Lz, st_maxmodes, stirMax, stirMin, ndim, 1, 0.0, 0.0, verbose);
 
     numModes         = turbulenceData.numModes;
@@ -74,7 +74,7 @@ TEST(Turbulence, spectForm1_nonunifdimensions)
     // T amplitudes[st_maxmodes];
     bool verbose = true;
 
-    sph::TurbulenceData<T, cstone::CpuTag> turbulenceData(TurbulenceConstants(), verbose);
+    sph::TurbulenceData<T, cstone::execution::Cpu> turbulenceData(TurbulenceConstants(), verbose);
     sph::createStirringModes(turbulenceData, Lx, Ly, Lz, st_maxmodes, stirMax, stirMin, ndim, 1, 0.0, 0.0, verbose);
 
     numModes         = turbulenceData.numModes;

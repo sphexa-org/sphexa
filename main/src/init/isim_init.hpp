@@ -75,10 +75,10 @@ private:
     void runTagging(IFileReader* reader, Dataset& simData) const
     {
         if (settingsFile_.empty()) { return; }
-        auto ids = toHost(simData.hydro.id);
-        auto x   = toHost(simData.hydro.x);
-        auto y   = toHost(simData.hydro.y);
-        auto z   = toHost(simData.hydro.z);
+        auto ids = cstone::toHost(simData.hydro.id);
+        auto x   = cstone::toHost(simData.hydro.x);
+        auto y   = cstone::toHost(simData.hydro.y);
+        auto z   = cstone::toHost(simData.hydro.z);
 
         reader->setStep(settingsFile_, -1, FileMode::independent);
 
@@ -150,7 +150,7 @@ struct SimInitializers
     static InitPtr makeTDEOrbitInit(const std::string& filePath, int initStep, IFileReader* reader);
 };
 
-extern template struct SimInitializers<SimulationData<cstone::CpuTag>>;
-extern template struct SimInitializers<SimulationData<cstone::GpuTag>>;
+extern template struct SimInitializers<SimulationData<cstone::execution::Cpu>>;
+extern template struct SimInitializers<SimulationData<cstone::execution::Gpu>>;
 
 } // namespace sphexa

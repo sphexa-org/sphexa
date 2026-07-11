@@ -93,8 +93,6 @@ extern template class DeviceVector<util::array<double, 3>>;
 extern template class DeviceVector<util::array<float, 4>>;
 extern template class DeviceVector<util::array<double, 4>>;
 
-} // namespace cstone
-
 template<class T>
 T* rawPtr(cstone::DeviceVector<T>& p)
 {
@@ -106,3 +104,5 @@ const T* rawPtr(const cstone::DeviceVector<T>& p)
 {
     return p.data();
 }
+
+} // namespace cstone

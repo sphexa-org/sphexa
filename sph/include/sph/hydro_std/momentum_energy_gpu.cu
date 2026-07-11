@@ -97,7 +97,7 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
     d.minDtCourant = minDt;
 }
 
-template void computeMomentumEnergyStdGpu(const GroupView& grp, sphexa::ParticlesData<cstone::GpuTag>& d,
+template void computeMomentumEnergyStdGpu(const GroupView& grp, sphexa::ParticlesData<cstone::execution::Gpu>& d,
                                           const cstone::Box<SphTypes::CoordinateType>&);
 
 template<typename Thydro, typename T>

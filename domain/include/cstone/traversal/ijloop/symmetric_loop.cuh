@@ -16,6 +16,7 @@
 #pragma once
 
 #include "cstone/cuda/cuda_utils.cuh"
+#include "cstone/execution.hpp"
 #include "cstone/primitives/math.hpp"
 #include "cstone/traversal/ijloop/common.hpp"
 
@@ -42,7 +43,8 @@ __global__ void initResultKernel(const LocalIndex firstBody,
 }
 
 template<class Config, class Tc, class ThP, class Input, class Output, class Interaction>
-void initResult(const LocalIndex firstBody,
+void initResult(execution::Gpu exec,
+                const LocalIndex firstBody,
                 const LocalIndex lastBody,
                 const Tc* x,
                 const Tc* y,
@@ -56,8 +58,9 @@ void initResult(const LocalIndex firstBody,
     const LocalIndex numBodies = lastBody - firstBody;
     constexpr unsigned threads = 256;
     const unsigned numBlocks   = iceil(numBodies, threads);
-    initResultKernel<<<numBlocks, threads>>>(firstBody, lastBody, x, y, z, h, std::forward<Input>(input),
-                                             std::forward<Output>(output), std::forward<Interaction>(interaction));
+    initResultKernel<<<numBlocks, threads, 0, exec>>>(firstBody, lastBody, x, y, z, h, std::forward<Input>(input),
+                                                      std::forward<Output>(output),
+                                                      std::forward<Interaction>(interaction));
     checkGpuErrors(cudaGetLastError());
 }
 
@@ -84,7 +87,8 @@ __global__ void applyPostambleKernel(const LocalIndex firstBody,
 }
 
 template<class Config, class Tc, class ThP, class Input, class Tmp, class Output, class Postamble>
-void applyPostamble(const LocalIndex firstBody,
+void applyPostamble(execution::Gpu exec,
+                    const LocalIndex firstBody,
                     const LocalIndex lastBody,
                     const LocalIndex firstValidBody,
                     const Tc* x,
@@ -103,9 +107,9 @@ void applyPostamble(const LocalIndex firstBody,
     const LocalIndex numBodies = lastBody - firstBody;
     constexpr unsigned threads = 256;
     const unsigned numBlocks   = iceil(numBodies, threads);
-    applyPostambleKernel<<<numBlocks, threads>>>(firstBody, lastBody, firstValidBody, x, y, z, h,
-                                                 std::forward<Input>(input), std::forward<Tmp>(tmp),
-                                                 std::forward<Output>(output), std::forward<Postamble>(postamble));
+    applyPostambleKernel<<<numBlocks, threads, 0, exec>>>(
+        firstBody, lastBody, firstValidBody, x, y, z, h, std::forward<Input>(input), std::forward<Tmp>(tmp),
+        std::forward<Output>(output), std::forward<Postamble>(postamble));
     checkGpuErrors(cudaGetLastError());
 }
 

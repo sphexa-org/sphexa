@@ -134,8 +134,10 @@ public:
 
     void traverse(cstone::GroupView grp, DataType& d, const DomainType& domain)
     {
+        using namespace cstone;
+
         const auto& box       = domain.box();
-        bool        usePbc    = box.boundaryX() == cstone::BoundaryType::periodic;
+        bool        usePbc    = box.boundaryX() == BoundaryType::periodic;
         int         numShells = usePbc ? ewaldSettings_.numReplicaShells : 0;
 
         d.egrav = mHolder_.compute(grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m), rawPtr(d.h), d.g, numShells,
@@ -149,9 +151,11 @@ public:
         if (usePbc)
         {
             ryoanji::Vec4<Tf> rootCenter;
-            memcpyD2H(domain.focusTree().expansionCentersAcc().data(), 1, &rootCenter);
+            memcpyD2HAsync(execution::gpuDefaultStream, domain.focusTree().expansionCentersAcc().data(), 1,
+                           &rootCenter);
             MType rootM;
-            memcpyD2H(mHolder_.deviceMultipoles(), 1, &rootM);
+            memcpyD2HAsync(execution::gpuDefaultStream, mHolder_.deviceMultipoles(), 1, &rootM);
+            syncGpu(execution::gpuDefaultStream);
 
             computeGravityEwaldGpu(makeVec3(rootCenter), rootM, grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m),
                                    box, d.g, rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), &d.egrav,

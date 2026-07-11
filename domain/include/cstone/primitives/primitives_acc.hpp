@@ -17,107 +17,89 @@
 
 #include <algorithm>
 #include <span>
-#include <type_traits>
 
-#include "cstone/cuda/device_vector.h"
-#include "cstone/util/pack_buffers.hpp"
+#include "cstone/execution.hpp"
 #include "cstone/primitives/primitives_gpu.h"
 #include "gather.hpp"
 
 namespace cstone
 {
 
-struct CpuTag
+template<class It, class T>
+void fill(execution::Cpu, It first, It last, T value)
 {
-};
-struct GpuTag
-{
-};
-
-template<class AccType>
-struct HaveGpu : public std::integral_constant<int, std::is_same_v<AccType, GpuTag>>
-{
-};
-
-template<bool useGpu, class Iterator, class T>
-void fill(Iterator first, Iterator last, T value)
-{
-    using T1 = std::decay_t<decltype(*first)>;
     if (last <= first) { return; }
-
-    if constexpr (useGpu) { fillGpu(first, last, T1(value)); }
-    else { std::fill(first, last, value); }
+    std::fill(first, last, value);
 }
 
-template<bool useGpu, class T>
-void copy_n(const T* src, std::size_t n, T* dest)
+template<class T>
+void copy_n(execution::Cpu, const T* src, std::size_t n, T* dest)
 {
-    if constexpr (useGpu) { memcpyD2D(src, n, dest); }
-    else { omp_copy(src, src + n, dest); }
+    omp_copy(src, src + n, dest);
 }
 
-template<bool useGpu, class T1, class T2, class T3>
-void scaleGpuAcc(const T1* in1, const T1* in2, T2* out, T3 value)
+template<class T1, class T2, class T3>
+void scale(execution::Cpu, const T1* in1, const T1* in2, T2* out, T3 value)
 {
-    if constexpr (useGpu) { scaleGpu(in1, in2, out, value); }
-    else { std::transform(in1, in2, out, [value](auto v_) { return v_ * value; }); }
+    std::transform(in1, in2, out, [value](auto v_) { return v_ * value; });
 }
 
-template<bool useGpu, class IndexType, class ValueType>
-void gatherAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
+template<class IndexType, class ValueType>
+void gather(execution::Cpu, std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
 {
-    if constexpr (useGpu) { gatherGpu(ordering.data(), ordering.size(), source, destination); }
-    else { gather(ordering, source, destination); }
+    gather(ordering, source, destination);
 }
 
-template<bool useGpu, class IndexType, class ValueType>
-void scatterAcc(std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
+template<class IndexType, class ValueType>
+void scatter(execution::Cpu, std::span<const IndexType> ordering, const ValueType* source, ValueType* destination)
 {
-    if constexpr (useGpu) { scatterGpu(ordering.data(), ordering.size(), source, destination); }
-    else { scatter(ordering, source, destination); }
+    scatter(ordering, source, destination);
+}
+
+template<class T>
+std::tuple<T, T> minMax(execution::Cpu, const T* first, const T* last)
+{
+    assert(last >= first);
+
+    T minimum = INFINITY;
+    T maximum = -INFINITY;
+
+#pragma omp parallel for reduction(min : minimum) reduction(max : maximum)
+    for (size_t pi = 0; pi < std::size_t(last - first); pi++)
+    {
+        T value = first[pi];
+        minimum = std::min(minimum, value);
+        maximum = std::max(maximum, value);
+    }
+
+    return std::make_tuple(minimum, maximum);
 }
 
 //! @brief sortByKey with temp buffer management
 template<class KeyType, class ValueType, class KeyBuf, class ValueBuf>
-void sortByKeyGpu(
-    std::span<KeyType> keys, std::span<ValueType> values, KeyBuf& keyBuf, ValueBuf& valueBuf, float growthRate)
+void sortByKey(execution::Cpu,
+               std::span<KeyType> keys,
+               std::span<ValueType> values,
+               KeyBuf& /*keyBuf*/,
+               ValueBuf& /*valueBuf*/,
+               float /*growthRate*/)
 {
-    // temp storage for radix sort as multiples of IndexType
-    uint64_t tempStorageEle = iceil(sortByKeyTempStorage<KeyType, ValueType>(keys.size()), sizeof(ValueType));
-    auto s1                 = reallocateBytes(keyBuf, keys.size() * sizeof(KeyType), growthRate);
-
-    // pack valueBuffer and temp storage into @p valueBuf
-    auto s2                 = valueBuf.size();
-    uint64_t numElements[2] = {uint64_t(keys.size() * growthRate), tempStorageEle};
-    auto tempBuffers        = util::packAllocBuffer<ValueType>(valueBuf, {numElements, 2}, 128);
-
-    sortByKeyGpu(keys.data(), keys.data() + keys.size(), values.data(), (KeyType*)rawPtr(keyBuf), tempBuffers[0].data(),
-                 tempBuffers[1].data(), tempStorageEle * sizeof(ValueType));
-    reallocate(keyBuf, s1, 1.0);
-    reallocate(valueBuf, s2, 1.0);
+    assert(keys.size() == values.size());
+    sort_by_key(keys.begin(), keys.end(), values.begin());
 }
 
-template<bool useGpu, class T1, class T2>
-void sequenceAcc(T1* first, T1* last, T2 value)
+template<class T1, class T2>
+void sequence(execution::Cpu, T1* first, T1* last, T2 value)
 {
-    if constexpr (useGpu) { sequenceGpu(first, last - first, T1(value)); }
-    else { std::iota(first, last, value); }
+    std::iota(first, last, value);
 }
 
-template<bool useGpu, class BufferType>
-void sequence(LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate)
+template<class BufferType>
+void sequence(execution::Cpu exec, LocalIndex first, LocalIndex n, BufferType& buffer, double growthRate)
 {
     reallocateBytes(buffer, sizeof(LocalIndex) * (first + n), growthRate);
     auto* seq = reinterpret_cast<LocalIndex*>(buffer.data());
-    sequenceAcc<useGpu>(seq + first, seq + first + n, first);
-}
-
-template<bool useGpu, class KeyType, class ValueType, class KeyBuf, class ValueBuf>
-void sortByKey(std::span<KeyType> keys, std::span<ValueType> values, KeyBuf& keyBuf, ValueBuf& valueBuf, double growth)
-{
-    assert(keys.size() == values.size());
-    if constexpr (useGpu) { sortByKeyGpu(keys, values, keyBuf, valueBuf, growth); }
-    else { sort_by_key(keys.begin(), keys.end(), values.begin()); }
+    sequence(exec, seq + first, seq + first + n, first);
 }
 
 } // namespace cstone

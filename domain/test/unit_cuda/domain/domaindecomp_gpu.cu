@@ -17,6 +17,7 @@
 
 #include "gtest/gtest.h"
 
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/domain/domaindecomp_gpu.cuh"
 
 using namespace cstone;
@@ -47,8 +48,12 @@ static void sendListMinimalGpu()
 
     std::span<const KeyType> d_keyView{rp(d_keys), d_keys.size()};
 
+    StreamHolder stream;
+
     // note: key input needs to be sorted
-    auto sendList = createSendRangesGpu(assignment, d_keyView, rp(d_searchKeys), rp(d_indices));
+    auto sendList = createSendRangesGpu(stream.exec(), assignment, d_keyView, rp(d_searchKeys), rp(d_indices));
+
+    stream.sync();
 
     EXPECT_EQ(sendList.count(0), 6);
     EXPECT_EQ(sendList.count(1), 3);

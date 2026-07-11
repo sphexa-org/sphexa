@@ -4,7 +4,7 @@
 namespace sph
 {
 
-void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cstone::GpuTag>& d,
+void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cstone::execution::Gpu>& d,
                       const cstone::Box<SphTypes::CoordinateType>& box, bool subgroups)
 {
     if (d.ng0 > d.ngmax) { throw std::runtime_error("ng0 should be smaller than ngmax\n"); }

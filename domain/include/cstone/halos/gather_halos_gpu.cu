@@ -43,7 +43,8 @@ __global__ void gatherRangesKernel(const IndexType* rangeScan,
 }
 
 template<class T, class IndexType>
-void gatherRanges(const IndexType* rangeScan,
+void gatherRanges(execution::Gpu exec,
+                  const IndexType* rangeScan,
                   const IndexType* rangeOffsets,
                   int numRanges,
                   const T* src,
@@ -53,28 +54,23 @@ void gatherRanges(const IndexType* rangeScan,
     int numThreads = 256;
     int numBlocks  = iceil(bufferSize, numThreads);
     if (numBlocks == 0) { return; }
-    gatherRangesKernel<<<numBlocks, numThreads>>>(rangeScan, rangeOffsets, numRanges, src, buffer, bufferSize);
+    gatherRangesKernel<<<numBlocks, numThreads, 0, exec>>>(rangeScan, rangeOffsets, numRanges, src, buffer, bufferSize);
 }
 
-template void gatherRanges(const unsigned*, const unsigned*, int, const int*, int*, size_t);
-template void gatherRanges(const uint64_t*, const uint64_t*, int, const int*, int*, size_t);
+#define GATHER_RANGES(T, IndexType)                                                                                    \
+    template void gatherRanges(execution::Gpu exec, const IndexType* rangeScan, const IndexType* rangeOffsets,         \
+                               int numRanges, const T* src, T* buffer, size_t bufferSize);
 
-template void
-gatherRanges(const unsigned*, const unsigned*, int, const util::array<float, 1>*, util::array<float, 1>*, size_t);
-template void
-gatherRanges(const unsigned*, const unsigned*, int, const util::array<float, 2>*, util::array<float, 2>*, size_t);
-template void
-gatherRanges(const unsigned*, const unsigned*, int, const util::array<float, 3>*, util::array<float, 3>*, size_t);
-template void
-gatherRanges(const unsigned*, const unsigned*, int, const util::array<float, 4>*, util::array<float, 4>*, size_t);
+GATHER_RANGES(int, unsigned)
 
-template void
-gatherRanges(const uint64_t*, const uint64_t*, int, const util::array<float, 1>*, util::array<float, 1>*, size_t);
-template void
-gatherRanges(const uint64_t*, const uint64_t*, int, const util::array<float, 2>*, util::array<float, 2>*, size_t);
-template void
-gatherRanges(const uint64_t*, const uint64_t*, int, const util::array<float, 3>*, util::array<float, 3>*, size_t);
-template void
-gatherRanges(const uint64_t*, const uint64_t*, int, const util::array<float, 4>*, util::array<float, 4>*, size_t);
+using ArrayF1 = util::array<float, 1>;
+using ArrayF2 = util::array<float, 2>;
+using ArrayF3 = util::array<float, 3>;
+using ArrayF4 = util::array<float, 4>;
+
+GATHER_RANGES(ArrayF1, unsigned)
+GATHER_RANGES(ArrayF2, unsigned)
+GATHER_RANGES(ArrayF3, unsigned)
+GATHER_RANGES(ArrayF4, unsigned)
 
 } // namespace cstone

@@ -17,6 +17,7 @@
 
 #include <thrust/universal_vector.h>
 
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/traversal/ijloop/upsweep.cuh"
 #include "cstone/util/tuple_util.hpp"
@@ -103,7 +104,7 @@ TEST(IjLoop, Upsweep)
     std::generate(v.begin(), v.end(), std::bind(std::uniform_real_distribution<double>(-100, 100), std::ref(gen)));
 
     auto [csTree, counts] = computeOctree(std::span<const KeyT>(rawPtr(keys), keys.size()), 8);
-    OctreeData<KeyT, CpuTag> octree;
+    OctreeData<KeyT, execution::Cpu> octree;
     octree.resize(nNodes(csTree));
     updateInternalTree<KeyT>(csTree, octree.data());
 
@@ -144,9 +145,10 @@ TEST(IjLoop, Upsweep)
                      std::tuple(rawPtr(reference)));
 
     thrust::universal_vector<long> result(octree.numNodes);
-    ijloop::upsweep(view, std::tuple(0l), TransformOp(), BinaryOp(), std::tuple(rawPtr(dataLong), rawPtr(dataBool)),
-                    std::tuple(rawPtr(result)));
-    checkGpuErrors(cudaDeviceSynchronize());
+    StreamHolder stream;
+    ijloop::upsweep(stream.exec(), view, std::tuple(0l), TransformOp(), BinaryOp(),
+                    std::tuple(rawPtr(dataLong), rawPtr(dataBool)), std::tuple(rawPtr(result)));
+    stream.sync();
 
     EXPECT_EQ(result, reference);
 }

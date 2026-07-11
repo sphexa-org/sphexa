@@ -17,6 +17,8 @@
 
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/cuda/memory.cuh"
+#include "cstone/cuda/stream_holder.cuh"
+#include "cstone/execution.hpp"
 
 using namespace cstone;
 
@@ -28,18 +30,20 @@ __global__ void deviceAccess(T* ptr, T value)
 
 TEST(Memory, DeviceAllocScalar)
 {
-    auto data = util::deviceAlloc<int>();
+    StreamHolder stream;
+    auto data = util::deviceAlloc<int>(stream.exec());
     ASSERT_TRUE(data);
-    deviceAccess<<<1, 1>>>(data.get(), 42);
-    checkGpuErrors(cudaDeviceSynchronize());
+    deviceAccess<<<1, 1, 0, stream>>>(data.get(), 42);
+    stream.sync();
 }
 
 TEST(Memory, DeviceAllocArray)
 {
-    auto data = util::deviceAlloc<float[]>(10);
+    StreamHolder stream;
+    auto data = util::deviceAlloc<float[]>(stream.exec(), 10);
     ASSERT_TRUE(data);
-    deviceAccess<<<1, 10>>>(data.get(), 37.5f);
-    checkGpuErrors(cudaDeviceSynchronize());
+    deviceAccess<<<1, 10, 0, stream>>>(data.get(), 37.5f);
+    stream.sync();
 }
 
 TEST(Memory, DeviceAllocVirtual)
@@ -105,12 +109,11 @@ __global__ void testSharedMemAlloc(bool* failed)
 
 TEST(Memory, SharedMemAllocator)
 {
-    auto failedDevice = util::deviceAlloc<bool>();
-    checkGpuErrors(cudaMemset(failedDevice.get(), 0, sizeof(bool)));
-    testSharedMemAlloc<<<1, 2 * GpuConfig::warpSize, (1 + GpuConfig::warpSize) * sizeof(double) * 2>>>(
-        failedDevice.get());
-    checkGpuErrors(cudaDeviceSynchronize());
+    bool* failedDevice;
+    checkGpuErrors(cudaMalloc(&failedDevice, sizeof(bool)));
+    checkGpuErrors(cudaMemset(failedDevice, 0, sizeof(bool)));
+    testSharedMemAlloc<<<1, 2 * GpuConfig::warpSize, (1 + GpuConfig::warpSize) * sizeof(double) * 2>>>(failedDevice);
     bool failedHost;
-    checkGpuErrors(cudaMemcpy(&failedHost, failedDevice.get(), sizeof(bool), cudaMemcpyDeviceToHost));
+    checkGpuErrors(cudaMemcpy(&failedHost, failedDevice, sizeof(bool), cudaMemcpyDeviceToHost));
     ASSERT_FALSE(failedHost);
 }

@@ -282,12 +282,12 @@ struct OctreeNsView
     float searchExtFactor{1.0};
 };
 
-template<class KeyType, class Accelerator>
+template<class KeyType, execution::Policy Exec>
 class OctreeData
 {
-    //! @brief A vector template that resides on the hardware specified as Accelerator
+    //! @brief A vector template that resides on the hardware specified as Exec
     template<class ValueType>
-    using AccVector = std::conditional_t<HaveGpu<Accelerator>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
+    using AccVector = std::conditional_t<execution::HaveGpu<Exec>{}, DeviceVector<ValueType>, std::vector<ValueType>>;
 
 public:
     void resize(TreeNodeIndex numCsLeafNodes)
@@ -368,8 +368,8 @@ void updateInternalTree(std::span<const KeyType> leaves, OctreeView<KeyType> o)
     std::copy(o.levelRangeSpan().begin(), o.levelRangeSpan().end(), o.d_levelRange);
 }
 
-template<class KeyType, class Accelerator>
-std::span<const TreeNodeIndex> leafToInternal(const OctreeData<KeyType, Accelerator>& octree)
+template<class KeyType, execution::Policy Exec>
+std::span<const TreeNodeIndex> leafToInternal(const OctreeData<KeyType, Exec>& octree)
 {
     return {rawPtr(octree.leafToInternal) + octree.numInternalNodes, size_t(octree.numLeafNodes)};
 }

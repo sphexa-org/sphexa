@@ -68,9 +68,8 @@ InitSettings IsobaricCubeConstants()
 template<class Dataset>
 void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& constants, double massPart)
 {
-    constexpr bool gpu = cstone::HaveGpu<typename Dataset::AcceleratorType>{};
-    using T            = typename Dataset::RealType;
-    using HydroType    = typename Dataset::HydroType;
+    using T         = typename Dataset::RealType;
+    using HydroType = typename Dataset::HydroType;
 
     T r         = constants.at("r");
     T rhoInt    = constants.at("rhoInt");
@@ -86,9 +85,9 @@ void initIsobaricCubeFields(Dataset& d, const std::map<std::string, double>& con
     auto cv = sph::idealGasCv(d.muiConst, d.gamma);
     initFieldsAtRest(d, massPart);
 
-    auto&&                 x = toHost(d.x);
-    auto&&                 y = toHost(d.y);
-    auto&&                 z = toHost(d.z);
+    auto&&                 x = cstone::toHost(d.x);
+    auto&&                 y = cstone::toHost(d.y);
+    auto&&                 z = cstone::toHost(d.z);
     std::vector<T>         u(d.x.size());
     std::vector<HydroType> h(d.h.size());
 

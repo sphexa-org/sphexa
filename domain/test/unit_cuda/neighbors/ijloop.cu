@@ -19,13 +19,13 @@
 
 #include <thrust/universal_vector.h>
 
+#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/cuda/thrust_util.cuh"
+#include "cstone/execution.hpp"
 #include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
 #include "cstone/traversal/ijloop/cpu_fullnblist.hpp"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
-#include "cstone/traversal/ijloop/gpu_fullnblist.cuh"
-#include "cstone/traversal/ijloop/gpu_compressednblist.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
 
 #include "../../coord_samples/random.hpp"
@@ -111,7 +111,7 @@ struct IjLoopTest : testing::Test
         std::generate(v.begin(), v.end(), std::bind(std::uniform_real_distribution<double>(-100, 100), std::ref(gen)));
 
         auto [csTree, counts] = computeOctree(std::span<const KeyT>(rawPtr(leaves), leaves.size()), 8);
-        OctreeData<KeyT, CpuTag> octree;
+        OctreeData<KeyT, execution::Cpu> octree;
         octree.resize(nNodes(csTree));
         updateInternalTree<KeyT>(csTree, octree.data());
 
@@ -346,9 +346,6 @@ using Neighborhoods = ::testing::Types<
     ijloop::CpuAlwaysTraverseNeighborhoodBuilder,
     ijloop::CpuFullNbListNeighborhoodBuilder,
     ijloop::GpuAlwaysTraverseNeighborhoodBuilder,
-    ijloop::GpuFullNbListNeighborhoodBuilder,
-    ijloop::GpuCompressedNbListNeighborhoodBuilder<>::withoutSymmetry,
-    ijloop::GpuCompressedNbListNeighborhoodBuilder<>::withSymmetry,
 #ifdef __CUDACC__
     ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withoutSymmetry::withoutCompression,
     ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, 4>::withSymmetry::withoutCompression,
@@ -362,6 +359,21 @@ using Neighborhoods = ::testing::Types<
 
 TYPED_TEST_SUITE(IjLoopTest, Neighborhoods);
 
+struct CpuStreamHolder
+{
+    execution::Cpu exec() const noexcept { return execution::cpu; }
+    void sync() const noexcept {}
+};
+
+CpuStreamHolder getStream(ijloop::CpuAlwaysTraverseNeighborhoodBuilder) { return {}; }
+CpuStreamHolder getStream(ijloop::CpuFullNbListNeighborhoodBuilder) { return {}; }
+StreamHolder getStream(ijloop::GpuAlwaysTraverseNeighborhoodBuilder) { return {}; }
+template<class Config>
+StreamHolder getStream(ijloop::GpuSuperclusterNbListNeighborhoodBuilder<Config>)
+{
+    return {};
+}
+
 TYPED_TEST(IjLoopTest, IjLoop)
 {
     using NeighborhoodBuilder = TypeParam;
@@ -370,18 +382,20 @@ TYPED_TEST(IjLoopTest, IjLoop)
     {
         this->setBoundaryType(boundaryType);
 
-        const auto nb =
-            NeighborhoodBuilder{1024}.build(this->treeView(), this->box, this->totalBodies, this->groupView(),
-                                            rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
-
         Result result;
         util::for_each_tuple([&](auto& v) { v.resize(this->totalBodies); }, result);
+
+        const auto nbBuilder = NeighborhoodBuilder{1024};
+        const auto stream    = getStream(nbBuilder);
+        const auto nb =
+            nbBuilder.build(stream.exec(), this->treeView(), this->box, this->totalBodies, this->groupView(),
+                            rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
 
         auto input  = std::make_tuple(rawPtr(this->v));
         auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
         nb.ijLoop(input, output, NeighborFun{}, PostambleFun{});
-        checkGpuErrors(cudaDeviceSynchronize());
+        stream.sync();
 
         Result reference = this->reference(this->groupView());
         this->validate(reference, result);
@@ -397,18 +411,20 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
     {
         this->setBoundaryType(boundaryType);
 
-        const auto nb = NeighborhoodBuilder{1024}.build(this->treeView(searchExtFactor), this->box, this->totalBodies,
-                                                        this->groupView(), rawPtr(this->x), rawPtr(this->y),
-                                                        rawPtr(this->z), rawPtr(this->h));
-
         Result result;
         util::for_each_tuple([&](auto& v) { v.resize(this->totalBodies); }, result);
+
+        const auto nbBuilder = NeighborhoodBuilder{1024};
+        const auto stream    = getStream(nbBuilder);
+        const auto nb =
+            nbBuilder.build(stream.exec(), this->treeView(searchExtFactor), this->box, this->totalBodies,
+                            this->groupView(), rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
 
         auto input  = std::make_tuple(rawPtr(this->v));
         auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
         nb.ijLoop(input, output, NeighborFun{}, PostambleFun{});
-        checkGpuErrors(cudaDeviceSynchronize());
+        stream.sync();
 
         Result reference = this->reference(this->groupView());
         this->validate(reference, result);
@@ -417,7 +433,7 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
             h *= searchExtFactor;
 
         nb.ijLoop(input, output, NeighborFun{}, PostambleFun{});
-        checkGpuErrors(cudaDeviceSynchronize());
+        stream.sync();
 
         reference = this->reference(this->groupView());
         this->validate(reference, result);
@@ -436,12 +452,6 @@ consteval bool supportsSubgroup(ijloop::GpuSuperclusterNbListNeighborhoodBuilder
     return !Config::symmetric;
 }
 
-template<class Config>
-consteval bool supportsSubgroup(ijloop::GpuCompressedNbListNeighborhoodBuilder<Config>)
-{
-    return false;
-}
-
 TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
 {
     using NeighborhoodBuilder = TypeParam;
@@ -452,20 +462,22 @@ TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
         {
             this->setBoundaryType(boundaryType);
 
-            const auto nb =
-                NeighborhoodBuilder{1024}.build(this->treeView(), this->box, this->totalBodies, this->groupView(),
-                                                rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
-
-            const auto subgroupNb = nb.subgroup(this->subgroupView());
-
             Result result;
             util::for_each_tuple([&](auto& v) { v.resize(this->totalBodies); }, result);
+
+            const auto nbBuilder = NeighborhoodBuilder{1024};
+            const auto stream    = getStream(nbBuilder);
+            const auto nb =
+                nbBuilder.build(stream.exec(), this->treeView(), this->box, this->totalBodies, this->groupView(),
+                                rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
+
+            const auto subgroupNb = nb.subgroup(this->subgroupView());
 
             auto input  = std::make_tuple(rawPtr(this->v));
             auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
             subgroupNb.ijLoop(input, output, NeighborFun{}, PostambleFun{});
-            checkGpuErrors(cudaDeviceSynchronize());
+            stream.sync();
 
             Result reference = this->reference(this->subgroupView());
             this->validate(reference, result);

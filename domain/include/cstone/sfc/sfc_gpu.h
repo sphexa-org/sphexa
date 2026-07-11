@@ -15,19 +15,14 @@
 
 #pragma once
 
+#include "cstone/execution.hpp"
 #include "cstone/sfc/sfc.hpp"
 
 namespace cstone
 {
 
 template<class KeyType, class T>
-extern void computeSfcKeysGpu(const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box);
-
-template<bool useGpu, class KeyType, class T>
-void computeSfcKeys(const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box)
-{
-    if constexpr (useGpu) { computeSfcKeysGpu(x, y, z, keys, numKeys, box); }
-    else { computeSfcKeys(x, y, z, keys, numKeys, box); }
-}
+extern void computeSfcKeys(
+    execution::Gpu exec, const T* x, const T* y, const T* z, KeyType* keys, size_t numKeys, const Box<T>& box);
 
 } // namespace cstone
