@@ -147,10 +147,7 @@ protected:
     void printAndClearIadRegularizationStats(HydroData& d, size_t first, size_t last, bool clear = true)
     {
         size_t localCount{};
-        if constexpr (cstone::HaveGpu<typename HydroData::AcceleratorType>{})
-        {
-            localCount = sph::countAndCleanRegTagGPU(d.id, first, last, true);
-        }
+        if constexpr (d.useGpu) { localCount = sph::countAndCleanRegTagGPU(d.id, first, last, true); }
         else { localCount = sph::countAndCleanRegTag(d.id, first, last, true); }
 
         size_t globalCount = 0;
