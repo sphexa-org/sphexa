@@ -32,14 +32,13 @@
 
 #pragma once
 
-#include <algorithm>
 #include <cstdint>
-#include <numeric>
 #include <variant>
 
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
+#include "sph/iad_regularization_stat.hpp"
 #include "sph/particles_data.hpp"
 #include "util/pm_reader.hpp"
 #include "util/timer.hpp"
@@ -141,29 +140,26 @@ public:
     }
 
 protected:
+    /*! @brief Show number of particles where IAD regularization was applied summed over all ranks
+     * @param clear Reset regularization tag
+     */
     template<class HydroData>
-    void printIadRegularizationStats(const HydroData& d, size_t first, size_t last, const char* label)
+    void printAndClearIadRegularizationStats(HydroData& d, size_t first, size_t last, bool clear = true)
     {
-//        auto&& flags = toHost(d.iadRegularized);
-        auto&& flags = toHost(d.ids);
-        last         = std::min(last, flags.size());
-
-        uint64_t localCount = 0;
-        for (size_t i = first; i < last; ++i)
+        size_t localCount{};
+        if constexpr (cstone::HaveGpu<typename HydroData::AcceleratorType>{})
         {
-            localCount += flags[i] != 0;
+            localCount = sph::countAndCleanRegTagGPU(d.id, first, last, true);
         }
+        else { localCount = sph::countAndCleanRegTag(d.id, first, last, true); }
 
-        uint64_t globalCount = 0;
-        mpiAllreduce(&localCount, &globalCount, 1, MPI_SUM, MPI_COMM_WORLD);
-
+        size_t globalCount = 0;
+        MPI_Reduce(&localCount, &globalCount, 1, MpiType<size_t>{}, MPI_SUM, 0, MPI_COMM_WORLD);
         if (rank_ == 0)
         {
-            out << "### IAD regularization ### " << label << ": " << globalCount << " / " << d.numParticlesGlobal
+            out << "### IAD regularization ###: " << globalCount << " / " << d.numParticlesGlobal
                 << " particles, target " << d.condition_quality_target << std::endl;
         }
-
-        d.ids = std::move(flags);
     }
 
     static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData)

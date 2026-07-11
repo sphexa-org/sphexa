@@ -96,7 +96,7 @@ protected:
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
-                                       "xm", "kx", "nc", "divv", "gradh", "dtCourant", "iadRegularized">;
+                                       "xm", "kx", "nc", "divv", "gradh", "dtCourant">;
 
     //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
@@ -245,7 +245,10 @@ public:
         timer.step("mpi::synchronizeHalos");
 
         computeIadDivvCurlvGradh(activeRungs_, d, domain.box());
-        Base::printIadRegularizationStats(d, activeRungs_.firstBody, activeRungs_.lastBody, "ve-bdt");
+        if (d.condition_quality_target > 0.)
+        {
+            Base::printAndClearIadRegularizationStats(d, groups_.view().firstBody, groups_.view().lastBody);
+        }
         groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
         timer.step("IadVelocityDivCurlGradh");
 

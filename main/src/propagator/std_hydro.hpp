@@ -73,9 +73,8 @@ protected:
     using ConservedFields = FieldList<"u", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "id">;
 
     //! @brief the list of dependent particle fields, these may be used as scratch space during domain sync
-    using DependentFields =
-        FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33", "nc",
-                  "dtCourant", "iadRegularized">;
+    using DependentFields = FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33",
+                                      "nc", "dtCourant">;
 
 public:
     HydroProp(std::ostream& output, size_t rank)
@@ -146,7 +145,10 @@ public:
         timer.step("mpi::synchronizeHalos");
 
         computeIAD(groups_.view(), d, domain.box());
-        Base::printIadRegularizationStats(d, groups_.view().firstBody, groups_.view().lastBody, "std");
+        if (d.condition_quality_target > 0.)
+        {
+            Base::printAndClearIadRegularizationStats(d, groups_.view().firstBody, groups_.view().lastBody);
+        }
         timer.step("IAD");
 
         domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33">(d), get<"ax">(d), get<"ay">(d));

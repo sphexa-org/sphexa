@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "cstone/tree/definitions.h"
+#include "sph/id_layout.hpp"
 #include "sph/types.hpp"
 
 namespace sphexa
@@ -43,20 +44,12 @@ namespace sphexa
 
 using CoordinateType = sph::SphTypes::CoordinateType;
 
-/*! @brief Number of bits used for tagging information storage
- */
-constexpr uint64_t tagNumBits = 10;
-
 /*! @brief Given tagNumBits, the maximum number of groups we can address is 2^tagNumBits - 1.
  * We subtract one, because groupId=0 corresponds to an unmasked particle ID
  */
-constexpr uint64_t maxNumGroupIds = (1 << tagNumBits) - 1;
+constexpr uint64_t maxNumGroupIds = (1 << sph::IDLayout::tagNumBits) - 1;
 
-/*! @brief First tagging bit position
- */
-constexpr uint64_t taggingMaskStartingBit = sizeof(uint64_t) * 8 - tagNumBits;
-
-constexpr uint64_t taggingCheckMask = maxNumGroupIds << taggingMaskStartingBit;
+constexpr uint64_t taggingCheckMask = maxNumGroupIds << sph::IDLayout::taggingMaskStartingBit;
 
 /*! @brief Tagged id identification condition functor
  */

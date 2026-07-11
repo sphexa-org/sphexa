@@ -37,6 +37,7 @@
 #include <numeric>
 
 #include "id_tag_utils.hpp"
+#include "sph/id_layout.hpp"
 
 namespace sphexa
 {
@@ -49,7 +50,7 @@ uint64_t applyTaggingMask(uint64_t groupId, uint64_t id)
     // Clear previous tagging bits if any
     uint64_t taggedId = id & ~taggingCheckMask;
 
-    taggedId |= ((groupId + 1) << taggingMaskStartingBit);
+    taggedId |= ((groupId + 1) << sph::IDLayout::taggingMaskStartingBit);
 
     return taggedId;
 }
