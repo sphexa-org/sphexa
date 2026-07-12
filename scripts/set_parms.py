@@ -34,6 +34,69 @@ import os
 from argparse import ArgumentParser
 
 import h5py
+import numpy as np
+
+def parse_value(v):
+    if "," in v:
+        try:
+        # Try parsing as list of integers
+            return [int(x) for x in v.split(",")]
+        except ValueError:
+            pass
+        # Try parsing as list of floats
+        try:
+            return [float(x) for x in v.split(",")]
+        except ValueError:
+            pass
+        # If both fail, keep as a single comma-separated string
+        # (not a list, so C++ can read it easily as a string attribute)
+        return v
+    else:
+        # Try parsing as single integer
+        try:
+            return int(v)
+        except ValueError:
+            pass
+        # Try parsing as single float
+        try:
+            return float(v)
+        except ValueError:
+            pass
+        # If both fail, keep as string
+        return v
+
+
+def format_number(value):
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        formatted = f"{value:.15g}"
+        if "." in formatted:
+            formatted = formatted.rstrip("0").rstrip(".")
+        return formatted
+    return str(value)
+
+
+def format_sequence(value):
+    if isinstance(value, (list, tuple)):
+        parts = [format_sequence(item) for item in value]
+        return "[" + ", ".join(parts) + "]"
+    return format_number(value)
+
+def select_int_dtype(value):
+    min32, max32 = -(1 << 31), (1 << 31) - 1
+    if isinstance(value, int):
+        if min32 <= value <= max32:
+            return np.int32(value)
+        return np.int64(value)
+    if isinstance(value, (list, tuple)) and all(isinstance(v, int) for v in value):
+        arr = np.asarray(value, dtype=np.int64)
+        if arr.size == 0:
+            return arr.astype(np.int32)
+        if arr.min() >= min32 and arr.max() <= max32:
+            return arr.astype(np.int32)
+        return arr
+    return value
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Create settings file")
@@ -49,13 +112,28 @@ if __name__ == "__main__":
     settingsDict = dict(zip(settings[:-1:2], settings[1::2]))
     for k, v in settingsDict.items():
         key = k.strip("-")
-        try:
-            f.attrs[key] = int(v)
-        except ValueError:
-            f.attrs[key] = float(v)
+        v = parse_value(v)
+        if key in f.attrs:
+            del f.attrs[key]
+        if isinstance(v, str):
+            dtype = h5py.string_dtype(encoding="ascii", length=len(v))
+            f.attrs.create(key, v, dtype=dtype)
+        else:
+            v = select_int_dtype(v)
+            if isinstance(v, np.ndarray):
+                f.attrs.create(key, v, dtype=v.dtype)
+            else:
+                f.attrs.create(key, v)
 
     print("{0} now contains the following settings:".format(args.settingsFile))
     for k, v in f.attrs.items():
-        print("  ", k, v)
+        if hasattr(v, "size") and getattr(v, "size", 1) > 1:
+            values = v.tolist()
+            formatted_value = format_sequence(values)
+            print(f"   {k} {formatted_value}")
+        else:
+            if isinstance(v, (bytes, bytearray)) or (hasattr(v, "decode") and not isinstance(v, str)):
+                v = v.decode("ascii")
+            print(f"   {k} {v}")
 
     f.close()
