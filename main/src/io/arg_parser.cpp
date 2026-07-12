@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <cmath>
+#include <format>
 
 #include "arg_parser.hpp"
 
@@ -11,14 +13,14 @@ ArgParser::ArgParser(int argc, const char** argv)
 {
 }
 
-std::vector<std::string> ArgParser::getCommaList(const std::string& option) const
+std::vector<std::string> splitCommaList(const std::string& listWithCommas)
 {
-    std::string listWithCommas = get(option);
+    std::string trimmed = listWithCommas;
 
-    std::replace(listWithCommas.begin(), listWithCommas.end(), ',', ' ');
+    std::replace(trimmed.begin(), trimmed.end(), ',', ' ');
 
     std::vector<std::string> list;
-    std::stringstream        ss(listWithCommas);
+    std::stringstream        ss(trimmed);
     std::string              field;
     while (ss >> field)
     {
@@ -28,6 +30,11 @@ std::vector<std::string> ArgParser::getCommaList(const std::string& option) cons
     return list;
 }
 
+std::vector<std::string> ArgParser::getCommaList(const std::string& option) const
+{
+    return splitCommaList(get(option));
+}
+
 bool ArgParser::exists(const std::string& option) const { return std::find(begin, end, option) != end; }
 
 bool strIsIntegral(const std::string& str)
@@ -35,6 +42,12 @@ bool strIsIntegral(const std::string& str)
     char* ptr;
     std::strtol(str.c_str(), &ptr, 10);
     return (*ptr) == '\0' && !str.empty();
+}
+
+std::string numToParamStr(double value)
+{
+    if (std::floor(value) == value) { return std::format("{}", static_cast<int>(value)); }
+    return std::format("{:.15g}", value);
 }
 
 bool isExtraOutputStep(size_t step, double t1, double t2, const std::vector<std::string>& extraOutputs)
