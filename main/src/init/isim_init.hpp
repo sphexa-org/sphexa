@@ -39,6 +39,7 @@
 #include "sphexa/simulation_data.hpp"
 
 #include "settings.hpp"
+#include "io/id_tag_setup.hpp"
 #include "io/id_tag_utils.hpp"
 
 namespace sphexa
