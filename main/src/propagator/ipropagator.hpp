@@ -36,6 +36,7 @@
 
 #include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
+#include "io/id_tag_utils.hpp"
 #include "sph/particles_data.hpp"
 #include "util/pm_reader.hpp"
 #include "util/timer.hpp"
@@ -74,6 +75,32 @@ public:
 
     //! @brief save particle data fields to file
     virtual void saveFields(IFileWriter*, size_t, size_t, ParticleDataType&, const cstone::Box<T>&) {}
+
+    //! @brief save particle subset data fields to file
+    // TODO: should be const ParticleDataType& but at some point we use the data() method which is non-const
+    void saveSubsetFields(IFileWriter* fileWriter, const std::string& outFileSubset, std::size_t firstIndex, std::size_t lastIndex, ParticleDataType& simData)
+    {
+        // Find the selected particles positions in dataset
+        using ParticleIndexVectorType = decltype(ParticleDataType::HydroData::id);
+        using Exec = ParticleDataType::Exec;
+        std::span<const uint64_t> ids(simData.hydro.id.data(), simData.hydro.id.size());
+        ParticleIndexVectorType selectedParticlesIndexes;
+        if constexpr (cstone::execution::HaveGpu<Exec>{}) {
+            findTaggedIdsGPU(ids, firstIndex, lastIndex, selectedParticlesIndexes);
+        }
+        else {
+            findTaggedIds(ids, firstIndex, lastIndex, selectedParticlesIndexes);
+        }
+        fileWriter->addStep(0, selectedParticlesIndexes.size(), outFileSubset);
+        simData.hydro.loadOrStoreAttributes(fileWriter);
+
+        outputAllocatedFields(fileWriter, simData, selectedParticlesIndexes);
+
+        fileWriter->closeStep();
+
+        timer.step("SelectedParticlesFileOutput");
+
+    }
 
     //! @brief save internal state to file
     virtual void save(IFileWriter*) {}
@@ -137,26 +164,45 @@ public:
     }
 
 protected:
-    static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData)
+    static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData, std::optional<std::span<const uint64_t>> selectedParticlesIndexes = std::nullopt)
     {
-        auto output = [](auto& d, IFileWriter* writer)
+        auto output = [](auto& d, IFileWriter* writer, std::optional<std::span<const uint64_t>> selectedParticlesIndexes)
         {
-            auto fieldPointers = d.data();
-            auto indicesDone   = d.outputFieldIndices;
-            auto namesDone     = d.outputFieldNames;
+            const bool  subsetOuput = selectedParticlesIndexes.has_value();
+            auto        fieldPointers  = d.data();
+            auto        selPartIndexes = selectedParticlesIndexes.value_or(std::span<const uint64_t>{});
+            const auto& outputFieldIndices = subsetOuput ? d.subsetOutputFieldIndices : d.outputFieldIndices;
+            auto        indicesDone    = outputFieldIndices;
+            auto        namesDone      = subsetOuput ? d.subsetOutputFieldNames : d.outputFieldNames;
 
             for (int i = int(indicesDone.size()) - 1; i >= 0; --i)
             {
                 int fidx = indicesDone[i];
                 if (d.isAllocated(fidx))
                 {
-                    int column = std::find(d.outputFieldIndices.begin(), d.outputFieldIndices.end(), fidx) -
-                                 d.outputFieldIndices.begin();
+                    int column = std::find(outputFieldIndices.begin(), outputFieldIndices.end(), fidx) - outputFieldIndices.begin();
                     std::visit(
-                        [writer, c = column, key = namesDone[i]](auto field)
+                        [writer, c = column, key = namesDone[i], selPartIndexes, subsetOuput](auto field)
                         {
-                            auto&& tmp = cstone::toHost(*field);
-                            writeField(writer, key, tmp.data(), c);
+                            if (!subsetOuput)
+                            {
+                                // Output field for all particles, no selection
+                                auto&& tmp = cstone::toHost(*field);
+                                writeField(writer, key, tmp.data(), c);
+                            }
+                            else
+                            {
+                                // Output field only for tagged particles
+                                using ValueType = std::remove_pointer_t<decltype(field)>::value_type;
+                                using Exec      = ParticleDataType::Exec;
+                                using GatherVec = std::conditional_t<cstone::execution::HaveGpu<Exec>{},
+                                                                     cstone::DeviceVector<ValueType>,
+                                                                     std::vector<ValueType>>;
+                                GatherVec gatherResult(selPartIndexes.size());
+                                cstone::gather(selPartIndexes, field->data(), gatherResult.data());
+                                auto&& tmp = cstone::toHost(gatherResult);
+                                writeField(writer, key, tmp.data(), c);
+                            }
                         },
                         fieldPointers[fidx]);
                     indicesDone.erase(indicesDone.begin() + i);
@@ -166,17 +212,18 @@ protected:
 
             if (!indicesDone.empty() && writer->rank() == 0)
             {
-                std::cout << "WARNING: the following fields are not in use and therefore not output: ";
+                std::cout << (subsetOuput ? "WARNING: the following subset fields are not in use and therefore not output: "
+                                     : "WARNING: the following fields are not in use and therefore not output: ");
                 for (std::size_t fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
                 {
-                    std::cout << d.fieldNames[fidx] << ",";
+                    std::cout << d.fieldNames[indicesDone[fidx]] << ",";
                 }
                 std::cout << d.fieldNames[indicesDone.back()] << std::endl;
             }
         };
 
-        output(simData.hydro, writer);
-        output(simData.chem, writer);
+        output(simData.hydro, writer, selectedParticlesIndexes);
+        output(simData.chem, writer, selectedParticlesIndexes);
     }
 
     void logDomainStats(const DomainType& domain, ParticleDataType& simData)
