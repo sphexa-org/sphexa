@@ -40,6 +40,7 @@
 #include "cstone/primitives/primitives_acc.hpp"
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/sfc/sfc.hpp"
+#include "io/id_tag_setup.hpp"
 #include "io/ifile_io.hpp"
 #include "init/settings.hpp"
 
