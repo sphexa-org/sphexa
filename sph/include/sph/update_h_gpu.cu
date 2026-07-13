@@ -29,7 +29,6 @@
  */
 
 #include "cstone/cuda/gpu_config.cuh"
-#include "cstone/traversal/find_neighbors.cuh"
 
 #include "sph/kernels.hpp"
 #include "sph/particles_data.hpp"
