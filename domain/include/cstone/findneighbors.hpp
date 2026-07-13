@@ -141,7 +141,7 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
             if (j == i) { continue; }
             if (distanceSq<false>(x[j], y[j], z[j], particle[0], particle[1], particle[2], box) < radiusSq)
             {
-                if (numNeighbors < ngmax) { neighbors[numNeighbors * neighborsStride] = j; }
+                if (neighbors && numNeighbors < ngmax) { neighbors[numNeighbors * neighborsStride] = j; }
                 numNeighbors++;
             }
         }
