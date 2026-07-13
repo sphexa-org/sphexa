@@ -35,6 +35,8 @@
 #include <variant>
 
 #include "cstone/sfc/box.hpp"
+#include "cstone/execution.hpp"
+#include "cstone/primitives/primitives_acc.hpp"
 #include "io/ifile_io.hpp"
 #include "io/id_tag_utils.hpp"
 #include "sph/particles_data.hpp"
@@ -199,7 +201,14 @@ protected:
                                                                      cstone::DeviceVector<ValueType>,
                                                                      std::vector<ValueType>>;
                                 GatherVec gatherResult(selPartIndexes.size());
-                                cstone::gather(selPartIndexes, field->data(), gatherResult.data());
+                                auto gatherExec = []
+                                {
+                                    if constexpr (cstone::execution::HaveGpu<Exec>{})
+                                        return cstone::execution::gpuDefaultStream;
+                                    else
+                                        return cstone::execution::cpu;
+                                }();
+                                cstone::gather(gatherExec, selPartIndexes, field->data(), gatherResult.data());
                                 auto&& tmp = cstone::toHost(gatherResult);
                                 writeField(writer, key, tmp.data(), c);
                             }
