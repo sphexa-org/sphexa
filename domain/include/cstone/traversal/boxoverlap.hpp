@@ -278,18 +278,4 @@ overlap(const Vec3<T>& aCenter, const Vec3<T>& aSize, const Vec3<T>& bCenter, co
     return dX[0] < eps && dX[1] < eps && dX[2] < eps;
 }
 
-//! @brief Convenience wrapper to minDistance. This should only be used for testing.
-template<class KeyType, class T>
-HOST_DEVICE_FUN T minDistanceSq(IBox a, IBox b, const Box<T>& box)
-{
-    auto [aCenter, aSize] = centerAndSize<KeyType>(a, box);
-    auto [bCenter, bSize] = centerAndSize<KeyType>(b, box);
-    if (aSize == Vec3<T>{0, 0, 0} || bSize == Vec3<T>{0, 0, 0})
-    {
-        // if a or b has no size, it's from a unmapped area of a mix-dim SFC curve and contains no particles
-        return std::numeric_limits<T>::max();
-    }
-    return norm2(minDistance(aCenter, aSize, bCenter, bSize, box));
-}
-
 } // namespace cstone
