@@ -83,7 +83,7 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
                                        const OctreeNsView<Tc, KeyType>& tree,
                                        const Box<Tc>& box,
                                        unsigned ngmax,
-                                       LocalIndex* neighbors = nullptr,
+                                       LocalIndex* neighbors         = nullptr,
                                        unsigned long neighborsStride = 1)
 {
     using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;

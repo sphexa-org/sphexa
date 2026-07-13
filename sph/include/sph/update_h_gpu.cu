@@ -78,34 +78,31 @@ template bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const
 template bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, double* h, uint64_t*);
 
 template<class Tc, class T, class KeyType>
-__global__ void
-updateSmoothingLengthIterativeGpuKernel(GroupView grp, unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box,
-                                        const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* __restrict__ x,
-                                        const Tc* __restrict__ y, const Tc* __restrict__ z, T* __restrict__ h,
-                                        unsigned* __restrict__ nc)
+__global__ __launch_bounds__(128) void updateSmoothingLengthIterativeGpuKernel(
+    GroupView grp, unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box,
+    const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* __restrict__ x, const Tc* __restrict__ y,
+    const Tc* __restrict__ z, T* __restrict__ h, unsigned* __restrict__ nc)
 {
     LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
     if (warpIdx >= grp.numGroups) { return; }
 
-    LocalIndex       i       = grp.groupStart[warpIdx] + laneIdx;
-    const LocalIndex bodyEnd = grp.groupEnd[warpIdx];
+    const LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
+    if (i >= grp.groupEnd[warpIdx]) { return; }
 
-    unsigned ncSph = 1 + (i < bodyEnd ? cstone::findNeighbors(i, x, y, z, h, tree, box, ngmax) : ngmax);
+    const unsigned ngmin = ng0 / 4;
 
-    constexpr int ncMaxIteration = 9;
-    for (int ncIt = 0; ncIt <= ncMaxIteration; ++ncIt)
+    constexpr int maxIteration = 10;
+
+    unsigned ncSph = 1 + findNeighbors(i, x, y, z, h, tree, box, ngmax);
+
+    int iteration = 0;
+    while ((ngmin > ncSph || (ncSph - 1) > ngmax) && iteration++ < maxIteration)
     {
-        bool repeat = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax);
-        if (!cstone::ballotSync(repeat)) { break; }
-        if (repeat) { h[i] = updateH(ng0, ncSph, h[i]); }
-        unsigned ncSph = 1 + (i < bodyEnd ? cstone::findNeighbors(i, x, y, z, h, tree, box, ngmax) : ngmax);
-
-        bool ncFail = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax);
-        if (ncIt == ncMaxIteration && ncFail) { ncSph = 1; }
+        h[i]  = updateH(ng0, ncSph, h[i]);
+        ncSph = 1 + findNeighbors(i, x, y, z, h, tree, box, ngmax);
     }
-
-    if (i >= bodyEnd) return;
+    if (iteration == maxIteration && (ngmin > ncSph || (ncSph - 1) > ngmax)) { ncSph = 1; }
 
     nc[i] = ncSph;
 }
@@ -113,7 +110,7 @@ updateSmoothingLengthIterativeGpuKernel(GroupView grp, unsigned ng0, unsigned ng
 template<class T, class Dataset>
 void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d, const cstone::Box<T>& box)
 {
-    unsigned numThreads       = 256;
+    unsigned numThreads       = 128;
     unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
     unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
     if (numBlocks == 0) { return; }
