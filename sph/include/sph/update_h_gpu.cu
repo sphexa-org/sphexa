@@ -90,21 +90,7 @@ __global__ __launch_bounds__(128) void updateSmoothingLengthIterativeGpuKernel(
     const LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
     if (i >= grp.groupEnd[warpIdx]) { return; }
 
-    const unsigned ngmin = ng0 / 4;
-
-    constexpr int maxIteration = 10;
-
-    unsigned ncSph = 1 + findNeighbors(i, x, y, z, h, tree, box, ngmax);
-
-    int iteration = 0;
-    while ((ngmin > ncSph || (ncSph - 1) > ngmax) && iteration++ < maxIteration)
-    {
-        h[i]  = updateH(ng0, ncSph, h[i]);
-        ncSph = 1 + findNeighbors(i, x, y, z, h, tree, box, ngmax);
-    }
-    if (iteration == maxIteration && (ngmin > ncSph || (ncSph - 1) > ngmax)) { ncSph = 1; }
-
-    nc[i] = ncSph;
+    updateHIterative(ng0, ngmax, box, tree, i, x, y, z, h, nc);
 }
 
 template<class T, class Dataset>

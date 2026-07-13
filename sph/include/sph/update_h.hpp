@@ -54,28 +54,10 @@ void updateSmoothingLengthIterativeCpu(const Tc* x, const Tc* y, const Tc* z, T*
                                        LocalIndex lastId, const cstone::Box<Tc>& box,
                                        const cstone::OctreeNsView<Tc, KeyType>& treeView, unsigned ng0, unsigned ngmax)
 {
-    LocalIndex numWork = lastId - firstId;
-
-    unsigned ngmin = ng0 / 4;
-
-    constexpr int maxIteration = 10;
-
 #pragma omp parallel for
-    for (LocalIndex i = 0; i < numWork; ++i)
+    for (LocalIndex i = firstId; i < lastId; ++i)
     {
-        LocalIndex id    = i + firstId;
-        unsigned   ncSph = 1 + findNeighbors(id, x, y, z, h, treeView, box, ngmax);
-
-        int iteration = 0;
-        while ((ngmin > ncSph || (ncSph - 1) > ngmax) && iteration++ < maxIteration)
-        {
-            h[id] = updateH(ng0, ncSph, h[id]);
-            ncSph = 1 + findNeighbors(id, x, y, z, h, treeView, box, ngmax);
-        }
-
-        nc[id] = ncSph;
-
-        if (iteration == maxIteration && (ngmin > ncSph || (ncSph - 1) > ngmax)) { nc[id] = 1; }
+        updateHIterative(ng0, ngmax, box, treeView, i, x, y, z, h, nc);
     }
 }
 
