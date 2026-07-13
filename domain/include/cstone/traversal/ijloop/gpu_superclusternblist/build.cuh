@@ -581,7 +581,8 @@ std::size_t buildNbList(const execution::Gpu exec,
 
     constexpr unsigned numSuperclustersPerBlock = 2;
     const dim3 blockSize                        = {GpuConfig::warpSize, 1, numSuperclustersPerBlock};
-    const unsigned numBlocks = std::min(GpuConfig::smCount * (TravConfig::numWarpsPerSm / numSuperclustersPerBlock),
+    constexpr unsigned numWarpsPerSm            = 40;
+    const unsigned numBlocks = std::min(GpuConfig::smCount * (numWarpsPerSm / numSuperclustersPerBlock),
                                         (numISuperclusters + numSuperclustersPerBlock - 1) / numSuperclustersPerBlock);
     const unsigned sharedMem = numSuperclustersPerBlock * buildNbListSharedMemPerSupercluster<Config, Tc, ThP>(ncmax);
 

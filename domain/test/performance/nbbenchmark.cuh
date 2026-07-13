@@ -34,7 +34,6 @@
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
-#include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/tuple_util.hpp"
@@ -177,7 +176,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
                                             .searchExtFactor = searchExtFactor};
 
     // split particles into consecutive groups
-    constexpr unsigned groupSize = TravConfig::targetSize;
+    constexpr unsigned groupSize = GpuConfig::warpSize;
     thrust::universal_vector<LocalIndex> groups((n + groupSize - 1) / groupSize + 1);
     for (unsigned i = 0; i < groups.size(); ++i)
         groups[i] = std::min(groupSize * i, n);

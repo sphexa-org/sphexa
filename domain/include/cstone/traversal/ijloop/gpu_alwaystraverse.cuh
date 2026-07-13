@@ -20,6 +20,7 @@
 #include "cstone/execution.hpp"
 #include "cstone/cuda/memory.cuh"
 #include "cstone/findneighbors.hpp"
+#include "cstone/primitives/warpscan.cuh"
 #include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/tree/octree.hpp"
 
