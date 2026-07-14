@@ -92,27 +92,24 @@ int main(int argc, char** argv)
     using Dataset = SimulationData<Exec>;
     using Domain  = cstone::Domain<sph::SphTypes::KeyType, sph::SphTypes::CoordinateType, Exec>;
 
-    const std::string        initCond     = parser.get("--init");
-    const size_t             problemSize  = parser.get("-n", 50);
-    const std::string        glassBlock   = parser.get("--glass");
-    const std::string        propChoice   = parser.get("--prop", std::string("ve"));
-    const std::string        maxStepStr   = parser.get("-s", std::string("200"));
-    std::vector<std::string> writeExtra   = parser.getCommaList("--wextra");
-    std::vector<std::string> outputFields = parser.getCommaList("-f");
-    const bool               ascii        = parser.exists("--ascii");
-    const bool               quiet        = parser.exists("--quiet");
-    const bool               SLR          = !parser.exists("--no-slr");
-    const bool               AVswitches   = parser.exists("--avswitches");
-    const bool               haveAvFloor  = parser.exists("--avfloor");
-    const int                simDuration  = parser.get("--duration", std::numeric_limits<int>::max());
-    const std::string        writeFreqStr = parser.get("-w", std::string("0"));
-    const bool               writeEnabled = writeFreqStr != "0" || !writeExtra.empty();
-    const std::string        profFreqStr  = parser.get("--profile", maxStepStr);
-    const bool               profEnabled  = parser.exists("--profile") || writeEnabled;
-    const std::string        pmroot       = parser.get("--pmroot", std::string("")); // /sys/cray/pm_counters
-    std::string              outFile      = parser.get("-o", "dump_" + removeModifiers(initCond));
-    std::string              profFile     = parser.get("-op", std::string("profile"));
-    const bool               initFromFile = fs::exists(strBeforeSign(initCond, ":")) || fs::exists(strBeforeSign(initCond, ","));
+    const std::string        initCond             = parser.get("--init");
+    const size_t             problemSize          = parser.get("-n", 50);
+    const std::string        glassBlock           = parser.get("--glass");
+    const std::string        propChoice           = parser.get("--prop", std::string("ve"));
+    const std::string        maxStepStr           = parser.get("-s", std::string("200"));
+    std::vector<std::string> writeExtra           = parser.getCommaList("--wextra");
+    std::vector<std::string> outputFields         = parser.getCommaList("-f");
+    const bool               ascii                = parser.exists("--ascii");
+    const bool               quiet                = parser.exists("--quiet");
+    const bool               avClean              = parser.exists("--avclean");
+    const int                simDuration          = parser.get("--duration", std::numeric_limits<int>::max());
+    const std::string        writeFreqStr         = parser.get("-w", std::string("0"));
+    const bool               writeEnabled         = writeFreqStr != "0" || !writeExtra.empty();
+    const std::string        profFreqStr          = parser.get("--profile", maxStepStr);
+    const bool               profEnabled          = parser.exists("--profile") || writeEnabled;
+    const std::string        pmroot               = parser.get("--pmroot", std::string("")); // /sys/cray/pm_counters
+    std::string              outFile              = parser.get("-o", "dump_" + removeModifiers(initCond));
+    std::string              profFile             = parser.get("-op", std::string("profile"));
     const bool               disableNeighborLists = parser.exists("--disable-neighbor-lists");
 
     std::ofstream nullOutput("/dev/null");
@@ -123,7 +120,7 @@ int main(int argc, char** argv)
     auto fileWriter  = fileWriterFactory(ascii, MPI_COMM_WORLD);
     auto fileReader  = fileReaderFactory(ascii, MPI_COMM_WORLD);
     auto simInit     = initializerFactory<Dataset>(initCond, glassBlock, fileReader.get());
-    auto propagator  = propagatorFactory<Domain, Dataset>(propChoice, SLR, AVswitches, output, rank, simInit->constants());
+    auto propagator  = propagatorFactory<Domain, Dataset>(propChoice, avClean, output, rank, simInit->constants());
     auto observables = observablesFactory<Dataset>(simInit->constants(), constantsFile);
 
     Dataset simData;
@@ -139,19 +136,6 @@ int main(int argc, char** argv)
     auto box = simInit->init(rank, numRanks, problemSize, simData, fileReader.get());
 
     auto& d = simData.hydro;
-    if (AVswitches)
-    {
-        const bool     resetAlpha = !initFromFile || d.alphamin == 1.0;
-        d.alphamin                = 0.05;
-        if (resetAlpha) { cstone::fill(exec, d.alpha.begin(), d.alpha.end(), d.alphamin); }
-    }
-    if (haveAvFloor) { d.avFloor = parser.get<double>("--avfloor"); }
-    if (!AVswitches && initFromFile)
-    {
-        d.alphamin         = 1.0;
-        d.alphamax         = 1.0;
-        cstone::fill(exec, d.alpha.begin(), d.alpha.end(), d.alphamin);
-    }
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
 
     if (disableNeighborLists) d.disableNeighborLists();
@@ -306,13 +290,6 @@ void printHelp(char* name, int rank)
                 \t e.g: --outDir /home/user/folderToSaveOutputFiles/\n\n");
 
         printf("\t--quiet \t Don't print anything to stdout\n\n");
-
-        printf("\t--no-slr \t Disable slope-limited reconstruction for artificial-viscosity dissipation\n\n");
-
-        printf("\t--avswitches \t Enable artificial-viscosity switches [disabled by default]\n\n");
-
-        printf("\t--avfloor NUM \t Set the floor F in the SLR/Balsara AV amplitude clamp.\n"
-               "\t\t\t F=1 disables the floor [default], F=0.5 is useful for subsonic turbulence.\n\n");
 
         printf("\t--duration \t Maximum wall-clock run time of the simulation in seconds.[MAX_INT]\n\n");
 

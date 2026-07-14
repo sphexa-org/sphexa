@@ -45,7 +45,7 @@ namespace sphexa
 using namespace sph;
 using util::FieldList;
 
-template<bool SLR, class DomainType, class DataType>
+template<bool avClean, class DomainType, class DataType>
 class HydroVeProp : public Propagator<DomainType, DataType>
 {
 protected:
@@ -65,7 +65,6 @@ protected:
 
     MHolder_t      mHolder_;
     GroupData<Acc> groups_;
-    bool           AVswitches_;
 
     /*! @brief the list of conserved particles fields with values preserved between iterations
      *
@@ -75,22 +74,20 @@ protected:
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
-                                       "xm", "kx", "nc", "dtCourant", "divv", "curlv", "gradh">;
+                                       "xm", "kx", "nc", "dtCourant">;
 
-    //! @brief velocity gradient fields will only be allocated when SLR is true
+    //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
 
-    //! @brief what will be allocated based on SLR choice
+    //! @brief what will be allocated based AV cleaning choice
     using DependentFields =
-        std::conditional_t<SLR, decltype(DependentFields_{} + GradVFields{}), decltype(DependentFields_{})>;
+        std::conditional_t<avClean, decltype(DependentFields_{} + GradVFields{}), decltype(DependentFields_{})>;
 
 public:
-    HydroVeProp(std::ostream& output, size_t rank, bool AVswitches)
+    HydroVeProp(std::ostream& output, size_t rank)
         : Base(output, rank)
-        , AVswitches_(AVswitches)
     {
-        if (SLR && rank == 0) { std::cout << "SLR is activated" << std::endl; }
-        if (AVswitches_ && rank == 0) { std::cout << "AV switches are activated" << std::endl; }
+        if (avClean && rank == 0) { std::cout << "AV cleaning is activated" << std::endl; }
     }
 
     std::vector<std::string> conservedFields() const override
@@ -157,8 +154,8 @@ public:
         domain.exchangeHalos(get<"vx", "vy", "vz", "kx">(d), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        //release(d, "ay", "az");
-        //acquire(d, "divv", "gradh");
+        release(d, "ay", "az");
+        acquire(d, "divv", "gradh");
         computeIadDivvCurlvGradh(groups_.view(), d, domain.box());
         d.minDtRho = rhoTimestep(first, last, d);
         timer.step("IadVelocityDivCurlGradh");
@@ -166,17 +163,14 @@ public:
         computeEOS(first, last, d);
         timer.step("EquationOfState");
 
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "curlv", "c">(d), get<"ax">(d),
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "c">(d), get<"ax">(d),
                              get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        if (AVswitches_)
-        {
-            computeAVswitches(groups_.view(), d, domain.box());
-            timer.step("AVswitches");
-        }
+        computeAVswitches(groups_.view(), d, domain.box());
+        timer.step("AVswitches");
 
-        if (SLR)
+        if (avClean)
         {
             domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "prho", "alpha">(d), get<"ax">(d),
                                  get<"keys">(d));
@@ -184,9 +178,9 @@ public:
         else { domain.exchangeHalos(get<"prho", "alpha">(d), get<"ax">(d), get<"keys">(d)); }
         timer.step("mpi::synchronizeHalos");
 
-        //release(d, "divv", "gradh");
-        //acquire(d, "ay", "az");
-        computeMomentumEnergy<SLR>(groups_.view(), nullptr, d, domain.box());
+        release(d, "divv", "gradh");
+        acquire(d, "ay", "az");
+        computeMomentumEnergy<avClean>(groups_.view(), nullptr, d, domain.box());
         timer.step("MomentumAndEnergy");
         pmReader.step();
 
@@ -257,21 +251,21 @@ public:
         output();
 
         // second output pass: write temporary quantities produced by the EOS
-        release(d, "c11", "c12"); //, "c13");
-        acquire(d, "rho", "p"); //, "gradh");
+        release(d, "c11", "c12", "c13");
+        acquire(d, "rho", "p", "gradh");
         computeEOS(first, last, d);
         output();
-        release(d, "rho", "p");//, "gradh");
-        acquire(d, "c11", "c12");//, "c13");
+        release(d, "rho", "p", "gradh");
+        acquire(d, "c11", "c12", "c13");
 
         // third output pass: recover temporary curlv and divv quantities
-        //release(d, "prho", "c");
-        //acquire(d, "divv", "curlv");
+        release(d, "prho", "c");
+        acquire(d, "divv", "curlv");
         // partial recovery of cij in range [first:last] without halos, which are not needed for divv and curlv
         if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
         output();
-        //release(d, "divv", "curlv");
-        //acquire(d, "prho", "c");
+        release(d, "divv", "curlv");
+        acquire(d, "prho", "c");
 
         /* The following data is now lost and no longer available in the integration step
          *  c11, c12, c12: halos invalidated

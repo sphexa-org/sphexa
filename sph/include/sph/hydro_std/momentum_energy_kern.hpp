@@ -60,7 +60,7 @@ struct MomentumAndEnergyInteractionStd
 
         T           wij          = i == j ? 0 : rv / dist;
         constexpr T av_alpha     = T(1);
-        T           viscosity_ij = T(0.5) * artificial_viscosity(av_alpha, av_alpha, ci, cj, wij, wij, T(1));
+        T           viscosity_ij = T(0.5) * artificial_viscosity(av_alpha, av_alpha, ci, cj, wij);
 
         // For time-step calculations
         T vijsignal = i == j ? 0 : ci + cj - T(3) * wij;

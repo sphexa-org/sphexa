@@ -64,7 +64,7 @@ protected:
         whd = tabulateFunction<T, lt::kTableSize>(getSphKernelDerivative(kernelType, sincIndex), 0.0, 2.0);
 
         auto fieldVectors =
-            std::tie(x, y, z, h, m, gradh, rho0, sumwhrho0, vx, vy, vz, c, p, u, divv, curlv, alpha, c11, c12, c13, c22, c23,
+            std::tie(x, y, z, h, m, gradh, rho0, sumwhrho0, vx, vy, vz, c, p, u, divv, alpha, c11, c12, c13, c22, c23,
                      c33, dvxdx, dvxdy, dvxdz, dvydx, dvydy, dvydz, dvzdx, dvzdy, dvzdz, sumwh, xm, kx, prho);
 
         // resize all vectors to npart
@@ -100,13 +100,12 @@ protected:
     T Atmin          = 0.1;
     T Atmax          = 0.2;
     T ramp           = 1.0 / (Atmax - Atmin);
-    T avFloor        = 1.0;
 
     uint64_t                        npart          = 99;
     unsigned                        neighborsCount = npart - 1;
     std::vector<cstone::LocalIndex> neighbors;
 
-    std::vector<T> x, y, z, h, m, gradh, rho0, sumwhrho0, vx, vy, vz, c, p, u, divv, curlv, alpha, c11, c12, c13, c22, c23,
+    std::vector<T> x, y, z, h, m, gradh, rho0, sumwhrho0, vx, vy, vz, c, p, u, divv, alpha, c11, c12, c13, c22, c23,
         c33, dvxdx, dvxdy, dvxdz, dvydx, dvydy, dvydz, dvzdx, dvzdy, dvzdz, sumwh, xm, kx, prho;
 };
 
@@ -301,7 +300,7 @@ void symmetrizeGradV(util::array<const T*, 9> dV, util::array<T*, 6> sdV, size_t
     }
 }
 
-template<bool SLR, size_t stride = 1, class Tc, class Tm, class T, class Tm1>
+template<bool avClean, size_t stride = 1, class Tc, class Tm, class T, class Tm1>
 HOST_DEVICE_FUN inline void
 momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
                        unsigned neighborsCount, const unsigned* nc, const Tc* x, const Tc* y, const Tc* z, const T* vx,
@@ -309,16 +308,14 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
                        const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
                        const T Atmin, const T Atmax, const T ramp, const T* wh, const T* kx, const T* xm,
                        const T* alpha, const T* dV11, const T* dV12, const T* dV13, const T* dV22, const T* dV23,
-                       const T* dV33, const T* divv, const T* curlv, const T avFloor, T* grad_P_x, T* grad_P_y,
-                       T* grad_P_z, Tm1* du, T* maxvsignal)
+                       const T* dV33, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, T* maxvsignal)
 {
-    MomentumAndEnergyInteraction<SLR, T> interaction{wh, Atmin, Atmax, ramp, avFloor};
+    MomentumAndEnergyInteraction<avClean, T> interaction{wh, Atmin, Atmax, ramp};
 
-    if constexpr (!SLR) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
+    if constexpr (!avClean) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
     const auto input =
         std::make_tuple(vx, vy, vz, m, c, kx, alpha, xm, prho, c11, c12, c13, c22, c23, c33, nc, dV11, dV12, dV13, dV22,
-                        dV23, dV33, tdpdTrho ? tdpdTrho : vx /* pass random derefable array if tdpdTrho is null */,
-                        divv, curlv);
+                        dV23, dV33, tdpdTrho ? tdpdTrho : vx /* pass random derefable array if tdpdTrho is null */);
     const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, maxvsignal - i);
 
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
@@ -357,7 +354,7 @@ TEST_F(SphKernelTests, MomentumEnergy)
                         dvzdx.data(), dvzdy.data(), dvzdz.data()},
                        {dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(), dV33.data()}, npart);
 
-    { // test with SLR
+    { // test with AV cleaning
         std::vector<unsigned> nc(x.size(), neighborsCount + 1);
         auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
@@ -366,8 +363,7 @@ TEST_F(SphKernelTests, MomentumEnergy)
                                      (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
                                      c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
                                      alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
-                                     dV33.data(), divv.data(), curlv.data(), avFloor, &grad_Px, &grad_Py, &grad_Pz, &du,
-                                     &maxvsignal);
+                                     dV33.data(), &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
         EXPECT_NEAR(grad_Px, -23175.29155183331, 0.023);
         EXPECT_NEAR(grad_Py, 13564.560025399775, 0.053);
@@ -375,7 +371,7 @@ TEST_F(SphKernelTests, MomentumEnergy)
         EXPECT_NEAR(du, -2.6643381633458105e11, 7.1e5);
         EXPECT_NEAR(maxvsignal, 26490876.319252387, 1e-6);
     }
-    { // test without SLR
+    { // test without AV cleaning
         std::vector<unsigned> nc(x.size(), neighborsCount + 1);
         auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
@@ -384,8 +380,7 @@ TEST_F(SphKernelTests, MomentumEnergy)
                                       (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
                                       c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
                                       alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
-                                      dV33.data(), divv.data(), curlv.data(), avFloor, &grad_Px, &grad_Py, &grad_Pz, &du,
-                                      &maxvsignal);
+                                      dV33.data(), &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
         EXPECT_NEAR(grad_Px, -23599.138813909038, 0.022);
         EXPECT_NEAR(grad_Py, 335.48616557085978, 0.064);
@@ -402,8 +397,7 @@ TEST_F(SphKernelTests, MomentumEnergy)
                                       (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
                                       c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
                                       alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
-                                      dV33.data(), divv.data(), curlv.data(), avFloor, &grad_Px, &grad_Py, &grad_Pz, &du,
-                                      &maxvsignal);
+                                      dV33.data(), &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
         EXPECT_EQ(grad_Px, 0.0);
         EXPECT_EQ(grad_Py, 0.0);
@@ -411,39 +405,6 @@ TEST_F(SphKernelTests, MomentumEnergy)
         EXPECT_EQ(du, 0.0);
         EXPECT_EQ(maxvsignal, 0.0);
     }
-}
-
-TEST_F(SphKernelTests, MomentumEnergyAvFloor)
-{
-    using Vec3 = cstone::Vec3<T>;
-
-    auto makeParticle = [](unsigned id, T vx)
-    {
-        return std::make_tuple(id, Vec3{0, 0, 0}, T(1), vx, T(0), T(0), T(1), T(1), T(1), T(1), T(1), T(0),
-                               T(1), T(0), T(0), T(1), T(0), T(1), unsigned(2), T(0), T(0), T(0), T(0),
-                               T(0), T(0), T(0), T(0), T(1));
-    };
-
-    const auto iData = makeParticle(0, T(0));
-    const auto jData = makeParticle(1, T(1));
-    const Vec3 r_ij{1, 0, 0};
-
-    auto evaluate = [&](T floor)
-    {
-        MomentumAndEnergyInteraction<true, T> interaction{wh.data(), Atmin, Atmax, ramp, floor};
-        MomentumAndEnergyPostamble<false, T, T> postamble{K};
-        return postamble(iData, cstone::ijloop::unwrapModifiers(interaction(iData, jData, r_ij, T(1))));
-    };
-
-    const auto defaultFloor = evaluate(T(1.0));
-    const auto clampedFloor = evaluate(T(0.5));
-    const T    ratio        = T(2.5) / T(3.0);
-
-    EXPECT_NEAR(std::get<0>(clampedFloor) / std::get<0>(defaultFloor), ratio, 1e-12);
-    EXPECT_NEAR(std::get<1>(clampedFloor) / std::get<1>(defaultFloor), ratio, 1e-12);
-    EXPECT_NEAR(std::get<2>(defaultFloor), T(0), 1e-12);
-    EXPECT_NEAR(std::get<3>(defaultFloor), T(0), 1e-12);
-    EXPECT_NEAR(std::get<4>(clampedFloor), std::get<4>(defaultFloor), 1e-12);
 }
 
 template<size_t stride = 1, class Tc, class T>

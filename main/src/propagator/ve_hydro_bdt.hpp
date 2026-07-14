@@ -48,7 +48,7 @@ namespace sphexa
 using namespace sph;
 using util::FieldList;
 
-template<bool SLR, class DomainType, class DataType>
+template<bool avClean, class DomainType, class DataType>
 class HydroVeBdtProp : public Propagator<DomainType, DataType>
 {
 protected:
@@ -88,7 +88,6 @@ protected:
 
     //! @brief no dependent fields can be temporarily reused as scratch space for halo exchanges
     AccVector<LocalIndex> haloRecvScratch;
-    bool                  AVswitches_;
 
     /*! @brief the list of conserved particles fields with values preserved between iterations
      *
@@ -98,14 +97,14 @@ protected:
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
     using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
-                                       "xm", "kx", "nc", "divv", "curlv","gradh", "dtCourant">;
+                                       "xm", "kx", "nc", "divv", "gradh", "dtCourant">;
 
-    //! @brief velocity gradient fields will only be allocated when SLR is true
+    //! @brief velocity gradient fields will only be allocated when avClean is true
     using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
 
-    //! @brief what will be allocated based on SLR choice
+    //! @brief what will be allocated based AV cleaning choice
     using DependentFields =
-        std::conditional_t<SLR, decltype(DependentFields_{} + GradVFields{}), decltype(DependentFields_{})>;
+        std::conditional_t<avClean, decltype(DependentFields_{} + GradVFields{}), decltype(DependentFields_{})>;
 
     //! @brief Return rung of current block time-step
     static int activeRung(int substep, int numRungs)
@@ -115,16 +114,14 @@ protected:
     }
 
 public:
-    HydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool AVswitches)
+    HydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings)
         : Base(output, rank)
-        , AVswitches_(AVswitches)
     {
         if (not cstone::execution::HaveGpu<Acc>{})
         {
             throw std::runtime_error("This propagator is not supported on CPUs\n");
         }
-        if (SLR && rank == 0) { std::cout << "SLR is activated" << std::endl; }
-        if (AVswitches_ && rank == 0) { std::cout << "AV switches are activated" << std::endl; }
+        if (avClean && rank == 0) { std::cout << "AV cleaning is activated" << std::endl; }
         try
         {
             timestep_.dt_m1[0] = settings.at("minDt");
@@ -257,7 +254,7 @@ public:
         groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
         timer.step("IadVelocityDivCurlGradh");
 
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "curlv", "gradh">(d), get<"keys">(d),
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "gradh">(d), get<"keys">(d),
                              haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
@@ -267,13 +264,10 @@ public:
         domain.exchangeHalos(get<"prho", "c">(d), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
-        if (AVswitches_)
-        {
-            computeAVswitches(activeRungs_, d, domain.box());
-            timer.step("AVswitches");
-        }
+        computeAVswitches(activeRungs_, d, domain.box());
+        timer.step("AVswitches");
 
-        if (SLR)
+        if (avClean)
         {
             domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "alpha">(d), get<"keys">(d),
                                  haloRecvScratch);
@@ -281,7 +275,7 @@ public:
         else { domain.exchangeHalos(std::tie(get<"alpha">(d)), get<"keys">(d), haloRecvScratch); }
         timer.step("mpi::synchronizeHalos");
 
-        computeMomentumEnergy<SLR>(activeRungs_, rawPtr(groupDt_), d, domain.box());
+        computeMomentumEnergy<avClean>(activeRungs_, rawPtr(groupDt_), d, domain.box());
         timer.step("MomentumAndEnergy");
         pmReader.step();
 
@@ -441,14 +435,14 @@ public:
         release(d, "rho", "p");
 
         // third output pass: recover temporary curlv and divv quantities
-        //acquire(d, "curlv");
+        acquire(d, "curlv");
         if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
         output();
-        //release(d, "curlv");
+        release(d, "curlv");
         acquire(d, "ay", "az");
 
         // restore destroyed accelerations
-        computeMomentumEnergy<SLR>(groups_.view(), nullptr, d, box);
+        computeMomentumEnergy<avClean>(groups_.view(), nullptr, d, box);
 
         if (!indicesDone.empty() && Base::rank_ == 0)
         {

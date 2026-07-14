@@ -41,31 +41,22 @@ namespace sphexa
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
 PropLib<DomainType, ParticleDataType>::makeHydroVeBdtProp(std::ostream& output, size_t rank,
-                                                          const InitSettings& settings, bool SLR, bool AVswitches)
+                                                          const InitSettings& settings, bool avClean)
 {
-    if (SLR)
+    if (avClean)
     {
-        return std::make_unique<HydroVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings, AVswitches);
+        return std::make_unique<HydroVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings);
     }
-    else
-    {
-        return std::make_unique<HydroVeBdtProp<false, DomainType, ParticleDataType>>(output, rank, settings, AVswitches);
-    }
+    else { return std::make_unique<HydroVeBdtProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
 }
 
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
 PropLib<DomainType, ParticleDataType>::makeTurbVeBdtProp(std::ostream& output, size_t rank,
-                                                         const InitSettings& settings, bool SLR, bool AVswitches)
+                                                         const InitSettings& settings, bool avClean)
 {
-    if (SLR)
-    {
-        return std::make_unique<TurbVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings, AVswitches);
-    }
-    else
-    {
-        return std::make_unique<TurbVeBdtProp<false, DomainType, ParticleDataType>>(output, rank, settings, AVswitches);
-    }
+    if (avClean) { return std::make_unique<TurbVeBdtProp<true, DomainType, ParticleDataType>>(output, rank, settings); }
+    else { return std::make_unique<TurbVeBdtProp<false, DomainType, ParticleDataType>>(output, rank, settings); }
 }
 
 #ifdef USE_CUDA
