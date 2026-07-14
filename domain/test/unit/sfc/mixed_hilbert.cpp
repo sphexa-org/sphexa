@@ -33,14 +33,16 @@ TEST(MixedHilbertBox, x10y9z9)
     for (int i = 0; i < numKeys; ++i)
     {
         auto hilbertMixDKey = iHilbert<unsigned>(x_le_511[i], y[i], z[i], bx, by, bz);
-        auto hilbertKey     = iHilbert3D<unsigned>(x_le_511[i], y[i], z[i]);
+        auto hilbertKey     = iHilbert3D<unsigned>(x_le_511[i], y[i], z[i], std::min({bx, by, bz}));
         EXPECT_EQ(hilbertMixDKey, hilbertKey);
     };
 
     for (int i = 0; i < numKeys; ++i)
     {
-        auto hilbertMixDKey      = iHilbert<unsigned>(x_ge_512[i], y[i], z[i], bx, by, bz);
-        auto hilbertKey_px_m_512 = iHilbert3D<unsigned>(x_ge_512[i] - 512, y[i], z[i]);
+        auto hilbertMixDKey = iHilbert<unsigned>(x_ge_512[i], y[i], z[i], bx, by, bz);
+        // min(bx, by, bz) = 9, so the 3D-Hilbert suffix is computed with 9 bits per dimension which is enough for
+        // (x_ge_512[i] - 512) as well
+        auto hilbertKey_px_m_512 = iHilbert3D<unsigned>(x_ge_512[i] - 512, y[i], z[i], std::min({bx, by, bz}));
         EXPECT_EQ(hilbertMixDKey, (1 << 27) + hilbertKey_px_m_512);
     };
 }
@@ -75,45 +77,64 @@ TEST(MixedHilbertBox, x10y10z9)
     std::generate(begin(y_ge_512), end(y_ge_512), getRandYge512);
     std::generate(begin(z), end(z), getRandZ);
 
+    // quadrant (0,0): the single 2D-level digit is 0, and since yi == 0 the low bits (which feed the
+    // 3D-Hilbert suffix) get swapped - see the inline recursion in iHilbert() - so x and y trade places
     for (int i = 0; i < numKeys; ++i)
     {
         auto hilbertMixDKey = iHilbert<unsigned>(x_le_511[i], y_le_511[i], z[i], bx, by, bz);
-        auto hilbertKey     = iHilbert3D<unsigned>(x_le_511[i], y_le_511[i], z[i]);
+        auto hilbertKey     = iHilbert3D<unsigned>(y_le_511[i], x_le_511[i], z[i], bz);
 
         EXPECT_EQ(hilbertMixDKey, hilbertKey);
     };
 
+    // quadrant (0,1): digit 1, yi == 1, so no swap/complement of the low bits
     for (int i = 0; i < numKeys; ++i)
     {
         auto hilbertMixDKey      = iHilbert<unsigned>(x_le_511[i], y_ge_512[i], z[i], bx, by, bz);
-        auto hilbertKey_py_m_512 = iHilbert3D<unsigned>(x_le_511[i], y_ge_512[i] - 512, z[i]);
+        auto hilbertKey_py_m_512 = iHilbert3D<unsigned>(x_le_511[i], y_ge_512[i] - 512, z[i], bz);
 
         EXPECT_EQ(hilbertMixDKey, (1 << 27) + hilbertKey_py_m_512);
     };
 
+    // quadrant (1,1): digit 2, yi == 1, so no swap/complement of the low bits
     for (int i = 0; i < numKeys; ++i)
     {
         auto hilbertMixDKey      = iHilbert<unsigned>(x_ge_512[i], y_ge_512[i], z[i], bx, by, bz);
-        auto hilbertKey_py_m_512 = iHilbert3D<unsigned>(x_ge_512[i] - 512, y_ge_512[i] - 512, z[i]);
+        auto hilbertKey_py_m_512 = iHilbert3D<unsigned>(x_ge_512[i] - 512, y_ge_512[i] - 512, z[i], bz);
 
         EXPECT_EQ(hilbertMixDKey, (2 << 27) + hilbertKey_py_m_512);
     };
 
+    // quadrant (1,0): digit 3, yi == 0 and xi == 1, so the low bits get swapped *and* complemented
+    // (mask = 511 for bz = 9 bits)
     for (int i = 0; i < numKeys; ++i)
     {
-        auto hilbertMixDKey      = iHilbert<unsigned>(x_ge_512[i], y_ge_512[i], z[i], bx, by, bz);
-        auto hilbertKey_py_m_512 = iHilbert3D<unsigned>(x_ge_512[i] - 512, y_ge_512[i] - 512, z[i]);
+        auto hilbertMixDKey = iHilbert<unsigned>(x_ge_512[i], y_le_511[i], z[i], bx, by, bz);
+        auto hilbertKey_rot = iHilbert3D<unsigned>(511 - y_le_511[i], 1023 - x_ge_512[i], z[i], bz);
 
-        EXPECT_EQ(hilbertMixDKey, (2 << 27) + hilbertKey_py_m_512);
+        EXPECT_EQ(hilbertMixDKey, (3 << 27) + hilbertKey_rot);
     };
 
     // clang-format off
-    // iHilbert(px in [0:512], py in [0:512], pz, bx, by, bz)       == iHilbert3D(px, py, pz) >> 3
-    // iHilbert(px in [0:512], py in [512:1024], pz, bx, by, bz)    == 01000000000 (=8^9) + (iHilbert3D(px, py - 512, pz) >> 3)
-    // iHilbert(px in [512:1024], py in [512:1024], pz, bx, by, bz) == 02000000000 (=8^9) + (iHilbert3D(px - 512, py - 512, pz) >> 3)
-    // IM: Can't understand below since inputs to the functions are the same as the 2nd case
-    // iHilbert(px in [0:512], py in [512:1024], pz, bx, by, bz)    == 03000000000 (=8^9) + (iHilbert3D(px, py - 512, pz) >> 3)
+    // iHilbert(px in [0:512], py in [0:512], pz, bx, by, bz)       == iHilbert3D(py, px, pz, bz)              (x,y swapped)
+    // iHilbert(px in [0:512], py in [512:1024], pz, bx, by, bz)    == 01000000000 (=8^9) + iHilbert3D(px, py - 512, pz, bz)
+    // iHilbert(px in [512:1024], py in [512:1024], pz, bx, by, bz) == 02000000000 (=8^9) + iHilbert3D(px - 512, py - 512, pz, bz)
+    // iHilbert(px in [512:1024], py in [0:512], pz, bx, by, bz)    == 03000000000 (=8^9) + iHilbert3D(511 - py, 1023 - px, pz, bz)
     // clang-format on
+
+    // round-trip sanity check across all 4 quadrants, independent of the hand-derived formulas above
+    for (int i = 0; i < numKeys; ++i)
+    {
+        for (auto [xv, yv] : {std::pair{x_le_511[i], y_le_511[i]}, std::pair{x_le_511[i], y_ge_512[i]},
+                              std::pair{x_ge_512[i], y_ge_512[i]}, std::pair{x_ge_512[i], y_le_511[i]}})
+        {
+            auto key          = iHilbert<unsigned>(xv, yv, z[i], bx, by, bz);
+            auto [xr, yr, zr] = decodeHilbert<unsigned>(key, bx, by, bz);
+            EXPECT_EQ(xv, xr);
+            EXPECT_EQ(yv, yr);
+            EXPECT_EQ(z[i], zr);
+        }
+    }
 }
 
 //! @brief tests numKeys random 3D points for encoding/decoding consistency
@@ -194,4 +215,3 @@ TEST(MixedHilbertEncoding, validMixDKey)
     EXPECT_FALSE(isValidHilbertMixDKey(decodePlaceholderBit(KeyType(01147)), l, l - 1, l - 2));
     EXPECT_FALSE(isValidHilbertMixDKey(decodePlaceholderBit(KeyType(01237)), l, l - 1, l - 2));
 }
-
