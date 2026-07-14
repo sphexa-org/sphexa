@@ -30,79 +30,36 @@
 
 using namespace cstone;
 
-/*! @brief CUDA kernel to compute SFC (Hilbert/Morton) keys from integer coordinates
- *
- * @tparam     KeyType    32-bit or 64-bit SFC key type
- * @param[out] keys       output array of SFC keys
- * @param[in]  x          input integer x-coordinates
- * @param[in]  y          input integer y-coordinates
- * @param[in]  z          input integer z-coordinates
- * @param[in]  numKeys    number of keys to compute
- * @param[in]  axesBits   mixed-dimension bit depth per axis (for non-cubic boxes)
- */
 template<class KeyType>
-__global__ void computeSfcKeysKernel(
-    KeyType* keys, const unsigned* x, const unsigned* y, const unsigned* z, size_t numKeys, const AxesBits axesBits)
+__global__ void keysFromIntKernel(
+    KeyType* keys, const uint32_t* x, const uint32_t* y, const uint32_t* z, size_t n, const AxesBits abits)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
-    if (tid < numKeys) { keys[tid] = iSfcKey<KeyType>(x[tid], y[tid], z[tid], axesBits); }
+    if (tid < n) { keys[tid] = iSfcKey<KeyType>(x[tid], y[tid], z[tid], abits); }
 }
 
 template<class KeyType>
-inline void computeSfcKeys(cudaStream_t stream,
-                           KeyType* keys,
-                           const unsigned* x,
-                           const unsigned* y,
-                           const unsigned* z,
-                           size_t numKeys,
-                           const AxesBits& axesBits)
+void keysFromInt(
+    cudaStream_t s, KeyType* keys, const uint32_t* x, const uint32_t* y, const uint32_t* z, size_t n, AxesBits abits)
 {
-    constexpr int threadsPerBlock = 256;
-    computeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock, 0, stream>>>(keys, x, y, z, numKeys,
-                                                                                          axesBits);
+    constexpr int numThreads = 256;
+    keysFromIntKernel<<<iceil(n, numThreads), numThreads, 0, s>>>(keys, x, y, z, n, abits);
 }
 
-/*! @brief CUDA kernel to decode SFC (Hilbert/Morton) keys into integer coordinates
- *
- * @tparam     KeyType    32-bit or 64-bit SFC key type
- * @param[in]  keys       input array of SFC keys
- * @param[out] x          output integer x-coordinates
- * @param[out] y          output integer y-coordinates
- * @param[out] z          output integer z-coordinates
- * @param[in]  numKeys    number of keys to decode
- * @param[in]  axesBits   mixed-dimension bit depth per axis (for non-cubic boxes)
- */
 template<class KeyType>
 __global__ void
-decodeSfcKeysKernel(const KeyType* keys, unsigned* x, unsigned* y, unsigned* z, size_t numKeys, const AxesBits axesBits)
+decodeSfcKeysKernel(const KeyType* keys, uint32_t* x, uint32_t* y, uint32_t* z, size_t numKeys, const AxesBits axesBits)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < numKeys) { util::tie(x[tid], y[tid], z[tid]) = decodeSfc(keys[tid], axesBits); }
 }
 
-/*! @brief Host wrapper to launch decodeSfcKeysKernel on the GPU
- *
- * @tparam     KeyType    32-bit or 64-bit SFC key type
- * @param[in]  stream     CUDA stream to launch kernel on
- * @param[in]  keys       device pointer to input SFC keys
- * @param[out] x          device pointer to output x-coordinates
- * @param[out] y          device pointer to output y-coordinates
- * @param[out] z          device pointer to output z-coordinates
- * @param[in]  numKeys    number of keys to decode
- * @param[in]  axesBits   mixed-dimension bit depth per axis (for non-cubic boxes)
- */
 template<class KeyType>
-inline void decodeSfcKeys(cudaStream_t stream,
-                          const KeyType* keys,
-                          unsigned* x,
-                          unsigned* y,
-                          unsigned* z,
-                          size_t numKeys,
-                          const AxesBits& axesBits)
+void decodeSfcKeys(
+    cudaStream_t stream, const KeyType* keys, uint32_t* x, uint32_t* y, uint32_t* z, size_t numKeys, AxesBits axesBits)
 {
-    constexpr int threadsPerBlock = 256;
-    decodeSfcKeysKernel<<<iceil(numKeys, threadsPerBlock), threadsPerBlock, 0, stream>>>(keys, x, y, z, numKeys,
-                                                                                         axesBits);
+    constexpr int numThreads = 256;
+    decodeSfcKeysKernel<<<iceil(numKeys, numThreads), numThreads, 0, stream>>>(keys, x, y, z, numKeys, axesBits);
 }
 
 int main()
@@ -146,10 +103,10 @@ int main()
         thrust::device_vector<unsigned> dz = iz;
 
         auto computeHilbert = [&](cudaStream_t stream)
-        { computeSfcKeys(stream, rawPtr(hilbertKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, axesBits); };
+        { keysFromInt(stream, rawPtr(hilbertKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, axesBits); };
 
         auto computeMorton = [&](cudaStream_t stream)
-        { computeSfcKeys(stream, rawPtr(mortonKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, axesBits); };
+        { keysFromInt(stream, rawPtr(mortonKeys), rawPtr(dx), rawPtr(dy), rawPtr(dz), numKeys, axesBits); };
 
         float t_hilbert = timeGpu(computeHilbert);
         float t_morton  = timeGpu(computeMorton);
