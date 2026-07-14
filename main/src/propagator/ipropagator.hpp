@@ -131,7 +131,7 @@ public:
             << domain.focusTree().depth();
         if constexpr (d.useGpu)
         {
-            out << ", maxStackNc " << d.stackUsedNc << ", maxStackGravity " << d.stackUsedGravity;
+            out << ", maxStackGravity " << d.stackUsedGravity;
         }
         out << "\n=== Total time for iteration(" << d.iteration << ") " << timer.sumOfSteps() << "s\n\n";
     }
