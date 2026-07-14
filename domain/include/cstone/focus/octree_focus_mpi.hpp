@@ -110,12 +110,6 @@ public:
 
         KeyType focusStart = assignment[myRank_];
         KeyType focusEnd   = assignment[myRank_ + 1];
-        // init on first call
-        if (prevFocusStart == 0 && prevFocusEnd == 0)
-        {
-            prevFocusStart = focusStart;
-            prevFocusEnd   = focusEnd;
-        }
 
         std::span enforcedKeys = globalLeaves.subspan(assignment.treeOffsetsConst()[myRank_],
                                                       assignment.numNodesPerRankConst()[myRank_] + 1);
@@ -168,8 +162,6 @@ public:
          *  the bounding box invalidates the expansion centers (centersAcc_)
          */
         box_             = box;
-        prevFocusStart   = focusStart;
-        prevFocusEnd     = focusEnd;
         rebalanceStatus_ = invalid;
         updateGeoCenters();
         return converged;
@@ -764,11 +756,6 @@ private:
     //! @brief leaves in cstone format for tree_
     std::vector<KeyType> leaves_;
     AccVector<KeyType> leavesAcc_;
-
-    //! @brief previous iteration focus start
-    KeyType prevFocusStart = 0;
-    //! @brief previous iteration focus end
-    KeyType prevFocusEnd = 0;
 
     //! @brief particle counts of the focused tree leaves, tree_.treeLeaves()
     AccVector<unsigned> leafCountsAcc_;
