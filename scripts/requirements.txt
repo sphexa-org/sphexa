@@ -3,3 +3,4 @@ h5py
 matplotlib
 numpy
 scipy
+plotly
