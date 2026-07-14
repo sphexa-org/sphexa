@@ -15,6 +15,9 @@
 
 #pragma once
 
+#include <algorithm>
+#include <iostream>
+
 #include <cassert>
 #include <cmath>
 #include <type_traits>
@@ -46,29 +49,6 @@ HOST_DEVICE_FUN unsigned toNBitInt(T x)
     // [0,1] to [0:1024] and convert to integer (32-bit) or
     // [0,1] to [0:2097152] and convert to integer (64-bit)
     unsigned result = x * T(1u << nBits);
-    return stl::min(result, (1u << nBits) - 1u);
-}
-
-/*! @brief normalize a floating point number in [0,1] to an integer in [0 : 2^(10 or 21)]
- *
- * @tparam KeyType  32-bit or 64-bit unsigned integer
- * @tparam T        float or double
- * @param  x        input floating point number in [0,1]
- * @return          x converted to an 10-bit or 21-bit integer
- *                  maximum return value is 1023 or 2097151
- *
- * Integer conversion happens with ceil() as required for converting halo radii to integers
- * where we must round up to the smallest integer not less than x*2^(10 or 21)
- */
-template<class KeyType, class T>
-HOST_DEVICE_FUN constexpr unsigned toNBitIntCeil(T x)
-{
-    // spatial resolution in bits per dimension
-    constexpr unsigned nBits = maxTreeLevel<KeyType>{};
-
-    // [0,1] to [0,1023] and convert to integer (32-bit) or
-    // [0,1] to [0,2097151] and convert to integer (64-bit)
-    unsigned result = std::ceil(x * T(1u << nBits));
     return stl::min(result, (1u << nBits) - 1u);
 }
 
@@ -122,6 +102,16 @@ HOST_DEVICE_FUN constexpr unsigned log8ceil(KeyType n)
 
     unsigned lz = countLeadingZeros(n - 1);
     return maxTreeLevel<KeyType>{} - (lz - unusedBits<KeyType>{}) / 3;
+}
+
+//! @brief compute ceil(log2(n))
+template<class KeyType>
+HOST_DEVICE_FUN constexpr unsigned log2ceil(KeyType n)
+{
+    if (n == 0) { return 0; }
+
+    unsigned lz = countLeadingZeros(n - 1);
+    return maxTreeLevel<KeyType>{} * 3 - (lz - unusedBits<KeyType>{});
 }
 
 //! @brief check whether n is a power of 8
@@ -397,6 +387,36 @@ HOST_DEVICE_FUN constexpr KeyType octalPower(int pos)
     return (KeyType(1) << 3 * (maxTreeLevel<KeyType>{} - pos));
 }
 
+/*! @brief return the mixed key incremented by adding 1 in position @p pos
+ *
+ * @tparam KeyType    32- or 64-bit unsigned integer
+ * @param  pos  Position counting from left, starting from 1. Maximum value 10 or 21 (64-bit)
+ * @param  b0   the first octal digit from the right with 1 bit
+ * @param  b1   the first octal digit from the right with 2 bits
+ * @param  b2   the first octal digit from the right with 3 bits
+ * @return      the mixed key with 1 added at position @p pos
+ */
+template<class KeyType>
+HOST_DEVICE_FUN constexpr KeyType increaseKey(KeyType key, int pos, unsigned b0, unsigned b1, unsigned b2)
+{
+    while (pos > 0)
+    {
+        const auto posFromRight = maxTreeLevel<KeyType>{} - pos;
+
+        if (posFromRight >= b0) { return key; } // inactive digit, carry stops / overflow
+
+        unsigned max = (posFromRight >= b1) ? 1 : (posFromRight >= b2) ? 3 : 7;
+
+        auto digit = octalDigit(key, pos);
+        key &= ~(static_cast<KeyType>(7) << (3 * posFromRight)); // clear current digit
+
+        if (digit < max) { return key | (static_cast<KeyType>(digit + 1) << (3 * posFromRight)); }
+
+        --pos; // digit was at max: wrap to 0 (already cleared) and carry to next position
+    }
+    return key;
+}
+
 /*! @brief generate SFC codes to cover the range [a:b] with a valid cornerstone sub-octree
  *
  * @tparam     KeyType 32- or 64-bit unsigned integer
@@ -423,6 +443,7 @@ template<class KeyType, class Store>
 HOST_DEVICE_FUN std::enable_if_t<std::is_same_v<Store, std::nullptr_t> || std::is_same_v<Store, KeyType*>, int>
 spanSfcRange(KeyType a, KeyType b, [[maybe_unused]] Store output)
 {
+    assert(b >= a);
     int numValues = 0;
     // position of first differing octal digit place
     int ab_first_diff_pos = (countLeadingZeros(a ^ b) + 3 - unusedBits<KeyType>{}) / 3;

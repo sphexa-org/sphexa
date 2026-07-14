@@ -15,6 +15,8 @@
 
 #pragma once
 
+#include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 
@@ -25,6 +27,8 @@
 
 namespace cstone
 {
+
+using AxesBits = util::array<unsigned, 3>;
 
 /*! @brief normalize a spatial length w.r.t. to a min/max range
  *
@@ -102,6 +106,7 @@ public:
         , lengths_{xyzMax - xyzMin, xyzMax - xyzMin, xyzMax - xyzMin}
         , inverseLengths_{T(1.) / (xyzMax - xyzMin), T(1.) / (xyzMax - xyzMin), T(1.) / (xyzMax - xyzMin)}
         , boundaries{b, b, b}
+        , axesBits_{computeBoxDimBits()}
     {
     }
 
@@ -118,6 +123,7 @@ public:
         , lengths_{xmax - xmin, ymax - ymin, zmax - zmin}
         , inverseLengths_{T(1.) / (xmax - xmin), T(1.) / (ymax - ymin), T(1.) / (zmax - zmin)}
         , boundaries{bx, by, bz}
+        , axesBits_{computeBoxDimBits()}
     {
     }
 
@@ -142,6 +148,20 @@ public:
     HOST_DEVICE_FUN constexpr BoundaryType boundaryY() const { return boundaries[1]; } // NOLINT
     HOST_DEVICE_FUN constexpr BoundaryType boundaryZ() const { return boundaries[2]; } // NOLINT
 
+    /*! @brief return per-axis SFC bit depths for the given key type
+     *
+     * @param maxLevels  maximum tree depth (@p maxTreeLevel<KeyType>{})
+     * @return           axis bit depths {bx, by, bz}
+     *
+     * The values are computed once in the constructor from the box aspect ratio.
+     * The longest dimension gets the full @p maxLevels, while shorter dimensions
+     * receive fewer bits.
+     */
+    HOST_DEVICE_FUN constexpr AxesBits getBoxDimBits(unsigned maxLevels) const
+    {
+        return AxesBits{maxLevels, maxLevels, maxLevels} - axesBits_;
+    }
+
     //! @brief return the shortest coordinate range in any dimension
     HOST_DEVICE_FUN constexpr T minExtent() const { return stl::min(stl::min(lengths_[0], lengths_[1]), lengths_[2]); }
 
@@ -159,6 +179,24 @@ public:
     }
 
 private:
+    /*! @brief compute per-axis SFC bit reductions for mixed-dimension (MixD) boxes
+     *
+     * @return           bit reductions {rx, ry, rz} relative to maxTreeLevel
+     *
+     * The longest box dimension gets a reduction of 0 (full key depth),
+     * while shorter dimensions receive a positive reduction according to
+     * the base-2 logarithm of the aspect ratio.
+     */
+    HOST_DEVICE_FUN constexpr AxesBits computeBoxDimBits() const
+    {
+        const T maxDim   = maxExtent();
+        constexpr T bias = 0.5849625007211563; // 1 - std::log2(1.0 / 0.75);
+
+        return {static_cast<unsigned>(std::floor(std::log2(maxDim / lx()) + bias)),
+                static_cast<unsigned>(std::floor(std::log2(maxDim / ly()) + bias)),
+                static_cast<unsigned>(std::floor(std::log2(maxDim / lz()) + bias))};
+    }
+
     HOST_DEVICE_FUN
     friend constexpr bool operator==(const Box<T>& a, const Box<T>& b)
     {
@@ -172,6 +210,7 @@ private:
     T lengths_[3];
     T inverseLengths_[3];
     BoundaryType boundaries[3];
+    AxesBits axesBits_;
 };
 
 //! @brief Compute the shortest periodic distance dX = A - B between two points,
@@ -307,7 +346,7 @@ using IBox = SimpleBox<int>;
 template<class T>
 using FBox = SimpleBox<T>;
 
-/*! @brief calculate floating point 3D center and radius of a and integer box and bounding box pair
+/*! @brief calculate floating point 3D center and radius of an integer box and bounding box pair
  *
  * @tparam T         float or double
  * @tparam KeyType   32- or 64-bit unsigned integer
@@ -318,13 +357,20 @@ using FBox = SimpleBox<T>;
 template<class KeyType, class T>
 constexpr HOST_DEVICE_FUN util::tuple<Vec3<T>, Vec3<T>> centerAndSize(const IBox& ibox, const Box<T>& box)
 {
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
+
     constexpr int maxCoord = 1u << maxTreeLevel<KeyType>{};
     // smallest octree cell edge length in unit cube
     constexpr T uL = T(1.) / maxCoord;
 
-    T halfUnitLengthX = T(0.5) * uL * box.lx();
-    T halfUnitLengthY = T(0.5) * uL * box.ly();
-    T halfUnitLengthZ = T(0.5) * uL * box.lz();
+    // For mixed-dimension boxes, axesBits[i] can be smaller than maxTreeLevel for short axes.
+    // Integer coordinates along such axes are shifted left by (maxTreeLevel - axesBits[i]) bits
+    // during key encoding, so one integer unit covers 2^(maxTreeLevel - axesBits[i]) times the
+    // full-resolution physical length. halfUnitLength[i] scales the unit-cube length uL
+    // accordingly for each axis.
+    T halfUnitLengthX = T(0.5) * uL * box.lx() * (1u << (maxTreeLevel<KeyType>{} - axesBits[0]));
+    T halfUnitLengthY = T(0.5) * uL * box.ly() * (1u << (maxTreeLevel<KeyType>{} - axesBits[1]));
+    T halfUnitLengthZ = T(0.5) * uL * box.lz() * (1u << (maxTreeLevel<KeyType>{} - axesBits[2]));
     Vec3<T> boxCenter = {box.xmin() + (ibox.xmax() + ibox.xmin()) * halfUnitLengthX,
                          box.ymin() + (ibox.ymax() + ibox.ymin()) * halfUnitLengthY,
                          box.zmin() + (ibox.zmax() + ibox.zmin()) * halfUnitLengthZ};

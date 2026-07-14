@@ -23,6 +23,9 @@ namespace cstone
 {
 
 template<class KeyType>
+constexpr AxesBits uniformAxesBits{maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}};
+
+template<class KeyType>
 IBox makeLevelBox(unsigned ix, unsigned iy, unsigned iz, unsigned level)
 {
     unsigned L = 1u << (maxTreeLevel<KeyType>{} - level);
@@ -32,31 +35,33 @@ IBox makeLevelBox(unsigned ix, unsigned iy, unsigned iz, unsigned level)
 template<class KeyType>
 void surfaceDetection()
 {
-    unsigned level            = 2;
-    std::vector<KeyType> tree = makeUniformNLevelTree<KeyType>(64, 1);
+    unsigned level              = 2;
+    std::vector<KeyType> leaves = makeUniformNLevelTree<KeyType>(64, 1);
 
-    Octree<KeyType> fullTree;
-    fullTree.update(tree.data(), nNodes(tree));
+    OctreeData<KeyType, execution::Cpu> octree;
+    octree.resize(nNodes(leaves));
+    updateInternalTree<KeyType>(leaves, octree.data());
 
     IBox targetBox = makeLevelBox<KeyType>(0, 0, 1, level);
 
-    std::vector<IBox> treeBoxes(fullTree.numTreeNodes());
-    for (TreeNodeIndex i = 0; i < fullTree.numTreeNodes(); ++i)
+    std::vector<IBox> treeBoxes(octree.numNodes);
+    for (TreeNodeIndex i = 0; i < octree.numNodes; ++i)
     {
-        treeBoxes[i] = sfcIBox(sfcKey(fullTree.codeStart(i)), fullTree.level(i));
+        auto [k1, k2] = decodePlaceholderBit2K(octree.prefixes[i]);
+        treeBoxes[i]  = sfcIBox(sfcKey(k1), treeLevel(k2 - k1), uniformAxesBits<KeyType>);
     }
 
     auto isSurface = [targetBox, bbox = Box<double>(0, 1), boxes = treeBoxes.data()](TreeNodeIndex idx)
     {
-        double distance = minDistanceSq<KeyType>(targetBox, boxes[idx], bbox);
-        return distance == 0.0;
+        auto [aCenter, aSize] = centerAndSize<KeyType>(targetBox, bbox);
+        auto [bCenter, bSize] = centerAndSize<KeyType>(boxes[idx], bbox);
+        return norm2(minDistance(aCenter, aSize, bCenter, bSize, bbox)) == 0.0;
     };
 
     std::vector<IBox> surfaceBoxes;
-    auto saveBox = [numInternalNodes = fullTree.numInternalNodes(), &surfaceBoxes, &treeBoxes](TreeNodeIndex idx)
-    { surfaceBoxes.push_back(treeBoxes[idx]); };
+    auto saveBox = [&surfaceBoxes, &treeBoxes](TreeNodeIndex idx) { surfaceBoxes.push_back(treeBoxes[idx]); };
 
-    singleTraversal(fullTree.childOffsets().data(), fullTree.parents().data(), isSurface, saveBox);
+    singleTraversal(octree.childOffsets.data(), octree.parents.data(), isSurface, saveBox);
 
     std::sort(begin(surfaceBoxes), end(surfaceBoxes));
 
@@ -85,9 +90,10 @@ TEST(Traversal, surfaceDetection)
 template<class KeyType>
 void dualTraversalAllPairs()
 {
-    Octree<KeyType> fullTree;
+    OctreeData<KeyType, execution::Cpu> octree;
     auto leaves = OctreeMaker<KeyType>{}.divide().divide(0).divide(0, 7).makeTree();
-    fullTree.update(leaves.data(), nNodes(leaves));
+    octree.resize(nNodes(leaves));
+    updateInternalTree<KeyType>(leaves, octree.data());
 
     std::vector<util::array<TreeNodeIndex, 2>> pairs;
 
@@ -96,7 +102,7 @@ void dualTraversalAllPairs()
     auto m2l = [](TreeNodeIndex, TreeNodeIndex) {};
     auto p2p = [&pairs](TreeNodeIndex a, TreeNodeIndex b) { pairs.push_back({a, b}); };
 
-    dualTraversal(fullTree.childOffsets().data(), 0, 0, allPairs, m2l, p2p);
+    dualTraversal(octree.childOffsets.data(), 0, 0, allPairs, m2l, p2p);
 
     std::sort(begin(pairs), end(pairs));
     auto uit = std::unique(begin(pairs), end(pairs));
@@ -118,24 +124,34 @@ TEST(Traversal, dualTraversalAllPairs)
 template<class KeyType>
 void dualTraversalNeighbors()
 {
-    Octree<KeyType> octree;
+    OctreeData<KeyType, execution::Cpu> octree;
     auto leaves = makeUniformNLevelTree<KeyType>(64, 1);
-    octree.update(leaves.data(), nNodes(leaves));
+    octree.resize(nNodes(leaves));
+    updateInternalTree<KeyType>(leaves, octree.data());
 
     Box<float> box(0, 1);
 
-    KeyType focusStart = octree.codeStart(octree.toInternal(0));
-    KeyType focusEnd   = octree.codeStart(octree.toInternal(8));
+    KeyType focusStart = leaves[0];
+    KeyType focusEnd   = leaves[8];
 
     auto crossFocusSurfacePairs = [focusStart, focusEnd, &tree = octree, &box](TreeNodeIndex a, TreeNodeIndex b)
     {
-        bool aFocusOverlap = overlapTwoRanges(focusStart, focusEnd, tree.codeStart(a), tree.codeEnd(a));
-        bool bInFocus      = containedIn(tree.codeStart(b), tree.codeEnd(b), focusStart, focusEnd);
+        auto [ka1, ka2] = decodePlaceholderBit2K(tree.prefixes[a]);
+        auto [kb1, kb2] = decodePlaceholderBit2K(tree.prefixes[b]);
+        bool aFocusOverlap = overlapTwoRanges(focusStart, focusEnd, ka1, ka2);
+        bool bInFocus      = containedIn(kb1, kb2, focusStart, focusEnd);
         if (!aFocusOverlap || bInFocus) { return false; }
 
-        IBox aBox = sfcIBox(sfcKey(tree.codeStart(a)), tree.level(a));
-        IBox bBox = sfcIBox(sfcKey(tree.codeStart(b)), tree.level(b));
-        return minDistanceSq<KeyType>(aBox, bBox, box) == 0.0;
+        IBox aBox             = sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1), uniformAxesBits<KeyType>);
+        IBox bBox             = sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1), uniformAxesBits<KeyType>);
+        auto [aCenter, aSize] = centerAndSize<KeyType>(aBox, box);
+        auto [bCenter, bSize] = centerAndSize<KeyType>(bBox, box);
+        if (aSize == Vec3<float>{0, 0, 0} || bSize == Vec3<float>{0, 0, 0})
+        {
+            // if a or b has no size, it's from a unmapped area of a mix-dim SFC curve and contains no particles
+            return false;
+        }
+        return norm2(minDistance(aCenter, aSize, bCenter, bSize, box)) == 0.0;
     };
 
     std::vector<util::array<TreeNodeIndex, 2>> pairs;
@@ -143,22 +159,24 @@ void dualTraversalNeighbors()
 
     auto m2l = [](TreeNodeIndex, TreeNodeIndex) {};
 
-    dualTraversal(octree.childOffsets().data(), 0, 0, crossFocusSurfacePairs, m2l, p2p);
+    dualTraversal(octree.childOffsets.data(), 0, 0, crossFocusSurfacePairs, m2l, p2p);
 
     EXPECT_EQ(pairs.size(), 61);
     std::sort(begin(pairs), end(pairs));
     for (auto p : pairs)
     {
-        auto a = p[0];
-        auto b = p[1];
+        auto [ka1, ka2] = decodePlaceholderBit2K(octree.prefixes[p[0]]);
+        auto [kb1, kb2] = decodePlaceholderBit2K(octree.prefixes[p[1]]);
         // a in focus
-        EXPECT_TRUE(octree.codeStart(a) >= focusStart && octree.codeEnd(a) <= focusEnd);
+        EXPECT_TRUE(ka1 >= focusStart && ka2 <= focusEnd);
         // b outside focus
-        EXPECT_TRUE(octree.codeStart(b) >= focusEnd || octree.codeEnd(a) <= focusStart);
+        EXPECT_TRUE(kb1 >= focusEnd || kb2 <= focusStart);
+        IBox aBox             = sfcIBox(sfcKey(ka1), nodeRange<KeyType>(ka2 - ka1), uniformAxesBits<KeyType>);
+        IBox bBox             = sfcIBox(sfcKey(kb1), nodeRange<KeyType>(kb2 - kb1), uniformAxesBits<KeyType>);
+        auto [aCenter, aSize] = centerAndSize<KeyType>(aBox, box);
+        auto [bCenter, bSize] = centerAndSize<KeyType>(bBox, box);
         // a and be touch each other
-        IBox aBox = sfcIBox(sfcKey(octree.codeStart(a)), octree.level(a));
-        IBox bBox = sfcIBox(sfcKey(octree.codeStart(b)), octree.level(b));
-        EXPECT_FLOAT_EQ((minDistanceSq<KeyType>(aBox, bBox, box)), 0.0);
+        EXPECT_FLOAT_EQ(norm2(minDistance(aCenter, aSize, bCenter, bSize, box)), 0.0);
     }
 }
 

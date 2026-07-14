@@ -210,16 +210,19 @@ template void
 upsweepCentersGpu(execution::Gpu, int, const TreeNodeIndex*, const TreeNodeIndex*, SourceCenterType<double>*);
 
 template<class KeyType, class T>
-__global__ void computeGeoCentersKernel(
-    const KeyType* prefixes, TreeNodeIndex numNodes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T> box)
+__global__ void computeGeoCentersKernel(const KeyType* prefixes,
+                                        TreeNodeIndex numNodes,
+                                        Vec3<T>* centers,
+                                        Vec3<T>* sizes,
+                                        __grid_constant__ const Box<T> box)
 {
     TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numNodes) { return; }
 
-    KeyType prefix                  = prefixes[i];
-    KeyType startKey                = decodePlaceholderBit(prefix);
-    unsigned level                  = decodePrefixLength(prefix) / 3;
-    auto nodeBox                    = sfcIBox(sfcKey(startKey), level);
+    KeyType prefix   = prefixes[i];
+    KeyType startKey = decodePlaceholderBit(prefix);
+    unsigned level   = decodePrefixLength(prefix) / 3;
+    auto nodeBox     = sfcIBox(sfcKey<KeyType>(startKey), level, box.getBoxDimBits(maxTreeLevel<KeyType>{}));
     util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box);
 }
 
@@ -245,8 +248,11 @@ GEO_CENTERS_GPU(uint64_t, float);
 GEO_CENTERS_GPU(uint64_t, double);
 
 template<class KeyType, class T>
-__global__ void geoMacSpheresKernel(
-    const KeyType* prefixes, TreeNodeIndex numNodes, SourceCenterType<T>* centers, float invTheta, Box<T> box)
+__global__ void geoMacSpheresKernel(const KeyType* prefixes,
+                                    TreeNodeIndex numNodes,
+                                    SourceCenterType<T>* centers,
+                                    float invTheta,
+                                    __grid_constant__ const Box<T> box)
 {
     TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numNodes) { return; }
@@ -276,8 +282,11 @@ GEO_MAC_SPHERES_GPU(uint64_t, float);
 GEO_MAC_SPHERES_GPU(uint64_t, double);
 
 template<class KeyType, class T>
-__global__ void
-setMacKernel(const KeyType* prefixes, TreeNodeIndex numNodes, Vec4<T>* macSpheres, float invTheta, const Box<T> box)
+__global__ void setMacKernel(const KeyType* prefixes,
+                             TreeNodeIndex numNodes,
+                             Vec4<T>* macSpheres,
+                             float invTheta,
+                             __grid_constant__ const Box<T> box)
 {
     TreeNodeIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numNodes) { return; }

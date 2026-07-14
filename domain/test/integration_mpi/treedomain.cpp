@@ -52,14 +52,13 @@ using namespace cstone;
  * 6. Repeat 3., the decomposition should now indicate that all particles stay on the
  *    node they currently are and that no rank sends any particles to other ranks.
  */
-template<class KeyType, class T>
-void globalRandomGaussian(int thisRank, int numRanks)
+template<class KeyType, class T, template<class> class sfcKeyType>
+void globalRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
 {
     LocalIndex numParticles = 1000;
     unsigned bucketSize     = 64;
 
-    Box<T> box{-1, 1};
-    RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numParticles, box, thisRank);
+    RandomCoordinates<T, sfcKeyType<KeyType>> coords{numParticles, box, static_cast<std::size_t>(thisRank)};
 
     std::vector<KeyType> tree = makeRootNodeTree<KeyType>();
     std::vector<unsigned> counts{numRanks * unsigned(numParticles)};
@@ -88,7 +87,8 @@ void globalRandomGaussian(int thisRank, int numRanks)
     ExchangeLog log;
     auto recvStart = domain_exchange::receiveStart(bufDesc, numAssigned - numPresent);
     auto recvEnd   = recvStart + numAssigned - numPresent;
-    exchangeParticles(0, log, sends, thisRank, recvStart, recvEnd, ordering.data(), MPI_COMM_WORLD, x.data(), y.data(), z.data());
+    exchangeParticles(0, log, sends, thisRank, recvStart, recvEnd, ordering.data(), MPI_COMM_WORLD, x.data(), y.data(),
+                      z.data());
 
     domain_exchange::extractLocallyOwned(bufDesc, numPresent, numAssigned, ordering.data() + sends[thisRank], x, y, z);
 
@@ -132,7 +132,10 @@ TEST(GlobalTreeDomain, randomGaussian)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
 
-    globalRandomGaussian<uint64_t, double>(rank, nRanks);
-    globalRandomGaussian<unsigned, float>(rank, nRanks);
-    globalRandomGaussian<uint64_t, float>(rank, nRanks);
+    globalRandomGaussian<uint64_t, double, SfcKind>(rank, nRanks, {-1, 1});
+    globalRandomGaussian<unsigned, float, SfcKind>(rank, nRanks, {-1, 1});
+    globalRandomGaussian<uint64_t, float, SfcKind>(rank, nRanks, {-1, 1});
+    globalRandomGaussian<uint64_t, double, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
+    globalRandomGaussian<unsigned, float, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
+    globalRandomGaussian<uint64_t, float, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
 }

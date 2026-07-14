@@ -89,16 +89,17 @@ public:
     template<class KeyType, class T>
     void check()
     {
-        int numParticles          = 1000;
-        std::vector<KeyType> keys = makeRandomGaussianKeys<KeyType>(numParticles);
-        auto [tree, counts]       = computeOctree<KeyType>(keys, 4);
+        int numParticles = 1000;
+        auto bType       = static_cast<BoundaryType>(std::get<3>(GetParam()));
+        Box<T> box(0, std::get<0>(GetParam()), 0, std::get<1>(GetParam()), 0, std::get<2>(GetParam()), bType);
+
+        const auto axesBits       = box.getBoxDimBits(maxTreeLevel<KeyType>{});
+        std::vector<KeyType> keys = makeRandomGaussianKeys<KeyType>(numParticles, 42, axesBits);
+        auto [tree, counts] = computeOctree<KeyType>(keys, 4);
 
         OctreeData<KeyType, execution::Cpu> octree;
         octree.resize(nNodes(tree));
         updateInternalTree<KeyType>(tree, octree.data());
-
-        auto bType = static_cast<BoundaryType>(std::get<3>(GetParam()));
-        Box<T> box(0, std::get<0>(GetParam()), 0, std::get<1>(GetParam()), 0, std::get<2>(GetParam()), bType);
 
         std::vector<T> haloRadii(octree.numLeafNodes, 1.001);
         generalCollisionTest(octree.cdata(), haloRadii, box);
@@ -108,7 +109,7 @@ public:
 TEST_P(CollisionTests, uint32f) { check<unsigned, float>(); }
 TEST_P(CollisionTests, uint64d) { check<uint64_t, double>(); }
 
-std::vector<std::array<int, 4>> boxLimits{{1, 2, 2, 0}, {2, 1, 2, 0}, {2, 2, 1, 0},
-                                          {1, 2, 2, 1}, {2, 1, 2, 1}, {2, 2, 1, 1}};
+std::vector<std::array<int, 4>> boxLimits{{2, 2, 2, 0}, {1, 2, 2, 0}, {2, 1, 2, 0}, {2, 2, 1, 0},
+                                          {2, 2, 2, 1}, {1, 2, 2, 1}, {2, 1, 2, 1}, {2, 2, 1, 1}};
 
 INSTANTIATE_TEST_SUITE_P(CollisionTests, CollisionTests, testing::ValuesIn(boxLimits));
