@@ -5,7 +5,8 @@ cstone_add_performance_test(peers.cpp peers_perf)
 
 if (CMAKE_CUDA_COMPILER)
     cstone_add_performance_test(hilbert.cpp hilbert_perf)
-    target_link_libraries(hilbert_perf PRIVATE ThrustOMP)
+    # cudart seems to be required when compiling with some MPI compiler wrappers
+    target_link_libraries(hilbert_perf PRIVATE ThrustOMP CUDA::cudart)
 endif ()
 
 if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
