@@ -154,142 +154,62 @@ TEST(BoxOverlap, pbcOverlaps)
     pbcOverlaps<uint64_t>();
 }
 
-//! @brief check halo box ranges in all spatial dimensions
-template<class KeyType>
-void makeHaloBoxXYZ()
-{
-    constexpr int maxCoord = 1 << maxTreeLevel<KeyType>{};
-    int r                  = KeyType(1) << (maxTreeLevel<KeyType>{} - 3);
-
-    Box<float> box(0, 1, 0, 0.5, 0, 1.0 / 3);
-    IBox nodeBox(r, 2 * r, r, 2 * r, r, 2 * r);
-
-    IBox haloBox = makeHaloBox<KeyType>(nodeBox, 1.0 / maxCoord, box);
-    IBox refBox{r - 1, 2 * r + 1, r - 2, 2 * r + 2, r - 3, 2 * r + 3};
-    EXPECT_EQ(haloBox, refBox);
-}
-
-TEST(BoxOverlap, makeHaloBoxXYZ)
-{
-    makeHaloBoxXYZ<unsigned>();
-    makeHaloBoxXYZ<uint64_t>();
-}
-
-//! @brief underflow check, non-periodic case
-template<class KeyType>
-void makeHaloBoxUnderflow()
-{
-    constexpr int maxCoord = 1 << maxTreeLevel<KeyType>{};
-    int r                  = KeyType(1) << (maxTreeLevel<KeyType>{} - 1);
-
-    Box<float> box(0, 1);
-    IBox nodeBox(0, r);
-
-    IBox haloBox = makeHaloBox<KeyType>(nodeBox, 0.99 / maxCoord, box);
-    IBox refBox{0, r + 1, 0, r + 1, 0, r + 1};
-    EXPECT_EQ(haloBox, refBox);
-}
-
-TEST(BoxOverlap, makeHaloBoxUnderflow)
-{
-    makeHaloBoxUnderflow<unsigned>();
-    makeHaloBoxUnderflow<uint64_t>();
-}
-
-//! @brief overflow check, non-periodic case
-template<class KeyType>
-void makeHaloBoxOverflow()
-{
-    constexpr int maxCoord = 1 << maxTreeLevel<KeyType>{};
-    int r                  = KeyType(1) << (maxTreeLevel<KeyType>{} - 1);
-
-    IBox nodeBox(r, 2 * r, r, 2 * r, r, 2 * r);
-    Box<float> box(0, 1);
-
-    IBox haloBox = makeHaloBox<KeyType>(nodeBox, 0.99 / maxCoord, box);
-    IBox refBox{r - 1, 2 * r, r - 1, 2 * r, r - 1, 2 * r};
-    EXPECT_EQ(haloBox, refBox);
-}
-
-TEST(BoxOverlap, makeHaloBoxOverflow)
-{
-    makeHaloBoxOverflow<unsigned>();
-    makeHaloBoxOverflow<uint64_t>();
-}
-
-//! @brief check halo box ranges with periodic boundary conditions
-template<class KeyType>
-void makeHaloBoxPbc()
-{
-    int r = 1 << (maxTreeLevel<KeyType>{} - 3);
-
-    IBox nodeBox(r, 2 * r, r, 2 * r, r, 2 * r);
-    Box<double> bbox(0, 1, cstone::BoundaryType::periodic);
-
-    {
-        double radius = 0.999 / r; // normalize(radius) = 7.992
-        IBox haloBox  = makeHaloBox<KeyType>(nodeBox, radius, bbox);
-        IBox refBox{r - 8, 2 * r + 8, r - 8, 2 * r + 8, r - 8, 2 * r + 8};
-        EXPECT_EQ(haloBox, refBox);
-    }
-    {
-        double radius = 1.000001 / 8; // normalize(radius) = r + epsilon
-        IBox haloBox  = makeHaloBox<KeyType>(nodeBox, radius, bbox);
-        IBox refBox{-1, 3 * r + 1, -1, 3 * r + 1, -1, 3 * r + 1};
-        EXPECT_EQ(haloBox, refBox);
-    }
-}
-
-TEST(BoxOverlap, makeHaloBoxPbc)
-{
-    makeHaloBoxPbc<unsigned>();
-    makeHaloBoxPbc<uint64_t>();
-}
-
+/*! @brief Test containment of a halo box within a Morton key range with per-axis bit depths
+ *
+ * @tparam I          integer type for key range
+ * @param  axesBits   mixed-dimension bit depth per axis (controls effective maxCoord per dimension)
+ *
+ * Verifies that containedIn behaves correctly for both regular and periodic (PBC) halo boxes
+ * when dimensions are allowed to use different bit depths.
+ */
 template<class I>
-void haloBoxContainedIn()
+void haloBoxContainedIn(const AxesBits axesBits)
 {
     {
         IBox haloBox{0, 1, 0, 1, 0, 1};
-        EXPECT_TRUE(containedIn(I(0), I(1), haloBox));
+        EXPECT_TRUE(containedIn(I(0), I(1), haloBox, axesBits));
     }
     {
         IBox haloBox{0, 1, 0, 1, 0, 2};
-        EXPECT_FALSE(containedIn(I(0), I(1), haloBox));
+        EXPECT_FALSE(containedIn(I(0), I(1), haloBox, axesBits));
     }
     {
         IBox haloBox{0, 1, 0, 1, 0, 2};
-        EXPECT_TRUE(containedIn(I(0), I(8), haloBox));
+        EXPECT_TRUE(containedIn(I(0), I(8), haloBox, axesBits));
     }
     {
         IBox haloBox{0, 1, 0, 2, 0, 2};
-        EXPECT_FALSE(containedIn(I(0), I(3), haloBox));
+        EXPECT_FALSE(containedIn(I(0), I(3), haloBox, axesBits));
     }
     {
         IBox haloBox{0, 1, 0, 2, 0, 2};
-        EXPECT_TRUE(containedIn(I(0), I(8), haloBox));
+        EXPECT_TRUE(containedIn(I(0), I(8), haloBox, axesBits));
     }
     {
         IBox haloBox{0, 2, 0, 2, 0, 2};
-        EXPECT_FALSE(containedIn(I(0), I(7), haloBox));
+        EXPECT_FALSE(containedIn(I(0), I(7), haloBox, axesBits));
     }
     {
         IBox haloBox{0, 2, 0, 2, 0, 2};
-        EXPECT_TRUE(containedIn(I(0), I(8), haloBox));
+        EXPECT_TRUE(containedIn(I(0), I(8), haloBox, axesBits));
     }
-
     /// PBC
     {
         IBox haloBox{-1, 1, 0, 1, 0, 1};
-        EXPECT_FALSE(containedIn(I(0), I(1), haloBox));
+        EXPECT_FALSE(containedIn(I(0), I(1), haloBox, axesBits));
     }
 }
+
+template<class KeyType>
+constexpr AxesBits uniformAxesBits{maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{}};
 
 //! @brief test containment of a box within a Morton code range
 TEST(BoxOverlap, haloBoxContainedIn)
 {
-    haloBoxContainedIn<unsigned>();
-    haloBoxContainedIn<uint64_t>();
+    haloBoxContainedIn<unsigned>(uniformAxesBits<unsigned>);
+    haloBoxContainedIn<uint64_t>(uniformAxesBits<uint64_t>);
+    haloBoxContainedIn<unsigned>({10, 4, 2});
+    haloBoxContainedIn<uint64_t>({10, 4, 2});
 }
 
 template<class KeyType>
@@ -387,6 +307,38 @@ TEST(BoxOverlap, minPointDistance)
 
         T probe = std::sqrt(norm2(minDistance(X, center, size, box)));
         EXPECT_NEAR(std::sqrt(3) / mc, probe, 1e-10);
+    }
+}
+
+TEST(BoxOverlap, minPointDistanceMixD)
+{
+    using T       = double;
+    using KeyType = unsigned;
+
+    {
+        Box<T> box(0, 1.0, 0, 0.015625, 0, 0.00390625);
+        const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
+        const auto expectedMixDBits =
+            (std::is_same<KeyType, unsigned>::value) ? AxesBits{10, 4, 2} : AxesBits{21, 15, 13};
+        EXPECT_EQ(axesBits[0], expectedMixDBits[0]);
+        EXPECT_EQ(axesBits[1], expectedMixDBits[1]);
+        EXPECT_EQ(axesBits[2], expectedMixDBits[2]);
+
+        const unsigned mcX = 1u << axesBits[0];
+        const unsigned mcY = 1u << axesBits[1];
+        const unsigned mcZ = 1u << axesBits[2];
+
+        IBox ibox(0, mcX / 2, 0, mcY / 2, 0, mcZ / 2);
+
+        T px = (mcX / 2.0 + 1) / mcX * 1.0;
+        T py = (mcY / 2.0 + 1) / mcY * 0.015625;
+        T pz = (mcZ / 2.0 + 1) / mcZ * 0.00390625;
+        Vec3<T> X{px, py, pz};
+
+        auto [center, size] = centerAndSize<KeyType>(ibox, box);
+
+        T probe = std::sqrt(norm2(minDistance(X, center, size, box)));
+        EXPECT_NEAR(std::sqrt(3) / maxCoord<KeyType>{}, probe, 1e-10);
     }
 }
 

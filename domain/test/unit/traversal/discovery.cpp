@@ -49,11 +49,19 @@ std::vector<uint8_t> findHalosAll2All(std::span<const KeyType> nodeKeys,
     return flags;
 }
 
+/*! @brief Test halo discovery flags on a uniform tree, optionally with mixed-dimension boxes
+ *
+ * @tparam     KeyType   32-bit or 64-bit SFC key type
+ * @param[in]  useMixD   if true, use a non-cubic box (0,1)x(0,0.015625)x(0,0.00390625) and a 512-leaf tree
+ *
+ * Compares findHalos results against an all-to-all reference for both standard uniform and
+ * mixed-dimension configurations. Adjust expected surface node counts for MixD geometry.
+ */
 template<class KeyType>
-void findHalosFlags()
+void findHalosFlags(bool useMixD = false)
 {
-    using T = double;
-    Box<T> box(0, 1);
+    using T  = double;
+    auto box = useMixD ? Box<double>(0, 1, 0, 1, 0, 0.5) : Box<double>(0, 1);
 
     std::vector<KeyType> tree = makeUniformNLevelTree<KeyType>(64, 1);
     OctreeData<KeyType, execution::Cpu> octree;
@@ -74,30 +82,34 @@ void findHalosFlags()
         tS[i] = nodeSizes[leaf2int[i]] + Vec3<T>{searchRadii[i], searchRadii[i], searchRadii[i]};
     }
 
+    // leaf ranges [0:a] [a:b] bipartition leaf nodes with non-zero volume
+    TreeNodeIndex a = useMixD ? 16 : 32;
+    TreeNodeIndex b = useMixD ? 32 : 64;
+
     auto od = octree.data();
     {
         std::vector<uint8_t> collisionFlags(octree.numNodes, 0);
         findHalos(od.prefixes, od.childOffsets, od.parents, nodeCenters.data(), nodeSizes.data(), tree.data(),
-                  tC.data(), tS.data(), box, 0, 32, collisionFlags.data());
+                  tC.data(), tS.data(), box, 0, a, collisionFlags.data());
 
         std::vector<uint8_t> reference = findHalosAll2All<KeyType>(octree.prefixes, leaf2int, tC.data(), tS.data(),
-                                                                   octree.numLeafNodes, box, tree[0], tree[32]);
+                                                                   octree.numLeafNodes, box, tree[0], tree[a]);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes (+5 internal nodes)
-        EXPECT_EQ(21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
-        EXPECT_EQ(21, std::accumulate(reference.begin(), reference.end(), 0));
+        EXPECT_EQ(useMixD ? 11 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
+        EXPECT_EQ(useMixD ? 11 : 21, std::accumulate(reference.begin(), reference.end(), 0));
         EXPECT_EQ(collisionFlags, reference);
     }
     {
         std::vector<uint8_t> collisionFlags(octree.numNodes, 0);
         findHalos(od.prefixes, od.childOffsets, od.parents, nodeCenters.data(), nodeSizes.data(), tree.data(),
-                  tC.data(), tS.data(), box, 32, 64, collisionFlags.data());
+                  tC.data(), tS.data(), box, a, b, collisionFlags.data());
 
         std::vector<uint8_t> reference = findHalosAll2All<KeyType>(octree.prefixes, leaf2int, tC.data(), tS.data(),
-                                                                   octree.numLeafNodes, box, tree[32], tree[64]);
+                                                                   octree.numLeafNodes, box, tree[a], tree[b]);
 
         // consistency check: the surface of the first 32 nodes with the last 32 nodes is 16 nodes
-        EXPECT_EQ(21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
+        EXPECT_EQ(useMixD ? 11 : 21, std::accumulate(collisionFlags.begin(), collisionFlags.end(), 0));
         EXPECT_EQ(collisionFlags, reference);
     }
 }
@@ -106,4 +118,6 @@ TEST(HaloDiscovery, findHalosFlags)
 {
     findHalosFlags<unsigned>();
     findHalosFlags<uint64_t>();
+    findHalosFlags<unsigned>(true);
+    findHalosFlags<uint64_t>(true);
 }

@@ -25,11 +25,11 @@ add_custom_command(TARGET ${testname} PRE_BUILD
 
 set(UNIT_TESTS_GPU timestep.cu)
 
-if (CMAKE_HIP_COMPILER)
+if (CMAKE_SPH_EXA_WITH_HIPHIP_COMPILER)
     set_source_files_properties(${UNIT_TESTS_GPU} PROPERTIES LANGUAGE HIP)
 endif ()
 
-if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
+if (SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP)
     set(testname sph_gpu_tests)
     add_executable(${testname} ${UNIT_TESTS_GPU})
 
@@ -42,7 +42,7 @@ if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
 
 endif()
 
-if (CMAKE_HIP_COMPILER)
+if (SPH_EXA_WITH_HIP)
     set_target_properties(${testname} PROPERTIES LINKER_LANGUAGE CXX)
     target_link_libraries(${testname} PRIVATE cstone_thrust_incl)
 endif ()

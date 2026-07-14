@@ -6,7 +6,7 @@ add_subdirectory(sfc)
 add_subdirectory(traversal)
 add_subdirectory(tree)
 
-if (CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
+if (CSTONE_WITH_CUDA OR CSTONE_WITH_HIP)
     add_library(cstone_gpu $<TARGET_OBJECTS:gather_halos_obj>
                            $<TARGET_OBJECTS:octree_obj>
                            $<TARGET_OBJECTS:primitives_gpu_obj>
