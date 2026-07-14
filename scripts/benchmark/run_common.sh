@@ -124,8 +124,16 @@ run_sim "develop branch" "${DEV_BIN}"  "${DEV_RUN_DIR}" "develop"
 source ${MIXD_ROOT}/venv_sphexa/bin/activate
 
 # ── Compare constants ─────────────────────────────────────────────────────────
+if [ $TEST = "windshock" ]; then
+  COLUMN_TO_CHECK=9
+elif [[ $TEST = "kelvin" ]]; then
+  COLUMN_TO_CHECK=9
+else
+  echo "ERROR: TEST must be 'windshock' or 'kelvin', got: '$TEST'" >&2
+  exit 1
+fi
 python3 "${MIXD_ROOT}/ci/scripts/compare_constants.py" \
-    "${MIXD_RUN_DIR}/constants.txt" "${DEV_RUN_DIR}/constants.txt"
+    "${MIXD_RUN_DIR}/constants.txt" "${DEV_RUN_DIR}/constants.txt" $COLUMN_TO_CHECK
 
 # ── Timing comparison ─────────────────────────────────────────────────────────
 python "${MIXD_ROOT}/scripts/analysis/timing_summary.py" \
