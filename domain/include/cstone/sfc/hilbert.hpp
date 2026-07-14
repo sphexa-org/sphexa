@@ -403,33 +403,31 @@ decodeHilbert(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
     KeyType   z3d          = get<2>(pair3D) >> shift3D;
     const KeyType maxCoord = (static_cast<KeyType>(1) << bits[2]) - static_cast<KeyType>(1);
 
-    auto permute0 = [](KeyType x, KeyType y, KeyType z) {
-        return util::tuple<KeyType, KeyType, KeyType>{y, x, z};
-    };
-    auto permute1 = [](KeyType x, KeyType y, KeyType z) {
-        return util::tuple<KeyType, KeyType, KeyType>{x, z, y};
-    };
-    auto permute2 = [](KeyType x, KeyType y, KeyType z) {
-        return util::tuple<KeyType, KeyType, KeyType>{x, z, y};
-    };
-    auto permute3 = [maxCoord](KeyType x, KeyType y, KeyType z) {
-        return util::tuple<KeyType, KeyType, KeyType>{maxCoord - y, maxCoord - x, z};
-    };
-
+    /* Undo the per-level swap/complement performed by the 2D-Hilbert curve, mirroring decodeHilbert2D.
+     * iHilbert2D appends 2 bits per level: high bit = xi, low bit = xi ^ yi (see the `2*xi + (xi^yi)`
+     * term in iHilbert2D). decodeHilbert2D recovers (xi, yi) from those two bits (sa = xi, sa^sb = yi)
+     * and, whenever yi == 0, swaps its running (x, y) accumulator and, if xi == 1, complements it.
+     * The same (xi, yi) pair also determines which orientation the 3D sub-cube was reached in, so the
+     * identical swap/complement must be undone here on (x3d, y3d) - z3d is untouched, exactly as z is
+     * left untouched by iHilbert2D. Levels are processed from i = 0 (finest, adjacent to the 3D suffix)
+     * out to the coarsest 2D level, i.e. the reverse order in which iHilbert encoded them. */
     const int num2DLevels = bits[1] > bits[2] ? bits[1] - bits[2] : 0;
     for (int i = 0; i < num2DLevels; ++i)
     {
-        const auto quad = static_cast<unsigned>((key2D >> (2 * i)) & 3u);
-        util::tuple<KeyType, KeyType, KeyType> result;
-        if (quad == 0) result      = permute0(x3d, y3d, z3d);
-        else if (quad == 1 && i % 2 == 0) result = permute1(x3d, y3d, z3d);
-        else if (quad == 1 && i % 2 == 1) result = {x3d, y3d, z3d};
-        else if (quad == 2 && i % 2 == 0) result = permute2(x3d, y3d, z3d);
-        else if (quad == 2 && i % 2 == 1) result = {x3d, y3d, z3d};
-        else result                = permute3(x3d, y3d, z3d);
-        x3d = get<0>(result);
-        y3d = get<1>(result);
-        z3d = get<2>(result);
+        const auto quad    = static_cast<unsigned>((key2D >> (2 * i)) & 3u);
+        const unsigned xi  = (quad >> 1) & 1u;
+        const unsigned yi  = xi ^ (quad & 1u);
+        if (yi == 0)
+        {
+            KeyType tmp = x3d;
+            x3d         = y3d;
+            y3d         = tmp;
+            if (xi == 1)
+            {
+                x3d = maxCoord - x3d;
+                y3d = maxCoord - y3d;
+            }
+        }
     }
 
     coordinates[0] |= x3d;
