@@ -24,8 +24,6 @@
 
 #pragma once
 
-#include <iostream>
-
 #include "cstone/util/tuple.hpp"
 #include "morton.hpp"
 
@@ -210,7 +208,7 @@ iHilbert(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, unsign
     assert(sortedCoordinates[1] < (static_cast<KeyType>(1) << bits[2]));
 
     // encode remaining bits[0] == min(bx,by,bz) 3D levels or octal digits with 3D-Hilbert and add to key
-    const KeyType key3D = iHilbert3D<KeyType>(sortedCoordinates[0], sortedCoordinates[1], sortedCoordinates[2]);
+    const KeyType key3D = iHilbert3D<KeyType>(sortedCoordinates[0], sortedCoordinates[1], sortedCoordinates[2], bits[2]);
     key |= key3D;
     // Example for (bx,by,bz) = (10,9,7): 1D,2D,2D,3D*7
 
@@ -382,11 +380,10 @@ decodeHilbert(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
         }
         key &= (static_cast<KeyType>(1) << (3 * bits[1])) - 1;
     }
+    KeyType key2D{};
     if (bits[1] > bits[2]) // 2 dims have more bits than the 3rd, add 2D levels
     {
         const int n = bits[1] - bits[2];
-        // const auto key2D  = key >> (3 * bits[2]);
-        KeyType key2D{};
         for (int i{}; i < n; ++i)
         {
             const auto processes2DKeyBitIndex      = n - 1 - i;
@@ -399,11 +396,43 @@ decodeHilbert(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
         coordinates[1] |= (get<1>(pair2D) & ((static_cast<KeyType>(1) << n) - 1)) << bits[2];
         key &= (static_cast<KeyType>(1) << (3 * bits[2])) - 1;
     }
+    const auto shift3D     = maxTreeLevel<KeyType>{} - bits[2];
+    const auto pair3D      = decodeHilbert3D<KeyType>(key << (3 * shift3D));
+    KeyType   x3d          = get<0>(pair3D) >> shift3D;
+    KeyType   y3d          = get<1>(pair3D) >> shift3D;
+    KeyType   z3d          = get<2>(pair3D) >> shift3D;
+    const KeyType maxCoord = (static_cast<KeyType>(1) << bits[2]) - static_cast<KeyType>(1);
 
-    const auto pair3D = decodeHilbert3D<KeyType>(key);
-    coordinates[0] |= get<0>(pair3D);
-    coordinates[1] |= get<1>(pair3D);
-    coordinates[2] |= get<2>(pair3D);
+    auto permute0 = [](KeyType x, KeyType y, KeyType z) {
+        return util::tuple<KeyType, KeyType, KeyType>{y, x, z};
+    };
+    auto permute1 = [](KeyType x, KeyType y, KeyType z) {
+        return util::tuple<KeyType, KeyType, KeyType>{x, z, y};
+    };
+    auto permute2 = [](KeyType x, KeyType y, KeyType z) {
+        return util::tuple<KeyType, KeyType, KeyType>{x, z, y};
+    };
+    auto permute3 = [maxCoord](KeyType x, KeyType y, KeyType z) {
+        return util::tuple<KeyType, KeyType, KeyType>{maxCoord - y, maxCoord - x, z};
+    };
+
+    const int num2DLevels = bits[1] > bits[2] ? bits[1] - bits[2] : 0;
+    for (int i = 0; i < num2DLevels; ++i)
+    {
+        const auto quad = static_cast<unsigned>((key2D >> (2 * i)) & 3u);
+        util::tuple<KeyType, KeyType, KeyType> result;
+        if (quad == 0) result      = permute0(x3d, y3d, z3d);
+        else if (quad == 1) result = permute1(x3d, y3d, z3d);
+        else if (quad == 2) result = permute2(x3d, y3d, z3d);
+        else result                = permute3(x3d, y3d, z3d);
+        x3d = get<0>(result);
+        y3d = get<1>(result);
+        z3d = get<2>(result);
+    }
+
+    coordinates[0] |= x3d;
+    coordinates[1] |= y3d;
+    coordinates[2] |= z3d;
 
     KeyType returnCoordinates[3]      = {0, 0, 0};
     returnCoordinates[permutation[0]] = coordinates[0];
