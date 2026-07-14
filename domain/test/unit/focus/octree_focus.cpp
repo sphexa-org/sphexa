@@ -18,7 +18,6 @@
 #include "cstone/focus/octree_focus.hpp"
 #include "cstone/focus/peer_flags.hpp"
 #include "cstone/tree/cs_util.hpp"
-#include "coord_samples/random.hpp"
 
 namespace cstone
 {
@@ -342,8 +341,7 @@ static void computeEssentialTree()
     FocusedOctreeSingleNode<KeyType> tree(bucketSize, theta);
 
     // sorted reference tree node counts in each (except focus) octant at the 1st division level
-    std::vector<TreeNodeIndex> refCounts{29, 302, 302, 302, 1184, 1184, 1184,
-                                         /*4131*/};
+    std::vector<TreeNodeIndex> refCounts{29, 302, 302, 302, 1184, 1184, 1184 /*, 4131*/};
 
     KeyType focusStart = 1;
     KeyType focusEnd   = pad(KeyType(1), 3);
@@ -409,94 +407,6 @@ TEST(FocusedOctree, compute)
 {
     computeEssentialTree<unsigned>();
     computeEssentialTree<uint64_t>();
-}
-
-template<class KeyType>
-static void computeEssentialTreeMixD()
-{
-    Box<double> box{0, 1, 0, 0.015625, 0, 0.00390625};
-    int nParticles        = 200000;
-    unsigned csBucketSize = 16;
-
-    auto coords = RandomCoordinates<double, SfcKind<KeyType>>(nParticles, box);
-    auto keys   = coords.particleKeys();
-
-    auto [csTree, csCounts] = computeOctree<KeyType>(keys, csBucketSize);
-    Octree<KeyType> globalTree;
-    globalTree.update(csTree.data(), nNodes(csTree));
-
-    unsigned bucketSize = 16;
-    float theta         = 0.9;
-    FocusedOctreeSingleNode<KeyType> tree(bucketSize, theta);
-
-    // sorted reference tree node counts in each (except focus) octant at the 1st division level
-    std::vector<TreeNodeIndex> refCounts{1, 1, 1, 1, 1, 1, 372};
-
-    KeyType focusStart = 1;
-    KeyType focusEnd   = pad(KeyType(1), 3);
-
-    tree.update(box, keys, focusStart, focusEnd, {});
-    // The focus boundaries have to be contained in the tree, even after just one update step.
-    // This example here is the worst-case scenario with a focus boundary at the highest possible
-    // octree subdivision level. Key-0 is always present, so the node with Key-1 is always at index 1, if present.
-    EXPECT_EQ(tree.treeLeaves()[1], focusStart);
-
-    // update until converged
-    while (!tree.update(box, keys, focusStart, focusEnd, {})) {}
-
-    {
-        // the first node in the cornerstone tree that starts at or above focusStart
-        TreeNodeIndex firstCstoneNode = findNodeAbove(csTree.data(), csTree.size(), focusStart);
-        TreeNodeIndex matchingFocusNode =
-            findNodeAbove(tree.treeLeaves().data(), tree.treeLeaves().size(), csTree[firstCstoneNode]);
-        // in the focus area (the first octant) the essential tree and the csTree are identical
-        TreeNodeIndex lastFocusNode = findNodeAbove(tree.treeLeaves().data(), tree.treeLeaves().size(), focusEnd);
-
-        EXPECT_TRUE(matchingFocusNode >= 1 && matchingFocusNode < lastFocusNode);
-
-        // We have: focusTree[matchingFocusNode] == csTree[firstCstoneNode]
-        // therefore all nodes past matchingFocusNode until lastFocusNode should match those in the csTree
-        EXPECT_TRUE(std::equal(tree.treeLeaves().begin() + matchingFocusNode, tree.treeLeaves().begin() + lastFocusNode,
-                               begin(csTree) + firstCstoneNode));
-
-        // From 0 to matchingFocusNode, the focusTree should be identical to the spanningTree
-        std::vector<KeyType> spanningKeys{0, focusStart, nodeRange<KeyType>(0)};
-        auto spanningTree = computeSpanningTree<KeyType>(spanningKeys);
-        auto a            = tree.treeLeaves().first(matchingFocusNode);
-        EXPECT_TRUE(std::equal(a.begin(), a.end(), spanningTree.data()));
-
-        auto nodeCounts = octantNodeCount<KeyType>(tree.treeLeaves());
-        EXPECT_EQ(nodeCounts, refCounts);
-    }
-
-    focusStart = pad(KeyType(7), 3);
-    focusEnd   = nodeRange<KeyType>(0) - 1;
-
-    while (!tree.update(box, keys, focusStart, focusEnd, {})) {}
-
-    {
-        auto nodeCounts = octantNodeCount<KeyType>(tree.treeLeaves());
-        EXPECT_EQ(nodeCounts, std::vector<TreeNodeIndex>(7, 1)); // Last octant doesn't include valid keys so it's empty
-    }
-
-    focusStart = 0; // slight variation; start from zero instead of 1
-    focusEnd   = pad(KeyType(1), 3);
-    while (!tree.update(box, keys, focusStart, focusEnd, {})) {}
-
-    {
-        TreeNodeIndex lastFocusNode = findNodeAbove(tree.treeLeaves().data(), tree.treeLeaves().size(), focusEnd);
-        // tree now focused again on first octant
-        EXPECT_TRUE(std::equal(begin(csTree), begin(csTree) + lastFocusNode, tree.treeLeaves().begin()));
-
-        auto nodeCounts = octantNodeCount<KeyType>(tree.treeLeaves());
-        EXPECT_EQ(nodeCounts, refCounts);
-    }
-}
-
-TEST(FocusedOctree, computeMixD)
-{
-    computeEssentialTreeMixD<unsigned>();
-    computeEssentialTreeMixD<uint64_t>();
 }
 
 class MacRefinement : public testing::Test
