@@ -50,6 +50,7 @@ public:
 
     /*! @brief construct empty Domain
      *
+     * @param exec            execution policy, CPU or GPU stream
      * @param rank            executing rank
      * @param nRanks          number of ranks
      * @param bucketSize      build global tree for domain decomposition with max @a bucketSize particles per node

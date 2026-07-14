@@ -1,8 +1,8 @@
-if(CMAKE_HIP_COMPILER)
+if(RYOANJI_WITH_HIP)
     set_source_files_properties(ewald.cu multipole_holder.cu PROPERTIES LANGUAGE HIP)
 endif()
 
-if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
+if(RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
     # workaround for compiling MPI with nvcc on cray systems
     if (MPI_CXX_INCLUDE_PATH STREQUAL "" AND DEFINED ENV{CRAY_MPICH2_DIR} OR DEFINED ENV{CRAY_MPICH_DIR})
         message(STATUS "Applying MPI include workaround on CRAY")
@@ -19,6 +19,6 @@ if(CMAKE_CUDA_COMPILER OR CMAKE_HIP_COMPILER)
     target_link_libraries(ryoanji PUBLIC cstone_gpu ${MPI_CXX_LIBRARIES})
 endif()
 
-if (CMAKE_HIP_COMPILER)
+if (RYOANJI_WITH_HIP)
     target_link_libraries(ryoanji_obj PRIVATE hip::hipcub)
 endif ()

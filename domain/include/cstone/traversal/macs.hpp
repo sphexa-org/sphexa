@@ -17,7 +17,6 @@
 #pragma once
 
 #include "boxoverlap.hpp"
-#include "cstone/primitives/math.hpp"
 #include "cstone/traversal/traversal.hpp"
 #include "cstone/tree/octree.hpp"
 
@@ -41,10 +40,11 @@ HOST_DEVICE_FUN inline float invThetaMinToVec(float theta) { return 1.0f / theta
 template<class T, class KeyType>
 HOST_DEVICE_FUN Vec4<T> computeMinMacR2(KeyType prefix, float invThetaEff, const Box<T>& box)
 {
-    KeyType nodeKey  = decodePlaceholderBit(prefix);
-    int prefixLength = decodePrefixLength(prefix);
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
+    KeyType nodeKey     = decodePlaceholderBit(prefix);
+    int prefixLength    = decodePrefixLength(prefix);
 
-    IBox cellBox              = sfcIBox(sfcKey(nodeKey), prefixLength / 3);
+    IBox cellBox              = sfcIBox(sfcKey(nodeKey), prefixLength / 3, axesBits);
     auto [geoCenter, geoSize] = centerAndSize<KeyType>(cellBox, box);
 
     T l   = T(2) * max(geoSize);
@@ -67,7 +67,9 @@ HOST_DEVICE_FUN T computeVecMacR2(KeyType prefix, Vec3<T> expCenter, float invTh
     KeyType nodeKey  = decodePlaceholderBit(prefix);
     int prefixLength = decodePrefixLength(prefix);
 
-    IBox cellBox              = sfcIBox(sfcKey(nodeKey), prefixLength / 3);
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
+
+    IBox cellBox              = sfcIBox(sfcKey(nodeKey), prefixLength / 3, axesBits);
     auto [geoCenter, geoSize] = centerAndSize<KeyType>(cellBox, box);
 
     Vec3<T> dX = expCenter - geoCenter;
@@ -135,6 +137,8 @@ evaluateMacPbc(Vec3<T> sourceCenter, T macSq, Vec3<T> targetCenter, Vec3<T> targ
 template<class T>
 HOST_DEVICE_FUN bool minMacMutualInt(IBox a, IBox b, Vec3<T> ellipse, Vec3<int> pbc)
 {
+    if (a == IBox{} || b == IBox{}) { return true; } // pass empty boxes from mixed-dim global boxes
+
     T l_max = std::max({a.xmax() - a.xmin(), a.ymax() - a.ymin(), a.zmax() - a.zmin(), b.xmax() - b.xmin(),
                         b.ymax() - b.ymin(), b.zmax() - b.zmin()});
 
@@ -209,16 +213,21 @@ void markMacs(const KeyType* prefixes,
     KeyType focusStart = focusNodes[0];
     KeyType focusEnd   = focusNodes[numFocusNodes];
 
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
+
 #pragma omp parallel for schedule(dynamic)
     for (TreeNodeIndex i = 0; i < numFocusNodes; ++i)
     {
-        IBox target    = sfcIBox(sfcKey(focusNodes[i]), sfcKey(focusNodes[i + 1]));
+        IBox target = sfcIBox(sfcKey(focusNodes[i]), sfcKey(focusNodes[i + 1]), axesBits);
+        if (target == IBox{}) { continue; }
+
         IBox targetExt = IBox(target.xmin() - 1, target.xmax() + 1, target.ymin() - 1, target.ymax() + 1,
                               target.zmin() - 1, target.zmax() + 1);
-        if (containedIn(focusStart, focusEnd, targetExt)) { continue; }
+        if (containedIn(focusStart, focusEnd, targetExt, axesBits)) { continue; }
 
         auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
-        unsigned maxLevel               = maxTreeLevel<KeyType>{};
+        assert(targetSize[0] != 0 && targetSize[1] != 0 && targetSize[2] != 0);
+        unsigned maxLevel = maxTreeLevel<KeyType>{};
         if (limitSource) { maxLevel = std::max(int(treeLevel(focusNodes[i + 1] - focusNodes[i])) - 1, 0); }
         markMacPerBox(targetCenter, targetSize, maxLevel, prefixes, childOffsets, parents, centers, box, focusStart,
                       focusEnd, markings);

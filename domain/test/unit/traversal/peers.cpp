@@ -43,7 +43,7 @@ static std::vector<int> findPeersAll2All(int myRank,
     std::vector<IBox> boxes(nNodes(tree));
     for (TreeNodeIndex i = 0; i < TreeNodeIndex(nNodes(tree)); ++i)
     {
-        boxes[i] = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]));
+        boxes[i] = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]), box.getBoxDimBits(maxTreeLevel<KeyType>{}));
     }
 
     std::vector<int> peers(assignment.numRanks());

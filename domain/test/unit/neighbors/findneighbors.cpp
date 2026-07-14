@@ -118,7 +118,10 @@ TEST_P(FindNeighborsRandom, HilbertGaussian64) { check<HilbertKey<uint64_t>, Ran
 
 std::array<double, 2> radii{0.124, 0.0624};
 std::array<int, 1> nParticles{2500};
-std::array<std::array<double, 6>, 2> boxes{{{0., 1., 0., 1., 0., 1.}, {-1.2, 0.23, -0.213, 3.213, -5.1, 1.23}}};
+std::array<std::array<double, 6>, 4> boxes{{{0., 1., 0., 1., 0., 1.},
+                                            {-1.2, 0.23, -0.213, 3.213, -5.1, 1.23},
+                                            {0., 100., 0., 50., 0., 12.0},
+                                            {0., 0.00390625, 0., 1., 0., 0.015625}}};
 std::array<cstone::BoundaryType, 2> pbcUsage{BoundaryType::open, BoundaryType::periodic};
 
 INSTANTIATE_TEST_SUITE_P(RandomNeighbors,

@@ -341,8 +341,7 @@ static void computeEssentialTree()
     FocusedOctreeSingleNode<KeyType> tree(bucketSize, theta);
 
     // sorted reference tree node counts in each (except focus) octant at the 1st division level
-    std::vector<TreeNodeIndex> refCounts{29, 302, 302, 302, 1184, 1184, 1184,
-                                         /*4131*/};
+    std::vector<TreeNodeIndex> refCounts{29, 302, 302, 302, 1184, 1184, 1184 /*, 4131*/};
 
     KeyType focusStart = 1;
     KeyType focusEnd   = pad(KeyType(1), 3);
