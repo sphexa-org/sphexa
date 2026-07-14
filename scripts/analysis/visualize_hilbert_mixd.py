@@ -220,7 +220,7 @@ def main() -> None:
     else:
         print("Largest distance between two consecutive points: N/A (only one point)")
 
-    output_path = Path(args.save) if args.save else None
+    output_path = Path(args.save) if args.save else Path(f'plots/sfc_{args.lx}_{args.ly}_{args.lz}_level{args.level}_{args.key_type}.png')
     ext = output_path.suffix.lower() if output_path else ''
 
     if output_path and ext in {'.png', '.jpg', '.jpeg'}:
@@ -304,7 +304,7 @@ def main() -> None:
             pio.write_html(fig, file=str(html_path), auto_open=False, include_plotlyjs='embed')
             print(f"Saved interactive plot to {html_path}")
         else:
-            fig.show()
+            print("Displaying interactively the plot doesn't work. Plese use --save with an `.html` suffix to save the plot as an HTML file.")
 
 
 if __name__ == "__main__":
