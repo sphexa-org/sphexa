@@ -6,7 +6,7 @@
 #   RANKS     – number of MPI ranks passed to srun
 #   CORES     – OMP_NUM_THREADS / --cpus-per-task value
 #
-# Usage:  bash run_{cpu,gpu}.sh [windshock|kelvin]
+# Usage:  bash run_{cpu,gpu}.sh [windshock|kelvin] [glass.h5]
 #
 # Output layout:
 #   build_${BACKEND}/${TEST}_r${RANKS}_c${CORES}_s${STEPS}_n${N}_${BACKEND}/constants.txt
@@ -16,6 +16,7 @@
 # $1 is inherited from the positional parameters of the sourcing script.
 # Pass --nsys as any additional argument to enable nsys profiling (GPU only).
 TEST="${1:-windshock}"
+GLASS="${2:-../50c.h5}"
 NSYS_ENABLED=0
 for _arg in "$@"; do
   [ "$_arg" = "--nsys" ] && NSYS_ENABLED=1
@@ -24,9 +25,14 @@ N=50
 STEPS=200
 
 # ── Directories ────────────────────────────────────────────────────────────────
-MIXD_ROOT="/capstor/scratch/cscs/ioannmag/CORNERSTONE/sphexa"
-DEV_ROOT="/capstor/scratch/cscs/ioannmag/CORNERSTONE/sphexa-develop"
-GLASS="/capstor/scratch/cscs/ioannmag/CORNERSTONE/50c.h5"
+# The script assumes that there are two clones of the repository in the same
+# parent directory:
+#   <sphexa>         – has the branch that we want to test checked out
+#   <sphexa-develop> – has the develop branch as reference for comparison
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+REPO_NAME="$(basename "$REPO_ROOT")"
+MIXD_ROOT="$REPO_ROOT"
+DEV_ROOT="$(dirname "$REPO_ROOT")/${REPO_NAME}-develop"
 
 # ── Resolve init-condition name (CLI uses dashes, compare script uses no dash) ─
 case "$TEST" in
@@ -42,6 +48,9 @@ esac
 RUN_DIR_NAME="${TEST}_r${RANKS}_c${CORES}_s${STEPS}_n${N}_${BACKEND}"
 
 # ── Binary paths ───────────────────────────────────────────────────────────────
+# The script assumes that in each repository clone, the binaries are built in a
+# build_${BACKEND} subdirectory.
+# Where BACKEND is either 'cpu' or 'gpu'.
 if [ "$BACKEND" = "gpu" ]; then
   BIN_SUFFIX="sphexa-cuda"
 else
@@ -112,14 +121,11 @@ DEV_RUN_DIR="${DEV_ROOT}/build_${BACKEND}/${RUN_DIR_NAME}"
 run_sim "MixD branch"    "${MIXD_BIN}" "${MIXD_RUN_DIR}" "MixD"
 run_sim "develop branch" "${DEV_BIN}"  "${DEV_RUN_DIR}" "develop"
 
-echo "Done. Run scripts/analysis/compare_sphexa_tests.py to generate the comparison plot."
+source ${MIXD_ROOT}/venv_sphexa/bin/activate
 
-source ${MIXD_ROOT}/venv_sphexa2/bin/activate
-
-# ── numHalos comparison ───────────────────────────────────────────────────────
-python "${MIXD_ROOT}/scripts/analysis/compare_num_halos.py" \
-    --test "${TEST}" --backend "${BACKEND}" --steps "${STEPS}" \
-    --ranks "${RANKS}" --cores "${CORES}" --n "${N}"
+# ── Compare constants ─────────────────────────────────────────────────────────
+python3 "${MIXD_ROOT}/ci/scripts/compare_constants.py" \
+    "${MIXD_RUN_DIR}/constants.txt" "${DEV_RUN_DIR}/constants.txt"
 
 # ── Timing comparison ─────────────────────────────────────────────────────────
 python "${MIXD_ROOT}/scripts/analysis/timing_summary.py" \
