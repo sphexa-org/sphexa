@@ -171,8 +171,8 @@ void dualTraversalNeighbors()
         EXPECT_TRUE(ka1 >= focusStart && ka2 <= focusEnd);
         // b outside focus
         EXPECT_TRUE(kb1 >= focusEnd || kb2 <= focusStart);
-        IBox aBox             = sfcIBox(sfcKey(ka1), nodeRange<KeyType>(ka2 - ka1), uniformAxesBits<KeyType>);
-        IBox bBox             = sfcIBox(sfcKey(kb1), nodeRange<KeyType>(kb2 - kb1), uniformAxesBits<KeyType>);
+        IBox aBox             = sfcIBox(sfcKey(ka1), treeLevel<KeyType>(ka2 - ka1), uniformAxesBits<KeyType>);
+        IBox bBox             = sfcIBox(sfcKey(kb1), treeLevel<KeyType>(kb2 - kb1), uniformAxesBits<KeyType>);
         auto [aCenter, aSize] = centerAndSize<KeyType>(aBox, box);
         auto [bCenter, bSize] = centerAndSize<KeyType>(bBox, box);
         // a and be touch each other
