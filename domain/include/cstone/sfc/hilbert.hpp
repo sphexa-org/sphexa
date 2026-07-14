@@ -422,8 +422,10 @@ decodeHilbert(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
         const auto quad = static_cast<unsigned>((key2D >> (2 * i)) & 3u);
         util::tuple<KeyType, KeyType, KeyType> result;
         if (quad == 0) result      = permute0(x3d, y3d, z3d);
-        else if (quad == 1) result = permute1(x3d, y3d, z3d);
-        else if (quad == 2) result = permute2(x3d, y3d, z3d);
+        else if (quad == 1 && i % 2 == 0) result = permute1(x3d, y3d, z3d);
+        else if (quad == 1 && i % 2 == 1) result = {x3d, y3d, z3d};
+        else if (quad == 2 && i % 2 == 0) result = permute2(x3d, y3d, z3d);
+        else if (quad == 2 && i % 2 == 1) result = {x3d, y3d, z3d};
         else result                = permute3(x3d, y3d, z3d);
         x3d = get<0>(result);
         y3d = get<1>(result);
