@@ -148,45 +148,6 @@ NB_MODULE(cstone_sfc, m)
         "Encode mixed-dimension integer coordinates into a Hilbert key for the selected key type");
 
     m.def(
-        "increaseKey",
-        [](std::uint64_t key, int pos, unsigned bx, unsigned by, unsigned bz, const std::string& keyType)
-        {
-            const cstone::AxesBits axesBits{bx, by, bz};
-            switch (parseKeyKind(keyType))
-            {
-                case KeyKind::uint64:
-                {
-                    validateBits<KeyType64>(axesBits);
-                    constexpr int maxPos = static_cast<int>(cstone::maxTreeLevel<KeyType64>{});
-                    if (pos > maxPos)
-                    {
-                        throw std::invalid_argument("pos must be <= maxTreeLevel for the selected key_type");
-                    }
-                    auto out = cstone::increaseKey<KeyType64>(KeyType64(key), pos, bx, by, bz);
-                    return std::uint64_t(out);
-                }
-                case KeyKind::u32:
-                {
-                    validateBits<KeyType32>(axesBits);
-                    constexpr int maxPos = static_cast<int>(cstone::maxTreeLevel<KeyType32>{});
-                    if (pos > maxPos)
-                    {
-                        throw std::invalid_argument("pos must be <= maxTreeLevel for the selected key_type");
-                    }
-                    if (key > std::uint64_t(std::numeric_limits<KeyType32>::max()))
-                    {
-                        throw std::invalid_argument("key does not fit in selected key_type 'unsigned'");
-                    }
-                    auto out = cstone::increaseKey<KeyType32>(KeyType32(key), pos, bx, by, bz);
-                    return std::uint64_t(out);
-                }
-            }
-            return std::uint64_t(0);
-        },
-        nb::arg("key"), nb::arg("pos"), nb::arg("bx"), nb::arg("by"), nb::arg("bz"), nb::arg("key_type") = "uint64_t",
-        "Return next valid MixD key by adding one at octal position pos (counted from left)");
-
-    m.def(
         "decodeHilbertMixD",
         [](std::uint64_t key, unsigned bx, unsigned by, unsigned bz, const std::string& keyType)
         {

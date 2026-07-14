@@ -4,57 +4,6 @@
 
 using namespace cstone;
 
-TEST(MixedHilbert, increaseKey)
-{
-    // Normal tests
-    EXPECT_EQ(increaseKey(0u, 10, 1, 1, 1), 1u);
-    EXPECT_EQ(increaseKey(760u, 10, 8, 4, 2), 761u);  // 1370 ->1371 octal
-    EXPECT_EQ(increaseKey(767u, 10, 8, 4, 2), 1024u); // 1377 -> 2000 octal
-
-    // posFromLeft=0 digit at max (7), carry to pos=9 (posFromLeft=1) which is
-    // inactive -> same as overflow, return 0
-    EXPECT_EQ(increaseKey(7u, 10, 1, 1, 1), 0u);
-
-    // b0=8, b1=4, b2=2: rightmost 2 digits 3-bit (max=7), next 2 are 2-bit
-    // (max=3), next 4 are 1-bit (max=1), leftmost 2 inactive.
-    // Full-max key: digits 0-1=7, digits 2-3=3, digits 4-7=1, digits 8-9=0
-    //   = 1*8^7 + 1*8^6 + 1*8^5 + 1*8^4 + 3*8^3 + 3*8^2 + 7*8 + 7
-    //   = 2097152 + 262144 + 32768 + 4096 + 1536 + 192 + 56 + 7 = 2397951
-    // decimal 2397951 -> octal 11113377
-    unsigned fullMax = 2397951u;
-
-    // Digit at posFromLeft=0 (3-bit) at max=7, posFromLeft=1 not yet at max:
-    // carry from pos=10 to pos=9 increments posFromLeft=1 digit from 0 to 1.
-    // 7 -> 8
-    EXPECT_EQ(increaseKey(7u, 10, 8, 4, 2), 8u);
-
-    // Carry across the 3-bit -> 2-bit boundary:
-    // posFromLeft=0,1 both at max (7*8^0 + 7*8^1 = 63), posFromLeft=2 at 0.
-    // carry lands at posFromLeft=2 (2-bit, max=3): 0 -> 1, adds 8^2 = 64
-    // decimal 63 -> octal 77, decimal 64 -> octal 100
-    EXPECT_EQ(increaseKey(63u, 10, 8, 4, 2), 64u);
-
-    // Carry across the 2-bit -> 1-bit boundary:
-    // posFromLeft=0..3 all at max (7+56+192+1536 = 1791),
-    // carry lands at posFromLeft=4 (1-bit, max=1): 0 -> 1, adds 8^4 = 4096
-    // decimal 1791 -> octal 3377, decimal 4096 -> octal 10000
-    EXPECT_EQ(increaseKey(1791u, 10, 8, 4, 2), 4096u);
-
-    // Carry across the 1-bit -> inactive boundary:
-    // posFromLeft=0..7 all at max -> fullMax, carry lands at posFromLeft=8
-    // overflow returns 0
-    EXPECT_EQ(increaseKey(fullMax, 10, 8, 4, 2), 0u);
-
-    // Increase posFromLeft=1 digit from 1 to 2 while keeping the posFromLeft=0 digit at 7
-    // decimal 15 -> octal 17, decimal 23 -> octal 27
-    EXPECT_EQ(increaseKey(15u, 9, 8, 4, 2), 23u);
-
-    // Standard full 3-bit Morton key (b0=b1=b2=10): plain octal increment
-    EXPECT_EQ(increaseKey(0u, 10, 10, 10, 10), 1u);
-    EXPECT_EQ(increaseKey(7u, 10, 10, 10, 10), 8u);          // carry from digit 0 to digit 1
-    EXPECT_EQ(increaseKey(1073741823u, 10, 10, 10, 10), 0u); // 2^30-1, full overflow
-}
-
 TEST(MixedHilbertBox, x10y9z9)
 {
     unsigned bx = 10, by = 9, bz = 9;

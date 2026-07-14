@@ -387,36 +387,6 @@ HOST_DEVICE_FUN constexpr KeyType octalPower(int pos)
     return (KeyType(1) << 3 * (maxTreeLevel<KeyType>{} - pos));
 }
 
-/*! @brief return the mixed key incremented by adding 1 in position @p pos
- *
- * @tparam KeyType    32- or 64-bit unsigned integer
- * @param  pos  Position counting from left, starting from 1. Maximum value 10 or 21 (64-bit)
- * @param  b0   the first octal digit from the right with 1 bit
- * @param  b1   the first octal digit from the right with 2 bits
- * @param  b2   the first octal digit from the right with 3 bits
- * @return      the mixed key with 1 added at position @p pos
- */
-template<class KeyType>
-HOST_DEVICE_FUN constexpr KeyType increaseKey(KeyType key, int pos, unsigned b0, unsigned b1, unsigned b2)
-{
-    while (pos > 0)
-    {
-        const auto posFromRight = maxTreeLevel<KeyType>{} - pos;
-
-        if (posFromRight >= b0) { return key; } // inactive digit, carry stops / overflow
-
-        unsigned max = (posFromRight >= b1) ? 1 : (posFromRight >= b2) ? 3 : 7;
-
-        auto digit = octalDigit(key, pos);
-        key &= ~(static_cast<KeyType>(7) << (3 * posFromRight)); // clear current digit
-
-        if (digit < max) { return key | (static_cast<KeyType>(digit + 1) << (3 * posFromRight)); }
-
-        --pos; // digit was at max: wrap to 0 (already cleared) and carry to next position
-    }
-    return key;
-}
-
 /*! @brief generate SFC codes to cover the range [a:b] with a valid cornerstone sub-octree
  *
  * @tparam     KeyType 32- or 64-bit unsigned integer
