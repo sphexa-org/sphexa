@@ -236,14 +236,14 @@ template<size_t stride = 1, class Tc, class T>
 HOST_DEVICE_FUN inline void IAD_gradhJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
                                            const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
                                            const Tc* y, const Tc* z, const T* h, const T* m, const T* wh, const T* whd,
-                                           const T* xm, const T* kx, const unsigned* nc, T* c11, T* c12, T* c13, T* c22,
-                                           T* c23, T* c33, T* gradh)
+                                           const T* xm, const T* kx, const unsigned* nc, uint64_t* id,
+                                           T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, T* gradh)
 {
     IADGradhInteraction      interaction{wh, whd};
     IADGradhPostamble<T, Tc> postamble{K};
 
-    const auto input  = std::make_tuple(m, xm, kx, nc);
-    const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh);
+    const auto input  = std::make_tuple(m, xm, kx, nc, static_cast<const uint64_t*>(id));
+    const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, id);
 
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
     const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
@@ -270,12 +270,13 @@ TEST_F(SphKernelTests, IAD)
     // fill with invalid initial value to make sure that the kernel overwrites it instead of add to it
     std::vector<T>        iad(6, -1);
     T                     gradh = -1;
+    std::vector<uint64_t> id(x.size(), 0);
     std::vector<unsigned> nc(x.size(), neighborsCount + 1);
 
     // compute the 6 tensor components for particle 0
     IAD_gradhJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), m.data(),
-                   wh.data(), whd.data(), xm.data(), kx.data(), nc.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4],
-                   &iad[5], &gradh);
+                   wh.data(), whd.data(), xm.data(), kx.data(), nc.data(), id.data(),
+                   &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5], &gradh);
 
     EXPECT_NEAR(iad[0], 1.9296619855715329e-18, 1e-10);
     EXPECT_NEAR(iad[1], -1.7838691836843698e-20, 1e-10);

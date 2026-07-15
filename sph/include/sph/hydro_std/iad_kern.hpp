@@ -20,8 +20,8 @@ struct IADInteractionSTD
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
                               T r2) const
     {
-        const auto [i, iPos, hi, mi, roi, nci] = iData;
-        const auto [j, jPos, hj, mj, roj, ncj] = jData;
+        const auto [i, iPos, hi, mi, roi, nci, id_i] = iData;
+        const auto [j, jPos, hj, mj, roj, ncj, id_j] = jData;
 
         T rx = r_ij[0];
         T ry = r_ij[1];
@@ -50,15 +50,14 @@ struct IADInteractionSTD
 template<class T, class Tc>
 struct IADPostambleSTD
 {
-    Tc        K;
-    T         iadConditionQuality{};
-    uint64_t* id{nullptr};
+    Tc K;
+    T   iadConditionQuality{};
 
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
-        const auto [i, iPos, hi, mi, roi, nci]          = iData;
-        auto [tau11, tau12, tau13, tau22, tau23, tau33] = result;
+        const auto [i, iPos, hi, mi, roi, nci, id_i]         = iData;
+        auto [tau11, tau12, tau13, tau22, tau23, tau33]      = result;
 
         auto getExp    = [](T val) { return (val == T(0) ? 0 : std::ilogb(val)); };
         int  tauExpSum = getExp(tau11) + getExp(tau12) + getExp(tau13) + getExp(tau22) + getExp(tau23) + getExp(tau33);
@@ -74,7 +73,7 @@ struct IADPostambleSTD
 
         auto [det, regularize] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
         if (regularize) { regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality); }
-        id[i] = setRegularizationTag(regularize, id[i]);
+        uint64_t newId = setRegularizationTag(regularize, id_i);
 
         // Note normalization factor: cij have units of 1/tau because det is proportional to tau^3 so we have to
         // divide by K/h^3.
@@ -90,16 +89,17 @@ struct IADPostambleSTD
             (tau12 * tau23 - tau22 * tau13) * factor, //
             (tau11 * tau33 - tau13 * tau13) * factor, //
             (tau13 * tau12 - tau11 * tau23) * factor, //
-            (tau11 * tau22 - tau12 * tau12) * factor);
+            (tau11 * tau22 - tau12 * tau12) * factor, //
+            newId);
     }
 };
 
 template<class Neighborhood, class Tc, class Tm, class T>
-void IADIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* rho, const unsigned* nc, const T* wh,
-               T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, T iadConditionQuality, uint64_t* id)
+void IADIjLoop(Neighborhood const& neighborhood, Tc K, T iadConditionQuality, const Tm* m, const T* rho,
+               const unsigned* nc, const T* wh, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, uint64_t* id)
 {
-    neighborhood.ijLoop(std::make_tuple(m, rho, nc), std::make_tuple(c11, c12, c13, c22, c23, c33),
-                        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K, iadConditionQuality, id});
+    neighborhood.ijLoop(std::make_tuple(m, rho, nc, id), std::make_tuple(c11, c12, c13, c22, c23, c33, id),
+                        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K, iadConditionQuality});
 }
 
 } // namespace sph

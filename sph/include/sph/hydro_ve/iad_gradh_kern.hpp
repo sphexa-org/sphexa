@@ -51,8 +51,8 @@ struct IADGradhInteraction
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
                               T r2) const
     {
-        const auto [i, iPos, hi, mi, xmi, kxi, nci] = iData;
-        const auto [j, jPos, hj, mj, xmj, kxj, ncj] = jData;
+        const auto [i, iPos, hi, mi, xmi, kxi, nci, id_i] = iData;
+        const auto [j, jPos, hj, mj, xmj, kxj, ncj, id_j] = jData;
 
         T rx = r_ij[0];
         T ry = r_ij[1];
@@ -87,14 +87,13 @@ struct IADGradhInteraction
 template<class T, class Tc>
 struct IADGradhPostamble
 {
-    Tc        K;
-    T         iadConditionQuality{};
-    uint64_t* id{nullptr};
+    Tc K;
+    T   iadConditionQuality{};
 
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
-        const auto [i, iPos, hi, mi, xmi, kxi, nci]                                  = iData;
+        const auto [i, iPos, hi, mi, xmi, kxi, nci, id_i]                            = iData;
         auto [tau11, tau12, tau13, tau22, tau23, tau33, whomegai, wrho0i, sum_error] = result;
 
         auto getExp    = [](T val) { return (val == T(0) ? 0 : std::ilogb(val)); };
@@ -111,7 +110,7 @@ struct IADGradhPostamble
 
         auto [det, regularize] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
         if (regularize) { regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality); }
-        id[i] = setRegularizationTag(regularize, id[i]);
+        uint64_t newId = setRegularizationTag(regularize, id_i);
 
         // note normalization factor: cij have units of 1/tau because det is proportional to tau^3, so we have to
         // divide by K/h^3
@@ -148,7 +147,7 @@ struct IADGradhPostamble
         T dhdrho = -hi / (rhoi * T(3)); // This /3 is the dimension hard-coded.
 
         T gradhi = T(1) - dhdrho * whomegai;
-        return std::make_tuple(c11i, c12i, c13i, c22i, c23i, c33i, gradhi);
+        return std::make_tuple(c11i, c12i, c13i, c22i, c23i, c33i, gradhi, newId);
     }
 };
 
