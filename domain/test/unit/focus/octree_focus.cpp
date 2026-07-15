@@ -333,8 +333,6 @@ static void computeEssentialTree()
     std::for_each(keys.begin(), keys.end(), [n = nParticles](auto& k) { k *= double(nodeRange<KeyType>(0)) / n; });
 
     auto [csTree, csCounts] = computeOctree<KeyType>(keys, csBucketSize);
-    Octree<KeyType> globalTree;
-    globalTree.update(csTree.data(), nNodes(csTree));
 
     unsigned bucketSize = 16;
     float theta         = 0.9;

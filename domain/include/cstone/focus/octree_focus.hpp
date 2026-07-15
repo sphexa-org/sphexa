@@ -43,7 +43,7 @@
 namespace cstone
 {
 
-//! @brief Encapsulation to allow making this a friend of Octree<KeyType>
+//! @brief Encapsulation to allow making this a friend of OctreeData<KeyType, execution::Cpu>
 template<class KeyType>
 struct CombinedUpdate
 {
