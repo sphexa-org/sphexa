@@ -390,4 +390,20 @@ __device__ __forceinline__ float atomicMaxFloat(float* addr, float value)
                            : __uint_as_float(atomicMin((unsigned int*)addr, __float_as_uint(value)));
 }
 
+// adapted from float version above
+__device__ __forceinline__ double atomicMinDouble(double* addr, double value)
+{
+    return !signbit(value) ? __longlong_as_double(atomicMin((long long*)addr, __double_as_longlong(value)))
+                           : __longlong_as_double(
+                                 atomicMax((unsigned long long*)addr, (unsigned long long)__double_as_longlong(value)));
+}
+
+// adapted from float version above
+__device__ __forceinline__ double atomicMaxDouble(double* addr, double value)
+{
+    return !signbit(value) ? __longlong_as_double(atomicMax((long long*)addr, __double_as_longlong(value)))
+                           : __longlong_as_double(
+                                 atomicMin((unsigned long long*)addr, (unsigned long long)__double_as_longlong(value)));
+}
+
 } // namespace cstone
