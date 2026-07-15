@@ -494,3 +494,87 @@ TEST_F(SphKernelTests, XMass)
     EXPECT_NEAR(xmass, m[0] / rho0i, 1e-10);
     EXPECT_NEAR(xmass, m[0] / rho0[0], m[0] / rho0[0] * 1.e-7);
 }
+
+TEST(RegularizeIadMomentMatrix, NoRegularizationWhenTargetZero)
+{
+    float tau11 = 1.0f, tau12 = 0.1f, tau13 = 0.2f, tau22 = 2.0f, tau23 = 0.3f, tau33 = 3.0f;
+    float orig11 = tau11, orig12 = tau12, orig13 = tau13;
+    float orig22 = tau22, orig23 = tau23, orig33 = tau33;
+    bool wasRegularized = true;
+
+    float det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, 0.0f, &wasRegularized);
+
+    EXPECT_FALSE(wasRegularized);
+    EXPECT_EQ(tau11, orig11);
+    EXPECT_EQ(tau12, orig12);
+    EXPECT_EQ(tau13, orig13);
+    EXPECT_EQ(tau22, orig22);
+    EXPECT_EQ(tau23, orig23);
+    EXPECT_EQ(tau33, orig33);
+    float expectedDet = iadMomentDet(orig11, orig12, orig13, orig22, orig23, orig33);
+    EXPECT_NEAR(det, expectedDet, 1e-6);
+}
+
+TEST(RegularizeIadMomentMatrix, NoRegularizationWhenQualitySufficient)
+{
+    float tau11 = 1.0f, tau12 = 0.0f, tau13 = 0.0f, tau22 = 1.0f, tau23 = 0.0f, tau33 = 1.0f;
+    float orig11 = tau11, orig12 = tau12, orig13 = tau13;
+    float orig22 = tau22, orig23 = tau23, orig33 = tau33;
+    bool wasRegularized = true;
+
+    float trAvg = (orig11 + orig22 + orig33) / 3.0f;
+    float qualityBefore = iadMomentQuality(iadMomentDet(orig11, orig12, orig13, orig22, orig23, orig33), trAvg);
+    float target = 0.1f;
+    ASSERT_GE(qualityBefore, target);
+
+    float det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, target, &wasRegularized);
+
+    EXPECT_FALSE(wasRegularized);
+    EXPECT_EQ(tau11, orig11);
+    EXPECT_EQ(tau22, orig22);
+    EXPECT_EQ(tau33, orig33);
+    float expectedDet = iadMomentDet(orig11, orig12, orig13, orig22, orig23, orig33);
+    EXPECT_NEAR(det, expectedDet, 1e-6);
+}
+
+TEST(RegularizeIadMomentMatrix, RegularizesDegenerateMatrix)
+{
+    float tau11 = 1.0f, tau12 = 0.0f, tau13 = 0.0f, tau22 = 1.0f, tau23 = 0.0f, tau33 = 0.0f;
+    float orig11 = tau11, orig12 = tau12, orig13 = tau13;
+    float orig22 = tau22, orig23 = tau23, orig33 = tau33;
+    float target = 0.5f;
+    bool wasRegularized = false;
+
+    float det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, target, &wasRegularized);
+
+    EXPECT_TRUE(wasRegularized);
+    EXPECT_EQ(tau12, orig12);
+    EXPECT_EQ(tau13, orig13);
+    EXPECT_EQ(tau23, orig23);
+    float delta11 = tau11 - orig11;
+    float delta22 = tau22 - orig22;
+    float delta33 = tau33 - orig33;
+    EXPECT_NEAR(delta11, delta22, 1e-6);
+    EXPECT_NEAR(delta11, delta33, 1e-6);
+    float trAvgNew = (tau11 + tau22 + tau33) / 3.0f;
+    float qualityNew = iadMomentQuality(det, trAvgNew);
+    EXPECT_NEAR(qualityNew, target, 1e-6);
+}
+
+TEST(RegularizeIadMomentMatrix, RegularizesWithOffDiagonal)
+{
+    float tau11 = 2.0f, tau12 = 0.5f, tau13 = -0.3f, tau22 = 1.0f, tau23 = 0.2f, tau33 = 0.0f;
+    float orig12 = tau12, orig13 = tau13, orig23 = tau23;
+    float target = 0.3f;
+    bool wasRegularized = false;
+
+    float det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, target, &wasRegularized);
+
+    EXPECT_TRUE(wasRegularized);
+    EXPECT_EQ(tau12, orig12);
+    EXPECT_EQ(tau13, orig13);
+    EXPECT_EQ(tau23, orig23);
+    float trAvgNew = (tau11 + tau22 + tau33) / 3.0f;
+    float qualityNew = iadMomentQuality(det, trAvgNew);
+    EXPECT_NEAR(qualityNew, target, 1e-6);
+}
