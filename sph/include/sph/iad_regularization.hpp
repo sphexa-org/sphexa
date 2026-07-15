@@ -56,20 +56,27 @@ HOST_DEVICE_FUN constexpr T regularizeIadMomentMatrix(T& tau11, T& tau12, T& tau
     if (quality >= target) { return det; }
 
     T secondInvariant = iadMomentSecondInvariant(tau11, tau12, tau13, tau22, tau23, tau33);
-    T lo = T(0);
-    T hi = T(1);
 
-    for (int iter = 0; iter < 64 && iadRidgeQuality(det, secondInvariant, trace, trAvg, hi) < target; ++iter)
+    T a = det / (trAvg * trAvg * trAvg);
+    T b = secondInvariant / (trAvg * trAvg);
+    T c3 = T(1) - target;
+    T c2 = T(3) * c3;
+    T c1 = b - T(3) * target;
+    T c0 = a - target;
+
+    auto f = [&](T lam) { return c3 * lam * lam * lam + c2 * lam * lam + c1 * lam + c0; };
+
+    T hi = T(1);
+    for (int iter = 0; iter < 10; ++iter)
     {
-        lo = hi;
+        if (f(hi) >= T(0)) break;
         hi *= T(2);
     }
 
-    for (int iter = 0; iter < 48; ++iter)
+    for (int iter = 0; iter < 8; ++iter)
     {
-        T mid = T(0.5) * (lo + hi);
-        if (iadRidgeQuality(det, secondInvariant, trace, trAvg, mid) < target) { lo = mid; }
-        else { hi = mid; }
+        T fp = T(3) * c3 * hi * hi + T(2) * c2 * hi + c1;
+        hi -= f(hi) / fp;
     }
 
     T delta = hi * trAvg;
