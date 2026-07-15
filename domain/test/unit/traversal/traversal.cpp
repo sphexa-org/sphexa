@@ -136,8 +136,8 @@ void dualTraversalNeighbors()
 
     auto crossFocusSurfacePairs = [focusStart, focusEnd, &tree = octree, &box](TreeNodeIndex a, TreeNodeIndex b)
     {
-        auto [ka1, ka2] = decodePlaceholderBit2K(tree.prefixes[a]);
-        auto [kb1, kb2] = decodePlaceholderBit2K(tree.prefixes[b]);
+        auto [ka1, ka2]    = decodePlaceholderBit2K(tree.prefixes[a]);
+        auto [kb1, kb2]    = decodePlaceholderBit2K(tree.prefixes[b]);
         bool aFocusOverlap = overlapTwoRanges(focusStart, focusEnd, ka1, ka2);
         bool bInFocus      = containedIn(kb1, kb2, focusStart, focusEnd);
         if (!aFocusOverlap || bInFocus) { return false; }

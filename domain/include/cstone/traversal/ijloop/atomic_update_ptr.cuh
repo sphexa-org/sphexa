@@ -47,6 +47,8 @@ __device__ __forceinline__ void atomicMinPtr(T* ptr, T value)
 
 __device__ __forceinline__ void atomicMinPtr(float* ptr, float value) { atomicMinFloat(ptr, value); }
 
+__device__ __forceinline__ void atomicMinPtr(double* ptr, double value) { atomicMinDouble(ptr, value); }
+
 template<class T, std::size_t N>
 __device__ __forceinline__ void atomicMinPtr(util::array<T, N>* ptr, util::array<T, N> const& value)
 {
@@ -62,6 +64,8 @@ __device__ __forceinline__ void atomicMaxPtr(T* ptr, T value)
 }
 
 __device__ __forceinline__ void atomicMaxPtr(float* ptr, float value) { atomicMaxFloat(ptr, value); }
+
+__device__ __forceinline__ void atomicMaxPtr(double* ptr, double value) { atomicMaxDouble(ptr, value); }
 
 template<class T, std::size_t N>
 __device__ __forceinline__ void atomicMaxPtr(util::array<T, N>* ptr, util::array<T, N> const& value)
