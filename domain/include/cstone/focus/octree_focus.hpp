@@ -32,9 +32,7 @@
 #include "cstone/focus/rebalance.hpp"
 #include "cstone/focus/rebalance_gpu.h"
 #include "cstone/focus/source_center.hpp"
-#include "cstone/focus/source_center_gpu.h"
 #include "cstone/primitives/primitives_gpu.h"
-#include "cstone/traversal/collisions_gpu.h"
 #include "cstone/traversal/macs.hpp"
 #include "cstone/tree/csarray_gpu.h"
 #include "cstone/tree/octree.hpp"
@@ -43,7 +41,6 @@
 namespace cstone
 {
 
-//! @brief Encapsulation to allow making this a friend of OctreeData<KeyType, execution::Cpu>
 template<class KeyType>
 struct CombinedUpdate
 {
