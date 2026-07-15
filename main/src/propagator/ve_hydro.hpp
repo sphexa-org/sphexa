@@ -159,7 +159,7 @@ public:
         release(d, "ay", "az");
         acquire(d, "divv", "gradh");
         computeIadDivvCurlvGradh(groups_.view(), d, domain.box());
-        if (d.condition_quality_target > 0.)
+        if (d.iadConditionQuality > 0.)
         {
             Base::printAndClearIadRegularizationStats(d, groups_.view().firstBody, groups_.view().lastBody);
         }

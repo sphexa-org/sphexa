@@ -155,7 +155,7 @@ protected:
         if (rank_ == 0)
         {
             out << "### IAD regularization ###: " << globalCount << " / " << d.numParticlesGlobal
-                << " particles, target " << d.condition_quality_target << std::endl;
+                << " particles, target " << d.iadConditionQuality << std::endl;
         }
     }
 

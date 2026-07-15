@@ -44,6 +44,8 @@ namespace sphexa
 
 using CoordinateType = sph::SphTypes::CoordinateType;
 
+constexpr uint64_t tagNumBits = sph::IDLayout::tagNumBits;
+
 /*! @brief Given tagNumBits, the maximum number of groups we can address is 2^tagNumBits - 1.
  * We subtract one, because groupId=0 corresponds to an unmasked particle ID
  */

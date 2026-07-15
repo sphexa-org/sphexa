@@ -48,7 +48,7 @@ void computeIadDivvCurlvGradh(const GroupView& grp, Dataset& d, const cstone::Bo
                                 d.c23.data(), d.c33.data(), d.wh.data(), d.whd.data(), d.gradh.data(), d.divv.data(),
                                 d.curlv.size() == d.x.size() ? d.curlv.data() : nullptr, d.dV11.data(), d.dV12.data(),
                                 d.dV13.data(), d.dV22.data(), d.dV23.data(), d.dV33.data(),
-                                d.dV11.size() == d.x.size(), d.condition_quality_target, d.id.data());
+                                d.dV11.size() == d.x.size(), d.iadConditionQuality, d.id.data());
     }
 }
 

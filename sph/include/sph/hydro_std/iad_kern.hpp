@@ -51,7 +51,7 @@ template<class T, class Tc>
 struct IADPostambleSTD
 {
     Tc        K;
-    T         condition_quality_target{};
+    T         iadConditionQuality{};
     uint64_t* id{nullptr};
 
     template<class ParticleData, class Result>
@@ -73,9 +73,9 @@ struct IADPostambleSTD
         tau33 *= normalization;
 
         bool wasRegularized = false;
-        T    det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, condition_quality_target,
+        T    det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality,
                                              &wasRegularized);
-        if (condition_quality_target > 0.) { id[i] = setRegularizationTag(wasRegularized, id[i]); }
+        if (iadConditionQuality > 0.) { id[i] = setRegularizationTag(wasRegularized, id[i]); }
 
         // Note normalization factor: cij have units of 1/tau because det is proportional to tau^3 so we have to
         // divide by K/h^3.
@@ -97,10 +97,10 @@ struct IADPostambleSTD
 
 template<class Neighborhood, class Tc, class Tm, class T>
 void IADIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* rho, const unsigned* nc, const T* wh,
-               T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, T condition_quality_target, uint64_t* id)
+               T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, T iadConditionQuality, uint64_t* id)
 {
     neighborhood.ijLoop(std::make_tuple(m, rho, nc), std::make_tuple(c11, c12, c13, c22, c23, c33),
-                        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K, condition_quality_target, id});
+                        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K, iadConditionQuality, id});
 }
 
 } // namespace sph

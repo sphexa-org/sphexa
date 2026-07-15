@@ -72,7 +72,7 @@ template<bool DoCurlV, bool DoGradV, class T, class Tc>
 struct IADDivVCurlVPostamble
 {
     Tc K;
-    T        condition_quality_target;
+    T        iadConditionQuality;
     uint64_t* id{nullptr};
 
     template<class ParticleData, class Result>
@@ -83,7 +83,7 @@ struct IADDivVCurlVPostamble
               dVxiZFactor, dVyiXFactor, dVyiYFactor, dVyiZFactor, dVziXFactor, dVziYFactor, dVziZFactor] = result;
 
         auto const [c11i, c12i, c13i, c22i, c23i, c33i, gradhi] =
-            IADGradhPostamble<T, Tc>{K, condition_quality_target, id}(
+            IADGradhPostamble<T, Tc>{K, iadConditionQuality, id}(
                 std::make_tuple(i, iPos, hi, mi, xmi, kxi, nci),
                 std::make_tuple(tau11, tau12, tau13, tau22, tau23, tau33, whomegai, wrho0i, sum_error));
 
@@ -100,7 +100,7 @@ template<class Neighborhood, class Tc, class T>
 void iadDivvCurlvGradhIjLoop(const Neighborhood& neighborhood, Tc K, const T* vx, const T* vy, const T* vz, const T* m,
                              const T* xm, const T* kx, const unsigned* nc, T* c11, T* c12, T* c13, T* c22, T* c23,
                              T* c33, const T* wh, const T* whd, T* gradh, T* divv, T* curlv, T* dV11, T* dV12, T* dV13,
-                             T* dV22, T* dV23, T* dV33, bool doGradV, T condition_quality_target,
+                             T* dV22, T* dV23, T* dV33, bool doGradV, T iadConditionQuality,
                              uint64_t* id)
 {
     const auto input = std::make_tuple(vx, vy, vz, m, xm, kx, nc);
@@ -109,26 +109,26 @@ void iadDivvCurlvGradhIjLoop(const Neighborhood& neighborhood, Tc K, const T* vx
         const auto output =
             std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33);
         neighborhood.ijLoop(input, output, IADDivVCurlVInteraction<T>{wh, whd},
-                            IADDivVCurlVPostamble<true, true, T, Tc>{K, condition_quality_target, id});
+                            IADDivVCurlVPostamble<true, true, T, Tc>{K, iadConditionQuality, id});
     }
     else if (curlv)
     {
         const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, divv, curlv);
         neighborhood.ijLoop(input, output, IADDivVCurlVInteraction<T>{wh, whd},
-                            IADDivVCurlVPostamble<true, false, T, Tc>{K, condition_quality_target, id});
+                            IADDivVCurlVPostamble<true, false, T, Tc>{K, iadConditionQuality, id});
     }
     else if (doGradV)
     {
         const auto output =
             std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, divv, dV11, dV12, dV13, dV22, dV23, dV33);
         neighborhood.ijLoop(input, output, IADDivVCurlVInteraction<T>{wh, whd},
-                            IADDivVCurlVPostamble<false, true, T, Tc>{K, condition_quality_target, id});
+                            IADDivVCurlVPostamble<false, true, T, Tc>{K, iadConditionQuality, id});
     }
     else
     {
         const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, divv);
         neighborhood.ijLoop(input, output, IADDivVCurlVInteraction<T>{wh, whd},
-                            IADDivVCurlVPostamble<false, false, T, Tc>{K, condition_quality_target, id});
+                            IADDivVCurlVPostamble<false, false, T, Tc>{K, iadConditionQuality, id});
     }
 }
 

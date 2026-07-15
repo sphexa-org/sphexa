@@ -88,7 +88,7 @@ template<class T, class Tc>
 struct IADGradhPostamble
 {
     Tc        K;
-    T         condition_quality_target{};
+    T         iadConditionQuality{};
     uint64_t* id{nullptr};
 
     template<class ParticleData, class Result>
@@ -110,9 +110,9 @@ struct IADGradhPostamble
         tau33 *= normalization;
 
         bool wasRegularized = false;
-        T    det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, condition_quality_target,
+        T    det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality,
                                              &wasRegularized);
-        if (condition_quality_target > 0.) { id[i] = setRegularizationTag(wasRegularized, id[i]); }
+        if (iadConditionQuality > 0.) { id[i] = setRegularizationTag(wasRegularized, id[i]); }
 
         // note normalization factor: cij have units of 1/tau because det is proportional to tau^3, so we have to
         // divide by K/h^3
