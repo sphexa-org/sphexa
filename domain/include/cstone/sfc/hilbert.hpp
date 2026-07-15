@@ -24,8 +24,6 @@
 
 #pragma once
 
-#include <iostream>
-
 #include "cstone/util/tuple.hpp"
 #include "morton.hpp"
 
@@ -181,13 +179,41 @@ iHilbert(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, unsign
 
     if (bits[1] > bits[2]) // 2 dims have more bits than the 3rd, add 2D levels
     {
-        const int n = bits[1] - bits[2];
-        // encode n 2D levels with 2D-Hilbert and add it to the key
-        // 2D key needs to be computed only for n bits
+        const int n        = bits[1] - bits[2];
+        const KeyType mask = (static_cast<KeyType>(1) << bits[2]) - 1;
+
+        /* key2D is computed by the real iHilbert2D, exactly as before. Each of its 2-bit digits is
+         * `2*xi + (xi^yi)` (see iHilbert2D), i.e. it already encodes (xi, xi^yi) for that level, so
+         * (xi, yi) can be recovered directly from key2D's own bits without duplicating iHilbert2D's
+         * recursion. Using that, apply the identical swap/complement that iHilbert2D performs on
+         * (hiX, hiY) internally to the low (to-be-3D-encoded) bits (lowX, lowY) instead, so that by the
+         * time we reach the 3D-Hilbert suffix, its coordinates are expressed in the orientation implied
+         * by the 2D digits - this is the forward counterpart of the rotation that decodeHilbert() undoes.
+         * z is left untouched, exactly as iHilbert2D never touches a third coordinate. Levels are
+         * processed from n-1 (coarsest, decided first by iHilbert2D) down to 0 (finest, adjacent to the
+         * 3D suffix), matching iHilbert2D's own descent order. */
         const KeyType key2D = iHilbert2D<KeyType>(sortedCoordinates[0] >> bits[2], sortedCoordinates[1] >> bits[2], n);
-        // IM: Check if we want to the 2D key together or break it from 2 bits per level to 3 bits per level
-        // key |= key2D << (3 * bits[2]);
-        // or below
+
+        KeyType lowX = sortedCoordinates[0] & mask;
+        KeyType lowY = sortedCoordinates[1] & mask;
+        for (int level = n - 1; level >= 0; --level)
+        {
+            const auto quad   = static_cast<unsigned>((key2D >> (2 * level)) & 3u);
+            const unsigned xi = (quad >> 1) & 1u;
+            const unsigned yi = xi ^ (quad & 1u);
+            if (yi == 0)
+            {
+                KeyType tmp = lowX;
+                lowX        = lowY;
+                lowY        = tmp;
+                if (xi == 1)
+                {
+                    lowX = mask - lowX;
+                    lowY = mask - lowY;
+                }
+            }
+        }
+
         for (int i{0}; i < n; ++i)
         {
             const auto processes2DKeyBitIndex      = n - 1 - i;
@@ -195,10 +221,9 @@ iHilbert(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, unsign
             key |= static_cast<KeyType>(static_cast<KeyType>(key2D >> (2 * processes2DKeyBitIndex)) & 3)
                    << (3 * processesCoordinateBitIndex);
         }
-        // remove n bits from sortedCoordinates[0] and sortedCoordinates[1]
-        const KeyType mask = (static_cast<KeyType>(1) << bits[2]) - 1;
-        sortedCoordinates[0] &= mask;
-        sortedCoordinates[1] &= mask;
+        // low bits are now the rotated (lowX, lowY), ready to be fed into the 3D-Hilbert suffix
+        sortedCoordinates[0] = lowX;
+        sortedCoordinates[1] = lowY;
         bits[0] -= n;
         bits[1] -= n;
         // now we have bits[0] == bits[1] == bits[2]
@@ -210,7 +235,8 @@ iHilbert(unsigned px, unsigned py, unsigned pz, unsigned bx, unsigned by, unsign
     assert(sortedCoordinates[1] < (static_cast<KeyType>(1) << bits[2]));
 
     // encode remaining bits[0] == min(bx,by,bz) 3D levels or octal digits with 3D-Hilbert and add to key
-    const KeyType key3D = iHilbert3D<KeyType>(sortedCoordinates[0], sortedCoordinates[1], sortedCoordinates[2]);
+    const KeyType key3D =
+        iHilbert3D<KeyType>(sortedCoordinates[0], sortedCoordinates[1], sortedCoordinates[2], bits[2]);
     key |= key3D;
     // Example for (bx,by,bz) = (10,9,7): 1D,2D,2D,3D*7
 
@@ -382,11 +408,10 @@ decodeHilbert(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
         }
         key &= (static_cast<KeyType>(1) << (3 * bits[1])) - 1;
     }
+    KeyType key2D{};
     if (bits[1] > bits[2]) // 2 dims have more bits than the 3rd, add 2D levels
     {
         const int n = bits[1] - bits[2];
-        // const auto key2D  = key >> (3 * bits[2]);
-        KeyType key2D{};
         for (int i{}; i < n; ++i)
         {
             const auto processes2DKeyBitIndex      = n - 1 - i;
@@ -399,11 +424,43 @@ decodeHilbert(KeyType key, unsigned bx, unsigned by, unsigned bz) noexcept
         coordinates[1] |= (get<1>(pair2D) & ((static_cast<KeyType>(1) << n) - 1)) << bits[2];
         key &= (static_cast<KeyType>(1) << (3 * bits[2])) - 1;
     }
+    const auto shift3D     = maxTreeLevel<KeyType>{} - bits[2];
+    const auto pair3D      = decodeHilbert3D<KeyType>(key << (3 * shift3D));
+    KeyType x3d            = get<0>(pair3D) >> shift3D;
+    KeyType y3d            = get<1>(pair3D) >> shift3D;
+    KeyType z3d            = get<2>(pair3D) >> shift3D;
+    const KeyType maxCoord = (static_cast<KeyType>(1) << bits[2]) - static_cast<KeyType>(1);
 
-    const auto pair3D = decodeHilbert3D<KeyType>(key);
-    coordinates[0] |= get<0>(pair3D);
-    coordinates[1] |= get<1>(pair3D);
-    coordinates[2] |= get<2>(pair3D);
+    /* Undo the per-level swap/complement performed by the 2D-Hilbert curve, mirroring decodeHilbert2D.
+     * iHilbert2D appends 2 bits per level: high bit = xi, low bit = xi ^ yi (see the `2*xi + (xi^yi)`
+     * term in iHilbert2D). decodeHilbert2D recovers (xi, yi) from those two bits (sa = xi, sa^sb = yi)
+     * and, whenever yi == 0, swaps its running (x, y) accumulator and, if xi == 1, complements it.
+     * The same (xi, yi) pair also determines which orientation the 3D sub-cube was reached in, so the
+     * identical swap/complement must be undone here on (x3d, y3d) - z3d is untouched, exactly as z is
+     * left untouched by iHilbert2D. Levels are processed from i = 0 (finest, adjacent to the 3D suffix)
+     * out to the coarsest 2D level, i.e. the reverse order in which iHilbert encoded them. */
+    const int num2DLevels = bits[1] > bits[2] ? bits[1] - bits[2] : 0;
+    for (int i = 0; i < num2DLevels; ++i)
+    {
+        const auto quad   = static_cast<unsigned>((key2D >> (2 * i)) & 3u);
+        const unsigned xi = (quad >> 1) & 1u;
+        const unsigned yi = xi ^ (quad & 1u);
+        if (yi == 0)
+        {
+            KeyType tmp = x3d;
+            x3d         = y3d;
+            y3d         = tmp;
+            if (xi == 1)
+            {
+                x3d = maxCoord - x3d;
+                y3d = maxCoord - y3d;
+            }
+        }
+    }
+
+    coordinates[0] |= x3d;
+    coordinates[1] |= y3d;
+    coordinates[2] |= z3d;
 
     KeyType returnCoordinates[3]      = {0, 0, 0};
     returnCoordinates[permutation[0]] = coordinates[0];

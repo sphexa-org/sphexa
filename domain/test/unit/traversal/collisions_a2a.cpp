@@ -95,7 +95,7 @@ public:
 
         const auto axesBits       = box.getBoxDimBits(maxTreeLevel<KeyType>{});
         std::vector<KeyType> keys = makeRandomGaussianKeys<KeyType>(numParticles, 42, axesBits);
-        auto [tree, counts] = computeOctree<KeyType>(keys, 4);
+        auto [tree, counts]       = computeOctree<KeyType>(keys, 4);
 
         OctreeData<KeyType, execution::Cpu> octree;
         octree.resize(nNodes(tree));
