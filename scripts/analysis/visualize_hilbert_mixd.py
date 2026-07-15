@@ -104,6 +104,36 @@ def count_mixd_nodes_at_level(bx: int, by: int, bz: int, level_from_right: int) 
     return 1 << exponent
 
 
+def increase_key(key: int, pos: int, bx: int, by: int, bz: int, max_level: int) -> int:
+    """Return the next valid MixD Hilbert key by adding 1 at octal position pos (counted from left, 1-based)."""
+    b0, b1, b2 = sorted((bx, by, bz))  # b0 = min bits, b1 = median, b2 = max bits
+
+    while pos > 0:
+        pos_from_left = max_level - pos
+
+        if pos_from_left >= b2:
+            return key  # inactive digit, carry stops / overflow
+
+        if pos_from_left >= b1:
+            max_digit = 1
+        elif pos_from_left >= b0:
+            max_digit = 3
+        else:
+            max_digit = 7
+
+        shift = 3 * pos_from_left
+        digit = (key >> shift) & 7
+        key &= ~(7 << shift)  # clear current digit
+
+        if digit < max_digit:
+            return key | ((digit + 1) << shift)
+
+        # digit was at max: wrap to 0 (already cleared) and carry to next position
+        pos -= 1
+
+    return key
+
+
 def main() -> None:
     args = parse_args()
     validate_lengths(args.lx, args.ly, args.lz)
@@ -165,9 +195,9 @@ def main() -> None:
             if len(xs) % 100000 == 0:
                 print(f"Processed {len(xs)} points...")
 
-        # increaseKey position is counted from the left (0..max_level), while args.level is from the right.
-        # increaseKey is used to create the keys of the leaf nodes of the octree at the specified level.
-        next_key = int(cstone_sfc.increaseKey(key, octree_level, bx, by, bz, args.key_type))
+        # increase_key position is counted from the left (0..max_level), while args.level is from the right.
+        # increase_key is used to create the keys of the leaf nodes of the octree at the specified level.
+        next_key = increase_key(key, octree_level, bx, by, bz, max_level)
         if node_idx == total_nodes - 1:
             break
         if next_key <= key:
