@@ -51,8 +51,8 @@ struct IADGradhInteraction
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
                               T r2) const
     {
-        const auto [i, iPos, hi, mi, xmi, kxi, nci, id_i] = iData;
-        const auto [j, jPos, hj, mj, xmj, kxj, ncj, id_j] = jData;
+        const auto [i, iPos, hi, mi, xmi, kxi, nci, idi] = iData;
+        const auto [j, jPos, hj, mj, xmj, kxj, ncj, idj] = jData;
 
         T rx = r_ij[0];
         T ry = r_ij[1];
@@ -93,7 +93,7 @@ struct IADGradhPostamble
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
-        const auto [i, iPos, hi, mi, xmi, kxi, nci, id_i]                            = iData;
+        const auto [i, iPos, hi, mi, xmi, kxi, nci, idi]                            = iData;
         auto [tau11, tau12, tau13, tau22, tau23, tau33, whomegai, wrho0i, sum_error] = result;
 
         auto getExp    = [](T val) { return (val == T(0) ? 0 : std::ilogb(val)); };
@@ -110,7 +110,7 @@ struct IADGradhPostamble
 
         auto [det, regularize] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
         if (regularize) { regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality); }
-        uint64_t newId = setRegularizationTag(regularize, id_i);
+        uint64_t newId = setRegularizationTag(regularize, idi);
 
         // note normalization factor: cij have units of 1/tau because det is proportional to tau^3, so we have to
         // divide by K/h^3

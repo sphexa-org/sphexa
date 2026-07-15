@@ -56,7 +56,7 @@ struct IADPostambleSTD
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
-        const auto [i, iPos, hi, mi, roi, nci, id_i]         = iData;
+        const auto [i, iPos, hi, mi, roi, nci, idi]         = iData;
         auto [tau11, tau12, tau13, tau22, tau23, tau33]      = result;
 
         auto getExp    = [](T val) { return (val == T(0) ? 0 : std::ilogb(val)); };
@@ -73,7 +73,7 @@ struct IADPostambleSTD
 
         auto [det, regularize] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
         if (regularize) { regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality); }
-        uint64_t newId = setRegularizationTag(regularize, id_i);
+        uint64_t newId = setRegularizationTag(regularize, idi);
 
         // Note normalization factor: cij have units of 1/tau because det is proportional to tau^3 so we have to
         // divide by K/h^3.

@@ -49,11 +49,11 @@ struct IADDivVCurlVInteraction
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, const cstone::Vec3<Tc>& r_ij,
                               const T r2) const
     {
-        auto const [i, iPos, hi, vxi, vyi, vzi, mi, xmi, kxi, nci, id_i] = iData;
-        auto const [j, jPos, hj, vxj, vyj, vzj, mj, xmj, kxj, ncj, id_j] = jData;
+        auto const [i, iPos, hi, vxi, vyi, vzi, mi, xmi, kxi, nci, idi] = iData;
+        auto const [j, jPos, hj, vxj, vyj, vzj, mj, xmj, kxj, ncj, idj] = jData;
 
-        auto iadIData  = std::make_tuple(i, iPos, hi, mi, xmi, kxi, nci, id_i);
-        auto iadJData  = std::make_tuple(j, jPos, hj, mj, xmj, kxj, ncj, id_j);
+        auto iadIData  = std::make_tuple(i, iPos, hi, mi, xmi, kxi, nci, idi);
+        auto iadJData  = std::make_tuple(j, jPos, hj, mj, xmj, kxj, ncj, idj);
         auto iadResult = IADGradhInteraction<T>{wh, whd}(iadIData, iadJData, r_ij, r2);
 
         // c11i ... c33i are only read in postamble, so we can pass dummy values here
