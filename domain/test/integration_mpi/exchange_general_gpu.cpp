@@ -98,9 +98,6 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
 
     auto [tree, counts] = computeOctree<KeyType>(coords.particleKeys(), bucketSize);
 
-    Octree<KeyType> domainTree;
-    domainTree.update(tree.data(), nNodes(tree));
-
     auto assignment = makeSfcAssignment(numRanks, counts, tree.data());
 
     // *******************************

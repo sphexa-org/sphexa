@@ -33,8 +33,9 @@ int main()
     auto keys = makeRandomGaussianKeys<KeyType>(nParticles);
 
     auto [treeLeaves, counts] = computeOctree<KeyType>(keys, bucketSize);
-    Octree<KeyType> octree;
-    octree.update(treeLeaves.data(), nNodes(treeLeaves));
+    OctreeData<KeyType, execution::Cpu> octree;
+    octree.resize(nNodes(treeLeaves));
+    updateInternalTree<KeyType>(treeLeaves, octree.data());
 
     auto assignment = makeSfcAssignment(numRanks, counts, treeLeaves.data());
     int probeRank   = numRanks / 2;
