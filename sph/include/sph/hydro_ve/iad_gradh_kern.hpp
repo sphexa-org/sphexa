@@ -109,10 +109,9 @@ struct IADGradhPostamble
         tau23 *= normalization;
         tau33 *= normalization;
 
-        bool wasRegularized = false;
-        T    det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality,
-                                             &wasRegularized);
-        if (iadConditionQuality > 0.) { id[i] = setRegularizationTag(wasRegularized, id[i]); }
+        auto [det, regularize] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
+        if (regularize) { regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality); }
+        id[i] = setRegularizationTag(regularize, id[i]);
 
         // note normalization factor: cij have units of 1/tau because det is proportional to tau^3, so we have to
         // divide by K/h^3

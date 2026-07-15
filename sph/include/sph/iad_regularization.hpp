@@ -36,20 +36,24 @@ HOST_DEVICE_FUN constexpr T iadRidgeQuality(T det, T secondInvariant, T trace, T
 }
 
 template<class T>
-HOST_DEVICE_FUN constexpr T regularizeIadMomentMatrix(T& tau11, const T& tau12, const T& tau13, T& tau22,
-                                                      const T& tau23, T& tau33, T conditionQualityTarget,
-                                                      bool* wasRegularized = nullptr)
+HOST_DEVICE_FUN constexpr auto needRegularization(T tau11, T tau12, T tau13, T tau22, T tau23, T tau33, T qualityTarget)
 {
     T trace = tau11 + tau22 + tau33;
     T trAvg = trace / T(3);
     T det   = iadMomentDet(tau11, tau12, tau13, tau22, tau23, tau33);
 
-    if (wasRegularized) { *wasRegularized = false; }
-    conditionQualityTarget = stl::min(conditionQualityTarget, T(1) - T(64) * std::numeric_limits<T>::epsilon());
+    T    quality = iadMomentQuality(det, trAvg);
+    bool ret     = true;
+    if (quality >= qualityTarget) { ret = false; }
+    return std::make_tuple(det, ret);
+}
 
-    T quality = iadMomentQuality(det, trAvg);
-    if (quality >= conditionQualityTarget) { return det; }
-
+template<class T>
+HOST_DEVICE_FUN constexpr void regularizeIadMomentMatrix(T& tau11, const T& tau12, const T& tau13, T& tau22,
+                                                         const T& tau23, T& tau33, const T conditionQualityTarget)
+{
+    T trAvg           = (tau11 + tau22 + tau33) / T(3);
+    T det             = iadMomentDet(tau11, tau12, tau13, tau22, tau23, tau33);
     T secondInvariant = iadMomentSecondInvariant(tau11, tau12, tau13, tau22, tau23, tau33);
 
     T a  = det / (trAvg * trAvg * trAvg);
@@ -68,9 +72,10 @@ HOST_DEVICE_FUN constexpr T regularizeIadMomentMatrix(T& tau11, const T& tau12, 
         hi *= T(2);
     }
 
+    // Newtons method to find f(hi) == 0
     for (int iter = 0; iter < 8; ++iter)
     {
-        T fp = T(3) * c3 * hi * hi + T(2) * c2 * hi + c1;
+        T fp = T(3) * c3 * hi * hi + T(2) * c2 * hi + c1; // derivative of f
         hi -= f(hi) / fp;
     }
 
@@ -78,9 +83,6 @@ HOST_DEVICE_FUN constexpr T regularizeIadMomentMatrix(T& tau11, const T& tau12, 
     tau11 += delta;
     tau22 += delta;
     tau33 += delta;
-
-    if (wasRegularized) { *wasRegularized = true; }
-    return iadMomentDet(tau11, tau12, tau13, tau22, tau23, tau33);
 }
 
 } // namespace sph
