@@ -37,10 +37,6 @@ void checkConnectivity(OctreeData<KeyType, execution::Cpu>& fullTree)
         KeyType prefix = decodePlaceholderBit(prefixes[nodeIdx]);
         unsigned level = decodePrefixLength(prefixes[nodeIdx]) / 3;
 
-        //auto [rangeStart, rangeEnd] = decodePlaceholderBit2K(prefixes[nodeIdx]);
-        //EXPECT_EQ(rangeStart, prefix);
-        //EXPECT_EQ(rangeEnd, prefix + nodeRange<KeyType>(level));
-
         if (childOffsets[nodeIdx] != 0)
         {
             for (int octant = 0; octant < 8; ++octant)
