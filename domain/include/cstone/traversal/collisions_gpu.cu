@@ -29,7 +29,7 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
                                 const KeyType* leaves,
                                 const Vec3<T>* searchCenters,
                                 const Vec3<T>* searchSizes,
-                                const Box<T> box,
+                                __grid_constant__ const Box<T> box,
                                 TreeNodeIndex firstNode,
                                 TreeNodeIndex lastNode,
                                 uint8_t* collisionFlags)
@@ -42,6 +42,9 @@ __global__ void findHalosKernel(const KeyType* nodePrefixes,
         Vec3<T> tS         = searchSizes[leafIdx];
         KeyType lowestKey  = leaves[firstNode];
         KeyType highestKey = leaves[lastNode];
+
+        // A zero search size means this leaf does not have a valid MixD SFC key so it doesn't include any particles
+        if (tS == Vec3<T>{0, 0, 0}) { return; }
 
         // if the halo box is fully inside the assigned SFC range, we skip collision detection
         if (containedIn(lowestKey, highestKey, tC, tS, box)) { return; }
@@ -92,11 +95,12 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
                                   const TreeNodeIndex* childOffsets,
                                   const TreeNodeIndex* parents,
                                   const Vec4<T>* centers,
-                                  const Box<T> box,
+                                  __grid_constant__ const Box<T> box,
                                   const KeyType* focusNodes,
                                   TreeNodeIndex numFocusNodes,
                                   bool limitSource,
-                                  uint8_t* markings)
+                                  uint8_t* markings,
+                                  const AxesBits axesBits)
 {
     TreeNodeIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -105,10 +109,11 @@ __global__ void markMacsGpuKernel(const KeyType* prefixes,
     KeyType focusStart = focusNodes[0];
     KeyType focusEnd   = focusNodes[numFocusNodes];
 
-    IBox target    = sfcIBox(sfcKey(focusNodes[tid]), sfcKey(focusNodes[tid + 1]));
+    IBox target = sfcIBox(sfcKey(focusNodes[tid]), sfcKey(focusNodes[tid + 1]), axesBits);
+    if (target == IBox{}) { return; }
     IBox targetExt = IBox(target.xmin() - 1, target.xmax() + 1, target.ymin() - 1, target.ymax() + 1, target.zmin() - 1,
                           target.zmax() + 1);
-    if (containedIn(focusStart, focusEnd, targetExt)) { return; }
+    if (containedIn(focusStart, focusEnd, targetExt, axesBits)) { return; }
 
     auto [targetCenter, targetSize] = centerAndSize<KeyType>(target, box);
     unsigned maxLevel               = maxTreeLevel<KeyType>{};
@@ -132,10 +137,11 @@ void markMacsGpu(execution::Gpu exec,
     constexpr unsigned numThreads = 128;
     unsigned numBlocks            = iceil(numFocusNodes, numThreads);
 
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
     if (numFocusNodes)
     {
         markMacsGpuKernel<<<numBlocks, numThreads, 0, exec>>>(prefixes, childOffsets, parents, centers, box, focusNodes,
-                                                              numFocusNodes, limitSource, markings);
+                                                              numFocusNodes, limitSource, markings, axesBits);
     }
 }
 

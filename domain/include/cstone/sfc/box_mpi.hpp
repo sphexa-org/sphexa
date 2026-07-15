@@ -20,8 +20,6 @@
 #include <mpi.h>
 
 #include <algorithm>
-#include <cassert>
-#include <cmath>
 
 #include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/primitives/primitives_acc.hpp"
@@ -35,7 +33,7 @@ namespace cstone
 /*! @brief compute global bounding box for local x,y,z arrays
  *
  * @tparam     T            float or double
- * @tparam     Execution    execution policy (Cpu or Gpu)
+ * @tparam     Exec         execution policy (Cpu or Gpu)
  * @param[in]  x            x coordinate array start
  * @param[in]  y            y coordinate array start
  * @param[in]  z            z coordinate array start

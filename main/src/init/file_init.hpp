@@ -35,6 +35,7 @@
 #include "cstone/sfc/box.hpp"
 
 #include "isim_init.hpp"
+#include "cstone/sfc/sfc.hpp"
 
 namespace sphexa
 {
@@ -152,6 +153,13 @@ public:
         cstone::Box<T> box(0, 1);
         box.loadOrStore(reader);
 
+        const auto axesBits = box.getBoxDimBits(cstone::maxTreeLevel<KeyType>{});
+        if (axesBits != cstone::Vec3<unsigned>{cstone::maxTreeLevel<KeyType>{}, cstone::maxTreeLevel<KeyType>{},
+                                               cstone::maxTreeLevel<KeyType>{}})
+        {
+            throw std::runtime_error("Particle splitting not implemented for discontinuous SFCs\n");
+        }
+
         auto& d = simData.hydro;
         d.loadOrStoreAttributes(reader);
 
@@ -206,7 +214,7 @@ public:
 
                 for (int j = 1; j < numSplits; ++j)
                 {
-                    auto [ixj, iyj, izj] = cstone::decodeSfc(cstone::sfcKey(keys[i] + j * keyDelta));
+                    auto [ixj, iyj, izj] = cstone::decodeSfc(cstone::sfcKey(keys[i] + j * keyDelta), axesBits);
 
                     x[sIdx + j] = box.xmin() + (ixj * box.lx()) / cstone::maxCoord<KeyType>{};
                     y[sIdx + j] = box.ymin() + (iyj * box.ly()) / cstone::maxCoord<KeyType>{};

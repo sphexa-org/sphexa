@@ -42,13 +42,14 @@ using namespace sphexa;
 TEST(Grids, intersect)
 {
     using T = double;
-    cstone::FBox<T> box{0.12, 0.50, 0.26, 0.44, 0.55, 0.8};
+    cstone::FBox<T>   box{8, 9, 0.5, 1.9, 0.1, 0.2};
+    cstone::Box<T>    gbox(0, 16, 0, 4, 0, 1);
+    cstone::Vec3<int> multiplicity = {16, 4, 1};
 
-    cstone::Vec3<int> multiplicity = {1, 2, 3};
-    auto [l, u]                    = gridIntersection(box, multiplicity);
+    auto [l, u] = gridIntersection(box, gbox, multiplicity);
 
-    cstone::Vec3<int> refLower{0, 0, 1};
-    cstone::Vec3<int> refUpper{1, 1, 3};
+    cstone::Vec3<int> refLower{8, 0, 0};
+    cstone::Vec3<int> refUpper{9, 2, 1};
 
     EXPECT_EQ(l, refLower);
     EXPECT_EQ(u, refUpper);

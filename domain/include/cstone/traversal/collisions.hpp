@@ -35,10 +35,13 @@ HOST_DEVICE_FUN void findCollisions(const KeyType* nodePrefixes,
                                     KeyType excludeEnd,
                                     uint8_t* flags)
 {
+    if (targetSize == Vec3<T>{0, 0, 0}) { return; }
     auto overlaps = [&](TreeNodeIndex idx)
     {
         auto [nk1, nk2] = decodePlaceholderBit2K(nodePrefixes[idx]);
-        bool bOverlap   = !containedIn(nk1, nk2, excludeStart, excludeEnd) &&
+        if (nodeSizes[idx] == Vec3<T>{0, 0, 0}) { return false; } // if the cell is empty, we return no overlap
+
+        bool bOverlap = !containedIn(nk1, nk2, excludeStart, excludeEnd) &&
                         overlap(nodeCenters[idx], nodeSizes[idx], targetCenter, targetSize, box);
         if (bOverlap) { flags[idx] = 1; }
         return bOverlap;
@@ -85,9 +88,7 @@ void findHalos(const KeyType* prefixes,
 #pragma omp parallel for
     for (TreeNodeIndex leafIdx = firstNode; leafIdx < lastNode; ++leafIdx)
     {
-        // if the halo box is fully inside the assigned SFC range, we skip collision detection
         if (containedIn(lowestKey, highestKey, searchCenters[leafIdx], searchSizes[leafIdx], box)) { continue; }
-
         findCollisions(prefixes, childOffsets, parents, nodeCenters, nodeSizes, searchCenters[leafIdx],
                        searchSizes[leafIdx], box, lowestKey, highestKey, collisionFlags);
     }
