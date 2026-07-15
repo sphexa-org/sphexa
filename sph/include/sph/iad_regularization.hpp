@@ -36,33 +36,28 @@ HOST_DEVICE_FUN constexpr T iadRidgeQuality(T det, T secondInvariant, T trace, T
 }
 
 template<class T>
-HOST_DEVICE_FUN constexpr T regularizeIadMomentMatrix(T& tau11, T& tau12, T& tau13, T& tau22, T& tau23, T& tau33,
-                                                      T conditionQualityTarget, bool* wasRegularized = nullptr)
+HOST_DEVICE_FUN constexpr T regularizeIadMomentMatrix(T& tau11, const T& tau12, const T& tau13, T& tau22,
+                                                      const T& tau23, T& tau33, T conditionQualityTarget,
+                                                      bool* wasRegularized = nullptr)
 {
     T trace = tau11 + tau22 + tau33;
     T trAvg = trace / T(3);
-    T det = iadMomentDet(tau11, tau12, tau13, tau22, tau23, tau33);
+    T det   = iadMomentDet(tau11, tau12, tau13, tau22, tau23, tau33);
 
     if (wasRegularized) { *wasRegularized = false; }
-
-    if (!(conditionQualityTarget > T(0)) || !(trAvg > T(0))) { return det; }
+    conditionQualityTarget = stl::min(conditionQualityTarget, T(1) - T(64) * std::numeric_limits<T>::epsilon());
 
     T quality = iadMomentQuality(det, trAvg);
     if (quality >= conditionQualityTarget) { return det; }
 
-    T target = conditionQualityTarget;
-    T maxTarget = T(1) - T(64) * std::numeric_limits<T>::epsilon();
-    if (target > maxTarget) { target = maxTarget; }
-    if (quality >= target) { return det; }
-
     T secondInvariant = iadMomentSecondInvariant(tau11, tau12, tau13, tau22, tau23, tau33);
 
-    T a = det / (trAvg * trAvg * trAvg);
-    T b = secondInvariant / (trAvg * trAvg);
-    T c3 = T(1) - target;
+    T a  = det / (trAvg * trAvg * trAvg);
+    T b  = secondInvariant / (trAvg * trAvg);
+    T c3 = T(1) - conditionQualityTarget;
     T c2 = T(3) * c3;
-    T c1 = b - T(3) * target;
-    T c0 = a - target;
+    T c1 = b - T(3) * conditionQualityTarget;
+    T c0 = a - conditionQualityTarget;
 
     auto f = [&](T lam) { return c3 * lam * lam * lam + c2 * lam * lam + c1 * lam + c0; };
 
