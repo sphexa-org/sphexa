@@ -31,7 +31,6 @@
 #include <thrust/transform.h>
 
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/traversal/find_neighbors.cuh"
 
 #include "sph/neighborhood_gpu.hpp"
 #include "sph/sph_gpu.hpp"
@@ -43,11 +42,9 @@ namespace sph
 
 using cstone::GpuConfig;
 using cstone::LocalIndex;
-using cstone::NcStats;
-using cstone::TravConfig;
 using cstone::TreeNodeIndex;
 
-unsigned nsGroupSize() { return TravConfig::targetSize; }
+unsigned nsGroupSize() { return GpuConfig::warpSize; }
 
 namespace gpu
 {

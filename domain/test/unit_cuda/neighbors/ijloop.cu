@@ -22,7 +22,6 @@
 #include "cstone/cuda/stream_holder.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/execution.hpp"
-#include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
 #include "cstone/traversal/ijloop/cpu_fullnblist.hpp"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
@@ -131,7 +130,7 @@ struct IjLoopTest : testing::Test
         leafToInternal = octree.leafToInternal;
         levelRange     = octree.levelRange;
 
-        constexpr unsigned groupSize = TravConfig::targetSize;
+        constexpr unsigned groupSize = GpuConfig::warpSize;
         const unsigned unsplitGroups = (lastBody - firstBody + groupSize - 1) / groupSize;
         groups.clear();
         for (unsigned i = 0; i < unsplitGroups; ++i)
