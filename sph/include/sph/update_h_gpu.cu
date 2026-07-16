@@ -74,7 +74,8 @@ bool updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d,
     if (numBlocks == 0) { return false; }
 
     updateSmoothingLengthIterativeGpuKernel<<<numBlocks, numThreads>>>(
-        grp, d.ng0, d.ngmax, box, d.treeView, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h), rawPtr(d.nc));
+        grp, d.ng0, d.ngmax, box, d.treeView, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h), rawPtr(d.nc),
+        rawPtr(d.keys));
 
     bool convergenceFailure;
     checkGpuErrors(cudaMemcpyFromSymbol(&convergenceFailure, GPU_SYMBOL(nc_h_convergenceFailure), sizeof(bool)));

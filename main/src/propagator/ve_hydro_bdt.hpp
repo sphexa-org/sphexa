@@ -235,7 +235,11 @@ public:
 
         fillMassHalos(domain.exec(), get<"m">(d), first, last);
 
-        updateSmoothingLengthIterative(activeRungs_, d, domain.box());
+        bool haveUnconvergedParticles = updateSmoothingLengthIterative(activeRungs_, d, domain.box());
+        if (haveUnconvergedParticles && not d.removeUnconvergedParticles)
+        {
+            throw std::runtime_error("Neighbor search did not converge\n");
+        }
         findNeighborsSfc(activeRungs_, d, domain.box(), true);
         timer.step("FindNeighbors");
         pmReader.step();
@@ -377,12 +381,6 @@ public:
                 driftPositions(rungs_[i], d, timestep_.dt_drift[i] + dt, timestep_.dt_drift[i], dt_m1, rung);
                 timestep_.dt_drift[i] += dt;
             }
-        }
-
-        bool haveUnconvergedParticles = updateSmoothingLength(activeRungs_, d);
-        if (haveUnconvergedParticles && not d.removeUnconvergedParticles)
-        {
-            throw std::runtime_error("Neighbor search did not converge\n");
         }
 
         timestep_.substep++;

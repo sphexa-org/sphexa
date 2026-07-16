@@ -165,7 +165,11 @@ public:
 
         computeGroups(first, last, d, domain.box(), groups_);
         timer.step("computeGroups");
-        updateSmoothingLengthIterative(groups_.view(), d, domain.box());
+        bool haveUnconvergedParticles = updateSmoothingLengthIterative(groups_.view(), d, domain.box());
+        if (haveUnconvergedParticles && not d.removeUnconvergedParticles)
+        {
+            throw std::runtime_error("Neighbor search did not converge\n");
+        }
         timer.step("updateSmoothingLengthIterative");
         findNeighborsSfc(groups_.view(), d, domain.box());
         timer.step("FindNeighbors");
@@ -220,12 +224,6 @@ public:
 
         computePositions(groups_.view(), d, domain.box(), d.minDt, {float(d.minDt_m1)});
         timer.step("UpdateQuantities");
-        bool haveUnconvergedParticles = updateSmoothingLength(groups_.view(), d);
-        if (haveUnconvergedParticles && not d.removeUnconvergedParticles)
-        {
-            throw std::runtime_error("Neighbor search did not converge\n");
-        }
-        timer.step("UpdateSmoothingLength");
     }
 };
 
