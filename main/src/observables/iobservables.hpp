@@ -34,6 +34,8 @@
 #include "cstone/sfc/box.hpp"
 #include "sphexa/simulation_data.hpp"
 
+#include "conserved_quantities.hpp"
+
 namespace sphexa
 {
 
@@ -44,6 +46,7 @@ public:
     void computeAndWrite(Dataset& d, size_t firstIndex, size_t lastIndex,
                          const cstone::Box<typename Dataset::RealType>& box)
     {
+        computeConservedQuantities(firstIndex, lastIndex, d.hydro, d.comm);
         computeAndWriteImpl(d, firstIndex, lastIndex, box);
     }
 

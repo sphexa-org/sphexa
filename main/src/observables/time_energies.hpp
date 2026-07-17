@@ -28,7 +28,6 @@
  * @author Lukas Schmidt
  */
 
-#include "conserved_quantities.hpp"
 #include "iobservables.hpp"
 #include "io/file_utils.hpp"
 
@@ -53,8 +52,6 @@ protected:
         int rank;
         MPI_Comm_rank(simData.comm, &rank);
         auto& d = simData.hydro;
-
-        computeConservedQuantities(firstIndex, lastIndex, d, simData.comm);
 
         if (rank == 0)
         {
