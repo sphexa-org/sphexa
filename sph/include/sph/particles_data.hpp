@@ -222,7 +222,7 @@ public:
     RealType K{0};
 
     //! @brief non-stateful variables for statistics
-    uint64_t totalNeighbors{0}, localNeighbors{0}, maxHalos{0};
+    uint64_t totalNeighbors{0}, localNeighbors{0}, maxHalos{0}, numIadRegBits{0};
 
     /*! @brief Particle fields
      *

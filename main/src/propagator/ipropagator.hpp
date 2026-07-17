@@ -131,24 +131,15 @@ public:
         out << "### Check ### Focus Tree Nodes: " << domain.focusTree().octreeViewAcc().numLeafNodes << ", maxDepth "
             << domain.focusTree().depth();
         if constexpr (d.useGpu) { out << ", maxStackGravity " << d.stackUsedGravity; }
+        if (d.numIadRegBits)
+        {
+            out << "### IAD regularization ###: " << d.numIadRegBits << " / " << d.numParticlesGlobal
+                << " particles, target " << d.iadConditionQuality << std::endl;
+        }
         out << "\n=== Total time for iteration(" << d.iteration << ") " << timer.sumOfSteps() << "s\n\n";
     }
 
 protected:
-    /*! @brief Show number of particles where IAD regularization was applied summed over all ranks
-     * @param clear Reset regularization tag
-     */
-    template<class HydroData>
-    void printAndClearIadRegularizationStats(HydroData& d, size_t first, size_t last, bool clear = true)
-    {
-        size_t localCount{};
-        size_t globalCount = 0;
-        if (rank_ == 0)
-        {
-            out << "### IAD regularization ###: " << globalCount << " / " << d.numParticlesGlobal
-                << " particles, target " << d.iadConditionQuality << std::endl;
-        }
-    }
 
     static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData)
     {

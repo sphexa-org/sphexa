@@ -33,15 +33,13 @@
 
 #pragma once
 
-#include <vector>
-#include <iostream>
-
 #include "mpi.h"
 
 #include "cstone/util/array.hpp"
 #include "cstone/primitives/primitives_gpu.h"
 #include "sph/eos.hpp"
 #include "conserved_gpu.h"
+#include "gpu_reductions.h"
 
 namespace sphexa
 {
@@ -133,7 +131,7 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
 {
     double               eKin, eInt;
     cstone::Vec3<double> linmom, angmom;
-    size_t               ncsum = 0;
+    size_t               ncsum = 0, iadNumErrBits = 0;
 
     if constexpr (d.useGpu)
     {
@@ -161,7 +159,13 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
     }
     d.localNeighbors = ncsum;
 
-    util::array<double, 11> quantities, globalQuantities;
+    if (d.iadConditionQuality > 0.0)
+    {
+        if (d.useGpu) { iadNumErrBits = countErrBitsGpu(d.id, startIndex, endIndex, d.iadRegBit); }
+        else { iadNumErrBits = countErrBitsCpu(d.id, startIndex, endIndex, d.iadRegBit); }
+    }
+
+    util::array<double, 12> quantities, globalQuantities;
     std::fill(globalQuantities.begin(), globalQuantities.end(), double(0));
 
     quantities[0]  = eKin;
@@ -175,6 +179,7 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
     quantities[8]  = angmom[2];
     quantities[9]  = double(ncsum);
     quantities[10] = double(endIndex - startIndex);
+    quantities[11] = double(iadNumErrBits);
 
     MPI_Reduce(quantities.data(), globalQuantities.data(), quantities.size(), MpiType<double>{}, MPI_SUM, 0, comm);
 
@@ -190,6 +195,7 @@ void computeConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d, 
     d.totalNeighbors         = size_t(globalQuantities[9]);
     d.numParticlesGlobalPrev = d.numParticlesGlobal;
     d.numParticlesGlobal     = size_t(globalQuantities[10]);
+    d.numIadRegBits          = size_t(globalQuantities[11]);
 }
 
 } // namespace sphexa

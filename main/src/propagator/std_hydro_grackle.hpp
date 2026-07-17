@@ -180,10 +180,6 @@ public:
         timer.step("mpi::synchronizeHalos");
 
         computeIAD(groups_.view(), d, domain.box());
-        if (d.iadConditionQuality > 0.)
-        {
-            Base::printAndClearIadRegularizationStats(d, groups_.view().firstBody, groups_.view().lastBody);
-        }
         timer.step("IAD");
 
         domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33">(d), get<"ax">(d), get<"ay">(d));

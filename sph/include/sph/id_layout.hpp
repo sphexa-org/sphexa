@@ -12,16 +12,13 @@ namespace sphexa
 // TODO: this will be moved to main/, together with ParticlesData
 struct IDLayout
 {
-    /*! @brief Number of bits used for tagging information storage
-     */
-    inline constexpr static std::uint64_t tagNumBits = 10;
+    //! @brief Number of bits used for tagging information storage
+    constexpr static std::uint64_t tagNumBits = 10;
 
-    /*! @brief First tagging bit position
-     */
-    inline constexpr static std::uint64_t taggingMaskStartingBit =
-        std::numeric_limits<std::uint64_t>::digits - tagNumBits;
-    /*! @brief Additional reserved bit for IAD regularization statistics
-     */
-    inline constexpr static std::uint64_t iadRegBit = taggingMaskStartingBit - 1;
+    //! @brief First tagging bit position
+    constexpr static std::uint64_t taggingMaskStartingBit = std::numeric_limits<std::uint64_t>::digits - tagNumBits;
+
+    //! @brief Additional reserved bit for IAD regularization statistics
+    constexpr static std::uint64_t iadRegBit = taggingMaskStartingBit - 1;
 };
 } // namespace sphexa

@@ -251,10 +251,6 @@ public:
         timer.step("mpi::synchronizeHalos");
 
         computeIadDivvCurlvGradh(activeRungs_, d, domain.box());
-        if (d.iadConditionQuality > 0.)
-        {
-            Base::printAndClearIadRegularizationStats(d, groups_.view().firstBody, groups_.view().lastBody);
-        }
         groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
         timer.step("IadVelocityDivCurlGradh");
 

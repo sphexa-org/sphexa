@@ -159,10 +159,6 @@ public:
         release(d, "ay", "az");
         acquire(d, "divv", "gradh");
         computeIadDivvCurlvGradh(groups_.view(), d, domain.box());
-        if (d.iadConditionQuality > 0.)
-        {
-            Base::printAndClearIadRegularizationStats(d, groups_.view().firstBody, groups_.view().lastBody);
-        }
         d.minDtRho = rhoTimestep(first, last, d);
         timer.step("IadVelocityDivCurlGradh");
 
