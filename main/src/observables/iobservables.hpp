@@ -41,10 +41,17 @@ template<class Dataset>
 class IObservables
 {
 public:
-    virtual void computeAndWrite(Dataset& d, size_t firstIndex, size_t lastIndex,
-                                 const cstone::Box<typename Dataset::RealType>& box) = 0;
+    void computeAndWrite(Dataset& d, size_t firstIndex, size_t lastIndex,
+                         const cstone::Box<typename Dataset::RealType>& box)
+    {
+        computeAndWriteImpl(d, firstIndex, lastIndex, box);
+    }
 
     virtual ~IObservables() = default;
+
+protected:
+    virtual void computeAndWriteImpl(Dataset& d, size_t firstIndex, size_t lastIndex,
+                                     const cstone::Box<typename Dataset::RealType>& box) = 0;
 };
 
 template<class Dataset>

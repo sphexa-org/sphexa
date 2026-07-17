@@ -107,7 +107,8 @@ public:
     {
     }
 
-    void computeAndWrite(Dataset& simData, size_t firstIndex, size_t lastIndex, const cstone::Box<T>& /*box*/)
+protected:
+    void computeAndWriteImpl(Dataset& simData, size_t firstIndex, size_t lastIndex, const cstone::Box<T>& /*box*/) override
     {
         auto& d = simData.hydro;
         auto [httplus, httcross, d2xx, d2yy, d2zz, d2xy, d2xz, d2yz] =
