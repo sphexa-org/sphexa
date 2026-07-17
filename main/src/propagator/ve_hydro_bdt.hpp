@@ -235,13 +235,14 @@ public:
 
         fillMassHalos(domain.exec(), get<"m">(d), first, last);
 
-        bool haveUnconvergedParticles = updateSmoothingLengthIterative(activeRungs_, d, domain.box());
+        bool haveUnconvergedParticles = updateHandNc(activeRungs_, d, domain.box());
         if (haveUnconvergedParticles && not d.removeUnconvergedParticles)
         {
             throw std::runtime_error("Neighbor search did not converge\n");
         }
+        timer.step("updateHandNc");
         findNeighborsSfc(activeRungs_, d, domain.box(), true);
-        timer.step("FindNeighbors");
+        timer.step("NeighborlistBuild");
         pmReader.step();
 
         computeXMass(activeRungs_, d, domain.box());

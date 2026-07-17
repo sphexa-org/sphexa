@@ -42,7 +42,7 @@ HOST_DEVICE_FUN void updateHIterative(unsigned ng0, unsigned ngmax, const cstone
     constexpr int  maxIteration = 10;
     const unsigned ngmin        = ng0 / 4;
 
-    if (ngmin <= nc[i] && nc[i] <= ngmax) { updateH(ng0, nc[i], h[i]); } 
+    if (ngmin <= nc[i] && nc[i] <= ngmax) { updateH(ng0, nc[i], h[i]); }
 
     unsigned ncSph = 1 + findNeighbors(i, x, y, z, h, treeView, box, ngmax);
 

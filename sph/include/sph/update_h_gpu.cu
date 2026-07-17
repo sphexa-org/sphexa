@@ -43,14 +43,16 @@ using cstone::TreeNodeIndex;
 __device__ bool nc_h_convergenceFailure = false;
 
 template<class Tc, class T, class KeyType>
-__global__ __launch_bounds__(128) void updateSmoothingLengthIterativeGpuKernel(
-    GroupView grp, unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box,
-    const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* __restrict__ x, const Tc* __restrict__ y,
-    const Tc* __restrict__ z, T* __restrict__ h, unsigned* __restrict__ nc, KeyType* __restrict__ keys)
+__global__ __launch_bounds__(128) void updateHandNcKernel(GroupView grp, unsigned ng0, unsigned ngmax,
+                                                          const cstone::Box<Tc>                   box,
+                                                          const cstone::OctreeNsView<Tc, KeyType> tree,
+                                                          const Tc* __restrict__ x, const Tc* __restrict__ y,
+                                                          const Tc* __restrict__ z, T* __restrict__ h,
+                                                          unsigned* __restrict__ nc, KeyType* __restrict__ keys)
 {
-    LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
-    LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
-    const LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
+    LocalIndex       laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
+    LocalIndex       warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
+    const LocalIndex i       = grp.groupStart[warpIdx] + laneIdx;
 
     if (warpIdx >= grp.numGroups || i >= grp.groupEnd[warpIdx]) { return; }
 
@@ -64,24 +66,22 @@ __global__ __launch_bounds__(128) void updateSmoothingLengthIterativeGpuKernel(
 }
 
 template<class T, class Dataset>
-bool updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d, const cstone::Box<T>& box)
+bool updateHandNcGpu(const cstone::GroupView& grp, Dataset& d, const cstone::Box<T>& box)
 {
     unsigned numThreads       = 128;
     unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
     unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
     if (numBlocks == 0) { return false; }
 
-    updateSmoothingLengthIterativeGpuKernel<<<numBlocks, numThreads>>>(
-        grp, d.ng0, d.ngmax, box, d.treeView, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h), rawPtr(d.nc),
-        rawPtr(d.keys));
+    updateHandNcKernel<<<numBlocks, numThreads>>>(grp, d.ng0, d.ngmax, box, d.treeView, rawPtr(d.x), rawPtr(d.y),
+                                                  rawPtr(d.z), rawPtr(d.h), rawPtr(d.nc), rawPtr(d.keys));
 
     bool convergenceFailure;
     checkGpuErrors(cudaMemcpyFromSymbol(&convergenceFailure, GPU_SYMBOL(nc_h_convergenceFailure), sizeof(bool)));
     return convergenceFailure;
 }
 
-template bool updateSmoothingLengthIterativeGpu(const cstone::GroupView&,
-                                                sphexa::ParticlesData<cstone::execution::Gpu>&,
-                                                const cstone::Box<SphTypes::CoordinateType>&);
+template bool updateHandNcGpu(const cstone::GroupView&, sphexa::ParticlesData<cstone::execution::Gpu>&,
+                              const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace sph

@@ -140,14 +140,14 @@ public:
 
         computeGroups(first, last, d, domain.box(), groups_);
         timer.step("computeGroups");
-        bool haveUnconvergedParticles = updateSmoothingLengthIterative(groups_.view(), d, domain.box());
+        bool haveUnconvergedParticles = updateHandNc(groups_.view(), d, domain.box());
         if (haveUnconvergedParticles && not d.removeUnconvergedParticles)
         {
             throw std::runtime_error("Neighbor search did not converge\n");
         }
-        timer.step("updateSmoothingLengthIterative");
+        timer.step("updateHandNc");
         findNeighborsSfc(groups_.view(), d, domain.box());
-        timer.step("FindNeighbors");
+        timer.step("NeighborlistBuild");
         pmReader.step();
 
         computeXMass(groups_.view(), d, domain.box());

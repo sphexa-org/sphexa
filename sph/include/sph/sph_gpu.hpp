@@ -86,7 +86,7 @@ extern void computePositionsGpu(const GroupView& grp, float dt, util::array<floa
                                 Thydro* mui, Tc gamma, Tc constCv, const cstone::Box<Tc>& box);
 
 template<class T, class Dataset>
-extern bool updateSmoothingLengthIterativeGpu(const GroupView&, Dataset& d, const cstone::Box<T>& box);
+extern bool updateHandNcGpu(const GroupView&, Dataset& d, const cstone::Box<T>& box);
 
 template<class T>
 extern void groupDivvTimestepGpu(float Krho, const GroupView&, const T* divv, float* groupDt);
