@@ -54,8 +54,6 @@ __global__ __launch_bounds__(128) void updateSmoothingLengthIterativeGpuKernel(
 
     if (warpIdx >= grp.numGroups || i >= grp.groupEnd[warpIdx]) { return; }
 
-    h[i] = updateH(ng0, nc[i], h[i]);
-
     updateHIterative(ng0, ngmax, box, tree, i, x, y, z, h, nc);
 
     if (nc[i] <= 1)

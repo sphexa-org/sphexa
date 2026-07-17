@@ -22,7 +22,6 @@ bool updateSmoothingLengthIterativeCpu(const Tc* x, const Tc* y, const Tc* z, T*
 #pragma omp parallel for
     for (LocalIndex i = firstId; i < lastId; ++i)
     {
-        h[i] = updateH(ng0, nc[i], h[i]);
         updateHIterative(ng0, ngmax, box, treeView, i, x, y, z, h, nc);
         if (nc[i] <= 1)
         {
