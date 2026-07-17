@@ -115,10 +115,7 @@ struct IADGradhPostamble
         // note normalization factor: cij have units of 1/tau because det is proportional to tau^3, so we have to
         // divide by K/h^3
         T factor = (nci > 1 && det > T(0)) ? normalization * (hi * hi * hi) / (det * K) : T(0);
-        if (std::isnan(factor) || factor > std::numeric_limits<T>::max() || factor < -std::numeric_limits<T>::max())
-        {
-            factor = T(0);
-        }
+        if (not std::isfinite(factor)) { factor = T(0); }
 
         T c11i = (tau22 * tau33 - tau23 * tau23) * factor;
         T c12i = (tau13 * tau23 - tau33 * tau12) * factor;
