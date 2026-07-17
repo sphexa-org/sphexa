@@ -6,7 +6,6 @@
 
 #include "sph/iad_regularization.hpp"
 #include "sph/table_lookup.hpp"
-#include "sph/iad_regularization_stat.hpp"
 
 namespace sph
 {
@@ -50,8 +49,9 @@ struct IADInteractionSTD
 template<class T, class Tc>
 struct IADPostambleSTD
 {
-    Tc K;
-    T   iadConditionQuality{};
+    const Tc       K;
+    const T        iadConditionQuality{};
+    const unsigned iadRegBit;
 
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
@@ -73,7 +73,7 @@ struct IADPostambleSTD
 
         auto [det, regularize] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
         if (regularize) { regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality); }
-        uint64_t newId = setRegularizationTag(regularize, idi);
+        uint64_t newId = setRegularizationTag(regularize, iadRegBit, idi);
 
         // Note normalization factor: cij have units of 1/tau because det is proportional to tau^3 so we have to
         // divide by K/h^3.
@@ -92,11 +92,11 @@ struct IADPostambleSTD
 };
 
 template<class Neighborhood, class Tc, class Tm, class T>
-void IADIjLoop(Neighborhood const& neighborhood, Tc K, T iadConditionQuality, const Tm* m, const T* rho,
+void IADIjLoop(Neighborhood const& neighborhood, Tc K, T iadConditionQuality, unsigned iadRegBit, const Tm* m, const T* rho,
                const unsigned* nc, const T* wh, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, uint64_t* id)
 {
     neighborhood.ijLoop(std::make_tuple(m, rho, nc, id), std::make_tuple(c11, c12, c13, c22, c23, c33, id),
-                        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K, iadConditionQuality});
+                        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K, iadConditionQuality, iadRegBit});
 }
 
 } // namespace sph

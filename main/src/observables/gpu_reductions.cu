@@ -29,6 +29,9 @@
  * @author Lukas Schmidt
  */
 
+#include <span>
+
+#include <thrust/count.h>
 #include <thrust/execution_policy.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/transform_reduce.h>
@@ -178,5 +181,13 @@ double survivingMassGpu(const Tt* temp, const T* kx, const T* xmass, const Tm* m
 SURVIVORS(double, double, double);
 SURVIVORS(float, float, float);
 SURVIVORS(float, double, float);
+
+std::size_t countErrBitsGpu(std::span<const std::uint64_t> id, std::size_t firstIndex, std::size_t lastIndex,
+                            unsigned errBit)
+{
+    std::uint64_t errMask    = std::uint64_t{1} << errBit;
+    auto          check_mask = [mask = errMask] __device__(std::uint64_t value) { return (value & mask) != 0; };
+    return thrust::count_if(thrust::device, id.data() + firstIndex, id.data() + lastIndex, check_mask);
+}
 
 } // namespace sphexa

@@ -7,8 +7,9 @@
 #include <cstdint>
 #include <limits>
 
-namespace sph
+namespace sphexa
 {
+// TODO: this will be moved to main/, together with ParticlesData
 struct IDLayout
 {
     /*! @brief Number of bits used for tagging information storage
@@ -23,4 +24,4 @@ struct IDLayout
      */
     inline constexpr static std::uint64_t iadRegBit = taggingMaskStartingBit - 1;
 };
-} // namespace sph
+} // namespace sphexa

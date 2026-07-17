@@ -44,6 +44,7 @@
 #include "cstone/util/reallocate.hpp"
 
 #include "sph/eos.hpp"
+#include "sph/id_layout.hpp"
 #include "sph/neighborhood.hpp"
 #include "sph/neighborhood_gpu.hpp"
 #include "sph/kernels.hpp"
@@ -151,7 +152,8 @@ public:
     //! @brief choice of smoothing kernel type
     sph::SphKernelType kernelChoice{sph::SphKernelType::sinc_n};
 
-    HydroType iadConditionQuality{0.0};
+    HydroType      iadConditionQuality{0.0};
+    const unsigned iadRegBit{IDLayout::iadRegBit};
 
     //! @brief Unified interface to attribute initialization, reading and writing
     template<class Archive>

@@ -36,7 +36,6 @@
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/iad_regularization.hpp"
-#include "sph/iad_regularization_stat.hpp"
 #include "sph/table_lookup.hpp"
 
 namespace sph
@@ -87,8 +86,9 @@ struct IADGradhInteraction
 template<class T, class Tc>
 struct IADGradhPostamble
 {
-    Tc K;
-    T   iadConditionQuality{};
+    const Tc       K;
+    const T        iadConditionQuality{};
+    const unsigned iadRegBit;
 
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
@@ -110,7 +110,7 @@ struct IADGradhPostamble
 
         auto [det, regularize] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
         if (regularize) { regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality); }
-        uint64_t newId = setRegularizationTag(regularize, idi);
+        uint64_t newId = setRegularizationTag(regularize, iadRegBit, idi);
 
         // note normalization factor: cij have units of 1/tau because det is proportional to tau^3, so we have to
         // divide by K/h^3

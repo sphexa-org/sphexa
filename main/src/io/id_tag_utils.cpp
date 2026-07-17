@@ -50,7 +50,7 @@ uint64_t applyTaggingMask(uint64_t groupId, uint64_t id)
     // Clear previous tagging bits if any
     uint64_t taggedId = id & ~taggingCheckMask;
 
-    taggedId |= ((groupId + 1) << sph::IDLayout::taggingMaskStartingBit);
+    taggedId |= ((groupId + 1) << IDLayout::taggingMaskStartingBit);
 
     return taggedId;
 }

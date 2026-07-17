@@ -44,14 +44,14 @@ namespace sphexa
 
 using CoordinateType = sph::SphTypes::CoordinateType;
 
-constexpr uint64_t tagNumBits = sph::IDLayout::tagNumBits;
+constexpr uint64_t tagNumBits = IDLayout::tagNumBits;
 
 /*! @brief Given tagNumBits, the maximum number of groups we can address is 2^tagNumBits - 1.
  * We subtract one, because groupId=0 corresponds to an unmasked particle ID
  */
-constexpr uint64_t maxNumGroupIds = (1 << sph::IDLayout::tagNumBits) - 1;
+constexpr uint64_t maxNumGroupIds = (1 << IDLayout::tagNumBits) - 1;
 
-constexpr uint64_t taggingCheckMask = maxNumGroupIds << sph::IDLayout::taggingMaskStartingBit;
+constexpr uint64_t taggingCheckMask = maxNumGroupIds << IDLayout::taggingMaskStartingBit;
 
 /*! @brief Tagged id identification condition functor
  */

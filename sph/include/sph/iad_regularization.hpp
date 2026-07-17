@@ -85,4 +85,11 @@ HOST_DEVICE_FUN constexpr void regularizeIadMomentMatrix(T& tau11, const T& tau1
     tau33 += delta;
 }
 
+HOST_DEVICE_FUN inline std::uint64_t setRegularizationTag(bool value, unsigned iadRegBit, std::uint64_t id)
+{
+    std::uint64_t regMask = std::uint64_t{1} << iadRegBit;
+    if (value) { return id | regMask; }
+    else { return id & ~regMask; }
+}
+
 } // namespace sph

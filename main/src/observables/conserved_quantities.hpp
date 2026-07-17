@@ -106,6 +106,20 @@ auto localConservedQuantities(size_t startIndex, size_t endIndex, Dataset& d)
     return std::make_tuple(0.5 * eKin, eInt, linmom, angmom);
 }
 
+inline std::size_t countErrBitsCpu(std::span<const std::uint64_t> id, std::size_t firstIndex, std::size_t lastIndex,
+                                   unsigned errBit)
+{
+    std::uint64_t errMask = std::uint64_t{1} << errBit;
+
+    std::size_t count{0};
+#pragma omp parallel for schedule(static) reduction(+ : count)
+    for (std::size_t i = firstIndex; i < lastIndex; i++)
+    {
+        if (bool(id[i] & errMask)) { count++; }
+    }
+    return count;
+}
+
 /*! @brief Computation of globally conserved quantities
  *
  * @tparam        T            float or double

@@ -35,10 +35,8 @@
 #include <cstdint>
 #include <variant>
 
-#include "cstone/primitives/mpi_wrappers.hpp"
 #include "cstone/sfc/box.hpp"
 #include "io/ifile_io.hpp"
-#include "sph/iad_regularization_stat.hpp"
 #include "sph/particles_data.hpp"
 #include "util/pm_reader.hpp"
 #include "util/timer.hpp"
@@ -144,11 +142,7 @@ protected:
     void printAndClearIadRegularizationStats(HydroData& d, size_t first, size_t last, bool clear = true)
     {
         size_t localCount{};
-        if constexpr (d.useGpu) { localCount = sph::countAndCleanRegTagGPU(d.id, first, last, true); }
-        else { localCount = sph::countAndCleanRegTag(d.id, first, last, true); }
-
         size_t globalCount = 0;
-        MPI_Reduce(&localCount, &globalCount, 1, MpiType<size_t>{}, MPI_SUM, 0, MPI_COMM_WORLD);
         if (rank_ == 0)
         {
             out << "### IAD regularization ###: " << globalCount << " / " << d.numParticlesGlobal
