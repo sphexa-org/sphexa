@@ -29,7 +29,6 @@
 #include "cstone/cuda/memory.cuh"
 #include "cstone/execution.hpp"
 #include "cstone/reducearray.cuh"
-#include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/ijloop/compressneighbors.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/common.cuh"
@@ -281,6 +280,23 @@ superclusterBoundingBox(const std::array<Vec3<Tc>, WarpsPerSupercluster>& iPos,
     const Vec3<Tc> bBoxSize   = (bBoxMax - bBoxMin) * Tc(0.5);
 
     return {bBoxCenter, bBoxSize, maxParticleRadius};
+}
+
+template<bool UsePbc, class T>
+__device__ __forceinline__ bool cellOverlap(const Vec3<T>& curSrcCenter,
+                                            const Vec3<T>& curSrcSize,
+                                            const Vec3<T>& targetCenter,
+                                            const Vec3<T>& targetSize,
+                                            const Box<T>& box)
+{
+    if constexpr (UsePbc)
+    {
+        return norm2(minDistance(curSrcCenter, curSrcSize, targetCenter, targetSize, box)) == T(0.0);
+    }
+    else
+    {
+        return norm2(minDistance(curSrcCenter, curSrcSize, targetCenter, targetSize)) == T(0.0);
+    }
 }
 
 /*! traverse the octree to find neighbor clusters for a supercluster
@@ -581,7 +597,8 @@ std::size_t buildNbList(const execution::Gpu exec,
 
     constexpr unsigned numSuperclustersPerBlock = 2;
     const dim3 blockSize                        = {GpuConfig::warpSize, 1, numSuperclustersPerBlock};
-    const unsigned numBlocks = std::min(GpuConfig::smCount * (TravConfig::numWarpsPerSm / numSuperclustersPerBlock),
+    constexpr unsigned numWarpsPerSm            = 40;
+    const unsigned numBlocks = std::min(GpuConfig::smCount * (numWarpsPerSm / numSuperclustersPerBlock),
                                         (numISuperclusters + numSuperclustersPerBlock - 1) / numSuperclustersPerBlock);
     const unsigned sharedMem = numSuperclustersPerBlock * buildNbListSharedMemPerSupercluster<Config, Tc, ThP>(ncmax);
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cstone/cuda/annotation.hpp"
+#include "cstone/findneighbors.hpp"
 #include "cstone/util/array.hpp"
 
 namespace sph
@@ -30,6 +31,29 @@ HOST_DEVICE_FUN T updateH(unsigned ng0, unsigned nc, T h)
     constexpr T c0  = 1023.0;
     constexpr T exp = 1.0 / 10.0;
     return h * T(0.5) * std::pow(T(1) + c0 * ng0 / T(nc), exp);
+}
+
+template<class Tc, class T, class KeyType>
+HOST_DEVICE_FUN void updateHIterative(unsigned ng0, unsigned ngmax, const cstone::Box<Tc>& box,
+                                      const cstone::OctreeNsView<Tc, KeyType>& treeView, cstone::LocalIndex i,
+                                      const Tc* __restrict__ x, const Tc* __restrict__ y, const Tc* __restrict__ z,
+                                      T* __restrict__ h, unsigned* __restrict__ nc)
+{
+    constexpr int  maxIteration = 10;
+    const unsigned ngmin        = ng0 / 4;
+
+    unsigned ncSph = 1 + findNeighbors(i, x, y, z, h, treeView, box, ngmax);
+
+    int iteration = 0;
+    while ((ngmin > ncSph || (ncSph - 1) > ngmax) && iteration++ < maxIteration)
+    {
+        h[i]  = updateH(ng0, ncSph, h[i]);
+        ncSph = 1 + findNeighbors(i, x, y, z, h, treeView, box, ngmax);
+    }
+
+    if (iteration == maxIteration && (ngmin > ncSph || (ncSph - 1) > ngmax)) { ncSph = 1; }
+
+    nc[i] = ncSph;
 }
 
 //! @brief sinc(PI/2 * v)
