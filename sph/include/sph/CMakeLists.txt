@@ -3,7 +3,7 @@ add_subdirectory(hydro_turb)
 add_subdirectory(hydro_ve)
 
 set(TIMESTEP_GPU_KERNELS
-        positions_gpu.cu ts_groups.cu update_h_gpu.cu acceleration_timestep.cu find_neighbors_gpu.cu neighborhood_gpu.cu iad_regularization_stat.cu
+        positions_gpu.cu ts_groups.cu update_h_gpu.cu find_neighbors_gpu.cu neighborhood_gpu.cu iad_regularization_stat.cu
 )
 
 if (SPH_EXA_WITH_HIP)

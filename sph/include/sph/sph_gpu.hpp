@@ -100,6 +100,9 @@ extern void groupAccTimestepGpu(float etaAcc, const GroupView&, const T* ax, con
 
 void storeRungGpu(const GroupView& grp, uint8_t rung, uint8_t* particleRungs);
 
+template<typename T>
+T accelerationTimestepGPU(size_t first, size_t last, const T* ax, const T* ay, const T* az, const T* h);
+
 //! @brief max number of particles per group used in neighbor search for SPH
 unsigned nsGroupSize();
 
