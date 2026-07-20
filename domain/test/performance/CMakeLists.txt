@@ -4,7 +4,7 @@ cstone_add_performance_test(octree.cpp octree_perf)
 cstone_add_performance_test(peers.cpp peers_perf)
 
 if (CMAKE_CUDA_COMPILER)
-    cstone_add_performance_test(hilbert.cpp hilbert_perf)
+    cstone_add_performance_test(hilbert.cpp hilbert_perf CUDA::cudart)
     target_link_libraries(hilbert_perf PRIVATE ThrustOMP)
 endif ()
 
