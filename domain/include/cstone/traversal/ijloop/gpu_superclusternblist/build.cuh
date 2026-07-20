@@ -354,7 +354,8 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
     {
         const Vec3<Tc> srcCenter = tree.centers[idx];
         const Vec3<Tc> srcSize   = tree.sizes[idx];
-        const Th srcRadius       = Config::symmetric ? loadAtIndexIfPtr(nodeRMax, idx) * tree.searchExtFactor : Th(0);
+        if (srcSize[0] == 0 && srcSize[1] == 0 && srcSize[2] == 0) return false;
+        const Th srcRadius = Config::symmetric ? loadAtIndexIfPtr(nodeRMax, idx) * tree.searchExtFactor : Th(0);
 
         bool overlaps = false;
         for (unsigned w = 0; w < warpsPerSupercluster; ++w)
