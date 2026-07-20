@@ -21,8 +21,8 @@ namespace cstone
 {
 
 template<class KeyType, class T>
-__global__ void
-computeSfcKeysKernel(KeyType* keys, const T* x, const T* y, const T* z, size_t numKeys, const Box<T> box)
+__global__ void computeSfcKeysKernel(
+    KeyType* keys, const T* x, const T* y, const T* z, size_t numKeys, __grid_constant__ const Box<T> box)
 {
     size_t tid = blockIdx.x * blockDim.x + threadIdx.x;
     if (tid < numKeys)

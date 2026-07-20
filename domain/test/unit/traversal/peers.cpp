@@ -43,7 +43,7 @@ static std::vector<int> findPeersAll2All(int myRank,
     std::vector<IBox> boxes(nNodes(tree));
     for (TreeNodeIndex i = 0; i < TreeNodeIndex(nNodes(tree)); ++i)
     {
-        boxes[i] = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]));
+        boxes[i] = sfcIBox(sfcKey(tree[i]), sfcKey(tree[i + 1]), box.getBoxDimBits(maxTreeLevel<KeyType>{}));
     }
 
     std::vector<int> peers(assignment.numRanks());
@@ -62,18 +62,19 @@ template<class KeyType>
 static void findMacPeers64grid(int rank, float theta, BoundaryType pbc, int /*refNumPeers*/)
 {
     Box<double> box{-1, 1, pbc};
-    Octree<KeyType> octree;
     auto leaves = makeUniformNLevelTree<KeyType>(64, 1);
-    octree.update(leaves.data(), nNodes(leaves));
+    OctreeData<KeyType, execution::Cpu> octree;
+    octree.resize(nNodes(leaves));
+    updateInternalTree<KeyType>(leaves, octree.data());
 
-    SfcAssignment<KeyType> assignment(octree.numLeafNodes());
-    for (int i = 0; i < octree.numLeafNodes() + 1; ++i)
+    SfcAssignment<KeyType> assignment(octree.numLeafNodes);
+    for (int i = 0; i < octree.numLeafNodes + 1; ++i)
     {
         assignment.set(i, leaves[i], 1);
     }
 
     std::vector<int> peers     = findPeersMac(rank, assignment, octree.cdata(), box, invThetaMinToVec(theta));
-    std::vector<int> reference = findPeersAll2All(rank, assignment, octree.treeLeaves(), box, invThetaMinToVec(theta));
+    std::vector<int> reference = findPeersAll2All<KeyType>(rank, assignment, leaves, box, invThetaMinToVec(theta));
 
     EXPECT_EQ(peers, reference);
 }
@@ -182,8 +183,9 @@ auto peerMatrix(const std::vector<KeyType>& leaves,
                 Box<T> box,
                 float invThetaEff)
 {
-    Octree<KeyType> octree;
-    octree.update(leaves.data(), nNodes(leaves));
+    OctreeData<KeyType, execution::Cpu> octree;
+    octree.resize(nNodes(leaves));
+    updateInternalTree<KeyType>(leaves, octree.data());
 
     int numRanks = assignmentKeys.size() - 1;
     SfcAssignment<KeyType> assignment(numRanks);
@@ -212,10 +214,11 @@ auto vecMacMatrix(const std::vector<KeyType>& leaves,
                   Box<T> box,
                   float invTheta)
 {
-    Octree<KeyType> octree;
-    octree.update(leaves.data(), nNodes(leaves));
+    OctreeData<KeyType, execution::Cpu> octree;
+    octree.resize(nNodes(leaves));
+    updateInternalTree<KeyType>(leaves, octree.data());
 
-    TreeNodeIndex numNodes = octree.numTreeNodes();
+    TreeNodeIndex numNodes = octree.numNodes;
 
     int numRanks = assignmentKeys.size() - 1;
     SfcAssignment<KeyType> assignment(numRanks);
@@ -225,7 +228,8 @@ auto vecMacMatrix(const std::vector<KeyType>& leaves,
     }
 
     std::vector<Vec3<T>> centers(numNodes), sizes(numNodes);
-    nodeFpCenters(octree.nodeKeys(), centers.data(), sizes.data(), box);
+    nodeFpCenters(std::span<const KeyType>{octree.prefixes.data(), size_t(octree.numNodes)}, centers.data(), sizes.data(),
+                  box);
 
     std::vector<Vec4<T>> c4(numNodes);
 
@@ -238,7 +242,7 @@ auto vecMacMatrix(const std::vector<KeyType>& leaves,
         c4[i][2] = centers[i][2] + randCorner() * sizes[i][2];
         c4[i][3] = 1;
     }
-    setMac<T, KeyType>(octree.nodeKeys(), c4, invTheta, box);
+    setMac<T, KeyType>(std::span<const KeyType>{octree.prefixes.data(), size_t(octree.numNodes)}, c4, invTheta, box);
 
     std::vector matrix(numRanks, std::vector<int>(numRanks));
     for (int i = 0; i < numRanks; ++i)
@@ -246,11 +250,13 @@ auto vecMacMatrix(const std::vector<KeyType>& leaves,
         TreeNodeIndex iStart = findNodeAbove(leaves.data(), nNodes(leaves), assignment[i]);
         TreeNodeIndex iEnd   = findNodeAbove(leaves.data(), nNodes(leaves), assignment[i + 1]);
         std::vector<uint8_t> macs_internal(numNodes, 0);
-        markMacs(octree.nodeKeys().data(), octree.childOffsets().data(), octree.parents().data(), c4.data(), box,
+        markMacs(octree.prefixes.data(), octree.childOffsets.data(), octree.parents.data(), c4.data(), box,
                  leaves.data() + iStart, iEnd - iStart, false, macs_internal.data());
 
-        std::vector<uint8_t> macs(octree.numLeafNodes(), 0);
-        gather(octree.internalOrder(), macs_internal.data(), macs.data());
+        std::vector<uint8_t> macs(octree.numLeafNodes, 0);
+        gather(std::span<const TreeNodeIndex>{octree.leafToInternal.data() + octree.numInternalNodes,
+                                              size_t(octree.numLeafNodes)},
+               macs_internal.data(), macs.data());
 
         for (int j = 0; j < numRanks; ++j)
         {

@@ -14,6 +14,7 @@ set(UNIT_TESTS
         sfc/box.cpp
         sfc/common.cpp
         sfc/hilbert.cpp
+        sfc/mixed_hilbert.cpp
         sfc/morton.cpp
         sfc/sfc.cpp
         traversal/boxoverlap.cpp

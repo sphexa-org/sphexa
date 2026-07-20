@@ -20,7 +20,7 @@ if (SPH_EXA_WITH_H5HUT)
     install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/main)
 endif ()
 
-if (CMAKE_CUDA_COMPILER AND SPH_EXA_WITH_H5HUT)
+if (SPH_EXA_WITH_CUDA AND SPH_EXA_WITH_H5HUT)
     set(testname frontend_units_cuda)
     add_executable(${testname}
             io/id_tag_utils_gpu.cu

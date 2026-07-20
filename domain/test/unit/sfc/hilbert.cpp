@@ -96,13 +96,13 @@ void firstOrderCurve()
                 unsigned mortonOctant = 4 * xi + 2 * yi + zi;
 
                 {
-                    KeyType hilbertKey     = iHilbert<KeyType>(L1Range * xi, L1Range * yi, L1Range * zi);
+                    KeyType hilbertKey     = iHilbert3D<KeyType>(L1Range * xi, L1Range * yi, L1Range * zi);
                     unsigned hilbertOctant = octalDigit(hilbertKey, 1);
                     EXPECT_EQ(mortonOctant, hilbertToMorton[hilbertOctant]);
                 }
                 {
-                    KeyType hilbertKey     = iHilbert<KeyType>(L1Range * xi + L1Range - 1, L1Range * yi + L1Range - 1,
-                                                               L1Range * zi + L1Range - 1);
+                    KeyType hilbertKey     = iHilbert3D<KeyType>(L1Range * xi + L1Range - 1, L1Range * yi + L1Range - 1,
+                                                                 L1Range * zi + L1Range - 1);
                     unsigned hilbertOctant = octalDigit(hilbertKey, 1);
                     EXPECT_EQ(mortonOctant, hilbertToMorton[hilbertOctant]);
                 }
@@ -131,9 +131,9 @@ void continuityTest()
             KeyType lastKey      = (octant + 1) * nodeRange<KeyType>(level) - 1;
             KeyType firstNextKey = lastKey + 1;
 
-            auto [x, y, z] = decodeHilbert(lastKey);
+            auto [x, y, z] = decodeHilbert3D(lastKey);
 
-            auto [xnext, ynext, znext] = decodeHilbert(firstNextKey);
+            auto [xnext, ynext, znext] = decodeHilbert3D(firstNextKey);
 
             // the points in 3D space should be right next to each other, i.e. delta == 1
             // this is a property that the Z-curve does not have
@@ -172,9 +172,9 @@ void inversionTest()
 
     for (int i = 0; i < numKeys; ++i)
     {
-        KeyType hilbertKey = iHilbert<KeyType>(x[i], y[i], z[i]);
+        KeyType hilbertKey = iHilbert3D<KeyType>(x[i], y[i], z[i]);
 
-        auto [a, b, c] = decodeHilbert(hilbertKey);
+        auto [a, b, c] = decodeHilbert3D(hilbertKey);
         EXPECT_EQ(x[i], a);
         EXPECT_EQ(y[i], b);
         EXPECT_EQ(z[i], c);
@@ -197,8 +197,8 @@ std::tuple<KeyType, KeyType> findMinMaxKey(const IBox& ibox)
         for (int hy = 0; hy < 2; ++hy)
             for (int hz = 0; hz < 2; ++hz)
             {
-                cornerKeys.push_back(iHilbert<KeyType>(ibox.xmin() + hx * cubeLength, ibox.ymin() + hy * cubeLength,
-                                                       ibox.zmin() + hz * cubeLength));
+                cornerKeys.push_back(iHilbert3D<KeyType>(ibox.xmin() + hx * cubeLength, ibox.ymin() + hy * cubeLength,
+                                                         ibox.zmin() + hz * cubeLength));
             }
 
     return {*std::min_element(cornerKeys.begin(), cornerKeys.end()),
@@ -213,7 +213,8 @@ void makeHilbertIBox()
         KeyType start                 = pad(KeyType(03), 3);
         KeyType end                   = pad(KeyType(04), 3);
 
-        IBox box = hilbertIBox(start, treeLevel(end - start));
+        IBox box = hilbertIBox(start, treeLevel(end - start), maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{},
+                               maxTreeLevel<KeyType>{});
 
         IBox reference(0, cubeLength / 2, cubeLength / 2, cubeLength, 0, cubeLength / 2);
 
@@ -232,7 +233,8 @@ void makeHilbertIBox()
                     {
                         IBox reference(ix, ix + L, iy, iy + L, iz, iz + L);
                         auto [start, end] = findMinMaxKey<KeyType>(reference);
-                        IBox testBox      = hilbertIBox(start, treeLevel(end - start));
+                        IBox testBox      = hilbertIBox(start, treeLevel(end - start), maxTreeLevel<KeyType>{},
+                                                        maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{});
                         EXPECT_EQ(testBox, reference);
                     }
                     {
@@ -240,7 +242,8 @@ void makeHilbertIBox()
                         auto [start, end] = findMinMaxKey<KeyType>(reference);
                         EXPECT_EQ(start + 1, end);
 
-                        IBox testBox = hilbertIBox(start, treeLevel(end - start));
+                        IBox testBox = hilbertIBox(start, treeLevel(end - start), maxTreeLevel<KeyType>{},
+                                                   maxTreeLevel<KeyType>{}, maxTreeLevel<KeyType>{});
                         EXPECT_EQ(testBox, reference);
                     }
                 }

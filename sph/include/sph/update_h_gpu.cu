@@ -29,7 +29,6 @@
  */
 
 #include "cstone/cuda/gpu_config.cuh"
-#include "cstone/traversal/find_neighbors.cuh"
 
 #include "sph/kernels.hpp"
 #include "sph/particles_data.hpp"
@@ -39,8 +38,6 @@ namespace sph
 {
 using cstone::GpuConfig;
 using cstone::LocalIndex;
-using cstone::NcStats;
-using cstone::TravConfig;
 using cstone::TreeNodeIndex;
 
 __device__ bool nc_h_convergenceFailure = false;
@@ -81,72 +78,31 @@ template bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const
 template bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned* nc, double* h, uint64_t*);
 
 template<class Tc, class T, class KeyType>
-__global__ void
-updateSmoothingLengthIterativeGpuKernel(unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box,
-                                        const LocalIndex* grpStart, const LocalIndex* grpEnd, LocalIndex numGroups,
-                                        const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* x, const Tc* y,
-                                        const Tc* z, T* h, unsigned* nc, LocalIndex* nidx, TreeNodeIndex* globalPool)
+__global__ __launch_bounds__(128) void updateSmoothingLengthIterativeGpuKernel(
+    GroupView grp, unsigned ng0, unsigned ngmax, const cstone::Box<Tc> box,
+    const cstone::OctreeNsView<Tc, KeyType> tree, const Tc* __restrict__ x, const Tc* __restrict__ y,
+    const Tc* __restrict__ z, T* __restrict__ h, unsigned* __restrict__ nc)
 {
-    unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
-    unsigned targetIdx   = 0;
-    unsigned warpIdxGrid = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
+    LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
+    LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
+    if (warpIdx >= grp.numGroups) { return; }
 
-    LocalIndex* neighborsWarp = nidx + ngmax * TravConfig::targetSize * warpIdxGrid;
+    const LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
+    if (i >= grp.groupEnd[warpIdx]) { return; }
 
-    while (true)
-    {
-        // first thread in warp grabs next target
-        if (laneIdx == 0) { targetIdx = atomicAdd(&cstone::targetCounterGlob, 1); }
-        targetIdx = cstone::shflSync(targetIdx, 0);
-
-        if (targetIdx >= numGroups) return;
-
-        LocalIndex bodyBegin = grpStart[targetIdx];
-        LocalIndex bodyEnd   = grpEnd[targetIdx];
-        LocalIndex i         = bodyBegin + laneIdx;
-
-        unsigned ncSph =
-            1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
-
-        constexpr int ncMaxIteration = 9;
-        for (int ncIt = 0; ncIt <= ncMaxIteration; ++ncIt)
-        {
-            bool repeat = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
-            if (!cstone::ballotSync(repeat)) { break; }
-            if (repeat) { h[i] = updateH(ng0, ncSph, h[i]); }
-            ncSph =
-                1 + traverseNeighbors(bodyBegin, bodyEnd, x, y, z, h, tree, box, neighborsWarp, ngmax, globalPool)[0];
-
-            bool ncFail = (ncSph < ng0 / 4 || (ncSph - 1) > ngmax) && i < bodyEnd;
-            if (ncIt == ncMaxIteration && ncFail) { ncSph = 1; }
-        }
-
-        if (i >= bodyEnd) continue;
-
-        nc[i] = ncSph;
-    }
+    updateHIterative(ng0, ngmax, box, tree, i, x, y, z, h, nc);
 }
 
 template<class T, class Dataset>
 void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d, const cstone::Box<T>& box)
 {
-    auto [traversalPool, nidxPool] = cstone::allocateNcStacks(d.traversalStack, d.ngmax);
-    cstone::resetTraversalCounters<<<1, 1>>>();
+    unsigned numThreads       = 128;
+    unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
+    unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+    if (numBlocks == 0) { return; }
 
-    updateSmoothingLengthIterativeGpuKernel<<<TravConfig::numBlocks(), TravConfig::numThreads>>>(
-        d.ng0, d.ngmax, box, grp.groupStart, grp.groupEnd, grp.numGroups, d.treeView, rawPtr(d.x), rawPtr(d.y),
-        rawPtr(d.z), rawPtr(d.h), rawPtr(d.nc), nidxPool, traversalPool);
-    checkGpuErrors(cudaDeviceSynchronize());
-
-    NcStats::type stats[NcStats::numStats];
-    checkGpuErrors(cudaMemcpyFromSymbol(stats, GPU_SYMBOL(cstone::ncStats), NcStats::numStats * sizeof(NcStats::type)));
-
-    NcStats::type maxP2P   = stats[cstone::NcStats::maxP2P];
-    NcStats::type maxStack = stats[cstone::NcStats::maxStack];
-
-    d.stackUsedNc = maxStack;
-
-    if (maxP2P == 0xFFFFFFFF) { throw std::runtime_error("GPU traversal stack exhausted in neighbor search\n"); }
+    updateSmoothingLengthIterativeGpuKernel<<<numBlocks, numThreads>>>(
+        grp, d.ng0, d.ngmax, box, d.treeView, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h), rawPtr(d.nc));
 }
 
 template void updateSmoothingLengthIterativeGpu(const cstone::GroupView&,
