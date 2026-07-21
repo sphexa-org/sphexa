@@ -48,14 +48,9 @@ inline constexpr std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...> loadParticleData(
     const Vec3<Tc> pos = {load(x), load(y), load(z)};
     Th hi;
     if constexpr (std::is_pointer_v<ThP>)
-    {
         hi = load(h);
-        if (std::isinf(hi)) hi = 0;
-    }
     else
-    {
         hi = h;
-    }
     return std::tuple_cat(std::make_tuple(index, pos, hi), util::tupleMap(load, input));
 }
 
@@ -91,7 +86,9 @@ inline constexpr bool requiresPbcHandling(Box<Tc> const& box, std::tuple<LocalIn
         (box.boundaryZ() != BoundaryType::periodic))
         return false;
     const Vec3<Tc>& iPos = std::get<1>(iData);
-    const Tc twoHi       = Tc(2) * std::get<2>(iData);
+    const Th hi          = std::get<2>(iData);
+    if (std::isinf(hi)) return false;
+    const Tc twoHi = Tc(2) * hi;
     return !insideBox(iPos, {twoHi, twoHi, twoHi}, box);
 }
 
