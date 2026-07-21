@@ -48,9 +48,14 @@ inline constexpr std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...> loadParticleData(
     const Vec3<Tc> pos = {load(x), load(y), load(z)};
     Th hi;
     if constexpr (std::is_pointer_v<ThP>)
+    {
         hi = load(h);
+        if (std::isinf(hi)) hi = 0;
+    }
     else
+    {
         hi = h;
+    }
     return std::tuple_cat(std::make_tuple(index, pos, hi), util::tupleMap(load, input));
 }
 

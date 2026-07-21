@@ -1,5 +1,7 @@
 #pragma once
 
+#include <limits>
+
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/findneighbors.hpp"
 #include "cstone/util/array.hpp"
@@ -54,7 +56,7 @@ HOST_DEVICE_FUN void updateHIterative(unsigned ng0, unsigned ngmax, const cstone
     if (ngmin > ncSph || (ncSph - 1) > ngmax)
     {
         ncSph = 1;
-        h[i]  = 1e-12;
+        h[i]  = std::numeric_limits<T>::infinity();
     }
 
     nc[i] = ncSph;
