@@ -15,8 +15,8 @@ HOST_DEVICE_FUN auto tsKCourant(T1 maxvsignal, T2 h, T3 c, float Kcour)
 {
     using T = std::common_type_t<T1, T2, T3>;
     T v     = maxvsignal > T(0) ? maxvsignal : c;
-    // h == 0 signals neighbor search didn't converge, particle will be removed
-    return h > T2(0) ? T(Kcour * h / v) : INFINITY;
+    assert(h > 0);
+    return T(Kcour * h / v);
 }
 
 /*! @brief estimate updated smoothing length to bring the neighbor count closer to ng0
