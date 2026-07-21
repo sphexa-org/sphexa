@@ -243,7 +243,9 @@ __device__ __forceinline__ auto loadSuperclusterParticleData(const LocalIndex fi
     {
         const unsigned i = std::min(firstBody + w * GpuConfig::warpSize + laneIdx, lastBody - 1);
         iPos[w]          = {x[i], y[i], z[i]};
-        iRadius[w]       = 2 * loadAtIndexIfPtr(h, i) * searchExtFactor;
+        Th hi            = loadAtIndexIfPtr(h, i);
+        if (std::isinf(hi)) hi = 0;
+        iRadius[w] = 2 * hi * searchExtFactor;
     }
     return std::make_tuple(iPos, iRadius);
 }
