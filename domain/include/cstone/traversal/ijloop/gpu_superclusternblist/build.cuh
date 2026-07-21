@@ -196,7 +196,6 @@ template<class Config, unsigned NumSuperclustersPerBlock>
 __device__ __forceinline__ bool storeNeighborData(std::uint32_t* const __restrict__ jClusters,
                                                   const unsigned jClusterBytes,
                                                   const std::uint32_t* const __restrict__ masks,
-                                                  const unsigned ncmax,
                                                   std::uint32_t* const __restrict__ neighborData,
                                                   const std::size_t maxNeighborDataSize,
                                                   unsigned long long* __restrict__ neighborDataSize,
@@ -206,7 +205,7 @@ __device__ __forceinline__ bool storeNeighborData(std::uint32_t* const __restric
     assert(blockDim.x * blockDim.y == GpuConfig::warpSize);
     assert(blockDim.z == NumSuperclustersPerBlock);
 
-    const unsigned mSize  = masksSize<Config>(std::min(info.neighborsCount, ncmax));
+    const unsigned mSize  = masksSize<Config>(info.neighborsCount);
     const unsigned nbSize = (jClusterBytes + sizeof(std::uint32_t) - 1) / sizeof(std::uint32_t);
 
     const unsigned long long totalSize = nbSize + mSize;
@@ -558,9 +557,10 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
         maxNeighbors = std::max(info.neighborsCount, maxNeighbors);
 
         if (info.neighborsCount > ncmax && laneIdx == 0) globalBuildData->status = BuildStatus::neighbor_list_overflow;
+        info.neighborsCount = std::min(info.neighborsCount, ncmax);
 
         const bool storeSuccessful = storeNeighborData<Config, NumSuperclustersPerBlock>(
-            jClusters.get(), jClusterBytes, masks.get(), ncmax, neighborData, neighborDataSize,
+            jClusters.get(), jClusterBytes, masks.get(), neighborData, neighborDataSize,
             &globalBuildData->neighborDataSize, info);
 
         if (!storeSuccessful)
