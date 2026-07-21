@@ -132,9 +132,14 @@ __global__ void computeJClusterBboxesKernel(const LocalIndex firstValidBody,
         using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
         Th hi;
         if constexpr (std::is_pointer_v<ThP>)
+        {
             hi = h[std::max(std::min(i, totalBodies - 1), firstValidBody)];
+            if (std::isinf(hi)) hi = 0;
+        }
         else
+        {
             hi = h;
+        }
         Th rMax = 2 * hi;
 
 #pragma unroll
