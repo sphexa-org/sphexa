@@ -323,6 +323,8 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
                          const Box<Tc>& box,
                          const LocalIndex firstValidBody,
                          const LocalIndex totalBodies,
+                         const LocalIndex firstBody,
+                         const LocalIndex lastBody,
                          const Tc* const __restrict__ x,
                          const Tc* const __restrict__ y,
                          const Tc* const __restrict__ z,
@@ -341,12 +343,13 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
     using Th               = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
     const unsigned laneIdx = laneIndex();
 
-    const unsigned firstBody     = std::max(info.index * Config::superclusterSize, firstValidBody);
-    const unsigned lastBody      = std::min((info.index + 1) * Config::superclusterSize, totalBodies);
-    const unsigned iSupercluster = superclusterIndex<Config>(firstBody);
+    const unsigned firstSuperclusterBody = info.index * Config::superclusterSize;
+    assert(firstSuperclusterBody >= firstBody);
+    const unsigned lastSuperclusterBody = std::min(firstSuperclusterBody + Config::superclusterSize, lastBody);
+    const unsigned iSupercluster        = superclusterIndex<Config>(firstSuperclusterBody);
 
-    const auto [iPos, iRadius] =
-        loadSuperclusterParticleData<Config>(firstBody, lastBody, x, y, z, h, tree.searchExtFactor);
+    const auto [iPos, iRadius] = loadSuperclusterParticleData<Config>(firstSuperclusterBody, lastSuperclusterBody, x, y,
+                                                                      z, h, tree.searchExtFactor);
     const auto [bBoxCenter, bBoxSize, maxParticleRadius] = superclusterBoundingBox<Config>(iPos, iRadius);
 
     const auto overlapsInternalNode = [&](const TreeNodeIndex idx)
@@ -551,8 +554,8 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
         SuperclusterInfo info = {.index = index + firstISupercluster, .neighborsCount = 0, .dataIndex = 0};
 
         const unsigned jClusterBytes = collectNeighborJClusters<Config, UsePbc>(
-            tree, box, firstValidBody, totalBodies, x, y, z, h, jClusterBboxes, nodeRMax, ncmax, firstISupercluster,
-            lastISupercluster, jClusters.get(), masks.get(), info);
+            tree, box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, jClusterBboxes, nodeRMax, ncmax,
+            firstISupercluster, lastISupercluster, jClusters.get(), masks.get(), info);
 
         maxNeighbors = std::max(info.neighborsCount, maxNeighbors);
 
