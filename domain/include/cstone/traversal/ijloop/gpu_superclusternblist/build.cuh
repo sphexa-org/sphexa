@@ -136,10 +136,7 @@ __global__ void computeJClusterBboxesKernel(const LocalIndex firstValidBody,
             hi = h[std::max(std::min(i, totalBodies - 1), firstValidBody)];
             if (std::isinf(hi)) hi = 0;
         }
-        else
-        {
-            hi = h;
-        }
+        else { hi = h; }
         Th rMax = 2 * hi;
 
 #pragma unroll
