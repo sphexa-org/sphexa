@@ -52,10 +52,7 @@ inline constexpr std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...> loadParticleData(
         hi = load(h);
         if (std::isinf(hi)) hi = 0;
     }
-    else
-    {
-        hi = h;
-    }
+    else { hi = h; }
     return std::tuple_cat(std::make_tuple(index, pos, hi), util::tupleMap(load, input));
 }
 
