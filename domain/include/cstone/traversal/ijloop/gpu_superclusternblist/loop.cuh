@@ -368,7 +368,8 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             auto jData                   = (nb < iSuperclusterNeighborsCount & j >= firstValidBody & j < totalBodies)
                                                ? loadParticleData(x, y, z, h, input, j)
                                                : dummyParticleData(x, y, z, h, input, j);
-            const Th jRadiusSq           = radiusSq(jData);
+            Th jRadiusSq                 = radiusSq(jData);
+            if (std::isinf(jRadiusSq)) jRadiusSq = 0;
             std::get<0>(jData) -= firstValidBody;
             Result jResult = {};
 
@@ -378,9 +379,10 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
                 if ((warpMask >> c) & (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j)))
                 {
                     const bool jRequired = i != j;
-                    const auto [iData, iRadiusSq] =
+                    auto [iData, iRadiusSq] =
                         getIData(iSuperclusterData, c * Config::iSize + threadIdx.x, i - firstValidBody, h);
                     assert(std::get<0>(iData) == i - firstValidBody);
+                    if (std::isinf(iRadiusSq)) iRadiusSq = 0;
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
                     bool iClose, jClose;
                     if constexpr (std::is_pointer_v<ThP>)
