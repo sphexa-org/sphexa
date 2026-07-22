@@ -35,10 +35,22 @@ constexpr std::remove_cvref_t<std::remove_pointer_t<T>> loadAtIndexIfPtr(T ptrOr
         return ptrOrValue;
 }
 
+/*! @brief Turns h values into an invalid signalling value used to indicate unconverged neighbor searches
+ *
+ * Current choice of infinity is transparent to timesteps and SPH kernels, but must be converted to zero in overlaps
+ * and neighbor searches.
+ */
 template<class T>
-constexpr T infToZero(T value)
+constexpr T invalidateH(T /*value*/)
 {
-    return std::isinf(value) ? 0 : value;
+    return std::numeric_limits<T>::infinity();
+}
+
+//! @brief Return 0 if @p value is invalid according to invalidateH, unmodified @p value otherwise
+template<class T>
+constexpr T invalidHToZero(T value)
+{
+    return value == invalidateH(value) ? 0 : value;
 }
 
 /*! @brief compute squared distance, taking PBC into account
@@ -105,7 +117,7 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
     Tc xi    = x[i];
     Tc yi    = y[i];
     Tc zi    = z[i];
-    Th hi    = infToZero(loadAtIndexIfPtr(h, i));
+    Th hi    = invalidHToZero(loadAtIndexIfPtr(h, i));
 
     auto radiusSq     = Th(4.0) * hi * hi;
     auto cellRadiusSq = radiusSq * tree.searchExtFactor * tree.searchExtFactor;

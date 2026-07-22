@@ -56,7 +56,7 @@ HOST_DEVICE_FUN void updateHIterative(unsigned ng0, unsigned ngmax, const cstone
     if (ngmin > ncSph || (ncSph - 1) > ngmax)
     {
         ncSph = 1;
-        h[i]  = std::numeric_limits<T>::infinity();
+        h[i]  = cstone::invalidateH(h[i]);
     }
 
     nc[i] = ncSph;

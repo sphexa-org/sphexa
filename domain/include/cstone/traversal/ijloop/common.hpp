@@ -78,7 +78,7 @@ inline constexpr bool requiresPbcHandling(Box<Tc> const& box, std::tuple<LocalIn
         (box.boundaryZ() != BoundaryType::periodic))
         return false;
     const Vec3<Tc>& iPos = std::get<1>(iData);
-    const Th hi          = infToZero(std::get<2>(iData));
+    const Th hi          = invalidHToZero(std::get<2>(iData));
     const Tc twoHi       = Tc(2) * hi;
     return !insideBox(iPos, {twoHi, twoHi, twoHi}, box);
 }
