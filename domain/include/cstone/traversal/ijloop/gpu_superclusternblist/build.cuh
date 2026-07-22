@@ -505,16 +505,15 @@ constexpr unsigned buildNbListSharedMemPerSupercluster(const unsigned ncmax)
  * @param[in]    jClusterBboxes         bounding boxes of j-clusters
  * @param[in]    nodeRMax               max. particle radii of tree nodes
  * @param[in]    ncmax                  max. number of neighbor clusters (upper bound for numCandidates)
- * @param[out]   neighborData           global memory neighbor data array where (possibly compressed) neighbor indices
- *                                      will be stored
+ * @param[out]   neighborData           global memory neighbor data array where (possibly compressed) neighbor
+ *                                      indices will be stored
  * @param[in]    neighborDataSize       size of neighborData array to avoid out of bounds accesses
  * @param[inout] superclusterInfo       supercluster info
  * @param[in]    numSuperClusters       number of superclusters
- * @param[in]    scratch               global scratch buffer of size numBlocks * numSuperclustersPerBlock
- *                                      * (ncmax + masksSize<Config>(ncmax)), private per-supercluster regions used
- *                                      to store uncompressed neighbor indices and interaction bitmasks
- * @param[inout] globalBuildData        global build data used to 'allocate' global memory regions per supercluster in a
- * pre-allocated array
+ * @param[in]    scratch                global scratch buffer to store neighbor indices and interaction bitmasks
+ *                                      temporarily at build time
+ * @param[inout] globalBuildData        global build data used to 'allocate' global memory regions per supercluster
+ *                                      in a pre-allocated array
  */
 template<class Config, unsigned NumSuperclustersPerBlock, bool UsePbc, class Tc, class ThP, class KeyType>
 __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void buildNbListKernel(
