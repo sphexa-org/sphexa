@@ -1,7 +1,5 @@
 #pragma once
 
-#include <limits>
-
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/findneighbors.hpp"
 #include "cstone/util/array.hpp"
