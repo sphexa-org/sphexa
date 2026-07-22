@@ -44,6 +44,7 @@
 #include "cstone/traversal/ijloop/gpu_superclusternblist/common.cuh"
 #include "cstone/traversal/ijloop/upsweep.cuh"
 #include "cstone/tree/octree.hpp"
+#include "cstone/util/h_helpers.hpp"
 
 namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail
 {
@@ -140,13 +141,8 @@ __global__ void computeJClusterBboxesKernel(const LocalIndex firstValidBody,
     if constexpr (Config::symmetric)
     {
         using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
-        Th hi;
-        if constexpr (std::is_pointer_v<ThP>)
-        {
-            hi = h[std::max(std::min(i, totalBodies - 1), firstValidBody)];
-            if (std::isinf(hi)) hi = 0;
-        }
-        else { hi = h; }
+        const Th hi =
+            util::infToZero(util::loadAtIndexIfPtr(h, std::max(std::min(i, totalBodies - 1), firstValidBody)));
         Th rMax = 2 * hi;
 
 #pragma unroll
@@ -255,9 +251,7 @@ __device__ __forceinline__ auto loadSuperclusterParticleData(const LocalIndex fi
     {
         const unsigned i = std::min(firstBody + w * GpuConfig::warpSize + laneIdx, lastBody - 1);
         iPos[w]          = {x[i], y[i], z[i]};
-        Th hi            = loadAtIndexIfPtr(h, i);
-        if (std::isinf(hi)) hi = 0;
-        iRadius[w] = 2 * hi * searchExtFactor;
+        iRadius[w]       = 2 * util::infToZero(util::loadAtIndexIfPtr(h, i)) * searchExtFactor;
     }
     return std::make_tuple(iPos, iRadius);
 }
@@ -368,7 +362,7 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
         const Vec3<Tc> srcCenter = tree.centers[idx];
         const Vec3<Tc> srcSize   = tree.sizes[idx];
         if (srcSize[0] == 0 && srcSize[1] == 0 && srcSize[2] == 0) return false;
-        const Th srcRadius = Config::symmetric ? loadAtIndexIfPtr(nodeRMax, idx) * tree.searchExtFactor : Th(0);
+        const Th srcRadius = Config::symmetric ? util::loadAtIndexIfPtr(nodeRMax, idx) * tree.searchExtFactor : Th(0);
 
         bool overlaps = false;
         for (unsigned w = 0; w < warpsPerSupercluster; ++w)
@@ -431,9 +425,10 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
                 {
                     const LocalIndex j =
                         std::clamp(jCluster * Config::jSize + jClusterParticle, firstValidBody, totalBodies - 1);
-                    const Vec3<Tc> jPos = {x[j], y[j], z[j]};
-                    Th jRadius          = Config::symmetric ? 2 * loadAtIndexIfPtr(h, j) * tree.searchExtFactor : Th(0);
-                    if (std::isinf(jRadius)) jRadius = 0;
+                    const Vec3<Tc> jPos      = {x[j], y[j], z[j]};
+                    Th jRadius               = Config::symmetric
+                                                   ? 2 * util::infToZero(util::loadAtIndexIfPtr(h, j)) * tree.searchExtFactor
+                                                   : Th(0);
                     const unsigned warpIndex = jClusterParticle / (Config::jSize / Config::numWarpsPerInteraction);
 
                     for (unsigned w = 0; w < warpsPerSupercluster; ++w)

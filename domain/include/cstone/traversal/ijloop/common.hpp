@@ -54,15 +54,6 @@ inline constexpr std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...> loadParticleData(
     return std::tuple_cat(std::make_tuple(index, pos, hi), util::tupleMap(load, input));
 }
 
-template<class T>
-inline constexpr std::remove_cvref_t<std::remove_pointer_t<T>> loadAtIndexIfPtr(T ptrOrConstant, LocalIndex index)
-{
-    if constexpr (std::is_pointer_v<T>)
-        return ptrOrConstant[index];
-    else
-        return ptrOrConstant;
-}
-
 template<class... Ts>
 inline constexpr void
 storeParticleData(std::tuple<Ts*...> const& output, LocalIndex index, std::tuple<Ts...> const& value)

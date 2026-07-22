@@ -38,6 +38,7 @@
 #include "cstone/traversal/ijloop/compressneighbors.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/common.cuh"
 #include "cstone/traversal/ijloop/symmetric_loop.cuh"
+#include "cstone/util/h_helpers.hpp"
 #include "cstone/util/tuple_util.hpp"
 #include "cstone/util/uninitialized.hpp"
 
@@ -124,7 +125,10 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
                 util::for_each_tuple([index](auto* ptr, auto const& t) { atomicUpdatePtr(&ptr[index], t); }, ptrs,
                                      tuple);
             }
-            else { storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple))); }
+            else
+            {
+                storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple)));
+            }
         }
     }
 }
@@ -175,9 +179,7 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
 /*! compile-time utility to get an array buffer type for each tuple element */
 template<std::size_t Size, class... Ts>
 consteval std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...> const&)
-{
-    return {};
-}
+{ return {}; }
 
 template<class Tc, class ThP, class... Ts>
 inline constexpr auto loadParticleDataWithRadiusSq(
@@ -187,10 +189,13 @@ inline constexpr auto loadParticleDataWithRadiusSq(
     const auto iInput = util::tupleMap([index](auto const* ptr) { return ptr[index]; }, input);
     if constexpr (std::is_pointer_v<ThP>)
     {
-        const auto hi = loadAtIndexIfPtr(h, index);
+        const auto hi = util::loadAtIndexIfPtr(h, index);
         return std::tuple_cat(std::move(iPos), std::make_tuple(hi, 4 * hi * hi), std::move(iInput));
     }
-    else { return std::tuple_cat(std::move(iPos), std::move(iInput)); }
+    else
+    {
+        return std::tuple_cat(std::move(iPos), std::move(iInput));
+    }
 }
 
 template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
@@ -226,7 +231,8 @@ inline constexpr auto splitParticleDataWithRadiusSq(std::tuple<Tc, Tc, Tc, Ts...
     }
 
     constexpr std::size_t skip = std::is_pointer_v<ThP> ? 2 : 0;
-    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>)
+    {
         return std::make_tuple(index, iPos, hi, std::get<Is + 3 + skip>(particleDataWithRadiusSq)...);
     }(std::make_index_sequence<sizeof...(Ts) - skip>());
 
@@ -258,8 +264,8 @@ __device__ __forceinline__ auto loadSuperclusterIParticleData(const LocalIndex f
          offset += Config::iSize * Config::jSize)
     {
         const unsigned i = base + offset;
-        auto iData       = (i >= firstValidBody & i < totalBodies) ? loadParticleDataWithRadiusSq(x, y, z, h, input, i)
-                                                                   : dummyParticleDataWithRadiusSq(x, y, z, h, input, i);
+        auto iData = (i >= firstValidBody & i < totalBodies) ? loadParticleDataWithRadiusSq(x, y, z, h, input, i)
+                                                             : dummyParticleDataWithRadiusSq(x, y, z, h, input, i);
 #if CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
         util::for_each_tuple([offset](auto& array, auto const& value) { array[offset] = value; }, *iSuperclusterData,
                              iData);
@@ -368,8 +374,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             auto jData                   = (nb < iSuperclusterNeighborsCount & j >= firstValidBody & j < totalBodies)
                                                ? loadParticleData(x, y, z, h, input, j)
                                                : dummyParticleData(x, y, z, h, input, j);
-            Th jRadiusSq                 = radiusSq(jData);
-            if (std::isinf(jRadiusSq)) jRadiusSq = 0;
+            const Th jRadiusSq           = util::infToZero(radiusSq(jData));
             std::get<0>(jData) -= firstValidBody;
             Result jResult = {};
 
@@ -378,22 +383,22 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
                 const unsigned i = iSupercluster * Config::superclusterSize + c * Config::iSize + threadIdx.x;
                 if ((warpMask >> c) & (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j)))
                 {
-                    const bool jRequired = i != j;
+                    const bool ijEq = i == j;
                     auto [iData, iRadiusSq] =
                         getIData(iSuperclusterData, c * Config::iSize + threadIdx.x, i - firstValidBody, h);
                     assert(std::get<0>(iData) == i - firstValidBody);
-                    if (std::isinf(iRadiusSq)) iRadiusSq = 0;
+                    iRadiusSq                      = util::infToZero(iRadiusSq);
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
                     bool iClose, jClose;
                     if constexpr (std::is_pointer_v<ThP>)
                     {
-                        iClose = distSq < iRadiusSq;
-                        jClose = Config::symmetric && (distSq < jRadiusSq & jRequired);
+                        iClose = distSq < iRadiusSq | ijEq;
+                        jClose = Config::symmetric && (distSq < jRadiusSq & !ijEq);
                     }
                     else
                     {
-                        iClose = distSq < jRadiusSq;
-                        jClose = Config::symmetric && (iClose & jRequired);
+                        iClose = distSq < jRadiusSq | ijEq;
+                        jClose = Config::symmetric && (iClose & !ijEq);
                     }
                     if (iClose | jClose)
                     {
