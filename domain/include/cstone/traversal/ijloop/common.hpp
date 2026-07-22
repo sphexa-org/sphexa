@@ -19,6 +19,7 @@
 #include <limits>
 #include <type_traits>
 
+#include "cstone/findneighbors.hpp"
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/boxoverlap.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
@@ -54,15 +55,6 @@ inline constexpr std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...> loadParticleData(
     return std::tuple_cat(std::make_tuple(index, pos, hi), util::tupleMap(load, input));
 }
 
-template<class T>
-inline constexpr std::remove_cvref_t<std::remove_pointer_t<T>> loadAtIndexIfPtr(T ptrOrConstant, LocalIndex index)
-{
-    if constexpr (std::is_pointer_v<T>)
-        return ptrOrConstant[index];
-    else
-        return ptrOrConstant;
-}
-
 template<class... Ts>
 inline constexpr void
 storeParticleData(std::tuple<Ts*...> const& output, LocalIndex index, std::tuple<Ts...> const& value)
@@ -86,7 +78,8 @@ inline constexpr bool requiresPbcHandling(Box<Tc> const& box, std::tuple<LocalIn
         (box.boundaryZ() != BoundaryType::periodic))
         return false;
     const Vec3<Tc>& iPos = std::get<1>(iData);
-    const Tc twoHi       = Tc(2) * std::get<2>(iData);
+    const Th hi          = invalidHToZero(std::get<2>(iData));
+    const Tc twoHi       = Tc(2) * hi;
     return !insideBox(iPos, {twoHi, twoHi, twoHi}, box);
 }
 

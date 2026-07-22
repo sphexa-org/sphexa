@@ -13,8 +13,8 @@ HOST_DEVICE_FUN auto tsKCourant(T1 maxvsignal, T2 h, T3 c, float Kcour)
 {
     using T = std::common_type_t<T1, T2, T3>;
     T v     = maxvsignal > T(0) ? maxvsignal : c;
-    // h == 0 signals neighbor search didn't converge, particle will be removed
-    return h > T2(0) ? T(Kcour * h / v) : INFINITY;
+    assert(h > 0);
+    return T(Kcour * h / v);
 }
 
 /*! @brief estimate updated smoothing length to bring the neighbor count closer to ng0
@@ -51,7 +51,11 @@ HOST_DEVICE_FUN void updateHIterative(unsigned ng0, unsigned ngmax, const cstone
         ncSph = 1 + findNeighbors(i, x, y, z, h, treeView, box, ngmax);
     }
 
-    if (iteration == maxIteration && (ngmin > ncSph || (ncSph - 1) > ngmax)) { ncSph = 1; }
+    if (ngmin > ncSph || (ncSph - 1) > ngmax)
+    {
+        ncSph = 1;
+        h[i]  = cstone::invalidateH(h[i]);
+    }
 
     nc[i] = ncSph;
 }

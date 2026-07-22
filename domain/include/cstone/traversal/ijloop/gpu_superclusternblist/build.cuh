@@ -28,6 +28,7 @@
 
 #include "cstone/cuda/memory.cuh"
 #include "cstone/execution.hpp"
+#include "cstone/findneighbors.hpp"
 #include "cstone/reducearray.cuh"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/ijloop/compressneighbors.cuh"
@@ -129,13 +130,9 @@ __global__ void computeJClusterBboxesKernel(const LocalIndex firstValidBody,
 
     if constexpr (Config::symmetric)
     {
-        using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
-        Th hi;
-        if constexpr (std::is_pointer_v<ThP>)
-            hi = h[std::max(std::min(i, totalBodies - 1), firstValidBody)];
-        else
-            hi = h;
-        Th rMax = 2 * hi;
+        using Th    = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
+        const Th hi = invalidHToZero(loadAtIndexIfPtr(h, std::max(std::min(i, totalBodies - 1), firstValidBody)));
+        Th rMax     = 2 * hi;
 
 #pragma unroll
         for (unsigned offset = Config::jSize / 2; offset >= 1; offset /= 2)
@@ -244,7 +241,7 @@ __device__ __forceinline__ auto loadSuperclusterParticleData(const LocalIndex fi
     {
         const unsigned i = std::min(firstBody + w * GpuConfig::warpSize + laneIdx, lastBody - 1);
         iPos[w]          = {x[i], y[i], z[i]};
-        iRadius[w]       = 2 * loadAtIndexIfPtr(h, i) * searchExtFactor;
+        iRadius[w]       = 2 * invalidHToZero(loadAtIndexIfPtr(h, i)) * searchExtFactor;
     }
     return std::make_tuple(iPos, iRadius);
 }
@@ -293,10 +290,7 @@ __device__ __forceinline__ bool cellOverlap(const Vec3<T>& curSrcCenter,
     {
         return norm2(minDistance(curSrcCenter, curSrcSize, targetCenter, targetSize, box)) == T(0.0);
     }
-    else
-    {
-        return norm2(minDistance(curSrcCenter, curSrcSize, targetCenter, targetSize)) == T(0.0);
-    }
+    else { return norm2(minDistance(curSrcCenter, curSrcSize, targetCenter, targetSize)) == T(0.0); }
 }
 
 /*! traverse the octree to find neighbor clusters for a supercluster
@@ -418,7 +412,8 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
                     const LocalIndex j =
                         std::clamp(jCluster * Config::jSize + jClusterParticle, firstValidBody, totalBodies - 1);
                     const Vec3<Tc> jPos = {x[j], y[j], z[j]};
-                    const Th jRadius    = Config::symmetric ? 2 * loadAtIndexIfPtr(h, j) * tree.searchExtFactor : Th(0);
+                    Th jRadius =
+                        Config::symmetric ? 2 * invalidHToZero(loadAtIndexIfPtr(h, j)) * tree.searchExtFactor : Th(0);
                     const unsigned warpIndex = jClusterParticle / (Config::jSize / Config::numWarpsPerInteraction);
 
                     for (unsigned w = 0; w < warpsPerSupercluster; ++w)
