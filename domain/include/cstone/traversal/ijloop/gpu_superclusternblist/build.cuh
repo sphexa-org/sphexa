@@ -146,10 +146,7 @@ __global__ void computeJClusterBboxesKernel(const LocalIndex firstValidBody,
             hi = h[std::max(std::min(i, totalBodies - 1), firstValidBody)];
             if (std::isinf(hi)) hi = 0;
         }
-        else
-        {
-            hi = h;
-        }
+        else { hi = h; }
         Th rMax = 2 * hi;
 
 #pragma unroll
@@ -309,10 +306,7 @@ __device__ __forceinline__ bool cellOverlap(const Vec3<T>& curSrcCenter,
     {
         return norm2(minDistance(curSrcCenter, curSrcSize, targetCenter, targetSize, box)) == T(0.0);
     }
-    else
-    {
-        return norm2(minDistance(curSrcCenter, curSrcSize, targetCenter, targetSize)) == T(0.0);
-    }
+    else { return norm2(minDistance(curSrcCenter, curSrcSize, targetCenter, targetSize)) == T(0.0); }
 }
 
 /*! traverse the octree to find neighbor clusters for a supercluster

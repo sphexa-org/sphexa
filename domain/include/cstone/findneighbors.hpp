@@ -96,10 +96,7 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
         hi = h[i];
         if (std::isinf(hi)) hi = 0;
     }
-    else
-    {
-        hi = h;
-    }
+    else { hi = h; }
 
     auto radiusSq     = Th(4.0) * hi * hi;
     auto cellRadiusSq = radiusSq * tree.searchExtFactor * tree.searchExtFactor;
