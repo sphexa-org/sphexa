@@ -378,7 +378,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
                 const unsigned i = iSupercluster * Config::superclusterSize + c * Config::iSize + threadIdx.x;
                 if ((warpMask >> c) & (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j)))
                 {
-                    const bool jRequired = i != j;
+                    const bool ijEq = i == j;
                     auto [iData, iRadiusSq] =
                         getIData(iSuperclusterData, c * Config::iSize + threadIdx.x, i - firstValidBody, h);
                     assert(std::get<0>(iData) == i - firstValidBody);
@@ -387,13 +387,13 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
                     bool iClose, jClose;
                     if constexpr (std::is_pointer_v<ThP>)
                     {
-                        iClose = distSq < iRadiusSq;
-                        jClose = Config::symmetric && (distSq < jRadiusSq & jRequired);
+                        iClose = distSq < iRadiusSq | ijEq;
+                        jClose = Config::symmetric && (distSq < jRadiusSq & !ijEq);
                     }
                     else
                     {
-                        iClose = distSq < jRadiusSq;
-                        jClose = Config::symmetric && (iClose & jRequired);
+                        iClose = distSq < jRadiusSq | ijEq;
+                        jClose = Config::symmetric && (iClose & !ijEq);
                     }
                     if (iClose | jClose)
                     {
