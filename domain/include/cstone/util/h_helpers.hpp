@@ -33,6 +33,8 @@ inline constexpr std::remove_cvref_t<std::remove_pointer_t<T>> loadAtIndexIfPtr(
 
 template<class T>
 inline constexpr T infToZero(T value)
-{ return std::isinf(value) ? 0 : value; }
+{
+    return std::isinf(value) ? 0 : value;
+}
 
 } // namespace util
