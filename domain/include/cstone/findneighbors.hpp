@@ -15,17 +15,31 @@
 
 #pragma once
 
+#include <type_traits>
 #include <cmath>
 
 #include "cstone/focus/source_center.hpp"
-#include "cstone/sfc/sfc.hpp"
 #include "cstone/traversal/traversal.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/util/array.hpp"
-#include "cstone/util/h_helpers.hpp"
 
 namespace cstone
 {
+
+template<class T>
+constexpr std::remove_cvref_t<std::remove_pointer_t<T>> loadAtIndexIfPtr(T ptrOrValue, LocalIndex index)
+{
+    if constexpr (std::is_pointer_v<T>)
+        return ptrOrValue[index];
+    else
+        return ptrOrValue;
+}
+
+template<class T>
+constexpr T infToZero(T value)
+{
+    return std::isinf(value) ? 0 : value;
+}
 
 /*! @brief compute squared distance, taking PBC into account
  *
@@ -91,7 +105,7 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
     Tc xi    = x[i];
     Tc yi    = y[i];
     Tc zi    = z[i];
-    Th hi    = util::infToZero(util::loadAtIndexIfPtr(h, i));
+    Th hi    = infToZero(loadAtIndexIfPtr(h, i));
 
     auto radiusSq     = Th(4.0) * hi * hi;
     auto cellRadiusSq = radiusSq * tree.searchExtFactor * tree.searchExtFactor;

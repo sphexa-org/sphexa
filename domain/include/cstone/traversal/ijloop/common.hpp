@@ -19,6 +19,7 @@
 #include <limits>
 #include <type_traits>
 
+#include "cstone/findneighbors.hpp"
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/boxoverlap.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
@@ -77,9 +78,8 @@ inline constexpr bool requiresPbcHandling(Box<Tc> const& box, std::tuple<LocalIn
         (box.boundaryZ() != BoundaryType::periodic))
         return false;
     const Vec3<Tc>& iPos = std::get<1>(iData);
-    const Th hi          = std::get<2>(iData);
-    if (std::isinf(hi)) return false;
-    const Tc twoHi = Tc(2) * hi;
+    const Th hi          = infToZero(std::get<2>(iData));
+    const Tc twoHi       = Tc(2) * hi;
     return !insideBox(iPos, {twoHi, twoHi, twoHi}, box);
 }
 

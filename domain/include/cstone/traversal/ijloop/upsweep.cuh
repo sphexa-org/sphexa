@@ -22,7 +22,6 @@
 #include "cstone/execution.hpp"
 #include "cstone/primitives/math.hpp"
 #include "cstone/tree/octree.hpp"
-#include "cstone/util/h_helpers.hpp"
 #include "cstone/util/tuple_util.hpp"
 
 namespace cstone::ijloop
@@ -138,7 +137,7 @@ computeNodeRMax(const execution::Gpu exec, const OctreeNsView<Tc, KeyType>& tree
         nodeRMax = util::deviceAlloc<Th[]>(exec, tree.numNodes);
         upsweep(
             exec, tree, std::tuple(Th(0)),
-            [] __device__(auto h) { return std::make_tuple(2 * util::infToZero(std::get<0>(h))); },
+            [] __device__(auto h) { return std::make_tuple(2 * infToZero(std::get<0>(h))); },
             [] __device__(auto accum, auto r) { return std::make_tuple(std::max(std::get<0>(accum), std::get<0>(r))); },
             std::tuple(h), std::tuple(nodeRMax.get()));
     }

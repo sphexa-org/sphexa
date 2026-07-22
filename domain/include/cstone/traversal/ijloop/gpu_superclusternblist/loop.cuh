@@ -32,13 +32,13 @@
 
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/cuda/memory.cuh"
+#include "cstone/findneighbors.hpp"
 #include "cstone/reducearray.cuh"
 #include "cstone/traversal/ijloop/atomic_update_ptr.cuh"
 #include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/traversal/ijloop/compressneighbors.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/common.cuh"
 #include "cstone/traversal/ijloop/symmetric_loop.cuh"
-#include "cstone/util/h_helpers.hpp"
 #include "cstone/util/tuple_util.hpp"
 #include "cstone/util/uninitialized.hpp"
 
@@ -188,7 +188,7 @@ inline constexpr auto loadParticleDataWithRadiusSq(
     const auto iInput = util::tupleMap([index](auto const* ptr) { return ptr[index]; }, input);
     if constexpr (std::is_pointer_v<ThP>)
     {
-        const auto hi = util::loadAtIndexIfPtr(h, index);
+        const auto hi = loadAtIndexIfPtr(h, index);
         return std::tuple_cat(std::move(iPos), std::make_tuple(hi, 4 * hi * hi), std::move(iInput));
     }
     else { return std::tuple_cat(std::move(iPos), std::move(iInput)); }
@@ -369,7 +369,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             auto jData                   = (nb < iSuperclusterNeighborsCount & j >= firstValidBody & j < totalBodies)
                                                ? loadParticleData(x, y, z, h, input, j)
                                                : dummyParticleData(x, y, z, h, input, j);
-            Th jRadiusSq                 = util::infToZero(radiusSq(jData));
+            Th jRadiusSq                 = infToZero(radiusSq(jData));
             std::get<0>(jData) -= firstValidBody;
             Result jResult = {};
 
@@ -382,7 +382,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
                     auto [iData, iRadiusSq] =
                         getIData(iSuperclusterData, c * Config::iSize + threadIdx.x, i - firstValidBody, h);
                     assert(std::get<0>(iData) == i - firstValidBody);
-                    iRadiusSq                      = util::infToZero(iRadiusSq);
+                    iRadiusSq                      = infToZero(iRadiusSq);
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
                     bool iClose, jClose;
                     if constexpr (std::is_pointer_v<ThP>)
