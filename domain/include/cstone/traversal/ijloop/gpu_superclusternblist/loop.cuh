@@ -125,10 +125,7 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
                 util::for_each_tuple([index](auto* ptr, auto const& t) { atomicUpdatePtr(&ptr[index], t); }, ptrs,
                                      tuple);
             }
-            else
-            {
-                storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple)));
-            }
+            else { storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple))); }
         }
     }
 }
@@ -179,7 +176,9 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
 /*! compile-time utility to get an array buffer type for each tuple element */
 template<std::size_t Size, class... Ts>
 consteval std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...> const&)
-{ return {}; }
+{
+    return {};
+}
 
 template<class Tc, class ThP, class... Ts>
 inline constexpr auto loadParticleDataWithRadiusSq(
@@ -192,10 +191,7 @@ inline constexpr auto loadParticleDataWithRadiusSq(
         const auto hi = loadAtIndexIfPtr(h, index);
         return std::tuple_cat(std::move(iPos), std::make_tuple(hi, 4 * hi * hi), std::move(iInput));
     }
-    else
-    {
-        return std::tuple_cat(std::move(iPos), std::move(iInput));
-    }
+    else { return std::tuple_cat(std::move(iPos), std::move(iInput)); }
 }
 
 template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
@@ -265,8 +261,8 @@ __device__ __forceinline__ auto loadSuperclusterIParticleData(const LocalIndex f
          offset += Config::iSize * Config::jSize)
     {
         const unsigned i = base + offset;
-        auto iData = (i >= firstValidBody & i < totalBodies) ? loadParticleDataWithRadiusSq(x, y, z, h, input, i)
-                                                             : dummyParticleDataWithRadiusSq(x, y, z, h, input, i);
+        auto iData       = (i >= firstValidBody & i < totalBodies) ? loadParticleDataWithRadiusSq(x, y, z, h, input, i)
+                                                                   : dummyParticleDataWithRadiusSq(x, y, z, h, input, i);
 #if CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
         util::for_each_tuple([offset](auto& array, auto const& value) { array[offset] = value; }, *iSuperclusterData,
                              iData);
@@ -375,7 +371,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             auto jData                   = (nb < iSuperclusterNeighborsCount & j >= firstValidBody & j < totalBodies)
                                                ? loadParticleData(x, y, z, h, input, j)
                                                : dummyParticleData(x, y, z, h, input, j);
-            const Th jRadiusSq                 = invalidHToZero(radiusSq(jData));
+            const Th jRadiusSq           = invalidHToZero(radiusSq(jData));
             std::get<0>(jData) -= firstValidBody;
             Result jResult = {};
 
