@@ -22,7 +22,6 @@
 #include "cstone/execution.hpp"
 #include "cstone/primitives/math.hpp"
 #include "cstone/tree/octree.hpp"
-#include "cstone/util/h_helpers.hpp"
 #include "cstone/util/tuple_util.hpp"
 
 namespace cstone::ijloop

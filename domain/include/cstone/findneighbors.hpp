@@ -21,8 +21,6 @@
 #include "cstone/focus/source_center.hpp"
 #include "cstone/traversal/traversal.hpp"
 #include "cstone/tree/definitions.h"
-#include "cstone/util/array.hpp"
-#include "cstone/util/h_helpers.hpp"
 
 namespace cstone
 {

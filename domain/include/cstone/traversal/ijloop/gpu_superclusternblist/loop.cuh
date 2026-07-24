@@ -39,7 +39,6 @@
 #include "cstone/traversal/ijloop/compressneighbors.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/common.cuh"
 #include "cstone/traversal/ijloop/symmetric_loop.cuh"
-#include "cstone/util/h_helpers.hpp"
 #include "cstone/util/tuple_util.hpp"
 #include "cstone/util/uninitialized.hpp"
 
@@ -190,7 +189,7 @@ inline constexpr auto loadParticleDataWithRadiusSq(
     const auto iInput = util::tupleMap([index](auto const* ptr) { return ptr[index]; }, input);
     if constexpr (std::is_pointer_v<ThP>)
     {
-        const auto hi = util::loadAtIndexIfPtr(h, index);
+        const auto hi = loadAtIndexIfPtr(h, index);
         return std::tuple_cat(std::move(iPos), std::make_tuple(hi, 4 * hi * hi), std::move(iInput));
     }
     else
