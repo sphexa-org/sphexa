@@ -15,10 +15,10 @@
 
 #pragma once
 
+#include <type_traits>
 #include <cmath>
 
 #include "cstone/focus/source_center.hpp"
-#include "cstone/sfc/sfc.hpp"
 #include "cstone/traversal/traversal.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/util/array.hpp"
@@ -26,6 +26,33 @@
 
 namespace cstone
 {
+
+template<class T>
+constexpr std::remove_cvref_t<std::remove_pointer_t<T>> loadAtIndexIfPtr(T ptrOrValue, LocalIndex index)
+{
+    if constexpr (std::is_pointer_v<T>)
+        return ptrOrValue[index];
+    else
+        return ptrOrValue;
+}
+
+/*! @brief Turns h values into an invalid signalling value used to indicate unconverged neighbor searches
+ *
+ * Current choice of infinity is transparent to timesteps and SPH kernels, but must be converted to zero in overlaps
+ * and neighbor searches.
+ */
+template<class T>
+constexpr T invalidateH(T /*value*/)
+{
+    return std::numeric_limits<T>::infinity();
+}
+
+//! @brief Return 0 if @p value is invalid according to invalidateH, unmodified @p value otherwise
+template<class T>
+constexpr T invalidHToZero(T value)
+{
+    return value == invalidateH(value) ? 0 : value;
+}
 
 /*! @brief compute squared distance, taking PBC into account
  *
@@ -91,7 +118,7 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
     Tc xi    = x[i];
     Tc yi    = y[i];
     Tc zi    = z[i];
-    Th hi    = util::infToZero(util::loadAtIndexIfPtr(h, i));
+    Th hi    = invalidHToZero(loadAtIndexIfPtr(h, i));
 
     auto radiusSq     = Th(4.0) * hi * hi;
     auto cellRadiusSq = radiusSq * tree.searchExtFactor * tree.searchExtFactor;

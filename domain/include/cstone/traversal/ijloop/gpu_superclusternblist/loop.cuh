@@ -32,6 +32,7 @@
 
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/cuda/memory.cuh"
+#include "cstone/findneighbors.hpp"
 #include "cstone/reducearray.cuh"
 #include "cstone/traversal/ijloop/atomic_update_ptr.cuh"
 #include "cstone/traversal/ijloop/common.hpp"
@@ -234,7 +235,8 @@ inline constexpr auto splitParticleDataWithRadiusSq(std::tuple<Tc, Tc, Tc, Ts...
     auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>)
     {
         return std::make_tuple(index, iPos, hi, std::get<Is + 3 + skip>(particleDataWithRadiusSq)...);
-    }(std::make_index_sequence<sizeof...(Ts) - skip>());
+    }
+    (std::make_index_sequence<sizeof...(Ts) - skip>());
 
     return std::make_tuple(iData, radiusSq);
 }
@@ -374,7 +376,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             auto jData                   = (nb < iSuperclusterNeighborsCount & j >= firstValidBody & j < totalBodies)
                                                ? loadParticleData(x, y, z, h, input, j)
                                                : dummyParticleData(x, y, z, h, input, j);
-            const Th jRadiusSq           = util::infToZero(radiusSq(jData));
+            const Th jRadiusSq                 = invalidHToZero(radiusSq(jData));
             std::get<0>(jData) -= firstValidBody;
             Result jResult = {};
 
@@ -387,7 +389,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
                     auto [iData, iRadiusSq] =
                         getIData(iSuperclusterData, c * Config::iSize + threadIdx.x, i - firstValidBody, h);
                     assert(std::get<0>(iData) == i - firstValidBody);
-                    iRadiusSq                      = util::infToZero(iRadiusSq);
+                    iRadiusSq                      = invalidHToZero(iRadiusSq);
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
                     bool iClose, jClose;
                     if constexpr (std::is_pointer_v<ThP>)
