@@ -46,7 +46,8 @@ namespace sph
 using cstone::LocalIndex;
 
 template<class Dataset>
-void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
+void computeMomentumEnergyStdGpu(cstone::LocalIndex firstBody, cstone::LocalIndex lastBody, Dataset& d,
+                                 const cstone::Box<typename Dataset::RealType>&)
 {
     momentumAndEnergyIjLoop(d.neighborhood, d.K, d.Kcour, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.nc), rawPtr(d.vx),
                             rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.p), rawPtr(d.c), rawPtr(d.c11), rawPtr(d.c12),
@@ -54,12 +55,13 @@ void computeMomentumEnergyStdGpu(const GroupView& grp, Dataset& d, const cstone:
                             rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.dtCourant));
 
     using DtCourantType = typename std::decay_t<decltype(d.dtCourant)>::value_type;
-    auto minDt = thrust::reduce(thrust::device, rawPtr(d.dtCourant) + grp.firstBody, rawPtr(d.dtCourant) + grp.lastBody,
-                                std::numeric_limits<DtCourantType>::infinity(), thrust::minimum<DtCourantType>());
+    auto minDt     = thrust::reduce(thrust::device, rawPtr(d.dtCourant) + firstBody, rawPtr(d.dtCourant) + lastBody,
+                                    std::numeric_limits<DtCourantType>::infinity(), thrust::minimum<DtCourantType>());
     d.minDtCourant = minDt;
 }
 
-template void computeMomentumEnergyStdGpu(const GroupView& grp, sphexa::ParticlesData<cstone::execution::Gpu>& d,
+template void computeMomentumEnergyStdGpu(cstone::LocalIndex firstBody, cstone::LocalIndex lastBody,
+                                          sphexa::ParticlesData<cstone::execution::Gpu>& d,
                                           const cstone::Box<SphTypes::CoordinateType>&);
 
 template<typename Thydro, typename T>
