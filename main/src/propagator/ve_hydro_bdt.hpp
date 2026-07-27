@@ -250,7 +250,7 @@ public:
         domain.exchangeHalos(get<"kx", "vx", "vy", "vz">(d), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
-        computeIadDivvCurlvGradh(activeRungs_, d, domain.box());
+        computeIadDivvCurlvGradh(d, domain.box());
         groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
         timer.step("IadVelocityDivCurlGradh");
 
@@ -436,7 +436,7 @@ public:
 
         // third output pass: recover temporary curlv and divv quantities
         acquire(d, "curlv");
-        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
+        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(d, box); }
         output();
         release(d, "curlv");
         acquire(d, "ay", "az");

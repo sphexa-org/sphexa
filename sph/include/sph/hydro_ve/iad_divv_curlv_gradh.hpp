@@ -38,9 +38,9 @@ namespace sph
 {
 
 template<class Tc, class Dataset>
-void computeIadDivvCurlvGradh(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
+void computeIadDivvCurlvGradh(Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (d.useGpu) { gpu::computeIadDivvCurlvGradh(grp, d, box); }
+    if constexpr (d.useGpu) { gpu::computeIadDivvCurlvGradh(d, box); }
     else
     {
         iadDivvCurlvGradhIjLoop(d.neighborhood, d.K, d.vx.data(), d.vy.data(), d.vz.data(), d.m.data(), d.xm.data(),
