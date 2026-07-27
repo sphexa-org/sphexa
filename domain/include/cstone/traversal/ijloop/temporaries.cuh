@@ -80,7 +80,10 @@ auto allocateOrMapTemporaries(const execution::Gpu exec,
                 auto holder = util::deviceAlloc<T[]>(exec, lastBody - firstBody);
                 return std::make_tuple(holder.get() - firstBody, std::move(holder));
             }
-            else { return std::make_tuple(std::get<Index::value>(output), nullptr); }
+            else
+            {
+                return std::make_tuple(reinterpret_cast<T*>(std::get<Index::value>(output)), nullptr);
+            }
         },
         IndexMap{}, Result{});
 }

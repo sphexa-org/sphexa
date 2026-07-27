@@ -133,23 +133,31 @@ struct MomentumAndEnergyPostambleStdWithDt : MomentumAndEnergyPostambleStd<Tc, T
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
-        const auto [du, grad_P_x, grad_P_y, grad_P_z, maxvsignal] =
+        auto [du, grad_P_x, grad_P_y, grad_P_z, maxvsignal] =
             MomentumAndEnergyPostambleStd<Tc, Tm1>::operator()(iData, result);
-        const auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
+        auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
 
         auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
-        return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
+        if (std::isnan(grad_P_x) || std::isnan(grad_P_y) || std::isnan(grad_P_z))
+        {
+            grad_P_x = 0;
+            grad_P_y = 0;
+            grad_P_z = 0;
+            du       = 0;
+            nci      = 1;
+        }
+        return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nci, dt);
     }
 };
 
 template<class Neighborhood, class Tc, class T, class Tm, class Tm1>
-void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, const Tm* m, const T* rho,
-                             const unsigned* nc, const T* vx, const T* vy, const T* vz, const T* p, const T* c,
-                             const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
-                             const T* wh, Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z, T* dt)
+void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, const Tm* m, const T* rho, unsigned* nc,
+                             const T* vx, const T* vy, const T* vz, const T* p, const T* c, const T* c11, const T* c12,
+                             const T* c13, const T* c22, const T* c23, const T* c33, const T* wh, Tm1* du, T* grad_P_x,
+                             T* grad_P_y, T* grad_P_z, T* dt)
 {
     neighborhood.ijLoop(std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
-                        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt),
+                        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc, dt),
                         MomentumAndEnergyInteractionStd<T, Tm1>{wh},
                         MomentumAndEnergyPostambleStdWithDt<Tc, Tm1>{K, Kcour});
 }
