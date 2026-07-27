@@ -13,7 +13,7 @@ using cstone::GroupData;
 using cstone::GroupView;
 
 template<class Dataset>
-extern void computeIADGpu(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
+extern void computeIADGpu(Dataset& d, const cstone::Box<typename Dataset::RealType>&);
 
 template<class Dataset>
 extern void computeMomentumEnergyStdGpu(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
