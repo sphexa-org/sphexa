@@ -39,9 +39,9 @@ namespace sph
 {
 
 template<typename Tc, class Dataset>
-void computeXMass(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
+void computeXMass(Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (d.useGpu) { gpu::computeXMass(grp, d, box); }
+    if constexpr (d.useGpu) { gpu::computeXMass(d, box); }
     else { xmassIjLoop(d.neighborhood, d.K, d.m.data(), d.wh.data(), d.xm.data()); }
 }
 

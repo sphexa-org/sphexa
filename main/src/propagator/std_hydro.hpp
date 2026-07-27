@@ -138,7 +138,7 @@ public:
         findNeighborsSfc(groups_.view(), d, domain.box(), true);
         timer.step("FindNeighbors");
 
-        computeDensity(groups_.view(), d, domain.box());
+        computeDensity(d, domain.box());
         timer.step("Density");
         computeEOS_HydroStd(first, last, d);
         timer.step("EquationOfState");

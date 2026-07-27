@@ -240,7 +240,7 @@ public:
         timer.step("FindNeighbors");
         pmReader.step();
 
-        computeXMass(activeRungs_, d, domain.box());
+        computeXMass(d, domain.box());
         timer.step("XMass");
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");

@@ -26,10 +26,10 @@ namespace gpu
 {
 
 template<class Dataset>
-extern void computeXMass(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
+extern void computeXMass(Dataset& d, const cstone::Box<typename Dataset::RealType>&);
 
 template<class Dataset>
-void computeDensity(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>& box);
+void computeDensity(Dataset& d, const cstone::Box<typename Dataset::RealType>& box);
 
 template<class Dataset>
 extern void computeVe(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);

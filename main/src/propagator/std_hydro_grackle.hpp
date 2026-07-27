@@ -170,7 +170,7 @@ public:
         findNeighborsSfc(groups_.view(), d, domain.box());
         timer.step("FindNeighbors");
 
-        computeDensity(groups_.view(), d, domain.box());
+        computeDensity(d, domain.box());
         timer.step("Density");
 
         eos_cooling(first, last, d, simData.chem, cooling_data);
