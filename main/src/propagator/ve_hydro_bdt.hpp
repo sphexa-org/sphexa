@@ -245,7 +245,7 @@ public:
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
-        computeVe(activeRungs_, d, domain.box());
+        computeVe(d, domain.box());
         timer.step("Generalized Volume Elements");
         domain.exchangeHalos(get<"kx", "vx", "vy", "vz">(d), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");

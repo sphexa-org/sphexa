@@ -33,7 +33,7 @@ template<class Dataset>
 void computeDensity(Dataset& d, const cstone::Box<typename Dataset::RealType>& box);
 
 template<class Dataset>
-extern void computeVe(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);
+extern void computeVe(Dataset& d, const cstone::Box<typename Dataset::RealType>&);
 
 template<class Dataset>
 extern void computeIadDivvCurlvGradh(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&);

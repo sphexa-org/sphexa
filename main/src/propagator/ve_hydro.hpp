@@ -151,7 +151,7 @@ public:
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeVe(groups_.view(), d, domain.box());
+        computeVe(d, domain.box());
         timer.step("Generalized Volume Elements");
         domain.exchangeHalos(get<"vx", "vy", "vz", "kx">(d), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");

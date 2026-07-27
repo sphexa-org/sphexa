@@ -42,13 +42,13 @@ namespace gpu
 {
 
 template<class Dataset>
-void computeVe(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
+void computeVe(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
     veIjLoop(d.neighborhood, d.K, rawPtr(d.xm), rawPtr(d.wh), rawPtr(d.kx));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeVe(const GroupView&, sphexa::ParticlesData<cstone::execution::Gpu>& d,
+template void computeVe(sphexa::ParticlesData<cstone::execution::Gpu>& d,
                         const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace gpu
