@@ -118,8 +118,10 @@ namespace detail
 
 struct ConceptTestInteraction
 {
-    constexpr std::tuple<int>
-    operator()(std::tuple<LocalIndex, double, float>, std::tuple<LocalIndex, double, float>, Vec3<double>, double) const
+    constexpr std::tuple<int> operator()(std::tuple<LocalIndex, Vec3<double>, float>,
+                                         std::tuple<LocalIndex, Vec3<double>, float>,
+                                         Vec3<double>,
+                                         double) const
     { return {0}; }
 };
 
