@@ -89,9 +89,14 @@ struct EmptyPostamble
 {
     template<class ParticleData, class Result>
     constexpr Result operator()(ParticleData const&, Result const& result) const
-    {
-        return result;
-    }
+    { return result; }
+};
+
+struct NoReduction
+{
+    template<class ParticleData, class Result, class PostambleResult>
+    constexpr std::tuple<> operator()(ParticleData const&, Result const&, PostambleResult const&) const
+    { return {}; }
 };
 
 } // namespace detail
@@ -99,6 +104,9 @@ struct EmptyPostamble
 //! Empty postamble that does nothing. Should always be prefered over a custom empty postamble, as it enables certain
 //! optimizations in the neighborhood implementations.
 constexpr detail::EmptyPostamble empty_postamble;
+
+//! Marker for disabling global reductions.
+constexpr detail::NoReduction no_reduction;
 
 struct Statistics
 {
@@ -112,9 +120,7 @@ struct ConceptTestInteraction
 {
     constexpr std::tuple<int>
     operator()(std::tuple<LocalIndex, double, float>, std::tuple<LocalIndex, double, float>, Vec3<double>, double) const
-    {
-        return {0};
-    }
+    { return {0}; }
 };
 
 template<class T, class Exec>
@@ -130,13 +136,9 @@ concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
                                                                   const float* h)
 {
     nb.build(exec, tree, box, totalBodies, groups, x, y, z, h);
-    {
-        nb.build(exec, tree, box, totalBodies, groups, x, y, z, h).stats()
-    } -> std::same_as<Statistics>;
-    {
-        nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
-            .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble)
-    } -> std::same_as<void>;
+    {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h).stats()}->std::same_as<Statistics>;
+    {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
+         .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble, no_reduction)};
 };
 
 } // namespace detail

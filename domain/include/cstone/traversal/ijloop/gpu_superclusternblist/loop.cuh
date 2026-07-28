@@ -125,7 +125,10 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
                 util::for_each_tuple([index](auto* ptr, auto const& t) { atomicUpdatePtr(&ptr[index], t); }, ptrs,
                                      tuple);
             }
-            else { storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple))); }
+            else
+            {
+                storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple)));
+            }
         }
     }
 }
@@ -176,9 +179,7 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
 /*! compile-time utility to get an array buffer type for each tuple element */
 template<std::size_t Size, class... Ts>
 consteval std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...> const&)
-{
-    return {};
-}
+{ return {}; }
 
 template<class Tc, class ThP, class... Ts>
 inline constexpr auto loadParticleDataWithRadiusSq(
@@ -191,7 +192,10 @@ inline constexpr auto loadParticleDataWithRadiusSq(
         const auto hi = loadAtIndexIfPtr(h, index);
         return std::tuple_cat(std::move(iPos), std::make_tuple(hi, 4 * hi * hi), std::move(iInput));
     }
-    else { return std::tuple_cat(std::move(iPos), std::move(iInput)); }
+    else
+    {
+        return std::tuple_cat(std::move(iPos), std::move(iInput));
+    }
 }
 
 template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
@@ -230,8 +234,7 @@ inline constexpr auto splitParticleDataWithRadiusSq(std::tuple<Tc, Tc, Tc, Ts...
     auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>)
     {
         return std::make_tuple(index, iPos, hi, std::get<Is + 3 + skip>(particleDataWithRadiusSq)...);
-    }
-    (std::make_index_sequence<sizeof...(Ts) - skip>());
+    }(std::make_index_sequence<sizeof...(Ts) - skip>());
 
     return std::make_tuple(iData, radiusSq);
 }
@@ -261,8 +264,8 @@ __device__ __forceinline__ auto loadSuperclusterIParticleData(const LocalIndex f
          offset += Config::iSize * Config::jSize)
     {
         const unsigned i = base + offset;
-        auto iData       = (i >= firstValidBody & i < totalBodies) ? loadParticleDataWithRadiusSq(x, y, z, h, input, i)
-                                                                   : dummyParticleDataWithRadiusSq(x, y, z, h, input, i);
+        auto iData = (i >= firstValidBody & i < totalBodies) ? loadParticleDataWithRadiusSq(x, y, z, h, input, i)
+                                                             : dummyParticleDataWithRadiusSq(x, y, z, h, input, i);
 #if CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
         util::for_each_tuple([offset](auto& array, auto const& value) { array[offset] = value; }, *iSuperclusterData,
                              iData);
@@ -293,8 +296,10 @@ template<class Config,
          class ThP,
          class In,
          class Out,
+         class UnwrappedReductionResult,
          class Interaction,
          class Postamble,
+         class Reduction,
          class Mask = void>
 __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBlock) void runIjLoopKernel(
     const Box<Tc> box,
@@ -308,8 +313,10 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     const ThP h,
     const In input,
     const Out output,
+    UnwrappedReductionResult* const __restrict__ globalReductionResult,
     const Interaction interaction,
     const Postamble postamble,
+    const Reduction reduction,
     const std::uint32_t* const __restrict__ neighborData,
     const SuperclusterInfo* const __restrict__ superclusterInfo,
     const unsigned numISuperclusters,
@@ -335,9 +342,10 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     const auto [iSupercluster, iSuperclusterNeighborsCount, iSuperclusterDataIndex] =
         superclusterInfo[iSuperclusterIndex];
 
-    using ParticleData             = decltype(loadParticleData(x, y, z, h, input, firstBody));
+    using Types                    = decltype(types(x, y, z, h, input, output, interaction, postamble, reduction));
+    using ParticleData             = Types::ParticleData;
     using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq(x, y, z, h, input, firstBody));
-    using Result = std::decay_t<decltype(interaction(ParticleData(), ParticleData(), Vec3<Tc>(), Tc(0)))>;
+    using Result                   = Types::Result;
 
     const auto iSuperclusterData =
         loadSuperclusterIParticleData<Config, NumSuperclustersPerBlock, ParticleDataWithRadiusSq>(
@@ -477,8 +485,10 @@ template<class Config,
          class ThP,
          class Input,
          class Output,
+         class UnwrappedReductionResult,
          class Interaction,
          class Postamble,
+         class Reduction,
          class Mask = void>
 void runIjLoop(const execution::Gpu exec,
                const Box<Tc>& box,
@@ -490,10 +500,12 @@ void runIjLoop(const execution::Gpu exec,
                const Tc* const y,
                const Tc* const z,
                const ThP h,
-               Input&& input,
-               Output&& output,
-               Interaction&& interaction,
-               Postamble&& postamble,
+               Input const& input,
+               Output const& output,
+               UnwrappedReductionResult* const reductionResult,
+               Interaction const& interaction,
+               Postamble const& postamble,
+               Reduction const& reduction,
                const std::uint32_t* const neighborData,
                const SuperclusterInfo* const superclusterInfo,
                const LocalIndex numISuperclusters,
@@ -505,9 +517,8 @@ void runIjLoop(const execution::Gpu exec,
     const auto run                              = [&](auto usePbc)
     {
         runIjLoopKernel<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, 0, exec>>>(
-            box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, std::forward<Input>(input),
-            std::forward<Output>(output), std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
-            neighborData, superclusterInfo, numISuperclusters, activeMasks);
+            box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, input, output, reductionResult,
+            interaction, postamble, reduction, neighborData, superclusterInfo, numISuperclusters, activeMasks);
         checkGpuErrors(cudaGetLastError());
     };
 

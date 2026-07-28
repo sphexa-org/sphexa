@@ -92,21 +92,27 @@ struct GpuSuperclusterNbListNeighborhood
     unsigned ncmax       = 0;
     std::size_t numBytes = 0;
 
-    template<class... In, class... Out, class Interaction, class Postamble>
-    void ijLoop(const std::tuple<In*...>& input,
+    template<class... In,
+             class... Out,
+             class Interaction,
+             class Postamble = detail::EmptyPostamble,
+             class Reduction = detail::NoReduction>
+    auto ijLoop(const std::tuple<In*...>& input,
                 const std::tuple<Out*...>& output,
-                Interaction&& interaction,
-                Postamble&& postamble) const
+                Interaction const& interaction,
+                Postamble const& postamble = empty_postamble,
+                Reduction const& reduction = no_reduction) const
     {
-        if (totalBodies == 0) return;
+        using UnwrappedReductionResult =
+            decltype(types(x, y, z, h, input, output, interaction, postamble, reduction))::UnwrappedReductionResult;
+        if (totalBodies == 0) return UnwrappedReductionResult{};
 
         assert(firstBody < lastBody);
         const LocalIndex firstISupercluster = superclusterIndex<Config>(firstBody);
         const LocalIndex lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
         const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
 
-        ijLoop(input, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
-               superclusterInfo.get(), numISuperclusters);
+        return ijLoop(input, output, interaction, postamble, reduction, superclusterInfo.get(), numISuperclusters);
     }
 
     Statistics stats() const { return {.numBodies = lastBody - firstBody, .numBytes = numBytes}; }
@@ -119,16 +125,23 @@ struct GpuSuperclusterNbListNeighborhood
         util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo;
         LocalIndex numISuperclusters;
 
-        template<class... In, class... Out, class Interaction, class Postamble>
-        void ijLoop(const std::tuple<In*...>& input,
+        template<class... In,
+                 class... Out,
+                 class Interaction,
+                 class Postamble = detail::EmptyPostamble,
+                 class Reduction = detail::NoReduction>
+        auto ijLoop(const std::tuple<In*...>& input,
                     const std::tuple<Out*...>& output,
-                    Interaction&& interaction,
-                    Postamble&& postamble) const
+                    Interaction const& interaction,
+                    Postamble const& postamble = empty_postamble,
+                    Reduction const& reduction = no_reduction) const
         {
-            if (groups.numGroups == 0) return;
+            using UnwrappedReductionResult =
+                decltype(types(x, y, z, h, input, output, interaction, postamble, reduction))::UnwrappedReductionResult;
+            if (groups.numGroups == 0) return UnwrappedReductionResult{};
 
-            parent.ijLoop(input, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
-                          superclusterInfo.get(), numISuperclusters, activeMasks.get());
+            return parent.ijLoop(input, output, interaction, postamble, superclusterInfo.get(), numISuperclusters,
+                                 activeMasks.get());
         }
     };
 
@@ -156,17 +169,33 @@ struct GpuSuperclusterNbListNeighborhood
     }
 
 protected:
-    template<class... In, class... Out, class Interaction, class Postamble, class Mask = void>
-    void ijLoop(std::tuple<In*...> input,
+    template<class... In, class... Out, class Interaction, class Postamble, class Reduction, class Mask = void>
+    auto ijLoop(std::tuple<In*...> input,
                 std::tuple<Out*...> output,
-                Interaction&& interaction,
-                Postamble&& postamble,
+                Interaction const& interaction,
+                Postamble const& postamble,
+                Reduction const& reduction,
                 const SuperclusterInfo* superclusterInfo,
                 const LocalIndex numISuperclusters,
                 const Mask* activeMasks = nullptr) const
     {
+        using Types                    = decltype(types(x, y, z, h, input, output, interaction, postamble, reduction));
+        using ReductionResult          = Types::ReductionResult;
+        using UnwrappedReductionResult = Types::UnwrappedReductionResult;
+        ReductionResult reductionResult{};
+
         const LocalIndex numBodies = lastBody - firstBody;
-        if (numBodies == 0) return;
+        if (numBodies == 0) return unwrapModifiers(reductionResult);
+
+        // allocate reduction result
+        util::UniqueDevicePtr<UnwrappedReductionResult> deviceReductionResult;
+        if constexpr (!std::is_empty_v<ReductionResult>)
+        {
+            deviceReductionResult = util::deviceAlloc<UnwrappedReductionResult>(exec);
+            static_assert(sizeof(ReductionResult) == sizeof(UnwrappedReductionResult));
+            checkGpuErrors(cudaMemcpyAsync(deviceReductionResult.get(), &reductionResult, sizeof(ReductionResult),
+                                           cudaMemcpyHostToDevice));
+        }
 
         // modify particle pointers to adhere to supercluster-aligned indexing
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, input);
@@ -174,30 +203,39 @@ protected:
 
         // for symmetric neighborhoods where the reduction returns more values than the postamble, temporary arrays have
         // to be allocated; in all other cases, this functions just returns the output data pointers
-        auto [tmpOrOutput, tmpHolder] = allocateTemporaries<Config, Tc, ThP>(
-            exec, firstBody, lastBody, makeConst(input), output, std::forward<Interaction>(interaction));
+        auto [tmpOrOutput, tmpHolder] =
+            allocateTemporaries<Config, Tc, ThP>(exec, firstBody, lastBody, makeConst(input), output, interaction);
 
         if constexpr (Config::symmetric)
         {
             // in the symmetric case, the output arrays need to be initialized beforehand due to the unordered atomic
             // updates in the main loop
-            initResult<Config>(exec, firstBody, lastBody, x, y, z, h, makeConst(input), tmpOrOutput,
-                               std::forward<Interaction>(interaction));
+            initResult<Config>(exec, firstBody, lastBody, x, y, z, h, makeConst(input), tmpOrOutput, interaction);
         }
 
         runIjLoop<Config>(exec, box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConst(input),
-                          tmpOrOutput, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
-                          neighborData.get(), superclusterInfo, numISuperclusters, activeMasks);
+                          tmpOrOutput, deviceReductionResult.get(), interaction, postamble, reduction, neighborData.get(), superclusterInfo, numISuperclusters,
+                          activeMasks);
 
         if constexpr (Config::symmetric)
         {
             // the postamble has to be applied in a separate step for symmetric neighborhoods
             applyPostamble<Config>(exec, firstBody, lastBody, firstValidBody, x, y, z, h, makeConst(input),
-                                   makeConst(tmpOrOutput), output, std::forward<Postamble>(postamble));
+                                   makeConst(tmpOrOutput), output, postamble);
+        }
 
-            // sync required due to possible use of allocated temporaries
+        if constexpr (!std::is_empty_v<ReductionResult>) {
+            // download reduction result
+            checkGpuErrors(cudaMemcpyAsync(&reductionResult, deviceReductionResult.get(), sizeof(ReductionResult),
+                                           cudaMemcpyDeviceToHost));
+        }
+
+        if constexpr (Config::symmetric || !std::is_empty_v<ReductionResult>) {
+            // sync required due to possible use of allocated temporaries / reduction result
             checkGpuErrors(cudaStreamSynchronize(exec));
         }
+
+        return unwrapModifiers(reductionResult);
     }
 };
 
@@ -330,7 +368,10 @@ struct GpuSuperclusterNbListNeighborhoodBuilder
             nodeRMax     = computeNodeRMax<Config>(exec, tree, h + firstValidBody);
             nodeRMaxData = nodeRMax.get();
         }
-        else { nodeRMaxData = h; }
+        else
+        {
+            nodeRMaxData = h;
+        }
 
         // main build with octree traversal
         std::size_t neighborDataSize = buildNbList<Config>(

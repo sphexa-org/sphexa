@@ -31,6 +31,15 @@ __device__ __forceinline__ void atomicAddPtr(T* ptr, T value)
     atomicAdd(ptr, value);
 }
 
+__device__ __forceinline__ void atomicAddPtr(unsigned long* ptr, unsigned long value)
+{
+    static_assert(sizeof(unsigned long) == sizeof(unsigned) || sizeof(unsigned long) == sizeof(unsigned long long));
+    if constexpr(sizeof(unsigned long) == sizeof(unsigned))
+        atomicAdd(reinterpret_cast<unsigned*>(ptr), static_cast<unsigned>(value));
+    else
+        atomicAdd(reinterpret_cast<unsigned long long*>(ptr), static_cast<unsigned long long>(value));
+}
+
 template<class T, std::size_t N>
 __device__ __forceinline__ void atomicAddPtr(util::array<T, N>* ptr, util::array<T, N> const& value)
 {

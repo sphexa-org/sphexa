@@ -40,22 +40,39 @@ struct CpuAlwaysTraverseNeighborhood
     ThP h;
     unsigned ngmax;
 
-    template<class... In, class... Out, class Interaction, class Postamble>
-    void ijLoop(std::tuple<In*...> const& input,
+    template<class... In,
+             class... Out,
+             class Interaction,
+             class Postamble = detail::EmptyPostamble,
+             class Reduction = detail::NoReduction>
+    auto ijLoop(std::tuple<In*...> const& input,
                 std::tuple<Out*...> const& output,
-                Interaction&& interaction,
-                Postamble&& postamble) const
+                Interaction const& interaction,
+                Postamble const& postamble = empty_postamble,
+                Reduction const& reduction = no_reduction) const
     {
+        using ReductionResult =
+            decltype(types(x, y, z, h, input, output, interaction, postamble, reduction))::ReductionResult;
+
         const auto constInput = makeConst(input);
+        ReductionResult globalReductionResult{};
 #pragma omp parallel
         {
             std::unique_ptr<LocalIndex[]> neighbors = std::make_unique_for_overwrite<LocalIndex[]>(ngmax);
+            ReductionResult reductionResult{};
 
 #pragma omp for
             for (LocalIndex i = firstBody; i < lastBody; ++i)
-                jLoop(constInput, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), i,
-                      neighbors.get());
+            {
+                ReductionResult iReductionResult =
+                    jLoop(constInput, output, interaction, postamble, reduction, i, neighbors.get());
+                updateResult(reductionResult, iReductionResult);
+            }
+
+#pragma omp critical
+            updateResult(globalReductionResult, reductionResult);
         }
+        return unwrapModifiers(globalReductionResult);
     }
 
     Statistics stats() const { return {.numBodies = lastBody - firstBody, .numBytes = 0}; }
@@ -65,34 +82,52 @@ struct CpuAlwaysTraverseNeighborhood
         CpuAlwaysTraverseNeighborhood const& parent;
         GroupView groups;
 
-        template<class... In, class... Out, class Interaction, class Postamble>
-        void ijLoop(std::tuple<In*...> const& input,
+        template<class... In,
+                 class... Out,
+                 class Interaction,
+                 class Postamble = detail::EmptyPostamble,
+                 class Reduction = detail::NoReduction>
+        auto ijLoop(std::tuple<In*...> const& input,
                     std::tuple<Out*...> const& output,
-                    Interaction&& interaction,
-                    Postamble&& postamble) const
+                    Interaction const& interaction,
+                    Postamble const& postamble = empty_postamble,
+                    Reduction const& reduction = no_reduction) const
         {
+            using ReductionResult =
+                decltype(types(x, y, z, h, input, output, interaction, postamble, reduction))::ReductionResult;
+
             const auto constInput = makeConst(input);
+            ReductionResult globalReductionResult{};
 #pragma omp parallel
             {
                 std::unique_ptr<LocalIndex[]> neighbors = std::make_unique_for_overwrite<LocalIndex[]>(parent.ngmax);
+                ReductionResult reductionResult{};
 
 #pragma omp for
                 for (LocalIndex g = 0; g < groups.numGroups; ++g)
                     for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
-                        parent.jLoop(constInput, output, std::forward<Interaction>(interaction),
-                                     std::forward<Postamble>(postamble), i, neighbors.get());
+                    {
+                        ReductionResult iReductionResult =
+                            parent.jLoop(constInput, output, interaction, postamble, reduction, i, neighbors.get());
+                        updateResult(reductionResult, iReductionResult);
+                    }
+
+#pragma omp critical
+                updateResult(globalReductionResult, reductionResult);
             }
+            return unwrapModifiers(globalReductionResult);
         }
     };
 
     Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
 
 protected:
-    template<class Input, class Output, class Interaction, class Postamble>
-    void jLoop(Input&& input,
+    template<class Input, class Output, class Interaction, class Postamble, class Reduction>
+    auto jLoop(Input&& input,
                Output&& output,
-               Interaction&& interaction,
-               Postamble&& postamble,
+               Interaction const& interaction,
+               Postamble const& postamble,
+               Reduction const& reduction,
                const LocalIndex i,
                LocalIndex* neighbors) const
     {
@@ -101,6 +136,7 @@ protected:
 
         const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, neighbors), ngmax);
         auto result        = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
+
         for (unsigned nb = 0; nb < nbs; ++nb)
         {
             const LocalIndex j = neighbors[nb];
@@ -111,7 +147,9 @@ protected:
             updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
         }
 
-        storeParticleData(std::forward<Output>(output), i, postamble(iData, unwrapModifiers(result)));
+        const auto postambleResult = postamble(iData, unwrapModifiers(result));
+        storeParticleData(std::forward<Output>(output), i, postambleResult);
+        return reduction(iData, unwrapModifiers(result), unwrapModifiers(postambleResult));
     }
 };
 
@@ -132,9 +170,7 @@ struct CpuAlwaysTraverseNeighborhoodBuilder
           const Tc* const y,
           const Tc* const z,
           const ThP h) const
-    {
-        return {tree, box, groups.firstBody, groups.lastBody, x, y, z, h, ngmax};
-    }
+    { return {tree, box, groups.firstBody, groups.lastBody, x, y, z, h, ngmax}; }
 };
 
 } // namespace cstone::ijloop
