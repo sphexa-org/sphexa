@@ -221,7 +221,8 @@ protected:
         {
             // the postamble has to be applied in a separate step for symmetric neighborhoods
             applyPostamble<Config>(exec, firstBody, lastBody, firstValidBody, x, y, z, h, makeConst(input),
-                                   makeConst(tmpOrOutput), output, postamble);
+                                   makeConst(tmpOrOutput), output, postamble, reduction,
+                                   deviceReductionResult.get());
         }
 
         if constexpr (!std::is_same_v<Reduction, detail::NoReduction>) {

@@ -79,13 +79,22 @@ __device__ __forceinline__ constexpr T0 dynamicTupleGet(std::tuple<T0, T...> con
  * @param[in]    postamble functor to apply to the data before storage
  * @param[in]    iData     particle data to be passed to the postamble
  */
-template<class Config, class T0, class... T, class... Ps, class Postamble, class ParticleData>
+template<class Config,
+         class T0,
+         class... T,
+         class... Ps,
+         class Postamble,
+         class ParticleData,
+         class Reduction,
+         class UnwrappedReductionResult>
 __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
                                                std::tuple<Ps*...> const& ptrs,
                                                const unsigned index,
                                                const bool store,
                                                Postamble const& postamble,
-                                               ParticleData const& iData)
+                                               ParticleData const& iData,
+                                               Reduction const& reduction,
+                                               UnwrappedReductionResult* const __restrict__ globalReductionResult)
 {
     assert(blockDim.x == Config::iSize);
 
@@ -127,7 +136,14 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
             }
             else
             {
-                storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple)));
+                const auto postambleResult = postamble(iData, unwrapModifiers(tuple));
+                storeParticleData(ptrs, index, postambleResult);
+                if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+                {
+                    const auto rptrs = util::tupleMap([](auto& v) { return &v; }, *globalReductionResult);
+                    util::for_each_tuple([](auto* ptr, auto const& v) { atomicUpdatePtr(ptr, v); }, rptrs,
+                                         reduction(iData, unwrapModifiers(tuple), unwrapModifiers(postambleResult)));
+                }
             }
         }
     }
@@ -346,6 +362,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     using ParticleData             = Types::ParticleData;
     using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq(x, y, z, h, input, firstBody));
     using Result                   = Types::Result;
+    using ReductionResult          = Types::ReductionResult;
 
     const auto iSuperclusterData =
         loadSuperclusterIParticleData<Config, NumSuperclustersPerBlock, ParticleDataWithRadiusSq>(
@@ -448,7 +465,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             const unsigned i      = iSupercluster * Config::superclusterSize + offset;
             const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
             storeTupleISum<Config>(iResults[c], outputBufferPtrs, c * Config::iSize + threadIdx.x, true,
-                                   detail::EmptyPostamble{}, iData);
+                                   detail::EmptyPostamble{}, iData, detail::NoReduction{}, (std::tuple<>*)nullptr);
         }
 
         __syncthreads();
@@ -463,7 +480,14 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             {
                 const auto iData   = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
                 const auto iResult = util::tupleMap([&](auto const* ptr) { return ptr[offset]; }, outputBufferPtrs);
-                storeParticleData(output, i, postamble(iData, unwrapModifiers(iResult)));
+                const auto postambleResult = postamble(iData, unwrapModifiers(iResult));
+                storeParticleData(output, i, postambleResult);
+                if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+                {
+                    const auto rptrs = util::tupleMap([](auto& v) { return &v; }, *globalReductionResult);
+                    util::for_each_tuple([](auto* ptr, auto const& v) { atomicUpdatePtr(ptr, v); }, rptrs,
+                                         reduction(iData, unwrapModifiers(iResult), unwrapModifiers(postambleResult)));
+                }
             }
         }
     }
@@ -475,7 +499,8 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             const auto i          = iSupercluster * Config::superclusterSize + offset;
             const bool active     = (activeMask >> (c * Config::iSize + threadIdx.x)) & 1;
             const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
-            storeTupleISum<Config>(iResults[c], output, i, i >= firstBody & i < lastBody & active, postamble, iData);
+            storeTupleISum<Config>(iResults[c], output, i, i >= firstBody & i < lastBody & active, postamble, iData,
+                                   reduction, globalReductionResult);
         }
     }
 }
