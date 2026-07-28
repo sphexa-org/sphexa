@@ -236,8 +236,8 @@ template<size_t stride = 1, class Tc, class T>
 HOST_DEVICE_FUN inline void IAD_gradhJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
                                            const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
                                            const Tc* y, const Tc* z, const T* h, const T* m, const T* wh, const T* whd,
-                                           const T* xm, const T* kx, const unsigned* nc, uint64_t* id,
-                                           T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, T* gradh)
+                                           const T* xm, const T* kx, const unsigned* nc, uint64_t* id, T* c11, T* c12,
+                                           T* c13, T* c22, T* c23, T* c33, T* gradh)
 {
     IADGradhInteraction      interaction{wh, whd};
     IADGradhPostamble<T, Tc> postamble{K};
@@ -275,8 +275,8 @@ TEST_F(SphKernelTests, IAD)
 
     // compute the 6 tensor components for particle 0
     IAD_gradhJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), m.data(),
-                   wh.data(), whd.data(), xm.data(), kx.data(), nc.data(), id.data(),
-                   &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5], &gradh);
+                   wh.data(), whd.data(), xm.data(), kx.data(), nc.data(), id.data(), &iad[0], &iad[1], &iad[2],
+                   &iad[3], &iad[4], &iad[5], &gradh);
 
     EXPECT_NEAR(iad[0], 1.9296619855715329e-18, 1e-10);
     EXPECT_NEAR(iad[1], -1.7838691836843698e-20, 1e-10);
@@ -521,9 +521,9 @@ TEST(RegularizeIadMomentMatrix, NoRegularizationWhenQualitySufficient)
     float orig11 = tau11, orig12 = tau12, orig13 = tau13;
     float orig22 = tau22, orig23 = tau23, orig33 = tau33;
 
-    float trAvg = (orig11 + orig22 + orig33) / 3.0f;
+    float trAvg         = (orig11 + orig22 + orig33) / 3.0f;
     float qualityBefore = iadMomentQuality(iadMomentDet(orig11, orig12, orig13, orig22, orig23, orig33), trAvg);
-    float target = 0.1f;
+    float target        = 0.1f;
     ASSERT_GE(qualityBefore, target);
 
     auto [det, needed] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, target);
@@ -546,7 +546,7 @@ TEST(RegularizeIadMomentMatrix, RegularizesDegenerateMatrix)
     auto [det, needed] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, target);
     ASSERT_TRUE(needed);
 
-    auto detNew =regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, target);
+    auto detNew = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, target);
 
     EXPECT_EQ(tau12, orig12);
     EXPECT_EQ(tau13, orig13);
@@ -558,10 +558,9 @@ TEST(RegularizeIadMomentMatrix, RegularizesDegenerateMatrix)
     EXPECT_NEAR(delta11, delta33, 1e-6);
     float detNewRecomputed = iadMomentDet(tau11, tau12, tau13, tau22, tau23, tau33);
     EXPECT_NEAR(detNew, detNewRecomputed, 1e-6);
-    float trAvgNew = (tau11 + tau22 + tau33) / 3.0f;
+    float trAvgNew   = (tau11 + tau22 + tau33) / 3.0f;
     float qualityNew = iadMomentQuality(detNew, trAvgNew);
     EXPECT_NEAR(qualityNew, target, 1e-6);
-
 }
 
 TEST(RegularizeIadMomentMatrix, RegularizesWithOffDiagonal)
@@ -580,7 +579,7 @@ TEST(RegularizeIadMomentMatrix, RegularizesWithOffDiagonal)
     EXPECT_EQ(tau23, orig23);
     float detNewRecomputed = iadMomentDet(tau11, tau12, tau13, tau22, tau23, tau33);
     EXPECT_NEAR(detNew, detNewRecomputed, 1e-6);
-    float trAvgNew = (tau11 + tau22 + tau33) / 3.0f;
+    float trAvgNew   = (tau11 + tau22 + tau33) / 3.0f;
     float qualityNew = iadMomentQuality(detNew, trAvgNew);
     EXPECT_NEAR(qualityNew, target, 1e-6);
 }
