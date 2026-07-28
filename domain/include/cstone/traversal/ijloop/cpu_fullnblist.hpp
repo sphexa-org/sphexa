@@ -92,7 +92,7 @@ struct CpuFullNbListNeighborhood
                  class Interaction,
                  class Postamble = detail::EmptyPostamble,
                  class Reduction = detail::NoReduction>
-        void ijLoop(std::tuple<In*...> const& input,
+        auto ijLoop(std::tuple<In*...> const& input,
                     std::tuple<Out*...> const& output,
                     Interaction const& interaction,
                     Postamble const& postamble = empty_postamble,
