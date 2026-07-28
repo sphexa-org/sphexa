@@ -352,7 +352,7 @@ struct IjLoopTest : testing::Test
             },
             std::get<0>(expected), std::get<0>(actual), resultNames);
         util::for_each_tuple(
-            [&failures](auto const& e, auto const& a, const char* name)
+            [&failures](auto e, auto a, const char* name)
             {
                 if constexpr (std::is_same_v<decltype(e), double>)
                 {
