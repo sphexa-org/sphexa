@@ -140,8 +140,8 @@ struct GpuSuperclusterNbListNeighborhood
                 decltype(types(x, y, z, h, input, output, interaction, postamble, reduction))::UnwrappedReductionResult;
             if (groups.numGroups == 0) return UnwrappedReductionResult{};
 
-            return parent.ijLoop(input, output, interaction, postamble, superclusterInfo.get(), numISuperclusters,
-                                 activeMasks.get());
+            return parent.ijLoop(input, output, interaction, postamble, reduction, superclusterInfo.get(),
+                                 numISuperclusters, activeMasks.get());
         }
     };
 
@@ -214,24 +214,25 @@ protected:
         }
 
         runIjLoop<Config>(exec, box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConst(input),
-                          tmpOrOutput, deviceReductionResult.get(), interaction, postamble, reduction, neighborData.get(), superclusterInfo, numISuperclusters,
-                          activeMasks);
+                          tmpOrOutput, deviceReductionResult.get(), interaction, postamble, reduction,
+                          neighborData.get(), superclusterInfo, numISuperclusters, activeMasks);
 
         if constexpr (Config::symmetric)
         {
             // the postamble has to be applied in a separate step for symmetric neighborhoods
             applyPostamble<Config>(exec, firstBody, lastBody, firstValidBody, x, y, z, h, makeConst(input),
-                                   makeConst(tmpOrOutput), output, postamble, reduction,
-                                   deviceReductionResult.get());
+                                   makeConst(tmpOrOutput), output, postamble, reduction, deviceReductionResult.get());
         }
 
-        if constexpr (!std::is_same_v<Reduction, detail::NoReduction>) {
+        if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+        {
             // download reduction result
             checkGpuErrors(cudaMemcpyAsync(&reductionResult, deviceReductionResult.get(), sizeof(ReductionResult),
                                            cudaMemcpyDeviceToHost));
         }
 
-        if constexpr (Config::symmetric || !std::is_same_v<Reduction, detail::NoReduction>) {
+        if constexpr (Config::symmetric || !std::is_same_v<Reduction, detail::NoReduction>)
+        {
             // sync required due to possible use of allocated temporaries / reduction result
             checkGpuErrors(cudaStreamSynchronize(exec));
         }
