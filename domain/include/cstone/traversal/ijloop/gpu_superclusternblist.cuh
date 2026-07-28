@@ -189,7 +189,7 @@ protected:
 
         // allocate reduction result
         util::UniqueDevicePtr<UnwrappedReductionResult> deviceReductionResult;
-        if constexpr (!std::is_empty_v<ReductionResult>)
+        if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
         {
             deviceReductionResult = util::deviceAlloc<UnwrappedReductionResult>(exec);
             static_assert(sizeof(ReductionResult) == sizeof(UnwrappedReductionResult));
@@ -224,13 +224,13 @@ protected:
                                    makeConst(tmpOrOutput), output, postamble);
         }
 
-        if constexpr (!std::is_empty_v<ReductionResult>) {
+        if constexpr (!std::is_same_v<Reduction, detail::NoReduction>) {
             // download reduction result
             checkGpuErrors(cudaMemcpyAsync(&reductionResult, deviceReductionResult.get(), sizeof(ReductionResult),
                                            cudaMemcpyDeviceToHost));
         }
 
-        if constexpr (Config::symmetric || !std::is_empty_v<ReductionResult>) {
+        if constexpr (Config::symmetric || !std::is_same_v<Reduction, detail::NoReduction>) {
             // sync required due to possible use of allocated temporaries / reduction result
             checkGpuErrors(cudaStreamSynchronize(exec));
         }

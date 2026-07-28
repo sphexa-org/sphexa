@@ -109,7 +109,7 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
             updateResult(reductionResult, reduction(iData, unwrapModifiers(result), unwrapModifiers(postambleResult)));
         }
     }
-    if constexpr (!std::is_empty_v<ReductionResult>)
+    if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
     {
         const auto ptrs = util::tupleMap([](auto& value) { return &value; }, *globalReductionResult);
         util::for_each_tuple([](auto* ptr, auto const& value) { atomicUpdatePtr(ptr, value); }, ptrs, reductionResult);
@@ -183,7 +183,7 @@ protected:
         if (groups.numGroups == 0) return unwrapModifiers(reductionResult);
 
         util::UniqueDevicePtr<UnwrappedReductionResult> deviceReductionResult;
-        if constexpr (!std::is_empty_v<ReductionResult>)
+        if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
         {
             deviceReductionResult = util::deviceAlloc<UnwrappedReductionResult>(exec);
             static_assert(sizeof(ReductionResult) == sizeof(UnwrappedReductionResult));
@@ -207,7 +207,7 @@ protected:
         }
         checkGpuErrors(cudaGetLastError());
 
-        if constexpr (!std::is_empty_v<ReductionResult>)
+        if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
         {
             checkGpuErrors(cudaMemcpyAsync(&reductionResult, deviceReductionResult.get(), sizeof(ReductionResult),
                                            cudaMemcpyDeviceToHost));
