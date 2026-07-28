@@ -517,7 +517,7 @@ template<class Config>
 consteval bool supportsSubgroup(ijloop::GpuSuperclusterNbListNeighborhoodBuilder<Config>)
 { return !Config::symmetric; }
 
-/*TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
+TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
 {
     using NeighborhoodBuilder = TypeParam;
 
@@ -553,4 +553,4 @@ consteval bool supportsSubgroup(ijloop::GpuSuperclusterNbListNeighborhoodBuilder
     {
         GTEST_SKIP() << "subgroups not supported";
     }
-}*/
+}
