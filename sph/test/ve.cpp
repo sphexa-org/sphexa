@@ -546,7 +546,7 @@ TEST(RegularizeIadMomentMatrix, RegularizesDegenerateMatrix)
     auto [det, needed] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, target);
     ASSERT_TRUE(needed);
 
-    regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, target);
+    auto detNew =regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, target);
 
     EXPECT_EQ(tau12, orig12);
     EXPECT_EQ(tau13, orig13);
@@ -556,10 +556,12 @@ TEST(RegularizeIadMomentMatrix, RegularizesDegenerateMatrix)
     float delta33 = tau33 - orig33;
     EXPECT_NEAR(delta11, delta22, 1e-6);
     EXPECT_NEAR(delta11, delta33, 1e-6);
-    float detNew = iadMomentDet(tau11, tau12, tau13, tau22, tau23, tau33);
+    float detNewRecomputed = iadMomentDet(tau11, tau12, tau13, tau22, tau23, tau33);
+    EXPECT_NEAR(detNew, detNewRecomputed, 1e-6);
     float trAvgNew = (tau11 + tau22 + tau33) / 3.0f;
     float qualityNew = iadMomentQuality(detNew, trAvgNew);
     EXPECT_NEAR(qualityNew, target, 1e-6);
+
 }
 
 TEST(RegularizeIadMomentMatrix, RegularizesWithOffDiagonal)
@@ -571,12 +573,13 @@ TEST(RegularizeIadMomentMatrix, RegularizesWithOffDiagonal)
     auto [det, needed] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, target);
     ASSERT_TRUE(needed);
 
-    regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, target);
+    auto detNew = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, target);
 
     EXPECT_EQ(tau12, orig12);
     EXPECT_EQ(tau13, orig13);
     EXPECT_EQ(tau23, orig23);
-    float detNew = iadMomentDet(tau11, tau12, tau13, tau22, tau23, tau33);
+    float detNewRecomputed = iadMomentDet(tau11, tau12, tau13, tau22, tau23, tau33);
+    EXPECT_NEAR(detNew, detNewRecomputed, 1e-6);
     float trAvgNew = (tau11 + tau22 + tau33) / 3.0f;
     float qualityNew = iadMomentQuality(detNew, trAvgNew);
     EXPECT_NEAR(qualityNew, target, 1e-6);

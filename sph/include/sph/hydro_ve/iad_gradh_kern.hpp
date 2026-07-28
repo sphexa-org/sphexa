@@ -111,8 +111,7 @@ struct IADGradhPostamble
         auto [det, regularize] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
         if (regularize && nci > 1)
         {
-            regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
-            det = iadMomentDet(tau11, tau12, tau13, tau22, tau23, tau33);
+            det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
         }
         uint64_t newId = setRegularizationTag(regularize, iadRegBit, idi);
 

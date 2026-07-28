@@ -56,8 +56,8 @@ struct IADPostambleSTD
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
-        const auto [i, iPos, hi, mi, roi, nci, idi]         = iData;
-        auto [tau11, tau12, tau13, tau22, tau23, tau33]      = result;
+        const auto [i, iPos, hi, mi, roi, nci, idi]     = iData;
+        auto [tau11, tau12, tau13, tau22, tau23, tau33] = result;
 
         auto getExp    = [](T val) { return (val == T(0) ? 0 : std::ilogb(val)); };
         int  tauExpSum = getExp(tau11) + getExp(tau12) + getExp(tau13) + getExp(tau22) + getExp(tau23) + getExp(tau33);
@@ -72,7 +72,10 @@ struct IADPostambleSTD
         tau33 *= normalization;
 
         auto [det, regularize] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
-        if (regularize) { regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality); }
+        if (regularize && nci > 1)
+        {
+            det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
+        }
         uint64_t newId = setRegularizationTag(regularize, iadRegBit, idi);
 
         // Note normalization factor: cij have units of 1/tau because det is proportional to tau^3 so we have to
@@ -92,8 +95,9 @@ struct IADPostambleSTD
 };
 
 template<class Neighborhood, class Tc, class Tm, class T>
-void IADIjLoop(Neighborhood const& neighborhood, Tc K, T iadConditionQuality, unsigned iadRegBit, const Tm* m, const T* rho,
-               const unsigned* nc, const T* wh, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, uint64_t* id)
+void IADIjLoop(Neighborhood const& neighborhood, Tc K, T iadConditionQuality, unsigned iadRegBit, const Tm* m,
+               const T* rho, const unsigned* nc, const T* wh, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33,
+               uint64_t* id)
 {
     neighborhood.ijLoop(std::make_tuple(m, rho, nc, id), std::make_tuple(c11, c12, c13, c22, c23, c33, id),
                         IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K, iadConditionQuality, iadRegBit});
