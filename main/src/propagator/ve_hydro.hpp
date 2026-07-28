@@ -169,7 +169,7 @@ public:
                              get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeAVswitches(groups_.view(), d, domain.box());
+        computeAVswitches(d, domain.box());
         timer.step("AVswitches");
 
         if (avClean)

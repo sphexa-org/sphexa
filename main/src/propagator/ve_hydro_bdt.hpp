@@ -264,7 +264,7 @@ public:
         domain.exchangeHalos(get<"prho", "c">(d), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
-        computeAVswitches(activeRungs_, d, domain.box());
+        computeAVswitches(d, domain.box());
         timer.step("AVswitches");
 
         if (avClean)
