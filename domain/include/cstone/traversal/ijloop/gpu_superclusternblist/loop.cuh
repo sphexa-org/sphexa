@@ -483,7 +483,8 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
                 const auto iResult = util::tupleMap([&](auto const* ptr) { return ptr[offset]; }, outputBufferPtrs);
                 const auto postambleResult = postamble(iData, unwrapModifiers(iResult));
                 storeParticleData(output, i, postambleResult);
-                reductionResult = reduction(iData, unwrapModifiers(iResult), unwrapModifiers(postambleResult));
+                if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+                    reductionResult = reduction(iData, unwrapModifiers(iResult), unwrapModifiers(postambleResult));
             }
             if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
                 warpReduceUpdatePtr(globalReductionResult, reductionResult);
