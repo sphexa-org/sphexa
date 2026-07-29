@@ -48,8 +48,7 @@ void computeVe(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeVe(sphexa::ParticlesData<cstone::execution::Gpu>& d,
-                        const cstone::Box<SphTypes::CoordinateType>&);
+template void computeVe(sphexa::ParticlesData<cstone::execution::Gpu>& d, const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace gpu
 } // namespace sph
