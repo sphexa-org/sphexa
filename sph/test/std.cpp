@@ -147,7 +147,7 @@ TEST_F(SphKernelTestsStd, IAD)
 
 template<size_t stride = 1, class Tc, class Tm, class T, class Tm1>
 HOST_DEVICE_FUN inline void
-momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
+momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, cstone::LocalIndex* neighbors,
                        unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy,
                        const T* vz, const T* h, const Tm* m, const T* rho, const T* p, const T* c, const T* c11,
                        const T* c12, const T* c13, const T* c22, const T* c23, const T* c33, const T* wh,
@@ -158,7 +158,7 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
     MomentumAndEnergyPostambleStd<Tc, Tm1>  postamble{K};
 
     const auto input  = std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33);
-    const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, maxvsignal - i);
+    const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, neighbors - i);
 
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
     const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
@@ -174,6 +174,7 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
 
         cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
     }
+    *maxvsignal = std::get<4>(cstone::ijloop::unwrapModifiers(result));
 
     auto presult = postamble(iData, cstone::ijloop::unwrapModifiers(result));
 
