@@ -108,7 +108,6 @@ struct MomentumAndEnergyPostambleStd
             momentum_x = 0;
             momentum_y = 0;
             momentum_z = 0;
-            maxvsignal = 0;
             nci        = 1;
         }
 
@@ -130,7 +129,7 @@ struct TimeStepReductionStd
     {
         const auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
         const auto [energy, momentum_x, momentum_y, momentum_z, maxvsignal]                                = result;
-        const auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
+        const auto dt = tsKCourant(nci == 1 ? 0 : maxvsignal, hi, ci, Kcour);
         return std::make_tuple(cstone::ijloop::reduction::min(dt));
     }
 };
