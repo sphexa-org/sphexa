@@ -50,10 +50,11 @@ __global__ void upsweepAccumulateLeafNodes(const TreeNodeIndex* __restrict__ lea
     util::for_each_tuple([&](auto* ptr, auto value) { ptr[nodeIdx] = value; }, output, accum);
 }
 
-template<class BinaryOp, class Init, class Output>
+template<class Tc, class BinaryOp, class Init, class Output>
 __global__ void upsweepAccumulateInternalNodes(const TreeNodeIndex firstNode,
                                                const TreeNodeIndex lastNode,
                                                const TreeNodeIndex* __restrict__ childOffsets,
+                                               const Vec3<Tc>* __restrict__ sizes,
                                                const Init init,
                                                BinaryOp binaryOp,
                                                const Output output)
@@ -66,7 +67,11 @@ __global__ void upsweepAccumulateInternalNodes(const TreeNodeIndex firstNode,
 
     auto accum = init;
     for (TreeNodeIndex childIdx = firstChild; childIdx < firstChild + eightSiblings; ++childIdx)
+    {
+        const Vec3<Tc> childSize = sizes[childIdx];
+        if (childSize[0] == 0 && childSize[1] == 0 && childSize[2] == 0) continue;
         accum = binaryOp(accum, util::tupleMap([&](const auto* ptr) { return ptr[childIdx]; }, output));
+    }
     util::for_each_tuple([&](auto* ptr, auto value) { ptr[nodeIdx] = value; }, output, accum);
 }
 
@@ -112,8 +117,8 @@ void upsweep(const execution::Gpu exec,
         const TreeNodeIndex numNodes  = lastNode - firstNode;
         if (numNodes)
         {
-            detail::upsweepAccumulateInternalNodes<<<iceil(numNodes, numThreads), numThreads, 0, exec>>>(
-                firstNode, lastNode, tree.childOffsets, init, std::forward<BinaryOp>(binaryOp), output);
+            detail::upsweepAccumulateInternalNodes<Tc><<<iceil(numNodes, numThreads), numThreads, 0, exec>>>(
+                firstNode, lastNode, tree.childOffsets, tree.sizes, init, std::forward<BinaryOp>(binaryOp), output);
             checkGpuErrors(cudaGetLastError());
         }
     }

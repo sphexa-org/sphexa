@@ -398,7 +398,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             auto jData                   = (nb < iSuperclusterNeighborsCount & j >= firstValidBody & j < totalBodies)
                                                ? loadParticleData(x, y, z, h, input, j)
                                                : dummyParticleData(x, y, z, h, input, j);
-            Th jRadiusSq                 = invalidHToZero(radiusSq(jData));
+            const Th jRadiusSq           = invalidHToZero(radiusSq(jData));
             std::get<0>(jData) -= firstValidBody;
             Result jResult = {};
 
