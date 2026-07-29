@@ -26,7 +26,7 @@ struct DeviceNeighborhoodData
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool subgroups);
 
     template<class... Args>
-    void ijLoop(Args&&... args) const;
+    IjLoopReturnType<Args...> ijLoop(Args&&... args) const;
 
 private:
     struct Impl;
@@ -76,7 +76,10 @@ struct DeviceNeighborhoodData::Impl
                 else
                     builder = ClusteredNeighborhoodBuilder<true>{ncmax};
             }
-            else { builder = cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder{d.ngmax}; }
+            else
+            {
+                builder = cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder{d.ngmax};
+            }
 
             std::visit(
                 [&](auto const& nb)
@@ -89,13 +92,13 @@ struct DeviceNeighborhoodData::Impl
     }
 
     template<class... Args>
-    void ijLoop(Args&&... args) const
+    IjLoopReturnType<Args...> ijLoop(Args&&... args) const
     {
-        const auto runIjLoop = [&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); };
+        const auto runIjLoop = [&](auto const& nb) { return nb.ijLoop(std::forward<Args>(args)...); };
         if (subgroupNeighborhood)
-            std::visit(runIjLoop, subgroupNeighborhood.value());
+            return std::visit<IjLoopReturnType<Args...>>(runIjLoop, subgroupNeighborhood.value());
         else
-            std::visit(runIjLoop, neighborhood);
+            return std::visit<IjLoopReturnType<Args...>>(runIjLoop, neighborhood);
     }
 
     std::variant<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder, cstone::execution::Gpu>,
@@ -118,10 +121,10 @@ void DeviceNeighborhoodData::build(const cstone::GroupView& groups, Dataset& d, 
 }
 
 template<class... Args>
-void DeviceNeighborhoodData::ijLoop(Args&&... args) const
+IjLoopReturnType<Args...> DeviceNeighborhoodData::ijLoop(Args&&... args) const
 {
     assert(impl);
-    impl->ijLoop(std::forward<Args>(args)...);
+    return impl->ijLoop(std::forward<Args>(args)...);
 }
 #endif
 

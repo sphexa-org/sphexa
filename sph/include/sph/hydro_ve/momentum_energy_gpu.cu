@@ -43,58 +43,41 @@ namespace sph
 namespace gpu
 {
 
-using cstone::GpuConfig;
-using cstone::LocalIndex;
-
-static __device__ float minDt_ve_device;
-
 template<class T>
-__global__ void reduceDt(const LocalIndex* __restrict__ grpStart, const LocalIndex* __restrict__ grpEnd,
-                         const LocalIndex numGroups, const T* dtCourant, float* __restrict__ groupDt)
+__global__ void computeGroupDt(const GroupView grp, const T* __restrict__ dtCourant, float* __restrict__ groupDt)
 {
-    unsigned laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
-    unsigned grpIdx  = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
+    unsigned laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
+    unsigned grpIdx  = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
 
-    if (grpIdx >= numGroups) return;
+    if (grpIdx >= grp.numGroups) return;
 
-    LocalIndex bodyBegin = grpStart[grpIdx];
-    LocalIndex bodyEnd   = grpEnd[grpIdx];
-    LocalIndex i         = bodyBegin + laneIdx;
+    auto bodyBegin = grp.groupStart[grpIdx];
+    auto bodyEnd   = grp.groupEnd[grpIdx];
+    auto i         = bodyBegin + laneIdx;
 
-    __shared__ float minBlockDt;
-    if (threadIdx.x == 0) minBlockDt = std::numeric_limits<float>::infinity();
-    __syncthreads();
-
-    float dt         = i < bodyEnd ? dtCourant[i] : std::numeric_limits<T>::infinity();
-    float minGroupDt = cstone::warpMin(dt);
-    if (groupDt && laneIdx == 0) groupDt[grpIdx] = std::min(groupDt[grpIdx], minGroupDt);
-
-    if (laneIdx == 0) cstone::atomicMinFloat(&minBlockDt, minGroupDt);
-    __syncthreads();
-    if (threadIdx.x == 0) cstone::atomicMinFloat(&minDt_ve_device, minBlockDt);
+    const T dt         = i < bodyEnd ? dtCourant[i] : std::numeric_limits<T>::infinity();
+    const T minGroupDt = cstone::warpMin(dt);
+    if (laneIdx == 0) groupDt[grpIdx] = std::min(groupDt[grpIdx], minGroupDt);
 }
 
 template<bool avClean, class Dataset>
 void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
                            const cstone::Box<typename Dataset::RealType>&)
 {
-    momentumAndEnergyIjLoop<avClean>(
+    d.minDtCourant = momentumAndEnergyIjLoop<avClean>(
         d.neighborhood, d.K, d.Kcour, d.Atmin, d.Atmax, d.ramp, rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.m),
         rawPtr(d.c), rawPtr(d.kx), rawPtr(d.alpha), rawPtr(d.xm), rawPtr(d.prho), rawPtr(d.c11), rawPtr(d.c12),
         rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.nc), rawPtr(d.dV11), rawPtr(d.dV12),
         rawPtr(d.dV13), rawPtr(d.dV22), rawPtr(d.dV23), rawPtr(d.dV33), rawPtr(d.tdpdTrho), rawPtr(d.wh), rawPtr(d.du),
         rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.dtCourant));
 
-    float minDt = std::numeric_limits<float>::infinity();
-    checkGpuErrors(
-        cudaMemcpyToSymbolAsync(GPU_SYMBOL(minDt_ve_device), &minDt, sizeof(minDt), 0, cudaMemcpyHostToDevice, 0));
-
-    constexpr LocalIndex threads = 256;
-    const LocalIndex     blocks  = cstone::iceil(grp.numGroups, threads / GpuConfig::warpSize);
-    reduceDt<<<blocks, threads>>>(grp.groupStart, grp.groupEnd, grp.numGroups, rawPtr(d.dtCourant), groupDt);
-
-    checkGpuErrors(cudaMemcpyFromSymbol(&minDt, GPU_SYMBOL(minDt_ve_device), sizeof(minDt)));
-    d.minDtCourant = minDt;
+    if (groupDt)
+    {
+        constexpr unsigned threads = 256;
+        const unsigned     blocks  = cstone::iceil(grp.numGroups, threads / cstone::GpuConfig::warpSize);
+        computeGroupDt<<<blocks, threads>>>(grp, rawPtr(d.dtCourant), groupDt);
+        checkGpuErrors(cudaGetLastError());
+    }
 }
 
 #define MOM_ENERGY(avc)                                                                                                \

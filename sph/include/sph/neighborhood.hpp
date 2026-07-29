@@ -24,6 +24,12 @@ template<class NeighborhoodBuilder, cstone::execution::Policy Exec>
 using NeighborhoodSubgroupType = decltype(std::declval<NeighborhoodDataType<NeighborhoodBuilder, Exec>>().subgroup(
     std::declval<cstone::GroupView>()));
 
+template<class... Args>
+using IjLoopReturnType =
+    decltype(std::declval<
+                 NeighborhoodDataType<cstone::ijloop::CpuAlwaysTraverseNeighborhoodBuilder, cstone::execution::Cpu>>()
+                 .ijLoop(std::declval<Args>()...));
+
 struct NeighborhoodData
 {
     NeighborhoodData() {}
@@ -54,9 +60,10 @@ struct NeighborhoodData
     }
 
     template<class... Args>
-    void ijLoop(Args&&... args) const
+    IjLoopReturnType<Args...> ijLoop(Args&&... args) const
     {
-        std::visit([&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); }, neighborhood);
+        return std::visit<IjLoopReturnType<Args...>>([&](auto const& nb)
+                                                     { return nb.ijLoop(std::forward<Args>(args)...); }, neighborhood);
     }
 
 private:

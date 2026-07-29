@@ -150,16 +150,27 @@ struct MomentumAndEnergyPostambleStdWithDt : MomentumAndEnergyPostambleStd<Tc, T
     }
 };
 
-template<class Neighborhood, class Tc, class T, class Tm, class Tm1>
-void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, const Tm* m, const T* rho, unsigned* nc,
-                             const T* vx, const T* vy, const T* vz, const T* p, const T* c, const T* c11, const T* c12,
-                             const T* c13, const T* c22, const T* c23, const T* c33, const T* wh, Tm1* du, T* grad_P_x,
-                             T* grad_P_y, T* grad_P_z, T* dt)
+struct TimeStepReductionStd
 {
-    neighborhood.ijLoop(std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
-                        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc, dt),
-                        MomentumAndEnergyInteractionStd<T, Tm1>{wh},
-                        MomentumAndEnergyPostambleStdWithDt<Tc, Tm1>{K, Kcour});
+    template<class ParticleData, class Result, class PostambleResult>
+    constexpr auto operator()(const ParticleData&, const Result&, const PostambleResult& postambleResult) const
+    {
+        const auto [du, grad_P_x, grad_P_y, grad_P_z, nci, dt] = postambleResult;
+        return std::make_tuple(cstone::ijloop::reduction::min(dt));
+    }
+};
+
+template<class Neighborhood, class Tc, class T, class Tm, class Tm1>
+T momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, const Tm* m, const T* rho, unsigned* nc,
+                          const T* vx, const T* vy, const T* vz, const T* p, const T* c, const T* c11, const T* c12,
+                          const T* c13, const T* c22, const T* c23, const T* c33, const T* wh, Tm1* du, T* grad_P_x,
+                          T* grad_P_y, T* grad_P_z, T* dt)
+{
+    auto [minDtCourant] = neighborhood.ijLoop(
+        std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
+        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc, dt), MomentumAndEnergyInteractionStd<T, Tm1>{wh},
+        MomentumAndEnergyPostambleStdWithDt<Tc, Tm1>{K, Kcour}, TimeStepReductionStd{});
+    return minDtCourant;
 }
 
 } // namespace sph

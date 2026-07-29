@@ -39,22 +39,15 @@ namespace sph
 {
 
 template<class T, class Dataset>
-void computeMomentumEnergySTD(cstone::LocalIndex firstBody, cstone::LocalIndex lastBody, Dataset& d,
-                              const cstone::Box<T>& box)
+void computeMomentumEnergySTD(Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (d.useGpu) { computeMomentumEnergyStdGpu(firstBody, lastBody, d, box); }
+    if constexpr (d.useGpu) { computeMomentumEnergyStdGpu(d, box); }
     else
     {
-        momentumAndEnergyIjLoop(d.neighborhood, d.K, d.Kcour, d.m.data(), d.rho.data(), d.nc.data(), d.vx.data(),
-                                d.vy.data(), d.vz.data(), d.p.data(), d.c.data(), d.c11.data(), d.c12.data(),
-                                d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data(), d.wh.data(), d.du.data(),
-                                d.ax.data(), d.ay.data(), d.az.data(), d.dtCourant.data());
-
-        auto minDt = std::numeric_limits<typename Dataset::HydroType>::infinity();
-#pragma omp parallel for reduction(min : minDt)
-        for (auto i = firstBody; i < lastBody; ++i)
-            minDt = std::min(minDt, d.dtCourant[i]);
-        d.minDtCourant = minDt;
+        d.minDtCourant = momentumAndEnergyIjLoop(
+            d.neighborhood, d.K, d.Kcour, d.m.data(), d.rho.data(), d.nc.data(), d.vx.data(), d.vy.data(), d.vz.data(),
+            d.p.data(), d.c.data(), d.c11.data(), d.c12.data(), d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data(),
+            d.wh.data(), d.du.data(), d.ax.data(), d.ay.data(), d.az.data(), d.dtCourant.data());
     }
 }
 
@@ -79,7 +72,10 @@ void relaxSystem(size_t startIndex, size_t endIndex, Dataset& d, double relaxati
         relaxSystemGPU(startIndex, endIndex, rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.vx), rawPtr(d.vy),
                        rawPtr(d.vz), relaxationTimescale);
     }
-    else { relaxSystemImpl(startIndex, endIndex, d, relaxationTimescale); }
+    else
+    {
+        relaxSystemImpl(startIndex, endIndex, d, relaxationTimescale);
+    }
 }
 
 } // namespace sph
