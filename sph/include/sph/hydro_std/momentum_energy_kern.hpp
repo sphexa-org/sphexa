@@ -99,63 +99,38 @@ struct MomentumAndEnergyPostambleStd
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
-        const auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
-        auto [energy, momentum_x, momentum_y, momentum_z, maxvsignal]                                      = result;
+        auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
+        auto [energy, momentum_x, momentum_y, momentum_z, maxvsignal]                                = result;
 
-        if (nci <= 1)
+        if (nci == 1 || std::isnan(momentum_x) || std::isnan(momentum_y) || std::isnan(momentum_z))
         {
             energy     = 0;
             momentum_x = 0;
             momentum_y = 0;
             momentum_z = 0;
             maxvsignal = 0;
+            nci        = 1;
         }
 
         // with the choice of calculating coordinate (r) and velocity (v_ij) differences as i - j,
         // we add the negative sign only here at the end instead of to termA123_ij in each interaction
         using T = std::remove_cvref_t<decltype(momentum_x)>;
         return std::make_tuple(Tm1(-K * Tm1(0.5) * energy), T(K * momentum_x), T(K * momentum_y), T(K * momentum_z),
-                               maxvsignal);
+                               nci);
     }
 };
 
-template<class Tc, class Tm1>
-struct MomentumAndEnergyPostambleStdWithDt : MomentumAndEnergyPostambleStd<Tc, Tm1>
+template<class Tc>
+struct TimeStepReductionStd
 {
     Tc Kcour;
 
-    MomentumAndEnergyPostambleStdWithDt(Tc K, Tc Kcour)
-        : MomentumAndEnergyPostambleStd<Tc, Tm1>{K}
-        , Kcour(Kcour)
-    {
-    }
-
-    template<class ParticleData, class Result>
-    constexpr auto operator()(const ParticleData& iData, const Result& result) const
-    {
-        auto [du, grad_P_x, grad_P_y, grad_P_z, maxvsignal] =
-            MomentumAndEnergyPostambleStd<Tc, Tm1>::operator()(iData, result);
-        auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
-
-        auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
-        if (std::isnan(grad_P_x) || std::isnan(grad_P_y) || std::isnan(grad_P_z))
-        {
-            grad_P_x = 0;
-            grad_P_y = 0;
-            grad_P_z = 0;
-            du       = 0;
-            nci      = 1;
-        }
-        return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nci, dt);
-    }
-};
-
-struct TimeStepReductionStd
-{
     template<class ParticleData, class Result, class PostambleResult>
-    constexpr auto operator()(const ParticleData&, const Result&, const PostambleResult& postambleResult) const
+    constexpr auto operator()(const ParticleData& iData, const Result& result, const PostambleResult&) const
     {
-        const auto [du, grad_P_x, grad_P_y, grad_P_z, nci, dt] = postambleResult;
+        const auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
+        const auto [energy, momentum_x, momentum_y, momentum_z, maxvsignal]                                = result;
+        const auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
         return std::make_tuple(cstone::ijloop::reduction::min(dt));
     }
 };
@@ -164,12 +139,12 @@ template<class Neighborhood, class Tc, class T, class Tm, class Tm1>
 T momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, const Tm* m, const T* rho, unsigned* nc,
                           const T* vx, const T* vy, const T* vz, const T* p, const T* c, const T* c11, const T* c12,
                           const T* c13, const T* c22, const T* c23, const T* c33, const T* wh, Tm1* du, T* grad_P_x,
-                          T* grad_P_y, T* grad_P_z, T* dt)
+                          T* grad_P_y, T* grad_P_z)
 {
     auto [minDtCourant] = neighborhood.ijLoop(
         std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
-        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc, dt), MomentumAndEnergyInteractionStd<T, Tm1>{wh},
-        MomentumAndEnergyPostambleStdWithDt<Tc, Tm1>{K, Kcour}, TimeStepReductionStd{});
+        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc), MomentumAndEnergyInteractionStd<T, Tm1>{wh},
+        MomentumAndEnergyPostambleStd<Tc, Tm1>{K}, TimeStepReductionStd<Tc>{Kcour});
     return minDtCourant;
 }
 

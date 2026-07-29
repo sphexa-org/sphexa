@@ -42,11 +42,10 @@ using cstone::LocalIndex;
 template<class Dataset>
 void computeMomentumEnergyStdGpu(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    d.minDtCourant =
-        momentumAndEnergyIjLoop(d.neighborhood, d.K, d.Kcour, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.nc), rawPtr(d.vx),
-                                rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.p), rawPtr(d.c), rawPtr(d.c11), rawPtr(d.c12),
-                                rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.wh), rawPtr(d.du),
-                                rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.dtCourant));
+    d.minDtCourant = momentumAndEnergyIjLoop(
+        d.neighborhood, d.K, d.Kcour, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.nc), rawPtr(d.vx), rawPtr(d.vy),
+        rawPtr(d.vz), rawPtr(d.p), rawPtr(d.c), rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22),
+        rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.wh), rawPtr(d.du), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az));
 }
 
 template void computeMomentumEnergyStdGpu(sphexa::ParticlesData<cstone::execution::Gpu>& d,

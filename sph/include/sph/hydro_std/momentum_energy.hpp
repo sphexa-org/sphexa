@@ -47,7 +47,7 @@ void computeMomentumEnergySTD(Dataset& d, const cstone::Box<T>& box)
         d.minDtCourant = momentumAndEnergyIjLoop(
             d.neighborhood, d.K, d.Kcour, d.m.data(), d.rho.data(), d.nc.data(), d.vx.data(), d.vy.data(), d.vz.data(),
             d.p.data(), d.c.data(), d.c11.data(), d.c12.data(), d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data(),
-            d.wh.data(), d.du.data(), d.ax.data(), d.ay.data(), d.az.data(), d.dtCourant.data());
+            d.wh.data(), d.du.data(), d.ax.data(), d.ay.data(), d.az.data());
     }
 }
 
