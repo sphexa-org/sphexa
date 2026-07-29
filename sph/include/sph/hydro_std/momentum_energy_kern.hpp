@@ -137,15 +137,16 @@ struct MomentumAndEnergyPostambleStdWithDt : MomentumAndEnergyPostambleStd<Tc, T
             MomentumAndEnergyPostambleStd<Tc, Tm1>::operator()(iData, result);
         auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
 
-        auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
         if (std::isnan(grad_P_x) || std::isnan(grad_P_y) || std::isnan(grad_P_z))
         {
-            grad_P_x = 0;
-            grad_P_y = 0;
-            grad_P_z = 0;
-            du       = 0;
-            nci      = 1;
+            grad_P_x   = 0;
+            grad_P_y   = 0;
+            grad_P_z   = 0;
+            du         = 0;
+            nci        = 1;
+            maxvsignal = 0;
         }
+        auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
         return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nci, dt);
     }
 };
