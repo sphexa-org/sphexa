@@ -19,6 +19,7 @@
 #include "cstone/execution.hpp"
 #include "cstone/primitives/math.hpp"
 #include "cstone/traversal/ijloop/common.hpp"
+#include "cstone/traversal/ijloop/atomic_update_ptr.cuh"
 
 namespace cstone::ijloop
 {
@@ -85,20 +86,25 @@ __global__ void applyPostambleKernel(const LocalIndex firstBody,
                                      UnwrappedReductionResult* const __restrict__ globalReductionResult)
 {
     const LocalIndex i = blockDim.x * blockIdx.x + threadIdx.x + firstBody;
-    if (i >= lastBody) return;
-
-    auto iData = loadParticleData(x, y, z, h, input, i);
-    std::get<0>(iData) -= firstValidBody;
-    const auto result          = util::tupleMap([&](auto* ptr) { return ptr[i]; }, tmp);
-    const auto postambleResult = postamble(iData, result);
-    storeParticleData(output, i, postambleResult);
-
-    if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+    using ParticleDataR = decltype(loadParticleData(x, y, z, h, input, i));
+    using ResultR       = decltype(util::tupleMap([&](auto* ptr) { return ptr[i]; }, tmp));
+    using RType =
+        std::decay_t<decltype(reduction(std::declval<ParticleDataR>(), unwrapModifiers(std::declval<ResultR>()),
+                                        unwrapModifiers(postamble(std::declval<ParticleDataR>(), std::declval<ResultR>()))))>;
+    RType reductionResult{};
+    if (i < lastBody)
     {
-        const auto ptrs = util::tupleMap([](auto& v) { return &v; }, *globalReductionResult);
-        util::for_each_tuple([](auto* ptr, auto const& v) { atomicUpdatePtr(ptr, v); }, ptrs,
-                             reduction(iData, unwrapModifiers(result), unwrapModifiers(postambleResult)));
+        auto iData = loadParticleData(x, y, z, h, input, i);
+        std::get<0>(iData) -= firstValidBody;
+        const auto result          = util::tupleMap([&](auto* ptr) { return ptr[i]; }, tmp);
+        const auto postambleResult = postamble(iData, result);
+        storeParticleData(output, i, postambleResult);
+
+        if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+            reductionResult = reduction(iData, unwrapModifiers(result), unwrapModifiers(postambleResult));
     }
+    if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+        warpReduceUpdatePtr(globalReductionResult, reductionResult);
 }
 
 template<class Config,

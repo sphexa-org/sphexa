@@ -17,6 +17,7 @@
 
 #include "cstone/primitives/warpscan.cuh"
 #include "cstone/traversal/ijloop/ijloop.hpp"
+#include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/util/array.hpp"
 
 namespace cstone::ijloop
@@ -27,14 +28,12 @@ namespace detail
 
 template<class T>
 __device__ __forceinline__ void atomicAddPtr(T* ptr, T value)
-{
-    atomicAdd(ptr, value);
-}
+{ atomicAdd(ptr, value); }
 
 __device__ __forceinline__ void atomicAddPtr(unsigned long* ptr, unsigned long value)
 {
     static_assert(sizeof(unsigned long) == sizeof(unsigned) || sizeof(unsigned long) == sizeof(unsigned long long));
-    if constexpr(sizeof(unsigned long) == sizeof(unsigned))
+    if constexpr (sizeof(unsigned long) == sizeof(unsigned))
         atomicAdd(reinterpret_cast<unsigned*>(ptr), static_cast<unsigned>(value));
     else
         atomicAdd(reinterpret_cast<unsigned long long*>(ptr), static_cast<unsigned long long>(value));
@@ -50,9 +49,7 @@ __device__ __forceinline__ void atomicAddPtr(util::array<T, N>* ptr, util::array
 
 template<class T>
 __device__ __forceinline__ void atomicMinPtr(T* ptr, T value)
-{
-    atomicMin(ptr, value);
-}
+{ atomicMin(ptr, value); }
 
 __device__ __forceinline__ void atomicMinPtr(float* ptr, float value) { atomicMinFloat(ptr, value); }
 
@@ -68,9 +65,7 @@ __device__ __forceinline__ void atomicMinPtr(util::array<T, N>* ptr, util::array
 
 template<class T>
 __device__ __forceinline__ void atomicMaxPtr(T* ptr, T value)
-{
-    atomicMax(ptr, value);
-}
+{ atomicMax(ptr, value); }
 
 __device__ __forceinline__ void atomicMaxPtr(float* ptr, float value) { atomicMaxFloat(ptr, value); }
 
@@ -88,32 +83,39 @@ __device__ __forceinline__ void atomicMaxPtr(util::array<T, N>* ptr, util::array
 
 template<class T>
 __device__ __forceinline__ void atomicUpdatePtr(T* ptr, T const& value)
-{
-    detail::atomicAddPtr(ptr, value);
-}
+{ detail::atomicAddPtr(ptr, value); }
 
 template<class T>
 __device__ __forceinline__ void atomicUpdatePtr(T* ptr, reduction::min<T> const& value)
-{
-    detail::atomicMinPtr(ptr, value.value);
-}
+{ detail::atomicMinPtr(ptr, value.value); }
 
 template<class T>
 __device__ __forceinline__ void atomicUpdatePtr(T* ptr, reduction::max<T> const& value)
-{
-    detail::atomicMaxPtr(ptr, value.value);
-}
+{ detail::atomicMaxPtr(ptr, value.value); }
 
 template<class T, class S>
 __device__ __forceinline__ void atomicUpdatePtr(T* ptr, symmetric::even<S> const& value)
-{
-    atomicUpdatePtr(ptr, value.value);
-}
+{ atomicUpdatePtr(ptr, value.value); }
 
 template<class T, class S>
 __device__ __forceinline__ void atomicUpdatePtr(T* ptr, symmetric::odd<S> const& value)
-{
-    atomicUpdatePtr(ptr, value.value);
-}
+{ atomicUpdatePtr(ptr, value.value); }
 
+template<class UnwrappedReductionResult, class ReductionResult>
+__device__ __forceinline__ void warpReduceUpdatePtr(UnwrappedReductionResult* const globalReductionResult,
+                                                    ReductionResult reductionResult)
+{
+#pragma unroll
+    for (unsigned offset = GpuConfig::warpSize / 2; offset >= 1; offset /= 2)
+    {
+        util::for_each_tuple([&](auto& value) { detail::updateResultImpl(value, shflDownSync(value, offset)); },
+                             reductionResult);
+    }
+
+    if (laneIndex() == 0)
+    {
+        util::for_each_tuple([](auto& target, auto const& value) { atomicUpdatePtr(&target, value); },
+                             *globalReductionResult, reductionResult);
+    }
+}
 } // namespace cstone::ijloop

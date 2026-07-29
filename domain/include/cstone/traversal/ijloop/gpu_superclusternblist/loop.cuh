@@ -127,24 +127,26 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
         for (unsigned offset = GpuConfig::warpSize / 2; offset >= Config::iSize; offset /= 2)
             util::for_each_tuple([&](auto& t) { detail::updateResultImpl(t, shflDownSync(t, offset)); }, tuple);
 
-        if ((threadIdx.y % (GpuConfig::warpSize / Config::iSize) == 0) & store)
+        if constexpr (Config::symmetric | Config::numWarpsPerInteraction > 1)
         {
-            if constexpr (Config::symmetric | Config::numWarpsPerInteraction > 1)
-            {
+            if ((threadIdx.y % (GpuConfig::warpSize / Config::iSize) == 0) & store)
                 util::for_each_tuple([index](auto* ptr, auto const& t) { atomicUpdatePtr(&ptr[index], t); }, ptrs,
                                      tuple);
-            }
-            else
+        }
+        else
+        {
+            using ReductionResult = decltype(reduction(iData, unwrapModifiers(tuple),
+                                                       unwrapModifiers(postamble(iData, unwrapModifiers(tuple)))));
+            ReductionResult reductionResult{};
+            if ((threadIdx.y % (GpuConfig::warpSize / Config::iSize) == 0) & store)
             {
                 const auto postambleResult = postamble(iData, unwrapModifiers(tuple));
                 storeParticleData(ptrs, index, postambleResult);
                 if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
-                {
-                    const auto rptrs = util::tupleMap([](auto& v) { return &v; }, *globalReductionResult);
-                    util::for_each_tuple([](auto* ptr, auto const& v) { atomicUpdatePtr(ptr, v); }, rptrs,
-                                         reduction(iData, unwrapModifiers(tuple), unwrapModifiers(postambleResult)));
-                }
+                    reductionResult = reduction(iData, unwrapModifiers(tuple), unwrapModifiers(postambleResult));
             }
+            if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+                warpReduceUpdatePtr(globalReductionResult, reductionResult);
         }
     }
 }
@@ -476,19 +478,17 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         {
             const unsigned i  = base + offset;
             const bool active = (activeMask >> offset) & 1;
+            ReductionResult reductionResult{};
             if (i >= firstBody & i < lastBody & active)
             {
                 const auto iData   = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
                 const auto iResult = util::tupleMap([&](auto const* ptr) { return ptr[offset]; }, outputBufferPtrs);
                 const auto postambleResult = postamble(iData, unwrapModifiers(iResult));
                 storeParticleData(output, i, postambleResult);
-                if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
-                {
-                    const auto rptrs = util::tupleMap([](auto& v) { return &v; }, *globalReductionResult);
-                    util::for_each_tuple([](auto* ptr, auto const& v) { atomicUpdatePtr(ptr, v); }, rptrs,
-                                         reduction(iData, unwrapModifiers(iResult), unwrapModifiers(postambleResult)));
-                }
+                reductionResult = reduction(iData, unwrapModifiers(iResult), unwrapModifiers(postambleResult));
             }
+            if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+                warpReduceUpdatePtr(globalReductionResult, reductionResult);
         }
     }
     else

@@ -110,10 +110,7 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
         }
     }
     if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
-    {
-        const auto ptrs = util::tupleMap([](auto& value) { return &value; }, *globalReductionResult);
-        util::for_each_tuple([](auto* ptr, auto const& value) { atomicUpdatePtr(ptr, value); }, ptrs, reductionResult);
-    }
+        warpReduceUpdatePtr(globalReductionResult, reductionResult);
 }
 
 template<class Tc, class KeyType, class ThP>
