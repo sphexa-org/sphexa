@@ -19,6 +19,7 @@
 #include "cstone/traversal/ijloop/ijloop.hpp"
 #include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/util/array.hpp"
+#include "cstone/util/uninitialized.hpp"
 
 namespace cstone::ijloop
 {
@@ -116,6 +117,26 @@ __device__ __forceinline__ void warpReduceUpdatePtr(UnwrappedReductionResult* co
     {
         util::for_each_tuple([](auto& target, auto const& value) { atomicUpdatePtr(&target, value); },
                              *globalReductionResult, reductionResult);
+    }
+}
+
+template<class UnwrappedReductionResult, class ReductionResult>
+__device__ __forceinline__ void blockReduceUpdatePtr(UnwrappedReductionResult* const globalReductionResult,
+                                                     ReductionResult reductionResult)
+{
+    __shared__ util::Uninitialized<ReductionResult> blockReductionResult;
+    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) *blockReductionResult.data() = ReductionResult{};
+
+    __syncthreads();
+
+    warpReduceUpdatePtr(reinterpret_cast<UnwrappedReductionResult*>(blockReductionResult.data()), reductionResult);
+
+    __syncthreads();
+
+    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
+    {
+        util::for_each_tuple([](auto& target, auto const& value) { atomicUpdatePtr(&target, value); },
+                             *globalReductionResult, *blockReductionResult.data());
     }
 }
 } // namespace cstone::ijloop

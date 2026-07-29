@@ -85,13 +85,13 @@ __global__ void applyPostambleKernel(const LocalIndex firstBody,
                                      const Reduction reduction,
                                      UnwrappedReductionResult* const __restrict__ globalReductionResult)
 {
-    const LocalIndex i = blockDim.x * blockIdx.x + threadIdx.x + firstBody;
-    using ParticleDataR = decltype(loadParticleData(x, y, z, h, input, i));
-    using ResultR       = decltype(util::tupleMap([&](auto* ptr) { return ptr[i]; }, tmp));
-    using RType =
-        std::decay_t<decltype(reduction(std::declval<ParticleDataR>(), unwrapModifiers(std::declval<ResultR>()),
-                                        unwrapModifiers(postamble(std::declval<ParticleDataR>(), std::declval<ResultR>()))))>;
-    RType reductionResult{};
+    const LocalIndex i    = blockDim.x * blockIdx.x + threadIdx.x + firstBody;
+    using ParticleData    = decltype(loadParticleData(x, y, z, h, input, i));
+    using Result          = decltype(util::tupleMap([&](auto* ptr) { return ptr[i]; }, tmp));
+    using ReductionResult = std::decay_t<decltype(reduction(
+        std::declval<ParticleData>(), unwrapModifiers(std::declval<Result>()),
+        unwrapModifiers(postamble(std::declval<ParticleData>(), std::declval<Result>()))))>;
+    ReductionResult reductionResult{};
     if (i < lastBody)
     {
         auto iData = loadParticleData(x, y, z, h, input, i);
@@ -104,7 +104,7 @@ __global__ void applyPostambleKernel(const LocalIndex firstBody,
             reductionResult = reduction(iData, unwrapModifiers(result), unwrapModifiers(postambleResult));
     }
     if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
-        warpReduceUpdatePtr(globalReductionResult, reductionResult);
+        blockReduceUpdatePtr(globalReductionResult, reductionResult);
 }
 
 template<class Config,
