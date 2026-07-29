@@ -197,7 +197,9 @@ storeTupleJSum(std::tuple<T0, T...> tuple, std::tuple<Ps*...> const& ptrs, const
 /*! compile-time utility to get an array buffer type for each tuple element */
 template<std::size_t Size, class... Ts>
 consteval std::tuple<std::array<Ts, Size>...> buffersForResults(std::tuple<Ts...> const&)
-{ return {}; }
+{
+    return {};
+}
 
 template<class Tc, class ThP, class... Ts>
 inline constexpr auto loadParticleDataWithRadiusSq(
@@ -210,10 +212,7 @@ inline constexpr auto loadParticleDataWithRadiusSq(
         const auto hi = loadAtIndexIfPtr(h, index);
         return std::tuple_cat(std::move(iPos), std::make_tuple(hi, 4 * hi * hi), std::move(iInput));
     }
-    else
-    {
-        return std::tuple_cat(std::move(iPos), std::move(iInput));
-    }
+    else { return std::tuple_cat(std::move(iPos), std::move(iInput)); }
 }
 
 template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
@@ -249,8 +248,7 @@ inline constexpr auto splitParticleDataWithRadiusSq(std::tuple<Tc, Tc, Tc, Ts...
     }
 
     constexpr std::size_t skip = std::is_pointer_v<ThP> ? 2 : 0;
-    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>)
-    {
+    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
         return std::make_tuple(index, iPos, hi, std::get<Is + 3 + skip>(particleDataWithRadiusSq)...);
     }(std::make_index_sequence<sizeof...(Ts) - skip>());
 
@@ -282,8 +280,8 @@ __device__ __forceinline__ auto loadSuperclusterIParticleData(const LocalIndex f
          offset += Config::iSize * Config::jSize)
     {
         const unsigned i = base + offset;
-        auto iData = (i >= firstValidBody & i < totalBodies) ? loadParticleDataWithRadiusSq(x, y, z, h, input, i)
-                                                             : dummyParticleDataWithRadiusSq(x, y, z, h, input, i);
+        auto iData       = (i >= firstValidBody & i < totalBodies) ? loadParticleDataWithRadiusSq(x, y, z, h, input, i)
+                                                                   : dummyParticleDataWithRadiusSq(x, y, z, h, input, i);
 #if CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
         util::for_each_tuple([offset](auto& array, auto const& value) { array[offset] = value; }, *iSuperclusterData,
                              iData);

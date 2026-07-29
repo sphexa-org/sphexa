@@ -89,14 +89,18 @@ struct EmptyPostamble
 {
     template<class ParticleData, class Result>
     constexpr Result operator()(ParticleData const&, Result const& result) const
-    { return result; }
+    {
+        return result;
+    }
 };
 
 struct NoReduction
 {
     template<class ParticleData, class Result, class PostambleResult>
     constexpr std::tuple<> operator()(ParticleData const&, Result const&, PostambleResult const&) const
-    { return {}; }
+    {
+        return {};
+    }
 };
 
 } // namespace detail
@@ -122,7 +126,9 @@ struct ConceptTestInteraction
                                          std::tuple<LocalIndex, Vec3<double>, float>,
                                          Vec3<double>,
                                          double) const
-    { return {0}; }
+    {
+        return {0};
+    }
 };
 
 template<class T, class Exec>
@@ -138,7 +144,9 @@ concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
                                                                   const float* h)
 {
     nb.build(exec, tree, box, totalBodies, groups, x, y, z, h);
-    {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h).stats()}->std::same_as<Statistics>;
+    {
+        nb.build(exec, tree, box, totalBodies, groups, x, y, z, h).stats()
+    } -> std::same_as<Statistics>;
     {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
          .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble, no_reduction)};
 };

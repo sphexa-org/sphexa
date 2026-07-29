@@ -72,10 +72,7 @@ void relaxSystem(size_t startIndex, size_t endIndex, Dataset& d, double relaxati
         relaxSystemGPU(startIndex, endIndex, rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.vx), rawPtr(d.vy),
                        rawPtr(d.vz), relaxationTimescale);
     }
-    else
-    {
-        relaxSystemImpl(startIndex, endIndex, d, relaxationTimescale);
-    }
+    else { relaxSystemImpl(startIndex, endIndex, d, relaxationTimescale); }
 }
 
 } // namespace sph

@@ -170,7 +170,9 @@ struct CpuAlwaysTraverseNeighborhoodBuilder
           const Tc* const y,
           const Tc* const z,
           const ThP h) const
-    { return {tree, box, groups.firstBody, groups.lastBody, x, y, z, h, ngmax}; }
+    {
+        return {tree, box, groups.firstBody, groups.lastBody, x, y, z, h, ngmax};
+    }
 };
 
 } // namespace cstone::ijloop

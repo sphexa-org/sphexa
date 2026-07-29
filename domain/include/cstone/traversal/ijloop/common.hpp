@@ -261,7 +261,7 @@ struct Types
         std::declval<ParticleData>(), std::declval<ParticleData>(), std::declval<Vec3<Tc>>(), std::declval<Tc>()));
     using PostambleResult =
         decltype(std::declval<Postamble>()(std::declval<ParticleData>(), unwrapModifiers(std::declval<Result>())));
-    using ReductionResult = decltype(std::declval<Reduction>()(std::declval<ParticleData>(),
+    using ReductionResult          = decltype(std::declval<Reduction>()(std::declval<ParticleData>(),
                                                                unwrapModifiers(std::declval<Result>()),
                                                                unwrapModifiers(std::declval<PostambleResult>())));
     using UnwrappedReductionResult = decltype(unwrapModifiers(std::declval<ReductionResult>()));
@@ -292,6 +292,8 @@ types(const Tc*,
       Interaction,
       Postamble = empty_postamble,
       Reduction = no_reduction)
-{ return {}; }
+{
+    return {};
+}
 
 } // namespace cstone::ijloop

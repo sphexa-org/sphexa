@@ -136,10 +136,14 @@ struct GpuAlwaysTraverseNeighborhood
                 Interaction const& interaction,
                 Postamble const& postamble = empty_postamble,
                 Reduction const& reduction = no_reduction) const
-    { return ijLoop(input, output, interaction, postamble, reduction, groups); }
+    {
+        return ijLoop(input, output, interaction, postamble, reduction, groups);
+    }
 
     Statistics stats() const
-    { return {.numBodies = groups.lastBody - groups.firstBody, .numBytes = neighborsSize(ngmax) * sizeof(LocalIndex)}; }
+    {
+        return {.numBodies = groups.lastBody - groups.firstBody, .numBytes = neighborsSize(ngmax) * sizeof(LocalIndex)};
+    }
 
     static unsigned neighborsSize(unsigned ngmax) { return ngmax * numBlocks() * numThreads; }
 
@@ -158,7 +162,9 @@ struct GpuAlwaysTraverseNeighborhood
                     Interaction const& interaction,
                     Postamble const& postamble = empty_postamble,
                     Reduction const& reduction = no_reduction) const
-        { return parent.ijLoop(input, output, interaction, postamble, reduction, groups); }
+        {
+            return parent.ijLoop(input, output, interaction, postamble, reduction, groups);
+        }
     };
 
     Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }

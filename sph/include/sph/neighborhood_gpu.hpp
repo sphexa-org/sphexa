@@ -74,10 +74,7 @@ struct DeviceNeighborhoodData::Impl
                 else
                     builder = ClusteredNeighborhoodBuilder<true>{cstone::GpuConfig::warpSize * d.ngmax / 2};
             }
-            else
-            {
-                builder = cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder{d.ngmax};
-            }
+            else { builder = cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder{d.ngmax}; }
 
             std::visit(
                 [&](auto const& nb)

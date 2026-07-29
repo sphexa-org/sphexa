@@ -415,7 +415,9 @@ CpuStreamHolder getStream(ijloop::CpuFullNbListNeighborhoodBuilder) { return {};
 StreamHolder getStream(ijloop::GpuAlwaysTraverseNeighborhoodBuilder) { return {}; }
 template<class Config>
 StreamHolder getStream(ijloop::GpuSuperclusterNbListNeighborhoodBuilder<Config>)
-{ return {}; }
+{
+    return {};
+}
 
 TYPED_TEST(IjLoopTest, IjLoop)
 {
@@ -511,11 +513,15 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
 
 template<ijloop::NeighborhoodBuilder NeighborhoodBuilder>
 consteval bool supportsSubgroup(NeighborhoodBuilder)
-{ return true; }
+{
+    return true;
+}
 
 template<class Config>
 consteval bool supportsSubgroup(ijloop::GpuSuperclusterNbListNeighborhoodBuilder<Config>)
-{ return !Config::symmetric; }
+{
+    return !Config::symmetric;
+}
 
 TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
 {
@@ -549,8 +555,5 @@ TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
             this->validate(reference, {result, reductionResult});
         }
     }
-    else
-    {
-        GTEST_SKIP() << "subgroups not supported";
-    }
+    else { GTEST_SKIP() << "subgroups not supported"; }
 }
