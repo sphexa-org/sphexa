@@ -30,6 +30,7 @@
 
 #include <mpi.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <string>
 #include <variant>
@@ -381,8 +382,9 @@ public:
     void fileAttribute(const std::string& key, std::string& val) override
     {
         auto numChars = fileAttributeSize(key);
-        val.resize(numChars - 1);
+        val.resize(numChars + 1, '\0');
         H5ReadFileAttribString(h5File_, key.c_str(), val.data());
+        val.erase(std::find(val.begin(), val.end(), '\0'), val.end());
     }
 
     void stepAttribute(const std::string& key, FieldType val, int64_t size) override
@@ -399,8 +401,9 @@ public:
     void stepAttribute(const std::string& key, std::string& val) override
     {
         auto numChars = stepAttributeSize(key);
-        val.resize(numChars - 1);
+        val.resize(numChars + 1, '\0');
         H5ReadStepAttribString(h5File_, key.c_str(), val.data());
+        val.erase(std::find(val.begin(), val.end(), '\0'), val.end());
     }
 
     void readField(const std::string& key, FieldType field) override

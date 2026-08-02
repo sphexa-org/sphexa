@@ -44,6 +44,7 @@
 #include "init/factory.hpp"
 #include "io/arg_parser.hpp"
 #include "io/factory.hpp"
+#include "io/id_tag_setup.hpp"
 #include "observables/factory.hpp"
 #include "propagator/factory.hpp"
 #include "sph/types.hpp"
@@ -123,6 +124,9 @@ int main(int argc, char** argv)
     auto propagator  = propagatorFactory<Domain, Dataset>(propChoice, avClean, output, rank, simInit->constants());
     auto observables = observablesFactory<Dataset>(simInit->constants(), constantsFile);
 
+    // ! @brief retrieval of tagging ouput setup
+    auto taggingOutputSetup = readFileTaggingOutputAttributes(initCond, fileReader.get(), fileWriter->suffix());
+
     Dataset simData;
     simData.comm = MPI_COMM_WORLD;
 
@@ -137,6 +141,8 @@ int main(int argc, char** argv)
 
     auto& d = simData.hydro;
     simData.setOutputFields(outputFields.empty() ? propagator->conservedFields() : outputFields);
+    if (taggingOutputSetup) { simData.setOutputFields(taggingOutputSetup->outputFields.empty() ?
+        propagator->conservedFields() : taggingOutputSetup->outputFields, true); }
 
     if (disableNeighborLists) d.disableNeighborLists();
 
@@ -163,6 +169,7 @@ int main(int argc, char** argv)
 
     size_t startIteration    = d.iteration;
     bool   isOutputTriggered = false;
+    bool   isSubsetOutputTriggered = false;
 
     for (bool keepRunning = true; keepRunning; d.iteration++)
     {
@@ -192,6 +199,22 @@ int main(int argc, char** argv)
             fileWriter->closeStep();
             isOutputTriggered = false;
         }
+
+        if (taggingOutputSetup)
+        {
+            isSubsetOutputTriggered =
+                (isOutputStep(d.iteration, taggingOutputSetup->writeFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, taggingOutputSetup->writeFreqStr) ||
+                 isExtraOutputStep(d.iteration, d.ttot - d.minDt, d.ttot, taggingOutputSetup->writeExtra) ||
+                 (isWallClockReached && taggingOutputSetup) || isSubsetOutputTriggered) &&
+                d.iteration > startIteration;
+
+            if (isSubsetOutputTriggered)
+            {
+                propagator->saveSubsetFields(fileWriter.get(), taggingOutputSetup->outFile, domain.startIndex(), domain.endIndex(), simData);
+                isSubsetOutputTriggered = false;
+            }
+        }
+
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||
                       not propagator->isSynced();
 

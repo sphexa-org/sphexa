@@ -11,6 +11,17 @@ namespace sphexa
 //! @brief returns true if all characters of @p str together represent a valid integral number
 bool strIsIntegral(const std::string& str);
 
+/*! @brief format a numeric output parameter as the string form expected by the isOutput helpers
+ *
+ * @param value  the numeric parameter (write frequency or extra output step/time)
+ * @return       an integer-formatted string if @p value has no fractional part, otherwise a
+ *               floating point string.
+ */
+std::string numToParamStr(double value);
+
+//! @brief split a comma- and/or whitespace-separated list, dropping empty tokens
+std::vector<std::string> splitCommaList(const std::string& listWithCommas);
+
 class ArgParser
 {
 public:
