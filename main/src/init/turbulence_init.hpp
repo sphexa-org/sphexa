@@ -98,8 +98,8 @@ class TurbulenceGlass : public ISimInitializer<Dataset>
 
 public:
     explicit TurbulenceGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
-        : glassBlock(std::move(initBlock))
-        , ISimInitializer<Dataset>(settingsFile)
+        : ISimInitializer<Dataset>(settingsFile)
+        , glassBlock(std::move(initBlock))
     {
         Dataset d;
         settings_ = buildSettings(d, TurbulenceConstants(), settingsFile, reader);

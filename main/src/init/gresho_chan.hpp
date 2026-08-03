@@ -124,8 +124,8 @@ class GreshoChan : public ISimInitializer<Dataset>
 
 public:
     GreshoChan(std::string initBlock, std::string settingsFile, IFileReader* reader)
-        : glassBlock(std::move(initBlock))
-        , ISimInitializer<Dataset>(settingsFile)
+        : ISimInitializer<Dataset>(settingsFile)
+        , glassBlock(std::move(initBlock))
     {
         Dataset d;
         settings_ = buildSettings(d, GreshoChanSettings(), settingsFile, reader);

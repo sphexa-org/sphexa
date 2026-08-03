@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(sphexa CXX C)
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_COMPILE_WARNING_AS_ERROR OFF)
 
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -DNDEBUG")
 set(CMAKE_CUDA_FLAGS_RELEASE "-O3 -DNDEBUG")
@@ -97,11 +98,15 @@ if (SPH_EXA_WITH_H5HUT)
       set(SPH_EXA_WITH_H5HUT OFF)
     endif ()
 endif ()
-
-option(SPH_EXA_WITH_GRACKLE "Enable radiative cooling with GRACKLE" OFF)
 if (SPH_EXA_WITH_GRACKLE)
     add_subdirectory(extern/grackle)
 endif()
+
+# HIP targets expose their headers as plain -I (not -isystem), so handling warnings as errors prohibits compilation
+if (NOT SPH_EXA_WITH_HIP)
+    set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+endif()
+add_compile_options(-Wall -Wextra $<$<COMPILE_LANGUAGE:CUDA>:-Wno-unknown-pragmas>)
 
 option(SPH_EXA_WITH_DISKS "Enable disk physics and propagator" OFF)
 option(SPH_EXA_WITH_TDE_INIT "Enable TDE initializers" OFF)

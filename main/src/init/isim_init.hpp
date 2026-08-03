@@ -90,7 +90,7 @@ private:
             selSpheres.resize(numSpheres4 / IdSelectionSphere{}.size());
             reader->fileAttribute(idTagFsStrings[0], selSpheres.data()->data(), numSpheres4);
 
-            if (reader->fileAttributeSize(idTagFsStrings[1]) != selSpheres.size())
+            if (reader->fileAttributeSize(idTagFsStrings[1]) != static_cast<int64_t>(selSpheres.size()))
                 throw std::runtime_error("number of selection spheres != number of sphere ids");
             sphereGroupIds.resize(selSpheres.size());
             reader->fileAttribute(std::string(idTagFsStrings[1]), sphereGroupIds.data(), selSpheres.size());
