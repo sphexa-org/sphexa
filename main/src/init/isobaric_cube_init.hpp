@@ -164,8 +164,8 @@ class IsobaricCubeGlass : public ISimInitializer<Dataset>
 
 public:
     explicit IsobaricCubeGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
-        : glassBlock(std::move(initBlock))
-        , ISimInitializer<Dataset>(settingsFile)
+        : ISimInitializer<Dataset>(settingsFile)
+        , glassBlock(std::move(initBlock))
     {
         Dataset d;
         settings_ = buildSettings(d, IsobaricCubeConstants(), settingsFile, reader);
