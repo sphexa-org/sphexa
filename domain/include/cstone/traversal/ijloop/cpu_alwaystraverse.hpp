@@ -97,6 +97,7 @@ protected:
                LocalIndex* neighbors) const
     {
         const auto iData  = loadParticleData(x, y, z, h, std::forward<Input>(input), i);
+        if (hasInfiniteH(iData)) return;
         const bool usePbc = requiresPbcHandling(box, iData);
 
         const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, neighbors), ngmax);
@@ -105,6 +106,7 @@ protected:
         {
             const LocalIndex j = neighbors[nb];
             const auto jData   = loadParticleData(x, y, z, h, std::forward<Input>(input), j);
+            if (hasInfiniteH(jData)) continue;
 
             const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 

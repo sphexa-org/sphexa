@@ -76,19 +76,23 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
             const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, threadNeighbors), ngmax);
 
             const auto iData  = loadParticleData(x, y, z, h, input, i);
-            const bool usePbc = UsePbc && requiresPbcHandling(box, iData);
-            auto result       = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
-            for (unsigned nb = 0; nb < nbs; ++nb)
+            if (!hasInfiniteH(iData))
             {
-                const LocalIndex j = threadNeighbors[nb];
-                const auto jData   = loadParticleData(x, y, z, h, input, j);
+                const bool usePbc = UsePbc && requiresPbcHandling(box, iData);
+                auto result       = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
+                for (unsigned nb = 0; nb < nbs; ++nb)
+                {
+                    const LocalIndex j = threadNeighbors[nb];
+                    const auto jData   = loadParticleData(x, y, z, h, input, j);
+                    if (hasInfiniteH(jData)) continue;
 
-                const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
+                    const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 
-                updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
+                    updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
+                }
+
+                storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
             }
-
-            storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
         }
     }
 }

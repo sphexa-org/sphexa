@@ -91,6 +91,7 @@ protected:
     jLoop(Input&& input, Output&& output, Interaction&& interaction, Postamble&& postamble, const LocalIndex i) const
     {
         const auto iData  = loadParticleData(x, y, z, h, std::forward<Input>(input), i);
+        if (hasInfiniteH(iData)) return;
         const bool usePbc = requiresPbcHandling(box, iData);
 
         const unsigned nbs = neighborsCount[i - firstBody];
@@ -99,6 +100,7 @@ protected:
         {
             const LocalIndex j = neighbors[(i - firstBody) * ngmax + nb];
             const auto jData   = loadParticleData(x, y, z, h, std::forward<Input>(input), j);
+            if (hasInfiniteH(jData)) continue;
 
             const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 

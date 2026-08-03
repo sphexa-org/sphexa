@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <tuple>
 #include <limits>
 #include <type_traits>
@@ -69,6 +70,12 @@ dummyParticleData(const Tc*, const Tc*, const Tc*, const ThP, std::tuple<const T
     constexpr Vec3<Tc> pos = {std::numeric_limits<Tc>::quiet_NaN(), std::numeric_limits<Tc>::quiet_NaN(),
                               std::numeric_limits<Tc>::quiet_NaN()};
     return std::make_tuple(index, pos, Th(0), Ts{}...);
+}
+
+template<class Tc, class Th, class... Ts>
+inline constexpr bool hasInfiniteH(std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...> const& data)
+{
+    return std::isinf(std::get<2>(data));
 }
 
 template<class Tc, class Th, class... Ts>

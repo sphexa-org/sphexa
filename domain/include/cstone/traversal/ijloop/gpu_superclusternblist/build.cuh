@@ -424,6 +424,7 @@ collectNeighborJClusters(const OctreeNsView<Tc, KeyType>& tree,
                     const Vec3<Tc> jPos = {x[j], y[j], z[j]};
                     Th jRadius =
                         Config::symmetric ? 2 * invalidHToZero(loadAtIndexIfPtr(h, j)) * tree.searchExtFactor : Th(0);
+                    if (std::isinf(loadAtIndexIfPtr(h, j))) continue;
                     const unsigned warpIndex = jClusterParticle / (Config::jSize / Config::numWarpsPerInteraction);
 
                     for (unsigned w = 0; w < warpsPerSupercluster; ++w)
