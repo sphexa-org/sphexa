@@ -101,13 +101,14 @@ template<size_t stride = 1, class Tc, class Tm, class T>
 HOST_DEVICE_FUN inline void
 IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
             unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* h, const Tm* m, const T* rho,
-            const unsigned* nc, const T* wh, const T* /*whd*/, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33)
+            const unsigned* nc, const T* wh, const T* /*whd*/, uint64_t* id,
+            T* c11, T* c12, T* c13, T* c22, T* c23, T* c33)
 {
     IADInteractionSTD      interaction{wh};
     IADPostambleSTD<T, Tc> postamble{K};
 
-    const auto input  = std::make_tuple(m, rho, nc);
-    const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33);
+    const auto input  = std::make_tuple(m, rho, nc, static_cast<const uint64_t*>(id));
+    const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, id);
 
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
     const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
@@ -124,18 +125,20 @@ IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone
         cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
     }
 
-    result = postamble(iData, result);
+    auto presult = postamble(iData, result);
 
-    cstone::ijloop::storeParticleData(output, i, result);
+    cstone::ijloop::storeParticleData(output, i, presult);
 }
 
 TEST_F(SphKernelTestsStd, IAD)
 {
     std::vector<T>        iad(6, -1);
+    std::vector<uint64_t> id(x.size(), 0);
     std::vector<unsigned> nc(x.size(), neighborsCount + 1);
 
     IADJLoopSTD(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), m.data(),
-                rho.data(), nc.data(), wh.data(), whd.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5]);
+                rho.data(), nc.data(), wh.data(), whd.data(), id.data(),
+                &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5]);
 
     EXPECT_NEAR(iad[0], 0.68826690779384281, 1e-8);
     EXPECT_NEAR(iad[1], -0.12963692768970825, 1e-8);

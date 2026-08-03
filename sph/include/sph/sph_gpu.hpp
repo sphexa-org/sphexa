@@ -86,12 +86,6 @@ extern void computePositionsGpu(const GroupView& grp, float dt, util::array<floa
                                 Ta* az, const uint8_t* rung, Tu* temp, Tu* u, Tdu* du, Tm1* du_m1, Thydro* h,
                                 Thydro* mui, Tc gamma, Tc constCv, const cstone::Box<Tc>& box);
 
-template<class Th, class KeyType>
-extern bool updateSmoothingLengthGpu(const GroupView&, unsigned ng0, const unsigned* nc, Th* h, KeyType* keys);
-
-template<class T, class Dataset>
-extern void updateSmoothingLengthIterativeGpu(const GroupView&, Dataset& d, const cstone::Box<T>& box);
-
 template<class T>
 extern void groupDivvTimestepGpu(float Krho, const GroupView&, const T* divv, float* groupDt);
 
@@ -100,6 +94,9 @@ extern void groupAccTimestepGpu(float etaAcc, const GroupView&, const T* ax, con
                                 float* groupDt);
 
 void storeRungGpu(const GroupView& grp, uint8_t rung, uint8_t* particleRungs);
+
+template<typename T>
+T accelerationTimestepGPU(size_t first, size_t last, const T* ax, const T* ay, const T* az, const T* h);
 
 //! @brief max number of particles per group used in neighbor search for SPH
 unsigned nsGroupSize();

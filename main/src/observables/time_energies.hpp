@@ -28,7 +28,6 @@
  * @author Lukas Schmidt
  */
 
-#include "conserved_quantities.hpp"
 #include "iobservables.hpp"
 #include "io/file_utils.hpp"
 
@@ -47,13 +46,12 @@ public:
     {
     }
 
-    void computeAndWrite(Dataset& simData, size_t firstIndex, size_t lastIndex, const cstone::Box<T>& /*box*/) override
+protected:
+    void computeAndWriteImpl(Dataset& simData, size_t firstIndex, size_t lastIndex, const cstone::Box<T>& /*box*/) override
     {
         int rank;
         MPI_Comm_rank(simData.comm, &rank);
         auto& d = simData.hydro;
-
-        computeConservedQuantities(firstIndex, lastIndex, d, simData.comm);
 
         if (rank == 0)
         {

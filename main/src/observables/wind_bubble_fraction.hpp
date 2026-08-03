@@ -32,7 +32,6 @@
 
 #include <mpi.h>
 
-#include "conserved_quantities.hpp"
 #include "iobservables.hpp"
 #include "io/file_utils.hpp"
 #include "gpu_reductions.h"
@@ -115,10 +114,10 @@ public:
 
     using T = typename Dataset::RealType;
 
-    void computeAndWrite(Dataset& simData, size_t firstIndex, size_t lastIndex, const cstone::Box<T>&) override
+protected:
+    void computeAndWriteImpl(Dataset& simData, size_t firstIndex, size_t lastIndex, const cstone::Box<T>&) override
     {
         auto& d = simData.hydro;
-        computeConservedQuantities(firstIndex, lastIndex, d, simData.comm);
 
         if (not d.isAllocated("kx"))
         {
