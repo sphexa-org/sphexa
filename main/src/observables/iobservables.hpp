@@ -34,6 +34,8 @@
 #include "cstone/sfc/box.hpp"
 #include "sphexa/simulation_data.hpp"
 
+#include "conserved_quantities.hpp"
+
 namespace sphexa
 {
 
@@ -41,10 +43,18 @@ template<class Dataset>
 class IObservables
 {
 public:
-    virtual void computeAndWrite(Dataset& d, size_t firstIndex, size_t lastIndex,
-                                 const cstone::Box<typename Dataset::RealType>& box) = 0;
+    void computeAndWrite(Dataset& d, size_t firstIndex, size_t lastIndex,
+                         const cstone::Box<typename Dataset::RealType>& box)
+    {
+        computeConservedQuantities(firstIndex, lastIndex, d.hydro, d.comm);
+        computeAndWriteImpl(d, firstIndex, lastIndex, box);
+    }
 
     virtual ~IObservables() = default;
+
+protected:
+    virtual void computeAndWriteImpl(Dataset& d, size_t firstIndex, size_t lastIndex,
+                                     const cstone::Box<typename Dataset::RealType>& box) = 0;
 };
 
 template<class Dataset>

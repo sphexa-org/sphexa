@@ -6,7 +6,6 @@
 #include "sph/eos.hpp"
 #include "sph/positions.hpp"
 #include "sph/ts_global.hpp"
-#include "sph/update_h.hpp"
 
 #include "sph/hydro_std/density.hpp"
 #include "sph/hydro_std/eos.hpp"

@@ -86,4 +86,15 @@ extern double machSquareSumGpu(const Tv* vx, const Tv* vy, const Tv* vz, const T
 template<class T, class Tt, class Tm>
 extern double survivingMassGpu(const Tt* temp, const T* kx, const T* xmass, const Tm* m, double rhoBubble,
                                double tempWind, size_t first, size_t last);
+
+/*! @brief count number of toggled error bits
+ *  @param[in] id
+ *  @param[in] firstIndex
+ *  @param[in] lastIndex
+ *  @param[in] errBit        error bit position
+ *  @return number of error bits
+ */
+std::size_t countErrBitsGpu(std::span<const std::uint64_t> id, std::size_t firstIndex, std::size_t lastIndex,
+                            unsigned errBit);
+
 } // namespace sphexa
