@@ -172,6 +172,12 @@ Example usage:
   gravitational forces between particles. The angle dependent accuracy parameter theta can be specificed
   with ```--theta <value>```, the default is `0.5`.
 
+> [!IMPORTANT]
+> On AMD GPU systems you have to set the environment variable `HSA_XNACK` to 1.
+> That is, use `export HSA_XNACK=1` before running `sphexa-hip`.
+> Otherwise, neighbor lists will use excessive GPU memory and show poor performance due to their use of managed memory.
+> See [the official ROCm/HIP documentation](https://rocm.docs.amd.com/projects/HIP/en/latest/how-to/hip_runtime_api/memory_management/unified_memory.html#memory-allocation-approaches-in-unified-memory) or [this more insightful blog post](https://niconiconi.neocities.org/tech-notes/xnack-on-amd-gpus) for more information on `HSA_XNACK`.
+
 #### Restarting from checkpoint files
 
 If output to file is enabled and if the ```-f``` option is not provided, sphexa will output all conserved particle
