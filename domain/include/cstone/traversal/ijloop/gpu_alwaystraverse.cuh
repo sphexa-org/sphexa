@@ -75,7 +75,7 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
         {
             const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, threadNeighbors), ngmax);
 
-            const auto iData  = loadParticleData(x, y, z, h, input, i);
+            const auto iData = loadParticleData(x, y, z, h, input, i);
             if (!hasInfiniteH(iData))
             {
                 const bool usePbc = UsePbc && requiresPbcHandling(box, iData);

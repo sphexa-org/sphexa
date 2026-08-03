@@ -90,7 +90,7 @@ protected:
     void
     jLoop(Input&& input, Output&& output, Interaction&& interaction, Postamble&& postamble, const LocalIndex i) const
     {
-        const auto iData  = loadParticleData(x, y, z, h, std::forward<Input>(input), i);
+        const auto iData = loadParticleData(x, y, z, h, std::forward<Input>(input), i);
         if (hasInfiniteH(iData)) return;
         const bool usePbc = requiresPbcHandling(box, iData);
 

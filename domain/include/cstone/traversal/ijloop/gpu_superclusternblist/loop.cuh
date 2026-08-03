@@ -227,11 +227,9 @@ inline constexpr auto splitParticleDataWithRadiusSq(std::tuple<Tc, Tc, Tc, Ts...
     }
 
     constexpr std::size_t skip = std::is_pointer_v<ThP> ? 2 : 0;
-    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>)
-    {
+    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
         return std::make_tuple(index, iPos, hi, std::get<Is + 3 + skip>(particleDataWithRadiusSq)...);
-    }
-    (std::make_index_sequence<sizeof...(Ts) - skip>());
+    }(std::make_index_sequence<sizeof...(Ts) - skip>());
 
     return std::make_tuple(iData, radiusSq);
 }
@@ -453,7 +451,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         {
             const unsigned i  = base + offset;
             const bool active = (activeMask >> offset) & 1;
-            const auto iData   = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
+            const auto iData  = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
             if (i >= firstBody & i < lastBody & active & !hasInfiniteH(iData))
             {
                 const auto iResult = util::tupleMap([&](auto const* ptr) { return ptr[offset]; }, outputBufferPtrs);
@@ -469,7 +467,8 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             const auto i          = iSupercluster * Config::superclusterSize + offset;
             const bool active     = (activeMask >> (c * Config::iSize + threadIdx.x)) & 1;
             const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
-            storeTupleISum<Config>(iResults[c], output, i, i >= firstBody & i < lastBody & active & !hasInfiniteH(iData), postamble, iData);
+            storeTupleISum<Config>(iResults[c], output, i,
+                                   i >= firstBody & i < lastBody & active & !hasInfiniteH(iData), postamble, iData);
         }
     }
 }
