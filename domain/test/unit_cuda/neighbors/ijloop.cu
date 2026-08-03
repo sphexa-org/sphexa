@@ -108,6 +108,9 @@ struct IjLoopTest : testing::Test
         std::mt19937 gen(42);
         std::generate(h.begin(), h.end(), std::bind(std::uniform_real_distribution<double>(0.03, 0.15), std::ref(gen)));
         std::generate(v.begin(), v.end(), std::bind(std::uniform_real_distribution<double>(-100, 100), std::ref(gen)));
+        auto randomIndex = std::bind(std::uniform_int_distribution<std::size_t>(0, totalBodies), std::ref(gen));
+        for (int i = 0; i < 10; ++i)
+            h[randomIndex()] = std::numeric_limits<double>::infinity();
 
         auto [csTree, counts] = computeOctree(std::span<const KeyT>(rawPtr(leaves), leaves.size()), 8);
         OctreeData<KeyT, execution::Cpu> octree;
@@ -224,10 +227,14 @@ struct IjLoopTest : testing::Test
             const LocalIndex lastBody  = groups.groupEnd[g];
             for (unsigned i = firstBody; i < lastBody; ++i)
             {
+                if (std::isinf(h[i])) continue;
+
                 jMin[i] = std::numeric_limits<LocalIndex>::max();
 
                 for (unsigned j = 0; j < totalBodies; ++j)
                 {
+                    if (std::isinf(h[j])) continue;
+
                     const double xi = x[i];
                     const double yi = y[i];
                     const double zi = z[i];
@@ -293,13 +300,15 @@ struct IjLoopTest : testing::Test
     {
 
         util::for_each_tuple(
-            [](auto const& e, auto const& a, const char* name)
+            [&](auto const& e, auto const& a, const char* name)
             {
                 ASSERT_EQ(e.size(), a.size());
 
                 std::ostringstream failures;
-                auto validateElem = [&failures](auto ei, auto ai, const char* name, std::size_t i)
+                auto validateElem = [&](auto ei, auto ai, const char* name, std::size_t i)
                 {
+                    if (std::isinf(h[i])) return;
+
                     if constexpr (std::is_same_v<decltype(ei), double>)
                     {
                         if (std::abs(ei - ai) > 1e-8)
