@@ -43,6 +43,7 @@
 #include "sph/hydro_ve/momentum_energy_kern.hpp"
 #include "sph/hydro_ve/ve_kern.hpp"
 #include "sph/hydro_ve/xmass_kern.hpp"
+#include "sph/id_layout.hpp"
 #include "sph/sph_kernel_tables.hpp"
 #include "sph/table_lookup.hpp"
 #include "../../main/src/io/file_utils.hpp"
@@ -240,7 +241,7 @@ HOST_DEVICE_FUN inline void IAD_gradhJLoop(cstone::LocalIndex i, Tc K, const cst
                                            T* c13, T* c22, T* c23, T* c33, T* gradh)
 {
     IADGradhInteraction      interaction{wh, whd};
-    IADGradhPostamble<T, Tc> postamble{K};
+    IADGradhPostamble<T, Tc> postamble{K, T(0), sphexa::IDLayout::iadRegBit};
 
     const auto input  = std::make_tuple(m, xm, kx, nc, static_cast<const uint64_t*>(id));
     const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, id);

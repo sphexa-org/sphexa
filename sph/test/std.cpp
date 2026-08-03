@@ -37,6 +37,7 @@
 
 #include "sph/hydro_std/iad_kern.hpp"
 #include "sph/hydro_std/momentum_energy_kern.hpp"
+#include "sph/id_layout.hpp"
 #include "sph/sph_kernel_tables.hpp"
 #include "sph/table_lookup.hpp"
 
@@ -105,7 +106,7 @@ IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone
             T* c11, T* c12, T* c13, T* c22, T* c23, T* c33)
 {
     IADInteractionSTD      interaction{wh};
-    IADPostambleSTD<T, Tc> postamble{K};
+    IADPostambleSTD<T, Tc> postamble{K, T(0), sphexa::IDLayout::iadRegBit};
 
     const auto input  = std::make_tuple(m, rho, nc, static_cast<const uint64_t*>(id));
     const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, id);
