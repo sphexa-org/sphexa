@@ -47,7 +47,8 @@ public:
     }
 
 protected:
-    void computeAndWriteImpl(Dataset& simData, size_t firstIndex, size_t lastIndex, const cstone::Box<T>& /*box*/) override
+    void computeAndWriteImpl(Dataset& simData, size_t /*firstIndex*/, size_t /*lastIndex*/,
+                             const cstone::Box<T>& /*box*/) override
     {
         int rank;
         MPI_Comm_rank(simData.comm, &rank);
