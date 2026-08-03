@@ -40,7 +40,7 @@ namespace sph::gpu
 {
 
 template<class Dataset>
-void computeAVswitches(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
+void computeAVswitches(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
     // alpha is an input and output field, thus first copy alpha to a temporary vector to properly support symmetric
     // neighborhoods
@@ -56,7 +56,7 @@ void computeAVswitches(const GroupView&, Dataset& d, const cstone::Box<typename 
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeAVswitches(const GroupView& grp, sphexa::ParticlesData<cstone::execution::Gpu>& d,
+template void computeAVswitches(sphexa::ParticlesData<cstone::execution::Gpu>& d,
                                 const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace sph::gpu
