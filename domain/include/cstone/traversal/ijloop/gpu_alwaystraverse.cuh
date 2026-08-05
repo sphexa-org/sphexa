@@ -106,19 +106,16 @@ struct GpuAlwaysTraverseNeighborhood
     util::UniqueDevicePtr<LocalIndex[]> neighbors;
     util::UniqueDevicePtr<LocalIndex> targetCounter;
 
-    template<class... In, class... Out, class Interaction, class Postamble>
-    void ijLoop(std::tuple<In*...> const& input,
-                std::tuple<Out*...> const& output,
-                Interaction&& interaction,
-                Postamble&& postamble) const
-    {
-        ijLoop(input, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), groups);
-    }
+    template<concepts::Input Input,
+             concepts::Output Output,
+             concepts::Interaction<Tc, ThP, Input> Interaction,
+             concepts::Postamble<Tc, ThP, Input, Output, Interaction> Postamble>
+    void
+    ijLoop(Input const& input, Output const& output, Interaction const& interaction, Postamble const& postamble) const
+    { ijLoop(input, output, interaction, postamble, groups); }
 
     Statistics stats() const
-    {
-        return {.numBodies = groups.lastBody - groups.firstBody, .numBytes = neighborsSize(ngmax) * sizeof(LocalIndex)};
-    }
+    { return {.numBodies = groups.lastBody - groups.firstBody, .numBytes = neighborsSize(ngmax) * sizeof(LocalIndex)}; }
 
     static unsigned neighborsSize(unsigned ngmax) { return ngmax * numBlocks() * numThreads; }
 
@@ -127,25 +124,28 @@ struct GpuAlwaysTraverseNeighborhood
         GpuAlwaysTraverseNeighborhood const& parent;
         GroupView groups;
 
-        template<class... In, class... Out, class Interaction, class Postamble>
-        void ijLoop(std::tuple<In*...> const& input,
-                    std::tuple<Out*...> const& output,
-                    Interaction&& interaction,
-                    Postamble&& postamble) const
-        {
-            parent.ijLoop(input, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
-                          groups);
-        }
+        template<concepts::Input Input,
+                 concepts::Output Output,
+                 concepts::Interaction<Tc, ThP, Input> Interaction,
+                 concepts::Postamble<Tc, ThP, Input, Output, Interaction> Postamble>
+        void ijLoop(Input const& input,
+                    Output const& output,
+                    Interaction const& interaction,
+                    Postamble const& postamble) const
+        { parent.ijLoop(input, output, interaction, postamble, groups); }
     };
 
     Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
 
 protected:
-    template<class... In, class... Out, class Interaction, class Postamble>
-    void ijLoop(std::tuple<In*...> const& input,
-                std::tuple<Out*...> const& output,
-                Interaction&& interaction,
-                Postamble&& postamble,
+    template<concepts::Input Input,
+             concepts::Output Output,
+             concepts::Interaction<Tc, ThP, Input> Interaction,
+             concepts::Postamble<Tc, ThP, Input, Output, Interaction> Postamble>
+    void ijLoop(Input const& input,
+                Output const& output,
+                Interaction const& interaction,
+                Postamble const& postamble,
                 GroupView const& groups) const
     {
         if (groups.numGroups == 0) return;
@@ -154,15 +154,15 @@ protected:
         if (box.boundaryX() == BoundaryType::periodic || box.boundaryY() == BoundaryType::periodic ||
             box.boundaryZ() == BoundaryType::periodic)
         {
-            runIjLoop<true><<<numBlocks(), numThreads, 0, exec>>>(
-                tree, box, groups, x, y, z, h, makeConst(input), output, std::forward<Interaction>(interaction),
-                std::forward<Postamble>(postamble), ngmax, neighbors.get(), targetCounter.get());
+            runIjLoop<true><<<numBlocks(), numThreads, 0, exec>>>(tree, box, groups, x, y, z, h, makeConst(input),
+                                                                  output, interaction, postamble, ngmax,
+                                                                  neighbors.get(), targetCounter.get());
         }
         else
         {
-            runIjLoop<false><<<numBlocks(), numThreads, 0, exec>>>(
-                tree, box, groups, x, y, z, h, makeConst(input), output, std::forward<Interaction>(interaction),
-                std::forward<Postamble>(postamble), ngmax, neighbors.get(), targetCounter.get());
+            runIjLoop<false><<<numBlocks(), numThreads, 0, exec>>>(tree, box, groups, x, y, z, h, makeConst(input),
+                                                                   output, interaction, postamble, ngmax,
+                                                                   neighbors.get(), targetCounter.get());
         }
         checkGpuErrors(cudaGetLastError());
     }

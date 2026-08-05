@@ -40,11 +40,12 @@ struct CpuAlwaysTraverseNeighborhood
     ThP h;
     unsigned ngmax;
 
-    template<class... In, class... Out, class Interaction, class Postamble>
-    void ijLoop(std::tuple<In*...> const& input,
-                std::tuple<Out*...> const& output,
-                Interaction&& interaction,
-                Postamble&& postamble) const
+    template<concepts::Input Input,
+             concepts::Output Output,
+             concepts::Interaction<Tc, ThP, Input> Interaction,
+             concepts::Postamble<Tc, ThP, Input, Output, Interaction> Postamble>
+    void
+    ijLoop(Input const& input, Output const& output, Interaction const& interaction, Postamble const& postamble) const
     {
         const auto constInput = makeConst(input);
 #pragma omp parallel
@@ -53,8 +54,7 @@ struct CpuAlwaysTraverseNeighborhood
 
 #pragma omp for
             for (LocalIndex i = firstBody; i < lastBody; ++i)
-                jLoop(constInput, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), i,
-                      neighbors.get());
+                jLoop(constInput, output, interaction, postamble, i, neighbors.get());
         }
     }
 
@@ -65,11 +65,14 @@ struct CpuAlwaysTraverseNeighborhood
         CpuAlwaysTraverseNeighborhood const& parent;
         GroupView groups;
 
-        template<class... In, class... Out, class Interaction, class Postamble>
-        void ijLoop(std::tuple<In*...> const& input,
-                    std::tuple<Out*...> const& output,
-                    Interaction&& interaction,
-                    Postamble&& postamble) const
+        template<concepts::Input Input,
+                 concepts::Output Output,
+                 concepts::Interaction<Tc, ThP, Input> Interaction,
+                 concepts::Postamble<Tc, ThP, Input, Output, Interaction> Postamble>
+        void ijLoop(Input const& input,
+                    Output const& output,
+                    Interaction const& interaction,
+                    Postamble const& postamble) const
         {
             const auto constInput = makeConst(input);
 #pragma omp parallel
@@ -79,8 +82,7 @@ struct CpuAlwaysTraverseNeighborhood
 #pragma omp for
                 for (LocalIndex g = 0; g < groups.numGroups; ++g)
                     for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
-                        parent.jLoop(constInput, output, std::forward<Interaction>(interaction),
-                                     std::forward<Postamble>(postamble), i, neighbors.get());
+                        parent.jLoop(constInput, output, interaction, postamble, i, neighbors.get());
             }
         }
     };
@@ -88,15 +90,18 @@ struct CpuAlwaysTraverseNeighborhood
     Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
 
 protected:
-    template<class Input, class Output, class Interaction, class Postamble>
-    void jLoop(Input&& input,
-               Output&& output,
-               Interaction&& interaction,
-               Postamble&& postamble,
+    template<concepts::Input Input,
+             concepts::Output Output,
+             concepts::Interaction<Tc, ThP, Input> Interaction,
+             concepts::Postamble<Tc, ThP, Input, Output, Interaction> Postamble>
+    void jLoop(Input const& input,
+               Output const& output,
+               Interaction const& interaction,
+               Postamble const& postamble,
                const LocalIndex i,
                LocalIndex* neighbors) const
     {
-        const auto iData  = loadParticleData(x, y, z, h, std::forward<Input>(input), i);
+        const auto iData  = loadParticleData(x, y, z, h, input, i);
         const bool usePbc = requiresPbcHandling(box, iData);
 
         const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, neighbors), ngmax);
@@ -104,14 +109,14 @@ protected:
         for (unsigned nb = 0; nb < nbs; ++nb)
         {
             const LocalIndex j = neighbors[nb];
-            const auto jData   = loadParticleData(x, y, z, h, std::forward<Input>(input), j);
+            const auto jData   = loadParticleData(x, y, z, h, input, j);
 
             const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 
             updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
         }
 
-        storeParticleData(std::forward<Output>(output), i, postamble(iData, unwrapModifiers(result)));
+        storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
     }
 };
 
@@ -121,7 +126,7 @@ struct CpuAlwaysTraverseNeighborhoodBuilder
 {
     unsigned ngmax;
 
-    template<class Tc, class KeyType, class ThP>
+    template<class Tc, class KeyType, concepts::H ThP>
     cpu_always_traverse_neighborhood_detail::CpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP>
     build(execution::Cpu,
           const OctreeNsView<Tc, KeyType>& tree,
@@ -132,9 +137,7 @@ struct CpuAlwaysTraverseNeighborhoodBuilder
           const Tc* const y,
           const Tc* const z,
           const ThP h) const
-    {
-        return {tree, box, groups.firstBody, groups.lastBody, x, y, z, h, ngmax};
-    }
+    { return {tree, box, groups.firstBody, groups.lastBody, x, y, z, h, ngmax}; }
 };
 
 } // namespace cstone::ijloop

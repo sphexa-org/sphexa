@@ -439,7 +439,7 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
     }
 }
 
-template<ijloop::NeighborhoodBuilder NeighborhoodBuilder>
+template<ijloop::concepts::NeighborhoodBuilder NeighborhoodBuilder>
 consteval bool supportsSubgroup(NeighborhoodBuilder)
 {
     return true;

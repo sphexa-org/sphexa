@@ -43,16 +43,17 @@ struct CpuFullNbListNeighborhood
     ThP h;
     unsigned ngmax;
 
-    template<class... In, class... Out, class Interaction, class Postamble>
-    void ijLoop(std::tuple<In*...> const& input,
-                std::tuple<Out*...> const& output,
-                Interaction&& interaction,
-                Postamble&& postamble) const
+    template<concepts::Input Input,
+             concepts::Output Output,
+             concepts::Interaction<Tc, ThP, Input> Interaction,
+             concepts::Postamble<Tc, ThP, Input, Output, Interaction> Postamble>
+    void
+    ijLoop(Input const& input, Output const& output, Interaction const& interaction, Postamble const& postamble) const
     {
         const auto constInput = makeConst(input);
 #pragma omp parallel for simd
         for (LocalIndex i = firstBody; i < lastBody; ++i)
-            jLoop(constInput, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), i);
+            jLoop(constInput, output, interaction, postamble, i);
     }
 
     Statistics stats() const
@@ -67,30 +68,38 @@ struct CpuFullNbListNeighborhood
         CpuFullNbListNeighborhood const& parent;
         GroupView groups;
 
-        template<class... In, class... Out, class Interaction, class Postamble>
-        void ijLoop(std::tuple<In*...> const& input,
-                    std::tuple<Out*...> const& output,
-                    Interaction&& interaction,
-                    Postamble&& postamble) const
+        template<concepts::Input Input,
+                 concepts::Output Output,
+                 concepts::Interaction<Tc, ThP, Input> Interaction,
+                 concepts::Postamble<Tc, ThP, Input, Output, Interaction> Postamble>
+        void ijLoop(Input const& input,
+                    Output const& output,
+                    Interaction const& interaction,
+                    Postamble const& postamble) const
         {
             const auto constInput = makeConst(input);
 #pragma omp parallel for
             for (LocalIndex g = 0; g < groups.numGroups; ++g)
 #pragma omp simd
                 for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
-                    parent.jLoop(constInput, output, std::forward<Interaction>(interaction),
-                                 std::forward<Postamble>(postamble), i);
+                    parent.jLoop(constInput, output, interaction, postamble, i);
         }
     };
 
     Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
 
 protected:
-    template<class Input, class Output, class Interaction, class Postamble>
-    void
-    jLoop(Input&& input, Output&& output, Interaction&& interaction, Postamble&& postamble, const LocalIndex i) const
+    template<concepts::Input Input,
+             concepts::Output Output,
+             concepts::Interaction<Tc, ThP, Input> Interaction,
+             concepts::Postamble<Tc, ThP, Input, Output, Interaction> Postamble>
+    void jLoop(Input const& input,
+               Output const& output,
+               Interaction const& interaction,
+               Postamble const& postamble,
+               const LocalIndex i) const
     {
-        const auto iData  = loadParticleData(x, y, z, h, std::forward<Input>(input), i);
+        const auto iData  = loadParticleData(x, y, z, h, input, i);
         const bool usePbc = requiresPbcHandling(box, iData);
 
         const unsigned nbs = neighborsCount[i - firstBody];
@@ -98,14 +107,14 @@ protected:
         for (unsigned nb = 0; nb < nbs; ++nb)
         {
             const LocalIndex j = neighbors[(i - firstBody) * ngmax + nb];
-            const auto jData   = loadParticleData(x, y, z, h, std::forward<Input>(input), j);
+            const auto jData   = loadParticleData(x, y, z, h, input, j);
 
             const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 
             if (distSq < radiusSq(iData)) updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
         }
 
-        storeParticleData(std::forward<Output>(output), i, postamble(iData, unwrapModifiers(result)));
+        storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
     }
 };
 } // namespace cpu_full_nb_list_neighborhood_detail
@@ -156,7 +165,10 @@ struct CpuFullNbListNeighborhoodBuilder
                     hExtData[i] = h[i] * tree.searchExtFactor;
                 hExt = hExtData.get();
             }
-            else { hExt = h * tree.searchExtFactor; }
+            else
+            {
+                hExt = h * tree.searchExtFactor;
+            }
             tree.searchExtFactor = 1;
         }
 

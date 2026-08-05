@@ -34,6 +34,7 @@
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
+#include "cstone/traversal/ijloop/concepts.hpp"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/tuple_util.hpp"
@@ -49,7 +50,7 @@ template<class Tc,
          class T,
          class StrongKeyType,
          class Coords,
-         cstone::ijloop::NeighborhoodBuilder NeighborhoodBuilder,
+         cstone::ijloop::concepts::NeighborhoodBuilder NeighborhoodBuilder,
          class Interaction,
          class... InputTs,
          class... OutputTs>

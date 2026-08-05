@@ -119,16 +119,19 @@ struct GpuSuperclusterNbListNeighborhood
         util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo;
         LocalIndex numISuperclusters;
 
-        template<class... In, class... Out, class Interaction, class Postamble>
-        void ijLoop(const std::tuple<In*...>& input,
-                    const std::tuple<Out*...>& output,
-                    Interaction&& interaction,
-                    Postamble&& postamble) const
+        template<concepts::Input Input,
+                 concepts::Output Output,
+                 concepts::Interaction<Tc, ThP, Input> Interaction,
+                 concepts::Postamble<Tc, ThP, Input, Output, Interaction> Postamble>
+        void ijLoop(Input const& input,
+                    Output const& output,
+                    Interaction const& interaction,
+                    Postamble const& postamble) const
         {
             if (groups.numGroups == 0) return;
 
-            parent.ijLoop(input, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
-                          superclusterInfo.get(), numISuperclusters, activeMasks.get());
+            parent.ijLoop(input, output, interaction, postamble, superclusterInfo.get(), numISuperclusters,
+                          activeMasks.get());
         }
     };
 
@@ -156,11 +159,15 @@ struct GpuSuperclusterNbListNeighborhood
     }
 
 protected:
-    template<class... In, class... Out, class Interaction, class Postamble, class Mask = void>
-    void ijLoop(std::tuple<In*...> input,
-                std::tuple<Out*...> output,
-                Interaction&& interaction,
-                Postamble&& postamble,
+    template<concepts::Input Input,
+             concepts::Output Output,
+             concepts::Interaction<Tc, ThP, Input> Interaction,
+             concepts::Postamble<Tc, ThP, Input, Output, Interaction> Postamble,
+             class Mask = void>
+    void ijLoop(Input input,
+                Output output,
+                Interaction const& interaction,
+                Postamble const& postamble,
                 const SuperclusterInfo* superclusterInfo,
                 const LocalIndex numISuperclusters,
                 const Mask* activeMasks = nullptr) const
@@ -174,26 +181,25 @@ protected:
 
         // for symmetric neighborhoods where the reduction returns more values than the postamble, temporary arrays have
         // to be allocated; in all other cases, this functions just returns the output data pointers
-        auto [tmpOrOutput, tmpHolder] = allocateTemporaries<Config, Tc, ThP>(
-            exec, firstBody, lastBody, makeConst(input), output, std::forward<Interaction>(interaction));
+        auto [tmpOrOutput, tmpHolder] =
+            allocateTemporaries<Config, Tc, ThP>(exec, firstBody, lastBody, makeConst(input), output, interaction);
 
         if constexpr (Config::symmetric)
         {
             // in the symmetric case, the output arrays need to be initialized beforehand due to the unordered atomic
             // updates in the main loop
-            initResult<Config>(exec, firstBody, lastBody, x, y, z, h, makeConst(input), tmpOrOutput,
-                               std::forward<Interaction>(interaction));
+            initResult<Config>(exec, firstBody, lastBody, x, y, z, h, makeConst(input), tmpOrOutput, interaction);
         }
 
         runIjLoop<Config>(exec, box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, makeConst(input),
-                          tmpOrOutput, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
-                          neighborData.get(), superclusterInfo, numISuperclusters, activeMasks);
+                          tmpOrOutput, interaction, postamble, neighborData.get(), superclusterInfo, numISuperclusters,
+                          activeMasks);
 
         if constexpr (Config::symmetric)
         {
             // the postamble has to be applied in a separate step for symmetric neighborhoods
             applyPostamble<Config>(exec, firstBody, lastBody, firstValidBody, x, y, z, h, makeConst(input),
-                                   makeConst(tmpOrOutput), output, std::forward<Postamble>(postamble));
+                                   makeConst(tmpOrOutput), output, postamble);
 
             // sync required due to possible use of allocated temporaries
             checkGpuErrors(cudaStreamSynchronize(exec));
@@ -330,7 +336,10 @@ struct GpuSuperclusterNbListNeighborhoodBuilder
             nodeRMax     = computeNodeRMax<Config>(exec, tree, h + firstValidBody);
             nodeRMaxData = nodeRMax.get();
         }
-        else { nodeRMaxData = h; }
+        else
+        {
+            nodeRMaxData = h;
+        }
 
         // main build with octree traversal
         std::size_t neighborDataSize = buildNbList<Config>(
