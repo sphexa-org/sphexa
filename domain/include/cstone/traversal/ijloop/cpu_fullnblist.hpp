@@ -91,20 +91,24 @@ protected:
     jLoop(Input&& input, Output&& output, Interaction&& interaction, Postamble&& postamble, const LocalIndex i) const
     {
         const auto iData = loadParticleData(x, y, z, h, std::forward<Input>(input), i);
-        if (hasInfiniteH(iData)) return;
-        const bool usePbc = requiresPbcHandling(box, iData);
 
-        const unsigned nbs = neighborsCount[i - firstBody];
-        auto result        = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
-        for (unsigned nb = 0; nb < nbs; ++nb)
+        using Result = decltype(interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0)));
+        Result result{};
+        if (!hasInfiniteH(iData))
         {
-            const LocalIndex j = neighbors[(i - firstBody) * ngmax + nb];
-            const auto jData   = loadParticleData(x, y, z, h, std::forward<Input>(input), j);
-            if (hasInfiniteH(jData)) continue;
+            const bool usePbc  = requiresPbcHandling(box, iData);
+            const unsigned nbs = neighborsCount[i - firstBody];
+            result             = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
+            for (unsigned nb = 0; nb < nbs; ++nb)
+            {
+                const LocalIndex j = neighbors[(i - firstBody) * ngmax + nb];
+                const auto jData   = loadParticleData(x, y, z, h, std::forward<Input>(input), j);
+                if (hasInfiniteH(jData)) continue;
 
-            const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
+                const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 
-            if (distSq < radiusSq(iData)) updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
+                if (distSq < radiusSq(iData)) updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
+            }
         }
 
         storeParticleData(std::forward<Output>(output), i, postamble(iData, unwrapModifiers(result)));

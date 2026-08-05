@@ -452,7 +452,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             const unsigned i  = base + offset;
             const bool active = (activeMask >> offset) & 1;
             const auto iData  = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
-            if (i >= firstBody & i < lastBody & active & !hasInfiniteH(iData))
+            if (i >= firstBody & i < lastBody & active)
             {
                 const auto iResult = util::tupleMap([&](auto const* ptr) { return ptr[offset]; }, outputBufferPtrs);
                 storeParticleData(output, i, postamble(iData, unwrapModifiers(iResult)));
@@ -467,8 +467,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             const auto i          = iSupercluster * Config::superclusterSize + offset;
             const bool active     = (activeMask >> (c * Config::iSize + threadIdx.x)) & 1;
             const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
-            storeTupleISum<Config>(iResults[c], output, i,
-                                   i >= firstBody & i < lastBody & active & !hasInfiniteH(iData), postamble, iData);
+            storeTupleISum<Config>(iResults[c], output, i, i >= firstBody & i < lastBody & active, postamble, iData);
         }
     }
 }

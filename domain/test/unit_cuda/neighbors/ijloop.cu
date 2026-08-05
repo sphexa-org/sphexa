@@ -227,63 +227,64 @@ struct IjLoopTest : testing::Test
             const LocalIndex lastBody  = groups.groupEnd[g];
             for (unsigned i = firstBody; i < lastBody; ++i)
             {
-                if (std::isinf(h[i])) continue;
-
                 jMin[i] = std::numeric_limits<LocalIndex>::max();
 
-                for (unsigned j = 0; j < totalBodies; ++j)
+                if (!std::isinf(h[i]))
                 {
-                    if (std::isinf(h[j])) continue;
-
-                    const double xi = x[i];
-                    const double yi = y[i];
-                    const double zi = z[i];
-                    const double xj = x[j];
-                    const double yj = y[j];
-                    const double zj = z[j];
-
-                    double xij = xi - xj;
-                    double yij = yi - yj;
-                    double zij = zi - zj;
-
-                    if (box.boundaryX() == BoundaryType::periodic)
+                    for (unsigned j = 0; j < totalBodies; ++j)
                     {
-                        if (xij < -0.5 * box.lx())
-                            xij += box.lx();
-                        else if (xij > 0.5 * box.lx())
-                            xij -= box.lx();
-                    }
-                    if (box.boundaryY() == BoundaryType::periodic)
-                    {
-                        if (yij < -0.5 * box.ly())
-                            yij += box.ly();
-                        else if (yij > 0.5 * box.ly())
-                            yij -= box.ly();
-                    }
-                    if (box.boundaryZ() == BoundaryType::periodic)
-                    {
-                        if (zij < -0.5 * box.lz())
-                            zij += box.lz();
-                        else if (zij > 0.5 * box.lz())
-                            zij -= box.lz();
-                    }
+                        if (std::isinf(h[j])) continue;
 
-                    const double d2 = xij * xij + yij * yij + zij * zij;
+                        const double xi = x[i];
+                        const double yi = y[i];
+                        const double zi = z[i];
+                        const double xj = x[j];
+                        const double yj = y[j];
+                        const double zj = z[j];
 
-                    if (d2 < 4 * h[i] * h[i])
-                    {
-                        iSum[i] += i;
-                        jSum[i] += j;
-                        iPosSum[i] += Vec3<double>{xi, yi, zi};
-                        jPosSum[i] += Vec3<double>{xj, yj, zj};
-                        ijPosDiffSum[i] += Vec3<double>{xij, yij, zij};
-                        distSqSum[i] += d2;
-                        hiSum[i] += h[i];
-                        hjSum[i] += h[j];
-                        viSum[i] += v[i];
-                        vjSum[i] += v[j];
-                        neighborsCount[i] += 1;
-                        jMin[i] = std::min(jMin[i], LocalIndex(j));
+                        double xij = xi - xj;
+                        double yij = yi - yj;
+                        double zij = zi - zj;
+
+                        if (box.boundaryX() == BoundaryType::periodic)
+                        {
+                            if (xij < -0.5 * box.lx())
+                                xij += box.lx();
+                            else if (xij > 0.5 * box.lx())
+                                xij -= box.lx();
+                        }
+                        if (box.boundaryY() == BoundaryType::periodic)
+                        {
+                            if (yij < -0.5 * box.ly())
+                                yij += box.ly();
+                            else if (yij > 0.5 * box.ly())
+                                yij -= box.ly();
+                        }
+                        if (box.boundaryZ() == BoundaryType::periodic)
+                        {
+                            if (zij < -0.5 * box.lz())
+                                zij += box.lz();
+                            else if (zij > 0.5 * box.lz())
+                                zij -= box.lz();
+                        }
+
+                        const double d2 = xij * xij + yij * yij + zij * zij;
+
+                        if (d2 < 4 * h[i] * h[i])
+                        {
+                            iSum[i] += i;
+                            jSum[i] += j;
+                            iPosSum[i] += Vec3<double>{xi, yi, zi};
+                            jPosSum[i] += Vec3<double>{xj, yj, zj};
+                            ijPosDiffSum[i] += Vec3<double>{xij, yij, zij};
+                            distSqSum[i] += d2;
+                            hiSum[i] += h[i];
+                            hjSum[i] += h[j];
+                            viSum[i] += v[i];
+                            vjSum[i] += v[j];
+                            neighborsCount[i] += 1;
+                            jMin[i] = std::min(jMin[i], LocalIndex(j));
+                        }
                     }
                 }
                 hiSumNormalized[i] = hiSum[i] / neighborsCount[i];
@@ -307,8 +308,6 @@ struct IjLoopTest : testing::Test
                 std::ostringstream failures;
                 auto validateElem = [&](auto ei, auto ai, const char* name, std::size_t i)
                 {
-                    if (std::isinf(h[i])) return;
-
                     if constexpr (std::is_same_v<decltype(ei), double>)
                     {
                         if (std::abs(ei - ai) > 1e-8)

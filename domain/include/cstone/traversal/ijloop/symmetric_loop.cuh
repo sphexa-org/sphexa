@@ -81,7 +81,6 @@ __global__ void applyPostambleKernel(const LocalIndex firstBody,
     if (i >= lastBody) return;
 
     auto iData = loadParticleData(x, y, z, h, input, i);
-    if (hasInfiniteH(iData)) return;
     std::get<0>(iData) -= firstValidBody;
     const auto result = util::tupleMap([&](auto* ptr) { return ptr[i]; }, tmp);
     storeParticleData(output, i, postamble(iData, result));

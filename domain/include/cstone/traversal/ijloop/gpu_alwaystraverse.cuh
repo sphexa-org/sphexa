@@ -76,10 +76,12 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
             const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, threadNeighbors), ngmax);
 
             const auto iData = loadParticleData(x, y, z, h, input, i);
+            using Result     = decltype(interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0)));
+            Result result{};
             if (!hasInfiniteH(iData))
             {
                 const bool usePbc = UsePbc && requiresPbcHandling(box, iData);
-                auto result       = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
+                result            = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
                 for (unsigned nb = 0; nb < nbs; ++nb)
                 {
                     const LocalIndex j = threadNeighbors[nb];
@@ -90,9 +92,9 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
 
                     updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
                 }
-
-                storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
             }
+
+            storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
         }
     }
 }
