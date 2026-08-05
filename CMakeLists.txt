@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.24)
 
 project(sphexa CXX C)
 set(CMAKE_CXX_STANDARD 20)
+
+# cache original CMAKE_COMPILE_WARNING_AS_ERROR and disable it for dependencies
+set(SPH_EXA_WARNING_AS_ERROR ${CMAKE_COMPILE_WARNING_AS_ERROR})
 set(CMAKE_COMPILE_WARNING_AS_ERROR OFF)
 
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native -DNDEBUG")
@@ -102,10 +105,8 @@ if (SPH_EXA_WITH_GRACKLE)
     add_subdirectory(extern/grackle)
 endif()
 
-# HIP targets expose their headers as plain -I (not -isystem), so handling warnings as errors prohibits compilation
-if ((NOT SPH_EXA_WITH_HIP) AND (DEFINED ENV{SPH_EXA_WARNING_AS_ERROR}))
-    set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
-endif()
+# reset CMAKE_COMPILE_WARNING_AS_ERROR to original value for main SPH-EXA build
+set(CMAKE_COMPILE_WARNING_AS_ERROR ${SPH_EXA_WARNING_AS_ERROR})
 add_compile_options(-Wall -Wextra $<$<COMPILE_LANGUAGE:CUDA>:-Wno-unknown-pragmas>)
 
 option(SPH_EXA_WITH_DISKS "Enable disk physics and propagator" OFF)
