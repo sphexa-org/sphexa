@@ -86,7 +86,7 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
                 {
                     const LocalIndex j = threadNeighbors[nb];
                     const auto jData   = loadParticleData(x, y, z, h, input, j);
-                    if (hasInfiniteH(jData)) continue;
+                    assert(!hasInfiniteH(jData));
 
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 

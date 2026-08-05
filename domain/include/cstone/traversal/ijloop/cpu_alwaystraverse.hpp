@@ -109,7 +109,7 @@ protected:
             {
                 const LocalIndex j = neighbors[nb];
                 const auto jData   = loadParticleData(x, y, z, h, std::forward<Input>(input), j);
-                if (hasInfiniteH(jData)) continue;
+                assert(!hasInfiniteH(jData));
 
                 const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 
