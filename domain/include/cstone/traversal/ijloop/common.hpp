@@ -33,7 +33,9 @@ namespace cstone::ijloop
 
 template<class... Ts>
 inline constexpr std::tuple<const Ts*...> makeConst(std::tuple<Ts*...> input)
-{ return {input}; }
+{
+    return {input};
+}
 
 template<class Tc, class ThP, class... Ts>
 inline constexpr std::tuple<LocalIndex, Vec3<Tc>, std::remove_cvref_t<std::remove_pointer_t<ThP>>, Ts...>
@@ -103,7 +105,9 @@ inline constexpr std::tuple<Vec3<Tc>, Tc> posDiffAndDistSq(bool usePbc,
 
 template<class Tc, class Th, class... Ts>
 inline constexpr Th radiusSq(std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...> const& data)
-{ return Th(4) * std::get<2>(data) * std::get<2>(data); }
+{
+    return Th(4) * std::get<2>(data) * std::get<2>(data);
+}
 
 // === j reductions ===
 
@@ -112,23 +116,33 @@ namespace detail
 
 template<class T>
 inline constexpr void updateResultImpl(T& result, T const& value)
-{ result += value; }
+{
+    result += value;
+}
 
 template<class T>
 inline constexpr void updateResultImpl(reduction::min<T>& result, reduction::min<T> const& value)
-{ result.value = std::min(result.value, value.value); }
+{
+    result.value = std::min(result.value, value.value);
+}
 
 template<class T>
 inline constexpr void updateResultImpl(reduction::max<T>& result, reduction::max<T> const& value)
-{ result.value = std::max(result.value, value.value); }
+{
+    result.value = std::max(result.value, value.value);
+}
 
 template<class T>
 inline constexpr void updateResultImpl(symmetric::even<T>& result, symmetric::even<T> const& value)
-{ updateResultImpl(result.value, value.value); }
+{
+    updateResultImpl(result.value, value.value);
+}
 
 template<class T>
 inline constexpr void updateResultImpl(symmetric::odd<T>& result, symmetric::odd<T> const& value)
-{ updateResultImpl(result.value, value.value); }
+{
+    updateResultImpl(result.value, value.value);
+}
 
 } // namespace detail
 
@@ -158,11 +172,15 @@ struct IsSymmetric<symmetric::odd<T>> : std::true_type
 
 template<class T>
 inline constexpr T const& applySymmetryImpl(T const& value)
-{ return value; }
+{
+    return value;
+}
 
 template<class T>
 inline constexpr symmetric::odd<T> applySymmetryImpl(symmetric::odd<T> const& value)
-{ return {-value.value}; }
+{
+    return {-value.value};
+}
 
 } // namespace detail
 
@@ -193,23 +211,33 @@ namespace detail
 
 template<class T>
 inline constexpr T unwrapModifiersImpl(T const& result)
-{ return result; }
+{
+    return result;
+}
 
 template<class T>
 inline constexpr auto unwrapModifiersImpl(reduction::min<T> const& result)
-{ return unwrapModifiersImpl(result.value); }
+{
+    return unwrapModifiersImpl(result.value);
+}
 
 template<class T>
 inline constexpr auto unwrapModifiersImpl(reduction::max<T> const& result)
-{ return unwrapModifiersImpl(result.value); }
+{
+    return unwrapModifiersImpl(result.value);
+}
 
 template<class T>
 inline constexpr auto unwrapModifiersImpl(symmetric::even<T> const& result)
-{ return unwrapModifiersImpl(result.value); }
+{
+    return unwrapModifiersImpl(result.value);
+}
 
 template<class T>
 inline constexpr auto unwrapModifiersImpl(symmetric::odd<T> const& result)
-{ return unwrapModifiersImpl(result.value); }
+{
+    return unwrapModifiersImpl(result.value);
+}
 
 } // namespace detail
 

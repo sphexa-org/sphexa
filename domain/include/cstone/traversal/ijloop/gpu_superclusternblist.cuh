@@ -336,10 +336,7 @@ struct GpuSuperclusterNbListNeighborhoodBuilder
             nodeRMax     = computeNodeRMax<Config>(exec, tree, h + firstValidBody);
             nodeRMaxData = nodeRMax.get();
         }
-        else
-        {
-            nodeRMaxData = h;
-        }
+        else { nodeRMaxData = h; }
 
         // main build with octree traversal
         std::size_t neighborDataSize = buildNbList<Config>(

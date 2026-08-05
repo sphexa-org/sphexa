@@ -112,10 +112,14 @@ struct GpuAlwaysTraverseNeighborhood
              concepts::Postamble<Tc, ThP, Input, Output, Interaction> Postamble>
     void
     ijLoop(Input const& input, Output const& output, Interaction const& interaction, Postamble const& postamble) const
-    { ijLoop(input, output, interaction, postamble, groups); }
+    {
+        ijLoop(input, output, interaction, postamble, groups);
+    }
 
     Statistics stats() const
-    { return {.numBodies = groups.lastBody - groups.firstBody, .numBytes = neighborsSize(ngmax) * sizeof(LocalIndex)}; }
+    {
+        return {.numBodies = groups.lastBody - groups.firstBody, .numBytes = neighborsSize(ngmax) * sizeof(LocalIndex)};
+    }
 
     static unsigned neighborsSize(unsigned ngmax) { return ngmax * numBlocks() * numThreads; }
 
@@ -132,7 +136,9 @@ struct GpuAlwaysTraverseNeighborhood
                     Output const& output,
                     Interaction const& interaction,
                     Postamble const& postamble) const
-        { parent.ijLoop(input, output, interaction, postamble, groups); }
+        {
+            parent.ijLoop(input, output, interaction, postamble, groups);
+        }
     };
 
     Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
