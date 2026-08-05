@@ -146,19 +146,19 @@ public:
         timer.step("FindNeighbors");
         pmReader.step();
 
-        computeXMass(groups_.view(), d, domain.box());
+        computeXMass(d, domain.box());
         timer.step("XMass");
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeVe(groups_.view(), d, domain.box());
+        computeVe(d, domain.box());
         timer.step("Generalized Volume Elements");
         domain.exchangeHalos(get<"vx", "vy", "vz", "kx">(d), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
         release(d, "ay", "az");
         acquire(d, "divv", "gradh");
-        computeIadDivvCurlvGradh(groups_.view(), d, domain.box());
+        computeIadDivvCurlvGradh(d, domain.box());
         d.minDtRho = rhoTimestep(first, last, d);
         timer.step("IadVelocityDivCurlGradh");
 
@@ -169,7 +169,7 @@ public:
                              get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeAVswitches(groups_.view(), d, domain.box());
+        computeAVswitches(d, domain.box());
         timer.step("AVswitches");
 
         if (avClean)
@@ -264,7 +264,7 @@ public:
         release(d, "prho", "c");
         acquire(d, "divv", "curlv");
         // partial recovery of cij in range [first:last] without halos, which are not needed for divv and curlv
-        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
+        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(d, box); }
         output();
         release(d, "divv", "curlv");
         acquire(d, "prho", "c");

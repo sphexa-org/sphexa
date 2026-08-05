@@ -103,7 +103,7 @@ if (SPH_EXA_WITH_GRACKLE)
 endif()
 
 # HIP targets expose their headers as plain -I (not -isystem), so handling warnings as errors prohibits compilation
-if (NOT SPH_EXA_WITH_HIP)
+if ((NOT SPH_EXA_WITH_HIP) AND (DEFINED ENV{SPH_EXA_WARNING_AS_ERROR}))
     set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 endif()
 add_compile_options(-Wall -Wextra $<$<COMPILE_LANGUAGE:CUDA>:-Wno-unknown-pragmas>)

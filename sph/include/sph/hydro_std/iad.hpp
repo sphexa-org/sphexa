@@ -39,9 +39,9 @@ namespace sph
 {
 
 template<class T, class Dataset>
-void computeIAD(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
+void computeIAD(Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (d.useGpu) { computeIADGpu(groups, d, box); }
+    if constexpr (d.useGpu) { computeIADGpu(d, box); }
     else
     {
         IADIjLoop(d.neighborhood, d.K, d.iadConditionQuality, d.iadRegBit, d.m.data(), d.rho.data(), d.nc.data(),
