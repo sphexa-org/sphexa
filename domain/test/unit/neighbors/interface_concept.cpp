@@ -18,20 +18,46 @@
 #include "cstone/traversal/ijloop/interface_concept.hpp"
 
 using namespace cstone;
+using namespace cstone::ijloop;
 
-template<ijloop::TupleOfPointers T>
+template<TupleOfPointers T>
 void foo(T a)
 {
     std::cout << std::get<0>(a);
 }
 
+template<class ThP>
+struct ijFunc
+{
+    template<class Tc, class ParticleData>
+    void operator()(ParticleData i, ParticleData j, Vec3<Tc> rij, std::remove_pointer_t<ThP> r2)
+    {
+    }
+};
+
+template<class Tc, class ThP, class Input, ParticlePairInteraction<Tc, ThP, Input> F>
+void ijLoop(F f)
+{
+
+}
+
+TEST(InterfaceConcept, derefTuple)
+{
+    static_assert(std::is_same_v<std::tuple<double>, DereferencedTuple<std::tuple<double*>>::type>);
+}
+
 TEST(InterfaceConcept, tuples)
 {
-    using DptrTuple = std::tuple<double*>;
-    using DTuple = std::tuple<double>;
+    using Tc = double;
+    using ThP = float*;
+    using Input = std::tuple<double*>;
+    using Output = std::tuple<double*>;
 
-    static_assert(ijloop::detail::IsTupleOfPointers<DptrTuple>{});
-    static_assert(not ijloop::detail::IsTupleOfPointers<DTuple>{});
+    static_assert(ijloop::detail::IsTupleOfPointers<Input>{});
 
-    foo(DptrTuple{});
+    ijFunc<ThP> f;
+
+    IJLoopDataset<Tc, ThP, Input, Output, ijFunc<ThP>> dataset;
+
+    //ijLoop<Tc, ThP, Input>(f);
 }

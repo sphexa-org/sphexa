@@ -20,6 +20,7 @@
 #include <type_traits>
 
 #include "cstone/tree/definitions.h"
+#include "cstone/traversal/ijloop/ijloop.hpp"
 
 namespace cstone::ijloop
 {
@@ -45,109 +46,87 @@ struct IsTupleOfPointers<std::tuple<Ts...>>
 template<class T>
 concept TupleOfPointers = detail::IsTupleOfPointers<T>::value;
 
+/*! @brief Maps a std::tuple of pointers to a std::tuple of the pointee types. */
+template<class T>
+struct DereferencedTuple;
 
-/*
-template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble, class Reduction>
-struct Types
+template<class... Ts>
+struct DereferencedTuple<std::tuple<Ts...>>
 {
-    using ParticleData = decltype(loadParticleData(std::declval<const Tc*>(),
-                                                   std::declval<const Tc*>(),
-                                                   std::declval<const Tc*>(),
-                                                   std::declval<ThP>(),
-                                                   makeConst(std::declval<Input>()),
-                                                   std::declval<LocalIndex>()));
-    using Result       = decltype(std::declval<Interaction>()(
-        std::declval<ParticleData>(), std::declval<ParticleData>(), std::declval<Vec3<Tc>>(), std::declval<Tc>()));
-    using PostambleResult =
-        decltype(std::declval<Postamble>()(std::declval<ParticleData>(), unwrapModifiers(std::declval<Result>())));
-    using ReductionResult          = decltype(std::declval<Reduction>()(std::declval<ParticleData>(),
-                                                               unwrapModifiers(std::declval<Result>()),
-                                                               unwrapModifiers(std::declval<PostambleResult>())));
-    using UnwrappedReductionResult = decltype(unwrapModifiers(std::declval<ReductionResult>()));
+    using type = std::tuple<std::decay_t<std::remove_pointer_t<Ts>>...>;
 };
 
-} // namespace detail
+template<std::floating_point Tc, class ThP, TupleOfPointers Input>
+using ParticleData =
+    decltype(std::tuple_cat(std::declval<std::tuple<LocalIndex, Vec3<Tc>, std::remove_pointer_t<ThP>>>(),
+                            std::declval<typename DereferencedTuple<Input>::type>()));
 
-template<class Tc,
-         class ThP,
-         class Input,
-         class Output,
-         class Interaction,
-         class Postamble = detail::EmptyPostamble,
-         class Reduction = detail::NoReduction>
-consteval detail::Types<Tc,
-                        ThP,
-                        std::decay_t<Input>,
-                        std::decay_t<Output>,
-                        std::decay_t<Interaction>,
-                        std::decay_t<Postamble>,
-                        std::decay_t<Reduction>>
-types(const Tc*,
-      const Tc*,
-      const Tc*,
-      ThP,
-      Input,
-      Output,
-      Interaction,
-      Postamble = empty_postamble,
-      Reduction = no_reduction)
+template<class F, class Tc, class ThP, class Input>
+concept ParticlePairInteraction = requires(F func,
+                                           ParticleData<Tc, ThP, Input> i,
+                                           ParticleData<Tc, ThP, Input> j,
+                                           Vec3<Tc> posdiff,
+                                           std::remove_pointer_t<ThP> r2)
 {
-    return {};
-}
- */
+    {func(i, j, posdiff, r2)};
+};
 
 /*! A dataset that can be passed to an ijLoop.
  *
- * The associated types are:
- * @tparam Input
- * @tparam Output
- * @tparam Interaction
- * @tparam Postamble
- * @tparam Reduction
- *
- * These types are subject to restrictions, modelled by a concept
+ * @tparam Tc              types of x,y,z coordinates
+ * @tparam ThP             type of h, pointer to floating_point if search radius per particle is variable
+ * @tparam Input           tuple of input particle field pointers
+ * @tparam Output          tuple of output particle field pointers
+ * @tparam Interaction     the i-j interaction
+ * @tparam Postamble       post-processing to apply to the i-j interaction result after reduction over j
  */
 template<std::floating_point Tc,
+         class ThP,
          TupleOfPointers Input,
          TupleOfPointers Output,
          class Interaction,
-         class Postamble,
-         class Reduction>
+         class Postamble = detail::EmptyPostamble>
 struct IJLoopDataset
 {
-    /*! typedefs:
+    //! @brief The tuple input data for a single particle in an i-j interaction,
+    using ParticleData_t = ParticleData<Tc, ThP, Input>;
+
+    //! @brief Type of search radii, e.g. smoothing lengths
+    using RadiusType = std::remove_pointer_t<ThP>;
+
+    //! @brief What an i-j interaction returns
+    using Result = decltype(std::declval<Interaction>()(std::declval<ParticleData_t>(),
+                                                        std::declval<ParticleData_t>(),
+                                                        std::declval<Vec3<Tc>>(),
+                                                        std::declval<RadiusType>()));
+
+    //! @brief what the postamble returns - will be stored back to the output fields
+    using PostambleResult = typename DereferencedTuple<Output>::type;
+
+    //! @brief tuple of pointers to input particle fields
+    Input input;
+    //! @brief tuple of pointers to output particle fields
+    Output output;
+
+    /*! @brief the i-j interaction kernel
      *
-     * Fixed with neighborhood type
-     *
-     * Tc     types of x,y,z
-     * ThP    type of h or pointer to h
-     *
-     * ------------
-     *
-     * ParticleData:     the tuple input data for a single particle in an i-j interaction,
-     *                   tuple_cat(std::tuple<LocalIndex, Vec3<Tc>, Th>, *Input),
-     *                   part of the interface specification of the Interaction signature
-     *
-     * Result:          return type of Interaction(ParticleData, ParticleData, Vec3<Tc>, Tc)
-     *                  what a single i-j interaction returns
-     *
-     * PostambleResult:  return type of Postamble(ParticleData, Result)
-     *
-     * ReductionResult:  return type of Reduction(ParticleData, Result, PostambleResult)
-     *
+     * callable, signature must accept (ParticleData, ParticleData, Vec3<Tc>, Th r2)
+     * return type must match the Result parameter of the Postamble call signature
      */
-    using ParticleData = std::tuple<LocalIndex, Vec3<Tc>>;
+    Interaction interaction;
 
-    Input input;             // tuple of pointers to trivial types
-    Output output;           // tuple of pointers to trivial types
+    /*! @brief Post-processing to apply to the Result after the j-loop
+     *
+     * callable, signature must accept (ParticleData, Result), return type must be
+     * typename DereferencedTuple<Output>::type
+     */
+    Postamble postamble;
 
-    Interaction interaction; // callable, signature must accept (ParticleData, ParticleData, Vec3<Tc>, Th r2)
-
-    Postamble postamble;     // callable, signature must accept (ParticleData, Result)
-                             // return type must be (tuple with dereferenced types of Output)
-
-    Reduction reduction;     // callable, signature must accept (ParticleData, Result, PostambleResult)
-                             // return type must be trivially copiable
+    /*! @brief Reduction
+     *
+     * callable, signature must accept (ParticleData, Result, PostambleResult)
+     * return type must be a trivially copiable type
+     */
 };
 
 } // namespace cstone::ijloop
