@@ -30,7 +30,7 @@ template<class ThP>
 struct ijFunc
 {
     template<class Tc, class ParticleData>
-    void operator()(ParticleData i, ParticleData j, Vec3<Tc> rij, std::remove_pointer_t<ThP> r2)
+    void operator()(const ParticleData& i, const ParticleData& j, Vec3<Tc> rij, std::remove_pointer_t<ThP> r2) const
     {
     }
 };

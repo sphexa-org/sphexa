@@ -62,9 +62,9 @@ using ParticleData =
                             std::declval<typename DereferencedTuple<Input>::type>()));
 
 template<class F, class Tc, class ThP, class Input>
-concept ParticlePairInteraction = requires(F func,
-                                           ParticleData<Tc, ThP, Input> i,
-                                           ParticleData<Tc, ThP, Input> j,
+concept ParticlePairInteraction = requires(const F& func,
+                                           const ParticleData<Tc, ThP, Input>& i,
+                                           const ParticleData<Tc, ThP, Input>& j,
                                            Vec3<Tc> posdiff,
                                            std::remove_pointer_t<ThP> r2)
 {
@@ -84,7 +84,7 @@ template<std::floating_point Tc,
          class ThP,
          TupleOfPointers Input,
          TupleOfPointers Output,
-         class Interaction,
+         ParticlePairInteraction<Tc, ThP, Input> Interaction,
          class Postamble = detail::EmptyPostamble>
 struct IJLoopDataset
 {
