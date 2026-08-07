@@ -45,7 +45,7 @@ void ijLoop(F f)
 
 TEST(InterfaceConcept, derefTuple)
 {
-    static_assert(std::is_same_v<std::tuple<double>, DereferencedTuple<std::tuple<double*>>::type>);
+    static_assert(std::is_same_v<std::tuple<double>, ijloop::detail::DereferencedTuple<std::tuple<double*>>::type>);
 }
 
 TEST(InterfaceConcept, tuples)

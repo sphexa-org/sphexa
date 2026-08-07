@@ -40,12 +40,6 @@ struct IsTupleOfPointers<std::tuple<Ts...>>
 {
 };
 
-} // namespace detail
-
-/*! @brief Restricts types to std::tuples of pointers to trivially copyable types. */
-template<class T>
-concept TupleOfPointers = detail::IsTupleOfPointers<T>::value;
-
 /*! @brief Maps a std::tuple of pointers to a std::tuple of the pointee types. */
 template<class T>
 struct DereferencedTuple;
@@ -56,10 +50,16 @@ struct DereferencedTuple<std::tuple<Ts...>>
     using type = std::tuple<std::decay_t<std::remove_pointer_t<Ts>>...>;
 };
 
+} // namespace detail
+
+/*! @brief Restricts types to std::tuples of pointers to trivially copyable types. */
+template<class T>
+concept TupleOfPointers = detail::IsTupleOfPointers<T>::value;
+
 template<std::floating_point Tc, class ThP, TupleOfPointers Input>
 using ParticleData =
     decltype(std::tuple_cat(std::declval<std::tuple<LocalIndex, Vec3<Tc>, std::remove_pointer_t<ThP>>>(),
-                            std::declval<typename DereferencedTuple<Input>::type>()));
+                            std::declval<typename detail::DereferencedTuple<Input>::type>()));
 
 template<class F, class Tc, class ThP, class Input>
 concept PairInteraction = requires(const F& func,
@@ -72,17 +72,16 @@ concept PairInteraction = requires(const F& func,
 };
 
 template<class Postamble, class Interaction, class Tc, class ThP, class Input, class Output>
-concept ValidPostamble = PairInteraction<Interaction, Tc, ThP, Input> && requires(const Interaction& interaction,
-                                                                                  const Postamble& postamble,
+concept ValidPostamble = PairInteraction<Interaction, Tc, ThP, Input> && requires(const Postamble& postamble,
+                                                                                  const Interaction& interaction,
                                                                                   const ParticleData<Tc, ThP, Input>& i,
                                                                                   const ParticleData<Tc, ThP, Input>& j,
                                                                                   Vec3<Tc> posdiff,
-                                                                                  std::remove_pointer_t<ThP> r2,
-                                                                                  const ParticleData<Tc, ThP, Input>& p)
+                                                                                  std::remove_pointer_t<ThP> r2)
 {
     {
-        postamble(p, interaction(i, j, posdiff, r2))
-        } -> std::same_as<typename DereferencedTuple<Output>::type>;
+        postamble(i, interaction(i, j, posdiff, r2))
+        } -> std::same_as<typename detail::DereferencedTuple<Output>::type>;
 };
 
 /*! A dataset that can be passed to an ijLoop.
@@ -103,19 +102,19 @@ template<std::floating_point Tc,
 struct IJLoopDataset
 {
     //! @brief The tuple input data for a single particle in an i-j interaction,
-    using ParticleData_t = ParticleData<Tc, ThP, Input>;
+    using ParticleDataType = ParticleData<Tc, ThP, Input>;
 
     //! @brief Type of search radii, e.g. smoothing lengths
     using RadiusType = std::remove_pointer_t<ThP>;
 
     //! @brief What an i-j interaction returns
-    using Result = decltype(std::declval<Interaction>()(std::declval<ParticleData_t>(),
-                                                        std::declval<ParticleData_t>(),
+    using Result = decltype(std::declval<Interaction>()(std::declval<ParticleDataType>(),
+                                                        std::declval<ParticleDataType>(),
                                                         std::declval<Vec3<Tc>>(),
                                                         std::declval<RadiusType>()));
 
     //! @brief what the postamble returns - will be stored back to the output fields
-    using PostambleResult = typename DereferencedTuple<Output>::type;
+    using PostambleResultType = typename detail::DereferencedTuple<Output>::type;
 
     //! @brief tuple of pointers to input particle fields
     Input input;
@@ -131,8 +130,7 @@ struct IJLoopDataset
 
     /*! @brief Post-processing to apply to the Result after the j-loop
      *
-     * callable, signature must accept (ParticleData, Result), return type must be
-     * typename DereferencedTuple<Output>::type
+     * callable, signature must accept (ParticleData, Result), return type must be PostambleResultType
      */
     Postamble postamble;
 };
