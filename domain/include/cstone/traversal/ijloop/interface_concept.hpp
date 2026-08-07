@@ -62,13 +62,27 @@ using ParticleData =
                             std::declval<typename DereferencedTuple<Input>::type>()));
 
 template<class F, class Tc, class ThP, class Input>
-concept ParticlePairInteraction = requires(const F& func,
+concept PairInteraction = requires(const F& func,
                                            const ParticleData<Tc, ThP, Input>& i,
                                            const ParticleData<Tc, ThP, Input>& j,
                                            Vec3<Tc> posdiff,
                                            std::remove_pointer_t<ThP> r2)
 {
     {func(i, j, posdiff, r2)};
+};
+
+template<class Postamble, class Interaction, class Tc, class ThP, class Input, class Output>
+concept ValidPostamble = PairInteraction<Interaction, Tc, ThP, Input> && requires(const Interaction& interaction,
+                                                                                  const Postamble& postamble,
+                                                                                  const ParticleData<Tc, ThP, Input>& i,
+                                                                                  const ParticleData<Tc, ThP, Input>& j,
+                                                                                  Vec3<Tc> posdiff,
+                                                                                  std::remove_pointer_t<ThP> r2,
+                                                                                  const ParticleData<Tc, ThP, Input>& p)
+{
+    {
+        postamble(p, interaction(i, j, posdiff, r2))
+        } -> std::same_as<typename DereferencedTuple<Output>::type>;
 };
 
 /*! A dataset that can be passed to an ijLoop.
@@ -84,8 +98,8 @@ template<std::floating_point Tc,
          class ThP,
          TupleOfPointers Input,
          TupleOfPointers Output,
-         ParticlePairInteraction<Tc, ThP, Input> Interaction,
-         class Postamble = detail::EmptyPostamble>
+         PairInteraction<Tc, ThP, Input> Interaction,
+         ValidPostamble<Interaction, Tc, ThP, Input, Output> Postamble = detail::EmptyPostamble>
 struct IJLoopDataset
 {
     //! @brief The tuple input data for a single particle in an i-j interaction,
@@ -121,12 +135,6 @@ struct IJLoopDataset
      * typename DereferencedTuple<Output>::type
      */
     Postamble postamble;
-
-    /*! @brief Reduction
-     *
-     * callable, signature must accept (ParticleData, Result, PostambleResult)
-     * return type must be a trivially copiable type
-     */
 };
 
 } // namespace cstone::ijloop

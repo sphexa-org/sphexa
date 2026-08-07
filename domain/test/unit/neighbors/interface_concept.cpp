@@ -30,12 +30,14 @@ template<class ThP>
 struct ijFunc
 {
     template<class Tc, class ParticleData>
-    void operator()(const ParticleData& i, const ParticleData& j, Vec3<Tc> rij, std::remove_pointer_t<ThP> r2) const
+    constexpr auto
+    operator()(const ParticleData& i, const ParticleData& j, Vec3<Tc> rij, std::remove_pointer_t<ThP> r2) const
     {
+        return std::tuple<Tc>{};
     }
 };
 
-template<class Tc, class ThP, class Input, ParticlePairInteraction<Tc, ThP, Input> F>
+template<class Tc, class ThP, class Input, PairInteraction<Tc, ThP, Input> F>
 void ijLoop(F f)
 {
 
