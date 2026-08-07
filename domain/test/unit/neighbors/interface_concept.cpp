@@ -59,7 +59,5 @@ TEST(InterfaceConcept, tuples)
 
     ijFunc<ThP> f;
 
-    IJLoopDataset<Tc, ThP, Input, Output, ijFunc<ThP>> dataset;
-
-    //ijLoop<Tc, ThP, Input>(f);
+    IjLoopData<Tc, ThP, Input, Output, ijFunc<ThP>> dataset;
 }
