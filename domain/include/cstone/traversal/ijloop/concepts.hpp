@@ -97,12 +97,18 @@ using ParticleData = ParticleDataT<Tc, ThP, Inp>::type;
 template<class T, class Tc, class ThP, class Inp>
 concept InteractionCorrectlyCallable =
     requires(ParticleData<Tc, ThP, Inp> iData, ParticleData<Tc, ThP, Inp> jData, Vec3<Tc> ijPosDiff, Tc distSq)
-{ std::declval<T>()(iData, jData, ijPosDiff, distSq); };
+{
+    std::declval<T>()(iData, jData, ijPosDiff, distSq);
+};
 
 template<class T, class Tc, class ThP, class Inp>
 concept InteractionReturnsValueTuple = requires(
     detail::ParticleData<Tc, ThP, Inp> iData, detail::ParticleData<Tc, ThP, Inp> jData, Vec3<Tc> ijPosDiff, Tc distSq)
-{ {std::declval<T>()(iData, jData, ijPosDiff, distSq)}->ValueTuple; };
+{
+    {
+        std::declval<T>()(iData, jData, ijPosDiff, distSq)
+    } -> ValueTuple;
+};
 } // namespace detail
 
 /*! @brief Concept for a pairwise particle interaction functor.
@@ -184,17 +190,27 @@ concept ValidOutput =
 template<class T, class Tc, class ThP, class Inp, class Inter>
 concept PostambleCorrectlyCallable =
     requires(ParticleData<Tc, ThP, Inp> iData, RemoveModifier<InteractionResult<Tc, ThP, Inp, Inter>> iResult)
-{ std::declval<T>()(iData, iResult); };
+{
+    std::declval<T>()(iData, iResult);
+};
 
 template<class T, class Tc, class ThP, class Inp, class Out, class Inter>
 concept PostambleReturnValueCompatibleWithOutput = requires(
     detail::ParticleData<Tc, ThP, Inp> iData, detail::RemoveModifier<InteractionResult<Tc, ThP, Inp, Inter>> iResult)
-{ {std::declval<T>()(iData, iResult)}->ValidOutput<Out>; };
+{
+    {
+        std::declval<T>()(iData, iResult)
+    } -> ValidOutput<Out>;
+};
 
 template<class T, class Tc, class ThP, class Inp, class Out>
 concept InteractionReturnValueCompatibleWithOutput = requires(
     detail::ParticleData<Tc, ThP, Inp> iData, detail::ParticleData<Tc, ThP, Inp> jData, Vec3<Tc> ijPosDiff, Tc distSq)
-{ {std::declval<T>()(iData, jData, ijPosDiff, distSq)}->ValidOutput<Out>; };
+{
+    {
+        std::declval<T>()(iData, jData, ijPosDiff, distSq)
+    } -> ValidOutput<Out>;
+};
 
 } // namespace detail
 
@@ -222,13 +238,17 @@ struct ConceptTestInteraction
                                          std::tuple<LocalIndex, Vec3<double>, float, float>,
                                          Vec3<double>,
                                          double) const
-    { return {0}; }
+    {
+        return {0};
+    }
 };
 
 struct ConceptTestPostamble
 {
     constexpr std::tuple<double> operator()(std::tuple<LocalIndex, Vec3<double>, float, float>, std::tuple<int>) const
-    { return {0.0}; }
+    {
+        return {0.0};
+    }
 };
 
 } // namespace detail
@@ -248,8 +268,12 @@ concept Neighborhood = requires(T nb,
                                 std::tuple<float*> input,
                                 std::tuple<double*> output)
 {
-    {nb.stats()}->std::same_as<Statistics>;
-    {nb.ijLoop(input, output, interaction, postamble)}->std::same_as<void>;
+    {
+        nb.stats()
+    } -> std::same_as<Statistics>;
+    {
+        nb.ijLoop(input, output, interaction, postamble)
+    } -> std::same_as<void>;
 };
 
 namespace detail
@@ -266,7 +290,11 @@ concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
                                                                   const double* y,
                                                                   const double* z,
                                                                   const float* h)
-{ {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)}->Neighborhood; };
+{
+    {
+        nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
+    } -> Neighborhood;
+};
 
 } // namespace detail
 
