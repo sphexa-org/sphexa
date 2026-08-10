@@ -29,6 +29,12 @@
 namespace cstone::ijloop::concepts
 {
 
+/*! @brief Concept satisfied by a particle smoothing length.
+ *
+ * Accepts either a floating-point value (a uniform smoothing length shared by all particles) or a pointer to a
+ * floating-point value (per-particle smoothing lengths). Both scalar and pointer forms let the neighborhood
+ * implementation load the smoothing length of a particle at a given index.
+ */
 template<class T>
 concept H = (std::is_pointer_v<T> && std::is_floating_point_v<std::remove_pointer_t<T>>) || std::is_floating_point_v<T>;
 
@@ -54,9 +60,21 @@ concept ValueTuple = isValueTuple<T>;
 
 } // namespace detail
 
+/*! @brief Concept for an input argument to the neighbor loop.
+ *
+ * Satisfied by a tuple of pointers to trivially-copyable types, where each pointer addresses the per-particle array
+ * for one input property (e.g., masses, charges). The loop loads the element at each neighbor's index from every
+ * pointer in the tuple.
+ */
 template<class T>
 concept Input = detail::PointerTuple<T>;
 
+/*! @brief Concept for an output argument to the neighbor loop.
+ *
+ * Satisfied by a tuple of pointers to trivially-copyable types, where each pointer addresses the per-particle output
+ * array for one output property. The loop writes the accumulated interaction result for each particle through these
+ * pointers.
+ */
 template<class T>
 concept Output = detail::PointerTuple<T>;
 
@@ -77,6 +95,14 @@ template<std::floating_point Tc, H ThP, Input Inp>
 using ParticleData = ParticleDataT<Tc, ThP, Inp>::type;
 } // namespace detail
 
+/*! @brief Concept for a pairwise particle interaction functor.
+ *
+ * A type @p T satisfies @c Interaction if it is callable with the per-particle data of two particles (referred to as i
+ * and j), the distance vector from i to j, and the squared distance between them. The return value must be a std::tuple
+ * of values. Each element of the returned tuple represents the contribution of the pair (i, j) to the output properties
+ * accumulated for particle i; elements may be wrapped in @ref symmetric::even, @ref symmetric::odd,
+ * @ref reduction::min, or @ref reduction::max to select the accumulation strategy.
+ */
 template<class T, class Tc, class ThP, class Inp>
 concept Interaction = std::floating_point<Tc> && H<ThP> && Input<Inp> &&
                       requires(detail::ParticleData<Tc, ThP, Inp> iData,
@@ -154,6 +180,14 @@ concept ValidOutput =
 
 } // namespace detail
 
+/*! @brief Concept for a postamble functor applied after the neighbor loop.
+ *
+ * A type @p T satisfies @c Postamble if it is callable with the per-particle data of a particle and the accumulated
+ * interaction result (with modifier types stripped) for that particle. The return value must be a std::tuple whose
+ * element types match the @ref Output argument after pointer removal. The postamble runs once per particle after all
+ * neighbors have been visited and lets the caller transform the accumulated result before it is written to the output
+ * arrays; use @ref cstone::ijloop::empty_postamble "empty_postamble" when no transformation is needed.
+ */
 template<class T, class Tc, class ThP, class Inp, class Out, class Inter>
 concept Postamble =
     std::floating_point<Tc> && H<ThP> && Input<Inp> && Output<Out> && Interaction<Inter, Tc, ThP, Inp> &&
@@ -174,21 +208,25 @@ struct ConceptTestInteraction
                                          std::tuple<LocalIndex, Vec3<double>, float, float>,
                                          Vec3<double>,
                                          double) const
-    {
-        return {0};
-    }
+    { return {0}; }
 };
 
 struct ConceptTestPostamble
 {
     constexpr std::tuple<double> operator()(std::tuple<LocalIndex, Vec3<double>, float, float>, std::tuple<int>) const
-    {
-        return {0.0};
-    }
+    { return {0.0}; }
 };
 
 } // namespace detail
 
+/*! @brief Concept for a neighborhood search backend.
+ *
+ * A type @p T satisfies @c Neighborhood if it exposes a @c stats() method returning @ref Statistics and an
+ * @c ijLoop(input, output, interaction, postamble) method matching the @ref Input, @ref Output, @ref Interaction, and
+ * @ref Postamble concepts. The @c ijLoop iterates over all particle pairs (i, j) within each other's smoothing
+ * length, invokes the interaction functor for each pair, accumulates the results, and finally calls the postamble
+ * once per particle before writing to the output arrays.
+ */
 template<class T>
 concept Neighborhood = requires(T nb,
                                 const detail::ConceptTestInteraction interaction,
@@ -226,6 +264,14 @@ concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
 
 } // namespace detail
 
+/*! @brief Concept for a factory that builds a neighborhood search backend.
+ *
+ * A type @p T satisfies @c NeighborhoodBuilder if its @c build(exec, tree, box, totalBodies, groups, x, y, z, h)
+ * method returns an object satisfying @ref Neighborhood. The build method is instantiated for both CPU and GPU
+ * execution policies; @c x, @c y, @c z are the particle coordinate arrays, @c h is the smoothing-length array,
+ * @c tree is the octree view, @c box the simulation domain, @c totalBodies the particle count, and @c groups the
+ * target particle grouping.
+ */
 template<class T>
 concept NeighborhoodBuilder =
     detail::NeighborhoodBuilder<T, execution::Cpu> || detail::NeighborhoodBuilder<T, execution::Gpu>;
