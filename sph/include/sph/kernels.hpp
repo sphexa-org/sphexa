@@ -53,8 +53,14 @@ HOST_DEVICE_FUN void updateHIterative(unsigned ng0, unsigned ngmax, const cstone
 
     if ((ncSph - 1) > ngmax)
     {
-        T        low = T(0), high = h[i];
-        unsigned ncLow = 1;
+        T high = h[i];
+
+        h[i]  = updateH(ng0, ncSph, h[i]);
+        ncSph = 1 + findNeighbors(i, x, y, z, h, treeView, box, ngmax);
+        assert(ncSph <= ng0);
+
+        T        low   = h[i];
+        unsigned ncLow = ncSph;
         for (int iteration = 0; iteration < maxIteration; ++iteration)
         {
             h[i]  = (low + high) / T(2);
