@@ -65,10 +65,7 @@ HOST_DEVICE_FUN void updateHIterative(unsigned ng0, unsigned ngmax, const cstone
                 low   = h[i];
                 ncLow = ncSph;
             }
-            else
-            {
-                high = h[i];
-            }
+            else { high = h[i]; }
         }
         if ((ncSph - 1) > ngmax)
         {

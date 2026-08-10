@@ -563,8 +563,8 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
         SuperclusterInfo info = {.index = index + firstISupercluster, .neighborsCount = 0, .dataIndex = 0};
 
         const unsigned jClusterBytes = collectNeighborJClusters<Config, UsePbc>(
-            tree, box, firstValidBody, totalBodies, x, y, z, h, jClusterBboxes, nodeRMax, ncmax,
-            firstISupercluster, lastISupercluster, jClusters, masks, info);
+            tree, box, firstValidBody, totalBodies, x, y, z, h, jClusterBboxes, nodeRMax, ncmax, firstISupercluster,
+            lastISupercluster, jClusters, masks, info);
         maxNeighbors = std::max(info.neighborsCount, maxNeighbors);
 
         if (info.neighborsCount > ncmax && laneIdx == 0) globalBuildData->status = BuildStatus::neighbor_list_overflow;
