@@ -33,6 +33,8 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
     variant("hdf5", default=True, description="Enable support for HDF5 I/O")
     variant("gpu_aware_mpi", default=True, description="GPU aware MPI")
 
+    variant("werror", default=False, description="Treat compiler warnings as errors")
+
     depends_on("cmake@3.22:", type="build")
     depends_on("c", type="build")
     depends_on("cxx", type="build")
@@ -80,6 +82,7 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
             self.define_from_variant("SPH_EXA_WITH_HIP", "rocm"),
             self.define_from_variant("RYOANJI_WITH_HIP", "rocm"),
             self.define_from_variant("CSTONE_WITH_HIP", "rocm"),
+            self.define_from_variant("CMAKE_COMPILE_WARNING_AS_ERROR", "werror"),
         ]
         args.append('-DCMAKE_C_COMPILER=mpicc')
         args.append('-DCMAKE_CXX_COMPILER=mpicxx')
