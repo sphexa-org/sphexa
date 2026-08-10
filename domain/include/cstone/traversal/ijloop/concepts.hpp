@@ -93,6 +93,16 @@ struct ParticleDataT<Tc, ThP, std::tuple<Ts*...>>
 
 template<std::floating_point Tc, H ThP, Input Inp>
 using ParticleData = ParticleDataT<Tc, ThP, Inp>::type;
+
+template<class T, class Tc, class ThP, class Inp>
+concept InteractionCorrectlyCallable =
+    requires(ParticleData<Tc, ThP, Inp> iData, ParticleData<Tc, ThP, Inp> jData, Vec3<Tc> ijPosDiff, Tc distSq)
+{ std::declval<T>()(iData, jData, ijPosDiff, distSq); };
+
+template<class T, class Tc, class ThP, class Inp>
+concept InteractionReturnsValueTuple = requires(
+    detail::ParticleData<Tc, ThP, Inp> iData, detail::ParticleData<Tc, ThP, Inp> jData, Vec3<Tc> ijPosDiff, Tc distSq)
+{ {std::declval<T>()(iData, jData, ijPosDiff, distSq)}->ValueTuple; };
 } // namespace detail
 
 /*! @brief Concept for a pairwise particle interaction functor.
@@ -104,12 +114,9 @@ using ParticleData = ParticleDataT<Tc, ThP, Inp>::type;
  * @ref reduction::min, or @ref reduction::max to select the accumulation strategy.
  */
 template<class T, class Tc, class ThP, class Inp>
-concept Interaction = std::floating_point<Tc> && H<ThP> && Input<Inp> &&
-                      requires(detail::ParticleData<Tc, ThP, Inp> iData,
-                               detail::ParticleData<Tc, ThP, Inp> jData,
-                               Vec3<Tc> ijPosDiff,
-                               Tc distSq)
-{ {std::declval<T>()(iData, jData, ijPosDiff, distSq)}->detail::ValueTuple; };
+concept Interaction =
+    std::floating_point<Tc> && H<ThP> && Input<Inp> && detail::InteractionCorrectlyCallable<T, Tc, ThP, Inp> &&
+    detail::InteractionReturnsValueTuple<T, Tc, ThP, Inp>;
 
 namespace detail
 {
@@ -174,6 +181,21 @@ template<class T, class Out>
 concept ValidOutput =
     ValueTuple<T> && Output<Out> && std::same_as<RemoveModifier<T>, typename RemovePointersT<Out>::type>;
 
+template<class T, class Tc, class ThP, class Inp, class Inter>
+concept PostambleCorrectlyCallable =
+    requires(ParticleData<Tc, ThP, Inp> iData, RemoveModifier<InteractionResult<Tc, ThP, Inp, Inter>> iResult)
+{ std::declval<T>()(iData, iResult); };
+
+template<class T, class Tc, class ThP, class Inp, class Out, class Inter>
+concept PostambleReturnValueCompatibleWithOutput = requires(
+    detail::ParticleData<Tc, ThP, Inp> iData, detail::RemoveModifier<InteractionResult<Tc, ThP, Inp, Inter>> iResult)
+{ {std::declval<T>()(iData, iResult)}->ValidOutput<Out>; };
+
+template<class T, class Tc, class ThP, class Inp, class Out>
+concept InteractionReturnValueCompatibleWithOutput = requires(
+    detail::ParticleData<Tc, ThP, Inp> iData, detail::ParticleData<Tc, ThP, Inp> jData, Vec3<Tc> ijPosDiff, Tc distSq)
+{ {std::declval<T>()(iData, jData, ijPosDiff, distSq)}->ValidOutput<Out>; };
+
 } // namespace detail
 
 /*! @brief Concept for a postamble functor applied after the neighbor loop.
@@ -185,11 +207,11 @@ concept ValidOutput =
  * arrays; use @ref cstone::ijloop::empty_postamble "empty_postamble" when no transformation is needed.
  */
 template<class T, class Tc, class ThP, class Inp, class Out, class Inter>
-concept Postamble =
-    std::floating_point<Tc> && H<ThP> && Input<Inp> && Output<Out> && Interaction<Inter, Tc, ThP, Inp> &&
-    requires(detail::ParticleData<Tc, ThP, Inp> iData,
-             detail::RemoveModifier<detail::InteractionResult<Tc, ThP, Inp, Inter>> iResult)
-{ {std::declval<T>()(iData, iResult)}->detail::ValidOutput<Out>; };
+concept Postamble = std::floating_point<Tc> && H<ThP> && Input<Inp> && Output<Out> &&
+                    Interaction<Inter, Tc, ThP, Inp> && detail::PostambleCorrectlyCallable<T, Tc, ThP, Inp, Inter> &&
+                    ((std::same_as<T, ::cstone::ijloop::detail::EmptyPostamble> &&
+                      detail::InteractionReturnValueCompatibleWithOutput<Inter, Tc, ThP, Inp, Out>) ||
+                     detail::PostambleReturnValueCompatibleWithOutput<T, Tc, ThP, Inp, Out, Inter>);
 
 namespace detail
 {
