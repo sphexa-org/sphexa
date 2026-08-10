@@ -76,7 +76,7 @@ concept Input = detail::PointerTuple<T>;
  * pointers.
  */
 template<class T>
-concept Output = detail::PointerTuple<T>;
+concept Output = detail::PointerTuple<T> && std::tuple_size_v<T> >= 1;
 
 namespace detail
 {
