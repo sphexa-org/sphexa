@@ -109,11 +109,7 @@ concept Interaction = std::floating_point<Tc> && H<ThP> && Input<Inp> &&
                                detail::ParticleData<Tc, ThP, Inp> jData,
                                Vec3<Tc> ijPosDiff,
                                Tc distSq)
-{
-    {
-        std::declval<T>()(iData, jData, ijPosDiff, distSq)
-    } -> detail::ValueTuple;
-};
+{ {std::declval<T>()(iData, jData, ijPosDiff, distSq)}->detail::ValueTuple; };
 
 namespace detail
 {
@@ -124,46 +120,46 @@ using InteractionResult = decltype(std::declval<Inter>()(std::declval<ParticleDa
                                                          std::declval<Tc>()));
 
 template<class T>
-struct RemoveWrapperFromElemT
+struct RemoveModifierFromElemT
 {
     using type = T;
 };
 
 template<class T>
-struct RemoveWrapperFromElemT<symmetric::even<T>>
+struct RemoveModifierFromElemT<symmetric::even<T>>
 {
-    using type = RemoveWrapperFromElemT<T>::type;
+    using type = RemoveModifierFromElemT<T>::type;
 };
 
 template<class T>
-struct RemoveWrapperFromElemT<symmetric::odd<T>>
+struct RemoveModifierFromElemT<symmetric::odd<T>>
 {
-    using type = RemoveWrapperFromElemT<T>::type;
+    using type = RemoveModifierFromElemT<T>::type;
 };
 
 template<class T>
-struct RemoveWrapperFromElemT<reduction::min<T>>
+struct RemoveModifierFromElemT<reduction::min<T>>
 {
-    using type = RemoveWrapperFromElemT<T>::type;
+    using type = RemoveModifierFromElemT<T>::type;
 };
 
 template<class T>
-struct RemoveWrapperFromElemT<reduction::max<T>>
+struct RemoveModifierFromElemT<reduction::max<T>>
 {
-    using type = RemoveWrapperFromElemT<T>::type;
+    using type = RemoveModifierFromElemT<T>::type;
 };
 
 template<ValueTuple T>
-struct RemoveWrapperT;
+struct RemoveModifierT;
 
 template<class... Ts>
-struct RemoveWrapperT<std::tuple<Ts...>>
+struct RemoveModifierT<std::tuple<Ts...>>
 {
-    using type = std::tuple<typename RemoveWrapperFromElemT<Ts>::type...>;
+    using type = std::tuple<typename RemoveModifierFromElemT<Ts>::type...>;
 };
 
 template<ValueTuple T>
-using RemoveWrapper = RemoveWrapperT<T>::type;
+using RemoveModifier = RemoveModifierT<T>::type;
 
 template<PointerTuple T>
 struct RemovePointersT;
@@ -176,7 +172,7 @@ struct RemovePointersT<std::tuple<Ts*...>>
 
 template<class T, class Out>
 concept ValidOutput =
-    ValueTuple<T> && Output<Out> && std::same_as<RemoveWrapper<T>, typename RemovePointersT<Out>::type>;
+    ValueTuple<T> && Output<Out> && std::same_as<RemoveModifier<T>, typename RemovePointersT<Out>::type>;
 
 } // namespace detail
 
@@ -192,12 +188,8 @@ template<class T, class Tc, class ThP, class Inp, class Out, class Inter>
 concept Postamble =
     std::floating_point<Tc> && H<ThP> && Input<Inp> && Output<Out> && Interaction<Inter, Tc, ThP, Inp> &&
     requires(detail::ParticleData<Tc, ThP, Inp> iData,
-             detail::RemoveWrapper<detail::InteractionResult<Tc, ThP, Inp, Inter>> iResult)
-{
-    {
-        std::declval<T>()(iData, iResult)
-    } -> detail::ValidOutput<Out>;
-};
+             detail::RemoveModifier<detail::InteractionResult<Tc, ThP, Inp, Inter>> iResult)
+{ {std::declval<T>()(iData, iResult)}->detail::ValidOutput<Out>; };
 
 namespace detail
 {
@@ -234,12 +226,8 @@ concept Neighborhood = requires(T nb,
                                 std::tuple<float*> input,
                                 std::tuple<double*> output)
 {
-    {
-        nb.stats()
-    } -> std::same_as<Statistics>;
-    {
-        nb.ijLoop(input, output, interaction, postamble)
-    } -> std::same_as<void>;
+    {nb.stats()}->std::same_as<Statistics>;
+    {nb.ijLoop(input, output, interaction, postamble)}->std::same_as<void>;
 };
 
 namespace detail
@@ -256,11 +244,7 @@ concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
                                                                   const double* y,
                                                                   const double* z,
                                                                   const float* h)
-{
-    {
-        nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
-    } -> Neighborhood;
-};
+{ {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)}->Neighborhood; };
 
 } // namespace detail
 
