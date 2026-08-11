@@ -124,10 +124,10 @@ _run_ctests() {
         ctest_dir=$(dirname $PWD/$_build_stage/spack-stage-sphexa-develop-*/spack-build-*/CTestTestfile.cmake)
 
         echo "# ---- cpu tests:"
-        ctest --output-on-failure --test-dir $ctest_dir -L "cpu" -j 2
+        ctest --output-on-failure --test-dir $ctest_dir -L "cpu" # -j 2
 
         echo "# ---- gpu tests:"
-        ctest --output-on-failure --test-dir $ctest_dir -L "gpu" -j 2
+        ctest --output-on-failure --test-dir $ctest_dir -L "gpu" # -j 2
     fi
     wait
 

@@ -25,7 +25,7 @@ sph-run-cuda13-sm90-debug-ctests:
   needs: ['sph-build-cuda13-sm90-debug']
   extends: [.uenv-runner-daint-gh200]
   variables:
-    SLURM_TIMELIMIT: '00:30:00'
+    SLURM_TIMELIMIT: '00:15:00'
     WITH_UENV_VIEW: 'default'
     SLURM_JOB_NUM_NODES: 1
     SLURM_NTASKS: 4

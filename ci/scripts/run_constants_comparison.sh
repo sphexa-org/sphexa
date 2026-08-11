@@ -63,10 +63,10 @@ ics=(
   wind-shock
 )
 
-if [ "$backend" = "cuda"] ; then
+if [ "$backend" = "cuda" ] ; then
     ics+=(kelvin-helmholtz)
 else
-    echo "skipping kelvin-helmholtz (too slow on cpu)"
+    echo "skipping kelvin-helmholtz test on cpu"
 fi
 
 # Exactly conserved observables to be compared by absolute value (not relative error) in compare_constants.py.
