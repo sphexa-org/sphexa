@@ -7,7 +7,8 @@ export _build_stage=_spack_stage
 export _build_env=_spack_env
 export APP_INSTALL_DIR="$_build_spack/opt/spack/linux-*/sphexa-develop-*/bin/"
 export TEST_INSTALL_DIR="$_build_spack/opt/spack/linux-*/sphexa-develop-*/sbin/"
-export SLURM_OVERLAP=1 SLURM_ACCOUNT=csstaff SLURM_CPU_BIND_TYPE=none
+export SLURM_OVERLAP=1 SLURM_ACCOUNT=csstaff
+# SLURM_CPU_BIND_TYPE=none
 
 _build_get_spack() {
     set -e
@@ -119,16 +120,14 @@ _run_ctests() {
     set -e
     if [ "$SLURM_PROCID" -eq 0 ]; then
 
-#        ranks="$1"
-
+        # ranks="$1"
         ctest_dir=$(dirname $PWD/$_build_stage/spack-stage-sphexa-develop-*/spack-build-*/CTestTestfile.cmake)
-        # ctest_dir=$(dirname $(find $_build_stage/ -name DartConfiguration.tcl |awk -F/ '{print NF,$0}' |sort -nk 1 |head -1 |awk '{print $2}'))
 
         echo "# ---- cpu tests:"
-        ctest --output-on-failure --test-dir $ctest_dir -L "cpu" -j
+        ctest --output-on-failure --test-dir $ctest_dir -L "cpu" -j 2
 
         echo "# ---- gpu tests:"
-        ctest --output-on-failure --test-dir $ctest_dir -L "gpu" -j
+        ctest --output-on-failure --test-dir $ctest_dir -L "gpu" -j 2
     fi
     wait
 
@@ -194,14 +193,18 @@ _run_sphexa-cuda() {
         exe=sphexa
     fi
 
+    if [ "$SLURM_PROCID" -eq 0 ]; then t0=$(date +%s) ;fi
+    $APP_INSTALL_DIR/$exe --init sedov --G 1.0 -n 40 -s 100 -w 10 --quiet
+    if [ "$SLURM_PROCID" -eq 0 ]; then t1=$(date +%s) ;echo "t=$(expr $t1 - $t0)" ;fi
     # Error with: sedov --glass ./50c.h5
     # -> H5PartGetNumParticles: Iteration is invalid! Have you set the time step?
-    $APP_INSTALL_DIR/$exe --init sedov --G 1.0 -n 40 -s 100 -w 10 --quiet
 
     if [ "$SLURM_PROCID" -eq 0 ]; then mv constants.txt constants_ref.txt ; fi
     wait
 
+    if [ "$SLURM_PROCID" -eq 0 ]; then t0=$(date +%s) ;fi
     $APP_INSTALL_DIR/$exe --init dump_sedov.h5:4 -s 100 --quiet
+    if [ "$SLURM_PROCID" -eq 0 ]; then t1=$(date +%s) ;echo "t=$(expr $t1 - $t0)" ;fi
 
     if [ "$SLURM_PROCID" -eq 0 ]; then
       awk 'start||$1==50 {print; start=1}' constants_ref.txt > constants_ref_tail.txt

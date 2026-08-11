@@ -61,8 +61,13 @@ ics=(
   turbulence
   gresho-chan
   wind-shock
-  kelvin-helmholtz
 )
+
+if [ "$backend" = "cuda"] ; then
+    ics+=(kelvin-helmholtz)
+else
+    echo "skipping kelvin-helmholtz (too slow on cpu)"
+fi
 
 # Exactly conserved observables to be compared by absolute value (not relative error) in compare_constants.py.
 declare -A abs_columns_for_ic=(
@@ -90,13 +95,14 @@ for ic in "${ics[@]}"; do
 
   if [ "$rank_id" -eq 0 ]; then
     echo "Running test for init condition: $ic"
+    t0=$(date +%s)
   fi
   wait
 
   $binary_path --quiet --glass ./50c.h5 --init "$ic" -s 10 -n 50
 
   if [ "$rank_id" -eq 0 ]; then
-
+    t1=$(date +%s) ; echo "t=$(expr $t1 - $t0)"
     const1="$PWD/ci/reference/const-${ic}-${backend}-rel-ref.txt"
     const2="$PWD/constants.txt"
     abs_cols="${abs_columns_for_ic[$ic]}"
