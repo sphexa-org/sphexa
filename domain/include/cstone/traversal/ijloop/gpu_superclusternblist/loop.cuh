@@ -227,11 +227,9 @@ inline constexpr auto splitParticleDataWithRadiusSq(std::tuple<Tc, Tc, Tc, Ts...
     }
 
     constexpr std::size_t skip = std::is_pointer_v<ThP> ? 2 : 0;
-    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>)
-    {
+    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
         return std::make_tuple(index, iPos, hi, std::get<Is + 3 + skip>(particleDataWithRadiusSq)...);
-    }
-    (std::make_index_sequence<sizeof...(Ts) - skip>());
+    }(std::make_index_sequence<sizeof...(Ts) - skip>());
 
     return std::make_tuple(iData, radiusSq);
 }
@@ -371,7 +369,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             auto jData                   = (nb < iSuperclusterNeighborsCount & j >= firstValidBody & j < totalBodies)
                                                ? loadParticleData(x, y, z, h, input, j)
                                                : dummyParticleData(x, y, z, h, input, j);
-            const Th jRadiusSq           = invalidHToZero(radiusSq(jData));
+            const Th jRadiusSq           = radiusSq(jData);
             std::get<0>(jData) -= firstValidBody;
             Result jResult = {};
 
@@ -380,22 +378,21 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
                 const unsigned i = iSupercluster * Config::superclusterSize + c * Config::iSize + threadIdx.x;
                 if ((warpMask >> c) & (!Config::symmetric | (iSupercluster != jSupercluster) | (i <= j)))
                 {
-                    const bool ijEq = i == j;
-                    auto [iData, iRadiusSq] =
+                    const bool jRequired = i != j;
+                    const auto [iData, iRadiusSq] =
                         getIData(iSuperclusterData, c * Config::iSize + threadIdx.x, i - firstValidBody, h);
                     assert(std::get<0>(iData) == i - firstValidBody);
-                    iRadiusSq                      = invalidHToZero(iRadiusSq);
                     const auto [ijPosDiff, distSq] = posDiffAndDistSq(UsePbc, box, iData, jData);
                     bool iClose, jClose;
                     if constexpr (std::is_pointer_v<ThP>)
                     {
-                        iClose = distSq < iRadiusSq | ijEq;
-                        jClose = Config::symmetric && (distSq < jRadiusSq & !ijEq);
+                        iClose = distSq < iRadiusSq;
+                        jClose = Config::symmetric && (distSq < jRadiusSq & jRequired);
                     }
                     else
                     {
-                        iClose = distSq < jRadiusSq | ijEq;
-                        jClose = Config::symmetric && (iClose & !ijEq);
+                        iClose = distSq < jRadiusSq;
+                        jClose = Config::symmetric && (iClose & jRequired);
                     }
                     if (iClose | jClose)
                     {
