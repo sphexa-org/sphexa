@@ -86,33 +86,12 @@ namespace detail
 {
 
 template<class T>
-constexpr T unwrapModifiersImpl(T const& result)
+constexpr auto unwrapModifiersImpl(T const& result)
 {
-    return result;
-}
-
-template<class T>
-constexpr auto unwrapModifiersImpl(reduction::min<T> const& result)
-{
-    return unwrapModifiersImpl(result.value);
-}
-
-template<class T>
-constexpr auto unwrapModifiersImpl(reduction::max<T> const& result)
-{
-    return unwrapModifiersImpl(result.value);
-}
-
-template<class T>
-constexpr auto unwrapModifiersImpl(symmetric::even<T> const& result)
-{
-    return unwrapModifiersImpl(result.value);
-}
-
-template<class T>
-constexpr auto unwrapModifiersImpl(symmetric::odd<T> const& result)
-{
-    return unwrapModifiersImpl(result.value);
+    if constexpr (util::HasValueMember<T>)
+        return unwrapModifiersImpl(result.value);
+    else
+        return result;
 }
 
 } // namespace detail
