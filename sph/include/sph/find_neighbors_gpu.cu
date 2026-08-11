@@ -12,8 +12,8 @@ void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cst
     d.neighborhood.build(groups, d, box, subgroups);
 }
 
-using cstone::GroupView;
 using cstone::GpuConfig;
+using cstone::GroupView;
 using cstone::LocalIndex;
 using cstone::TreeNodeIndex;
 
