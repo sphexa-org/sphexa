@@ -40,7 +40,7 @@ _build_sphexa_cuda() {
 : "${build_type:=Debug}"
     _spec="sphexa@develop +hdf5 +gpu_aware_mpi +tests +disks +grackle +werror "
     _spec+="+overlap +cuda cuda_arch=90 build_type=${build_type}"
-    _repo="$PWD/ci/scripts/spack_repo/sphx_${build_type}"
+    _repo="$PWD/ci/scripts/spack_repo/sphx${build_type}"
     _build_get_spack
     _build_spack_env
 
@@ -63,8 +63,8 @@ spack:
     - $_repo
 EOF
     ln -fs $SPACK_ROOT/var/spack/environments/$_build_env/spack.yaml
-    spack repo rm sphx_${build_type}
-    spack repo add $_repo
+    # spack repo rm sphx_${build_type}
+    # spack repo add $_repo
 
     # --- keep _spack-stage/*/spack-build-* build dir for CTestTestfile.cmake files
     spack config --scope=defaults:base add "config:build_stage:$PWD/$_build_stage"
