@@ -80,6 +80,8 @@ void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d,
 
     updateSmoothingLengthIterativeGpuKernel<<<numBlocks, numThreads>>>(
         grp, d.ng0, d.ngmax, box, d.treeView, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.h), rawPtr(d.nc));
+    checkGpuErrors(cudaGetLastError());
+    checkGpuErrors(cudaDeviceSynchronize());
 }
 
 template void updateSmoothingLengthIterativeGpu(const cstone::GroupView&,
