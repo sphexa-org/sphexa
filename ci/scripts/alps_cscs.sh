@@ -7,7 +7,7 @@ export _build_stage=_spack_stage
 export _build_env=_spack_env
 export APP_INSTALL_DIR="$_build_spack/opt/spack/linux-*/sphexa-develop-*/bin/"
 export TEST_INSTALL_DIR="$_build_spack/opt/spack/linux-*/sphexa-develop-*/sbin/"
-export SLURM_OVERLAP=1 SLURM_ACCOUNT=csstaff
+export SLURM_OVERLAP=1 SLURM_ACCOUNT=csstaff SLURM_CPU_BIND_TYPE=none
 
 _build_get_spack() {
     set -e
