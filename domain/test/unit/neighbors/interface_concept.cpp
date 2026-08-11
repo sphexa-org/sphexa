@@ -15,7 +15,7 @@
 
 #include "gtest/gtest.h"
 
-#include "cstone/traversal/ijloop/interface_concept.hpp"
+#include "cstone/traversal/ijloop/ijloop.hpp"
 
 using namespace cstone;
 using namespace cstone::ijloop;
@@ -36,12 +36,6 @@ struct ijFunc
         return std::tuple<Tc>{};
     }
 };
-
-template<class Tc, class ThP, class Input, PairInteraction<Tc, ThP, Input> F>
-void ijLoop(F f)
-{
-
-}
 
 TEST(InterfaceConcept, derefTuple)
 {

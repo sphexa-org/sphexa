@@ -85,20 +85,43 @@ struct max
 namespace detail
 {
 
-struct EmptyPostamble
+template<class T>
+constexpr T unwrapModifiersImpl(T const& result)
 {
-    template<class ParticleData, class Result>
-    constexpr Result operator()(ParticleData const&, Result const& result) const
-    {
-        return result;
-    }
-};
+    return result;
+}
+
+template<class T>
+constexpr auto unwrapModifiersImpl(reduction::min<T> const& result)
+{
+    return unwrapModifiersImpl(result.value);
+}
+
+template<class T>
+constexpr auto unwrapModifiersImpl(reduction::max<T> const& result)
+{
+    return unwrapModifiersImpl(result.value);
+}
+
+template<class T>
+constexpr auto unwrapModifiersImpl(symmetric::even<T> const& result)
+{
+    return unwrapModifiersImpl(result.value);
+}
+
+template<class T>
+constexpr auto unwrapModifiersImpl(symmetric::odd<T> const& result)
+{
+    return unwrapModifiersImpl(result.value);
+}
 
 } // namespace detail
 
-//! Empty postamble that does nothing. Should always be prefered over a custom empty postamble, as it enables certain
-//! optimizations in the neighborhood implementations.
-constexpr detail::EmptyPostamble empty_postamble;
+template<class... Ts>
+constexpr auto unwrapModifiers(std::tuple<Ts...> const& value)
+{
+    return util::tupleMap([](auto const& v) { return detail::unwrapModifiersImpl(v); }, value);
+}
 
 struct Statistics
 {
@@ -108,10 +131,138 @@ struct Statistics
 namespace detail
 {
 
+template<class T>
+struct IsTupleOfPointers : std::false_type
+{
+};
+
+template<class... Ts>
+struct IsTupleOfPointers<std::tuple<Ts...>>
+    : std::bool_constant<(std::is_pointer_v<Ts> && ...) &&
+                         (std::is_trivially_copyable_v<std::remove_pointer_t<Ts>> && ...)>
+{
+};
+
+/*! @brief Maps a std::tuple of pointers to a std::tuple of the pointee types. */
+template<class T>
+struct DereferencedTuple;
+
+template<class... Ts>
+struct DereferencedTuple<std::tuple<Ts...>>
+{
+    using type = std::tuple<std::decay_t<std::remove_pointer_t<Ts>>...>;
+};
+
+struct EmptyPostamble
+{
+    template<class ParticleData, class Result>
+    constexpr Result operator()(const ParticleData&, const Result& result) const
+    {
+        return result;
+    }
+};
+
+} // namespace detail
+
+//! @brief Restricts types to std::tuples of pointers to trivially copyable types.
+template<class T>
+concept TupleOfPointers = detail::IsTupleOfPointers<T>::value;
+
+//! Empty postamble that does nothing. Should always be preferred over a custom empty postamble, as it enables certain
+//! optimizations in the neighborhood implementations.
+constexpr detail::EmptyPostamble empty_postamble;
+
+//! @brief A tuple of stack variables with data associated with one particle
+template<std::floating_point Tc, class ThP, TupleOfPointers Input>
+using ParticleData =
+    decltype(std::tuple_cat(std::declval<std::tuple<LocalIndex, Vec3<Tc>, std::remove_pointer_t<ThP>>>(),
+                            std::declval<typename detail::DereferencedTuple<Input>::type>()));
+
+//! @brief Defines what a valid i-j pair interaction is: a function object taking (i, j, posdiff, r2)
+template<class F, class Tc, class ThP, class Input>
+concept PairInteraction = requires(const F& func,
+                                   const ParticleData<Tc, ThP, Input>& i,
+                                   const ParticleData<Tc, ThP, Input>& j,
+                                   Vec3<Tc> posdiff,
+                                   std::remove_pointer_t<ThP> r2)
+{
+    {func(i, j, posdiff, r2)}; // must be callable with this signature
+};
+
+//! @brief A postamble is callable with (ParticleData, interaction result), and returns a tuple compatible with Output
+template<class Postamble, class Interaction, class Tc, class ThP, class Input, class Output>
+concept ValidPostamble = PairInteraction<Interaction, Tc, ThP, Input> && requires(const Postamble& postamble,
+                                                                                  const Interaction& interaction,
+                                                                                  const ParticleData<Tc, ThP, Input>& i,
+                                                                                  const ParticleData<Tc, ThP, Input>& j,
+                                                                                  Vec3<Tc> posdiff,
+                                                                                  std::remove_pointer_t<ThP> r2)
+{
+    {
+        postamble(i, unwrapModifiers(interaction(i, j, posdiff, r2)))        // must be callable with this signature
+        } -> std::same_as<typename detail::DereferencedTuple<Output>::type>; // must return this type
+};
+
+/*! A dataset that can be passed to an ijLoop.
+ *
+ * @tparam Tc              types of x,y,z coordinates
+ * @tparam ThP             type of h, pointer to floating_point if search radius per particle is variable
+ * @tparam Input           tuple of input particle field pointers
+ * @tparam Output          tuple of output particle field pointers
+ * @tparam Interaction     function object satisfying the PairInteraction concept
+ * @tparam Postamble       function object satisfying the ValidPostamble concept
+ */
+template<std::floating_point Tc,
+         class ThP,
+         TupleOfPointers Input,
+         TupleOfPointers Output,
+         PairInteraction<Tc, ThP, Input> Interaction,
+         ValidPostamble<Interaction, Tc, ThP, Input, Output> Postamble = detail::EmptyPostamble>
+struct IjLoopData
+{
+    //! @brief The tuple input data for a single particle in an i-j interaction,
+    using ParticleDataType = ParticleData<Tc, ThP, Input>;
+
+    //! @brief Type of search radii, e.g. smoothing lengths
+    using RadiusType = std::remove_pointer_t<ThP>;
+
+    //! @brief What an i-j interaction returns
+    using Result = decltype(std::declval<Interaction>()(std::declval<ParticleDataType>(),
+                                                        std::declval<ParticleDataType>(),
+                                                        std::declval<Vec3<Tc>>(),
+                                                        std::declval<RadiusType>()));
+
+    //! @brief what the postamble returns - will be stored back to the output fields
+    using PostambleResultType = typename detail::DereferencedTuple<Output>::type;
+
+    Input input;
+    Output output;
+
+    //! @brief the i-j interaction kernel
+    Interaction interaction;
+    //! @brief Post-processing to apply to the Result after the j-loop
+    Postamble postamble;
+};
+
+//! @brief Convenience factory to construct an @p IjLoopData with explicit Tc and ThP and deduced tuple/functor types.
+template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble>
+auto makeIjLoopData(Input&& input, Output&& output, Interaction&& interaction, Postamble&& postamble)
+{
+    return IjLoopData<Tc, ThP, std::decay_t<Input>, std::decay_t<Output>, std::decay_t<Interaction>,
+                      std::decay_t<Postamble>>{std::forward<Input>(input), std::forward<Output>(output),
+                                               std::forward<Interaction>(interaction),
+                                               std::forward<Postamble>(postamble)};
+}
+
+namespace detail
+{
+
 struct ConceptTestInteraction
 {
-    constexpr std::tuple<int>
-    operator()(std::tuple<LocalIndex, double, float>, std::tuple<LocalIndex, double, float>, Vec3<double>, double) const
+    constexpr std::tuple<int> operator()(std::tuple<LocalIndex, Vec3<double>, float>,
+                                         std::tuple<LocalIndex, Vec3<double>, float>,
+                                         Vec3<double>,
+                                         float) const
     {
         return {0};
     }
@@ -135,7 +286,8 @@ concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
     } -> std::same_as<Statistics>;
     {
         nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
-            .ijLoop(std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble)
+            .ijLoop(IjLoopData<double, float*, std::tuple<>, std::tuple<int*>, detail::ConceptTestInteraction>{
+                std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble})
     } -> std::same_as<void>;
 };
 

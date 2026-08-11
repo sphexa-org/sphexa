@@ -157,10 +157,11 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, c
                              const T* c13, const T* c22, const T* c23, const T* c33, const T* wh, Tm1* du, T* grad_P_x,
                              T* grad_P_y, T* grad_P_z, T* dt)
 {
-    neighborhood.ijLoop(std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
-                        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc, dt),
-                        MomentumAndEnergyInteractionStd<T, Tm1>{wh},
-                        MomentumAndEnergyPostambleStdWithDt<Tc, Tm1>{K, Kcour});
+    neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+        std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
+        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc, dt),
+        MomentumAndEnergyInteractionStd<T, Tm1>{wh},
+        MomentumAndEnergyPostambleStdWithDt<Tc, Tm1>{K, Kcour}));
 }
 
 } // namespace sph

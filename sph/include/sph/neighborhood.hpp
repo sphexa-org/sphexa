@@ -53,10 +53,10 @@ struct NeighborhoodData
             builder);
     }
 
-    template<class... Args>
-    void ijLoop(Args&&... args) const
+    template<class IjData>
+    void ijLoop(IjData&& ijData) const
     {
-        std::visit([&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); }, neighborhood);
+        std::visit([&](auto const& nb) { nb.ijLoop(std::forward<IjData>(ijData)); }, neighborhood);
     }
 
 private:

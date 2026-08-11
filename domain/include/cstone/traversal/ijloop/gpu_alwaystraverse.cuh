@@ -106,13 +106,10 @@ struct GpuAlwaysTraverseNeighborhood
     util::UniqueDevicePtr<LocalIndex[]> neighbors;
     util::UniqueDevicePtr<LocalIndex> targetCounter;
 
-    template<class... In, class... Out, class Interaction, class Postamble>
-    void ijLoop(std::tuple<In*...> const& input,
-                std::tuple<Out*...> const& output,
-                Interaction&& interaction,
-                Postamble&& postamble) const
+    template<class... Ts>
+    void ijLoop(IjLoopData<Ts...> ijData) const
     {
-        ijLoop(input, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), groups);
+        ijLoop(std::move(ijData), groups);
     }
 
     Statistics stats() const
@@ -127,26 +124,18 @@ struct GpuAlwaysTraverseNeighborhood
         GpuAlwaysTraverseNeighborhood const& parent;
         GroupView groups;
 
-        template<class... In, class... Out, class Interaction, class Postamble>
-        void ijLoop(std::tuple<In*...> const& input,
-                    std::tuple<Out*...> const& output,
-                    Interaction&& interaction,
-                    Postamble&& postamble) const
+        template<class... Ts>
+        void ijLoop(IjLoopData<Ts...> ijData) const
         {
-            parent.ijLoop(input, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
-                          groups);
+            parent.ijLoop(std::move(ijData), groups);
         }
     };
 
     Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
 
 protected:
-    template<class... In, class... Out, class Interaction, class Postamble>
-    void ijLoop(std::tuple<In*...> const& input,
-                std::tuple<Out*...> const& output,
-                Interaction&& interaction,
-                Postamble&& postamble,
-                GroupView const& groups) const
+    template<class... Ts>
+    void ijLoop(IjLoopData<Ts...> ijData, GroupView const& groups) const
     {
         if (groups.numGroups == 0) return;
         checkGpuErrors(cudaMemsetAsync(targetCounter.get(), 0, sizeof(LocalIndex), exec));
@@ -155,14 +144,14 @@ protected:
             box.boundaryZ() == BoundaryType::periodic)
         {
             runIjLoop<true><<<numBlocks(), numThreads, 0, exec>>>(
-                tree, box, groups, x, y, z, h, makeConst(input), output, std::forward<Interaction>(interaction),
-                std::forward<Postamble>(postamble), ngmax, neighbors.get(), targetCounter.get());
+                tree, box, groups, x, y, z, h, makeConst(ijData.input), ijData.output, ijData.interaction,
+                ijData.postamble, ngmax, neighbors.get(), targetCounter.get());
         }
         else
         {
             runIjLoop<false><<<numBlocks(), numThreads, 0, exec>>>(
-                tree, box, groups, x, y, z, h, makeConst(input), output, std::forward<Interaction>(interaction),
-                std::forward<Postamble>(postamble), ngmax, neighbors.get(), targetCounter.get());
+                tree, box, groups, x, y, z, h, makeConst(ijData.input), ijData.output, ijData.interaction,
+                ijData.postamble, ngmax, neighbors.get(), targetCounter.get());
         }
         checkGpuErrors(cudaGetLastError());
     }
