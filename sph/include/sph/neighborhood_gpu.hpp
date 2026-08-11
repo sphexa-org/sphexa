@@ -89,7 +89,7 @@ struct DeviceNeighborhoodData::Impl
     template<class... Args>
     void ijLoop(cstone::ijloop::IjLoopData<Args...> ijData) const
     {
-        const auto runIjLoop = [&](auto const& nb) { nb.ijLoop(ijData); };
+        const auto runIjLoop = [&](auto& nb) { nb.ijLoop(std::move(ijData)); };
         if (subgroupNeighborhood)
             std::visit(runIjLoop, subgroupNeighborhood.value());
         else
