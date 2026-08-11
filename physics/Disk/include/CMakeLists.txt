@@ -15,5 +15,7 @@ if (SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP)
         set_target_properties(${exename} PROPERTIES LINKER_LANGUAGE CXX)
     endif ()
     add_test(NAME ${testname} COMMAND ${testname})
+    set_tests_properties(${testname} PROPERTIES LABELS "01r;gpu")
+    install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/physics)
 endif ()
 

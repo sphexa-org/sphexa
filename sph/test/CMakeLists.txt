@@ -14,7 +14,7 @@ target_compile_options(${testname} PRIVATE -Wall -Wextra -Wno-unknown-pragmas)
 target_include_directories(${testname} PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE_DIR}/include)
 target_link_libraries(${testname} PRIVATE GTest::gtest_main)
 add_test(NAME ${testname} COMMAND ${testname})
-
+set_tests_properties(${testname} PROPERTIES LABELS "01r;cpu")
 install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/hydro)
 install(FILES ${PROJECT_SOURCE_DIR}/test/example_data.txt DESTINATION ${CMAKE_INSTALL_SBINDIR}/hydro)
 
@@ -36,6 +36,7 @@ if (SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP)
     target_include_directories(${testname} PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE_DIR}/include)
     target_link_libraries(${testname} PRIVATE sph_gpu GTest::gtest_main)
     add_test(NAME ${testname} COMMAND ${testname})
+    set_tests_properties(${testname} PROPERTIES LABELS "01r;gpu")
 
     install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/hydro)
     install(FILES ${PROJECT_SOURCE_DIR}/test/example_data.txt DESTINATION ${CMAKE_INSTALL_SBINDIR}/hydro)

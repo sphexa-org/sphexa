@@ -10,10 +10,16 @@ function(addRyoanjiMpiTest source exename testname ranks)
 endfunction()
 
 addRyoanjiMpiTest(global_upsweep_cpu.cpp global_upsweep_cpu GlobalUpsweepCpu 10)
+set_tests_properties(global_upsweep_cpu PROPERTIES LABELS "10r;cpu")
 
 function(addRyoanjiGpuMpiTest source exename testname ranks)
     if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
         addRyoanjiMpiTest(${source} ${exename} ${testname} ${ranks})
+        if (${ranks} LESS 10)
+            set_tests_properties(${exename} PROPERTIES LABELS "0${ranks}r;gpu")
+        else()
+            set_tests_properties(${exename} PROPERTIES LABELS "${ranks}r;gpu")
+        endif()
         target_link_libraries(${exename} PRIVATE cstone_gpu ryoanji)
     endif()
 
@@ -28,4 +34,4 @@ function(addRyoanjiGpuMpiTest source exename testname ranks)
 endfunction()
 
 addRyoanjiGpuMpiTest(global_upsweep_gpu.cpp global_upsweep_gpu GlobalUpsweepGpu 10)
-addRyoanjiGpuMpiTest(global_forces_gpu.cpp global_forces_gpu GlobalForcesGpu 6)
+addRyoanjiGpuMpiTest(global_forces_gpu.cpp global_forces_gpu GlobalForcesGpu 4)

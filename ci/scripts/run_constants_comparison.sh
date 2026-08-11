@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
@@ -7,6 +8,7 @@ if [ "$#" -ne 1 ]; then
 fi
 
 binary_path="$1"
+
 # Expand possible wildcards in binary path
 shopt -s nullglob
 matches=( $binary_path )
@@ -17,11 +19,14 @@ if [ ${#matches[@]} -eq 0 ]; then
   echo "Binary path '$binary_path' did not match any file" >&2
   exit 1
 fi
+
 if [ ${#matches[@]} -gt 1 ]; then
   echo "Binary path '$binary_path' is ambiguous; matches: ${matches[*]}" >&2
   exit 1
 fi
+
 binary_path="${matches[0]}"
+
 case "$(basename "$binary_path")" in
   sphexa-cuda)
     backend="cuda"
@@ -34,13 +39,18 @@ case "$(basename "$binary_path")" in
     exit 1
     ;;
 esac
+
 rank_id="${SLURM_PROCID:-0}"
-venv_python="constant_comparison_venv/bin/python"
 
 if [ "$rank_id" -eq 0 ]; then
-  wget --quiet -O 50c.h5 https://zenodo.org/records/8369645/files/50c.h5
+    source ci/scripts/alps_cscs.sh
+    _run_prerun h5
+    _build_python_deps
 fi
 wait
+
+export PYTHONPATH="$PWD/external${PYTHONPATH:+:$PYTHONPATH}"
+uenv_python="/user-environment/env/default/bin/python3"
 
 # Init cases
 ics=(
@@ -54,7 +64,7 @@ ics=(
   kelvin-helmholtz
 )
 
-# Exaclty conserved observables to be compared by absolute value (not relative error) in compare_constants.py.
+# Exactly conserved observables to be compared by absolute value (not relative error) in compare_constants.py.
 declare -A abs_columns_for_ic=(
   # TimeAndEnergy: egrav/linmom/angmom (if not changed in CLI, gravConstant = 0.0)
   [sedov]="6,7,8"
@@ -77,25 +87,38 @@ declare -A abs_columns_for_ic=(
 failed_comparisons=()
 
 for ic in "${ics[@]}"; do
+
   if [ "$rank_id" -eq 0 ]; then
     echo "Running test for init condition: $ic"
   fi
   wait
-  "$binary_path" --quiet --glass "./50c.h5" --init "$ic" -s 10 -n 50
+
+  $binary_path --quiet --glass ./50c.h5 --init "$ic" -s 10 -n 50
+
   if [ "$rank_id" -eq 0 ]; then
-    abs_cols="${abs_columns_for_ic[$ic]:-}"
-    cmd=("$venv_python" ci/scripts/compare_constants.py "ci/reference/const-${ic}-${backend}-rel-ref.txt" constants.txt)
-    if [ -n "$abs_cols" ]; then
-      cmd+=("$abs_cols")
-    fi
-    if ! "${cmd[@]}"; then
-      failed_comparisons+=("$ic")
-    fi
+
+    const1="$PWD/ci/reference/const-${ic}-${backend}-rel-ref.txt"
+    const2="$PWD/constants.txt"
+    abs_cols="${abs_columns_for_ic[$ic]}"
+
+    set +e
+    $uenv_python \
+        $PWD/ci/scripts/compare_constants.py \
+        $const1 \
+        $const2 \
+        $abs_cols
+    rc=$?
+    set -e
+    if [ "$rc" -ne 0 ]; then failed_comparisons+=("$ic") ; fi
+    echo "# -------------"
+
   fi
   wait
+
 done
 
 if [ "$rank_id" -eq 0 ]; then
+
   if [ ${#failed_comparisons[@]} -gt 0 ]; then
     echo "Constant comparison failed for init conditions:" >&2
     for failed_ic in "${failed_comparisons[@]}"; do
@@ -103,5 +126,7 @@ if [ "$rank_id" -eq 0 ]; then
     done
     exit 1
   fi
+
   echo "All constant comparisons passed."
+
 fi

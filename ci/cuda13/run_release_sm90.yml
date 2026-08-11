@@ -1,46 +1,15 @@
+variables:
+  APP_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/bin'
+  TEST_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/sbin'
+
 include:
-  - local: 'ci/cuda13/run_template_sm90.yml'
-
-sph-run-cuda13-sm90-release-1rank:
-  extends: [.sph-run-cuda13-sm90-1rank]
-  needs: ['sph-build-cuda13-sm90-release']
-
-sph-run-cuda13-sm90-release-2ranks:
-  extends: [.sph-run-cuda13-sm90-2ranks]
-  needs: ['sph-build-cuda13-sm90-release']
-
-sph-run-cuda13-sm90-release-4ranks:
-  extends: [.sph-run-cuda13-sm90-4ranks]
-  needs: ['sph-build-cuda13-sm90-release']
-
-sph-run-cuda13-sm90-release-12ranks:
-  extends: [.sph-run-cuda13-sm90-12ranks]
-  needs: ['sph-build-cuda13-sm90-release']
-
-sph-run-cuda13-sm90-release-sphexa-cuda:
-  extends: [.sph-run-cuda13-sm90-sphexa-cuda]
-  needs:
-    - job: sph-build-cuda13-sm90-release
-    - job: sph-test-venv-setup
-      artifacts: true
-
-sph-run-cuda13-sm90-release-sphexa-cpu:
-  extends: [.sph-run-cuda13-sm90-sphexa-cpu]
-  needs:
-    - job: sph-build-cuda13-sm90-release
-    - job: sph-test-venv-setup
-      artifacts: true
-
-sph-compare-constants-cuda13-sm90-release-sphexa-cuda:
-  extends: [.sph-compare-constants-cuda13-sm90-sphexa-cuda]
-  needs:
-    - job: sph-build-cuda13-sm90-release
-    - job: sph-test-venv-setup
-      artifacts: true
-
-sph-compare-constants-cuda13-sm90-release-sphexa-cpu:
-  extends: [.sph-compare-constants-cuda13-sm90-sphexa-cpu]
-  needs:
-    - job: sph-build-cuda13-sm90-release
-    - job: sph-test-venv-setup
-      artifacts: true
+  - local: 'ci/common.yml'
+  - local: 'ci/cuda13/release/run_release_sm90_01r.yml'
+  - local: 'ci/cuda13/release/run_release_sm90_02r.yml'
+  - local: 'ci/cuda13/release/run_release_sm90_04r.yml'
+  - local: 'ci/cuda13/release/run_release_sm90_10r.yml'
+  - local: 'ci/cuda13/release/run_release_sm90_12r.yml'
+  - local: 'ci/cuda13/release/run_release_sm90_sphexa-cuda.yml'
+  - local: 'ci/cuda13/release/run_release_sm90_sphexa-cpu.yml'
+  - local: 'ci/cuda13/release/run_release_sm90_sphexa-cpu-compare.yml'
+  - local: 'ci/cuda13/release/run_release_sm90_sphexa-cuda-compare.yml'

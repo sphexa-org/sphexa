@@ -1,0 +1,17 @@
+sph-run-cuda13-sm90-release-10ranks:
+  stage: sphexa_run
+  needs: ['sph-build-cuda13-sm90-release']
+  extends: [.uenv-runner-daint-gh200]
+  image: ${UENV_CUDA}
+  variables:
+    SLURM_TIMELIMIT: '00:15:00'
+    WITH_UENV_VIEW: 'default'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 10
+    # SLURM_PARTITION: 'debug'
+  before_script:
+    - if [ "$SLURM_PROCID" -eq 0 ]; then pwd ; fi
+  script:
+    - |
+      source ci/scripts/alps_cscs.sh &&
+      _run_ctests 10r

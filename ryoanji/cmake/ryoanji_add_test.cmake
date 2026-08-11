@@ -33,7 +33,7 @@ function(ryoanji_add_test name)
   set(cmd ${_exe})
 
   list(PREPEND cmd "${MPIEXEC_EXECUTABLE}" "${MPIEXEC_NUMPROC_FLAG}"
-     "${${name}_RANKS}"
+     "${${name}_RANKS}" "${MPIEXEC_PREFLAGS}"
   )
 
   add_test(NAME "${name}" COMMAND ${cmd} ${args})

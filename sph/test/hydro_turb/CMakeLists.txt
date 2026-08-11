@@ -14,5 +14,5 @@ target_include_directories(${testname} PRIVATE ${PROJECT_SOURCE_DIR}/include)
 
 target_link_libraries(${testname} PRIVATE GTest::gtest_main)
 add_test(NAME ${testname} COMMAND ${testname})
-
+set_tests_properties(${testname} PROPERTIES LABELS "01r;cpu")
 install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/hydro)

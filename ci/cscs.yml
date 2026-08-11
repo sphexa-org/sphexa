@@ -1,11 +1,10 @@
 variables:
-  MYUENV: prgenv-gnu/26.3:v1
+  UENV_CUDA: prgenv-gnu/26.3:v1
+  # SLURM_RESERVATION: 'uss140-shs131-nv590-staging'
 
 include:
   # NVIDIA/GH200:
-  - local: 'ci/test_venv_setup.yml'
   - local: 'ci/cuda13/build_debug_sm90.yml'
   - local: 'ci/cuda13/run_debug_sm90.yml'
   - local: 'ci/cuda13/build_release_sm90.yml'
-  - local: 'ci/cuda13/run_release_sm90.yml'
-
+#  - local: 'ci/cuda13/run_release_sm90.yml'

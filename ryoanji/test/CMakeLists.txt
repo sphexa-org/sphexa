@@ -9,17 +9,20 @@ if (RYOANJI_WITH_HIP)
 endif()
 
 if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
-    add_executable(ryoanji_demo demo.cu)
-    target_link_libraries(ryoanji_demo PRIVATE ryoanji_kernels cstone_gpu)
-    set_target_properties(ryoanji_demo PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-    target_include_directories(ryoanji_demo PRIVATE ${RYOANJI_TEST_INCLUDE_DIRS})
+    set(testname ryoanji_demo)
+    add_executable(${testname} demo.cu)
+    target_link_libraries(${testname} PRIVATE ryoanji_kernels cstone_gpu)
+    set_target_properties(${testname} PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    target_include_directories(${testname} PRIVATE ${RYOANJI_TEST_INCLUDE_DIRS})
     # set_source_files_properties(demo.cu PROPERTIES COMPILE_FLAGS "-Xptxas -v")
-    install(TARGETS ryoanji_demo RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji/ryoanji_demo)
+    if (RYOANJI_WITH_HIP)
+        target_link_libraries(${testname} PUBLIC roc::rocthrust hip::hipcub)
+    endif()
+    add_test(NAME ${testname} COMMAND ${testname})
+    set_tests_properties(${testname} PROPERTIES LABELS "01r;gpu")
+    install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji)
 endif ()
 
-if (RYOANJI_WITH_HIP)
-    target_link_libraries(ryoanji_demo PUBLIC roc::rocthrust hip::hipcub)
-endif()
 
 # multi-rank demonstrator
 if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
@@ -37,12 +40,14 @@ if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
         target_link_libraries(${testname} PRIVATE CUDA::cudart)
     endif ()
     target_compile_options(${testname} PRIVATE -Wno-unknown-pragmas)
-    install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji/)
+    add_test(NAME ${testname} COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_PREFLAGS} 2 $<TARGET_FILE:${testname}>)
+    set_tests_properties(${testname} PROPERTIES LABELS "02r;gpu")
+    install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji)
     unset(testname)
 endif ()
 
 # CPU unit test suite
-set(testname ryoanji_cpu_unit_tests)
+set(testname cpu_unit_tests)
 add_executable(${testname}
         nbody/cartesian_qpole.cpp
         nbody/kernel.cpp
@@ -53,8 +58,9 @@ add_executable(${testname}
 target_compile_options(${testname} PRIVATE -Wall -Wextra -Wno-unknown-pragmas)
 target_include_directories(${testname} PRIVATE ${RYOANJI_TEST_INCLUDE_DIRS})
 target_link_libraries(${testname} PRIVATE GTest::gtest_main OpenMP::OpenMP_CXX)
-add_test(NAME ${testname} COMMAND ryoanji_cpu_unit_tests)
-install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji/cpu_unit_tests)
+add_test(NAME ${testname} COMMAND ${testname})
+set_tests_properties(${testname} PROPERTIES LABELS "01r;cpu")
+install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji)
 
 if (RYOANJI_WITH_HIP)
     set_source_files_properties(nbody/direct.cu nbody/warpscan.cu PROPERTIES LANGUAGE HIP)
@@ -62,7 +68,7 @@ endif()
 
 # GPU unit test suite
 if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
-    set(testname ryoanji_unit_tests)
+    set(testname gpu_unit_tests)
     add_executable(${testname}
             nbody/ewald.cu
             nbody/direct.cu
@@ -77,7 +83,8 @@ if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
     endif ()
 
     add_test(NAME ${testname} COMMAND ${testname})
-    install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji/unit_tests)
+    set_tests_properties(${testname} PROPERTIES LABELS "01r;gpu")
+    install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji)
 endif ()
 
 add_subdirectory(interface)

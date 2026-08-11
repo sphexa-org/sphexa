@@ -8,10 +8,7 @@ target_compile_options(${exename} PRIVATE -Wall -Wextra)
 target_compile_definitions(${exename} PUBLIC SPH_EXA_HAVE_H5PART)
 target_include_directories(${exename} PRIVATE ${MPI_CXX_INCLUDE_PATH})
 target_include_directories(${exename} PRIVATE ${DISK_DIR} ${CSTONE_DIR} ${SPH_DIR} ${PROJECT_SOURCE_DIR}/include ${MAIN_APP_DIR} ${MPI_TEST_DIR})
-
 target_link_libraries(${exename} PRIVATE ${MPI_CXX_LIBRARIES} GTest::gtest_main OpenMP::OpenMP_CXX)
-
-set(cmd ${exename})
-list(PREPEND cmd "${MPIEXEC_EXECUTABLE}" " " "${MPIEXEC_NUMPROC_FLAG}" " 2 ")
-add_test(NAME ${testname} COMMAND ${cmd})
+add_test(NAME ${exename} COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_PREFLAGS} 2 $<TARGET_FILE:${exename}>)
+set_tests_properties(${exename} PROPERTIES LABELS "02r;cpu")
 install(TARGETS ${exename} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/physics)

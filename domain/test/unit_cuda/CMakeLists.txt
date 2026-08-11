@@ -27,7 +27,7 @@ if(CSTONE_WITH_HIP)
     set_source_files_properties(${UNIT_TEST_SOURCES_GPU} PROPERTIES LANGUAGE HIP)
 endif()
 
-set(testname component_units_cuda)
+set(testname component_units_gpu)
 
 if(CSTONE_WITH_CUDA OR CSTONE_WITH_HIP)
     add_library(gpu_unit_obj OBJECT ${UNIT_TEST_SOURCES_GPU})
@@ -44,7 +44,8 @@ if(CSTONE_WITH_CUDA OR CSTONE_WITH_HIP)
     add_executable(${testname} test_main.cpp)
     target_link_libraries(${testname} PRIVATE gpu_unit_obj)
     cstone_add_test(${testname} EXECUTABLE ${testname} RANKS 1)
-    install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/unit_cuda)
+    set_tests_properties(${testname} PROPERTIES LABELS "01r;gpu")
+    install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/unit_gpu)
 endif()
 
 if(CSTONE_WITH_HIP)

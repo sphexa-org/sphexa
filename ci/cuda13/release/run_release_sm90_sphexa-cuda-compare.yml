@@ -1,0 +1,18 @@
+sph-compare-constants-cuda13-sm90-release-sphexa-cuda:
+  stage: sphexa_run
+  image: ${UENV_CUDA}
+  needs: ['sph-build-cuda13-sm90-release']
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    SLURM_TIMELIMIT: '00:15:00'
+    WITH_UENV_VIEW: 'default'
+    SLURM_JOB_NUM_NODES: 1
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+    OMP_NUM_THREADS: 71
+    # SLURM_PARTITION: 'debug'
+  before_script:
+    - if [ "$SLURM_PROCID" -eq 0 ]; then pwd ; fi
+  script:
+    - |
+      bash ci/scripts/run_constants_comparison.sh ${APP_INSTALL_DIR}/sphexa-cuda
