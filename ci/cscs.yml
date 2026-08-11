@@ -1,5 +1,6 @@
 variables:
-  UENV_CUDA: prgenv-gnu/26.3:v1
+  UENV_CUDA: 'prgenv-gnu/26.3:v1'
+  SLURM_GPUS_PER_NODE: '4'
   # SLURM_RESERVATION: 'uss140-shs131-nv590-staging'
 
 include:

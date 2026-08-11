@@ -15,9 +15,15 @@ function(addFrontendMpiTest source exename testname ranks)
     target_include_directories(${exename} PRIVATE ${CSTONE_DIR} ${SPH_DIR} ${PROJECT_SOURCE_DIR}/main/src)
 endfunction()
 
+set(exename hdf5io)
+set(testname HDF5IO)
 if (SPH_EXA_WITH_H5HUT)
-    addFrontendMpiTest(hdf5.cpp hdf5io HDF5IO 2)
-    target_link_libraries(hdf5io PRIVATE io)
-endif()
+    addFrontendMpiTest(hdf5.cpp ${exename} ${testname} 2)
 
+    if(DEFINED ENV{SPH_CTEST_WORKING_DIR})
+        set_tests_properties(${testname} PROPERTIES WORKING_DIRECTORY "$ENV{SPH_CTEST_WORKING_DIR}")
+    endif()
+
+    target_link_libraries(${exename} PRIVATE io)
+endif()
 

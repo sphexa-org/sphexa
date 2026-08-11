@@ -7,6 +7,7 @@ export _build_stage=_spack_stage
 export _build_env=_spack_env
 export APP_INSTALL_DIR="$_build_spack/opt/spack/linux-*/sphexa-develop-*/bin/"
 export TEST_INSTALL_DIR="$_build_spack/opt/spack/linux-*/sphexa-develop-*/sbin/"
+export SLURM_OVERLAP=1 SLURM_ACCOUNT=csstaff
 
 _build_get_spack() {
     set -e
@@ -119,31 +120,61 @@ _run_ctests() {
     set -x
     if [ "$SLURM_PROCID" -eq 0 ]; then
 
-        # 01r 02r 06r 10r 12r
         ranks="$1"
-        ctest_dir=$(dirname $(find $_build_stage/ -name DartConfiguration.tcl |awk -F/ '{print NF,$0}' |sort -nk 1 |head -1 |awk '{print $2}'))
 
-        if [ "$SLURM_PROCID" -eq 0 ]; then
-            echo "ranks=$ranks NUM_KEYS=$NUM_KEYS"
-            echo "ctest_dir=$ctest_dir"
-            pwd
-        fi
+        ctest_dir=$(dirname $PWD/$_build_stage/spack-stage-sphexa-develop-*/spack-build-*/CTestTestfile.cmake)
+        # ctest_dir=$(dirname $(find $_build_stage/ -name DartConfiguration.tcl |awk -F/ '{print NF,$0}' |sort -nk 1 |head -1 |awk '{print $2}'))
 
-        if [ $ranks = "01r" ] ; then
-            _run_prerun grackle
-            ctest --output-on-failure --test-dir $ctest_dir -N -L "$ranks" -V
-            ctest --output-on-failure --test-dir $ctest_dir -j -L "$ranks" -V
-        else
-            echo "# ---- cpu tests:"
-            ctest --output-on-failure --test-dir $ctest_dir -L "$ranks" -L "cpu" -j
-            echo "# ---- gpu tests:"
-            ctest --output-on-failure --test-dir $ctest_dir -L "$ranks" -L "gpu"
-        fi
+        echo "# ---- cpu tests:"
+        ctest --output-on-failure --test-dir $ctest_dir -L "cpu" -j
 
-        date
+        echo "# ---- gpu tests:"
+        ctest --output-on-failure --test-dir $ctest_dir -L "gpu" -j
 
-    fi
-    wait
+
+#         if [ "$SLURM_PROCID" -eq 0 ]; then
+#             echo "ranks=$ranks NUM_KEYS=$NUM_KEYS"
+#             echo "ctest_dir=$ctest_dir"
+#             pwd
+#         fi
+# 
+#         if [ $ranks = "01r" ] ; then
+#             _run_prerun grackle
+#             ctest --output-on-failure --test-dir $ctest_dir -j -L "$ranks" # -V
+#             # ctest --output-on-failure --test-dir $ctest_dir -N -L "$ranks" # -V
+#         else
+#             echo "# ---- cpu tests:"
+#             ctest --output-on-failure --test-dir $ctest_dir -L "$ranks" -L "cpu" -j
+#             echo "# ---- gpu tests:"
+#             ctest --output-on-failure --test-dir $ctest_dir -L "$ranks" -L "gpu"
+#         fi
+# 
+#         date
+# 
+#     fi
+#     wait
+
+# # --- GPU
+# 10/17 Test #14: ExchangeGeneralGpu ...............   Passed   13.31 sec
+# 11/17 Test #18: DomainGpu ........................   Passed   21.15 sec
+# 12/17 Test #33: global_upsweep_gpu ...............   Passed   24.79 sec
+# 13/17 Test #27: component_units_gpu ..............   Passed   30.99 sec
+# 14/17 Test #34: global_forces_gpu ................   Passed   34.18 sec
+# 15/17 Test #24: hilbert_perf_gpu .................   Passed   43.71 sec
+# 16/17 Test #22: sph_density_test_gpu .............   Passed   64.10 sec
+# 17/17 Test #21: hilbert_perf .....................   Passed   71.99 sec
+
+# # --- CPU
+# 16/25 Test #26: component_units_omp ..............   Passed   20.43 sec
+# 17/25 Test #30: cpu_unit_tests ...................   Passed   25.80 sec
+# 18/25 Test  #8: GlobalDomainResize ...............   Passed   27.79 sec
+# 19/25 Test #12: FocusTreeIntregration ............   Passed   32.62 sec
+# 20/25 Test #11: GlobalDomainExchange .............   Passed   32.72 sec
+# 21/25 Test  #9: GlobalDomainTreeIntregration .....   Passed   32.86 sec
+# 22/25 Test #25: component_units ..................   Passed   38.65 sec
+# 23/25 Test #32: global_upsweep_cpu ...............   Passed   40.32 sec
+# 24/25 Test #13: GlobalDomainNRanks ...............   Passed   61.27 sec
+# 25/25 Test #19: octree_perf ......................   Passed   68.52 sec
 }
 
 _run_sphexa-cuda() {

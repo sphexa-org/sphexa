@@ -131,7 +131,8 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
 
         if spec.satisfies("+overlap"):
             args.append(self.define("MPIEXEC_EXECUTABLE", "srun"))
-            args.append(self.define("MPIEXEC_PREFLAGS", "--overlap"))
+            # args.append(self.define("MPIEXEC_PREFLAGS", "--overlap\\;--account=csstaff"))
+            # args.append("-DMPIEXEC_PREFLAGS=--overlap --account=csstaff")
 
         if spec.satisfies("+cuda"):
             args.append(
