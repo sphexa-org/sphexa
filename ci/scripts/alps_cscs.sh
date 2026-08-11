@@ -117,10 +117,9 @@ _run_prerun() {
 
 _run_ctests() {
     set -e
-    set -x
     if [ "$SLURM_PROCID" -eq 0 ]; then
 
-        ranks="$1"
+#        ranks="$1"
 
         ctest_dir=$(dirname $PWD/$_build_stage/spack-stage-sphexa-develop-*/spack-build-*/CTestTestfile.cmake)
         # ctest_dir=$(dirname $(find $_build_stage/ -name DartConfiguration.tcl |awk -F/ '{print NF,$0}' |sort -nk 1 |head -1 |awk '{print $2}'))
@@ -130,7 +129,8 @@ _run_ctests() {
 
         echo "# ---- gpu tests:"
         ctest --output-on-failure --test-dir $ctest_dir -L "gpu" -j
-
+    fi
+    wait
 
 #         if [ "$SLURM_PROCID" -eq 0 ]; then
 #             echo "ranks=$ranks NUM_KEYS=$NUM_KEYS"
