@@ -181,14 +181,6 @@ constexpr symmetric::odd<T> applySymmetryImpl(symmetric::odd<T> const& value)
 
 } // namespace detail
 
-template<class T>
-struct IsFullySymmetric;
-
-template<class... Ts>
-struct IsFullySymmetric<std::tuple<Ts...>> : std::conjunction<detail::IsSymmetric<std::remove_cvref_t<Ts>>...>
-{
-};
-
 template<class... Ts>
 constexpr auto selectSymmetric(std::tuple<Ts...> const& symmetricValue, std::tuple<Ts...> const& asymmetricValue)
 {
