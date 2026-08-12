@@ -26,7 +26,7 @@ namespace util
  * @return       the integral of func over [a, b]
  */
 template<class F>
-double simpson(double a, double b, uint64_t n, F&& func)
+constexpr double simpson(double a, double b, uint64_t n, F&& func)
 {
     uint64_t numOdd  = n / 2;
     uint64_t numEven = (numOdd >= 1) ? numOdd - 1 : 0;
@@ -74,11 +74,14 @@ T sphynx_3D_k(T n)
     return b0 + b1 * std::sqrt(n) + b2 * n + b3 * std::sqrt(n * n * n);
 }
 
+template<class T>
+constexpr inline T kernelSupport = 2.0;
+
 //! @brief compute the 3D normalization constant for an arbitrary kernel
 template<class F>
-double kernel_3D_k(F&& sphKernel, double support)
+constexpr double kernel_3D_k(F sphKernel, double support)
 {
-    auto kernelVol3D = [sphKernel](double x) { return 4.0 * M_PI * x * x * sphKernel(x); };
+    auto kernelVol3D = [sphKernel = std::move(sphKernel)](double x) { return 4.0 * M_PI * x * x * sphKernel(x); };
 
     uint64_t numIntervals = 2000;
     return 1.0 / util::simpson(0, support, numIntervals, kernelVol3D);
@@ -101,34 +104,31 @@ std::array<T, N> tabulateFunction(F&& func, double lowerSupport, double upperSup
     return table;
 }
 
-//! @brief derivative of sinc(Pi/2 * x)^sincIndex w.r.t. x
 template<class T>
-T powSincDerivative(T x, T sincIndex)
+struct SincN
 {
-    return sincIndex * std::pow(wharmonic_std(x), sincIndex - 1) * wharmonic_derivative_std(x);
-}
+    T n;
+
+    constexpr T operator()(const T x) const { return std::pow(wharmonic_std(x), n); }
+
+    constexpr T derivative(const T x) const
+    { return n * std::pow(wharmonic_std(x), n - 1) * wharmonic_derivative_std(x); }
+};
 
 //! @brief smoothing kernel as a linear combination of two sinc^n terms
 template<class T>
 struct SincN1SincN2
 {
-    SincN1SincN2()
-    {
-        T support = 2.0;
-        K1        = kernel_3D_k([this](auto x) { return std::pow(wharmonic_std(x), n1); }, support);
-        K2        = kernel_3D_k([this](auto x) { return std::pow(wharmonic_std(x), n2); }, support);
-    }
+    constexpr T operator()(const T x) const { return a * K1 * sincN1(x) + (1 - a) * K2 * sincN2(x); }
+    constexpr T derivative(T x) const { return a * K1 * sincN1.derivative(x) + (1 - a) * K2 * sincN2.derivative(x); }
 
-    T kernel(T x) const
-    {
-        return a * K1 * std::pow(wharmonic_std(x), n1) + (1 - a) * K2 * std::pow(wharmonic_std(x), n2);
-    }
-    T derivative(T x) const { return a * K1 * powSincDerivative(x, n1) + (1 - a) * K2 * powSincDerivative(x, n2); }
-
-    T a  = 0.9;
-    T n1 = 4.0;
-    T n2 = 9.0;
-    T K1, K2;
+    static constexpr T        a      = 0.9;
+    static constexpr T        n1     = 4.0;
+    static constexpr T        n2     = 9.0;
+    static constexpr SincN<T> sincN1 = SincN<T>{n1};
+    static constexpr SincN<T> sincN2 = SincN<T>{n2};
+    static constexpr T        K1     = kernel_3D_k(sincN1, kernelSupport<double>);
+    static constexpr T        K2     = kernel_3D_k(sincN2, kernelSupport<double>);
 };
 
 enum SphKernelType : int
@@ -145,15 +145,8 @@ enum SphKernelType : int
 template<class T>
 std::function<T(T)> getSphKernel(SphKernelType choice, T sincIndex)
 {
-    if (choice == SphKernelType::sinc_n)
-    {
-        return [sincIndex](T x) { return std::pow(wharmonic_std(x), sincIndex); };
-    }
-    else if (choice == SphKernelType::sinc_n1_sinc_n2)
-    {
-        auto kfunc = SincN1SincN2<T>{};
-        return [f = kfunc](T x) { return f.kernel(x); };
-    }
+    if (choice == SphKernelType::sinc_n) { return SincN<T>{sincIndex}; }
+    else if (choice == SphKernelType::sinc_n1_sinc_n2) { return SincN1SincN2<T>{}; }
     return [](T x) { return x; };
 }
 
@@ -162,12 +155,11 @@ std::function<T(T)> getSphKernelDerivative(SphKernelType choice, T sincIndex)
 {
     if (choice == SphKernelType::sinc_n)
     {
-        return [sincIndex](T x) { return powSincDerivative(x, sincIndex); };
+        return [kfunc = SincN<T>{sincIndex}](T x) { return kfunc.derivative(x); };
     }
     else if (choice == SphKernelType::sinc_n1_sinc_n2)
     {
-        auto kfunc = SincN1SincN2<T>{};
-        return [f = kfunc](T x) { return f.derivative(x); };
+        return [kfunc = SincN1SincN2<T>{}](T x) { return kfunc.derivative(x); };
     }
     return [](T x) { return x; };
 }

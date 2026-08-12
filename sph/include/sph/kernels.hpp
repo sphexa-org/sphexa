@@ -88,7 +88,7 @@ HOST_DEVICE_FUN void updateHIterative(unsigned ng0, unsigned ngmax, const cstone
 
 //! @brief sinc(PI/2 * v)
 template<typename T>
-HOST_DEVICE_FUN inline T wharmonic_std(T v)
+HOST_DEVICE_FUN constexpr inline T wharmonic_std(T v)
 {
     if (v == 0.0) { return 1.0; }
 
@@ -101,7 +101,7 @@ HOST_DEVICE_FUN inline T wharmonic_std(T v)
  * Unoptimized for clarity as this is only used to construct look-up tables
  */
 template<typename T>
-HOST_DEVICE_FUN inline T wharmonic_derivative_std(T v)
+HOST_DEVICE_FUN constexpr inline T wharmonic_derivative_std(T v)
 {
     if (v == 0.0) return 0.0;
 
