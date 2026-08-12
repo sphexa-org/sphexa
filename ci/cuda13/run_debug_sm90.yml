@@ -1,23 +1,23 @@
 include:
   - local: 'ci/common.yml'
 
-sph-run-cuda13-sm90-debug-ctests:
-  stage: sphexa_run
-  image: ${UENV_CUDA}
-  needs: ['sph-build-cuda13-sm90-debug']
-  extends: [.uenv-runner-daint-gh200]
-  variables:
-    SLURM_TIMELIMIT: '00:15:00'
-    WITH_UENV_VIEW: 'default'
-    SLURM_JOB_NUM_NODES: 1
-    SLURM_CPUS_PER_TASK: 71
-    OMP_NUM_THREADS: 64
-  before_script:
-    - if [ "${SLURM_PROCID}" -eq 0 ]; then pwd ; fi
-  script:
-    - |
-      source ci/scripts/alps_cscs.sh &&
-      _run_ctests
+#del sph-run-cuda13-sm90-debug-ctests:
+#del   stage: sphexa_run
+#del   image: ${UENV_CUDA}
+#del   needs: ['sph-build-cuda13-sm90-debug']
+#del   extends: [.uenv-runner-daint-gh200]
+#del   variables:
+#del     SLURM_TIMELIMIT: '00:15:00'
+#del     WITH_UENV_VIEW: 'default'
+#del     SLURM_JOB_NUM_NODES: 1
+#del     SLURM_CPUS_PER_TASK: 71
+#del     OMP_NUM_THREADS: 64
+#del   before_script:
+#del     - if [ "${SLURM_PROCID}" -eq 0 ]; then pwd ; fi
+#del   script:
+#del     - |
+#del       source ci/scripts/alps_cscs.sh &&
+#del       _run_ctests
 
 .sph-run-cuda13-sm90-debug-base:
   stage: sphexa_run
@@ -28,48 +28,51 @@ sph-run-cuda13-sm90-debug-ctests:
     SLURM_TIMELIMIT: '00:15:00'
     WITH_UENV_VIEW: 'default'
     SLURM_JOB_NUM_NODES: 1
+  before_script:
+    - if [ "${SLURM_PROCID}" -eq 0 ]; then pwd ; fi
+   script:
+     - |
+       source ci/scripts/alps_cscs.sh &&
+       time -p _run_ctests ${RUN_CTESTS_ARG}
+
+# ----------------------------------------------------------------------------    
+sph-run-cuda13-sm90-debug-01ranks:
+  extends: [.sph-run-cuda13-sm90-debug-base]
+  variables:
+    SLURM_NTASKS: 1
+    RUN_CTESTS_ARG: '01r'
+
+sph-run-cuda13-sm90-debug-02ranks:
+  extends: [.sph-run-cuda13-sm90-debug-base]
+  variables:
+    SLURM_NTASKS: 2
+    RUN_CTESTS_ARG: '02r'
+
+sph-run-cuda13-sm90-debug-04ranks:
+  extends: [.sph-run-cuda13-sm90-debug-base]
+  variables:
+    SLURM_NTASKS: 4
+    RUN_CTESTS_ARG: '04r'
+
+sph-run-cuda13-sm90-debug-10ranks:
+  extends: [.sph-run-cuda13-sm90-debug-base]
+  variables:
+    SLURM_NTASKS: 10
+    RUN_CTESTS_ARG: '10r'
+
+sph-run-cuda13-sm90-debug-12ranks:
+  extends: [.sph-run-cuda13-sm90-debug-base]
+  variables:
+    SLURM_NTASKS: 12
+    RUN_CTESTS_ARG: '12r'
+
+# ----------------------------------------------------------------------------    
+sph-run-cuda13-sm90-debug-sphexa-cpu:
+  extends: [.sph-run-cuda13-sm90-debug-base]
+  variables:
     SLURM_NTASKS: 4
     SLURM_CPUS_PER_TASK: 71
     OMP_NUM_THREADS: 64
-  before_script:
-    - if [ "${SLURM_PROCID}" -eq 0 ]; then pwd ; fi
-#   script:
-#     - |
-#       source ci/scripts/alps_cscs.sh &&
-#       time -p _run_ctests ${RUN_CTESTS_ARG}
-# 
-# sph-run-cuda13-sm90-debug-01ranks:
-#   extends: [.sph-run-cuda13-sm90-debug-base]
-#   variables:
-#     SLURM_NTASKS: 1
-#     RUN_CTESTS_ARG: '01r'
-# 
-# sph-run-cuda13-sm90-debug-02ranks:
-#   extends: [.sph-run-cuda13-sm90-debug-base]
-#   variables:
-#     SLURM_NTASKS: 2
-#     RUN_CTESTS_ARG: '02r'
-# 
-# sph-run-cuda13-sm90-debug-04ranks:
-#   extends: [.sph-run-cuda13-sm90-debug-base]
-#   variables:
-#     SLURM_NTASKS: 4
-#     RUN_CTESTS_ARG: '04r'
-# 
-# sph-run-cuda13-sm90-debug-10ranks:
-#   extends: [.sph-run-cuda13-sm90-debug-base]
-#   variables:
-#     SLURM_NTASKS: 10
-#     RUN_CTESTS_ARG: '10r'
-# 
-# sph-run-cuda13-sm90-debug-12ranks:
-#   extends: [.sph-run-cuda13-sm90-debug-base]
-#   variables:
-#     SLURM_NTASKS: 12
-#     RUN_CTESTS_ARG: '12r'
-
-sph-run-cuda13-sm90-debug-sphexa-cpu:
-  extends: [.sph-run-cuda13-sm90-debug-base]
   script:
     - |
       source ci/scripts/alps_cscs.sh &&
@@ -77,13 +80,22 @@ sph-run-cuda13-sm90-debug-sphexa-cpu:
 
 sph-run-cuda13-sm90-debug-sphexa-cuda:
   extends: [.sph-run-cuda13-sm90-debug-base]
+  variables:
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+    OMP_NUM_THREADS: 64
   script:
     - |
       source ci/scripts/alps_cscs.sh &&
       _run_sphexa-cuda gpu
 
+# ----------------------------------------------------------------------------    
 sph-compare-constants-cuda13-sm90-debug-sphexa-cpu:
   extends: [.sph-run-cuda13-sm90-debug-base]
+  variables:
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+    OMP_NUM_THREADS: 64
   script:
     - |
       source ci/scripts/alps_cscs.sh &&
@@ -91,6 +103,10 @@ sph-compare-constants-cuda13-sm90-debug-sphexa-cpu:
 
 sph-compare-constants-cuda13-sm90-debug-sphexa-cuda:
   extends: [.sph-run-cuda13-sm90-debug-base]
+  variables:
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+    OMP_NUM_THREADS: 64
   script:
     - |
       source ci/scripts/alps_cscs.sh &&
