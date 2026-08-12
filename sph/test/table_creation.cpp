@@ -33,7 +33,7 @@ TEST(KernelTable, simpson3DK)
         return std::pow(std::sin(Pv) / Pv, n);
     };
 
-    double Bn = kernel_3D_k(Sn, 2.0);
+    double Bn = kernel_3D_k(Sn);
 
     printf("3D-K: interpolated %.16f, integrated %.16f, diff %.16f\n", sphynx_3D_k(n), Bn, sphynx_3D_k(n) - Bn);
     EXPECT_NEAR(sphynx_3D_k(n), Bn, 1e-4);

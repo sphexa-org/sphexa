@@ -5,15 +5,15 @@
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/kernels.hpp"
-#include "sph/table_lookup.hpp"
+#include "sph/sph_kernel_tables.hpp"
 
 namespace sph
 {
 
-template<class T, class Tm1>
+template<class T, class Tm1, class Kernel>
 struct MomentumAndEnergyInteractionStd
 {
-    const T* wh;
+    Kernel wh;
 
     template<class ParticleData, class Tc>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
@@ -47,8 +47,8 @@ struct MomentumAndEnergyInteractionStd
         T rv = rx * vx_ij + ry * vy_ij + rz * vz_ij;
 
         T hjInv3 = hjInv * hjInv * hjInv;
-        T Wi     = hiInv3 * lt::lookup(wh, v1);
-        T Wj     = hjInv3 * lt::lookup(wh, v2);
+        T Wi     = hiInv3 * wh(v1);
+        T Wj     = hjInv3 * wh(v2);
 
         T termA1_i = c11i * rx + c12i * ry + c13i * rz;
         T termA2_i = c12i * rx + c22i * ry + c23i * rz;
@@ -154,13 +154,18 @@ struct MomentumAndEnergyPostambleStdWithDt : MomentumAndEnergyPostambleStd<Tc, T
 template<class Neighborhood, class Tc, class T, class Tm, class Tm1>
 void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, const Tm* m, const T* rho, unsigned* nc,
                              const T* vx, const T* vy, const T* vz, const T* p, const T* c, const T* c11, const T* c12,
-                             const T* c13, const T* c22, const T* c23, const T* c33, const T* wh, Tm1* du, T* grad_P_x,
-                             T* grad_P_y, T* grad_P_z, T* dt)
+                             const T* c13, const T* c22, const T* c23, const T* c33, KernelVariant<T> const& wh,
+                             Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z, T* dt)
 {
-    neighborhood.ijLoop(std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
-                        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc, dt),
-                        MomentumAndEnergyInteractionStd<T, Tm1>{wh},
-                        MomentumAndEnergyPostambleStdWithDt<Tc, Tm1>{K, Kcour});
+    std::visit(
+        [&]<class Kernel>(Kernel wh)
+        {
+            neighborhood.ijLoop(std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
+                                std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc, dt),
+                                MomentumAndEnergyInteractionStd<T, Tm1, Kernel>{wh},
+                                MomentumAndEnergyPostambleStdWithDt<Tc, Tm1>{K, Kcour});
+        },
+        wh);
 }
 
 } // namespace sph

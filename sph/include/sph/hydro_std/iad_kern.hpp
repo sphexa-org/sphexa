@@ -5,15 +5,15 @@
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/iad_regularization.hpp"
-#include "sph/table_lookup.hpp"
+#include "sph/sph_kernel_tables.hpp"
 
 namespace sph
 {
 
-template<class T>
+template<class T, class Kernel>
 struct IADInteractionSTD
 {
-    const T* wh;
+    Kernel wh;
 
     template<class ParticleData, class Tc>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
@@ -32,7 +32,7 @@ struct IADInteractionSTD
 
         // calculate the v as ratio between the distance and the smoothing length
         T vloc = dist * hiInv;
-        T w    = lt::lookup(wh, vloc);
+        T w    = wh(vloc);
 
         T mj_roj_w = mj / roj * w;
 
@@ -96,11 +96,17 @@ struct IADPostambleSTD
 
 template<class Neighborhood, class Tc, class Tm, class T>
 void IADIjLoop(Neighborhood const& neighborhood, Tc K, T iadConditionQuality, unsigned iadRegBit, const Tm* m,
-               const T* rho, const unsigned* nc, const T* wh, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33,
-               uint64_t* id)
+               const T* rho, const unsigned* nc, KernelVariant<T> const& wh, T* c11, T* c12, T* c13, T* c22, T* c23,
+               T* c33, uint64_t* id)
 {
-    neighborhood.ijLoop(std::make_tuple(m, rho, nc, id), std::make_tuple(c11, c12, c13, c22, c23, c33, id),
-                        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K, iadConditionQuality, iadRegBit});
+    std::visit(
+        [&]<class Kernel>(Kernel wh)
+        {
+            neighborhood.ijLoop(std::make_tuple(m, rho, nc, id), std::make_tuple(c11, c12, c13, c22, c23, c33, id),
+                                IADInteractionSTD<T, Kernel>{wh},
+                                IADPostambleSTD<T, Tc>{K, iadConditionQuality, iadRegBit});
+        },
+        wh);
 }
 
 } // namespace sph

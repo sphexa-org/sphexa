@@ -394,9 +394,10 @@ public:
 private:
     void createTables()
     {
-        std::optional<FieldVector<HydroType>&> kernelTable = whTable;
-        wh = sph::getSphKernel<HydroType, FieldVector<HydroType>>(exec, kernelChoice, sincIndex, kernelTable);
-        std::visit([this](auto const& kernel) { K = sph::kernel_3D_k(kernel); }, wh);
+        wh = sph::getSphKernel<HydroType>(exec, kernelChoice, sincIndex, &whTable);
+
+        const auto whUntabulated = sph::getSphKernel<HydroType>(exec, kernelChoice, sincIndex);
+        std::visit([this](auto const& kernel) { K = sph::kernel_3D_k(kernel); }, whUntabulated);
     }
 
     //! @brief buffer growth factor when reallocating

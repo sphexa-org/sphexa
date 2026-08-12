@@ -151,13 +151,13 @@ struct TabulatedKernel
 
         if constexpr (cstone::execution::HaveGpu<Exec>())
         {
-            cstone::memcpyH2DAsync(exec, tabulatedValues.data(), TableSize, buffer);
-            cstone::memcpyH2DAsync(exec, tabulatedDerivatives.data(), TableSize, buffer + TableSize);
+            cstone::memcpyH2DAsync(exec, tabulatedValues.data(), TableSize, buffer.data());
+            cstone::memcpyH2DAsync(exec, tabulatedDerivatives.data(), TableSize, buffer.data() + TableSize);
         }
         else
         {
-            cstone::copy_n(exec, tabulatedValues.data(), TableSize, buffer);
-            cstone::copy_n(exec, tabulatedValues.data(), TableSize, buffer + TableSize);
+            cstone::copy_n(exec, tabulatedValues.data(), TableSize, buffer.data());
+            cstone::copy_n(exec, tabulatedDerivatives.data(), TableSize, buffer.data() + TableSize);
         }
 
         return {buffer.data()};
@@ -193,15 +193,17 @@ enum SphKernelType : int
  * If sinc_n is chosen, n will be set to @p sincIndex.
  * For sinc_n1_plus_sinc_n2, the linear combination and exponents are fixed here
  */
-template<class T, cstone::execution::Policy Exec, class Vector>
-KernelVariant<T> getSphKernel(Exec exec, SphKernelType choice, T sincIndex, std::optional<Vector&> table)
+template<class T, cstone::execution::Policy Exec, class Vector = std::vector<T>>
+KernelVariant<T> getSphKernel(Exec exec, SphKernelType choice, T sincIndex, Vector* table = nullptr)
 {
     switch (choice)
     {
         case SphKernelType::sinc_n:
-            return table ? TabulatedKernel<T>::tabulate(exec, SincN<T>{sincIndex}, *table) : SincN<T>{sincIndex};
+            if (table) { return TabulatedKernel<T>::tabulate(exec, SincN<T>{sincIndex}, *table); }
+            return KernelVariant<T>{SincN<T>{sincIndex}};
         case SphKernelType::sinc_n1_sinc_n2:
-            return table ? TabulatedKernel<T>::tabulate(exec, SincN1SincN2<T>{}, *table) : SincN1SincN2<T>{};
+            if (table) { return TabulatedKernel<T>::tabulate(exec, SincN1SincN2<T>{}, *table); }
+            return KernelVariant<T>{SincN1SincN2<T>{}};
         default: throw std::runtime_error("Invalid SPH kernel type");
     }
 }

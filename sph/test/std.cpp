@@ -39,7 +39,6 @@
 #include "sph/hydro_std/momentum_energy_kern.hpp"
 #include "sph/id_layout.hpp"
 #include "sph/sph_kernel_tables.hpp"
-#include "sph/table_lookup.hpp"
 
 using namespace sph;
 
@@ -48,19 +47,11 @@ class SphKernelTestsStd : public testing::Test
 protected:
     using T = double;
 
-    void SetUp() override
-    {
-        wh  = tabulateFunction<T, lt::kTableSize>(getSphKernel(kernelType, sincIndex), 0.0, 2.0);
-        whd = tabulateFunction<T, lt::kTableSize>(getSphKernelDerivative(kernelType, sincIndex), 0.0, 2.0);
-    }
-
     static auto box() { return cstone::Box<T>(0, 6, cstone::BoundaryType::open); }
 
-    std::array<T, lt::kTableSize> wh{0}, whd{0};
-
-    SphKernelType kernelType = SphKernelType::sinc_n;
-    T             sincIndex  = 6.0;
-    T             K          = sphynx_3D_k(sincIndex);
+    static constexpr T        sincIndex = 6.0;
+    static constexpr SincN<T> wh        = SincN<T>{sincIndex};
+    T                         K         = sphynx_3D_k(sincIndex);
 
     std::vector<cstone::LocalIndex> neighbors{1, 2, 3, 4};
     unsigned                        neighborsCount = 4;
@@ -98,15 +89,14 @@ protected:
      */
 };
 
-template<size_t stride = 1, class Tc, class Tm, class T>
-HOST_DEVICE_FUN inline void IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
-                                        const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
-                                        const Tc* y, const Tc* z, const T* h, const Tm* m, const T* rho,
-                                        const unsigned* nc, const T* wh, const T* /*whd*/, uint64_t* id, T* c11, T* c12,
-                                        T* c13, T* c22, T* c23, T* c33)
+template<size_t stride = 1, class Tc, class Tm, class T, class Kernel>
+HOST_DEVICE_FUN inline void
+IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
+            unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* h, const Tm* m, const T* rho,
+            const unsigned* nc, const Kernel& wh, uint64_t* id, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33)
 {
-    IADInteractionSTD      interaction{wh};
-    IADPostambleSTD<T, Tc> postamble{K, T(0), sphexa::IDLayout::iadRegBit};
+    IADInteractionSTD<T, Kernel> interaction{wh};
+    IADPostambleSTD<T, Tc>       postamble{K, T(0), sphexa::IDLayout::iadRegBit};
 
     const auto input  = std::make_tuple(m, rho, nc, static_cast<const uint64_t*>(id));
     const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, id);
@@ -138,8 +128,7 @@ TEST_F(SphKernelTestsStd, IAD)
     std::vector<unsigned> nc(x.size(), neighborsCount + 1);
 
     IADJLoopSTD(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), m.data(),
-                rho.data(), nc.data(), wh.data(), whd.data(), id.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4],
-                &iad[5]);
+                rho.data(), nc.data(), wh, id.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5]);
 
     EXPECT_NEAR(iad[0], 0.68826690779384281, 1e-8);
     EXPECT_NEAR(iad[1], -0.12963692768970825, 1e-8);
@@ -149,17 +138,16 @@ TEST_F(SphKernelTestsStd, IAD)
     EXPECT_NEAR(iad[5], 1.9055087813473524, 1e-8);
 }
 
-template<size_t stride = 1, class Tc, class Tm, class T, class Tm1>
+template<size_t stride = 1, class Tc, class Tm, class T, class Tm1, class Kernel>
 HOST_DEVICE_FUN inline void
 momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
                        unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy,
                        const T* vz, const T* h, const Tm* m, const T* rho, const T* p, const T* c, const T* c11,
-                       const T* c12, const T* c13, const T* c22, const T* c23, const T* c33, const T* wh,
-                       const T* /*whd*/, const cstone::LocalIndex* nc, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du,
-                       T* maxvsignal)
+                       const T* c12, const T* c13, const T* c22, const T* c23, const T* c33, const Kernel& wh,
+                       const cstone::LocalIndex* nc, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, T* maxvsignal)
 {
-    MomentumAndEnergyInteractionStd<T, Tm1> interaction{wh};
-    MomentumAndEnergyPostambleStd<Tc, Tm1>  postamble{K};
+    MomentumAndEnergyInteractionStd<T, Tm1, Kernel> interaction{wh};
+    MomentumAndEnergyPostambleStd<Tc, Tm1>          postamble{K};
 
     const auto input  = std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33);
     const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, maxvsignal - i);
@@ -191,8 +179,8 @@ TEST_F(SphKernelTestsStd, MomentumEnergy)
     std::vector<cstone::LocalIndex> nc(x.size(), neighborsCount + 1);
     momentumAndEnergyJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), vx.data(),
                            vy.data(), vz.data(), h.data(), m.data(), rho.data(), p.data(), c.data(), c11.data(),
-                           c12.data(), c13.data(), c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), nc.data(),
-                           &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
+                           c12.data(), c13.data(), c22.data(), c23.data(), c33.data(), wh, nc.data(), &grad_Px,
+                           &grad_Py, &grad_Pz, &du, &maxvsignal);
 
     EXPECT_NEAR(grad_Px, 14.407211846688075, 1.3e-7);
     EXPECT_NEAR(grad_Py, -1.2396802157028355, 1.4e-7);
@@ -208,8 +196,8 @@ TEST_F(SphKernelTestsStd, MomentumEnergyZero)
     std::vector<cstone::LocalIndex> nc(x.size(), neighborsCount + 1);
     momentumAndEnergyJLoop(0, K, box(), neighbors.data(), 0, x.data(), y.data(), z.data(), vx.data(), vy.data(),
                            vz.data(), h.data(), m.data(), rho.data(), p.data(), c.data(), c11.data(), c12.data(),
-                           c13.data(), c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), nc.data(), &grad_Px,
-                           &grad_Py, &grad_Pz, &du, &maxvsignal);
+                           c13.data(), c22.data(), c23.data(), c33.data(), wh, nc.data(), &grad_Px, &grad_Py, &grad_Pz,
+                           &du, &maxvsignal);
 
     EXPECT_EQ(grad_Px, 0.0);
     EXPECT_EQ(grad_Py, 0.0);

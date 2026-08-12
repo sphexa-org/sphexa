@@ -36,15 +36,15 @@
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/iad_regularization.hpp"
-#include "sph/table_lookup.hpp"
+#include "sph/sph_kernel_tables.hpp"
 
 namespace sph
 {
 
-template<class T>
+template<class T, class Kernel>
 struct IADGradhInteraction
 {
-    const T *wh, *whd;
+    Kernel wh;
 
     template<class ParticleData, class Tc>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
@@ -61,7 +61,7 @@ struct IADGradhInteraction
 
         T dist = std::sqrt(r2);
         T vloc = dist * hiInv;
-        T w    = i == j ? 0 : lt::lookup(wh, vloc);
+        T w    = i == j ? 0 : wh(vloc);
 
         T volj_w = xmj / kxj * w;
 
@@ -73,7 +73,7 @@ struct IADGradhInteraction
         T tau33 = rz * rz * volj_w;
 
         // gradh summation
-        T dw        = i == j ? 0 : lt::lookup(whd, vloc);
+        T dw        = i == j ? 0 : wh.derivative(vloc);
         T dterh     = -(T(3) * w + vloc * dw);
         T whomegai  = dterh * xmj;
         T wrho0i    = dterh * mj;

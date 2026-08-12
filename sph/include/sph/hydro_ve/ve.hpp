@@ -41,7 +41,7 @@ template<typename Tc, class Dataset>
 void computeVe(Dataset& d, const cstone::Box<Tc>& box)
 {
     if constexpr (d.useGpu) { gpu::computeVe(d, box); }
-    else { veIjLoop(d.neighborhood, d.K, d.xm.data(), d.wh.data(), d.kx.data()); }
+    else { veIjLoop(d.neighborhood, d.K, d.xm.data(), d.wh, d.kx.data()); }
 }
 
 } // namespace sph
