@@ -263,8 +263,9 @@ public:
     std::conditional_t<useGpu, sph::DeviceNeighborhoodData, sph::NeighborhoodData> neighborhood;
     cstone::OctreeNsView<RealType, KeyType>                                        treeView;
 
-    //! @brief lookup tables for the SPH-kernel and its derivative
-    FieldVector<HydroType> wh, whd;
+    //! @brief SPH-kernel
+    sph::KernelVariant<HydroType> wh;
+    FieldVector<HydroType>        whTable;
 
     FieldVector<cstone::LocalIndex> traversalStack;
     //! @brief non-stateful variables for statistics
@@ -393,14 +394,9 @@ public:
 private:
     void createTables()
     {
-        using H   = HydroType;
-        K         = sph::kernel_3D_k(getSphKernel(kernelChoice, sincIndex), 2.0);
-        auto a_wh = sph::tabulateFunction<H, lt::kTableSize>(sph::getSphKernel(kernelChoice, sincIndex), 0, 2);
-        auto a_whd =
-            sph::tabulateFunction<H, lt::kTableSize>(sph::getSphKernelDerivative(kernelChoice, sincIndex), 0, 2);
-
-        wh  = FieldVector<HydroType>(a_wh.begin(), a_wh.end());
-        whd = FieldVector<HydroType>(a_whd.begin(), a_whd.end());
+        std::optional<FieldVector<HydroType>&> kernelTable = whTable;
+        wh = sph::getSphKernel<HydroType, FieldVector<HydroType>>(exec, kernelChoice, sincIndex, kernelTable);
+        std::visit([this](auto const& kernel) { K = sph::kernel_3D_k(kernel); }, wh);
     }
 
     //! @brief buffer growth factor when reallocating

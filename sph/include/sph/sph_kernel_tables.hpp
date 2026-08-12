@@ -10,9 +10,13 @@
 #include <cstdint>
 #include <functional>
 #include <numeric>
+#include <optional>
+#include <variant>
 #include <vector>
 
+#include "cstone/util/reallocate.hpp"
 #include "kernels.hpp"
+#include "table_lookup.hpp"
 
 namespace util
 {
@@ -79,12 +83,12 @@ constexpr inline T kernelSupport = 2.0;
 
 //! @brief compute the 3D normalization constant for an arbitrary kernel
 template<class F>
-constexpr double kernel_3D_k(F sphKernel, double support)
+constexpr double kernel_3D_k(F sphKernel)
 {
     auto kernelVol3D = [sphKernel = std::move(sphKernel)](double x) { return 4.0 * M_PI * x * x * sphKernel(x); };
 
     uint64_t numIntervals = 2000;
-    return 1.0 / util::simpson(0, support, numIntervals, kernelVol3D);
+    return 1.0 / util::simpson(0, kernelSupport<double>, numIntervals, kernelVol3D);
 }
 
 //! @brief tabulate and arbitrary function at N points between lower support and upperSupport
@@ -127,9 +131,56 @@ struct SincN1SincN2
     static constexpr T        n2     = 9.0;
     static constexpr SincN<T> sincN1 = SincN<T>{n1};
     static constexpr SincN<T> sincN2 = SincN<T>{n2};
-    static constexpr T        K1     = kernel_3D_k(sincN1, kernelSupport<double>);
-    static constexpr T        K2     = kernel_3D_k(sincN2, kernelSupport<double>);
+    T                         K1     = kernel_3D_k(sincN1);
+    T                         K2     = kernel_3D_k(sincN2);
 };
+
+template<class T, std::size_t TableSize = 20000>
+struct TabulatedKernel
+{
+    const T* buffer;
+
+    template<class Kernel, cstone::execution::Policy Exec, class Vector>
+    static TabulatedKernel tabulate(Exec exec, Kernel const& kernel, Vector& buffer)
+    {
+        const auto tabulatedValues = tabulateFunction<T, TableSize>(kernel, 0.0, kernelSupport<double>);
+        const auto tabulatedDerivatives =
+            tabulateFunction<T, TableSize>([&kernel](T x) { return kernel.derivative(x); }, 0.0, kernelSupport<double>);
+
+        reallocate(buffer, 2 * TableSize, 1.0);
+
+        if constexpr (cstone::execution::HaveGpu<Exec>())
+        {
+            cstone::memcpyH2DAsync(exec, tabulatedValues.data(), TableSize, buffer);
+            cstone::memcpyH2DAsync(exec, tabulatedDerivatives.data(), TableSize, buffer + TableSize);
+        }
+        else
+        {
+            cstone::copy_n(exec, tabulatedValues.data(), TableSize, buffer);
+            cstone::copy_n(exec, tabulatedValues.data(), TableSize, buffer + TableSize);
+        }
+
+        return {buffer.data()};
+    }
+
+    constexpr T operator()(const T x) const { return lookup(buffer, x); }
+    constexpr T derivative(const T x) const { return lookup(buffer + TableSize, x); }
+
+private:
+    constexpr T lookup(const T* table, const T x) const
+    {
+        constexpr std::size_t numIntervals = TableSize - 1;
+        constexpr T           dx           = kernelSupport<T> / numIntervals;
+        constexpr T           invDx        = T(1) / dx;
+
+        const std::size_t idx        = x * invDx;
+        const T           derivative = (idx >= numIntervals) ? T(0) : (table[idx + 1] - table[idx]) * invDx;
+        return (idx >= numIntervals) ? T(0) : table[idx] + derivative * (x - idx * dx);
+    }
+};
+
+template<class T>
+using KernelVariant = std::variant<SincN<T>, SincN1SincN2<T>, TabulatedKernel<T>>;
 
 enum SphKernelType : int
 {
@@ -142,26 +193,17 @@ enum SphKernelType : int
  * If sinc_n is chosen, n will be set to @p sincIndex.
  * For sinc_n1_plus_sinc_n2, the linear combination and exponents are fixed here
  */
-template<class T>
-std::function<T(T)> getSphKernel(SphKernelType choice, T sincIndex)
+template<class T, cstone::execution::Policy Exec, class Vector>
+KernelVariant<T> getSphKernel(Exec exec, SphKernelType choice, T sincIndex, std::optional<Vector&> table)
 {
-    if (choice == SphKernelType::sinc_n) { return SincN<T>{sincIndex}; }
-    else if (choice == SphKernelType::sinc_n1_sinc_n2) { return SincN1SincN2<T>{}; }
-    return [](T x) { return x; };
-}
-
-template<class T>
-std::function<T(T)> getSphKernelDerivative(SphKernelType choice, T sincIndex)
-{
-    if (choice == SphKernelType::sinc_n)
+    switch (choice)
     {
-        return [kfunc = SincN<T>{sincIndex}](T x) { return kfunc.derivative(x); };
+        case SphKernelType::sinc_n:
+            return table ? TabulatedKernel<T>::tabulate(exec, SincN<T>{sincIndex}, *table) : SincN<T>{sincIndex};
+        case SphKernelType::sinc_n1_sinc_n2:
+            return table ? TabulatedKernel<T>::tabulate(exec, SincN1SincN2<T>{}, *table) : SincN1SincN2<T>{};
+        default: throw std::runtime_error("Invalid SPH kernel type");
     }
-    else if (choice == SphKernelType::sinc_n1_sinc_n2)
-    {
-        return [kfunc = SincN1SincN2<T>{}](T x) { return kfunc.derivative(x); };
-    }
-    return [](T x) { return x; };
 }
 
 } // namespace sph

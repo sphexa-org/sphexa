@@ -33,15 +33,15 @@
 
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
-#include "sph/table_lookup.hpp"
+#include "sph/sph_kernel_tables.hpp"
 
 namespace sph
 {
 
-template<class T>
+template<class T, class Kernel>
 struct XmassInteraction
 {
-    const T* wh;
+    Kernel wh;
 
     template<class ParticleData, class Tc>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& /* r_ij */,
@@ -55,7 +55,7 @@ struct XmassInteraction
         T dist = std::sqrt(r2);
 
         T vloc = dist * hInv;
-        T w    = lt::lookup(wh, vloc);
+        T w    = wh(vloc);
 
         return std::make_tuple(w * mj);
     }
@@ -107,16 +107,27 @@ struct XmassToDensityPostamble : XmassPostamble<T, Tc>
 };
 
 template<class Neighborhood, class Tc, class T, class Tm>
-void xmassIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* wh, T* xmass)
+void xmassIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, KernelVariant<T> const& wh, T* xmass)
 {
-    neighborhood.ijLoop(std::make_tuple(m), std::make_tuple(xmass), XmassInteraction<T>{wh}, XmassPostamble<T, Tc>{K});
+    std::visit(
+        [&]<class Kernel>(Kernel wh)
+        {
+            neighborhood.ijLoop(std::make_tuple(m), std::make_tuple(xmass), XmassInteraction<T, Kernel>{wh},
+                                XmassPostamble<T, Tc>{K});
+        },
+        wh);
 }
 
 template<class Neighborhood, class Tc, class T, class Tm>
-void densityIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* wh, T* xmass)
+void densityIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, KernelVariant<T> const& wh, T* xmass)
 {
-    neighborhood.ijLoop(std::make_tuple(m), std::make_tuple(xmass), XmassInteraction<T>{wh},
-                        XmassToDensityPostamble<T, Tc>{K});
+    std::visit(
+        [&]<class Kernel>(Kernel wh)
+        {
+            neighborhood.ijLoop(std::make_tuple(m), std::make_tuple(xmass), XmassInteraction<T, Kernel>{wh},
+                                XmassToDensityPostamble<T, Tc>{K});
+        },
+        wh);
 }
 
 } // namespace sph
