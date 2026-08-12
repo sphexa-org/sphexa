@@ -14,6 +14,7 @@
 #include <variant>
 #include <vector>
 
+#include "cstone/util/fastmath.hpp"
 #include "cstone/util/reallocate.hpp"
 #include "kernels.hpp"
 #include "table_lookup.hpp"
@@ -113,10 +114,17 @@ struct SincN
 {
     T n;
 
-    constexpr T operator()(const T x) const { return std::pow(wharmonic_std(x), n); }
+    constexpr T operator()(const T x) const
+    {
+        if (x >= kernelSupport<T>) return 0;
+        return util::fastmath::pow(wharmonic_std(x), n);
+    }
 
     constexpr T derivative(const T x) const
-    { return n * std::pow(wharmonic_std(x), n - 1) * wharmonic_derivative_std(x); }
+    {
+        if (x >= kernelSupport<T>) return 0;
+        return n * util::fastmath::pow(wharmonic_std(x), n - 1) * wharmonic_derivative_std(x);
+    }
 };
 
 //! @brief smoothing kernel as a linear combination of two sinc^n terms
@@ -199,11 +207,15 @@ KernelVariant<T> getSphKernel(Exec exec, SphKernelType choice, T sincIndex, Vect
     switch (choice)
     {
         case SphKernelType::sinc_n:
-            if (table) { return TabulatedKernel<T>::tabulate(exec, SincN<T>{sincIndex}, *table); }
-            return KernelVariant<T>{SincN<T>{sincIndex}};
+            if (table)
+                return TabulatedKernel<T>::tabulate(exec, SincN<T>{sincIndex}, *table);
+            else
+                return SincN<T>{sincIndex};
         case SphKernelType::sinc_n1_sinc_n2:
-            if (table) { return TabulatedKernel<T>::tabulate(exec, SincN1SincN2<T>{}, *table); }
-            return KernelVariant<T>{SincN1SincN2<T>{}};
+            if (table)
+                return TabulatedKernel<T>::tabulate(exec, SincN1SincN2<T>{}, *table);
+            else
+                return SincN1SincN2<T>{};
         default: throw std::runtime_error("Invalid SPH kernel type");
     }
 }
