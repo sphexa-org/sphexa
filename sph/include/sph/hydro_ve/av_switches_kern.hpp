@@ -42,7 +42,7 @@ template<class T, class Tc, class Kernel>
 struct AVswitchesInteraction
 {
     Kernel wh;
-    Tc       K;
+    Tc     K;
 
     template<class ParticleData>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,

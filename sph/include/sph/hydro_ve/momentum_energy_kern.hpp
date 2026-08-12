@@ -66,7 +66,7 @@ template<bool AvClean, class T, class Kernel>
 struct MomentumAndEnergyInteraction
 {
     Kernel wh;
-    T        Atmin, Atmax, ramp;
+    T      Atmin, Atmax, ramp;
 
     template<class ParticleData, class Tc>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,

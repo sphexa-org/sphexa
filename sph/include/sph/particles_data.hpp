@@ -395,10 +395,9 @@ public:
 private:
     void createTables()
     {
-        FieldVector<HydroType>* table = &whTable;
-        const char* disableKernelTables = std::getenv("SPH_EXA_DISABLE_KERNEL_TABLES");
-        if(disableKernelTables && std::strcmp(disableKernelTables, "0"))
-            table = nullptr;
+        FieldVector<HydroType>* table               = &whTable;
+        const char*             disableKernelTables = std::getenv("SPH_EXA_DISABLE_KERNEL_TABLES");
+        if (disableKernelTables && std::strcmp(disableKernelTables, "0")) table = nullptr;
         wh = sph::getSphKernel<HydroType>(exec, kernelChoice, sincIndex, table);
 
         const auto whUntabulated = sph::getSphKernel<HydroType>(exec, kernelChoice, sincIndex);

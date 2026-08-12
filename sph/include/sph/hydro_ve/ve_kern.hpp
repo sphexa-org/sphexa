@@ -86,8 +86,7 @@ template<class Neighbordhood, class Tc, class T>
 void veIjLoop(const Neighbordhood& neighborhood, Tc K, const T* xm, KernelVariant<T> const& wh, T* kx)
 {
     std::visit(
-        [&]<class Kernel>(Kernel wh)
-        {
+        [&]<class Kernel>(Kernel wh) {
             neighborhood.ijLoop(std::make_tuple(xm), std::make_tuple(kx), VeInteraction<T, Kernel>{wh},
                                 VePostamble<T, Tc>{K});
         },

@@ -42,10 +42,7 @@ template<typename Tc, class Dataset>
 void computeXMass(Dataset& d, const cstone::Box<Tc>& box)
 {
     if constexpr (d.useGpu) { gpu::computeXMass(d, box); }
-    else
-    {
-        xmassIjLoop(d.neighborhood, d.K, d.m.data(), d.wh, d.xm.data());
-    }
+    else { xmassIjLoop(d.neighborhood, d.K, d.m.data(), d.wh, d.xm.data()); }
 }
 
 } // namespace sph

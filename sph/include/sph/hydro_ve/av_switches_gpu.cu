@@ -50,8 +50,7 @@ void computeAVswitches(Dataset& d, const cstone::Box<typename Dataset::RealType>
                                    cudaMemcpyDeviceToDevice));
     AVswitchesIjLoop(d.neighborhood, d.K, d.minDt, d.alphamin, d.alphamax, d.decay_constant, rawPtr(d.xm), rawPtr(d.kx),
                      rawPtr(d.divv), rawPtr(tmp), rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.c), rawPtr(d.c11),
-                     rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), d.wh,
-                     rawPtr(d.alpha));
+                     rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), d.wh, rawPtr(d.alpha));
 
     checkGpuErrors(cudaDeviceSynchronize());
 }

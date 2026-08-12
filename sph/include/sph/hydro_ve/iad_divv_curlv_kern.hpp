@@ -122,8 +122,8 @@ void iadDivvCurlvGradhIjLoop(const Neighborhood& neighborhood, Tc K, T iadCondit
             }
             else if (doGradV)
             {
-                const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, id, divv, dV11, dV12, dV13,
-                                                    dV22, dV23, dV33);
+                const auto output =
+                    std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, id, divv, dV11, dV12, dV13, dV22, dV23, dV33);
                 neighborhood.ijLoop(input, output, IADDivVCurlVInteraction<T, Kernel>{wh},
                                     IADDivVCurlVPostamble<false, true, T, Tc>{K, iadConditionQuality, iadRegBit});
             }

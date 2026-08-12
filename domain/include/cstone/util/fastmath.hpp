@@ -32,7 +32,9 @@ constexpr float sin(float x)
 
 [[gnu::optimize("-ffast-math")]]
 constexpr double sin(double x)
-{ return std::sin(x); }
+{
+    return std::sin(x);
+}
 
 [[gnu::optimize("-ffast-math")]]
 constexpr float cos(float x)
@@ -46,7 +48,9 @@ constexpr float cos(float x)
 
 [[gnu::optimize("-ffast-math")]]
 constexpr double cos(double x)
-{ return std::cos(x); }
+{
+    return std::cos(x);
+}
 
 [[gnu::optimize("-ffast-math")]]
 constexpr float rcp(float x)
@@ -113,7 +117,7 @@ constexpr float pow(float x, float y)
 
 [[gnu::optimize("-ffast-math")]]
 constexpr double pow(double x, double y)
-{ 
+{
     return std::pow(x, y);
 }
 
