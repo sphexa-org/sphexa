@@ -174,8 +174,7 @@ protected:
                                ijData.interaction);
         }
 
-        runIjLoop<Config>(exec, box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h,
-                          makeConst(ijData.input), tmpOrOutput, ijData.interaction, ijData.postamble,
+        runIjLoop<Config>(exec, box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, ijData, tmpOrOutput,
                           neighborData.get(), superclusterInfo, numISuperclusters, activeMasks);
 
         if constexpr (Config::symmetric)

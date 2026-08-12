@@ -147,6 +147,12 @@ struct EmptyPostamble
 template<class T>
 concept TupleOfPointers = detail::IsTupleOfPointers<T>::value;
 
+template<class... Ts>
+constexpr std::tuple<const Ts*...> makeConst(std::tuple<Ts*...> input)
+{
+    return {input};
+}
+
 //! Empty postamble that does nothing. Should always be preferred over a custom empty postamble, as it enables certain
 //! optimizations in the neighborhood implementations.
 constexpr detail::EmptyPostamble empty_postamble;
@@ -227,8 +233,9 @@ struct IjLoopData
 template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble>
 auto makeIjLoopData(Input&& input, Output&& output, Interaction&& interaction, Postamble&& postamble)
 {
-    return IjLoopData<Tc, ThP, std::decay_t<Input>, std::decay_t<Output>, std::decay_t<Interaction>,
-                      std::decay_t<Postamble>>{std::forward<Input>(input), std::forward<Output>(output),
+    auto constInput = makeConst(input);
+    return IjLoopData<Tc, ThP, std::decay_t<decltype(constInput)>, std::decay_t<Output>, std::decay_t<Interaction>,
+                      std::decay_t<Postamble>>{constInput, std::forward<Output>(output),
                                                std::forward<Interaction>(interaction),
                                                std::forward<Postamble>(postamble)};
 }

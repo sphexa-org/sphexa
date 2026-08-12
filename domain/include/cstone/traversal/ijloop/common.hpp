@@ -31,12 +31,6 @@ namespace cstone::ijloop
 
 // === particle data handling ===
 
-template<class... Ts>
-constexpr std::tuple<const Ts*...> makeConst(std::tuple<Ts*...> input)
-{
-    return {input};
-}
-
 template<class Tc, class ThP, class... Ts, class Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>>
 constexpr std::tuple<LocalIndex, Vec3<Tc>, Th, Ts...> loadParticleData(
     const Tc* x, const Tc* y, const Tc* z, const ThP h, std::tuple<const Ts*...> const& input, LocalIndex index)
