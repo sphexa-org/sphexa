@@ -186,10 +186,8 @@ _run_sphexa-cuda() {
     fi
 
     if [ "$SLURM_PROCID" -eq 0 ]; then t0=$(date +%s) ;fi
-    $APP_INSTALL_DIR/$exe --init sedov --G 1.0 -n 40 -s 100 -w 10 --quiet
+    $APP_INSTALL_DIR/$exe --init sedov --G 1.0 -n 40 -s 100 -w 10 --quiet --glass ./50c.h5
     if [ "$SLURM_PROCID" -eq 0 ]; then t1=$(date +%s) ;echo "t=$(expr $t1 - $t0)" ;fi
-    # Error with: sedov --glass ./50c.h5
-    # -> H5PartGetNumParticles: Iteration is invalid! Have you set the time step?
 
     if [ "$SLURM_PROCID" -eq 0 ]; then mv constants.txt constants_ref.txt ; fi
     wait
