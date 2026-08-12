@@ -118,40 +118,32 @@ _run_prerun() {
 
 _run_ctests() {
     set -e
+
     if [ "$SLURM_PROCID" -eq 0 ]; then
 
-        # ranks="$1"
+        ranks="$1"
         ctest_dir=$(dirname $PWD/$_build_stage/spack-stage-sphexa-develop-*/spack-build-*/CTestTestfile.cmake)
 
-        echo "# ---- cpu tests:"
-        ctest --output-on-failure --test-dir $ctest_dir -L "cpu" # -j 2
+        if [ "$SLURM_PROCID" -eq 0 ]; then
+            echo "ranks=$ranks NUM_KEYS=$NUM_KEYS ctest_dir=$ctest_dir"
+        fi
 
-        echo "# ---- gpu tests:"
-        ctest --output-on-failure --test-dir $ctest_dir -L "gpu" # -j 2
+        if [ $ranks = "01r" ] ; then
+            _run_prerun grackle
+            ctest --output-on-failure --test-dir $ctest_dir -j -L "$ranks" # -V
+            # ctest --output-on-failure --test-dir $ctest_dir -N -L "$ranks" # -V
+        else
+            echo "# ---- cpu tests:"
+            ctest --output-on-failure --test-dir $ctest_dir -L "$ranks" -L "cpu" -j
+
+            echo "# ---- gpu tests:"
+            ctest --output-on-failure --test-dir $ctest_dir -L "$ranks" -L "gpu"
+        fi
+
+        date
+
     fi
     wait
-
-#         if [ "$SLURM_PROCID" -eq 0 ]; then
-#             echo "ranks=$ranks NUM_KEYS=$NUM_KEYS"
-#             echo "ctest_dir=$ctest_dir"
-#             pwd
-#         fi
-# 
-#         if [ $ranks = "01r" ] ; then
-#             _run_prerun grackle
-#             ctest --output-on-failure --test-dir $ctest_dir -j -L "$ranks" # -V
-#             # ctest --output-on-failure --test-dir $ctest_dir -N -L "$ranks" # -V
-#         else
-#             echo "# ---- cpu tests:"
-#             ctest --output-on-failure --test-dir $ctest_dir -L "$ranks" -L "cpu" -j
-#             echo "# ---- gpu tests:"
-#             ctest --output-on-failure --test-dir $ctest_dir -L "$ranks" -L "gpu"
-#         fi
-# 
-#         date
-# 
-#     fi
-#     wait
 
 # # --- GPU
 # 10/17 Test #14: ExchangeGeneralGpu ...............   Passed   13.31 sec
@@ -214,7 +206,6 @@ _run_sphexa-cuda() {
       if [ $? -ne 0 ]; then exit 1 ; fi
     fi
     wait
-    date
 }
 
 _run_get_build_artifact() {
