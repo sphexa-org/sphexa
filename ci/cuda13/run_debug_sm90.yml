@@ -30,10 +30,10 @@ include:
     SLURM_JOB_NUM_NODES: 1
   before_script:
     - if [ "${SLURM_PROCID}" -eq 0 ]; then pwd ; fi
-   script:
-     - |
-       source ci/scripts/alps_cscs.sh &&
-       time -p _run_ctests ${RUN_CTESTS_ARG}
+  script:
+    - |
+      source ci/scripts/alps_cscs.sh &&
+      time -p _run_ctests ${RUN_CTESTS_ARG}
 
 # ----------------------------------------------------------------------------    
 sph-run-cuda13-sm90-debug-01ranks:
