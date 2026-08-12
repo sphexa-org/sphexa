@@ -1,15 +1,96 @@
-variables:
-  APP_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/bin'
-  TEST_INSTALL_DIR: 'sphexa+spack/store/linux-neoverse_v2/sphexa-*/sbin'
-
 include:
   - local: 'ci/common.yml'
-  - local: 'ci/cuda13/release/run_release_sm90_01r.yml'
-  - local: 'ci/cuda13/release/run_release_sm90_02r.yml'
-  - local: 'ci/cuda13/release/run_release_sm90_04r.yml'
-  - local: 'ci/cuda13/release/run_release_sm90_10r.yml'
-  - local: 'ci/cuda13/release/run_release_sm90_12r.yml'
-  - local: 'ci/cuda13/release/run_release_sm90_sphexa-cuda.yml'
-  - local: 'ci/cuda13/release/run_release_sm90_sphexa-cpu.yml'
-  - local: 'ci/cuda13/release/run_release_sm90_sphexa-cpu-compare.yml'
-  - local: 'ci/cuda13/release/run_release_sm90_sphexa-cuda-compare.yml'
+
+.sph-run-cuda13-sm90-release-base:
+  stage: sphexa_run
+  image: ${UENV_CUDA}
+  needs: ['sph-build-cuda13-sm90-release']
+  extends: [.uenv-runner-daint-gh200]
+  variables:
+    SLURM_TIMELIMIT: '00:15:00'
+    WITH_UENV_VIEW: 'default'
+    SLURM_JOB_NUM_NODES: 1
+  before_script:
+    - if [ "${SLURM_PROCID}" -eq 0 ]; then pwd ; fi
+  script:
+    - |
+      source ci/scripts/alps_cscs.sh &&
+      time -p _run_ctests ${RUN_CTESTS_ARG}
+
+# ----------------------------------------------------------------------------    
+sph-run-cuda13-sm90-release-01ranks:
+  extends: [.sph-run-cuda13-sm90-release-base]
+  variables:
+    SLURM_NTASKS: 1
+    RUN_CTESTS_ARG: '01r'
+
+sph-run-cuda13-sm90-release-02ranks:
+  extends: [.sph-run-cuda13-sm90-release-base]
+  variables:
+    SLURM_NTASKS: 2
+    RUN_CTESTS_ARG: '02r'
+
+sph-run-cuda13-sm90-release-04ranks:
+  extends: [.sph-run-cuda13-sm90-release-base]
+  variables:
+    SLURM_NTASKS: 4
+    RUN_CTESTS_ARG: '04r'
+
+sph-run-cuda13-sm90-release-10ranks:
+  extends: [.sph-run-cuda13-sm90-release-base]
+  variables:
+    SLURM_NTASKS: 10
+    RUN_CTESTS_ARG: '10r'
+
+sph-run-cuda13-sm90-release-12ranks:
+  extends: [.sph-run-cuda13-sm90-release-base]
+  variables:
+    SLURM_NTASKS: 12
+    RUN_CTESTS_ARG: '12r'
+
+# ----------------------------------------------------------------------------    
+sph-run-cuda13-sm90-release-sphexa-cpu:
+  extends: [.sph-run-cuda13-sm90-release-base]
+  variables:
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+    OMP_NUM_THREADS: 64
+  script:
+    - |
+      source ci/scripts/alps_cscs.sh &&
+      _run_sphexa-cuda cpu
+
+sph-run-cuda13-sm90-release-sphexa-cuda:
+  extends: [.sph-run-cuda13-sm90-release-base]
+  variables:
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+    OMP_NUM_THREADS: 64
+  script:
+    - |
+      source ci/scripts/alps_cscs.sh &&
+      _run_sphexa-cuda gpu
+
+# ----------------------------------------------------------------------------    
+sph-compare-constants-cuda13-sm90-release-sphexa-cpu:
+  extends: [.sph-run-cuda13-sm90-release-base]
+  variables:
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+    OMP_NUM_THREADS: 64
+  script:
+    - |
+      source ci/scripts/alps_cscs.sh &&
+      bash ci/scripts/run_constants_comparison.sh ${APP_INSTALL_DIR}/sphexa Release
+
+sph-compare-constants-cuda13-sm90-release-sphexa-cuda:
+  extends: [.sph-run-cuda13-sm90-release-base]
+  variables:
+    SLURM_NTASKS: 4
+    SLURM_CPUS_PER_TASK: 71
+    OMP_NUM_THREADS: 64
+  script:
+    - |
+      source ci/scripts/alps_cscs.sh &&
+      bash ci/scripts/run_constants_comparison.sh ${APP_INSTALL_DIR}/sphexa-cuda Release
+

@@ -1,24 +1,6 @@
 include:
   - local: 'ci/common.yml'
 
-#del sph-run-cuda13-sm90-debug-ctests:
-#del   stage: sphexa_run
-#del   image: ${UENV_CUDA}
-#del   needs: ['sph-build-cuda13-sm90-debug']
-#del   extends: [.uenv-runner-daint-gh200]
-#del   variables:
-#del     SLURM_TIMELIMIT: '00:15:00'
-#del     WITH_UENV_VIEW: 'default'
-#del     SLURM_JOB_NUM_NODES: 1
-#del     SLURM_CPUS_PER_TASK: 71
-#del     OMP_NUM_THREADS: 64
-#del   before_script:
-#del     - if [ "${SLURM_PROCID}" -eq 0 ]; then pwd ; fi
-#del   script:
-#del     - |
-#del       source ci/scripts/alps_cscs.sh &&
-#del       _run_ctests
-
 .sph-run-cuda13-sm90-debug-base:
   stage: sphexa_run
   image: ${UENV_CUDA}
@@ -99,7 +81,7 @@ sph-compare-constants-cuda13-sm90-debug-sphexa-cpu:
   script:
     - |
       source ci/scripts/alps_cscs.sh &&
-      bash ci/scripts/run_constants_comparison.sh ${APP_INSTALL_DIR}/sphexa
+      bash ci/scripts/run_constants_comparison.sh ${APP_INSTALL_DIR}/sphexa Debug
 
 sph-compare-constants-cuda13-sm90-debug-sphexa-cuda:
   extends: [.sph-run-cuda13-sm90-debug-base]
@@ -110,5 +92,5 @@ sph-compare-constants-cuda13-sm90-debug-sphexa-cuda:
   script:
     - |
       source ci/scripts/alps_cscs.sh &&
-      bash ci/scripts/run_constants_comparison.sh ${APP_INSTALL_DIR}/sphexa-cuda
+      bash ci/scripts/run_constants_comparison.sh ${APP_INSTALL_DIR}/sphexa-cuda Debug
 

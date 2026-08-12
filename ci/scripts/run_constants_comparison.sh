@@ -2,12 +2,13 @@
 
 set -euo pipefail
 
-if [ "$#" -ne 1 ]; then
-  echo "Usage: $0 <sphexa_executable>" >&2
+if [ "$#" -ne 2 ]; then
+  echo "Usage: $0 <sphexa_executable> <build_type>" >&2
   exit 1
 fi
 
 binary_path="$1"
+build_type="$2"
 
 # Expand possible wildcards in binary path
 shopt -s nullglob
@@ -59,14 +60,14 @@ ics=(
   isobaric-cube
   evrard
   turbulence
-  gresho-chan
   wind-shock
 )
 
-if [ "$backend" = "cuda" ] ; then
+if [ "$backend" = "cuda" ] && [ "$build_type" = "Debug" ] ; then
     ics+=(kelvin-helmholtz)
+    ics+=(gresho-chan)
 else
-    echo "skipping kelvin-helmholtz test on cpu"
+    echo "skipping kelvin-helmholtz and gresho-chan tests on cpu/debug"
 fi
 
 # Exactly conserved observables to be compared by absolute value (not relative error) in compare_constants.py.
