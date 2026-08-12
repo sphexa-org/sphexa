@@ -31,6 +31,7 @@
 #pragma once
 
 #include <array>
+#include <cstring>
 #include <iostream>
 #include <vector>
 #include <variant>
@@ -394,7 +395,11 @@ public:
 private:
     void createTables()
     {
-        wh = sph::getSphKernel<HydroType>(exec, kernelChoice, sincIndex, &whTable);
+        FieldVector<HydroType>* table = &whTable;
+        const char* disableKernelTables = std::getenv("SPH_EXA_DISABLE_KERNEL_TABLES");
+        if(disableKernelTables && std::strcmp(disableKernelTables, "0"))
+            table = nullptr;
+        wh = sph::getSphKernel<HydroType>(exec, kernelChoice, sincIndex, table);
 
         const auto whUntabulated = sph::getSphKernel<HydroType>(exec, kernelChoice, sincIndex);
         std::visit([this](auto const& kernel) { K = sph::kernel_3D_k(kernel); }, whUntabulated);
