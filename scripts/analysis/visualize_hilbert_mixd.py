@@ -280,8 +280,8 @@ def main() -> None:
         print(f"Saved static image to {output_path}")
     else:
         # Plotly interactive HTML export or show
-        import plotly.graph_objs as go
-        import plotly.io as pio
+        import plotly.graph_objects as go
+        from plotly.io import write_html
 
         # Plotly interactive 3D polyline (not closed)
         trace = go.Scatter3d(
@@ -312,6 +312,12 @@ def main() -> None:
                 line=dict(width=5, color='orange', dash='dash'),
                 name='max-distance pair'
             )
+        # Normalize aspect ratio relative to the largest dimension. Passing raw box lengths (which can
+        # be very large or very unequal) miscalibrates the three.js camera clipping planes, which
+        # prevents zooming out far enough to see the whole plot.
+        max_len = max(args.lx, args.ly, args.lz)
+        aspect_x, aspect_y, aspect_z = args.lx / max_len, args.ly / max_len, args.lz / max_len
+
         layout = go.Layout(
             title=f"MixD Hilbert curve centers (bx, by, bz)=({bx}, {by}, {bz}), key_type={args.key_type}, level={args.level}",
             scene=dict(
@@ -319,7 +325,8 @@ def main() -> None:
                 yaxis_title='y',
                 zaxis_title='z',
                 aspectmode='manual',
-                aspectratio=dict(x=args.lx, y=args.ly, z=args.lz)
+                aspectratio=dict(x=aspect_x, y=aspect_y, z=aspect_z),
+                camera=dict(eye=dict(x=1.8, y=1.8, z=1.8)),
             ),
             margin=dict(l=0, r=0, b=0, t=40)
         )
@@ -331,7 +338,8 @@ def main() -> None:
         if output_path:
             html_path = output_path.with_suffix('.html')
             html_path.parent.mkdir(parents=True, exist_ok=True)
-            pio.write_html(fig, file=str(html_path), auto_open=False, include_plotlyjs='embed')
+            write_html(fig, file=str(html_path), auto_open=False, include_plotlyjs='embed',
+                       config=dict(scrollZoom=True))
             print(f"Saved interactive plot to {html_path}")
         else:
             print("Displaying interactively the plot doesn't work. Plese use --save with an `.html` suffix to save the plot as an HTML file.")
