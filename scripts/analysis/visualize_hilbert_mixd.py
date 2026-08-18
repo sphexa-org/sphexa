@@ -340,7 +340,7 @@ def main() -> None:
             html_path.parent.mkdir(parents=True, exist_ok=True)
             write_html(fig, file=str(html_path), auto_open=False, include_plotlyjs='embed',
                        config=dict(scrollZoom=True))
-            print(f"Saved interactive plot to {html_path}")
+            print(f"Saved interactive plot to {html_path.resolve()}")
         else:
             print("Displaying interactively the plot doesn't work. Plese use --save with an `.html` suffix to save the plot as an HTML file.")
 
