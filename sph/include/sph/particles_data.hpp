@@ -82,7 +82,7 @@ public:
     using FieldVariant = std::variant<FieldVector<float>*, FieldVector<double>*, FieldVector<unsigned>*,
                                       FieldVector<uint64_t>*, FieldVector<uint8_t>*>;
 
-    ParticlesData() { createTables(); }
+    ParticlesData() { createSphKernel(); }
     ParticlesData(const ParticlesData&) = delete;
 
     uint64_t iteration{1};
@@ -213,7 +213,7 @@ public:
         optionalIO("kernelChoice", &kernelChoice, 1);
         optionalIO("iadConditionQuality", &iadConditionQuality, 1);
 
-        createTables();
+        createSphKernel();
     }
 
     //! @brief Interpolation kernel normalization constant, will be recomputed on initialization
@@ -389,7 +389,7 @@ public:
     void disableNeighborLists() { neighborhood.disableNeighborLists(); }
 
 private:
-    void createTables()
+    void createSphKernel()
     {
         wh = sph::getSphKernel<HydroType>(kernelChoice, sincIndex);
         std::visit([this](auto const& kernel) { K = sph::kernel_3D_k(kernel); }, wh);
