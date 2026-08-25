@@ -17,7 +17,6 @@
 #include "cstone/util/fastmath.hpp"
 #include "cstone/util/reallocate.hpp"
 #include "kernels.hpp"
-#include "table_lookup.hpp"
 
 namespace util
 {
@@ -92,23 +91,6 @@ constexpr double kernel_3D_k(F sphKernel)
     return 1.0 / util::simpson(0, kernelSupport<double>, numIntervals, kernelVol3D);
 }
 
-//! @brief tabulate and arbitrary function at N points between lower support and upperSupport
-template<typename T, std::size_t N, class F>
-std::array<T, N> tabulateFunction(F&& func, double lowerSupport, double upperSupport)
-{
-    constexpr int    numIntervals = N - 1;
-    std::array<T, N> table;
-
-    const T dx = (upperSupport - lowerSupport) / numIntervals;
-    for (size_t i = 0; i < N; ++i)
-    {
-        T normalizedVal = lowerSupport + i * dx;
-        table[i]        = func(normalizedVal);
-    }
-
-    return table;
-}
-
 template<class T>
 struct SincN
 {
@@ -143,52 +125,8 @@ struct SincN1SincN2
     T                         K2     = kernel_3D_k(sincN2);
 };
 
-template<class T, std::size_t TableSize = 20000>
-struct TabulatedKernel
-{
-    const T* buffer;
-
-    template<class Kernel, cstone::execution::Policy Exec, class Vector>
-    static TabulatedKernel tabulate(Exec exec, Kernel const& kernel, Vector& buffer)
-    {
-        const auto tabulatedValues = tabulateFunction<T, TableSize>(kernel, 0.0, kernelSupport<double>);
-        const auto tabulatedDerivatives =
-            tabulateFunction<T, TableSize>([&kernel](T x) { return kernel.derivative(x); }, 0.0, kernelSupport<double>);
-
-        reallocate(buffer, 2 * TableSize, 1.0);
-
-        if constexpr (cstone::execution::HaveGpu<Exec>())
-        {
-            cstone::memcpyH2DAsync(exec, tabulatedValues.data(), TableSize, buffer.data());
-            cstone::memcpyH2DAsync(exec, tabulatedDerivatives.data(), TableSize, buffer.data() + TableSize);
-        }
-        else
-        {
-            cstone::copy_n(exec, tabulatedValues.data(), TableSize, buffer.data());
-            cstone::copy_n(exec, tabulatedDerivatives.data(), TableSize, buffer.data() + TableSize);
-        }
-
-        return {buffer.data()};
-    }
-
-    constexpr T operator()(const T x) const { return lookup(buffer, x); }
-    constexpr T derivative(const T x) const { return lookup(buffer + TableSize, x); }
-
-private:
-    constexpr T lookup(const T* table, const T x) const
-    {
-        constexpr std::size_t numIntervals = TableSize - 1;
-        constexpr T           dx           = kernelSupport<T> / numIntervals;
-        constexpr T           invDx        = T(1) / dx;
-
-        const std::size_t idx        = x * invDx;
-        const T           derivative = (idx >= numIntervals) ? T(0) : (table[idx + 1] - table[idx]) * invDx;
-        return (idx >= numIntervals) ? T(0) : table[idx] + derivative * (x - idx * dx);
-    }
-};
-
 template<class T>
-using KernelVariant = std::variant<SincN<T>, SincN1SincN2<T>, TabulatedKernel<T>>;
+using KernelVariant = std::variant<SincN<T>, SincN1SincN2<T>>;
 
 enum SphKernelType : int
 {
@@ -201,21 +139,15 @@ enum SphKernelType : int
  * If sinc_n is chosen, n will be set to @p sincIndex.
  * For sinc_n1_plus_sinc_n2, the linear combination and exponents are fixed here
  */
-template<class T, cstone::execution::Policy Exec, class Vector = std::vector<T>>
-KernelVariant<T> getSphKernel(Exec exec, SphKernelType choice, T sincIndex, Vector* table = nullptr)
+template<class T>
+KernelVariant<T> getSphKernel(SphKernelType choice, T sincIndex)
 {
     switch (choice)
     {
         case SphKernelType::sinc_n:
-            if (table)
-                return TabulatedKernel<T>::tabulate(exec, SincN<T>{sincIndex}, *table);
-            else
-                return SincN<T>{sincIndex};
+            return SincN<T>{sincIndex};
         case SphKernelType::sinc_n1_sinc_n2:
-            if (table)
-                return TabulatedKernel<T>::tabulate(exec, SincN1SincN2<T>{}, *table);
-            else
-                return SincN1SincN2<T>{};
+            return SincN1SincN2<T>{};
         default: throw std::runtime_error("Invalid SPH kernel type");
     }
 }

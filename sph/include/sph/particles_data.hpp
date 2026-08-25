@@ -49,15 +49,12 @@
 #include "sph/neighborhood.hpp"
 #include "sph/neighborhood_gpu.hpp"
 #include "sph/kernels.hpp"
-#include "sph/table_lookup.hpp"
 #include "sph/types.hpp"
 
 #include "sph_kernel_tables.hpp"
 
 namespace sphexa
 {
-
-namespace lt = ::sph::lt;
 
 template<cstone::execution::Policy Execution>
 class ParticlesData : public cstone::FieldStates<ParticlesData<Execution>>
@@ -266,7 +263,6 @@ public:
 
     //! @brief SPH-kernel
     sph::KernelVariant<HydroType> wh;
-    FieldVector<HydroType>        whTable;
 
     FieldVector<cstone::LocalIndex> traversalStack;
     //! @brief non-stateful variables for statistics
@@ -395,13 +391,8 @@ public:
 private:
     void createTables()
     {
-        FieldVector<HydroType>* table               = &whTable;
-        const char*             disableKernelTables = std::getenv("SPH_EXA_DISABLE_KERNEL_TABLES");
-        if (disableKernelTables && std::strcmp(disableKernelTables, "0")) table = nullptr;
-        wh = sph::getSphKernel<HydroType>(exec, kernelChoice, sincIndex, table);
-
-        const auto whUntabulated = sph::getSphKernel<HydroType>(exec, kernelChoice, sincIndex);
-        std::visit([this](auto const& kernel) { K = sph::kernel_3D_k(kernel); }, whUntabulated);
+        wh = sph::getSphKernel<HydroType>(kernelChoice, sincIndex);
+        std::visit([this](auto const& kernel) { K = sph::kernel_3D_k(kernel); }, wh);
     }
 
     //! @brief buffer growth factor when reallocating
