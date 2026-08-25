@@ -111,7 +111,7 @@ void haloExchangeGpu(int epoch,
 
     if (not sendRequests.empty()) { MPI_Waitall(int(sendRequests.size()), sendRequests.data(), MPI_STATUSES_IGNORE); }
 
-    checkGpuErrors(cudaFreeAsync(d_range, exec));
+    if (d_range) checkGpuErrors(cudaFreeAsync(d_range, exec));
     reallocate(sendScratchBuffer, oldSendSize, 1.0);
     reallocate(receiveScratchBuffer, oldRecvSize, 1.0);
 
