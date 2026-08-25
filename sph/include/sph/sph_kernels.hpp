@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <functional>
 #include <numeric>
-#include <optional>
+#include <stdexcept>
 #include <variant>
 #include <vector>
 
