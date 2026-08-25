@@ -10,7 +10,7 @@
 
 #include "gtest/gtest.h"
 
-#include "sph/sph_kernel_tables.hpp"
+#include "sph/sph_kernels.hpp"
 
 using namespace sph;
 

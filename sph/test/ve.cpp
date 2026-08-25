@@ -44,7 +44,7 @@
 #include "sph/hydro_ve/ve_kern.hpp"
 #include "sph/hydro_ve/xmass_kern.hpp"
 #include "sph/id_layout.hpp"
-#include "sph/sph_kernel_tables.hpp"
+#include "sph/sph_kernels.hpp"
 #include "../../main/src/io/file_utils.hpp"
 
 using namespace sph;

@@ -38,7 +38,7 @@
 #include "sph/hydro_std/iad_kern.hpp"
 #include "sph/hydro_std/momentum_energy_kern.hpp"
 #include "sph/id_layout.hpp"
-#include "sph/sph_kernel_tables.hpp"
+#include "sph/sph_kernels.hpp"
 
 using namespace sph;
 

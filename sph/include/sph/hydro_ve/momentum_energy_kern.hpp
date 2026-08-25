@@ -35,7 +35,7 @@
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/kernels.hpp"
-#include "sph/sph_kernel_tables.hpp"
+#include "sph/sph_kernels.hpp"
 
 namespace sph
 {

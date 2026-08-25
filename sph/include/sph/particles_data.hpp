@@ -51,7 +51,7 @@
 #include "sph/kernels.hpp"
 #include "sph/types.hpp"
 
-#include "sph_kernel_tables.hpp"
+#include "sph_kernels.hpp"
 
 namespace sphexa
 {
