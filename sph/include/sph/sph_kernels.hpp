@@ -144,10 +144,8 @@ KernelVariant<T> getSphKernel(SphKernelType choice, T sincIndex)
 {
     switch (choice)
     {
-        case SphKernelType::sinc_n:
-            return SincN<T>{sincIndex};
-        case SphKernelType::sinc_n1_sinc_n2:
-            return SincN1SincN2<T>{};
+        case SphKernelType::sinc_n: return SincN<T>{sincIndex};
+        case SphKernelType::sinc_n1_sinc_n2: return SincN1SincN2<T>{};
         default: throw std::runtime_error("Invalid SPH kernel type");
     }
 }
