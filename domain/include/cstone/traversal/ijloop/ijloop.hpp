@@ -111,16 +111,11 @@ namespace detail
 {
 
 template<class T>
-struct IsTupleOfPointers : std::false_type
-{
-};
+inline constexpr bool IsTupleOfPointers_v = false;
 
 template<class... Ts>
-struct IsTupleOfPointers<std::tuple<Ts...>>
-    : std::bool_constant<(std::is_pointer_v<Ts> && ...) &&
-                         (std::is_trivially_copyable_v<std::remove_pointer_t<Ts>> && ...)>
-{
-};
+inline constexpr bool IsTupleOfPointers_v<std::tuple<Ts...>> =
+    (std::is_pointer_v<Ts> && ...) && (std::is_trivially_copyable_v<std::remove_pointer_t<Ts>> && ...);
 
 /*! @brief Maps a std::tuple of pointers to a std::tuple of the pointee types. */
 template<class T>
@@ -145,7 +140,7 @@ struct EmptyPostamble
 
 //! @brief Restricts types to std::tuples of pointers to trivially copyable types.
 template<class T>
-concept TupleOfPointers = detail::IsTupleOfPointers<T>::value;
+concept TupleOfPointers = detail::IsTupleOfPointers_v<T>;
 
 template<class... Ts>
 constexpr std::tuple<const Ts*...> makeConst(std::tuple<Ts*...> input)
