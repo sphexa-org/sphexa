@@ -330,7 +330,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         superclusterInfo[iSuperclusterIndex];
 
     using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq(x, y, z, h, ijData.input, firstBody));
-    using Result = typename IjData::Result;
+    using InteractionResultType = typename IjData::InteractionResultType;
 
     const auto iSuperclusterData =
         loadSuperclusterIParticleData<Config, NumSuperclustersPerBlock, ParticleDataWithRadiusSq>(
@@ -338,7 +338,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
 
     __syncthreads();
 
-    std::array<Result, Config::iClustersPerSupercluster> iResults = {};
+    std::array<InteractionResultType, Config::iClustersPerSupercluster> iResults = {};
 
     const unsigned maskSize = masksSize<Config>(iSuperclusterNeighborsCount);
     typename Config::Compression::Decompression decompression(&neighborData[iSuperclusterDataIndex + maskSize],
@@ -366,7 +366,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
                                                : dummyParticleData(x, y, z, h, ijData.input, j);
             const Th jRadiusSq           = radiusSq(jData);
             std::get<0>(jData) -= firstValidBody;
-            Result jResult = {};
+            InteractionResultType jResult = {};
 
             for (unsigned c = 0; c < Config::iClustersPerSupercluster; ++c)
             {
@@ -415,11 +415,11 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
 
     if constexpr (!Config::symmetric && Config::numWarpsPerInteraction > 1)
     {
-        using Buffer = decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(Result())));
+        using Buffer = decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(InteractionResultType())));
         __shared__ util::Uninitialized<Buffer> outputBuffers[NumSuperclustersPerBlock];
         Buffer* outputBuffer  = outputBuffers[threadIdx.z].data();
         auto outputBufferPtrs = util::tupleMap([](auto& array) { return array.data(); }, *outputBuffer);
-        auto init             = unwrapModifiers(Result{});
+        auto init             = unwrapModifiers(InteractionResultType{});
         for (unsigned offset = threadIdx.y * Config::iSize + threadIdx.x; offset < Config::superclusterSize;
              offset += Config::iSize * Config::jSize)
             storeParticleData(outputBufferPtrs, offset, init);

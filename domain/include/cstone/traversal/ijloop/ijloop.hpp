@@ -210,10 +210,10 @@ struct IjLoopData
     using RadiusType = std::remove_pointer_t<ThP>;
 
     //! @brief What an i-j interaction returns
-    using Result = decltype(std::declval<Interaction>()(std::declval<ParticleDataType>(),
-                                                        std::declval<ParticleDataType>(),
-                                                        std::declval<Vec3<Tc>>(),
-                                                        std::declval<RadiusType>()));
+    using InteractionResultType = decltype(std::declval<Interaction>()(std::declval<ParticleDataType>(),
+                                                                       std::declval<ParticleDataType>(),
+                                                                       std::declval<Vec3<Tc>>(),
+                                                                       std::declval<RadiusType>()));
 
     //! @brief what the postamble returns - will be stored back to the output fields
     using PostambleResultType = typename detail::DereferencedTuple<Output>::type;
