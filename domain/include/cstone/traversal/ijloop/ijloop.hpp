@@ -234,13 +234,11 @@ struct IjLoopData
 
 //! @brief Convenience factory to construct an @p IjLoopData with explicit Tc and ThP and deduced tuple/functor types.
 template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble>
-auto makeIjLoopData(Input&& input, Output&& output, Interaction&& interaction, Postamble&& postamble)
+auto makeIjLoopData(const Input& in, const Output& out, const Interaction& interaction, const Postamble& postamble)
 {
-    auto constInput = makeConst(input);
+    auto constInput = makeConst(in);
     return IjLoopData<Tc, ThP, std::decay_t<decltype(constInput)>, std::decay_t<Output>, std::decay_t<Interaction>,
-                      std::decay_t<Postamble>>{constInput, std::forward<Output>(output),
-                                               std::forward<Interaction>(interaction),
-                                               std::forward<Postamble>(postamble)};
+                      std::decay_t<Postamble>>{constInput, out, interaction, postamble};
 }
 
 namespace detail
