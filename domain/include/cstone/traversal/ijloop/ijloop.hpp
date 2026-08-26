@@ -102,11 +102,6 @@ constexpr auto unwrapModifiers(std::tuple<Ts...> const& value)
     return util::tupleMap([](auto const& v) { return detail::unwrapModifiersImpl(v); }, value);
 }
 
-struct Statistics
-{
-    const std::size_t numBodies, numBytes;
-};
-
 namespace detail
 {
 
@@ -116,13 +111,26 @@ inline constexpr bool IsTupleOfPointers_v = false;
 template<class... Ts>
 inline constexpr bool IsTupleOfPointers_v<std::tuple<Ts...>> =
     (std::is_pointer_v<Ts> && ...) && (std::is_trivially_copyable_v<std::remove_pointer_t<Ts>> && ...);
+} // namespace detail
 
+//! @brief Restricts types to std::tuples of pointers to trivially copyable types.
+template<class T>
+concept TupleOfPointers = detail::IsTupleOfPointers_v<T>;
+
+template<class... Ts>
+constexpr std::tuple<const Ts*...> makeConst(std::tuple<Ts*...> input)
+{
+    return {input};
+}
+
+namespace detail
+{
 /*! @brief Maps a std::tuple of pointers to a std::tuple of the pointee types. */
 template<class T>
 struct DereferencedTuple;
 
 template<class... Ts>
-struct DereferencedTuple<std::tuple<Ts...>>
+requires TupleOfPointers<std::tuple<Ts...>> struct DereferencedTuple<std::tuple<Ts...>>
 {
     using type = std::tuple<std::decay_t<std::remove_pointer_t<Ts>>...>;
 };
@@ -138,15 +146,10 @@ struct EmptyPostamble
 
 } // namespace detail
 
-//! @brief Restricts types to std::tuples of pointers to trivially copyable types.
-template<class T>
-concept TupleOfPointers = detail::IsTupleOfPointers_v<T>;
-
-template<class... Ts>
-constexpr std::tuple<const Ts*...> makeConst(std::tuple<Ts*...> input)
+struct Statistics
 {
-    return {input};
-}
+    const std::size_t numBodies, numBytes;
+};
 
 //! Empty postamble that does nothing. Should always be preferred over a custom empty postamble, as it enables certain
 //! optimizations in the neighborhood implementations.
