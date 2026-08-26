@@ -146,6 +146,11 @@ struct EmptyPostamble
 
 } // namespace detail
 
+//! @brief Concept satisfied by a floating point number, or a pointer to one. Used e.g. for smoothing lengths.
+template<class T>
+concept FpOrPtrToFp =
+    (std::is_pointer_v<T> && std::is_floating_point_v<std::remove_pointer_t<T>>) || std::is_floating_point_v<T>;
+
 struct Statistics
 {
     const std::size_t numBodies, numBytes;
@@ -156,7 +161,7 @@ struct Statistics
 constexpr detail::EmptyPostamble empty_postamble;
 
 //! @brief A tuple of stack variables with data associated with one particle
-template<std::floating_point Tc, class ThP, TupleOfPointers Input>
+template<std::floating_point Tc, FpOrPtrToFp ThP, TupleOfPointers Input>
 using ParticleData =
     decltype(std::tuple_cat(std::declval<std::tuple<LocalIndex, Vec3<Tc>, std::remove_pointer_t<ThP>>>(),
                             std::declval<typename detail::DereferencedTuple<Input>::type>()));
@@ -196,7 +201,7 @@ concept ValidPostamble = PairInteraction<Interaction, Tc, ThP, Input> && require
  * @tparam Postamble       function object satisfying the ValidPostamble concept
  */
 template<std::floating_point Tc,
-         class ThP,
+         FpOrPtrToFp ThP,
          TupleOfPointers Input,
          TupleOfPointers Output,
          PairInteraction<Tc, ThP, Input> Interaction,
