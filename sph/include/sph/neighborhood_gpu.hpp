@@ -26,7 +26,7 @@ struct DeviceNeighborhoodData
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool subgroups);
 
     template<class... Args>
-    void ijLoop(Args&&... args) const;
+    void ijLoop(cstone::ijloop::IjLoopData<Args...>) const;
 
 private:
     struct Impl;
@@ -87,9 +87,9 @@ struct DeviceNeighborhoodData::Impl
     }
 
     template<class... Args>
-    void ijLoop(Args&&... args) const
+    void ijLoop(cstone::ijloop::IjLoopData<Args...> ijData) const
     {
-        const auto runIjLoop = [&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); };
+        const auto runIjLoop = [&](auto& nb) { nb.ijLoop(std::move(ijData)); };
         if (subgroupNeighborhood)
             std::visit(runIjLoop, subgroupNeighborhood.value());
         else
@@ -116,10 +116,10 @@ void DeviceNeighborhoodData::build(const cstone::GroupView& groups, Dataset& d, 
 }
 
 template<class... Args>
-void DeviceNeighborhoodData::ijLoop(Args&&... args) const
+void DeviceNeighborhoodData::ijLoop(cstone::ijloop::IjLoopData<Args...> ijData) const
 {
     assert(impl);
-    impl->ijLoop(std::forward<Args>(args)...);
+    impl->ijLoop(ijData);
 }
 #endif
 
