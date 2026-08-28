@@ -30,14 +30,13 @@
  * @author Jose A. Escartin <ja.escartin@gmail.com>
  */
 
-#pragma once
-
-#include "cstone/fields/field_get.hpp"
+#include <algorithm>
 #include "sph/particles_data.hpp"
 #include "sph/sph.hpp"
 
 #include "ipropagator.hpp"
 #include "gravity_wrapper.hpp"
+#include "load_balance_criterion.hpp"
 
 namespace sphexa
 {
@@ -63,8 +62,12 @@ protected:
                                          MultipoleHolderGpu<MultipoleType, DomainType, typename DataType::HydroData>,
                                          MultipoleHolderCpu<MultipoleType, DomainType, typename DataType::HydroData>>;
 
-    MHolder_t      mHolder_;
-    GroupData<Acc> groups_;
+    MHolder_t                   mHolder_;
+    GroupData<Acc>              groups_;
+    BoulmierLoadBalanceCriterion lbCriterion_;
+    bool                        useBoulmierLb_{false};
+    size_t                      syncInterval_{1};
+    float                       computeTimeBaseline_{0};
 
     /*! @brief the list of conserved particles fields with values preserved between iterations
      *
@@ -84,11 +87,24 @@ protected:
         std::conditional_t<avClean, decltype(DependentFields_{} + GradVFields{}), decltype(DependentFields_{})>;
 
 public:
-    HydroVeProp(std::ostream& output, size_t rank)
+    HydroVeProp(std::ostream& output, size_t rank, bool useBoulmierLb = false, size_t syncInterval = 1)
         : Base(output, rank)
+        , useBoulmierLb_(useBoulmierLb)
+        , syncInterval_(syncInterval)
     {
+        lbCriterion_.setEnabled(useBoulmierLb_);
         if (avClean && rank == 0) { std::cout << "AV cleaning is activated" << std::endl; }
+        if (useBoulmierLb_ && rank == 0)
+        {
+            std::cout << "Boulmier load-balancing criterion enabled (automatic domain sync)" << std::endl;
+        }
+        else if (syncInterval_ > 1 && rank == 0)
+        {
+            std::cout << "Domain sync interval set to " << syncInterval_ << " timesteps" << std::endl;
+        }
     }
+
+    bool isSynced() override { return !useBoulmierLb_ || lbCriterion_.isFullySynced(); }
 
     std::vector<std::string> conservedFields() const override
     {
@@ -128,15 +144,49 @@ public:
         d.treeView = domain.octreeProperties();
     }
 
+    void syncLocal(DomainType& domain, DataType& simData)
+    {
+        auto& d = simData.hydro;
+        if (d.g != 0.0)
+        {
+            domain.syncLocalGrav(get<"keys">(d), get<"x">(d), get<"y">(d), get<"z">(d), get<"h">(d), get<"m">(d),
+                                 get<ConservedFields>(d), get<DependentFields>(d));
+        }
+        else
+        {
+            domain.syncLocal(get<"keys">(d), get<"x">(d), get<"y">(d), get<"z">(d), get<"h">(d),
+                             std::tuple_cat(std::tie(get<"m">(d)), get<ConservedFields>(d)), get<DependentFields>(d));
+        }
+        d.treeView = domain.octreeProperties();
+    }
+
     void computeForces(DomainType& domain, DataType& simData) override
     {
         timer.start();
         pmReader.start();
-        sync(domain, simData);
-        timer.step("domain::sync");
-        Base::logDomainStats(domain, simData);
 
         auto& d = simData.hydro;
+        const bool fullSync = useBoulmierLb_
+                                  ? lbCriterion_.needsFullSync(d.iteration, domain.haloSearchExt())
+                                  : (syncInterval_ <= 1 || d.iteration % syncInterval_ == 0);
+
+        if (fullSync)
+        {
+            domain.setHaloFactor(1.0f);
+            sync(domain, simData);
+            timer.step("domain::sync");
+            if (useBoulmierLb_) { lbCriterion_.resetAfterFullSync(timer.getLastStepTime(), d.comm); }
+            Base::logDomainStats(domain, simData);
+        }
+        else
+        {
+            const float haloGrowth = 1.0f + 0.05f * float(std::min(lbCriterion_.stepsSinceSync(), size_t(20)));
+            domain.setHaloFactor(haloGrowth);
+            syncLocal(domain, simData);
+            timer.step("domain::syncLocal");
+            lbCriterion_.setFullySynced(false);
+        }
+        computeTimeBaseline_ = timer.sumOfSteps();
         d.resizeAcc(domain.nParticlesWithHalos());
         resizeNeighbors(d, domain.nParticles() * d.ngmax);
         size_t first = domain.startIndex();
@@ -205,6 +255,15 @@ public:
             timer.logStatistics("sumP2P", stats[0] / timer.getLastStepTime());
             timer.logStatistics("sumM2P", stats[2] / timer.getLastStepTime());
         }
+
+        if (useBoulmierLb_)
+        {
+            const float localComputeTime = timer.sumOfSteps() - computeTimeBaseline_;
+            lbCriterion_.recordComputeImbalance(localComputeTime, d.comm);
+            timer.logStatistics("lbImbalance", lbCriterion_.lastImbalance());
+            timer.logStatistics("lbCumulativeImbalance", lbCriterion_.cumulativeImbalance());
+            timer.logStatistics("lbSyncCost", lbCriterion_.loadBalanceCost());
+        }
     }
 
     void integrate(DomainType& domain, DataType& simData) override
@@ -222,6 +281,22 @@ public:
             throw std::runtime_error("Neighbor search did not converge\n");
         }
         timer.step("UpdateQuantities");
+
+        if (useBoulmierLb_)
+        {
+            if constexpr (cstone::HaveGpu<Acc>{})
+            {
+                transferToHost(d, first, last, {"vx", "vy", "vz", "h"});
+            }
+            const auto& vx = get<"vx">(d);
+            const auto& vy = get<"vy">(d);
+            const auto& vz = get<"vz">(d);
+            const auto& h  = get<"h">(d);
+            const float localMaxSpeed =
+                localMaxParticleSpeed(first, last, vx.data(), vy.data(), vz.data());
+            const double localSumH = localSumSmoothingLength(first, last, h.data());
+            lbCriterion_.recordMotion(d.minDt, localMaxSpeed, localSumH, last - first, d.comm);
+        }
     }
 
     void saveFields(IFileWriter* writer, size_t first, size_t last, DataType& simData,

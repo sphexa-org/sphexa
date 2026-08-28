@@ -227,8 +227,8 @@ public:
         if (firstCall_)
         {
             // first rough convergence to avoid computing expansion centers of large nodes with a lot of particles
-            focusTree_.converge(box(), keyView, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
-                                1.0, std::get<0>(scratch));
+            focusTree_.converge(box(), keyView, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(), 1.0,
+                                std::get<0>(scratch));
             focusTree_.updateMinMac(global_.assignment(), 1.0, false);
             int converged = 0, reps = 0;
             while (converged != numRanks_ || reps < 2)
@@ -269,6 +269,135 @@ public:
         } while (fail && maxRep--);
 
         // diagnostics(keyView.size());
+
+        updateLayout(sorter, keyView, particleKeys, std::tie(x, y, z, h, m), particleProperties, scratch);
+        setupHalos(particleKeys, x, y, z, h, scratch);
+        firstCall_ = false;
+    }
+
+    /*! @brief Local reordering only (no MPI exchange between ranks)
+     *
+     * This method updates the global tree and assignment, and reorders particles locally
+     * in SFC order, but does NOT redistribute particles between ranks via MPI.
+     * Use this when you want to maintain SFC order locally but skip expensive MPI communication.
+     */
+    template<class KeyVec, class VectorX, class VectorH, class... Vectors1, class... Vectors2>
+    void syncLocal(KeyVec& particleKeys,
+                   VectorX& x,
+                   VectorX& y,
+                   VectorX& z,
+                   VectorH& h,
+                   std::tuple<Vectors1&...> particleProperties,
+                   std::tuple<Vectors2&...> scratchBuffers)
+    {
+        staticChecks<KeyVec, VectorX, VectorH, Vectors1...>(scratchBuffers);
+        auto& sfcOrder = std::get<sizeof...(Vectors2) - 1>(scratchBuffers);
+        SfcSorter sorter(sfcOrder);
+
+        auto scratch = util::discardLastElement(scratchBuffers);
+
+        // Update tree and assignment, do local SFC sorting, but skip MPI exchange
+        auto [exchangeStart, keyView] =
+            distribute(sorter, particleKeys, x, y, z, std::tuple_cat(std::tie(h), particleProperties), scratch, true);
+        // Reorder locally using the SFC ordering from assign()
+        // When skipping MPI exchange, numPresent() == numAssigned() since no particles were redistributed
+        gatherArrays({sorter.getMap() + bufDesc_.start, global_.numPresent()}, 0, std::tie(x, y, z, h),
+                     util::reverse(scratch));
+
+        float invThetaEff = invThetaMinMac(theta_);
+        if (firstCall_)
+        {
+            focusTree_.converge(box(), keyView, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(),
+                                invThetaEff, std::get<0>(scratch));
+        }
+        focusTree_.updateMinMac(global_.assignment(), invThetaEff, true);
+        focusTree_.updateTree(global_.assignment(), global_.treeLeaves(), box(), std::get<0>(scratch));
+        focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
+
+        reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
+        focusTree_.discoverHalos(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), {rawPtr(layoutAcc_), layoutAcc_.size()},
+                                 haloSearchExt_, get<0>(scratch), false);
+        focusTree_.computeLayout({rawPtr(layoutAcc_), layoutAcc_.size()}, layout_);
+        halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), layout_);
+
+        updateLayout(sorter, keyView, particleKeys, std::tie(x, y, z, h), particleProperties, scratch);
+        setupHalos(particleKeys, x, y, z, h, scratch);
+        firstCall_ = false;
+    }
+
+    /*! @brief Local reordering only for gravity case (no MPI exchange between ranks)
+     *
+     * This method updates the global tree and assignment, and reorders particles locally
+     * in SFC order, but does NOT redistribute particles between ranks via MPI.
+     * Use this when you want to maintain SFC order locally but skip expensive MPI communication.
+     */
+    template<class KeyVec, class VectorX, class VectorH, class VectorM, class... Vectors1, class... Vectors2>
+    void syncLocalGrav(KeyVec& particleKeys,
+                       VectorX& x,
+                       VectorX& y,
+                       VectorX& z,
+                       VectorH& h,
+                       VectorM& m,
+                       std::tuple<Vectors1&...> particleProperties,
+                       std::tuple<Vectors2&...> scratchBuffers)
+    {
+        staticChecks<KeyVec, VectorX, VectorH, VectorM, Vectors1...>(scratchBuffers);
+        auto& sfcOrder = std::get<sizeof...(Vectors2) - 1>(scratchBuffers);
+        SfcSorter sorter(sfcOrder);
+
+        auto scratch = util::discardLastElement(scratchBuffers);
+
+        // Update tree and assignment, do local SFC sorting, but skip MPI exchange
+        auto [exchangeStart, keyView] = distribute(sorter, particleKeys, x, y, z,
+                                                   std::tuple_cat(std::tie(h, m), particleProperties), scratch, true);
+        // Reorder locally using the SFC ordering from assign()
+        // When skipping MPI exchange, numPresent() == numAssigned() since no particles were redistributed
+        gatherArrays({sorter.getMap() + bufDesc_.start, global_.numPresent()}, 0, std::tie(x, y, z, h, m),
+                     util::reverse(scratch));
+
+        if (firstCall_)
+        {
+            // first rough convergence to avoid computing expansion centers of large nodes with a lot of particles
+            focusTree_.converge(box(), keyView, global_.assignment(), global_.treeLeaves(), global_.nodeCounts(), 1.0,
+                                std::get<0>(scratch));
+            focusTree_.updateMinMac(global_.assignment(), 1.0, false);
+            int converged = 0, reps = 0;
+            while (converged != numRanks_ || reps < 2)
+            {
+                converged =
+                    focusTree_.updateTree(global_.assignment(), global_.treeLeaves(), box(), std::get<0>(scratch));
+                focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
+                focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(),
+                                         std::get<0>(scratch), std::get<1>(scratch));
+                focusTree_.updateMacs(global_.assignment(), 1.0 / theta_, false);
+                MPI_Allreduce(MPI_IN_PLACE, &converged, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+                reps++;
+            }
+        }
+
+        int fail = 0, maxRep = 10;
+        do
+        {
+            focusTree_.updateMacs(global_.assignment(), centerDriftTol_ / theta_, true);
+            focusTree_.updateTree(global_.assignment(), global_.treeLeaves(), box(), std::get<0>(scratch));
+            focusTree_.updateCounts(keyView, global_.treeLeaves(), global_.nodeCounts(), std::get<0>(scratch));
+            focusTree_.updateCenters(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(m), global_.octree(), std::get<0>(scratch),
+                                     std::get<1>(scratch));
+            focusTree_.updateMacs(global_.assignment(), 1.0 / theta_, false);
+
+            reallocate(focusTree_.octreeViewAcc().numLeafNodes + 1, allocGrowthRate_, layout_, layoutAcc_);
+            focusTree_.discoverHalos(rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h),
+                                     {rawPtr(layoutAcc_), layoutAcc_.size()}, haloSearchExt_, get<0>(scratch), true);
+            fail = focusTree_.computeLayout({rawPtr(layoutAcc_), layoutAcc_.size()}, layout_);
+            MPI_Allreduce(MPI_IN_PLACE, &fail, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+
+            halos_.exchangeRequests(focusTree_.treeLeaves(), focusTree_.assignment(), layout_);
+
+            if (fail)
+            {
+                if (myRank_ == 0) { std::cout << "LET refine, mode=" << fail << std::endl; }
+            }
+        } while (fail && maxRep--);
 
         updateLayout(sorter, keyView, particleKeys, std::tie(x, y, z, h, m), particleProperties, scratch);
         setupHalos(particleKeys, x, y, z, h, scratch);
@@ -351,6 +480,7 @@ public:
 
     void setTreeConv(bool flag) { convergeTrees = flag; }
     void setHaloFactor(float factor) { haloSearchExt_ = factor; }
+    [[nodiscard]] float haloSearchExt() const { return haloSearchExt_; }
     void setGrowthAllocRate(float factor) { allocGrowthRate_ = factor; }
 
     //! @brief update expansion (c.o.m) centers of the focus tree
@@ -438,7 +568,8 @@ private:
                     VectorX& y,
                     VectorX& z,
                     std::tuple<Vectors1&...> particleProperties,
-                    std::tuple<Vectors2&...> scratchBuffers)
+                    std::tuple<Vectors2&...> scratchBuffers,
+                    bool skipMpiExchange = false)
     {
         initBounds(x.size());
         auto distributedArrays = std::tuple_cat(std::tie(keys, x, y, z), particleProperties);
@@ -451,6 +582,14 @@ private:
 
         // Must zero new memory to exclude possibility of special value (removeKey) in uninitialized memory
         fill<IsDeviceVector<KeyVec>{}>(rawPtr(keys) + bufDesc_.size, rawPtr(keys) + exchangeSize, KeyType(0));
+
+        if (skipMpiExchange)
+        {
+            // Skip MPI exchange, just return local assignment info
+            // The particles are already sorted locally by assign()
+            std::span<KeyType> keyView(keys.data() + bufDesc_.start, bufDesc_.end - bufDesc_.start);
+            return std::make_tuple(bufDesc_.start, keyView);
+        }
 
         return std::apply(
             [exchangeSize, &sorter, &scratchBuffers, this](auto&... arrays)
@@ -586,9 +725,8 @@ private:
             {
                 std::cout << "rank " << i << " " << assignedSize << " " << layout_.back()
                           << " focus h/true/peers/loc/tot: " << numFlags << "/" << numFocusTruePeer << "/"
-                          << numFocusPeers << "/" << focusAssignment[myRank_].count() << "/"
-                          << flags.size() << " peers: [" << std::max(hPeers.size(), fPeers.size())
-                          << "] ";
+                          << numFocusPeers << "/" << focusAssignment[myRank_].count() << "/" << flags.size()
+                          << " peers: [" << std::max(hPeers.size(), fPeers.size()) << "] ";
                 if (numRanks_ <= 64)
                 {
                     for (auto r : fPeers)

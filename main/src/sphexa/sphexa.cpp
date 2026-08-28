@@ -89,6 +89,7 @@ int main(int argc, char** argv)
     const bool               ascii        = parser.exists("--ascii");
     const bool               quiet        = parser.exists("--quiet");
     const bool               avClean      = parser.exists("--avclean");
+    const bool               boulmierLb   = parser.exists("--boulmier-lb");
     const int                simDuration  = parser.get("--duration", std::numeric_limits<int>::max());
     const std::string        writeFreqStr = parser.get("-w", std::string("0"));
     const bool               writeEnabled = writeFreqStr != "0" || !writeExtra.empty();
@@ -106,7 +107,8 @@ int main(int argc, char** argv)
     auto fileWriter  = fileWriterFactory(ascii, MPI_COMM_WORLD);
     auto fileReader  = fileReaderFactory(ascii, MPI_COMM_WORLD);
     auto simInit     = initializerFactory<Dataset>(initCond, glassBlock, fileReader.get());
-    auto propagator  = propagatorFactory<Domain, Dataset>(propChoice, avClean, output, rank, simInit->constants());
+    auto propagator  = propagatorFactory<Domain, Dataset>(propChoice, avClean, output, rank, simInit->constants(),
+                                                          boulmierLb);
     auto observables = observablesFactory<Dataset>(simInit->constants(), constantsFile);
 
     Dataset simData;
@@ -248,6 +250,10 @@ void printHelp(char* name, int rank)
         printf("\t--G NUM \t Gravitational constant [default dependent on test-case selection]\n\n");
 
         printf("\t--prop STRING \t Choice of SPH propagator [default: modern SPH]. For standard SPH, use \"std\" \n\n");
+
+        printf("\t--boulmier-lb \t Enable automatic domain sync with the Boulmier load-balancing criterion\n"
+               "\t\t\t (ve propagator only). Skips MPI redistribution until imbalance cost\n"
+               "\t\t\t exceeds the measured sync cost, with a halo-travel safety guard.\n\n");
 
         printf("\t-s NUM \t\t int(NUM):  Number of iterations (time-steps) [200],\n\
                 \t real(NUM): Time of simulation (time-model)\n\n");

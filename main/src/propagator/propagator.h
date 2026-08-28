@@ -47,7 +47,7 @@ struct PropLib
 
     using PropPtr = std::unique_ptr<Propagator<DomainType, ParticleDataType>>;
 
-    static PropPtr makeHydroVeProp(std::ostream& output, size_t rank, bool avClean);
+    static PropPtr makeHydroVeProp(std::ostream& output, size_t rank, bool avClean, bool useBoulmierLb = false);
     static PropPtr makeHydroProp(std::ostream& output, size_t rank);
     static PropPtr makeHydroVeBdtProp(std::ostream& output, size_t rank, const InitSettings& settings, bool avClean);
 #ifdef SPH_EXA_HAVE_GRACKLE

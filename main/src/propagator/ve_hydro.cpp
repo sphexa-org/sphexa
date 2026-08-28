@@ -40,10 +40,14 @@ namespace sphexa
 
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
-PropLib<DomainType, ParticleDataType>::makeHydroVeProp(std::ostream& output, size_t rank, bool avClean)
+PropLib<DomainType, ParticleDataType>::makeHydroVeProp(std::ostream& output, size_t rank, bool avClean,
+                                                      bool useBoulmierLb)
 {
-    if (avClean) { return std::make_unique<HydroVeProp<true, DomainType, ParticleDataType>>(output, rank); }
-    else { return std::make_unique<HydroVeProp<false, DomainType, ParticleDataType>>(output, rank); }
+    if (avClean)
+    {
+        return std::make_unique<HydroVeProp<true, DomainType, ParticleDataType>>(output, rank, useBoulmierLb);
+    }
+    else { return std::make_unique<HydroVeProp<false, DomainType, ParticleDataType>>(output, rank, useBoulmierLb); }
 }
 
 template<class DomainType, class ParticleDataType>
