@@ -99,9 +99,11 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
     assert(blockDim.x == Config::iSize);
 
     if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < GpuConfig::warpSize / Config::iSize &&
-                  std::is_same<Postamble, detail::EmptyPostamble>())
+                  std::is_same_v<Postamble, detail::EmptyPostamble> &&
+                  std::is_same_v<Reduction, detail::NoReduction>)
     {
         // fast path: specialized reduction on multiple elements at the same time if all types in the tuple are the same
+        // and no post-processing or global reduction is requested
 
         const T0 res =
             reduceTuple<GpuConfig::warpSize / Config::iSize, true>(tuple,
@@ -310,12 +312,8 @@ template<class Config,
          bool UsePbc,
          class Tc,
          class ThP,
-         class In,
-         class Out,
-         class UnwrappedReductionResult,
-         class Interaction,
-         class Postamble,
-         class Reduction,
+         class IjData,
+         TupleOfPointers Out,
          class Mask = void>
 __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBlock) void runIjLoopKernel(
     const Box<Tc> box,
@@ -327,12 +325,9 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     const Tc* const __restrict__ y,
     const Tc* const __restrict__ z,
     const ThP h,
-    const In input,
-    const Out output,
-    UnwrappedReductionResult* const __restrict__ globalReductionResult,
-    const Interaction interaction,
-    const Postamble postamble,
-    const Reduction reduction,
+    const IjData ijData,
+    const Out symmTmpOutput,
+    typename IjData::UnwrappedReductionResultType* const __restrict__ globalReductionResult,
     const std::uint32_t* const __restrict__ neighborData,
     const SuperclusterInfo* const __restrict__ superclusterInfo,
     const unsigned numISuperclusters,
@@ -358,19 +353,16 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     const auto [iSupercluster, iSuperclusterNeighborsCount, iSuperclusterDataIndex] =
         superclusterInfo[iSuperclusterIndex];
 
-    using Types                    = decltype(types(x, y, z, h, input, output, interaction, postamble, reduction));
-    using ParticleData             = Types::ParticleData;
-    using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq(x, y, z, h, input, firstBody));
-    using Result                   = Types::Result;
-    using ReductionResult          = Types::ReductionResult;
+    using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq(x, y, z, h, ijData.input, firstBody));
+    using InteractionResultType    = typename IjData::InteractionResultType;
 
     const auto iSuperclusterData =
         loadSuperclusterIParticleData<Config, NumSuperclustersPerBlock, ParticleDataWithRadiusSq>(
-            firstValidBody, totalBodies, iSupercluster, x, y, z, h, input);
+            firstValidBody, totalBodies, iSupercluster, x, y, z, h, ijData.input);
 
     __syncthreads();
 
-    std::array<Result, Config::iClustersPerSupercluster> iResults = {};
+    std::array<InteractionResultType, Config::iClustersPerSupercluster> iResults = {};
 
     const unsigned maskSize = masksSize<Config>(iSuperclusterNeighborsCount);
     typename Config::Compression::Decompression decompression(&neighborData[iSuperclusterDataIndex + maskSize],
@@ -394,11 +386,11 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             const unsigned j             = jCluster * Config::jSize + threadIdx.y;
             const unsigned jSupercluster = superclusterIndex<Config>(j);
             auto jData                   = (nb < iSuperclusterNeighborsCount & j >= firstValidBody & j < totalBodies)
-                                               ? loadParticleData(x, y, z, h, input, j)
-                                               : dummyParticleData(x, y, z, h, input, j);
+                                               ? loadParticleData(x, y, z, h, ijData.input, j)
+                                               : dummyParticleData(x, y, z, h, ijData.input, j);
             const Th jRadiusSq           = radiusSq(jData);
             std::get<0>(jData) -= firstValidBody;
-            Result jResult = {};
+            InteractionResultType jResult = {};
 
             for (unsigned c = 0; c < Config::iClustersPerSupercluster; ++c)
             {
@@ -423,12 +415,12 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
                     }
                     if (iClose | jClose)
                     {
-                        const auto ijInteraction = interaction(iData, jData, ijPosDiff, distSq);
+                        const auto ijInteraction = ijData.interaction(iData, jData, ijPosDiff, distSq);
                         if (iClose) updateResult(iResults[c], ijInteraction);
                         if (jClose)
                         {
                             const auto jiInteraction =
-                                selectSymmetric(ijInteraction, interaction(jData, iData, -ijPosDiff, distSq));
+                                selectSymmetric(ijInteraction, ijData.interaction(jData, iData, -ijPosDiff, distSq));
                             updateResult(jResult, jiInteraction);
                         }
                     }
@@ -437,7 +429,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
 
             if constexpr (Config::symmetric)
             {
-                storeTupleJSum<Config>(jResult, output, j, j >= firstBody & j < lastBody);
+                storeTupleJSum<Config>(jResult, symmTmpOutput, j, j >= firstBody & j < lastBody);
             }
         }
     }
@@ -447,11 +439,11 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
 
     if constexpr (!Config::symmetric && Config::numWarpsPerInteraction > 1)
     {
-        using Buffer = decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(Result())));
+        using Buffer = decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(InteractionResultType())));
         __shared__ util::Uninitialized<Buffer> outputBuffers[NumSuperclustersPerBlock];
         Buffer* outputBuffer  = outputBuffers[threadIdx.z].data();
         auto outputBufferPtrs = util::tupleMap([](auto& array) { return array.data(); }, *outputBuffer);
-        auto init             = unwrapModifiers(Result{});
+        auto init             = unwrapModifiers(InteractionResultType{});
         for (unsigned offset = threadIdx.y * Config::iSize + threadIdx.x; offset < Config::superclusterSize;
              offset += Config::iSize * Config::jSize)
             storeParticleData(outputBufferPtrs, offset, init);
@@ -475,17 +467,18 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         {
             const unsigned i  = base + offset;
             const bool active = (activeMask >> offset) & 1;
-            ReductionResult reductionResult{};
+            typename IjData::ReductionResultType reductionResult{};
             if (i >= firstBody & i < lastBody & active)
             {
                 const auto iData   = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
                 const auto iResult = util::tupleMap([&](auto const* ptr) { return ptr[offset]; }, outputBufferPtrs);
-                const auto postambleResult = postamble(iData, unwrapModifiers(iResult));
-                storeParticleData(output, i, postambleResult);
-                if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
-                    reductionResult = reduction(iData, unwrapModifiers(iResult), unwrapModifiers(postambleResult));
+                const auto postambleResult = ijData.postamble(iData, unwrapModifiers(iResult));
+                storeParticleData(symmTmpOutput, i, postambleResult);
+                if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
+                    reductionResult =
+                        ijData.reduction(iData, unwrapModifiers(iResult), unwrapModifiers(postambleResult));
             }
-            if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+            if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
                 warpReduceUpdatePtr(globalReductionResult, reductionResult);
         }
     }
@@ -497,22 +490,13 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             const auto i          = iSupercluster * Config::superclusterSize + offset;
             const bool active     = (activeMask >> (c * Config::iSize + threadIdx.x)) & 1;
             const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
-            storeTupleISum<Config>(iResults[c], output, i, i >= firstBody & i < lastBody & active, postamble, iData,
-                                   reduction, globalReductionResult);
+            storeTupleISum<Config>(iResults[c], symmTmpOutput, i, i >= firstBody & i < lastBody & active,
+                                   ijData.postamble, iData, ijData.reduction, globalReductionResult);
         }
     }
 }
 
-template<class Config,
-         class Tc,
-         class ThP,
-         class Input,
-         class Output,
-         class UnwrappedReductionResult,
-         class Interaction,
-         class Postamble,
-         class Reduction,
-         class Mask = void>
+template<class Config, class Tc, class ThP, class IjData, TupleOfPointers Out, class Mask = void>
 void runIjLoop(const execution::Gpu exec,
                const Box<Tc>& box,
                const LocalIndex firstValidBody,
@@ -523,12 +507,9 @@ void runIjLoop(const execution::Gpu exec,
                const Tc* const y,
                const Tc* const z,
                const ThP h,
-               Input const& input,
-               Output const& output,
-               UnwrappedReductionResult* const reductionResult,
-               Interaction const& interaction,
-               Postamble const& postamble,
-               Reduction const& reduction,
+               const IjData ijData,
+               const Out symmTmpOutput,
+               typename IjData::UnwrappedReductionResultType* const globalReductionResult,
                const std::uint32_t* const neighborData,
                const SuperclusterInfo* const superclusterInfo,
                const LocalIndex numISuperclusters,
@@ -540,8 +521,8 @@ void runIjLoop(const execution::Gpu exec,
     const auto run                              = [&](auto usePbc)
     {
         runIjLoopKernel<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, 0, exec>>>(
-            box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, input, output, reductionResult,
-            interaction, postamble, reduction, neighborData, superclusterInfo, numISuperclusters, activeMasks);
+            box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, ijData, symmTmpOutput,
+            globalReductionResult, neighborData, superclusterInfo, numISuperclusters, activeMasks);
         checkGpuErrors(cudaGetLastError());
     };
 

@@ -40,21 +40,14 @@ struct CpuAlwaysTraverseNeighborhood
     ThP h;
     unsigned ngmax;
 
-    template<class... In,
-             class... Out,
-             class Interaction,
-             class Postamble = detail::EmptyPostamble,
-             class Reduction = detail::NoReduction>
-    auto ijLoop(std::tuple<In*...> const& input,
-                std::tuple<Out*...> const& output,
-                Interaction const& interaction,
-                Postamble const& postamble = empty_postamble,
-                Reduction const& reduction = no_reduction) const
+    template<class... Ts>
+    auto ijLoop(IjLoopData<Ts...> ijData) const
     {
-        using ReductionResult =
-            decltype(types(x, y, z, h, input, output, interaction, postamble, reduction))::ReductionResult;
+        using Types           = decltype(types(x, y, z, h, ijData.input, ijData.output, ijData.interaction,
+                                      ijData.postamble, ijData.reduction));
+        using ReductionResult = Types::ReductionResult;
 
-        const auto constInput = makeConst(input);
+        const auto constInput = makeConst(ijData.input);
         ReductionResult globalReductionResult{};
 #pragma omp parallel
         {
@@ -65,7 +58,8 @@ struct CpuAlwaysTraverseNeighborhood
             for (LocalIndex i = firstBody; i < lastBody; ++i)
             {
                 ReductionResult iReductionResult =
-                    jLoop(constInput, output, interaction, postamble, reduction, i, neighbors.get());
+                    jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble, ijData.reduction, i,
+                          neighbors.get());
                 updateResult(reductionResult, iReductionResult);
             }
 
@@ -82,21 +76,14 @@ struct CpuAlwaysTraverseNeighborhood
         CpuAlwaysTraverseNeighborhood const& parent;
         GroupView groups;
 
-        template<class... In,
-                 class... Out,
-                 class Interaction,
-                 class Postamble = detail::EmptyPostamble,
-                 class Reduction = detail::NoReduction>
-        auto ijLoop(std::tuple<In*...> const& input,
-                    std::tuple<Out*...> const& output,
-                    Interaction const& interaction,
-                    Postamble const& postamble = empty_postamble,
-                    Reduction const& reduction = no_reduction) const
+        template<class... Ts>
+        auto ijLoop(IjLoopData<Ts...> ijData) const
         {
-            using ReductionResult =
-                decltype(types(x, y, z, h, input, output, interaction, postamble, reduction))::ReductionResult;
+            using Types = decltype(types(parent.x, parent.y, parent.z, parent.h, ijData.input, ijData.output,
+                                         ijData.interaction, ijData.postamble, ijData.reduction));
+            using ReductionResult = Types::ReductionResult;
 
-            const auto constInput = makeConst(input);
+            const auto constInput = makeConst(ijData.input);
             ReductionResult globalReductionResult{};
 #pragma omp parallel
             {
@@ -108,7 +95,8 @@ struct CpuAlwaysTraverseNeighborhood
                     for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
                     {
                         ReductionResult iReductionResult =
-                            parent.jLoop(constInput, output, interaction, postamble, reduction, i, neighbors.get());
+                            parent.jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble,
+                                         ijData.reduction, i, neighbors.get());
                         updateResult(reductionResult, iReductionResult);
                     }
 

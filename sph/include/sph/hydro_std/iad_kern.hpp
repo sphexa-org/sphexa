@@ -99,8 +99,9 @@ void IADIjLoop(Neighborhood const& neighborhood, Tc K, T iadConditionQuality, un
                const T* rho, const unsigned* nc, const T* wh, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33,
                uint64_t* id)
 {
-    neighborhood.ijLoop(std::make_tuple(m, rho, nc, id), std::make_tuple(c11, c12, c13, c22, c23, c33, id),
-                        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K, iadConditionQuality, iadRegBit});
+    neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+        std::make_tuple(m, rho, nc, id), std::make_tuple(c11, c12, c13, c22, c23, c33, id),
+        IADInteractionSTD<T>{wh}, IADPostambleSTD<T, Tc>{K, iadConditionQuality, iadRegBit}));
 }
 
 } // namespace sph

@@ -39,16 +39,7 @@ inline unsigned numBlocks()
     return GpuConfig::smCount * (numWarpsPerSm / (numThreads / GpuConfig::warpSize));
 }
 
-template<bool UsePbc,
-         class Tc,
-         class ThP,
-         class KeyType,
-         class Input,
-         class Output,
-         class UnwrappedReductionResult,
-         class Interaction,
-         class Postamble,
-         class Reduction>
+template<bool UsePbc, class Tc, class ThP, class KeyType, class IjData>
 __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
                                                         const Box<Tc> __grid_constant__ box,
                                                         const GroupView groups,
@@ -56,12 +47,8 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
                                                         const Tc* __restrict__ y,
                                                         const Tc* __restrict__ z,
                                                         const ThP h,
-                                                        const Input input,
-                                                        const Output output,
-                                                        UnwrappedReductionResult* __restrict__ globalReductionResult,
-                                                        const Interaction interaction,
-                                                        const Postamble postamble,
-                                                        const Reduction reduction,
+                                                        const IjData ijData,
+                                                        typename IjData::UnwrappedReductionResultType* __restrict__ globalReductionResult,
                                                         const unsigned ngmax,
                                                         LocalIndex* __restrict__ neighbors,
                                                         LocalIndex* __restrict__ targetCounter)
@@ -72,8 +59,7 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
 
     LocalIndex* threadNeighbors = neighbors + warpIdxGrid * ngmax * GpuConfig::warpSize + laneIdx * ngmax;
 
-    using ReductionResult =
-        decltype(types(x, y, z, h, input, output, interaction, postamble, reduction))::ReductionResult;
+    using ReductionResult = typename IjData::ReductionResultType;
     ReductionResult reductionResult{};
 
     while (true)
@@ -91,25 +77,27 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
         {
             const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, threadNeighbors), ngmax);
 
-            const auto iData  = loadParticleData(x, y, z, h, input, i);
+            const auto iData  = loadParticleData(x, y, z, h, makeConst(ijData.input), i);
             const bool usePbc = UsePbc && requiresPbcHandling(box, iData);
-            auto result       = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
+            auto result       = ijData.interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
             for (unsigned nb = 0; nb < nbs; ++nb)
             {
                 const LocalIndex j = threadNeighbors[nb];
-                const auto jData   = loadParticleData(x, y, z, h, input, j);
+                const auto jData   = loadParticleData(x, y, z, h, makeConst(ijData.input), j);
 
                 const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 
-                updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
+                updateResult(result, ijData.interaction(iData, jData, ijPosDiff, distSq));
             }
 
-            const auto postambleResult = postamble(iData, unwrapModifiers(result));
-            storeParticleData(output, i, postambleResult);
-            updateResult(reductionResult, reduction(iData, unwrapModifiers(result), unwrapModifiers(postambleResult)));
+            const auto postambleResult = ijData.postamble(iData, unwrapModifiers(result));
+            storeParticleData(ijData.output, i, postambleResult);
+            if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
+                updateResult(reductionResult,
+                             ijData.reduction(iData, unwrapModifiers(result), unwrapModifiers(postambleResult)));
         }
     }
-    if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+    if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
         warpReduceUpdatePtr(globalReductionResult, reductionResult);
 }
 
@@ -126,18 +114,10 @@ struct GpuAlwaysTraverseNeighborhood
     util::UniqueDevicePtr<LocalIndex[]> neighbors;
     util::UniqueDevicePtr<LocalIndex> targetCounter;
 
-    template<class... In,
-             class... Out,
-             class Interaction,
-             class Postamble = detail::EmptyPostamble,
-             class Reduction = detail::NoReduction>
-    auto ijLoop(std::tuple<In*...> const& input,
-                std::tuple<Out*...> const& output,
-                Interaction const& interaction,
-                Postamble const& postamble = empty_postamble,
-                Reduction const& reduction = no_reduction) const
+    template<class... Ts>
+    auto ijLoop(const IjLoopData<Ts...>& ijData) const
     {
-        return ijLoop(input, output, interaction, postamble, reduction, groups);
+        return ijLoop(ijData, groups);
     }
 
     Statistics stats() const
@@ -152,41 +132,28 @@ struct GpuAlwaysTraverseNeighborhood
         GpuAlwaysTraverseNeighborhood const& parent;
         GroupView groups;
 
-        template<class... In,
-                 class... Out,
-                 class Interaction,
-                 class Postamble = detail::EmptyPostamble,
-                 class Reduction = detail::NoReduction>
-        auto ijLoop(std::tuple<In*...> const& input,
-                    std::tuple<Out*...> const& output,
-                    Interaction const& interaction,
-                    Postamble const& postamble = empty_postamble,
-                    Reduction const& reduction = no_reduction) const
+        template<class... Ts>
+        auto ijLoop(const IjLoopData<Ts...>& ijData) const
         {
-            return parent.ijLoop(input, output, interaction, postamble, reduction, groups);
+            return parent.ijLoop(ijData, groups);
         }
     };
 
     Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
 
 protected:
-    template<class... In, class... Out, class Interaction, class Postamble, class Reduction>
-    auto ijLoop(std::tuple<In*...> const& input,
-                std::tuple<Out*...> const& output,
-                Interaction const& interaction,
-                Postamble const& postamble,
-                Reduction const& reduction,
-                GroupView const& groups) const
+    template<class... Ts>
+    auto ijLoop(const IjLoopData<Ts...>& ijData, GroupView const& groups) const
     {
-        using Types                    = decltype(types(x, y, z, h, input, output, interaction, postamble, reduction));
-        using ReductionResult          = Types::ReductionResult;
-        using UnwrappedReductionResult = Types::UnwrappedReductionResult;
+        using IjLoopData               = IjLoopData<Ts...>;
+        using ReductionResult          = typename IjLoopData::ReductionResultType;
+        using UnwrappedReductionResult = typename IjLoopData::UnwrappedReductionResultType;
         ReductionResult reductionResult{};
 
         if (groups.numGroups == 0) return unwrapModifiers(reductionResult);
 
         util::UniqueDevicePtr<UnwrappedReductionResult> deviceReductionResult;
-        if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+        if constexpr (!std::is_same_v<typename IjLoopData::ReductionType, detail::NoReduction>)
         {
             deviceReductionResult = util::deviceAlloc<UnwrappedReductionResult>(exec);
             static_assert(sizeof(ReductionResult) == sizeof(UnwrappedReductionResult));
@@ -199,18 +166,18 @@ protected:
             box.boundaryZ() == BoundaryType::periodic)
         {
             runIjLoop<true><<<numBlocks(), numThreads, 0, exec>>>(
-                tree, box, groups, x, y, z, h, makeConst(input), output, deviceReductionResult.get(), interaction,
-                postamble, reduction, ngmax, neighbors.get(), targetCounter.get());
+                tree, box, groups, x, y, z, h, ijData, deviceReductionResult.get(), ngmax, neighbors.get(),
+                targetCounter.get());
         }
         else
         {
             runIjLoop<false><<<numBlocks(), numThreads, 0, exec>>>(
-                tree, box, groups, x, y, z, h, makeConst(input), output, deviceReductionResult.get(), interaction,
-                postamble, reduction, ngmax, neighbors.get(), targetCounter.get());
+                tree, box, groups, x, y, z, h, ijData, deviceReductionResult.get(), ngmax, neighbors.get(),
+                targetCounter.get());
         }
         checkGpuErrors(cudaGetLastError());
 
-        if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+        if constexpr (!std::is_same_v<typename IjLoopData::ReductionType, detail::NoReduction>)
         {
             checkGpuErrors(cudaMemcpyAsync(&reductionResult, deviceReductionResult.get(), sizeof(ReductionResult),
                                            cudaMemcpyDeviceToHost));

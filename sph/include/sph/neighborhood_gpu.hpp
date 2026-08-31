@@ -26,7 +26,7 @@ struct DeviceNeighborhoodData
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool subgroups);
 
     template<class... Args>
-    IjLoopReturnType<Args...> ijLoop(Args&&... args) const;
+    auto ijLoop(cstone::ijloop::IjLoopData<Args...> ijData) const;
 
 private:
     struct Impl;
@@ -87,13 +87,14 @@ struct DeviceNeighborhoodData::Impl
     }
 
     template<class... Args>
-    IjLoopReturnType<Args...> ijLoop(Args&&... args) const
+    auto ijLoop(cstone::ijloop::IjLoopData<Args...> ijData) const
     {
-        const auto runIjLoop = [&](auto const& nb) { return nb.ijLoop(std::forward<Args>(args)...); };
+        using ReturnType = typename cstone::ijloop::IjLoopData<Args...>::UnwrappedReductionResultType;
+        const auto runIjLoop = [&](auto const& nb) { return nb.ijLoop(ijData); };
         if (subgroupNeighborhood)
-            return std::visit<IjLoopReturnType<Args...>>(runIjLoop, subgroupNeighborhood.value());
+            return std::visit<ReturnType>(runIjLoop, subgroupNeighborhood.value());
         else
-            return std::visit<IjLoopReturnType<Args...>>(runIjLoop, neighborhood);
+            return std::visit<ReturnType>(runIjLoop, neighborhood);
     }
 
     std::variant<NeighborhoodDataType<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder, cstone::execution::Gpu>,
@@ -116,10 +117,10 @@ void DeviceNeighborhoodData::build(const cstone::GroupView& groups, Dataset& d, 
 }
 
 template<class... Args>
-IjLoopReturnType<Args...> DeviceNeighborhoodData::ijLoop(Args&&... args) const
+auto DeviceNeighborhoodData::ijLoop(cstone::ijloop::IjLoopData<Args...> ijData) const
 {
     assert(impl);
-    return impl->ijLoop(std::forward<Args>(args)...);
+    return impl->ijLoop(ijData);
 }
 #endif
 

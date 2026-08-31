@@ -1,3 +1,34 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2021 CSCS, ETH Zurich
+ *               2021 University of Basel
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+/*! @file
+ * @brief Pressure gradients and energy kernel
+ *
+ * @author Ruben Cabezon <ruben.cabezon@unibas.ch>
+ */
+
 #pragma once
 
 #include <type_traits>
@@ -91,6 +122,7 @@ struct MomentumAndEnergyInteractionStd
     }
 };
 
+
 template<class Tc, class Tm1>
 struct MomentumAndEnergyPostambleStd
 {
@@ -140,10 +172,10 @@ T momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, cons
                           const T* c13, const T* c22, const T* c23, const T* c33, const T* wh, Tm1* du, T* grad_P_x,
                           T* grad_P_y, T* grad_P_z)
 {
-    auto [minDtCourant] = neighborhood.ijLoop(
+    auto [minDtCourant] = neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
         std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
         std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc), MomentumAndEnergyInteractionStd<T, Tm1>{wh},
-        MomentumAndEnergyPostambleStd<Tc, Tm1>{K}, TimeStepReductionStd<Tc>{Kcour});
+        MomentumAndEnergyPostambleStd<Tc, Tm1>{K}, TimeStepReductionStd<Tc>{Kcour}));
     return minDtCourant;
 }
 

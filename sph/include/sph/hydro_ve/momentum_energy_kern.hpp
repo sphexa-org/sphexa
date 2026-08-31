@@ -240,15 +240,15 @@ T momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T At
     T          minDt;
     if (tdpdTrho)
     {
-        std::tie(minDt) =
-            neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<AvClean, T>{wh, Atmin, Atmax, ramp},
-                                MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour}, TimeStepReduction{});
+        std::tie(minDt) = neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+            input, output, MomentumAndEnergyInteraction<AvClean, T>{wh, Atmin, Atmax, ramp},
+            MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour}, TimeStepReduction{}));
     }
     else
     {
-        std::tie(minDt) =
-            neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<AvClean, T>{wh, Atmin, Atmax, ramp},
-                                MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour}, TimeStepReduction{});
+        std::tie(minDt) = neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+            input, output, MomentumAndEnergyInteraction<AvClean, T>{wh, Atmin, Atmax, ramp},
+            MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour}, TimeStepReduction{}));
     }
     return minDt;
 }
