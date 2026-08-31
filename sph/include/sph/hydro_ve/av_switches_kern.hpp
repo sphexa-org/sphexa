@@ -133,9 +133,10 @@ void AVswitchesIjLoop(Neighborhood const& neighborhood, Tc K, Tc dt, T alphamin,
     std::visit(
         [&]<class Kernel>(Kernel wh)
         {
-            neighborhood.ijLoop(std::make_tuple(xm, kx, divv, alpha, vx, vy, vz, c, c11, c12, c13, c22, c23, c33),
-                                std::make_tuple(alpha_out), AVswitchesInteraction<T, Tc, Kernel>{wh, K},
-                                AVswitchesPostamble<T, Tc>{alphamin, alphamax, decay_constant, dt});
+            neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                std::make_tuple(xm, kx, divv, alpha, vx, vy, vz, c, c11, c12, c13, c22, c23, c33),
+                std::make_tuple(alpha_out), AVswitchesInteraction<T, Tc, Kernel>{wh, K},
+                AVswitchesPostamble<T, Tc>{alphamin, alphamax, decay_constant, dt}));
         },
         wh);
 }

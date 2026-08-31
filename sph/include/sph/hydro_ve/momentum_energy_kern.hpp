@@ -232,15 +232,15 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T
         {
             if (tdpdTrho)
             {
-                neighborhood.ijLoop(input, output,
-                                    MomentumAndEnergyInteraction<AvClean, T, Kernel>{wh, Atmin, Atmax, ramp},
-                                    MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour});
+                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                    input, output, MomentumAndEnergyInteraction<AvClean, T, Kernel>{wh, Atmin, Atmax, ramp},
+                    MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour}));
             }
             else
             {
-                neighborhood.ijLoop(input, output,
-                                    MomentumAndEnergyInteraction<AvClean, T, Kernel>{wh, Atmin, Atmax, ramp},
-                                    MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour});
+                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                    input, output, MomentumAndEnergyInteraction<AvClean, T, Kernel>{wh, Atmin, Atmax, ramp},
+                    MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour}));
             }
         },
         wh);

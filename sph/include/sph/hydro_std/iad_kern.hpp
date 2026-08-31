@@ -102,9 +102,9 @@ void IADIjLoop(Neighborhood const& neighborhood, Tc K, T iadConditionQuality, un
     std::visit(
         [&]<class Kernel>(Kernel wh)
         {
-            neighborhood.ijLoop(std::make_tuple(m, rho, nc, id), std::make_tuple(c11, c12, c13, c22, c23, c33, id),
-                                IADInteractionSTD<T, Kernel>{wh},
-                                IADPostambleSTD<T, Tc>{K, iadConditionQuality, iadRegBit});
+            neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                std::make_tuple(m, rho, nc, id), std::make_tuple(c11, c12, c13, c22, c23, c33, id),
+                IADInteractionSTD<T, Kernel>{wh}, IADPostambleSTD<T, Tc>{K, iadConditionQuality, iadRegBit}));
         },
         wh);
 }

@@ -24,18 +24,10 @@
 namespace util
 {
 
-// Like std::void_t but for values
-template<auto...>
-using void_value_t = void;
-
-template<class T, class = void>
-struct HasValueMember : std::false_type
-{
-};
-
 template<class T>
-struct HasValueMember<T, void_value_t<T::value>> : std::true_type
+inline constexpr bool HasValueMember = requires(T t)
 {
+    t.value;
 };
 
 //! @brief Base template for a holder of entries of different data types

@@ -43,16 +43,13 @@ struct CpuFullNbListNeighborhood
     ThP h;
     unsigned ngmax;
 
-    template<class... In, class... Out, class Interaction, class Postamble>
-    void ijLoop(std::tuple<In*...> const& input,
-                std::tuple<Out*...> const& output,
-                Interaction&& interaction,
-                Postamble&& postamble) const
+    template<class... Ts>
+    void ijLoop(IjLoopData<Ts...> ijData) const
     {
-        const auto constInput = makeConst(input);
+        const auto constInput = makeConst(ijData.input);
 #pragma omp parallel for simd
         for (LocalIndex i = firstBody; i < lastBody; ++i)
-            jLoop(constInput, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), i);
+            jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble, i);
     }
 
     Statistics stats() const
@@ -67,19 +64,15 @@ struct CpuFullNbListNeighborhood
         CpuFullNbListNeighborhood const& parent;
         GroupView groups;
 
-        template<class... In, class... Out, class Interaction, class Postamble>
-        void ijLoop(std::tuple<In*...> const& input,
-                    std::tuple<Out*...> const& output,
-                    Interaction&& interaction,
-                    Postamble&& postamble) const
+        template<class... Ts>
+        void ijLoop(IjLoopData<Ts...> ijData) const
         {
-            const auto constInput = makeConst(input);
+            const auto constInput = makeConst(ijData.input);
 #pragma omp parallel for
             for (LocalIndex g = 0; g < groups.numGroups; ++g)
 #pragma omp simd
                 for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
-                    parent.jLoop(constInput, output, std::forward<Interaction>(interaction),
-                                 std::forward<Postamble>(postamble), i);
+                    parent.jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble, i);
         }
     };
 

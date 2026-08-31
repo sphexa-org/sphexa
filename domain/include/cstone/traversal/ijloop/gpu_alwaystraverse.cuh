@@ -38,7 +38,7 @@ inline unsigned numBlocks()
     return GpuConfig::smCount * (numWarpsPerSm / (numThreads / GpuConfig::warpSize));
 }
 
-template<bool UsePbc, class Tc, class ThP, class KeyType, class Input, class Output, class Interaction, class Postamble>
+template<bool UsePbc, class Tc, class ThP, class KeyType, class... Ts>
 __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
                                                         const Box<Tc> __grid_constant__ box,
                                                         const GroupView groups,
@@ -46,10 +46,7 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
                                                         const Tc* __restrict__ y,
                                                         const Tc* __restrict__ z,
                                                         const ThP h,
-                                                        const Input input,
-                                                        const Output output,
-                                                        const Interaction interaction,
-                                                        const Postamble postamble,
+                                                        const IjLoopData<Tc, ThP, Ts...> ijData,
                                                         const unsigned ngmax,
                                                         LocalIndex* __restrict__ neighbors,
                                                         LocalIndex* __restrict__ targetCounter)
@@ -75,20 +72,20 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
         {
             const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, threadNeighbors), ngmax);
 
-            const auto iData  = loadParticleData(x, y, z, h, input, i);
+            const auto iData  = loadParticleData(x, y, z, h, makeConst(ijData.input), i);
             const bool usePbc = UsePbc && requiresPbcHandling(box, iData);
-            auto result       = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
+            auto result       = ijData.interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
             for (unsigned nb = 0; nb < nbs; ++nb)
             {
                 const LocalIndex j = threadNeighbors[nb];
-                const auto jData   = loadParticleData(x, y, z, h, input, j);
+                const auto jData   = loadParticleData(x, y, z, h, makeConst(ijData.input), j);
 
                 const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 
-                updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
+                updateResult(result, ijData.interaction(iData, jData, ijPosDiff, distSq));
             }
 
-            storeParticleData(output, i, postamble(iData, unwrapModifiers(result)));
+            storeParticleData(ijData.output, i, ijData.postamble(iData, unwrapModifiers(result)));
         }
     }
 }
@@ -106,13 +103,10 @@ struct GpuAlwaysTraverseNeighborhood
     util::UniqueDevicePtr<LocalIndex[]> neighbors;
     util::UniqueDevicePtr<LocalIndex> targetCounter;
 
-    template<class... In, class... Out, class Interaction, class Postamble>
-    void ijLoop(std::tuple<In*...> const& input,
-                std::tuple<Out*...> const& output,
-                Interaction&& interaction,
-                Postamble&& postamble) const
+    template<class... Ts>
+    void ijLoop(const IjLoopData<Ts...>& ijData) const
     {
-        ijLoop(input, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble), groups);
+        ijLoop(ijData, groups);
     }
 
     Statistics stats() const
@@ -127,26 +121,18 @@ struct GpuAlwaysTraverseNeighborhood
         GpuAlwaysTraverseNeighborhood const& parent;
         GroupView groups;
 
-        template<class... In, class... Out, class Interaction, class Postamble>
-        void ijLoop(std::tuple<In*...> const& input,
-                    std::tuple<Out*...> const& output,
-                    Interaction&& interaction,
-                    Postamble&& postamble) const
+        template<class... Ts>
+        void ijLoop(const IjLoopData<Ts...>& ijData) const
         {
-            parent.ijLoop(input, output, std::forward<Interaction>(interaction), std::forward<Postamble>(postamble),
-                          groups);
+            parent.ijLoop(ijData, groups);
         }
     };
 
     Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
 
 protected:
-    template<class... In, class... Out, class Interaction, class Postamble>
-    void ijLoop(std::tuple<In*...> const& input,
-                std::tuple<Out*...> const& output,
-                Interaction&& interaction,
-                Postamble&& postamble,
-                GroupView const& groups) const
+    template<class... Ts>
+    void ijLoop(const IjLoopData<Ts...>& ijData, GroupView const& groups) const
     {
         if (groups.numGroups == 0) return;
         checkGpuErrors(cudaMemsetAsync(targetCounter.get(), 0, sizeof(LocalIndex), exec));
@@ -154,15 +140,13 @@ protected:
         if (box.boundaryX() == BoundaryType::periodic || box.boundaryY() == BoundaryType::periodic ||
             box.boundaryZ() == BoundaryType::periodic)
         {
-            runIjLoop<true><<<numBlocks(), numThreads, 0, exec>>>(
-                tree, box, groups, x, y, z, h, makeConst(input), output, std::forward<Interaction>(interaction),
-                std::forward<Postamble>(postamble), ngmax, neighbors.get(), targetCounter.get());
+            runIjLoop<true><<<numBlocks(), numThreads, 0, exec>>>(tree, box, groups, x, y, z, h, ijData, ngmax,
+                                                                  neighbors.get(), targetCounter.get());
         }
         else
         {
-            runIjLoop<false><<<numBlocks(), numThreads, 0, exec>>>(
-                tree, box, groups, x, y, z, h, makeConst(input), output, std::forward<Interaction>(interaction),
-                std::forward<Postamble>(postamble), ngmax, neighbors.get(), targetCounter.get());
+            runIjLoop<false><<<numBlocks(), numThreads, 0, exec>>>(tree, box, groups, x, y, z, h, ijData, ngmax,
+                                                                   neighbors.get(), targetCounter.get());
         }
         checkGpuErrors(cudaGetLastError());
     }
