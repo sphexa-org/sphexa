@@ -11,5 +11,7 @@ set(MAIN_APP_DIR ${CMAKE_SOURCE_DIR}/main/src)
 add_subdirectory(include/cooling)
 
 if (BUILD_TESTING)
+    list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+    include(cooling_add_test)
     add_subdirectory(test)
 endif ()
