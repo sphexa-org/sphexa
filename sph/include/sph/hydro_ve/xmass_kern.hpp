@@ -64,7 +64,9 @@ struct XmassInteraction
 //! @brief a particular choice of defining generalized volume elements
 template<class T, class Tm>
 constexpr inline T veDefinition(Tm mass, T rhoZero)
-{ return mass / rhoZero; }
+{
+    return mass / rhoZero;
+}
 
 template<class T, class Tc>
 struct XmassPostamble
