@@ -1,3 +1,4 @@
+include(cstone_add_unit_test)
 
 set(UNIT_TESTS
         domain/domaindecomp.cpp
@@ -35,22 +36,5 @@ set(UNIT_TESTS
         util/value_list.cpp
         test_main.cpp)
 
-set(testname component_units)
-add_executable(${testname} ${UNIT_TESTS} neighbors/all_to_all.hpp)
-target_compile_options(${testname} PRIVATE -Wall -Wextra -Wno-unknown-pragmas)
-target_include_directories(${testname} PRIVATE ../../include)
-target_include_directories(${testname} PRIVATE ../)
-target_link_libraries(${testname} PRIVATE GTest::gtest_main)
-add_test(NAME ${testname} COMMAND ${testname})
-set_tests_properties(${testname} PROPERTIES LABELS "01r;cpu")
-install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/unit)
-
-set(testname component_units_omp)
-add_executable(${testname} ${UNIT_TESTS})
-target_include_directories(${testname} PRIVATE ../../include)
-target_include_directories(${testname} PRIVATE ../)
-target_link_libraries(${testname} PRIVATE GTest::gtest_main)
-target_link_libraries(${testname} PUBLIC OpenMP::OpenMP_CXX)
-add_test(NAME ${testname} COMMAND ${testname})
-set_tests_properties(${testname} PROPERTIES LABELS "01r;cpu")
-install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/unit)
+cstone_add_unit_test(component_units SOURCES ${UNIT_TESTS} neighbors/all_to_all.hpp INCLUDE ../)
+cstone_add_unit_test(component_units_omp SOURCES ${UNIT_TESTS} INCLUDE ../ OPENMP)
