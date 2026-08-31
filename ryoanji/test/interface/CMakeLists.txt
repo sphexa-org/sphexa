@@ -1,37 +1,48 @@
-include(ryoanji_add_test)
+ryoanji_add_executable_test(global_upsweep_cpu
+    SOURCES global_upsweep_cpu.cpp
+    LINK ${MPI_CXX_LIBRARIES}
+    INCLUDE ${MPI_CXX_INCLUDE_PATH};${RYOANJI_TEST_INCLUDE_DIRS}
+    COMPILE_OPTIONS -Wno-unknown-pragmas
+    LABELS "10r;cpu"
+    MPI RANKS 10
+)
 
-function(addRyoanjiMpiTest source exename testname ranks)
-    add_executable(${exename} ${source})
-    target_include_directories(${exename} PRIVATE ${MPI_CXX_INCLUDE_PATH} ${RYOANJI_TEST_INCLUDE_DIRS})
-    target_link_libraries(${exename} PRIVATE ${MPI_CXX_LIBRARIES})
-    target_compile_options(${exename} PRIVATE -Wno-unknown-pragmas)
-    ryoanji_add_test(${exename} EXECUTABLE ${exename} RANKS ${ranks})
-    install(TARGETS ${exename} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji/)
-endfunction()
-
-addRyoanjiMpiTest(global_upsweep_cpu.cpp global_upsweep_cpu GlobalUpsweepCpu 10)
-set_tests_properties(global_upsweep_cpu PROPERTIES LABELS "10r;cpu")
-
-function(addRyoanjiGpuMpiTest source exename testname ranks)
-    if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
-        addRyoanjiMpiTest(${source} ${exename} ${testname} ${ranks})
-        if (${ranks} LESS 10)
-            set_tests_properties(${exename} PROPERTIES LABELS "0${ranks}r;gpu")
-        else()
-            set_tests_properties(${exename} PROPERTIES LABELS "${ranks}r;gpu")
-        endif()
-        target_link_libraries(${exename} PRIVATE cstone_gpu ryoanji)
-    endif()
+if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
+    ryoanji_add_executable_test(global_upsweep_gpu
+        SOURCES global_upsweep_gpu.cpp
+        LINK ${MPI_CXX_LIBRARIES};cstone_gpu;ryoanji
+        INCLUDE ${MPI_CXX_INCLUDE_PATH};${RYOANJI_TEST_INCLUDE_DIRS}
+        COMPILE_OPTIONS -Wno-unknown-pragmas
+        LABELS "10r;gpu"
+        MPI RANKS 10
+    )
 
     if (RYOANJI_WITH_HIP)
-        target_link_libraries(${exename} PRIVATE hip::host)
-        set_target_properties(${exename} PROPERTIES LINKER_LANGUAGE CXX)
-    endif ()
+        target_link_libraries(global_upsweep_gpu PRIVATE hip::host)
+        set_target_properties(global_upsweep_gpu PROPERTIES LINKER_LANGUAGE CXX)
+    endif()
 
     if (RYOANJI_WITH_CUDA)
-        target_link_libraries(${exename} PRIVATE CUDA::cudart)
-    endif ()
-endfunction()
+        target_link_libraries(global_upsweep_gpu PRIVATE CUDA::cudart)
+    endif()
+endif()
 
-addRyoanjiGpuMpiTest(global_upsweep_gpu.cpp global_upsweep_gpu GlobalUpsweepGpu 10)
-addRyoanjiGpuMpiTest(global_forces_gpu.cpp global_forces_gpu GlobalForcesGpu 4)
+if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
+    ryoanji_add_executable_test(global_forces_gpu
+        SOURCES global_forces_gpu.cpp
+        LINK ${MPI_CXX_LIBRARIES};cstone_gpu;ryoanji
+        INCLUDE ${MPI_CXX_INCLUDE_PATH};${RYOANJI_TEST_INCLUDE_DIRS}
+        COMPILE_OPTIONS -Wno-unknown-pragmas
+        LABELS "04r;gpu"
+        MPI RANKS 4
+    )
+
+    if (RYOANJI_WITH_HIP)
+        target_link_libraries(global_forces_gpu PRIVATE hip::host)
+        set_target_properties(global_forces_gpu PROPERTIES LINKER_LANGUAGE CXX)
+    endif()
+
+    if (RYOANJI_WITH_CUDA)
+        target_link_libraries(global_forces_gpu PRIVATE CUDA::cudart)
+    endif()
+endif()

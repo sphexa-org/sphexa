@@ -47,3 +47,46 @@ function(ryoanji_add_test name)
     set_tests_properties("${_full_name}" PROPERTIES WILL_FAIL TRUE)
   endif()
 endfunction()
+
+function(ryoanji_add_executable_test target)
+    cmake_parse_arguments(ARG "MPI" "RANKS" "SOURCES;LINK;COMPILE_OPTIONS;INCLUDE;LABELS" ${ARGN})
+
+    if(NOT ARG_SOURCES)
+        message(FATAL_ERROR "ryoanji_add_executable_test: SOURCES required")
+    endif()
+
+    add_executable(${target} ${ARG_SOURCES})
+
+    if(ARG_INCLUDE)
+        target_include_directories(${target} PRIVATE ${ARG_INCLUDE})
+    endif()
+
+    if(DEFINED RYOANJI_TEST_INCLUDE_DIRS)
+        target_include_directories(${target} PRIVATE ${RYOANJI_TEST_INCLUDE_DIRS})
+    endif()
+
+    if(ARG_LINK)
+        target_link_libraries(${target} PRIVATE ${ARG_LINK})
+    endif()
+
+    if(ARG_COMPILE_OPTIONS)
+        target_compile_options(${target} PRIVATE ${ARG_COMPILE_OPTIONS})
+    endif()
+
+    if(ARG_MPI)
+        if(NOT ARG_RANKS)
+            set(ARG_RANKS 2)
+        endif()
+        add_test(NAME ${target}
+                 COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${ARG_RANKS}
+                         ${MPIEXEC_PREFLAGS} $<TARGET_FILE:${target}>)
+    else()
+        add_test(NAME ${target} COMMAND ${target})
+    endif()
+
+    if(ARG_LABELS)
+        set_tests_properties(${target} PROPERTIES LABELS "${ARG_LABELS}")
+    endif()
+
+    install(TARGETS ${target} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/ryoanji)
+endfunction()
