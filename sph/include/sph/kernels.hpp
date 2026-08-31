@@ -51,11 +51,37 @@ HOST_DEVICE_FUN void updateHIterative(unsigned ng0, unsigned ngmax, const cstone
         ncSph = 1 + findNeighbors(i, x, y, z, h, treeView, box, ngmax);
     }
 
-    if (ngmin > ncSph || (ncSph - 1) > ngmax)
+    if ((ncSph - 1) > ngmax)
     {
-        ncSph = 1;
-        h[i]  = cstone::invalidateH(h[i]);
+        T high = h[i];
+
+        h[i]  = updateH(ng0, ncSph, h[i]);
+        ncSph = 1 + findNeighbors(i, x, y, z, h, treeView, box, ngmax);
+        assert(ncSph <= ng0);
+
+        T        low   = h[i];
+        unsigned ncLow = ncSph;
+        for (int iteration = 0; iteration < maxIteration; ++iteration)
+        {
+            h[i]  = (low + high) / T(2);
+            ncSph = 1 + findNeighbors(i, x, y, z, h, treeView, box, ngmax);
+            if (ncSph == ng0) { break; }
+            else if (ncSph < ng0)
+            {
+                low   = h[i];
+                ncLow = ncSph;
+            }
+            else { high = h[i]; }
+        }
+        if ((ncSph - 1) > ngmax)
+        {
+            h[i]  = low;
+            ncSph = ncLow;
+        }
     }
+    assert((ncSph - 1) <= ngmax);
+
+    if (ngmin > ncSph) { ncSph = 1; }
 
     nc[i] = ncSph;
 }
