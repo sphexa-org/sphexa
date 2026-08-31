@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <variant>
 
 #include "cstone/sfc/box.hpp"
@@ -130,10 +131,17 @@ public:
         out << "### Check ### Focus Tree Nodes: " << domain.focusTree().octreeViewAcc().numLeafNodes << ", maxDepth "
             << domain.focusTree().depth();
         if constexpr (d.useGpu) { out << ", maxStackGravity " << d.stackUsedGravity; }
-        out << "\n=== Total time for iteration(" << d.iteration << ") " << timer.sumOfSteps() << "s\n\n";
+        out << std::endl;
+        if (d.numIadRegBits)
+        {
+            out << "### IAD regularization ###: " << d.numIadRegBits << " / " << d.numParticlesGlobal
+                << " particles, target " << d.iadConditionQuality << std::endl;
+        }
+        out << "=== Total time for iteration(" << d.iteration << ") " << timer.sumOfSteps() << "s\n\n";
     }
 
 protected:
+
     static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData)
     {
         auto output = [](auto& d, IFileWriter* writer)

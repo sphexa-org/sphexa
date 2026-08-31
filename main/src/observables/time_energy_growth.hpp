@@ -34,7 +34,6 @@
 #include <mpi.h>
 
 #include "io/file_utils.hpp"
-#include "conserved_quantities.hpp"
 #include "gpu_reductions.h"
 #include "iobservables.hpp"
 
@@ -122,10 +121,10 @@ public:
 
     using T = typename Dataset::RealType;
 
-    void computeAndWrite(Dataset& simData, size_t firstIndex, size_t lastIndex, const cstone::Box<T>& box)
+protected:
+    void computeAndWriteImpl(Dataset& simData, size_t firstIndex, size_t lastIndex, const cstone::Box<T>& box) override
     {
         auto& d = simData.hydro;
-        computeConservedQuantities(firstIndex, lastIndex, d, simData.comm);
         double khgr = computeKHGrowthRate<T>(firstIndex, lastIndex, d, box, simData.comm);
 
         int rank;

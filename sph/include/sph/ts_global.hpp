@@ -35,8 +35,8 @@
 #include <cmath>
 #include <mpi.h>
 
-#include "acceleration_timestep_gpu.hpp"
 #include "cstone/primitives/mpi_wrappers.hpp"
+#include "sph/sph_gpu.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/util/array.hpp"
 

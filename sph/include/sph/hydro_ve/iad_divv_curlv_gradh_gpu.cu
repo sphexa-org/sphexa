@@ -42,12 +42,12 @@ namespace gpu
 template<class Dataset>
 void computeIadDivvCurlvGradh(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    iadDivvCurlvGradhIjLoop(d.neighborhood, d.K, rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.m), rawPtr(d.xm),
-                            rawPtr(d.kx), rawPtr(d.nc), rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22),
-                            rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.gradh), rawPtr(d.divv),
-                            d.curlv.size() == d.x.size() ? rawPtr(d.curlv) : nullptr, rawPtr(d.dV11), rawPtr(d.dV12),
-                            rawPtr(d.dV13), rawPtr(d.dV22), rawPtr(d.dV23), rawPtr(d.dV33),
-                            d.dV11.size() == d.x.size());
+    iadDivvCurlvGradhIjLoop(
+        d.neighborhood, d.K, d.iadConditionQuality, d.iadRegBit, rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.m),
+        rawPtr(d.xm), rawPtr(d.kx), rawPtr(d.nc), rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22),
+        rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.wh), rawPtr(d.whd), rawPtr(d.gradh), rawPtr(d.divv),
+        d.curlv.size() == d.x.size() ? rawPtr(d.curlv) : nullptr, rawPtr(d.dV11), rawPtr(d.dV12), rawPtr(d.dV13),
+        rawPtr(d.dV22), rawPtr(d.dV23), rawPtr(d.dV33), d.dV11.size() == d.x.size(), rawPtr(d.id));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
