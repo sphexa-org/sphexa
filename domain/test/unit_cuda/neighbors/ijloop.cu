@@ -61,20 +61,26 @@ struct PostambleFun
     }
 };
 
-using Result                      = std::tuple<thrust::universal_vector<LocalIndex>,   // iSum
-                                               thrust::universal_vector<LocalIndex>,   // jSum
-                                               thrust::universal_vector<Vec3<double>>, // iPosSum
-                                               thrust::universal_vector<Vec3<double>>, // jPosSum
-                                               thrust::universal_vector<Vec3<double>>, // ijPosDiffSum
-                                               thrust::universal_vector<double>,       // distSqSum
-                                               thrust::universal_vector<double>,       // hiSum
-                                               thrust::universal_vector<double>,       // hjSum
-                                               thrust::universal_vector<double>,       // viSum
-                                               thrust::universal_vector<double>,       // vjSum
-                                               thrust::universal_vector<unsigned>,     // neighborsCount
-                                               thrust::universal_vector<double>,       // hiSumNormalized
-                                               thrust::universal_vector<LocalIndex>    // jMin
-                                               >;
+auto makeIjLoopData(const auto& input, const auto& output)
+{
+    return ijloop::makeIjLoopData<double, double*>(input, output, NeighborFun{}, PostambleFun{});
+}
+
+using Result = std::tuple<thrust::universal_vector<LocalIndex>,   // iSum
+                          thrust::universal_vector<LocalIndex>,   // jSum
+                          thrust::universal_vector<Vec3<double>>, // iPosSum
+                          thrust::universal_vector<Vec3<double>>, // jPosSum
+                          thrust::universal_vector<Vec3<double>>, // ijPosDiffSum
+                          thrust::universal_vector<double>,       // distSqSum
+                          thrust::universal_vector<double>,       // hiSum
+                          thrust::universal_vector<double>,       // hjSum
+                          thrust::universal_vector<double>,       // viSum
+                          thrust::universal_vector<double>,       // vjSum
+                          thrust::universal_vector<unsigned>,     // neighborsCount
+                          thrust::universal_vector<double>,       // hiSumNormalized
+                          thrust::universal_vector<LocalIndex>    // jMin
+                          >;
+
 constexpr static auto resultNames = std::make_tuple("iSum",
                                                     "jSum",
                                                     "iPosSum",
@@ -393,7 +399,7 @@ TYPED_TEST(IjLoopTest, IjLoop)
         auto input  = std::make_tuple(rawPtr(this->v));
         auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
-        nb.ijLoop(input, output, NeighborFun{}, PostambleFun{});
+        nb.ijLoop(makeIjLoopData(input, output));
         stream.sync();
 
         Result reference = this->reference(this->groupView());
@@ -422,7 +428,7 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
         auto input  = std::make_tuple(rawPtr(this->v));
         auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
-        nb.ijLoop(input, output, NeighborFun{}, PostambleFun{});
+        nb.ijLoop(makeIjLoopData(input, output));
         stream.sync();
 
         Result reference = this->reference(this->groupView());
@@ -431,7 +437,7 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
         for (auto& h : this->h)
             h *= searchExtFactor;
 
-        nb.ijLoop(input, output, NeighborFun{}, PostambleFun{});
+        nb.ijLoop(makeIjLoopData(input, output));
         stream.sync();
 
         reference = this->reference(this->groupView());
@@ -475,7 +481,7 @@ TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
             auto input  = std::make_tuple(rawPtr(this->v));
             auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
-            subgroupNb.ijLoop(input, output, NeighborFun{}, PostambleFun{});
+            subgroupNb.ijLoop(makeIjLoopData(input, output));
             stream.sync();
 
             Result reference = this->reference(this->subgroupView());

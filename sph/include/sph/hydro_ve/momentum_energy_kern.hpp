@@ -229,13 +229,15 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T
     const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
     if (tdpdTrho)
     {
-        neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<AvClean, T>{wh, Atmin, Atmax, ramp},
-                            MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour});
+        neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+            input, output, MomentumAndEnergyInteraction<AvClean, T>{wh, Atmin, Atmax, ramp},
+            MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour}));
     }
     else
     {
-        neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<AvClean, T>{wh, Atmin, Atmax, ramp},
-                            MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour});
+        neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+            input, output, MomentumAndEnergyInteraction<AvClean, T>{wh, Atmin, Atmax, ramp},
+            MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour}));
     }
 }
 

@@ -130,9 +130,10 @@ void AVswitchesIjLoop(Neighborhood const& neighborhood, Tc K, Tc dt, T alphamin,
                       const T* c, const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
                       const T* wh, T* alpha_out)
 {
-    neighborhood.ijLoop(std::make_tuple(xm, kx, divv, alpha, vx, vy, vz, c, c11, c12, c13, c22, c23, c33),
-                        std::make_tuple(alpha_out), AVswitchesInteraction<T, Tc>{wh, K},
-                        AVswitchesPostamble<T, Tc>{alphamin, alphamax, decay_constant, dt});
+    neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+        std::make_tuple(xm, kx, divv, alpha, vx, vy, vz, c, c11, c12, c13, c22, c23, c33),
+        std::make_tuple(alpha_out), AVswitchesInteraction<T, Tc>{wh, K},
+        AVswitchesPostamble<T, Tc>{alphamin, alphamax, decay_constant, dt}));
 }
 
 } // namespace sph
