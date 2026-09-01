@@ -38,7 +38,7 @@ __build_spack_vars() {
 
 __build_spack_env() {
     trap _onerror ERR
-    _build_spack_vars
+    __build_spack_vars
     spack env create $_build_env
     spack env ls
     # spack env rm $_build_env
