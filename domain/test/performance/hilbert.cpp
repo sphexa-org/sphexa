@@ -17,8 +17,6 @@
 #include <chrono>
 #include <iostream>
 #include <random>
-#include <cstdlib>
-#include <string>
 
 #define THRUST_DEVICE_SYSTEM THRUST_DEVICE_SYSTEM_OMP
 #include <thrust/execution_policy.h>
@@ -29,10 +27,10 @@
 
 using namespace cstone;
 
-int main(int argc, char** argv)
+int main()
 {
     using KeyType    = uint64_t;
-    unsigned numKeys = argc > 1 ? static_cast<unsigned>(std::stoul(argv[1])) : 32000000;
+    unsigned numKeys = 32000000;
 
     using Real = double;
     Box<Real> box(-1, 1);
