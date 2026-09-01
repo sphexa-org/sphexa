@@ -22,8 +22,16 @@ sph-run-cuda13-sm90-release-unittests:
   extends: [.sph-run-cuda13-sm90-release-base]
   parallel:
     matrix:
-      - SLURM_NTASKS: [1, 2, 4, 10, 12]
-        RUN_CTESTS_ARG: ['1r', '2r', '4r', '10r', '12r']
+      - SLURM_NTASKS: 1
+        RUN_CTESTS_ARG: '1r'
+      - SLURM_NTASKS: 2
+        RUN_CTESTS_ARG: '2r'
+      - SLURM_NTASKS: 4
+        RUN_CTESTS_ARG: '4r'
+      - SLURM_NTASKS: 10
+        RUN_CTESTS_ARG: '10r'
+      - SLURM_NTASKS: 12
+        RUN_CTESTS_ARG: '12r'
 
 # ----------------------------------------------------------------------------    
 sph-run-cuda13-sm90-release-sphexa-cpu:

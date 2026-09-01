@@ -138,10 +138,7 @@ _run_ctests() {
 
         ranks="$1"
         ctest_dir=$(dirname $PWD/$_build_stage/spack-stage-sphexa-develop-*/spack-build-*/CTestTestfile.cmake)
-
-        if [ "$SLURM_PROCID" -eq 0 ]; then
-            echo "ranks=$ranks NUM_KEYS=$NUM_KEYS ctest_dir=$ctest_dir"
-        fi
+        echo "ranks=$ranks ctest_dir=$ctest_dir"
 
         if [ $ranks = "1r" ] ; then
             _run_prerun grackle
