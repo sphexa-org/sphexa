@@ -93,16 +93,17 @@ struct GpuSuperclusterNbListNeighborhood
     std::size_t numBytes = 0;
 
     template<class... Ts>
-    void ijLoop(IjLoopData<Ts...> ijData) const
+    auto ijLoop(IjLoopData<Ts...> ijData) const
     {
-        if (totalBodies == 0) return;
+        using UnwrappedReductionResult = typename IjLoopData<Ts...>::UnwrappedReductionResultType;
+        if (totalBodies == 0) return UnwrappedReductionResult{};
 
         assert(firstBody < lastBody);
         const LocalIndex firstISupercluster = superclusterIndex<Config>(firstBody);
         const LocalIndex lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
         const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
 
-        ijLoop(std::move(ijData), superclusterInfo.get(), numISuperclusters);
+        return ijLoop(std::move(ijData), superclusterInfo.get(), numISuperclusters);
     }
 
     Statistics stats() const { return {.numBodies = lastBody - firstBody, .numBytes = numBytes}; }
@@ -116,11 +117,12 @@ struct GpuSuperclusterNbListNeighborhood
         LocalIndex numISuperclusters;
 
         template<class... Ts>
-        void ijLoop(IjLoopData<Ts...> ijData) const
+        auto ijLoop(IjLoopData<Ts...> ijData) const
         {
-            if (groups.numGroups == 0) return;
+            using UnwrappedReductionResult = typename IjLoopData<Ts...>::UnwrappedReductionResultType;
+            if (groups.numGroups == 0) return UnwrappedReductionResult{};
 
-            parent.ijLoop(std::move(ijData), superclusterInfo.get(), numISuperclusters, activeMasks.get());
+            return parent.ijLoop(std::move(ijData), superclusterInfo.get(), numISuperclusters, activeMasks.get());
         }
     };
 
@@ -149,13 +151,28 @@ struct GpuSuperclusterNbListNeighborhood
 
 protected:
     template<class... Ts, class Mask = void>
-    void ijLoop(IjLoopData<Ts...> ijData,
+    auto ijLoop(IjLoopData<Ts...> ijData,
                 const SuperclusterInfo* superclusterInfo,
                 const LocalIndex numISuperclusters,
                 const Mask* activeMasks = nullptr) const
     {
+        using IjData                   = IjLoopData<Ts...>;
+        using ReductionResult          = typename IjData::ReductionResultType;
+        using UnwrappedReductionResult = typename IjData::UnwrappedReductionResultType;
+        ReductionResult reductionResult{};
+
         const LocalIndex numBodies = lastBody - firstBody;
-        if (numBodies == 0) return;
+        if (numBodies == 0) return unwrapModifiers(reductionResult);
+
+        // allocate reduction result
+        util::UniqueDevicePtr<UnwrappedReductionResult> deviceReductionResult;
+        if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
+        {
+            deviceReductionResult = util::deviceAlloc<UnwrappedReductionResult>(exec);
+            static_assert(sizeof(ReductionResult) == sizeof(UnwrappedReductionResult));
+            checkGpuErrors(cudaMemcpyAsync(deviceReductionResult.get(), &reductionResult, sizeof(ReductionResult),
+                                           cudaMemcpyHostToDevice));
+        }
 
         // modify particle pointers to adhere to supercluster-aligned indexing
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, ijData.input);
@@ -175,17 +192,31 @@ protected:
         }
 
         runIjLoop<Config>(exec, box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, ijData, tmpOrOutput,
-                          neighborData.get(), superclusterInfo, numISuperclusters, activeMasks);
+                          deviceReductionResult.get(), neighborData.get(), superclusterInfo, numISuperclusters,
+                          activeMasks);
 
         if constexpr (Config::symmetric)
         {
             // the postamble has to be applied in a separate step for symmetric neighborhoods
             applyPostamble<Config>(exec, firstBody, lastBody, firstValidBody, x, y, z, h, makeConst(ijData.input),
-                                   makeConst(tmpOrOutput), ijData.output, ijData.postamble);
+                                   makeConst(tmpOrOutput), ijData.output, ijData.postamble, ijData.reduction,
+                                   deviceReductionResult.get());
+        }
 
-            // sync required due to possible use of allocated temporaries
+        if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
+        {
+            // download reduction result
+            checkGpuErrors(cudaMemcpyAsync(&reductionResult, deviceReductionResult.get(), sizeof(ReductionResult),
+                                           cudaMemcpyDeviceToHost));
+        }
+
+        if constexpr (Config::symmetric || !std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
+        {
+            // sync required due to possible use of allocated temporaries / reduction result
             checkGpuErrors(cudaStreamSynchronize(exec));
         }
+
+        return unwrapModifiers(reductionResult);
     }
 };
 

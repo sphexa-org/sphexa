@@ -1,3 +1,34 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2021 CSCS, ETH Zurich
+ *               2021 University of Basel
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+/*! @file
+ * @brief Pressure gradients and energy kernel
+ *
+ * @author Ruben Cabezon <ruben.cabezon@unibas.ch>
+ */
+
 #pragma once
 
 #include <type_traits>
@@ -91,12 +122,10 @@ struct MomentumAndEnergyInteractionStd
     }
 };
 
-
 template<class Tc, class Tm1>
 struct MomentumAndEnergyPostambleStd
 {
     Tc K;
-    Tc Kcour;
 
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
@@ -104,34 +133,51 @@ struct MomentumAndEnergyPostambleStd
         auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
         auto [energy, momentum_x, momentum_y, momentum_z, maxvsignal]                                = result;
 
-        using T = std::remove_cvref_t<decltype(momentum_x)>;
-        auto [du, grad_P_x, grad_P_y, grad_P_z] =
-            std::make_tuple(Tm1(-K * Tm1(0.5) * energy), T(K * momentum_x), T(K * momentum_y), T(K * momentum_z));
-
-        if (nci <= 1 || std::isnan(grad_P_x) || std::isnan(grad_P_y) || std::isnan(grad_P_z))
+        if (nci == 1 || std::isnan(momentum_x) || std::isnan(momentum_y) || std::isnan(momentum_z))
         {
-            grad_P_x   = 0;
-            grad_P_y   = 0;
-            grad_P_z   = 0;
-            du         = 0;
+            energy     = 0;
+            momentum_x = 0;
+            momentum_y = 0;
+            momentum_z = 0;
             nci        = 1;
-            maxvsignal = 0;
         }
-        auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
-        return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nci, dt);
+
+        // with the choice of calculating coordinate (r) and velocity (v_ij) differences as i - j,
+        // we add the negative sign only here at the end instead of to termA123_ij in each interaction
+        using T = std::remove_cvref_t<decltype(momentum_x)>;
+        return std::make_tuple(Tm1(-K * Tm1(0.5) * energy), T(K * momentum_x), T(K * momentum_y), T(K * momentum_z),
+                               nci);
+    }
+};
+
+template<class Tc>
+struct TimeStepReductionStd
+{
+    Tc Kcour;
+
+    template<class ParticleData, class Result, class PostambleResult>
+    constexpr auto operator()(const ParticleData& iData, const Result& result,
+                              const PostambleResult& postambleResult) const
+    {
+        const auto [i, iPos, hi, mi, roi, nci_, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
+        const auto [energy, momentum_x, momentum_y, momentum_z, maxvsignal]                                 = result;
+        const auto [dui, grad_P_xi, grad_P_yi, grad_P_zi, nci] = postambleResult;
+        const auto dt                                          = tsKCourant(nci == 1 ? 0 : maxvsignal, hi, ci, Kcour);
+        return std::make_tuple(cstone::ijloop::reduction::min(dt));
     }
 };
 
 template<class Neighborhood, class Tc, class T, class Tm, class Tm1>
-void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, const Tm* m, const T* rho, unsigned* nc,
-                             const T* vx, const T* vy, const T* vz, const T* p, const T* c, const T* c11, const T* c12,
-                             const T* c13, const T* c22, const T* c23, const T* c33, const T* wh, Tm1* du, T* grad_P_x,
-                             T* grad_P_y, T* grad_P_z, T* dt)
+T momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, const Tm* m, const T* rho, unsigned* nc,
+                          const T* vx, const T* vy, const T* vz, const T* p, const T* c, const T* c11, const T* c12,
+                          const T* c13, const T* c22, const T* c23, const T* c33, const T* wh, Tm1* du, T* grad_P_x,
+                          T* grad_P_y, T* grad_P_z)
 {
-    neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+    auto [minDtCourant] = neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
         std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
-        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc, dt), MomentumAndEnergyInteractionStd<T, Tm1>{wh},
-        MomentumAndEnergyPostambleStd<Tc, Tm1>{K, Kcour}));
+        std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc), MomentumAndEnergyInteractionStd<T, Tm1>{wh},
+        MomentumAndEnergyPostambleStd<Tc, Tm1>{K}, TimeStepReductionStd<Tc>{Kcour}));
+    return minDtCourant;
 }
 
 } // namespace sph

@@ -17,7 +17,9 @@
 
 #include "cstone/primitives/warpscan.cuh"
 #include "cstone/traversal/ijloop/ijloop.hpp"
+#include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/util/array.hpp"
+#include "cstone/util/uninitialized.hpp"
 
 namespace cstone::ijloop
 {
@@ -29,6 +31,15 @@ template<class T>
 __device__ __forceinline__ void atomicAddPtr(T* ptr, T value)
 {
     atomicAdd(ptr, value);
+}
+
+__device__ __forceinline__ void atomicAddPtr(unsigned long* ptr, unsigned long value)
+{
+    static_assert(sizeof(unsigned long) == sizeof(unsigned) || sizeof(unsigned long) == sizeof(unsigned long long));
+    if constexpr (sizeof(unsigned long) == sizeof(unsigned))
+        atomicAdd(reinterpret_cast<unsigned*>(ptr), static_cast<unsigned>(value));
+    else
+        atomicAdd(reinterpret_cast<unsigned long long*>(ptr), static_cast<unsigned long long>(value));
 }
 
 template<class T, std::size_t N>
@@ -107,4 +118,41 @@ __device__ __forceinline__ void atomicUpdatePtr(T* ptr, symmetric::odd<S> const&
     atomicUpdatePtr(ptr, value.value);
 }
 
+template<class UnwrappedReductionResult, class ReductionResult>
+__device__ __forceinline__ void warpReduceUpdatePtr(UnwrappedReductionResult* const globalReductionResult,
+                                                    ReductionResult reductionResult)
+{
+#pragma unroll
+    for (unsigned offset = GpuConfig::warpSize / 2; offset >= 1; offset /= 2)
+    {
+        util::for_each_tuple([&](auto& value) { detail::updateResultImpl(value, shflDownSync(value, offset)); },
+                             reductionResult);
+    }
+
+    if (laneIndex() == 0)
+    {
+        util::for_each_tuple([](auto& target, auto const& value) { atomicUpdatePtr(&target, value); },
+                             *globalReductionResult, reductionResult);
+    }
+}
+
+template<class UnwrappedReductionResult, class ReductionResult>
+__device__ __forceinline__ void blockReduceUpdatePtr(UnwrappedReductionResult* const globalReductionResult,
+                                                     ReductionResult reductionResult)
+{
+    __shared__ util::Uninitialized<ReductionResult> blockReductionResult;
+    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) *blockReductionResult.data() = ReductionResult{};
+
+    __syncthreads();
+
+    warpReduceUpdatePtr(reinterpret_cast<UnwrappedReductionResult*>(blockReductionResult.data()), reductionResult);
+
+    __syncthreads();
+
+    if (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0)
+    {
+        util::for_each_tuple([](auto& target, auto const& value) { atomicUpdatePtr(&target, value); },
+                             *globalReductionResult, *blockReductionResult.data());
+    }
+}
 } // namespace cstone::ijloop

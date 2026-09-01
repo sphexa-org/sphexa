@@ -79,20 +79,30 @@ __device__ __forceinline__ constexpr T0 dynamicTupleGet(std::tuple<T0, T...> con
  * @param[in]    postamble functor to apply to the data before storage
  * @param[in]    iData     particle data to be passed to the postamble
  */
-template<class Config, class T0, class... T, class... Ps, class Postamble, class ParticleData>
+template<class Config,
+         class T0,
+         class... T,
+         class... Ps,
+         class Postamble,
+         class ParticleData,
+         class Reduction,
+         class UnwrappedReductionResult>
 __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
                                                std::tuple<Ps*...> const& ptrs,
                                                const unsigned index,
                                                const bool store,
                                                Postamble const& postamble,
-                                               ParticleData const& iData)
+                                               ParticleData const& iData,
+                                               Reduction const& reduction,
+                                               UnwrappedReductionResult* const __restrict__ globalReductionResult)
 {
     assert(blockDim.x == Config::iSize);
 
     if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < GpuConfig::warpSize / Config::iSize &&
-                  std::is_same<Postamble, detail::EmptyPostamble>())
+                  std::is_same_v<Postamble, detail::EmptyPostamble> && std::is_same_v<Reduction, detail::NoReduction>)
     {
         // fast path: specialized reduction on multiple elements at the same time if all types in the tuple are the same
+        // and no post-processing or global reduction is requested
 
         const T0 res =
             reduceTuple<GpuConfig::warpSize / Config::iSize, true>(tuple,
@@ -118,14 +128,26 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
         for (unsigned offset = GpuConfig::warpSize / 2; offset >= Config::iSize; offset /= 2)
             util::for_each_tuple([&](auto& t) { detail::updateResultImpl(t, shflDownSync(t, offset)); }, tuple);
 
-        if ((threadIdx.y % (GpuConfig::warpSize / Config::iSize) == 0) & store)
+        if constexpr (Config::symmetric | Config::numWarpsPerInteraction > 1)
         {
-            if constexpr (Config::symmetric | Config::numWarpsPerInteraction > 1)
-            {
+            if ((threadIdx.y % (GpuConfig::warpSize / Config::iSize) == 0) & store)
                 util::for_each_tuple([index](auto* ptr, auto const& t) { atomicUpdatePtr(&ptr[index], t); }, ptrs,
                                      tuple);
+        }
+        else
+        {
+            using ReductionResult = decltype(reduction(iData, unwrapModifiers(tuple),
+                                                       unwrapModifiers(postamble(iData, unwrapModifiers(tuple)))));
+            ReductionResult reductionResult{};
+            if ((threadIdx.y % (GpuConfig::warpSize / Config::iSize) == 0) & store)
+            {
+                const auto postambleResult = postamble(iData, unwrapModifiers(tuple));
+                storeParticleData(ptrs, index, postambleResult);
+                if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+                    reductionResult = reduction(iData, unwrapModifiers(tuple), unwrapModifiers(postambleResult));
             }
-            else { storeParticleData(ptrs, index, postamble(iData, unwrapModifiers(tuple))); }
+            if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+                warpReduceUpdatePtr(globalReductionResult, reductionResult);
         }
     }
 }
@@ -304,6 +326,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     const ThP h,
     const IjData ijData,
     const Out symmTmpOutput,
+    typename IjData::UnwrappedReductionResultType* const __restrict__ globalReductionResult,
     const std::uint32_t* const __restrict__ neighborData,
     const SuperclusterInfo* const __restrict__ superclusterInfo,
     const unsigned numISuperclusters,
@@ -330,7 +353,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         superclusterInfo[iSuperclusterIndex];
 
     using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq(x, y, z, h, ijData.input, firstBody));
-    using InteractionResultType = typename IjData::InteractionResultType;
+    using InteractionResultType    = typename IjData::InteractionResultType;
 
     const auto iSuperclusterData =
         loadSuperclusterIParticleData<Config, NumSuperclustersPerBlock, ParticleDataWithRadiusSq>(
@@ -432,7 +455,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             const unsigned i      = iSupercluster * Config::superclusterSize + offset;
             const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
             storeTupleISum<Config>(iResults[c], outputBufferPtrs, c * Config::iSize + threadIdx.x, true,
-                                   detail::EmptyPostamble{}, iData);
+                                   detail::EmptyPostamble{}, iData, detail::NoReduction{}, (std::tuple<>*)nullptr);
         }
 
         __syncthreads();
@@ -443,12 +466,19 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         {
             const unsigned i  = base + offset;
             const bool active = (activeMask >> offset) & 1;
+            typename IjData::ReductionResultType reductionResult{};
             if (i >= firstBody & i < lastBody & active)
             {
                 const auto iData   = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
                 const auto iResult = util::tupleMap([&](auto const* ptr) { return ptr[offset]; }, outputBufferPtrs);
-                storeParticleData(symmTmpOutput, i, ijData.postamble(iData, unwrapModifiers(iResult)));
+                const auto postambleResult = ijData.postamble(iData, unwrapModifiers(iResult));
+                storeParticleData(symmTmpOutput, i, postambleResult);
+                if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
+                    reductionResult =
+                        ijData.reduction(iData, unwrapModifiers(iResult), unwrapModifiers(postambleResult));
             }
+            if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
+                warpReduceUpdatePtr(globalReductionResult, reductionResult);
         }
     }
     else
@@ -459,8 +489,8 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             const auto i          = iSupercluster * Config::superclusterSize + offset;
             const bool active     = (activeMask >> (c * Config::iSize + threadIdx.x)) & 1;
             const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
-            storeTupleISum<Config>(iResults[c], symmTmpOutput, i, i >= firstBody & i < lastBody & active, ijData.postamble,
-                                   iData);
+            storeTupleISum<Config>(iResults[c], symmTmpOutput, i, i >= firstBody & i < lastBody & active,
+                                   ijData.postamble, iData, ijData.reduction, globalReductionResult);
         }
     }
 }
@@ -478,6 +508,7 @@ void runIjLoop(const execution::Gpu exec,
                const ThP h,
                const IjData ijData,
                const Out symmTmpOutput,
+               typename IjData::UnwrappedReductionResultType* const globalReductionResult,
                const std::uint32_t* const neighborData,
                const SuperclusterInfo* const superclusterInfo,
                const LocalIndex numISuperclusters,
@@ -489,8 +520,8 @@ void runIjLoop(const execution::Gpu exec,
     const auto run                              = [&](auto usePbc)
     {
         runIjLoopKernel<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, 0, exec>>>(
-            box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, ijData, symmTmpOutput, neighborData,
-            superclusterInfo, numISuperclusters, activeMasks);
+            box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, ijData, symmTmpOutput,
+            globalReductionResult, neighborData, superclusterInfo, numISuperclusters, activeMasks);
         checkGpuErrors(cudaGetLastError());
     };
 
