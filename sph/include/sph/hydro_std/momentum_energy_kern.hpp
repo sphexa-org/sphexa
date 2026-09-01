@@ -157,11 +157,13 @@ struct TimeStepReductionStd
     Tc Kcour;
 
     template<class ParticleData, class Result, class PostambleResult>
-    constexpr auto operator()(const ParticleData& iData, const Result& result, const PostambleResult&) const
+    constexpr auto operator()(const ParticleData& iData, const Result& result,
+                              const PostambleResult& postambleResult) const
     {
-        const auto [i, iPos, hi, mi, roi, nci, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
-        const auto [energy, momentum_x, momentum_y, momentum_z, maxvsignal]                                = result;
-        const auto dt = tsKCourant(nci == 1 ? 0 : maxvsignal, hi, ci, Kcour);
+        const auto [i, iPos, hi, mi, roi, nci_, vxi, vyi, vzi, pri, ci, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
+        const auto [energy, momentum_x, momentum_y, momentum_z, maxvsignal]                                 = result;
+        const auto [dui, grad_P_xi, grad_P_yi, grad_P_zi, nci] = postambleResult;
+        const auto dt                                          = tsKCourant(nci == 1 ? 0 : maxvsignal, hi, ci, Kcour);
         return std::make_tuple(cstone::ijloop::reduction::min(dt));
     }
 };
