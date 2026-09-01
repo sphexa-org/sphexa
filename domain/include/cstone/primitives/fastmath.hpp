@@ -19,7 +19,7 @@
 
 #define CSTONE_FAST_MATH [[gnu::optimize("-ffast-math")]]
 
-namespace util::fastmath
+namespace cstone::fastmath
 {
 
 CSTONE_FAST_MATH constexpr float sin(float x)
@@ -103,4 +103,4 @@ CSTONE_FAST_MATH constexpr float pow(float x, float y)
 
 CSTONE_FAST_MATH constexpr double pow(double x, double y) { return std::pow(x, y); }
 
-} // namespace util::fastmath
+} // namespace cstone::fastmath

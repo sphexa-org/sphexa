@@ -14,7 +14,7 @@
 #include <variant>
 #include <vector>
 
-#include "cstone/util/fastmath.hpp"
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/util/reallocate.hpp"
 #include "kernels.hpp"
 
@@ -100,7 +100,7 @@ struct SincN
     {
         if (x >= kernelSupport<T>) return 0;
         const T w = wharmonic_std(x);
-        return n == T(6) ? (w * w) * (w * w) * (w * w) : util::fastmath::pow(w, n);
+        return n == T(6) ? (w * w) * (w * w) * (w * w) : cstone::fastmath::pow(w, n);
     }
 
     constexpr T derivative(const T x) const
@@ -108,7 +108,7 @@ struct SincN
         if (x >= kernelSupport<T>) return 0;
         const T w   = wharmonic_std(x);
         const T dw  = wharmonic_derivative_std(x);
-        const T wn1 = n == T(6) ? (w * w) * (w * w) * w : util::fastmath::pow(w, n - 1);
+        const T wn1 = n == T(6) ? (w * w) * (w * w) * w : cstone::fastmath::pow(w, n - 1);
         return n * wn1 * dw;
     }
 };
@@ -118,7 +118,8 @@ template<class T>
 struct SincN1SincN2
 {
     constexpr T operator()(const T x) const { return a * K1 * sincN1(x) + (1 - a) * K2 * sincN2(x); }
-    constexpr T derivative(const T x) const { return a * K1 * sincN1.derivative(x) + (1 - a) * K2 * sincN2.derivative(x); }
+    constexpr T derivative(const T x) const
+    { return a * K1 * sincN1.derivative(x) + (1 - a) * K2 * sincN2.derivative(x); }
 
     static constexpr T        a      = 0.9;
     static constexpr T        n1     = 4.0;
@@ -129,64 +130,73 @@ struct SincN1SincN2
     T                         K2     = kernel_3D_k(sincN2);
 };
 
-template <class T>
-struct WendlandC2 {
-    constexpr T operator()(const T x) const {
+template<class T>
+struct WendlandC2
+{
+    constexpr T operator()(const T x) const
+    {
         if (x >= kernelSupport<T>) return T(0);
-        const T r = T(0.5) * x;
-        const T omr = T(1) - r;
+        const T r    = T(0.5) * x;
+        const T omr  = T(1) - r;
         const T omr2 = omr * omr;
         const T omr4 = omr2 * omr2;
         return omr4 * (T(1) + T(4) * r);
     }
 
-    constexpr T derivative(const T x) const {
+    constexpr T derivative(const T x) const
+    {
         if (x >= kernelSupport<T>) return T(0);
-        const T r = T(0.5) * x;
-        const T omr = T(1) - r;
+        const T r    = T(0.5) * x;
+        const T omr  = T(1) - r;
         const T omr3 = omr * omr * omr;
         return T(-10) * r * omr3;
     };
 };
 
-template <class T>
-struct WendlandC4 {
-    constexpr T operator()(const T x) const {
+template<class T>
+struct WendlandC4
+{
+    constexpr T operator()(const T x) const
+    {
         if (x >= kernelSupport<T>) return T(0);
-        const T r = T(0.5) * x;
-        const T omr = T(1) - r;
+        const T r    = T(0.5) * x;
+        const T omr  = T(1) - r;
         const T omr2 = omr * omr;
         const T omr6 = omr2 * omr2 * omr2;
         return omr6 * (T(1) + T(6) * r + T(35.0 / 3.0) * r * r);
     }
 
-    constexpr T derivative(const T x) const {
+    constexpr T derivative(const T x) const
+    {
         if (x >= kernelSupport<T>) return T(0);
-        const T r = T(0.5) * x;
-        const T omr = T(1) - r;
+        const T r    = T(0.5) * x;
+        const T omr  = T(1) - r;
         const T omr2 = omr * omr;
         const T omr5 = omr2 * omr2 * omr;
         return T(-56.0 / 6.0) * r * (T(5) * r + T(1)) * omr5;
     };
 };
 
-template <class T>
-struct WendlandC6 {
-    constexpr T operator()(const T x) const {
+template<class T>
+struct WendlandC6
+{
+    constexpr T operator()(const T x) const
+    {
         if (x >= kernelSupport<T>) return T(0);
-        const T r = T(0.5) * x;
-        const T r2 = r * r;
-        const T omr = T(1) - r;
+        const T r    = T(0.5) * x;
+        const T r2   = r * r;
+        const T omr  = T(1) - r;
         const T omr2 = omr * omr;
         const T omr4 = omr2 * omr2;
         const T omr8 = omr4 * omr4;
         return omr8 * (T(1) + T(8) * r + T(25) * r2 + T(32) * r2 * r);
     }
 
-    constexpr T derivative(const T x) const {
+    constexpr T derivative(const T x) const
+    {
         if (x >= kernelSupport<T>) return T(0);
-        const T r = T(0.5) * x;
-        const T omr = T(1) - r;
+        const T r    = T(0.5) * x;
+        const T omr  = T(1) - r;
         const T omr2 = omr * omr;
         const T omr3 = omr2 * omr;
         const T omr7 = omr3 * omr3 * omr;

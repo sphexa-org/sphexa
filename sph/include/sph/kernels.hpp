@@ -3,7 +3,7 @@
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/findneighbors.hpp"
 #include "cstone/util/array.hpp"
-#include "cstone/util/fastmath.hpp"
+#include "cstone/primitives/fastmath.hpp"
 
 namespace sph
 {
@@ -95,7 +95,7 @@ HOST_DEVICE_FUN constexpr inline T wharmonic_std(T v)
 
     constexpr T piHalf = M_PI_2;
     const T     Pv     = piHalf * v;
-    return util::fastmath::sin(Pv) * util::fastmath::rcp(Pv);
+    return cstone::fastmath::sin(Pv) * cstone::fastmath::rcp(Pv);
 }
 
 //! @brief Derivative of sinc(PI/2 * v) w.r to v
@@ -106,9 +106,9 @@ HOST_DEVICE_FUN constexpr inline T wharmonic_derivative_std(T v)
 
     constexpr T piHalf = M_PI_2;
     const T     Pv     = piHalf * v;
-    const T     sinPv  = util::fastmath::sin(Pv);
-    const T     cosPv  = util::fastmath::cos(Pv);
-    const T     invPv  = util::fastmath::rcp(Pv);
+    const T     sinPv  = cstone::fastmath::sin(Pv);
+    const T     cosPv  = cstone::fastmath::cos(Pv);
+    const T     invPv  = cstone::fastmath::rcp(Pv);
     const T     sincv  = sinPv * invPv;
 
     return sincv * piHalf * (cosPv / sinPv - invPv);
