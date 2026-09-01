@@ -113,11 +113,21 @@ template<class... Ts>
 inline constexpr bool IsTupleOfPointers_v<std::tuple<Ts...>> =
     (std::is_pointer_v<Ts> && ...) && (std::is_trivially_copyable_v<std::remove_pointer_t<Ts>> && ...);
 
+template<class T>
+inline constexpr bool IsTupleOfValues_v = false;
+
+template<class... Ts>
+inline constexpr bool IsTupleOfValues_v<std::tuple<Ts...>> =
+    (!std::is_pointer_v<Ts> && ...) && (std::is_trivially_copyable_v<Ts> && ...);
+
 } // namespace detail
 
 //! @brief Restricts types to std::tuples of pointers to trivially copyable types.
 template<class T>
 concept TupleOfPointers = detail::IsTupleOfPointers_v<T>;
+
+template<class T>
+concept TupleOfValues = detail::IsTupleOfValues_v<T>;
 
 template<class... Ts>
 constexpr std::tuple<const Ts*...> makeConst(std::tuple<Ts*...> input)
@@ -187,10 +197,8 @@ concept PairInteraction = requires(const F& func,
                                    const ParticleData<Tc, ThP, Input>& i,
                                    const ParticleData<Tc, ThP, Input>& j,
                                    Vec3<Tc> posdiff,
-                                   std::remove_pointer_t<ThP> r2)
-{
-    {func(i, j, posdiff, r2)}; // must be callable with this signature
-};
+                                   Tc r2)
+{ {func(i, j, posdiff, r2)}->TupleOfValues; };
 
 //! @brief A postamble is callable with (ParticleData, interaction result), and returns a tuple compatible with Output
 template<class Postamble, class Interaction, class Tc, class ThP, class Input, class Output>
@@ -199,12 +207,22 @@ concept ValidPostamble = PairInteraction<Interaction, Tc, ThP, Input> && require
                                                                                   const ParticleData<Tc, ThP, Input>& i,
                                                                                   const ParticleData<Tc, ThP, Input>& j,
                                                                                   Vec3<Tc> posdiff,
-                                                                                  std::remove_pointer_t<ThP> r2)
+                                                                                  Tc r2)
 {
-    {
-        postamble(i, unwrapModifiers(interaction(i, j, posdiff, r2)))        // must be callable with this signature
-        } -> std::same_as<typename detail::DereferencedTuple<Output>::type>; // must return this type
+    {postamble(i, unwrapModifiers(interaction(i, j, posdiff, r2)))}
+        ->std::same_as<typename detail::DereferencedTuple<Output>::type>;
 };
+
+template<class Reduction, class Interaction, class Tc, class ThP, class Input, class Output>
+concept ValidReduction =
+    PairInteraction<Interaction, Tc, ThP, Input> && requires(const Reduction& reduction,
+                                                             const Interaction& interaction,
+                                                             const ParticleData<Tc, ThP, Input>& i,
+                                                             const ParticleData<Tc, ThP, Input>& j,
+                                                             Vec3<Tc> posdiff,
+                                                             Tc r2,
+                                                             detail::DereferencedTuple<Output>::type postambleOutput)
+{ {reduction(i, unwrapModifiers(interaction(i, j, posdiff, r2)), postambleOutput)}->TupleOfValues; };
 
 /*! A dataset that can be passed to an ijLoop.
  *
@@ -222,7 +240,7 @@ template<std::floating_point Tc,
          TupleOfPointers Output,
          PairInteraction<Tc, ThP, Input> Interaction,
          ValidPostamble<Interaction, Tc, ThP, Input, Output> Postamble = detail::EmptyPostamble,
-         class Reduction = detail::NoReduction>
+         ValidReduction<Interaction, Tc, ThP, Input, Output> Reduction = detail::NoReduction>
 struct IjLoopData
 {
     //! @brief The tuple input data for a single particle in an i-j interaction,
@@ -244,10 +262,10 @@ struct IjLoopData
     using ReductionType = Reduction;
 
     //! @brief what the reduction returns across all particles
-    using ReductionResultType = decltype(std::declval<Reduction>()(
-        std::declval<ParticleDataType>(),
-        unwrapModifiers(std::declval<InteractionResultType>()),
-        unwrapModifiers(std::declval<PostambleResultType>())));
+    using ReductionResultType =
+        decltype(std::declval<Reduction>()(std::declval<ParticleDataType>(),
+                                           unwrapModifiers(std::declval<InteractionResultType>()),
+                                           unwrapModifiers(std::declval<PostambleResultType>())));
 
     //! @brief the reduction result with all modifiers (min/max/...) unwrapped
     using UnwrappedReductionResultType = decltype(unwrapModifiers(std::declval<ReductionResultType>()));
@@ -259,26 +277,28 @@ struct IjLoopData
     Interaction interaction;
     //! @brief Post-processing to apply to the Result after the j-loop
     Postamble postamble;
-    //! @brief Optional global reduction over per-particle values
-    Reduction reduction{};
+    //! @brief Global reduction over per-particle values
+    Reduction reduction;
 };
 
 //! @brief Convenience factory to construct an @p IjLoopData with explicit Tc and ThP and deduced tuple/functor types.
-template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble, class Reduction = detail::NoReduction>
+template<class Tc,
+         class ThP,
+         class Input,
+         class Output,
+         class Interaction,
+         class Postamble = detail::EmptyPostamble,
+         class Reduction = detail::NoReduction>
 auto makeIjLoopData(const Input& in,
                     const Output& out,
                     const Interaction& interaction,
-                    const Postamble& postamble,
+                    const Postamble& postamble = empty_postamble,
                     const Reduction& reduction = no_reduction)
 {
     auto constInput = makeConst(in);
-    return IjLoopData<Tc,
-                      ThP,
-                      std::decay_t<decltype(constInput)>,
-                      std::decay_t<Output>,
-                      std::decay_t<Interaction>,
-                      std::decay_t<Postamble>,
-                      std::decay_t<Reduction>>{constInput, out, interaction, postamble, reduction};
+    return IjLoopData<Tc, ThP, std::decay_t<decltype(constInput)>, std::decay_t<Output>, std::decay_t<Interaction>,
+                      std::decay_t<Postamble>, std::decay_t<Reduction>>{constInput, out, interaction, postamble,
+                                                                        reduction};
 }
 
 namespace detail
