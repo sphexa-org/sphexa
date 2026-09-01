@@ -17,11 +17,12 @@
 
 #include <cmath>
 
+#define CSTONE_FAST_MATH [[gnu::optimize("-ffast-math")]]
+
 namespace util::fastmath
 {
 
-[[gnu::optimize("-ffast-math")]]
-constexpr float sin(float x)
+CSTONE_FAST_MATH constexpr float sin(float x)
 {
 #if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
     return __sinf(x);
@@ -30,14 +31,9 @@ constexpr float sin(float x)
 #endif
 }
 
-[[gnu::optimize("-ffast-math")]]
-constexpr double sin(double x)
-{
-    return std::sin(x);
-}
+CSTONE_FAST_MATH constexpr double sin(double x) { return std::sin(x); }
 
-[[gnu::optimize("-ffast-math")]]
-constexpr float cos(float x)
+CSTONE_FAST_MATH constexpr float cos(float x)
 {
 #if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
     return __cosf(x);
@@ -46,14 +42,9 @@ constexpr float cos(float x)
 #endif
 }
 
-[[gnu::optimize("-ffast-math")]]
-constexpr double cos(double x)
-{
-    return std::cos(x);
-}
+CSTONE_FAST_MATH constexpr double cos(double x) { return std::cos(x); }
 
-[[gnu::optimize("-ffast-math")]]
-constexpr float rcp(float x)
+CSTONE_FAST_MATH constexpr float rcp(float x)
 {
 #ifdef __CUDA_ARCH__
     // __frcp_rn might not flush to zero and thus can be significantly slower
@@ -66,8 +57,7 @@ constexpr float rcp(float x)
 #endif
 }
 
-[[gnu::optimize("-ffast-math")]]
-constexpr double rcp(double x)
+CSTONE_FAST_MATH constexpr double rcp(double x)
 {
 #ifdef __CUDA_ARCH__
     // __drcp_rn might not flush to zero and thus can be significantly slower
@@ -80,8 +70,7 @@ constexpr double rcp(double x)
 #endif
 }
 
-[[gnu::optimize("-ffast-math")]]
-constexpr float sqrt(float x)
+CSTONE_FAST_MATH constexpr float sqrt(float x)
 {
 #if defined(__CUDA_ARCH__)
     // __fsqrt_rn might not flush to zero and thus can be significantly slower
@@ -94,8 +83,7 @@ constexpr float sqrt(float x)
 #endif
 }
 
-[[gnu::optimize("-ffast-math")]]
-constexpr double sqrt(double x)
+CSTONE_FAST_MATH constexpr double sqrt(double x)
 {
 #if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
     return __dsqrt_rn(x);
@@ -104,8 +92,7 @@ constexpr double sqrt(double x)
 #endif
 }
 
-[[gnu::optimize("-ffast-math")]]
-constexpr float pow(float x, float y)
+CSTONE_FAST_MATH constexpr float pow(float x, float y)
 {
     if (y == 6.0f) return (x * x) * (x * x) * (x * x);
 #if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
@@ -115,10 +102,6 @@ constexpr float pow(float x, float y)
 #endif
 }
 
-[[gnu::optimize("-ffast-math")]]
-constexpr double pow(double x, double y)
-{
-    return std::pow(x, y);
-}
+CSTONE_FAST_MATH constexpr double pow(double x, double y) { return std::pow(x, y); }
 
 } // namespace util::fastmath
