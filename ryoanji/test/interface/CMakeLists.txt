@@ -33,7 +33,7 @@ if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
         LINK ${MPI_CXX_LIBRARIES};cstone_gpu;ryoanji
         INCLUDE ${MPI_CXX_INCLUDE_PATH};${RYOANJI_TEST_INCLUDE_DIRS}
         COMPILE_OPTIONS -Wno-unknown-pragmas
-        LABELS "04r;gpu"
+        LABELS "4r;gpu"
         MPI RANKS 4
     )
 

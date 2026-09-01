@@ -143,7 +143,7 @@ _run_ctests() {
             echo "ranks=$ranks NUM_KEYS=$NUM_KEYS ctest_dir=$ctest_dir"
         fi
 
-        if [ $ranks = "01r" ] ; then
+        if [ $ranks = "1r" ] ; then
             _run_prerun grackle
             ctest --output-on-failure --test-dir $ctest_dir -j -L "$ranks" # -V
             # ctest --output-on-failure --test-dir $ctest_dir -N -L "$ranks" # -V

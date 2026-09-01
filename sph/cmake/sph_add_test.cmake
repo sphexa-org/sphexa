@@ -6,7 +6,7 @@ function(sph_add_test target)
     endif()
 
     if(NOT ARG_LABELS)
-        set(ARG_LABELS "01r;cpu")
+        set(ARG_LABELS "1r;cpu")
     endif()
 
     add_executable(${target} ${ARG_SOURCES})

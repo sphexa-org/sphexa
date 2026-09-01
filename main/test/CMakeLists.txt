@@ -21,5 +21,5 @@ if (SPH_EXA_WITH_CUDA AND SPH_EXA_WITH_H5HUT)
         SOURCES io/id_tag_utils_gpu.cu test_main.cpp
         LINK cstone_gpu io_gpu sph_gpu OpenMP::OpenMP_CXX CUDA::cudart
         INCLUDE ${COOLING_DIR}
-        LABELS "01r;gpu")
+        LABELS "1r;gpu")
 endif ()

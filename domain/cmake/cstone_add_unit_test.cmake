@@ -6,7 +6,7 @@ function(cstone_add_unit_test target)
     endif()
 
     if(NOT ARG_LABELS)
-        set(ARG_LABELS "01r;cpu")
+        set(ARG_LABELS "1r;cpu")
     endif()
 
     if(NOT ARG_DESTINATION)

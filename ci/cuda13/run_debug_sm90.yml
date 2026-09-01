@@ -18,35 +18,12 @@ include:
       time -p _run_ctests ${RUN_CTESTS_ARG}
 
 # ----------------------------------------------------------------------------    
-sph-run-cuda13-sm90-debug-01ranks:
+sph-run-cuda13-sm90-debug-unittests:
   extends: [.sph-run-cuda13-sm90-debug-base]
-  variables:
-    SLURM_NTASKS: 1
-    RUN_CTESTS_ARG: '01r'
-
-sph-run-cuda13-sm90-debug-02ranks:
-  extends: [.sph-run-cuda13-sm90-debug-base]
-  variables:
-    SLURM_NTASKS: 2
-    RUN_CTESTS_ARG: '02r'
-
-sph-run-cuda13-sm90-debug-04ranks:
-  extends: [.sph-run-cuda13-sm90-debug-base]
-  variables:
-    SLURM_NTASKS: 4
-    RUN_CTESTS_ARG: '04r'
-
-sph-run-cuda13-sm90-debug-10ranks:
-  extends: [.sph-run-cuda13-sm90-debug-base]
-  variables:
-    SLURM_NTASKS: 10
-    RUN_CTESTS_ARG: '10r'
-
-sph-run-cuda13-sm90-debug-12ranks:
-  extends: [.sph-run-cuda13-sm90-debug-base]
-  variables:
-    SLURM_NTASKS: 12
-    RUN_CTESTS_ARG: '12r'
+  parallel:
+    matrix:
+      - SLURM_NTASKS: [1, 2, 4, 10, 12]
+        RUN_CTESTS_ARG: ['1r', '2r', '4r', '10r', '12r']
 
 # ----------------------------------------------------------------------------    
 sph-run-cuda13-sm90-debug-sphexa-cpu:

@@ -8,7 +8,7 @@ function(cstone_add_cuda_unit_test target)
     endif()
 
     if(NOT ARG_LABELS)
-        set(ARG_LABELS "01r;gpu")
+        set(ARG_LABELS "1r;gpu")
     endif()
 
     if(CSTONE_WITH_HIP)

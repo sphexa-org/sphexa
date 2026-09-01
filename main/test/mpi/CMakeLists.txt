@@ -2,7 +2,7 @@ set(CSTONE_TEST_DIR ${CSTONE_DIR}/../test)
 message(STATUS "cstone test dir " ${CSTONE_TEST_DIR})
 
 if (SPH_EXA_WITH_H5HUT)
-    main_add_mpi_test(hdf5io HDF5IO 2 "02r;cpu"
+    main_add_mpi_test(hdf5io HDF5IO 2 "2r;cpu"
         SOURCES hdf5.cpp
         LINK io)
 

@@ -15,7 +15,7 @@ if(SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP)
     sph_add_test(sph_gpu_tests
         SOURCES timestep.cu
         LINK sph_gpu
-        LABELS "01r;gpu")
+        LABELS "1r;gpu")
 
     if(SPH_EXA_WITH_HIP)
         set_target_properties(sph_gpu_tests PROPERTIES LINKER_LANGUAGE CXX)

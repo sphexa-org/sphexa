@@ -15,7 +15,7 @@ if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
     ryoanji_add_executable_test(ryoanji_demo
         SOURCES demo.cu
         LINK ryoanji_kernels;cstone_gpu
-        LABELS "01r;gpu"
+        LABELS "1r;gpu"
     )
     set_target_properties(ryoanji_demo PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
@@ -29,7 +29,7 @@ if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
         SOURCES demo_mpi.cpp
         LINK cstone_gpu;ryoanji;${MPI_CXX_LIBRARIES}
         INCLUDE ${MPI_CXX_INCLUDE_PATH}
-        LABELS "02r;gpu"
+        LABELS "2r;gpu"
         MPI
     )
 
@@ -54,7 +54,7 @@ ryoanji_add_executable_test(cpu_unit_tests
         test_main.cpp
     LINK GTest::gtest_main;OpenMP::OpenMP_CXX
     COMPILE_OPTIONS -Wall;-Wextra;-Wno-unknown-pragmas
-    LABELS "01r;cpu"
+    LABELS "1r;cpu"
 )
 
 if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
@@ -64,7 +64,7 @@ if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
             nbody/direct.cu
             test_main.cpp
         LINK cstone_thrust_incl;OpenMP::OpenMP_CXX;ryoanji;GTest::gtest_main
-        LABELS "01r;gpu"
+        LABELS "1r;gpu"
     )
 
     if (RYOANJI_WITH_HIP)
