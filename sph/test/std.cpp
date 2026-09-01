@@ -164,7 +164,7 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
     const auto input  = std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33);
     const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, neighbors - i);
 
-    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
+    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, cstone::ijloop::makeConst(input), i);
     const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
 
     auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
@@ -172,7 +172,7 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
     {
         cstone::LocalIndex j = neighbors[stride * pj];
 
-        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
+        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, cstone::ijloop::makeConst(input), j);
 
         const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
 
@@ -199,6 +199,7 @@ TEST_F(SphKernelTestsStd, MomentumEnergy)
     EXPECT_NEAR(grad_Py, -1.2396802157028355, 1.4e-7);
     EXPECT_NEAR(grad_Pz, 15.596554152643426, 2.15e-7);
     EXPECT_NEAR(du, -0.40541191600274296, 1e-8);
+    EXPECT_EQ(nc[0], neighborsCount + 1);
     EXPECT_NEAR(maxvsignal, 1.4112466828564341, 1e-10);
 }
 
