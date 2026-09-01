@@ -10,8 +10,14 @@ export TEST_INSTALL_DIR="$_build_spack/opt/spack/linux-*/sphexa-develop-*/sbin/"
 export SLURM_OVERLAP=1 SLURM_ACCOUNT=csstaff
 # SLURM_CPU_BIND_TYPE=none
 
-_build_get_spack() {
-    set -e
+_onerror() {
+    exitcode=$?
+    echo "-alps_cscs.sh: command \`$BASH_COMMAND' failed (exit code: $exitcode)"
+    # exit $exitcode
+}
+
+__build_get_spack() {
+    trap _onerror ERR
     _version=1.2.2
     wget --quiet https://jfrog.svc.cscs.ch/artifactory/cscs-reframe-tests/sphexa/spack-$_version.tar.gz
     tar xf spack-$_version.tar.gz
@@ -22,33 +28,26 @@ _build_get_spack() {
     # git clone --quiet --depth=1 --branch=v$_version https://github.com/spack/spack.git spack.git
 }
 
-_build_spack_env() {
-    set -e
-    _env=$1
+__build_spack_vars() {
+    trap _onerror ERR
     export SPACK_SYSTEM_CONFIG_PATH=${UENV_SPACK_CONFIG_PATH}
     export SPACK_SYSTEM_CONFIG_PATH=/user-environment/config
     export SPACK_ROOT=$PWD/$_build_spack
-    source $SPACK_ROOT/share/spack/setup-env.sh
-    spack env create $_build_env
-    spack env ls
-    # spack env rm $_env
+    if [ -z $SPACK_PYTHON ] ; then source $SPACK_ROOT/share/spack/setup-env.sh ; fi
 }
 
-_build_sphexa_cuda() {
-    # use code in current dir + build with custom spack recipe + ctests
-    set -e
+__build_spack_env() {
+    trap _onerror ERR
+    _build_spack_vars
+    spack env create $_build_env
+    spack env ls
+    # spack env rm $_build_env
+}
 
-    build_type="$1"
-: "${build_type:=Debug}"
-    _spec="sphexa@develop +hdf5 +gpu_aware_mpi +tests +disks +grackle +werror "
-    _spec+="+overlap +cuda cuda_arch=90 build_type=${build_type}"
-    _repo="$PWD/ci/scripts/spack_repo/sphx${build_type,,}"
-    _build_get_spack
-    _build_spack_env
-
+__build_sphexa_yaml() {
     # --- use local code and local spack repo/recipe
     # ruff check ci/scripts/spack_repo/sphx/packages/sphexa/package.py
-cat > $SPACK_ROOT/var/spack/environments/$_build_env/spack.yaml <<EOF
+    cat > $SPACK_ROOT/var/spack/environments/$_build_env/spack.yaml <<EOF
 spack:
   specs:
     - $_spec ^mpi=cray-mpich@9.1.0
@@ -70,6 +69,22 @@ EOF
     spack config --scope=defaults:base add "config:build_stage:$PWD/$_build_stage"
     spack config --scope=defaults:base get config |grep -A1 build_stage
     # spack config blame config | grep build_stage
+}
+
+_build_sphexa_cuda() {
+    # use code in current dir + build with custom spack recipe + ctests
+    trap _onerror ERR
+
+    build_type="$1"
+: "${build_type:=Debug}"
+    _spec="sphexa@develop +hdf5 +gpu_aware_mpi +tests +disks +grackle +werror "
+    _spec+="+overlap +cuda cuda_arch=90 build_type=${build_type}"
+    _repo="$PWD/ci/scripts/spack_repo/sphx${build_type,,}"
+
+    # --- setup spack
+    __build_get_spack
+    __build_spack_env
+    __build_sphexa_yaml
 
     # --- start compiling
     rm -fr ./$_build_stage/*
@@ -117,7 +132,7 @@ _run_prerun() {
 }
 
 _run_ctests() {
-    set -e
+    trap _onerror ERR
 
     if [ "$SLURM_PROCID" -eq 0 ]; then
 

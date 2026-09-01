@@ -1,4 +1,3 @@
-list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 include(sph_add_test)
 
 add_subdirectory(hydro_turb)
