@@ -109,7 +109,7 @@ struct SincN
         const T w   = wharmonic_std(x);
         const T dw  = wharmonic_derivative_std(x);
         const T wn1 = n == T(6) ? (w * w) * (w * w) * w : util::fastmath::pow(w, n - 1);
-        return w * wn1 * dw;
+        return n * wn1 * dw;
     }
 };
 
