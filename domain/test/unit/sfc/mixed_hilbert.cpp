@@ -1,6 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <cmath>
+#include <cstddef>
+#include <set>
+#include <stdexcept>
+#include <vector>
+
 #include "coord_samples/random.hpp"
+#include "cstone/sfc/box.hpp"
+#include "cstone/sfc/hilbert.hpp"
 
 using namespace cstone;
 
@@ -214,4 +222,204 @@ TEST(MixedHilbertEncoding, validMixDKey)
     EXPECT_TRUE(isValidHilbertMixDKey(decodePlaceholderBit(KeyType(01137)), l, l - 1, l - 2));
     EXPECT_FALSE(isValidHilbertMixDKey(decodePlaceholderBit(KeyType(01147)), l, l - 1, l - 2));
     EXPECT_FALSE(isValidHilbertMixDKey(decodePlaceholderBit(KeyType(01237)), l, l - 1, l - 2));
+}
+
+/*!
+ * @brief Verify that MixD Hilbert node centers at a given level form a curve that steps
+ *        one axis-aligned cell at a time, with a per-axis step size that stays constant.
+ *
+ * Given a box with extents (lx, ly, lz), derive the per-axis SFC bit depths (bx, by, bz)
+ * from the box aspect ratio, enumerate all nodes at @p level (counted from the right, 0 =
+ * leaves) in increasing key order with an octal-carry increment that respects the
+ * shorter-axis bit limits, map each key to its node via hilbertIBox, compute the
+ * floating-point node center with centerAndSize, and assert that every consecutive
+ * (key-adjacent) pair of centers differs along exactly one axis, with a step size that is
+ * the same every time that axis is stepped.
+ *
+ * The Hilbert curve visits each node as a single axis-aligned step of one node cell at
+ * that level, so consecutive centers always move along exactly one axis, by exactly one
+ * cell edge on that axis. Because the per-axis bit depths (bx, by, bz) are derived by
+ * flooring a continuous aspect-ratio ratio to an integer, the physical cell edge length
+ * can differ slightly between axes unless the box's aspect ratio is an exact power of 2
+ * (e.g. lx:ly:lz = 256:32:1) - so the step size is only required to be constant *within*
+ * a given axis, not equal *across* axes.
+ *
+ * @tparam KeyType  32- or 64-bit unsigned integer used for the MixD Hilbert key
+ * @param  lx       box extent along x, in the same arbitrary units as ly and lz
+ * @param  ly       box extent along y
+ * @param  lz       box extent along z
+ * @param  level    node level counted from the right (0 = leaves, maxTreeLevel<KeyType>{}
+ *                  = root); determines how many octal digits of the key are enumerated
+ */
+template<class KeyType>
+void equalLeafCenterDistances(double lx, double ly, double lz, unsigned level = 0)
+{
+    // The floating-point box over the unit cube [0,lx] x [0,ly] x [0,lz].
+    Box<double> box(0.0, lx, 0.0, ly, 0.0, lz);
+
+    // Per-axis bit depths, derived from the box aspect ratio.
+    auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
+    unsigned bx   = axesBits[0];
+    unsigned by   = axesBits[1];
+    unsigned bz   = axesBits[2];
+
+    // "level" is counted from the right (0 = leaves), so the octree depth from the
+    // root is octreeLevel = maxLevel - level.
+    constexpr unsigned maxLevel = maxTreeLevel<KeyType>{};
+    ASSERT_LE(level, maxLevel) << "level must be <= maxTreeLevel (" << maxLevel << ")";
+    const unsigned octreeLevel = maxLevel - level;
+
+    /*!
+     * @brief Count the number of MixD nodes at @p level (counted from the right).
+     */
+    auto countMixDLeaves = [&]() -> std::size_t
+    {
+        unsigned b0 = std::min({bx, by, bz});
+        unsigned b2 = std::max({bx, by, bz});
+        unsigned b1 = bx + by + bz - b0 - b2;
+        unsigned l  = level; // node level (from the right)
+        unsigned exponent;
+        if (l <= b0) { exponent = bx + by + bz - 3 * l; }
+        else if (l <= b1) { exponent = b1 + b2 - 2 * l; }
+        else if (l <= b2) { exponent = b2 - l; }
+        else { exponent = 0; }
+        return std::size_t(1) << exponent;
+    };
+
+    /*!
+     * @brief Return the next valid MixD Hilbert key by adding 1 at the octal
+     *        position @p pos (counted from the left, 1-based). Used to
+     *        enumerate leaf keys in increasing order.
+     *
+     * @param key   current MixD Hilbert key to increment
+     * @param pos   1-based octal digit position (from the left) at which to add 1,
+     *              carrying into shallower (more significant) digits on overflow
+     * @param bxIn  per-axis SFC bit depth for x (same convention as bx above)
+     * @param byIn  per-axis SFC bit depth for y
+     * @param bzIn  per-axis SFC bit depth for z
+     */
+    auto increaseKey = [&](KeyType key, unsigned pos, unsigned bxIn, unsigned byIn, unsigned bzIn) -> KeyType
+    {
+        unsigned b0 = std::min({bxIn, byIn, bzIn});
+        unsigned b2 = std::max({bxIn, byIn, bzIn});
+        unsigned b1 = bxIn + byIn + bzIn - b0 - b2;
+
+        while (pos > 0)
+        {
+            unsigned posFromLeft = maxLevel - pos;
+
+            if (posFromLeft >= b2)
+            {
+                return key; // inactive digit, carry stops / overflow
+            }
+
+            unsigned maxDigit;
+            if (posFromLeft >= b1) { maxDigit = 1; }
+            else if (posFromLeft >= b0) { maxDigit = 3; }
+            else { maxDigit = 7; }
+
+            unsigned shift = 3 * posFromLeft;
+            unsigned digit = (key >> shift) & 7u;
+            key &= ~(KeyType(7) << shift); // clear current digit
+
+            if (digit < maxDigit) { return key | (KeyType(digit + 1) << shift); }
+
+            // digit was at max: wrap to 0 (already cleared) and carry up
+            pos -= 1;
+        }
+        return key;
+    };
+
+    const std::size_t totalLeaves = countMixDLeaves();
+    ASSERT_GT(totalLeaves, 0u) << "no leaves for (bx,by,bz)=(" << bx << "," << by << "," << bz << ")";
+
+    // Enumerate leaf centers in increasing key order.
+    std::vector<std::array<double, 3>> centers;
+    centers.reserve(totalLeaves);
+    std::set<std::array<int, 6>> seenIBoxes;
+
+    KeyType key = 0;
+    for (std::size_t nodeIdx = 0; nodeIdx < totalLeaves; ++nodeIdx)
+    {
+        IBox ibox = hilbertIBox<KeyType>(key, octreeLevel, bx, by, bz);
+
+        // Skip empty boxes returned for invalid keys (defensive; all generated
+        // keys here are valid by construction).
+        if (ibox.xmax() > ibox.xmin() || ibox.ymax() > ibox.ymin() || ibox.zmax() > ibox.zmin())
+        {
+            std::array<int, 6> iboxKey = {ibox.xmin(), ibox.xmax(), ibox.ymin(), ibox.ymax(), ibox.zmin(), ibox.zmax()};
+            auto [it, inserted]        = seenIBoxes.insert(iboxKey);
+            ASSERT_TRUE(inserted) << "duplicate ibox encountered for key=" << key;
+
+            auto [center, size] = centerAndSize<KeyType>(ibox, box);
+            centers.push_back(
+                {static_cast<double>(center[0]), static_cast<double>(center[1]), static_cast<double>(center[2])});
+        }
+
+        if (nodeIdx == totalLeaves - 1) { break; }
+
+        KeyType nextKey = increaseKey(key, octreeLevel, bx, by, bz);
+        ASSERT_GT(nextKey, key) << "increaseKey terminated early at index=" << nodeIdx;
+        key = nextKey;
+    }
+
+    ASSERT_FALSE(centers.empty()) << "no points produced for (lx,ly,lz)=(" << lx << "," << ly << "," << lz << ")";
+
+    // Every consecutive (key-adjacent) step is a single axis-aligned move of one cell:
+    // exactly one of dx, dy, dz is nonzero, and that per-axis step size is the same
+    // every time that axis is the one being stepped.
+    std::array<double, 3> axisStep    = {0.0, 0.0, 0.0};
+    std::array<bool, 3> axisStepIsSet = {false, false, false};
+
+    for (std::size_t i = 0; i + 1 < centers.size(); ++i)
+    {
+        std::array<double, 3> delta = {centers[i + 1][0] - centers[i][0], centers[i + 1][1] - centers[i][1],
+                                       centers[i + 1][2] - centers[i][2]};
+
+        int activeAxis = -1;
+        for (int ax = 0; ax < 3; ++ax)
+        {
+            if (std::abs(delta[ax]) > 1e-9)
+            {
+                ASSERT_EQ(activeAxis, -1) << "step (" << i << ", " << i + 1 << ") moves along more than one axis "
+                                          << "for (lx,ly,lz)=(" << lx << "," << ly << "," << lz << ")";
+                activeAxis = ax;
+            }
+        }
+        ASSERT_NE(activeAxis, -1) << "step (" << i << ", " << i + 1 << ") has zero displacement for (lx,ly,lz)=(" << lx
+                                  << "," << ly << "," << lz << ")";
+
+        double stepSize = std::abs(delta[activeAxis]);
+        if (!axisStepIsSet[activeAxis])
+        {
+            axisStep[activeAxis]      = stepSize;
+            axisStepIsSet[activeAxis] = true;
+        }
+        else
+        {
+            EXPECT_NEAR(stepSize, axisStep[activeAxis], 1e-9)
+                << "axis " << activeAxis << " step size mismatch at pair (" << i << ", " << i + 1
+                << ") for (lx,ly,lz)=(" << lx << "," << ly << "," << lz << "), "
+                << "(bx,by,bz)=(" << bx << "," << by << "," << bz << ")";
+        }
+    }
+}
+
+TEST(MixedHilbertLeafCenters, EqualDistancesAtLevel)
+{
+    // Non-leaf levels (counted from the right, 0 = leaves): coarser levels still
+    // visit equal-edge cells one Hilbert step at a time.
+    equalLeafCenterDistances<unsigned>(1.0, 1.0, 1.0, maxTreeLevel<unsigned>{} - 1);
+    equalLeafCenterDistances<unsigned>(1.0, 1.0, 1.0, maxTreeLevel<unsigned>{} - 3);
+    equalLeafCenterDistances<uint64_t>(1.0, 1.0, 1.0, maxTreeLevel<uint64_t>{} - 1);
+    equalLeafCenterDistances<uint64_t>(1.0, 1.0, 1.0, maxTreeLevel<uint64_t>{} - 5);
+
+    equalLeafCenterDistances<unsigned>(2.0, 3.0, 1.0, maxTreeLevel<unsigned>{} - 1);
+    equalLeafCenterDistances<unsigned>(4.0, 2.0, 1.0, maxTreeLevel<unsigned>{} - 2);
+    equalLeafCenterDistances<uint64_t>(2.0, 3.0, 1.0, maxTreeLevel<uint64_t>{} - 1);
+    equalLeafCenterDistances<uint64_t>(4.0, 2.0, 1.0, maxTreeLevel<uint64_t>{} - 2);
+
+    // The case below has bx=21, by=18, bz=13 and we want to check that the distance
+    // per axis is the same from the center of the box of one leaf to the next.
+    equalLeafCenterDistances<uint64_t>(10000, 1400, 40, 12);
 }
