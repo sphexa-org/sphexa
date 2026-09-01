@@ -99,13 +99,17 @@ struct SincN
     constexpr T operator()(const T x) const
     {
         if (x >= kernelSupport<T>) return 0;
-        return util::fastmath::pow(wharmonic_std(x), n);
+        const T w = wharmonic_std(x);
+        return n == T(6) ? (w * w) * (w * w) * (w * w) : util::fastmath::pow(w, n);
     }
 
     constexpr T derivative(const T x) const
     {
         if (x >= kernelSupport<T>) return 0;
-        return n * util::fastmath::pow(wharmonic_std(x), n - 1) * wharmonic_derivative_std(x);
+        const T w   = wharmonic_std(x);
+        const T dw  = wharmonic_derivative_std(x);
+        const T wn1 = n == T(6) ? (w * w) * (w * w) * w : util::fastmath::pow(w, n - 1);
+        return w * wn1 * dw;
     }
 };
 
@@ -114,7 +118,7 @@ template<class T>
 struct SincN1SincN2
 {
     constexpr T operator()(const T x) const { return a * K1 * sincN1(x) + (1 - a) * K2 * sincN2(x); }
-    constexpr T derivative(T x) const { return a * K1 * sincN1.derivative(x) + (1 - a) * K2 * sincN2.derivative(x); }
+    constexpr T derivative(const T x) const { return a * K1 * sincN1.derivative(x) + (1 - a) * K2 * sincN2.derivative(x); }
 
     static constexpr T        a      = 0.9;
     static constexpr T        n1     = 4.0;

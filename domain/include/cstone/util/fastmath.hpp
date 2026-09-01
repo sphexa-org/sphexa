@@ -94,7 +94,6 @@ CSTONE_FAST_MATH constexpr double sqrt(double x)
 
 CSTONE_FAST_MATH constexpr float pow(float x, float y)
 {
-    if (y == 6.0f) return (x * x) * (x * x) * (x * x);
 #if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
     return __powf(x, y);
 #else
