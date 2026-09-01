@@ -94,9 +94,8 @@ struct CpuFullNbListNeighborhood
 #pragma omp simd
                     for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
                     {
-                        ReductionResult iReductionResult =
-                            parent.jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble,
-                                         ijData.reduction, i);
+                        ReductionResult iReductionResult = parent.jLoop(constInput, ijData.output, ijData.interaction,
+                                                                        ijData.postamble, ijData.reduction, i);
                         updateResult(reductionResult, iReductionResult);
                     }
 #pragma omp critical

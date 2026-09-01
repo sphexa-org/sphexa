@@ -40,18 +40,19 @@ inline unsigned numBlocks()
 }
 
 template<bool UsePbc, class Tc, class ThP, class KeyType, class IjData>
-__global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
-                                                        const Box<Tc> __grid_constant__ box,
-                                                        const GroupView groups,
-                                                        const Tc* __restrict__ x,
-                                                        const Tc* __restrict__ y,
-                                                        const Tc* __restrict__ z,
-                                                        const ThP h,
-                                                        const IjData ijData,
-                                                        typename IjData::UnwrappedReductionResultType* __restrict__ globalReductionResult,
-                                                        const unsigned ngmax,
-                                                        LocalIndex* __restrict__ neighbors,
-                                                        LocalIndex* __restrict__ targetCounter)
+__global__ __launch_bounds__(numThreads) void runIjLoop(
+    const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
+    const Box<Tc> __grid_constant__ box,
+    const GroupView groups,
+    const Tc* __restrict__ x,
+    const Tc* __restrict__ y,
+    const Tc* __restrict__ z,
+    const ThP h,
+    const IjData ijData,
+    typename IjData::UnwrappedReductionResultType* __restrict__ globalReductionResult,
+    const unsigned ngmax,
+    LocalIndex* __restrict__ neighbors,
+    LocalIndex* __restrict__ targetCounter)
 {
     const unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     const unsigned warpIdxGrid = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
@@ -165,15 +166,15 @@ protected:
         if (box.boundaryX() == BoundaryType::periodic || box.boundaryY() == BoundaryType::periodic ||
             box.boundaryZ() == BoundaryType::periodic)
         {
-            runIjLoop<true><<<numBlocks(), numThreads, 0, exec>>>(
-                tree, box, groups, x, y, z, h, ijData, deviceReductionResult.get(), ngmax, neighbors.get(),
-                targetCounter.get());
+            runIjLoop<true><<<numBlocks(), numThreads, 0, exec>>>(tree, box, groups, x, y, z, h, ijData,
+                                                                  deviceReductionResult.get(), ngmax, neighbors.get(),
+                                                                  targetCounter.get());
         }
         else
         {
-            runIjLoop<false><<<numBlocks(), numThreads, 0, exec>>>(
-                tree, box, groups, x, y, z, h, ijData, deviceReductionResult.get(), ngmax, neighbors.get(),
-                targetCounter.get());
+            runIjLoop<false><<<numBlocks(), numThreads, 0, exec>>>(tree, box, groups, x, y, z, h, ijData,
+                                                                   deviceReductionResult.get(), ngmax, neighbors.get(),
+                                                                   targetCounter.get());
         }
         checkGpuErrors(cudaGetLastError());
 

@@ -55,9 +55,8 @@ struct CpuAlwaysTraverseNeighborhood
 #pragma omp for
             for (LocalIndex i = firstBody; i < lastBody; ++i)
             {
-                ReductionResult iReductionResult =
-                    jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble, ijData.reduction, i,
-                          neighbors.get());
+                ReductionResult iReductionResult = jLoop(constInput, ijData.output, ijData.interaction,
+                                                         ijData.postamble, ijData.reduction, i, neighbors.get());
                 updateResult(reductionResult, iReductionResult);
             }
 

@@ -56,9 +56,7 @@ struct NeighborhoodData
     template<class... Args>
     auto ijLoop(cstone::ijloop::IjLoopData<Args...> ijData) const
     {
-        return std::visit(
-            [&](auto const& nb) { return nb.ijLoop(std::move(ijData)); },
-            neighborhood);
+        return std::visit([&](auto const& nb) { return nb.ijLoop(std::move(ijData)); }, neighborhood);
     }
 
 private:

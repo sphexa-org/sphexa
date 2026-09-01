@@ -122,7 +122,6 @@ struct MomentumAndEnergyInteractionStd
     }
 };
 
-
 template<class Tc, class Tm1>
 struct MomentumAndEnergyPostambleStd
 {

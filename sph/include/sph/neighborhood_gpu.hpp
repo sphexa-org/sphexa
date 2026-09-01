@@ -89,7 +89,7 @@ struct DeviceNeighborhoodData::Impl
     template<class... Args>
     auto ijLoop(cstone::ijloop::IjLoopData<Args...> ijData) const
     {
-        using ReturnType = typename cstone::ijloop::IjLoopData<Args...>::UnwrappedReductionResultType;
+        using ReturnType     = typename cstone::ijloop::IjLoopData<Args...>::UnwrappedReductionResultType;
         const auto runIjLoop = [&](auto const& nb) { return nb.ijLoop(ijData); };
         if (subgroupNeighborhood)
             return std::visit<ReturnType>(runIjLoop, subgroupNeighborhood.value());

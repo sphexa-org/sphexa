@@ -198,7 +198,11 @@ concept PairInteraction = requires(const F& func,
                                    const ParticleData<Tc, ThP, Input>& j,
                                    Vec3<Tc> posdiff,
                                    Tc r2)
-{ {func(i, j, posdiff, r2)}->TupleOfValues; };
+{
+    {
+        func(i, j, posdiff, r2)
+    } -> TupleOfValues;
+};
 
 //! @brief A postamble is callable with (ParticleData, interaction result), and returns a tuple compatible with Output
 template<class Postamble, class Interaction, class Tc, class ThP, class Input, class Output>
@@ -209,8 +213,9 @@ concept ValidPostamble = PairInteraction<Interaction, Tc, ThP, Input> && require
                                                                                   Vec3<Tc> posdiff,
                                                                                   Tc r2)
 {
-    {postamble(i, unwrapModifiers(interaction(i, j, posdiff, r2)))}
-        ->std::same_as<typename detail::DereferencedTuple<Output>::type>;
+    {
+        postamble(i, unwrapModifiers(interaction(i, j, posdiff, r2)))
+    } -> std::same_as<typename detail::DereferencedTuple<Output>::type>;
 };
 
 template<class Reduction, class Interaction, class Tc, class ThP, class Input, class Output>
@@ -222,7 +227,11 @@ concept ValidReduction =
                                                              Vec3<Tc> posdiff,
                                                              Tc r2,
                                                              detail::DereferencedTuple<Output>::type postambleOutput)
-{ {reduction(i, unwrapModifiers(interaction(i, j, posdiff, r2)), postambleOutput)}->TupleOfValues; };
+{
+    {
+        reduction(i, unwrapModifiers(interaction(i, j, posdiff, r2)), postambleOutput)
+    } -> TupleOfValues;
+};
 
 /*! A dataset that can be passed to an ijLoop.
  *

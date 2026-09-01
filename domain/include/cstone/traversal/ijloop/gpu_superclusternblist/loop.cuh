@@ -99,8 +99,7 @@ __device__ __forceinline__ void storeTupleISum(std::tuple<T0, T...> tuple,
     assert(blockDim.x == Config::iSize);
 
     if constexpr (std::conjunction_v<std::is_same<T0, T>...> && sizeof...(T) < GpuConfig::warpSize / Config::iSize &&
-                  std::is_same_v<Postamble, detail::EmptyPostamble> &&
-                  std::is_same_v<Reduction, detail::NoReduction>)
+                  std::is_same_v<Postamble, detail::EmptyPostamble> && std::is_same_v<Reduction, detail::NoReduction>)
     {
         // fast path: specialized reduction on multiple elements at the same time if all types in the tuple are the same
         // and no post-processing or global reduction is requested

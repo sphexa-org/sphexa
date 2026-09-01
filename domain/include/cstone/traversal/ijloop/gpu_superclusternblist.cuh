@@ -156,7 +156,7 @@ protected:
                 const LocalIndex numISuperclusters,
                 const Mask* activeMasks = nullptr) const
     {
-        using IjData                 = IjLoopData<Ts...>;
+        using IjData                   = IjLoopData<Ts...>;
         using ReductionResult          = typename IjData::ReductionResultType;
         using UnwrappedReductionResult = typename IjData::UnwrappedReductionResultType;
         ReductionResult reductionResult{};
@@ -210,8 +210,7 @@ protected:
                                            cudaMemcpyDeviceToHost));
         }
 
-        if constexpr (Config::symmetric ||
-                      !std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
+        if constexpr (Config::symmetric || !std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
         {
             // sync required due to possible use of allocated temporaries / reduction result
             checkGpuErrors(cudaStreamSynchronize(exec));
