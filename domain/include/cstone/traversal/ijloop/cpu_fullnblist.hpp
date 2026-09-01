@@ -46,9 +46,7 @@ struct CpuFullNbListNeighborhood
     template<class... Ts>
     auto ijLoop(IjLoopData<Ts...> ijData) const
     {
-        using Types = decltype(types(x, y, z, h, ijData.input, ijData.output, ijData.interaction, ijData.postamble,
-                                     ijData.reduction));
-        using ReductionResult = Types::ReductionResult;
+        using ReductionResult = IjLoopData<Ts...>::ReductionResultType;
 
         const auto constInput = makeConst(ijData.input);
         ReductionResult globalReductionResult{};
@@ -84,9 +82,7 @@ struct CpuFullNbListNeighborhood
         template<class... Ts>
         auto ijLoop(IjLoopData<Ts...> ijData) const
         {
-            using Types = decltype(types(parent.x, parent.y, parent.z, parent.h, ijData.input, ijData.output,
-                                         ijData.interaction, ijData.postamble, ijData.reduction));
-            using ReductionResult = Types::ReductionResult;
+            using ReductionResult = IjLoopData<Ts...>::ReductionResultType;
 
             const auto constInput = makeConst(ijData.input);
             ReductionResult globalReductionResult{};
