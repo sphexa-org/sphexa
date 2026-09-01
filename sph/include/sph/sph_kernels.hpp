@@ -129,13 +129,81 @@ struct SincN1SincN2
     T                         K2     = kernel_3D_k(sincN2);
 };
 
+template <class T>
+struct WendlandC2 {
+    constexpr T operator()(const T x) const {
+        if (x >= kernelSupport<T>) return T(0);
+        const T r = T(0.5) * x;
+        const T omr = T(1) - r;
+        const T omr2 = omr * omr;
+        const T omr4 = omr2 * omr2;
+        return omr4 * (T(1) + T(4) * r);
+    }
+
+    constexpr T derivative(const T x) const {
+        if (x >= kernelSupport<T>) return T(0);
+        const T r = T(0.5) * x;
+        const T omr = T(1) - r;
+        const T omr3 = omr * omr * omr;
+        return T(-10) * r * omr3;
+    };
+};
+
+template <class T>
+struct WendlandC4 {
+    constexpr T operator()(const T x) const {
+        if (x >= kernelSupport<T>) return T(0);
+        const T r = T(0.5) * x;
+        const T omr = T(1) - r;
+        const T omr2 = omr * omr;
+        const T omr6 = omr2 * omr2 * omr2;
+        return omr6 * (T(1) + T(6) * r + T(35.0 / 3.0) * r * r);
+    }
+
+    constexpr T derivative(const T x) const {
+        if (x >= kernelSupport<T>) return T(0);
+        const T r = T(0.5) * x;
+        const T omr = T(1) - r;
+        const T omr2 = omr * omr;
+        const T omr5 = omr2 * omr2 * omr;
+        return T(-56.0 / 6.0) * r * (T(5) * r + T(1)) * omr5;
+    };
+};
+
+template <class T>
+struct WendlandC6 {
+    constexpr T operator()(const T x) const {
+        if (x >= kernelSupport<T>) return T(0);
+        const T r = T(0.5) * x;
+        const T r2 = r * r;
+        const T omr = T(1) - r;
+        const T omr2 = omr * omr;
+        const T omr4 = omr2 * omr2;
+        const T omr8 = omr4 * omr4;
+        return omr8 * (T(1) + T(8) * r + T(25) * r2 + T(32) * r2 * r);
+    }
+
+    constexpr T derivative(const T x) const {
+        if (x >= kernelSupport<T>) return T(0);
+        const T r = T(0.5) * x;
+        const T omr = T(1) - r;
+        const T omr2 = omr * omr;
+        const T omr3 = omr2 * omr;
+        const T omr7 = omr3 * omr3 * omr;
+        return T(-11) * r * (T(16) * r * r + T(7) * r + T(1)) * omr7;
+    };
+};
+
 template<class T>
-using KernelVariant = std::variant<SincN<T>, SincN1SincN2<T>>;
+using KernelVariant = std::variant<SincN<T>, SincN1SincN2<T>, WendlandC2<T>, WendlandC4<T>, WendlandC6<T>>;
 
 enum SphKernelType : int
 {
     sinc_n          = 0,
     sinc_n1_sinc_n2 = 1,
+    wendland_c2     = 2,
+    wendland_c4     = 3,
+    wendland_c6     = 4,
 };
 
 /*! @brief return the SPH kernel as a function object
@@ -150,6 +218,9 @@ KernelVariant<T> getSphKernel(SphKernelType choice, T sincIndex)
     {
         case SphKernelType::sinc_n: return SincN<T>{sincIndex};
         case SphKernelType::sinc_n1_sinc_n2: return SincN1SincN2<T>{};
+        case SphKernelType::wendland_c2: return WendlandC2<T>{};
+        case SphKernelType::wendland_c4: return WendlandC4<T>{};
+        case SphKernelType::wendland_c6: return WendlandC6<T>{};
         default: throw std::runtime_error("Invalid SPH kernel type");
     }
 }
