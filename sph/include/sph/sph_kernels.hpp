@@ -119,7 +119,9 @@ struct SincN1SincN2
 {
     constexpr T operator()(const T x) const { return a * K1 * sincN1(x) + (1 - a) * K2 * sincN2(x); }
     constexpr T derivative(const T x) const
-    { return a * K1 * sincN1.derivative(x) + (1 - a) * K2 * sincN2.derivative(x); }
+    {
+        return a * K1 * sincN1.derivative(x) + (1 - a) * K2 * sincN2.derivative(x);
+    }
 
     static constexpr T        a      = 0.9;
     static constexpr T        n1     = 4.0;
