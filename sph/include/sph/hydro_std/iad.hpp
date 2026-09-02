@@ -39,13 +39,14 @@ namespace sph
 {
 
 template<class T, class Dataset>
-void computeIAD(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
+void computeIAD(Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (d.useGpu) { computeIADGpu(groups, d, box); }
+    if constexpr (d.useGpu) { computeIADGpu(d, box); }
     else
     {
-        IADIjLoop(d.neighborhood, d.K, d.m.data(), d.rho.data(), d.nc.data(), d.wh.data(), d.c11.data(), d.c12.data(),
-                  d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data());
+        IADIjLoop(d.neighborhood, d.K, d.iadConditionQuality, d.iadRegBit, d.m.data(), d.rho.data(), d.nc.data(),
+                  d.wh.data(), d.c11.data(), d.c12.data(), d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data(),
+                  d.id.data());
     }
 }
 

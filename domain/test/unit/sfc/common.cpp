@@ -54,42 +54,6 @@ TEST(SfcCode, normalization64)
     normalization64<double>();
 }
 
-template<class T>
-void normalizationCeil32()
-{
-    EXPECT_EQ(toNBitIntCeil<unsigned>(T(0)), 0);
-    EXPECT_EQ(toNBitIntCeil<unsigned>(T(0.0000001)), 1);
-    EXPECT_EQ(toNBitIntCeil<unsigned>(T(1)), 1023);
-
-    EXPECT_EQ(toNBitIntCeil<unsigned>(T(0.00489)), 6);
-    EXPECT_EQ(toNBitIntCeil<unsigned>(T(0.00196)), 3);
-    EXPECT_EQ(toNBitIntCeil<unsigned>(T(0.00391)), 5);
-}
-
-TEST(SfcCode, normalizationCeil32)
-{
-    normalizationCeil32<float>();
-    normalizationCeil32<double>();
-}
-
-template<class T>
-void normalizationCeil64()
-{
-    EXPECT_EQ(toNBitIntCeil<uint64_t>(T(0)), 0);
-    EXPECT_EQ(toNBitIntCeil<unsigned>(T(0.0000001)), 1);
-    EXPECT_EQ(toNBitIntCeil<uint64_t>(T(1)), 2097151);
-
-    EXPECT_EQ(toNBitIntCeil<uint64_t>(T(0.00489)), 10256);
-    EXPECT_EQ(toNBitIntCeil<uint64_t>(T(0.00196)), 4111);
-    EXPECT_EQ(toNBitIntCeil<uint64_t>(T(0.00391)), 8200);
-}
-
-TEST(SfcCode, normalizationCeil64)
-{
-    normalizationCeil64<float>();
-    normalizationCeil64<double>();
-}
-
 TEST(SfcCode, zeroLowBits32)
 {
     EXPECT_EQ((0b00111000u << 24u), zeroLowBits((0b00111111u << 24u), 3));

@@ -146,13 +146,16 @@ void setMac(std::span<const KeyType> nodeKeys,
 template<class KeyType, class T>
 void nodeFpCenters(std::span<const KeyType> prefixes, Vec3<T>* centers, Vec3<T>* sizes, const Box<T>& box)
 {
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
+
 #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < prefixes.size(); ++i)
     {
-        KeyType prefix                  = prefixes[i];
-        KeyType startKey                = decodePlaceholderBit(prefix);
-        unsigned level                  = decodePrefixLength(prefix) / 3;
-        auto nodeBox                    = sfcIBox(sfcKey(startKey), level);
+        KeyType prefix   = prefixes[i];
+        KeyType startKey = decodePlaceholderBit(prefix);
+        unsigned level   = decodePrefixLength(prefix) / 3;
+
+        IBox nodeBox                    = sfcIBox(sfcKey<KeyType>(startKey), level, axesBits);
         util::tie(centers[i], sizes[i]) = centerAndSize<KeyType>(nodeBox, box);
     }
 }

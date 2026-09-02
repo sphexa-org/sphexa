@@ -85,7 +85,8 @@ struct VePostamble
 template<class Neighbordhood, class Tc, class T>
 void veIjLoop(const Neighbordhood& neighborhood, Tc K, const T* xm, const T* wh, T* kx)
 {
-    neighborhood.ijLoop(std::make_tuple(xm), std::make_tuple(kx), VeInteraction{wh}, VePostamble<T, Tc>{K});
+    neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+        std::make_tuple(xm), std::make_tuple(kx), VeInteraction{wh}, VePostamble<T, Tc>{K}));
 }
 
 } // namespace sph

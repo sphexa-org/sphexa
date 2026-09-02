@@ -37,8 +37,8 @@ using namespace cstone;
  * From the distributed coordinate set, the same focused trees are then built, but with distributed communicating
  * algorithms. This should yield the same tree on each rank as the local case,
  */
-template<class KeyType, class T>
-static void generalExchangeRandomGaussian(int thisRank, int numRanks)
+template<class KeyType, class T, template<class> class sfcKeyType>
+static void generalExchangeRandomGaussian(int thisRank, int numRanks, const Box<T>& box)
 {
     const LocalIndex numParticles = 1000;
     unsigned bucketSize           = 64;
@@ -46,13 +46,11 @@ static void generalExchangeRandomGaussian(int thisRank, int numRanks)
     float theta                   = 10.0;
     float invThetaEff             = invThetaMinMac(theta);
 
-    Box<T> box{-1, 1};
-
     // ******************************
     // identical data on all ranks
 
     // common pool of coordinates, identical on all ranks
-    RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numRanks * numParticles, box);
+    RandomCoordinates<T, sfcKeyType<KeyType>> coords{numRanks * numParticles, box};
 
     auto [tree, counts] = computeOctree<KeyType>(coords.particleKeys(), bucketSize);
 
@@ -136,14 +134,26 @@ TEST(GeneralFocusExchange, randomGaussian)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
 
-    generalExchangeRandomGaussian<unsigned, double>(rank, nRanks);
-    generalExchangeRandomGaussian<uint64_t, double>(rank, nRanks);
-    generalExchangeRandomGaussian<unsigned, float>(rank, nRanks);
-    generalExchangeRandomGaussian<uint64_t, float>(rank, nRanks);
+    generalExchangeRandomGaussian<uint64_t, double, SfcKind>(rank, nRanks, {-1, 1});
+    generalExchangeRandomGaussian<unsigned, float, SfcKind>(rank, nRanks, {-1, 1});
+    generalExchangeRandomGaussian<uint64_t, double, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
+    generalExchangeRandomGaussian<unsigned, float, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
 }
 
-template<class KeyType, class T>
-static void generalExchangeSourceCenter(int thisRank, int numRanks)
+/*! @brief Test focused octree source center exchange for mixed-dimension boxes
+ *
+ * @tparam     KeyType         32-bit or 64-bit SFC key type
+ * @tparam     T               float or double
+ * @tparam     sfcKeyType      SFC key wrapper template (e.g. SfcKind)
+ * @param[in]  thisRank        MPI rank
+ * @param[in]  numRanks        total number of MPI ranks
+ * @param[in]  box             simulation bounding box (supports non-cubic MixD boxes)
+ *
+ * Verifies that octree source centers from a distributed build match the reference computed
+ * from a common pool of Gaussian particle coordinates with global equal masses.
+ */
+template<class KeyType, class T, template<class> class sfcKeyType>
+static void generalExchangeSourceCenter(int thisRank, int numRanks, const Box<T>& box)
 {
     const LocalIndex numParticles = 1000;
     unsigned bucketSize           = 64;
@@ -151,13 +161,12 @@ static void generalExchangeSourceCenter(int thisRank, int numRanks)
     float theta                   = 10.0;
     float invThetaEff             = invThetaMinMac(theta);
 
-    Box<T> box{-1, 1};
-
     /*******************************/
     /* identical data on all ranks */
 
     // common pool of coordinates, identical on all ranks
-    RandomGaussianCoordinates<T, SfcKind<KeyType>> coords(numRanks * numParticles, box);
+    RandomGaussianCoordinates<T, sfcKeyType<KeyType>> coords{numRanks * numParticles, box};
+
     std::vector<T> globalMasses(numRanks * numParticles, 1.0 / (numRanks * numParticles));
 
     auto [tree, counts] = computeOctree(std::span(coords.particleKeys()), bucketSize);
@@ -226,6 +235,8 @@ TEST(GeneralFocusExchange, sourceCenter)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nRanks);
 
-    generalExchangeSourceCenter<uint64_t, double>(rank, nRanks);
-    generalExchangeSourceCenter<unsigned, float>(rank, nRanks);
+    generalExchangeSourceCenter<uint64_t, double, SfcKind>(rank, nRanks, {-1, 1});
+    generalExchangeSourceCenter<unsigned, float, SfcKind>(rank, nRanks, {-1, 1});
+    generalExchangeSourceCenter<uint64_t, double, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
+    generalExchangeSourceCenter<unsigned, float, SfcKind>(rank, nRanks, {0, 1, 0, 0.015625, 0, 0.00390625});
 }

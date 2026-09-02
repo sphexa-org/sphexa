@@ -237,17 +237,17 @@ public:
         timer.step("FindNeighbors");
         pmReader.step();
 
-        computeXMass(activeRungs_, d, domain.box());
+        computeXMass(d, domain.box());
         timer.step("XMass");
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
-        computeVe(activeRungs_, d, domain.box());
+        computeVe(d, domain.box());
         timer.step("Generalized Volume Elements");
         domain.exchangeHalos(get<"kx", "vx", "vy", "vz">(d), get<"keys">(d), haloRecvScratch);
         timer.step("mpi::synchronizeHalos");
 
-        computeIadDivvCurlvGradh(activeRungs_, d, domain.box());
+        computeIadDivvCurlvGradh(d, domain.box());
         groupDivvTimestep(activeRungs_, rawPtr(groupDt_), d);
         timer.step("IadVelocityDivCurlGradh");
 
@@ -263,7 +263,7 @@ public:
 
         if (AVswitches_)
         {
-            computeAVswitches(activeRungs_, d, domain.box());
+            computeAVswitches(d, domain.box());
             timer.step("AVswitches");
         }
 
@@ -436,7 +436,7 @@ public:
 
         // third output pass: recover temporary curlv and divv quantities
         //acquire(d, "curlv");
-        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
+        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(d, box); }
         output();
         //release(d, "curlv");
         acquire(d, "ay", "az");
@@ -449,7 +449,7 @@ public:
             std::cout << "WARNING: the following fields are not in use and therefore not output: ";
             for (std::size_t fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
             {
-                std::cout << d.fieldNames[fidx] << ",";
+                std::cout << d.fieldNames[indicesDone[fidx]] << ",";
             }
             std::cout << d.fieldNames[indicesDone.back()] << std::endl;
         }

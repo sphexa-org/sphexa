@@ -109,14 +109,16 @@ struct XmassToDensityPostamble : XmassPostamble<T, Tc>
 template<class Neighborhood, class Tc, class T, class Tm>
 void xmassIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* wh, T* xmass)
 {
-    neighborhood.ijLoop(std::make_tuple(m), std::make_tuple(xmass), XmassInteraction<T>{wh}, XmassPostamble<T, Tc>{K});
+    neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+        std::make_tuple(m), std::make_tuple(xmass), XmassInteraction<T>{wh}, XmassPostamble<T, Tc>{K}));
 }
 
 template<class Neighborhood, class Tc, class T, class Tm>
 void densityIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, const T* wh, T* xmass)
 {
-    neighborhood.ijLoop(std::make_tuple(m), std::make_tuple(xmass), XmassInteraction<T>{wh},
-                        XmassToDensityPostamble<T, Tc>{K});
+    neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+        std::make_tuple(m), std::make_tuple(xmass), XmassInteraction<T>{wh},
+        XmassToDensityPostamble<T, Tc>{K}));
 }
 
 } // namespace sph

@@ -44,6 +44,7 @@
 #include "cstone/util/reallocate.hpp"
 
 #include "sph/eos.hpp"
+#include "sph/id_layout.hpp"
 #include "sph/neighborhood.hpp"
 #include "sph/neighborhood_gpu.hpp"
 #include "sph/kernels.hpp"
@@ -154,6 +155,9 @@ public:
     //! @brief choice of smoothing kernel type
     sph::SphKernelType kernelChoice{sph::SphKernelType::sinc_n};
 
+    HydroType      iadConditionQuality{0.0};
+    const unsigned iadRegBit{IDLayout::iadRegBit};
+
     //! @brief Unified interface to attribute initialization, reading and writing
     template<class Archive>
     void loadOrStoreAttributes(Archive* ar)
@@ -213,6 +217,7 @@ public:
 
         optionalIO("sincIndex", &sincIndex, 1);
         optionalIO("kernelChoice", &kernelChoice, 1);
+        optionalIO("iadConditionQuality", &iadConditionQuality, 1);
 
         createTables();
     }
@@ -221,7 +226,7 @@ public:
     RealType K{0};
 
     //! @brief non-stateful variables for statistics
-    uint64_t totalNeighbors{0}, localNeighbors{0}, maxHalos{0};
+    uint64_t totalNeighbors{0}, localNeighbors{0}, maxHalos{0}, numIadRegBits{0};
 
     /*! @brief Particle fields
      *
@@ -267,7 +272,7 @@ public:
 
     FieldVector<cstone::LocalIndex> traversalStack;
     //! @brief non-stateful variables for statistics
-    size_t stackUsedNc{0}, stackUsedGravity{0};
+    size_t stackUsedGravity{0};
 
     /*! @brief
      * Name of each field as string for use e.g in HDF5 output. Order has to correspond to what's returned by data().

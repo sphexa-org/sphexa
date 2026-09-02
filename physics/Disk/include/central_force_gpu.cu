@@ -75,9 +75,8 @@ void computeCentralForceGPU(size_t first, size_t last, const Treal* x, const Tre
     checkGpuErrors(cudaMemcpyToSymbol(GPU_SYMBOL(force_device), &force_local, sizeof(force_local)));
     checkGpuErrors(cudaMemcpyToSymbol(GPU_SYMBOL(t_star_device), &t_star_local, sizeof(t_star_local)));
 
-    const double         inner_size2 = star.inner_size * star.inner_size;
-    CentralPotentialData data{x, y, z, m, ax, ay, az, g, star.m, inner_size2, 1.0};
-    data.star_position = star.position; // Initializing in aggregate list produces an error
+    const double                               inner_size2 = star.inner_size * star.inner_size;
+    CentralPotentialData<Treal, Thydro, Tmass> data{x, y, z, m, ax, ay, az, g, star.m, inner_size2, 1.0, star.position};
     if (last > first)
     {
         computeCentralForceGPUKernel<numThreads><<<numBlocks, numThreads>>>(first, last, data, star.potentialType);

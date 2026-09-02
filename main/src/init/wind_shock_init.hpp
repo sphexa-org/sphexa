@@ -147,8 +147,8 @@ class WindShockGlass : public ISimInitializer<Dataset>
 
 public:
     WindShockGlass(std::string initBlock, std::string settingsFile, IFileReader* reader)
-        : glassBlock(std::move(initBlock))
-        , ISimInitializer<Dataset>(settingsFile)
+        : ISimInitializer<Dataset>(settingsFile)
+        , glassBlock(std::move(initBlock))
     {
         Dataset d;
         settings_ = buildSettings(d, WindShockConstants(), settingsFile, reader);

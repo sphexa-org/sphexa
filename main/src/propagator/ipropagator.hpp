@@ -32,6 +32,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <variant>
 
 #include "cstone/sfc/box.hpp"
@@ -129,14 +130,18 @@ public:
         out << ")" << std::endl;
         out << "### Check ### Focus Tree Nodes: " << domain.focusTree().octreeViewAcc().numLeafNodes << ", maxDepth "
             << domain.focusTree().depth();
-        if constexpr (d.useGpu)
+        if constexpr (d.useGpu) { out << ", maxStackGravity " << d.stackUsedGravity; }
+        out << std::endl;
+        if (d.numIadRegBits)
         {
-            out << ", maxStackNc " << d.stackUsedNc << ", maxStackGravity " << d.stackUsedGravity;
+            out << "### IAD regularization ###: " << d.numIadRegBits << " / " << d.numParticlesGlobal
+                << " particles, target " << d.iadConditionQuality << std::endl;
         }
-        out << "\n=== Total time for iteration(" << d.iteration << ") " << timer.sumOfSteps() << "s\n\n";
+        out << "=== Total time for iteration(" << d.iteration << ") " << timer.sumOfSteps() << "s\n\n";
     }
 
 protected:
+
     static void outputAllocatedFields(IFileWriter* writer, ParticleDataType& simData)
     {
         auto output = [](auto& d, IFileWriter* writer)
@@ -169,7 +174,7 @@ protected:
                 std::cout << "WARNING: the following fields are not in use and therefore not output: ";
                 for (std::size_t fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
                 {
-                    std::cout << d.fieldNames[fidx] << ",";
+                    std::cout << d.fieldNames[indicesDone[fidx]] << ",";
                 }
                 std::cout << d.fieldNames[indicesDone.back()] << std::endl;
             }

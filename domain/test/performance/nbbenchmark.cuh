@@ -34,7 +34,6 @@
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
-#include "cstone/traversal/find_neighbors.cuh"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/tuple_util.hpp"
@@ -124,10 +123,13 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     const auto allocVec = [n]<class Tv>(Tv initialValue) { return std::vector<Tv>(n, initialValue); };
     const std::tuple<std::vector<InputTs>...> inputs = util::tupleMap(allocVec, inputValues);
     std::tuple<std::vector<OutputTs>...> outputs     = util::tupleMap(allocVec, initialOutputValues);
+
+    auto ijData = ijloop::makeIjLoopData<Tc, T>(util::tupleMap([](auto const& v) { return v.data(); }, inputs),
+                                                util::tupleMap([](auto& v) { return v.data(); }, outputs),
+                                                interaction, ijloop::empty_postamble);
     ijloop::CpuAlwaysTraverseNeighborhoodBuilder{ngmax}
         .build(execution::cpu, nsView, box, n, groupView, x, y, z, hVal)
-        .ijLoop(util::tupleMap([](auto const& v) { return v.data(); }, inputs),
-                util::tupleMap([](auto& v) { return v.data(); }, outputs), interaction, ijloop::empty_postamble);
+        .ijLoop(ijData);
 
     // allocate GPU data, use thrust::universal_vector to support neighborhoods that build on the CPU
     const thrust::universal_vector<Tc> dX(coords.x().begin(), coords.x().end()),
@@ -177,7 +179,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
                                             .searchExtFactor = searchExtFactor};
 
     // split particles into consecutive groups
-    constexpr unsigned groupSize = TravConfig::targetSize;
+    constexpr unsigned groupSize = GpuConfig::warpSize;
     thrust::universal_vector<LocalIndex> groups((n + groupSize - 1) / groupSize + 1);
     for (unsigned i = 0; i < groups.size(); ++i)
         groups[i] = std::min(groupSize * i, n);
@@ -230,9 +232,9 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     checkGpuErrors(cudaEventRecord(events[0], stream));
     for (std::size_t i = 1; i < events.size(); ++i)
     {
-        neighborhood.ijLoop(util::tupleMap([](auto const& v) { return rawPtr(v); }, dInputs),
-                            util::tupleMap([](auto& v) { return rawPtr(v); }, dOutputs), interaction,
-                            ijloop::empty_postamble);
+        neighborhood.ijLoop(ijloop::makeIjLoopData<Tc, T>(
+            util::tupleMap([](auto const& v) { return rawPtr(v); }, dInputs),
+            util::tupleMap([](auto& v) { return rawPtr(v); }, dOutputs), interaction, ijloop::empty_postamble));
         checkGpuErrors(cudaEventRecord(events[i], stream));
     }
     checkGpuErrors(cudaEventSynchronize(events.back()));

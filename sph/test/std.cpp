@@ -37,6 +37,7 @@
 
 #include "sph/hydro_std/iad_kern.hpp"
 #include "sph/hydro_std/momentum_energy_kern.hpp"
+#include "sph/id_layout.hpp"
 #include "sph/sph_kernel_tables.hpp"
 #include "sph/table_lookup.hpp"
 
@@ -98,16 +99,17 @@ protected:
 };
 
 template<size_t stride = 1, class Tc, class Tm, class T>
-HOST_DEVICE_FUN inline void
-IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
-            unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* h, const Tm* m, const T* rho,
-            const unsigned* nc, const T* wh, const T* /*whd*/, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33)
+HOST_DEVICE_FUN inline void IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
+                                        const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
+                                        const Tc* y, const Tc* z, const T* h, const Tm* m, const T* rho,
+                                        const unsigned* nc, const T* wh, const T* /*whd*/, uint64_t* id, T* c11, T* c12,
+                                        T* c13, T* c22, T* c23, T* c33)
 {
     IADInteractionSTD      interaction{wh};
-    IADPostambleSTD<T, Tc> postamble{K};
+    IADPostambleSTD<T, Tc> postamble{K, T(0), sphexa::IDLayout::iadRegBit};
 
-    const auto input  = std::make_tuple(m, rho, nc);
-    const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33);
+    const auto input  = std::make_tuple(m, rho, nc, static_cast<const uint64_t*>(id));
+    const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, id);
 
     const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
     const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
@@ -124,18 +126,20 @@ IADJLoopSTD(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone
         cstone::ijloop::updateResult(result, interaction(iData, jData, r_ij, r2));
     }
 
-    result = postamble(iData, result);
+    auto presult = postamble(iData, result);
 
-    cstone::ijloop::storeParticleData(output, i, result);
+    cstone::ijloop::storeParticleData(output, i, presult);
 }
 
 TEST_F(SphKernelTestsStd, IAD)
 {
     std::vector<T>        iad(6, -1);
+    std::vector<uint64_t> id(x.size(), 0);
     std::vector<unsigned> nc(x.size(), neighborsCount + 1);
 
     IADJLoopSTD(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), m.data(),
-                rho.data(), nc.data(), wh.data(), whd.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5]);
+                rho.data(), nc.data(), wh.data(), whd.data(), id.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4],
+                &iad[5]);
 
     EXPECT_NEAR(iad[0], 0.68826690779384281, 1e-8);
     EXPECT_NEAR(iad[1], -0.12963692768970825, 1e-8);
@@ -146,21 +150,21 @@ TEST_F(SphKernelTestsStd, IAD)
 }
 
 template<size_t stride = 1, class Tc, class Tm, class T, class Tm1>
-HOST_DEVICE_FUN inline void
-momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
-                       unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy,
-                       const T* vz, const T* h, const Tm* m, const T* rho, const T* p, const T* c, const T* c11,
-                       const T* c12, const T* c13, const T* c22, const T* c23, const T* c33, const T* wh,
-                       const T* /*whd*/, const cstone::LocalIndex* nc, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du,
-                       T* maxvsignal)
+HOST_DEVICE_FUN void momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, Tc Kcour, const cstone::Box<Tc>& box,
+                                            const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
+                                            const Tc* y, const Tc* z, const T* vx, const T* vy, const T* vz, const T* h,
+                                            const Tm* m, const T* rho, const T* p, const T* c, const T* c11,
+                                            const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
+                                            const T* wh, const T* /*whd*/, cstone::LocalIndex* nc, T* grad_P_x,
+                                            T* grad_P_y, T* grad_P_z, Tm1* du, T* dt)
 {
     MomentumAndEnergyInteractionStd<T, Tm1> interaction{wh};
-    MomentumAndEnergyPostambleStd<Tc, Tm1>  postamble{K};
+    MomentumAndEnergyPostambleStd<Tc, Tm1>  postamble{K, Kcour};
 
     const auto input  = std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33);
-    const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, maxvsignal - i);
+    const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc, dt);
 
-    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
+    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, cstone::ijloop::makeConst(input), i);
     const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
 
     auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
@@ -168,7 +172,7 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
     {
         cstone::LocalIndex j = neighbors[stride * pj];
 
-        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
+        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, cstone::ijloop::makeConst(input), j);
 
         const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
 
@@ -182,34 +186,36 @@ momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, c
 
 TEST_F(SphKernelTestsStd, MomentumEnergy)
 {
-    auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
+    auto [du, grad_Px, grad_Py, grad_Pz, dt] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
     std::vector<cstone::LocalIndex> nc(x.size(), neighborsCount + 1);
-    momentumAndEnergyJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), vx.data(),
+    momentumAndEnergyJLoop(0, K, 0.2, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), vx.data(),
                            vy.data(), vz.data(), h.data(), m.data(), rho.data(), p.data(), c.data(), c11.data(),
                            c12.data(), c13.data(), c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), nc.data(),
-                           &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
+                           &grad_Px, &grad_Py, &grad_Pz, &du, &dt);
 
     EXPECT_NEAR(grad_Px, 14.407211846688075, 1.3e-7);
     EXPECT_NEAR(grad_Py, -1.2396802157028355, 1.4e-7);
     EXPECT_NEAR(grad_Pz, 15.596554152643426, 2.15e-7);
     EXPECT_NEAR(du, -0.40541191600274296, 1e-8);
-    EXPECT_NEAR(maxvsignal, 1.4112466828564341, 1e-10);
+    EXPECT_EQ(nc[0], neighborsCount + 1);
+    EXPECT_NEAR(dt, 0.70859335015555969, 1e-10);
 }
 
 TEST_F(SphKernelTestsStd, MomentumEnergyZero)
 {
-    auto [du, grad_Px, grad_Py, grad_Pz, maxvsignal] = std::array<T, 5>{-1, -1, -1, -1, -1};
+    auto [du, grad_Px, grad_Py, grad_Pz, dt] = std::array<T, 5>{-1, -1, -1, -1, -1};
 
+    T Kcour = 0.2;
     std::vector<cstone::LocalIndex> nc(x.size(), neighborsCount + 1);
-    momentumAndEnergyJLoop(0, K, box(), neighbors.data(), 0, x.data(), y.data(), z.data(), vx.data(), vy.data(),
+    momentumAndEnergyJLoop(0, K, Kcour, box(), neighbors.data(), 0, x.data(), y.data(), z.data(), vx.data(), vy.data(),
                            vz.data(), h.data(), m.data(), rho.data(), p.data(), c.data(), c11.data(), c12.data(),
                            c13.data(), c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), nc.data(), &grad_Px,
-                           &grad_Py, &grad_Pz, &du, &maxvsignal);
+                           &grad_Py, &grad_Pz, &du, &dt);
 
     EXPECT_EQ(grad_Px, 0.0);
     EXPECT_EQ(grad_Py, 0.0);
     EXPECT_EQ(grad_Pz, 0.0);
     EXPECT_EQ(du, 0.0);
-    EXPECT_EQ(maxvsignal, 0.0);
+    EXPECT_EQ(dt, tsKCourant(0.0, h[0], c[0], Kcour));
 }

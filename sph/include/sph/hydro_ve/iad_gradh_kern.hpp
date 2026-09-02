@@ -31,8 +31,11 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
+#include "sph/iad_regularization.hpp"
 #include "sph/table_lookup.hpp"
 
 namespace sph
@@ -47,8 +50,8 @@ struct IADGradhInteraction
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
                               T r2) const
     {
-        const auto [i, iPos, hi, mi, xmi, kxi, nci] = iData;
-        const auto [j, jPos, hj, mj, xmj, kxj, ncj] = jData;
+        const auto [i, iPos, hi, mi, xmi, kxi, nci, idi] = iData;
+        const auto [j, jPos, hj, mj, xmj, kxj, ncj, idj] = jData;
 
         T rx = r_ij[0];
         T ry = r_ij[1];
@@ -83,12 +86,14 @@ struct IADGradhInteraction
 template<class T, class Tc>
 struct IADGradhPostamble
 {
-    Tc K;
+    const Tc       K;
+    const T        iadConditionQuality{};
+    const unsigned iadRegBit;
 
     template<class ParticleData, class Result>
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
-        const auto [i, iPos, hi, mi, xmi, kxi, nci]                                  = iData;
+        const auto [i, iPos, hi, mi, xmi, kxi, nci, idi]                             = iData;
         auto [tau11, tau12, tau13, tau22, tau23, tau33, whomegai, wrho0i, sum_error] = result;
 
         auto getExp    = [](T val) { return (val == T(0) ? 0 : std::ilogb(val)); };
@@ -103,13 +108,17 @@ struct IADGradhPostamble
         tau23 *= normalization;
         tau33 *= normalization;
 
-        T det = tau11 * tau22 * tau33 + T(2) * tau12 * tau23 * tau13 - tau11 * tau23 * tau23 - tau22 * tau13 * tau13 -
-                tau33 * tau12 * tau12;
+        auto [det, regularize] = needRegularization(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
+        if (regularize && nci > 1)
+        {
+            det = regularizeIadMomentMatrix(tau11, tau12, tau13, tau22, tau23, tau33, iadConditionQuality);
+        }
+        uint64_t newId = setRegularizationTag(regularize, iadRegBit, idi);
 
         // note normalization factor: cij have units of 1/tau because det is proportional to tau^3, so we have to
         // divide by K/h^3
-        T factor = normalization * (hi * hi * hi) / (det * K);
-        if (std::isnan(factor) && nci <= 1) { factor = T(0); }
+        T factor = (nci > 1 && det > T(0)) ? normalization * (hi * hi * hi) / (det * K) : T(0);
+        if (not std::isfinite(factor)) { factor = T(0); }
 
         T c11i = (tau22 * tau33 - tau23 * tau23) * factor;
         T c12i = (tau13 * tau23 - tau33 * tau12) * factor;
@@ -138,7 +147,7 @@ struct IADGradhPostamble
         T dhdrho = -hi / (rhoi * T(3)); // This /3 is the dimension hard-coded.
 
         T gradhi = T(1) - dhdrho * whomegai;
-        return std::make_tuple(c11i, c12i, c13i, c22i, c23i, c33i, gradhi);
+        return std::make_tuple(c11i, c12i, c13i, c22i, c23i, c33i, gradhi, newId);
     }
 };
 

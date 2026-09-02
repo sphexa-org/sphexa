@@ -106,6 +106,42 @@ The following integration tests represent fully functional versions of the progr
 * `test/integration_mpi/domain_nranks` (CPU version)
 * `test/integration_mpi/domain_gpu` (GPU version)
 
+#### Python bindings
+
+Selected cstone utilities are exposed to Python via [nanobind](https://github.com/wjakob/nanobind)
+in the `python/` subdirectory. The resulting extension module, `cstone_sfc`, provides
+mixed-dimension (MixD) Hilbert curve and box geometry helpers, including key encoding/decoding,
+SFC box queries, and dimension bit calculation.
+
+The bindings are **off by default**. The build workflow is:
+
+1. Install the nanobind pip package into your Python environment:
+   ```shell
+   pip install -r requirements.txt
+   ```
+2. Configure and build the project with Python bindings enabled:
+   ```shell
+   CC=mpicc CXX=mpicxx cmake -DCSTONE_BUILD_PYTHON_BINDINGS=ON <GIT_SOURCE_DIR>
+   cmake --build .
+   ```
+   CMake detects nanobind through the installed pip package, so make sure the
+   Python interpreter used at configure time is the one you installed
+   `requirements.txt` into.
+
+A minimal usage example:
+```python
+import cstone_sfc
+
+# Max octree depth supported by a 64-bit Hilbert key
+print(cstone_sfc.maxTreeLevel("uint64_t"))
+
+# Encode integer coordinates (px, py, pz) into a Hilbert key
+key = cstone_sfc.iHilbertMixD(3, 5, 2, 64, 64, 64, key_type="uint64_t")
+
+# Decode the key back into coordinates
+print(cstone_sfc.decodeHilbertMixD(key, 64, 64, 64, key_type="uint64_t"))
+```
+
 ## Authors
 
 * **Sebastian Keller**

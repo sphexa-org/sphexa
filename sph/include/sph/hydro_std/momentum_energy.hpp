@@ -39,9 +39,10 @@ namespace sph
 {
 
 template<class T, class Dataset>
-void computeMomentumEnergySTD(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
+void computeMomentumEnergySTD(cstone::LocalIndex firstBody, cstone::LocalIndex lastBody, Dataset& d,
+                              const cstone::Box<T>& box)
 {
-    if constexpr (d.useGpu) { computeMomentumEnergyStdGpu(groups, d, box); }
+    if constexpr (d.useGpu) { computeMomentumEnergyStdGpu(firstBody, lastBody, d, box); }
     else
     {
         momentumAndEnergyIjLoop(d.neighborhood, d.K, d.Kcour, d.m.data(), d.rho.data(), d.nc.data(), d.vx.data(),
@@ -51,7 +52,7 @@ void computeMomentumEnergySTD(const GroupView& groups, Dataset& d, const cstone:
 
         auto minDt = std::numeric_limits<typename Dataset::HydroType>::infinity();
 #pragma omp parallel for reduction(min : minDt)
-        for (auto i = groups.firstBody; i < groups.lastBody; ++i)
+        for (auto i = firstBody; i < lastBody; ++i)
             minDt = std::min(minDt, d.dtCourant[i]);
         d.minDtCourant = minDt;
     }

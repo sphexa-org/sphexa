@@ -56,6 +56,7 @@ int main(int argc, char** argv)
     using KeyType = uint64_t;
     using T       = double;
     Box<T> box{-1, 1};
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
 
     unsigned numParticles = argc > 1 ? std::stoi(argv[1]) : 2000000;
     unsigned bucketSize   = 16;
@@ -179,7 +180,7 @@ int main(int argc, char** argv)
         KeyType prefix   = h_octree.prefixes[i];
         KeyType startKey = decodePlaceholderBit(prefix);
         unsigned level   = decodePrefixLength(prefix) / 3;
-        auto nodeBox     = sfcIBox(sfcKey(startKey), level);
+        auto nodeBox     = sfcIBox(sfcKey(startKey), level, axesBits);
         Vec3<T> center_i;
         util::tie(center_i, std::ignore) = centerAndSize<KeyType>(nodeBox, box);
 
