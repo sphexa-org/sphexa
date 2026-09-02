@@ -226,8 +226,7 @@ inline constexpr auto splitParticleDataWithRadiusSq(std::tuple<Tc, Tc, Tc, Ts...
     }
 
     constexpr std::size_t skip = std::is_pointer_v<ThP> ? 2 : 0;
-    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>)
-    {
+    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
         return std::make_tuple(index, iPos, hi, std::get<Is + 3 + skip>(particleDataWithRadiusSq)...);
     }(std::make_index_sequence<sizeof...(Ts) - skip>());
 
@@ -257,7 +256,7 @@ __device__ __forceinline__ auto loadSuperclusterIParticleData(const LocalIndex f
     constexpr bool useSoa = useSoaSharedLayout<ParticleData>;
     using SoaBufferType = decltype(buffersForResults<Config::iClustersPerSupercluster * Config::iSize>(ParticleData{}));
     using AosBufferType = ParticleData[Config::iClustersPerSupercluster * Config::iSize];
-    using Buffer          = std::conditional_t<useSoa, SoaBufferType, AosBufferType>;
+    using Buffer        = std::conditional_t<useSoa, SoaBufferType, AosBufferType>;
 
     __shared__ util::Uninitialized<Buffer> iSuperclusterDataBuffer[NumSuperclustersPerBlock];
     auto* iSuperclusterData = iSuperclusterDataBuffer[threadIdx.z].data();
@@ -268,17 +267,14 @@ __device__ __forceinline__ auto loadSuperclusterIParticleData(const LocalIndex f
          offset += Config::iSize * Config::jSize)
     {
         const unsigned i = base + offset;
-        auto iData = (i >= firstValidBody & i < totalBodies) ? loadParticleDataWithRadiusSq(x, y, z, h, input, i)
-                                                             : dummyParticleDataWithRadiusSq(x, y, z, h, input, i);
+        auto iData       = (i >= firstValidBody & i < totalBodies) ? loadParticleDataWithRadiusSq(x, y, z, h, input, i)
+                                                                   : dummyParticleDataWithRadiusSq(x, y, z, h, input, i);
         if constexpr (useSoa)
         {
             util::for_each_tuple([offset](auto& array, auto const& value) { array[offset] = value; },
                                  *iSuperclusterData, iData);
         }
-        else
-        {
-            iSuperclusterData[offset] = iData;
-        }
+        else { iSuperclusterData[offset] = iData; }
     }
 
     return iSuperclusterData;
@@ -351,7 +347,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         superclusterInfo[iSuperclusterIndex];
 
     using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq(x, y, z, h, ijData.input, firstBody));
-    using InteractionResultType = typename IjData::InteractionResultType;
+    using InteractionResultType    = typename IjData::InteractionResultType;
 
     const auto iSuperclusterData =
         loadSuperclusterIParticleData<Config, NumSuperclustersPerBlock, ParticleDataWithRadiusSq>(
@@ -382,8 +378,8 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         {
             const unsigned j             = jCluster * Config::jSize + threadIdx.y;
             const unsigned jSupercluster = superclusterIndex<Config>(j);
-            auto jData = (j >= firstValidBody & j < totalBodies) ? loadParticleData(x, y, z, h, ijData.input, j)
-                                                                 : dummyParticleData(x, y, z, h, ijData.input, j);
+            auto jData         = (j >= firstValidBody & j < totalBodies) ? loadParticleData(x, y, z, h, ijData.input, j)
+                                                                         : dummyParticleData(x, y, z, h, ijData.input, j);
             const Th jRadiusSq = radiusSq(jData);
             std::get<0>(jData) -= firstValidBody;
             InteractionResultType jResult = {};
@@ -479,8 +475,8 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
             const auto i          = iSupercluster * Config::superclusterSize + offset;
             const bool active     = (activeMask >> (c * Config::iSize + threadIdx.x)) & 1;
             const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
-            storeTupleISum<Config>(iResults[c], symmTmpOutput, i, i >= firstBody & i < lastBody & active, ijData.postamble,
-                                   iData);
+            storeTupleISum<Config>(iResults[c], symmTmpOutput, i, i >= firstBody & i < lastBody & active,
+                                   ijData.postamble, iData);
         }
     }
 }
