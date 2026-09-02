@@ -117,9 +117,20 @@ struct SincN
 template<class T>
 struct SincN1SincN2
 {
-    constexpr T operator()(const T x) const { return a * K1 * sincN1(x) + (1 - a) * K2 * sincN2(x); }
+    constexpr T operator()(const T x) const
+    {
+        // Local sinc copies to work around NVCC bug (tested with 13.1)
+        constexpr SincN<T> sincN1_ = sincN1;
+        constexpr SincN<T> sincN2_ = sincN2;
+        return a * K1 * sincN1_(x) + (1 - a) * K2 * sincN2_(x);
+    }
     constexpr T derivative(const T x) const
-    { return a * K1 * sincN1.derivative(x) + (1 - a) * K2 * sincN2.derivative(x); }
+    {
+        // Local sinc copies to work around NVCC bug (tested with 13.1)
+        constexpr SincN<T> sincN1_ = sincN1;
+        constexpr SincN<T> sincN2_ = sincN2;
+        return a * K1 * sincN1_.derivative(x) + (1 - a) * K2 * sincN2_.derivative(x);
+    }
 
     static constexpr T        a      = 0.9;
     static constexpr T        n1     = 4.0;
