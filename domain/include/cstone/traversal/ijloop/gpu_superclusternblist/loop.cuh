@@ -15,12 +15,6 @@
 
 #pragma once
 
-// if 1, a bank-conflict reducing shared memory layout is used which might increase register count
-// and required load/store instructions and thus not necessarily improve performance
-#ifndef CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
-#define CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS 0
-#endif
-
 #include <array>
 #include <cassert>
 #include <cstddef>
@@ -232,12 +226,22 @@ inline constexpr auto splitParticleDataWithRadiusSq(std::tuple<Tc, Tc, Tc, Ts...
     }
 
     constexpr std::size_t skip = std::is_pointer_v<ThP> ? 2 : 0;
-    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+    auto iData                 = [&]<std::size_t... Is>(std::index_sequence<Is...>)
+    {
         return std::make_tuple(index, iPos, hi, std::get<Is + 3 + skip>(particleDataWithRadiusSq)...);
     }(std::make_index_sequence<sizeof...(Ts) - skip>());
 
     return std::make_tuple(iData, radiusSq);
 }
+
+/*! @brief selects the shared memory layout for particle data
+ *
+ * AoS layout suffers from bank conflicts, SoA layout introduces more load/store instructions. With few input fields,
+ * fewer bank conflicts occur and AoS is faster, with many input fields they start to dominate, so SoA is faster. Cutoff
+ * based on measurements on GH200.
+ */
+template<class ParticleData>
+inline constexpr bool useSoaSharedLayout = std::tuple_size_v<ParticleData> > 19;
 
 template<class Config, unsigned NumSuperclustersPerBlock, class ParticleData, class Tc, class ThP, class Input>
 __device__ __forceinline__ auto loadSuperclusterIParticleData(const LocalIndex firstValidBody,
@@ -250,11 +254,11 @@ __device__ __forceinline__ auto loadSuperclusterIParticleData(const LocalIndex f
                                                               Input const& input)
 
 {
-#if CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
-    using Buffer = decltype(buffersForResults<Config::iClustersPerSupercluster * Config::iSize>(ParticleData{}));
-#else
-    using Buffer = ParticleData[Config::iClustersPerSupercluster * Config::iSize];
-#endif
+    constexpr bool useSoa = useSoaSharedLayout<ParticleData>;
+    using SoaBufferType = decltype(buffersForResults<Config::iClustersPerSupercluster * Config::iSize>(ParticleData{}));
+    using AosBufferType = ParticleData[Config::iClustersPerSupercluster * Config::iSize];
+    using Buffer          = std::conditional_t<useSoa, SoaBufferType, AosBufferType>;
+
     __shared__ util::Uninitialized<Buffer> iSuperclusterDataBuffer[NumSuperclustersPerBlock];
     auto* iSuperclusterData = iSuperclusterDataBuffer[threadIdx.z].data();
 
@@ -264,29 +268,41 @@ __device__ __forceinline__ auto loadSuperclusterIParticleData(const LocalIndex f
          offset += Config::iSize * Config::jSize)
     {
         const unsigned i = base + offset;
-        auto iData       = (i >= firstValidBody & i < totalBodies) ? loadParticleDataWithRadiusSq(x, y, z, h, input, i)
-                                                                   : dummyParticleDataWithRadiusSq(x, y, z, h, input, i);
-#if CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
-        util::for_each_tuple([offset](auto& array, auto const& value) { array[offset] = value; }, *iSuperclusterData,
-                             iData);
-#else
-        iSuperclusterData[offset] = iData;
-#endif
+        auto iData = (i >= firstValidBody & i < totalBodies) ? loadParticleDataWithRadiusSq(x, y, z, h, input, i)
+                                                             : dummyParticleDataWithRadiusSq(x, y, z, h, input, i);
+        if constexpr (useSoa)
+        {
+            util::for_each_tuple([offset](auto& array, auto const& value) { array[offset] = value; },
+                                 *iSuperclusterData, iData);
+        }
+        else
+        {
+            iSuperclusterData[offset] = iData;
+        }
     }
 
     return iSuperclusterData;
 }
 
+template<class T>
+inline constexpr bool isSoaData = false;
+template<std::size_t N, class... Ts>
+inline constexpr bool isSoaData<std::tuple<std::array<Ts, N>...>> = true;
+
 template<class ISuperclusterData, class ThP>
 __device__ __forceinline__ auto
-getIData(ISuperclusterData const& iSuperclusterData, const unsigned offset, const unsigned index, const ThP h)
+getIData(const ISuperclusterData* iSuperclusterData, const unsigned offset, const unsigned index, const ThP h)
 {
-#if CSTONE_SUPERCLUSTER_REDUCE_BANK_CONFLICTS
-    auto iDataWithRadiusSq = util::tupleMap([&](auto const& array) { return array[offset]; }, *iSuperclusterData);
-#else
-    auto iDataWithRadiusSq = iSuperclusterData[offset];
-#endif
-    return splitParticleDataWithRadiusSq(iDataWithRadiusSq, index, h);
+    if constexpr (isSoaData<ISuperclusterData>)
+    {
+        auto iDataWithRadiusSq = util::tupleMap([&](auto const& array) { return array[offset]; }, *iSuperclusterData);
+        return splitParticleDataWithRadiusSq(iDataWithRadiusSq, index, h);
+    }
+    else
+    {
+        auto iDataWithRadiusSq = iSuperclusterData[offset];
+        return splitParticleDataWithRadiusSq(iDataWithRadiusSq, index, h);
+    }
 }
 
 template<class Config,
