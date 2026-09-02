@@ -184,11 +184,16 @@ template<class Tc, class ThP, class... Ts>
 inline constexpr auto loadParticleDataWithRadiusSq(
     const Tc* x, const Tc* y, const Tc* z, const ThP h, std::tuple<const Ts*...> const& input, LocalIndex index)
 {
-    const auto iPos   = std::make_tuple(x[index], y[index], z[index]);
-    const auto iInput = util::tupleMap([index](auto const* ptr) { return ptr[index]; }, input);
+#ifdef __CUDA_ARCH__
+    auto load = [index](auto const* ptr) { return __ldg(&ptr[index]); };
+#else
+    auto load = [index](auto const* ptr) { return ptr[index]; };
+#endif
+    const auto iPos   = std::make_tuple(load(x), load(y), load(z));
+    const auto iInput = util::tupleMap(load, input);
     if constexpr (std::is_pointer_v<ThP>)
     {
-        const auto hi = loadAtIndexIfPtr(h, index);
+        const auto hi = load(h);
         return std::tuple_cat(std::move(iPos), std::make_tuple(hi, 4 * hi * hi), std::move(iInput));
     }
     else { return std::tuple_cat(std::move(iPos), std::move(iInput)); }
