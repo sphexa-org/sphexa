@@ -240,7 +240,7 @@ inline constexpr auto splitParticleDataWithRadiusSq(std::tuple<Tc, Tc, Tc, Ts...
  * based on measurements on GH200.
  */
 template<class ParticleData>
-inline constexpr bool useSoaSharedLayout = std::tuple_size_v<ParticleData> > 19;
+inline constexpr bool useSoaSharedLayout = std::tuple_size_v<ParticleData> > 20;
 
 template<class Config, unsigned NumSuperclustersPerBlock, class ParticleData, class Tc, class ThP, class Input>
 __device__ __forceinline__ auto loadSuperclusterIParticleData(const LocalIndex firstValidBody,
