@@ -1,19 +1,2 @@
-
-if (SPH_EXA_WITH_HIP)
-    set_source_files_properties(central_force_gpu.cu accretion_gpu.cu beta_cooling_gpu.cu PROPERTIES LANGUAGE HIP)
-endif ()
-
-set(testname disk_gpu)
-if (SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP)
-    add_library(${testname} OBJECT central_force_gpu.cu accretion_gpu.cu beta_cooling_gpu.cu)
-    target_include_directories(${testname} PRIVATE ${CSTONE_DIR} ${SPH_DIR})
-    if (SPH_EXA_WITH_CUDA)
-        target_link_libraries(${testname} PRIVATE CUDA::cudart)
-    elseif (SPH_EXA_WITH_HIP)
-        target_link_libraries(${testname} PRIVATE hip::host cstone_thrust_incl)
-        target_compile_definitions(${testname} PRIVATE THRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)
-        set_target_properties(${exename} PROPERTIES LINKER_LANGUAGE CXX)
-    endif ()
-    add_test(NAME ${testname} COMMAND ${testname})
-endif ()
-
+disk_add_gpu_object(disk_gpu
+    SOURCES central_force_gpu.cu accretion_gpu.cu beta_cooling_gpu.cu)
