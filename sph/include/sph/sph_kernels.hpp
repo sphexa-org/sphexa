@@ -118,17 +118,35 @@ struct SincN1SincN2
 {
     constexpr T operator()(const T x) const
     {
-        // Local sinc copies to work around NVCC bug (tested with 13.1)
-        constexpr SincN<T> sincN1_ = sincN1;
-        constexpr SincN<T> sincN2_ = sincN2;
-        return a * K1 * sincN1_(x) + (1 - a) * K2 * sincN2_(x);
+        // For some reason, NVCC fails applying proper CSE in this nice code, thus the manually inlined version below
+        // return a * K1 * sincN1(x) + (1 - a) * K2 * sincN2(x);
+
+        static_assert(n1 == 4 && n2 == 9);
+        if (x >= kernelSupport<T>) return 0;
+        const T     w        = wharmonic_std(x);
+        const T     w2       = w * w;
+        const T     w4       = w2 * w2;
+        const T     w9       = w4 * w4 * w;
+        constexpr T w4Weight = a * K1;
+        constexpr T w9Weight = (1 - a) * K2;
+        return w4Weight * w4 + w9Weight * w9;
     }
     constexpr T derivative(const T x) const
     {
-        // Local sinc copies to work around NVCC bug (tested with 13.1)
-        constexpr SincN<T> sincN1_ = sincN1;
-        constexpr SincN<T> sincN2_ = sincN2;
-        return a * K1 * sincN1_.derivative(x) + (1 - a) * K2 * sincN2_.derivative(x);
+        // For some reason, NVCC fails applying proper CSE in this nice code, thus the manually inlined version below
+        // return a * K1 * sincN1.derivative(x) + (1 - a) * K2 * sincN2.derivative(x);
+
+        static_assert(n1 == 4 && n2 == 9);
+        if (x >= kernelSupport<T>) return 0;
+        const T     w        = wharmonic_std(x);
+        const T     dwdx     = wharmonic_derivative_std(x);
+        const T     w2       = w * w;
+        const T     w3       = w2 * w;
+        const T     w4       = w2 * w2;
+        const T     w8       = w4 * w4;
+        constexpr T w3Weight = a * K1 * n1;
+        constexpr T w8Weight = (1 - a) * K2 * n2;
+        return (w3Weight * w3 + w8Weight * w8) * dwdx;
     }
 
     static constexpr T        a      = 0.9;
@@ -136,8 +154,8 @@ struct SincN1SincN2
     static constexpr T        n2     = 9.0;
     static constexpr SincN<T> sincN1 = SincN<T>{n1};
     static constexpr SincN<T> sincN2 = SincN<T>{n2};
-    T                         K1     = kernel_3D_k(sincN1);
-    T                         K2     = kernel_3D_k(sincN2);
+    static constexpr T        K1     = 0.4589175166876355; // kernel_3D_k(sincN1);
+    static constexpr T        K2     = 1.391322148921789;  // kernel_3D_k(sincN2);
 };
 
 template<class T>
