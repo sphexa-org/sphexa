@@ -15,7 +15,6 @@
 #include <vector>
 
 #include "cstone/primitives/fastmath.hpp"
-#include "cstone/util/reallocate.hpp"
 #include "kernels.hpp"
 
 namespace util
@@ -161,7 +160,7 @@ struct WendlandC2
         const T omr  = T(1) - r;
         const T omr3 = omr * omr * omr;
         return T(-10) * r * omr3;
-    };
+    }
 };
 
 template<class T>
@@ -185,7 +184,7 @@ struct WendlandC4
         const T omr2 = omr * omr;
         const T omr5 = omr2 * omr2 * omr;
         return T(-56.0 / 6.0) * r * (T(5) * r + T(1)) * omr5;
-    };
+    }
 };
 
 template<class T>
@@ -212,19 +211,26 @@ struct WendlandC6
         const T omr3 = omr2 * omr;
         const T omr7 = omr3 * omr3 * omr;
         return T(-11) * r * (T(16) * r * r + T(7) * r + T(1)) * omr7;
-    };
+    }
 };
 
+#ifdef SPHEXA_WITH_WENDLAND
 template<class T>
 using KernelVariant = std::variant<SincN<T>, SincN1SincN2<T>, WendlandC2<T>, WendlandC4<T>, WendlandC6<T>>;
+#else
+template<class T>
+using KernelVariant = std::variant<SincN<T>, SincN1SincN2<T>>;
+#endif
 
 enum SphKernelType : int
 {
     sinc_n          = 0,
     sinc_n1_sinc_n2 = 1,
+#ifdef SPHEXA_WITH_WENDLAND
     wendland_c2     = 2,
     wendland_c4     = 3,
     wendland_c6     = 4,
+#endif
 };
 
 /*! @brief return the SPH kernel as a function object
@@ -239,9 +245,11 @@ KernelVariant<T> getSphKernel(SphKernelType choice, T sincIndex)
     {
         case SphKernelType::sinc_n: return SincN<T>{sincIndex};
         case SphKernelType::sinc_n1_sinc_n2: return SincN1SincN2<T>{};
+#ifdef SPHEXA_WITH_WENDLAND
         case SphKernelType::wendland_c2: return WendlandC2<T>{};
         case SphKernelType::wendland_c4: return WendlandC4<T>{};
         case SphKernelType::wendland_c6: return WendlandC6<T>{};
+#endif
         default: throw std::runtime_error("Invalid SPH kernel type");
     }
 }
