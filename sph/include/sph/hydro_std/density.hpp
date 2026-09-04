@@ -40,10 +40,10 @@ namespace sph
 {
 
 template<class T, class Dataset>
-void computeDensity(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
+void computeDensity(Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (d.useGpu) { gpu::computeDensity(groups, d, box); }
-    else { densityIjLoop(d.neighborhood, d.K, d.m.data(), d.wh.data(), d.rho.data()); }
+    if constexpr (d.useGpu) { gpu::computeDensity(d, box); }
+    else { densityIjLoop(d.neighborhood, d.K, d.m.data(), d.wh, d.rho.data()); }
 }
 
 } // namespace sph

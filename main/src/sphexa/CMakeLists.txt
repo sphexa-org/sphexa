@@ -8,7 +8,7 @@ enableGrackle(${exename})
 
 install(TARGETS ${exename} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-if (CMAKE_CUDA_COMPILER)
+if (SPH_EXA_WITH_CUDA)
     add_executable(${exename}-cuda sphexa.cpp)
     target_include_directories(${exename}-cuda PRIVATE ${SPH_EXA_INCLUDE_DIRS})
     target_include_directories(${exename}-cuda PUBLIC ${CMAKE_BINARY_DIR}/main/src)
@@ -18,7 +18,7 @@ if (CMAKE_CUDA_COMPILER)
     enableGrackle(${exename}-cuda)
     install(TARGETS ${exename}-cuda RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-elseif (CMAKE_HIP_COMPILER)
+elseif (SPH_EXA_WITH_HIP)
     add_executable(${exename}-hip sphexa.cpp)
     target_include_directories(${exename}-hip PRIVATE ${SPH_EXA_INCLUDE_DIRS})
     target_compile_definitions(${exename}-hip PRIVATE USE_CUDA THRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)

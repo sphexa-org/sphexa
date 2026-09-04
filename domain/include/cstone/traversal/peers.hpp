@@ -53,23 +53,29 @@ std::vector<int> findPeersMac(int myRank,
     KeyType domainStart = assignment[myRank];
     KeyType domainEnd   = assignment[myRank + 1];
 
-    int maxCoord   = 1u << maxTreeLevel<KeyType>{};
-    float roundOff = 1 + 1e-6; // ensure that peers are picked up in case of a numerical tie
-    auto ellipse   = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invThetaEff * roundOff;
-    auto pbc_t     = BoundaryType::periodic;
-    auto pbc       = Vec3<int>{box.boundaryX() == pbc_t, box.boundaryY() == pbc_t, box.boundaryZ() == pbc_t} * maxCoord;
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
 
-    auto crossFocusPairs = [domainStart, domainEnd, ellipse, pbc, &tree = domainTree](TreeNodeIndex a, TreeNodeIndex b)
+    constexpr float roundOff  = 1 + 1e-6; // ensure that peers are picked up in case of a numerical tie
+    const Vec3<int> maxCoords = {(1 << axesBits[0]), (1 << axesBits[1]), (1 << axesBits[2])};
+    const Vec3<T> gridStep    = {box.lx() / maxCoords[0], box.ly() / maxCoords[1], box.lz() / maxCoords[2]};
+    const T maxGridStep       = *std::max_element(gridStep.begin(), gridStep.end());
+    const auto ellipse = Vec3<T>{maxGridStep / gridStep[0], maxGridStep / gridStep[1], maxGridStep / gridStep[2]} *
+                         invThetaEff * roundOff;
+    constexpr auto pbc_t = BoundaryType::periodic;
+    const Vec3<int> pbc  = {(box.boundaryX() == pbc_t) * maxCoords[0], (box.boundaryY() == pbc_t) * maxCoords[1],
+                            (box.boundaryZ() == pbc_t) * maxCoords[2]};
+
+    auto crossFocusPairs = [&](TreeNodeIndex a, TreeNodeIndex b)
     {
-        auto [ka1, ka2]    = decodePlaceholderBit2K(tree.prefixes[a]);
-        auto [kb1, kb2]    = decodePlaceholderBit2K(tree.prefixes[b]);
+        auto [ka1, ka2]    = decodePlaceholderBit2K(domainTree.prefixes[a]);
+        auto [kb1, kb2]    = decodePlaceholderBit2K(domainTree.prefixes[b]);
         bool aFocusOverlap = overlapTwoRanges(domainStart, domainEnd, ka1, ka2);
         bool bInFocus      = containedIn(kb1, kb2, domainStart, domainEnd);
         // node a has to overlap/be contained in the focus, while b must not be inside it
         if (!aFocusOverlap || bInFocus) { return false; }
 
-        IBox aBox = sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1));
-        IBox bBox = sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1));
+        IBox aBox = sfcIBox(sfcKey(ka1), treeLevel(ka2 - ka1), axesBits);
+        IBox bBox = sfcIBox(sfcKey(kb1), treeLevel(kb2 - kb1), axesBits);
         return !minMacMutualInt(aBox, bBox, ellipse, pbc);
     };
 
@@ -117,25 +123,31 @@ std::vector<int> findPeersMacStt(int myRank,
     TreeNodeIndex firstLeaf = findNodeAbove(leaves, octree.numLeafNodes, domainStart);
     TreeNodeIndex lastLeaf  = findNodeAbove(leaves, octree.numLeafNodes, domainEnd);
 
-    int maxCoord = 1u << maxTreeLevel<KeyType>{};
-    auto ellipse = Vec3<T>{box.ilx(), box.ily(), box.ilz()} * box.maxExtent() * invThetaEff;
-    auto pbc_t   = BoundaryType::periodic;
-    auto pbc     = Vec3<int>{box.boundaryX() == pbc_t, box.boundaryY() == pbc_t, box.boundaryZ() == pbc_t} * maxCoord;
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
+
+    const Vec3<int> maxCoords = {(1 << axesBits[0]), (1 << axesBits[1]), (1 << axesBits[2])};
+    const Vec3<T> gridStep    = {box.lx() / maxCoords[0], box.ly() / maxCoords[1], box.lz() / maxCoords[2]};
+    const T maxGridStep       = *std::max_element(gridStep.begin(), gridStep.end());
+    const auto ellipse =
+        Vec3<T>{maxGridStep / gridStep[0], maxGridStep / gridStep[1], maxGridStep / gridStep[2]} * invThetaEff;
+    constexpr auto pbc_t = BoundaryType::periodic;
+    const Vec3<int> pbc  = {(box.boundaryX() == pbc_t) * maxCoords[0], (box.boundaryY() == pbc_t) * maxCoords[1],
+                            (box.boundaryZ() == pbc_t) * maxCoords[2]};
 
     std::vector<int> peers(assignment.numRanks());
 
 #pragma omp parallel for
     for (TreeNodeIndex i = firstLeaf; i < lastLeaf; ++i)
     {
-        IBox target = sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]));
+        IBox target = sfcIBox(sfcKey(leaves[i]), sfcKey(leaves[i + 1]), axesBits);
 
-        auto violatesMac = [target, ellipse, pbc, &octree, domainStart, domainEnd](TreeNodeIndex idx)
+        auto violatesMac = [target, ellipse, pbc, &octree, domainStart, domainEnd, &axesBits](TreeNodeIndex idx)
         {
             auto [nodeStart, nodeEnd] = decodePlaceholderBit2K(octree.prefixes[idx]);
             // if the tree node with index idx is fully contained in the focus, we stop traversal
             if (containedIn(nodeStart, nodeEnd, domainStart, domainEnd)) { return false; }
 
-            IBox source = sfcIBox(sfcKey(nodeStart), treeLevel(nodeEnd - nodeStart));
+            IBox source = sfcIBox(sfcKey(nodeStart), treeLevel(nodeEnd - nodeStart), axesBits);
             return !minMacMutualInt(target, source, ellipse, pbc);
         };
 

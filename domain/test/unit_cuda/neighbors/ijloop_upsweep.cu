@@ -62,7 +62,11 @@ void upsweepReference(const OctreeNsView<Tc, KeyType>& tree,
             {
                 auto accum = init;
                 for (TreeNodeIndex childIdx = firstChild; childIdx < firstChild + eightSiblings; ++childIdx)
+                {
+                    const Vec3<Tc>& childSize = tree.sizes[childIdx];
+                    if (childSize[0] == 0 && childSize[1] == 0 && childSize[2] == 0) continue;
                     accum = binaryOp(accum, util::tupleMap([&](const auto* ptr) { return ptr[childIdx]; }, output));
+                }
 
                 util::for_each_tuple([&](auto* ptr, auto value) { ptr[nodeIdx] = value; }, output, accum);
             }

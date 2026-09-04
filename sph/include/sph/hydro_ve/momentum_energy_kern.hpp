@@ -35,7 +35,7 @@
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/kernels.hpp"
-#include "sph/table_lookup.hpp"
+#include "sph/sph_kernels.hpp"
 
 namespace sph
 {
@@ -62,11 +62,11 @@ HOST_DEVICE_FUN T avRvCorrection(util::array<Tc, 3> R, Tc eta_ab, T eta_crit, T 
     return rvSLR;
 }
 
-template<bool SLR, class T>
+template<bool SLR, class T, class Kernel>
 struct MomentumAndEnergyInteraction
 {
-    const T* wh;
-    T        Atmin, Atmax, ramp, avFloor;
+    Kernel wh;
+    T      Atmin, Atmax, ramp, avFloor;
 
     template<class ParticleData, class Tc>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
@@ -100,8 +100,8 @@ struct MomentumAndEnergyInteraction
         T v2 = dist * hjInv;
 
         T hjInv3 = hjInv * hjInv * hjInv;
-        T Wi     = hiInv3 * lt::lookup(wh, v1);
-        T Wj     = hjInv3 * lt::lookup(wh, v2);
+        T Wi     = hiInv3 * wh(v1);
+        T Wj     = hjInv3 * wh(v2);
 
         T termA1_i = -(c11i * rx + c12i * ry + c13i * rz) * Wi;
         T termA2_i = -(c12i * rx + c22i * ry + c23i * rz) * Wi;
@@ -113,8 +113,7 @@ struct MomentumAndEnergyInteraction
 
         auto rhoj = kxj * mj / xmassj;
 
-        T rv     = rx * vx_ij + ry * vy_ij + rz * vz_ij;
-        T rv_slr = rv;
+        T rv_slr = rx * vx_ij + ry * vy_ij + rz * vz_ij;
         T Lij    = T(1);
 
         if constexpr (SLR)
@@ -234,8 +233,9 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T
                              const T* vy, const T* vz, const Tm* m, const T* c, const T* kx, const T* alpha,
                              const T* xm, const T* prho, const T* c11, const T* c12, const T* c13, const T* c22,
                              const T* c23, const T* c33, const unsigned* nc, const T* dV11, const T* dV12,
-                             const T* dV13, const T* dV22, const T* dV23, const T* dV33, const T* tdpdTrho, const T* wh,
-                             T avFloor, Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z, const T* curlv, T* dt)
+                              const T* dV13, const T* dV22, const T* dV23, const T* dV33, const T* tdpdTrho,
+                              KernelVariant<T> const& wh, T avFloor, Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z,
+                              const T* curlv, T* dt)
 {
     if constexpr (!SLR) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
     const auto input = std::make_tuple(
@@ -243,16 +243,23 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T
         tdpdTrho ? tdpdTrho : vx /* pass random derefable array if tdpdTrho is null */, curlv);
 
     const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
-    if (tdpdTrho)
-    {
-        neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<SLR, T>{wh, Atmin, Atmax, ramp, avFloor},
-                            MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour});
-    }
-    else
-    {
-        neighborhood.ijLoop(input, output, MomentumAndEnergyInteraction<SLR, T>{wh, Atmin, Atmax, ramp, avFloor},
-                            MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour});
-    }
+    std::visit(
+        [&]<class Kernel>(Kernel wh)
+        {
+            if (tdpdTrho)
+            {
+                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                    input, output, MomentumAndEnergyInteraction<SLR, T, Kernel>{wh, Atmin, Atmax, ramp, avFloor},
+                    MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour}));
+            }
+            else
+            {
+                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                    input, output, MomentumAndEnergyInteraction<SLR, T, Kernel>{wh, Atmin, Atmax, ramp, avFloor},
+                    MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour}));
+            }
+        },
+        wh);
 }
 
 } // namespace sph

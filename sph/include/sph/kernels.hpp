@@ -1,7 +1,9 @@
 #pragma once
 
 #include "cstone/cuda/annotation.hpp"
+#include "cstone/findneighbors.hpp"
 #include "cstone/util/array.hpp"
+#include "cstone/primitives/fastmath.hpp"
 
 namespace sph
 {
@@ -12,8 +14,8 @@ HOST_DEVICE_FUN auto tsKCourant(T1 maxvsignal, T2 h, T3 c, float Kcour)
 {
     using T = std::common_type_t<T1, T2, T3>;
     T v     = maxvsignal > T(0) ? maxvsignal : c;
-    // h == 0 signals neighbor search didn't converge, particle will be removed
-    return h > T2(0) ? T(Kcour * h / v) : INFINITY;
+    assert(h > 0);
+    return T(Kcour * h / v);
 }
 
 /*! @brief estimate updated smoothing length to bring the neighbor count closer to ng0
@@ -32,30 +34,84 @@ HOST_DEVICE_FUN T updateH(unsigned ng0, unsigned nc, T h)
     return h * T(0.5) * std::pow(T(1) + c0 * ng0 / T(nc), exp);
 }
 
-//! @brief sinc(PI/2 * v)
-template<typename T>
-HOST_DEVICE_FUN inline T wharmonic_std(T v)
+template<class Tc, class T, class KeyType>
+HOST_DEVICE_FUN void updateHIterative(unsigned ng0, unsigned ngmax, const cstone::Box<Tc>& box,
+                                      const cstone::OctreeNsView<Tc, KeyType>& treeView, cstone::LocalIndex i,
+                                      const Tc* __restrict__ x, const Tc* __restrict__ y, const Tc* __restrict__ z,
+                                      T* __restrict__ h, unsigned* __restrict__ nc)
 {
-    if (v == 0.0) { return 1.0; }
+    constexpr int  maxIteration = 10;
+    const unsigned ngmin        = ng0 / 4;
 
-    const T Pv = M_PI_2 * v;
-    return std::sin(Pv) / Pv;
+    unsigned ncSph = 1 + findNeighbors(i, x, y, z, h, treeView, box, ngmax);
+
+    int iteration = 0;
+    while ((ngmin > ncSph || (ncSph - 1) > ngmax) && iteration++ < maxIteration)
+    {
+        h[i]  = updateH(ng0, ncSph, h[i]);
+        ncSph = 1 + findNeighbors(i, x, y, z, h, treeView, box, ngmax);
+    }
+
+    if ((ncSph - 1) > ngmax)
+    {
+        T high = h[i];
+
+        h[i]  = updateH(ng0, ncSph, h[i]);
+        ncSph = 1 + findNeighbors(i, x, y, z, h, treeView, box, ngmax);
+        assert(ncSph <= ng0);
+
+        T        low   = h[i];
+        unsigned ncLow = ncSph;
+        for (int iteration = 0; iteration < maxIteration; ++iteration)
+        {
+            h[i]  = (low + high) / T(2);
+            ncSph = 1 + findNeighbors(i, x, y, z, h, treeView, box, ngmax);
+            if (ncSph == ng0) { break; }
+            else if (ncSph < ng0)
+            {
+                low   = h[i];
+                ncLow = ncSph;
+            }
+            else { high = h[i]; }
+        }
+        if ((ncSph - 1) > ngmax)
+        {
+            h[i]  = low;
+            ncSph = ncLow;
+        }
+    }
+    assert((ncSph - 1) <= ngmax);
+
+    if (ngmin > ncSph) { ncSph = 1; }
+
+    nc[i] = ncSph;
 }
 
-/*! @brief Derivative of sinc(PI/2 * v) w.r to v
- *
- * Unoptimized for clarity as this is only used to construct look-up tables
- */
+//! @brief sinc(PI/2 * v)
 template<typename T>
-HOST_DEVICE_FUN inline T wharmonic_derivative_std(T v)
+HOST_DEVICE_FUN constexpr inline T wharmonic_std(T v)
 {
-    if (v == 0.0) return 0.0;
+    if (v == T(0)) { return T(1); }
 
     constexpr T piHalf = M_PI_2;
     const T     Pv     = piHalf * v;
-    const T     sincv  = std::sin(Pv) / (Pv);
+    return cstone::fastmath::sin(Pv) * cstone::fastmath::rcp(Pv);
+}
 
-    return sincv * piHalf * ((std::cos(Pv) / std::sin(Pv)) - T(1) / Pv);
+//! @brief Derivative of sinc(PI/2 * v) w.r to v
+template<typename T>
+HOST_DEVICE_FUN constexpr inline T wharmonic_derivative_std(T v)
+{
+    if (v == T(0)) return T(0);
+
+    constexpr T piHalf = M_PI_2;
+    const T     Pv     = piHalf * v;
+    const T     sinPv  = cstone::fastmath::sin(Pv);
+    const T     cosPv  = cstone::fastmath::cos(Pv);
+    const T     invPv  = cstone::fastmath::rcp(Pv);
+    const T     sincv  = sinPv * invPv;
+
+    return sincv * piHalf * (cosPv / sinPv - invPv);
 }
 
 /*! @brief calculate the artificial viscosity between a pair of two particles

@@ -31,7 +31,6 @@
 #include <thrust/transform.h>
 
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/traversal/find_neighbors.cuh"
 
 #include "sph/neighborhood_gpu.hpp"
 #include "sph/sph_gpu.hpp"
@@ -43,33 +42,31 @@ namespace sph
 
 using cstone::GpuConfig;
 using cstone::LocalIndex;
-using cstone::NcStats;
-using cstone::TravConfig;
 using cstone::TreeNodeIndex;
 
-unsigned nsGroupSize() { return TravConfig::targetSize; }
+unsigned nsGroupSize() { return GpuConfig::warpSize; }
 
 namespace gpu
 {
 
 template<class Dataset>
-void computeXMass(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
+void computeXMass(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    xmassIjLoop(d.neighborhood, d.K, rawPtr(d.m), rawPtr(d.wh), rawPtr(d.xm));
+    xmassIjLoop(d.neighborhood, d.K, rawPtr(d.m), d.wh, rawPtr(d.xm));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeXMass(const GroupView& grp, sphexa::ParticlesData<cstone::execution::Gpu>& d,
+template void computeXMass(sphexa::ParticlesData<cstone::execution::Gpu>& d,
                            const cstone::Box<SphTypes::CoordinateType>&);
 
 template<class Dataset>
-void computeDensity(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
+void computeDensity(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    densityIjLoop(d.neighborhood, d.K, rawPtr(d.m), rawPtr(d.wh), rawPtr(d.rho));
+    densityIjLoop(d.neighborhood, d.K, rawPtr(d.m), d.wh, rawPtr(d.rho));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeDensity(const GroupView&, sphexa::ParticlesData<cstone::execution::Gpu>& d,
+template void computeDensity(sphexa::ParticlesData<cstone::execution::Gpu>& d,
                              const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace gpu

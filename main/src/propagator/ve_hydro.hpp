@@ -136,24 +136,26 @@ public:
         fillMassHalos(domain.exec(), get<"m">(d), first, last);
 
         computeGroups(first, last, d, domain.box(), groups_);
+        timer.step("computeGroups");
         updateSmoothingLengthIterative(groups_.view(), d, domain.box());
+        timer.step("updateSmoothingLengthIterative");
         findNeighborsSfc(groups_.view(), d, domain.box());
         timer.step("FindNeighbors");
         pmReader.step();
 
-        computeXMass(groups_.view(), d, domain.box());
+        computeXMass(d, domain.box());
         timer.step("XMass");
         domain.exchangeHalos(std::tie(get<"xm">(d)), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeVe(groups_.view(), d, domain.box());
+        computeVe(d, domain.box());
         timer.step("Generalized Volume Elements");
         domain.exchangeHalos(get<"vx", "vy", "vz", "kx">(d), get<"ax">(d), get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
         release(d, "ay", "az");
         acquire(d, "divv", "gradh");
-        computeIadDivvCurlvGradh(groups_.view(), d, domain.box());
+        computeIadDivvCurlvGradh(d, domain.box());
         d.minDtRho = rhoTimestep(first, last, d);
         timer.step("IadVelocityDivCurlGradh");
 
@@ -166,7 +168,7 @@ public:
 
         if (AVswitches_)
         {
-            computeAVswitches(groups_.view(), d, domain.box());
+            computeAVswitches(d, domain.box());
             timer.step("AVswitches");
         }
 
@@ -262,7 +264,7 @@ public:
         release(d, "prho");
         acquire(d, "divv");
         // partial recovery of cij in range [first:last] without halos, which are not needed for divv
-        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(groups_.view(), d, box); }
+        if (!indicesDone.empty()) { computeIadDivvCurlvGradh(d, box); }
         output();
         release(d, "divv");
         acquire(d, "prho");
@@ -277,7 +279,7 @@ public:
             std::cout << "WARNING: the following fields are not in use and therefore not output: ";
             for (std::size_t fidx = 0; fidx < indicesDone.size() - 1; ++fidx)
             {
-                std::cout << d.fieldNames[fidx] << ",";
+                std::cout << d.fieldNames[indicesDone[fidx]] << ",";
             }
             std::cout << d.fieldNames[indicesDone.back()] << std::endl;
         }

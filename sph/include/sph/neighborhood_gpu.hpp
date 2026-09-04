@@ -26,7 +26,7 @@ struct DeviceNeighborhoodData
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool subgroups);
 
     template<class... Args>
-    void ijLoop(Args&&... args) const;
+    void ijLoop(cstone::ijloop::IjLoopData<Args...>) const;
 
 private:
     struct Impl;
@@ -37,7 +37,7 @@ private:
 template<bool Symmetric>
 using ClusteredNeighborhoodBuilder =
     cstone::ijloop::GpuSuperclusterNbListNeighborhoodBuilder<>::withClusterSize<8, cstone::GpuConfig::warpSize / 8>::
-        withSuperclusterSize<cstone::TravConfig::targetSize>::setSymmetry<Symmetric>::template withCompression<>;
+        withSuperclusterSize<cstone::GpuConfig::warpSize>::setSymmetry<Symmetric>::template withCompression<>;
 
 struct DeviceNeighborhoodData::Impl
 {
@@ -63,8 +63,6 @@ struct DeviceNeighborhoodData::Impl
             neighborhood.emplace<0>();
             subgroupNeighborhood.reset();
 
-            const unsigned ncmax = d.ngmax * 3;
-
             std::variant<cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder, ClusteredNeighborhoodBuilder<false>,
                          ClusteredNeighborhoodBuilder<true>>
                 builder;
@@ -72,9 +70,9 @@ struct DeviceNeighborhoodData::Impl
             {
 
                 if (subgroups)
-                    builder = ClusteredNeighborhoodBuilder<false>{ncmax};
+                    builder = ClusteredNeighborhoodBuilder<false>{cstone::GpuConfig::warpSize * d.ngmax};
                 else
-                    builder = ClusteredNeighborhoodBuilder<true>{ncmax};
+                    builder = ClusteredNeighborhoodBuilder<true>{cstone::GpuConfig::warpSize * d.ngmax / 2};
             }
             else { builder = cstone::ijloop::GpuAlwaysTraverseNeighborhoodBuilder{d.ngmax}; }
 
@@ -89,9 +87,9 @@ struct DeviceNeighborhoodData::Impl
     }
 
     template<class... Args>
-    void ijLoop(Args&&... args) const
+    void ijLoop(cstone::ijloop::IjLoopData<Args...> ijData) const
     {
-        const auto runIjLoop = [&](auto const& nb) { nb.ijLoop(std::forward<Args>(args)...); };
+        const auto runIjLoop = [&](auto& nb) { nb.ijLoop(std::move(ijData)); };
         if (subgroupNeighborhood)
             std::visit(runIjLoop, subgroupNeighborhood.value());
         else
@@ -118,10 +116,10 @@ void DeviceNeighborhoodData::build(const cstone::GroupView& groups, Dataset& d, 
 }
 
 template<class... Args>
-void DeviceNeighborhoodData::ijLoop(Args&&... args) const
+void DeviceNeighborhoodData::ijLoop(cstone::ijloop::IjLoopData<Args...> ijData) const
 {
     assert(impl);
-    impl->ijLoop(std::forward<Args>(args)...);
+    impl->ijLoop(ijData);
 }
 #endif
 

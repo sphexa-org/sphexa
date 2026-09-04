@@ -44,27 +44,41 @@ std::vector<Integer> makeRandomUniformKeys(size_t numKeys, int seed = 42)
 }
 
 template<class Integer>
-std::vector<Integer> makeRandomGaussianKeys(size_t numKeys, int seed = 42)
+std::vector<Integer> makeRandomGaussianKeys(size_t numKeys,
+                                            int seed          = 42,
+                                            AxesBits axesBits = {maxTreeLevel<Integer>{}, maxTreeLevel<Integer>{},
+                                                                 maxTreeLevel<Integer>{}})
 {
-    Integer maxCoord = nodeRange<Integer>(0) - 1;
-    std::mt19937 gen(seed);
-    std::normal_distribution<double> distribution(double(maxCoord) / 2, double(maxCoord) / 5);
 
-    auto randInt = [&distribution, &gen, maxCoord]()
+    std::mt19937 gen(seed);
+    std::vector<Integer> ret(numKeys);
+
+    auto maxCoordX = double((1u << axesBits[0]) - 1);
+    auto maxCoordY = double((1u << axesBits[1]) - 1);
+    auto maxCoordZ = double((1u << axesBits[2]) - 1);
+    std::normal_distribution<double> distX(maxCoordX / 2, maxCoordX / 5);
+    std::normal_distribution<double> distY(maxCoordY / 2, maxCoordY / 5);
+    std::normal_distribution<double> distZ(maxCoordZ / 2, maxCoordZ / 5);
+
+    auto randCoord = [&gen](std::normal_distribution<double>& dist, unsigned maxC) -> unsigned
     {
-        double x = distribution(gen);
-        // we can't cut down x to maxCoord in case it's too big, otherwise there will be too many keys in the last cell
-        while (x < 0.0 || x > maxCoord)
+        double x = dist(gen);
+        while (x < 0.0 || x > double(maxC))
         {
-            x = distribution(gen);
+            x = dist(gen);
         }
-        return Integer(x);
+        return unsigned(x);
     };
 
-    std::vector<Integer> ret(numKeys);
-    std::generate(ret.begin(), ret.end(), randInt);
-    std::sort(ret.begin(), ret.end());
+    for (size_t i = 0; i < numKeys; ++i)
+    {
+        unsigned px = randCoord(distX, (1u << axesBits[0]) - 1);
+        unsigned py = randCoord(distY, (1u << axesBits[1]) - 1);
+        unsigned pz = randCoord(distZ, (1u << axesBits[2]) - 1);
+        ret[i]      = iHilbert<Integer>(px, py, pz, axesBits[0], axesBits[1], axesBits[2]);
+    }
 
+    std::sort(ret.begin(), ret.end());
     return ret;
 }
 
@@ -174,6 +188,7 @@ protected:
     {
         std::size_t n = x_.size();
         auto keyData  = (KeyType*)(codes_.data());
+
         computeSfcKeys(x_.data(), y_.data(), z_.data(), keyData, n, box_);
 
         std::vector<LocalIndex> sfcOrder(n);

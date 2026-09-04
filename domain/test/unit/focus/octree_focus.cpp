@@ -333,16 +333,13 @@ static void computeEssentialTree()
     std::for_each(keys.begin(), keys.end(), [n = nParticles](auto& k) { k *= double(nodeRange<KeyType>(0)) / n; });
 
     auto [csTree, csCounts] = computeOctree<KeyType>(keys, csBucketSize);
-    Octree<KeyType> globalTree;
-    globalTree.update(csTree.data(), nNodes(csTree));
 
     unsigned bucketSize = 16;
     float theta         = 0.9;
     FocusedOctreeSingleNode<KeyType> tree(bucketSize, theta);
 
     // sorted reference tree node counts in each (except focus) octant at the 1st division level
-    std::vector<TreeNodeIndex> refCounts{29, 302, 302, 302, 1184, 1184, 1184,
-                                         /*4131*/};
+    std::vector<TreeNodeIndex> refCounts{29, 302, 302, 302, 1184, 1184, 1184 /*, 4131*/};
 
     KeyType focusStart = 1;
     KeyType focusEnd   = pad(KeyType(1), 3);

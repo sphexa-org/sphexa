@@ -15,16 +15,24 @@
 
 #pragma once
 
+#include <type_traits>
 #include <cmath>
 
 #include "cstone/focus/source_center.hpp"
-#include "cstone/sfc/sfc.hpp"
 #include "cstone/traversal/traversal.hpp"
 #include "cstone/tree/definitions.h"
-#include "cstone/util/array.hpp"
 
 namespace cstone
 {
+
+template<class T>
+constexpr std::remove_cvref_t<std::remove_pointer_t<T>> loadAtIndexIfPtr(T ptrOrValue, LocalIndex index)
+{
+    if constexpr (std::is_pointer_v<T>)
+        return ptrOrValue[index];
+    else
+        return ptrOrValue;
+}
 
 /*! @brief compute squared distance, taking PBC into account
  *
@@ -83,18 +91,14 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
                                        const OctreeNsView<Tc, KeyType>& tree,
                                        const Box<Tc>& box,
                                        unsigned ngmax,
-                                       LocalIndex* neighbors,
+                                       LocalIndex* neighbors         = nullptr,
                                        unsigned long neighborsStride = 1)
 {
     using Th = std::remove_cvref_t<std::remove_pointer_t<ThP>>;
     Tc xi    = x[i];
     Tc yi    = y[i];
     Tc zi    = z[i];
-    Th hi;
-    if constexpr (std::is_pointer_v<ThP>)
-        hi = h[i];
-    else
-        hi = h;
+    Th hi    = loadAtIndexIfPtr(h, i);
 
     auto radiusSq     = Th(4.0) * hi * hi;
     auto cellRadiusSq = radiusSq * tree.searchExtFactor * tree.searchExtFactor;
@@ -106,10 +110,16 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
     bool usePbc = anyPbc && !insideBox(particle, {Tc(2) * hi, Tc(2) * hi, Tc(2) * hi}, box);
 
     auto overlapsPbc = [particle, cellRadiusSq, centers = tree.centers, sizes = tree.sizes, &box](TreeNodeIndex idx)
-    { return norm2(minDistance(particle, centers[idx], sizes[idx], box)) < cellRadiusSq; };
+    {
+        if (sizes[idx][0] == 0 && sizes[idx][1] == 0 && sizes[idx][2] == 0) return false;
+        return norm2(minDistance(particle, centers[idx], sizes[idx], box)) < cellRadiusSq;
+    };
 
     auto overlaps = [particle, cellRadiusSq, centers = tree.centers, sizes = tree.sizes](TreeNodeIndex idx)
-    { return norm2(minDistance(particle, centers[idx], sizes[idx])) < cellRadiusSq; };
+    {
+        if (sizes[idx][0] == 0 && sizes[idx][1] == 0 && sizes[idx][2] == 0) return false;
+        return norm2(minDistance(particle, centers[idx], sizes[idx])) < cellRadiusSq;
+    };
 
     auto searchBoxPbc = [i, particle, radiusSq, &tree, x, y, z, ngmax, neighbors, neighborsStride, &numNeighbors,
                          &box](TreeNodeIndex idx)
@@ -123,7 +133,7 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
             if (j == i) { continue; }
             if (distanceSq<true>(x[j], y[j], z[j], particle[0], particle[1], particle[2], box) < radiusSq)
             {
-                if (numNeighbors < ngmax) { neighbors[numNeighbors * neighborsStride] = j; }
+                if (neighbors && numNeighbors < ngmax) { neighbors[numNeighbors * neighborsStride] = j; }
                 numNeighbors++;
             }
         }
@@ -141,7 +151,7 @@ HOST_DEVICE_FUN unsigned findNeighbors(LocalIndex i,
             if (j == i) { continue; }
             if (distanceSq<false>(x[j], y[j], z[j], particle[0], particle[1], particle[2], box) < radiusSq)
             {
-                if (numNeighbors < ngmax) { neighbors[numNeighbors * neighborsStride] = j; }
+                if (neighbors && numNeighbors < ngmax) { neighbors[numNeighbors * neighborsStride] = j; }
                 numNeighbors++;
             }
         }

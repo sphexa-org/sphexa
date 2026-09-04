@@ -29,72 +29,12 @@
 
 #include "cstone/cuda/cuda_runtime.hpp"
 #include "cstone/cuda/thrust_util.cuh"
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/gpu_alwaystraverse.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist.cuh"
 
 #include "../coord_samples/random.hpp"
 #include "./nbbenchmark.cuh"
-
-/* some fast math functions to reach good performance at -O3 */
-
-constexpr float fast_sin(float x)
-{
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-    return __sinf(x);
-#else
-    return std::sin(x);
-#endif
-}
-
-constexpr double fast_sin(double x) { return std::sin(x); }
-
-constexpr float fast_rcp(float x)
-{
-#ifdef __CUDA_ARCH__
-    // __frcp_rn might not flush to zero and thus can be significantly slower
-    asm("rcp.approx.ftz.f32 %0,%0;" : "+f"(x) :);
-    return x;
-#elif defined(__HIP_DEVICE_COMPILE__)
-    return __frcp_rn(x);
-#else
-    return 1.0f / x;
-#endif
-}
-
-constexpr double fast_rcp(double x)
-{
-#ifdef __CUDA_ARCH__
-    // __drcp_rn might not flush to zero and thus can be significantly slower
-    asm("rcp.approx.ftz.f64 %0,%0;" : "+d"(x) :);
-    return x;
-#elif defined(__HIP_DEVICE_COMPILE__)
-    return __drcp_rn(x);
-#else
-    return 1.0 / x;
-#endif
-}
-
-constexpr float fast_sqrt(float x)
-{
-#if defined(__CUDA_ARCH__)
-    // __fsqrt_rn might not flush to zero and thus can be significantly slower
-    asm("sqrt.approx.ftz.f32 %0,%0;" : "+f"(x) :);
-    return x;
-#elif defined(__HIP_DEVICE_COMPILE__)
-    return __fsqrt_rn(x);
-#else
-    return std::sqrt(x);
-#endif
-}
-
-constexpr double fast_sqrt(double x)
-{
-#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
-    return __dsqrt_rn(x);
-#else
-    return std::sqrt(x);
-#endif
-}
 
 /* smoothing kernel evaluation functionality borrowed from SPH-EXA */
 
@@ -107,7 +47,7 @@ constexpr inline T wharmonicStd(T v)
 
     constexpr T halfPi = std::numbers::pi_v<T> / T(2);
     const T Pv         = halfPi * v;
-    return fast_sin(Pv) * fast_rcp(Pv);
+    return cstone::fastmath::sin(Pv) * cstone::fastmath::rcp(Pv);
 }
 
 template<class T, class F>
@@ -174,8 +114,8 @@ struct DensityKernelFun
     {
         const auto [i, iPos, hi, mi] = iData;
         const auto [j, jPos, hj, mj] = jData;
-        const T dist                 = fast_sqrt(distSq);
-        const T vloc                 = dist * fast_rcp(hi);
+        const T dist                 = cstone::fastmath::sqrt(distSq);
+        const T vloc                 = dist * cstone::fastmath::rcp(hi);
         const T w                    = i == j ? T(1) : table_lookup<UseKernelTable>(wh, vloc);
         return std::make_tuple(cstone::ijloop::symmetric::even(w * mj));
     }

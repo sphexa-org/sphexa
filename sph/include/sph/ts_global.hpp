@@ -35,8 +35,8 @@
 #include <cmath>
 #include <mpi.h>
 
-#include "acceleration_timestep_gpu.hpp"
 #include "cstone/primitives/mpi_wrappers.hpp"
+#include "sph/sph_gpu.hpp"
 #include "cstone/tree/definitions.h"
 #include "cstone/util/array.hpp"
 
@@ -106,20 +106,12 @@ void computeTimestep(size_t first, size_t last, Dataset& d, Ts... extraTimesteps
 
     T minDtLoc = std::min({minDtAcc, d.minDtCourant, d.minDtRho, d.maxDtIncrease * d.minDt, extraTimesteps...});
 
-    util::array<T, 4> varsIn{minDtLoc, 0, 0, -T(d.size() - last + first)}, varsOut;
-    if constexpr (d.useGpu)
-    {
-        varsIn[1] = -int(d.stackUsedNc);
-        varsIn[2] = -int(d.stackUsedGravity);
-    }
+    util::array<T, 3> varsIn{minDtLoc, 0, -T(d.size() - last + first)}, varsOut;
+    if constexpr (d.useGpu) { varsIn[1] = -int(d.stackUsedGravity); }
     MPI_Allreduce(varsIn.data(), varsOut.data(), varsIn.size(), MpiType<T>{}, MPI_MIN, MPI_COMM_WORLD);
     T minDtGlobal = varsOut[0];
-    if constexpr (d.useGpu)
-    {
-        d.stackUsedNc      = int(-varsOut[1]);
-        d.stackUsedGravity = int(-varsOut[2]);
-    }
-    d.maxHalos = int(-varsOut[3]);
+    if constexpr (d.useGpu) { d.stackUsedGravity = int(-varsOut[1]); }
+    d.maxHalos = int(-varsOut[2]);
 
     d.ttot += minDtGlobal;
 

@@ -40,14 +40,14 @@ namespace sph
 using cstone::GroupView;
 
 template<class Dataset>
-void computeIADGpu(const GroupView&, Dataset& d, const cstone::Box<typename Dataset::RealType>&)
+void computeIADGpu(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    IADIjLoop(d.neighborhood, d.K, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.nc), rawPtr(d.wh), rawPtr(d.c11), rawPtr(d.c12),
-              rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33));
+    IADIjLoop(d.neighborhood, d.K, d.iadConditionQuality, d.iadRegBit, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.nc), d.wh,
+              rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.id));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void computeIADGpu(const GroupView&, sphexa::ParticlesData<cstone::execution::Gpu>& d,
+template void computeIADGpu(sphexa::ParticlesData<cstone::execution::Gpu>& d,
                             const cstone::Box<SphTypes::CoordinateType>&);
 
 } // namespace sph

@@ -33,15 +33,15 @@
 
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
-#include "sph/table_lookup.hpp"
+#include "sph/sph_kernels.hpp"
 
 namespace sph
 {
 
-template<class T>
+template<class T, class Kernel>
 struct VeInteraction
 {
-    const T* wh;
+    Kernel wh;
 
     template<class ParticleData, class Tc>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& /* r_ij */,
@@ -54,7 +54,7 @@ struct VeInteraction
 
         T dist = std::sqrt(r2);
         T vloc = dist * hInv;
-        T w    = lt::lookup(wh, vloc);
+        T w    = wh(vloc);
 
         T kxi = w * xmassj;
 
@@ -83,9 +83,15 @@ struct VePostamble
 };
 
 template<class Neighbordhood, class Tc, class T>
-void veIjLoop(const Neighbordhood& neighborhood, Tc K, const T* xm, const T* wh, T* kx)
+void veIjLoop(const Neighbordhood& neighborhood, Tc K, const T* xm, KernelVariant<T> const& wh, T* kx)
 {
-    neighborhood.ijLoop(std::make_tuple(xm), std::make_tuple(kx), VeInteraction{wh}, VePostamble<T, Tc>{K});
+    std::visit(
+        [&]<class Kernel>(Kernel wh)
+        {
+            neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                std::make_tuple(xm), std::make_tuple(kx), VeInteraction<T, Kernel>{wh}, VePostamble<T, Tc>{K}));
+        },
+        wh);
 }
 
 } // namespace sph

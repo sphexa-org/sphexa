@@ -182,14 +182,17 @@ __global__ void groupSplitsKernel(LocalIndex first,
         leafIdx[k] = stl::upper_bound(layout, layout + numLeaves, bodyIdx[k]) - layout - 1;
     }
 
-    Box<T> unitBox(0, 1);
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
+    Box<T> unitBox(0, 1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[0])), 0,
+                   1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[1])), 0,
+                   1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[2])));
     T nodeVolume = 1;
     for (LocalIndex k = 0; k < nwt; ++k)
     {
-        auto [nodeCenter, nodeSize] =
-            centerAndSize<KeyType>(sfcIBox(sfcKey(leaves[leafIdx[0]]), sfcKey(leaves[leafIdx[0] + 1])), unitBox);
-        T vol      = 8 * nodeSize[0] * nodeSize[1] * nodeSize[2];
-        nodeVolume = min(vol, nodeVolume);
+        auto nodeIBox = sfcIBox(sfcKey<KeyType>(leaves[leafIdx[0]]), sfcKey<KeyType>(leaves[leafIdx[0] + 1]), axesBits);
+        auto [nodeCenter, nodeSize] = centerAndSize<KeyType>(nodeIBox, unitBox);
+        T vol                       = 8 * nodeSize[0] * nodeSize[1] * nodeSize[2];
+        nodeVolume                  = vol > 0 ? min(vol, nodeVolume) : nodeVolume;
     }
     nodeVolume  = warpMin(nodeVolume);
     Tc distCrit = std::cbrt(nodeVolume) * tolFactor;

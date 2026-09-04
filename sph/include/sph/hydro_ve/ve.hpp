@@ -38,10 +38,10 @@ namespace sph
 {
 
 template<typename Tc, class Dataset>
-void computeVe(const GroupView& grp, Dataset& d, const cstone::Box<Tc>& box)
+void computeVe(Dataset& d, const cstone::Box<Tc>& box)
 {
-    if constexpr (d.useGpu) { gpu::computeVe(grp, d, box); }
-    else { veIjLoop(d.neighborhood, d.K, d.xm.data(), d.wh.data(), d.kx.data()); }
+    if constexpr (d.useGpu) { gpu::computeVe(d, box); }
+    else { veIjLoop(d.neighborhood, d.K, d.xm.data(), d.wh, d.kx.data()); }
 }
 
 } // namespace sph

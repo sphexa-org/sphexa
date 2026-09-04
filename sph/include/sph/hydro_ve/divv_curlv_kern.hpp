@@ -33,15 +33,15 @@
 
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
-#include "sph/table_lookup.hpp"
+#include "sph/sph_kernels.hpp"
 
 namespace sph
 {
 
-template<class T>
+template<class T, class Kernel>
 struct DivVCurlVInteraction
 {
-    const T* wh;
+    Kernel wh;
 
     template<class ParticleData, class Tc>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, const cstone::Vec3<Tc>& r_ij,
@@ -62,7 +62,7 @@ struct DivVCurlVInteraction
         T vz_ji = vzj - vzi;
 
         T v1 = dist * hiInv;
-        T Wi = lt::lookup(wh, v1);
+        T Wi = wh(v1);
 
         const T dVxiXFactor = (vx_ji * xmj) * (-rx * Wi);
         const T dVxiYFactor = (vx_ji * xmj) * (-ry * Wi);
@@ -130,29 +130,39 @@ struct DivVCurlVPostamble
 template<class Neighborhood, class Tc, class T>
 void divVCurlVIjLoop(const Neighborhood& neighborhood, Tc K, const T* vx, const T* vy, const T* vz, const T* xm,
                      const T* kx, const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
-                     const T* wh, T* divv, T* curlv, T* dV11, T* dV12, T* dV13, T* dV22, T* dV23, T* dV33, bool doGradV)
+                     KernelVariant<T> const& wh, T* divv, T* curlv, T* dV11, T* dV12, T* dV13, T* dV22, T* dV23,
+                     T* dV33, bool doGradV)
 {
-    const auto input = std::make_tuple(vx, vy, vz, xm, kx, c11, c12, c13, c22, c23, c33);
-    if (curlv && doGradV)
-    {
-        const auto output = std::make_tuple(divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33);
-        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<true, true, T, Tc>{K});
-    }
-    else if (curlv)
-    {
-        const auto output = std::make_tuple(divv, curlv);
-        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<true, false, T, Tc>{K});
-    }
-    else if (doGradV)
-    {
-        const auto output = std::make_tuple(divv, dV11, dV12, dV13, dV22, dV23, dV33);
-        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<false, true, T, Tc>{K});
-    }
-    else
-    {
-        const auto output = std::make_tuple(divv);
-        neighborhood.ijLoop(input, output, DivVCurlVInteraction<T>{wh}, DivVCurlVPostamble<false, false, T, Tc>{K});
-    }
+    std::visit(
+        [&]<class Kernel>(Kernel wh)
+        {
+            const auto input = std::make_tuple(vx, vy, vz, xm, kx, c11, c12, c13, c22, c23, c33);
+            if (curlv && doGradV)
+            {
+                const auto output = std::make_tuple(divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33);
+                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                    input, output, DivVCurlVInteraction<T, Kernel>{wh}, DivVCurlVPostamble<true, true, T, Tc>{K}));
+            }
+            else if (curlv)
+            {
+                const auto output = std::make_tuple(divv, curlv);
+                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                    input, output, DivVCurlVInteraction<T, Kernel>{wh}, DivVCurlVPostamble<true, false, T, Tc>{K}));
+            }
+            else if (doGradV)
+            {
+                const auto output = std::make_tuple(divv, dV11, dV12, dV13, dV22, dV23, dV33);
+                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                    input, output, DivVCurlVInteraction<T, Kernel>{wh}, DivVCurlVPostamble<false, true, T, Tc>{K}));
+            }
+            else
+            {
+                const auto output = std::make_tuple(divv);
+                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                    input, output, DivVCurlVInteraction<T, Kernel>{wh}, DivVCurlVPostamble<false, false, T, Tc>{K}));
+            }
+        },
+        wh);
 }
 
 } // namespace sph

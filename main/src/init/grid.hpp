@@ -132,18 +132,20 @@ void regularGrid(double r, size_t side, size_t first, size_t last, Vector& x, Ve
 
 /*! @brief intersection of a box with a regular grid
  *
- * @tparam T   float or double
- * @param  a   sub box of the unit-cube
- * @param  m   number of grid-segments per dimension
- * @return     two integer triples marking which grid cells intersected with @p a
+ * @tparam T    float or double
+ * @param  a    sub box of @p box
+ * @param  box  global coordinate bounding box
+ * @param  m    number of grid-segments per dimension
+ * @return      two integer triples marking which grid cells intersected with @p a
  */
 template<class T>
-auto gridIntersection(const cstone::FBox<T>& a, cstone::Vec3<int> m)
+auto gridIntersection(const cstone::FBox<T>& a, const cstone::Box<T>& box, cstone::Vec3<int> m)
 {
-    auto                l = util::array<T, 3>{a.xmin() * m[0], a.ymin() * m[1], a.zmin() * m[2]};
-    util::array<int, 3> lowerIdx{int(l[0]), int(l[1]), int(l[2])};
+    util::array<T, 3> e{box.lx() / m[0], box.ly() / m[1], box.lz() / m[2]}; // template block size
+    util::array<T, 3> l{(a.xmin() - box.xmin()) / e[0], (a.ymin() - box.ymin()) / e[1], (a.zmin() - box.zmin()) / e[2]};
+    util::array<T, 3> u{(a.xmax() - box.xmin()) / e[0], (a.ymax() - box.ymin()) / e[1], (a.zmax() - box.zmin()) / e[2]};
 
-    auto                u = util::array<T, 3>{a.xmax() * m[0], a.ymax() * m[1], a.zmax() * m[2]};
+    util::array<int, 3> lowerIdx{int(l[0]), int(l[1]), int(l[2])};
     util::array<int, 3> upperIdx{int(std::ceil(u[0])), int(std::ceil(u[1])), int(std::ceil(u[2]))};
 
     return std::make_tuple(lowerIdx, upperIdx);
@@ -264,7 +266,8 @@ void assembleCuboid(KeyType keyStart, KeyType keyEnd, const cstone::Box<T>& glob
     }
 
     // span the assigned SFC range with valid octree cells
-    int                  numCells = cstone::spanSfcRange(keyStart, keyEnd);
+    auto                 gridSfcBits = globalBox.getBoxDimBits(cstone::maxTreeLevel<KeyType>{});
+    int                  numCells    = cstone::spanSfcRange(keyStart, keyEnd);
     std::vector<KeyType> cells(numCells + 1);
     cstone::spanSfcRange(keyStart, keyEnd, cells.data());
     cells.back() = keyEnd;
@@ -274,12 +277,11 @@ void assembleCuboid(KeyType keyStart, KeyType keyEnd, const cstone::Box<T>& glob
     // extract the volume of each cell from the virtual global glass block grid
     for (size_t i = 0; i < cstone::nNodes(cells); ++i)
     {
-        auto iBox      = cstone::sfcIBox(cstone::sfcKey(cells[i]), cstone::sfcKey(cells[i + 1]));
+        auto iBox      = cstone::sfcIBox(cstone::sfcKey(cells[i]), cstone::sfcKey(cells[i + 1]), gridSfcBits);
         auto selectBox = cstone::createFpBox<KeyType>(iBox, globalBox);
 
         // determine which building blocks in the glass block grid the current selectBox intersects with
-        auto [lowerIdx, upperIdx] =
-            gridIntersection(cstone::createFpBox<KeyType>(iBox, cstone::Box<T>(0, 1)), multiplicity);
+        auto [lowerIdx, upperIdx] = gridIntersection(selectBox, globalBox, multiplicity);
         for (int ix = lowerIdx[0]; ix < upperIdx[0]; ++ix)
             for (int iy = lowerIdx[1]; iy < upperIdx[1]; ++iy)
                 for (int iz = lowerIdx[2]; iz < upperIdx[2]; ++iz)

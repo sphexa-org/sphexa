@@ -73,8 +73,8 @@ protected:
     using ConservedFields = FieldList<"u", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "id">;
 
     //! @brief the list of dependent particle fields, these may be used as scratch space during domain sync
-    using DependentFields =
-        FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33", "nc", "dtCourant">;
+    using DependentFields = FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33",
+                                      "nc", "dtCourant">;
 
 public:
     HydroProp(std::ostream& output, size_t rank)
@@ -132,11 +132,13 @@ public:
 
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
         computeGroups(first, last, d, domain.box(), groups_);
+        timer.step("computeGroups");
         updateSmoothingLengthIterative(groups_.view(), d, domain.box());
+        timer.step("updateSmoothingLengthIterative");
         findNeighborsSfc(groups_.view(), d, domain.box(), true);
         timer.step("FindNeighbors");
 
-        computeDensity(groups_.view(), d, domain.box());
+        computeDensity(d, domain.box());
         timer.step("Density");
         computeEOS_HydroStd(first, last, d);
         timer.step("EquationOfState");
@@ -144,13 +146,13 @@ public:
         domain.exchangeHalos(get<"vx", "vy", "vz", "rho", "p", "c">(d), get<"ax">(d), get<"ay">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeIAD(groups_.view(), d, domain.box());
+        computeIAD(d, domain.box());
         timer.step("IAD");
 
         domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33">(d), get<"ax">(d), get<"ay">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeMomentumEnergySTD(groups_.view(), d, domain.box());
+        computeMomentumEnergySTD(first, last, d, domain.box());
         timer.step("MomentumEnergyIAD");
 
         if (d.g != 0.0)
