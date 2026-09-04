@@ -44,8 +44,7 @@
 #include "sph/hydro_ve/ve_kern.hpp"
 #include "sph/hydro_ve/xmass_kern.hpp"
 #include "sph/id_layout.hpp"
-#include "sph/sph_kernel_tables.hpp"
-#include "sph/table_lookup.hpp"
+#include "sph/sph_kernels.hpp"
 #include "../../main/src/io/file_utils.hpp"
 
 using namespace sph;
@@ -60,9 +59,6 @@ protected:
     {
         neighbors.resize(neighborsCount);
         std::iota(neighbors.begin(), neighbors.end(), 1);
-
-        wh  = tabulateFunction<T, lt::kTableSize>(getSphKernel(kernelType, sincIndex), 0.0, 2.0);
-        whd = tabulateFunction<T, lt::kTableSize>(getSphKernelDerivative(kernelType, sincIndex), 0.0, 2.0);
 
         auto fieldVectors =
             std::tie(x, y, z, h, m, gradh, rho0, sumwhrho0, vx, vy, vz, c, p, u, divv, alpha, c11, c12, c13, c22, c23,
@@ -88,9 +84,8 @@ protected:
 
     static auto box() { return cstone::Box<T>(-1.e9, 1.e9, cstone::BoundaryType::open); }
 
-    T                             sincIndex  = 6.0;
-    SphKernelType                 kernelType = SphKernelType::sinc_n;
-    std::array<T, lt::kTableSize> wh{0}, whd{0};
+    static constexpr T        sincIndex = 6.0;
+    static constexpr SincN<T> wh        = SincN<T>{sincIndex};
 
     T K              = sphynx_3D_k(sincIndex);
     T alphamin       = 0.05;
@@ -110,16 +105,16 @@ protected:
         c33, dvxdx, dvxdy, dvxdz, dvydx, dvydy, dvydz, dvzdx, dvzdy, dvzdz, sumwh, xm, kx, prho;
 };
 
-template<size_t stride = 1, class Tc, class T>
+template<size_t stride = 1, class Tc, class T, class Kernel>
 HOST_DEVICE_FUN inline T
 AVswitchesJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
                 unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy, const T* vz,
                 const T* h, const T* c, const T* c11, const T* c12, const T* c13, const T* c22, const T* c23,
-                const T* c33, const T* wh, const T* /*whd*/, const T* kx, const T* xm, const T* divv, const T* alpha,
-                const Tc dt, const T alphamin, const T alphamax, const T decay_constant)
+                const T* c33, const Kernel& wh, const T* kx, const T* xm, const T* divv, const T* alpha, const Tc dt,
+                const T alphamin, const T alphamax, const T decay_constant)
 {
-    AVswitchesInteraction<T, Tc> interaction{wh, K};
-    AVswitchesPostamble<T, Tc>   postamble{alphamin, alphamax, decay_constant, dt};
+    AVswitchesInteraction<T, Tc, Kernel> interaction{wh, K};
+    AVswitchesPostamble<T, Tc>           postamble{alphamin, alphamax, decay_constant, dt};
 
     const auto input   = std::make_tuple(xm, kx, divv, alpha, vx, vy, vz, c, c11, c12, c13, c22, c23, c33);
     T          alpha_i = 0;
@@ -151,21 +146,21 @@ TEST_F(SphKernelTests, AVSwitches)
 {
     T newAlpha = AVswitchesJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), vx.data(),
                                  vy.data(), vz.data(), h.data(), c.data(), c11.data(), c12.data(), c13.data(),
-                                 c22.data(), c23.data(), c33.data(), wh.data(), whd.data(), kx.data(), xm.data(),
-                                 divv.data(), alpha.data(), dt, alphamin, alphamax, decay_constant);
+                                 c22.data(), c23.data(), c33.data(), wh, kx.data(), xm.data(), divv.data(),
+                                 alpha.data(), dt, alphamin, alphamax, decay_constant);
 
     EXPECT_NEAR(newAlpha, 0.34425163896226968, 2e-9);
 }
 
-template<size_t stride = 1, typename Tc, class T>
-HOST_DEVICE_FUN inline void
-divV_curlVJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
-                unsigned neighborsCount, const Tc* x, const Tc* y, const Tc* z, const T* vx, const T* vy, const T* vz,
-                const T* h, const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
-                const T* wh, const T* /*whd*/, const T* kx, const T* xm, T* divv, T* curlv, T* dV11, T* dV12, T* dV13,
-                T* dV22, T* dV23, T* dV33, bool doGradV)
+template<size_t stride = 1, typename Tc, class T, class Kernel>
+HOST_DEVICE_FUN inline void divV_curlVJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
+                                            const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
+                                            const Tc* y, const Tc* z, const T* vx, const T* vy, const T* vz, const T* h,
+                                            const T* c11, const T* c12, const T* c13, const T* c22, const T* c23,
+                                            const T* c33, const Kernel& wh, const T* kx, const T* xm, T* divv, T* curlv,
+                                            T* dV11, T* dV12, T* dV13, T* dV22, T* dV23, T* dV33, bool doGradV)
 {
-    DivVCurlVInteraction<T> interaction{wh};
+    DivVCurlVInteraction<T, Kernel> interaction{wh};
 
     const auto input = std::make_tuple(vx, vy, vz, xm, kx, c11, c12, c13, c22, c23, c33);
 
@@ -219,9 +214,8 @@ TEST_F(SphKernelTests, Divv_Curlv)
     auto [divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33] = std::array<T, 8>{-1, -1, -1, -1, -1, -1, -1, -1};
 
     divV_curlVJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), vx.data(), vy.data(),
-                    vz.data(), h.data(), c11.data(), c12.data(), c13.data(), c22.data(), c23.data(), c33.data(),
-                    wh.data(), whd.data(), kx.data(), xm.data(), &divv, &curlv, &dV11, &dV12, &dV13, &dV22, &dV23,
-                    &dV33, true);
+                    vz.data(), h.data(), c11.data(), c12.data(), c13.data(), c22.data(), c23.data(), c33.data(), wh,
+                    kx.data(), xm.data(), &divv, &curlv, &dV11, &dV12, &dV13, &dV22, &dV23, &dV33, true);
 
     EXPECT_NEAR(divv, 8.9647658450583111e-3, 2e-9);
     EXPECT_NEAR(curlv, 1.0047189924410768e-2, 2e-9);
@@ -233,15 +227,15 @@ TEST_F(SphKernelTests, Divv_Curlv)
     EXPECT_NEAR(dV33, 2.6145407628371843e-3, 2e-9);
 }
 
-template<size_t stride = 1, class Tc, class T>
+template<size_t stride = 1, class Tc, class T, class Kernel>
 HOST_DEVICE_FUN inline void IAD_gradhJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
                                            const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
-                                           const Tc* y, const Tc* z, const T* h, const T* m, const T* wh, const T* whd,
+                                           const Tc* y, const Tc* z, const T* h, const T* m, const Kernel& wh,
                                            const T* xm, const T* kx, const unsigned* nc, uint64_t* id, T* c11, T* c12,
                                            T* c13, T* c22, T* c23, T* c33, T* gradh)
 {
-    IADGradhInteraction      interaction{wh, whd};
-    IADGradhPostamble<T, Tc> postamble{K, T(0), sphexa::IDLayout::iadRegBit};
+    IADGradhInteraction<T, Kernel> interaction{wh};
+    IADGradhPostamble<T, Tc>       postamble{K, T(0), sphexa::IDLayout::iadRegBit};
 
     const auto input  = std::make_tuple(m, xm, kx, nc, static_cast<const uint64_t*>(id));
     const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, id);
@@ -275,9 +269,9 @@ TEST_F(SphKernelTests, IAD)
     std::vector<unsigned> nc(x.size(), neighborsCount + 1);
 
     // compute the 6 tensor components for particle 0
-    IAD_gradhJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), m.data(),
-                   wh.data(), whd.data(), xm.data(), kx.data(), nc.data(), id.data(), &iad[0], &iad[1], &iad[2],
-                   &iad[3], &iad[4], &iad[5], &gradh);
+    IAD_gradhJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), m.data(), wh,
+                   xm.data(), kx.data(), nc.data(), id.data(), &iad[0], &iad[1], &iad[2], &iad[3], &iad[4], &iad[5],
+                   &gradh);
 
     EXPECT_NEAR(iad[0], 1.9296619855715329e-18, 1e-10);
     EXPECT_NEAR(iad[1], -1.7838691836843698e-20, 1e-10);
@@ -302,17 +296,17 @@ void symmetrizeGradV(util::array<const T*, 9> dV, util::array<T*, 6> sdV, size_t
     }
 }
 
-template<bool avClean, size_t stride = 1, class Tc, class Tm, class T, class Tm1>
+template<bool avClean, size_t stride = 1, class Tc, class Tm, class T, class Tm1, class Kernel>
 HOST_DEVICE_FUN inline void
 momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box, const cstone::LocalIndex* neighbors,
                        unsigned neighborsCount, const unsigned* nc, const Tc* x, const Tc* y, const Tc* z, const T* vx,
                        const T* vy, const T* vz, const T* h, const Tm* m, const T* prho, const T* tdpdTrho, const T* c,
                        const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
-                       const T Atmin, const T Atmax, const T ramp, const T* wh, const T* kx, const T* xm,
+                       const T Atmin, const T Atmax, const T ramp, const Kernel& wh, const T* kx, const T* xm,
                        const T* alpha, const T* dV11, const T* dV12, const T* dV13, const T* dV22, const T* dV23,
                        const T* dV33, T* grad_P_x, T* grad_P_y, T* grad_P_z, Tm1* du, T* maxvsignal)
 {
-    MomentumAndEnergyInteraction<avClean, T> interaction{wh, Atmin, Atmax, ramp};
+    MomentumAndEnergyInteraction<avClean, T, Kernel> interaction{wh, Atmin, Atmax, ramp};
 
     if constexpr (!avClean) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
     const auto input =
@@ -363,9 +357,9 @@ TEST_F(SphKernelTests, MomentumEnergy)
         momentumAndEnergyJLoop<true>(0, K, box(), neighbors.data(), neighborsCount, nc.data(), x.data(), y.data(),
                                      z.data(), vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
                                      (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
-                                     c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
-                                     alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
-                                     dV33.data(), &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
+                                     c23.data(), c33.data(), Atmin, Atmax, ramp, wh, kx.data(), xm.data(), alpha.data(),
+                                     dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(), dV33.data(),
+                                     &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
         EXPECT_NEAR(grad_Px, -23175.29155183331, 0.023);
         EXPECT_NEAR(grad_Py, 13564.560025399775, 0.053);
@@ -380,7 +374,7 @@ TEST_F(SphKernelTests, MomentumEnergy)
         momentumAndEnergyJLoop<false>(0, K, box(), neighbors.data(), neighborsCount, nc.data(), x.data(), y.data(),
                                       z.data(), vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
                                       (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
-                                      c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
+                                      c23.data(), c33.data(), Atmin, Atmax, ramp, wh, kx.data(), xm.data(),
                                       alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
                                       dV33.data(), &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
@@ -397,7 +391,7 @@ TEST_F(SphKernelTests, MomentumEnergy)
         momentumAndEnergyJLoop<false>(0, K, box(), neighbors.data(), 0, nc.data(), x.data(), y.data(), z.data(),
                                       vx.data(), vy.data(), vz.data(), h.data(), m.data(), prho.data(),
                                       (const T*)nullptr, c.data(), c11.data(), c12.data(), c13.data(), c22.data(),
-                                      c23.data(), c33.data(), Atmin, Atmax, ramp, wh.data(), kx.data(), xm.data(),
+                                      c23.data(), c33.data(), Atmin, Atmax, ramp, wh, kx.data(), xm.data(),
                                       alpha.data(), dV11.data(), dV12.data(), dV13.data(), dV22.data(), dV23.data(),
                                       dV33.data(), &grad_Px, &grad_Py, &grad_Pz, &du, &maxvsignal);
 
@@ -409,13 +403,13 @@ TEST_F(SphKernelTests, MomentumEnergy)
     }
 }
 
-template<size_t stride = 1, class Tc, class T>
+template<size_t stride = 1, class Tc, class T, class Kernel>
 HOST_DEVICE_FUN inline T veJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
                                  const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x, const Tc* y,
-                                 const Tc* z, const T* h, const T* wh, const T* xm)
+                                 const Tc* z, const T* h, const Kernel& wh, const T* xm)
 {
-    VeInteraction      interaction{wh};
-    VePostamble<T, Tc> postamble{K};
+    VeInteraction<T, Kernel> interaction{wh};
+    VePostamble<T, Tc>       postamble{K};
 
     const auto input = std::make_tuple(xm);
     T          kxi;
@@ -444,21 +438,21 @@ HOST_DEVICE_FUN inline T veJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<T
 
 TEST_F(SphKernelTests, VeDefGradh)
 {
-    T kxx = veJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), wh.data(),
-                    xm.data());
+    T kxx =
+        veJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), wh, xm.data());
 
     T density = kxx * m[0] / xm[0];
     EXPECT_NEAR(density, 3.4662283566584293e1, 8e-7);
     EXPECT_NEAR(kxx, 1.0042661134076782, 3e-7);
 }
 
-template<size_t stride = 1, class Tc, class Tm, class T>
+template<size_t stride = 1, class Tc, class Tm, class T, class Kernel>
 HOST_DEVICE_FUN inline T xmassJLoop(cstone::LocalIndex i, Tc K, const cstone::Box<Tc>& box,
                                     const cstone::LocalIndex* neighbors, unsigned neighborsCount, const Tc* x,
-                                    const Tc* y, const Tc* z, const T* h, const Tm* m, const T* wh, const T* /*whd*/)
+                                    const Tc* y, const Tc* z, const T* h, const Tm* m, const Kernel& wh)
 {
-    XmassInteraction      interaction{wh};
-    XmassPostamble<T, Tc> postamble{K};
+    XmassInteraction<T, Kernel> interaction{wh};
+    XmassPostamble<T, Tc>       postamble{K};
 
     const auto input  = std::make_tuple(m);
     T          xmassi = 0;
@@ -488,8 +482,8 @@ HOST_DEVICE_FUN inline T xmassJLoop(cstone::LocalIndex i, Tc K, const cstone::Bo
 
 TEST_F(SphKernelTests, XMass)
 {
-    T xmass = xmassJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(),
-                         m.data(), wh.data(), whd.data());
+    T xmass =
+        xmassJLoop(0, K, box(), neighbors.data(), neighborsCount, x.data(), y.data(), z.data(), h.data(), m.data(), wh);
     T rho0i = m[0] / xmass;
 
     EXPECT_NEAR(rho0i, 34.515038498081417, 7.33e-7);

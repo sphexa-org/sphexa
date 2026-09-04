@@ -3,6 +3,7 @@
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/findneighbors.hpp"
 #include "cstone/util/array.hpp"
+#include "cstone/primitives/fastmath.hpp"
 
 namespace sph
 {
@@ -88,28 +89,29 @@ HOST_DEVICE_FUN void updateHIterative(unsigned ng0, unsigned ngmax, const cstone
 
 //! @brief sinc(PI/2 * v)
 template<typename T>
-HOST_DEVICE_FUN inline T wharmonic_std(T v)
+HOST_DEVICE_FUN constexpr inline T wharmonic_std(T v)
 {
-    if (v == 0.0) { return 1.0; }
-
-    const T Pv = M_PI_2 * v;
-    return std::sin(Pv) / Pv;
-}
-
-/*! @brief Derivative of sinc(PI/2 * v) w.r to v
- *
- * Unoptimized for clarity as this is only used to construct look-up tables
- */
-template<typename T>
-HOST_DEVICE_FUN inline T wharmonic_derivative_std(T v)
-{
-    if (v == 0.0) return 0.0;
+    if (v == T(0)) { return T(1); }
 
     constexpr T piHalf = M_PI_2;
     const T     Pv     = piHalf * v;
-    const T     sincv  = std::sin(Pv) / (Pv);
+    return cstone::fastmath::sin(Pv) * cstone::fastmath::rcp(Pv);
+}
 
-    return sincv * piHalf * ((std::cos(Pv) / std::sin(Pv)) - T(1) / Pv);
+//! @brief Derivative of sinc(PI/2 * v) w.r to v
+template<typename T>
+HOST_DEVICE_FUN constexpr inline T wharmonic_derivative_std(T v)
+{
+    if (v == T(0)) return T(0);
+
+    constexpr T piHalf = M_PI_2;
+    const T     Pv     = piHalf * v;
+    const T     sinPv  = cstone::fastmath::sin(Pv);
+    const T     cosPv  = cstone::fastmath::cos(Pv);
+    const T     invPv  = cstone::fastmath::rcp(Pv);
+    const T     sincv  = sinPv * invPv;
+
+    return sincv * piHalf * (cosPv / sinPv - invPv);
 }
 
 /*! @brief calculate the artificial viscosity between a pair of two particles
