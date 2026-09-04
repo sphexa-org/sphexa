@@ -33,16 +33,16 @@
 
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
-#include "sph/table_lookup.hpp"
+#include "sph/sph_kernels.hpp"
 
 namespace sph
 {
 
-template<class T, class Tc>
+template<class T, class Tc, class Kernel>
 struct AVswitchesInteraction
 {
-    const T* wh;
-    Tc       K;
+    Kernel wh;
+    Tc     K;
 
     template<class ParticleData>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
@@ -72,7 +72,7 @@ struct AVswitchesInteraction
         if (rv < T(0)) { vijsignal_ij = ci + cj - T(3) * rv / dist; }
 
         T v1 = dist * hiInv;
-        T Wi = K * hiInv3 * lt::lookup(wh, v1);
+        T Wi = K * hiInv3 * wh(v1);
 
         T termA1 = -(c11i * rx + c12i * ry + c13i * rz) * Wi;
         T termA2 = -(c12i * rx + c22i * ry + c23i * rz) * Wi;
@@ -128,12 +128,17 @@ template<class Neighborhood, class Tc, class T>
 void AVswitchesIjLoop(Neighborhood const& neighborhood, Tc K, Tc dt, T alphamin, T alphamax, T decay_constant,
                       const T* xm, const T* kx, const T* divv, const T* alpha, const T* vx, const T* vy, const T* vz,
                       const T* c, const T* c11, const T* c12, const T* c13, const T* c22, const T* c23, const T* c33,
-                      const T* wh, T* alpha_out)
+                      KernelVariant<T> const& wh, T* alpha_out)
 {
-    neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
-        std::make_tuple(xm, kx, divv, alpha, vx, vy, vz, c, c11, c12, c13, c22, c23, c33),
-        std::make_tuple(alpha_out), AVswitchesInteraction<T, Tc>{wh, K},
-        AVswitchesPostamble<T, Tc>{alphamin, alphamax, decay_constant, dt}));
+    std::visit(
+        [&]<class Kernel>(Kernel wh)
+        {
+            neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                std::make_tuple(xm, kx, divv, alpha, vx, vy, vz, c, c11, c12, c13, c22, c23, c33),
+                std::make_tuple(alpha_out), AVswitchesInteraction<T, Tc, Kernel>{wh, K},
+                AVswitchesPostamble<T, Tc>{alphamin, alphamax, decay_constant, dt}));
+        },
+        wh);
 }
 
 } // namespace sph

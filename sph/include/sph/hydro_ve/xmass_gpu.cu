@@ -52,7 +52,7 @@ namespace gpu
 template<class Dataset>
 void computeXMass(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    xmassIjLoop(d.neighborhood, d.K, rawPtr(d.m), rawPtr(d.wh), rawPtr(d.xm));
+    xmassIjLoop(d.neighborhood, d.K, rawPtr(d.m), d.wh, rawPtr(d.xm));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
@@ -62,7 +62,7 @@ template void computeXMass(sphexa::ParticlesData<cstone::execution::Gpu>& d,
 template<class Dataset>
 void computeDensity(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    densityIjLoop(d.neighborhood, d.K, rawPtr(d.m), rawPtr(d.wh), rawPtr(d.rho));
+    densityIjLoop(d.neighborhood, d.K, rawPtr(d.m), d.wh, rawPtr(d.rho));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
