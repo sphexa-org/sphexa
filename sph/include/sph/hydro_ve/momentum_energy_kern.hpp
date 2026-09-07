@@ -83,7 +83,8 @@ struct MomentumAndEnergyInteraction
         T hiInv = cstone::fastmath::rcp(hi);
         T hiInv3 = hiInv * hiInv * hiInv;
 
-        T eta_crit = std::cbrt(T(32) * M_PI / T(3) / T(nci));
+        constexpr T eta_fac = 32 * M_PI / 3;
+        T eta_crit = std::cbrt(eta_fac / T(nci));
 
         T rx = r_ij[0];
         T ry = r_ij[1];
