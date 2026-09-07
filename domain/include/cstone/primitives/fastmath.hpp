@@ -76,11 +76,7 @@ CSTONE_FAST_MATH constexpr float rcp(float x)
 
 CSTONE_FAST_MATH constexpr double rcp(double x)
 {
-#ifdef __CUDA_ARCH__
-    // __drcp_rn might not flush to zero and thus can be significantly slower
-    asm("rcp.approx.ftz.f64 %0,%0;" : "+d"(x) :);
-    return x;
-#elif defined(__HIP_DEVICE_COMPILE__)
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
     return __drcp_rn(x);
 #else
     return 1.0 / x;
