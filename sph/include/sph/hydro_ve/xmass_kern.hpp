@@ -80,7 +80,7 @@ struct XmassPostamble
         const auto [i, iPos, hi, mi] = iData;
         auto [rho0i]                 = result;
 
-        T hInv = cstone::fastmath::rcp(hi);
+        T hInv  = cstone::fastmath::rcp(hi);
         T h3Inv = hInv * hInv * hInv;
 
         T xmassi = veDefinition(mi, rho0i * K * h3Inv);

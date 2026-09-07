@@ -101,7 +101,7 @@ struct DivVCurlVPostamble
                                       c12i * dVziXFactor + c22i * dVziYFactor + c23i * dVziZFactor,
                                       c13i * dVziXFactor + c23i * dVziYFactor + c33i * dVziZFactor};
 
-        T hiInv = cstone::fastmath::rcp(hi);
+        T hiInv  = cstone::fastmath::rcp(hi);
         T hiInv3 = hiInv * hiInv * hiInv;
 
         T norm_kxi = K * hiInv3 / kxi;

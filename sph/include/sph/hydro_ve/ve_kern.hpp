@@ -74,7 +74,7 @@ struct VePostamble
         const auto [i, iPos, hi, xmassi] = iData;
         auto [kxi]                       = result;
 
-        auto hInv = cstone::fastmath::rcp(hi);
+        auto hInv  = cstone::fastmath::rcp(hi);
         auto h3Inv = hInv * hInv * hInv;
 
         kxi *= K * h3Inv;

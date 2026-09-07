@@ -80,11 +80,11 @@ struct MomentumAndEnergyInteraction
 
         auto rhoi = kxi * mi / xmassi;
 
-        T hiInv = cstone::fastmath::rcp(hi);
+        T hiInv  = cstone::fastmath::rcp(hi);
         T hiInv3 = hiInv * hiInv * hiInv;
 
-        constexpr T eta_fac = 32 * M_PI / 3;
-        T eta_crit = std::cbrt(eta_fac / T(nci));
+        constexpr T eta_fac  = 32 * M_PI / 3;
+        T           eta_crit = std::cbrt(eta_fac / T(nci));
 
         T rx = r_ij[0];
         T ry = r_ij[1];

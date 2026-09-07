@@ -57,7 +57,9 @@ CSTONE_FAST_MATH HOST_DEVICE_FUN HOST_DEVICE_INLINE void sincos(float x, float* 
 }
 
 CSTONE_FAST_MATH HOST_DEVICE_FUN HOST_DEVICE_INLINE void sincos(double x, double* sinx, double* cosx)
-{ ::sincos(x, sinx, cosx); }
+{
+    ::sincos(x, sinx, cosx);
+}
 
 CSTONE_FAST_MATH constexpr float rcp(float x)
 {
