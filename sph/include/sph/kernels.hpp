@@ -111,7 +111,7 @@ HOST_DEVICE_FUN constexpr inline T wharmonic_derivative_std(T v)
     const T     invPv  = cstone::fastmath::rcp(Pv);
     const T     sincv  = sinPv * invPv;
 
-    return sincv * piHalf * (cosPv / sinPv - invPv);
+    return piHalf * (cosPv - sincv) * invPv;
 }
 
 /*! @brief calculate the artificial viscosity between a pair of two particles
