@@ -41,17 +41,29 @@ struct CpuAlwaysTraverseNeighborhood
     unsigned ngmax;
 
     template<class... Ts>
-    void ijLoop(IjLoopData<Ts...> ijData) const
+    auto ijLoop(IjLoopData<Ts...> ijData) const
     {
+        using ReductionResult = IjLoopData<Ts...>::ReductionResultType;
+
         const auto constInput = makeConst(ijData.input);
+        ReductionResult globalReductionResult{};
 #pragma omp parallel
         {
             std::unique_ptr<LocalIndex[]> neighbors = std::make_unique_for_overwrite<LocalIndex[]>(ngmax);
+            ReductionResult reductionResult{};
 
 #pragma omp for
             for (LocalIndex i = firstBody; i < lastBody; ++i)
-                jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble, i, neighbors.get());
+            {
+                ReductionResult iReductionResult = jLoop(constInput, ijData.output, ijData.interaction,
+                                                         ijData.postamble, ijData.reduction, i, neighbors.get());
+                updateResult(reductionResult, iReductionResult);
+            }
+
+#pragma omp critical
+            updateResult(globalReductionResult, reductionResult);
         }
+        return unwrapModifiers(globalReductionResult);
     }
 
     Statistics stats() const { return {.numBodies = lastBody - firstBody, .numBytes = 0}; }
@@ -62,29 +74,43 @@ struct CpuAlwaysTraverseNeighborhood
         GroupView groups;
 
         template<class... Ts>
-        void ijLoop(IjLoopData<Ts...> ijData) const
+        auto ijLoop(IjLoopData<Ts...> ijData) const
         {
+            using ReductionResult = IjLoopData<Ts...>::ReductionResultType;
+
             const auto constInput = makeConst(ijData.input);
+            ReductionResult globalReductionResult{};
 #pragma omp parallel
             {
                 std::unique_ptr<LocalIndex[]> neighbors = std::make_unique_for_overwrite<LocalIndex[]>(parent.ngmax);
+                ReductionResult reductionResult{};
 
 #pragma omp for
                 for (LocalIndex g = 0; g < groups.numGroups; ++g)
                     for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
-                        parent.jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble, i, neighbors.get());
+                    {
+                        ReductionResult iReductionResult =
+                            parent.jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble,
+                                         ijData.reduction, i, neighbors.get());
+                        updateResult(reductionResult, iReductionResult);
+                    }
+
+#pragma omp critical
+                updateResult(globalReductionResult, reductionResult);
             }
+            return unwrapModifiers(globalReductionResult);
         }
     };
 
     Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
 
 protected:
-    template<class Input, class Output, class Interaction, class Postamble>
-    void jLoop(Input&& input,
+    template<class Input, class Output, class Interaction, class Postamble, class Reduction>
+    auto jLoop(Input&& input,
                Output&& output,
-               Interaction&& interaction,
-               Postamble&& postamble,
+               Interaction const& interaction,
+               Postamble const& postamble,
+               Reduction const& reduction,
                const LocalIndex i,
                LocalIndex* neighbors) const
     {
@@ -93,6 +119,7 @@ protected:
 
         const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, neighbors), ngmax);
         auto result        = interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
+
         for (unsigned nb = 0; nb < nbs; ++nb)
         {
             const LocalIndex j = neighbors[nb];
@@ -103,7 +130,9 @@ protected:
             updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
         }
 
-        storeParticleData(std::forward<Output>(output), i, postamble(iData, unwrapModifiers(result)));
+        const auto postambleResult = postamble(iData, unwrapModifiers(result));
+        storeParticleData(std::forward<Output>(output), i, postambleResult);
+        return reduction(iData, unwrapModifiers(result), unwrapModifiers(postambleResult));
     }
 };
 

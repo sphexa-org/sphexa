@@ -44,12 +44,27 @@ struct CpuFullNbListNeighborhood
     unsigned ngmax;
 
     template<class... Ts>
-    void ijLoop(IjLoopData<Ts...> ijData) const
+    auto ijLoop(IjLoopData<Ts...> ijData) const
     {
+        using ReductionResult = IjLoopData<Ts...>::ReductionResultType;
+
         const auto constInput = makeConst(ijData.input);
-#pragma omp parallel for simd
-        for (LocalIndex i = firstBody; i < lastBody; ++i)
-            jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble, i);
+        ReductionResult globalReductionResult{};
+#pragma omp parallel
+        {
+            ReductionResult reductionResult{};
+
+#pragma omp for simd
+            for (LocalIndex i = firstBody; i < lastBody; ++i)
+            {
+                ReductionResult iReductionResult =
+                    jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble, ijData.reduction, i);
+                updateResult(reductionResult, iReductionResult);
+            }
+#pragma omp critical
+            updateResult(globalReductionResult, reductionResult);
+        }
+        return unwrapModifiers(globalReductionResult);
     }
 
     Statistics stats() const
@@ -65,23 +80,41 @@ struct CpuFullNbListNeighborhood
         GroupView groups;
 
         template<class... Ts>
-        void ijLoop(IjLoopData<Ts...> ijData) const
+        auto ijLoop(IjLoopData<Ts...> ijData) const
         {
+            using ReductionResult = IjLoopData<Ts...>::ReductionResultType;
+
             const auto constInput = makeConst(ijData.input);
-#pragma omp parallel for
-            for (LocalIndex g = 0; g < groups.numGroups; ++g)
+            ReductionResult globalReductionResult{};
+#pragma omp parallel
+            {
+                ReductionResult reductionResult{};
+#pragma omp for
+                for (LocalIndex g = 0; g < groups.numGroups; ++g)
 #pragma omp simd
-                for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
-                    parent.jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble, i);
+                    for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
+                    {
+                        ReductionResult iReductionResult = parent.jLoop(constInput, ijData.output, ijData.interaction,
+                                                                        ijData.postamble, ijData.reduction, i);
+                        updateResult(reductionResult, iReductionResult);
+                    }
+#pragma omp critical
+                updateResult(globalReductionResult, reductionResult);
+            }
+            return unwrapModifiers(globalReductionResult);
         }
     };
 
     Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
 
 protected:
-    template<class Input, class Output, class Interaction, class Postamble>
-    void
-    jLoop(Input&& input, Output&& output, Interaction&& interaction, Postamble&& postamble, const LocalIndex i) const
+    template<class Input, class Output, class Interaction, class Postamble, class Reduction>
+    auto jLoop(Input&& input,
+               Output&& output,
+               Interaction const& interaction,
+               Postamble const& postamble,
+               Reduction const& reduction,
+               const LocalIndex i) const
     {
         const auto iData  = loadParticleData(x, y, z, h, std::forward<Input>(input), i);
         const bool usePbc = requiresPbcHandling(box, iData);
@@ -98,7 +131,9 @@ protected:
             if (distSq < radiusSq(iData)) updateResult(result, interaction(iData, jData, ijPosDiff, distSq));
         }
 
-        storeParticleData(std::forward<Output>(output), i, postamble(iData, unwrapModifiers(result)));
+        const auto postambleResult = postamble(iData, unwrapModifiers(result));
+        storeParticleData(std::forward<Output>(output), i, postambleResult);
+        return reduction(iData, unwrapModifiers(result), unwrapModifiers(postambleResult));
     }
 };
 } // namespace cpu_full_nb_list_neighborhood_detail

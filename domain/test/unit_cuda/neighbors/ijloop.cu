@@ -52,12 +52,26 @@ struct NeighborFun
 struct PostambleFun
 {
     template<class ParticleData, class Result>
-    constexpr auto operator()(ParticleData const& /* iData */, Result jResult) const
+    constexpr auto operator()(ParticleData const& /* iData */, Result const& iResult) const
     {
-        auto [iSum, jSum, iPosSum, jPosSum, ijPosDiffSum, distSqSum, hiSum, hjSum, viSum, vjSum, neighborsCount, jMin,
-              constantShortSum] = jResult;
+        const auto [iSum, jSum, iPosSum, jPosSum, ijPosDiffSum, distSqSum, hiSum, hjSum, viSum, vjSum, neighborsCount,
+                    jMin, constantShortSum] = iResult;
         return std::make_tuple(iSum, jSum, iPosSum, jPosSum, ijPosDiffSum, distSqSum, hiSum, hjSum, viSum, vjSum,
                                neighborsCount, hiSum / neighborsCount, jMin);
+    }
+};
+
+struct ReductionFun
+{
+    template<class ParticleData, class Result, class PostambleResult>
+    constexpr auto
+    operator()(ParticleData const& iData, Result const& /* iResult */, PostambleResult const& iPostambleResult) const
+    {
+        const auto [i, iPos, hi, vi]       = iData;
+        const auto [iSum, jSum, iPosSum, jPosSum, ijPosDiffSum, distSqSum, hiSum, hjSum, viSum, vjSum, neighborsCount,
+                    hiSumNormalized, jMin] = iPostambleResult;
+        return std::make_tuple(ijloop::reduction::min(hi), std::size_t(neighborsCount),
+                               ijloop::reduction::max(hiSumNormalized));
     }
 };
 
@@ -94,6 +108,12 @@ constexpr static auto resultNames = std::make_tuple("iSum",
                                                     "neighborsCount",
                                                     "hiSumNormalized",
                                                     "jMin");
+
+using ReductionResult                      = std::tuple<double,      // minHi
+                                                        std::size_t, // totalNeighborsCount
+                                                        double       // maxHiSumNormalized
+                                                        >;
+constexpr static auto reductionResultNames = std::make_tuple("minHi", "totalNeighborsCount", "maxHiSumNormalized");
 
 template<class NeighborhoodBuilder>
 struct IjLoopTest : testing::Test
@@ -216,7 +236,7 @@ struct IjLoopTest : testing::Test
                 .groupEnd   = rawPtr(subgroupEnd)};
     }
 
-    Result reference(const GroupView& groups) const
+    std::tuple<Result, ReductionResult> reference(const GroupView& groups) const
     {
         thrust::universal_vector<LocalIndex> iSum(totalBodies), jSum(totalBodies), jMin(totalBodies);
         thrust::universal_vector<Vec3<double>> iPosSum(totalBodies), jPosSum(totalBodies), ijPosDiffSum(totalBodies);
@@ -224,6 +244,9 @@ struct IjLoopTest : testing::Test
             viSum(totalBodies), vjSum(totalBodies), hiSumNormalized(totalBodies);
         thrust::universal_vector<unsigned> neighborsCount(totalBodies);
 
+        double minHi                    = std::numeric_limits<double>::infinity();
+        std::size_t totalNeighborsCount = 0;
+        double maxHiSumNormalized       = -std::numeric_limits<double>::infinity();
         for (unsigned g = 0; g < groups.numGroups; ++g)
         {
             const LocalIndex firstBody = groups.groupStart[g];
@@ -286,24 +309,28 @@ struct IjLoopTest : testing::Test
                     }
                 }
                 hiSumNormalized[i] = hiSum[i] / neighborsCount[i];
+
+                minHi = std::min(minHi, h[i]);
+                totalNeighborsCount += neighborsCount[i];
+                maxHiSumNormalized = std::max(maxHiSumNormalized, hiSumNormalized[i]);
             }
         }
 
-        return {std::move(iSum),         std::move(jSum),      std::move(iPosSum),        std::move(jPosSum),
-                std::move(ijPosDiffSum), std::move(distSqSum), std::move(hiSum),          std::move(hjSum),
-                std::move(viSum),        std::move(vjSum),     std::move(neighborsCount), std::move(hiSumNormalized),
-                std::move(jMin)};
+        return {{std::move(iSum), std::move(jSum), std::move(iPosSum), std::move(jPosSum), std::move(ijPosDiffSum),
+                 std::move(distSqSum), std::move(hiSum), std::move(hjSum), std::move(viSum), std::move(vjSum),
+                 std::move(neighborsCount), std::move(hiSumNormalized), std::move(jMin)},
+                {minHi, totalNeighborsCount, maxHiSumNormalized}};
     }
 
-    void validate(const Result& expected, const Result& actual) const
+    void validate(const std::tuple<Result, ReductionResult>& expected,
+                  const std::tuple<Result, ReductionResult>& actual) const
     {
-
+        std::ostringstream failures;
         util::for_each_tuple(
-            [](auto const& e, auto const& a, const char* name)
+            [&failures](auto const& e, auto const& a, const char* name)
             {
                 ASSERT_EQ(e.size(), a.size());
 
-                std::ostringstream failures;
                 auto validateElem = [&failures](auto ei, auto ai, const char* name, std::size_t i)
                 {
                     if constexpr (std::is_same_v<decltype(ei), double>)
@@ -328,11 +355,30 @@ struct IjLoopTest : testing::Test
 
                 for (std::size_t i = 0; i < e.size(); ++i)
                     validateElem(e[i], a[i], name, i);
-
-                auto output = failures.view();
-                if (!output.empty()) ADD_FAILURE() << output;
             },
-            expected, actual, resultNames);
+            std::get<0>(expected), std::get<0>(actual), resultNames);
+        util::for_each_tuple(
+            [&failures](auto e, auto a, const char* name)
+            {
+                if constexpr (std::is_same_v<decltype(e), double>)
+                {
+                    if (std::abs(e - a) > 1e-8) failures << "  " << name << " == " << a << " != " << e << "\n";
+                }
+                else if constexpr (std::is_same_v<decltype(e), Vec3<double>>)
+                {
+                    if (std::abs(e[0] - a[0]) > 1e-8 || std::abs(e[1] - a[1]) > 1e-8 || std::abs(e[2] - a[2]) > 1e-8)
+                        failures << "  " << name << " == {" << a[0] << ", " << a[1] << ", " << a[2] << "} != {" << e[0]
+                                 << ", " << e[1] << ", " << e[2] << "}\n";
+                }
+                else
+                {
+                    if (e != a) failures << "  " << name << " == " << a << " (actual) != " << e << " (expected)\n";
+                }
+            },
+            std::get<1>(expected), std::get<1>(actual), reductionResultNames);
+
+        auto output = failures.view();
+        if (!output.empty()) ADD_FAILURE() << output;
     }
 
     Box<double> box = {0, 1, BoundaryType::periodic};
@@ -399,11 +445,38 @@ TYPED_TEST(IjLoopTest, IjLoop)
         auto input  = std::make_tuple(rawPtr(this->v));
         auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
-        nb.ijLoop(makeIjLoopData(input, output));
+        ReductionResult reductionResult = nb.ijLoop(
+            ijloop::makeIjLoopData<double, double*>(input, output, NeighborFun{}, PostambleFun{}, ReductionFun{}));
         stream.sync();
 
-        Result reference = this->reference(this->groupView());
-        this->validate(reference, result);
+        auto reference = this->reference(this->groupView());
+        this->validate(reference, {result, reductionResult});
+    }
+}
+
+TYPED_TEST(IjLoopTest, IjLoopWithoutReduction)
+{
+    using NeighborhoodBuilder = TypeParam;
+
+    for (BoundaryType boundaryType : {BoundaryType::open, BoundaryType::periodic, BoundaryType::fixed})
+    {
+        this->setBoundaryType(boundaryType);
+
+        Result result;
+        util::for_each_tuple([&](auto& v) { v.resize(this->totalBodies); }, result);
+
+        const auto nbBuilder = NeighborhoodBuilder{1024};
+        const auto stream    = getStream(nbBuilder);
+        const auto nb =
+            nbBuilder.build(stream.exec(), this->treeView(), this->box, this->totalBodies, this->groupView(),
+                            rawPtr(this->x), rawPtr(this->y), rawPtr(this->z), rawPtr(this->h));
+
+        auto input  = std::make_tuple(rawPtr(this->v));
+        auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
+
+        auto reductionResult = nb.ijLoop(makeIjLoopData(input, output));
+        static_assert(std::is_same_v<decltype(reductionResult), std::tuple<>>);
+        stream.sync();
     }
 }
 
@@ -428,20 +501,22 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
         auto input  = std::make_tuple(rawPtr(this->v));
         auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
-        nb.ijLoop(makeIjLoopData(input, output));
+        ReductionResult reductionResult = nb.ijLoop(
+            ijloop::makeIjLoopData<double, double*>(input, output, NeighborFun{}, PostambleFun{}, ReductionFun{}));
         stream.sync();
 
-        Result reference = this->reference(this->groupView());
-        this->validate(reference, result);
+        auto reference = this->reference(this->groupView());
+        this->validate(reference, {result, reductionResult});
 
         for (auto& h : this->h)
             h *= searchExtFactor;
 
-        nb.ijLoop(makeIjLoopData(input, output));
+        reductionResult = nb.ijLoop(
+            ijloop::makeIjLoopData<double, double*>(input, output, NeighborFun{}, PostambleFun{}, ReductionFun{}));
         stream.sync();
 
         reference = this->reference(this->groupView());
-        this->validate(reference, result);
+        this->validate(reference, {result, reductionResult});
     }
 }
 
@@ -481,11 +556,12 @@ TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
             auto input  = std::make_tuple(rawPtr(this->v));
             auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
-            subgroupNb.ijLoop(makeIjLoopData(input, output));
+            ReductionResult reductionResult = subgroupNb.ijLoop(
+                ijloop::makeIjLoopData<double, double*>(input, output, NeighborFun{}, PostambleFun{}, ReductionFun{}));
             stream.sync();
 
-            Result reference = this->reference(this->subgroupView());
-            this->validate(reference, result);
+            auto reference = this->reference(this->subgroupView());
+            this->validate(reference, {result, reductionResult});
         }
     }
     else { GTEST_SKIP() << "subgroups not supported"; }

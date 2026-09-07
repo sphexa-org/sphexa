@@ -17,6 +17,7 @@
 
 #include <concepts>
 #include <tuple>
+#include <type_traits>
 #include <limits>
 
 #include "cstone/execution.hpp"
@@ -111,11 +112,22 @@ inline constexpr bool IsTupleOfPointers_v = false;
 template<class... Ts>
 inline constexpr bool IsTupleOfPointers_v<std::tuple<Ts...>> =
     (std::is_pointer_v<Ts> && ...) && (std::is_trivially_copyable_v<std::remove_pointer_t<Ts>> && ...);
+
+template<class T>
+inline constexpr bool IsTupleOfValues_v = false;
+
+template<class... Ts>
+inline constexpr bool IsTupleOfValues_v<std::tuple<Ts...>> =
+    (!std::is_pointer_v<Ts> && ...) && (std::is_trivially_copyable_v<Ts> && ...);
+
 } // namespace detail
 
 //! @brief Restricts types to std::tuples of pointers to trivially copyable types.
 template<class T>
 concept TupleOfPointers = detail::IsTupleOfPointers_v<T>;
+
+template<class T>
+concept TupleOfValues = detail::IsTupleOfValues_v<T>;
 
 template<class... Ts>
 constexpr std::tuple<const Ts*...> makeConst(std::tuple<Ts*...> input)
@@ -125,6 +137,7 @@ constexpr std::tuple<const Ts*...> makeConst(std::tuple<Ts*...> input)
 
 namespace detail
 {
+
 /*! @brief Maps a std::tuple of pointers to a std::tuple of the pointee types. */
 template<class T>
 struct DereferencedTuple;
@@ -144,12 +157,24 @@ struct EmptyPostamble
     }
 };
 
+struct NoReduction
+{
+    template<class ParticleData, class Result, class PostambleResult>
+    constexpr std::tuple<> operator()(ParticleData const&, Result const&, PostambleResult const&) const
+    {
+        return {};
+    }
+};
+
 } // namespace detail
 
 //! @brief Concept satisfied by a floating point number, or a pointer to one. Used e.g. for smoothing lengths.
 template<class T>
 concept FpOrPtrToFp =
     (std::is_pointer_v<T> && std::is_floating_point_v<std::remove_pointer_t<T>>) || std::is_floating_point_v<T>;
+
+//! @brief Marker for disabling global reductions.
+constexpr detail::NoReduction no_reduction;
 
 struct Statistics
 {
@@ -172,9 +197,11 @@ concept PairInteraction = requires(const F& func,
                                    const ParticleData<Tc, ThP, Input>& i,
                                    const ParticleData<Tc, ThP, Input>& j,
                                    Vec3<Tc> posdiff,
-                                   std::remove_pointer_t<ThP> r2)
+                                   Tc r2)
 {
-    {func(i, j, posdiff, r2)}; // must be callable with this signature
+    {
+        func(i, j, posdiff, r2)
+    } -> TupleOfValues;
 };
 
 //! @brief A postamble is callable with (ParticleData, interaction result), and returns a tuple compatible with Output
@@ -184,11 +211,26 @@ concept ValidPostamble = PairInteraction<Interaction, Tc, ThP, Input> && require
                                                                                   const ParticleData<Tc, ThP, Input>& i,
                                                                                   const ParticleData<Tc, ThP, Input>& j,
                                                                                   Vec3<Tc> posdiff,
-                                                                                  std::remove_pointer_t<ThP> r2)
+                                                                                  Tc r2)
 {
     {
-        postamble(i, unwrapModifiers(interaction(i, j, posdiff, r2)))        // must be callable with this signature
-        } -> std::same_as<typename detail::DereferencedTuple<Output>::type>; // must return this type
+        postamble(i, unwrapModifiers(interaction(i, j, posdiff, r2)))
+    } -> std::same_as<typename detail::DereferencedTuple<Output>::type>;
+};
+
+template<class Reduction, class Interaction, class Tc, class ThP, class Input, class Output>
+concept ValidReduction =
+    PairInteraction<Interaction, Tc, ThP, Input> && requires(const Reduction& reduction,
+                                                             const Interaction& interaction,
+                                                             const ParticleData<Tc, ThP, Input>& i,
+                                                             const ParticleData<Tc, ThP, Input>& j,
+                                                             Vec3<Tc> posdiff,
+                                                             Tc r2,
+                                                             detail::DereferencedTuple<Output>::type postambleOutput)
+{
+    {
+        reduction(i, unwrapModifiers(interaction(i, j, posdiff, r2)), postambleOutput)
+    } -> TupleOfValues;
 };
 
 /*! A dataset that can be passed to an ijLoop.
@@ -199,13 +241,15 @@ concept ValidPostamble = PairInteraction<Interaction, Tc, ThP, Input> && require
  * @tparam Output          tuple of output particle field pointers
  * @tparam Interaction     function object satisfying the PairInteraction concept
  * @tparam Postamble       function object satisfying the ValidPostamble concept
+ * @tparam Reduction       optional global reduction functor
  */
 template<std::floating_point Tc,
          FpOrPtrToFp ThP,
          TupleOfPointers Input,
          TupleOfPointers Output,
          PairInteraction<Tc, ThP, Input> Interaction,
-         ValidPostamble<Interaction, Tc, ThP, Input, Output> Postamble = detail::EmptyPostamble>
+         ValidPostamble<Interaction, Tc, ThP, Input, Output> Postamble = detail::EmptyPostamble,
+         ValidReduction<Interaction, Tc, ThP, Input, Output> Reduction = detail::NoReduction>
 struct IjLoopData
 {
     //! @brief The tuple input data for a single particle in an i-j interaction,
@@ -223,6 +267,18 @@ struct IjLoopData
     //! @brief what the postamble returns - will be stored back to the output fields
     using PostambleResultType = typename detail::DereferencedTuple<Output>::type;
 
+    using PostambleType = Postamble;
+    using ReductionType = Reduction;
+
+    //! @brief what the reduction returns across all particles
+    using ReductionResultType =
+        decltype(std::declval<Reduction>()(std::declval<ParticleDataType>(),
+                                           unwrapModifiers(std::declval<InteractionResultType>()),
+                                           unwrapModifiers(std::declval<PostambleResultType>())));
+
+    //! @brief the reduction result with all modifiers (min/max/...) unwrapped
+    using UnwrappedReductionResultType = decltype(unwrapModifiers(std::declval<ReductionResultType>()));
+
     Input input;
     Output output;
 
@@ -230,15 +286,28 @@ struct IjLoopData
     Interaction interaction;
     //! @brief Post-processing to apply to the Result after the j-loop
     Postamble postamble;
+    //! @brief Global reduction over per-particle values
+    Reduction reduction;
 };
 
 //! @brief Convenience factory to construct an @p IjLoopData with explicit Tc and ThP and deduced tuple/functor types.
-template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble>
-auto makeIjLoopData(const Input& in, const Output& out, const Interaction& interaction, const Postamble& postamble)
+template<class Tc,
+         class ThP,
+         class Input,
+         class Output,
+         class Interaction,
+         class Postamble = detail::EmptyPostamble,
+         class Reduction = detail::NoReduction>
+auto makeIjLoopData(const Input& in,
+                    const Output& out,
+                    const Interaction& interaction,
+                    const Postamble& postamble = empty_postamble,
+                    const Reduction& reduction = no_reduction)
 {
     auto constInput = makeConst(in);
     return IjLoopData<Tc, ThP, std::decay_t<decltype(constInput)>, std::decay_t<Output>, std::decay_t<Interaction>,
-                      std::decay_t<Postamble>>{constInput, out, interaction, postamble};
+                      std::decay_t<Postamble>, std::decay_t<Reduction>>{constInput, out, interaction, postamble,
+                                                                        reduction};
 }
 
 namespace detail
@@ -275,7 +344,7 @@ concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
         nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
             .ijLoop(IjLoopData<double, float*, std::tuple<>, std::tuple<int*>, detail::ConceptTestInteraction>{
                 std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble})
-    } -> std::same_as<void>;
+    } -> std::same_as<std::tuple<>>;
 };
 
 } // namespace detail

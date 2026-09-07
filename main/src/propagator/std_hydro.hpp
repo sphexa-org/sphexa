@@ -73,8 +73,8 @@ protected:
     using ConservedFields = FieldList<"u", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "id">;
 
     //! @brief the list of dependent particle fields, these may be used as scratch space during domain sync
-    using DependentFields = FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33",
-                                      "nc", "dtCourant">;
+    using DependentFields =
+        FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33", "nc">;
 
 public:
     HydroProp(std::ostream& output, size_t rank)
@@ -152,7 +152,7 @@ public:
         domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33">(d), get<"ax">(d), get<"ay">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeMomentumEnergySTD(first, last, d, domain.box());
+        computeMomentumEnergySTD(d, domain.box());
         timer.step("MomentumEnergyIAD");
 
         if (d.g != 0.0)
