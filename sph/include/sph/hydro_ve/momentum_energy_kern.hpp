@@ -31,6 +31,8 @@
 
 #pragma once
 
+#include <cassert>
+
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
@@ -143,7 +145,7 @@ struct MomentumAndEnergyInteraction
         else
         {
             T sigma_ij = ramp * (Atwood - Atmin);
-            assert(xmassi != 0);
+            assert(xmassi != 0 && xmassj != 0);
             T xms = cstone::fastmath::pow(xmassj / xmassi, sigma_ij);
             a_mom = xmassi * xmassi * xms;
             b_mom = xmassj * xmassj / xms;
