@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/sph_kernels.hpp"
@@ -50,7 +51,7 @@ struct VeInteraction
         const auto [i, iPos, hi, xmassi] = iData;
         const auto [j, jPos, hj, xmassj] = jData;
 
-        auto hInv = T(1) / hi;
+        T hInv = cstone::fastmath::rcp(hi);
 
         T dist = std::sqrt(r2);
         T vloc = dist * hInv;
@@ -73,7 +74,7 @@ struct VePostamble
         const auto [i, iPos, hi, xmassi] = iData;
         auto [kxi]                       = result;
 
-        auto hInv  = T(1) / hi;
+        auto hInv = cstone::fastmath::rcp(hi);
         auto h3Inv = hInv * hInv * hInv;
 
         kxi *= K * h3Inv;

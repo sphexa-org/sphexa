@@ -32,6 +32,7 @@
 #pragma once
 
 #include "cstone/cuda/annotation.hpp"
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/kernels.hpp"
@@ -79,7 +80,7 @@ struct MomentumAndEnergyInteraction
 
         auto rhoi = kxi * mi / xmassi;
 
-        T hiInv  = T(1) / hi;
+        T hiInv = cstone::fastmath::rcp(hi);
         T hiInv3 = hiInv * hiInv * hiInv;
 
         T eta_crit = std::cbrt(T(32) * M_PI / T(3) / T(nci));
@@ -94,7 +95,7 @@ struct MomentumAndEnergyInteraction
         T vy_ij = vyi - vyj;
         T vz_ij = vzi - vzj;
 
-        T hjInv = T(1) / hj;
+        T hjInv = cstone::fastmath::rcp(hj);
 
         T v1 = dist * hiInv;
         T v2 = dist * hjInv;

@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/sph_kernels.hpp"
@@ -57,8 +58,8 @@ struct AVswitchesInteraction
         T ry = r_ij[1];
         T rz = r_ij[2];
 
-        auto hiInv  = T(1) / hi;
-        auto hiInv3 = hiInv * hiInv * hiInv;
+        T hiInv  = cstone::fastmath::rcp(hi);
+        T hiInv3 = hiInv * hiInv * hiInv;
 
         T dist = std::sqrt(r2);
 

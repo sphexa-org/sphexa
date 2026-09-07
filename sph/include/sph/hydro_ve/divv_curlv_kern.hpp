@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/sph_kernels.hpp"
@@ -50,7 +51,7 @@ struct DivVCurlVInteraction
         auto const [i, iPos, hi, vxi, vyi, vzi, xmi, kxi, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
         auto const [j, jPos, hj, vxj, vyj, vzj, xmj, kxj, c11j, c12j, c13j, c22j, c23j, c33j] = jData;
 
-        T hiInv = T(1) / hi;
+        T hiInv = cstone::fastmath::rcp(hi);
 
         T rx   = r_ij[0];
         T ry   = r_ij[1];
@@ -100,7 +101,7 @@ struct DivVCurlVPostamble
                                       c12i * dVziXFactor + c22i * dVziYFactor + c23i * dVziZFactor,
                                       c13i * dVziXFactor + c23i * dVziYFactor + c33i * dVziZFactor};
 
-        T hiInv  = T(1) / hi;
+        T hiInv = cstone::fastmath::rcp(hi);
         T hiInv3 = hiInv * hiInv * hiInv;
 
         T norm_kxi = K * hiInv3 / kxi;

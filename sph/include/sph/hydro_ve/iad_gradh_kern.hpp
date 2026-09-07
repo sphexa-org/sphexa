@@ -33,6 +33,7 @@
 
 #include <cstdint>
 
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/iad_regularization.hpp"
@@ -57,7 +58,7 @@ struct IADGradhInteraction
         T ry = r_ij[1];
         T rz = r_ij[2];
 
-        T hiInv = T(1) / hi;
+        T hiInv = cstone::fastmath::rcp(hi);
 
         T dist = std::sqrt(r2);
         T vloc = dist * hiInv;
@@ -130,7 +131,7 @@ struct IADGradhPostamble
 
         // -----------------------------------------------------
         // gradh postamble
-        T    hiInv = T(1) / hi;
+        T    hiInv = cstone::fastmath::rcp(hi);
         auto h3Inv = hiInv * hiInv * hiInv;
         auto dnorm = K * hiInv * h3Inv;
 

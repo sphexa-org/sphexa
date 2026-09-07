@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/iad_regularization.hpp"
@@ -26,7 +27,7 @@ struct IADInteractionSTD
         T ry = r_ij[1];
         T rz = r_ij[2];
 
-        T hiInv = T(1) / hi;
+        T hiInv = cstone::fastmath::rcp(hi);
 
         T dist = std::sqrt(r2);
 
