@@ -76,12 +76,6 @@ class Sphexa(CMakePackage, CudaPackage, ROCmPackage):
 
         depends_on("mpich +rocm", when="+rocm ^[virtuals=mpi] mpich")
 
-    # ROCm 7.2 exposes several 0.96.2 test build issues: hilbert_perf pulls in
-    # HIP/Thrust headers without HIP platform definitions, disk_gpu uses the
-    # wrong target name/link interface, and laneSeg accidentally uses HIP's
-    # runtime warpSize instead of its constexpr warpSize_ argument.
-    patch("v0-96-2.patch", when="@0.96.2 +rocm")
-
     conflicts("%gcc@16:", when="@:0.96.2")
     conflicts("%gcc@:11", when="@0.95:")
     conflicts("%gcc@:10", when="@:0.93.1")
