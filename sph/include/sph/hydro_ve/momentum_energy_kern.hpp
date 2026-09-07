@@ -143,8 +143,10 @@ struct MomentumAndEnergyInteraction
         else
         {
             T sigma_ij = ramp * (Atwood - Atmin);
-            a_mom      = pow(xmassi, T(2) - sigma_ij) * pow(xmassj, sigma_ij);
-            b_mom      = pow(xmassj, T(2) - sigma_ij) * pow(xmassi, sigma_ij);
+            assert(xmassi != 0);
+            T xms = cstone::fastmath::pow(xmassj / xmassi, sigma_ij);
+            a_mom = mi * mi * xms;
+            b_mom = mj * mj / xms;
         }
 
         auto a_visc        = mj / rhoi * viscosity_ij;
