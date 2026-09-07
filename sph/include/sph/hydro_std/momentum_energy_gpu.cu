@@ -51,7 +51,7 @@ void computeMomentumEnergyStdGpu(cstone::LocalIndex firstBody, cstone::LocalInde
 {
     momentumAndEnergyIjLoop(d.neighborhood, d.K, d.Kcour, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.nc), rawPtr(d.vx),
                             rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.p), rawPtr(d.c), rawPtr(d.c11), rawPtr(d.c12),
-                            rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.wh), rawPtr(d.du),
+                            rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), d.wh, rawPtr(d.du),
                             rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.dtCourant));
 
     using DtCourantType = typename std::decay_t<decltype(d.dtCourant)>::value_type;

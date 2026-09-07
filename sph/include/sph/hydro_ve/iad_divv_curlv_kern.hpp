@@ -40,10 +40,10 @@
 namespace sph
 {
 
-template<class T>
+template<class T, class Kernel>
 struct IADDivVCurlVInteraction
 {
-    const T *wh, *whd;
+    Kernel wh;
 
     template<class ParticleData, class Tc>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, const cstone::Vec3<Tc>& r_ij,
@@ -54,7 +54,7 @@ struct IADDivVCurlVInteraction
 
         auto iadIData  = std::make_tuple(i, iPos, hi, mi, xmi, kxi, nci, idi);
         auto iadJData  = std::make_tuple(j, jPos, hj, mj, xmj, kxj, ncj, idj);
-        auto iadResult = IADGradhInteraction<T>{wh, whd}(iadIData, iadJData, r_ij, r2);
+        auto iadResult = IADGradhInteraction<T, Kernel>{wh}(iadIData, iadJData, r_ij, r2);
 
         // c11i ... c33i are only read in postamble, so we can pass dummy values here
         T    dummy = std::numeric_limits<T>::signaling_NaN();
@@ -62,7 +62,7 @@ struct IADDivVCurlVInteraction
             std::make_tuple(i, iPos, hi, vxi, vyi, vzi, xmi, kxi, dummy, dummy, dummy, dummy, dummy, dummy);
         auto divVCurlVJData =
             std::make_tuple(j, jPos, hj, vxj, vyj, vzj, xmj, kxj, dummy, dummy, dummy, dummy, dummy, dummy);
-        auto divVCurlVResult = DivVCurlVInteraction<T>{wh}(divVCurlVIData, divVCurlVJData, r_ij, r2);
+        auto divVCurlVResult = DivVCurlVInteraction<T, Kernel>{wh}(divVCurlVIData, divVCurlVJData, r_ij, r2);
 
         return std::tuple_cat(iadResult, divVCurlVResult);
     }
@@ -99,41 +99,46 @@ struct IADDivVCurlVPostamble
 template<class Neighborhood, class Tc, class T>
 void iadDivvCurlvGradhIjLoop(const Neighborhood& neighborhood, Tc K, T iadConditionQuality, unsigned iadRegBit,
                              const T* vx, const T* vy, const T* vz, const T* m, const T* xm, const T* kx,
-                             const unsigned* nc, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33, const T* wh,
-                             const T* whd, T* gradh, T* divv, T* curlv, T* dV11, T* dV12, T* dV13, T* dV22, T* dV23,
-                             T* dV33, bool doGradV, uint64_t* id)
+                             const unsigned* nc, T* c11, T* c12, T* c13, T* c22, T* c23, T* c33,
+                             KernelVariant<T> const& wh, T* gradh, T* divv, T* curlv, T* dV11, T* dV12, T* dV13,
+                             T* dV22, T* dV23, T* dV33, bool doGradV, uint64_t* id)
 {
-    const auto input = std::make_tuple(vx, vy, vz, m, xm, kx, nc, id);
-    if (curlv && doGradV)
-    {
-        const auto output =
-            std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, id, divv, curlv, dV11, dV12, dV13, dV22, dV23, dV33);
-        neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
-            input, output, IADDivVCurlVInteraction<T>{wh, whd},
-            IADDivVCurlVPostamble<true, true, T, Tc>{K, iadConditionQuality, iadRegBit}));
-    }
-    else if (curlv)
-    {
-        const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, id, divv, curlv);
-        neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
-            input, output, IADDivVCurlVInteraction<T>{wh, whd},
-            IADDivVCurlVPostamble<true, false, T, Tc>{K, iadConditionQuality, iadRegBit}));
-    }
-    else if (doGradV)
-    {
-        const auto output =
-            std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, id, divv, dV11, dV12, dV13, dV22, dV23, dV33);
-        neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
-            input, output, IADDivVCurlVInteraction<T>{wh, whd},
-            IADDivVCurlVPostamble<false, true, T, Tc>{K, iadConditionQuality, iadRegBit}));
-    }
-    else
-    {
-        const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, id, divv);
-        neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
-            input, output, IADDivVCurlVInteraction<T>{wh, whd},
-            IADDivVCurlVPostamble<false, false, T, Tc>{K, iadConditionQuality, iadRegBit}));
-    }
+    std::visit(
+        [&]<class Kernel>(Kernel wh)
+        {
+            const auto input = std::make_tuple(vx, vy, vz, m, xm, kx, nc, id);
+            if (curlv && doGradV)
+            {
+                const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, id, divv, curlv, dV11, dV12,
+                                                    dV13, dV22, dV23, dV33);
+                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                    input, output, IADDivVCurlVInteraction<T, Kernel>{wh},
+                    IADDivVCurlVPostamble<true, true, T, Tc>{K, iadConditionQuality, iadRegBit}));
+            }
+            else if (curlv)
+            {
+                const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, id, divv, curlv);
+                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                    input, output, IADDivVCurlVInteraction<T, Kernel>{wh},
+                    IADDivVCurlVPostamble<true, false, T, Tc>{K, iadConditionQuality, iadRegBit}));
+            }
+            else if (doGradV)
+            {
+                const auto output =
+                    std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, id, divv, dV11, dV12, dV13, dV22, dV23, dV33);
+                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                    input, output, IADDivVCurlVInteraction<T, Kernel>{wh},
+                    IADDivVCurlVPostamble<false, true, T, Tc>{K, iadConditionQuality, iadRegBit}));
+            }
+            else
+            {
+                const auto output = std::make_tuple(c11, c12, c13, c22, c23, c33, gradh, id, divv);
+                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                    input, output, IADDivVCurlVInteraction<T, Kernel>{wh},
+                    IADDivVCurlVPostamble<false, false, T, Tc>{K, iadConditionQuality, iadRegBit}));
+            }
+        },
+        wh);
 }
 
 } // namespace sph
