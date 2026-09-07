@@ -15,7 +15,6 @@
 
 #pragma once
 
-#include <cassert>
 #include <cmath>
 
 #include "cstone/cuda/annotation.hpp"
