@@ -15,7 +15,10 @@
 
 #pragma once
 
+#include <cassert>
 #include <cmath>
+
+#include "cstone/cuda/annotation.hpp"
 
 #define CSTONE_FAST_MATH [[gnu::optimize("-ffast-math")]]
 
@@ -43,6 +46,18 @@ CSTONE_FAST_MATH constexpr float cos(float x)
 }
 
 CSTONE_FAST_MATH constexpr double cos(double x) { return std::cos(x); }
+
+CSTONE_FAST_MATH HOST_DEVICE_FUN HOST_DEVICE_INLINE void sincos(float x, float* sinx, float* cosx)
+{
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+    __sincosf(x, sinx, cosx);
+#else
+    ::sincosf(x, sinx, cosx);
+#endif
+}
+
+CSTONE_FAST_MATH HOST_DEVICE_FUN HOST_DEVICE_INLINE void sincos(double x, double* sinx, double* cosx)
+{ ::sincos(x, sinx, cosx); }
 
 CSTONE_FAST_MATH constexpr float rcp(float x)
 {

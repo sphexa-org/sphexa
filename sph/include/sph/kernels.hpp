@@ -106,8 +106,8 @@ HOST_DEVICE_FUN constexpr inline T wharmonic_derivative_std(T v)
 
     constexpr T piHalf = M_PI_2;
     const T     Pv     = piHalf * v;
-    const T     sinPv  = cstone::fastmath::sin(Pv);
-    const T     cosPv  = cstone::fastmath::cos(Pv);
+    T sinPv, cosPv;
+    cstone::fastmath::sincos(Pv, &sinPv, &cosPv);
     const T     invPv  = cstone::fastmath::rcp(Pv);
     const T     sincv  = sinPv * invPv;
 
