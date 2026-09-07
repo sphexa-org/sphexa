@@ -60,7 +60,7 @@ struct IADGradhInteraction
 
         T hiInv = cstone::fastmath::rcp(hi);
 
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
         T vloc = dist * hiInv;
         T w    = i == j ? 0 : wh(vloc);
 

@@ -56,7 +56,7 @@ struct DivVCurlVInteraction
         T rx   = r_ij[0];
         T ry   = r_ij[1];
         T rz   = r_ij[2];
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
 
         T vx_ji = vxj - vxi;
         T vy_ji = vyj - vyi;
@@ -108,7 +108,7 @@ struct DivVCurlVPostamble
         T divvi    = norm_kxi * (dVxi[0] + dVyi[1] + dVzi[2]);
 
         cstone::Vec3<T> curlV{dVzi[1] - dVyi[2], dVxi[2] - dVzi[0], dVyi[0] - dVxi[1]};
-        T               curlvi = norm_kxi * std::sqrt(norm2(curlV));
+        T               curlvi = norm_kxi * cstone::fastmath::sqrt(norm2(curlV));
 
         T dV11i = norm_kxi * dVxi[0];
         T dV12i = norm_kxi * (dVxi[1] + dVyi[0]);

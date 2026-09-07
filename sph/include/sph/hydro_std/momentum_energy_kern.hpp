@@ -34,7 +34,7 @@ struct MomentumAndEnergyInteractionStd
         T    hiInv3 = hiInv * hiInv * hiInv;
         auto mi_roi = mi / roi;
 
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
 
         T vx_ij = vxi - vxj;
         T vy_ij = vyi - vyj;

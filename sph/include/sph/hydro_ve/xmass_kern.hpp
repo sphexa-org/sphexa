@@ -53,7 +53,7 @@ struct XmassInteraction
 
         T hInv = cstone::fastmath::rcp(hi);
 
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
 
         T vloc = dist * hInv;
         T w    = wh(vloc);

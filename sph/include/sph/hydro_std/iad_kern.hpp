@@ -29,7 +29,7 @@ struct IADInteractionSTD
 
         T hiInv = cstone::fastmath::rcp(hi);
 
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
 
         // calculate the v as ratio between the distance and the smoothing length
         T vloc = dist * hiInv;

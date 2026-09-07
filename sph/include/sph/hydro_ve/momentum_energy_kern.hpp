@@ -89,7 +89,7 @@ struct MomentumAndEnergyInteraction
         T ry = r_ij[1];
         T rz = r_ij[2];
 
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
 
         T vx_ij = vxi - vxj;
         T vy_ij = vyi - vyj;

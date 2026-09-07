@@ -61,7 +61,7 @@ struct AVswitchesInteraction
         T hiInv  = cstone::fastmath::rcp(hi);
         T hiInv3 = hiInv * hiInv * hiInv;
 
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
 
         T vx_ij = vxi - vxj;
         T vy_ij = vyi - vyj;
@@ -102,7 +102,8 @@ struct AVswitchesPostamble
         auto [graddivv_x, graddivv_y, graddivv_z, vijsignalr_i]                                              = result;
         T vijsignal_i = std::max(vijsignalr_i, T(1e-40));
 
-        T graddivv = std::sqrt(graddivv_x * graddivv_x + graddivv_y * graddivv_y + graddivv_z * graddivv_z);
+        T graddivv =
+            cstone::fastmath::sqrt(graddivv_x * graddivv_x + graddivv_y * graddivv_y + graddivv_z * graddivv_z);
 
         T alphaloc = 0;
         if (divv_i < T(0))
