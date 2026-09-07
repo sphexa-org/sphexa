@@ -103,4 +103,15 @@ CSTONE_FAST_MATH constexpr float pow(float x, float y)
 
 CSTONE_FAST_MATH constexpr double pow(double x, double y) { return std::pow(x, y); }
 
+CSTONE_FAST_MATH constexpr float exp(float x)
+{
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+    return __expf(x);
+#else
+    return std::exp(x);
+#endif
+}
+
+CSTONE_FAST_MATH constexpr double exp(double x) { return std::exp(x); }
+
 } // namespace cstone::fastmath

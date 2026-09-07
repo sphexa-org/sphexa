@@ -51,7 +51,7 @@ HOST_DEVICE_FUN T avRvCorrection(util::array<Tc, 3> R, Tc eta_ab, T eta_crit, co
     if (eta_ab < eta_crit)
     {
         T etaDiff = T(5) * (eta_ab - eta_crit);
-        dmy3      = std::exp(-etaDiff * etaDiff);
+        dmy3      = cstone::fastmath::exp(-etaDiff * etaDiff);
     }
 
     T A_ab   = (dmy2 != T(0)) ? dmy1 / dmy2 : T(0);
