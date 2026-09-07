@@ -1,23 +1,9 @@
-
-set(VE_KERNELS
+sph_add_gpu_object(hydro_ve_gpu
+    SOURCES
         xmass_gpu.cu
         eos_gpu.cu
         ve_gpu.cu
         iad_divv_curlv_gradh_gpu.cu
         av_switches_gpu.cu
-        momentum_energy_gpu.cu)
-
-if(SPH_EXA_WITH_HIP)
-    set_source_files_properties(${VE_KERNELS} PROPERTIES LANGUAGE HIP)
-endif()
-
-if(SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP)
-    add_library(hydro_ve_gpu OBJECT ${VE_KERNELS})
-    target_include_directories(hydro_ve_gpu PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE_DIR}/include)
-    target_compile_definitions(hydro_ve_gpu PRIVATE USE_CUDA)
-endif()
-
-if (SPH_EXA_WITH_HIP)
-    target_link_libraries(hydro_ve_gpu PRIVATE roc::rocthrust hip::hipcub)
-endif ()
-
+        momentum_energy_gpu.cu
+    DEFINITIONS USE_CUDA)
