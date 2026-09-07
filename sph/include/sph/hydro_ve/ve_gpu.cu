@@ -44,7 +44,7 @@ namespace gpu
 template<class Dataset>
 void computeVe(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    veIjLoop(d.neighborhood, d.K, rawPtr(d.xm), rawPtr(d.wh), rawPtr(d.kx));
+    veIjLoop(d.neighborhood, d.K, rawPtr(d.xm), d.wh, rawPtr(d.kx));
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
