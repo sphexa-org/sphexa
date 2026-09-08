@@ -1,5 +1,7 @@
 #pragma once
 
+#include <type_traits>
+
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/findneighbors.hpp"
 #include "cstone/util/array.hpp"
@@ -102,7 +104,8 @@ HOST_DEVICE_FUN constexpr inline T wharmonic_std(T v)
 template<typename T>
 HOST_DEVICE_FUN constexpr inline T wharmonic_derivative_std(T v)
 {
-    if (v < T(0.1))
+    constexpr T cutoff = std::is_same_v<T, double> ? 0.02 : 0.25;
+    if (v < cutoff)
     {
         // Taylor expansion due to cancellation with small v
         constexpr T f1 = -0.82246703342411321824; // -pi^2 / 12
