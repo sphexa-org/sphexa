@@ -343,8 +343,11 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     const unsigned iSuperclusterIndex = blockIdx.x * NumSuperclustersPerBlock + threadIdx.z;
     if (iSuperclusterIndex >= numISuperclusters) return;
 
-    const auto [iSupercluster, iSuperclusterNeighborsCount, iSuperclusterDataIndex] =
+    auto [iSupercluster, iSuperclusterNeighborsCount, iSuperclusterDataIndex] =
         superclusterInfo[iSuperclusterIndex];
+    // Show NVCC that variables are warp-uniform. Inspired by https://gitlab.com/gromacs/gromacs/-/merge_requests/5715.
+    iSuperclusterNeighborsCount = shflSync(iSuperclusterNeighborsCount, 0);
+    iSuperclusterDataIndex = shflSync(iSuperclusterDataIndex, 0);
 
     using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq(x, y, z, h, ijData.input, firstBody));
     using InteractionResultType    = typename IjData::InteractionResultType;
