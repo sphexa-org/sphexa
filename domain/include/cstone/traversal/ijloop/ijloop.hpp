@@ -187,8 +187,8 @@ concept ValidPostamble = PairInteraction<Interaction, Tc, ThP, Input> && require
                                                                                   std::remove_pointer_t<ThP> r2)
 {
     {
-        postamble(i, unwrapModifiers(interaction(i, j, posdiff, r2)))        // must be callable with this signature
-        } -> std::same_as<typename detail::DereferencedTuple<Output>::type>; // must return this type
+        postamble(i, unwrapModifiers(interaction(i, j, posdiff, r2)))    // must be callable with this signature
+    } -> std::same_as<typename detail::DereferencedTuple<Output>::type>; // must return this type
 };
 
 /*! A dataset that can be passed to an ijLoop.
@@ -253,7 +253,9 @@ check(IjLoopData<Input, Output, Interaction, Postamble> const& unchecked)
 
 template<class LoopData, class Tc, class Th>
 concept ValidIjLoopData = requires(LoopData const& unchecked)
-{ check<Tc, Th>(unchecked); };
+{
+    check<Tc, Th>(unchecked);
+};
 
 namespace detail
 {
@@ -282,11 +284,14 @@ concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
                                                                   const float* h)
 {
     nb.build(exec, tree, box, totalBodies, groups, x, y, z, h);
-    {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h).stats()}->std::same_as<Statistics>;
-    {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
-         .ijLoop(IjLoopData<std::tuple<>, std::tuple<int*>, detail::ConceptTestInteraction>{
-             std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble})}
-        ->std::same_as<void>;
+    {
+        nb.build(exec, tree, box, totalBodies, groups, x, y, z, h).stats()
+    } -> std::same_as<Statistics>;
+    {
+        nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
+            .ijLoop(IjLoopData<std::tuple<>, std::tuple<int*>, detail::ConceptTestInteraction>{
+                std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble})
+    } -> std::same_as<void>;
 };
 
 } // namespace detail

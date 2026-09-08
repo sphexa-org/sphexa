@@ -105,7 +105,9 @@ struct GpuAlwaysTraverseNeighborhood
 
     template<ValidIjLoopData<Tc, ThP> IjData>
     void ijLoop(IjData const& data) const
-    { ijLoop(check<Tc, ThP>(data), groups); }
+    {
+        ijLoop(check<Tc, ThP>(data), groups);
+    }
 
     Statistics stats() const
     {
@@ -121,7 +123,9 @@ struct GpuAlwaysTraverseNeighborhood
 
         template<ValidIjLoopData<Tc, ThP> IjData>
         void ijLoop(IjData const& data) const
-        { parent.ijLoop(check<Tc, ThP>(data), groups); }
+        {
+            parent.ijLoop(check<Tc, ThP>(data), groups);
+        }
     };
 
     Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
