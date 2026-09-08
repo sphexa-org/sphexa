@@ -102,7 +102,17 @@ HOST_DEVICE_FUN constexpr inline T wharmonic_std(T v)
 template<typename T>
 HOST_DEVICE_FUN constexpr inline T wharmonic_derivative_std(T v)
 {
-    if (v == T(0)) return T(0);
+    if (v < T(0.1))
+    {
+        // Taylor expansion due to cancellation with small v
+        constexpr T f1 = -0.82246703342411321824; // -pi^2 / 12
+        constexpr T f3 = +0.20293560632083841091; // +pi^4 / 480
+        constexpr T f5 = -0.01788298351144539503; // -pi^6 / 53760
+        const T     v2 = v * v;
+        const T     v3 = v2 * v;
+        const T     v5 = v2 * v2 * v;
+        return f1 * v + f3 * v3 + f5 * v5;
+    }
 
     constexpr T piHalf = M_PI_2;
     const T     Pv     = piHalf * v;
