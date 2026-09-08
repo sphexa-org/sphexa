@@ -150,10 +150,11 @@ HOST_DEVICE_FUN void momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, Tc Kcour
     MomentumAndEnergyInteractionStd<T, Tm1, Kernel> interaction{wh};
     MomentumAndEnergyPostambleStd<Tc, Tm1>          postamble{K, Kcour};
 
-    const auto input  = std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33);
+    const auto input  = std::make_tuple(m, rho, const_cast<const cstone::LocalIndex*>(nc), vx, vy, vz, p, c, c11, c12,
+                                        c13, c22, c23, c33);
     const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc, dt);
 
-    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, cstone::ijloop::makeConst(input), i);
+    const auto iData  = cstone::ijloop::loadParticleData(x, y, z, h, input, i);
     const bool usePbc = cstone::ijloop::requiresPbcHandling(box, iData);
 
     auto result = interaction(iData, iData, cstone::Vec3<Tc>{0, 0, 0}, T(0));
@@ -161,7 +162,7 @@ HOST_DEVICE_FUN void momentumAndEnergyJLoop(cstone::LocalIndex i, Tc K, Tc Kcour
     {
         cstone::LocalIndex j = neighbors[stride * pj];
 
-        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, cstone::ijloop::makeConst(input), j);
+        const auto jData = cstone::ijloop::loadParticleData(x, y, z, h, input, j);
 
         const auto [r_ij, r2] = cstone::ijloop::posDiffAndDistSq(usePbc, box, iData, jData);
 

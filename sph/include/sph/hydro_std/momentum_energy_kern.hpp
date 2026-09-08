@@ -130,7 +130,7 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, c
     std::visit(
         [&]<class Kernel>(Kernel wh)
         {
-            neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+            neighborhood.ijLoop(cstone::ijloop::IjLoopData(
                 std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
                 std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc, dt),
                 MomentumAndEnergyInteractionStd<T, Tm1, Kernel>{wh}, MomentumAndEnergyPostambleStd<Tc, Tm1>{K, Kcour}));

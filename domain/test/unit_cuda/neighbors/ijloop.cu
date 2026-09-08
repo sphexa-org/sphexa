@@ -63,7 +63,8 @@ struct PostambleFun
 
 auto makeIjLoopData(const auto& input, const auto& output)
 {
-    return ijloop::makeIjLoopData<double, double*>(input, output, NeighborFun{}, PostambleFun{});
+    return ijloop::IjLoopData{
+        .input = input, .output = output, .interaction = NeighborFun{}, .postamble = PostambleFun{}};
 }
 
 using Result = std::tuple<thrust::universal_vector<LocalIndex>,   // iSum

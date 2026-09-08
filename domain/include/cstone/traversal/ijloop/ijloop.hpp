@@ -206,7 +206,7 @@ template<std::floating_point Tc,
          TupleOfPointers Output,
          PairInteraction<Tc, ThP, Input> Interaction,
          ValidPostamble<Interaction, Tc, ThP, Input, Output> Postamble = detail::EmptyPostamble>
-struct IjLoopData
+struct CheckedIjLoopData
 {
     //! @brief The tuple input data for a single particle in an i-j interaction,
     using ParticleDataType = ParticleData<Tc, ThP, Input>;
@@ -232,14 +232,28 @@ struct IjLoopData
     Postamble postamble;
 };
 
-//! @brief Convenience factory to construct an @p IjLoopData with explicit Tc and ThP and deduced tuple/functor types.
-template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble>
-auto makeIjLoopData(const Input& in, const Output& out, const Interaction& interaction, const Postamble& postamble)
+template<class Input, class Output, class Interaction, class Postamble = detail::EmptyPostamble>
+struct IjLoopData
 {
-    auto constInput = makeConst(in);
-    return IjLoopData<Tc, ThP, std::decay_t<decltype(constInput)>, std::decay_t<Output>, std::decay_t<Interaction>,
-                      std::decay_t<Postamble>>{constInput, out, interaction, postamble};
+    Input input;
+    Output output;
+    Interaction interaction;
+    Postamble postamble = empty_postamble;
+};
+
+template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble>
+CheckedIjLoopData<Tc, ThP, decltype(makeConst(std::declval<Input>())), Output, Interaction, Postamble>
+check(IjLoopData<Input, Output, Interaction, Postamble> const& unchecked)
+{
+    return {.input       = makeConst(unchecked.input),
+            .output      = unchecked.output,
+            .interaction = unchecked.interaction,
+            .postamble   = unchecked.postamble};
 }
+
+template<class LoopData, class Tc, class Th>
+concept ValidIjLoopData = requires(LoopData const& unchecked)
+{ check<Tc, Th>(unchecked); };
 
 namespace detail
 {
@@ -268,14 +282,11 @@ concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
                                                                   const float* h)
 {
     nb.build(exec, tree, box, totalBodies, groups, x, y, z, h);
-    {
-        nb.build(exec, tree, box, totalBodies, groups, x, y, z, h).stats()
-    } -> std::same_as<Statistics>;
-    {
-        nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
-            .ijLoop(IjLoopData<double, float*, std::tuple<>, std::tuple<int*>, detail::ConceptTestInteraction>{
-                std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble})
-    } -> std::same_as<void>;
+    {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h).stats()}->std::same_as<Statistics>;
+    {nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
+         .ijLoop(IjLoopData<std::tuple<>, std::tuple<int*>, detail::ConceptTestInteraction>{
+             std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble})}
+        ->std::same_as<void>;
 };
 
 } // namespace detail
