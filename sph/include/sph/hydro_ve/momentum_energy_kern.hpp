@@ -41,8 +41,8 @@ namespace sph
 {
 
 template<class Tc, class T>
-HOST_DEVICE_FUN T avRvCorrection(util::array<Tc, 3> R, Tc eta_ab, T eta_crit, const util::array<T, 6>& gradV_i,
-                                 const util::array<const T, 6>& gradV_j)
+HOST_DEVICE_FUN T avRvCorrection(util::array<Tc, 3> R, Tc eta_ab, T eta_crit, T balsi, T balsj,
+                                  const util::array<T, 6>& gradV_i, const util::array<const T, 6>& gradV_j)
 {
     T dmy1 = dot(R, symv(gradV_i, R));
     T dmy2 = dot(R, symv(gradV_j, R));
@@ -57,25 +57,25 @@ HOST_DEVICE_FUN T avRvCorrection(util::array<Tc, 3> R, Tc eta_ab, T eta_crit, co
     T A_abp1 = T(1) + A_ab;
     T phi_ab = T(0.5) * dmy3 * stl::max(T(0), stl::min(T(1), T(4) * A_ab / (A_abp1 * A_abp1)));
 
-    // additive AV correction to rv = dot(R, Vij)
-    T rv_AV = -phi_ab * (dmy1 + dmy2);
-    return rv_AV;
+    // additive SLR correction to rv = dot(R, Vij), including Balsara terms
+    T rvSLR = -phi_ab * (balsi * dmy1 + balsj * dmy2);
+    return rvSLR;
 }
 
-template<bool AvClean, class T, class Kernel>
+template<bool SLR, class T, class Kernel>
 struct MomentumAndEnergyInteraction
 {
     Kernel wh;
-    T      Atmin, Atmax, ramp;
+    T      Atmin, Atmax, ramp, avFloor;
 
     template<class ParticleData, class Tc>
     constexpr auto operator()(const ParticleData& iData, const ParticleData& jData, cstone::Vec3<Tc> const& r_ij,
                               T r2) const
     {
         const auto [i, iPos, hi, vxi, vyi, vzi, mi, ci, kxi, alpha_i, xmassi, prhoi, c11i, c12i, c13i, c22i, c23i, c33i,
-                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi] = iData;
+                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi, curlvi] = iData;
         const auto [j, jPos, hj, vxj, vyj, vzj, mj, cj, kxj, alpha_j, xmassj, prhoj, c11j, c12j, c13j, c22j, c23j, c33j,
-                    ncj, dV11j, dV12j, dV13j, dV22j, dV23j, dV33j, tdpdTrhoj] = jData;
+                    ncj, dV11j, dV12j, dV13j, dV22j, dV23j, dV33j, tdpdTrhoj, curlvj] = jData;
 
         auto rhoi = kxi * mi / xmassi;
 
@@ -113,18 +113,32 @@ struct MomentumAndEnergyInteraction
 
         auto rhoj = kxj * mj / xmassj;
 
-        T rv = rx * vx_ij + ry * vy_ij + rz * vz_ij;
-        if constexpr (AvClean)
+        T rv_slr = rx * vx_ij + ry * vy_ij + rz * vz_ij;
+        T Lij    = T(1);
+
+        if constexpr (SLR)
         {
-            rv += avRvCorrection({rx, ry, rz}, stl::min(v1, v2), eta_crit, {dV11i, dV12i, dV13i, dV22i, dV23i, dV33i},
-                                 {dV11j, dV12j, dV13j, dV22j, dV23j, dV33j});
+            T eps_i   = T(1e-4) * ci * hiInv;
+            T eps_j   = T(1e-4) * cj * hjInv;
+            T divvi   = std::abs(dV11i + dV22i + dV33i);
+            T divvj   = std::abs(dV11j + dV22j + dV33j);
+            T denom_i = divvi + std::abs(curlvi) + eps_i;
+            T denom_j = divvj + std::abs(curlvj) + eps_j;
+            T f_i     = divvi / denom_i;
+            T f_j     = divvj / denom_j;
+            Lij       = stl::max(avFloor, T(0.5) * (f_i + f_j));
+            T balsi   = T(1) - f_i * f_i;
+            T balsj   = T(1) - f_j * f_j;
+            rv_slr +=
+                avRvCorrection({rx, ry, rz}, stl::min(v1, v2), eta_crit, balsi, balsj,
+                               {dV11i, dV12i, dV13i, dV22i, dV23i, dV33i}, {dV11j, dV12j, dV13j, dV22j, dV23j, dV33j});
         }
 
-        T wij          = i == j ? 0 : rv / dist;
-        T viscosity_ij = artificial_viscosity(alpha_i, alpha_j, ci, cj, wij);
+        T wij_slr      = i == j ? 0 : rv_slr / dist;
+        T viscosity_ij = artificial_viscosity(alpha_i, alpha_j, ci, cj, wij_slr, wij_slr, Lij);
 
         // For time-step calculations
-        T vijsignal = i == j ? 0 : T(0.5) * (ci + cj) - T(2) * wij;
+        T vijsignal = i == j ? 0 : T(0.5) * (ci + cj) - T(2) * wij_slr;
 
         T a_mom, b_mom;
         T Atwood = (std::abs(rhoi - rhoj)) / (rhoi + rhoj);
@@ -174,10 +188,10 @@ struct MomentumAndEnergyPostamble
     constexpr auto operator()(const ParticleData& iData, const Result& result) const
     {
         const auto [i, iPos, hi, vxi, vyi, vzi, mi, ci, kxi, alpha_i, xmassi, prhoi, c11i, c12i, c13i, c22i, c23i, c33i,
-                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi]        = iData;
-        auto [a_visc_energy, energy, momentum_x, momentum_y, momentum_z, maxvsignal] = result;
-        a_visc_energy                                                                = stl::max(T(0), a_visc_energy);
-        T eCoeff                                                                     = UseTdpdTrho ? tdpdTrhoi : prhoi;
+                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi, curlvi] = iData;
+        auto [a_visc_energy, energy, momentum_x, momentum_y, momentum_z, maxvsignal]  = result;
+        a_visc_energy                                                                 = stl::max(T(0), a_visc_energy);
+        T eCoeff                                                                      = UseTdpdTrho ? tdpdTrhoi : prhoi;
         T dui = K * (eCoeff * energy + T(0.5) * a_visc_energy); // factor of 2 already removed from 2P/rho
         if (nci <= 1)
         {
@@ -207,25 +221,27 @@ struct MomentumAndEnergyPostambleWithDt : MomentumAndEnergyPostamble<UseTdpdTrho
         const auto [du, grad_P_x, grad_P_y, grad_P_z, maxvsignal] =
             MomentumAndEnergyPostamble<UseTdpdTrho, T, Tc>::operator()(iData, result);
         const auto [i, iPos, hi, vxi, vyi, vzi, mi, ci, kxi, alpha_i, xmassi, prhoi, c11i, c12i, c13i, c22i, c23i, c33i,
-                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi] = iData;
+                    nci, dV11i, dV12i, dV13i, dV22i, dV23i, dV33i, tdpdTrhoi, curlvi] = iData;
 
         auto dt = tsKCourant(maxvsignal, hi, ci, Kcour);
         return std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
     }
 };
 
-template<bool AvClean, class Neighborhood, class Tc, class T, class Tm, class Tm1>
+template<bool SLR, class Neighborhood, class Tc, class T, class Tm, class Tm1>
 void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T Atmin, T Atmax, T ramp, const T* vx,
                              const T* vy, const T* vz, const Tm* m, const T* c, const T* kx, const T* alpha,
                              const T* xm, const T* prho, const T* c11, const T* c12, const T* c13, const T* c22,
                              const T* c23, const T* c33, const unsigned* nc, const T* dV11, const T* dV12,
-                             const T* dV13, const T* dV22, const T* dV23, const T* dV33, const T* tdpdTrho,
-                             KernelVariant<T> const& wh, Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z, T* dt)
+                              const T* dV13, const T* dV22, const T* dV23, const T* dV33, const T* tdpdTrho,
+                              KernelVariant<T> const& wh, T avFloor, Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z,
+                              const T* curlv, T* dt)
 {
-    if constexpr (!AvClean) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
-    const auto input =
-        std::make_tuple(vx, vy, vz, m, c, kx, alpha, xm, prho, c11, c12, c13, c22, c23, c33, nc, dV11, dV12, dV13, dV22,
-                        dV23, dV33, tdpdTrho ? tdpdTrho : vx /* pass random derefable array if tdpdTrho is null */);
+    if constexpr (!SLR) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
+    const auto input = std::make_tuple(
+        vx, vy, vz, m, c, kx, alpha, xm, prho, c11, c12, c13, c22, c23, c33, nc, dV11, dV12, dV13, dV22, dV23, dV33,
+        tdpdTrho ? tdpdTrho : vx /* pass random derefable array if tdpdTrho is null */, curlv);
+
     const auto output = std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, dt);
     std::visit(
         [&]<class Kernel>(Kernel wh)
@@ -233,13 +249,13 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T
             if (tdpdTrho)
             {
                 neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
-                    input, output, MomentumAndEnergyInteraction<AvClean, T, Kernel>{wh, Atmin, Atmax, ramp},
+                    input, output, MomentumAndEnergyInteraction<SLR, T, Kernel>{wh, Atmin, Atmax, ramp, avFloor},
                     MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour}));
             }
             else
             {
                 neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
-                    input, output, MomentumAndEnergyInteraction<AvClean, T, Kernel>{wh, Atmin, Atmax, ramp},
+                    input, output, MomentumAndEnergyInteraction<SLR, T, Kernel>{wh, Atmin, Atmax, ramp, avFloor},
                     MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour}));
             }
         },

@@ -41,12 +41,16 @@ namespace sphexa
 
 template<class DomainType, class ParticleDataType>
 std::unique_ptr<Propagator<DomainType, ParticleDataType>>
-propagatorFactory(const std::string& choice, bool avClean, std::ostream& output, size_t rank, const InitSettings& s)
+propagatorFactory(const std::string& choice, bool SLR, bool AVswitches, std::ostream& output, size_t rank,
+                  const InitSettings& s)
 {
-    if (choice == "ve") { return PropLib<DomainType, ParticleDataType>::makeHydroVeProp(output, rank, avClean); }
+    if (choice == "ve")
+    {
+        return PropLib<DomainType, ParticleDataType>::makeHydroVeProp(output, rank, SLR, AVswitches);
+    }
     if (choice == "ve-bdt")
     {
-        return PropLib<DomainType, ParticleDataType>::makeHydroVeBdtProp(output, rank, s, avClean);
+        return PropLib<DomainType, ParticleDataType>::makeHydroVeBdtProp(output, rank, s, SLR, AVswitches);
     }
     if (choice == "std") { return PropLib<DomainType, ParticleDataType>::makeHydroProp(output, rank); }
 #ifdef SPH_EXA_HAVE_GRACKLE
@@ -58,11 +62,11 @@ propagatorFactory(const std::string& choice, bool avClean, std::ostream& output,
     if (choice == "nbody") { return PropLib<DomainType, ParticleDataType>::makeNbodyProp(output, rank); }
     if (choice == "turbulence")
     {
-        return PropLib<DomainType, ParticleDataType>::makeTurbVeBdtProp(output, rank, s, avClean);
+        return PropLib<DomainType, ParticleDataType>::makeTurbVeBdtProp(output, rank, s, SLR, AVswitches);
     }
     if (choice == "turbulence-ve")
     {
-        return PropLib<DomainType, ParticleDataType>::makeTurbVeProp(output, rank, s, avClean);
+        return PropLib<DomainType, ParticleDataType>::makeTurbVeProp(output, rank, s, SLR, AVswitches);
     }
 #ifdef SPH_EXA_HAVE_DISKS
     if (choice == "std-disk") { return PropLib<DomainType, ParticleDataType>::makeDiskProp(output, rank, s); }

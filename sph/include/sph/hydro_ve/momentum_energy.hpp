@@ -37,18 +37,18 @@
 namespace sph
 {
 
-template<bool avClean, class T, class Dataset>
+template<bool SLR, class T, class Dataset>
 void computeMomentumEnergy(const GroupView& groups, float* groupDt, Dataset& d, const cstone::Box<T>& box)
 {
-    if constexpr (d.useGpu) { gpu::computeMomentumEnergy<avClean>(groups, groupDt, d, box); }
+    if constexpr (d.useGpu) { gpu::computeMomentumEnergy<SLR>(groups, groupDt, d, box); }
     else
     {
-        momentumAndEnergyIjLoop<avClean>(
+        momentumAndEnergyIjLoop<SLR>(
             d.neighborhood, d.K, d.Kcour, d.Atmin, d.Atmax, d.ramp, d.vx.data(), d.vy.data(), d.vz.data(), d.m.data(),
             d.c.data(), d.kx.data(), d.alpha.data(), d.xm.data(), d.prho.data(), d.c11.data(), d.c12.data(),
             d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data(), d.nc.data(), d.dV11.data(), d.dV12.data(),
-            d.dV13.data(), d.dV22.data(), d.dV23.data(), d.dV33.data(), d.tdpdTrho.data(), d.wh, d.du.data(),
-            d.ax.data(), d.ay.data(), d.az.data(), d.dtCourant.data());
+            d.dV13.data(), d.dV22.data(), d.dV23.data(), d.dV33.data(), d.tdpdTrho.data(), d.wh, d.avFloor,
+            d.du.data(), d.ax.data(), d.ay.data(), d.az.data(), d.curlv.data(), d.dtCourant.data());
 
         auto minDt = std::numeric_limits<typename Dataset::HydroType>::infinity();
 #pragma omp parallel for reduction(min : minDt)

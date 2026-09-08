@@ -49,18 +49,18 @@ namespace sphexa
 
 using namespace sph;
 
-template<bool avClean, class DomainType, class DataType>
-class TurbVeProp final : public HydroVeProp<avClean, DomainType, DataType>
+template<bool SLR, class DomainType, class DataType>
+class TurbVeProp final : public HydroVeProp<SLR, DomainType, DataType>
 {
-    using Base = HydroVeProp<avClean, DomainType, DataType>;
+    using Base = HydroVeProp<SLR, DomainType, DataType>;
     using Base::rank_;
     using Base::timer;
 
     sph::TurbulenceData<typename DataType::RealType, typename DataType::Exec> turbulenceData;
 
 public:
-    TurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings)
-        : Base(output, rank)
+    TurbVeProp(std::ostream& output, size_t rank, const InitSettings& settings, bool AVswitches)
+        : Base(output, rank, AVswitches)
         , turbulenceData(settings, rank == 0)
     {
     }

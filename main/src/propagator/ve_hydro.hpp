@@ -45,7 +45,7 @@ namespace sphexa
 using namespace sph;
 using util::FieldList;
 
-template<bool avClean, class DomainType, class DataType>
+template<bool SLR, class DomainType, class DataType>
 class HydroVeProp : public Propagator<DomainType, DataType>
 {
 protected:
@@ -65,6 +65,7 @@ protected:
 
     MHolder_t      mHolder_;
     GroupData<Acc> groups_;
+    bool           AVswitches_;
 
     /*! @brief the list of conserved particles fields with values preserved between iterations
      *
@@ -73,21 +74,17 @@ protected:
     using ConservedFields = FieldList<"temp", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "alpha", "id">;
 
     //! @brief list of dependent fields, these may be used as scratch space during domain sync
-    using DependentFields_ = FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33",
-                                       "xm", "kx", "nc", "dtCourant">;
-
-    //! @brief velocity gradient fields will only be allocated when avClean is true
-    using GradVFields = FieldList<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
-
-    //! @brief what will be allocated based AV cleaning choice
     using DependentFields =
-        std::conditional_t<avClean, decltype(DependentFields_{} + GradVFields{}), decltype(DependentFields_{})>;
+        FieldList<"ax", "ay", "az", "prho", "c", "du", "c11", "c12", "c13", "c22", "c23", "c33", "xm", "kx", "nc",
+                  "dtCourant", "curlv", "dV11", "dV12", "dV13", "dV22", "dV23", "dV33">;
 
 public:
-    HydroVeProp(std::ostream& output, size_t rank)
+    HydroVeProp(std::ostream& output, size_t rank, bool AVswitches)
         : Base(output, rank)
+        , AVswitches_(AVswitches)
     {
-        if (avClean && rank == 0) { std::cout << "AV cleaning is activated" << std::endl; }
+        if (SLR && rank == 0) { std::cout << "SLR is activated" << std::endl; }
+        if (AVswitches_ && rank == 0) { std::cout << "AV switches are activated" << std::endl; }
     }
 
     std::vector<std::string> conservedFields() const override
@@ -165,14 +162,17 @@ public:
         computeEOS(first, last, d);
         timer.step("EquationOfState");
 
-        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "divv", "c">(d), get<"ax">(d),
+        domain.exchangeHalos(get<"c11", "c12", "c13", "c22", "c23", "c33", "curlv", "c">(d), get<"ax">(d),
                              get<"keys">(d));
         timer.step("mpi::synchronizeHalos");
 
-        computeAVswitches(d, domain.box());
-        timer.step("AVswitches");
+        if (AVswitches_)
+        {
+            computeAVswitches(d, domain.box());
+            timer.step("AVswitches");
+        }
 
-        if (avClean)
+        if (SLR)
         {
             domain.exchangeHalos(get<"dV11", "dV12", "dV13", "dV22", "dV23", "dV33", "prho", "alpha">(d), get<"ax">(d),
                                  get<"keys">(d));
@@ -182,7 +182,7 @@ public:
 
         release(d, "divv", "gradh");
         acquire(d, "ay", "az");
-        computeMomentumEnergy<avClean>(groups_.view(), nullptr, d, domain.box());
+        computeMomentumEnergy<SLR>(groups_.view(), nullptr, d, domain.box());
         timer.step("MomentumAndEnergy");
         pmReader.step();
 
@@ -260,14 +260,14 @@ public:
         release(d, "rho", "p", "gradh");
         acquire(d, "c11", "c12", "c13");
 
-        // third output pass: recover temporary curlv and divv quantities
-        release(d, "prho", "c");
-        acquire(d, "divv", "curlv");
-        // partial recovery of cij in range [first:last] without halos, which are not needed for divv and curlv
+        // third output pass: recover temporary divv
+        release(d, "prho");
+        acquire(d, "divv");
+        // partial recovery of cij in range [first:last] without halos, which are not needed for divv
         if (!indicesDone.empty()) { computeIadDivvCurlvGradh(d, box); }
         output();
-        release(d, "divv", "curlv");
-        acquire(d, "prho", "c");
+        release(d, "divv");
+        acquire(d, "prho");
 
         /* The following data is now lost and no longer available in the integration step
          *  c11, c12, c12: halos invalidated

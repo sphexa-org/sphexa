@@ -131,7 +131,7 @@ void initWindShockFields(Dataset& d, const std::map<std::string, double>& consta
     cstone::scale(d.exec, d.vy.data(), d.vy.data() + d.vy.size(), d.y_m1.data(), constants.at("minDt"));
     cstone::scale(d.exec, d.vz.data(), d.vz.data() + d.vz.size(), d.z_m1.data(), constants.at("minDt"));
 
-    if (d.u.empty())
+    if (d.u.empty()) //if there is no u ASSUMES that temp is allocated so it divides by cv
     {
         std::for_each(u.begin(), u.end(), [cvm1 = 1.0 / cv](auto& t) { t *= cvm1; });
         d.temp = std::move(u);
