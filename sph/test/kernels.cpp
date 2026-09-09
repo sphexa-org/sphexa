@@ -42,24 +42,10 @@ using float128 = _Float128;
 
 constexpr float128 pi128 = 3.1415926535897932384626433832795028841971693993751f128;
 
-#ifdef __aarch64__
-#include <cmath>
-
 inline float128 fabs128(float128 x) { return fabsf128(x); }
 inline float128 sin128(float128 x) { return sinf128(x); }
 inline float128 cos128(float128 x) { return cosf128(x); }
 inline float128 pow128(float128 x, float128 y) { return powf128(x, y); }
-
-#elif defined(HAVE_QUADMATH)
-#include <quadmath.h>
-
-inline float128 fabs128(float128 x) { return fabsq(x); }
-inline float128 sin128(float128 x) { return sinq(x); }
-inline float128 cos128(float128 x) { return cosq(x); }
-inline float128 pow128(float128 x, float128 y) { return powq(x, y); }
-#endif
-
-#if defined(__aarch64__) || defined(HAVE_QUADMATH)
 
 template<class T, class FRef, class F>
 void checkErrors(FRef fRef, F f, double absTol, double relTol)
@@ -101,5 +87,3 @@ TEST(Kernels, WharmonicDerivativeStd)
     checkErrors<double>(fRef, f, 1e-14, 1e-9);
     checkErrors<float>(fRef, f, 1e-7, 1e-5);
 }
-
-#endif
