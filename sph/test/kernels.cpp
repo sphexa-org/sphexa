@@ -29,11 +29,7 @@
  * @author Felix Thaler <thaler@cscs.ch>
  */
 
-#ifdef HAVE_QUADMATH
-
 #include <cmath>
-
-#include <quadmath.h>
 
 #include "gtest/gtest.h"
 
@@ -42,27 +38,48 @@
 using namespace cstone;
 using namespace sph;
 
-using reffloat_t = _Float128;
+using float128 = _Float128;
+
+constexpr float128 pi128 = 3.1415926535897932384626433832795028841971693993751f128;
+
+#ifdef __aarch64__
+#include <cmath>
+
+inline float128 fabs128(float128 x) { return fabsf128(x); }
+inline float128 sin128(float128 x) { return sinf128(x); }
+inline float128 cos128(float128 x) { return cosf128(x); }
+inline float128 pow128(float128 x, float128 y) { return powf128(x, y); }
+
+#elif defined(HAVE_QUADMATH)
+#include <quadmath.h>
+
+inline float128 fabs128(float128 x) { return fabsq(x); }
+inline float128 sin128(float128 x) { return sinq(x); }
+inline float128 cos128(float128 x) { return cosq(x); }
+inline float128 pow128(float128 x, float128 y) { return powq(x, y); }
+#endif
+
+#if defined(__aarch64__) || defined(HAVE_QUADMATH)
 
 template<class T, class FRef, class F>
 void checkErrors(FRef fRef, F f, double absTol, double relTol)
 {
-    constexpr reffloat_t startExp  = -40;
-    constexpr reffloat_t endExp    = 2;
-    constexpr int        n         = 1000;
-    double               maxAbsErr = 0;
-    double               maxRelErr = 0;
+    constexpr float128 startExp  = -40;
+    constexpr float128 endExp    = 2;
+    constexpr int      n         = 1000;
+    double             maxAbsErr = 0;
+    double             maxRelErr = 0;
     for (int i = 0; i < n; ++i)
     {
-        const reffloat_t x = powq(reffloat_t(2), startExp + (endExp - startExp) * i / n);
+        const float128 x = pow128(float128(2), startExp + (endExp - startExp) * i / n);
 
-        const reffloat_t yRef = fRef(x);
-        const T          y    = f(T(x));
+        const float128 yRef = fRef(x);
+        const T        y    = f(T(x));
 
-        const reffloat_t absErr = fabsq(reffloat_t(y) - yRef);
-        const reffloat_t relErr = absErr / fabsq(yRef);
-        maxAbsErr               = std::max(maxAbsErr, double(absErr));
-        maxRelErr               = std::max(maxRelErr, double(relErr));
+        const float128 absErr = fabs128(float128(y) - yRef);
+        const float128 relErr = absErr / fabs128(yRef);
+        maxAbsErr             = std::max(maxAbsErr, double(absErr));
+        maxRelErr             = std::max(maxRelErr, double(relErr));
     }
     EXPECT_LE(maxAbsErr, absTol);
     EXPECT_LE(maxRelErr, relTol);
@@ -70,7 +87,7 @@ void checkErrors(FRef fRef, F f, double absTol, double relTol)
 
 TEST(Kernels, WharmonicStd)
 {
-    const auto fRef = [](reffloat_t x) { return sinq(x * M_PI_2q) / (x * M_PI_2q); };
+    const auto fRef = [](float128 x) { return sin128(x * pi128 / 2) / (x * pi128 / 2); };
     const auto f    = [](auto x) { return wharmonic_std(x); };
     checkErrors<double>(fRef, f, 1e-15, 1e-14);
     checkErrors<float>(fRef, f, 1e-6, 1e-4);
@@ -78,8 +95,9 @@ TEST(Kernels, WharmonicStd)
 
 TEST(Kernels, WharmonicDerivativeStd)
 {
-    const auto fRef = [](reffloat_t x) { return cosq(x * M_PI_2q) / x - 2 * sinq(x * M_PI_2q) / (M_PIq * x * x); };
-    const auto f    = [](double x) { return wharmonic_derivative_std(x); };
+    const auto fRef = [](float128 x)
+    { return cos128(x * pi128 / 2) / x - 2 * sin128(x * pi128 / 2) / (pi128 * x * x); };
+    const auto f = [](double x) { return wharmonic_derivative_std(x); };
     checkErrors<double>(fRef, f, 1e-14, 1e-9);
     checkErrors<float>(fRef, f, 1e-7, 1e-5);
 }
