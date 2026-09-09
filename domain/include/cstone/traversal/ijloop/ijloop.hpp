@@ -248,6 +248,7 @@ struct CheckedIjLoopData
     Postamble postamble;
 };
 
+//! Converts unchecked loop data to fully typed and checked data, i.e., applies all concept checks.
 template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble>
 CheckedIjLoopData<Tc, ThP, decltype(makeConst(std::declval<Input>())), Output, Interaction, Postamble>
 check(IjLoopData<Input, Output, Interaction, Postamble> const& unchecked)
