@@ -77,7 +77,8 @@ struct ReductionFun
 
 auto makeIjLoopData(const auto& input, const auto& output)
 {
-    return ijloop::makeIjLoopData<double, double*>(input, output, NeighborFun{}, PostambleFun{});
+    return ijloop::IjLoopData{
+        .input = input, .output = output, .interaction = NeighborFun{}, .postamble = PostambleFun{}};
 }
 
 using Result = std::tuple<thrust::universal_vector<LocalIndex>,   // iSum
@@ -446,7 +447,11 @@ TYPED_TEST(IjLoopTest, IjLoop)
         auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
         ReductionResult reductionResult = nb.ijLoop(
-            ijloop::makeIjLoopData<double, double*>(input, output, NeighborFun{}, PostambleFun{}, ReductionFun{}));
+            ijloop::IjLoopData{.input       = input,
+               .output      = output,
+               .interaction = NeighborFun{},
+               .postamble   = PostambleFun{},
+               .reduction   = ReductionFun{}});
         stream.sync();
 
         auto reference = this->reference(this->groupView());
@@ -502,7 +507,11 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
         auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
         ReductionResult reductionResult = nb.ijLoop(
-            ijloop::makeIjLoopData<double, double*>(input, output, NeighborFun{}, PostambleFun{}, ReductionFun{}));
+            ijloop::IjLoopData{.input       = input,
+               .output      = output,
+               .interaction = NeighborFun{},
+               .postamble   = PostambleFun{},
+               .reduction   = ReductionFun{}});
         stream.sync();
 
         auto reference = this->reference(this->groupView());
@@ -512,7 +521,11 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
             h *= searchExtFactor;
 
         reductionResult = nb.ijLoop(
-            ijloop::makeIjLoopData<double, double*>(input, output, NeighborFun{}, PostambleFun{}, ReductionFun{}));
+            ijloop::IjLoopData{.input       = input,
+               .output      = output,
+               .interaction = NeighborFun{},
+               .postamble   = PostambleFun{},
+               .reduction   = ReductionFun{}});
         stream.sync();
 
         reference = this->reference(this->groupView());
@@ -557,7 +570,11 @@ TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
             auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
             ReductionResult reductionResult = subgroupNb.ijLoop(
-                ijloop::makeIjLoopData<double, double*>(input, output, NeighborFun{}, PostambleFun{}, ReductionFun{}));
+                ijloop::IjLoopData{.input       = input,
+                   .output      = output,
+                   .interaction = NeighborFun{},
+                   .postamble   = PostambleFun{},
+                   .reduction   = ReductionFun{}});
             stream.sync();
 
             auto reference = this->reference(this->subgroupView());

@@ -39,21 +39,23 @@ inline unsigned numBlocks()
     return GpuConfig::smCount * (numWarpsPerSm / (numThreads / GpuConfig::warpSize));
 }
 
-template<bool UsePbc, class Tc, class ThP, class KeyType, class IjData>
-__global__ __launch_bounds__(numThreads) void runIjLoop(
-    const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
-    const Box<Tc> __grid_constant__ box,
-    const GroupView groups,
-    const Tc* __restrict__ x,
-    const Tc* __restrict__ y,
-    const Tc* __restrict__ z,
-    const ThP h,
-    const IjData ijData,
-    typename IjData::UnwrappedReductionResultType* __restrict__ globalReductionResult,
-    const unsigned ngmax,
-    LocalIndex* __restrict__ neighbors,
-    LocalIndex* __restrict__ targetCounter)
+template<bool UsePbc, class Tc, class ThP, class KeyType, class... Ts>
+__global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
+                                                        const Box<Tc> __grid_constant__ box,
+                                                        const GroupView groups,
+                                                        const Tc* __restrict__ x,
+                                                        const Tc* __restrict__ y,
+                                                        const Tc* __restrict__ z,
+                                                        const ThP h,
+                                                        const CheckedIjLoopData<Tc, ThP, Ts...> ijData,
+                                                        typename CheckedIjLoopData<Tc, ThP,
+                                                                                   Ts...>::UnwrappedReductionResultType*
+                                                            __restrict__ globalReductionResult,
+                                                        const unsigned ngmax,
+                                                        LocalIndex* __restrict__ neighbors,
+                                                        LocalIndex* __restrict__ targetCounter)
 {
+    using IjData                  = CheckedIjLoopData<Tc, ThP, Ts...>;
     const unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     const unsigned warpIdxGrid = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
     LocalIndex targetIdx       = 0;
@@ -78,13 +80,13 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(
         {
             const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, threadNeighbors), ngmax);
 
-            const auto iData  = loadParticleData(x, y, z, h, makeConst(ijData.input), i);
+            const auto iData  = loadParticleData(x, y, z, h, ijData.input, i);
             const bool usePbc = UsePbc && requiresPbcHandling(box, iData);
             auto result       = ijData.interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
             for (unsigned nb = 0; nb < nbs; ++nb)
             {
                 const LocalIndex j = threadNeighbors[nb];
-                const auto jData   = loadParticleData(x, y, z, h, makeConst(ijData.input), j);
+                const auto jData   = loadParticleData(x, y, z, h, ijData.input, j);
 
                 const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 
@@ -115,10 +117,10 @@ struct GpuAlwaysTraverseNeighborhood
     util::UniqueDevicePtr<LocalIndex[]> neighbors;
     util::UniqueDevicePtr<LocalIndex> targetCounter;
 
-    template<class... Ts>
-    auto ijLoop(const IjLoopData<Ts...>& ijData) const
+    template<ValidIjLoopData<Tc, ThP> IjData>
+    auto ijLoop(IjData const& data) const
     {
-        return ijLoop(ijData, groups);
+        return ijLoop(check<Tc, ThP>(data), groups);
     }
 
     Statistics stats() const
@@ -133,10 +135,10 @@ struct GpuAlwaysTraverseNeighborhood
         GpuAlwaysTraverseNeighborhood const& parent;
         GroupView groups;
 
-        template<class... Ts>
-        auto ijLoop(const IjLoopData<Ts...>& ijData) const
+        template<ValidIjLoopData<Tc, ThP> IjData>
+        auto ijLoop(IjData const& data) const
         {
-            return parent.ijLoop(ijData, groups);
+            return parent.ijLoop(check<Tc, ThP>(data), groups);
         }
     };
 
@@ -144,17 +146,17 @@ struct GpuAlwaysTraverseNeighborhood
 
 protected:
     template<class... Ts>
-    auto ijLoop(const IjLoopData<Ts...>& ijData, GroupView const& groups) const
+    auto ijLoop(const CheckedIjLoopData<Ts...>& ijData, GroupView const& groups) const
     {
-        using IjLoopData               = IjLoopData<Ts...>;
-        using ReductionResult          = typename IjLoopData::ReductionResultType;
-        using UnwrappedReductionResult = typename IjLoopData::UnwrappedReductionResultType;
+        using IjData                   = CheckedIjLoopData<Ts...>;
+        using ReductionResult          = typename IjData::ReductionResultType;
+        using UnwrappedReductionResult = typename IjData::UnwrappedReductionResultType;
         ReductionResult reductionResult{};
 
         if (groups.numGroups == 0) return unwrapModifiers(reductionResult);
 
         util::UniqueDevicePtr<UnwrappedReductionResult> deviceReductionResult;
-        if constexpr (!std::is_same_v<typename IjLoopData::ReductionType, detail::NoReduction>)
+        if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
         {
             deviceReductionResult = util::deviceAlloc<UnwrappedReductionResult>(exec);
             static_assert(sizeof(ReductionResult) == sizeof(UnwrappedReductionResult));
@@ -178,7 +180,7 @@ protected:
         }
         checkGpuErrors(cudaGetLastError());
 
-        if constexpr (!std::is_same_v<typename IjLoopData::ReductionType, detail::NoReduction>)
+        if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
         {
             checkGpuErrors(cudaMemcpyAsync(&reductionResult, deviceReductionResult.get(), sizeof(ReductionResult),
                                            cudaMemcpyDeviceToHost));

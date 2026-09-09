@@ -40,12 +40,12 @@ struct CpuAlwaysTraverseNeighborhood
     ThP h;
     unsigned ngmax;
 
-    template<class... Ts>
-    auto ijLoop(IjLoopData<Ts...> ijData) const
+    template<ValidIjLoopData<Tc, ThP> IjData>
+    auto ijLoop(IjData const& data) const
     {
-        using ReductionResult = IjLoopData<Ts...>::ReductionResultType;
+        const auto ijData = check<Tc, ThP>(data);
+        using ReductionResult = typename std::remove_cvref_t<decltype(ijData)>::ReductionResultType;
 
-        const auto constInput = makeConst(ijData.input);
         ReductionResult globalReductionResult{};
 #pragma omp parallel
         {
@@ -55,8 +55,9 @@ struct CpuAlwaysTraverseNeighborhood
 #pragma omp for
             for (LocalIndex i = firstBody; i < lastBody; ++i)
             {
-                ReductionResult iReductionResult = jLoop(constInput, ijData.output, ijData.interaction,
-                                                         ijData.postamble, ijData.reduction, i, neighbors.get());
+                ReductionResult iReductionResult =
+                    jLoop(ijData.input, ijData.output, ijData.interaction, ijData.postamble, ijData.reduction, i,
+                          neighbors.get());
                 updateResult(reductionResult, iReductionResult);
             }
 
@@ -73,12 +74,12 @@ struct CpuAlwaysTraverseNeighborhood
         CpuAlwaysTraverseNeighborhood const& parent;
         GroupView groups;
 
-        template<class... Ts>
-        auto ijLoop(IjLoopData<Ts...> ijData) const
+        template<ValidIjLoopData<Tc, ThP> IjData>
+        auto ijLoop(IjData const& data) const
         {
-            using ReductionResult = IjLoopData<Ts...>::ReductionResultType;
+            const auto ijData = check<Tc, ThP>(data);
+            using ReductionResult = typename std::remove_cvref_t<decltype(ijData)>::ReductionResultType;
 
-            const auto constInput = makeConst(ijData.input);
             ReductionResult globalReductionResult{};
 #pragma omp parallel
             {
@@ -89,9 +90,9 @@ struct CpuAlwaysTraverseNeighborhood
                 for (LocalIndex g = 0; g < groups.numGroups; ++g)
                     for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
                     {
-                        ReductionResult iReductionResult =
-                            parent.jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble,
-                                         ijData.reduction, i, neighbors.get());
+                        ReductionResult iReductionResult = parent.jLoop(ijData.input, ijData.output, ijData.interaction,
+                                                                       ijData.postamble, ijData.reduction, i,
+                                                                       neighbors.get());
                         updateResult(reductionResult, iReductionResult);
                     }
 

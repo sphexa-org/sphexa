@@ -92,10 +92,11 @@ struct GpuSuperclusterNbListNeighborhood
     unsigned ncmax       = 0;
     std::size_t numBytes = 0;
 
-    template<class... Ts>
-    auto ijLoop(IjLoopData<Ts...> ijData) const
+    template<ValidIjLoopData<Tc, ThP> IjData>
+    auto ijLoop(IjData const& data) const
     {
-        using UnwrappedReductionResult = typename IjLoopData<Ts...>::UnwrappedReductionResultType;
+        auto ijData                    = check<Tc, ThP>(data);
+        using UnwrappedReductionResult = typename std::remove_cvref_t<decltype(ijData)>::UnwrappedReductionResultType;
         if (totalBodies == 0) return UnwrappedReductionResult{};
 
         assert(firstBody < lastBody);
@@ -116,10 +117,12 @@ struct GpuSuperclusterNbListNeighborhood
         util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo;
         LocalIndex numISuperclusters;
 
-        template<class... Ts>
-        auto ijLoop(IjLoopData<Ts...> ijData) const
+        template<ValidIjLoopData<Tc, ThP> IjData>
+        auto ijLoop(IjData const& data) const
         {
-            using UnwrappedReductionResult = typename IjLoopData<Ts...>::UnwrappedReductionResultType;
+            auto ijData = check<Tc, ThP>(data);
+            using UnwrappedReductionResult =
+                typename std::remove_cvref_t<decltype(ijData)>::UnwrappedReductionResultType;
             if (groups.numGroups == 0) return UnwrappedReductionResult{};
 
             return parent.ijLoop(std::move(ijData), superclusterInfo.get(), numISuperclusters, activeMasks.get());
@@ -151,12 +154,12 @@ struct GpuSuperclusterNbListNeighborhood
 
 protected:
     template<class... Ts, class Mask = void>
-    auto ijLoop(IjLoopData<Ts...> ijData,
+    auto ijLoop(CheckedIjLoopData<Ts...> ijData,
                 const SuperclusterInfo* superclusterInfo,
                 const LocalIndex numISuperclusters,
                 const Mask* activeMasks = nullptr) const
     {
-        using IjData                   = IjLoopData<Ts...>;
+        using IjData                   = CheckedIjLoopData<Ts...>;
         using ReductionResult          = typename IjData::ReductionResultType;
         using UnwrappedReductionResult = typename IjData::UnwrappedReductionResultType;
         ReductionResult reductionResult{};
@@ -180,15 +183,14 @@ protected:
 
         // for symmetric neighborhoods where the reduction returns more values than the postamble, temporary arrays have
         // to be allocated; in all other cases, this functions just returns the output data pointers
-        auto [tmpOrOutput, tmpHolder] = allocateTemporaries<Config, Tc, ThP>(
-            exec, firstBody, lastBody, makeConst(ijData.input), ijData.output, ijData.interaction);
+        auto [tmpOrOutput, tmpHolder] = allocateTemporaries<Config, Tc, ThP>(exec, firstBody, lastBody, ijData.input,
+                                                                             ijData.output, ijData.interaction);
 
         if constexpr (Config::symmetric)
         {
             // in the symmetric case, the output arrays need to be initialized beforehand due to the unordered atomic
             // updates in the main loop
-            initResult<Config>(exec, firstBody, lastBody, x, y, z, h, makeConst(ijData.input), tmpOrOutput,
-                               ijData.interaction);
+            initResult<Config>(exec, firstBody, lastBody, x, y, z, h, ijData.input, tmpOrOutput, ijData.interaction);
         }
 
         runIjLoop<Config>(exec, box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, ijData, tmpOrOutput,
@@ -198,7 +200,7 @@ protected:
         if constexpr (Config::symmetric)
         {
             // the postamble has to be applied in a separate step for symmetric neighborhoods
-            applyPostamble<Config>(exec, firstBody, lastBody, firstValidBody, x, y, z, h, makeConst(ijData.input),
+            applyPostamble<Config>(exec, firstBody, lastBody, firstValidBody, x, y, z, h, ijData.input,
                                    makeConst(tmpOrOutput), ijData.output, ijData.postamble, ijData.reduction,
                                    deviceReductionResult.get());
         }

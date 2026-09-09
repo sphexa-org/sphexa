@@ -233,7 +233,28 @@ concept ValidReduction =
     } -> TupleOfValues;
 };
 
-/*! A dataset that can be passed to an ijLoop.
+/*! A dataset that can be passed to an ijLoop. Enables aggregate initialization using CTAD and designated initializers.
+ *
+ * @tparam Input           tuple of input particle field pointers
+ * @tparam Output          tuple of output particle field pointers
+ * @tparam Interaction     function object satisfying the PairInteraction concept
+ * @tparam Postamble       function object satisfying the ValidPostamble concept
+ */
+template<class Input,
+         class Output,
+         class Interaction,
+         class Postamble = detail::EmptyPostamble,
+         class Reduction = detail::NoReduction>
+struct IjLoopData
+{
+    Input input;
+    Output output;
+    Interaction interaction;
+    Postamble postamble = empty_postamble;
+    Reduction reduction = no_reduction;
+};
+
+/*! A type-checked version of IjLoopData. Requires coordinate and smoothing length types.
  *
  * @tparam Tc              types of x,y,z coordinates
  * @tparam ThP             type of h, pointer to floating_point if search radius per particle is variable
@@ -250,7 +271,7 @@ template<std::floating_point Tc,
          PairInteraction<Tc, ThP, Input> Interaction,
          ValidPostamble<Interaction, Tc, ThP, Input, Output> Postamble = detail::EmptyPostamble,
          ValidReduction<Interaction, Tc, ThP, Input, Output> Reduction = detail::NoReduction>
-struct IjLoopData
+struct CheckedIjLoopData
 {
     //! @brief The tuple input data for a single particle in an i-j interaction,
     using ParticleDataType = ParticleData<Tc, ThP, Input>;
@@ -290,25 +311,23 @@ struct IjLoopData
     Reduction reduction;
 };
 
-//! @brief Convenience factory to construct an @p IjLoopData with explicit Tc and ThP and deduced tuple/functor types.
-template<class Tc,
-         class ThP,
-         class Input,
-         class Output,
-         class Interaction,
-         class Postamble = detail::EmptyPostamble,
-         class Reduction = detail::NoReduction>
-auto makeIjLoopData(const Input& in,
-                    const Output& out,
-                    const Interaction& interaction,
-                    const Postamble& postamble = empty_postamble,
-                    const Reduction& reduction = no_reduction)
+//! Converts unchecked loop data to fully typed and checked data, i.e., applies all concept checks.
+template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble, class Reduction>
+CheckedIjLoopData<Tc, ThP, decltype(makeConst(std::declval<Input>())), Output, Interaction, Postamble, Reduction>
+check(IjLoopData<Input, Output, Interaction, Postamble, Reduction> const& unchecked)
 {
-    auto constInput = makeConst(in);
-    return IjLoopData<Tc, ThP, std::decay_t<decltype(constInput)>, std::decay_t<Output>, std::decay_t<Interaction>,
-                      std::decay_t<Postamble>, std::decay_t<Reduction>>{constInput, out, interaction, postamble,
-                                                                        reduction};
+    return {.input       = makeConst(unchecked.input),
+            .output      = unchecked.output,
+            .interaction = unchecked.interaction,
+            .postamble   = unchecked.postamble,
+            .reduction   = unchecked.reduction};
 }
+
+template<class LoopData, class Tc, class Th>
+concept ValidIjLoopData = requires(LoopData const& unchecked)
+{
+    check<Tc, Th>(unchecked);
+};
 
 namespace detail
 {
@@ -342,7 +361,7 @@ concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
     } -> std::same_as<Statistics>;
     {
         nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
-            .ijLoop(IjLoopData<double, float*, std::tuple<>, std::tuple<int*>, detail::ConceptTestInteraction>{
+            .ijLoop(IjLoopData<std::tuple<>, std::tuple<int*>, detail::ConceptTestInteraction>{
                 std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble})
     } -> std::same_as<std::tuple<>>;
 };
