@@ -83,7 +83,7 @@ TEST(Kernels, WharmonicDerivativeStd)
 {
     const auto fRef = [](float128 x)
     { return cos128(x * pi128 / 2) / x - 2 * sin128(x * pi128 / 2) / (pi128 * x * x); };
-    const auto f = [](double x) { return wharmonic_derivative_std(x); };
+    const auto f = [](auto x) { return wharmonic_derivative_std(x); };
     checkErrors<double>(fRef, f, 1e-14, 1e-9);
-    checkErrors<float>(fRef, f, 1e-7, 1e-5);
+    checkErrors<float>(fRef, f, 1e-6, 1e-5);
 }
