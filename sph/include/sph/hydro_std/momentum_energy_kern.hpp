@@ -2,6 +2,7 @@
 
 #include <type_traits>
 
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/kernels.hpp"
@@ -29,17 +30,17 @@ struct MomentumAndEnergyInteractionStd
         T ry = r_ij[1];
         T rz = r_ij[2];
 
-        T    hiInv  = T(1) / hi;
+        T    hiInv  = cstone::fastmath::rcp(hi);
         T    hiInv3 = hiInv * hiInv * hiInv;
         auto mi_roi = mi / roi;
 
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
 
         T vx_ij = vxi - vxj;
         T vy_ij = vyi - vyj;
         T vz_ij = vzi - vzj;
 
-        T hjInv = T(1) / hj;
+        T hjInv = cstone::fastmath::rcp(hj);
 
         T v1 = dist * hiInv;
         T v2 = dist * hjInv;

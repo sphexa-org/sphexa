@@ -31,7 +31,10 @@
 
 #pragma once
 
+#include <cassert>
+
 #include "cstone/cuda/annotation.hpp"
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/kernels.hpp"
@@ -50,7 +53,7 @@ HOST_DEVICE_FUN T avRvCorrection(util::array<Tc, 3> R, Tc eta_ab, T eta_crit, co
     if (eta_ab < eta_crit)
     {
         T etaDiff = T(5) * (eta_ab - eta_crit);
-        dmy3      = std::exp(-etaDiff * etaDiff);
+        dmy3      = cstone::fastmath::exp(-etaDiff * etaDiff);
     }
 
     T A_ab   = (dmy2 != T(0)) ? dmy1 / dmy2 : T(0);
@@ -79,22 +82,23 @@ struct MomentumAndEnergyInteraction
 
         auto rhoi = kxi * mi / xmassi;
 
-        T hiInv  = T(1) / hi;
+        T hiInv  = cstone::fastmath::rcp(hi);
         T hiInv3 = hiInv * hiInv * hiInv;
 
-        T eta_crit = std::cbrt(T(32) * M_PI / T(3) / T(nci));
+        constexpr T eta_fac  = 32 * M_PI / 3;
+        T           eta_crit = std::cbrt(eta_fac / T(nci));
 
         T rx = r_ij[0];
         T ry = r_ij[1];
         T rz = r_ij[2];
 
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
 
         T vx_ij = vxi - vxj;
         T vy_ij = vyi - vyj;
         T vz_ij = vzi - vzj;
 
-        T hjInv = T(1) / hj;
+        T hjInv = cstone::fastmath::rcp(hj);
 
         T v1 = dist * hiInv;
         T v2 = dist * hjInv;
@@ -141,8 +145,10 @@ struct MomentumAndEnergyInteraction
         else
         {
             T sigma_ij = ramp * (Atwood - Atmin);
-            a_mom      = pow(xmassi, T(2) - sigma_ij) * pow(xmassj, sigma_ij);
-            b_mom      = pow(xmassj, T(2) - sigma_ij) * pow(xmassi, sigma_ij);
+            assert(xmassi != 0 && xmassj != 0);
+            T xms = cstone::fastmath::pow(xmassj / xmassi, sigma_ij);
+            a_mom = xmassi * xmassi * xms;
+            b_mom = xmassj * xmassj / xms;
         }
 
         auto a_visc        = mj / rhoi * viscosity_ij;

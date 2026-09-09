@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/sph_kernels.hpp"
@@ -50,12 +51,12 @@ struct DivVCurlVInteraction
         auto const [i, iPos, hi, vxi, vyi, vzi, xmi, kxi, c11i, c12i, c13i, c22i, c23i, c33i] = iData;
         auto const [j, jPos, hj, vxj, vyj, vzj, xmj, kxj, c11j, c12j, c13j, c22j, c23j, c33j] = jData;
 
-        T hiInv = T(1) / hi;
+        T hiInv = cstone::fastmath::rcp(hi);
 
         T rx   = r_ij[0];
         T ry   = r_ij[1];
         T rz   = r_ij[2];
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
 
         T vx_ji = vxj - vxi;
         T vy_ji = vyj - vyi;
@@ -100,14 +101,14 @@ struct DivVCurlVPostamble
                                       c12i * dVziXFactor + c22i * dVziYFactor + c23i * dVziZFactor,
                                       c13i * dVziXFactor + c23i * dVziYFactor + c33i * dVziZFactor};
 
-        T hiInv  = T(1) / hi;
+        T hiInv  = cstone::fastmath::rcp(hi);
         T hiInv3 = hiInv * hiInv * hiInv;
 
         T norm_kxi = K * hiInv3 / kxi;
         T divvi    = norm_kxi * (dVxi[0] + dVyi[1] + dVzi[2]);
 
         cstone::Vec3<T> curlV{dVzi[1] - dVyi[2], dVxi[2] - dVzi[0], dVyi[0] - dVxi[1]};
-        T               curlvi = norm_kxi * std::sqrt(norm2(curlV));
+        T               curlvi = norm_kxi * cstone::fastmath::sqrt(norm2(curlV));
 
         T dV11i = norm_kxi * dVxi[0];
         T dV12i = norm_kxi * (dVxi[1] + dVyi[0]);

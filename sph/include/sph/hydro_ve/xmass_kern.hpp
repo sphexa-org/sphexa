@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/sph_kernels.hpp"
@@ -50,9 +51,9 @@ struct XmassInteraction
         const auto [i, iPos, hi, mi] = iData;
         const auto [j, jPos, hj, mj] = jData;
 
-        T hInv = 1.0 / hi;
+        T hInv = cstone::fastmath::rcp(hi);
 
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
 
         T vloc = dist * hInv;
         T w    = wh(vloc);
@@ -79,7 +80,7 @@ struct XmassPostamble
         const auto [i, iPos, hi, mi] = iData;
         auto [rho0i]                 = result;
 
-        T hInv  = 1.0 / hi;
+        T hInv  = cstone::fastmath::rcp(hi);
         T h3Inv = hInv * hInv * hInv;
 
         T xmassi = veDefinition(mi, rho0i * K * h3Inv);

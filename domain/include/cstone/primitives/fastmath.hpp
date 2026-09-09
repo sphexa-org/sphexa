@@ -17,6 +17,8 @@
 
 #include <cmath>
 
+#include "cstone/cuda/annotation.hpp"
+
 #define CSTONE_FAST_MATH [[gnu::optimize("-ffast-math")]]
 
 namespace cstone::fastmath
@@ -44,6 +46,20 @@ CSTONE_FAST_MATH constexpr float cos(float x)
 
 CSTONE_FAST_MATH constexpr double cos(double x) { return std::cos(x); }
 
+CSTONE_FAST_MATH HOST_DEVICE_FUN HOST_DEVICE_INLINE void sincos(float x, float* sinx, float* cosx)
+{
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+    __sincosf(x, sinx, cosx);
+#else
+    ::sincosf(x, sinx, cosx);
+#endif
+}
+
+CSTONE_FAST_MATH HOST_DEVICE_FUN HOST_DEVICE_INLINE void sincos(double x, double* sinx, double* cosx)
+{
+    ::sincos(x, sinx, cosx);
+}
+
 CSTONE_FAST_MATH constexpr float rcp(float x)
 {
 #ifdef __CUDA_ARCH__
@@ -59,11 +75,7 @@ CSTONE_FAST_MATH constexpr float rcp(float x)
 
 CSTONE_FAST_MATH constexpr double rcp(double x)
 {
-#ifdef __CUDA_ARCH__
-    // __drcp_rn might not flush to zero and thus can be significantly slower
-    asm("rcp.approx.ftz.f64 %0,%0;" : "+d"(x) :);
-    return x;
-#elif defined(__HIP_DEVICE_COMPILE__)
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
     return __drcp_rn(x);
 #else
     return 1.0 / x;
@@ -102,5 +114,16 @@ CSTONE_FAST_MATH constexpr float pow(float x, float y)
 }
 
 CSTONE_FAST_MATH constexpr double pow(double x, double y) { return std::pow(x, y); }
+
+CSTONE_FAST_MATH constexpr float exp(float x)
+{
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+    return __expf(x);
+#else
+    return std::exp(x);
+#endif
+}
+
+CSTONE_FAST_MATH constexpr double exp(double x) { return std::exp(x); }
 
 } // namespace cstone::fastmath

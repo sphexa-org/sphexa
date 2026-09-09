@@ -1,6 +1,7 @@
 add_subdirectory(hydro_turb)
 
 set(UNIT_TESTS
+        kernels.cpp
         positions.cpp
         std.cpp
         table_creation.cpp

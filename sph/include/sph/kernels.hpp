@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cassert>
+#include <type_traits>
+
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/findneighbors.hpp"
 #include "cstone/util/array.hpp"
@@ -102,16 +105,29 @@ HOST_DEVICE_FUN constexpr inline T wharmonic_std(T v)
 template<typename T>
 HOST_DEVICE_FUN constexpr inline T wharmonic_derivative_std(T v)
 {
-    if (v == T(0)) return T(0);
+    assert(v >= T(0));
+
+    constexpr T cutoff = std::is_same_v<T, double> ? 0.02 : 0.25;
+    if (v < cutoff)
+    {
+        // Taylor expansion due to cancellation with small v
+        constexpr T f1 = -0.82246703342411321824; // -pi^2 / 12
+        constexpr T f3 = +0.20293560632083841091; // +pi^4 / 480
+        constexpr T f5 = -0.01788298351144539503; // -pi^6 / 53760
+        const T     v2 = v * v;
+        const T     v3 = v2 * v;
+        const T     v5 = v2 * v2 * v;
+        return f1 * v + f3 * v3 + f5 * v5;
+    }
 
     constexpr T piHalf = M_PI_2;
     const T     Pv     = piHalf * v;
-    const T     sinPv  = cstone::fastmath::sin(Pv);
-    const T     cosPv  = cstone::fastmath::cos(Pv);
-    const T     invPv  = cstone::fastmath::rcp(Pv);
-    const T     sincv  = sinPv * invPv;
+    T           sinPv, cosPv;
+    cstone::fastmath::sincos(Pv, &sinPv, &cosPv);
+    const T invPv = cstone::fastmath::rcp(Pv);
+    const T sincv = sinPv * invPv;
 
-    return sincv * piHalf * (cosPv / sinPv - invPv);
+    return piHalf * (cosPv - sincv) * invPv;
 }
 
 /*! @brief calculate the artificial viscosity between a pair of two particles
