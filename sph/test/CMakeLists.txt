@@ -1,6 +1,7 @@
 add_subdirectory(hydro_turb)
 
 set(UNIT_TESTS
+        kernels.cpp
         positions.cpp
         std.cpp
         table_creation.cpp
@@ -9,6 +10,12 @@ set(UNIT_TESTS
 
 set(testname sph_tests)
 add_executable(${testname} ${UNIT_TESTS})
+
+execute_process(COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=libquadmath.so OUTPUT_VARIABLE libquadmath_path OUTPUT_STRIP_TRAILING_WHITESPACE)
+if (EXISTS ${libquadmath_path})
+    target_link_libraries(${testname} PRIVATE quadmath)
+    target_compile_definitions(${testname} PRIVATE HAVE_QUADMATH)
+endif ()
 
 target_compile_options(${testname} PRIVATE -Wall -Wextra -Wno-unknown-pragmas)
 target_include_directories(${testname} PRIVATE ${CSTONE_DIR} ${PROJECT_SOURCE_DIR}/include)
