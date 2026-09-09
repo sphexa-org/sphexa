@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <type_traits>
 
 #include "cstone/cuda/annotation.hpp"
@@ -104,6 +105,8 @@ HOST_DEVICE_FUN constexpr inline T wharmonic_std(T v)
 template<typename T>
 HOST_DEVICE_FUN constexpr inline T wharmonic_derivative_std(T v)
 {
+    assert(v >= T(0));
+
     constexpr T cutoff = std::is_same_v<T, double> ? 0.02 : 0.25;
     if (v < cutoff)
     {
