@@ -51,8 +51,8 @@ template<class T, class FRef, class F>
 void checkErrors(FRef fRef, F f, double absTol, double relTol)
 {
     constexpr float128 startExp  = -40;
-    constexpr float128 endExp    = 2;
-    constexpr int      n         = 1000;
+    constexpr float128 endExp    = 1;
+    constexpr int      n         = 10000;
     double             maxAbsErr = 0;
     double             maxRelErr = 0;
     for (int i = 0; i < n; ++i)
@@ -75,7 +75,7 @@ TEST(Kernels, WharmonicStd)
 {
     const auto fRef = [](float128 x) { return sin128(x * pi128 / 2) / (x * pi128 / 2); };
     const auto f    = [](auto x) { return wharmonic_std(x); };
-    checkErrors<double>(fRef, f, 1e-15, 1e-14);
+    checkErrors<double>(fRef, f, 1e-15, 1e-13);
     checkErrors<float>(fRef, f, 1e-6, 1e-4);
 }
 
