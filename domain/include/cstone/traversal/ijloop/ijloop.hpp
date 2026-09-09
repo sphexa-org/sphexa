@@ -191,7 +191,23 @@ concept ValidPostamble = PairInteraction<Interaction, Tc, ThP, Input> && require
     } -> std::same_as<typename detail::DereferencedTuple<Output>::type>; // must return this type
 };
 
-/*! A dataset that can be passed to an ijLoop.
+/*! A dataset that can be passed to an ijLoop. Enables aggregate initialization using CTAD and designated initializers.
+ *
+ * @tparam Input           tuple of input particle field pointers
+ * @tparam Output          tuple of output particle field pointers
+ * @tparam Interaction     function object satisfying the PairInteraction concept
+ * @tparam Postamble       function object satisfying the ValidPostamble concept
+ */
+template<class Input, class Output, class Interaction, class Postamble = detail::EmptyPostamble>
+struct IjLoopData
+{
+    Input input;
+    Output output;
+    Interaction interaction;
+    Postamble postamble = empty_postamble;
+};
+
+/*! A type-checked version of IjLoopData. Requires coordinate and smoothing length types.
  *
  * @tparam Tc              types of x,y,z coordinates
  * @tparam ThP             type of h, pointer to floating_point if search radius per particle is variable
@@ -230,15 +246,6 @@ struct CheckedIjLoopData
     Interaction interaction;
     //! @brief Post-processing to apply to the Result after the j-loop
     Postamble postamble;
-};
-
-template<class Input, class Output, class Interaction, class Postamble = detail::EmptyPostamble>
-struct IjLoopData
-{
-    Input input;
-    Output output;
-    Interaction interaction;
-    Postamble postamble = empty_postamble;
 };
 
 template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble>
