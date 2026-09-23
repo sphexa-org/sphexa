@@ -119,11 +119,16 @@ __device__ void approxAcc(Vec4<Ta> acc_i[TravConfig::nwt], const Vec4<Tc> pos_i[
         // all lanes read the same source cell multipole: global loads of identical addresses are
         // hardware broadcasts and stay L1-resident. Unlike shared-memory staging, this does not
         // require a warp sync per source cell, so independent M2P chains can be software-pipelined.
+        // The loads are 16-byte vectorized: the multipole element size is a multiple of 16 bytes
+        // for all multipole types, so individual multipoles are 16-byte aligned in memory.
         MType multipole_j;
+        constexpr int numChunks = sizeof(MType) / sizeof(uint4);
+        auto* __restrict__ gm_M4 = reinterpret_cast<const uint4*>(gm_M);
 #pragma unroll
-        for (int t = 0; t < termSize; t++)
+        for (int c = 0; c < numChunks; c++)
         {
-            multipole_j[t] = gm_M[currentCell * termSize + t];
+            uint4 chunk = gm_M4[currentCell * numChunks + c];
+            memcpy(reinterpret_cast<char*>(&multipole_j) + c * sizeof(uint4), &chunk, sizeof(uint4));
         }
 
 #pragma unroll
