@@ -49,16 +49,15 @@ void computeMomentumEnergyStdGpu(Dataset& d, const cstone::Box<typename Dataset:
 
     auto deviceReductionResult = util::deviceAlloc<std::tuple<HydroType>>(cstone::execution::gpuDefaultStream);
 
-    momentumAndEnergyIjLoop(
-        d.neighborhood, d.K, d.Kcour, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.nc), rawPtr(d.vx), rawPtr(d.vy),
-        rawPtr(d.vz), rawPtr(d.p), rawPtr(d.c), rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22),
-        rawPtr(d.c23), rawPtr(d.c33), d.wh, rawPtr(d.du), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az),
-        deviceReductionResult.get());
+    momentumAndEnergyIjLoop(d.neighborhood, d.K, d.Kcour, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.nc), rawPtr(d.vx),
+                            rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.p), rawPtr(d.c), rawPtr(d.c11), rawPtr(d.c12),
+                            rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), d.wh, rawPtr(d.du),
+                            rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), deviceReductionResult.get());
 
     // device-to-host transfer
     std::tuple<HydroType> hostResult;
-    checkGpuErrors(cudaMemcpyAsync(&hostResult, deviceReductionResult.get(), sizeof(hostResult),
-                                   cudaMemcpyDeviceToHost, cstone::execution::gpuDefaultStream));
+    checkGpuErrors(cudaMemcpyAsync(&hostResult, deviceReductionResult.get(), sizeof(hostResult), cudaMemcpyDeviceToHost,
+                                   cstone::execution::gpuDefaultStream));
     checkGpuErrors(cudaStreamSynchronize(cstone::execution::gpuDefaultStream));
     d.minDtCourant = std::get<0>(hostResult);
 }

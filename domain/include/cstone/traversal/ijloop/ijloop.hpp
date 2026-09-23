@@ -251,8 +251,8 @@ struct IjLoopData
     Input input;
     Output output;
     Interaction interaction;
-    Postamble postamble = empty_postamble;
-    Reduction reduction = no_reduction;
+    Postamble postamble                = empty_postamble;
+    Reduction reduction                = no_reduction;
     ReductionResultPtr reductionResult = nullptr;
 };
 
@@ -303,8 +303,8 @@ struct CheckedIjLoopData
     using UnwrappedReductionResultType = decltype(unwrapModifiers(std::declval<ReductionResultType>()));
     static_assert(sizeof(ReductionResultType) == sizeof(UnwrappedReductionResultType));
 
-    static constexpr bool hasPostamble = !std::is_same_v<Postamble, detail::EmptyPostamble>;
-    static constexpr bool hasReduction = !std::is_same_v<Reduction, detail::NoReduction>;
+    static constexpr bool hasPostamble                      = !std::is_same_v<Postamble, detail::EmptyPostamble>;
+    static constexpr bool hasReduction                      = !std::is_same_v<Reduction, detail::NoReduction>;
     static constexpr ReductionResultType reductionInitValue = ReductionResultType{};
 
     Input input;

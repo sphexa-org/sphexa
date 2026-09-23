@@ -46,11 +46,10 @@ void computeMomentumEnergySTD(Dataset& d, const cstone::Box<T>& box)
     {
         using HydroType = typename Dataset::HydroType;
         std::tuple<HydroType> reductionResult{};
-        momentumAndEnergyIjLoop(
-            d.neighborhood, d.K, d.Kcour, d.m.data(), d.rho.data(), d.nc.data(), d.vx.data(), d.vy.data(),
-            d.vz.data(), d.p.data(), d.c.data(), d.c11.data(), d.c12.data(), d.c13.data(), d.c22.data(),
-            d.c23.data(), d.c33.data(), d.wh, d.du.data(), d.ax.data(), d.ay.data(), d.az.data(),
-            &reductionResult);
+        momentumAndEnergyIjLoop(d.neighborhood, d.K, d.Kcour, d.m.data(), d.rho.data(), d.nc.data(), d.vx.data(),
+                                d.vy.data(), d.vz.data(), d.p.data(), d.c.data(), d.c11.data(), d.c12.data(),
+                                d.c13.data(), d.c22.data(), d.c23.data(), d.c33.data(), d.wh, d.du.data(), d.ax.data(),
+                                d.ay.data(), d.az.data(), &reductionResult);
         d.minDtCourant = std::get<0>(reductionResult);
     }
 }

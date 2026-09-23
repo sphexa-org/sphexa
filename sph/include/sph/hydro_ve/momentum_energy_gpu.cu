@@ -80,8 +80,8 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
 
     // device-to-host transfer
     std::tuple<HydroType> hostResult;
-    checkGpuErrors(cudaMemcpyAsync(&hostResult, deviceReductionResult.get(), sizeof(hostResult),
-                                   cudaMemcpyDeviceToHost, cstone::execution::gpuDefaultStream));
+    checkGpuErrors(cudaMemcpyAsync(&hostResult, deviceReductionResult.get(), sizeof(hostResult), cudaMemcpyDeviceToHost,
+                                   cstone::execution::gpuDefaultStream));
     checkGpuErrors(cudaStreamSynchronize(cstone::execution::gpuDefaultStream));
     d.minDtCourant = std::get<0>(hostResult);
 

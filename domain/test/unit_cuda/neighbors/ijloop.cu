@@ -445,8 +445,8 @@ struct ReductionResultHandle
     ReductionResult get(StreamHolder const& stream) const
     {
         ReductionResult result;
-        checkGpuErrors(cudaMemcpyAsync(&result, deviceValue.get(), sizeof(result), cudaMemcpyDeviceToHost,
-                                       stream.exec()));
+        checkGpuErrors(
+            cudaMemcpyAsync(&result, deviceValue.get(), sizeof(result), cudaMemcpyDeviceToHost, stream.exec()));
         stream.sync();
         return result;
     }
@@ -476,13 +476,12 @@ TYPED_TEST(IjLoopTest, IjLoop)
 
         ReductionResultHandle reductionResult;
         reductionResult.init(stream);
-        nb.ijLoop(
-            ijloop::IjLoopData{.input       = input,
-               .output      = output,
-               .interaction = NeighborFun{},
-               .postamble   = PostambleFun{},
-               .reduction   = ReductionFun{},
-               .reductionResult = reductionResult.ptr});
+        nb.ijLoop(ijloop::IjLoopData{.input           = input,
+                                     .output          = output,
+                                     .interaction     = NeighborFun{},
+                                     .postamble       = PostambleFun{},
+                                     .reduction       = ReductionFun{},
+                                     .reductionResult = reductionResult.ptr});
         ReductionResult reductionResultValue = reductionResult.get(stream);
 
         auto reference = this->reference(this->groupView());
@@ -538,13 +537,12 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
 
         ReductionResultHandle reductionResult;
         reductionResult.init(stream);
-        nb.ijLoop(
-            ijloop::IjLoopData{.input       = input,
-               .output      = output,
-               .interaction = NeighborFun{},
-               .postamble   = PostambleFun{},
-               .reduction   = ReductionFun{},
-               .reductionResult = reductionResult.ptr});
+        nb.ijLoop(ijloop::IjLoopData{.input           = input,
+                                     .output          = output,
+                                     .interaction     = NeighborFun{},
+                                     .postamble       = PostambleFun{},
+                                     .reduction       = ReductionFun{},
+                                     .reductionResult = reductionResult.ptr});
         ReductionResult reductionResultValue = reductionResult.get(stream);
 
         auto reference = this->reference(this->groupView());
@@ -553,13 +551,12 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
         for (auto& h : this->h)
             h *= searchExtFactor;
 
-        nb.ijLoop(
-            ijloop::IjLoopData{.input       = input,
-               .output      = output,
-               .interaction = NeighborFun{},
-               .postamble   = PostambleFun{},
-               .reduction   = ReductionFun{},
-               .reductionResult = reductionResult.ptr});
+        nb.ijLoop(ijloop::IjLoopData{.input           = input,
+                                     .output          = output,
+                                     .interaction     = NeighborFun{},
+                                     .postamble       = PostambleFun{},
+                                     .reduction       = ReductionFun{},
+                                     .reductionResult = reductionResult.ptr});
         reductionResultValue = reductionResult.get(stream);
 
         reference = this->reference(this->groupView());
@@ -605,13 +602,12 @@ TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
 
             ReductionResultHandle reductionResult;
             reductionResult.init(stream);
-            subgroupNb.ijLoop(
-                ijloop::IjLoopData{.input       = input,
-                   .output      = output,
-                   .interaction = NeighborFun{},
-                   .postamble   = PostambleFun{},
-                   .reduction   = ReductionFun{},
-                   .reductionResult = reductionResult.ptr});
+            subgroupNb.ijLoop(ijloop::IjLoopData{.input           = input,
+                                                 .output          = output,
+                                                 .interaction     = NeighborFun{},
+                                                 .postamble       = PostambleFun{},
+                                                 .reduction       = ReductionFun{},
+                                                 .reductionResult = reductionResult.ptr});
             ReductionResult reductionResultValue = reductionResult.get(stream);
 
             auto reference = this->reference(this->subgroupView());
