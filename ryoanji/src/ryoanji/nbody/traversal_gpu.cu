@@ -89,24 +89,17 @@ __host__ __device__ __forceinline__ bool applyMAC(Vec3<T> sourceCenter, T MAC, V
  * @param[in]    cellIdx      the index of each lane of the multipole to apply, in [0:numSourceCells]
  * @param[in]    srcCenter    pointer to source cell centers in global memory, length numSourceCells
  * @param[in]    Multipoles   pointer to the multipole array in global memory, length numSourceCells
- * @param[-]     warpSpace    shared memory for temporary multipole storage, uninitialized
  *
  * Number of computed M2P interactions per call is GpuConfig::warpSize^2 * TravConfig::nwt
  */
 template<class Ta, class Tc, class Tf, class MType>
 __device__ void approxAcc(Vec4<Ta> acc_i[TravConfig::nwt], const Vec4<Tc> pos_i[TravConfig::nwt], const int cellIdx,
-                          const Vec4<Tf>* __restrict__ srcCenter, const MType* __restrict__ Multipoles,
-                          volatile int* warpSpace)
+                          const Vec4<Tf>* __restrict__ srcCenter, const MType* __restrict__ Multipoles)
 {
     constexpr int termSize = MType{}.size();
-    static_assert(termSize <= GpuConfig::warpSize, "multipole size too large for shared-mem warpSpace");
 
     using MValueType = typename MType::value_type;
-
-    auto* sm_Multipole      = reinterpret_cast<volatile MValueType*>(warpSpace);
     auto* __restrict__ gm_M = reinterpret_cast<const MValueType*>(Multipoles);
-
-    const int laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
 
     for (int j = 0; j < GpuConfig::warpSize; j++)
     {
@@ -115,13 +108,20 @@ __device__ void approxAcc(Vec4<Ta> acc_i[TravConfig::nwt], const Vec4<Tc> pos_i[
 
         Vec3<Tf> pos_j = makeVec3(srcCenter[currentCell]);
 
-        if (laneIdx < termSize) { sm_Multipole[laneIdx] = gm_M[currentCell * termSize + laneIdx]; }
-        syncWarp();
+        // all lanes read the same source cell multipole: global loads of identical addresses are
+        // hardware broadcasts and stay L1-resident. Unlike shared-memory staging, this does not
+        // require a warp sync per source cell, so independent M2P chains can be software-pipelined.
+        MType multipole_j;
+#pragma unroll
+        for (int t = 0; t < termSize; t++)
+        {
+            multipole_j[t] = gm_M[currentCell * termSize + t];
+        }
 
 #pragma unroll
         for (int k = 0; k < TravConfig::nwt; k++)
         {
-            acc_i[k] = M2P(acc_i[k], makeVec3(pos_i[k]), pos_j, *(MType*)sm_Multipole);
+            acc_i[k] = M2P(acc_i[k], makeVec3(pos_i[k]), pos_j, multipole_j);
         }
     }
 }
@@ -251,7 +251,7 @@ __device__ util::tuple<unsigned, unsigned, unsigned>
         if (apxFillLevel >= GpuConfig::warpSize) // If queue is larger than warp size,
         {
             // Call M2P kernel
-            approxAcc(acc_i, pos_i, approxQueue, sourceCenter, Multipoles, tempQueue);
+            approxAcc(acc_i, pos_i, approxQueue, sourceCenter, Multipoles);
             apxFillLevel -= GpuConfig::warpSize;
             // pull down remaining source cell indices into now empty approxQueue
             approxQueue = shflDownSync(sourceQueue, numKeepWarp - apxFillLevel);
@@ -322,7 +322,7 @@ __device__ util::tuple<unsigned, unsigned, unsigned>
     if (apxFillLevel > 0) // If there are leftover approx cells
     {
         // Call M2P kernel
-        approxAcc(acc_i, pos_i, laneIdx < apxFillLevel ? approxQueue : -1, sourceCenter, Multipoles, tempQueue);
+        approxAcc(acc_i, pos_i, laneIdx < apxFillLevel ? approxQueue : -1, sourceCenter, Multipoles);
 
         m2pCounter += apxFillLevel;
     }
