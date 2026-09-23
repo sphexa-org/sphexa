@@ -132,7 +132,7 @@ struct GpuSuperclusterNbListNeighborhood
             // initialize the reduction result with the neutral element of the reduction
             if constexpr (ijData.hasReduction)
             {
-                const auto initial = ijData.reductionInitValue;
+                const auto initial = unwrapModifiers(ijData.reductionInitValue);
                 checkGpuErrors(cudaMemcpyAsync(ijData.reductionResult, &initial, sizeof(initial),
                                                cudaMemcpyHostToDevice, parent.exec));
             }
