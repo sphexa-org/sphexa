@@ -31,8 +31,23 @@ HOST_DEVICE_FUN HOST_DEVICE_INLINE float inverseSquareRoot(float x)
 
 HOST_DEVICE_FUN HOST_DEVICE_INLINE double inverseSquareRoot(double x)
 {
-#if defined(__HIP_DEVICE_COMPILE__) || defined(__CUDA_ARCH__)
+#if defined(__HIP_DEVICE_COMPILE__)
     return rsqrt(x);
+#elif defined(__CUDA_ARCH__)
+    /*! @brief inline reciprocal square root
+     *
+     * Seeds with the hardware single-precision reciprocal square root (~2^-23 relative error)
+     * and refines with one Newton-Raphson iteration, doubling the correct bits to ~2^-46.
+     * This is far below the precision of the float accelerations the result is accumulated
+     * into, but much cheaper than the ~2 ulp double-precision libdevice rsqrt, whose
+     * special-case handling and extra refinements are not needed for squared distances.
+     *
+     * Note: unlike libdevice rsqrt, x == 0 returns NaN instead of inf. Downstream use in P2P/M2P
+     * produces NaN either way for coincident particles with zero softening.
+     */
+    double y = (double)rsqrtf((float)x);
+    y *= (1.5 - 0.5 * x * y * y);
+    return y;
 #else
     return 1.0 / std::sqrt(x);
 #endif
