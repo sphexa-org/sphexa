@@ -435,7 +435,7 @@ struct ReductionResultHandle
 
     ReductionResult hostValue{};
     util::UniqueDevicePtr<ReductionResult> deviceValue;
-    void* ptr = nullptr;
+    ReductionResult* ptr = nullptr;
     bool isGpu = false;
 
     void init(StreamHolder const& stream)

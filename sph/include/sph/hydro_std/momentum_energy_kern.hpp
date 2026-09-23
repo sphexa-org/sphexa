@@ -180,7 +180,7 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, c
                 std::make_tuple(m, rho, nc, vx, vy, vz, p, c, c11, c12, c13, c22, c23, c33),
                 std::make_tuple(du, grad_P_x, grad_P_y, grad_P_z, nc),
                 MomentumAndEnergyInteractionStd<T, Tm1, Kernel>{wh}, MomentumAndEnergyPostambleStd<Tc, Tm1>{K},
-                TimeStepReductionStd<Tc>{Kcour}, static_cast<void*>(reductionResult)));
+                TimeStepReductionStd<Tc>{Kcour}, reductionResult));
         },
         wh);
 }

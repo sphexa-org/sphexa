@@ -243,8 +243,9 @@ concept ValidReduction =
 template<class Input,
          class Output,
          class Interaction,
-         class Postamble = detail::EmptyPostamble,
-         class Reduction = detail::NoReduction>
+         class Postamble          = detail::EmptyPostamble,
+         class Reduction          = detail::NoReduction,
+         class ReductionResultPtr = std::tuple<>*>
 struct IjLoopData
 {
     Input input;
@@ -259,7 +260,7 @@ struct IjLoopData
      * location instead of returning it. The caller is responsible for device-to-host transfer when
      * running on a GPU. If the Reduction is NoReduction, this can be left as nullptr.
      */
-    void* reductionResult = nullptr;
+    ReductionResultPtr reductionResult = nullptr;
 };
 
 /*! A type-checked version of IjLoopData. Requires coordinate and smoothing length types.
@@ -324,23 +325,20 @@ struct CheckedIjLoopData
      * returning it. The caller is responsible for allocating storage and, in the GPU case,
      * initializing it with the correct initial values and performing device-to-host transfer.
      */
-    UnwrappedReductionResultType* reductionResult = nullptr;
+    UnwrappedReductionResultType* reductionResult;
 };
 
 //! Converts unchecked loop data to fully typed and checked data, i.e., applies all concept checks.
-template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble, class Reduction>
+template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble, class Reduction, class ReductionResultPtr>
 CheckedIjLoopData<Tc, ThP, decltype(makeConst(std::declval<Input>())), Output, Interaction, Postamble, Reduction>
-check(IjLoopData<Input, Output, Interaction, Postamble, Reduction> const& unchecked)
+check(IjLoopData<Input, Output, Interaction, Postamble, Reduction, ReductionResultPtr> const& unchecked)
 {
-    using ReturnType = CheckedIjLoopData<Tc, ThP, decltype(makeConst(std::declval<Input>())), Output, Interaction,
-                                         Postamble, Reduction>;
-    return {.input       = makeConst(unchecked.input),
-            .output      = unchecked.output,
-            .interaction = unchecked.interaction,
-            .postamble   = unchecked.postamble,
-            .reduction   = unchecked.reduction,
-            .reductionResult = static_cast<typename ReturnType::UnwrappedReductionResultType*>(
-                unchecked.reductionResult)};
+    return {.input           = makeConst(unchecked.input),
+            .output          = unchecked.output,
+            .interaction     = unchecked.interaction,
+            .postamble       = unchecked.postamble,
+            .reduction       = unchecked.reduction,
+            .reductionResult = unchecked.reductionResult};
 }
 
 template<class LoopData, class Tc, class Th>
