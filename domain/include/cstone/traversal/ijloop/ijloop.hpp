@@ -329,10 +329,33 @@ struct CheckedIjLoopData
 };
 
 //! Converts unchecked loop data to fully typed and checked data, i.e., applies all concept checks.
-template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble, class Reduction, class ReductionResultPtr>
+template<class Tc,
+         class ThP,
+         class Input,
+         class Output,
+         class Interaction,
+         class Postamble,
+         class Reduction,
+         class ReductionResultPtr>
 CheckedIjLoopData<Tc, ThP, decltype(makeConst(std::declval<Input>())), Output, Interaction, Postamble, Reduction>
 check(IjLoopData<Input, Output, Interaction, Postamble, Reduction, ReductionResultPtr> const& unchecked)
 {
+    util::for_each_tuple(
+        [](auto ptr)
+        {
+            if (!ptr) throw std::runtime_error("input pointer is null");
+        },
+        unchecked.input);
+    util::for_each_tuple(
+        [](auto ptr)
+        {
+            if (!ptr) throw std::runtime_error("output pointer is null");
+        },
+        unchecked.output);
+    if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+    {
+        if (!unchecked.reductionResult) throw std::runtime_error("reduction result pointer is null");
+    }
     return {.input           = makeConst(unchecked.input),
             .output          = unchecked.output,
             .interaction     = unchecked.interaction,
