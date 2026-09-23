@@ -427,25 +427,17 @@ StreamHolder getStream(ijloop::GpuSuperclusterNbListNeighborhoodBuilder<Config>)
     return {};
 }
 
-//! Helper to allocate, initialize, and read back a reduction result for both CPU and GPU neighborhoods.
+//! Helper to allocate and read back a reduction result for both CPU and GPU neighborhoods.
 struct ReductionResultHandle
 {
-    using Wrapped = std::tuple<ijloop::reduction::min<double>, std::size_t, ijloop::reduction::max<double>>;
-    static_assert(sizeof(Wrapped) == sizeof(ReductionResult));
-
     ReductionResult hostValue{};
     util::UniqueDevicePtr<ReductionResult> deviceValue;
     ReductionResult* ptr = nullptr;
-    bool isGpu = false;
 
     void init(StreamHolder const& stream)
     {
-        isGpu   = true;
-        Wrapped initial{};
         deviceValue = util::deviceAlloc<ReductionResult>(stream.exec());
-        checkGpuErrors(cudaMemcpyAsync(deviceValue.get(), &initial, sizeof(Wrapped), cudaMemcpyHostToDevice,
-                                       stream.exec()));
-        ptr = deviceValue.get();
+        ptr         = deviceValue.get();
     }
 
     void init(CpuStreamHolder const&) { ptr = &hostValue; }
@@ -561,7 +553,6 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
         for (auto& h : this->h)
             h *= searchExtFactor;
 
-        reductionResult.init(stream);
         nb.ijLoop(
             ijloop::IjLoopData{.input       = input,
                .output      = output,

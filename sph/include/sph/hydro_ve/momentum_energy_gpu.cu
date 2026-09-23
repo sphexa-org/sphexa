@@ -69,12 +69,7 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
     using HydroType = typename Dataset::HydroType;
     using namespace cstone::ijloop;
 
-    // allocate and initialize device reduction result
-    std::tuple<reduction::min<HydroType>> initial{};
     auto deviceReductionResult = util::deviceAlloc<std::tuple<HydroType>>(cstone::execution::gpuDefaultStream);
-    static_assert(sizeof(std::tuple<reduction::min<HydroType>>) == sizeof(std::tuple<HydroType>));
-    checkGpuErrors(cudaMemcpyAsync(deviceReductionResult.get(), &initial, sizeof(initial), cudaMemcpyHostToDevice,
-                                   cstone::execution::gpuDefaultStream));
 
     momentumAndEnergyIjLoop<avClean>(
         d.neighborhood, d.K, d.Kcour, d.Atmin, d.Atmax, d.ramp, rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.m),

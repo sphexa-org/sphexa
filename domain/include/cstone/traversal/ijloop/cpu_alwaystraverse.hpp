@@ -44,29 +44,25 @@ struct CpuAlwaysTraverseNeighborhood
     void ijLoop(IjData const& data) const
     {
         const auto ijData = check<Tc, ThP>(data);
-        using CheckedIjData = std::remove_cvref_t<decltype(ijData)>;
-        using ReductionResult = typename CheckedIjData::ReductionResultType;
 
-        ReductionResult globalReductionResult{};
+        auto globalReductionResult = ijData.reductionInitValue;
 #pragma omp parallel
         {
             std::unique_ptr<LocalIndex[]> neighbors = std::make_unique_for_overwrite<LocalIndex[]>(ngmax);
-            ReductionResult reductionResult{};
+            auto reductionResult                    = ijData.reductionInitValue;
 
 #pragma omp for
             for (LocalIndex i = firstBody; i < lastBody; ++i)
             {
-                ReductionResult iReductionResult =
-                    jLoop(ijData.input, ijData.output, ijData.interaction, ijData.postamble, ijData.reduction, i,
-                          neighbors.get());
+                auto iReductionResult = jLoop(ijData.input, ijData.output, ijData.interaction, ijData.postamble,
+                                              ijData.reduction, i, neighbors.get());
                 updateResult(reductionResult, iReductionResult);
             }
 
 #pragma omp critical
             updateResult(globalReductionResult, reductionResult);
         }
-        if constexpr (!std::is_same_v<typename CheckedIjData::ReductionType, detail::NoReduction>)
-            *ijData.reductionResult = unwrapModifiers(globalReductionResult);
+        if constexpr (ijData.hasReduction) *ijData.reductionResult = unwrapModifiers(globalReductionResult);
     }
 
     Statistics stats() const { return {.numBodies = lastBody - firstBody, .numBytes = 0}; }
@@ -80,30 +76,26 @@ struct CpuAlwaysTraverseNeighborhood
         void ijLoop(IjData const& data) const
         {
             const auto ijData = check<Tc, ThP>(data);
-            using CheckedIjData = std::remove_cvref_t<decltype(ijData)>;
-            using ReductionResult = typename CheckedIjData::ReductionResultType;
 
-            ReductionResult globalReductionResult{};
+            auto globalReductionResult = ijData.reductionInitValue;
 #pragma omp parallel
             {
                 std::unique_ptr<LocalIndex[]> neighbors = std::make_unique_for_overwrite<LocalIndex[]>(parent.ngmax);
-                ReductionResult reductionResult{};
+                auto reductionResult                    = ijData.reductionInitValue;
 
 #pragma omp for
                 for (LocalIndex g = 0; g < groups.numGroups; ++g)
                     for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
                     {
-                        ReductionResult iReductionResult = parent.jLoop(ijData.input, ijData.output, ijData.interaction,
-                                                                       ijData.postamble, ijData.reduction, i,
-                                                                       neighbors.get());
+                        auto iReductionResult = parent.jLoop(ijData.input, ijData.output, ijData.interaction,
+                                                             ijData.postamble, ijData.reduction, i, neighbors.get());
                         updateResult(reductionResult, iReductionResult);
                     }
 
 #pragma omp critical
                 updateResult(globalReductionResult, reductionResult);
             }
-            if constexpr (!std::is_same_v<typename CheckedIjData::ReductionType, detail::NoReduction>)
-                *ijData.reductionResult = unwrapModifiers(globalReductionResult);
+            if constexpr (ijData.hasReduction) *ijData.reductionResult = unwrapModifiers(globalReductionResult);
         }
     };
 

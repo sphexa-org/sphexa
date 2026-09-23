@@ -253,13 +253,6 @@ struct IjLoopData
     Interaction interaction;
     Postamble postamble = empty_postamble;
     Reduction reduction = no_reduction;
-
-    /*! @brief Device or host pointer to the result of the global reduction.
-     *
-     * If non-null, the ij-loop implementation will write the (unwrapped) reduction result to this
-     * location instead of returning it. The caller is responsible for device-to-host transfer when
-     * running on a GPU. If the Reduction is NoReduction, this can be left as nullptr.
-     */
     ReductionResultPtr reductionResult = nullptr;
 };
 
@@ -308,6 +301,11 @@ struct CheckedIjLoopData
 
     //! @brief the reduction result with all modifiers (min/max/...) unwrapped
     using UnwrappedReductionResultType = decltype(unwrapModifiers(std::declval<ReductionResultType>()));
+    static_assert(sizeof(ReductionResultType) == sizeof(UnwrappedReductionResultType));
+
+    static constexpr bool hasPostamble = !std::is_same_v<Postamble, detail::EmptyPostamble>;
+    static constexpr bool hasReduction = !std::is_same_v<Reduction, detail::NoReduction>;
+    static constexpr ReductionResultType reductionInitValue = ReductionResultType{};
 
     Input input;
     Output output;
@@ -319,12 +317,6 @@ struct CheckedIjLoopData
     //! @brief Global reduction over per-particle values
     Reduction reduction;
 
-    /*! @brief Device or host pointer to the unwrapped global reduction result.
-     *
-     * If non-null, the ij-loop implementation writes the final reduction result here instead of
-     * returning it. The caller is responsible for allocating storage and, in the GPU case,
-     * initializing it with the correct initial values and performing device-to-host transfer.
-     */
     UnwrappedReductionResultType* reductionResult;
 };
 

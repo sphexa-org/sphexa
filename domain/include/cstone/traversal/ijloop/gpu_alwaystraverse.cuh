@@ -40,30 +40,27 @@ inline unsigned numBlocks()
 }
 
 template<bool UsePbc, class Tc, class ThP, class KeyType, class... Ts>
-__global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
-                                                        const Box<Tc> __grid_constant__ box,
-                                                        const GroupView groups,
-                                                        const Tc* __restrict__ x,
-                                                        const Tc* __restrict__ y,
-                                                        const Tc* __restrict__ z,
-                                                        const ThP h,
-                                                        const CheckedIjLoopData<Tc, ThP, Ts...> ijData,
-                                                        typename CheckedIjLoopData<Tc, ThP,
-                                                                                   Ts...>::UnwrappedReductionResultType*
-                                                            __restrict__ globalReductionResult,
-                                                        const unsigned ngmax,
-                                                        LocalIndex* __restrict__ neighbors,
-                                                        LocalIndex* __restrict__ targetCounter)
+__global__ __launch_bounds__(numThreads) void runIjLoop(
+    const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
+    const Box<Tc> __grid_constant__ box,
+    const GroupView groups,
+    const Tc* __restrict__ x,
+    const Tc* __restrict__ y,
+    const Tc* __restrict__ z,
+    const ThP h,
+    const CheckedIjLoopData<Tc, ThP, Ts...> ijData,
+    typename CheckedIjLoopData<Tc, ThP, Ts...>::UnwrappedReductionResultType* __restrict__ globalReductionResult,
+    const unsigned ngmax,
+    LocalIndex* __restrict__ neighbors,
+    LocalIndex* __restrict__ targetCounter)
 {
-    using IjData                  = CheckedIjLoopData<Tc, ThP, Ts...>;
     const unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     const unsigned warpIdxGrid = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
     LocalIndex targetIdx       = 0;
 
     LocalIndex* threadNeighbors = neighbors + warpIdxGrid * ngmax * GpuConfig::warpSize + laneIdx * ngmax;
 
-    using ReductionResult = typename IjData::ReductionResultType;
-    ReductionResult reductionResult{};
+    auto reductionResult = ijData.reductionInitValue;
 
     while (true)
     {
@@ -95,13 +92,14 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
 
             const auto postambleResult = ijData.postamble(iData, unwrapModifiers(result));
             storeParticleData(ijData.output, i, postambleResult);
-            if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
+            if constexpr (ijData.hasReduction)
+            {
                 updateResult(reductionResult,
                              ijData.reduction(iData, unwrapModifiers(result), unwrapModifiers(postambleResult)));
+            }
         }
     }
-    if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
-        warpReduceUpdatePtr(globalReductionResult, reductionResult);
+    if constexpr (ijData.hasReduction) warpReduceUpdatePtr(globalReductionResult, reductionResult);
 }
 
 template<class Tc, class KeyType, class ThP>
@@ -148,7 +146,12 @@ protected:
     template<class... Ts>
     void ijLoop(const CheckedIjLoopData<Ts...>& ijData, GroupView const& groups) const
     {
-        using IjData = CheckedIjLoopData<Ts...>;
+        if constexpr (ijData.hasReduction)
+        {
+            const auto initial = unwrapModifiers(ijData.reductionInitValue);
+            checkGpuErrors(
+                cudaMemcpyAsync(ijData.reductionResult, &initial, sizeof(initial), cudaMemcpyHostToDevice, exec));
+        }
 
         if (groups.numGroups == 0) return;
 

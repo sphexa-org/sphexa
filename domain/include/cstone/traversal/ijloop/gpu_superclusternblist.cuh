@@ -96,6 +96,14 @@ struct GpuSuperclusterNbListNeighborhood
     void ijLoop(IjData const& data) const
     {
         auto ijData = check<Tc, ThP>(data);
+
+        if constexpr (ijData.hasReduction)
+        {
+            const auto initial = unwrapModifiers(ijData.reductionInitValue);
+            checkGpuErrors(
+                cudaMemcpyAsync(ijData.reductionResult, &initial, sizeof(initial), cudaMemcpyHostToDevice, exec));
+        }
+
         if (totalBodies == 0) return;
 
         assert(firstBody < lastBody);
@@ -120,6 +128,15 @@ struct GpuSuperclusterNbListNeighborhood
         void ijLoop(IjData const& data) const
         {
             auto ijData = check<Tc, ThP>(data);
+
+            // initialize the reduction result with the neutral element of the reduction
+            if constexpr (ijData.hasReduction)
+            {
+                const auto initial = ijData.reductionInitValue;
+                checkGpuErrors(cudaMemcpyAsync(ijData.reductionResult, &initial, sizeof(initial),
+                                               cudaMemcpyHostToDevice, parent.exec));
+            }
+
             if (groups.numGroups == 0) return;
 
             parent.ijLoop(std::move(ijData), superclusterInfo.get(), numISuperclusters, activeMasks.get());
@@ -156,8 +173,6 @@ protected:
                 const LocalIndex numISuperclusters,
                 const Mask* activeMasks = nullptr) const
     {
-        using IjData = CheckedIjLoopData<Ts...>;
-
         const LocalIndex numBodies = lastBody - firstBody;
         if (numBodies == 0) return;
 
@@ -178,8 +193,7 @@ protected:
         }
 
         runIjLoop<Config>(exec, box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, ijData, tmpOrOutput,
-                          ijData.reductionResult, neighborData.get(), superclusterInfo, numISuperclusters,
-                          activeMasks);
+                          ijData.reductionResult, neighborData.get(), superclusterInfo, numISuperclusters, activeMasks);
 
         if constexpr (Config::symmetric)
         {

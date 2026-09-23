@@ -47,26 +47,23 @@ struct CpuFullNbListNeighborhood
     void ijLoop(IjData const& data) const
     {
         const auto ijData = check<Tc, ThP>(data);
-        using CheckedIjData = std::remove_cvref_t<decltype(ijData)>;
-        using ReductionResult = typename CheckedIjData::ReductionResultType;
 
-        ReductionResult globalReductionResult{};
+        auto globalReductionResult = ijData.reductionInitValue;
 #pragma omp parallel
         {
-            ReductionResult reductionResult{};
+            auto reductionResult = ijData.reductionInitValue;
 
 #pragma omp for simd
             for (LocalIndex i = firstBody; i < lastBody; ++i)
             {
-                ReductionResult iReductionResult =
+                auto iReductionResult =
                     jLoop(ijData.input, ijData.output, ijData.interaction, ijData.postamble, ijData.reduction, i);
                 updateResult(reductionResult, iReductionResult);
             }
 #pragma omp critical
             updateResult(globalReductionResult, reductionResult);
         }
-        if constexpr (!std::is_same_v<typename CheckedIjData::ReductionType, detail::NoReduction>)
-            *ijData.reductionResult = unwrapModifiers(globalReductionResult);
+        if constexpr (ijData.hasReduction) *ijData.reductionResult = unwrapModifiers(globalReductionResult);
     }
 
     Statistics stats() const
@@ -85,28 +82,24 @@ struct CpuFullNbListNeighborhood
         void ijLoop(IjData const& data) const
         {
             const auto ijData = check<Tc, ThP>(data);
-            using CheckedIjData = std::remove_cvref_t<decltype(ijData)>;
-            using ReductionResult = typename CheckedIjData::ReductionResultType;
 
-            ReductionResult globalReductionResult{};
+            auto globalReductionResult = ijData.reductionInitValue;
 #pragma omp parallel
             {
-                ReductionResult reductionResult{};
+                auto reductionResult = ijData.reductionInitValue;
 #pragma omp for
                 for (LocalIndex g = 0; g < groups.numGroups; ++g)
 #pragma omp simd
                     for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
                     {
-                        ReductionResult iReductionResult = parent.jLoop(ijData.input, ijData.output,
-                                                                        ijData.interaction, ijData.postamble,
-                                                                        ijData.reduction, i);
+                        auto iReductionResult = parent.jLoop(ijData.input, ijData.output, ijData.interaction,
+                                                             ijData.postamble, ijData.reduction, i);
                         updateResult(reductionResult, iReductionResult);
                     }
 #pragma omp critical
                 updateResult(globalReductionResult, reductionResult);
             }
-            if constexpr (!std::is_same_v<typename CheckedIjData::ReductionType, detail::NoReduction>)
-                *ijData.reductionResult = unwrapModifiers(globalReductionResult);
+            if constexpr (ijData.hasReduction) *ijData.reductionResult = unwrapModifiers(globalReductionResult);
         }
     };
 
