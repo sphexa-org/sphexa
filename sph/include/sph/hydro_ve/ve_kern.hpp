@@ -88,8 +88,8 @@ void veIjLoop(const Neighbordhood& neighborhood, Tc K, const T* xm, KernelVarian
     std::visit(
         [&]<class Kernel>(Kernel wh)
         {
-            neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
-                std::make_tuple(xm), std::make_tuple(kx), VeInteraction<T, Kernel>{wh}, VePostamble<T, Tc>{K}));
+            neighborhood.ijLoop(cstone::ijloop::IjLoopData(std::make_tuple(xm), std::make_tuple(kx),
+                                                           VeInteraction<T, Kernel>{wh}, VePostamble<T, Tc>{K}));
         },
         wh);
 }

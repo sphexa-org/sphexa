@@ -29,16 +29,12 @@
  * @author Sebastian Keller <sebastian.f.keller@gmail.com>
  */
 
-#include <limits>
-
-#include <thrust/execution_policy.h>
-#include <thrust/functional.h>
-#include <thrust/reduce.h>
-
 #include "sph/neighborhood_gpu.hpp"
 #include "sph/sph_gpu.hpp"
 #include "sph/particles_data.hpp"
 #include "sph/hydro_std/momentum_energy_kern.hpp"
+
+#include "cstone/cuda/memory.cuh"
 
 namespace sph
 {
@@ -46,22 +42,27 @@ namespace sph
 using cstone::LocalIndex;
 
 template<class Dataset>
-void computeMomentumEnergyStdGpu(cstone::LocalIndex firstBody, cstone::LocalIndex lastBody, Dataset& d,
-                                 const cstone::Box<typename Dataset::RealType>&)
+void computeMomentumEnergyStdGpu(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
+    using HydroType = typename Dataset::HydroType;
+    using namespace cstone::ijloop;
+
+    auto deviceReductionResult = util::deviceAlloc<std::tuple<HydroType>>(cstone::execution::gpuDefaultStream);
+
     momentumAndEnergyIjLoop(d.neighborhood, d.K, d.Kcour, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.nc), rawPtr(d.vx),
                             rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.p), rawPtr(d.c), rawPtr(d.c11), rawPtr(d.c12),
                             rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), d.wh, rawPtr(d.du),
-                            rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.dtCourant));
+                            rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), deviceReductionResult.get());
 
-    using DtCourantType = typename std::decay_t<decltype(d.dtCourant)>::value_type;
-    auto minDt     = thrust::reduce(thrust::device, rawPtr(d.dtCourant) + firstBody, rawPtr(d.dtCourant) + lastBody,
-                                    std::numeric_limits<DtCourantType>::infinity(), thrust::minimum<DtCourantType>());
-    d.minDtCourant = minDt;
+    // device-to-host transfer
+    std::tuple<HydroType> hostResult;
+    checkGpuErrors(cudaMemcpyAsync(&hostResult, deviceReductionResult.get(), sizeof(hostResult), cudaMemcpyDeviceToHost,
+                                   cstone::execution::gpuDefaultStream));
+    checkGpuErrors(cudaStreamSynchronize(cstone::execution::gpuDefaultStream));
+    d.minDtCourant = std::get<0>(hostResult);
 }
 
-template void computeMomentumEnergyStdGpu(cstone::LocalIndex firstBody, cstone::LocalIndex lastBody,
-                                          sphexa::ParticlesData<cstone::execution::Gpu>& d,
+template void computeMomentumEnergyStdGpu(sphexa::ParticlesData<cstone::execution::Gpu>& d,
                                           const cstone::Box<SphTypes::CoordinateType>&);
 
 template<typename Thydro, typename T>

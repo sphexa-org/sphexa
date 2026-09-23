@@ -21,6 +21,7 @@
 #include "cstone/cuda/memory.cuh"
 #include "cstone/findneighbors.hpp"
 #include "cstone/primitives/warpscan.cuh"
+#include "cstone/traversal/ijloop/atomic_update_ptr.cuh"
 #include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/tree/octree.hpp"
 
@@ -39,23 +40,27 @@ inline unsigned numBlocks()
 }
 
 template<bool UsePbc, class Tc, class ThP, class KeyType, class... Ts>
-__global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
-                                                        const Box<Tc> __grid_constant__ box,
-                                                        const GroupView groups,
-                                                        const Tc* __restrict__ x,
-                                                        const Tc* __restrict__ y,
-                                                        const Tc* __restrict__ z,
-                                                        const ThP h,
-                                                        const IjLoopData<Tc, ThP, Ts...> ijData,
-                                                        const unsigned ngmax,
-                                                        LocalIndex* __restrict__ neighbors,
-                                                        LocalIndex* __restrict__ targetCounter)
+__global__ __launch_bounds__(numThreads) void runIjLoop(
+    const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
+    const Box<Tc> __grid_constant__ box,
+    const GroupView groups,
+    const Tc* __restrict__ x,
+    const Tc* __restrict__ y,
+    const Tc* __restrict__ z,
+    const ThP h,
+    const CheckedIjLoopData<Tc, ThP, Ts...> ijData,
+    typename CheckedIjLoopData<Tc, ThP, Ts...>::UnwrappedReductionResultType* __restrict__ globalReductionResult,
+    const unsigned ngmax,
+    LocalIndex* __restrict__ neighbors,
+    LocalIndex* __restrict__ targetCounter)
 {
     const unsigned laneIdx     = threadIdx.x & (GpuConfig::warpSize - 1);
     const unsigned warpIdxGrid = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
     LocalIndex targetIdx       = 0;
 
     LocalIndex* threadNeighbors = neighbors + warpIdxGrid * ngmax * GpuConfig::warpSize + laneIdx * ngmax;
+
+    auto reductionResult = ijData.reductionInitValue;
 
     while (true)
     {
@@ -72,22 +77,29 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
         {
             const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, threadNeighbors), ngmax);
 
-            const auto iData  = loadParticleData(x, y, z, h, makeConst(ijData.input), i);
+            const auto iData  = loadParticleData(x, y, z, h, ijData.input, i);
             const bool usePbc = UsePbc && requiresPbcHandling(box, iData);
             auto result       = ijData.interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
             for (unsigned nb = 0; nb < nbs; ++nb)
             {
                 const LocalIndex j = threadNeighbors[nb];
-                const auto jData   = loadParticleData(x, y, z, h, makeConst(ijData.input), j);
+                const auto jData   = loadParticleData(x, y, z, h, ijData.input, j);
 
                 const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 
                 updateResult(result, ijData.interaction(iData, jData, ijPosDiff, distSq));
             }
 
-            storeParticleData(ijData.output, i, ijData.postamble(iData, unwrapModifiers(result)));
+            const auto postambleResult = ijData.postamble(iData, unwrapModifiers(result));
+            storeParticleData(ijData.output, i, postambleResult);
+            if constexpr (ijData.hasReduction)
+            {
+                updateResult(reductionResult,
+                             ijData.reduction(iData, unwrapModifiers(result), unwrapModifiers(postambleResult)));
+            }
         }
     }
+    if constexpr (ijData.hasReduction) warpReduceUpdatePtr(globalReductionResult, reductionResult);
 }
 
 template<class Tc, class KeyType, class ThP>
@@ -103,10 +115,10 @@ struct GpuAlwaysTraverseNeighborhood
     util::UniqueDevicePtr<LocalIndex[]> neighbors;
     util::UniqueDevicePtr<LocalIndex> targetCounter;
 
-    template<class... Ts>
-    void ijLoop(const IjLoopData<Ts...>& ijData) const
+    template<ValidIjLoopData<Tc, ThP> IjData>
+    void ijLoop(IjData const& data) const
     {
-        ijLoop(ijData, groups);
+        ijLoop(check<Tc, ThP>(data), groups);
     }
 
     Statistics stats() const
@@ -121,10 +133,10 @@ struct GpuAlwaysTraverseNeighborhood
         GpuAlwaysTraverseNeighborhood const& parent;
         GroupView groups;
 
-        template<class... Ts>
-        void ijLoop(const IjLoopData<Ts...>& ijData) const
+        template<ValidIjLoopData<Tc, ThP> IjData>
+        void ijLoop(IjData const& data) const
         {
-            parent.ijLoop(ijData, groups);
+            parent.ijLoop(check<Tc, ThP>(data), groups);
         }
     };
 
@@ -132,21 +144,31 @@ struct GpuAlwaysTraverseNeighborhood
 
 protected:
     template<class... Ts>
-    void ijLoop(const IjLoopData<Ts...>& ijData, GroupView const& groups) const
+    void ijLoop(const CheckedIjLoopData<Ts...>& ijData, GroupView const& groups) const
     {
+        if constexpr (ijData.hasReduction)
+        {
+            const auto initial = unwrapModifiers(ijData.reductionInitValue);
+            checkGpuErrors(
+                cudaMemcpyAsync(ijData.reductionResult, &initial, sizeof(initial), cudaMemcpyHostToDevice, exec));
+        }
+
         if (groups.numGroups == 0) return;
+
         checkGpuErrors(cudaMemsetAsync(targetCounter.get(), 0, sizeof(LocalIndex), exec));
 
         if (box.boundaryX() == BoundaryType::periodic || box.boundaryY() == BoundaryType::periodic ||
             box.boundaryZ() == BoundaryType::periodic)
         {
-            runIjLoop<true><<<numBlocks(), numThreads, 0, exec>>>(tree, box, groups, x, y, z, h, ijData, ngmax,
-                                                                  neighbors.get(), targetCounter.get());
+            runIjLoop<true><<<numBlocks(), numThreads, 0, exec>>>(tree, box, groups, x, y, z, h, ijData,
+                                                                  ijData.reductionResult, ngmax, neighbors.get(),
+                                                                  targetCounter.get());
         }
         else
         {
-            runIjLoop<false><<<numBlocks(), numThreads, 0, exec>>>(tree, box, groups, x, y, z, h, ijData, ngmax,
-                                                                   neighbors.get(), targetCounter.get());
+            runIjLoop<false><<<numBlocks(), numThreads, 0, exec>>>(tree, box, groups, x, y, z, h, ijData,
+                                                                   ijData.reductionResult, ngmax, neighbors.get(),
+                                                                   targetCounter.get());
         }
         checkGpuErrors(cudaGetLastError());
     }

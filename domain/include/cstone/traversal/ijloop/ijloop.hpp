@@ -17,6 +17,7 @@
 
 #include <concepts>
 #include <tuple>
+#include <type_traits>
 #include <limits>
 
 #include "cstone/execution.hpp"
@@ -111,11 +112,22 @@ inline constexpr bool IsTupleOfPointers_v = false;
 template<class... Ts>
 inline constexpr bool IsTupleOfPointers_v<std::tuple<Ts...>> =
     (std::is_pointer_v<Ts> && ...) && (std::is_trivially_copyable_v<std::remove_pointer_t<Ts>> && ...);
+
+template<class T>
+inline constexpr bool IsTupleOfValues_v = false;
+
+template<class... Ts>
+inline constexpr bool IsTupleOfValues_v<std::tuple<Ts...>> =
+    (!std::is_pointer_v<Ts> && ...) && (std::is_trivially_copyable_v<Ts> && ...);
+
 } // namespace detail
 
 //! @brief Restricts types to std::tuples of pointers to trivially copyable types.
 template<class T>
 concept TupleOfPointers = detail::IsTupleOfPointers_v<T>;
+
+template<class T>
+concept TupleOfValues = detail::IsTupleOfValues_v<T>;
 
 template<class... Ts>
 constexpr std::tuple<const Ts*...> makeConst(std::tuple<Ts*...> input)
@@ -125,6 +137,7 @@ constexpr std::tuple<const Ts*...> makeConst(std::tuple<Ts*...> input)
 
 namespace detail
 {
+
 /*! @brief Maps a std::tuple of pointers to a std::tuple of the pointee types. */
 template<class T>
 struct DereferencedTuple;
@@ -144,12 +157,24 @@ struct EmptyPostamble
     }
 };
 
+struct NoReduction
+{
+    template<class ParticleData, class Result, class PostambleResult>
+    constexpr std::tuple<> operator()(ParticleData const&, Result const&, PostambleResult const&) const
+    {
+        return {};
+    }
+};
+
 } // namespace detail
 
 //! @brief Concept satisfied by a floating point number, or a pointer to one. Used e.g. for smoothing lengths.
 template<class T>
 concept FpOrPtrToFp =
     (std::is_pointer_v<T> && std::is_floating_point_v<std::remove_pointer_t<T>>) || std::is_floating_point_v<T>;
+
+//! @brief Marker for disabling global reductions.
+constexpr detail::NoReduction no_reduction;
 
 struct Statistics
 {
@@ -172,9 +197,11 @@ concept PairInteraction = requires(const F& func,
                                    const ParticleData<Tc, ThP, Input>& i,
                                    const ParticleData<Tc, ThP, Input>& j,
                                    Vec3<Tc> posdiff,
-                                   std::remove_pointer_t<ThP> r2)
+                                   Tc r2)
 {
-    {func(i, j, posdiff, r2)}; // must be callable with this signature
+    {
+        func(i, j, posdiff, r2)
+    } -> TupleOfValues;
 };
 
 //! @brief A postamble is callable with (ParticleData, interaction result), and returns a tuple compatible with Output
@@ -184,14 +211,52 @@ concept ValidPostamble = PairInteraction<Interaction, Tc, ThP, Input> && require
                                                                                   const ParticleData<Tc, ThP, Input>& i,
                                                                                   const ParticleData<Tc, ThP, Input>& j,
                                                                                   Vec3<Tc> posdiff,
-                                                                                  std::remove_pointer_t<ThP> r2)
+                                                                                  Tc r2)
 {
     {
-        postamble(i, unwrapModifiers(interaction(i, j, posdiff, r2)))        // must be callable with this signature
-        } -> std::same_as<typename detail::DereferencedTuple<Output>::type>; // must return this type
+        postamble(i, unwrapModifiers(interaction(i, j, posdiff, r2)))
+    } -> std::same_as<typename detail::DereferencedTuple<Output>::type>;
 };
 
-/*! A dataset that can be passed to an ijLoop.
+template<class Reduction, class Interaction, class Tc, class ThP, class Input, class Output>
+concept ValidReduction =
+    PairInteraction<Interaction, Tc, ThP, Input> && requires(const Reduction& reduction,
+                                                             const Interaction& interaction,
+                                                             const ParticleData<Tc, ThP, Input>& i,
+                                                             const ParticleData<Tc, ThP, Input>& j,
+                                                             Vec3<Tc> posdiff,
+                                                             Tc r2,
+                                                             detail::DereferencedTuple<Output>::type postambleOutput)
+{
+    {
+        reduction(i, unwrapModifiers(interaction(i, j, posdiff, r2)), postambleOutput)
+    } -> TupleOfValues;
+};
+
+/*! A dataset that can be passed to an ijLoop. Enables aggregate initialization using CTAD and designated initializers.
+ *
+ * @tparam Input           tuple of input particle field pointers
+ * @tparam Output          tuple of output particle field pointers
+ * @tparam Interaction     function object satisfying the PairInteraction concept
+ * @tparam Postamble       function object satisfying the ValidPostamble concept
+ */
+template<class Input,
+         class Output,
+         class Interaction,
+         class Postamble          = detail::EmptyPostamble,
+         class Reduction          = detail::NoReduction,
+         class ReductionResultPtr = std::tuple<>*>
+struct IjLoopData
+{
+    Input input;
+    Output output;
+    Interaction interaction;
+    Postamble postamble                = empty_postamble;
+    Reduction reduction                = no_reduction;
+    ReductionResultPtr reductionResult = nullptr;
+};
+
+/*! A type-checked version of IjLoopData. Requires coordinate and smoothing length types.
  *
  * @tparam Tc              types of x,y,z coordinates
  * @tparam ThP             type of h, pointer to floating_point if search radius per particle is variable
@@ -199,14 +264,16 @@ concept ValidPostamble = PairInteraction<Interaction, Tc, ThP, Input> && require
  * @tparam Output          tuple of output particle field pointers
  * @tparam Interaction     function object satisfying the PairInteraction concept
  * @tparam Postamble       function object satisfying the ValidPostamble concept
+ * @tparam Reduction       optional global reduction functor
  */
 template<std::floating_point Tc,
          FpOrPtrToFp ThP,
          TupleOfPointers Input,
          TupleOfPointers Output,
          PairInteraction<Tc, ThP, Input> Interaction,
-         ValidPostamble<Interaction, Tc, ThP, Input, Output> Postamble = detail::EmptyPostamble>
-struct IjLoopData
+         ValidPostamble<Interaction, Tc, ThP, Input, Output> Postamble = detail::EmptyPostamble,
+         ValidReduction<Interaction, Tc, ThP, Input, Output> Reduction = detail::NoReduction>
+struct CheckedIjLoopData
 {
     //! @brief The tuple input data for a single particle in an i-j interaction,
     using ParticleDataType = ParticleData<Tc, ThP, Input>;
@@ -223,6 +290,23 @@ struct IjLoopData
     //! @brief what the postamble returns - will be stored back to the output fields
     using PostambleResultType = typename detail::DereferencedTuple<Output>::type;
 
+    using PostambleType = Postamble;
+    using ReductionType = Reduction;
+
+    //! @brief what the reduction returns across all particles
+    using ReductionResultType =
+        decltype(std::declval<Reduction>()(std::declval<ParticleDataType>(),
+                                           unwrapModifiers(std::declval<InteractionResultType>()),
+                                           unwrapModifiers(std::declval<PostambleResultType>())));
+
+    //! @brief the reduction result with all modifiers (min/max/...) unwrapped
+    using UnwrappedReductionResultType = decltype(unwrapModifiers(std::declval<ReductionResultType>()));
+    static_assert(sizeof(ReductionResultType) == sizeof(UnwrappedReductionResultType));
+
+    static constexpr bool hasPostamble                      = !std::is_same_v<Postamble, detail::EmptyPostamble>;
+    static constexpr bool hasReduction                      = !std::is_same_v<Reduction, detail::NoReduction>;
+    static constexpr ReductionResultType reductionInitValue = ReductionResultType{};
+
     Input input;
     Output output;
 
@@ -230,16 +314,53 @@ struct IjLoopData
     Interaction interaction;
     //! @brief Post-processing to apply to the Result after the j-loop
     Postamble postamble;
+    //! @brief Global reduction over per-particle values
+    Reduction reduction;
+
+    UnwrappedReductionResultType* reductionResult;
 };
 
-//! @brief Convenience factory to construct an @p IjLoopData with explicit Tc and ThP and deduced tuple/functor types.
-template<class Tc, class ThP, class Input, class Output, class Interaction, class Postamble>
-auto makeIjLoopData(const Input& in, const Output& out, const Interaction& interaction, const Postamble& postamble)
+//! Converts unchecked loop data to fully typed and checked data, i.e., applies all concept checks.
+template<class Tc,
+         class ThP,
+         class Input,
+         class Output,
+         class Interaction,
+         class Postamble,
+         class Reduction,
+         class ReductionResultPtr>
+CheckedIjLoopData<Tc, ThP, decltype(makeConst(std::declval<Input>())), Output, Interaction, Postamble, Reduction>
+check(IjLoopData<Input, Output, Interaction, Postamble, Reduction, ReductionResultPtr> const& unchecked)
 {
-    auto constInput = makeConst(in);
-    return IjLoopData<Tc, ThP, std::decay_t<decltype(constInput)>, std::decay_t<Output>, std::decay_t<Interaction>,
-                      std::decay_t<Postamble>>{constInput, out, interaction, postamble};
+    util::for_each_tuple(
+        [](auto ptr)
+        {
+            if (!ptr) throw std::runtime_error("input pointer is null");
+        },
+        unchecked.input);
+    util::for_each_tuple(
+        [](auto ptr)
+        {
+            if (!ptr) throw std::runtime_error("output pointer is null");
+        },
+        unchecked.output);
+    if constexpr (!std::is_same_v<Reduction, detail::NoReduction>)
+    {
+        if (!unchecked.reductionResult) throw std::runtime_error("reduction result pointer is null");
+    }
+    return {.input           = makeConst(unchecked.input),
+            .output          = unchecked.output,
+            .interaction     = unchecked.interaction,
+            .postamble       = unchecked.postamble,
+            .reduction       = unchecked.reduction,
+            .reductionResult = unchecked.reductionResult};
 }
+
+template<class LoopData, class Tc, class Th>
+concept ValidIjLoopData = requires(LoopData const& unchecked)
+{
+    check<Tc, Th>(unchecked);
+};
 
 namespace detail
 {
@@ -273,7 +394,7 @@ concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
     } -> std::same_as<Statistics>;
     {
         nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
-            .ijLoop(IjLoopData<double, float*, std::tuple<>, std::tuple<int*>, detail::ConceptTestInteraction>{
+            .ijLoop(IjLoopData<std::tuple<>, std::tuple<int*>, detail::ConceptTestInteraction>{
                 std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble})
     } -> std::same_as<void>;
 };

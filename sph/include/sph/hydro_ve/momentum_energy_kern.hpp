@@ -214,13 +214,24 @@ struct MomentumAndEnergyPostambleWithDt : MomentumAndEnergyPostamble<UseTdpdTrho
     }
 };
 
+struct TimeStepReduction
+{
+    template<class ParticleData, class Result, class PostambleResult>
+    constexpr auto operator()(const ParticleData&, const Result&, const PostambleResult& postambleResult) const
+    {
+        const auto [du, grad_P_x, grad_P_y, grad_P_z, dt] = postambleResult;
+        return std::make_tuple(cstone::ijloop::reduction::min(dt));
+    }
+};
+
 template<bool AvClean, class Neighborhood, class Tc, class T, class Tm, class Tm1>
 void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T Atmin, T Atmax, T ramp, const T* vx,
                              const T* vy, const T* vz, const Tm* m, const T* c, const T* kx, const T* alpha,
                              const T* xm, const T* prho, const T* c11, const T* c12, const T* c13, const T* c22,
                              const T* c23, const T* c33, const unsigned* nc, const T* dV11, const T* dV12,
                              const T* dV13, const T* dV22, const T* dV23, const T* dV33, const T* tdpdTrho,
-                             KernelVariant<T> const& wh, Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z, T* dt)
+                             KernelVariant<T> const& wh, Tm1* du, T* grad_P_x, T* grad_P_y, T* grad_P_z, T* dt,
+                             std::tuple<T>* reductionResult)
 {
     if constexpr (!AvClean) dV11 = dV12 = dV13 = dV22 = dV23 = dV33 = vx;
     const auto input =
@@ -232,15 +243,15 @@ void momentumAndEnergyIjLoop(Neighborhood const& neighborhood, Tc K, Tc Kcour, T
         {
             if (tdpdTrho)
             {
-                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                neighborhood.ijLoop(cstone::ijloop::IjLoopData(
                     input, output, MomentumAndEnergyInteraction<AvClean, T, Kernel>{wh, Atmin, Atmax, ramp},
-                    MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour}));
+                    MomentumAndEnergyPostambleWithDt<true, T, Tc>{K, Kcour}, TimeStepReduction{}, reductionResult));
             }
             else
             {
-                neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+                neighborhood.ijLoop(cstone::ijloop::IjLoopData(
                     input, output, MomentumAndEnergyInteraction<AvClean, T, Kernel>{wh, Atmin, Atmax, ramp},
-                    MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour}));
+                    MomentumAndEnergyPostambleWithDt<false, T, Tc>{K, Kcour}, TimeStepReduction{}, reductionResult));
             }
         },
         wh);

@@ -92,9 +92,18 @@ struct GpuSuperclusterNbListNeighborhood
     unsigned ncmax       = 0;
     std::size_t numBytes = 0;
 
-    template<class... Ts>
-    void ijLoop(IjLoopData<Ts...> ijData) const
+    template<ValidIjLoopData<Tc, ThP> IjData>
+    void ijLoop(IjData const& data) const
     {
+        auto ijData = check<Tc, ThP>(data);
+
+        if constexpr (ijData.hasReduction)
+        {
+            const auto initial = unwrapModifiers(ijData.reductionInitValue);
+            checkGpuErrors(
+                cudaMemcpyAsync(ijData.reductionResult, &initial, sizeof(initial), cudaMemcpyHostToDevice, exec));
+        }
+
         if (totalBodies == 0) return;
 
         assert(firstBody < lastBody);
@@ -115,9 +124,19 @@ struct GpuSuperclusterNbListNeighborhood
         util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo;
         LocalIndex numISuperclusters;
 
-        template<class... Ts>
-        void ijLoop(IjLoopData<Ts...> ijData) const
+        template<ValidIjLoopData<Tc, ThP> IjData>
+        void ijLoop(IjData const& data) const
         {
+            auto ijData = check<Tc, ThP>(data);
+
+            // initialize the reduction result with the neutral element of the reduction
+            if constexpr (ijData.hasReduction)
+            {
+                const auto initial = unwrapModifiers(ijData.reductionInitValue);
+                checkGpuErrors(cudaMemcpyAsync(ijData.reductionResult, &initial, sizeof(initial),
+                                               cudaMemcpyHostToDevice, parent.exec));
+            }
+
             if (groups.numGroups == 0) return;
 
             parent.ijLoop(std::move(ijData), superclusterInfo.get(), numISuperclusters, activeMasks.get());
@@ -149,7 +168,7 @@ struct GpuSuperclusterNbListNeighborhood
 
 protected:
     template<class... Ts, class Mask = void>
-    void ijLoop(IjLoopData<Ts...> ijData,
+    void ijLoop(CheckedIjLoopData<Ts...> ijData,
                 const SuperclusterInfo* superclusterInfo,
                 const LocalIndex numISuperclusters,
                 const Mask* activeMasks = nullptr) const
@@ -163,26 +182,29 @@ protected:
 
         // for symmetric neighborhoods where the reduction returns more values than the postamble, temporary arrays have
         // to be allocated; in all other cases, this functions just returns the output data pointers
-        auto [tmpOrOutput, tmpHolder] = allocateTemporaries<Config, Tc, ThP>(
-            exec, firstBody, lastBody, makeConst(ijData.input), ijData.output, ijData.interaction);
+        auto [tmpOrOutput, tmpHolder] = allocateTemporaries<Config, Tc, ThP>(exec, firstBody, lastBody, ijData.input,
+                                                                             ijData.output, ijData.interaction);
 
         if constexpr (Config::symmetric)
         {
             // in the symmetric case, the output arrays need to be initialized beforehand due to the unordered atomic
             // updates in the main loop
-            initResult<Config>(exec, firstBody, lastBody, x, y, z, h, makeConst(ijData.input), tmpOrOutput,
-                               ijData.interaction);
+            initResult<Config>(exec, firstBody, lastBody, x, y, z, h, ijData.input, tmpOrOutput, ijData.interaction);
         }
 
         runIjLoop<Config>(exec, box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, ijData, tmpOrOutput,
-                          neighborData.get(), superclusterInfo, numISuperclusters, activeMasks);
+                          ijData.reductionResult, neighborData.get(), superclusterInfo, numISuperclusters, activeMasks);
 
         if constexpr (Config::symmetric)
         {
             // the postamble has to be applied in a separate step for symmetric neighborhoods
-            applyPostamble<Config>(exec, firstBody, lastBody, firstValidBody, x, y, z, h, makeConst(ijData.input),
-                                   makeConst(tmpOrOutput), ijData.output, ijData.postamble);
+            applyPostamble<Config>(exec, firstBody, lastBody, firstValidBody, x, y, z, h, ijData.input,
+                                   makeConst(tmpOrOutput), ijData.output, ijData.postamble, ijData.reduction,
+                                   ijData.reductionResult);
+        }
 
+        if constexpr (Config::symmetric)
+        {
             // sync required due to possible use of allocated temporaries
             checkGpuErrors(cudaStreamSynchronize(exec));
         }
