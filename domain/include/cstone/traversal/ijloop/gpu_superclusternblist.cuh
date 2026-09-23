@@ -93,18 +93,17 @@ struct GpuSuperclusterNbListNeighborhood
     std::size_t numBytes = 0;
 
     template<ValidIjLoopData<Tc, ThP> IjData>
-    auto ijLoop(IjData const& data) const
+    void ijLoop(IjData const& data) const
     {
-        auto ijData                    = check<Tc, ThP>(data);
-        using UnwrappedReductionResult = typename std::remove_cvref_t<decltype(ijData)>::UnwrappedReductionResultType;
-        if (totalBodies == 0) return UnwrappedReductionResult{};
+        auto ijData = check<Tc, ThP>(data);
+        if (totalBodies == 0) return;
 
         assert(firstBody < lastBody);
         const LocalIndex firstISupercluster = superclusterIndex<Config>(firstBody);
         const LocalIndex lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
         const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
 
-        return ijLoop(std::move(ijData), superclusterInfo.get(), numISuperclusters);
+        ijLoop(std::move(ijData), superclusterInfo.get(), numISuperclusters);
     }
 
     Statistics stats() const { return {.numBodies = lastBody - firstBody, .numBytes = numBytes}; }
@@ -118,14 +117,12 @@ struct GpuSuperclusterNbListNeighborhood
         LocalIndex numISuperclusters;
 
         template<ValidIjLoopData<Tc, ThP> IjData>
-        auto ijLoop(IjData const& data) const
+        void ijLoop(IjData const& data) const
         {
             auto ijData = check<Tc, ThP>(data);
-            using UnwrappedReductionResult =
-                typename std::remove_cvref_t<decltype(ijData)>::UnwrappedReductionResultType;
-            if (groups.numGroups == 0) return UnwrappedReductionResult{};
+            if (groups.numGroups == 0) return;
 
-            return parent.ijLoop(std::move(ijData), superclusterInfo.get(), numISuperclusters, activeMasks.get());
+            parent.ijLoop(std::move(ijData), superclusterInfo.get(), numISuperclusters, activeMasks.get());
         }
     };
 
@@ -154,28 +151,15 @@ struct GpuSuperclusterNbListNeighborhood
 
 protected:
     template<class... Ts, class Mask = void>
-    auto ijLoop(CheckedIjLoopData<Ts...> ijData,
+    void ijLoop(CheckedIjLoopData<Ts...> ijData,
                 const SuperclusterInfo* superclusterInfo,
                 const LocalIndex numISuperclusters,
                 const Mask* activeMasks = nullptr) const
     {
-        using IjData                   = CheckedIjLoopData<Ts...>;
-        using ReductionResult          = typename IjData::ReductionResultType;
-        using UnwrappedReductionResult = typename IjData::UnwrappedReductionResultType;
-        ReductionResult reductionResult{};
+        using IjData = CheckedIjLoopData<Ts...>;
 
         const LocalIndex numBodies = lastBody - firstBody;
-        if (numBodies == 0) return unwrapModifiers(reductionResult);
-
-        // allocate reduction result
-        util::UniqueDevicePtr<UnwrappedReductionResult> deviceReductionResult;
-        if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
-        {
-            deviceReductionResult = util::deviceAlloc<UnwrappedReductionResult>(exec);
-            static_assert(sizeof(ReductionResult) == sizeof(UnwrappedReductionResult));
-            checkGpuErrors(cudaMemcpyAsync(deviceReductionResult.get(), &reductionResult, sizeof(ReductionResult),
-                                           cudaMemcpyHostToDevice));
-        }
+        if (numBodies == 0) return;
 
         // modify particle pointers to adhere to supercluster-aligned indexing
         util::for_each_tuple([&](auto& ptr) { ptr -= firstValidBody; }, ijData.input);
@@ -194,7 +178,7 @@ protected:
         }
 
         runIjLoop<Config>(exec, box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, ijData, tmpOrOutput,
-                          deviceReductionResult.get(), neighborData.get(), superclusterInfo, numISuperclusters,
+                          ijData.reductionResult, neighborData.get(), superclusterInfo, numISuperclusters,
                           activeMasks);
 
         if constexpr (Config::symmetric)
@@ -202,23 +186,14 @@ protected:
             // the postamble has to be applied in a separate step for symmetric neighborhoods
             applyPostamble<Config>(exec, firstBody, lastBody, firstValidBody, x, y, z, h, ijData.input,
                                    makeConst(tmpOrOutput), ijData.output, ijData.postamble, ijData.reduction,
-                                   deviceReductionResult.get());
+                                   ijData.reductionResult);
         }
 
-        if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
+        if constexpr (Config::symmetric)
         {
-            // download reduction result
-            checkGpuErrors(cudaMemcpyAsync(&reductionResult, deviceReductionResult.get(), sizeof(ReductionResult),
-                                           cudaMemcpyDeviceToHost));
-        }
-
-        if constexpr (Config::symmetric || !std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
-        {
-            // sync required due to possible use of allocated temporaries / reduction result
+            // sync required due to possible use of allocated temporaries
             checkGpuErrors(cudaStreamSynchronize(exec));
         }
-
-        return unwrapModifiers(reductionResult);
     }
 };
 

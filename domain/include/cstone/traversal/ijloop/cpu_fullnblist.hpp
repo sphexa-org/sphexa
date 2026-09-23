@@ -44,10 +44,11 @@ struct CpuFullNbListNeighborhood
     unsigned ngmax;
 
     template<ValidIjLoopData<Tc, ThP> IjData>
-    auto ijLoop(IjData const& data) const
+    void ijLoop(IjData const& data) const
     {
         const auto ijData = check<Tc, ThP>(data);
-        using ReductionResult = typename std::remove_cvref_t<decltype(ijData)>::ReductionResultType;
+        using CheckedIjData = std::remove_cvref_t<decltype(ijData)>;
+        using ReductionResult = typename CheckedIjData::ReductionResultType;
 
         ReductionResult globalReductionResult{};
 #pragma omp parallel
@@ -64,7 +65,8 @@ struct CpuFullNbListNeighborhood
 #pragma omp critical
             updateResult(globalReductionResult, reductionResult);
         }
-        return unwrapModifiers(globalReductionResult);
+        if constexpr (!std::is_same_v<typename CheckedIjData::ReductionType, detail::NoReduction>)
+            *ijData.reductionResult = unwrapModifiers(globalReductionResult);
     }
 
     Statistics stats() const
@@ -80,10 +82,11 @@ struct CpuFullNbListNeighborhood
         GroupView groups;
 
         template<ValidIjLoopData<Tc, ThP> IjData>
-        auto ijLoop(IjData const& data) const
+        void ijLoop(IjData const& data) const
         {
             const auto ijData = check<Tc, ThP>(data);
-            using ReductionResult = typename std::remove_cvref_t<decltype(ijData)>::ReductionResultType;
+            using CheckedIjData = std::remove_cvref_t<decltype(ijData)>;
+            using ReductionResult = typename CheckedIjData::ReductionResultType;
 
             ReductionResult globalReductionResult{};
 #pragma omp parallel
@@ -102,7 +105,8 @@ struct CpuFullNbListNeighborhood
 #pragma omp critical
                 updateResult(globalReductionResult, reductionResult);
             }
-            return unwrapModifiers(globalReductionResult);
+            if constexpr (!std::is_same_v<typename CheckedIjData::ReductionType, detail::NoReduction>)
+                *ijData.reductionResult = unwrapModifiers(globalReductionResult);
         }
     };
 

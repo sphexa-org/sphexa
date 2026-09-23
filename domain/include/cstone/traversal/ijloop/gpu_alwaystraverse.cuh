@@ -118,9 +118,9 @@ struct GpuAlwaysTraverseNeighborhood
     util::UniqueDevicePtr<LocalIndex> targetCounter;
 
     template<ValidIjLoopData<Tc, ThP> IjData>
-    auto ijLoop(IjData const& data) const
+    void ijLoop(IjData const& data) const
     {
-        return ijLoop(check<Tc, ThP>(data), groups);
+        ijLoop(check<Tc, ThP>(data), groups);
     }
 
     Statistics stats() const
@@ -136,9 +136,9 @@ struct GpuAlwaysTraverseNeighborhood
         GroupView groups;
 
         template<ValidIjLoopData<Tc, ThP> IjData>
-        auto ijLoop(IjData const& data) const
+        void ijLoop(IjData const& data) const
         {
-            return parent.ijLoop(check<Tc, ThP>(data), groups);
+            parent.ijLoop(check<Tc, ThP>(data), groups);
         }
     };
 
@@ -146,47 +146,28 @@ struct GpuAlwaysTraverseNeighborhood
 
 protected:
     template<class... Ts>
-    auto ijLoop(const CheckedIjLoopData<Ts...>& ijData, GroupView const& groups) const
+    void ijLoop(const CheckedIjLoopData<Ts...>& ijData, GroupView const& groups) const
     {
-        using IjData                   = CheckedIjLoopData<Ts...>;
-        using ReductionResult          = typename IjData::ReductionResultType;
-        using UnwrappedReductionResult = typename IjData::UnwrappedReductionResultType;
-        ReductionResult reductionResult{};
+        using IjData = CheckedIjLoopData<Ts...>;
 
-        if (groups.numGroups == 0) return unwrapModifiers(reductionResult);
+        if (groups.numGroups == 0) return;
 
-        util::UniqueDevicePtr<UnwrappedReductionResult> deviceReductionResult;
-        if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
-        {
-            deviceReductionResult = util::deviceAlloc<UnwrappedReductionResult>(exec);
-            static_assert(sizeof(ReductionResult) == sizeof(UnwrappedReductionResult));
-            checkGpuErrors(cudaMemcpyAsync(deviceReductionResult.get(), &reductionResult, sizeof(ReductionResult),
-                                           cudaMemcpyHostToDevice));
-        }
         checkGpuErrors(cudaMemsetAsync(targetCounter.get(), 0, sizeof(LocalIndex), exec));
 
         if (box.boundaryX() == BoundaryType::periodic || box.boundaryY() == BoundaryType::periodic ||
             box.boundaryZ() == BoundaryType::periodic)
         {
             runIjLoop<true><<<numBlocks(), numThreads, 0, exec>>>(tree, box, groups, x, y, z, h, ijData,
-                                                                  deviceReductionResult.get(), ngmax, neighbors.get(),
+                                                                  ijData.reductionResult, ngmax, neighbors.get(),
                                                                   targetCounter.get());
         }
         else
         {
             runIjLoop<false><<<numBlocks(), numThreads, 0, exec>>>(tree, box, groups, x, y, z, h, ijData,
-                                                                   deviceReductionResult.get(), ngmax, neighbors.get(),
+                                                                   ijData.reductionResult, ngmax, neighbors.get(),
                                                                    targetCounter.get());
         }
         checkGpuErrors(cudaGetLastError());
-
-        if constexpr (!std::is_same_v<typename IjData::ReductionType, detail::NoReduction>)
-        {
-            checkGpuErrors(cudaMemcpyAsync(&reductionResult, deviceReductionResult.get(), sizeof(ReductionResult),
-                                           cudaMemcpyDeviceToHost));
-            checkGpuErrors(cudaStreamSynchronize(exec));
-        }
-        return unwrapModifiers(reductionResult);
     }
 };
 } // namespace gpu_always_traverse_neighborhood_detail

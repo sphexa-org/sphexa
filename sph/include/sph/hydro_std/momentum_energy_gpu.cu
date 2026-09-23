@@ -34,6 +34,8 @@
 #include "sph/particles_data.hpp"
 #include "sph/hydro_std/momentum_energy_kern.hpp"
 
+#include "cstone/cuda/memory.cuh"
+
 namespace sph
 {
 
@@ -42,10 +44,28 @@ using cstone::LocalIndex;
 template<class Dataset>
 void computeMomentumEnergyStdGpu(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
-    d.minDtCourant = momentumAndEnergyIjLoop(
+    using HydroType = typename Dataset::HydroType;
+    using namespace cstone::ijloop;
+
+    // allocate and initialize device reduction result
+    std::tuple<reduction::min<HydroType>> initial{};
+    auto deviceReductionResult = util::deviceAlloc<std::tuple<HydroType>>(cstone::execution::gpuDefaultStream);
+    static_assert(sizeof(std::tuple<reduction::min<HydroType>>) == sizeof(std::tuple<HydroType>));
+    checkGpuErrors(cudaMemcpyAsync(deviceReductionResult.get(), &initial, sizeof(initial), cudaMemcpyHostToDevice,
+                                   cstone::execution::gpuDefaultStream));
+
+    momentumAndEnergyIjLoop(
         d.neighborhood, d.K, d.Kcour, rawPtr(d.m), rawPtr(d.rho), rawPtr(d.nc), rawPtr(d.vx), rawPtr(d.vy),
         rawPtr(d.vz), rawPtr(d.p), rawPtr(d.c), rawPtr(d.c11), rawPtr(d.c12), rawPtr(d.c13), rawPtr(d.c22),
-        rawPtr(d.c23), rawPtr(d.c33), d.wh, rawPtr(d.du), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az));
+        rawPtr(d.c23), rawPtr(d.c33), d.wh, rawPtr(d.du), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az),
+        deviceReductionResult.get());
+
+    // device-to-host transfer
+    std::tuple<HydroType> hostResult;
+    checkGpuErrors(cudaMemcpyAsync(&hostResult, deviceReductionResult.get(), sizeof(hostResult),
+                                   cudaMemcpyDeviceToHost, cstone::execution::gpuDefaultStream));
+    checkGpuErrors(cudaStreamSynchronize(cstone::execution::gpuDefaultStream));
+    d.minDtCourant = std::get<0>(hostResult);
 }
 
 template void computeMomentumEnergyStdGpu(sphexa::ParticlesData<cstone::execution::Gpu>& d,

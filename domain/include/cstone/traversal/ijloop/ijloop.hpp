@@ -252,6 +252,14 @@ struct IjLoopData
     Interaction interaction;
     Postamble postamble = empty_postamble;
     Reduction reduction = no_reduction;
+
+    /*! @brief Device or host pointer to the result of the global reduction.
+     *
+     * If non-null, the ij-loop implementation will write the (unwrapped) reduction result to this
+     * location instead of returning it. The caller is responsible for device-to-host transfer when
+     * running on a GPU. If the Reduction is NoReduction, this can be left as nullptr.
+     */
+    void* reductionResult = nullptr;
 };
 
 /*! A type-checked version of IjLoopData. Requires coordinate and smoothing length types.
@@ -309,6 +317,14 @@ struct CheckedIjLoopData
     Postamble postamble;
     //! @brief Global reduction over per-particle values
     Reduction reduction;
+
+    /*! @brief Device or host pointer to the unwrapped global reduction result.
+     *
+     * If non-null, the ij-loop implementation writes the final reduction result here instead of
+     * returning it. The caller is responsible for allocating storage and, in the GPU case,
+     * initializing it with the correct initial values and performing device-to-host transfer.
+     */
+    UnwrappedReductionResultType* reductionResult = nullptr;
 };
 
 //! Converts unchecked loop data to fully typed and checked data, i.e., applies all concept checks.
@@ -316,11 +332,15 @@ template<class Tc, class ThP, class Input, class Output, class Interaction, clas
 CheckedIjLoopData<Tc, ThP, decltype(makeConst(std::declval<Input>())), Output, Interaction, Postamble, Reduction>
 check(IjLoopData<Input, Output, Interaction, Postamble, Reduction> const& unchecked)
 {
+    using ReturnType = CheckedIjLoopData<Tc, ThP, decltype(makeConst(std::declval<Input>())), Output, Interaction,
+                                         Postamble, Reduction>;
     return {.input       = makeConst(unchecked.input),
             .output      = unchecked.output,
             .interaction = unchecked.interaction,
             .postamble   = unchecked.postamble,
-            .reduction   = unchecked.reduction};
+            .reduction   = unchecked.reduction,
+            .reductionResult = static_cast<typename ReturnType::UnwrappedReductionResultType*>(
+                unchecked.reductionResult)};
 }
 
 template<class LoopData, class Tc, class Th>
@@ -363,7 +383,7 @@ concept NeighborhoodBuilder = execution::Policy<Exec> && requires(Exec exec,
         nb.build(exec, tree, box, totalBodies, groups, x, y, z, h)
             .ijLoop(IjLoopData<std::tuple<>, std::tuple<int*>, detail::ConceptTestInteraction>{
                 std::tuple(), std::tuple<int*>(), detail::ConceptTestInteraction{}, empty_postamble})
-    } -> std::same_as<std::tuple<>>;
+    } -> std::same_as<void>;
 };
 
 } // namespace detail

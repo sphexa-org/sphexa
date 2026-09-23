@@ -19,6 +19,7 @@
 
 #include <thrust/universal_vector.h>
 
+#include "cstone/cuda/memory.cuh"
 #include "cstone/cuda/stream_holder.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/execution.hpp"
@@ -426,6 +427,41 @@ StreamHolder getStream(ijloop::GpuSuperclusterNbListNeighborhoodBuilder<Config>)
     return {};
 }
 
+//! Helper to allocate, initialize, and read back a reduction result for both CPU and GPU neighborhoods.
+struct ReductionResultHandle
+{
+    using Wrapped = std::tuple<ijloop::reduction::min<double>, std::size_t, ijloop::reduction::max<double>>;
+    static_assert(sizeof(Wrapped) == sizeof(ReductionResult));
+
+    ReductionResult hostValue{};
+    util::UniqueDevicePtr<ReductionResult> deviceValue;
+    void* ptr = nullptr;
+    bool isGpu = false;
+
+    void init(StreamHolder const& stream)
+    {
+        isGpu   = true;
+        Wrapped initial{};
+        deviceValue = util::deviceAlloc<ReductionResult>(stream.exec());
+        checkGpuErrors(cudaMemcpyAsync(deviceValue.get(), &initial, sizeof(Wrapped), cudaMemcpyHostToDevice,
+                                       stream.exec()));
+        ptr = deviceValue.get();
+    }
+
+    void init(CpuStreamHolder const&) { ptr = &hostValue; }
+
+    ReductionResult get(StreamHolder const& stream) const
+    {
+        ReductionResult result;
+        checkGpuErrors(cudaMemcpyAsync(&result, deviceValue.get(), sizeof(result), cudaMemcpyDeviceToHost,
+                                       stream.exec()));
+        stream.sync();
+        return result;
+    }
+
+    ReductionResult get(CpuStreamHolder const&) const { return hostValue; }
+};
+
 TYPED_TEST(IjLoopTest, IjLoop)
 {
     using NeighborhoodBuilder = TypeParam;
@@ -446,16 +482,19 @@ TYPED_TEST(IjLoopTest, IjLoop)
         auto input  = std::make_tuple(rawPtr(this->v));
         auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
-        ReductionResult reductionResult = nb.ijLoop(
+        ReductionResultHandle reductionResult;
+        reductionResult.init(stream);
+        nb.ijLoop(
             ijloop::IjLoopData{.input       = input,
                .output      = output,
                .interaction = NeighborFun{},
                .postamble   = PostambleFun{},
-               .reduction   = ReductionFun{}});
-        stream.sync();
+               .reduction   = ReductionFun{},
+               .reductionResult = reductionResult.ptr});
+        ReductionResult reductionResultValue = reductionResult.get(stream);
 
         auto reference = this->reference(this->groupView());
-        this->validate(reference, {result, reductionResult});
+        this->validate(reference, {result, reductionResultValue});
     }
 }
 
@@ -479,8 +518,7 @@ TYPED_TEST(IjLoopTest, IjLoopWithoutReduction)
         auto input  = std::make_tuple(rawPtr(this->v));
         auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
-        auto reductionResult = nb.ijLoop(makeIjLoopData(input, output));
-        static_assert(std::is_same_v<decltype(reductionResult), std::tuple<>>);
+        nb.ijLoop(makeIjLoopData(input, output));
         stream.sync();
     }
 }
@@ -506,30 +544,35 @@ TYPED_TEST(IjLoopTest, IjLoopWithSearchExtFactor)
         auto input  = std::make_tuple(rawPtr(this->v));
         auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
-        ReductionResult reductionResult = nb.ijLoop(
+        ReductionResultHandle reductionResult;
+        reductionResult.init(stream);
+        nb.ijLoop(
             ijloop::IjLoopData{.input       = input,
                .output      = output,
                .interaction = NeighborFun{},
                .postamble   = PostambleFun{},
-               .reduction   = ReductionFun{}});
-        stream.sync();
+               .reduction   = ReductionFun{},
+               .reductionResult = reductionResult.ptr});
+        ReductionResult reductionResultValue = reductionResult.get(stream);
 
         auto reference = this->reference(this->groupView());
-        this->validate(reference, {result, reductionResult});
+        this->validate(reference, {result, reductionResultValue});
 
         for (auto& h : this->h)
             h *= searchExtFactor;
 
-        reductionResult = nb.ijLoop(
+        reductionResult.init(stream);
+        nb.ijLoop(
             ijloop::IjLoopData{.input       = input,
                .output      = output,
                .interaction = NeighborFun{},
                .postamble   = PostambleFun{},
-               .reduction   = ReductionFun{}});
-        stream.sync();
+               .reduction   = ReductionFun{},
+               .reductionResult = reductionResult.ptr});
+        reductionResultValue = reductionResult.get(stream);
 
         reference = this->reference(this->groupView());
-        this->validate(reference, {result, reductionResult});
+        this->validate(reference, {result, reductionResultValue});
     }
 }
 
@@ -569,16 +612,19 @@ TYPED_TEST(IjLoopTest, IjLoopOnSubgroups)
             auto input  = std::make_tuple(rawPtr(this->v));
             auto output = util::tupleMap([](auto& v) { return rawPtr(v); }, result);
 
-            ReductionResult reductionResult = subgroupNb.ijLoop(
+            ReductionResultHandle reductionResult;
+            reductionResult.init(stream);
+            subgroupNb.ijLoop(
                 ijloop::IjLoopData{.input       = input,
                    .output      = output,
                    .interaction = NeighborFun{},
                    .postamble   = PostambleFun{},
-                   .reduction   = ReductionFun{}});
-            stream.sync();
+                   .reduction   = ReductionFun{},
+                   .reductionResult = reductionResult.ptr});
+            ReductionResult reductionResultValue = reductionResult.get(stream);
 
             auto reference = this->reference(this->subgroupView());
-            this->validate(reference, {result, reductionResult});
+            this->validate(reference, {result, reductionResultValue});
         }
     }
     else { GTEST_SKIP() << "subgroups not supported"; }

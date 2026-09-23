@@ -38,6 +38,8 @@
 #include "sph/particles_data.hpp"
 #include "sph/hydro_ve/momentum_energy_kern.hpp"
 
+#include "cstone/cuda/memory.cuh"
+
 namespace sph
 {
 namespace gpu
@@ -64,12 +66,29 @@ template<bool avClean, class Dataset>
 void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
                            const cstone::Box<typename Dataset::RealType>&)
 {
-    d.minDtCourant = momentumAndEnergyIjLoop<avClean>(
+    using HydroType = typename Dataset::HydroType;
+    using namespace cstone::ijloop;
+
+    // allocate and initialize device reduction result
+    std::tuple<reduction::min<HydroType>> initial{};
+    auto deviceReductionResult = util::deviceAlloc<std::tuple<HydroType>>(cstone::execution::gpuDefaultStream);
+    static_assert(sizeof(std::tuple<reduction::min<HydroType>>) == sizeof(std::tuple<HydroType>));
+    checkGpuErrors(cudaMemcpyAsync(deviceReductionResult.get(), &initial, sizeof(initial), cudaMemcpyHostToDevice,
+                                   cstone::execution::gpuDefaultStream));
+
+    momentumAndEnergyIjLoop<avClean>(
         d.neighborhood, d.K, d.Kcour, d.Atmin, d.Atmax, d.ramp, rawPtr(d.vx), rawPtr(d.vy), rawPtr(d.vz), rawPtr(d.m),
         rawPtr(d.c), rawPtr(d.kx), rawPtr(d.alpha), rawPtr(d.xm), rawPtr(d.prho), rawPtr(d.c11), rawPtr(d.c12),
         rawPtr(d.c13), rawPtr(d.c22), rawPtr(d.c23), rawPtr(d.c33), rawPtr(d.nc), rawPtr(d.dV11), rawPtr(d.dV12),
         rawPtr(d.dV13), rawPtr(d.dV22), rawPtr(d.dV23), rawPtr(d.dV33), rawPtr(d.tdpdTrho), d.wh, rawPtr(d.du),
-        rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.dtCourant));
+        rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), rawPtr(d.dtCourant), deviceReductionResult.get());
+
+    // device-to-host transfer
+    std::tuple<HydroType> hostResult;
+    checkGpuErrors(cudaMemcpyAsync(&hostResult, deviceReductionResult.get(), sizeof(hostResult),
+                                   cudaMemcpyDeviceToHost, cstone::execution::gpuDefaultStream));
+    checkGpuErrors(cudaStreamSynchronize(cstone::execution::gpuDefaultStream));
+    d.minDtCourant = std::get<0>(hostResult);
 
     if (groupDt)
     {
