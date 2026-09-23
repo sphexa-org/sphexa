@@ -104,6 +104,7 @@ __device__ void approxAcc(Vec4<Ta> acc_i[TravConfig::nwt], const Vec4<Tc> pos_i[
     // With CheckValidity == false, all warp lanes are guaranteed to carry valid source cell
     // indices, so the loop below is free of control flow. This lets the compiler keep the M2P
     // contributions of consecutive source cells in flight together to hide instruction latency.
+#pragma unroll 4
     for (int j = 0; j < GpuConfig::warpSize; j++)
     {
         int currentCell = shflSync(cellIdx, j);
