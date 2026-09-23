@@ -36,17 +36,21 @@ HOST_DEVICE_FUN HOST_DEVICE_INLINE double inverseSquareRoot(double x)
 #elif defined(__CUDA_ARCH__)
     /*! @brief inline single-precision reciprocal square root
      *
-     * The hardware reciprocal square root (MUFU.RSQ) has ~2^-23 relative error. This matches the
-     * precision of the float multipoles the result is multiplied with and of the float
-     * accelerations it is accumulated into in the GPU gravity kernels, and is orders of
-     * magnitude below the Barnes-Hut multipole approximation error. It replaces the ~2 ulp
-     * double-precision libdevice rsqrt, whose special-case handling and Newton refinements
-     * are unnecessary at this accuracy level.
+     * The hardware reciprocal square root (MUFU.RSQ, PTX rsqrt.approx.f32) has ~2^-22 relative
+     * error. This matches the precision of the float multipoles the result is multiplied with
+     * and of the float accelerations it is accumulated into in the GPU gravity kernels, and is
+     * orders of magnitude below the Barnes-Hut multipole approximation error. It replaces the
+     * ~2 ulp double-precision libdevice rsqrt, whose special-case handling and Newton
+     * refinements are unnecessary at this accuracy level. The inline PTX form avoids the
+     * domain-check and scaling instructions that the rsqrtf() intrinsic emits.
      *
      * Note: unlike libdevice rsqrt, x == 0 returns inf; downstream use in P2P/M2P produces
-     * NaN either way for coincident particles with zero softening.
+     * NaN either way for coincident particles with zero softening. Negative x returns NaN.
      */
-    return double(rsqrtf(float(x)));
+    float xf = float(x);
+    float yf;
+    asm("rsqrt.approx.f32 %0, %1;" : "=f"(yf) : "f"(xf));
+    return double(yf);
 #else
     return 1.0 / std::sqrt(x);
 #endif
