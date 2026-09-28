@@ -49,7 +49,7 @@ HOST_DEVICE_FUN HOST_DEVICE_INLINE double inverseSquareRoot(double x)
      */
     float xf = float(x);
     float yf;
-    asm("rsqrt.approx.f32 %0, %1;" : "=f"(yf) : "f"(xf));
+    asm("rsqrt.approx.ftz.f32 %0, %1;" : "=f"(yf) : "f"(xf));
     return double(yf);
 #else
     return 1.0 / std::sqrt(x);
