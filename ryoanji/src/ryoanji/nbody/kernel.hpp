@@ -31,18 +31,18 @@ HOST_DEVICE_FUN HOST_DEVICE_INLINE float inverseSquareRoot(float x)
 
 HOST_DEVICE_FUN HOST_DEVICE_INLINE double inverseSquareRoot(double x)
 {
-#if defined(__HIP_DEVICE_COMPILE__)
     // perform a single-precision reciprocal square root, accumulated error should still be orders of magnitude below
     // Barnes-Hut approximation error
-    return double(rsqrtf(float(x)));
-#elif defined(__CUDA_ARCH__)
+#ifdef __CUDA_ARCH__
     // inline PTX using rsqrt.approx.ftz.f32 which flushes to zero and is much faster than rsqrtf when not using
     // fast-math
     float xf = float(x), yf;
     asm("rsqrt.approx.ftz.f32 %0, %1;" : "=f"(yf) : "f"(xf));
     return double(yf);
+#elif defined(__HIP_DEVICE_COMPILE__)
+    return double(rsqrtf(float(x)));
 #else
-    return 1.0 / std::sqrt(x);
+    return double(1.0f / std::sqrt(float(x)));
 #endif
 }
 
