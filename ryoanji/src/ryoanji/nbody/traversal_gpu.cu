@@ -74,13 +74,9 @@ __device__ __forceinline__ int ringAddr(const int i) { return i & (TravConfig::m
 template<class T>
 __host__ __device__ __forceinline__ bool applyMAC(Vec3<T> sourceCenter, T MAC, Vec3<T> targetCenter, Vec3<T> targetSize)
 {
-    // distance vector from the target bounding box to the source center per axis, where the
-    // target box is shrunk to a point; negative components are clamped to zero. Since
-    // dX + |dX| == 2*max(dX, 0), this is what the original formulation
-    //     dX = (|targetCenter - sourceCenter| - targetSize); dX = (dX + |dX|) * 0.5;
-    // computes, but without the redundant add/multiply round-trip.
-    Vec3<T> dX = max(abs(targetCenter - sourceCenter) - targetSize, Vec3<T>{T(0), T(0), T(0)});
-
+    Vec3<T> dX = abs(targetCenter - sourceCenter) - targetSize;
+    dX += abs(dX);
+    dX *= T(0.5);
     return norm2(dX) < MAC;
 }
 
