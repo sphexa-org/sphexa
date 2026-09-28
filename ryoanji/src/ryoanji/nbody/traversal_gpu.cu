@@ -92,7 +92,7 @@ __host__ __device__ __forceinline__ bool applyMAC(Vec3<T> sourceCenter, T MAC, V
  *
  * Number of computed M2P interactions per call is GpuConfig::warpSize^2 * TravConfig::nwt
  */
-template<bool CheckValidity, class Ta, class Tc, class Tf, class MType>
+template<bool CheckValidity = true, class Ta, class Tc, class Tf, class MType>
 __device__ void approxAcc(Vec4<Ta> acc_i[TravConfig::nwt], const Vec4<Tc> pos_i[TravConfig::nwt], const int cellIdx,
                           const Vec4<Tf>* __restrict__ srcCenter, const MType* __restrict__ Multipoles)
 {
@@ -238,7 +238,6 @@ __device__ util::tuple<unsigned, unsigned, unsigned>
         if (apxFillLevel >= GpuConfig::warpSize) // If queue is larger than warp size,
         {
             // Call M2P kernel
-            // Call M2P kernel: queue is full, all lanes carry valid cell indices
             approxAcc<false>(acc_i, pos_i, approxQueue, sourceCenter, Multipoles);
             apxFillLevel -= GpuConfig::warpSize;
             // pull down remaining source cell indices into now empty approxQueue
@@ -310,7 +309,7 @@ __device__ util::tuple<unsigned, unsigned, unsigned>
     if (apxFillLevel > 0) // If there are leftover approx cells
     {
         // Call M2P kernel
-        approxAcc<true>(acc_i, pos_i, laneIdx < apxFillLevel ? approxQueue : -1, sourceCenter, Multipoles);
+        approxAcc(acc_i, pos_i, laneIdx < apxFillLevel ? approxQueue : -1, sourceCenter, Multipoles);
 
         m2pCounter += apxFillLevel;
     }
