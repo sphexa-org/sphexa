@@ -102,8 +102,8 @@ __device__ void approxAcc(Vec4<Ta> acc_i[TravConfig::nwt], const Vec4<Tc> pos_i[
         int currentCell = shflSync(cellIdx, j);
         if (CheckValidity && currentCell < 0) { continue; }
 
-        Vec3<Tf> pos_j = makeVec3(srcCenter[currentCell]);
-        MType multipole_j = Multipoles[currentCell];
+        Vec3<Tf> pos_j       = makeVec3(srcCenter[currentCell]);
+        MType    multipole_j = Multipoles[currentCell];
 
 #pragma unroll
         for (int k = 0; k < TravConfig::nwt; k++)
