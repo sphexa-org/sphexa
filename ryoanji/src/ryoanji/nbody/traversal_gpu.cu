@@ -96,14 +96,6 @@ template<bool CheckValidity, class Ta, class Tc, class Tf, class MType>
 __device__ void approxAcc(Vec4<Ta> acc_i[TravConfig::nwt], const Vec4<Tc> pos_i[TravConfig::nwt], const int cellIdx,
                           const Vec4<Tf>* __restrict__ srcCenter, const MType* __restrict__ Multipoles)
 {
-    constexpr int termSize = MType{}.size();
-
-    using MValueType = typename MType::value_type;
-    auto* __restrict__ gm_M = reinterpret_cast<const MValueType*>(Multipoles);
-
-    // With CheckValidity == false, all warp lanes are guaranteed to carry valid source cell
-    // indices, so the loop below is free of control flow. This lets the compiler keep the M2P
-    // contributions of consecutive source cells in flight together to hide instruction latency.
 #pragma unroll 4
     for (int j = 0; j < GpuConfig::warpSize; j++)
     {
@@ -111,21 +103,7 @@ __device__ void approxAcc(Vec4<Ta> acc_i[TravConfig::nwt], const Vec4<Tc> pos_i[
         if (CheckValidity && currentCell < 0) { continue; }
 
         Vec3<Tf> pos_j = makeVec3(srcCenter[currentCell]);
-
-        // all lanes read the same source cell multipole: global loads of identical addresses are
-        // hardware broadcasts and stay L1-resident. Unlike shared-memory staging, this does not
-        // require a warp sync per source cell, so independent M2P chains can be software-pipelined.
-        // The loads are 16-byte vectorized: the multipole element size is a multiple of 16 bytes
-        // for all multipole types, so individual multipoles are 16-byte aligned in memory.
-        MType multipole_j;
-        constexpr int numChunks = sizeof(MType) / sizeof(uint4);
-        auto* __restrict__ gm_M4 = reinterpret_cast<const uint4*>(gm_M);
-#pragma unroll
-        for (int c = 0; c < numChunks; c++)
-        {
-            uint4 chunk = gm_M4[currentCell * numChunks + c];
-            memcpy(reinterpret_cast<char*>(&multipole_j) + c * sizeof(uint4), &chunk, sizeof(uint4));
-        }
+        MType multipole_j = Multipoles[currentCell];
 
 #pragma unroll
         for (int k = 0; k < TravConfig::nwt; k++)
