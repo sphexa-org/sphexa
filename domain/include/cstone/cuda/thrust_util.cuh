@@ -55,9 +55,9 @@ const T* rawPtr(const thrust::universal_vector<T, Alloc>& p)
 inline auto thrustExecPolicy(execution::Gpu exec)
 {
 #if defined(__HIPCC__)
-    return thrust::hip::par.on(exec);
+    return thrust::hip::par_nosync.on(exec);
 #else
-    return thrust::cuda::par.on(exec);
+    return thrust::cuda::par_nosync.on(exec);
 #endif
 }
 
