@@ -311,7 +311,8 @@ public:
     {
         closeStep();
         pathStep_ = path;
-        h5File_   = fileutils::openH5Part(path, H5_O_RDWR, comm_);
+        // read-only, such that files without write permission (e.g. owned by other users) can be read
+        h5File_ = fileutils::openH5Part(path, H5_O_RDONLY, comm_);
 
         if (H5GetNumSteps(h5File_) == 0) { return; }
 
