@@ -74,8 +74,10 @@ HOST_DEVICE_FUN T computeVecMacR2(KeyType prefix, Vec3<T> expCenter, float invTh
 
     Vec3<T> dX = expCenter - geoCenter;
 
-    T s   = sqrt(norm2(dX));
-    T l   = T(2.0) * max(geoSize);
+    T s = sqrt(norm2(dX));
+    // cell diagonal normalized to the edge length of a cube, identical to the max edge for cubic cells,
+    // but shorter for flat MixD cells whose extent along the shorter axes is less than the longest edge
+    T l   = T(2.0) * sqrt(norm2(geoSize) / T(3));
     T mac = l * invTheta + s;
 
     return mac * mac;
