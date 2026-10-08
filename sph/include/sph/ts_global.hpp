@@ -109,7 +109,9 @@ void computeTimestep(size_t first, size_t last, Dataset& d, Ts... extraTimesteps
     util::array<T, 3> varsIn{minDtLoc, 0, -T(d.size() - last + first)}, varsOut;
     if constexpr (d.useGpu) { varsIn[1] = -int(d.stackUsedGravity); }
     MPI_Allreduce(varsIn.data(), varsOut.data(), varsIn.size(), MpiType<T>{}, MPI_MIN, MPI_COMM_WORLD);
-    T minDtGlobal = varsOut[0];
+    //! @brief floor to guard against minDtAcc hitting exactly 0 when an overflowing acceleration
+    //! makes norm2(A) evaluate to inf; matches the initial minDt/minDt_m1 value in ParticlesData.
+    T minDtGlobal = std::max(varsOut[0], T(1e-12));
     if constexpr (d.useGpu) { d.stackUsedGravity = int(-varsOut[1]); }
     d.maxHalos = int(-varsOut[2]);
 
