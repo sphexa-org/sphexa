@@ -346,6 +346,53 @@ using IBox = SimpleBox<int>;
 template<class T>
 using FBox = SimpleBox<T>;
 
+/*! @brief per-axis bit-exponents of the extent of an octree node, relative to the full box extent
+ *
+ * @tparam KeyType   32- or 64-bit unsigned integer
+ * @param axesBits   per-axis SFC bit depth {bx, by, bz}, e.g. from Box::getBoxDimBits
+ * @param level      octree level of the node, e.g. from treeLevel(keyEnd - keyStart)
+ * @return           exponents {sx, sy, sz}, such that the node covers 2^-si of the box along axis i
+ *
+ * A node at @p level has height h = maxTreeLevel - level, i.e. that many levels remain below it. For
+ * mixed-dimension (MixD) boxes, an axis with bi bits is only subdivided once fewer than bi levels remain,
+ * so its extent saturates at the full box extent for h >= bi. This mirrors the min(bi, h) clamping that
+ * hilbertIBox applies to the integer node extents. For cubic boxes, all bi are maxTreeLevel and the
+ * exponents reduce to {level, level, level}.
+ *
+ * Example for axesBits {21, 19, 17} at level 3 (h = 18): {3, 1, 0}, i.e. the node spans an eighth of the
+ * box in x, half of it in y and all of it in z.
+ */
+template<class KeyType>
+HOST_DEVICE_FUN constexpr AxesBits nodeSizeExponents(const AxesBits& axesBits, unsigned level)
+{
+    assert(level <= maxTreeLevel<KeyType>{});
+    const unsigned height = maxTreeLevel<KeyType>{} - level;
+
+    AxesBits ret{0, 0, 0};
+    for (int axis = 0; axis < 3; ++axis)
+    {
+        ret[axis] = axesBits[axis] > height ? axesBits[axis] - height : 0u;
+    }
+    return ret;
+}
+
+/*! @brief per-axis extent of an octree node as a fraction of the box extent
+ *
+ * @tparam KeyType   32- or 64-bit unsigned integer
+ * @tparam T         float or double
+ * @param axesBits   per-axis SFC bit depth {bx, by, bz}, e.g. from Box::getBoxDimBits
+ * @param level      octree level of the node, e.g. from treeLevel(keyEnd - keyStart)
+ * @return           fractions {fx, fy, fz} with fi = 2^-si, see @a nodeSizeExponents
+ *
+ * The product fx * fy * fz is the node volume as a fraction of the box volume.
+ */
+template<class KeyType, class T>
+HOST_DEVICE_FUN constexpr Vec3<T> nodeSizeFractions(const AxesBits& axesBits, unsigned level)
+{
+    auto sizeExp = nodeSizeExponents<KeyType>(axesBits, level);
+    return {T(1) / T(1u << sizeExp[0]), T(1) / T(1u << sizeExp[1]), T(1) / T(1u << sizeExp[2])};
+}
+
 /*! @brief calculate floating point 3D center and radius of an integer box and bounding box pair
  *
  * @tparam T         float or double
