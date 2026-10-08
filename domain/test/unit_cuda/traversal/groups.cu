@@ -92,7 +92,7 @@ __global__ void findSplitTester(util::array<GpuConfig::ThreadMask, N>* splits)
         pos[lk[1]][2] -= 0.5;
     }
 
-    *splits = findSplits(pos, 3.01);
+    *splits = findSplits(pos, T(3.01));
 }
 
 TEST(TargetGroups, findSplits)
@@ -208,10 +208,22 @@ TEST(TargetGroups, makeSplits)
     }
 }
 
-TEST(TargetGroups, groupVolumes)
+/*! @brief group splitting test body, parametrized on the bounding box
+ *
+ * @param box       global bounding box, its x-extent has to be at least @a last so that the unit-spaced x
+ *                  coordinates below fit inside
+ * @param nodeEdge  edge length of the smallest leaf cell of any group, i.e. the cubic root of its volume
+ *                  expressed as a fraction of the box volume. This is the quantity the kernel derives from
+ *                  the leaf level and the per-axis SFC bit depths, and the reference value @p tolFactor is
+ *                  calibrated against.
+ *
+ * The kernel measures distances and interaction radii in units of the geometric mean of the box edges. The
+ * particles are placed along the box diagonal and the thresholds are expressed relative to their physical
+ * spacing, such that all reference values below are independent of the box, except for @p nodeEdge.
+ */
+template<class T, class KeyType>
+static void groupVolumesTest(const Box<T>& box, double nodeEdge)
 {
-    using T                        = double;
-    using KeyType                  = uint64_t;
     constexpr LocalIndex groupSize = 64;
 
     LocalIndex first        = 4;
@@ -219,8 +231,13 @@ TEST(TargetGroups, groupVolumes)
     LocalIndex numParticles = last - first;
     LocalIndex numGroups    = iceil(numParticles, groupSize);
 
-    Box<T> box(0, last);
-    double distCrit = std::cbrt(box.lx() * box.ly() * box.lz() / 64);
+    // consecutive particles are placed along the box diagonal, a unit step in x keeps all of them inside the box
+    T scaleY = box.ly() / box.lx();
+    T scaleZ = box.lz() / box.lx();
+    // physical distance between consecutive particles
+    T stepLength = std::sqrt(1 + scaleY * scaleY + scaleZ * scaleZ);
+    // distance between consecutive particles in the units of groupSplitsKernel
+    double spacing = stepLength / std::cbrt(box.lx() * box.ly() * box.lz());
 
     auto leaves = OctreeMaker<KeyType>{}.divide().divide(2).makeTree();
     // nodeIdx                   0  1 |2  3  4  5  6   7  8  9 |10  11  12 13 14 15
@@ -231,19 +248,19 @@ TEST(TargetGroups, groupVolumes)
 
     // these coordinates do not lie in the leaf cells specified by layout, but this is irrelevant for this test case
     thrust::device_vector<T> x(last), y(last), z(last), h(last);
-    thrust::sequence(x.begin(), x.end(), 0);
-    thrust::sequence(y.begin(), y.end(), 0);
-    thrust::sequence(z.begin(), z.end(), 0);
+    thrust::sequence(x.begin(), x.end(), T(0), T(1));
+    thrust::sequence(y.begin(), y.end(), T(0), scaleY);
+    thrust::sequence(z.begin(), z.end(), T(0), scaleZ);
     thrust::fill(h.begin(), h.end(), box.maxExtent());
     // particle 6 in 2nd group get a smaller interaction radius, just enough to cause a split
-    h[first + groupSize + 6] = 0.99 * std::sqrt(3.) / 2;
+    h[first + groupSize + 6] = 0.99 * stepLength / 2;
     // particle 7 in 2nd group's radius is just big enough not to cause a split
-    h[first + groupSize + 7] = 1.01 * std::sqrt(3.) / 2;
+    h[first + groupSize + 7] = 1.01 * stepLength / 2;
 
     // introduce a split by increasing distance between particles 5 and 6
     x[5] -= 0.01;
-    y[5] -= 0.01;
-    z[5] -= 0.01;
+    y[5] -= 0.01 * scaleY;
+    z[5] -= 0.01 * scaleZ;
 
     thrust::device_vector<LocalIndex> groupDiv(numGroups);
     thrust::device_vector<SplitType> splitMasks(numGroups);
@@ -254,7 +271,7 @@ TEST(TargetGroups, groupVolumes)
     unsigned numThreads = 256;
     unsigned gridSize   = numGroups * GpuConfig::warpSize;
     {
-        float tolFactor = std::sqrt(3.0) / distCrit * 1.01;
+        float tolFactor = spacing / nodeEdge * 1.01;
         groupSplitsKernel<groupSize, T><<<iceil(gridSize, numThreads), numThreads>>>(
             first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves), nNodes(leaves), rawPtr(d_layout),
             box, tolFactor, rawPtr(splitMasks), rawPtr(groupDiv), numGroups);
@@ -264,7 +281,7 @@ TEST(TargetGroups, groupVolumes)
         EXPECT_EQ(h_groupDiv, ref);
     }
     {
-        float tolFactor = std::sqrt(3.0) / distCrit * 0.99;
+        float tolFactor = spacing / nodeEdge * 0.99;
         groupSplitsKernel<groupSize, T><<<iceil(gridSize, numThreads), numThreads>>>(
             first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves), nNodes(leaves), rawPtr(d_layout),
             box, tolFactor, rawPtr(splitMasks), rawPtr(groupDiv), numGroups);
@@ -281,7 +298,7 @@ TEST(TargetGroups, groupVolumes)
 
         StreamHolder stream;
 
-        float tolFactor = std::sqrt(3.0) / distCrit * 1.01;
+        float tolFactor = spacing / nodeEdge * 1.01;
         computeGroupSplits(stream.exec(), first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves),
                            nNodes(leaves), rawPtr(d_layout), box, groupSize, tolFactor, temp, groups);
         stream.sync();
@@ -290,4 +307,23 @@ TEST(TargetGroups, groupVolumes)
         std::vector<LocalIndex> ref{4, 6, 68, 75, 128};
         EXPECT_EQ(h_groups, ref);
     }
+}
+
+TEST(TargetGroups, groupVolumes)
+{
+    using T       = double;
+    using KeyType = uint64_t;
+
+    // cubic box, axesBits (21, 21, 21): the smallest leaf is a level-2 node covering 1/4 of each axis
+    groupVolumesTest<T, KeyType>(Box<T>(0, 128), 1.0 / 4);
+}
+
+TEST(TargetGroups, groupVolumesMixD)
+{
+    using T       = double;
+    using KeyType = uint64_t;
+
+    // mixed-dimension box, axesBits (21, 20, 19): at level 2, only x has been subdivided twice, y once and z
+    // not at all, so the smallest leaf covers (1/4, 1/2, 1) of the box, an edge length of cbrt(1/8) = 1/2
+    groupVolumesTest<T, KeyType>(Box<T>(0, 128, 0, 64, 0, 32), 1.0 / 2);
 }
