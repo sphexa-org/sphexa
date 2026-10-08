@@ -11,7 +11,5 @@ target_include_directories(${exename} PRIVATE ${DISK_DIR} ${CSTONE_DIR} ${SPH_DI
 
 target_link_libraries(${exename} PRIVATE ${MPI_CXX_LIBRARIES} GTest::gtest_main OpenMP::OpenMP_CXX)
 
-set(cmd ${exename})
-list(PREPEND cmd "${MPIEXEC_EXECUTABLE}" " " "${MPIEXEC_NUMPROC_FLAG}" " 2 ")
-add_test(NAME ${testname} COMMAND ${cmd})
+add_test(NAME ${testname} COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 $<TARGET_FILE:${exename}>)
 install(TARGETS ${exename} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/physics)

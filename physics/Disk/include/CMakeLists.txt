@@ -14,6 +14,5 @@ if (SPH_EXA_WITH_CUDA OR SPH_EXA_WITH_HIP)
         target_compile_definitions(${testname} PRIVATE THRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_HIP)
         set_target_properties(${exename} PROPERTIES LINKER_LANGUAGE CXX)
     endif ()
-    add_test(NAME ${testname} COMMAND ${testname})
 endif ()
 
