@@ -45,7 +45,7 @@ def parse_args() -> argparse.Namespace:
         "--level",
         type=int,
         default=0,
-        help="Oct number level from right for hilbertMixDIBox (0 = leaves, default: 0).",
+        help="Spatial hybrid tree level from right for hilbertMixDIBox (0 = leaves, default: 0).",
     )
     parser.add_argument(
         "--save",
@@ -154,7 +154,7 @@ def main() -> None:
         raise SystemExit(f"--level must be <= tree_height ({tree_height})")
     print(f"Using maxTreeLevel={max_level} for key_type={args.key_type}, effective tree_height={tree_height}")
 
-    octree_level = tree_height - args.level  # adjust for level-from-right
+    tree_level = tree_height - args.level  # adjust for level-from-right
 
     if args.bits is None:
         bx_full, by_full, bz_full = map(int, cstone_sfc.getBoxDimBits(box_limits, args.key_type))
@@ -179,7 +179,7 @@ def main() -> None:
     key = 0
     for node_idx in range(total_nodes):
         print(f"Visiting key {key} (octal: {oct(key)})...")
-        ibox_arr = cstone_sfc.hilbertIBox(key, octree_level, bx, by, bz, args.key_type)
+        ibox_arr = cstone_sfc.hilbertIBox(key, tree_level, bx, by, bz, args.key_type)
         ibox = (int(ibox_arr[0]), int(ibox_arr[1]), int(ibox_arr[2]), int(ibox_arr[3]), int(ibox_arr[4]), int(ibox_arr[5]))
         center, size = cstone_sfc.centerAndSize(ibox, box_limits, args.key_type)
         if not (size[0] <= 0 and size[1] <= 0 and size[2] <= 0):
@@ -196,8 +196,8 @@ def main() -> None:
                 print(f"Processed {len(xs)} points...")
 
         # increase_key position is counted from the left (0..max_level), while args.level is from the right.
-        # increase_key is used to create the keys of the leaf nodes of the octree at the specified level.
-        next_key = increase_key(key, octree_level, bx, by, bz, max_level)
+        # increase_key is used to create the keys of the leaf nodes of the spatial hybrid tree at the specified level.
+        next_key = increase_key(key, tree_level, bx, by, bz, max_level)
         if node_idx == total_nodes - 1:
             break
         if next_key <= key:
@@ -250,6 +250,10 @@ def main() -> None:
     else:
         print("Largest distance between two consecutive points: N/A (only one point)")
 
+    key_bits = "64-bit" if args.key_type == "uint64_t" else "32-bit"
+    title = "Mixed dimensional Hilbert curve box centers of the spatial hybrid tree"
+    subtitle = f"(bx, by, bz) = ({bx}, {by}, {bz}), {key_bits} keys, level {args.level} from the bottom of the tree (0 = leaves)"
+
     output_path = Path(args.save) if args.save else Path(f'plots/sfc_{args.lx}_{args.ly}_{args.lz}_level{args.level}_{args.key_type}.png')
     ext = output_path.suffix.lower() if output_path else ''
 
@@ -267,14 +271,20 @@ def main() -> None:
             ax.plot([xs[max_idx], xs[max_idx_next]], [ys[max_idx], ys[max_idx_next]], [zs[max_idx], zs[max_idx_next]],
                     color="orange", linewidth=2.0, linestyle="--")
         ax.legend()
-        ax.set_title(
-            f"MixD Hilbert curve centers (bx, by, bz)=({bx}, {by}, {bz}), key_type={args.key_type}, "
-            f"level={args.level}"
-        )
         ax.set_xlabel("x")
         ax.set_ylabel("y")
         ax.set_zlabel("z")
         ax.set_box_aspect((args.lx, args.ly, args.lz))
+        # Title on top and the parameters in a smaller line under it, both centred on everything else drawn (which is
+        # what the tight crop keeps), so they sit in the middle of the saved image rather than over the 3D axes.
+        fig.canvas.draw()  # the 3D tick labels are only placed on drawing
+        renderer = fig.canvas.get_renderer()
+        content = ax.get_tightbbox(renderer).transformed(fig.transFigure.inverted())
+        x_mid = (content.x0 + content.x1) / 2
+        pt = 1 / (fig.get_size_inches()[1] * 72)  # one point in figure fraction (vertical)
+        sub = fig.text(x_mid, content.y1 + 4 * pt, subtitle, ha="center", va="bottom", fontsize=10)
+        fig.text(x_mid, content.y1 + 4 * pt + sub.get_window_extent(renderer).height / fig.dpi * 72 * pt + 4 * pt,
+                 title, ha="center", va="bottom", fontsize=12)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(str(output_path), dpi=180, bbox_inches="tight")
         print(f"Saved static image to {output_path}")
@@ -319,7 +329,7 @@ def main() -> None:
         aspect_x, aspect_y, aspect_z = args.lx / max_len, args.ly / max_len, args.lz / max_len
 
         layout = go.Layout(
-            title=f"MixD Hilbert curve centers (bx, by, bz)=({bx}, {by}, {bz}), key_type={args.key_type}, level={args.level}",
+            title=f"{title}<br><sup>{subtitle}</sup>",
             scene=dict(
                 xaxis_title='x',
                 yaxis_title='y',
