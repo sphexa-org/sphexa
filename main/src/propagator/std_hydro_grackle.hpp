@@ -145,8 +145,14 @@ public:
                         std::tuple_cat(std::tie(get<"m">(d)), get<ConservedFields>(d)), get<DependentFields>(d));
         }
 
+        // sync stores the SFC ordering in the LAST scratch buffer, i.e. the last of DependentFields, and
+        // reapplySync needs that ordering. By taking a reference to the last element of the DependentFields tuple,
+        // we can pass it to reapplySync without having to know the field name in case of future changes to the
+        // DependentFields list.
+        auto                      scratchFields = get<DependentFields>(d);
+        auto&                     sfcOrder = std::get<std::tuple_size_v<decltype(scratchFields)> - 1>(scratchFields);
         std::vector<ChemRealType> scratch1, scratch2;
-        domain.reapplySync(get<CoolingFields>(simData.chem), scratch1, scratch2, get<"nc">(d));
+        domain.reapplySync(get<CoolingFields>(simData.chem), scratch1, scratch2, sfcOrder);
         d.treeView = domain.octreeProperties();
     }
 
