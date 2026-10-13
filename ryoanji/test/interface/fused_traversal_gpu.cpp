@@ -174,7 +174,8 @@ static int fusedTraversalTest(int thisRank, int numRanks)
     }
 
     // CPU leaf-range traversal from identical state, compared to the fused GPU result
-    // within the Barnes-Hut approximation tolerance
+    // within the Barnes-Hut approximation tolerance. The local leaf-cell range mirrors
+    // the group-free MultipoleHolderCpu::traverse path at propagator level.
     {
         auto cpToHost = []<class X>(const X* ptr, int n)
         {
@@ -201,9 +202,9 @@ static int fusedTraversalTest(int thisRank, int numRanks)
 
         T egravTot_cpu = 0;
         computeGravity(child.data(), parents.data(), intToLeaf.data(), centers_cpu.data(), multipoles_cpu.data(),
-                       layout.data(), 0, octree.numLeafNodes, x_cpu.data(), y_cpu.data(), z_cpu.data(), h_cpu.data(),
-                       m_cpu.data(), box, G, (T*)nullptr, ax_cpu.data(), ay_cpu.data(), az_cpu.data(), &egravTot_cpu,
-                       numShells);
+                       layout.data(), domain.startCell(), domain.endCell(), x_cpu.data(), y_cpu.data(), z_cpu.data(),
+                       h_cpu.data(), m_cpu.data(), box, G, (T*)nullptr, ax_cpu.data(), ay_cpu.data(), az_cpu.data(),
+                       &egravTot_cpu, numShells);
 
         auto dl = [](auto* p1, auto* p2)
         {

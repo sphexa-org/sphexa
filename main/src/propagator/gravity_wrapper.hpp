@@ -71,6 +71,17 @@ public:
 
     void traverse(cstone::GroupView /*grp*/, DataType& d, const DomainType& domain)
     {
+        //! the CPU traversal is range-based, the group parameter is not used
+        traverse(d, domain);
+    }
+
+    /*! @brief compute gravity accelerations from the domain and particles alone
+     *
+     * Group-free counterpart of the group-based traverse overload: the CPU traversal
+     * processes targets by leaf-cell ranges, no precomputed groups are involved.
+     */
+    void traverse(DataType& d, const DomainType& domain)
+    {
         //! includes tree plus associated information, like peer ranks, assignment, counts, centers, etc
         const auto& focusTree = domain.focusTree();
         //! the focused octree, structure only
@@ -160,6 +171,48 @@ public:
             computeGravityEwaldGpu(makeVec3(rootCenter), rootM, grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m),
                                    box, d.g, rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), &d.egrav,
                                    ewaldSettings_);
+        }
+
+        d.stackUsedGravity = stats[4];
+    }
+
+    /*! @brief compute gravity accelerations from the domain and particles alone
+     *
+     * Group-free counterpart of the group-based traverse overload: the target groups
+     * are determined in-register inside the gravity traversal kernel with the spatial
+     * compactness criterion, such that no call to computeSpatialGroups and no
+     * device-to-host synchronization precede the traversal launch.
+     */
+    void traverse(DataType& d, const DomainType& domain)
+    {
+        using namespace cstone;
+
+        const auto& box       = domain.box();
+        bool        usePbc    = box.boundaryX() == BoundaryType::periodic;
+        int         numShells = usePbc ? ewaldSettings_.numReplicaShells : 0;
+
+        d.egrav = mHolder_.compute(rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m), rawPtr(d.h), d.g, numShells,
+                                   domain.startIndex(), domain.endIndex(), domain.focusTree(),
+                                   domain.layout().data(), domain.box(), rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay),
+                                   rawPtr(d.az));
+
+        auto stats = mHolder_.readStats();
+
+        auto maxP2P = stats[1];
+        if (maxP2P == 0xFFFFFFFF) { throw std::runtime_error("GPU traversal stack exhausted in Barnes-Hut\n"); }
+
+        if (usePbc)
+        {
+            ryoanji::Vec4<Tf> rootCenter;
+            memcpyD2HAsync(execution::gpuDefaultStream, domain.focusTree().expansionCentersAcc().data(), 1,
+                           &rootCenter);
+            MType rootM;
+            memcpyD2HAsync(execution::gpuDefaultStream, mHolder_.deviceMultipoles(), 1, &rootM);
+            syncGpu(execution::gpuDefaultStream);
+
+            computeGravityEwaldGpu(makeVec3(rootCenter), rootM, domain.startIndex(), domain.endIndex(), rawPtr(d.x),
+                                   rawPtr(d.y), rawPtr(d.z), rawPtr(d.m), box, d.g, rawPtr(d.ugrav), rawPtr(d.ax),
+                                   rawPtr(d.ay), rawPtr(d.az), &d.egrav, ewaldSettings_);
         }
 
         d.stackUsedGravity = stats[4];
