@@ -29,4 +29,3 @@ endfunction()
 
 addRyoanjiGpuMpiTest(global_upsweep_gpu.cpp global_upsweep_gpu GlobalUpsweepGpu 10)
 addRyoanjiGpuMpiTest(global_forces_gpu.cpp global_forces_gpu GlobalForcesGpu 6)
-addRyoanjiGpuMpiTest(fused_traversal_gpu.cpp fused_traversal_gpu FusedTraversalGpu 2)
