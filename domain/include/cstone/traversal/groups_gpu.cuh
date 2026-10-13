@@ -77,6 +77,83 @@ __device__ util::array<GpuConfig::ThreadMask, N> findSplits(util::array<Vec4<T>,
     return splits;
 }
 
+/*! @brief evaluate the spatial compactness criterion for one fixed-size target group
+ *
+ * Determines the split boundaries of the fixed-size group starting at particle index @p bodyBegin:
+ * two consecutive particles of the group are split when they are farther apart than the smaller of
+ * (tolFactor times the edge length of the smallest leaf cell occupied by any particle of the group)
+ * or twice their smoothing length. Particle loads beyond @p last - 1 are clamped, such that the
+ * trailing lanes of the last fixed group of a particle range re-load the last particle.
+ *
+ * This is the single source of truth for the split criterion, shared between the standalone
+ * split kernels and fused traversals that compute the split in-register.
+ *
+ * @tparam groupSize   number of particles per fixed group, a multiple of GpuConfig::warpSize
+ * @tparam Tc          float or double, type of the particle coordinates
+ * @tparam Th          float or double, type of the particle smoothing lengths
+ * @tparam KeyType     32- or 64-bit unsigned integer
+ * @param[in] bodyBegin  particle index of the first particle of the fixed group
+ * @param[in] last       index one past the last particle of the range
+ * @param[in] x          local x particle coordinates
+ * @param[in] y          local y particle coordinates
+ * @param[in] z          local z particle coordinates
+ * @param[in] h          local smoothing lengths, may be nullptr
+ * @param[in] leaves     cornerstone leaf-cell array, size is @p numLeaves + 1
+ * @param[in] numLeaves  number of leaves in @p leaves
+ * @param[in] layout     layout[i] is the particle index of the first particle in leaf i
+ * @param[in] box        global coordinate bounding box
+ * @param[in] tolFactor  maximum distance between consecutive particles is
+ *                       tolFactor * cbrt(smallest leaf-cell volume in group)
+ * @return               a warp-uniform thread mask with a 1-bit at the position of the last
+ *                       particle of each subgroup
+ */
+template<unsigned groupSize, class Tc, class Th, class KeyType>
+__device__ util::array<GpuConfig::ThreadMask, groupSize / GpuConfig::warpSize> evalGroupSplitMask(
+    LocalIndex bodyBegin, LocalIndex last, const Tc* x, const Tc* y, const Tc* z, const Th* h, const KeyType* leaves,
+    TreeNodeIndex numLeaves, const LocalIndex* layout, const Box<Tc> box, float tolFactor)
+{
+    constexpr LocalIndex nwt = groupSize / GpuConfig::warpSize;
+
+    LocalIndex laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
+
+    LocalIndex bodyIdx[nwt];
+    for (LocalIndex k = 0; k < nwt; ++k)
+    {
+        bodyIdx[k] = imin(bodyBegin + k * GpuConfig::warpSize + laneIdx, last - 1);
+    }
+
+    TreeNodeIndex leafIdx[nwt];
+    for (LocalIndex k = 0; k < nwt; ++k)
+    {
+        leafIdx[k] = stl::upper_bound(layout, layout + numLeaves, bodyIdx[k]) - layout - 1;
+    }
+
+    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
+    Box<Th> unitBox(0, 1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[0])), 0,
+                    1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[1])), 0,
+                    1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[2])));
+    Th nodeVolume = 1;
+    for (LocalIndex k = 0; k < nwt; ++k)
+    {
+        auto nodeIBox = sfcIBox(sfcKey<KeyType>(leaves[leafIdx[k]]), sfcKey<KeyType>(leaves[leafIdx[k] + 1]), axesBits);
+        auto [nodeCenter, nodeSize] = centerAndSize<KeyType>(nodeIBox, unitBox);
+        Th vol                       = 8 * nodeSize[0] * nodeSize[1] * nodeSize[2];
+        nodeVolume                  = vol > 0 ? min(vol, nodeVolume) : nodeVolume;
+    }
+    nodeVolume  = warpMin(nodeVolume);
+    Tc distCrit = std::cbrt(nodeVolume) * tolFactor;
+
+    // load target coordinates scaled to the unit cube
+    util::array<Vec4<Tc>, nwt> pos_i;
+    for (LocalIndex k = 0; k < nwt; k++)
+    {
+        pos_i[k] = {x[bodyIdx[k]] * box.ilx(), y[bodyIdx[k]] * box.ily(), z[bodyIdx[k]] * box.ilz(),
+                    h ? Tc(2) * h[bodyIdx[k]] / box.minExtent() : Tc(1)};
+    }
+
+    return findSplits(pos_i, distCrit * distCrit);
+}
+
 /*! @brief Count number of zero bits between 1-bits for the bitstream defined by @p splits
  *
  * @tparam N                  number of particles per thread
@@ -170,42 +247,8 @@ __global__ void groupSplitsKernel(LocalIndex first,
 
     if (warpIdx * groupSize >= last - first) { return; }
 
-    LocalIndex bodyIdx[nwt];
-    for (LocalIndex k = 0; k < nwt; ++k)
-    {
-        bodyIdx[k] = imin(first + warpIdx * groupSize + k * GpuConfig::warpSize + laneIdx, last - 1);
-    }
-
-    TreeNodeIndex leafIdx[nwt];
-    for (LocalIndex k = 0; k < nwt; ++k)
-    {
-        leafIdx[k] = stl::upper_bound(layout, layout + numLeaves, bodyIdx[k]) - layout - 1;
-    }
-
-    const auto axesBits = box.getBoxDimBits(maxTreeLevel<KeyType>{});
-    Box<T> unitBox(0, 1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[0])), 0,
-                   1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[1])), 0,
-                   1 / (1 << (maxTreeLevel<KeyType>{} - axesBits[2])));
-    T nodeVolume = 1;
-    for (LocalIndex k = 0; k < nwt; ++k)
-    {
-        auto nodeIBox = sfcIBox(sfcKey<KeyType>(leaves[leafIdx[k]]), sfcKey<KeyType>(leaves[leafIdx[k] + 1]), axesBits);
-        auto [nodeCenter, nodeSize] = centerAndSize<KeyType>(nodeIBox, unitBox);
-        T vol                       = 8 * nodeSize[0] * nodeSize[1] * nodeSize[2];
-        nodeVolume                  = vol > 0 ? min(vol, nodeVolume) : nodeVolume;
-    }
-    nodeVolume  = warpMin(nodeVolume);
-    Tc distCrit = std::cbrt(nodeVolume) * tolFactor;
-
-    // load target coordinates
-    util::array<Vec4<Tc>, nwt> pos_i;
-    for (LocalIndex k = 0; k < nwt; k++)
-    {
-        pos_i[k] = {x[bodyIdx[k]] * box.ilx(), y[bodyIdx[k]] * box.ily(), z[bodyIdx[k]] * box.ilz(),
-                    h ? Tc(2) * h[bodyIdx[k]] / box.minExtent() : Tc(1)};
-    }
-
-    auto splitMask = findSplits(pos_i, distCrit * distCrit);
+    auto splitMask = evalGroupSplitMask<groupSize, Tc, T, KeyType>(first + warpIdx * groupSize, last, x, y, z, h,
+                                                                   leaves, numLeaves, layout, box, tolFactor);
 
     if (laneIdx == 0)
     {
