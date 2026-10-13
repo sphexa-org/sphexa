@@ -103,6 +103,24 @@ public:
                         ay, az, (int*)rawPtr(traversalStack_));
     }
 
+    float compute(const Tc* x, const Tc* y, const Tc* z, const Tm* m, const Th* h, Tc G, int numShells,
+                  LocalIndex first, LocalIndex last,
+                  const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
+                  const cstone::LocalIndex* layout, const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az)
+    {
+        auto  d_leaves  = focusTree.treeLeavesAcc();
+        float tolFactor = 2.0f;
+
+        // the fixed-group count is host-computable, no device-to-host sync is needed before the launch
+        LocalIndex numFixedGroups = cstone::iceil(last - first, LocalIndex(bhMaxTargetSize()));
+        reallocate(traversalStack_, stackSize(numFixedGroups), 1.01);
+
+        return traverse(first, last, d_leaves.data(), TreeNodeIndex(d_leaves.size() - 1), layout, box, tolFactor, 1,
+                        x, y, z, m, h, octree_.childOffsets, octree_.internalToLeaf, centers_, rawPtr(multipoles_), G,
+                        numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()}, ugrav, ax, ay, az,
+                        (int*)rawPtr(traversalStack_));
+    }
+
     float compute(GroupView grp, const Tc* xt, const Tc* yt, const Tc* zt, const Tm* mt, const Th* ht, const Tc* xs,
                   const Tc* ys, const Tc* zs, const Tm* ms, const Th* hs, Tc G, int numShells,
                   const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az)
@@ -173,6 +191,18 @@ float MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::compute(GroupView grp
                                                                    Ta* ay, Ta* az)
 {
     return impl_->compute(grp, x, y, z, m, h, G, numShells, box, ugrav, ax, ay, az);
+}
+
+template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
+float MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::compute(const Tc* x, const Tc* y, const Tc* z, const Tm* m,
+                                                                   const Th* h, Tc G, int numShells, LocalIndex first,
+                                                                   LocalIndex last,
+                                                                   const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
+                                                                   const cstone::LocalIndex* layout,
+                                                                   const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax,
+                                                                   Ta* ay, Ta* az)
+{
+    return impl_->compute(x, y, z, m, h, G, numShells, first, last, focusTree, layout, box, ugrav, ax, ay, az);
 }
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>

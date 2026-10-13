@@ -17,6 +17,7 @@
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/primitives/math.hpp"
 #include "cstone/primitives/warpscan.cuh"
+#include "cstone/traversal/groups_gpu.cuh"
 #include "cartesian_qpole.hpp"
 #include "kernel.hpp"
 #include "traversal_gpu.h"
@@ -371,6 +372,153 @@ __global__ void resetTraversalCounters()
     targetCounterGlob  = 0;
 }
 
+/*! @brief traverse one group of up to TravConfig::targetSize target particles down the tree
+ *
+ * This is the per-group body of the Barnes-Hut traversal kernels: it computes the
+ * accelerations of the target particles in [bodyBegin : bodyEnd) and adds them to the
+ * output arrays.
+ *
+ * @param[in]    bodyBegin      first target particle index of the group
+ * @param[in]    bodyEnd        one past the last target particle index of the group
+ * @param[in]    mt             target body masses
+ * @param[in]    xt,yt,zt,ht    target bodies, in SFC order
+ * @param[in]    xs,ys,zs,ms,hs source bodies, in SFC order as used for tree-build and as referenced by layout
+ * @param[in]    childOffsets   location (index in [0:numTreeNodes]) of first child of each cell, 0 indicates a leaf
+ * @param[in]    internalToLeaf for each cell in [0:numTreeNodes], stores the leaf cell (cstone) index in [0:numLeaves]
+ *                              if the cell is not a leaf, the value is negative
+ * @param[in]    layout         for each leaf cell in [0:numLeaves], stores the index of the first source body in cell
+ * @param[in]    sourceCenter   x,y,z center and square MAC radius of each cell in [0:numTreeNodes]
+ * @param[in]    Multipoles     cell multipoles, on device
+ * @param[in]    initNodeIdx    traversal will be started with all children of the parent of @p initNodeIdx
+ * @param[in]    G              gravitational constant
+ * @param[in]    numShells      number of periodic replicas in each dimension to include
+ * @param[in]    boxL           length of coordinate bounding box in each dimension
+ * @param[inout] p              output body potential to add to if not nullptr
+ * @param[inout] ax, ay, az     output body acceleration to add to
+ * @param[-]     tempQueue      shared mem int pointer to GpuConfig::warpSize ints, uninitialized
+ * @param[-]     cellQueue      pointer to TravConfig::memPerWarp ints of warp-specific space global memory
+ */
+template<class Tc, class Th, class Tm, class Ta, class Tf, class MType>
+__device__ void traverseGroup(const int bodyBegin, const int bodyEnd, const Tm* __restrict__ mt,
+                              const Tc* __restrict__ xt, const Tc* __restrict__ yt, const Tc* __restrict__ zt,
+                              const Th* __restrict__ ht, const Tc* __restrict__ xs, const Tc* __restrict__ ys,
+                              const Tc* __restrict__ zs, const Tm* __restrict__ ms, const Th* __restrict__ hs,
+                              const TreeNodeIndex* __restrict__ childOffsets,
+                              const TreeNodeIndex* __restrict__ internalToLeaf, const LocalIndex* __restrict__ layout,
+                              const Vec4<Tf>* __restrict__ sourceCenter, const MType* __restrict__ Multipoles,
+                              const int initNodeIdx, Tc G, int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay,
+                              Ta* az, int* tempQueue, int* cellQueue)
+{
+    const int laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
+
+    // load target coordinates
+    Vec4<Tc> pos_i[TravConfig::nwt];
+    for (int i = 0; i < TravConfig::nwt; i++)
+    {
+        int bodyIdx = imin(bodyBegin + i * GpuConfig::warpSize + laneIdx, bodyEnd - 1);
+        pos_i[i]    = {xt[bodyIdx], yt[bodyIdx], zt[bodyIdx], ht[bodyIdx]};
+    }
+
+    Vec3<Tc> Xmin = makeVec3(pos_i[0]);
+    Vec3<Tc> Xmax = makeVec3(pos_i[0]);
+    for (int i = 1; i < TravConfig::nwt; i++)
+    {
+        Xmin = min(Xmin, makeVec3(pos_i[i]));
+        Xmax = max(Xmax, makeVec3(pos_i[i]));
+    }
+
+    Xmin = {warpMin(Xmin[0]), warpMin(Xmin[1]), warpMin(Xmin[2])};
+    Xmax = {warpMax(Xmax[0]), warpMax(Xmax[1]), warpMax(Xmax[2])};
+
+    Vec3<Tf>       targetCenter = (Xmax + Xmin) * Tf(0.5);
+    const Vec3<Tf> targetSize   = (Xmax - Xmin) * Tf(0.5);
+
+    Vec4<Tf> acc_i[TravConfig::nwt];
+    for (int i = 0; i < TravConfig::nwt; i++)
+    {
+        acc_i[i] = Vec4<Tc>{Tc(0), Tc(0), Tc(0), Tc(0)};
+    }
+
+    unsigned numM2P = 0, numP2P = 0, maxStack = 0;
+    for (int iz = -numShells; iz <= numShells; ++iz)
+    {
+        for (int iy = -numShells; iy <= numShells; ++iy)
+        {
+            for (int ix = -numShells; ix <= numShells; ++ix)
+            {
+                {
+                    Vec3<Tf> pbcShift{ix * boxL[0], iy * boxL[1], iz * boxL[2]};
+                    targetCenter += pbcShift;
+                    for (int i = 0; i < TravConfig::nwt; i++)
+                    {
+                        pos_i[i][0] += pbcShift[0];
+                        pos_i[i][1] += pbcShift[1];
+                        pos_i[i][2] += pbcShift[2];
+                    }
+                }
+
+                auto [numM2P_, numP2P_, maxStack_] =
+                    traverseWarp(acc_i, pos_i, targetCenter, targetSize, xs, ys, zs, ms, hs, childOffsets,
+                                 internalToLeaf, layout, sourceCenter, Multipoles, initNodeIdx, tempQueue, cellQueue);
+
+                {
+                    Vec3<Tf> pbcShift{ix * boxL[0], iy * boxL[1], iz * boxL[2]};
+                    targetCenter -= pbcShift;
+                    for (int i = 0; i < TravConfig::nwt; i++)
+                    {
+                        pos_i[i][0] -= pbcShift[0];
+                        pos_i[i][1] -= pbcShift[1];
+                        pos_i[i][2] -= pbcShift[2];
+                    }
+                }
+
+                assert(numM2P_ != 0xFFFFFFFF && numP2P_ != 0xFFFFFFFF);
+                numM2P += numM2P_;
+                numP2P += numP2P_;
+                maxStack = max(maxStack, maxStack_);
+            }
+        }
+    }
+
+    const int bodyIdxLane = bodyBegin + laneIdx;
+
+    float warpPotential = 0;
+    for (int i = 0; i < TravConfig::nwt; i++)
+    {
+        const int bodyIdx = bodyIdxLane + i * GpuConfig::warpSize;
+        if (bodyIdx < bodyEnd) { warpPotential += mt[bodyIdx] * acc_i[i][0]; }
+    }
+
+#pragma unroll
+    for (int i = 0; i < GpuConfig::warpSizeLog2; i++)
+    {
+        warpPotential += shflXorSync(warpPotential, 1 << i);
+    }
+
+    if (laneIdx == 0)
+    {
+        int targetGroupSize = bodyEnd - bodyBegin;
+        atomicMax(&bhStats[BhStats::maxP2P], numP2P);
+        atomicAdd(&bhStats[BhStats::sumP2P], numP2P * targetGroupSize);
+        atomicMax(&bhStats[BhStats::maxM2P], numM2P);
+        atomicAdd(&bhStats[BhStats::sumM2P], numM2P * targetGroupSize);
+        atomicMax(&bhStats[BhStats::maxStack], maxStack);
+        atomicAdd(&totalPotentialGlob, warpPotential);
+    }
+
+    for (int i = 0; i < TravConfig::nwt; i++)
+    {
+        const int bodyIdx = bodyIdxLane + i * GpuConfig::warpSize;
+        if (bodyIdx < bodyEnd)
+        {
+            if (p) { p[bodyIdx] += G * mt[bodyIdx] * acc_i[i][0]; }
+            ax[bodyIdx] += G * acc_i[i][1];
+            ay[bodyIdx] += G * acc_i[i][2];
+            az[bodyIdx] += G * acc_i[i][3];
+        }
+    }
+}
+
 /*! @brief Compute approximate body accelerations with Barnes-Hut
  *
  * @param[in]    grp            groups of target particles to compute accelerations for
@@ -436,114 +584,117 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
 
         if (targetIdx >= grp.numGroups) return;
 
-        const int bodyBegin = grp.groupStart[targetIdx];
-        const int bodyEnd   = grp.groupEnd[targetIdx];
+        traverseGroup(grp.groupStart[targetIdx], grp.groupEnd[targetIdx], mt, xt, yt, zt, ht, xs, ys, zs, ms, hs,
+                      childOffsets, internalToLeaf, layout, sourceCenter, Multipoles, initNodeIdx, G, numShells, boxL,
+                      p, ax, ay, az, tempQueue, cellQueue);
+    }
+}
 
-        // load target coordinates
-        Vec4<Tc> pos_i[TravConfig::nwt];
-        for (int i = 0; i < TravConfig::nwt; i++)
-        {
-            int bodyIdx = imin(bodyBegin + i * GpuConfig::warpSize + laneIdx, bodyEnd - 1);
-            pos_i[i]    = {xt[bodyIdx], yt[bodyIdx], zt[bodyIdx], ht[bodyIdx]};
-        }
+/*! @brief Compute approximate body accelerations with Barnes-Hut with in-register group splitting
+ *
+ * Identical to @p traverseKernel, except that the target groups are determined inside the kernel:
+ * each warp claims one fixed group of TravConfig::targetSize particles starting at @p first via the
+ * atomic target counter, evaluates the spatial compactness criterion in-register with the shared
+ * cstone device function @p evalGroupSplitMask, decodes its subgroup boundaries and traverses the
+ * subgroups sequentially with @p traverseGroup. No precomputed groups are needed, the number of
+ * fixed groups is computable on the host, such that no device-to-host synchronization is required
+ * before the launch.
+ *
+ * @param[in]    first, last   local target particle index range, fixed groups start at @p first
+ * @param[in]    numFixedGroups number of fixed groups in [first:last), host-computable
+ * @param[in]    leaves        cornerstone leaf-cell array, size is @p numLeaves + 1, on device
+ * @param[in]    numLeaves     number of leaf cells in @p leaves
+ * @param[in]    layout        for each leaf cell in [0:numLeaves], stores the index of the first source body in cell
+ * @param[in]    box           global coordinate bounding box
+ * @param[in]    tolFactor     tolerance factor for the spatial compactness criterion
+ * @param[in]    initNodeIdx   traversal will be started with all children of the parent of @p initNodeIdx
+ * @param[in]    x,y,z,m,h     target and source bodies, in SFC order as referenced by layout
+ * @param[in]    childOffsets   location (index in [0:numTreeNodes]) of first child of each cell, 0 indicates a leaf
+ * @param[in]    internalToLeaf for each cell in [0:numTreeNodes], stores the leaf cell (cstone) index in [0:numLeaves]
+ *                              if the cell is not a leaf, the value is negative
+ * @param[in]    sourceCenter   x,y,z center and square MAC radius of each cell in [0:numTreeNodes]
+ * @param[in]    Multipoles     cell multipoles, on device
+ * @param[in]    G              gravitational constant
+ * @param[in]    numShells      number of periodic replicas in each dimension to include
+ * @param[in]    boxL           length of coordinate bounding box in each dimension
+ * @param[inout] p              output body potential to add to if not nullptr
+ * @param[inout] ax, ay, az     output body acceleration to add to
+ * @param[-]     gmPool         temporary storage for the cell traversal stack, uninitialized
+ *                              each active warp needs space for TravConfig::memPerWarp int32,
+ *                              so the total size is TravConfig::memPerWarp * numWarpsPerBlock * numBlocks
+ */
+template<class Tc, class Th, class Tm, class Ta, class Tf, class MType, class KeyType>
+__global__ __launch_bounds__(TravConfig::numThreads) void traverseSplitKernel(
+    LocalIndex first, LocalIndex last, LocalIndex numFixedGroups, const KeyType* __restrict__ leaves,
+    TreeNodeIndex numLeaves, const LocalIndex* __restrict__ layout, const cstone::Box<Tc> box, float tolFactor,
+    const int initNodeIdx, const Tc* __restrict__ x, const Tc* __restrict__ y, const Tc* __restrict__ z,
+    const Tm* __restrict__ m, const Th* __restrict__ h, const TreeNodeIndex* __restrict__ childOffsets,
+    const TreeNodeIndex* __restrict__ internalToLeaf, const Vec4<Tf>* __restrict__ sourceCenter,
+    const MType* __restrict__ Multipoles, Tc G, int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az, int* gmPool)
+{
+    const int laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
+    const int warpIdx = threadIdx.x >> GpuConfig::warpSizeLog2;
 
-        Vec3<Tc> Xmin = makeVec3(pos_i[0]);
-        Vec3<Tc> Xmax = makeVec3(pos_i[0]);
-        for (int i = 1; i < TravConfig::nwt; i++)
-        {
-            Xmin = min(Xmin, makeVec3(pos_i[i]));
-            Xmax = max(Xmax, makeVec3(pos_i[i]));
-        }
+    constexpr int termSize         = MType{}.size();
+    constexpr int numWarpsPerBlock = TravConfig::numThreads / GpuConfig::warpSize;
 
-        Xmin = {warpMin(Xmin[0]), warpMin(Xmin[1]), warpMin(Xmin[2])};
-        Xmax = {warpMax(Xmax[0]), warpMax(Xmax[1]), warpMax(Xmax[2])};
+    using MValueType         = typename MType::value_type;
+    constexpr int mSizeRatio = sizeof(MValueType) / sizeof(int);
 
-        Vec3<Tf>       targetCenter = (Xmax + Xmin) * Tf(0.5);
-        const Vec3<Tf> targetSize   = (Xmax - Xmin) * Tf(0.5);
+    static_assert(termSize <= GpuConfig::warpSize, "review approxAcc function before disabling this check");
+    constexpr int smSize =
+        (TravConfig::numThreads > termSize * numWarpsPerBlock) ? TravConfig::numThreads : termSize * numWarpsPerBlock;
+    __shared__ int sharedPool[smSize * mSizeRatio];
 
-        Vec4<Tf> acc_i[TravConfig::nwt];
-        for (int i = 0; i < TravConfig::nwt; i++)
-        {
-            acc_i[i] = Vec4<Tc>{Tc(0), Tc(0), Tc(0), Tc(0)};
-        }
+    // warp-common shared mem, 1 int per thread
+    int* tempQueue = sharedPool + GpuConfig::warpSize * warpIdx * mSizeRatio;
+    // warp-common global mem storage
+    int* cellQueue = gmPool + TravConfig::memPerWarp * ((blockIdx.x * numWarpsPerBlock) + warpIdx);
 
-        unsigned numM2P = 0, numP2P = 0, maxStack = 0;
-        for (int iz = -numShells; iz <= numShells; ++iz)
-        {
-            for (int iy = -numShells; iy <= numShells; ++iy)
-            {
-                for (int ix = -numShells; ix <= numShells; ++ix)
-                {
-                    {
-                        Vec3<Tf> pbcShift{ix * boxL[0], iy * boxL[1], iz * boxL[2]};
-                        targetCenter += pbcShift;
-                        for (int i = 0; i < TravConfig::nwt; i++)
-                        {
-                            pos_i[i][0] += pbcShift[0];
-                            pos_i[i][1] += pbcShift[1];
-                            pos_i[i][2] += pbcShift[2];
-                        }
-                    }
+    LocalIndex targetIdx = 0;
 
-                    auto [numM2P_, numP2P_, maxStack_] = traverseWarp(
-                        acc_i, pos_i, targetCenter, targetSize, xs, ys, zs, ms, hs, childOffsets, internalToLeaf,
-                        layout, sourceCenter, Multipoles, initNodeIdx, tempQueue, cellQueue);
-
-                    {
-                        Vec3<Tf> pbcShift{ix * boxL[0], iy * boxL[1], iz * boxL[2]};
-                        targetCenter -= pbcShift;
-                        for (int i = 0; i < TravConfig::nwt; i++)
-                        {
-                            pos_i[i][0] -= pbcShift[0];
-                            pos_i[i][1] -= pbcShift[1];
-                            pos_i[i][2] -= pbcShift[2];
-                        }
-                    }
-
-                    assert(numM2P_ != 0xFFFFFFFF && numP2P_ != 0xFFFFFFFF);
-                    numM2P += numM2P_;
-                    numP2P += numP2P_;
-                    maxStack = max(maxStack, maxStack_);
-                }
-            }
-        }
-
-        const int bodyIdxLane = bodyBegin + laneIdx;
-
-        float warpPotential = 0;
-        for (int i = 0; i < TravConfig::nwt; i++)
-        {
-            const int bodyIdx = bodyIdxLane + i * GpuConfig::warpSize;
-            if (bodyIdx < bodyEnd) { warpPotential += mt[bodyIdx] * acc_i[i][0]; }
-        }
-
-#pragma unroll
-        for (int i = 0; i < GpuConfig::warpSizeLog2; i++)
-        {
-            warpPotential += shflXorSync(warpPotential, 1 << i);
-        }
-
+    while (true)
+    {
+        // first thread in warp grabs next fixed group
         if (laneIdx == 0)
         {
-            int targetGroupSize = bodyEnd - bodyBegin;
-            atomicMax(&bhStats[BhStats::maxP2P], numP2P);
-            atomicAdd(&bhStats[BhStats::sumP2P], numP2P * targetGroupSize);
-            atomicMax(&bhStats[BhStats::maxM2P], numM2P);
-            atomicAdd(&bhStats[BhStats::sumM2P], numM2P * targetGroupSize);
-            atomicMax(&bhStats[BhStats::maxStack], maxStack);
-            atomicAdd(&totalPotentialGlob, warpPotential);
+            targetIdx = atomicAdd(&targetCounterGlob, 1);
+        }
+        targetIdx = shflSync(targetIdx, 0);
+
+        if (targetIdx >= numFixedGroups) return;
+
+        // fixed group range, the last group of the range can be shorter than TravConfig::targetSize
+        const LocalIndex groupBegin = first + targetIdx * TravConfig::targetSize;
+        const LocalIndex groupEnd   = imin(groupBegin + TravConfig::targetSize, last);
+
+        // evaluate the spatial compactness criterion in-register, a 1-bit at group-relative
+        // position i marks the last particle of a subgroup
+        auto splitMask =
+            cstone::evalGroupSplitMask<TravConfig::targetSize, Tc, Th, KeyType>(groupBegin, last, x, y, z, h, leaves,
+                                                                                numLeaves, layout, box, tolFactor);
+
+        // combine the per-thread-segment masks into one bitstream over the fixed group
+        uint64_t splitBits = 0;
+        for (int k = 0; k < TravConfig::nwt; ++k)
+        {
+            splitBits |= uint64_t(splitMask[k]) << (k * GpuConfig::warpSize);
         }
 
-        for (int i = 0; i < TravConfig::nwt; i++)
+        // decode the subgroup [start, end) boundaries and traverse the subgroups sequentially,
+        // all quantities are warp-uniform
+        int      start     = 0;
+        uint64_t remaining = splitBits;
+        while (start < int(groupEnd - groupBegin))
         {
-            const int bodyIdx = bodyIdxLane + i * GpuConfig::warpSize;
-            if (bodyIdx < bodyEnd)
-            {
-                if (p) { p[bodyIdx] += G * mt[bodyIdx] * acc_i[i][0]; }
-                ax[bodyIdx] += G * acc_i[i][1];
-                ay[bodyIdx] += G * acc_i[i][2];
-                az[bodyIdx] += G * acc_i[i][3];
-            }
+            const int end = remaining ? countTrailingZeros(remaining) + 1 : groupEnd - groupBegin;
+            remaining &= remaining - 1;
+
+            traverseGroup(groupBegin + start, groupBegin + end, m, x, y, z, h, x, y, z, m, h, childOffsets,
+                          internalToLeaf, layout, sourceCenter, Multipoles, initNodeIdx, G, numShells, boxL, p, ax, ay,
+                          az, tempQueue, cellQueue);
+
+            start = end;
         }
     }
 }
@@ -572,6 +723,30 @@ double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restri
     return 0.5 * Tc(G) * totalPotential;
 }
 
+template<class Tc, class Th, class Tm, class Ta, class Tf, class MType, class KeyType>
+double traverse(LocalIndex first, LocalIndex last, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves,
+                const LocalIndex* __restrict__ layout, const cstone::Box<Tc>& box, float tolFactor,
+                const int initNodeIdx, const Tc* __restrict__ x, const Tc* __restrict__ y, const Tc* __restrict__ z,
+                const Tm* __restrict__ m, const Th* __restrict__ h, const TreeNodeIndex* __restrict__ childOffsets,
+                const TreeNodeIndex* __restrict__ internalToLeaf, const Vec4<Tf>* __restrict__ sourceCenter,
+                const MType* __restrict__ multipoles, Tc G, int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay,
+                Ta* az, int* gmPool)
+{
+    int numWarpsPerBlock   = TravConfig::numThreads / GpuConfig::warpSize;
+    int numFixedGroups     = cstone::iceil(last - first, TravConfig::targetSize);
+    int numBlocks          = cstone::iceil(numFixedGroups, numWarpsPerBlock);
+    numBlocks              = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
+
+    resetTraversalCounters<<<1, 1>>>();
+    if (numBlocks > 0)
+        traverseSplitKernel<<<numBlocks, TravConfig::numThreads>>>(
+            first, last, numFixedGroups, leaves, numLeaves, layout, box, tolFactor, initNodeIdx, x, y, z, m, h,
+            childOffsets, internalToLeaf, sourceCenter, multipoles, G, numShells, boxL, p, ax, ay, az, gmPool);
+    float totalPotential;
+    checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
+    return 0.5 * Tc(G) * totalPotential;
+}
+
 #define TRAVERSE(Tc, Th, Tm, Ta, Tf, MType)                                                                            \
     template double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restrict__ xt,                  \
                              const Tc* __restrict__ yt, const Tc* __restrict__ zt, const Tm* __restrict__ mt,          \
@@ -589,6 +764,24 @@ double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restri
 
 TRAVERSE_MPOLE(CartesianQuadrupole)
 TRAVERSE_MPOLE(CartesianMDQpole)
+
+#define TRAVERSE_SPLIT(Tc, Th, Tm, Ta, Tf, MType, KeyType)                                                             \
+    template double traverse(LocalIndex first, LocalIndex last, const KeyType* __restrict__ leaves,                    \
+                             TreeNodeIndex numLeaves, const LocalIndex* __restrict__ layout, const cstone::Box<Tc>&     \
+                             box, float tolFactor, const int initNodeIdx, const Tc* __restrict__ x,                    \
+                             const Tc* __restrict__ y, const Tc* __restrict__ z, const Tm* __restrict__ m,              \
+                             const Th* __restrict__ h, const TreeNodeIndex* __restrict__ childOffsets,                  \
+                             const TreeNodeIndex* __restrict__ internalToLeaf, const Vec4<Tf>* __restrict__ sourceCenter, \
+                             const MType* __restrict__ multipoles, Tc G, int numShells, Vec3<Tc> boxL, Ta* p,           \
+                             Ta* ax, Ta* ay, Ta* az, int* gmPool)
+
+#define TRAVERSE_SPLIT_MPOLE(MType)                                                                                    \
+    TRAVERSE_SPLIT(double, double, double, double, double, MType<double>, uint64_t);                                   \
+    TRAVERSE_SPLIT(double, float, float, float, double, MType<float>, uint64_t);                                       \
+    TRAVERSE_SPLIT(float, float, float, float, float, MType<float>, uint64_t);
+
+TRAVERSE_SPLIT_MPOLE(CartesianQuadrupole)
+TRAVERSE_SPLIT_MPOLE(CartesianMDQpole)
 
 int bhMaxTargetSize() { return TravConfig::targetSize; }
 

@@ -61,6 +61,29 @@ public:
     float compute(cstone::GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m, const Th* h, Tc G,
                   int numShells, const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az);
 
+    /*! @brief compute accelerations on target particles, assuming sources = targets,
+     *         with target groups determined inside the traversal kernel
+     *
+     * Group-free counterpart of the group-based compute overload: the target particle
+     * groups are computed in-register inside the gravity traversal kernel with the
+     * spatial compactness criterion, no call to computeSpatialGroups is required and no
+     * device-to-host synchronization precedes the traversal launch.
+     *
+     * @param[in]    x,y,z,m,h    target and source particles in SFC order as referenced by layout, on GPU
+     * @param[in]    G            gravitational constant
+     * @param[in]    numShells    number of periodic images to include
+     * @param[in]    first, last  local target particle index range
+     * @param[in]    focusTree    locally essential octree focused on local domain
+     * @param[in]    layout       for each leaf cell, stores the index of the first source body in cell, on GPU
+     * @param[in]    box          global coordinate bounding box
+     * @param[inout] ugrav        potential per particle to add to, can be nullptr, on GPU
+     * @param[inout] ax, ay, az   particle accelerations to add to, on GPU
+     */
+    float compute(const Tc* x, const Tc* y, const Tc* z, const Tm* m, const Th* h, Tc G, int numShells,
+                  LocalIndex first, LocalIndex last,
+                  const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
+                  const cstone::LocalIndex* layout, const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az);
+
     /*! @brief compute accelerations on target particles
      *
      * @param[in]    grp             target particle grouping into spatially compact groups
