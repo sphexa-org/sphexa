@@ -136,10 +136,9 @@ public:
         cstone::fill(domain.exec(), d.ay.begin() + first, d.ay.begin() + last, HydroType(0));
         cstone::fill(domain.exec(), d.az.begin() + first, d.az.begin() + last, HydroType(0));
 
-        auto groups = mHolder_.computeSpatialGroups(d, domain);
         mHolder_.upsweep(d, domain);
         timer.step("Upsweep");
-        mHolder_.traverse(groups, d, domain);
+        mHolder_.traverse(d, domain);
 
         timer.step("Gravity");
 

@@ -188,11 +188,10 @@ public:
 
         if (d.g != 0.0)
         {
-            auto groups = mHolder_.computeSpatialGroups(d, domain);
             mHolder_.upsweep(d, domain);
             timer.step("Upsweep");
             pmReader.step();
-            mHolder_.traverse(groups, d, domain);
+            mHolder_.traverse(d, domain);
             timer.step("Gravity");
             pmReader.step();
 

@@ -190,10 +190,9 @@ public:
 
         if (d.g != 0.0)
         {
-            auto groups = Base::mHolder_.computeSpatialGroups(d, domain);
             Base::mHolder_.upsweep(d, domain);
             timer.step("Upsweep");
-            Base::mHolder_.traverse(groups, d, domain);
+            Base::mHolder_.traverse(d, domain);
             timer.step("Gravity");
         }
     }
