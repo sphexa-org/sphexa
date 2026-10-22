@@ -7,6 +7,9 @@ set(CMAKE_CXX_STANDARD 20)
 option(BUILD_TESTING "build unit and integration tests" ON)
 option(GPU_DIRECT "Enable CUDA-aware MPI communication" OFF)
 
+include(CTest)
+include(CheckLanguage)
+
 find_package(MPI)
 find_package(OpenMP)
 
