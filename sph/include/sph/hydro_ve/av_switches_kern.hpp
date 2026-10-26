@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/sph_kernels.hpp"
@@ -57,10 +58,10 @@ struct AVswitchesInteraction
         T ry = r_ij[1];
         T rz = r_ij[2];
 
-        auto hiInv  = T(1) / hi;
-        auto hiInv3 = hiInv * hiInv * hiInv;
+        T hiInv  = cstone::fastmath::rcp(hi);
+        T hiInv3 = hiInv * hiInv * hiInv;
 
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
 
         T vx_ij = vxi - vxj;
         T vy_ij = vyi - vyj;
@@ -101,7 +102,8 @@ struct AVswitchesPostamble
         auto [graddivv_x, graddivv_y, graddivv_z, vijsignalr_i]                                              = result;
         T vijsignal_i = std::max(vijsignalr_i, T(1e-40));
 
-        T graddivv = std::sqrt(graddivv_x * graddivv_x + graddivv_y * graddivv_y + graddivv_z * graddivv_z);
+        T graddivv =
+            cstone::fastmath::sqrt(graddivv_x * graddivv_x + graddivv_y * graddivv_y + graddivv_z * graddivv_z);
 
         T alphaloc = 0;
         if (divv_i < T(0))
@@ -133,7 +135,7 @@ void AVswitchesIjLoop(Neighborhood const& neighborhood, Tc K, Tc dt, T alphamin,
     std::visit(
         [&]<class Kernel>(Kernel wh)
         {
-            neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+            neighborhood.ijLoop(cstone::ijloop::IjLoopData(
                 std::make_tuple(xm, kx, divv, alpha, vx, vy, vz, c, c11, c12, c13, c22, c23, c33),
                 std::make_tuple(alpha_out), AVswitchesInteraction<T, Tc, Kernel>{wh, K},
                 AVswitchesPostamble<T, Tc>{alphamin, alphamax, decay_constant, dt}));

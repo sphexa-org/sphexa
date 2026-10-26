@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/sph_kernels.hpp"
@@ -50,9 +51,9 @@ struct XmassInteraction
         const auto [i, iPos, hi, mi] = iData;
         const auto [j, jPos, hj, mj] = jData;
 
-        T hInv = 1.0 / hi;
+        T hInv = cstone::fastmath::rcp(hi);
 
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
 
         T vloc = dist * hInv;
         T w    = wh(vloc);
@@ -79,7 +80,7 @@ struct XmassPostamble
         const auto [i, iPos, hi, mi] = iData;
         auto [rho0i]                 = result;
 
-        T hInv  = 1.0 / hi;
+        T hInv  = cstone::fastmath::rcp(hi);
         T h3Inv = hInv * hInv * hInv;
 
         T xmassi = veDefinition(mi, rho0i * K * h3Inv);
@@ -112,8 +113,8 @@ void xmassIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, KernelVari
     std::visit(
         [&]<class Kernel>(Kernel wh)
         {
-            neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
-                std::make_tuple(m), std::make_tuple(xmass), XmassInteraction<T, Kernel>{wh}, XmassPostamble<T, Tc>{K}));
+            neighborhood.ijLoop(cstone::ijloop::IjLoopData(std::make_tuple(m), std::make_tuple(xmass),
+                                                           XmassInteraction<T, Kernel>{wh}, XmassPostamble<T, Tc>{K}));
         },
         wh);
 }
@@ -124,9 +125,9 @@ void densityIjLoop(Neighborhood const& neighborhood, Tc K, const Tm* m, KernelVa
     std::visit(
         [&]<class Kernel>(Kernel wh)
         {
-            neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(std::make_tuple(m), std::make_tuple(xmass),
-                                                                       XmassInteraction<T, Kernel>{wh},
-                                                                       XmassToDensityPostamble<T, Tc>{K}));
+            neighborhood.ijLoop(cstone::ijloop::IjLoopData(std::make_tuple(m), std::make_tuple(xmass),
+                                                           XmassInteraction<T, Kernel>{wh},
+                                                           XmassToDensityPostamble<T, Tc>{K}));
         },
         wh);
 }

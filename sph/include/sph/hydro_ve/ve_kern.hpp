@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/sph_kernels.hpp"
@@ -50,9 +51,9 @@ struct VeInteraction
         const auto [i, iPos, hi, xmassi] = iData;
         const auto [j, jPos, hj, xmassj] = jData;
 
-        auto hInv = T(1) / hi;
+        T hInv = cstone::fastmath::rcp(hi);
 
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
         T vloc = dist * hInv;
         T w    = wh(vloc);
 
@@ -73,7 +74,7 @@ struct VePostamble
         const auto [i, iPos, hi, xmassi] = iData;
         auto [kxi]                       = result;
 
-        auto hInv  = T(1) / hi;
+        auto hInv  = cstone::fastmath::rcp(hi);
         auto h3Inv = hInv * hInv * hInv;
 
         kxi *= K * h3Inv;
@@ -88,8 +89,8 @@ void veIjLoop(const Neighbordhood& neighborhood, Tc K, const T* xm, KernelVarian
     std::visit(
         [&]<class Kernel>(Kernel wh)
         {
-            neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
-                std::make_tuple(xm), std::make_tuple(kx), VeInteraction<T, Kernel>{wh}, VePostamble<T, Tc>{K}));
+            neighborhood.ijLoop(cstone::ijloop::IjLoopData(std::make_tuple(xm), std::make_tuple(kx),
+                                                           VeInteraction<T, Kernel>{wh}, VePostamble<T, Tc>{K}));
         },
         wh);
 }

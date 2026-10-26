@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "cstone/primitives/fastmath.hpp"
 #include "cstone/traversal/ijloop/ijloop.hpp"
 
 #include "sph/iad_regularization.hpp"
@@ -26,9 +27,9 @@ struct IADInteractionSTD
         T ry = r_ij[1];
         T rz = r_ij[2];
 
-        T hiInv = T(1) / hi;
+        T hiInv = cstone::fastmath::rcp(hi);
 
-        T dist = std::sqrt(r2);
+        T dist = cstone::fastmath::sqrt(r2);
 
         // calculate the v as ratio between the distance and the smoothing length
         T vloc = dist * hiInv;
@@ -102,7 +103,7 @@ void IADIjLoop(Neighborhood const& neighborhood, Tc K, T iadConditionQuality, un
     std::visit(
         [&]<class Kernel>(Kernel wh)
         {
-            neighborhood.ijLoop(cstone::ijloop::makeIjLoopData<Tc, T*>(
+            neighborhood.ijLoop(cstone::ijloop::IjLoopData(
                 std::make_tuple(m, rho, nc, id), std::make_tuple(c11, c12, c13, c22, c23, c33, id),
                 IADInteractionSTD<T, Kernel>{wh}, IADPostambleSTD<T, Tc>{K, iadConditionQuality, iadRegBit}));
         },

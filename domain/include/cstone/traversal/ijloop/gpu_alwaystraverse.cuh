@@ -46,7 +46,7 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
                                                         const Tc* __restrict__ y,
                                                         const Tc* __restrict__ z,
                                                         const ThP h,
-                                                        const IjLoopData<Tc, ThP, Ts...> ijData,
+                                                        const CheckedIjLoopData<Tc, ThP, Ts...> ijData,
                                                         const unsigned ngmax,
                                                         LocalIndex* __restrict__ neighbors,
                                                         LocalIndex* __restrict__ targetCounter)
@@ -72,13 +72,13 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
         {
             const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, threadNeighbors), ngmax);
 
-            const auto iData  = loadParticleData(x, y, z, h, makeConst(ijData.input), i);
+            const auto iData  = loadParticleData(x, y, z, h, ijData.input, i);
             const bool usePbc = UsePbc && requiresPbcHandling(box, iData);
             auto result       = ijData.interaction(iData, iData, Vec3<Tc>{0, 0, 0}, Tc(0));
             for (unsigned nb = 0; nb < nbs; ++nb)
             {
                 const LocalIndex j = threadNeighbors[nb];
-                const auto jData   = loadParticleData(x, y, z, h, makeConst(ijData.input), j);
+                const auto jData   = loadParticleData(x, y, z, h, ijData.input, j);
 
                 const auto [ijPosDiff, distSq] = posDiffAndDistSq(usePbc, box, iData, jData);
 
@@ -103,10 +103,10 @@ struct GpuAlwaysTraverseNeighborhood
     util::UniqueDevicePtr<LocalIndex[]> neighbors;
     util::UniqueDevicePtr<LocalIndex> targetCounter;
 
-    template<class... Ts>
-    void ijLoop(const IjLoopData<Ts...>& ijData) const
+    template<ValidIjLoopData<Tc, ThP> IjData>
+    void ijLoop(IjData const& data) const
     {
-        ijLoop(ijData, groups);
+        ijLoop(check<Tc, ThP>(data), groups);
     }
 
     Statistics stats() const
@@ -121,10 +121,10 @@ struct GpuAlwaysTraverseNeighborhood
         GpuAlwaysTraverseNeighborhood const& parent;
         GroupView groups;
 
-        template<class... Ts>
-        void ijLoop(const IjLoopData<Ts...>& ijData) const
+        template<ValidIjLoopData<Tc, ThP> IjData>
+        void ijLoop(IjData const& data) const
         {
-            parent.ijLoop(ijData, groups);
+            parent.ijLoop(check<Tc, ThP>(data), groups);
         }
     };
 
@@ -132,7 +132,7 @@ struct GpuAlwaysTraverseNeighborhood
 
 protected:
     template<class... Ts>
-    void ijLoop(const IjLoopData<Ts...>& ijData, GroupView const& groups) const
+    void ijLoop(const CheckedIjLoopData<Ts...>& ijData, GroupView const& groups) const
     {
         if (groups.numGroups == 0) return;
         checkGpuErrors(cudaMemsetAsync(targetCounter.get(), 0, sizeof(LocalIndex), exec));

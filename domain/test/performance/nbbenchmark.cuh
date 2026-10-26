@@ -35,6 +35,7 @@
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/ijloop/cpu_alwaystraverse.hpp"
 #include "cstone/traversal/groups.hpp"
+#include "cstone/traversal/ijloop/ijloop.hpp"
 #include "cstone/tree/octree.hpp"
 #include "cstone/util/tuple_util.hpp"
 
@@ -124,9 +125,9 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     const std::tuple<std::vector<InputTs>...> inputs = util::tupleMap(allocVec, inputValues);
     std::tuple<std::vector<OutputTs>...> outputs     = util::tupleMap(allocVec, initialOutputValues);
 
-    auto ijData = ijloop::makeIjLoopData<Tc, T>(util::tupleMap([](auto const& v) { return v.data(); }, inputs),
-                                                util::tupleMap([](auto& v) { return v.data(); }, outputs),
-                                                interaction, ijloop::empty_postamble);
+    ijloop::IjLoopData ijData{.input       = util::tupleMap([](auto const& v) { return v.data(); }, inputs),
+                              .output      = util::tupleMap([](auto& v) { return v.data(); }, outputs),
+                              .interaction = interaction};
     ijloop::CpuAlwaysTraverseNeighborhoodBuilder{ngmax}
         .build(execution::cpu, nsView, box, n, groupView, x, y, z, hVal)
         .ijLoop(ijData);
@@ -232,9 +233,10 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     checkGpuErrors(cudaEventRecord(events[0], stream));
     for (std::size_t i = 1; i < events.size(); ++i)
     {
-        neighborhood.ijLoop(ijloop::makeIjLoopData<Tc, T>(
-            util::tupleMap([](auto const& v) { return rawPtr(v); }, dInputs),
-            util::tupleMap([](auto& v) { return rawPtr(v); }, dOutputs), interaction, ijloop::empty_postamble));
+        neighborhood.ijLoop(
+            ijloop::IjLoopData{.input       = util::tupleMap([](auto const& v) { return rawPtr(v); }, dInputs),
+                               .output      = util::tupleMap([](auto& v) { return rawPtr(v); }, dOutputs),
+                               .interaction = interaction});
         checkGpuErrors(cudaEventRecord(events[i], stream));
     }
     checkGpuErrors(cudaEventSynchronize(events.back()));

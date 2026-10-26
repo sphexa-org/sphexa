@@ -43,13 +43,13 @@ struct CpuFullNbListNeighborhood
     ThP h;
     unsigned ngmax;
 
-    template<class... Ts>
-    void ijLoop(IjLoopData<Ts...> ijData) const
+    template<ValidIjLoopData<Tc, ThP> IjData>
+    void ijLoop(IjData const& data) const
     {
-        const auto constInput = makeConst(ijData.input);
+        const auto ijData = check<Tc, ThP>(data);
 #pragma omp parallel for simd
         for (LocalIndex i = firstBody; i < lastBody; ++i)
-            jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble, i);
+            jLoop(ijData.input, ijData.output, ijData.interaction, ijData.postamble, i);
     }
 
     Statistics stats() const
@@ -64,15 +64,15 @@ struct CpuFullNbListNeighborhood
         CpuFullNbListNeighborhood const& parent;
         GroupView groups;
 
-        template<class... Ts>
-        void ijLoop(IjLoopData<Ts...> ijData) const
+        template<ValidIjLoopData<Tc, ThP> IjData>
+        void ijLoop(IjData const& data) const
         {
-            const auto constInput = makeConst(ijData.input);
+            const auto ijData = check<Tc, ThP>(data);
 #pragma omp parallel for
             for (LocalIndex g = 0; g < groups.numGroups; ++g)
 #pragma omp simd
                 for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
-                    parent.jLoop(constInput, ijData.output, ijData.interaction, ijData.postamble, i);
+                    parent.jLoop(ijData.input, ijData.output, ijData.interaction, ijData.postamble, i);
         }
     };
 
