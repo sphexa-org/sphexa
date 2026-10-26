@@ -24,20 +24,13 @@ namespace cstone
 {
 
 //! @brief simple-fixed width group targets
-__global__ static void
-fixedGroupsKernel(LocalIndex first, LocalIndex last, unsigned groupSize, LocalIndex* groups, unsigned numGroups)
+__global__ static void fixedGroupsKernel(LocalIndex numGroups, LocalIndex* groups)
 {
     LocalIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    LocalIndex groupIdx = tid / groupSize;
-    if (groupIdx >= numGroups) { return; }
+    if (tid >= numGroups) { return; }
 
-    if (tid == groupIdx * groupSize)
-    {
-        LocalIndex scan  = first + groupIdx * groupSize;
-        groups[groupIdx] = scan;
-        if (groupIdx + 1 == numGroups) { groups[numGroups] = last; }
-    }
+    groups[tid] = tid;
 }
 
 void computeFixedGroups(
@@ -45,14 +38,14 @@ void computeFixedGroups(
 {
     LocalIndex numBodies = last - first;
     LocalIndex numGroups = iceil(numBodies, groupSize);
-    groups.data.resize(numGroups + 1);
-    fixedGroupsKernel<<<iceil(numBodies, 256), 256, 0, exec>>>(first, last, groupSize, rawPtr(groups.data), numGroups);
+    groups.data.resize(numGroups);
+    if (numGroups > 0)
+        fixedGroupsKernel<<<iceil(numGroups, 256), 256, 0, exec>>>(numGroups, rawPtr(groups.data));
 
-    groups.firstBody  = first;
-    groups.lastBody   = last;
-    groups.numGroups  = numGroups;
-    groups.groupStart = rawPtr(groups.data);
-    groups.groupEnd   = rawPtr(groups.data) + 1;
+    groups.firstBody = first;
+    groups.lastBody  = last;
+    groups.numGroups = numGroups;
+    groups.groups    = rawPtr(groups.data);
 }
 
 //! @brief convenience wrapper for groupSplitsKernel

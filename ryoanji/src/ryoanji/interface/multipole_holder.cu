@@ -40,11 +40,6 @@ public:
     {
         cstone::computeFixedGroups(cstone::execution::gpuDefaultStream, first, last, bhMaxTargetSize(), groups_);
 
-        groups_.firstBody  = first;
-        groups_.lastBody   = last;
-        groups_.numGroups  = groups_.data.size() - 1;
-        groups_.groupStart = rawPtr(groups_.data);
-        groups_.groupEnd   = rawPtr(groups_.data) + 1;
         return groups_.view();
     }
 

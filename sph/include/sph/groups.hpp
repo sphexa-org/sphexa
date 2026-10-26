@@ -30,7 +30,10 @@
 
 #pragma once
 
+#include <numeric>
+
 #include "cstone/sfc/box.hpp"
+#include "cstone/primitives/math.hpp"
 #include "cstone/primitives/primitives_gpu.h"
 #include "cstone/traversal/groups_gpu.h"
 #include "sph/sph_gpu.hpp"
@@ -53,40 +56,43 @@ void computeGroups(size_t startIndex, size_t endIndex, Dataset& d, const cstone:
     if constexpr (d.useGpu) { computeSpatialGroups(startIndex, endIndex, d, box, groups); }
     else
     {
-        groups.firstBody  = startIndex;
-        groups.lastBody   = endIndex;
-        groups.numGroups  = 1;
-        groups.groupStart = &groups.firstBody;
-        groups.groupEnd   = &groups.lastBody;
+        const cstone::LocalIndex numGroups = cstone::iceil(endIndex - startIndex, cstone::groupSize);
+        groups.data.resize(numGroups);
+        std::iota(groups.data.begin(), groups.data.end(), cstone::LocalIndex(0));
+
+        groups.firstBody = startIndex;
+        groups.lastBody  = endIndex;
+        groups.numGroups = numGroups;
+        groups.groups    = groups.data.data();
     }
 }
 
-//! @brief extract the specified subgroup [first:last] indexed through @p index from @p grp into @p outGroup
+//! @brief extract the specified subgroup [first:last] indexed through @p indices from @p grp into @p out
+/*! the extracted view keeps the original firstBody/lastBody of @p grp, while out.groups stores the
+ *  selected group indices (a plain copy of indices[first:last])
+ */
 template<cstone::execution::Policy Exec>
 inline void extractGroupGpu(const GroupView& grp, const cstone::LocalIndex* indices, cstone::LocalIndex first,
                             cstone::LocalIndex last, GroupData<Exec>& out)
 {
     auto numOutGroups = last - first;
-    reallocate(out.data, 2 * numOutGroups, 1.01);
+    reallocate(out.data, numOutGroups, 1.01);
 
-    out.firstBody  = 0;
-    out.lastBody   = 0;
-    out.numGroups  = numOutGroups;
-    out.groupStart = rawPtr(out.data);
-    out.groupEnd   = rawPtr(out.data) + numOutGroups;
+    out.firstBody = grp.firstBody;
+    out.lastBody  = grp.lastBody;
+    out.numGroups = numOutGroups;
+    out.groups    = rawPtr(out.data);
 
     if (numOutGroups == 0) { return; }
-    cstone::gather(cstone::execution::gpuDefaultStream, indices + first, numOutGroups, grp.groupStart, out.groupStart);
-    cstone::gather(cstone::execution::gpuDefaultStream, indices + first, numOutGroups, grp.groupEnd, out.groupEnd);
+    cstone::memcpyD2DAsync(cstone::execution::gpuDefaultStream, indices + first, numOutGroups, out.groups);
 }
 
 //! @brief return a new GroupView that corresponds to a slice [first:last] of the input group @p grp
 inline GroupView makeSlicedView(const GroupView& grp, cstone::LocalIndex first, cstone::LocalIndex last)
 {
     GroupView ret = grp;
+    ret.groups   += first;
     ret.numGroups = last - first;
-    ret.groupStart += first;
-    ret.groupEnd += first;
     return ret;
 }
 

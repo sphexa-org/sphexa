@@ -26,7 +26,10 @@ __global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, cons
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
     if (warpIdx >= grp.numGroups) { return; }
 
-    for (LocalIndex i = grp.groupStart[warpIdx] + laneIdx; i < grp.groupEnd[warpIdx]; i += cstone::GpuConfig::warpSize)
+    const LocalIndex bodyBegin = grp.groupStart(warpIdx);
+    const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
+
+    for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += cstone::GpuConfig::warpSize)
     {
         if (nc[i] <= 1)
         {
@@ -64,7 +67,10 @@ __global__ __launch_bounds__(128) void updateSmoothingLengthIterativeGpuKernel(
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
     if (warpIdx >= grp.numGroups) { return; }
 
-    for (LocalIndex i = grp.groupStart[warpIdx] + laneIdx; i < grp.groupEnd[warpIdx]; i += cstone::GpuConfig::warpSize)
+    const LocalIndex bodyBegin = grp.groupStart(warpIdx);
+    const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
+
+    for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += cstone::GpuConfig::warpSize)
     {
         updateHIterative(ng0, ngmax, box, tree, i, x, y, z, h, nc);
     }

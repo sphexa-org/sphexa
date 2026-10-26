@@ -44,7 +44,11 @@ struct DeviceNeighborhoodData::Impl
     template<class Dataset, class T>
     void build(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool subgroups)
     {
-        if (subgroups && groups.firstBody == 0 && groups.lastBody == 0)
+        //! a view is an active subset of the fixed groups iff it contains fewer groups than the
+        //! full range [firstBody:lastBody); otherwise rebuild the full neighborhood
+        const bool isActiveSubset = groups.numGroups < cstone::iceil(groups.lastBody - groups.firstBody,
+                                                                     cstone::groupSize);
+        if (subgroups && isActiveSubset)
         {
             subgroupNeighborhood.reset();
             std::visit(

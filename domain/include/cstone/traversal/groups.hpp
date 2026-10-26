@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <utility>
 
 #include "cstone/cuda/device_vector.h"
@@ -24,13 +25,25 @@
 namespace cstone
 {
 
+constexpr LocalIndex groupSize = 64;
+
 //! @brief A view object to describe groups of target particles
+/*!
+ * @p groups[i] stores the index of the i-th active group, relative to @p firstBody. Active group
+ * @p groups[i] covers the particles
+ *
+ *     [firstBody + groups[i] * groupSize, min(firstBody + groups[i] * groupSize + groupSize, lastBody)),
+ *
+ * i.e., all groups are blocks of groupSize consecutive particles (the last group of the range may be shorter).
+ */
 struct GroupView
 {
     LocalIndex firstBody, lastBody;
-    LocalIndex numGroups;
-    const LocalIndex* groupStart;
-    const LocalIndex* groupEnd;
+    const LocalIndex* groups = nullptr;
+    LocalIndex numGroups     = 0;
+
+    constexpr LocalIndex groupStart(LocalIndex group) const { return firstBody + groups[group] * groupSize; }
+    constexpr LocalIndex groupEnd(LocalIndex group) const { return std::min(groupStart(group) + groupSize, lastBody); }
 };
 
 //! @brief Describes groups of spatially close particles that can be traversed through octrees in groups
@@ -43,13 +56,12 @@ class GroupData
 public:
     GroupData()                 = default;
     GroupData(const GroupView&) = delete;
-    GroupView view() const { return {firstBody, lastBody, numGroups, groupStart, groupEnd}; }
+    GroupView view() const { return {firstBody, lastBody, groups, numGroups}; }
 
     AccVector<LocalIndex> data;
     LocalIndex firstBody, lastBody;
+    LocalIndex* groups = nullptr;
     LocalIndex numGroups;
-    LocalIndex* groupStart;
-    LocalIndex* groupEnd;
 
 private:
     friend void swap(GroupData& lhs, GroupData& rhs)
@@ -57,9 +69,8 @@ private:
         swap(lhs.data, rhs.data);
         std::swap(lhs.firstBody, rhs.firstBody);
         std::swap(lhs.lastBody, rhs.lastBody);
+        std::swap(lhs.groups, rhs.groups);
         std::swap(lhs.numGroups, rhs.numGroups);
-        std::swap(lhs.groupStart, rhs.groupStart);
-        std::swap(lhs.groupEnd, rhs.groupEnd);
     }
 };
 

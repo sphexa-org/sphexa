@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 
 #include "cstone/cuda/annotation.hpp"
@@ -108,7 +109,9 @@ void computeStirring(cstone::GroupView grp, size_t numDim, const Tc* x, const Tc
 #pragma omp parallel for schedule(static)
     for (cstone::LocalIndex gi = 0; gi < grp.numGroups; ++gi)
     {
-        for (cstone::LocalIndex i = grp.groupStart[gi]; i < grp.groupEnd[gi]; ++i)
+        const cstone::LocalIndex bodyBegin = grp.groupStart(gi);
+        const cstone::LocalIndex bodyEnd   = grp.groupEnd(gi);
+        for (cstone::LocalIndex i = bodyBegin; i < bodyEnd; ++i)
         {
             auto [turbAx, turbAy, turbAz] =
                 stirParticle<Tc, Ta, T>(numDim, x[i], y[i], z[i], numModes, modes, phaseReal, phaseImag, amplitudes);

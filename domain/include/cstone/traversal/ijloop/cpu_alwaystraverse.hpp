@@ -71,9 +71,13 @@ struct CpuAlwaysTraverseNeighborhood
 
 #pragma omp for
                 for (LocalIndex g = 0; g < groups.numGroups; ++g)
-                    for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
+                {
+                    const LocalIndex bodyBegin = groups.groupStart(g);
+                    const LocalIndex bodyEnd   = groups.groupEnd(g);
+                    for (LocalIndex i = bodyBegin; i < bodyEnd; ++i)
                         parent.jLoop(ijData.input, ijData.output, ijData.interaction, ijData.postamble, i,
                                      neighbors.get());
+                }
             }
         }
     };

@@ -61,6 +61,8 @@ struct TravConfig
     static constexpr int nwt = targetSize / GpuConfig::warpSize;
 };
 
+static_assert(TravConfig::targetSize == cstone::groupSize);
+
 __device__ __forceinline__ int ringAddr(const int i) { return i & (TravConfig::memPerWarp - 1); }
 
 /*! @brief evaluate multipole acceptance criterion
@@ -571,7 +573,10 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
 
         if (targetIdx >= grp.numGroups) return;
 
-        traverseGroup(grp.groupStart[targetIdx], grp.groupEnd[targetIdx], mt, xt, yt, zt, ht, xs, ys, zs, ms, hs,
+        const LocalIndex bodyBegin = grp.groupStart(targetIdx);
+        const LocalIndex bodyEnd   = grp.groupEnd(targetIdx);
+
+        traverseGroup(bodyBegin, bodyEnd, mt, xt, yt, zt, ht, xs, ys, zs, ms, hs,
                       childOffsets, internalToLeaf, layout, sourceCenter, Multipoles, initNodeIdx, G, numShells, boxL,
                       p, ax, ay, az, tempQueue, cellQueue);
     }

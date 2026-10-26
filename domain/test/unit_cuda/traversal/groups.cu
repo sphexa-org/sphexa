@@ -46,7 +46,7 @@ TEST(TargetGroups, t0)
     stream.sync();
 
     std::vector<LocalIndex> hgroups = toHost(groups.data);
-    std::vector<LocalIndex> ref{4, 12, 20, 28, 34};
+    std::vector<LocalIndex> ref{0, 1, 2, 3};
     EXPECT_EQ(hgroups, ref);
 }
 

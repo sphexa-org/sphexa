@@ -127,12 +127,18 @@ struct GpuSuperclusterNbListNeighborhood
     Subgroup subgroup(GroupView const& groups) const
     {
         static_assert(!Config::symmetric, "subgroup only supported in non-symmetric neighborhoods");
+
+        // shift into supercluster-aligned coordinates; group indices are relative to firstBody,
+        // so shifting the base shifts all particle ranges
+        GroupView shiftedGroups   = groups;
+        shiftedGroups.firstBody  += firstValidBody;
+        shiftedGroups.lastBody   += firstValidBody;
+
         const LocalIndex firstISupercluster = superclusterIndex<Config>(firstBody);
         const LocalIndex lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
         const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
 
-        auto activeMasks =
-            computeActiveMasks<Config>(exec, firstISupercluster, numISuperclusters, firstValidBody, groups);
+        auto activeMasks = computeActiveMasks<Config>(exec, firstISupercluster, numISuperclusters, shiftedGroups);
 
         const auto superclusterIsActive =
             [activeMasksPtr = activeMasks.get(), firstISupercluster] __device__(const SuperclusterInfo& info)

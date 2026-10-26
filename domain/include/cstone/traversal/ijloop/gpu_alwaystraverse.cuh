@@ -64,11 +64,10 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
 
         if (targetIdx >= groups.numGroups) break;
 
-        const LocalIndex bodyBegin = groups.groupStart[targetIdx];
-        const LocalIndex bodyEnd   = groups.groupEnd[targetIdx];
+        const LocalIndex bodyBegin = groups.groupStart(targetIdx);
+        const LocalIndex bodyEnd   = groups.groupEnd(targetIdx);
 
-        const LocalIndex i = bodyBegin + laneIdx;
-        if (i < bodyEnd)
+        for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += GpuConfig::warpSize)
         {
             const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, threadNeighbors), ngmax);
 

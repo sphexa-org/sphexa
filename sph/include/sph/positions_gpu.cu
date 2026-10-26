@@ -53,7 +53,10 @@ __global__ void driftKernel(GroupView grp, float dt, float dt_back, util::array<
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
     if (warpIdx >= grp.numGroups) { return; }
 
-    for (LocalIndex i = grp.groupStart[warpIdx] + laneIdx; i < grp.groupEnd[warpIdx]; i += GpuConfig::warpSize)
+    const LocalIndex bodyBegin = grp.groupStart(warpIdx);
+    const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
+
+    for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += GpuConfig::warpSize)
     {
     // drifting must not adjust for PBC because that would require octrees to be rebuilt
     cstone::Box<Tc> noPbc(0, 1, cstone::BoundaryType::open);
@@ -126,7 +129,10 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
     if (warpIdx >= grp.numGroups) { return; }
 
-    for (LocalIndex i = grp.groupStart[warpIdx] + laneIdx; i < grp.groupEnd[warpIdx]; i += GpuConfig::warpSize)
+    const LocalIndex bodyBegin = grp.groupStart(warpIdx);
+    const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
+
+    for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += GpuConfig::warpSize)
     {
     float dt_m1_rung = (rung != nullptr) ? dt_m1[rung[i]] : dt_m1[0];
 

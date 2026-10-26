@@ -71,7 +71,9 @@ __global__ void computeGravityEwaldKernel(cstone::GroupView grp, const Tc* x, co
     Ta Uewald = 0;
     if (tid < grp.numGroups)
     {
-        for (LocalIndex i = grp.groupStart[tid]; i < grp.groupEnd[tid]; ++i)
+        const LocalIndex bodyBegin = grp.groupStart(tid);
+        const LocalIndex bodyEnd   = grp.groupEnd(tid);
+        for (LocalIndex i = bodyBegin; i < bodyEnd; ++i)
         {
             Uewald += ewaldParticle(i, x, y, z, m, G, ugrav, ax, ay, az, *ewaldParams);
         }

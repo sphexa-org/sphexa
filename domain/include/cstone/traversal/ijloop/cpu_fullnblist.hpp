@@ -70,9 +70,13 @@ struct CpuFullNbListNeighborhood
             const auto ijData = check<Tc, ThP>(data);
 #pragma omp parallel for
             for (LocalIndex g = 0; g < groups.numGroups; ++g)
+            {
+                const LocalIndex bodyBegin = groups.groupStart(g);
+                const LocalIndex bodyEnd   = groups.groupEnd(g);
 #pragma omp simd
-                for (LocalIndex i = groups.groupStart[g]; i < groups.groupEnd[g]; ++i)
+                for (LocalIndex i = bodyBegin; i < bodyEnd; ++i)
                     parent.jLoop(ijData.input, ijData.output, ijData.interaction, ijData.postamble, i);
+            }
         }
     };
 

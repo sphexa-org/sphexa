@@ -48,7 +48,10 @@ __global__ void computeStirringKernel(GroupView grp, size_t numDim, const Tc* x,
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
     if (warpIdx >= grp.numGroups) { return; }
 
-    for (LocalIndex i = grp.groupStart[warpIdx] + laneIdx; i < grp.groupEnd[warpIdx]; i += GpuConfig::warpSize)
+    const LocalIndex bodyBegin = grp.groupStart(warpIdx);
+    const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
+
+    for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += GpuConfig::warpSize)
     {
         auto [turbAx, turbAy, turbAz] =
             stirParticle<Tc, Ta, T>(numDim, x[i], y[i], z[i], numModes, modes, phaseReal, phaseImag, amplitudes);

@@ -522,7 +522,6 @@ void runIjLoop(const execution::Gpu exec,
 
 template<class Config>
 __global__ void computeActiveMasksKernel(const LocalIndex firstISupercluster,
-                                         const LocalIndex firstValidBody,
                                          const GroupView groups,
                                          typename Config::SuperclusterParticleMask* __restrict__ activeMasks)
 {
@@ -531,14 +530,14 @@ __global__ void computeActiveMasksKernel(const LocalIndex firstISupercluster,
     const LocalIndex index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= groups.numGroups) return;
 
-    const LocalIndex groupStart = groups.groupStart[index] + firstValidBody;
-    const LocalIndex groupEnd   = groups.groupEnd[index] + firstValidBody;
-    assert(groupStart < groupEnd);
-    assert(superclusterIndex<Config>(groupStart) == superclusterIndex<Config>(groupEnd - 1));
+    const LocalIndex bodyBegin = groups.groupStart(index);
+    const LocalIndex bodyEnd   = groups.groupEnd(index);
+    assert(bodyBegin < bodyEnd);
+    assert(superclusterIndex<Config>(bodyBegin) == superclusterIndex<Config>(bodyEnd - 1));
 
-    const LocalIndex supercluster = superclusterIndex<Config>(groupStart);
-    const LocalIndex startOffset  = groupStart - supercluster * Config::superclusterSize;
-    const LocalIndex endOffset    = groupEnd - supercluster * Config::superclusterSize;
+    const LocalIndex supercluster = superclusterIndex<Config>(bodyBegin);
+    const LocalIndex startOffset  = bodyBegin - supercluster * Config::superclusterSize;
+    const LocalIndex endOffset    = bodyEnd - supercluster * Config::superclusterSize;
 
     auto* activeMaskPtr = &activeMasks[supercluster - firstISupercluster];
     const Mask activeMask =
@@ -553,7 +552,6 @@ util::UniqueDevicePtr<typename Config::SuperclusterParticleMask[]>
 computeActiveMasks(const execution::Gpu exec,
                    const LocalIndex firstISupercluster,
                    const LocalIndex numISuperclusters,
-                   const LocalIndex firstValidBody,
                    const GroupView& groups)
 {
     auto activeMasks = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(exec, numISuperclusters);
@@ -563,7 +561,7 @@ computeActiveMasks(const execution::Gpu exec,
     constexpr unsigned numThreads = 256;
     const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
     computeActiveMasksKernel<Config>
-        <<<numBlocks, numThreads, 0, exec>>>(firstISupercluster, firstValidBody, groups, activeMasks.get());
+        <<<numBlocks, numThreads, 0, exec>>>(firstISupercluster, groups, activeMasks.get());
     checkGpuErrors(cudaGetLastError());
     return activeMasks;
 }
