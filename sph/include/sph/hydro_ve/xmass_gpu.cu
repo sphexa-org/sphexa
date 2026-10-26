@@ -44,7 +44,7 @@ using cstone::GpuConfig;
 using cstone::LocalIndex;
 using cstone::TreeNodeIndex;
 
-unsigned nsGroupSize() { return GpuConfig::warpSize; }
+unsigned nsGroupSize() { return 64; }
 
 namespace gpu
 {

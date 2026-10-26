@@ -53,9 +53,8 @@ __global__ void driftKernel(GroupView grp, float dt, float dt_back, util::array<
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
     if (warpIdx >= grp.numGroups) { return; }
 
-    LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
-    if (i >= grp.groupEnd[warpIdx]) { return; }
-
+    for (LocalIndex i = grp.groupStart[warpIdx] + laneIdx; i < grp.groupEnd[warpIdx]; i += GpuConfig::warpSize)
+    {
     // drifting must not adjust for PBC because that would require octrees to be rebuilt
     cstone::Box<Tc> noPbc(0, 1, cstone::BoundaryType::open);
 
@@ -85,6 +84,7 @@ __global__ void driftKernel(GroupView grp, float dt, float dt_back, util::array<
     {
         auto u_recov = energyUpdate(u[i], -dt_back, dt_m1_rung, du[i], Tdu(du_m1[i]));
         u[i]         = energyUpdate(u_recov, dt, dt_m1_rung, du[i], Tdu(du_m1[i]));
+    }
     }
 }
 
@@ -126,9 +126,8 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
     if (warpIdx >= grp.numGroups) { return; }
 
-    LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
-    if (i >= grp.groupEnd[warpIdx]) { return; }
-
+    for (LocalIndex i = grp.groupStart[warpIdx] + laneIdx; i < grp.groupEnd[warpIdx]; i += GpuConfig::warpSize)
+    {
     float dt_m1_rung = (rung != nullptr) ? dt_m1[rung[i]] : dt_m1[0];
 
     cstone::Vec3<Tc> X{x[i], y[i], z[i]};
@@ -161,6 +160,7 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
         // we multiply dt_m1 by that factor so it applies only once to each of the updating terms
         u[i]     = energyUpdate(u[i], dt * minDistanceFactor, dt_m1_rung * minDistanceFactor, du[i], du_m1[i]);
         du_m1[i] = du[i];
+    }
     }
 }
 

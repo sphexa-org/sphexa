@@ -97,10 +97,10 @@ __global__ void storeRungKernel(const GroupView grp, uint8_t rung, uint8_t* part
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
     if (warpIdx >= grp.numGroups) { return; }
 
-    LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
-    if (i >= grp.groupEnd[warpIdx]) { return; }
-
-    particleRungs[i] = rung;
+    for (LocalIndex i = grp.groupStart[warpIdx] + laneIdx; i < grp.groupEnd[warpIdx]; i += cstone::GpuConfig::warpSize)
+    {
+        particleRungs[i] = rung;
+    }
 }
 
 void storeRungGpu(const GroupView& grp, uint8_t rung, uint8_t* particleRungs)

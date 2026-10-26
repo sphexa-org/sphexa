@@ -26,15 +26,15 @@ __global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, cons
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
     if (warpIdx >= grp.numGroups) { return; }
 
-    LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
-    if (i >= grp.groupEnd[warpIdx]) { return; }
-
-    if (nc[i] <= 1)
+    for (LocalIndex i = grp.groupStart[warpIdx] + laneIdx; i < grp.groupEnd[warpIdx]; i += cstone::GpuConfig::warpSize)
     {
-        keys[i]                 = cstone::removeKey<KeyType>{};
-        nc_h_convergenceFailure = true;
+        if (nc[i] <= 1)
+        {
+            keys[i] = cstone::removeKey<KeyType>{};
+            nc_h_convergenceFailure = true;
+        }
+        h[i] = updateH(ng0, nc[i], h[i]);
     }
-    h[i] = updateH(ng0, nc[i], h[i]);
 }
 
 template<class Th, class KeyType>
@@ -64,10 +64,10 @@ __global__ __launch_bounds__(128) void updateSmoothingLengthIterativeGpuKernel(
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
     if (warpIdx >= grp.numGroups) { return; }
 
-    const LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
-    if (i >= grp.groupEnd[warpIdx]) { return; }
-
-    updateHIterative(ng0, ngmax, box, tree, i, x, y, z, h, nc);
+    for (LocalIndex i = grp.groupStart[warpIdx] + laneIdx; i < grp.groupEnd[warpIdx]; i += cstone::GpuConfig::warpSize)
+    {
+        updateHIterative(ng0, ngmax, box, tree, i, x, y, z, h, nc);
+    }
 }
 
 template<class T, class Dataset>

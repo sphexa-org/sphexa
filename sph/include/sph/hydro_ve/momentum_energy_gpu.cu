@@ -59,14 +59,17 @@ __global__ void reduceDt(const LocalIndex* __restrict__ grpStart, const LocalInd
 
     LocalIndex bodyBegin = grpStart[grpIdx];
     LocalIndex bodyEnd   = grpEnd[grpIdx];
-    LocalIndex i         = bodyBegin + laneIdx;
 
     __shared__ float minBlockDt;
     if (threadIdx.x == 0) minBlockDt = std::numeric_limits<float>::infinity();
     __syncthreads();
 
-    float dt         = i < bodyEnd ? dtCourant[i] : std::numeric_limits<T>::infinity();
-    float minGroupDt = cstone::warpMin(dt);
+    float minGroupDt = std::numeric_limits<float>::infinity();
+    for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += GpuConfig::warpSize)
+    {
+        minGroupDt = std::min(minGroupDt, dtCourant[i]);
+    }
+    minGroupDt = cstone::warpMin(minGroupDt);
     if (groupDt && laneIdx == 0) groupDt[grpIdx] = std::min(groupDt[grpIdx], minGroupDt);
 
     if (laneIdx == 0) cstone::atomicMinFloat(&minBlockDt, minGroupDt);
