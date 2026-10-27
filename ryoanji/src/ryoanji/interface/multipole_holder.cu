@@ -102,9 +102,9 @@ public:
         // the group count is host-computable from grp, no device-to-host sync is needed before the launch
         reallocate(traversalStack_, stackSize(grp.numGroups()), 1.01);
 
-        return traverse(grp, d_leaves.data(), TreeNodeIndex(d_leaves.size() - 1), layout, box, tolFactor, 1, x, y, z,
-                        m, h, octree_.childOffsets, octree_.internalToLeaf, centers_, rawPtr(multipoles_), G,
-                        numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()}, ugrav, ax, ay, az,
+        return traverse(grp, d_leaves.data(), TreeNodeIndex(d_leaves.size() - 1), box, tolFactor, 1, x, y, z, m, h,
+                        x, y, z, m, h, octree_.childOffsets, octree_.internalToLeaf, layout, centers_,
+                        rawPtr(multipoles_), G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()}, ugrav, ax, ay, az,
                         (int*)rawPtr(traversalStack_));
     }
 

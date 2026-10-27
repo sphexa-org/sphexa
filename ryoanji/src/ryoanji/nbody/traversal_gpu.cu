@@ -595,11 +595,11 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
  * @param[in]    grp           target group view, typically a trivial view with fixed-size groups
  * @param[in]    leaves        cornerstone leaf-cell array, size is @p numLeaves + 1, on device
  * @param[in]    numLeaves     number of leaf cells in @p leaves
- * @param[in]    layout        for each leaf cell in [0:numLeaves], stores the index of the first source body in cell
  * @param[in]    box           global coordinate bounding box
  * @param[in]    tolFactor     tolerance factor for the spatial compactness criterion
  * @param[in]    initNodeIdx   traversal will be started with all children of the parent of @p initNodeIdx
- * @param[in]    x,y,z,m,h     target and source bodies, in SFC order as referenced by layout
+ * @param[in]    xt,yt,zt,mt,ht target bodies, as referenced and grouped by @p grp
+ * @param[in]    xs,ys,zs,ms,hs source bodies, in SFC order as used for tree-build and as referenced by layout
  * @param[in]    childOffsets   location (index in [0:numTreeNodes]) of first child of each cell, 0 indicates a leaf
  * @param[in]    internalToLeaf for each cell in [0:numTreeNodes], stores the leaf cell (cstone) index in [0:numLeaves]
  *                              if the cell is not a leaf, the value is negative
@@ -616,12 +616,14 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
  */
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType, class KeyType>
 __global__ __launch_bounds__(TravConfig::numThreads) void traverseSplitKernel(
-    cstone::GroupView grp, const KeyType* __restrict__ leaves,
-    TreeNodeIndex numLeaves, const LocalIndex* __restrict__ layout, const cstone::Box<Tc> box, float tolFactor,
-    const int initNodeIdx, const Tc* __restrict__ x, const Tc* __restrict__ y, const Tc* __restrict__ z,
-    const Tm* __restrict__ m, const Th* __restrict__ h, const TreeNodeIndex* __restrict__ childOffsets,
-    const TreeNodeIndex* __restrict__ internalToLeaf, const Vec4<Tf>* __restrict__ sourceCenter,
-    const MType* __restrict__ Multipoles, Tc G, int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az, int* gmPool)
+    cstone::GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves, const cstone::Box<Tc> box,
+    float tolFactor, const int initNodeIdx, const Tc* __restrict__ xt, const Tc* __restrict__ yt,
+    const Tc* __restrict__ zt, const Tm* __restrict__ mt, const Th* __restrict__ ht, const Tc* __restrict__ xs,
+    const Tc* __restrict__ ys, const Tc* __restrict__ zs, const Tm* __restrict__ ms, const Th* __restrict__ hs,
+    const TreeNodeIndex* __restrict__ childOffsets, const TreeNodeIndex* __restrict__ internalToLeaf,
+    const LocalIndex* __restrict__ layout, const Vec4<Tf>* __restrict__ sourceCenter,
+    const MType* __restrict__ Multipoles, Tc G, int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az,
+    int* gmPool)
 {
     const int laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
     const int warpIdx = threadIdx.x >> GpuConfig::warpSizeLog2;
@@ -662,8 +664,8 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseSplitKernel(
         // evaluate the spatial compactness criterion in-register, a 1-bit at group-relative
         // position i marks the last particle of a subgroup
         auto splitMask =
-            cstone::evalGroupSplitMask<TravConfig::targetSize, Tc, Th, KeyType>(groupBegin, grp.lastBody, x, y, z, h,
-                                                                                leaves, numLeaves, layout, box,
+            cstone::evalGroupSplitMask<TravConfig::targetSize, Tc, Th, KeyType>(groupBegin, grp.lastBody, xt, yt, zt,
+                                                                                ht, leaves, numLeaves, layout, box,
                                                                                 tolFactor);
 
         // combine the per-thread-segment masks into one bitstream over the fixed group
@@ -682,7 +684,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseSplitKernel(
             const int end = remaining ? countTrailingZeros(remaining) + 1 : groupEnd - groupBegin;
             remaining &= remaining - 1;
 
-            traverseGroup(groupBegin + start, groupBegin + end, m, x, y, z, h, x, y, z, m, h, childOffsets,
+            traverseGroup(groupBegin + start, groupBegin + end, mt, xt, yt, zt, ht, xs, ys, zs, ms, hs, childOffsets,
                           internalToLeaf, layout, sourceCenter, Multipoles, initNodeIdx, G, numShells, boxL, p, ax, ay,
                           az, tempQueue, cellQueue);
 
@@ -717,10 +719,12 @@ double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restri
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType, class KeyType>
 double traverse(cstone::GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves,
-                const LocalIndex* __restrict__ layout, const cstone::Box<Tc>& box, float tolFactor,
-                const int initNodeIdx, const Tc* __restrict__ x, const Tc* __restrict__ y, const Tc* __restrict__ z,
-                const Tm* __restrict__ m, const Th* __restrict__ h, const TreeNodeIndex* __restrict__ childOffsets,
-                const TreeNodeIndex* __restrict__ internalToLeaf, const Vec4<Tf>* __restrict__ sourceCenter,
+                const cstone::Box<Tc>& box, float tolFactor, const int initNodeIdx, const Tc* __restrict__ xt,
+                const Tc* __restrict__ yt, const Tc* __restrict__ zt, const Tm* __restrict__ mt,
+                const Th* __restrict__ ht, const Tc* __restrict__ xs, const Tc* __restrict__ ys,
+                const Tc* __restrict__ zs, const Tm* __restrict__ ms, const Th* __restrict__ hs,
+                const TreeNodeIndex* __restrict__ childOffsets, const TreeNodeIndex* __restrict__ internalToLeaf,
+                const LocalIndex* __restrict__ layout, const Vec4<Tf>* __restrict__ sourceCenter,
                 const MType* __restrict__ multipoles, Tc G, int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay,
                 Ta* az, int* gmPool)
 {
@@ -731,8 +735,8 @@ double traverse(cstone::GroupView grp, const KeyType* __restrict__ leaves, TreeN
     resetTraversalCounters<<<1, 1>>>();
     if (numBlocks > 0)
         traverseSplitKernel<<<numBlocks, TravConfig::numThreads>>>(
-            grp, leaves, numLeaves, layout, box, tolFactor, initNodeIdx, x, y, z, m, h,
-            childOffsets, internalToLeaf, sourceCenter, multipoles, G, numShells, boxL, p, ax, ay, az, gmPool);
+            grp, leaves, numLeaves, box, tolFactor, initNodeIdx, xt, yt, zt, mt, ht, xs, ys, zs, ms, hs, childOffsets,
+            internalToLeaf, layout, sourceCenter, multipoles, G, numShells, boxL, p, ax, ay, az, gmPool);
     float totalPotential;
     checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
     return 0.5 * Tc(G) * totalPotential;
@@ -758,13 +762,15 @@ TRAVERSE_MPOLE(CartesianMDQpole)
 
 #define TRAVERSE_SPLIT(Tc, Th, Tm, Ta, Tf, MType, KeyType)                                                             \
     template double traverse(cstone::GroupView grp, const KeyType* __restrict__ leaves,                                \
-                             TreeNodeIndex numLeaves, const LocalIndex* __restrict__ layout, const cstone::Box<Tc>&     \
-                             box, float tolFactor, const int initNodeIdx, const Tc* __restrict__ x,                    \
-                             const Tc* __restrict__ y, const Tc* __restrict__ z, const Tm* __restrict__ m,              \
-                             const Th* __restrict__ h, const TreeNodeIndex* __restrict__ childOffsets,                  \
-                             const TreeNodeIndex* __restrict__ internalToLeaf, const Vec4<Tf>* __restrict__ sourceCenter, \
-                             const MType* __restrict__ multipoles, Tc G, int numShells, Vec3<Tc> boxL, Ta* p,           \
-                             Ta* ax, Ta* ay, Ta* az, int* gmPool)
+                             TreeNodeIndex numLeaves, const cstone::Box<Tc>& box, float tolFactor,                     \
+                             const int initNodeIdx, const Tc* __restrict__ xt, const Tc* __restrict__ yt,              \
+                             const Tc* __restrict__ zt, const Tm* __restrict__ mt, const Th* __restrict__ ht,          \
+                             const Tc* __restrict__ xs, const Tc* __restrict__ ys, const Tc* __restrict__ zs,          \
+                             const Tm* __restrict__ ms, const Th* __restrict__ hs,                                     \
+                             const TreeNodeIndex* __restrict__ childOffsets,                                           \
+                             const TreeNodeIndex* __restrict__ internalToLeaf, const LocalIndex* __restrict__ layout,  \
+                             const Vec4<Tf>* __restrict__ sourceCenter, const MType* __restrict__ multipoles, Tc G,    \
+                             int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az, int* gmPool)
 
 #define TRAVERSE_SPLIT_MPOLE(MType)                                                                                    \
     TRAVERSE_SPLIT(double, double, double, double, double, MType<double>, uint64_t);                                   \
