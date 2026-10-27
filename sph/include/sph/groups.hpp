@@ -47,6 +47,8 @@ void computeGroups(size_t startIndex, size_t endIndex, GroupData<Exec>& groups)
 {
     groups.firstBody = startIndex;
     groups.lastBody  = endIndex;
+    groups.activeGroups = nullptr;
+    groups.numActiveGroups = 0;
 }
 
 //! @brief extract the specified subgroup [first:last] indexed through @p indices from @p grp into @p out
