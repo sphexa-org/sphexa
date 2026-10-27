@@ -33,14 +33,6 @@ class MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::Impl
 public:
     Impl() {}
 
-    GroupView computeSpatialGroups(LocalIndex first, LocalIndex last, const Tc* x, const Tc* y, const Tc* z,
-                                   const Th*                                                         h,
-                                   const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
-                                   const cstone::LocalIndex* layout, const cstone::Box<Tc>& box)
-    {
-        return {.firstBody = first, .lastBody = last};
-    }
-
     void upsweep(const Tc* x, const Tc* y, const Tc* z, const Tm* m, cstone::OctreeView<const KeyType> gOctree,
                  const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
                  const cstone::LocalIndex*                                         layout)
@@ -140,13 +132,6 @@ MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::MultipoleHolder()
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
 MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::~MultipoleHolder() = default;
-
-template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
-GroupView MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::computeSpatialGroups(
-    LocalIndex firstBody, LocalIndex lastBody, const Tc* x, const Tc* y, const Tc* z, const Th* h,
-    const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree, const LocalIndex* layout,
-    const cstone::Box<Tc>& box)
-{ return impl_->computeSpatialGroups(firstBody, lastBody, x, y, z, h, focusTree, layout, box); }
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
 void MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::upsweep(

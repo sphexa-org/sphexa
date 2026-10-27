@@ -146,9 +146,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
         d_ay = std::vector<T>(domain.nParticlesWithHalos(), 0);
         d_az = std::vector<T>(domain.nParticlesWithHalos(), 0);
 
-        auto   grp = multipoleHolder.computeSpatialGroups(domain.startIndex(), domain.endIndex(), rawPtr(d_x),
-                                                          rawPtr(d_y), rawPtr(d_z), rawPtr(d_h), domain.focusTree(),
-                                                          domain.layout().data(), domain.box());
+        cstone::GroupView grp{domain.startIndex(), domain.endIndex()};
         double bhPotential =
             multipoleHolder.compute(grp, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), rawPtr(d_h), G, 0, box,
                                     nullptr, rawPtr(d_ax), rawPtr(d_ay), rawPtr(d_az));
@@ -252,7 +250,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
             /* Compute accelerations for some target particles. We pick the first numTarget sources because
              * we already have the reference values. But the target particles can be distinct from the sources.
              * The only concern is performance: this only runs efficiently if the targets are SFC sorted and grouped
-             * by MultipoleHolder::computeSpatialGroups to ensure that target groups have compact bounding boxes.
+             * into spatially compact groups with compact bounding boxes.
              */
             LocalIndex              numTargets = 100;
             cstone::DeviceVector<T> d_xt       = extract(d_x, domain.startIndex(), domain.startIndex() + numTargets);
@@ -261,9 +259,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
             cstone::DeviceVector<T> d_mt       = extract(d_m, domain.startIndex(), domain.startIndex() + numTargets);
             cstone::DeviceVector<T> d_ht       = extract(d_h, domain.startIndex(), domain.startIndex() + numTargets);
 
-            auto targetGroups =
-                multipoleHolder.computeSpatialGroups(0, numTargets, d_xt.data(), d_yt.data(), d_zt.data(), d_ht.data(),
-                                                     focusTree, domain.layout().data(), box);
+            cstone::GroupView targetGroups{0, numTargets};
 
             cstone::DeviceVector<T> d_axt(numTargets, 0), d_ayt(numTargets, 0), d_azt(numTargets, 0);
 

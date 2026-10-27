@@ -50,11 +50,6 @@ class MultipoleHolderCpu
 public:
     MultipoleHolderCpu() = default;
 
-    cstone::GroupView computeSpatialGroups(const DataType& /*d*/, const DomainType& domain)
-    {
-        return {.firstBody = domain.startIndex(), .lastBody = domain.endIndex()};
-    }
-
     void upsweep(const DataType& d, const DomainType& domain)
     {
         //! includes tree plus associated information, like peer ranks, assignment, counts, centers, etc
@@ -125,13 +120,6 @@ class MultipoleHolderGpu
 public:
     MultipoleHolderGpu() = default;
 
-    cstone::GroupView computeSpatialGroups(const DataType& d, const DomainType& domain)
-    {
-        return mHolder_.computeSpatialGroups(domain.startIndex(), domain.endIndex(), rawPtr(d.x), rawPtr(d.y),
-                                             rawPtr(d.z), rawPtr(d.h), domain.focusTree(), domain.layout().data(),
-                                             domain.box());
-    }
-
     void upsweep(const DataType& d, const DomainType& domain)
     {
         const auto& focusTree = domain.focusTree();
@@ -176,9 +164,9 @@ public:
      *
      * Group-free counterpart of the group-based traverse overload: the target groups
      * are determined in-register inside the gravity traversal kernel with the spatial
-     * compactness criterion, such that no call to computeSpatialGroups and no
-     * device-to-host synchronization precede the traversal launch. The groups are described
-     * by a trivial cstone::GroupView over the full local particle range.
+     * compactness criterion, such that no device-to-host synchronization precede the
+     * traversal launch. The groups are described by a trivial cstone::GroupView over the
+     * full local particle range.
      */
     void traverse(DataType& d, const DomainType& domain)
     {

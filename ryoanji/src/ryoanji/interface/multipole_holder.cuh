@@ -32,11 +32,6 @@ public:
 
     ~MultipoleHolder();
 
-    cstone::GroupView computeSpatialGroups(LocalIndex first, LocalIndex last, const Tc* x, const Tc* y, const Tc* z,
-                                           const Th*                                                         h,
-                                           const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
-                                           const cstone::LocalIndex* layout, const cstone::Box<Tc>& box);
-
     /*! @brief compute multipole moments with an upsweep from leaves to the tree root
      *
      * @param[in]  x, y, z, m    source particles in SFC order as referenced by layout, on GPU
