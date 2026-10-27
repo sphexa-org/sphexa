@@ -177,7 +177,8 @@ public:
      * Group-free counterpart of the group-based traverse overload: the target groups
      * are determined in-register inside the gravity traversal kernel with the spatial
      * compactness criterion, such that no call to computeSpatialGroups and no
-     * device-to-host synchronization precede the traversal launch.
+     * device-to-host synchronization precede the traversal launch. The groups are described
+     * by a trivial cstone::GroupView over the full local particle range.
      */
     void traverse(DataType& d, const DomainType& domain)
     {
@@ -187,10 +188,11 @@ public:
         bool        usePbc    = box.boundaryX() == BoundaryType::periodic;
         int         numShells = usePbc ? ewaldSettings_.numReplicaShells : 0;
 
-        d.egrav = mHolder_.compute(rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m), rawPtr(d.h), d.g, numShells,
-                                   domain.startIndex(), domain.endIndex(), domain.focusTree(),
-                                   domain.layout().data(), domain.box(), rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay),
-                                   rawPtr(d.az));
+        cstone::GroupView grp{domain.startIndex(), domain.endIndex()};
+
+        d.egrav = mHolder_.compute(grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m), rawPtr(d.h), d.g,
+                                   numShells, domain.focusTree(), domain.layout().data(), domain.box(),
+                                   rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az));
 
         auto stats = mHolder_.readStats();
 
@@ -206,9 +208,9 @@ public:
             memcpyD2HAsync(execution::gpuDefaultStream, mHolder_.deviceMultipoles(), 1, &rootM);
             syncGpu(execution::gpuDefaultStream);
 
-            computeGravityEwaldGpu(makeVec3(rootCenter), rootM, domain.startIndex(), domain.endIndex(), rawPtr(d.x),
-                                   rawPtr(d.y), rawPtr(d.z), rawPtr(d.m), box, d.g, rawPtr(d.ugrav), rawPtr(d.ax),
-                                   rawPtr(d.ay), rawPtr(d.az), &d.egrav, ewaldSettings_);
+            computeGravityEwaldGpu(makeVec3(rootCenter), rootM, grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z),
+                                   rawPtr(d.m), box, d.g, rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az),
+                                   &d.egrav, ewaldSettings_);
         }
 
         d.stackUsedGravity = stats[4];

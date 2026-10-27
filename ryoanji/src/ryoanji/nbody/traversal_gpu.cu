@@ -585,15 +585,14 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
 /*! @brief Compute approximate body accelerations with Barnes-Hut with in-register group splitting
  *
  * Identical to @p traverseKernel, except that the target groups are determined inside the kernel:
- * each warp claims one fixed group of TravConfig::targetSize particles starting at @p first via the
- * atomic target counter, evaluates the spatial compactness criterion in-register with the shared
- * cstone device function @p evalGroupSplitMask, decodes its subgroup boundaries and traverses the
- * subgroups sequentially with @p traverseGroup. No precomputed groups are needed, the number of
- * fixed groups is computable on the host, such that no device-to-host synchronization is required
+ * each warp claims one fixed group of TravConfig::targetSize particles via the atomic target
+ * counter, evaluates the spatial compactness criterion in-register with the shared cstone device
+ * function @p evalGroupSplitMask, decodes its subgroup boundaries and traverses the subgroups
+ * sequentially with @p traverseGroup. No precomputed groups are needed, the number of groups is
+ * computable on the host from @p grp, such that no device-to-host synchronization is required
  * before the launch.
  *
- * @param[in]    first, last   local target particle index range, fixed groups start at @p first
- * @param[in]    numFixedGroups number of fixed groups in [first:last), host-computable
+ * @param[in]    grp           target group view, typically a trivial view with fixed-size groups
  * @param[in]    leaves        cornerstone leaf-cell array, size is @p numLeaves + 1, on device
  * @param[in]    numLeaves     number of leaf cells in @p leaves
  * @param[in]    layout        for each leaf cell in [0:numLeaves], stores the index of the first source body in cell
@@ -617,7 +616,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
  */
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType, class KeyType>
 __global__ __launch_bounds__(TravConfig::numThreads) void traverseSplitKernel(
-    LocalIndex first, LocalIndex last, LocalIndex numFixedGroups, const KeyType* __restrict__ leaves,
+    cstone::GroupView grp, const KeyType* __restrict__ leaves,
     TreeNodeIndex numLeaves, const LocalIndex* __restrict__ layout, const cstone::Box<Tc> box, float tolFactor,
     const int initNodeIdx, const Tc* __restrict__ x, const Tc* __restrict__ y, const Tc* __restrict__ z,
     const Tm* __restrict__ m, const Th* __restrict__ h, const TreeNodeIndex* __restrict__ childOffsets,
@@ -654,17 +653,18 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseSplitKernel(
         }
         targetIdx = shflSync(targetIdx, 0);
 
-        if (targetIdx >= numFixedGroups) return;
+        if (targetIdx >= grp.numGroups()) return;
 
         // fixed group range, the last group of the range can be shorter than TravConfig::targetSize
-        const LocalIndex groupBegin = first + targetIdx * TravConfig::targetSize;
-        const LocalIndex groupEnd   = imin(groupBegin + TravConfig::targetSize, last);
+        const LocalIndex groupBegin = grp.groupStart(targetIdx);
+        const LocalIndex groupEnd   = grp.groupEnd(targetIdx);
 
         // evaluate the spatial compactness criterion in-register, a 1-bit at group-relative
         // position i marks the last particle of a subgroup
         auto splitMask =
-            cstone::evalGroupSplitMask<TravConfig::targetSize, Tc, Th, KeyType>(groupBegin, last, x, y, z, h, leaves,
-                                                                                numLeaves, layout, box, tolFactor);
+            cstone::evalGroupSplitMask<TravConfig::targetSize, Tc, Th, KeyType>(groupBegin, grp.lastBody, x, y, z, h,
+                                                                                leaves, numLeaves, layout, box,
+                                                                                tolFactor);
 
         // combine the per-thread-segment masks into one bitstream over the fixed group
         uint64_t splitBits = 0;
@@ -716,7 +716,7 @@ double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restri
 }
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType, class KeyType>
-double traverse(LocalIndex first, LocalIndex last, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves,
+double traverse(cstone::GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves,
                 const LocalIndex* __restrict__ layout, const cstone::Box<Tc>& box, float tolFactor,
                 const int initNodeIdx, const Tc* __restrict__ x, const Tc* __restrict__ y, const Tc* __restrict__ z,
                 const Tm* __restrict__ m, const Th* __restrict__ h, const TreeNodeIndex* __restrict__ childOffsets,
@@ -724,15 +724,14 @@ double traverse(LocalIndex first, LocalIndex last, const KeyType* __restrict__ l
                 const MType* __restrict__ multipoles, Tc G, int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay,
                 Ta* az, int* gmPool)
 {
-    int numWarpsPerBlock   = TravConfig::numThreads / GpuConfig::warpSize;
-    int numFixedGroups     = cstone::iceil(last - first, TravConfig::targetSize);
-    int numBlocks          = cstone::iceil(numFixedGroups, numWarpsPerBlock);
-    numBlocks              = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
+    int numWarpsPerBlock = TravConfig::numThreads / GpuConfig::warpSize;
+    int numBlocks        = cstone::iceil(grp.numGroups(), numWarpsPerBlock);
+    numBlocks            = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
 
     resetTraversalCounters<<<1, 1>>>();
     if (numBlocks > 0)
         traverseSplitKernel<<<numBlocks, TravConfig::numThreads>>>(
-            first, last, numFixedGroups, leaves, numLeaves, layout, box, tolFactor, initNodeIdx, x, y, z, m, h,
+            grp, leaves, numLeaves, layout, box, tolFactor, initNodeIdx, x, y, z, m, h,
             childOffsets, internalToLeaf, sourceCenter, multipoles, G, numShells, boxL, p, ax, ay, az, gmPool);
     float totalPotential;
     checkGpuErrors(cudaMemcpyFromSymbol(&totalPotential, GPU_SYMBOL(totalPotentialGlob), sizeof(float)));
@@ -758,7 +757,7 @@ TRAVERSE_MPOLE(CartesianQuadrupole)
 TRAVERSE_MPOLE(CartesianMDQpole)
 
 #define TRAVERSE_SPLIT(Tc, Th, Tm, Ta, Tf, MType, KeyType)                                                             \
-    template double traverse(LocalIndex first, LocalIndex last, const KeyType* __restrict__ leaves,                    \
+    template double traverse(cstone::GroupView grp, const KeyType* __restrict__ leaves,                                \
                              TreeNodeIndex numLeaves, const LocalIndex* __restrict__ layout, const cstone::Box<Tc>&     \
                              box, float tolFactor, const int initNodeIdx, const Tc* __restrict__ x,                    \
                              const Tc* __restrict__ y, const Tc* __restrict__ z, const Tm* __restrict__ m,              \
@@ -774,8 +773,6 @@ TRAVERSE_MPOLE(CartesianMDQpole)
 
 TRAVERSE_SPLIT_MPOLE(CartesianQuadrupole)
 TRAVERSE_SPLIT_MPOLE(CartesianMDQpole)
-
-int bhMaxTargetSize() { return TravConfig::targetSize; }
 
 LocalIndex stackSize(LocalIndex numGroups)
 {
