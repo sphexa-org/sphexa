@@ -14,7 +14,7 @@
  */
 
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/traversal/groups_gpu.h"
+#include "cstone/traversal/groups.hpp"
 #include "cstone/util/reallocate.hpp"
 #include "ryoanji/nbody/cartesian_qpole.hpp"
 #include "ryoanji/nbody/direct.cuh"

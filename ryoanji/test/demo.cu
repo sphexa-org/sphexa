@@ -23,7 +23,7 @@
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/focus/source_center_gpu.h"
-#include "cstone/traversal/groups_gpu.h"
+#include "cstone/traversal/groups.hpp"
 #include "cstone/util/array.hpp"
 
 #include "nbody/dataset.hpp"
