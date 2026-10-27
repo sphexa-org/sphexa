@@ -60,15 +60,15 @@ void computeGroups(size_t startIndex, size_t endIndex, Dataset& d, const cstone:
         groups.data.resize(numGroups);
         std::iota(groups.data.begin(), groups.data.end(), cstone::LocalIndex(0));
 
-        groups.firstBody = startIndex;
-        groups.lastBody  = endIndex;
-        groups.numGroups = numGroups;
-        groups.groups    = groups.data.data();
+        groups.firstBody       = startIndex;
+        groups.lastBody        = endIndex;
+        groups.numActiveGroups = numGroups;
+        groups.activeGroups    = groups.data.data();
     }
 }
 
 //! @brief extract the specified subgroup [first:last] indexed through @p indices from @p grp into @p out
-/*! the extracted view keeps the original firstBody/lastBody of @p grp, while out.groups stores the
+/*! the extracted view keeps the original firstBody/lastBody of @p grp, while out.activeGroups stores the
  *  selected group indices (a plain copy of indices[first:last])
  */
 template<cstone::execution::Policy Exec>
@@ -78,21 +78,21 @@ inline void extractGroupGpu(const GroupView& grp, const cstone::LocalIndex* indi
     auto numOutGroups = last - first;
     reallocate(out.data, numOutGroups, 1.01);
 
-    out.firstBody = grp.firstBody;
-    out.lastBody  = grp.lastBody;
-    out.numGroups = numOutGroups;
-    out.groups    = rawPtr(out.data);
+    out.firstBody       = grp.firstBody;
+    out.lastBody        = grp.lastBody;
+    out.numActiveGroups = numOutGroups;
+    out.activeGroups    = rawPtr(out.data);
 
     if (numOutGroups == 0) { return; }
-    cstone::memcpyD2DAsync(cstone::execution::gpuDefaultStream, indices + first, numOutGroups, out.groups);
+    cstone::memcpyD2DAsync(cstone::execution::gpuDefaultStream, indices + first, numOutGroups, out.activeGroups);
 }
 
 //! @brief return a new GroupView that corresponds to a slice [first:last] of the input group @p grp
 inline GroupView makeSlicedView(const GroupView& grp, cstone::LocalIndex first, cstone::LocalIndex last)
 {
-    GroupView ret = grp;
-    ret.groups   += first;
-    ret.numGroups = last - first;
+    GroupView ret         = grp;
+    ret.activeGroups     += first;
+    ret.numActiveGroups   = last - first;
     return ret;
 }
 

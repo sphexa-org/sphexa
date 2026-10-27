@@ -571,7 +571,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
         }
         targetIdx = shflSync(targetIdx, 0);
 
-        if (targetIdx >= grp.numGroups) return;
+        if (targetIdx >= grp.numGroups()) return;
 
         const LocalIndex bodyBegin = grp.groupStart(targetIdx);
         const LocalIndex bodyEnd   = grp.groupEnd(targetIdx);
@@ -702,7 +702,7 @@ double traverse(cstone::GroupView grp, const int initNodeIdx, const Tc* __restri
 {
 
     int numWarpsPerBlock = TravConfig::numThreads / GpuConfig::warpSize;
-    int numBlocks        = cstone::iceil(grp.numGroups, numWarpsPerBlock);
+    int numBlocks        = cstone::iceil(grp.numGroups(), numWarpsPerBlock);
     numBlocks            = std::min(numBlocks, TravConfig::maxNumActiveBlocks);
 
     resetTraversalCounters<<<1, 1>>>();

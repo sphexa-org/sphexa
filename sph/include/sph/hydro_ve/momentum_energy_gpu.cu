@@ -53,7 +53,7 @@ __global__ void reduceDt(const GroupView grp, const T* dtCourant, float* __restr
     unsigned laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned grpIdx  = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
 
-    if (grpIdx >= grp.numGroups) return;
+    if (grpIdx >= grp.numGroups()) return;
 
     const LocalIndex bodyBegin = grp.groupStart(grpIdx);
     const LocalIndex bodyEnd   = grp.groupEnd(grpIdx);
@@ -91,7 +91,7 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
         cudaMemcpyToSymbolAsync(GPU_SYMBOL(minDt_ve_device), &minDt, sizeof(minDt), 0, cudaMemcpyHostToDevice, 0));
 
     constexpr LocalIndex threads = 256;
-    const LocalIndex     blocks  = cstone::iceil(grp.numGroups, threads / GpuConfig::warpSize);
+    const LocalIndex     blocks  = cstone::iceil(grp.numGroups(), threads / GpuConfig::warpSize);
     reduceDt<<<blocks, threads>>>(grp, rawPtr(d.dtCourant), groupDt);
 
     checkGpuErrors(cudaMemcpyFromSymbol(&minDt, GPU_SYMBOL(minDt_ve_device), sizeof(minDt)));

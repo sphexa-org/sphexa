@@ -188,7 +188,7 @@ public:
         computeGroups(domain.startIndex(), domain.endIndex(), d, domain.box(), groups_);
         activeRungs_ = groups_.view();
 
-        reallocate(groups_.numGroups, d.getAllocGrowthRate(), groupDt_, groupIndices_);
+        reallocate(groups_.numActiveGroups, d.getAllocGrowthRate(), groupDt_, groupIndices_);
         cstone::fill(domain.exec(), groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max());
     }
 
@@ -309,12 +309,12 @@ public:
         {
             prevTimestep_ = timestep_;
             float maxDt   = timestep_.dt_m1[0] * d.maxDtIncrease;
-            timestep_ = rungTimestep(rawPtr(groupDt_), rawPtr(groupIndices_), groups_.numGroups, maxDt, get<"keys">(d));
+            timestep_ = rungTimestep(rawPtr(groupDt_), rawPtr(groupIndices_), groups_.numActiveGroups, maxDt, get<"keys">(d));
 
             if (safetySteps > 0)
             {
                 timestep_.numRungs = 1;
-                std::fill(timestep_.rungRanges.begin() + 1, timestep_.rungRanges.end(), groups_.numGroups);
+                std::fill(timestep_.rungRanges.begin() + 1, timestep_.rungRanges.end(), groups_.numActiveGroups);
                 safetySteps--;
             }
         }
@@ -469,7 +469,7 @@ private:
             LocalIndex numActiveGroups = 0;
             for (int i = 0; i < highRung; ++i)
             {
-                numActiveGroups += rungs_[i].numGroups;
+                numActiveGroups += rungs_[i].numGroups();
             }
             if (highRung == 0) { std::cout << "# New block-TS " << ts.numRungs << " rungs, "; }
             else
@@ -479,11 +479,11 @@ private:
             }
 
             // clang-format off
-            std::cout << "R0: " << numRungs[0] << " (" << (100. * numRungs[0] / groups_.numGroups) << "%) "
-                      << "R1: " << numRungs[1] << " (" << (100. * numRungs[1] / groups_.numGroups) << "%) "
-                      << "R2: " << numRungs[2] << " (" << (100. * numRungs[2] / groups_.numGroups) << "%) "
-                      << "R3: " << numRungs[3] << " (" << (100. * numRungs[3] / groups_.numGroups) << "%) "
-                      << "All: " << groups_.numGroups << " (100%)" << std::endl;
+            std::cout << "R0: " << numRungs[0] << " (" << (100. * numRungs[0] / groups_.numActiveGroups) << "%) "
+                      << "R1: " << numRungs[1] << " (" << (100. * numRungs[1] / groups_.numActiveGroups) << "%) "
+                      << "R2: " << numRungs[2] << " (" << (100. * numRungs[2] / groups_.numActiveGroups) << "%) "
+                      << "R3: " << numRungs[3] << " (" << (100. * numRungs[3] / groups_.numActiveGroups) << "%) "
+                      << "All: " << groups_.numActiveGroups << " (100%)" << std::endl;
             // clang-format on
         }
     }

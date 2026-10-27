@@ -118,7 +118,7 @@ struct GpuSuperclusterNbListNeighborhood
         template<ValidIjLoopData<Tc, ThP> IjData>
         void ijLoop(IjData const& data) const
         {
-            if (groups.numGroups == 0) return;
+            if (groups.numGroups() == 0) return;
 
             parent.ijLoop(check<Tc, ThP>(data), superclusterInfo.get(), numISuperclusters, activeMasks.get());
         }

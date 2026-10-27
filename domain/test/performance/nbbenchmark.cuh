@@ -119,10 +119,10 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
                                            .searchExtFactor = 1};
     std::vector<LocalIndex> groupIndices(iceil(size_t(n), cstone::groupSize));
     std::iota(groupIndices.begin(), groupIndices.end(), LocalIndex(0));
-    const GroupView groupView{.firstBody = 0,
-                              .lastBody  = n,
-                              .groups    = groupIndices.data(),
-                              .numGroups = LocalIndex(groupIndices.size())};
+    const GroupView groupView{.firstBody       = 0,
+                              .lastBody        = n,
+                              .activeGroups    = groupIndices.data(),
+                              .numActiveGroups = LocalIndex(groupIndices.size())};
 
     // compute reference using basic CPU neighborhood
     const auto allocVec = [n]<class Tv>(Tv initialValue) { return std::vector<Tv>(n, initialValue); };
@@ -188,10 +188,10 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     thrust::universal_vector<LocalIndex> groups((n + groupSize - 1) / groupSize);
     for (unsigned i = 0; i < groups.size(); ++i)
         groups[i] = i;
-    const GroupView dGroupView{.firstBody = 0,
-                               .lastBody  = n,
-                               .groups    = rawPtr(groups),
-                               .numGroups = unsigned(groups.size())};
+    const GroupView dGroupView{.firstBody       = 0,
+                               .lastBody        = n,
+                               .activeGroups    = rawPtr(groups),
+                               .numActiveGroups = unsigned(groups.size())};
 
     StreamHolder stream;
 

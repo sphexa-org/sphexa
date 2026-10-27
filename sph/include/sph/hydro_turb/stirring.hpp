@@ -107,7 +107,7 @@ void computeStirring(cstone::GroupView grp, size_t numDim, const Tc* x, const Tc
                      const T* amplitudes, T solWeightNorm)
 {
 #pragma omp parallel for schedule(static)
-    for (cstone::LocalIndex gi = 0; gi < grp.numGroups; ++gi)
+    for (cstone::LocalIndex gi = 0; gi < grp.numGroups(); ++gi)
     {
         const cstone::LocalIndex bodyBegin = grp.groupStart(gi);
         const cstone::LocalIndex bodyEnd   = grp.groupEnd(gi);

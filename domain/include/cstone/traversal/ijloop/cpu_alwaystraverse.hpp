@@ -70,7 +70,7 @@ struct CpuAlwaysTraverseNeighborhood
                 std::unique_ptr<LocalIndex[]> neighbors = std::make_unique_for_overwrite<LocalIndex[]>(parent.ngmax);
 
 #pragma omp for
-                for (LocalIndex g = 0; g < groups.numGroups; ++g)
+                for (LocalIndex g = 0; g < groups.numGroups(); ++g)
                 {
                     const LocalIndex bodyBegin = groups.groupStart(g);
                     const LocalIndex bodyEnd   = groups.groupEnd(g);

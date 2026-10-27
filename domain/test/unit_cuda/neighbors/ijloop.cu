@@ -175,18 +175,18 @@ struct IjLoopTest : testing::Test
 
     GroupView groupView() const
     {
-        return {.firstBody = firstBody,
-                .lastBody  = lastBody,
-                .groups    = rawPtr(groups),
-                .numGroups = LocalIndex(groups.size())};
+        return {.firstBody       = firstBody,
+                .lastBody        = lastBody,
+                .activeGroups    = rawPtr(groups),
+                .numActiveGroups = LocalIndex(groups.size())};
     }
 
     GroupView subgroupView() const
     {
-        return {.firstBody = firstBody,
-                .lastBody  = lastBody,
-                .groups    = rawPtr(subgroups),
-                .numGroups = LocalIndex(subgroups.size())};
+        return {.firstBody       = firstBody,
+                .lastBody        = lastBody,
+                .activeGroups    = rawPtr(subgroups),
+                .numActiveGroups = LocalIndex(subgroups.size())};
     }
 
     Result reference(const GroupView& groups) const
@@ -197,7 +197,7 @@ struct IjLoopTest : testing::Test
             viSum(totalBodies), vjSum(totalBodies), hiSumNormalized(totalBodies);
         thrust::universal_vector<unsigned> neighborsCount(totalBodies);
 
-        for (unsigned g = 0; g < groups.numGroups; ++g)
+        for (unsigned g = 0; g < groups.numGroups(); ++g)
         {
             const LocalIndex groupBegin = groups.groupStart(g);
             const LocalIndex groupEnd   = groups.groupEnd(g);

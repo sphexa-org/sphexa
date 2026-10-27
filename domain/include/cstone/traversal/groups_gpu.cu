@@ -42,10 +42,10 @@ void computeFixedGroups(
     if (numGroups > 0)
         fixedGroupsKernel<<<iceil(numGroups, 256), 256, 0, exec>>>(numGroups, rawPtr(groups.data));
 
-    groups.firstBody = first;
-    groups.lastBody  = last;
-    groups.numGroups = numGroups;
-    groups.groups    = rawPtr(groups.data);
+    groups.firstBody       = first;
+    groups.lastBody        = last;
+    groups.numActiveGroups = numGroups;
+    groups.activeGroups    = rawPtr(groups.data);
 }
 
 //! @brief convenience wrapper for groupSplitsKernel

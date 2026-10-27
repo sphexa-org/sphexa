@@ -51,7 +51,7 @@ __global__ void driftKernel(GroupView grp, float dt, float dt_back, util::array<
 {
     LocalIndex laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
-    if (warpIdx >= grp.numGroups) { return; }
+    if (warpIdx >= grp.numGroups()) { return; }
 
     const LocalIndex bodyBegin = grp.groupStart(warpIdx);
     const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
@@ -99,7 +99,7 @@ void driftPositionsGpu(const GroupView& grp, float dt, float dt_back, util::arra
 {
     unsigned numThreads       = 256;
     unsigned numWarpsPerBlock = numThreads / GpuConfig::warpSize;
-    unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+    unsigned numBlocks        = (grp.numGroups() + numWarpsPerBlock - 1) / numWarpsPerBlock;
 
     if (numBlocks == 0) { return; }
     driftKernel<<<numBlocks, numThreads>>>(grp, dt, dt_back, dt_m1, x, y, z, vx, vy, vz, x_m1, y_m1, z_m1, ax, ay, az,
@@ -127,7 +127,7 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
 {
     LocalIndex laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
-    if (warpIdx >= grp.numGroups) { return; }
+    if (warpIdx >= grp.numGroups()) { return; }
 
     const LocalIndex bodyBegin = grp.groupStart(warpIdx);
     const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
@@ -178,7 +178,7 @@ void computePositionsGpu(const GroupView& grp, float dt, util::array<float, Time
 {
     unsigned numThreads       = 256;
     unsigned numWarpsPerBlock = numThreads / GpuConfig::warpSize;
-    unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+    unsigned numBlocks        = (grp.numGroups() + numWarpsPerBlock - 1) / numWarpsPerBlock;
 
     bool anyFBC = box.boundaryX() == cstone::BoundaryType::fixed || box.boundaryY() == cstone::BoundaryType::fixed ||
                   box.boundaryZ() == cstone::BoundaryType::fixed;

@@ -22,7 +22,7 @@ __global__ void groupDivvKernel(float Krho, const GroupView grp, const T* divv, 
 {
     LocalIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (tid < grp.numGroups)
+    if (tid < grp.numGroups())
     {
         float localMax = -INFINITY;
 
@@ -42,7 +42,7 @@ template<class T>
 void groupDivvTimestepGpu(float Krho, const GroupView& grp, const T* divv, float* groupDt)
 {
     int numThreads = 256;
-    int numBlocks  = cstone::iceil(grp.numGroups, numThreads);
+    int numBlocks  = cstone::iceil(grp.numGroups(), numThreads);
 
     if (numBlocks == 0) { return; }
     groupDivvKernel<<<numBlocks, numThreads>>>(Krho, grp, divv, groupDt);
@@ -57,7 +57,7 @@ __global__ void groupAccKernel(float etaAcc, const GroupView grp, const T* ax, c
 {
     LocalIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (tid < grp.numGroups)
+    if (tid < grp.numGroups())
     {
         float minH2_A2 = INFINITY;
 
@@ -78,7 +78,7 @@ void groupAccTimestepGpu(float etaAcc, const GroupView& grp, const T* ax, const 
                          float* groupDt)
 {
     int numThreads = 256;
-    int numBlocks  = cstone::iceil(grp.numGroups, numThreads);
+    int numBlocks  = cstone::iceil(grp.numGroups(), numThreads);
 
     if (numBlocks == 0) { return; }
     groupAccKernel<<<numBlocks, numThreads>>>(etaAcc, grp, ax, ay, az, h, groupDt);
@@ -93,7 +93,7 @@ __global__ void storeRungKernel(const GroupView grp, uint8_t rung, uint8_t* part
 {
     LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
-    if (warpIdx >= grp.numGroups) { return; }
+    if (warpIdx >= grp.numGroups()) { return; }
 
     const LocalIndex bodyBegin = grp.groupStart(warpIdx);
     const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
@@ -108,7 +108,7 @@ void storeRungGpu(const GroupView& grp, uint8_t rung, uint8_t* particleRungs)
 {
     unsigned numThreads       = 256;
     unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
-    unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+    unsigned numBlocks        = (grp.numGroups() + numWarpsPerBlock - 1) / numWarpsPerBlock;
     if (numBlocks == 0) { return; }
     storeRungKernel<<<numBlocks, numThreads>>>(grp, rung, particleRungs);
 }

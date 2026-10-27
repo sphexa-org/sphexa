@@ -23,7 +23,10 @@ TEST(TimestepGpu, Divv)
     using T = double;
     // two fixed groups of cstone::groupSize particles: [0,64) and [64,128)
     thrust::device_vector<LocalIndex> groups = std::vector<int>{0, 1};
-    GroupView grpView{.firstBody = 0, .lastBody = 128, .groups = rawPtr(groups), .numGroups = LocalIndex(groups.size())};
+    GroupView grpView{.firstBody       = 0,
+                      .lastBody        = 128,
+                      .activeGroups    = rawPtr(groups),
+                      .numActiveGroups = LocalIndex(groups.size())};
 
     thrust::device_vector<T> divv(128);
     thrust::sequence(divv.begin(), divv.end(), 100);
@@ -43,7 +46,10 @@ TEST(TimestepGpu, Acc)
     using T = double;
     // two fixed groups of cstone::groupSize particles: [0,64) and [64,128)
     thrust::device_vector<LocalIndex> groups = std::vector<int>{0, 1};
-    GroupView grpView{.firstBody = 0, .lastBody = 128, .groups = rawPtr(groups), .numGroups = LocalIndex(groups.size())};
+    GroupView grpView{.firstBody       = 0,
+                      .lastBody        = 128,
+                      .activeGroups    = rawPtr(groups),
+                      .numActiveGroups = LocalIndex(groups.size())};
 
     thrust::device_vector<T> ax(128), ay(128), az(128), h(128);
 

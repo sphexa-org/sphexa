@@ -69,7 +69,7 @@ __global__ void computeGravityEwaldKernel(cstone::GroupView grp, const Tc* x, co
     LocalIndex tid = blockDim.x * blockIdx.x + threadIdx.x;
 
     Ta Uewald = 0;
-    if (tid < grp.numGroups)
+    if (tid < grp.numGroups())
     {
         const LocalIndex bodyBegin = grp.groupStart(tid);
         const LocalIndex bodyEnd   = grp.groupEnd(tid);
@@ -120,7 +120,7 @@ void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mro
     if (ewaldParams.numEwaldShells == 0) { return; }
 
     unsigned numThreads = EwaldKernelConfig::numThreads;
-    unsigned numBlocks  = (grp.numGroups - 1) / numThreads + 1;
+    unsigned numBlocks  = (grp.numGroups() - 1) / numThreads + 1;
 
     resetEwaldPotential<<<1, 1>>>();
     computeGravityEwaldKernel<<<numBlocks, numThreads>>>(grp, x, y, z, m, G, ugrav, ax, ay, az, ewaldParamsGpu);

@@ -62,7 +62,7 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
         if (laneIdx == 0) targetIdx = atomicAdd(targetCounter, 1);
         targetIdx = shflSync(targetIdx, 0);
 
-        if (targetIdx >= groups.numGroups) break;
+        if (targetIdx >= groups.numGroups()) break;
 
         const LocalIndex bodyBegin = groups.groupStart(targetIdx);
         const LocalIndex bodyEnd   = groups.groupEnd(targetIdx);
@@ -133,7 +133,7 @@ protected:
     template<class... Ts>
     void ijLoop(const CheckedIjLoopData<Ts...>& ijData, GroupView const& groups) const
     {
-        if (groups.numGroups == 0) return;
+        if (groups.numGroups() == 0) return;
         checkGpuErrors(cudaMemsetAsync(targetCounter.get(), 0, sizeof(LocalIndex), exec));
 
         if (box.boundaryX() == BoundaryType::periodic || box.boundaryY() == BoundaryType::periodic ||

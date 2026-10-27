@@ -528,7 +528,7 @@ __global__ void computeActiveMasksKernel(const LocalIndex firstISupercluster,
     using Mask = typename Config::SuperclusterParticleMask;
 
     const LocalIndex index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index >= groups.numGroups) return;
+    if (index >= groups.numGroups()) return;
 
     const LocalIndex bodyBegin = groups.groupStart(index);
     const LocalIndex bodyEnd   = groups.groupEnd(index);
@@ -559,7 +559,7 @@ computeActiveMasks(const execution::Gpu exec,
                                    sizeof(typename Config::SuperclusterParticleMask) * numISuperclusters, exec));
 
     constexpr unsigned numThreads = 256;
-    const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
+    const unsigned numBlocks      = iceil(groups.numGroups(), numThreads);
     computeActiveMasksKernel<Config>
         <<<numBlocks, numThreads, 0, exec>>>(firstISupercluster, groups, activeMasks.get());
     checkGpuErrors(cudaGetLastError());

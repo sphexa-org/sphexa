@@ -88,7 +88,7 @@ public:
     float compute(GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m, const Th* h, Tc G, int numShells,
                   const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az)
     {
-        reallocate(traversalStack_, stackSize(grp.numGroups), 1.01);
+        reallocate(traversalStack_, stackSize(grp.numGroups()), 1.01);
         return traverse(grp, 1, x, y, z, m, h, x, y, z, m, h, octree_.childOffsets, octree_.internalToLeaf, layout_,
                         centers_, rawPtr(multipoles_), G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()}, ugrav, ax,
                         ay, az, (int*)rawPtr(traversalStack_));
@@ -116,7 +116,7 @@ public:
                   const Tc* ys, const Tc* zs, const Tm* ms, const Th* hs, Tc G, int numShells,
                   const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az)
     {
-        reallocate(traversalStack_, stackSize(grp.numGroups), 1.01);
+        reallocate(traversalStack_, stackSize(grp.numGroups()), 1.01);
         return traverse(grp, 1, xt, yt, zt, mt, ht, xs, ys, zs, ms, hs, octree_.childOffsets, octree_.internalToLeaf,
                         layout_, centers_, rawPtr(multipoles_), G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()},
                         ugrav, ax, ay, az, (int*)rawPtr(traversalStack_));

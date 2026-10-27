@@ -69,7 +69,7 @@ struct CpuFullNbListNeighborhood
         {
             const auto ijData = check<Tc, ThP>(data);
 #pragma omp parallel for
-            for (LocalIndex g = 0; g < groups.numGroups; ++g)
+            for (LocalIndex g = 0; g < groups.numGroups(); ++g)
             {
                 const LocalIndex bodyBegin = groups.groupStart(g);
                 const LocalIndex bodyEnd   = groups.groupEnd(g);

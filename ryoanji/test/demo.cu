@@ -178,7 +178,7 @@ util::array<Tc, 5> computeAcceleration(size_t firstBody, size_t lastBody, const 
     auto                                      numBodies = lastBody - firstBody;
     cstone::GroupData<cstone::execution::Gpu> groups;
     cstone::computeFixedGroups(cstone::execution::gpuDefaultStream, firstBody, lastBody, bhMaxTargetSize(), groups);
-    thrust::device_vector<int> globalPool(stackSize(groups.numGroups));
+    thrust::device_vector<int> globalPool(stackSize(groups.numActiveGroups));
 
     double totalPotential = traverse(groups.view(), 1, x, y, z, m, h, x, y, z, m, h, childOffsets, internalToLeaf,
                                      layout, sourceCenter, Multipole, G, numShells, {box.lx(), box.ly(), box.lz()}, p,

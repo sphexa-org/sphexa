@@ -24,7 +24,7 @@ __global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, cons
 {
     LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
-    if (warpIdx >= grp.numGroups) { return; }
+    if (warpIdx >= grp.numGroups()) { return; }
 
     const LocalIndex bodyBegin = grp.groupStart(warpIdx);
     const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
@@ -45,7 +45,7 @@ bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned
 {
     unsigned numThreads       = 256;
     unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
-    unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+    unsigned numBlocks        = (grp.numGroups() + numWarpsPerBlock - 1) / numWarpsPerBlock;
     if (numBlocks == 0) { return false; }
     updateSmoothingLengthGpuKernel<<<numBlocks, numThreads>>>(grp, ng0, nc, h, keys);
 
@@ -65,7 +65,7 @@ __global__ __launch_bounds__(128) void updateSmoothingLengthIterativeGpuKernel(
 {
     LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
-    if (warpIdx >= grp.numGroups) { return; }
+    if (warpIdx >= grp.numGroups()) { return; }
 
     const LocalIndex bodyBegin = grp.groupStart(warpIdx);
     const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
@@ -81,7 +81,7 @@ void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d,
 {
     unsigned numThreads       = 128;
     unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
-    unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+    unsigned numBlocks        = (grp.numGroups() + numWarpsPerBlock - 1) / numWarpsPerBlock;
     if (numBlocks == 0) { return; }
 
     updateSmoothingLengthIterativeGpuKernel<<<numBlocks, numThreads>>>(

@@ -46,7 +46,7 @@ __global__ void computeStirringKernel(GroupView grp, size_t numDim, const Tc* x,
 {
     LocalIndex laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
-    if (warpIdx >= grp.numGroups) { return; }
+    if (warpIdx >= grp.numGroups()) { return; }
 
     const LocalIndex bodyBegin = grp.groupStart(warpIdx);
     const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
@@ -70,7 +70,7 @@ void computeStirringGpu(GroupView grp, size_t numDim, const Tc* x, const Tc* y, 
 {
     unsigned numThreads       = 256;
     unsigned numWarpsPerBlock = numThreads / GpuConfig::warpSize;
-    unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+    unsigned numBlocks        = (grp.numGroups() + numWarpsPerBlock - 1) / numWarpsPerBlock;
 
     if (numBlocks == 0) { return; }
     computeStirringKernel<<<numBlocks, numThreads>>>(grp, numDim, x, y, z, ax, ay, az, numModes, modes, st_aka, st_akb,
