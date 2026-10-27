@@ -103,7 +103,7 @@ void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mro
     if (ewaldParams.numEwaldShells == 0) { return; }
 
     unsigned numThreads = EwaldKernelConfig::numThreads;
-    unsigned numBlocks  = (grp.numGroups() - 1) / numThreads + 1;
+    unsigned numBlocks  = (grp.numGroups() + numThreads - 1) / numThreads;
 
     resetEwaldPotential<<<1, 1>>>();
     computeGravityEwaldKernel<<<numBlocks, numThreads>>>(grp, x, y, z, m, G, ugrav, ax, ay, az, ewaldParamsGpu);
