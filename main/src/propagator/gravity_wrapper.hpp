@@ -190,9 +190,8 @@ public:
 
         cstone::GroupView grp{domain.startIndex(), domain.endIndex()};
 
-        d.egrav = mHolder_.compute(grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m), rawPtr(d.h), d.g,
-                                   numShells, domain.focusTree(), domain.layout().data(), domain.box(),
-                                   rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az));
+        d.egrav = mHolder_.compute(grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m), rawPtr(d.h), d.g, numShells,
+                                   domain.box(), rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az));
 
         auto stats = mHolder_.readStats();
 
@@ -208,9 +207,9 @@ public:
             memcpyD2HAsync(execution::gpuDefaultStream, mHolder_.deviceMultipoles(), 1, &rootM);
             syncGpu(execution::gpuDefaultStream);
 
-            computeGravityEwaldGpu(makeVec3(rootCenter), rootM, grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z),
-                                   rawPtr(d.m), box, d.g, rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az),
-                                   &d.egrav, ewaldSettings_);
+            computeGravityEwaldGpu(makeVec3(rootCenter), rootM, grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m),
+                                   box, d.g, rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az), &d.egrav,
+                                   ewaldSettings_);
         }
 
         d.stackUsedGravity = stats[4];
