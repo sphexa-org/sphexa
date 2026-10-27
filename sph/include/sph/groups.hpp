@@ -30,41 +30,23 @@
 
 #pragma once
 
-#include <numeric>
-
-#include "cstone/sfc/box.hpp"
-#include "cstone/primitives/math.hpp"
 #include "cstone/primitives/primitives_gpu.h"
-#include "cstone/traversal/groups_gpu.h"
+#include "cstone/traversal/groups.hpp"
 #include "sph/sph_gpu.hpp"
 
 namespace sph
 {
 
-template<class Dataset>
-void computeSpatialGroups(cstone::LocalIndex startIndex, cstone::LocalIndex endIndex, Dataset& d,
-                          const cstone::Box<typename Dataset::RealType>& box, GroupData<cstone::execution::Gpu>& groups)
+//! @brief Compute spatial (=SFC-consecutive) groups of particles: all groups of the range are active
+/*!
+ * The returned group data does not store an index list: the GroupView obtained through view() describes
+ * all consecutive groups of cstone::groupSize particles in [startIndex, endIndex).
+ */
+template<cstone::execution::Policy Exec>
+void computeGroups(size_t startIndex, size_t endIndex, GroupData<Exec>& groups)
 {
-    cstone::computeFixedGroups(cstone::execution::gpuDefaultStream, startIndex, endIndex, nsGroupSize(), groups);
-}
-
-//! @brief Compute spatial (=SFC-consecutive) groups of particles with compact bounding boxes
-template<typename Tc, class Dataset>
-void computeGroups(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box,
-                   GroupData<typename Dataset::Exec>& groups)
-{
-    if constexpr (d.useGpu) { computeSpatialGroups(startIndex, endIndex, d, box, groups); }
-    else
-    {
-        const cstone::LocalIndex numGroups = cstone::iceil(endIndex - startIndex, cstone::groupSize);
-        groups.data.resize(numGroups);
-        std::iota(groups.data.begin(), groups.data.end(), cstone::LocalIndex(0));
-
-        groups.firstBody       = startIndex;
-        groups.lastBody        = endIndex;
-        groups.numActiveGroups = numGroups;
-        groups.activeGroups    = groups.data.data();
-    }
+    groups.firstBody = startIndex;
+    groups.lastBody  = endIndex;
 }
 
 //! @brief extract the specified subgroup [first:last] indexed through @p indices from @p grp into @p out

@@ -38,9 +38,7 @@ public:
                                    const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
                                    const cstone::LocalIndex* layout, const cstone::Box<Tc>& box)
     {
-        cstone::computeFixedGroups(cstone::execution::gpuDefaultStream, first, last, bhMaxTargetSize(), groups_);
-
-        return groups_.view();
+        return {.firstBody = first, .lastBody = last};
     }
 
     void upsweep(const Tc* x, const Tc* y, const Tc* z, const Tm* m, cstone::OctreeView<const KeyType> gOctree,
@@ -141,9 +139,6 @@ private:
     const LocalIndex*           layout_;
     const Vec4<Tf>*             centers_;
     cstone::DeviceVector<MType> multipoles_;
-
-    //! @brief target particle group data
-    cstone::GroupData<cstone::execution::Gpu> groups_;
 
     //! @brief temporary memory during traversal
     cstone::DeviceVector<LocalIndex> traversalStack_;

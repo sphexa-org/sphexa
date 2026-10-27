@@ -138,7 +138,7 @@ public:
 
         fillMassHalos(domain.exec(), get<"m">(d), first, last);
 
-        computeGroups(first, last, d, domain.box(), groups_);
+        computeGroups(first, last, groups_);
         timer.step("computeGroups");
         updateSmoothingLengthIterative(groups_.view(), d, domain.box());
         timer.step("updateSmoothingLengthIterative");

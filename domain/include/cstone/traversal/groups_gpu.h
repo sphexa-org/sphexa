@@ -22,18 +22,7 @@
 
 namespace cstone
 {
-
-/*! @brief set up fixed-size particle groups
- * @param[in]  exec       execution policy
- * @param[in]  first      first local particle index
- * @param[in]  last       last local particle index
- * @param[in]  groupSize  number of particles per group
- * @param[out] groups     groups with fixed size @p groupSize
- */
-void computeFixedGroups(
-    execution::Gpu exec, LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups);
-
-/*!* @brief Compute groups of particles with a maximum size and distance between consecutive particles limited
+/*! @brief Compute groups of particles with a maximum size and distance between consecutive particles limited
  *
  * @tparam groupSize                integer
  * @tparam Tc                       float or double

@@ -131,7 +131,7 @@ public:
         size_t last  = domain.endIndex();
 
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
-        computeGroups(first, last, d, domain.box(), groups_);
+        computeGroups(first, last, groups_);
         timer.step("computeGroups");
         updateSmoothingLengthIterative(groups_.view(), d, domain.box());
         timer.step("updateSmoothingLengthIterative");

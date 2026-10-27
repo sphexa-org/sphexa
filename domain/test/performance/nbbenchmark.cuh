@@ -117,12 +117,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
                                            .centers         = centers.data(),
                                            .sizes           = sizes.data(),
                                            .searchExtFactor = 1};
-    std::vector<LocalIndex> groupIndices(iceil(size_t(n), cstone::groupSize));
-    std::iota(groupIndices.begin(), groupIndices.end(), LocalIndex(0));
-    const GroupView groupView{.firstBody       = 0,
-                              .lastBody        = n,
-                              .activeGroups    = groupIndices.data(),
-                              .numActiveGroups = LocalIndex(groupIndices.size())};
+    const GroupView groupView{.firstBody = 0, .lastBody = n};
 
     // compute reference using basic CPU neighborhood
     const auto allocVec = [n]<class Tv>(Tv initialValue) { return std::vector<Tv>(n, initialValue); };
@@ -183,15 +178,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
                                             .sizes           = rawPtr(dSizes),
                                             .searchExtFactor = searchExtFactor};
 
-    // split particles into consecutive groups
-    constexpr unsigned groupSize = cstone::groupSize;
-    thrust::universal_vector<LocalIndex> groups((n + groupSize - 1) / groupSize);
-    for (unsigned i = 0; i < groups.size(); ++i)
-        groups[i] = i;
-    const GroupView dGroupView{.firstBody       = 0,
-                               .lastBody        = n,
-                               .activeGroups    = rawPtr(groups),
-                               .numActiveGroups = unsigned(groups.size())};
+    const GroupView dGroupView{.firstBody = 0, .lastBody = n};
 
     StreamHolder stream;
 
@@ -210,8 +197,9 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     util::for_each_tuple(prefetchToDevice, std::tie(dX, dY, dZ, dH));
     util::for_each_tuple(prefetchToDevice, dInputs);
     util::for_each_tuple(prefetchToDevice, dOutputs);
-    util::for_each_tuple(prefetchToDevice, std::tie(dPrefixes, dChildOffsets, dParents, dInternalToLeaf,
-                                                    dLeafToInternal, dLevelRange, dLayout, dCenters, dSizes, groups));
+    util::for_each_tuple(prefetchToDevice,
+                         std::tie(dPrefixes, dChildOffsets, dParents, dInternalToLeaf, dLeafToInternal, dLevelRange,
+                                  dLayout, dCenters, dSizes));
     stream.sync();
 
     // build neighborhood, measure CPU time

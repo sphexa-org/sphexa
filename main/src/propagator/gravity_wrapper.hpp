@@ -52,10 +52,7 @@ public:
 
     cstone::GroupView computeSpatialGroups(const DataType& /*d*/, const DomainType& domain)
     {
-        return {.firstBody       = domain.startIndex(),
-                .lastBody        = domain.endIndex(),
-                .activeGroups    = nullptr,
-                .numActiveGroups = 0};
+        return {.firstBody = domain.startIndex(), .lastBody = domain.endIndex()};
     }
 
     void upsweep(const DataType& d, const DomainType& domain)

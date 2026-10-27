@@ -35,6 +35,9 @@ constexpr LocalIndex groupSize = 64;
  *     [firstBody + activeGroups[i] * groupSize, min(firstBody + activeGroups[i] * groupSize + groupSize, lastBody)),
  *
  * i.e., all groups are blocks of groupSize consecutive particles (the last group of the range may be shorter).
+ *
+ * If @p activeGroups is @p nullptr, all groups of the range [firstBody, lastBody) are active: group @p i covers
+ * [firstBody + i * groupSize, min(firstBody + (i + 1) * groupSize, lastBody)) and no index list is stored.
  */
 struct GroupView
 {
@@ -67,7 +70,7 @@ public:
     AccVector<LocalIndex> data;
     LocalIndex firstBody, lastBody;
     LocalIndex* activeGroups = nullptr;
-    LocalIndex numActiveGroups;
+    LocalIndex numActiveGroups = 0;
 
 private:
     friend void swap(GroupData& lhs, GroupData& rhs)

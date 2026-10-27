@@ -22,32 +22,6 @@
 
 namespace cstone
 {
-
-//! @brief simple-fixed width group targets
-__global__ static void fixedGroupsKernel(LocalIndex numGroups, LocalIndex* groups)
-{
-    LocalIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
-
-    if (tid >= numGroups) { return; }
-
-    groups[tid] = tid;
-}
-
-void computeFixedGroups(
-    execution::Gpu exec, LocalIndex first, LocalIndex last, unsigned groupSize, GroupData<execution::Gpu>& groups)
-{
-    LocalIndex numBodies = last - first;
-    LocalIndex numGroups = iceil(numBodies, groupSize);
-    groups.data.resize(numGroups);
-    if (numGroups > 0)
-        fixedGroupsKernel<<<iceil(numGroups, 256), 256, 0, exec>>>(numGroups, rawPtr(groups.data));
-
-    groups.firstBody       = first;
-    groups.lastBody        = last;
-    groups.numActiveGroups = numGroups;
-    groups.activeGroups    = rawPtr(groups.data);
-}
-
 //! @brief convenience wrapper for groupSplitsKernel
 template<unsigned groupSize, class Tc, class T, class KeyType>
 void computeGroupSplitsImpl(

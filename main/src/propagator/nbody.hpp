@@ -129,7 +129,7 @@ public:
 
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
 
-        computeGroups(first, last, d, domain.box(), groups_);
+        computeGroups(first, last, groups_);
         timer.step("computeGroups");
 
         cstone::fill(domain.exec(), d.ax.begin() + first, d.ax.begin() + last, HydroType(0));

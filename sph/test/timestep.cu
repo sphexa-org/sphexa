@@ -21,16 +21,12 @@ using namespace sph;
 TEST(TimestepGpu, Divv)
 {
     using T = double;
-    // two fixed groups of cstone::groupSize particles: [0,64) and [64,128)
-    thrust::device_vector<LocalIndex> groups = std::vector<int>{0, 1};
-    GroupView grpView{.firstBody       = 0,
-                      .lastBody        = 128,
-                      .activeGroups    = rawPtr(groups),
-                      .numActiveGroups = LocalIndex(groups.size())};
+    // two consecutive groups of cstone::groupSize particles: [0,64) and [64,128)
+    GroupView grpView{.firstBody = 0, .lastBody = 128};
 
     thrust::device_vector<T> divv(128);
     thrust::sequence(divv.begin(), divv.end(), 100);
-    thrust::device_vector<float> groupDt(groups.size(), 1e10f);
+    thrust::device_vector<float> groupDt(grpView.numGroups(), 1e10f);
 
     float Krho = 0.2;
     groupDivvTimestepGpu(Krho, grpView, rawPtr(divv), rawPtr(groupDt));
@@ -44,12 +40,8 @@ TEST(TimestepGpu, Divv)
 TEST(TimestepGpu, Acc)
 {
     using T = double;
-    // two fixed groups of cstone::groupSize particles: [0,64) and [64,128)
-    thrust::device_vector<LocalIndex> groups = std::vector<int>{0, 1};
-    GroupView grpView{.firstBody       = 0,
-                      .lastBody        = 128,
-                      .activeGroups    = rawPtr(groups),
-                      .numActiveGroups = LocalIndex(groups.size())};
+    // two consecutive groups of cstone::groupSize particles: [0,64) and [64,128)
+    GroupView grpView{.firstBody = 0, .lastBody = 128};
 
     thrust::device_vector<T> ax(128), ay(128), az(128), h(128);
 
@@ -59,7 +51,7 @@ TEST(TimestepGpu, Acc)
     thrust::fill(h.begin(), h.begin() + 64, 1.0);
     thrust::fill(h.begin() + 64, h.end(), 2.0);
 
-    thrust::device_vector<float> groupDt(groups.size(), 1e10f);
+    thrust::device_vector<float> groupDt(grpView.numGroups(), 1e10f);
 
     float etaAcc = 0.2;
     groupAccTimestepGpu(etaAcc, grpView, rawPtr(ax), rawPtr(ay), rawPtr(az), rawPtr(h), rawPtr(groupDt));

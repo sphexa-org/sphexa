@@ -37,17 +37,14 @@ using SplitType             = util::array<GpuConfig::ThreadMask, nwt>;
 
 TEST(TargetGroups, t0)
 {
-    LocalIndex groupSize = 8, first = 4, last = 34;
+    //! all groups active without an index list: group ranges derive from the body range
+    GroupView groups{.firstBody = 4, .lastBody = 260};
 
-    StreamHolder stream;
-
-    GroupData<execution::Gpu> groups;
-    computeFixedGroups(stream.exec(), first, last, groupSize, groups);
-    stream.sync();
-
-    std::vector<LocalIndex> hgroups = toHost(groups.data);
-    std::vector<LocalIndex> ref{0, 1, 2, 3};
-    EXPECT_EQ(hgroups, ref);
+    EXPECT_EQ(groups.numGroups(), 4);
+    EXPECT_EQ(groups.groupStart(0), 4);
+    EXPECT_EQ(groups.groupEnd(0), 68);
+    EXPECT_EQ(groups.groupStart(3), 196);
+    EXPECT_EQ(groups.groupEnd(3), 260);
 }
 
 __device__ constexpr util::array<unsigned, 2> laneSeg(unsigned idx, unsigned warpSize_)

@@ -21,7 +21,6 @@
 #include "cstone/cuda/cuda_utils.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/focus/source_center.hpp"
-#include "cstone/traversal/groups_gpu.cu"
 
 #include "dataset.hpp"
 #include "ryoanji/nbody/cartesian_qpole.hpp"
@@ -57,12 +56,10 @@ TEST(Ewald, MatchCpu)
     thrust::device_vector<T> d_x = x, d_y = y, d_z = z, d_m = m, d_h = h;
     thrust::device_vector<T> p(numBodies), ax(numBodies), ay(numBodies), az(numBodies);
 
-    GroupData<execution::Gpu> groups;
-    computeFixedGroups(execution::gpuDefaultStream, 0, numBodies, cstone::groupSize, groups);
-
     T utot = 0;
-    computeGravityEwaldGpu(makeVec3(centerMass), rootMultipole, groups.view(), rawPtr(d_x), rawPtr(d_y), rawPtr(d_z),
-                           rawPtr(d_m), box, G, rawPtr(p), rawPtr(ax), rawPtr(ay), rawPtr(az), &utot, settings);
+    computeGravityEwaldGpu(makeVec3(centerMass), rootMultipole, {.firstBody = 0, .lastBody = LocalIndex(numBodies)},
+                           rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), box, G, rawPtr(p), rawPtr(ax),
+                           rawPtr(ay), rawPtr(az), &utot, settings);
 
     T              utotRef = 0;
     std::vector<T> refP(numBodies), refAx(numBodies), refAy(numBodies), refAz(numBodies);

@@ -185,10 +185,10 @@ public:
 
         d.resize(domain.nParticlesWithHalos());
 
-        computeGroups(domain.startIndex(), domain.endIndex(), d, domain.box(), groups_);
+        computeGroups(domain.startIndex(), domain.endIndex(), groups_);
         activeRungs_ = groups_.view();
 
-        reallocate(groups_.numActiveGroups, d.getAllocGrowthRate(), groupDt_, groupIndices_);
+        reallocate(activeRungs_.numGroups(), d.getAllocGrowthRate(), groupDt_, groupIndices_);
         cstone::fill(domain.exec(), groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max());
     }
 
@@ -309,12 +309,13 @@ public:
         {
             prevTimestep_ = timestep_;
             float maxDt   = timestep_.dt_m1[0] * d.maxDtIncrease;
-            timestep_ = rungTimestep(rawPtr(groupDt_), rawPtr(groupIndices_), groups_.numActiveGroups, maxDt, get<"keys">(d));
+            timestep_ =
+                rungTimestep(rawPtr(groupDt_), rawPtr(groupIndices_), activeRungs_.numGroups(), maxDt, get<"keys">(d));
 
             if (safetySteps > 0)
             {
                 timestep_.numRungs = 1;
-                std::fill(timestep_.rungRanges.begin() + 1, timestep_.rungRanges.end(), groups_.numActiveGroups);
+                std::fill(timestep_.rungRanges.begin() + 1, timestep_.rungRanges.end(), activeRungs_.numGroups());
                 safetySteps--;
             }
         }
@@ -479,11 +480,11 @@ private:
             }
 
             // clang-format off
-            std::cout << "R0: " << numRungs[0] << " (" << (100. * numRungs[0] / groups_.numActiveGroups) << "%) "
-                      << "R1: " << numRungs[1] << " (" << (100. * numRungs[1] / groups_.numActiveGroups) << "%) "
-                      << "R2: " << numRungs[2] << " (" << (100. * numRungs[2] / groups_.numActiveGroups) << "%) "
-                      << "R3: " << numRungs[3] << " (" << (100. * numRungs[3] / groups_.numActiveGroups) << "%) "
-                      << "All: " << groups_.numActiveGroups << " (100%)" << std::endl;
+            std::cout << "R0: " << numRungs[0] << " (" << (100. * numRungs[0] / ts.rungRanges.back()) << "%) "
+                      << "R1: " << numRungs[1] << " (" << (100. * numRungs[1] / ts.rungRanges.back()) << "%) "
+                      << "R2: " << numRungs[2] << " (" << (100. * numRungs[2] / ts.rungRanges.back()) << "%) "
+                      << "R3: " << numRungs[3] << " (" << (100. * numRungs[3] / ts.rungRanges.back()) << "%) "
+                      << "All: " << ts.rungRanges.back() << " (100%)" << std::endl;
             // clang-format on
         }
     }

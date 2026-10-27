@@ -140,8 +140,6 @@ struct IjLoopTest : testing::Test
 
         constexpr unsigned groupSize = cstone::groupSize;
         const unsigned numGroups     = (lastBody - firstBody + groupSize - 1) / groupSize;
-        groups.resize(numGroups);
-        std::iota(groups.begin(), groups.end(), LocalIndex(0));
 
         subgroups.clear();
         for (unsigned g = 0; g < numGroups; ++g)
@@ -173,13 +171,7 @@ struct IjLoopTest : testing::Test
                 .searchExtFactor = searchExtFactor};
     }
 
-    GroupView groupView() const
-    {
-        return {.firstBody       = firstBody,
-                .lastBody        = lastBody,
-                .activeGroups    = rawPtr(groups),
-                .numActiveGroups = LocalIndex(groups.size())};
-    }
+    GroupView groupView() const { return {.firstBody = firstBody, .lastBody = lastBody}; }
 
     GroupView subgroupView() const
     {
@@ -317,7 +309,7 @@ struct IjLoopTest : testing::Test
     thrust::universal_vector<Vec3<double>> centers, sizes;
     thrust::universal_vector<TreeNodeIndex> childOffsets, parents, internalToLeaf, leafToInternal, levelRange;
 
-    thrust::universal_vector<LocalIndex> groups, subgroups;
+    thrust::universal_vector<LocalIndex> subgroups;
 };
 
 using Neighborhoods = ::testing::Types<
