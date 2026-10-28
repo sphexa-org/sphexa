@@ -40,7 +40,7 @@ namespace sph
 //! @brief Compute spatial (=SFC-consecutive) groups of particles: all groups of the range are active
 /*!
  * The returned group data does not store an index list: the GroupView obtained through view() describes
- * all consecutive groups of cstone::groupSize particles in [startIndex, endIndex).
+ * all consecutive groups of GroupView::groupSize particles in [startIndex, endIndex).
  */
 template<cstone::execution::Policy Exec>
 void computeGroups(size_t startIndex, size_t endIndex, GroupData<Exec>& groups)

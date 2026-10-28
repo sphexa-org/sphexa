@@ -62,7 +62,7 @@ __device__ void ewaldBlockReduce(Ta Uewald)
 }
 
 template<class Tc, class Ta, class Tm, class Tmm>
-__global__ void computeGravityEwaldKernel(cstone::GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m,
+__global__ void computeGravityEwaldKernel(GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m,
                                           float G, Ta* ugrav, Ta* ax, Ta* ay, Ta* az,
                                           const EwaldParameters<Tc, Tmm>* ewaldParams)
 {
@@ -86,7 +86,7 @@ __global__ void resetEwaldPotential() { totalEwaldPotentialGlob = 0; }
 
 //! GPU version of computeGravityEwald
 template<class MType, class Tc, class Ta, class Tm, class Tu>
-void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mroot, cstone::GroupView grp, const Tc* x,
+void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mroot, GroupView grp, const Tc* x,
                             const Tc* y, const Tc* z, const Tm* m, const cstone::Box<Tc>& box, float G, Ta* ugrav,
                             Ta* ax, Ta* ay, Ta* az, Tu* ugravTot, EwaldSettings settings)
 {
@@ -116,7 +116,7 @@ void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mro
 }
 
 #define COMPUTE_GRAVITY_EWALD_GPU(MType, Tc, Ta, Tm, Tu)                                                               \
-    template void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mroot, cstone::GroupView,    \
+    template void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mroot, GroupView,          \
                                          const Tc* x, const Tc* y, const Tc* z, const Tm* m,                           \
                                          const cstone::Box<Tc>& box, float G, Ta* ugrav, Ta* ax, Ta* ay, Ta* az,       \
                                          Tu* ugravTot, EwaldSettings settings)

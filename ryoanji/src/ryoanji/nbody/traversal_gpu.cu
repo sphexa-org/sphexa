@@ -61,8 +61,6 @@ struct TravConfig
     static constexpr int nwt = targetSize / GpuConfig::warpSize;
 };
 
-static_assert(TravConfig::targetSize == cstone::groupSize);
-
 __device__ __forceinline__ int ringAddr(const int i) { return i & (TravConfig::memPerWarp - 1); }
 
 /*! @brief evaluate multipole acceptance criterion
@@ -533,7 +531,7 @@ traverseGroup(const int bodyBegin, const int bodyEnd, const Tm* __restrict__ mt,
  */
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType, class KeyType>
 __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
-    cstone::GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves, const cstone::Box<Tc> box,
+    GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves, const cstone::Box<Tc> box,
     float tolFactor, const int initNodeIdx, const Tc* __restrict__ xt, const Tc* __restrict__ yt,
     const Tc* __restrict__ zt, const Tm* __restrict__ mt, const Th* __restrict__ ht, const Tc* __restrict__ xs,
     const Tc* __restrict__ ys, const Tc* __restrict__ zs, const Tm* __restrict__ ms, const Th* __restrict__ hs,
@@ -552,6 +550,8 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
     constexpr int mSizeRatio = sizeof(MValueType) / sizeof(int);
 
     static_assert(termSize <= GpuConfig::warpSize, "review approxAcc function before disabling this check");
+    // the fixed groups of the view are split by the warp-wide split mask which is laid out for targetSize particles
+    static_assert(TravConfig::targetSize == GroupView::groupSize, "target size must match the group size of the view");
     constexpr int smSize =
         (TravConfig::numThreads > termSize * numWarpsPerBlock) ? TravConfig::numThreads : termSize * numWarpsPerBlock;
     __shared__ int sharedPool[smSize * mSizeRatio];
@@ -606,7 +606,7 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
 }
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType, class KeyType>
-double traverse(cstone::GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves,
+double traverse(GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves,
                 const cstone::Box<Tc>& box, float tolFactor, const int initNodeIdx, const Tc* __restrict__ xt,
                 const Tc* __restrict__ yt, const Tc* __restrict__ zt, const Tm* __restrict__ mt,
                 const Th* __restrict__ ht, const Tc* __restrict__ xs, const Tc* __restrict__ ys,
@@ -631,7 +631,7 @@ double traverse(cstone::GroupView grp, const KeyType* __restrict__ leaves, TreeN
 }
 
 #define TRAVERSE(Tc, Th, Tm, Ta, Tf, MType, KeyType)                                                             \
-    template double traverse(cstone::GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves,       \
+    template double traverse(GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves,             \
                              const cstone::Box<Tc>& box, float tolFactor, const int initNodeIdx,                       \
                              const Tc* __restrict__ xt, const Tc* __restrict__ yt, const Tc* __restrict__ zt,          \
                              const Tm* __restrict__ mt, const Th* __restrict__ ht, const Tc* __restrict__ xs,          \

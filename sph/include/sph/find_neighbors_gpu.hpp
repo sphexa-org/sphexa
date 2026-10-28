@@ -4,17 +4,18 @@
 #include "cstone/traversal/groups.hpp"
 
 #include "sph/particles_data.hpp"
+#include "sph/sph_gpu.hpp"
 
 namespace sph
 {
 
-void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cstone::execution::Gpu>& d,
+void findNeighborsSfc(const GroupView& groups, sphexa::ParticlesData<cstone::execution::Gpu>& d,
                       const cstone::Box<SphTypes::CoordinateType>& box, bool subgroups = false);
 
 template<class Th, class KeyType>
-extern bool updateSmoothingLengthGpu(const cstone::GroupView&, unsigned ng0, const unsigned* nc, Th* h, KeyType* keys);
+extern bool updateSmoothingLengthGpu(const GroupView&, unsigned ng0, const unsigned* nc, Th* h, KeyType* keys);
 
 template<class T, class Dataset>
-extern void updateSmoothingLengthIterativeGpu(const cstone::GroupView&, Dataset& d, const cstone::Box<T>& box);
+extern void updateSmoothingLengthIterativeGpu(const GroupView&, Dataset& d, const cstone::Box<T>& box);
 
 }

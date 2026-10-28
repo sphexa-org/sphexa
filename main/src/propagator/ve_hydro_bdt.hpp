@@ -282,7 +282,8 @@ public:
         if (d.g != 0.0)
         {
             bool      isNewHierarchy = activeRung(timestep_.substep, timestep_.numRungs) == 0;
-            GroupView gravGroup = isNewHierarchy ? GroupView{domain.startIndex(), domain.endIndex()} : activeRungs_;
+            sph::GroupView gravGroup =
+                isNewHierarchy ? sph::GroupView{domain.startIndex(), domain.endIndex()} : activeRungs_;
 
             mHolder_.upsweep(d, domain);
             timer.step("Upsweep");

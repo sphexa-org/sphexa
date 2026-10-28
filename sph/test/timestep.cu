@@ -21,8 +21,8 @@ using namespace sph;
 TEST(TimestepGpu, Divv)
 {
     using T = double;
-    // two consecutive groups of cstone::groupSize particles: [0,64) and [64,128)
-    GroupView grpView{.firstBody = 0, .lastBody = 128};
+    // two consecutive groups of GroupView::groupSize particles: [0,64) and [64,128)
+    sph::GroupView grpView{.firstBody = 0, .lastBody = 128};
 
     thrust::device_vector<T> divv(128);
     thrust::sequence(divv.begin(), divv.end(), 100);
@@ -40,8 +40,8 @@ TEST(TimestepGpu, Divv)
 TEST(TimestepGpu, Acc)
 {
     using T = double;
-    // two consecutive groups of cstone::groupSize particles: [0,64) and [64,128)
-    GroupView grpView{.firstBody = 0, .lastBody = 128};
+    // two consecutive groups of GroupView::groupSize particles: [0,64) and [64,128)
+    sph::GroupView grpView{.firstBody = 0, .lastBody = 128};
 
     thrust::device_vector<T> ax(128), ay(128), az(128), h(128);
 

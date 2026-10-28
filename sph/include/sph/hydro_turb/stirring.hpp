@@ -36,6 +36,7 @@
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/util/tuple.hpp"
+#include "sph/sph_gpu.hpp"
 
 namespace sph
 {
@@ -102,7 +103,7 @@ HOST_DEVICE_FUN auto stirParticle(size_t ndim, Tc xi, Tc yi, Tc zi, size_t numMo
  *
  */
 template<class Tc, class Ta, class T>
-void computeStirring(cstone::GroupView grp, size_t numDim, const Tc* x, const Tc* y, const Tc* z, Ta* ax, Ta* ay,
+void computeStirring(GroupView grp, size_t numDim, const Tc* x, const Tc* y, const Tc* z, Ta* ax, Ta* ay,
                      Ta* az, size_t numModes, const T* modes, const T* phaseReal, const T* phaseImag,
                      const T* amplitudes, T solWeightNorm)
 {
@@ -124,7 +125,7 @@ void computeStirring(cstone::GroupView grp, size_t numDim, const Tc* x, const Tc
 }
 
 template<class Tc, class Ta, class T>
-extern void computeStirringGpu(cstone::GroupView grp, size_t numDim, const Tc* x, const Tc* y, const Tc* z, Ta* ax,
+extern void computeStirringGpu(GroupView grp, size_t numDim, const Tc* x, const Tc* y, const Tc* z, Ta* ax,
                                Ta* ay, Ta* az, size_t numModes, const T* modes, const T* phaseReal, const T* phaseImag,
                                const T* amplitudes, T solWeightNorm);
 

@@ -101,6 +101,7 @@ template<class NeighborhoodBuilder>
 struct IjLoopTest : testing::Test
 {
     static constexpr LocalIndex totalBodies = 997, firstBody = 241, lastBody = 701;
+    static constexpr unsigned groupSize     = 64;
 
     IjLoopTest()
     {
@@ -138,8 +139,7 @@ struct IjLoopTest : testing::Test
         leafToInternal = octree.leafToInternal;
         levelRange     = octree.levelRange;
 
-        constexpr unsigned groupSize = cstone::groupSize;
-        const unsigned numGroups     = (lastBody - firstBody + groupSize - 1) / groupSize;
+        const unsigned numGroups = (lastBody - firstBody + groupSize - 1) / groupSize;
 
         subgroups.clear();
         for (unsigned g = 0; g < numGroups; ++g)
@@ -171,9 +171,9 @@ struct IjLoopTest : testing::Test
                 .searchExtFactor = searchExtFactor};
     }
 
-    GroupView groupView() const { return {.firstBody = firstBody, .lastBody = lastBody}; }
+    GroupView<groupSize> groupView() const { return {.firstBody = firstBody, .lastBody = lastBody}; }
 
-    GroupView subgroupView() const
+    GroupView<groupSize> subgroupView() const
     {
         return {.firstBody       = firstBody,
                 .lastBody        = lastBody,
@@ -181,7 +181,7 @@ struct IjLoopTest : testing::Test
                 .numActiveGroups = LocalIndex(subgroups.size())};
     }
 
-    Result reference(const GroupView& groups) const
+    Result reference(const GroupView<groupSize>& groups) const
     {
         thrust::universal_vector<LocalIndex> iSum(totalBodies), jSum(totalBodies), jMin(totalBodies);
         thrust::universal_vector<Vec3<double>> iPosSum(totalBodies), jPosSum(totalBodies), ijPosDiffSum(totalBodies);

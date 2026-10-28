@@ -117,7 +117,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
                                            .centers         = centers.data(),
                                            .sizes           = sizes.data(),
                                            .searchExtFactor = 1};
-    const GroupView groupView{.firstBody = 0, .lastBody = n};
+    const GroupView<64> groupView{.firstBody = 0, .lastBody = n};
 
     // compute reference using basic CPU neighborhood
     const auto allocVec = [n]<class Tv>(Tv initialValue) { return std::vector<Tv>(n, initialValue); };
@@ -178,7 +178,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
                                             .sizes           = rawPtr(dSizes),
                                             .searchExtFactor = searchExtFactor};
 
-    const GroupView dGroupView{.firstBody = 0, .lastBody = n};
+    const GroupView<64> dGroupView{.firstBody = 0, .lastBody = n};
 
     StreamHolder stream;
 

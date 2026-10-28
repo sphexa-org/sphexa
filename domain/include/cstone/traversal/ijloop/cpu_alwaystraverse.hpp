@@ -30,7 +30,7 @@ namespace cstone::ijloop
 
 namespace cpu_always_traverse_neighborhood_detail
 {
-template<class Tc, class KeyType, class ThP>
+template<class Tc, class KeyType, class ThP, unsigned GroupSize>
 struct CpuAlwaysTraverseNeighborhood
 {
     OctreeNsView<Tc, KeyType> tree;
@@ -59,7 +59,7 @@ struct CpuAlwaysTraverseNeighborhood
     struct Subgroup
     {
         CpuAlwaysTraverseNeighborhood const& parent;
-        GroupView groups;
+        GroupView<GroupSize> groups;
 
         template<ValidIjLoopData<Tc, ThP> IjData>
         void ijLoop(IjData const& data) const
@@ -82,7 +82,7 @@ struct CpuAlwaysTraverseNeighborhood
         }
     };
 
-    Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
+    Subgroup subgroup(const GroupView<GroupSize>& groups) const { return {*this, groups}; }
 
 protected:
     template<class Input, class Output, class Interaction, class Postamble>
@@ -118,13 +118,13 @@ struct CpuAlwaysTraverseNeighborhoodBuilder
 {
     unsigned ngmax;
 
-    template<class Tc, class KeyType, class ThP>
-    cpu_always_traverse_neighborhood_detail::CpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP>
+    template<class Tc, class KeyType, class ThP, unsigned GroupSize>
+    cpu_always_traverse_neighborhood_detail::CpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP, GroupSize>
     build(execution::Cpu,
           const OctreeNsView<Tc, KeyType>& tree,
           const Box<Tc>& box,
           const LocalIndex /* totalBodies */,
-          const GroupView& groups,
+          const GroupView<GroupSize>& groups,
           const Tc* const x,
           const Tc* const y,
           const Tc* const z,

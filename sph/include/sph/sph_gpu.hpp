@@ -9,8 +9,9 @@
 namespace sph
 {
 
-using cstone::GroupData;
-using cstone::GroupView;
+using GroupView = cstone::GroupView<64>;
+template<cstone::execution::Policy Exec>
+using GroupData = cstone::GroupData<Exec, GroupView::groupSize>;
 
 template<class Dataset>
 extern void computeIADGpu(Dataset& d, const cstone::Box<typename Dataset::RealType>&);

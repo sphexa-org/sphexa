@@ -37,6 +37,7 @@
 #include "ryoanji/interface/multipole_holder.cuh"
 #include "ryoanji/nbody/ewald.hpp"
 #include "ryoanji/nbody/traversal_cpu.hpp"
+#include "sph/sph_gpu.hpp"
 
 namespace sphexa
 {
@@ -60,7 +61,7 @@ public:
                                    domain.focusTree(), domain.layout().data(), multipoles_.data());
     }
 
-    void traverse(cstone::GroupView /*grp*/, DataType& d, const DomainType& domain)
+    void traverse(sph::GroupView /*grp*/, DataType& d, const DomainType& domain)
     {
         //! the CPU traversal is range-based, the group parameter is not used
         traverse(d, domain);
@@ -127,7 +128,7 @@ public:
                          domain.layout().data());
     }
 
-    void traverse(cstone::GroupView grp, DataType& d, const DomainType& domain)
+    void traverse(sph::GroupView grp, DataType& d, const DomainType& domain)
     {
         using namespace cstone;
 
@@ -165,7 +166,7 @@ public:
      * Group-free counterpart of the group-based traverse overload: the target groups
      * are determined in-register inside the gravity traversal kernel with the spatial
      * compactness criterion, such that no device-to-host synchronization precede the
-     * traversal launch. The groups are described by a trivial cstone::GroupView over the
+     * traversal launch. The groups are described by a trivial sph::GroupView over the
      * full local particle range.
      */
     void traverse(DataType& d, const DomainType& domain)
@@ -176,7 +177,7 @@ public:
         bool        usePbc    = box.boundaryX() == BoundaryType::periodic;
         int         numShells = usePbc ? ewaldSettings_.numReplicaShells : 0;
 
-        cstone::GroupView grp{domain.startIndex(), domain.endIndex()};
+        sph::GroupView grp{domain.startIndex(), domain.endIndex()};
 
         d.egrav = mHolder_.compute(grp, rawPtr(d.x), rawPtr(d.y), rawPtr(d.z), rawPtr(d.m), rawPtr(d.h), d.g, numShells,
                                    domain.box(), rawPtr(d.ugrav), rawPtr(d.ax), rawPtr(d.ay), rawPtr(d.az));

@@ -25,7 +25,6 @@
 
 namespace ryoanji
 {
-using cstone::GroupView;
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
 class MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::Impl

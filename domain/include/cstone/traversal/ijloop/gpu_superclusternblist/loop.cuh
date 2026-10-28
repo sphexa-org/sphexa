@@ -512,12 +512,12 @@ void runIjLoop(const execution::Gpu exec,
         run(std::false_type());
 }
 
-template<class Config>
-__global__ void computeActiveSuperclustersKernel(const GroupView groups,
+template<class Config, unsigned GroupSize>
+__global__ void computeActiveSuperclustersKernel(const GroupView<GroupSize> groups,
                                                  const LocalIndex numISuperclusters,
                                                  bool* __restrict__ activeSuperclusters)
 {
-    constexpr unsigned superclustersPerGroup = cstone::groupSize / Config::superclusterSize;
+    constexpr unsigned superclustersPerGroup = GroupSize / Config::superclusterSize;
     const LocalIndex index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= groups.numActiveGroups) return;
 
@@ -529,10 +529,10 @@ __global__ void computeActiveSuperclustersKernel(const GroupView groups,
     for (LocalIndex i = firstSupercluster; i < lastSupercluster; ++i) activeSuperclusters[i] = true;
 }
 
-template<class Config>
+template<class Config, unsigned GroupSize>
 util::UniqueDevicePtr<bool[]> computeActiveSuperclusters(const execution::Gpu exec,
                                                          const LocalIndex numISuperclusters,
-                                                         const GroupView& groups)
+                                                         const GroupView<GroupSize>& groups)
 {
     auto activeSuperclusters = util::deviceAlloc<bool[]>(exec, numISuperclusters);
     // without an index list, all groups are active, hence all superclusters
@@ -542,7 +542,7 @@ util::UniqueDevicePtr<bool[]> computeActiveSuperclusters(const execution::Gpu ex
     {
         constexpr unsigned numThreads = 256;
         const unsigned numBlocks      = iceil(groups.numActiveGroups, numThreads);
-        computeActiveSuperclustersKernel<Config>
+        computeActiveSuperclustersKernel<Config, GroupSize>
             <<<numBlocks, numThreads, 0, exec>>>(groups, numISuperclusters, activeSuperclusters.get());
         checkGpuErrors(cudaGetLastError());
     }

@@ -181,13 +181,25 @@ thrust::host_vector<LocalIndex> computeGroupSplits(LocalIndex first, LocalIndex 
 TEST(TargetGroups, t0)
 {
     //! all groups active without an index list: group ranges derive from the body range
-    GroupView groups{.firstBody = 4, .lastBody = 260};
+    GroupView<64> groups{.firstBody = 4, .lastBody = 260};
 
     EXPECT_EQ(groups.numGroups(), 4);
     EXPECT_EQ(groups.groupStart(0), 4);
     EXPECT_EQ(groups.groupEnd(0), 68);
     EXPECT_EQ(groups.groupStart(3), 196);
     EXPECT_EQ(groups.groupEnd(3), 260);
+}
+
+TEST(TargetGroups, t0SmallGroups)
+{
+    //! same body range, but with a smaller compile-time group size
+    GroupView<32> groups{.firstBody = 4, .lastBody = 260};
+
+    EXPECT_EQ(groups.numGroups(), 8);
+    EXPECT_EQ(groups.groupStart(0), 4);
+    EXPECT_EQ(groups.groupEnd(0), 36);
+    EXPECT_EQ(groups.groupStart(7), 228);
+    EXPECT_EQ(groups.groupEnd(7), 260);
 }
 
 __device__ constexpr util::array<unsigned, 2> laneSeg(unsigned idx, unsigned warpSize_)

@@ -24,9 +24,6 @@
 
 namespace cstone
 {
-
-constexpr LocalIndex groupSize = 64;
-
 //! @brief A view object to describe groups of target particles
 /*!
  * @p activeGroups[i] stores the index of the i-th active group, relative to @p firstBody. Active group
@@ -39,8 +36,11 @@ constexpr LocalIndex groupSize = 64;
  * If @p activeGroups is @p nullptr, all groups of the range [firstBody, lastBody) are active: group @p i covers
  * [firstBody + i * groupSize, min(firstBody + (i + 1) * groupSize, lastBody)) and no index list is stored.
  */
+template <unsigned GroupSize>
 struct GroupView
 {
+    static constexpr unsigned groupSize = GroupSize;
+
     LocalIndex firstBody, lastBody;
     const LocalIndex* activeGroups = nullptr;
     LocalIndex numActiveGroups     = 0;
@@ -56,16 +56,18 @@ struct GroupView
 };
 
 //! @brief Describes groups of spatially close particles that can be traversed through octrees in groups
-template<execution::Policy Exec>
+template<execution::Policy Exec, unsigned GroupSize>
 class GroupData
 {
     template<class T>
     using AccVector = std::conditional_t<execution::HaveGpu<Exec>{}, DeviceVector<T>, std::vector<T>>;
 
 public:
-    GroupData()                 = default;
-    GroupData(const GroupView&) = delete;
-    GroupView view() const { return {firstBody, lastBody, activeGroups, numActiveGroups}; }
+    static constexpr unsigned groupSize = GroupSize;
+
+    GroupData()                              = default;
+    GroupData(const GroupView<GroupSize>&)   = delete;
+    GroupView<GroupSize> view() const { return {firstBody, lastBody, activeGroups, numActiveGroups}; }
 
     AccVector<LocalIndex> data;
     LocalIndex firstBody, lastBody;

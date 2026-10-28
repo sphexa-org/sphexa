@@ -32,7 +32,7 @@ namespace cstone::ijloop
 namespace cpu_full_nb_list_neighborhood_detail
 {
 
-template<class Tc, class KeyType, class ThP>
+template<class Tc, class KeyType, class ThP, unsigned GroupSize>
 struct CpuFullNbListNeighborhood
 {
     OctreeNsView<Tc, KeyType> tree;
@@ -62,7 +62,7 @@ struct CpuFullNbListNeighborhood
     struct Subgroup
     {
         CpuFullNbListNeighborhood const& parent;
-        GroupView groups;
+        GroupView<GroupSize> groups;
 
         template<ValidIjLoopData<Tc, ThP> IjData>
         void ijLoop(IjData const& data) const
@@ -80,7 +80,7 @@ struct CpuFullNbListNeighborhood
         }
     };
 
-    Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
+    Subgroup subgroup(const GroupView<GroupSize>& groups) const { return {*this, groups}; }
 
 protected:
     template<class Input, class Output, class Interaction, class Postamble>
@@ -111,13 +111,13 @@ struct CpuFullNbListNeighborhoodBuilder
 {
     unsigned ngmax;
 
-    template<class Tc, class KeyType, class ThP>
-    cpu_full_nb_list_neighborhood_detail::CpuFullNbListNeighborhood<Tc, KeyType, ThP>
+    template<class Tc, class KeyType, class ThP, unsigned GroupSize>
+    cpu_full_nb_list_neighborhood_detail::CpuFullNbListNeighborhood<Tc, KeyType, ThP, GroupSize>
     build(execution::Cpu,
           OctreeNsView<Tc, KeyType> tree,
           const Box<Tc>& box,
           const LocalIndex totalBodies,
-          const GroupView& groups,
+          const GroupView<GroupSize>& groups,
           const Tc* const x,
           const Tc* const y,
           const Tc* const z,
@@ -127,7 +127,7 @@ struct CpuFullNbListNeighborhoodBuilder
 
         const LocalIndex numBodies = groups.lastBody - groups.firstBody;
 
-        CpuFullNbListNeighborhood<Tc, KeyType, ThP> nbList{
+        CpuFullNbListNeighborhood<Tc, KeyType, ThP, GroupSize> nbList{
             tree,
             box,
             groups.firstBody,

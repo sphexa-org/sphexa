@@ -77,7 +77,7 @@ void ryoanjiTest(int thisRank, int numRanks, size_t numParticlesGlobal)
 
     MultipoleHolder<T, T, T, T, T, KeyType, MultipoleType> multipoleHolder;
 
-    cstone::GroupView grp{domain.startIndex(), domain.endIndex()};
+    ryoanji::GroupView grp{domain.startIndex(), domain.endIndex()};
     multipoleHolder.upsweep(rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), domain.globalTree(), focusTree,
                             domain.layout().data());
 

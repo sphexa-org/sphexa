@@ -4,7 +4,7 @@
 namespace sph
 {
 
-void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cstone::execution::Gpu>& d,
+void findNeighborsSfc(const GroupView& groups, sphexa::ParticlesData<cstone::execution::Gpu>& d,
                       const cstone::Box<SphTypes::CoordinateType>& box, bool subgroups)
 {
     if (d.ng0 > d.ngmax) { throw std::runtime_error("ng0 should be smaller than ngmax\n"); }
@@ -13,7 +13,6 @@ void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cst
 }
 
 using cstone::GpuConfig;
-using cstone::GroupView;
 using cstone::LocalIndex;
 using cstone::TreeNodeIndex;
 
@@ -77,7 +76,7 @@ __global__ __launch_bounds__(128) void updateSmoothingLengthIterativeGpuKernel(
 }
 
 template<class T, class Dataset>
-void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d, const cstone::Box<T>& box)
+void updateSmoothingLengthIterativeGpu(const GroupView& grp, Dataset& d, const cstone::Box<T>& box)
 {
     unsigned numThreads       = 128;
     unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
@@ -90,7 +89,7 @@ void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d,
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void updateSmoothingLengthIterativeGpu(const cstone::GroupView&,
+template void updateSmoothingLengthIterativeGpu(const GroupView&,
                                                 sphexa::ParticlesData<cstone::execution::Gpu>&,
                                                 const cstone::Box<SphTypes::CoordinateType>&);
 } // namespace sph

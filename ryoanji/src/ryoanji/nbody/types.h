@@ -17,6 +17,7 @@
 
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/sfc/box.hpp"
+#include "cstone/traversal/groups.hpp"
 #include "cstone/util/array.hpp"
 
 namespace ryoanji
@@ -30,5 +31,7 @@ using Vec4 = cstone::Vec4<T>;
 
 using TreeNodeIndex = cstone::TreeNodeIndex;
 using LocalIndex    = cstone::LocalIndex;
+
+using GroupView = cstone::GroupView<64>;
 
 } // namespace ryoanji

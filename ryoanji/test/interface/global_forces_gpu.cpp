@@ -146,7 +146,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
         d_ay = std::vector<T>(domain.nParticlesWithHalos(), 0);
         d_az = std::vector<T>(domain.nParticlesWithHalos(), 0);
 
-        cstone::GroupView grp{domain.startIndex(), domain.endIndex()};
+        ryoanji::GroupView grp{domain.startIndex(), domain.endIndex()};
         double bhPotential =
             multipoleHolder.compute(grp, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), rawPtr(d_h), G, 0, box,
                                     nullptr, rawPtr(d_ax), rawPtr(d_ay), rawPtr(d_az));
@@ -259,7 +259,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
             cstone::DeviceVector<T> d_mt       = extract(d_m, domain.startIndex(), domain.startIndex() + numTargets);
             cstone::DeviceVector<T> d_ht       = extract(d_h, domain.startIndex(), domain.startIndex() + numTargets);
 
-            cstone::GroupView targetGroups{0, numTargets};
+            ryoanji::GroupView targetGroups{0, numTargets};
 
             cstone::DeviceVector<T> d_axt(numTargets, 0), d_ayt(numTargets, 0), d_azt(numTargets, 0);
 

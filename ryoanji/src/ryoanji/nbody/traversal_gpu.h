@@ -19,6 +19,7 @@
 #include "cstone/sfc/box.hpp"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/util/array.hpp"
+#include "types.h"
 
 namespace ryoanji
 {
@@ -50,7 +51,7 @@ namespace ryoanji
  * @return                      total potential
  */
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType, class KeyType>
-extern double traverse(cstone::GroupView grp, const KeyType* leaves, TreeNodeIndex numLeaves, const cstone::Box<Tc>& box,
+extern double traverse(GroupView grp, const KeyType* leaves, TreeNodeIndex numLeaves, const cstone::Box<Tc>& box,
                        float tolFactor, int initNodeIdx, const Tc* xt, const Tc* yt, const Tc* zt, const Tm* mt,
                        const Th* ht, const Tc* xs, const Tc* ys, const Tc* zs, const Tm* ms, const Th* hs,
                        const TreeNodeIndex* childOffsets, const TreeNodeIndex* internalToLeaf, const LocalIndex* layout,

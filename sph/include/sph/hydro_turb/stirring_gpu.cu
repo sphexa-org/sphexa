@@ -32,11 +32,11 @@
 #include "cstone/traversal/groups.hpp"
 
 #include "sph/hydro_turb/stirring.hpp"
+#include "sph/sph_gpu.hpp"
 
 namespace sph
 {
 using cstone::GpuConfig;
-using cstone::GroupView;
 using cstone::LocalIndex;
 
 template<class Tc, class Ta, class T>

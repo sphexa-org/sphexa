@@ -123,9 +123,12 @@ struct GpuSuperclusterNbListNeighborhood
         }
     };
 
-    Subgroup subgroup(GroupView const& groups) const
+    template<unsigned GroupSize>
+    Subgroup subgroup(GroupView<GroupSize> const& groups) const
     {
         static_assert(!Config::symmetric, "subgroup only supported in non-symmetric neighborhoods");
+        static_assert(Config::superclusterSize <= GroupSize, "superclusters must not be larger than the particle groups");
+        static_assert(GroupSize % Config::superclusterSize == 0, "particle groups must consist of whole superclusters");
 
         // the group view must describe the same body range the neighborhood was built for; group indices are relative
         // to firstBody, which is supercluster-aligned, so active groups map directly to ranges of superclusters
@@ -225,9 +228,6 @@ struct GpuSuperclusterNbListNeighborhoodConfig
     template<bool NewSymmetric>
     using setSymmetry =
         GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, SuperclusterSize, WarpCompression, NewSymmetric>;
-
-    static_assert(SuperclusterSize <= cstone::groupSize, "superclusters must not be larger than the particle groups");
-    static_assert(cstone::groupSize % SuperclusterSize == 0, "particle groups must consist of whole superclusters");
 };
 
 } // namespace gpu_supercluster_nb_list_neighborhood_detail
@@ -260,19 +260,22 @@ struct GpuSuperclusterNbListNeighborhoodBuilder
     unsigned ncmax;
     std::size_t upperBoundBytesPerParticle = 128;
 
-    template<class Tc, class KeyType, class ThP>
+    template<class Tc, class KeyType, class ThP, unsigned GroupSize>
     gpu_supercluster_nb_list_neighborhood_detail::GpuSuperclusterNbListNeighborhood<Config, Tc, ThP>
     build(execution::Gpu exec,
           const OctreeNsView<Tc, KeyType>& tree,
           const Box<Tc>& box,
           LocalIndex totalBodies,
-          GroupView groups,
+          GroupView<GroupSize> groups,
           const Tc* x,
           const Tc* y,
           const Tc* z,
           ThP h) const
     {
         using namespace gpu_supercluster_nb_list_neighborhood_detail;
+
+        static_assert(Config::superclusterSize <= GroupSize, "superclusters must not be larger than the particle groups");
+        static_assert(GroupSize % Config::superclusterSize == 0, "particle groups must consist of whole superclusters");
 
         if (totalBodies == 0) return {};
 
