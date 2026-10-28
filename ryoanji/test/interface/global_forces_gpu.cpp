@@ -147,7 +147,7 @@ static int multipoleHolderTest(int thisRank, int numRanks)
         d_az = std::vector<T>(domain.nParticlesWithHalos(), 0);
 
         ryoanji::GroupView grp{domain.startIndex(), domain.endIndex()};
-        double bhPotential =
+        double             bhPotential =
             multipoleHolder.compute(grp, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m), rawPtr(d_h), G, 0, box,
                                     nullptr, rawPtr(d_ax), rawPtr(d_ay), rawPtr(d_az));
 

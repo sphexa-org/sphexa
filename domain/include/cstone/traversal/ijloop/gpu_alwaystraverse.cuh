@@ -178,9 +178,8 @@ struct GpuAlwaysTraverseNeighborhoodBuilder
                 z,
                 h,
                 ngmax,
-                util::deviceAlloc<LocalIndex[]>(exec,
-                                                GpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP,
-                                                                              GroupSize>::neighborsSize(ngmax)),
+                util::deviceAlloc<LocalIndex[]>(
+                    exec, GpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP, GroupSize>::neighborsSize(ngmax)),
                 util::deviceAlloc<LocalIndex>(exec)};
     }
 };

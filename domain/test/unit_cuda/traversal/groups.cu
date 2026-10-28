@@ -140,10 +140,17 @@ __global__ void groupSplitsKernel(LocalIndex first,
 //!
 //! Single fixed group size of targetSize (no warpSize dispatch), no growth heuristics, default stream.
 template<class Tc, class T, class KeyType>
-thrust::host_vector<LocalIndex> computeGroupSplits(LocalIndex first, LocalIndex last, const Tc* x, const Tc* y,
-                                                   const Tc* z, const T* h, const KeyType* leaves,
-                                                   TreeNodeIndex numLeaves, const LocalIndex* layout,
-                                                   const Box<Tc> box, float tolFactor)
+thrust::host_vector<LocalIndex> computeGroupSplits(LocalIndex first,
+                                                   LocalIndex last,
+                                                   const Tc* x,
+                                                   const Tc* y,
+                                                   const Tc* z,
+                                                   const T* h,
+                                                   const KeyType* leaves,
+                                                   TreeNodeIndex numLeaves,
+                                                   const LocalIndex* layout,
+                                                   const Box<Tc> box,
+                                                   float tolFactor)
 {
     LocalIndex numFixedGroups = iceil(last - first, targetSize);
 
@@ -153,9 +160,9 @@ thrust::host_vector<LocalIndex> computeGroupSplits(LocalIndex first, LocalIndex 
     {
         constexpr unsigned numThreads = 256;
         unsigned gridSize             = numFixedGroups * GpuConfig::warpSize;
-        groupSplitsKernel<targetSize, Tc, T, KeyType><<<iceil(gridSize, numThreads), numThreads>>>(
-            first, last, x, y, z, h, leaves, numLeaves, layout, box, tolFactor, rawPtr(splitMasks),
-            rawPtr(numSplitsPerGroup));
+        groupSplitsKernel<targetSize, Tc, T, KeyType>
+            <<<iceil(gridSize, numThreads), numThreads>>>(first, last, x, y, z, h, leaves, numLeaves, layout, box,
+                                                          tolFactor, rawPtr(splitMasks), rawPtr(numSplitsPerGroup));
     }
 
     // group starts are the prefix sums of the per-group split segment lengths; the trailing segment of the

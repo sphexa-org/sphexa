@@ -32,7 +32,7 @@ __global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, cons
     {
         if (nc[i] <= 1)
         {
-            keys[i] = cstone::removeKey<KeyType>{};
+            keys[i]                 = cstone::removeKey<KeyType>{};
             nc_h_convergenceFailure = true;
         }
         h[i] = updateH(ng0, nc[i], h[i]);
@@ -89,7 +89,6 @@ void updateSmoothingLengthIterativeGpu(const GroupView& grp, Dataset& d, const c
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void updateSmoothingLengthIterativeGpu(const GroupView&,
-                                                sphexa::ParticlesData<cstone::execution::Gpu>&,
+template void updateSmoothingLengthIterativeGpu(const GroupView&, sphexa::ParticlesData<cstone::execution::Gpu>&,
                                                 const cstone::Box<SphTypes::CoordinateType>&);
 } // namespace sph

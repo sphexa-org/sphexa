@@ -58,36 +58,36 @@ __global__ void driftKernel(GroupView grp, float dt, float dt_back, util::array<
 
     for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += GpuConfig::warpSize)
     {
-    // drifting must not adjust for PBC because that would require octrees to be rebuilt
-    cstone::Box<Tc> noPbc(0, 1, cstone::BoundaryType::open);
+        // drifting must not adjust for PBC because that would require octrees to be rebuilt
+        cstone::Box<Tc> noPbc(0, 1, cstone::BoundaryType::open);
 
-    float            dt_m1_rung = (rung != nullptr) ? dt_m1[rung[i]] : dt_m1[0];
-    cstone::Vec3<Tc> An{ax[i], ay[i], az[i]};
-    cstone::Vec3<Tc> Xnback{x[i], y[i], z[i]};
-    cstone::Vec3<Tc> dXn{x_m1[i], y_m1[i], z_m1[i]};
+        float            dt_m1_rung = (rung != nullptr) ? dt_m1[rung[i]] : dt_m1[0];
+        cstone::Vec3<Tc> An{ax[i], ay[i], az[i]};
+        cstone::Vec3<Tc> Xnback{x[i], y[i], z[i]};
+        cstone::Vec3<Tc> dXn{x_m1[i], y_m1[i], z_m1[i]};
 
-    // recover Xn, at which point An was calculated
-    cstone::Vec3<Tc> Xn_recov, ignore;
-    util::tie(Xn_recov, ignore, ignore) = positionUpdate(-dt_back, dt_m1_rung, Xnback, An, dXn, noPbc);
+        // recover Xn, at which point An was calculated
+        cstone::Vec3<Tc> Xn_recov, ignore;
+        util::tie(Xn_recov, ignore, ignore) = positionUpdate(-dt_back, dt_m1_rung, Xnback, An, dXn, noPbc);
 
-    // drift to new point in time starting from (Xn, An, dXn)
-    cstone::Vec3<Tc> Xnp1, Vnp1;
-    util::tie(Xnp1, Vnp1, ignore) = positionUpdate(dt, dt_m1_rung, Xn_recov, An, dXn, noPbc);
+        // drift to new point in time starting from (Xn, An, dXn)
+        cstone::Vec3<Tc> Xnp1, Vnp1;
+        util::tie(Xnp1, Vnp1, ignore) = positionUpdate(dt, dt_m1_rung, Xn_recov, An, dXn, noPbc);
 
-    util::tie(x[i], y[i], z[i])    = util::tie(Xnp1[0], Xnp1[1], Xnp1[2]);
-    util::tie(vx[i], vy[i], vz[i]) = util::tie(Vnp1[0], Vnp1[1], Vnp1[2]);
+        util::tie(x[i], y[i], z[i])    = util::tie(Xnp1[0], Xnp1[1], Xnp1[2]);
+        util::tie(vx[i], vy[i], vz[i]) = util::tie(Vnp1[0], Vnp1[1], Vnp1[2]);
 
-    if (temp != nullptr)
-    {
-        Thydro cv      = (constCv < 0) ? idealGasCv(mui[i], gamma) : constCv;
-        auto   u_recov = energyUpdate(Tc(temp[i] * cv), -dt_back, dt_m1_rung, du[i], Tdu(du_m1[i]));
-        temp[i]        = energyUpdate(u_recov, dt, dt_m1_rung, du[i], Tdu(du_m1[i])) / cv;
-    }
-    else if (u != nullptr)
-    {
-        auto u_recov = energyUpdate(u[i], -dt_back, dt_m1_rung, du[i], Tdu(du_m1[i]));
-        u[i]         = energyUpdate(u_recov, dt, dt_m1_rung, du[i], Tdu(du_m1[i]));
-    }
+        if (temp != nullptr)
+        {
+            Thydro cv      = (constCv < 0) ? idealGasCv(mui[i], gamma) : constCv;
+            auto   u_recov = energyUpdate(Tc(temp[i] * cv), -dt_back, dt_m1_rung, du[i], Tdu(du_m1[i]));
+            temp[i]        = energyUpdate(u_recov, dt, dt_m1_rung, du[i], Tdu(du_m1[i])) / cv;
+        }
+        else if (u != nullptr)
+        {
+            auto u_recov = energyUpdate(u[i], -dt_back, dt_m1_rung, du[i], Tdu(du_m1[i]));
+            u[i]         = energyUpdate(u_recov, dt, dt_m1_rung, du[i], Tdu(du_m1[i]));
+        }
     }
 }
 
@@ -134,39 +134,39 @@ __global__ void computePositionsKernel(GroupView grp, float dt, util::array<floa
 
     for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += GpuConfig::warpSize)
     {
-    float dt_m1_rung = (rung != nullptr) ? dt_m1[rung[i]] : dt_m1[0];
+        float dt_m1_rung = (rung != nullptr) ? dt_m1[rung[i]] : dt_m1[0];
 
-    cstone::Vec3<Tc> X{x[i], y[i], z[i]};
-    cstone::Vec3<Tc> adjustForFBC{Tc(1.), Tc(1.), Tc(1.)};
-    if (anyFBC) { adjustForFBC = fbcAdjustFactors(X, box, h[i]); }
+        cstone::Vec3<Tc> X{x[i], y[i], z[i]};
+        cstone::Vec3<Tc> adjustForFBC{Tc(1.), Tc(1.), Tc(1.)};
+        if (anyFBC) { adjustForFBC = fbcAdjustFactors(X, box, h[i]); }
 
-    // To keep particles belonging to the fixed boundaries from moving, these two quantities need to be adjusted
-    cstone::Vec3<Tc> A{ax[i] * adjustForFBC[0], ay[i] * adjustForFBC[1], az[i] * adjustForFBC[2]};
-    cstone::Vec3<Tc> X_m1{x_m1[i] * adjustForFBC[0], y_m1[i] * adjustForFBC[1], z_m1[i] * adjustForFBC[2]};
-    cstone::Vec3<Tc> V;
-    util::tie(X, V, X_m1) = positionUpdate(dt, dt_m1_rung, X, A, X_m1, box);
+        // To keep particles belonging to the fixed boundaries from moving, these two quantities need to be adjusted
+        cstone::Vec3<Tc> A{ax[i] * adjustForFBC[0], ay[i] * adjustForFBC[1], az[i] * adjustForFBC[2]};
+        cstone::Vec3<Tc> X_m1{x_m1[i] * adjustForFBC[0], y_m1[i] * adjustForFBC[1], z_m1[i] * adjustForFBC[2]};
+        cstone::Vec3<Tc> V;
+        util::tie(X, V, X_m1) = positionUpdate(dt, dt_m1_rung, X, A, X_m1, box);
 
-    util::tie(x[i], y[i], z[i])          = util::tie(X[0], X[1], X[2]);
-    util::tie(x_m1[i], y_m1[i], z_m1[i]) = util::tie(X_m1[0], X_m1[1], X_m1[2]);
-    util::tie(vx[i], vy[i], vz[i])       = util::tie(V[0], V[1], V[2]);
+        util::tie(x[i], y[i], z[i])          = util::tie(X[0], X[1], X[2]);
+        util::tie(x_m1[i], y_m1[i], z_m1[i]) = util::tie(X_m1[0], X_m1[1], X_m1[2]);
+        util::tie(vx[i], vy[i], vz[i])       = util::tie(V[0], V[1], V[2]);
 
-    Tc minDistanceFactor = min(adjustForFBC);
-    if (temp != nullptr)
-    {
-        Thydro cv    = (constCv < 0) ? idealGasCv(mui[i], gamma) : constCv;
-        auto   u_old = temp[i] * cv;
-        // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
-        // we multiply dt_m1 by that factor so it applies only once to each of the updating terms
-        temp[i]  = energyUpdate(u_old, dt * minDistanceFactor, dt_m1_rung * minDistanceFactor, du[i], du_m1[i]) / cv;
-        du_m1[i] = du[i];
-    }
-    else if (u != nullptr)
-    {
-        // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on dt.
-        // we multiply dt_m1 by that factor so it applies only once to each of the updating terms
-        u[i]     = energyUpdate(u[i], dt * minDistanceFactor, dt_m1_rung * minDistanceFactor, du[i], du_m1[i]);
-        du_m1[i] = du[i];
-    }
+        Tc minDistanceFactor = min(adjustForFBC);
+        if (temp != nullptr)
+        {
+            Thydro cv    = (constCv < 0) ? idealGasCv(mui[i], gamma) : constCv;
+            auto   u_old = temp[i] * cv;
+            // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on
+            // dt. we multiply dt_m1 by that factor so it applies only once to each of the updating terms
+            temp[i] = energyUpdate(u_old, dt * minDistanceFactor, dt_m1_rung * minDistanceFactor, du[i], du_m1[i]) / cv;
+            du_m1[i] = du[i];
+        }
+        else if (u != nullptr)
+        {
+            // notice the common factor of dt in energyUpdate: to apply the Fixed Boundary Correction we can do it on
+            // dt. we multiply dt_m1 by that factor so it applies only once to each of the updating terms
+            u[i]     = energyUpdate(u[i], dt * minDistanceFactor, dt_m1_rung * minDistanceFactor, du[i], du_m1[i]);
+            du_m1[i] = du[i];
+        }
     }
 }
 

@@ -45,9 +45,9 @@ namespace sph
 template<cstone::execution::Policy Exec>
 void computeGroups(size_t startIndex, size_t endIndex, GroupData<Exec>& groups)
 {
-    groups.firstBody = startIndex;
-    groups.lastBody  = endIndex;
-    groups.activeGroups = nullptr;
+    groups.firstBody       = startIndex;
+    groups.lastBody        = endIndex;
+    groups.activeGroups    = nullptr;
     groups.numActiveGroups = 0;
 }
 
@@ -74,9 +74,9 @@ inline void extractGroupGpu(const GroupView& grp, const cstone::LocalIndex* indi
 //! @brief return a new GroupView that corresponds to a slice [first:last] of the input group @p grp
 inline GroupView makeSlicedView(const GroupView& grp, cstone::LocalIndex first, cstone::LocalIndex last)
 {
-    GroupView ret         = grp;
-    ret.activeGroups     += first;
-    ret.numActiveGroups   = last - first;
+    GroupView ret = grp;
+    ret.activeGroups += first;
+    ret.numActiveGroups = last - first;
     return ret;
 }
 

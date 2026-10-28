@@ -100,8 +100,8 @@ public:
         return octreeGpuData_.numInternalNodes + octreeGpuData_.numLeafNodes;
     }
 
-    const LocalIndex*    layout() const { return cstone::rawPtr(d_layout_); }
-    const KeyType*       nodeKeys() const { return cstone::rawPtr(octreeGpuData_.prefixes); }
+    const LocalIndex* layout() const { return cstone::rawPtr(d_layout_); }
+    const KeyType*    nodeKeys() const { return cstone::rawPtr(octreeGpuData_.prefixes); }
     //! @brief return the device-resident cornerstone leaf-cell array, size is numLeafNodes() + 1
     const KeyType*       treeLeaves() const { return cstone::rawPtr(d_tree_); }
     const TreeNodeIndex* childOffsets() const { return cstone::rawPtr(octreeGpuData_.childOffsets); }

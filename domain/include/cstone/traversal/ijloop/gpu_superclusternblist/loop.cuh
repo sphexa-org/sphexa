@@ -341,11 +341,10 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     const unsigned iSuperclusterIndex = blockIdx.x * NumSuperclustersPerBlock + threadIdx.z;
     if (iSuperclusterIndex >= numISuperclusters) return;
 
-    auto [iSupercluster, iSuperclusterNeighborsCount, iSuperclusterDataIndex] =
-        superclusterInfo[iSuperclusterIndex];
+    auto [iSupercluster, iSuperclusterNeighborsCount, iSuperclusterDataIndex] = superclusterInfo[iSuperclusterIndex];
     // Show NVCC that variables are warp-uniform. Inspired by https://gitlab.com/gromacs/gromacs/-/merge_requests/5715.
     iSuperclusterNeighborsCount = shflSync(iSuperclusterNeighborsCount, 0);
-    iSuperclusterDataIndex = shflSync(iSuperclusterDataIndex, 0);
+    iSuperclusterDataIndex      = shflSync(iSuperclusterDataIndex, 0);
 
     using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq(x, y, z, h, ijData.input, firstBody));
     using InteractionResultType    = typename IjData::InteractionResultType;
@@ -469,8 +468,8 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         for (unsigned c = 0; c < Config::iClustersPerSupercluster; ++c)
         {
             const unsigned offset = c * Config::iSize + threadIdx.x;
-            const auto i     = iSupercluster * Config::superclusterSize + offset;
-            const auto iData = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
+            const auto i          = iSupercluster * Config::superclusterSize + offset;
+            const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
             storeTupleISum<Config>(iResults[c], symmTmpOutput, i, i >= firstBody & i < lastBody, ijData.postamble,
                                    iData);
         }
@@ -518,7 +517,7 @@ __global__ void computeActiveSuperclustersKernel(const GroupView<GroupSize> grou
                                                  bool* __restrict__ activeSuperclusters)
 {
     constexpr unsigned superclustersPerGroup = GroupSize / Config::superclusterSize;
-    const LocalIndex index = blockIdx.x * blockDim.x + threadIdx.x;
+    const LocalIndex index                   = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= groups.numActiveGroups) return;
 
     const LocalIndex group             = groups.activeGroups[index];
@@ -526,7 +525,8 @@ __global__ void computeActiveSuperclustersKernel(const GroupView<GroupSize> grou
     const LocalIndex lastSupercluster  = std::min(firstSupercluster + superclustersPerGroup, numISuperclusters);
     assert(firstSupercluster < numISuperclusters);
 
-    for (LocalIndex i = firstSupercluster; i < lastSupercluster; ++i) activeSuperclusters[i] = true;
+    for (LocalIndex i = firstSupercluster; i < lastSupercluster; ++i)
+        activeSuperclusters[i] = true;
 }
 
 template<class Config, unsigned GroupSize>

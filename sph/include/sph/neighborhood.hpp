@@ -22,8 +22,8 @@ using NeighborhoodDataType = decltype(std::declval<NeighborhoodBuilder>().build(
     std::declval<sph::SphTypes::CoordinateType*>(), std::declval<sph::SphTypes::HydroType*>()));
 
 template<class NeighborhoodBuilder, cstone::execution::Policy Exec>
-using NeighborhoodSubgroupType = decltype(std::declval<NeighborhoodDataType<NeighborhoodBuilder, Exec>>().subgroup(
-    std::declval<sph::GroupView>()));
+using NeighborhoodSubgroupType =
+    decltype(std::declval<NeighborhoodDataType<NeighborhoodBuilder, Exec>>().subgroup(std::declval<sph::GroupView>()));
 
 struct NeighborhoodData
 {

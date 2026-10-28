@@ -167,12 +167,12 @@ __device__ void directAcc(Vec4<Tc> sourceBody, Th hSource, Vec4<Ta> acc_i[TravCo
  */
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType>
 __device__ util::tuple<unsigned, unsigned, unsigned>
-traverseWarp(Vec4<Ta>* acc_i, const Vec4<Tc> pos_i[TravConfig::nwt], const Vec3<Tf> targetCenter,
-             const Vec3<Tf> targetSize, const Tc* __restrict__ x, const Tc* __restrict__ y, const Tc* __restrict__ z,
-             const Tm* __restrict__ m, const Th* __restrict__ h, const TreeNodeIndex* __restrict__ childOffsets,
-             const TreeNodeIndex* __restrict__ internalToLeaf, const LocalIndex* __restrict__ layout,
-             const Vec4<Tf>* __restrict__ sourceCenter, const MType* __restrict__ Multipoles, int initNodeIdx,
-             volatile int* tempQueue, int* cellQueue)
+           traverseWarp(Vec4<Ta>* acc_i, const Vec4<Tc> pos_i[TravConfig::nwt], const Vec3<Tf> targetCenter,
+                        const Vec3<Tf> targetSize, const Tc* __restrict__ x, const Tc* __restrict__ y, const Tc* __restrict__ z,
+                        const Tm* __restrict__ m, const Th* __restrict__ h, const TreeNodeIndex* __restrict__ childOffsets,
+                        const TreeNodeIndex* __restrict__ internalToLeaf, const LocalIndex* __restrict__ layout,
+                        const Vec4<Tf>* __restrict__ sourceCenter, const MType* __restrict__ Multipoles, int initNodeIdx,
+                        volatile int* tempQueue, int* cellQueue)
 {
     const int laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
 
@@ -606,15 +606,14 @@ __global__ __launch_bounds__(TravConfig::numThreads) void traverseKernel(
 }
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class MType, class KeyType>
-double traverse(GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves,
-                const cstone::Box<Tc>& box, float tolFactor, const int initNodeIdx, const Tc* __restrict__ xt,
-                const Tc* __restrict__ yt, const Tc* __restrict__ zt, const Tm* __restrict__ mt,
-                const Th* __restrict__ ht, const Tc* __restrict__ xs, const Tc* __restrict__ ys,
-                const Tc* __restrict__ zs, const Tm* __restrict__ ms, const Th* __restrict__ hs,
-                const TreeNodeIndex* __restrict__ childOffsets, const TreeNodeIndex* __restrict__ internalToLeaf,
-                const LocalIndex* __restrict__ layout, const Vec4<Tf>* __restrict__ sourceCenter,
-                const MType* __restrict__ multipoles, Tc G, int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az,
-                int* gmPool)
+double traverse(GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves, const cstone::Box<Tc>& box,
+                float tolFactor, const int initNodeIdx, const Tc* __restrict__ xt, const Tc* __restrict__ yt,
+                const Tc* __restrict__ zt, const Tm* __restrict__ mt, const Th* __restrict__ ht,
+                const Tc* __restrict__ xs, const Tc* __restrict__ ys, const Tc* __restrict__ zs,
+                const Tm* __restrict__ ms, const Th* __restrict__ hs, const TreeNodeIndex* __restrict__ childOffsets,
+                const TreeNodeIndex* __restrict__ internalToLeaf, const LocalIndex* __restrict__ layout,
+                const Vec4<Tf>* __restrict__ sourceCenter, const MType* __restrict__ multipoles, Tc G, int numShells,
+                Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az, int* gmPool)
 {
     int numWarpsPerBlock = TravConfig::numThreads / GpuConfig::warpSize;
     int numBlocks        = cstone::iceil(grp.numGroups(), numWarpsPerBlock);
@@ -630,8 +629,8 @@ double traverse(GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex
     return 0.5 * Tc(G) * totalPotential;
 }
 
-#define TRAVERSE(Tc, Th, Tm, Ta, Tf, MType, KeyType)                                                             \
-    template double traverse(GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves,             \
+#define TRAVERSE(Tc, Th, Tm, Ta, Tf, MType, KeyType)                                                                   \
+    template double traverse(GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex numLeaves,               \
                              const cstone::Box<Tc>& box, float tolFactor, const int initNodeIdx,                       \
                              const Tc* __restrict__ xt, const Tc* __restrict__ yt, const Tc* __restrict__ zt,          \
                              const Tm* __restrict__ mt, const Th* __restrict__ ht, const Tc* __restrict__ xs,          \
@@ -641,9 +640,9 @@ double traverse(GroupView grp, const KeyType* __restrict__ leaves, TreeNodeIndex
                              const Vec4<Tf>* __restrict__ sourceCenter, const MType* __restrict__ multipoles, Tc G,    \
                              int numShells, Vec3<Tc> boxL, Ta* p, Ta* ax, Ta* ay, Ta* az, int* gmPool)
 
-#define TRAVERSE_MPOLE(MType)                                                                                    \
-    TRAVERSE(double, double, double, double, double, MType<double>, uint64_t);                                   \
-    TRAVERSE(double, float, float, float, double, MType<float>, uint64_t);                                       \
+#define TRAVERSE_MPOLE(MType)                                                                                          \
+    TRAVERSE(double, double, double, double, double, MType<double>, uint64_t);                                         \
+    TRAVERSE(double, float, float, float, double, MType<float>, uint64_t);                                             \
     TRAVERSE(float, float, float, float, float, MType<float>, uint64_t);
 
 TRAVERSE_MPOLE(CartesianQuadrupole)

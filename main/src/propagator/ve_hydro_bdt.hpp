@@ -281,7 +281,7 @@ public:
 
         if (d.g != 0.0)
         {
-            bool      isNewHierarchy = activeRung(timestep_.substep, timestep_.numRungs) == 0;
+            bool           isNewHierarchy = activeRung(timestep_.substep, timestep_.numRungs) == 0;
             sph::GroupView gravGroup =
                 isNewHierarchy ? sph::GroupView{domain.startIndex(), domain.endIndex()} : activeRungs_;
 

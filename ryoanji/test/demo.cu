@@ -179,7 +179,7 @@ util::array<Tc, 5> computeAcceleration(size_t firstBody, size_t lastBody, const 
     auto numBodies = lastBody - firstBody;
 
     // trivial group view: fixed-size groups, the in-register subgroup splitting happens inside the kernel
-    ryoanji::GroupView groups{.firstBody = LocalIndex(firstBody), .lastBody = LocalIndex(lastBody)};
+    ryoanji::GroupView         groups{.firstBody = LocalIndex(firstBody), .lastBody = LocalIndex(lastBody)};
     thrust::device_vector<int> globalPool(stackSize(groups.numGroups()));
 
     constexpr float tolFactor = 2.0f;

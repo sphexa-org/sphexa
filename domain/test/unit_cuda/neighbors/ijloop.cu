@@ -101,7 +101,7 @@ template<class NeighborhoodBuilder>
 struct IjLoopTest : testing::Test
 {
     static constexpr LocalIndex totalBodies = 997, firstBody = 241, lastBody = 701;
-    static constexpr unsigned groupSize     = 64;
+    static constexpr unsigned groupSize = 64;
 
     IjLoopTest()
     {

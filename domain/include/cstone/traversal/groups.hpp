@@ -36,7 +36,7 @@ namespace cstone
  * If @p activeGroups is @p nullptr, all groups of the range [firstBody, lastBody) are active: group @p i covers
  * [firstBody + i * groupSize, min(firstBody + (i + 1) * groupSize, lastBody)) and no index list is stored.
  */
-template <unsigned GroupSize>
+template<unsigned GroupSize>
 struct GroupView
 {
     static constexpr unsigned groupSize = GroupSize;
@@ -46,7 +46,9 @@ struct GroupView
     LocalIndex numActiveGroups     = 0;
 
     constexpr LocalIndex groupStart(LocalIndex group) const
-    { return firstBody + (activeGroups ? activeGroups[group] * groupSize : group * groupSize); }
+    {
+        return firstBody + (activeGroups ? activeGroups[group] * groupSize : group * groupSize);
+    }
     constexpr LocalIndex groupEnd(LocalIndex group) const { return std::min(groupStart(group) + groupSize, lastBody); }
     constexpr LocalIndex numGroups() const
     {
@@ -65,13 +67,13 @@ class GroupData
 public:
     static constexpr unsigned groupSize = GroupSize;
 
-    GroupData()                              = default;
-    GroupData(const GroupView<GroupSize>&)   = delete;
+    GroupData()                            = default;
+    GroupData(const GroupView<GroupSize>&) = delete;
     GroupView<GroupSize> view() const { return {firstBody, lastBody, activeGroups, numActiveGroups}; }
 
     AccVector<LocalIndex> data;
     LocalIndex firstBody, lastBody;
-    LocalIndex* activeGroups = nullptr;
+    LocalIndex* activeGroups   = nullptr;
     LocalIndex numActiveGroups = 0;
 
 private:

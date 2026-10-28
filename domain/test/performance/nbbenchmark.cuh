@@ -197,9 +197,8 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     util::for_each_tuple(prefetchToDevice, std::tie(dX, dY, dZ, dH));
     util::for_each_tuple(prefetchToDevice, dInputs);
     util::for_each_tuple(prefetchToDevice, dOutputs);
-    util::for_each_tuple(prefetchToDevice,
-                         std::tie(dPrefixes, dChildOffsets, dParents, dInternalToLeaf, dLeafToInternal, dLevelRange,
-                                  dLayout, dCenters, dSizes));
+    util::for_each_tuple(prefetchToDevice, std::tie(dPrefixes, dChildOffsets, dParents, dInternalToLeaf,
+                                                    dLeafToInternal, dLevelRange, dLayout, dCenters, dSizes));
     stream.sync();
 
     // build neighborhood, measure CPU time

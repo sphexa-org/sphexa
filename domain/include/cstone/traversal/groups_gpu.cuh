@@ -110,9 +110,18 @@ __device__ util::array<GpuConfig::ThreadMask, N> findSplits(util::array<Vec4<T>,
  *                       particle of each subgroup
  */
 template<unsigned groupSize, class Tc, class Th, class KeyType>
-__device__ util::array<GpuConfig::ThreadMask, groupSize / GpuConfig::warpSize> evalGroupSplitMask(
-    LocalIndex bodyBegin, LocalIndex last, const Tc* x, const Tc* y, const Tc* z, const Th* h, const KeyType* leaves,
-    TreeNodeIndex numLeaves, const LocalIndex* layout, const Box<Tc> box, float tolFactor)
+__device__ util::array<GpuConfig::ThreadMask, groupSize / GpuConfig::warpSize>
+evalGroupSplitMask(LocalIndex bodyBegin,
+                   LocalIndex last,
+                   const Tc* x,
+                   const Tc* y,
+                   const Tc* z,
+                   const Th* h,
+                   const KeyType* leaves,
+                   TreeNodeIndex numLeaves,
+                   const LocalIndex* layout,
+                   const Box<Tc> box,
+                   float tolFactor)
 {
     constexpr LocalIndex nwt = groupSize / GpuConfig::warpSize;
 
@@ -139,7 +148,7 @@ __device__ util::array<GpuConfig::ThreadMask, groupSize / GpuConfig::warpSize> e
     {
         auto nodeIBox = sfcIBox(sfcKey<KeyType>(leaves[leafIdx[k]]), sfcKey<KeyType>(leaves[leafIdx[k] + 1]), axesBits);
         auto [nodeCenter, nodeSize] = centerAndSize<KeyType>(nodeIBox, unitBox);
-        Th vol                       = 8 * nodeSize[0] * nodeSize[1] * nodeSize[2];
+        Th vol                      = 8 * nodeSize[0] * nodeSize[1] * nodeSize[2];
         nodeVolume                  = vol > 0 ? min(vol, nodeVolume) : nodeVolume;
     }
     nodeVolume  = warpMin(nodeVolume);

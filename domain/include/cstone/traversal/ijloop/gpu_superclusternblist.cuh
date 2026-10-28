@@ -127,7 +127,8 @@ struct GpuSuperclusterNbListNeighborhood
     Subgroup subgroup(GroupView<GroupSize> const& groups) const
     {
         static_assert(!Config::symmetric, "subgroup only supported in non-symmetric neighborhoods");
-        static_assert(Config::superclusterSize <= GroupSize, "superclusters must not be larger than the particle groups");
+        static_assert(Config::superclusterSize <= GroupSize,
+                      "superclusters must not be larger than the particle groups");
         static_assert(GroupSize % Config::superclusterSize == 0, "particle groups must consist of whole superclusters");
 
         // the group view must describe the same body range the neighborhood was built for; group indices are relative
@@ -140,8 +141,8 @@ struct GpuSuperclusterNbListNeighborhood
 
         auto activeSuperclusters = computeActiveSuperclusters<Config>(exec, numISuperclusters, groups);
 
-        const auto superclusterIsActive =
-            [activeSuperclustersPtr = activeSuperclusters.get(), firstISupercluster] __device__(const SuperclusterInfo& info)
+        const auto superclusterIsActive = [activeSuperclustersPtr = activeSuperclusters.get(),
+                                           firstISupercluster] __device__(const SuperclusterInfo& info)
         { return activeSuperclustersPtr[info.index - firstISupercluster]; };
 
         auto activeSuperclusterInfo = util::deviceAlloc<SuperclusterInfo[]>(exec, numISuperclusters);
@@ -274,7 +275,8 @@ struct GpuSuperclusterNbListNeighborhoodBuilder
     {
         using namespace gpu_supercluster_nb_list_neighborhood_detail;
 
-        static_assert(Config::superclusterSize <= GroupSize, "superclusters must not be larger than the particle groups");
+        static_assert(Config::superclusterSize <= GroupSize,
+                      "superclusters must not be larger than the particle groups");
         static_assert(GroupSize % Config::superclusterSize == 0, "particle groups must consist of whole superclusters");
 
         if (totalBodies == 0) return {};

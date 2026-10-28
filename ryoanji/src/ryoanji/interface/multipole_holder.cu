@@ -136,14 +136,18 @@ template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class 
 void MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::upsweep(
     const Tc* x, const Tc* y, const Tc* z, const Tm* m, cstone::OctreeView<const KeyType> gOctree,
     const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree, const LocalIndex* layout)
-{ impl_->upsweep(x, y, z, m, gOctree, focusTree, layout); }
+{
+    impl_->upsweep(x, y, z, m, gOctree, focusTree, layout);
+}
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
 float MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::compute(GroupView grp, const Tc* x, const Tc* y, const Tc* z,
                                                                    const Tm* m, const Th* h, Tc G, int numShells,
                                                                    const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax,
                                                                    Ta* ay, Ta* az)
-{ return impl_->compute(grp, x, y, z, m, h, G, numShells, box, ugrav, ax, ay, az); }
+{
+    return impl_->compute(grp, x, y, z, m, h, G, numShells, box, ugrav, ax, ay, az);
+}
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
 float MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::compute(GroupView grp, const Tc* xt, const Tc* yt,
@@ -152,15 +156,21 @@ float MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::compute(GroupView grp
                                                                    const Tm* ms, const Th* hs, Tc G, int numShells,
                                                                    const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax,
                                                                    Ta* ay, Ta* az)
-{ return impl_->compute(grp, xt, yt, zt, mt, ht, xs, ys, zs, ms, hs, G, numShells, box, ugrav, ax, ay, az); }
+{
+    return impl_->compute(grp, xt, yt, zt, mt, ht, xs, ys, zs, ms, hs, G, numShells, box, ugrav, ax, ay, az);
+}
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
 util::array<uint64_t, 5> MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::readStats() const
-{ return impl_->readStats(); }
+{
+    return impl_->readStats();
+}
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
 const MType* MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::deviceMultipoles() const
-{ return impl_->deviceMultipoles(); }
+{
+    return impl_->deviceMultipoles();
+}
 
 #define MHOLDER_MTYPE(Tc, Th, Tm, Ta, Tf, KeyType, MType)                                                              \
     template class MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>

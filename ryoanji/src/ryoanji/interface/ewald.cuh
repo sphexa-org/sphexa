@@ -22,8 +22,8 @@ namespace ryoanji
 {
 
 template<class MType, class Tc, class Ta, class Tm, class Tu>
-extern void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mroot, GroupView grp,
-                                   const Tc* x, const Tc* y, const Tc* z, const Tm* m, const cstone::Box<Tc>& box,
-                                   float G, Ta* ugrav, Ta* ax, Ta* ay, Ta* az, Tu* ugravTot, EwaldSettings settings);
+extern void computeGravityEwaldGpu(const cstone::Vec3<Tc>& rootCenter, const MType& Mroot, GroupView grp, const Tc* x,
+                                   const Tc* y, const Tc* z, const Tm* m, const cstone::Box<Tc>& box, float G,
+                                   Ta* ugrav, Ta* ax, Ta* ay, Ta* az, Tu* ugravTot, EwaldSettings settings);
 
 } // namespace ryoanji

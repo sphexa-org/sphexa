@@ -46,8 +46,9 @@ struct DeviceNeighborhoodData::Impl
     {
         //! a view is an active subset of the fixed groups iff it has a non-null list of active groups
         //! that contains fewer groups than the full range [firstBody:lastBody); otherwise rebuild the full neighborhood
-        const cstone::LocalIndex numFixedGroups = cstone::iceil(groups.lastBody - groups.firstBody, GroupView::groupSize);
-        const bool isActiveSubset       = groups.activeGroups != nullptr && groups.numActiveGroups < numFixedGroups;
+        const cstone::LocalIndex numFixedGroups =
+            cstone::iceil(groups.lastBody - groups.firstBody, GroupView::groupSize);
+        const bool isActiveSubset = groups.activeGroups != nullptr && groups.numActiveGroups < numFixedGroups;
         if (subgroups && isActiveSubset)
         {
             subgroupNeighborhood.reset();
@@ -112,8 +113,7 @@ struct DeviceNeighborhoodData::Impl
 };
 
 template<class Dataset, class T>
-void DeviceNeighborhoodData::build(const GroupView& groups, Dataset& d, const cstone::Box<T>& box,
-                                   bool subgroups)
+void DeviceNeighborhoodData::build(const GroupView& groups, Dataset& d, const cstone::Box<T>& box, bool subgroups)
 {
     assert(impl);
     impl->build(groups, d, box, subgroups);
