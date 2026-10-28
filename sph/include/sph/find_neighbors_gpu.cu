@@ -4,7 +4,7 @@
 namespace sph
 {
 
-void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cstone::execution::Gpu>& d,
+void findNeighborsSfc(const GroupView& groups, sphexa::ParticlesData<cstone::execution::Gpu>& d,
                       const cstone::Box<SphTypes::CoordinateType>& box, bool subgroups)
 {
     if (d.ng0 > d.ngmax) { throw std::runtime_error("ng0 should be smaller than ngmax\n"); }
@@ -13,7 +13,6 @@ void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cst
 }
 
 using cstone::GpuConfig;
-using cstone::GroupView;
 using cstone::LocalIndex;
 using cstone::TreeNodeIndex;
 
@@ -24,17 +23,20 @@ __global__ void updateSmoothingLengthGpuKernel(GroupView grp, unsigned ng0, cons
 {
     LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
-    if (warpIdx >= grp.numGroups) { return; }
+    if (warpIdx >= grp.numGroups()) { return; }
 
-    LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
-    if (i >= grp.groupEnd[warpIdx]) { return; }
+    const LocalIndex bodyBegin = grp.groupStart(warpIdx);
+    const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
 
-    if (nc[i] <= 1)
+    for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += cstone::GpuConfig::warpSize)
     {
-        keys[i]                 = cstone::removeKey<KeyType>{};
-        nc_h_convergenceFailure = true;
+        if (nc[i] <= 1)
+        {
+            keys[i]                 = cstone::removeKey<KeyType>{};
+            nc_h_convergenceFailure = true;
+        }
+        h[i] = updateH(ng0, nc[i], h[i]);
     }
-    h[i] = updateH(ng0, nc[i], h[i]);
 }
 
 template<class Th, class KeyType>
@@ -42,7 +44,7 @@ bool updateSmoothingLengthGpu(const GroupView& grp, unsigned ng0, const unsigned
 {
     unsigned numThreads       = 256;
     unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
-    unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+    unsigned numBlocks        = (grp.numGroups() + numWarpsPerBlock - 1) / numWarpsPerBlock;
     if (numBlocks == 0) { return false; }
     updateSmoothingLengthGpuKernel<<<numBlocks, numThreads>>>(grp, ng0, nc, h, keys);
 
@@ -62,20 +64,23 @@ __global__ __launch_bounds__(128) void updateSmoothingLengthIterativeGpuKernel(
 {
     LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
-    if (warpIdx >= grp.numGroups) { return; }
+    if (warpIdx >= grp.numGroups()) { return; }
 
-    const LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
-    if (i >= grp.groupEnd[warpIdx]) { return; }
+    const LocalIndex bodyBegin = grp.groupStart(warpIdx);
+    const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
 
-    updateHIterative(ng0, ngmax, box, tree, i, x, y, z, h, nc);
+    for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += cstone::GpuConfig::warpSize)
+    {
+        updateHIterative(ng0, ngmax, box, tree, i, x, y, z, h, nc);
+    }
 }
 
 template<class T, class Dataset>
-void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d, const cstone::Box<T>& box)
+void updateSmoothingLengthIterativeGpu(const GroupView& grp, Dataset& d, const cstone::Box<T>& box)
 {
     unsigned numThreads       = 128;
     unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
-    unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+    unsigned numBlocks        = (grp.numGroups() + numWarpsPerBlock - 1) / numWarpsPerBlock;
     if (numBlocks == 0) { return; }
 
     updateSmoothingLengthIterativeGpuKernel<<<numBlocks, numThreads>>>(
@@ -84,7 +89,6 @@ void updateSmoothingLengthIterativeGpu(const cstone::GroupView& grp, Dataset& d,
     checkGpuErrors(cudaDeviceSynchronize());
 }
 
-template void updateSmoothingLengthIterativeGpu(const cstone::GroupView&,
-                                                sphexa::ParticlesData<cstone::execution::Gpu>&,
+template void updateSmoothingLengthIterativeGpu(const GroupView&, sphexa::ParticlesData<cstone::execution::Gpu>&,
                                                 const cstone::Box<SphTypes::CoordinateType>&);
 } // namespace sph

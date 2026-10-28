@@ -38,10 +38,10 @@ inline unsigned numBlocks()
     return GpuConfig::smCount * (numWarpsPerSm / (numThreads / GpuConfig::warpSize));
 }
 
-template<bool UsePbc, class Tc, class ThP, class KeyType, class... Ts>
+template<bool UsePbc, class Tc, class ThP, class KeyType, unsigned GroupSize, class... Ts>
 __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, KeyType> __grid_constant__ tree,
                                                         const Box<Tc> __grid_constant__ box,
-                                                        const GroupView groups,
+                                                        const GroupView<GroupSize> groups,
                                                         const Tc* __restrict__ x,
                                                         const Tc* __restrict__ y,
                                                         const Tc* __restrict__ z,
@@ -62,13 +62,12 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
         if (laneIdx == 0) targetIdx = atomicAdd(targetCounter, 1);
         targetIdx = shflSync(targetIdx, 0);
 
-        if (targetIdx >= groups.numGroups) break;
+        if (targetIdx >= groups.numGroups()) break;
 
-        const LocalIndex bodyBegin = groups.groupStart[targetIdx];
-        const LocalIndex bodyEnd   = groups.groupEnd[targetIdx];
+        const LocalIndex bodyBegin = groups.groupStart(targetIdx);
+        const LocalIndex bodyEnd   = groups.groupEnd(targetIdx);
 
-        const LocalIndex i = bodyBegin + laneIdx;
-        if (i < bodyEnd)
+        for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += GpuConfig::warpSize)
         {
             const unsigned nbs = std::min(findNeighbors(i, x, y, z, h, tree, box, ngmax, threadNeighbors), ngmax);
 
@@ -90,13 +89,13 @@ __global__ __launch_bounds__(numThreads) void runIjLoop(const OctreeNsView<Tc, K
     }
 }
 
-template<class Tc, class KeyType, class ThP>
+template<class Tc, class KeyType, class ThP, unsigned GroupSize>
 struct GpuAlwaysTraverseNeighborhood
 {
     execution::Gpu exec = execution::gpuDefaultStream;
     OctreeNsView<Tc, KeyType> tree;
     Box<Tc> box = {0, 0};
-    GroupView groups;
+    GroupView<GroupSize> groups;
     const Tc *x, *y, *z;
     ThP h;
     unsigned ngmax;
@@ -119,7 +118,7 @@ struct GpuAlwaysTraverseNeighborhood
     struct Subgroup
     {
         GpuAlwaysTraverseNeighborhood const& parent;
-        GroupView groups;
+        GroupView<GroupSize> groups;
 
         template<ValidIjLoopData<Tc, ThP> IjData>
         void ijLoop(IjData const& data) const
@@ -128,13 +127,13 @@ struct GpuAlwaysTraverseNeighborhood
         }
     };
 
-    Subgroup subgroup(GroupView const& groups) const { return {*this, groups}; }
+    Subgroup subgroup(const GroupView<GroupSize>& groups) const { return {*this, groups}; }
 
 protected:
     template<class... Ts>
-    void ijLoop(const CheckedIjLoopData<Ts...>& ijData, GroupView const& groups) const
+    void ijLoop(const CheckedIjLoopData<Ts...>& ijData, const GroupView<GroupSize>& groups) const
     {
-        if (groups.numGroups == 0) return;
+        if (groups.numGroups() == 0) return;
         checkGpuErrors(cudaMemsetAsync(targetCounter.get(), 0, sizeof(LocalIndex), exec));
 
         if (box.boundaryX() == BoundaryType::periodic || box.boundaryY() == BoundaryType::periodic ||
@@ -157,13 +156,13 @@ struct GpuAlwaysTraverseNeighborhoodBuilder
 {
     unsigned ngmax;
 
-    template<class Tc, class KeyType, class ThP>
-    gpu_always_traverse_neighborhood_detail::GpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP>
+    template<class Tc, class KeyType, class ThP, unsigned GroupSize>
+    gpu_always_traverse_neighborhood_detail::GpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP, GroupSize>
     build(execution::Gpu exec,
           const OctreeNsView<Tc, KeyType>& tree,
           const Box<Tc>& box,
           const LocalIndex /* totalBodies */,
-          const GroupView& groups,
+          const GroupView<GroupSize>& groups,
           const Tc* x,
           const Tc* y,
           const Tc* z,
@@ -179,8 +178,8 @@ struct GpuAlwaysTraverseNeighborhoodBuilder
                 z,
                 h,
                 ngmax,
-                util::deviceAlloc<LocalIndex[]>(exec,
-                                                GpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP>::neighborsSize(ngmax)),
+                util::deviceAlloc<LocalIndex[]>(
+                    exec, GpuAlwaysTraverseNeighborhood<Tc, KeyType, ThP, GroupSize>::neighborsSize(ngmax)),
                 util::deviceAlloc<LocalIndex>(exec)};
     }
 };

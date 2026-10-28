@@ -23,7 +23,7 @@
 #include "cstone/cuda/gpu_config.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/focus/source_center_gpu.h"
-#include "cstone/traversal/groups_gpu.h"
+#include "cstone/traversal/groups.hpp"
 #include "cstone/util/array.hpp"
 
 #include "nbody/dataset.hpp"
@@ -36,12 +36,12 @@
 
 using namespace ryoanji;
 
-template<class Tc, class Th, class Tm, class Ta, class Tf, class MType>
+template<class Tc, class Th, class Tm, class Ta, class Tf, class MType, class KeyType>
 util::array<Tc, 5> computeAcceleration(size_t firstBody, size_t lastBody, const Tc* x, const Tc* y, const Tc* z,
-                                       const Tm* m, const Th* h, Tc G, int numShells, const cstone::Box<Tc>& box, Ta* p,
-                                       Ta* ax, Tc* ay, Tc* az, const TreeNodeIndex* childOffsets,
-                                       const TreeNodeIndex* internalToLeaf, const LocalIndex* layout,
-                                       const Vec4<Tf>* sourceCenter, const MType* Multipole);
+                                       const Tm* m, const Th* h, const KeyType* treeLeaves, TreeNodeIndex numLeaves,
+                                       Tc G, int numShells, const cstone::Box<Tc>& box, Ta* p, Ta* ax, Tc* ay, Tc* az,
+                                       const TreeNodeIndex* childOffsets, const TreeNodeIndex* internalToLeaf,
+                                       const LocalIndex* layout, const Vec4<Tf>* sourceCenter, const MType* Multipole);
 
 template<class KeyType, class T, class MType>
 void upsweep(int numSources, int numLeaves, int numLevels, float theta, const TreeNodeIndex* levelRange, const T* x,
@@ -99,8 +99,9 @@ int main(int argc, char** argv)
     auto t0 = std::chrono::high_resolution_clock::now();
 
     auto interactions = computeAcceleration(0, numBodies, rawPtr(d_x), rawPtr(d_y), rawPtr(d_z), rawPtr(d_m),
-                                            rawPtr(d_h), G, numShells, box, rawPtr(d_p), rawPtr(d_ax), rawPtr(d_ay),
-                                            rawPtr(d_az), treeBuilder.childOffsets(), treeBuilder.internalToLeaf(),
+                                            rawPtr(d_h), treeBuilder.treeLeaves(), treeBuilder.numLeafNodes(), G,
+                                            numShells, box, rawPtr(d_p), rawPtr(d_ax), rawPtr(d_ay), rawPtr(d_az),
+                                            treeBuilder.childOffsets(), treeBuilder.internalToLeaf(),
                                             treeBuilder.layout(), rawPtr(sourceCenter), rawPtr(Multipole));
 
     auto   t1    = std::chrono::high_resolution_clock::now();
@@ -168,21 +169,25 @@ int main(int argc, char** argv)
     return 0;
 }
 
-template<class Tc, class Th, class Tm, class Ta, class Tf, class MType>
+template<class Tc, class Th, class Tm, class Ta, class Tf, class MType, class KeyType>
 util::array<Tc, 5> computeAcceleration(size_t firstBody, size_t lastBody, const Tc* x, const Tc* y, const Tc* z,
-                                       const Tm* m, const Th* h, Tc G, int numShells, const cstone::Box<Tc>& box, Ta* p,
-                                       Ta* ax, Tc* ay, Tc* az, const TreeNodeIndex* childOffsets,
-                                       const TreeNodeIndex* internalToLeaf, const LocalIndex* layout,
-                                       const Vec4<Tf>* sourceCenter, const MType* Multipole)
+                                       const Tm* m, const Th* h, const KeyType* treeLeaves, TreeNodeIndex numLeaves,
+                                       Tc G, int numShells, const cstone::Box<Tc>& box, Ta* p, Ta* ax, Tc* ay, Tc* az,
+                                       const TreeNodeIndex* childOffsets, const TreeNodeIndex* internalToLeaf,
+                                       const LocalIndex* layout, const Vec4<Tf>* sourceCenter, const MType* Multipole)
 {
-    auto                                      numBodies = lastBody - firstBody;
-    cstone::GroupData<cstone::execution::Gpu> groups;
-    cstone::computeFixedGroups(cstone::execution::gpuDefaultStream, firstBody, lastBody, bhMaxTargetSize(), groups);
-    thrust::device_vector<int> globalPool(stackSize(groups.numGroups));
+    auto numBodies = lastBody - firstBody;
 
-    double totalPotential = traverse(groups.view(), 1, x, y, z, m, h, x, y, z, m, h, childOffsets, internalToLeaf,
-                                     layout, sourceCenter, Multipole, G, numShells, {box.lx(), box.ly(), box.lz()}, p,
-                                     ax, ay, az, thrust::raw_pointer_cast(globalPool.data()));
+    // trivial group view: fixed-size groups, the in-register subgroup splitting happens inside the kernel
+    ryoanji::GroupView         groups{.firstBody = LocalIndex(firstBody), .lastBody = LocalIndex(lastBody)};
+    thrust::device_vector<int> globalPool(stackSize(groups.numGroups()));
+
+    constexpr float tolFactor = 2.0f;
+
+    double totalPotential =
+        traverse(groups, treeLeaves, numLeaves, box, tolFactor, 1, x, y, z, m, h, x, y, z, m, h, childOffsets,
+                 internalToLeaf, layout, sourceCenter, Multipole, G, numShells, {box.lx(), box.ly(), box.lz()}, p, ax,
+                 ay, az, thrust::raw_pointer_cast(globalPool.data()));
     kernelSuccess("traverse");
 
     auto stats = readBhStats();

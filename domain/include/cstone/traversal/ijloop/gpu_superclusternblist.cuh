@@ -68,6 +68,7 @@
 
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/execution.hpp"
+#include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/build.cuh"
 #include "cstone/traversal/ijloop/gpu_superclusternblist/loop.cuh"
 #include "cstone/traversal/ijloop/temporaries.cuh"
@@ -110,33 +111,39 @@ struct GpuSuperclusterNbListNeighborhood
     struct Subgroup
     {
         GpuSuperclusterNbListNeighborhood const& parent;
-        GroupView groups;
-        util::UniqueDevicePtr<typename Config::SuperclusterParticleMask[]> activeMasks;
-        util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo;
-        LocalIndex numISuperclusters;
+        util::UniqueDevicePtr<SuperclusterInfo[]> superclusterInfo; // active superclusters only
+        LocalIndex numISuperclusters;                               // number of active superclusters
 
         template<ValidIjLoopData<Tc, ThP> IjData>
         void ijLoop(IjData const& data) const
         {
-            if (groups.numGroups == 0) return;
+            if (numISuperclusters == 0) return;
 
-            parent.ijLoop(check<Tc, ThP>(data), superclusterInfo.get(), numISuperclusters, activeMasks.get());
+            parent.ijLoop(check<Tc, ThP>(data), superclusterInfo.get(), numISuperclusters);
         }
     };
 
-    Subgroup subgroup(GroupView const& groups) const
+    template<unsigned GroupSize>
+    Subgroup subgroup(GroupView<GroupSize> const& groups) const
     {
         static_assert(!Config::symmetric, "subgroup only supported in non-symmetric neighborhoods");
+        static_assert(Config::superclusterSize <= GroupSize,
+                      "superclusters must not be larger than the particle groups");
+        static_assert(GroupSize % Config::superclusterSize == 0, "particle groups must consist of whole superclusters");
+
+        // the group view must describe the same body range the neighborhood was built for; group indices are relative
+        // to firstBody, which is supercluster-aligned, so active groups map directly to ranges of superclusters
+        assert(groups.firstBody + firstValidBody == firstBody);
+        assert(groups.lastBody + firstValidBody == lastBody);
+
         const LocalIndex firstISupercluster = superclusterIndex<Config>(firstBody);
-        const LocalIndex lastISupercluster  = superclusterIndex<Config>(lastBody - 1) + 1;
-        const LocalIndex numISuperclusters  = lastISupercluster - firstISupercluster;
+        const LocalIndex numISuperclusters  = superclusterIndex<Config>(lastBody - 1) + 1 - firstISupercluster;
 
-        auto activeMasks =
-            computeActiveMasks<Config>(exec, firstISupercluster, numISuperclusters, firstValidBody, groups);
+        auto activeSuperclusters = computeActiveSuperclusters<Config>(exec, numISuperclusters, groups);
 
-        const auto superclusterIsActive =
-            [activeMasksPtr = activeMasks.get(), firstISupercluster] __device__(const SuperclusterInfo& info)
-        { return activeMasksPtr[info.index - firstISupercluster] != 0; };
+        const auto superclusterIsActive = [activeSuperclustersPtr = activeSuperclusters.get(),
+                                           firstISupercluster] __device__(const SuperclusterInfo& info)
+        { return activeSuperclustersPtr[info.index - firstISupercluster]; };
 
         auto activeSuperclusterInfo = util::deviceAlloc<SuperclusterInfo[]>(exec, numISuperclusters);
         SuperclusterInfo* lastCopied =
@@ -144,15 +151,14 @@ struct GpuSuperclusterNbListNeighborhood
                             activeSuperclusterInfo.get(), superclusterIsActive);
         const LocalIndex activeNumISuperclusters = lastCopied - activeSuperclusterInfo.get();
 
-        return {*this, groups, std::move(activeMasks), std::move(activeSuperclusterInfo), activeNumISuperclusters};
+        return {*this, std::move(activeSuperclusterInfo), activeNumISuperclusters};
     }
 
 protected:
-    template<class... Ts, class Mask = void>
+    template<class... Ts>
     void ijLoop(CheckedIjLoopData<Ts...> ijData,
                 const SuperclusterInfo* superclusterInfo,
-                const LocalIndex numISuperclusters,
-                const Mask* activeMasks = nullptr) const
+                const LocalIndex numISuperclusters) const
     {
         const LocalIndex numBodies = lastBody - firstBody;
         if (numBodies == 0) return;
@@ -174,7 +180,7 @@ protected:
         }
 
         runIjLoop<Config>(exec, box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, ijData, tmpOrOutput,
-                          neighborData.get(), superclusterInfo, numISuperclusters, activeMasks);
+                          neighborData.get(), superclusterInfo, numISuperclusters);
 
         if constexpr (Config::symmetric)
         {
@@ -223,10 +229,6 @@ struct GpuSuperclusterNbListNeighborhoodConfig
     template<bool NewSymmetric>
     using setSymmetry =
         GpuSuperclusterNbListNeighborhoodConfig<ISize, JSize, SuperclusterSize, WarpCompression, NewSymmetric>;
-
-    // per-particle mask type for superclusters, always 32 or 64 bits to support atomic operations
-    using SuperclusterParticleMask = std::conditional_t<(superclusterSize > 32), unsigned long long, unsigned>;
-    static_assert(superclusterSize <= 64, "superclusters with more than 64 particles are not supported");
 };
 
 } // namespace gpu_supercluster_nb_list_neighborhood_detail
@@ -259,19 +261,23 @@ struct GpuSuperclusterNbListNeighborhoodBuilder
     unsigned ncmax;
     std::size_t upperBoundBytesPerParticle = 128;
 
-    template<class Tc, class KeyType, class ThP>
+    template<class Tc, class KeyType, class ThP, unsigned GroupSize>
     gpu_supercluster_nb_list_neighborhood_detail::GpuSuperclusterNbListNeighborhood<Config, Tc, ThP>
     build(execution::Gpu exec,
           const OctreeNsView<Tc, KeyType>& tree,
           const Box<Tc>& box,
           LocalIndex totalBodies,
-          GroupView groups,
+          GroupView<GroupSize> groups,
           const Tc* x,
           const Tc* y,
           const Tc* z,
           ThP h) const
     {
         using namespace gpu_supercluster_nb_list_neighborhood_detail;
+
+        static_assert(Config::superclusterSize <= GroupSize,
+                      "superclusters must not be larger than the particle groups");
+        static_assert(GroupSize % Config::superclusterSize == 0, "particle groups must consist of whole superclusters");
 
         if (totalBodies == 0) return {};
 

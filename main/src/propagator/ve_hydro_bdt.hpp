@@ -185,10 +185,10 @@ public:
 
         d.resize(domain.nParticlesWithHalos());
 
-        computeGroups(domain.startIndex(), domain.endIndex(), d, domain.box(), groups_);
+        computeGroups(domain.startIndex(), domain.endIndex(), groups_);
         activeRungs_ = groups_.view();
 
-        reallocate(groups_.numGroups, d.getAllocGrowthRate(), groupDt_, groupIndices_);
+        reallocate(activeRungs_.numGroups(), d.getAllocGrowthRate(), groupDt_, groupIndices_);
         cstone::fill(domain.exec(), groupDt_.begin(), groupDt_.end(), std::numeric_limits<float>::max());
     }
 
@@ -281,8 +281,9 @@ public:
 
         if (d.g != 0.0)
         {
-            bool      isNewHierarchy = activeRung(timestep_.substep, timestep_.numRungs) == 0;
-            GroupView gravGroup      = isNewHierarchy ? mHolder_.computeSpatialGroups(d, domain) : activeRungs_;
+            bool           isNewHierarchy = activeRung(timestep_.substep, timestep_.numRungs) == 0;
+            sph::GroupView gravGroup =
+                isNewHierarchy ? sph::GroupView{domain.startIndex(), domain.endIndex()} : activeRungs_;
 
             mHolder_.upsweep(d, domain);
             timer.step("Upsweep");
@@ -309,12 +310,13 @@ public:
         {
             prevTimestep_ = timestep_;
             float maxDt   = timestep_.dt_m1[0] * d.maxDtIncrease;
-            timestep_ = rungTimestep(rawPtr(groupDt_), rawPtr(groupIndices_), groups_.numGroups, maxDt, get<"keys">(d));
+            timestep_ =
+                rungTimestep(rawPtr(groupDt_), rawPtr(groupIndices_), activeRungs_.numGroups(), maxDt, get<"keys">(d));
 
             if (safetySteps > 0)
             {
                 timestep_.numRungs = 1;
-                std::fill(timestep_.rungRanges.begin() + 1, timestep_.rungRanges.end(), groups_.numGroups);
+                std::fill(timestep_.rungRanges.begin() + 1, timestep_.rungRanges.end(), activeRungs_.numGroups());
                 safetySteps--;
             }
         }
@@ -469,7 +471,7 @@ private:
             LocalIndex numActiveGroups = 0;
             for (int i = 0; i < highRung; ++i)
             {
-                numActiveGroups += rungs_[i].numGroups;
+                numActiveGroups += rungs_[i].numGroups();
             }
             if (highRung == 0) { std::cout << "# New block-TS " << ts.numRungs << " rungs, "; }
             else
@@ -479,11 +481,11 @@ private:
             }
 
             // clang-format off
-            std::cout << "R0: " << numRungs[0] << " (" << (100. * numRungs[0] / groups_.numGroups) << "%) "
-                      << "R1: " << numRungs[1] << " (" << (100. * numRungs[1] / groups_.numGroups) << "%) "
-                      << "R2: " << numRungs[2] << " (" << (100. * numRungs[2] / groups_.numGroups) << "%) "
-                      << "R3: " << numRungs[3] << " (" << (100. * numRungs[3] / groups_.numGroups) << "%) "
-                      << "All: " << groups_.numGroups << " (100%)" << std::endl;
+            std::cout << "R0: " << numRungs[0] << " (" << (100. * numRungs[0] / ts.rungRanges.back()) << "%) "
+                      << "R1: " << numRungs[1] << " (" << (100. * numRungs[1] / ts.rungRanges.back()) << "%) "
+                      << "R2: " << numRungs[2] << " (" << (100. * numRungs[2] / ts.rungRanges.back()) << "%) "
+                      << "R3: " << numRungs[3] << " (" << (100. * numRungs[3] / ts.rungRanges.back()) << "%) "
+                      << "All: " << ts.rungRanges.back() << " (100%)" << std::endl;
             // clang-format on
         }
     }

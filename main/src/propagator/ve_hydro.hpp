@@ -138,7 +138,7 @@ public:
 
         fillMassHalos(domain.exec(), get<"m">(d), first, last);
 
-        computeGroups(first, last, d, domain.box(), groups_);
+        computeGroups(first, last, groups_);
         timer.step("computeGroups");
         updateSmoothingLengthIterative(groups_.view(), d, domain.box());
         timer.step("updateSmoothingLengthIterative");
@@ -188,11 +188,10 @@ public:
 
         if (d.g != 0.0)
         {
-            auto groups = mHolder_.computeSpatialGroups(d, domain);
             mHolder_.upsweep(d, domain);
             timer.step("Upsweep");
             pmReader.step();
-            mHolder_.traverse(groups, d, domain);
+            mHolder_.traverse(d, domain);
             timer.step("Gravity");
             pmReader.step();
 

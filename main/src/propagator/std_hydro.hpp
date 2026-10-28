@@ -73,8 +73,8 @@ protected:
     using ConservedFields = FieldList<"u", "vx", "vy", "vz", "x_m1", "y_m1", "z_m1", "du_m1", "id">;
 
     //! @brief the list of dependent particle fields, these may be used as scratch space during domain sync
-    using DependentFields = FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33",
-                                      "nc", "dtCourant">;
+    using DependentFields =
+        FieldList<"rho", "p", "c", "ax", "ay", "az", "du", "c11", "c12", "c13", "c22", "c23", "c33", "nc", "dtCourant">;
 
 public:
     HydroProp(std::ostream& output, size_t rank)
@@ -131,7 +131,7 @@ public:
         size_t last  = domain.endIndex();
 
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
-        computeGroups(first, last, d, domain.box(), groups_);
+        computeGroups(first, last, groups_);
         timer.step("computeGroups");
         updateSmoothingLengthIterative(groups_.view(), d, domain.box());
         timer.step("updateSmoothingLengthIterative");
@@ -157,10 +157,9 @@ public:
 
         if (d.g != 0.0)
         {
-            auto groups = mHolder_.computeSpatialGroups(d, domain);
             mHolder_.upsweep(d, domain);
             timer.step("Upsweep");
-            mHolder_.traverse(groups, d, domain);
+            mHolder_.traverse(d, domain);
             timer.step("Gravity");
 
             auto stats = mHolder_.readStats();

@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <numeric>
 #include <random>
 
 #include <thrust/universal_vector.h>
@@ -100,6 +101,7 @@ template<class NeighborhoodBuilder>
 struct IjLoopTest : testing::Test
 {
     static constexpr LocalIndex totalBodies = 997, firstBody = 241, lastBody = 701;
+    static constexpr unsigned groupSize = 64;
 
     IjLoopTest()
     {
@@ -137,42 +139,12 @@ struct IjLoopTest : testing::Test
         leafToInternal = octree.leafToInternal;
         levelRange     = octree.levelRange;
 
-        constexpr unsigned groupSize = GpuConfig::warpSize;
-        const unsigned unsplitGroups = (lastBody - firstBody + groupSize - 1) / groupSize;
-        groups.clear();
-        for (unsigned i = 0; i < unsplitGroups; ++i)
-        {
-            assert(firstBody + i * groupSize < lastBody);
-            groups.push_back(firstBody + i * groupSize);
-            if (i == unsplitGroups / 2)
-            {
-                // we just split a "random" group into as-small-as-possible subgroups
-                for (unsigned j = 16; j < groupSize; ++j)
-                {
-                    groups.push_back(firstBody + i * groupSize + j);
-                }
-            }
-            else
-            {
-                // also split some other groups
-                for (unsigned j : {3u, 5u, 7u})
-                {
-                    if (i == unsplitGroups / j) groups.push_back(firstBody + i * groupSize + j);
-                }
-            }
-        }
-        groups.push_back(lastBody);
+        const unsigned numGroups = (lastBody - firstBody + groupSize - 1) / groupSize;
 
-        if (!groups.empty())
+        subgroups.clear();
+        for (unsigned g = 0; g < numGroups; ++g)
         {
-            for (std::size_t g = 0; g < groups.size() - 1; ++g)
-            {
-                if (g % 3 == 0 || g % 5 == 0)
-                {
-                    subgroupStart.push_back(groups[g]);
-                    subgroupEnd.push_back(groups[g + 1]);
-                }
-            }
+            if (g % 3 == 0 || g % 5 == 0 || g == numGroups - 1) { subgroups.push_back(g); }
         }
     }
 
@@ -199,25 +171,17 @@ struct IjLoopTest : testing::Test
                 .searchExtFactor = searchExtFactor};
     }
 
-    GroupView groupView() const
+    GroupView<groupSize> groupView() const { return {.firstBody = firstBody, .lastBody = lastBody}; }
+
+    GroupView<groupSize> subgroupView() const
     {
-        return {.firstBody  = firstBody,
-                .lastBody   = lastBody,
-                .numGroups  = LocalIndex(groups.size() - 1),
-                .groupStart = rawPtr(groups),
-                .groupEnd   = rawPtr(groups) + 1};
+        return {.firstBody       = firstBody,
+                .lastBody        = lastBody,
+                .activeGroups    = rawPtr(subgroups),
+                .numActiveGroups = LocalIndex(subgroups.size())};
     }
 
-    GroupView subgroupView() const
-    {
-        return {.firstBody  = 0,
-                .lastBody   = 0,
-                .numGroups  = LocalIndex(subgroupStart.size()),
-                .groupStart = rawPtr(subgroupStart),
-                .groupEnd   = rawPtr(subgroupEnd)};
-    }
-
-    Result reference(const GroupView& groups) const
+    Result reference(const GroupView<groupSize>& groups) const
     {
         thrust::universal_vector<LocalIndex> iSum(totalBodies), jSum(totalBodies), jMin(totalBodies);
         thrust::universal_vector<Vec3<double>> iPosSum(totalBodies), jPosSum(totalBodies), ijPosDiffSum(totalBodies);
@@ -225,11 +189,11 @@ struct IjLoopTest : testing::Test
             viSum(totalBodies), vjSum(totalBodies), hiSumNormalized(totalBodies);
         thrust::universal_vector<unsigned> neighborsCount(totalBodies);
 
-        for (unsigned g = 0; g < groups.numGroups; ++g)
+        for (unsigned g = 0; g < groups.numGroups(); ++g)
         {
-            const LocalIndex firstBody = groups.groupStart[g];
-            const LocalIndex lastBody  = groups.groupEnd[g];
-            for (unsigned i = firstBody; i < lastBody; ++i)
+            const LocalIndex groupBegin = groups.groupStart(g);
+            const LocalIndex groupEnd   = groups.groupEnd(g);
+            for (unsigned i = groupBegin; i < groupEnd; ++i)
             {
                 jMin[i] = std::numeric_limits<LocalIndex>::max();
 
@@ -345,7 +309,7 @@ struct IjLoopTest : testing::Test
     thrust::universal_vector<Vec3<double>> centers, sizes;
     thrust::universal_vector<TreeNodeIndex> childOffsets, parents, internalToLeaf, leafToInternal, levelRange;
 
-    thrust::universal_vector<LocalIndex> groups, subgroupStart, subgroupEnd;
+    thrust::universal_vector<LocalIndex> subgroups;
 };
 
 using Neighborhoods = ::testing::Types<

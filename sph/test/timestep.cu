@@ -20,44 +20,44 @@ using namespace sph;
 
 TEST(TimestepGpu, Divv)
 {
-    using T                                  = double;
-    thrust::device_vector<LocalIndex> groups = std::vector<int>{10, 20, 40};
-    GroupView                         grpView{10, 40, 2, rawPtr(groups), rawPtr(groups) + 1};
+    using T = double;
+    // two consecutive groups of GroupView::groupSize particles: [0,64) and [64,128)
+    sph::GroupView grpView{.firstBody = 0, .lastBody = 128};
 
-    thrust::device_vector<T> divv(40);
+    thrust::device_vector<T> divv(128);
     thrust::sequence(divv.begin(), divv.end(), 100);
-    thrust::device_vector<float> groupDt(groups.size() - 1, 1e10f);
+    thrust::device_vector<float> groupDt(grpView.numGroups(), 1e10f);
 
     float Krho = 0.2;
     groupDivvTimestepGpu(Krho, grpView, rawPtr(divv), rawPtr(groupDt));
 
     thrust::host_vector<float> probe = groupDt;
 
-    EXPECT_NEAR(probe[0], Krho / 119, 1e-10);
-    EXPECT_NEAR(probe[1], Krho / 139, 1e-10);
+    EXPECT_NEAR(probe[0], Krho / 163, 1e-10);
+    EXPECT_NEAR(probe[1], Krho / 227, 1e-10);
 }
 
 TEST(TimestepGpu, Acc)
 {
-    using T                                  = double;
-    thrust::device_vector<LocalIndex> groups = std::vector<int>{10, 20, 40};
-    GroupView                         grpView{10, 40, 2, rawPtr(groups), rawPtr(groups) + 1};
+    using T = double;
+    // two consecutive groups of GroupView::groupSize particles: [0,64) and [64,128)
+    sph::GroupView grpView{.firstBody = 0, .lastBody = 128};
 
-    thrust::device_vector<T> ax(40), ay(40), az(40), h(40);
+    thrust::device_vector<T> ax(128), ay(128), az(128), h(128);
 
     thrust::sequence(ax.begin(), ax.end(), 100);
     thrust::sequence(ay.begin(), ay.end(), 200);
     thrust::sequence(az.begin(), az.end(), 300);
-    thrust::fill(h.begin() + groups[0], h.begin() + groups[1], 1.0);
-    thrust::fill(h.begin() + groups[1], h.begin() + groups[2], 2.0);
+    thrust::fill(h.begin(), h.begin() + 64, 1.0);
+    thrust::fill(h.begin() + 64, h.end(), 2.0);
 
-    thrust::device_vector<float> groupDt(groups.size() - 1, 1e10f);
+    thrust::device_vector<float> groupDt(grpView.numGroups(), 1e10f);
 
     float etaAcc = 0.2;
     groupAccTimestepGpu(etaAcc, grpView, rawPtr(ax), rawPtr(ay), rawPtr(az), rawPtr(h), rawPtr(groupDt));
 
     thrust::host_vector<float> probe = groupDt;
 
-    EXPECT_NEAR(probe[0], etaAcc * std::sqrt((1.0) / std::sqrt(norm2(Vec3<T>{100 + 19, 200 + 19, 300 + 19}))), 1e-8);
-    EXPECT_NEAR(probe[1], etaAcc * std::sqrt((2.0) / std::sqrt(norm2(Vec3<T>{100 + 39, 200 + 39, 300 + 39}))), 1e-8);
+    EXPECT_NEAR(probe[0], etaAcc * std::sqrt((1.0) / std::sqrt(norm2(Vec3<T>{163, 263, 363}))), 1e-8);
+    EXPECT_NEAR(probe[1], etaAcc * std::sqrt((2.0) / std::sqrt(norm2(Vec3<T>{227, 327, 427}))), 1e-8);
 }

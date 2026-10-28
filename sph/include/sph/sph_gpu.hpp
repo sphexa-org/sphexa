@@ -9,8 +9,9 @@
 namespace sph
 {
 
-using cstone::GroupData;
-using cstone::GroupView;
+using GroupView = cstone::GroupView<64>;
+template<cstone::execution::Policy Exec>
+using GroupData = cstone::GroupData<Exec, GroupView::groupSize>;
 
 template<class Dataset>
 extern void computeIADGpu(Dataset& d, const cstone::Box<typename Dataset::RealType>&);
@@ -97,8 +98,5 @@ void storeRungGpu(const GroupView& grp, uint8_t rung, uint8_t* particleRungs);
 
 template<typename T>
 T accelerationTimestepGPU(size_t first, size_t last, const T* ax, const T* ay, const T* az, const T* h);
-
-//! @brief max number of particles per group used in neighbor search for SPH
-unsigned nsGroupSize();
 
 } // namespace sph

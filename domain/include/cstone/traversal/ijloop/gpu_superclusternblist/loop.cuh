@@ -28,6 +28,7 @@
 #include "cstone/cuda/memory.cuh"
 #include "cstone/findneighbors.hpp"
 #include "cstone/reducearray.cuh"
+#include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/ijloop/atomic_update_ptr.cuh"
 #include "cstone/traversal/ijloop/common.hpp"
 #include "cstone/traversal/ijloop/compressneighbors.cuh"
@@ -307,8 +308,7 @@ template<class Config,
          class Tc,
          class ThP,
          class IjData,
-         TupleOfPointers Out,
-         class Mask = void>
+         TupleOfPointers Out>
 __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBlock) void runIjLoopKernel(
     const Box<Tc> box,
     const LocalIndex firstValidBody,
@@ -323,8 +323,7 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     const Out symmTmpOutput,
     const std::uint32_t* const __restrict__ neighborData,
     const SuperclusterInfo* const __restrict__ superclusterInfo,
-    const unsigned numISuperclusters,
-    const Mask* const __restrict__ activeMasks)
+    const unsigned numISuperclusters)
 {
     static_assert(NumSuperclustersPerBlock > 0);
     static_assert(Config::iSize * Config::jSize >= GpuConfig::warpSize);
@@ -339,15 +338,13 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
     const unsigned warpIndex =
         Config::numWarpsPerInteraction == 1 ? 0 : threadIdx.y / (Config::jSize / Config::numWarpsPerInteraction);
 
-    const unsigned firstISupercluster = superclusterIndex<Config>(firstBody);
     const unsigned iSuperclusterIndex = blockIdx.x * NumSuperclustersPerBlock + threadIdx.z;
     if (iSuperclusterIndex >= numISuperclusters) return;
 
-    auto [iSupercluster, iSuperclusterNeighborsCount, iSuperclusterDataIndex] =
-        superclusterInfo[iSuperclusterIndex];
+    auto [iSupercluster, iSuperclusterNeighborsCount, iSuperclusterDataIndex] = superclusterInfo[iSuperclusterIndex];
     // Show NVCC that variables are warp-uniform. Inspired by https://gitlab.com/gromacs/gromacs/-/merge_requests/5715.
     iSuperclusterNeighborsCount = shflSync(iSuperclusterNeighborsCount, 0);
-    iSuperclusterDataIndex = shflSync(iSuperclusterDataIndex, 0);
+    iSuperclusterDataIndex      = shflSync(iSuperclusterDataIndex, 0);
 
     using ParticleDataWithRadiusSq = decltype(loadParticleDataWithRadiusSq(x, y, z, h, ijData.input, firstBody));
     using InteractionResultType    = typename IjData::InteractionResultType;
@@ -429,9 +426,6 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         }
     }
 
-    auto activeMask = ~(typename Config::SuperclusterParticleMask)(0);
-    if constexpr (!std::is_same_v<Mask, void>) activeMask = activeMasks[iSupercluster - firstISupercluster];
-
     if constexpr (!Config::symmetric && Config::numWarpsPerInteraction > 1)
     {
         using Buffer = decltype(buffersForResults<Config::superclusterSize>(unwrapModifiers(InteractionResultType())));
@@ -460,9 +454,8 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         for (unsigned offset = threadIdx.y * Config::iSize + threadIdx.x; offset < Config::superclusterSize;
              offset += Config::iSize * Config::jSize)
         {
-            const unsigned i  = base + offset;
-            const bool active = (activeMask >> offset) & 1;
-            if (i >= firstBody & i < lastBody & active)
+            const unsigned i = base + offset;
+            if (i >= firstBody & i < lastBody)
             {
                 const auto iData   = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
                 const auto iResult = util::tupleMap([&](auto const* ptr) { return ptr[offset]; }, outputBufferPtrs);
@@ -476,15 +469,14 @@ __global__ __launch_bounds__(Config::iSize* Config::jSize* NumSuperclustersPerBl
         {
             const unsigned offset = c * Config::iSize + threadIdx.x;
             const auto i          = iSupercluster * Config::superclusterSize + offset;
-            const bool active     = (activeMask >> (c * Config::iSize + threadIdx.x)) & 1;
             const auto iData      = std::get<0>(getIData(iSuperclusterData, offset, i - firstValidBody, h));
-            storeTupleISum<Config>(iResults[c], symmTmpOutput, i, i >= firstBody & i < lastBody & active,
-                                   ijData.postamble, iData);
+            storeTupleISum<Config>(iResults[c], symmTmpOutput, i, i >= firstBody & i < lastBody, ijData.postamble,
+                                   iData);
         }
     }
 }
 
-template<class Config, class Tc, class ThP, class IjData, TupleOfPointers Out, class Mask = void>
+template<class Config, class Tc, class ThP, class IjData, TupleOfPointers Out>
 void runIjLoop(const execution::Gpu exec,
                const Box<Tc>& box,
                const LocalIndex firstValidBody,
@@ -499,8 +491,7 @@ void runIjLoop(const execution::Gpu exec,
                const Out symmTmpOutput,
                const std::uint32_t* const neighborData,
                const SuperclusterInfo* const superclusterInfo,
-               const LocalIndex numISuperclusters,
-               const Mask* const activeMasks)
+               const LocalIndex numISuperclusters)
 {
     constexpr unsigned numSuperclustersPerBlock = 64 / (Config::iSize * Config::jSize);
     const dim3 blockSize                        = {Config::iSize, Config::jSize, numSuperclustersPerBlock};
@@ -509,7 +500,7 @@ void runIjLoop(const execution::Gpu exec,
     {
         runIjLoopKernel<Config, numSuperclustersPerBlock, decltype(usePbc)::value><<<numBlocks, blockSize, 0, exec>>>(
             box, firstValidBody, totalBodies, firstBody, lastBody, x, y, z, h, ijData, symmTmpOutput, neighborData,
-            superclusterInfo, numISuperclusters, activeMasks);
+            superclusterInfo, numISuperclusters);
         checkGpuErrors(cudaGetLastError());
     };
 
@@ -520,52 +511,42 @@ void runIjLoop(const execution::Gpu exec,
         run(std::false_type());
 }
 
-template<class Config>
-__global__ void computeActiveMasksKernel(const LocalIndex firstISupercluster,
-                                         const LocalIndex firstValidBody,
-                                         const GroupView groups,
-                                         typename Config::SuperclusterParticleMask* __restrict__ activeMasks)
+template<class Config, unsigned GroupSize>
+__global__ void computeActiveSuperclustersKernel(const GroupView<GroupSize> groups,
+                                                 const LocalIndex numISuperclusters,
+                                                 bool* __restrict__ activeSuperclusters)
 {
-    using Mask = typename Config::SuperclusterParticleMask;
+    constexpr unsigned superclustersPerGroup = GroupSize / Config::superclusterSize;
+    const LocalIndex index                   = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= groups.numActiveGroups) return;
 
-    const LocalIndex index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index >= groups.numGroups) return;
+    const LocalIndex group             = groups.activeGroups[index];
+    const LocalIndex firstSupercluster = group * superclustersPerGroup;
+    const LocalIndex lastSupercluster  = std::min(firstSupercluster + superclustersPerGroup, numISuperclusters);
+    assert(firstSupercluster < numISuperclusters);
 
-    const LocalIndex groupStart = groups.groupStart[index] + firstValidBody;
-    const LocalIndex groupEnd   = groups.groupEnd[index] + firstValidBody;
-    assert(groupStart < groupEnd);
-    assert(superclusterIndex<Config>(groupStart) == superclusterIndex<Config>(groupEnd - 1));
-
-    const LocalIndex supercluster = superclusterIndex<Config>(groupStart);
-    const LocalIndex startOffset  = groupStart - supercluster * Config::superclusterSize;
-    const LocalIndex endOffset    = groupEnd - supercluster * Config::superclusterSize;
-
-    auto* activeMaskPtr = &activeMasks[supercluster - firstISupercluster];
-    const Mask activeMask =
-        ~(endOffset == Config::superclusterSize ? Mask(0) : ~Mask(0) << endOffset) & (~Mask(0) << startOffset);
-
-    // atomic update as multiple groups can be inside the same supercluster
-    atomicOr(activeMaskPtr, activeMask);
+    for (LocalIndex i = firstSupercluster; i < lastSupercluster; ++i)
+        activeSuperclusters[i] = true;
 }
 
-template<class Config>
-util::UniqueDevicePtr<typename Config::SuperclusterParticleMask[]>
-computeActiveMasks(const execution::Gpu exec,
-                   const LocalIndex firstISupercluster,
-                   const LocalIndex numISuperclusters,
-                   const LocalIndex firstValidBody,
-                   const GroupView& groups)
+template<class Config, unsigned GroupSize>
+util::UniqueDevicePtr<bool[]> computeActiveSuperclusters(const execution::Gpu exec,
+                                                         const LocalIndex numISuperclusters,
+                                                         const GroupView<GroupSize>& groups)
 {
-    auto activeMasks = util::deviceAlloc<typename Config::SuperclusterParticleMask[]>(exec, numISuperclusters);
-    checkGpuErrors(cudaMemsetAsync(activeMasks.get(), 0,
-                                   sizeof(typename Config::SuperclusterParticleMask) * numISuperclusters, exec));
-
-    constexpr unsigned numThreads = 256;
-    const unsigned numBlocks      = iceil(groups.numGroups, numThreads);
-    computeActiveMasksKernel<Config>
-        <<<numBlocks, numThreads, 0, exec>>>(firstISupercluster, firstValidBody, groups, activeMasks.get());
-    checkGpuErrors(cudaGetLastError());
-    return activeMasks;
+    auto activeSuperclusters = util::deviceAlloc<bool[]>(exec, numISuperclusters);
+    // without an index list, all groups are active, hence all superclusters
+    const bool allGroupsActive = groups.activeGroups == nullptr;
+    checkGpuErrors(cudaMemsetAsync(activeSuperclusters.get(), allGroupsActive ? 1 : 0, numISuperclusters, exec));
+    if (groups.activeGroups != nullptr)
+    {
+        constexpr unsigned numThreads = 256;
+        const unsigned numBlocks      = iceil(groups.numActiveGroups, numThreads);
+        computeActiveSuperclustersKernel<Config, GroupSize>
+            <<<numBlocks, numThreads, 0, exec>>>(groups, numISuperclusters, activeSuperclusters.get());
+        checkGpuErrors(cudaGetLastError());
+    }
+    return activeSuperclusters;
 }
 
 } // namespace cstone::ijloop::gpu_supercluster_nb_list_neighborhood_detail

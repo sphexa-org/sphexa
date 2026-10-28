@@ -30,72 +30,53 @@
 
 #pragma once
 
-#include "cstone/sfc/box.hpp"
 #include "cstone/primitives/primitives_gpu.h"
-#include "cstone/traversal/groups_gpu.h"
+#include "cstone/traversal/groups.hpp"
 #include "sph/sph_gpu.hpp"
 
 namespace sph
 {
 
-template<class Dataset>
-void computeSpatialGroups(cstone::LocalIndex startIndex, cstone::LocalIndex endIndex, Dataset& d,
-                          const cstone::Box<typename Dataset::RealType>& box, GroupData<cstone::execution::Gpu>& groups)
+//! @brief Compute spatial (=SFC-consecutive) groups of particles: all groups of the range are active
+/*!
+ * The returned group data does not store an index list: the GroupView obtained through view() describes
+ * all consecutive groups of GroupView::groupSize particles in [startIndex, endIndex).
+ */
+template<cstone::execution::Policy Exec>
+void computeGroups(size_t startIndex, size_t endIndex, GroupData<Exec>& groups)
 {
-    float tolFactor = 2.0f;
-    cstone::computeGroupSplits(cstone::execution::gpuDefaultStream, startIndex, endIndex, rawPtr(d.x), rawPtr(d.y),
-                               rawPtr(d.z), rawPtr(d.h), d.treeView.leaves, d.treeView.numLeafNodes, d.treeView.layout,
-                               box, nsGroupSize(), tolFactor, d.traversalStack, groups.data);
-
-    groups.firstBody  = startIndex;
-    groups.lastBody   = endIndex;
-    groups.numGroups  = groups.data.size() - 1;
-    groups.groupStart = rawPtr(groups.data);
-    groups.groupEnd   = rawPtr(groups.data) + 1;
+    groups.firstBody       = startIndex;
+    groups.lastBody        = endIndex;
+    groups.activeGroups    = nullptr;
+    groups.numActiveGroups = 0;
 }
 
-//! @brief Compute spatial (=SFC-consecutive) groups of particles with compact bounding boxes
-template<typename Tc, class Dataset>
-void computeGroups(size_t startIndex, size_t endIndex, Dataset& d, const cstone::Box<Tc>& box,
-                   GroupData<typename Dataset::Exec>& groups)
-{
-    if constexpr (d.useGpu) { computeSpatialGroups(startIndex, endIndex, d, box, groups); }
-    else
-    {
-        groups.firstBody  = startIndex;
-        groups.lastBody   = endIndex;
-        groups.numGroups  = 1;
-        groups.groupStart = &groups.firstBody;
-        groups.groupEnd   = &groups.lastBody;
-    }
-}
-
-//! @brief extract the specified subgroup [first:last] indexed through @p index from @p grp into @p outGroup
+//! @brief extract the specified subgroup [first:last] indexed through @p indices from @p grp into @p out
+/*! the extracted view keeps the original firstBody/lastBody of @p grp, while out.activeGroups stores the
+ *  selected group indices (a plain copy of indices[first:last])
+ */
 template<cstone::execution::Policy Exec>
 inline void extractGroupGpu(const GroupView& grp, const cstone::LocalIndex* indices, cstone::LocalIndex first,
                             cstone::LocalIndex last, GroupData<Exec>& out)
 {
     auto numOutGroups = last - first;
-    reallocate(out.data, 2 * numOutGroups, 1.01);
+    reallocate(out.data, numOutGroups, 1.01);
 
-    out.firstBody  = 0;
-    out.lastBody   = 0;
-    out.numGroups  = numOutGroups;
-    out.groupStart = rawPtr(out.data);
-    out.groupEnd   = rawPtr(out.data) + numOutGroups;
+    out.firstBody       = grp.firstBody;
+    out.lastBody        = grp.lastBody;
+    out.numActiveGroups = numOutGroups;
+    out.activeGroups    = rawPtr(out.data);
 
     if (numOutGroups == 0) { return; }
-    cstone::gather(cstone::execution::gpuDefaultStream, indices + first, numOutGroups, grp.groupStart, out.groupStart);
-    cstone::gather(cstone::execution::gpuDefaultStream, indices + first, numOutGroups, grp.groupEnd, out.groupEnd);
+    cstone::memcpyD2DAsync(cstone::execution::gpuDefaultStream, indices + first, numOutGroups, out.activeGroups);
 }
 
 //! @brief return a new GroupView that corresponds to a slice [first:last] of the input group @p grp
 inline GroupView makeSlicedView(const GroupView& grp, cstone::LocalIndex first, cstone::LocalIndex last)
 {
     GroupView ret = grp;
-    ret.numGroups = last - first;
-    ret.groupStart += first;
-    ret.groupEnd += first;
+    ret.activeGroups += first;
+    ret.numActiveGroups = last - first;
     return ret;
 }
 

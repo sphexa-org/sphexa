@@ -14,7 +14,7 @@
  */
 
 #include "cstone/cuda/cuda_utils.cuh"
-#include "cstone/traversal/groups_gpu.h"
+#include "cstone/traversal/groups.hpp"
 #include "cstone/util/reallocate.hpp"
 #include "ryoanji/nbody/cartesian_qpole.hpp"
 #include "ryoanji/nbody/direct.cuh"
@@ -25,7 +25,6 @@
 
 namespace ryoanji
 {
-using cstone::GroupView;
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
 class MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::Impl
@@ -33,30 +32,12 @@ class MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::Impl
 public:
     Impl() {}
 
-    GroupView computeSpatialGroups(LocalIndex first, LocalIndex last, const Tc* x, const Tc* y, const Tc* z,
-                                   const Th*                                                         h,
-                                   const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
-                                   const cstone::LocalIndex* layout, const cstone::Box<Tc>& box)
-    {
-        auto  d_leaves  = focusTree.treeLeavesAcc();
-        float tolFactor = 2.0f;
-        cstone::computeGroupSplits(cstone::execution::gpuDefaultStream, first, last, x, y, z, h, d_leaves.data(),
-                                   d_leaves.size() - 1, layout, box, bhMaxTargetSize(), tolFactor, traversalStack_,
-                                   groups_.data);
-
-        groups_.firstBody  = first;
-        groups_.lastBody   = last;
-        groups_.numGroups  = groups_.data.size() - 1;
-        groups_.groupStart = rawPtr(groups_.data);
-        groups_.groupEnd   = rawPtr(groups_.data) + 1;
-        return groups_.view();
-    }
-
     void upsweep(const Tc* x, const Tc* y, const Tc* z, const Tm* m, cstone::OctreeView<const KeyType> gOctree,
                  const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
                  const cstone::LocalIndex*                                         layout)
     {
         octree_ = focusTree.octreeViewAcc();
+        leaves_ = focusTree.treeLeavesAcc();
         resize(octree_.numLeafNodes);
 
         auto globalCenters = focusTree.globalExpansionCenters();
@@ -97,20 +78,24 @@ public:
     float compute(GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m, const Th* h, Tc G, int numShells,
                   const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az)
     {
-        reallocate(traversalStack_, stackSize(grp.numGroups), 1.01);
-        return traverse(grp, 1, x, y, z, m, h, x, y, z, m, h, octree_.childOffsets, octree_.internalToLeaf, layout_,
-                        centers_, rawPtr(multipoles_), G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()}, ugrav, ax,
-                        ay, az, (int*)rawPtr(traversalStack_));
+        constexpr float tolFactor = 2.0f;
+        reallocate(traversalStack_, stackSize(grp.numGroups()), 1.01);
+        return traverse(grp, leaves_.data(), TreeNodeIndex(leaves_.size() - 1), box, tolFactor, 1, x, y, z, m, h, x, y,
+                        z, m, h, octree_.childOffsets, octree_.internalToLeaf, layout_, centers_, rawPtr(multipoles_),
+                        G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()}, ugrav, ax, ay, az,
+                        (int*)rawPtr(traversalStack_));
     }
 
     float compute(GroupView grp, const Tc* xt, const Tc* yt, const Tc* zt, const Tm* mt, const Th* ht, const Tc* xs,
                   const Tc* ys, const Tc* zs, const Tm* ms, const Th* hs, Tc G, int numShells,
                   const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az)
     {
-        reallocate(traversalStack_, stackSize(grp.numGroups), 1.01);
-        return traverse(grp, 1, xt, yt, zt, mt, ht, xs, ys, zs, ms, hs, octree_.childOffsets, octree_.internalToLeaf,
-                        layout_, centers_, rawPtr(multipoles_), G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()},
-                        ugrav, ax, ay, az, (int*)rawPtr(traversalStack_));
+        constexpr float tolFactor = 2.0f;
+        reallocate(traversalStack_, stackSize(grp.numGroups()), 1.01);
+        return traverse(grp, leaves_.data(), TreeNodeIndex(leaves_.size() - 1), box, tolFactor, 1, xt, yt, zt, mt, ht,
+                        xs, ys, zs, ms, hs, octree_.childOffsets, octree_.internalToLeaf, layout_, centers_,
+                        rawPtr(multipoles_), G, numShells, Vec3<Tc>{box.lx(), box.ly(), box.lz()}, ugrav, ax, ay, az,
+                        (int*)rawPtr(traversalStack_));
     }
 
     util::array<uint64_t, 5> readStats() const { return readBhStats(); }
@@ -127,14 +112,12 @@ private:
     }
 
     cstone::OctreeView<const KeyType> octree_;
+    std::span<const KeyType>          leaves_;
 
     //! @brief properties of focused octree nodes
     const LocalIndex*           layout_;
     const Vec4<Tf>*             centers_;
     cstone::DeviceVector<MType> multipoles_;
-
-    //! @brief target particle group data
-    cstone::GroupData<cstone::execution::Gpu> groups_;
 
     //! @brief temporary memory during traversal
     cstone::DeviceVector<LocalIndex> traversalStack_;
@@ -148,15 +131,6 @@ MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::MultipoleHolder()
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
 MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::~MultipoleHolder() = default;
-
-template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
-GroupView MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::computeSpatialGroups(
-    LocalIndex firstBody, LocalIndex lastBody, const Tc* x, const Tc* y, const Tc* z, const Th* h,
-    const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree, const LocalIndex* layout,
-    const cstone::Box<Tc>& box)
-{
-    return impl_->computeSpatialGroups(firstBody, lastBody, x, y, z, h, focusTree, layout, box);
-}
 
 template<class Tc, class Th, class Tm, class Ta, class Tf, class KeyType, class MType>
 void MultipoleHolder<Tc, Th, Tm, Ta, Tf, KeyType, MType>::upsweep(

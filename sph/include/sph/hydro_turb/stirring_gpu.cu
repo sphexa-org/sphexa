@@ -32,11 +32,11 @@
 #include "cstone/traversal/groups.hpp"
 
 #include "sph/hydro_turb/stirring.hpp"
+#include "sph/sph_gpu.hpp"
 
 namespace sph
 {
 using cstone::GpuConfig;
-using cstone::GroupView;
 using cstone::LocalIndex;
 
 template<class Tc, class Ta, class T>
@@ -46,17 +46,20 @@ __global__ void computeStirringKernel(GroupView grp, size_t numDim, const Tc* x,
 {
     LocalIndex laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
-    if (warpIdx >= grp.numGroups) { return; }
+    if (warpIdx >= grp.numGroups()) { return; }
 
-    LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
-    if (i >= grp.groupEnd[warpIdx]) { return; }
+    const LocalIndex bodyBegin = grp.groupStart(warpIdx);
+    const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
 
-    auto [turbAx, turbAy, turbAz] =
-        stirParticle<Tc, Ta, T>(numDim, x[i], y[i], z[i], numModes, modes, phaseReal, phaseImag, amplitudes);
+    for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += GpuConfig::warpSize)
+    {
+        auto [turbAx, turbAy, turbAz] =
+            stirParticle<Tc, Ta, T>(numDim, x[i], y[i], z[i], numModes, modes, phaseReal, phaseImag, amplitudes);
 
-    ax[i] += solWeightNorm * turbAx;
-    ay[i] += solWeightNorm * turbAy;
-    az[i] += solWeightNorm * turbAz;
+        ax[i] += solWeightNorm * turbAx;
+        ay[i] += solWeightNorm * turbAy;
+        az[i] += solWeightNorm * turbAz;
+    }
 }
 
 //! @brief Add stirring accelerations on the GPU, see CPU version for documentation
@@ -67,7 +70,7 @@ void computeStirringGpu(GroupView grp, size_t numDim, const Tc* x, const Tc* y, 
 {
     unsigned numThreads       = 256;
     unsigned numWarpsPerBlock = numThreads / GpuConfig::warpSize;
-    unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+    unsigned numBlocks        = (grp.numGroups() + numWarpsPerBlock - 1) / numWarpsPerBlock;
 
     if (numBlocks == 0) { return; }
     computeStirringKernel<<<numBlocks, numThreads>>>(grp, numDim, x, y, z, ax, ay, az, numModes, modes, st_aka, st_akb,
