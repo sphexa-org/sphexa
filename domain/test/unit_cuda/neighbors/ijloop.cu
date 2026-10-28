@@ -144,7 +144,7 @@ struct IjLoopTest : testing::Test
         subgroups.clear();
         for (unsigned g = 0; g < numGroups; ++g)
         {
-            if (g % 3 == 0 || g % 5 == 0) { subgroups.push_back(g); }
+            if (g % 3 == 0 || g % 5 == 0 || g == numGroups - 1) { subgroups.push_back(g); }
         }
     }
 
