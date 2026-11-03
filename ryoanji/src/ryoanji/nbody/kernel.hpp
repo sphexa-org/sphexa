@@ -48,7 +48,7 @@ HOST_DEVICE_FUN HOST_DEVICE_INLINE double inverseSquareRoot(double x)
 #elif defined(__HIP_DEVICE_COMPILE__)
     return double(rsqrtf(float(x)));
 #else
-    return double(1.0f / std::sqrt(float(x)));
+    return 1.0 / std::sqrt(x);
 #endif
 }
 
