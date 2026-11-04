@@ -232,7 +232,7 @@ struct WendlandC6
     }
 };
 
-#ifdef SPHEXA_WITH_WENDLAND
+#ifdef SPH_EXA_WITH_WENDLAND
 template<class T>
 using KernelVariant = std::variant<SincN<T>, SincN1SincN2<T>, WendlandC2<T>, WendlandC4<T>, WendlandC6<T>>;
 #else
@@ -244,7 +244,7 @@ enum SphKernelType : int
 {
     sinc_n          = 0,
     sinc_n1_sinc_n2 = 1,
-#ifdef SPHEXA_WITH_WENDLAND
+#ifdef SPH_EXA_WITH_WENDLAND
     wendland_c2     = 2,
     wendland_c4     = 3,
     wendland_c6     = 4,
@@ -263,7 +263,7 @@ KernelVariant<T> getSphKernel(SphKernelType choice, T sincIndex)
     {
         case SphKernelType::sinc_n: return SincN<T>{sincIndex};
         case SphKernelType::sinc_n1_sinc_n2: return SincN1SincN2<T>{};
-#ifdef SPHEXA_WITH_WENDLAND
+#ifdef SPH_EXA_WITH_WENDLAND
         case SphKernelType::wendland_c2: return WendlandC2<T>{};
         case SphKernelType::wendland_c4: return WendlandC4<T>{};
         case SphKernelType::wendland_c6: return WendlandC6<T>{};
