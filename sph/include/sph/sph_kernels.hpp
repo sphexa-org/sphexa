@@ -245,9 +245,9 @@ enum SphKernelType : int
     sinc_n          = 0,
     sinc_n1_sinc_n2 = 1,
 #ifdef SPH_EXA_WITH_WENDLAND
-    wendland_c2     = 2,
-    wendland_c4     = 3,
-    wendland_c6     = 4,
+    wendland_c2 = 2,
+    wendland_c4 = 3,
+    wendland_c6 = 4,
 #endif
 };
 
