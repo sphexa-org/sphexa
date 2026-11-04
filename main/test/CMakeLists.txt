@@ -1,3 +1,5 @@
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/main/cmake")
+include(main_add_test)
 
 set(UNIT_TESTS
         init/grid.cpp
@@ -9,29 +11,15 @@ set(UNIT_TESTS
         test_main.cpp)
 
 if (SPH_EXA_WITH_H5HUT)
-    set(testname frontend_units)
-    add_executable(${testname} ${UNIT_TESTS})
-    target_compile_options(${testname} PRIVATE -Wall -Wextra -Wno-unknown-pragmas)
-
-    target_include_directories(${testname} PRIVATE ${MPI_CXX_INCLUDE_PATH} ${SPH_DIR} ${CSTONE_DIR} ${PROJECT_SOURCE_DIR}/main/src)
-    target_link_libraries(${testname} PRIVATE io ${MPI_CXX_LIBRARIES} GTest::gtest_main)
-    enableH5hut(${testname})
-    add_test(NAME ${testname} COMMAND ${testname})
-    install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/main)
+    main_add_test(frontend_units
+        SOURCES ${UNIT_TESTS}
+        H5HUT)
 endif ()
 
 if (SPH_EXA_WITH_CUDA AND SPH_EXA_WITH_H5HUT)
-    set(testname frontend_units_cuda)
-    add_executable(${testname}
-            io/id_tag_utils_gpu.cu
-            test_main.cpp)
-    target_include_directories(${testname} PRIVATE
-                               ${COOLING_DIR}
-                               ${SPH_DIR}
-                               ${CSTONE_DIR}
-                               ${PROJECT_SOURCE_DIR}/main/src)
-    target_link_libraries(${testname} PUBLIC cstone_gpu io io_gpu sph_gpu OpenMP::OpenMP_CXX CUDA::cudart GTest::gtest_main)
-    add_test(NAME ${testname} COMMAND ${testname})
-    install(TARGETS ${testname} RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR}/main)
-    unset(testname)
+    main_add_test(frontend_units_cuda
+        SOURCES io/id_tag_utils_gpu.cu test_main.cpp
+        LINK cstone_gpu io_gpu sph_gpu OpenMP::OpenMP_CXX CUDA::cudart
+        INCLUDE ${COOLING_DIR}
+        LABELS "1r;gpu")
 endif ()

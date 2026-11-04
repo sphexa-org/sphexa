@@ -87,7 +87,7 @@ endif()
 
 option(SPH_EXA_WITH_H5HUT "Enable HDF5 IO using the H5hut (H5part) library" ON)
 if (SPH_EXA_WITH_H5HUT)
-    set(SPH_EXA_HDF5_PARALLEL_MODE "independent" CACHE STRING "Parallel IO mode used by the H5hut hdf5 IO")
+    set(SPH_EXA_HDF5_PARALLEL_MODE "collective" CACHE STRING "Parallel IO mode used by the H5hut hdf5 IO")
     set_property(CACHE SPH_EXA_HDF5_PARALLEL_MODE PROPERTY STRINGS independent collective)
     set(HDF5_ENABLE_PARALLEL ON)
     find_package(HDF5)
