@@ -117,8 +117,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
                                            .centers         = centers.data(),
                                            .sizes           = sizes.data(),
                                            .searchExtFactor = 1};
-    LocalIndex zero = 0;
-    const GroupView groupView{.firstBody = 0, .lastBody = n, .numGroups = 1, .groupStart = &zero, .groupEnd = &n};
+    const GroupView<64> groupView{.firstBody = 0, .lastBody = n};
 
     // compute reference using basic CPU neighborhood
     const auto allocVec = [n]<class Tv>(Tv initialValue) { return std::vector<Tv>(n, initialValue); };
@@ -179,16 +178,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
                                             .sizes           = rawPtr(dSizes),
                                             .searchExtFactor = searchExtFactor};
 
-    // split particles into consecutive groups
-    constexpr unsigned groupSize = GpuConfig::warpSize;
-    thrust::universal_vector<LocalIndex> groups((n + groupSize - 1) / groupSize + 1);
-    for (unsigned i = 0; i < groups.size(); ++i)
-        groups[i] = std::min(groupSize * i, n);
-    const GroupView dGroupView{.firstBody  = 0,
-                               .lastBody   = n,
-                               .numGroups  = unsigned(groups.size() - 1),
-                               .groupStart = rawPtr(groups),
-                               .groupEnd   = rawPtr(groups) + 1};
+    const GroupView<64> dGroupView{.firstBody = 0, .lastBody = n};
 
     StreamHolder stream;
 
@@ -208,7 +198,7 @@ NeighborhoodBenchmarkResults benchmarkNeighborhood(const Coords& coords,
     util::for_each_tuple(prefetchToDevice, dInputs);
     util::for_each_tuple(prefetchToDevice, dOutputs);
     util::for_each_tuple(prefetchToDevice, std::tie(dPrefixes, dChildOffsets, dParents, dInternalToLeaf,
-                                                    dLeafToInternal, dLevelRange, dLayout, dCenters, dSizes, groups));
+                                                    dLeafToInternal, dLevelRange, dLayout, dCenters, dSizes));
     stream.sync();
 
     // build neighborhood, measure CPU time

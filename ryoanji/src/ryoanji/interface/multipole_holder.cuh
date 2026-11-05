@@ -32,11 +32,6 @@ public:
 
     ~MultipoleHolder();
 
-    cstone::GroupView computeSpatialGroups(LocalIndex first, LocalIndex last, const Tc* x, const Tc* y, const Tc* z,
-                                           const Th*                                                         h,
-                                           const cstone::FocusedOctree<KeyType, Tf, cstone::execution::Gpu>& focusTree,
-                                           const cstone::LocalIndex* layout, const cstone::Box<Tc>& box);
-
     /*! @brief compute multipole moments with an upsweep from leaves to the tree root
      *
      * @param[in]  x, y, z, m    source particles in SFC order as referenced by layout, on GPU
@@ -58,8 +53,8 @@ public:
      * @param[inout] ugrav        potential per particle to add to, can be nullptr, on GPU
      * @param[inout] ax, ay, az   particle accelerations to add to, on GPU
      */
-    float compute(cstone::GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m, const Th* h, Tc G,
-                  int numShells, const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az);
+    float compute(GroupView grp, const Tc* x, const Tc* y, const Tc* z, const Tm* m, const Th* h, Tc G, int numShells,
+                  const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az);
 
     /*! @brief compute accelerations on target particles
      *
@@ -72,8 +67,8 @@ public:
      * @param[inout] ugrav           potential per particle to add to, can be nullptr, on GPU
      * @param[inout] ax, ay, az      particle accelerations to add to, on GPU
      */
-    float compute(cstone::GroupView grp, const Tc* xt, const Tc* yt, const Tc* zt, const Tm* mt, const Th* ht,
-                  const Tc* xs, const Tc* ys, const Tc* zs, const Tm* ms, const Th* hs, Tc G, int numShells,
+    float compute(GroupView grp, const Tc* xt, const Tc* yt, const Tc* zt, const Tm* mt, const Th* ht, const Tc* xs,
+                  const Tc* ys, const Tc* zs, const Tm* ms, const Th* hs, Tc G, int numShells,
                   const cstone::Box<Tc>& box, Ta* ugrav, Ta* ax, Ta* ay, Ta* az);
 
     util::array<uint64_t, 5> readStats() const;

@@ -16,17 +16,18 @@
 
 #include "gtest/gtest.h"
 
+#include <array>
 #include <bitset>
+#include <climits>
 
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 #include <thrust/sequence.h>
 
-#include "cstone/cuda/stream_holder.cuh"
 #include "cstone/cuda/thrust_util.cuh"
 #include "cstone/primitives/math.hpp"
+#include "cstone/traversal/groups.hpp"
 #include "cstone/traversal/groups_gpu.cuh"
-#include "cstone/traversal/groups_gpu.h"
 #include "cstone/tree/cs_util.hpp"
 
 using namespace cstone;
@@ -35,19 +36,177 @@ constexpr size_t targetSize = 64;
 constexpr size_t nwt        = targetSize / GpuConfig::warpSize;
 using SplitType             = util::array<GpuConfig::ThreadMask, nwt>;
 
+/*! @brief Count number of zero bits between 1-bits for the bitstream defined by @p splits
+ *
+ * @tparam N                  number of particles per thread
+ * @param[in]  split          the split-bitmask
+ * @param[out] splitLengths   output number of 0-bits between 1-bits, with space for popCount(split) + 1 elements
+ * @return                    popCount(split) + 1, the number of segments written to @p splitLengths
+ *
+ * Examples, assuming split is a 64-bit stream (either 2x32bit or 1x64bit):
+ *    split = 0x0 --> splitLengths = {64}
+ *    split = 0x1 --> splitLengths = {1, 63}
+ *    split = 0x2 --> splitLengths = {2, 62}
+ *    split = 0x3 --> splitLengths = {1, 1, 61}
+ */
+template<std::size_t N>
+__host__ __device__ int makeSplits(util::array<GpuConfig::ThreadMask, N> split, LocalIndex* splitLengths)
+{
+    int numSegments  = 0;
+    auto readSegment = [&splitLengths, &numSegments](GpuConfig::ThreadMask mask, int carry)
+    {
+        int bitsRemaining = CHAR_BIT * sizeof(GpuConfig::ThreadMask);
+        while (mask)
+        {
+            int length = countTrailingZeros(mask) + 1;
+            bitsRemaining -= length;
+            *splitLengths++ = length + carry;
+            carry           = 0;
+            mask >>= length;
+            numSegments++;
+        }
+        return carry + bitsRemaining;
+    };
+
+    int carry = 0;
+    for (std::size_t k = 0; k < N; ++k)
+    {
+        carry = readSegment(split[k], carry);
+    }
+    *splitLengths = carry;
+
+    return numSegments + 1;
+}
+
+/*! @brief compute split pattern and split counts for each initial fixed-size target particle group
+ *
+ * @tparam groupSize           a multiple of GpuConfig::warpSize
+ * @tparam T                   float or double
+ * @tparam KeyType             32- or 64-bit unsigned integer
+ * @param[in]  first           first particle from x,y,z,h to consider
+ * @param[in]  last            last particle to consider
+ * @param[in]  x               local x particle coordinates
+ * @param[in]  y               local y particle coordinates
+ * @param[in]  z               local z particle coordinates
+ * @param[in]  h               local smoothing lengths
+ * @param[in]  leaves          cornerstone leaf-cell array
+ * @param[in]  numLeaves       number of leaves in @p leaves
+ * @param[in]  layout          layout[i] is the x,y,z,h-array particle index of the first particle in leaf i,
+ * @param[in]  box             global coordinate bounding box
+ * @param[in]  tolFactor       max distance between consecutive particles is
+ *                             tolFactor * cbrt(smallest leaf node size in group)
+ * @param[out] splitMasks      split mask for each of the ceil((last-first)/groupSize) fixed-size groups
+ * @param[out] numSplitsPerGroup 1 + number-of-1-bits in @p splitMasks for each fixed-size group
+ */
+template<unsigned groupSize, class Tc, class T, class KeyType>
+__global__ void groupSplitsKernel(LocalIndex first,
+                                  LocalIndex last,
+                                  const Tc* x,
+                                  const Tc* y,
+                                  const Tc* z,
+                                  const T* h,
+                                  const KeyType* leaves,
+                                  TreeNodeIndex numLeaves,
+                                  const LocalIndex* layout,
+                                  const Box<Tc> box,
+                                  float tolFactor,
+                                  util::array<GpuConfig::ThreadMask, groupSize / GpuConfig::warpSize>* splitMasks,
+                                  LocalIndex* numSplitsPerGroup)
+{
+    constexpr LocalIndex nwt = groupSize / GpuConfig::warpSize;
+
+    LocalIndex tid     = blockIdx.x * blockDim.x + threadIdx.x;
+    LocalIndex warpIdx = tid / GpuConfig::warpSize;
+    LocalIndex laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
+
+    if (warpIdx * groupSize >= last - first) { return; }
+
+    auto splitMask = evalGroupSplitMask<groupSize, Tc, T, KeyType>(first + warpIdx * groupSize, last, x, y, z, h,
+                                                                   leaves, numLeaves, layout, box, tolFactor);
+
+    if (laneIdx == 0)
+    {
+        splitMasks[warpIdx] = splitMask;
+        int numSubGroups    = 1;
+        for (LocalIndex k = 0; k < nwt; ++k)
+        {
+            numSubGroups += popCount(splitMask[k]);
+        }
+        numSplitsPerGroup[warpIdx] = numSubGroups;
+    }
+}
+
+//! @brief test-local replacement for the removed production computeGroupSplits
+//!
+//! Single fixed group size of targetSize (no warpSize dispatch), no growth heuristics, default stream.
+template<class Tc, class T, class KeyType>
+thrust::host_vector<LocalIndex> computeGroupSplits(LocalIndex first,
+                                                   LocalIndex last,
+                                                   const Tc* x,
+                                                   const Tc* y,
+                                                   const Tc* z,
+                                                   const T* h,
+                                                   const KeyType* leaves,
+                                                   TreeNodeIndex numLeaves,
+                                                   const LocalIndex* layout,
+                                                   const Box<Tc> box,
+                                                   float tolFactor)
+{
+    LocalIndex numFixedGroups = iceil(last - first, targetSize);
+
+    thrust::device_vector<SplitType> splitMasks(numFixedGroups);
+    thrust::device_vector<LocalIndex> numSplitsPerGroup(numFixedGroups); // required kernel output, unused here
+    if (numFixedGroups > 0)
+    {
+        constexpr unsigned numThreads = 256;
+        unsigned gridSize             = numFixedGroups * GpuConfig::warpSize;
+        groupSplitsKernel<targetSize, Tc, T, KeyType>
+            <<<iceil(gridSize, numThreads), numThreads>>>(first, last, x, y, z, h, leaves, numLeaves, layout, box,
+                                                          tolFactor, rawPtr(splitMasks), rawPtr(numSplitsPerGroup));
+    }
+
+    // group starts are the prefix sums of the per-group split segment lengths; the trailing segment of the
+    // last fixed group may overcount up to targetSize and is clamped by writing last as the final boundary
+    thrust::host_vector<LocalIndex> groups;
+    thrust::host_vector<SplitType> splitMasksHost = splitMasks;
+    LocalIndex pos                                = first;
+    for (LocalIndex i = 0; i < numFixedGroups; ++i)
+    {
+        std::array<LocalIndex, targetSize + 1> lengths; // popCount(group bits) + 1 segments max
+        int numSegments = makeSplits(splitMasksHost[i], lengths.data());
+        for (int k = 0; k < numSegments; ++k)
+        {
+            groups.push_back(pos);
+            pos += lengths[k];
+        }
+    }
+    groups.push_back(last);
+
+    return groups;
+}
+
 TEST(TargetGroups, t0)
 {
-    LocalIndex groupSize = 8, first = 4, last = 34;
+    //! all groups active without an index list: group ranges derive from the body range
+    GroupView<64> groups{.firstBody = 4, .lastBody = 260};
 
-    StreamHolder stream;
+    EXPECT_EQ(groups.numGroups(), 4);
+    EXPECT_EQ(groups.groupStart(0), 4);
+    EXPECT_EQ(groups.groupEnd(0), 68);
+    EXPECT_EQ(groups.groupStart(3), 196);
+    EXPECT_EQ(groups.groupEnd(3), 260);
+}
 
-    GroupData<execution::Gpu> groups;
-    computeFixedGroups(stream.exec(), first, last, groupSize, groups);
-    stream.sync();
+TEST(TargetGroups, t0SmallGroups)
+{
+    //! same body range, but with a smaller compile-time group size
+    GroupView<32> groups{.firstBody = 4, .lastBody = 260};
 
-    std::vector<LocalIndex> hgroups = toHost(groups.data);
-    std::vector<LocalIndex> ref{4, 12, 20, 28, 34};
-    EXPECT_EQ(hgroups, ref);
+    EXPECT_EQ(groups.numGroups(), 8);
+    EXPECT_EQ(groups.groupStart(0), 4);
+    EXPECT_EQ(groups.groupEnd(0), 36);
+    EXPECT_EQ(groups.groupStart(7), 228);
+    EXPECT_EQ(groups.groupEnd(7), 260);
 }
 
 __device__ constexpr util::array<unsigned, 2> laneSeg(unsigned idx, unsigned warpSize_)
@@ -103,7 +262,7 @@ TEST(TargetGroups, findSplits)
         SplitType split = d_splits[0];
 
         std::bitset<targetSize> splitBits;
-        for (int k = nwt; k >= 0; --k)
+        for (int k = nwt - 1; k >= 0; --k)
         {
             splitBits <<= GpuConfig::warpSize;
             splitBits |= split[k];
@@ -118,6 +277,13 @@ TEST(TargetGroups, findSplits)
 }
 
 __global__ void makeSplitTester(SplitType splitMask, LocalIndex* splitLengths) { makeSplits(splitMask, splitLengths); }
+
+thrust::host_vector<LocalIndex> makeSplitLengths(SplitType splitMask)
+{
+    thrust::device_vector<LocalIndex> splitLengths(targetSize);
+    makeSplitTester<<<1, 1>>>(splitMask, rawPtr(splitLengths));
+    return thrust::host_vector<LocalIndex>(splitLengths);
+}
 
 TEST(TargetGroups, makeSplits)
 {
@@ -134,62 +300,43 @@ TEST(TargetGroups, makeSplits)
     };
 
     {
-        thrust::device_vector<LocalIndex> splitLengths(targetSize);
-        SplitType splitMask = makeMask(0, 0);
-        makeSplitTester<<<1, 1>>>(splitMask, rawPtr(splitLengths));
+        auto splitLengths = makeSplitLengths(makeMask(0, 0));
         EXPECT_EQ(splitLengths[0], 64);
     }
     {
-        thrust::device_vector<LocalIndex> splitLengths(targetSize);
-        SplitType splitMask = makeMask(1, 0);
-        makeSplitTester<<<1, 1>>>(splitMask, rawPtr(splitLengths));
+        auto splitLengths = makeSplitLengths(makeMask(1, 0));
         EXPECT_EQ(splitLengths[0], 1);
         EXPECT_EQ(splitLengths[1], 63);
     }
     {
-        thrust::device_vector<LocalIndex> splitLengths(targetSize);
-        SplitType splitMask = makeMask(0, 1u << 30);
-        makeSplitTester<<<1, 1>>>(splitMask, rawPtr(splitLengths));
+        auto splitLengths = makeSplitLengths(makeMask(0, 1u << 30));
         EXPECT_EQ(splitLengths[0], 63);
         EXPECT_EQ(splitLengths[1], 1);
     }
     {
-        thrust::device_vector<LocalIndex> splitLengths(targetSize);
-        SplitType splitMask = makeMask(2, 0);
-        makeSplitTester<<<1, 1>>>(splitMask, rawPtr(splitLengths));
+        auto splitLengths = makeSplitLengths(makeMask(2, 0));
         EXPECT_EQ(splitLengths[0], 2);
         EXPECT_EQ(splitLengths[1], 62);
     }
     {
-        thrust::device_vector<LocalIndex> splitLengths(targetSize);
-        SplitType splitMask = makeMask(3, 0);
-        makeSplitTester<<<1, 1>>>(splitMask, rawPtr(splitLengths));
+        auto splitLengths = makeSplitLengths(makeMask(3, 0));
         EXPECT_EQ(splitLengths[0], 1);
         EXPECT_EQ(splitLengths[1], 1);
         EXPECT_EQ(splitLengths[2], 62);
     }
     {
-        thrust::device_vector<LocalIndex> splitLengths(targetSize);
-        SplitType splitMask = makeMask(1u << 31, 1);
-
-        makeSplitTester<<<1, 1>>>(splitMask, rawPtr(splitLengths));
+        auto splitLengths = makeSplitLengths(makeMask(1u << 31, 1));
         EXPECT_EQ(splitLengths[0], 32);
         EXPECT_EQ(splitLengths[1], 1);
         EXPECT_EQ(splitLengths[2], 31);
     }
     {
-        thrust::device_vector<LocalIndex> splitLengths(targetSize);
-        SplitType splitMask = makeMask(0, 8);
-
-        makeSplitTester<<<1, 1>>>(splitMask, rawPtr(splitLengths));
+        auto splitLengths = makeSplitLengths(makeMask(0, 8));
         EXPECT_EQ(splitLengths[0], 36);
         EXPECT_EQ(splitLengths[1], 28);
     }
     {
-        thrust::device_vector<LocalIndex> splitLengths(targetSize);
-        SplitType splitMask = makeMask(0xFFFFFFFFu, 0x6FFFFFFFu);
-
-        makeSplitTester<<<1, 1>>>(splitMask, rawPtr(splitLengths));
+        auto splitLengths = makeSplitLengths(makeMask(0xFFFFFFFFu, 0x6FFFFFFFu));
         for (std::size_t i = 0; i < targetSize - 1; ++i)
         {
             if (i == 60) { EXPECT_EQ(splitLengths[i], 2); }
@@ -197,10 +344,7 @@ TEST(TargetGroups, makeSplits)
         }
     }
     {
-        thrust::device_vector<LocalIndex> splitLengths(targetSize);
-        SplitType splitMask = makeMask(0xFFFFFFFF, 0x7FFFFFFF);
-
-        makeSplitTester<<<1, 1>>>(splitMask, rawPtr(splitLengths));
+        auto splitLengths = makeSplitLengths(makeMask(0xFFFFFFFF, 0x7FFFFFFF));
         for (std::size_t i = 0; i < targetSize - 1; ++i)
         {
             EXPECT_EQ(splitLengths[i], 1);
@@ -257,7 +401,7 @@ TEST(TargetGroups, groupVolumes)
         float tolFactor = std::sqrt(3.0) / distCrit * 1.01;
         groupSplitsKernel<groupSize, T><<<iceil(gridSize, numThreads), numThreads>>>(
             first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves), nNodes(leaves), rawPtr(d_layout),
-            box, tolFactor, rawPtr(splitMasks), rawPtr(groupDiv), numGroups);
+            box, tolFactor, rawPtr(splitMasks), rawPtr(groupDiv));
 
         thrust::host_vector<LocalIndex> h_groupDiv = groupDiv;
         thrust::host_vector<LocalIndex> ref        = std::vector<LocalIndex>{2, 2};
@@ -267,7 +411,7 @@ TEST(TargetGroups, groupVolumes)
         float tolFactor = std::sqrt(3.0) / distCrit * 0.99;
         groupSplitsKernel<groupSize, T><<<iceil(gridSize, numThreads), numThreads>>>(
             first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves), nNodes(leaves), rawPtr(d_layout),
-            box, tolFactor, rawPtr(splitMasks), rawPtr(groupDiv), numGroups);
+            box, tolFactor, rawPtr(splitMasks), rawPtr(groupDiv));
 
         thrust::host_vector<LocalIndex> h_groupDiv = groupDiv;
         thrust::host_vector<LocalIndex> ref        = std::vector<LocalIndex>{64, 60};
@@ -277,17 +421,11 @@ TEST(TargetGroups, groupVolumes)
     {
         // Fixed size groups (4,68,128) get split into (4,6,68,75,128)
         //                            because of distance ^    ^ because of interaction radius
-        DeviceVector<LocalIndex> temp, groups;
-
-        StreamHolder stream;
-
         float tolFactor = std::sqrt(3.0) / distCrit * 1.01;
-        computeGroupSplits(stream.exec(), first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves),
-                           nNodes(leaves), rawPtr(d_layout), box, groupSize, tolFactor, temp, groups);
-        stream.sync();
-
-        std::vector<LocalIndex> h_groups = toHost(groups);
-        std::vector<LocalIndex> ref{4, 6, 68, 75, 128};
+        thrust::host_vector<LocalIndex> h_groups =
+            computeGroupSplits(first, last, rawPtr(x), rawPtr(y), rawPtr(z), rawPtr(h), rawPtr(d_leaves),
+                               nNodes(leaves), rawPtr(d_layout), box, tolFactor);
+        thrust::host_vector<LocalIndex> ref = std::vector<LocalIndex>{4, 6, 68, 75, 128};
         EXPECT_EQ(h_groups, ref);
     }
 }

@@ -5,11 +5,12 @@
 #include "sph/find_neighbors_gpu.hpp"
 #include "sph/neighborhood.hpp"
 #include "sph/particles_data.hpp"
+#include "sph/sph_gpu.hpp"
 
 namespace sph
 {
 
-inline void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesData<cstone::execution::Cpu>& d,
+inline void findNeighborsSfc(const GroupView& groups, sphexa::ParticlesData<cstone::execution::Cpu>& d,
                              const cstone::Box<SphTypes::CoordinateType>& box, bool subgroups = false)
 {
     if (d.ng0 > d.ngmax) { throw std::runtime_error("ng0 should be smaller than ngmax\n"); }
@@ -17,7 +18,6 @@ inline void findNeighborsSfc(const cstone::GroupView& groups, sphexa::ParticlesD
     d.neighborhood.build(groups, d, box, subgroups);
 }
 
-using cstone::GroupView;
 using cstone::LocalIndex;
 
 template<class T, class KeyType>
@@ -69,7 +69,7 @@ void updateSmoothingLengthIterativeCpu(const Tc* x, const Tc* y, const Tc* z, T*
 }
 
 template<class T, class Dataset>
-void updateSmoothingLengthIterative(const cstone::GroupView& groups, Dataset& d, const cstone::Box<T>& box)
+void updateSmoothingLengthIterative(const GroupView& groups, Dataset& d, const cstone::Box<T>& box)
 {
     if constexpr (d.useGpu) { updateSmoothingLengthIterativeGpu(groups, d, box); }
     else

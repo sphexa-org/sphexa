@@ -30,7 +30,6 @@
  */
 
 #include <limits>
-
 #include "cstone/primitives/warpscan.cuh"
 
 #include "sph/neighborhood_gpu.hpp"
@@ -49,24 +48,26 @@ using cstone::LocalIndex;
 static __device__ float minDt_ve_device;
 
 template<class T>
-__global__ void reduceDt(const LocalIndex* __restrict__ grpStart, const LocalIndex* __restrict__ grpEnd,
-                         const LocalIndex numGroups, const T* dtCourant, float* __restrict__ groupDt)
+__global__ void reduceDt(const GroupView grp, const T* dtCourant, float* __restrict__ groupDt)
 {
     unsigned laneIdx = threadIdx.x & (GpuConfig::warpSize - 1);
     unsigned grpIdx  = (blockDim.x * blockIdx.x + threadIdx.x) >> GpuConfig::warpSizeLog2;
 
-    if (grpIdx >= numGroups) return;
+    if (grpIdx >= grp.numGroups()) return;
 
-    LocalIndex bodyBegin = grpStart[grpIdx];
-    LocalIndex bodyEnd   = grpEnd[grpIdx];
-    LocalIndex i         = bodyBegin + laneIdx;
+    const LocalIndex bodyBegin = grp.groupStart(grpIdx);
+    const LocalIndex bodyEnd   = grp.groupEnd(grpIdx);
 
     __shared__ float minBlockDt;
     if (threadIdx.x == 0) minBlockDt = std::numeric_limits<float>::infinity();
     __syncthreads();
 
-    float dt         = i < bodyEnd ? dtCourant[i] : std::numeric_limits<T>::infinity();
-    float minGroupDt = cstone::warpMin(dt);
+    float minGroupDt = std::numeric_limits<float>::infinity();
+    for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += GpuConfig::warpSize)
+    {
+        minGroupDt = std::min(minGroupDt, dtCourant[i]);
+    }
+    minGroupDt = cstone::warpMin(minGroupDt);
     if (groupDt && laneIdx == 0) groupDt[grpIdx] = std::min(groupDt[grpIdx], minGroupDt);
 
     if (laneIdx == 0) cstone::atomicMinFloat(&minBlockDt, minGroupDt);
@@ -90,8 +91,8 @@ void computeMomentumEnergy(const GroupView& grp, float* groupDt, Dataset& d,
         cudaMemcpyToSymbolAsync(GPU_SYMBOL(minDt_ve_device), &minDt, sizeof(minDt), 0, cudaMemcpyHostToDevice, 0));
 
     constexpr LocalIndex threads = 256;
-    const LocalIndex     blocks  = cstone::iceil(grp.numGroups, threads / GpuConfig::warpSize);
-    reduceDt<<<blocks, threads>>>(grp.groupStart, grp.groupEnd, grp.numGroups, rawPtr(d.dtCourant), groupDt);
+    const LocalIndex     blocks  = cstone::iceil(grp.numGroups(), threads / GpuConfig::warpSize);
+    reduceDt<<<blocks, threads>>>(grp, rawPtr(d.dtCourant), groupDt);
 
     checkGpuErrors(cudaMemcpyFromSymbol(&minDt, GPU_SYMBOL(minDt_ve_device), sizeof(minDt)));
     d.minDtCourant = minDt;

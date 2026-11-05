@@ -37,8 +37,6 @@
 namespace sph
 {
 
-using cstone::GroupView;
-
 template<class Dataset>
 void computeIADGpu(Dataset& d, const cstone::Box<typename Dataset::RealType>&)
 {
