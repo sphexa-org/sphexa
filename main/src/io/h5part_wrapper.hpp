@@ -32,9 +32,11 @@
 
 #include <array>
 #include <cstdint>
+#include <cstdlib>
 #include <functional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "H5hut.h"
@@ -290,14 +292,16 @@ h5_file_t openH5Part(const std::string& path, h5_int64_t mode, MPI_Comm comm)
     h5_file_t   h5_file;
 
 #ifdef H5_HAVE_PARALLEL
-    h5_prop_t prop = H5CreateFileProp();
-#if defined(SPH_EXA_HDF5_PARALLEL_MODE_INDEPENDENT)
-    H5SetPropFileMPIOIndependent(prop, &comm);
-#elif defined(SPH_EXA_HDF5_PARALLEL_MODE_COLLECTIVE)
-    H5SetPropFileMPIOCollective(prop, &comm);
-#else
-    static_assert(false, "HDF5 Parallel IO mode unset");
-#endif
+    h5_prop_t        prop         = H5CreateFileProp();
+    const char*      modeEnv      = std::getenv("SPH_EXA_HDF5_PARALLEL_MODE");
+    std::string_view parallelMode = modeEnv ? modeEnv : "collective";
+    if (parallelMode == "independent") { H5SetPropFileMPIOIndependent(prop, &comm); }
+    else if (parallelMode == "collective") { H5SetPropFileMPIOCollective(prop, &comm); }
+    else
+    {
+        throw std::runtime_error("Invalid SPH_EXA_HDF5_PARALLEL_MODE '" + std::string(parallelMode) +
+                                 "': valid values are 'collective' and 'independent'\n");
+    }
     h5_file = H5OpenFile(h5_fname, mode, prop);
     H5CloseProp(prop);
 #else
