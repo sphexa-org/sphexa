@@ -34,10 +34,13 @@
 #include <cstdint>
 #include <cstdlib>
 #include <functional>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include <mpi.h>
 
 #include "H5hut.h"
 
@@ -293,15 +296,44 @@ h5_file_t openH5Part(const std::string& path, h5_int64_t mode, MPI_Comm comm)
 
 #ifdef H5_HAVE_PARALLEL
     h5_prop_t        prop         = H5CreateFileProp();
-    const char*      modeEnv      = std::getenv("SPH_EXA_HDF5_PARALLEL_MODE");
-    std::string_view parallelMode = modeEnv ? modeEnv : "collective";
-    if (parallelMode == "independent") { H5SetPropFileMPIOIndependent(prop, &comm); }
-    else if (parallelMode == "collective") { H5SetPropFileMPIOCollective(prop, &comm); }
+    const char*      modeEnv      = std::getenv("SPH_EXA_HDF5_COLLECTIVE_MODE");
+    std::string_view parallelMode = modeEnv ? modeEnv : "all";
+    bool             collData     = false;
+    bool             collMetadata = false;
+    // deprecated aliases: warn once per process
+    static bool warnedDeprecated = false;
+    auto        warnDeprecated   = [&](const char* oldMode, const char* newMode)
+    {
+        if (!warnedDeprecated)
+        {
+            int wrank = 0;
+            MPI_Comm_rank(comm, &wrank);
+            if (wrank == 0)
+            {
+                std::cerr << "WARNING: SPH_EXA_HDF5_COLLECTIVE_MODE='" << oldMode << "' is deprecated, use '" << newMode
+                          << "'\n";
+            }
+            warnedDeprecated = true;
+        }
+    };
+    if (parallelMode == "all") { collData = collMetadata = true; }
+    else if (parallelMode == "data") { collData = true; }
+    else if (parallelMode == "metadata") { collMetadata = true; }
+    else if (parallelMode == "none") {}
+    else if (parallelMode == "collective")
+    {
+        collData = true;
+        warnDeprecated("collective", "data");
+    }
+    else if (parallelMode == "independent") { warnDeprecated("independent", "none"); }
     else
     {
-        throw std::runtime_error("Invalid SPH_EXA_HDF5_PARALLEL_MODE '" + std::string(parallelMode) +
-                                 "': valid values are 'collective' and 'independent'\n");
+        throw std::runtime_error("Invalid SPH_EXA_HDF5_COLLECTIVE_MODE '" + std::string(parallelMode) +
+                                 "': valid values are 'all', 'data', 'metadata' and 'none'\n");
     }
+    if (collData) { H5SetPropFileMPIOCollective(prop, &comm); }
+    else { H5SetPropFileMPIOIndependent(prop, &comm); }
+    H5SetPropFileCollMetadata(prop, collMetadata ? 1 : 0);
     h5_file = H5OpenFile(h5_fname, mode, prop);
     H5CloseProp(prop);
 #else

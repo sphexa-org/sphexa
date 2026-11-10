@@ -89,8 +89,12 @@ option(SPH_EXA_WITH_H5HUT "Enable HDF5 IO using the H5hut (H5part) library" ON)
 if (SPH_EXA_WITH_H5HUT)
     set(HDF5_ENABLE_PARALLEL ON)
     find_package(HDF5)
-    # until merged, we need the cmake branch of H5hut from ethz repo
-    set(H5hut_VERSION git.53666583861f944b1284eb7324337dfe025242d0)
+    # until merged, we need the coll-metadata branch of H5hut from ethz repo
+    # (includes the cmake branch plus H5SetPropFileCollMetadata).
+    # can be overridden on the command line, e.g. -DH5hut_VERSION=git.<branch|tag|sha>
+    if (NOT DEFINED H5hut_VERSION)
+        set(H5hut_VERSION git.coll-metadata)
+    endif()
     set(H5hut_WITH_MPI ON)
     include(Fetch_H5hut)
     if (HDF5_FOUND AND H5hut_FOUND)

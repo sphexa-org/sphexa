@@ -42,6 +42,7 @@
 #include "cstone/domain/domain.hpp"
 
 #include "init/factory.hpp"
+#include "io/checkpoint.hpp"
 #include "io/arg_parser.hpp"
 #include "io/factory.hpp"
 #include "observables/factory.hpp"
@@ -184,12 +185,7 @@ int main(int argc, char** argv)
 
         if (isOutputTriggered && propagator->isSynced())
         {
-            fileWriter->addStep(domain.startIndex(), domain.endIndex(), outFile);
-            simData.hydro.loadOrStoreAttributes(fileWriter.get());
-            box.loadOrStore(fileWriter.get());
-            propagator->saveFields(fileWriter.get(), domain.startIndex(), domain.endIndex(), simData, box);
-            propagator->save(fileWriter.get());
-            fileWriter->closeStep();
+            writeCheckpoint(fileWriter.get(), outFile, domain, simData, propagator.get(), box);
             isOutputTriggered = false;
         }
         keepRunning = not(stopConditionReached(d.iteration, d.ttot, maxStepStr) || isWallClockReached) ||

@@ -190,6 +190,25 @@ these fields, it is necessary to add the ```_m1```. We provide an example script
 ./scripts/add_m1.py <hdf5-output-file>
 ```
 
+#### HDF5 collective mode (environment variable)
+
+For parallel HDF5 output, the environment variable `SPH_EXA_HDF5_COLLECTIVE_MODE` selects which
+file operations use collective MPI-IO:
+
+| value       | particle data | metadata |
+|:------------|:--------------|:---------|
+| `all` (default) | collective | collective |
+| `data`      | collective    | independent |
+| `metadata`  | independent   | collective |
+| `none`      | independent   | independent |
+
+The legacy values `collective` (= `data`) and `independent` (= `none`) are still accepted, but
+deprecated and produce a warning. An invalid value aborts the program with an error listing the
+valid choices.
+
+The standalone IO benchmark `iobench` (see `main/src/iobench/`) uses the same setting and
+additionally accepts it as a command line argument, e.g. `--hdf5-collective metadata`.
+
 #### Unit, integration and regression tests
 
 Cornerstone octree comes with an extensive suite of unit, integration and regression tests, see [README](domain/README.md).
