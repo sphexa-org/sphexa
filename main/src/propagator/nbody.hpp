@@ -129,17 +129,16 @@ public:
 
         domain.exchangeHalos(std::tie(get<"m">(d)), get<"ax">(d), get<"ay">(d));
 
-        computeGroups(first, last, d, domain.box(), groups_);
+        computeGroups(first, last, groups_);
         timer.step("computeGroups");
 
         cstone::fill(domain.exec(), d.ax.begin() + first, d.ax.begin() + last, HydroType(0));
         cstone::fill(domain.exec(), d.ay.begin() + first, d.ay.begin() + last, HydroType(0));
         cstone::fill(domain.exec(), d.az.begin() + first, d.az.begin() + last, HydroType(0));
 
-        auto groups = mHolder_.computeSpatialGroups(d, domain);
         mHolder_.upsweep(d, domain);
         timer.step("Upsweep");
-        mHolder_.traverse(groups, d, domain);
+        mHolder_.traverse(d, domain);
 
         timer.step("Gravity");
 

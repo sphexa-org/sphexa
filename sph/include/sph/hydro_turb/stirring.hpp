@@ -30,11 +30,13 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 
 #include "cstone/cuda/annotation.hpp"
 #include "cstone/traversal/groups.hpp"
 #include "cstone/util/tuple.hpp"
+#include "sph/sph_gpu.hpp"
 
 namespace sph
 {
@@ -101,14 +103,16 @@ HOST_DEVICE_FUN auto stirParticle(size_t ndim, Tc xi, Tc yi, Tc zi, size_t numMo
  *
  */
 template<class Tc, class Ta, class T>
-void computeStirring(cstone::GroupView grp, size_t numDim, const Tc* x, const Tc* y, const Tc* z, Ta* ax, Ta* ay,
-                     Ta* az, size_t numModes, const T* modes, const T* phaseReal, const T* phaseImag,
-                     const T* amplitudes, T solWeightNorm)
+void computeStirring(GroupView grp, size_t numDim, const Tc* x, const Tc* y, const Tc* z, Ta* ax, Ta* ay, Ta* az,
+                     size_t numModes, const T* modes, const T* phaseReal, const T* phaseImag, const T* amplitudes,
+                     T solWeightNorm)
 {
 #pragma omp parallel for schedule(static)
-    for (cstone::LocalIndex gi = 0; gi < grp.numGroups; ++gi)
+    for (cstone::LocalIndex gi = 0; gi < grp.numGroups(); ++gi)
     {
-        for (cstone::LocalIndex i = grp.groupStart[gi]; i < grp.groupEnd[gi]; ++i)
+        const cstone::LocalIndex bodyBegin = grp.groupStart(gi);
+        const cstone::LocalIndex bodyEnd   = grp.groupEnd(gi);
+        for (cstone::LocalIndex i = bodyBegin; i < bodyEnd; ++i)
         {
             auto [turbAx, turbAy, turbAz] =
                 stirParticle<Tc, Ta, T>(numDim, x[i], y[i], z[i], numModes, modes, phaseReal, phaseImag, amplitudes);
@@ -121,8 +125,8 @@ void computeStirring(cstone::GroupView grp, size_t numDim, const Tc* x, const Tc
 }
 
 template<class Tc, class Ta, class T>
-extern void computeStirringGpu(cstone::GroupView grp, size_t numDim, const Tc* x, const Tc* y, const Tc* z, Ta* ax,
-                               Ta* ay, Ta* az, size_t numModes, const T* modes, const T* phaseReal, const T* phaseImag,
+extern void computeStirringGpu(GroupView grp, size_t numDim, const Tc* x, const Tc* y, const Tc* z, Ta* ax, Ta* ay,
+                               Ta* az, size_t numModes, const T* modes, const T* phaseReal, const T* phaseImag,
                                const T* amplitudes, T solWeightNorm);
 
 } // namespace sph

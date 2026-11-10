@@ -41,6 +41,7 @@
 #include "cstone/primitives/primitives_gpu.h"
 #include "cstone/util/pack_buffers.hpp"
 #include "sph/kernels.hpp"
+#include "sph/sph_gpu.hpp"
 #include "sph/timestep.h"
 
 namespace sph

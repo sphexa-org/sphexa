@@ -18,19 +18,18 @@ namespace sph
 using cstone::LocalIndex;
 
 template<class T>
-__global__ void groupDivvKernel(float Krho, const LocalIndex* grpStart, const LocalIndex* grpEnd, LocalIndex numGroups,
-                                const T* divv, float* groupDt)
+__global__ void groupDivvKernel(float Krho, const GroupView grp, const T* divv, float* groupDt)
 {
     LocalIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (tid < numGroups)
+    if (tid < grp.numGroups())
     {
         float localMax = -INFINITY;
 
-        LocalIndex segStart = grpStart[tid];
-        LocalIndex segEnd   = grpEnd[tid];
+        const LocalIndex bodyBegin = grp.groupStart(tid);
+        const LocalIndex bodyEnd   = grp.groupEnd(tid);
 
-        for (LocalIndex i = segStart; i < segEnd; ++i)
+        for (LocalIndex i = bodyBegin; i < bodyEnd; ++i)
         {
             localMax = max(localMax, divv[i]);
         }
@@ -43,29 +42,29 @@ template<class T>
 void groupDivvTimestepGpu(float Krho, const GroupView& grp, const T* divv, float* groupDt)
 {
     int numThreads = 256;
-    int numBlocks  = cstone::iceil(grp.numGroups, numThreads);
+    int numBlocks  = cstone::iceil(grp.numGroups(), numThreads);
 
     if (numBlocks == 0) { return; }
-    groupDivvKernel<<<numBlocks, numThreads>>>(Krho, grp.groupStart, grp.groupEnd, grp.numGroups, divv, groupDt);
+    groupDivvKernel<<<numBlocks, numThreads>>>(Krho, grp, divv, groupDt);
 }
 
 template void groupDivvTimestepGpu(float, const GroupView& grp, const float*, float*);
 template void groupDivvTimestepGpu(float, const GroupView& grp, const double*, float*);
 
 template<class T>
-__global__ void groupAccKernel(float etaAcc, const LocalIndex* grpStart, const LocalIndex* grpEnd, LocalIndex numGroups,
-                               const T* ax, const T* ay, const T* az, const T* h, float* groupDt)
+__global__ void groupAccKernel(float etaAcc, const GroupView grp, const T* ax, const T* ay, const T* az, const T* h,
+                               float* groupDt)
 {
     LocalIndex tid = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (tid < numGroups)
+    if (tid < grp.numGroups())
     {
         float minH2_A2 = INFINITY;
 
-        LocalIndex segStart = grpStart[tid];
-        LocalIndex segEnd   = grpEnd[tid];
+        const LocalIndex bodyBegin = grp.groupStart(tid);
+        const LocalIndex bodyEnd   = grp.groupEnd(tid);
 
-        for (LocalIndex i = segStart; i < segEnd; ++i)
+        for (LocalIndex i = bodyBegin; i < bodyEnd; ++i)
         {
             minH2_A2 = min(minH2_A2, h[i] * h[i] / norm2(cstone::Vec3<T>{ax[i], ay[i], az[i]}));
         }
@@ -79,11 +78,10 @@ void groupAccTimestepGpu(float etaAcc, const GroupView& grp, const T* ax, const 
                          float* groupDt)
 {
     int numThreads = 256;
-    int numBlocks  = cstone::iceil(grp.numGroups, numThreads);
+    int numBlocks  = cstone::iceil(grp.numGroups(), numThreads);
 
     if (numBlocks == 0) { return; }
-    groupAccKernel<<<numBlocks, numThreads>>>(etaAcc, grp.groupStart, grp.groupEnd, grp.numGroups, ax, ay, az, h,
-                                              groupDt);
+    groupAccKernel<<<numBlocks, numThreads>>>(etaAcc, grp, ax, ay, az, h, groupDt);
 }
 
 template void groupAccTimestepGpu(float, const GroupView&, const double*, const double*, const double*, const double*,
@@ -95,19 +93,22 @@ __global__ void storeRungKernel(const GroupView grp, uint8_t rung, uint8_t* part
 {
     LocalIndex laneIdx = threadIdx.x & (cstone::GpuConfig::warpSize - 1);
     LocalIndex warpIdx = (blockDim.x * blockIdx.x + threadIdx.x) >> cstone::GpuConfig::warpSizeLog2;
-    if (warpIdx >= grp.numGroups) { return; }
+    if (warpIdx >= grp.numGroups()) { return; }
 
-    LocalIndex i = grp.groupStart[warpIdx] + laneIdx;
-    if (i >= grp.groupEnd[warpIdx]) { return; }
+    const LocalIndex bodyBegin = grp.groupStart(warpIdx);
+    const LocalIndex bodyEnd   = grp.groupEnd(warpIdx);
 
-    particleRungs[i] = rung;
+    for (LocalIndex i = bodyBegin + laneIdx; i < bodyEnd; i += cstone::GpuConfig::warpSize)
+    {
+        particleRungs[i] = rung;
+    }
 }
 
 void storeRungGpu(const GroupView& grp, uint8_t rung, uint8_t* particleRungs)
 {
     unsigned numThreads       = 256;
     unsigned numWarpsPerBlock = numThreads / cstone::GpuConfig::warpSize;
-    unsigned numBlocks        = (grp.numGroups + numWarpsPerBlock - 1) / numWarpsPerBlock;
+    unsigned numBlocks        = (grp.numGroups() + numWarpsPerBlock - 1) / numWarpsPerBlock;
     if (numBlocks == 0) { return; }
     storeRungKernel<<<numBlocks, numThreads>>>(grp, rung, particleRungs);
 }

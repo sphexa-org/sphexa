@@ -589,12 +589,12 @@ __global__ __launch_bounds__(GpuConfig::warpSize* NumSuperclustersPerBlock) void
     if (laneIdx == 0) atomicMax(&globalBuildData->maxNeighbors, maxNeighbors);
 }
 
-template<class Config, class Tc, class ThP, class KeyType>
+template<class Config, class Tc, class ThP, class KeyType, unsigned GroupSize>
 std::size_t buildNbList(const execution::Gpu exec,
                         const OctreeNsView<Tc, KeyType>& tree,
                         const Box<Tc>& box,
                         const LocalIndex totalBodies,
-                        const GroupView& groups,
+                        const GroupView<GroupSize>& groups,
                         const Tc* const x,
                         const Tc* const y,
                         const Tc* const z,
