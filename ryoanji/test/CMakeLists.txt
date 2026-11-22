@@ -24,6 +24,7 @@ if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
     endif()
 endif()
 
+# multi-rank demonstrator
 if (RYOANJI_WITH_CUDA OR RYOANJI_WITH_HIP)
     ryoanji_add_executable_test(ryoanji_demo_mpi
         SOURCES demo_mpi.cpp

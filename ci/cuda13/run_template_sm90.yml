@@ -26,7 +26,7 @@ variables:
     - $TEST_INSTALL_DIR/hydro/sph_tests
     - $TEST_INSTALL_DIR/performance/peers_perf
     - $TEST_INSTALL_DIR/ryoanji/cpu_unit_tests
-    - $TEST_INSTALL_DIR/ryoanji/unit_tests/ryoanji_unit_tests
+    - $TEST_INSTALL_DIR/ryoanji/gpu_unit_tests
     - $TEST_INSTALL_DIR/unit/component_units_omp
     - $TEST_INSTALL_DIR/unit/component_units
     # --- grackle
