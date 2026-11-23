@@ -6,6 +6,7 @@
 #include <mpi.h>
 #include <omp.h>
 
+#include "io/mpi_init.hpp"
 #include "version.h"
 
 namespace sphexa
@@ -20,7 +21,8 @@ struct MPIScope
         int  ts_main  = std::chrono::duration_cast<std::chrono::seconds>(t0.time_since_epoch()).count();
         int  ts_slurm = getenv("SLURM_JOB_START_TIME") == nullptr ? ts_main : std::stoi(getenv("SLURM_JOB_START_TIME"));
 
-        MPI_Init(NULL, NULL);
+        // H5HUT_VFD=subfiling needs MPI_THREAD_MULTIPLE (checked in here)
+        sphexa::initMpi(nullptr, nullptr);
         auto t1      = std::chrono::high_resolution_clock::now();
         int  ts_init = std::chrono::duration_cast<std::chrono::seconds>(t1.time_since_epoch()).count();
 
