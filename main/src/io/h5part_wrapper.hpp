@@ -31,8 +31,11 @@
 #pragma once
 
 #include <array>
+#include <cctype>
+#include <charconv>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <functional>
 #include <iostream>
 #include <stdexcept>
@@ -288,6 +291,30 @@ void readAttribute_typesafe(h5_file_t h5_file, attribute_type domain, ExtractTyp
 }
 
 // ---------------------------------------------------------------------------
+inline unsigned long long h5FileAlignBytes()
+{
+    const char* value = std::getenv("H5HUT_FILE_ALIGN");
+    if (!value || !*value) { return 0; }
+
+    unsigned long long bytes = 0;
+    const char*        last  = value + std::strlen(value);
+    auto [ptr, error]        = std::from_chars(value, last, bytes);
+    if (error != std::errc{}) { return 0; }
+
+    if (ptr != last && last - ptr == 1)
+    {
+        switch (std::tolower(static_cast<unsigned char>(*ptr)))
+        {
+            case 'k': bytes *= 1024ull; break;
+            case 'm': bytes *= 1024ull * 1024ull; break;
+            case 'g': bytes *= 1024ull * 1024ull * 1024ull; break;
+            default: return 0;
+        }
+    }
+    else if (ptr != last) { return 0; }
+    return bytes;
+}
+
 //! @brief Open in parallel mode if supported, otherwise serial if numRanks == 1
 h5_file_t openH5Part(const std::string& path, h5_int64_t mode, MPI_Comm comm)
 {
@@ -334,6 +361,7 @@ h5_file_t openH5Part(const std::string& path, h5_int64_t mode, MPI_Comm comm)
     if (collData) { H5SetPropFileMPIOCollective(prop, &comm); }
     else { H5SetPropFileMPIOIndependent(prop, &comm); }
     H5SetPropFileCollMetadata(prop, collMetadata ? 1 : 0);
+    if (auto alignment = h5FileAlignBytes(); alignment > 0) { H5SetPropFileAlign(prop, alignment); }
     h5_file = H5OpenFile(h5_fname, mode, prop);
     H5CloseProp(prop);
 #else
