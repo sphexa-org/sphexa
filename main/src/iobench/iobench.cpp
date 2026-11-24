@@ -55,6 +55,7 @@
 #include "io/arg_parser.hpp"
 #include "io/checkpoint.hpp"
 #include "io/factory.hpp"
+#include "io/io_options.hpp"
 #include "io/mpi_init.hpp"
 #include "propagator/factory.hpp"
 #include "sphexa/simulation_data.hpp"
@@ -207,24 +208,8 @@ int main(int argc, char** argv)
     size_t      writeFreq    = parser.get<size_t>("-w", 1);
     size_t      stepsPerFile = parser.get<size_t>("--steps-per-file", 1);
     std::string outFile      = parser.get("-o", std::string("iobench_dump"));
-    bool        ascii        = parser.exists("--ascii");
     bool        overwrite    = parser.exists("--overwrite");
-
-    std::string hdf5Mode = parser.get("--hdf5-collective", std::string(""));
-    if (!hdf5Mode.empty())
-    {
-        if (hdf5Mode != "all" && hdf5Mode != "data" && hdf5Mode != "metadata" && hdf5Mode != "none" &&
-            hdf5Mode != "collective" && hdf5Mode != "independent")
-        {
-            if (rank == 0)
-            {
-                std::cerr << "ERROR: invalid --hdf5-collective '" << hdf5Mode
-                          << "', valid values are 'all', 'data', 'metadata' and 'none'\n";
-            }
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
-        setenv("SPH_EXA_HDF5_COLLECTIVE_MODE", hdf5Mode.c_str(), 1);
-    }
+    const auto  ioOptions    = ioOptionsFromArguments(parser);
 
     if (writeFreq == 0) { writeFreq = 1; }
     if (numSteps == 0) { numSteps = 1; }
@@ -247,7 +232,7 @@ int main(int argc, char** argv)
     else { outputFields = propagator->conservedFields(); }
     simData.setOutputFields(outputFields);
 
-    auto fileWriter = fileWriterFactory(ascii, MPI_COMM_WORLD);
+    auto fileWriter = fileWriterFactory(ioOptions, MPI_COMM_WORLD);
 
     int dirStatus = 0;
     if (rank == 0)
@@ -303,11 +288,8 @@ int main(int argc, char** argv)
                   << ", dump every " << writeFreq << " step(s)\n"
                   << "steps per file: "
                   << (stepsPerFile == 0 ? std::string("single file") : std::to_string(stepsPerFile))
-                  << ", writer: " << (ascii ? "ascii" : "h5 (parallel)") << (overwrite ? ", overwrite enabled" : "")
-                  << ", hdf5-collective: "
-                  << (std::getenv("SPH_EXA_HDF5_COLLECTIVE_MODE") ? std::getenv("SPH_EXA_HDF5_COLLECTIVE_MODE")
-                                                                  : "all (default)")
-                  << "\nfields (" << numFields << "): ";
+                  << ", backend: " << ioBackendName(ioOptions.backend) << (overwrite ? ", overwrite enabled" : "")
+                  << ", collective: " << ioOptions.collective << "\nfields (" << numFields << "): ";
         for (const auto& name : d.outputFieldNames)
         {
             std::cout << name << " ";
@@ -362,7 +344,7 @@ int main(int argc, char** argv)
                 {
                     if (overwrite)
                     {
-                        std::filesystem::remove(path);
+                        std::filesystem::remove_all(path);
                         fileStatus = 1;
                     }
                     else

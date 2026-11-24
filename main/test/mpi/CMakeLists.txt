@@ -9,8 +9,13 @@ function(addFrontendMpiTest source exename testname ranks)
 endfunction()
 
 if (SPH_EXA_WITH_H5HUT)
-    addFrontendMpiTest(hdf5.cpp hdf5io HDF5IO 2)
+  addFrontendMpiTest(hdf5.cpp hdf5io IO_HDF5 2)
     target_link_libraries(hdf5io PRIVATE io)
+endif()
+
+if (SPH_EXA_WITH_OPENPMD)
+  addFrontendMpiTest(openpmd.cpp openpmdio IO_OpenPMD 2)
+    target_link_libraries(openpmdio PRIVATE io)
 endif()
 
 

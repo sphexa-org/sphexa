@@ -34,6 +34,8 @@
 #include <filesystem>
 #include <string>
 
+#include <mpi.h>
+
 #include "io/ifile_io.hpp"
 
 namespace sphexa
@@ -48,10 +50,9 @@ inline constexpr std::array idTagFsStrings = {"id_selection_spheres", "id_select
 //! @brief write @p InitSettings as file attributes of a new file @p path
 inline void writeSettings(const InitSettings& settings, const std::string& path, IFileWriter* writer)
 {
-    if (std::filesystem::exists(path))
-    {
-        throw std::runtime_error("Cannot write settings: file " + path + " already exists\n");
-    }
+    int outputExists = writer->rank() == 0 && std::filesystem::exists(path);
+    MPI_Bcast(&outputExists, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    if (outputExists) { throw std::runtime_error("Cannot write settings: file " + path + " already exists\n"); }
 
     writer->addStep(0, 0, path);
     for (auto it = settings.cbegin(); it != settings.cend(); ++it)

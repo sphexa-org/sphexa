@@ -103,6 +103,12 @@ if (SPH_EXA_WITH_H5HUT)
       set(SPH_EXA_WITH_H5HUT OFF)
     endif ()
 endif ()
+
+option(SPH_EXA_WITH_OPENPMD "Enable openPMD I/O with parallel HDF5 and ADIOS2/BP5 backends" OFF)
+if (SPH_EXA_WITH_OPENPMD)
+    find_package(openPMD 0.17 CONFIG REQUIRED COMPONENTS MPI HDF5 ADIOS2)
+endif()
+
 if (SPH_EXA_WITH_GRACKLE)
     add_subdirectory(extern/grackle)
 endif()

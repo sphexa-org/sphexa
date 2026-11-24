@@ -33,6 +33,7 @@
 #include <memory>
 
 #include "ifile_io_impl.h"
+#include "io_options.hpp"
 
 namespace sphexa
 {
@@ -48,5 +49,34 @@ std::unique_ptr<IFileWriter> fileWriterFactory(bool ascii, MPI_Comm comm, bool s
 }
 
 std::unique_ptr<IFileReader> fileReaderFactory(bool /*ascii*/, MPI_Comm comm) { return makeH5PartReader(comm); }
+
+std::unique_ptr<IFileWriter> fileWriterFactory(const IOOptions& options, MPI_Comm comm)
+{
+    configureIOEnvironment(options);
+    switch (options.backend)
+    {
+        case IOBackend::ascii: return makeAsciiWriter(comm);
+        case IOBackend::h5hut: return makeH5PartWriter(comm);
+        case IOBackend::openpmdHdf5:
+            return makeOpenPMDWriter(comm, false, options.stagingBytes, options.collective, options.openpmdConfig,
+                                     options.openpmdEngineCfg);
+        case IOBackend::openpmdBp5:
+            return makeOpenPMDWriter(comm, true, options.stagingBytes, options.collective, options.openpmdConfig,
+                                     options.openpmdEngineCfg);
+    }
+    throw std::runtime_error("Unknown I/O backend");
+}
+
+std::unique_ptr<IFileReader> fileReaderFactory(const IOOptions& options, MPI_Comm comm)
+{
+    switch (options.backend)
+    {
+        case IOBackend::ascii: return makeH5PartReader(comm);
+        case IOBackend::h5hut: return makeH5PartReader(comm);
+        case IOBackend::openpmdHdf5: return makeOpenPMDReader(comm, false);
+        case IOBackend::openpmdBp5: return makeOpenPMDReader(comm, true);
+    }
+    throw std::runtime_error("Unknown I/O backend");
+}
 
 } // namespace sphexa

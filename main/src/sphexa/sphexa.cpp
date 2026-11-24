@@ -45,6 +45,7 @@
 #include "io/checkpoint.hpp"
 #include "io/arg_parser.hpp"
 #include "io/factory.hpp"
+#include "io/io_options.hpp"
 #include "observables/factory.hpp"
 #include "propagator/factory.hpp"
 #include "sph/types.hpp"
@@ -100,7 +101,6 @@ int main(int argc, char** argv)
     const std::string        maxStepStr           = parser.get("-s", std::string("200"));
     std::vector<std::string> writeExtra           = parser.getCommaList("--wextra");
     std::vector<std::string> outputFields         = parser.getCommaList("-f");
-    const bool               ascii                = parser.exists("--ascii");
     const bool               quiet                = parser.exists("--quiet");
     const bool               avClean              = parser.exists("--avclean");
     const int                simDuration          = parser.get("--duration", std::numeric_limits<int>::max());
@@ -112,14 +112,15 @@ int main(int argc, char** argv)
     std::string              outFile              = parser.get("-o", "dump_" + removeModifiers(initCond));
     std::string              profFile             = parser.get("-op", std::string("profile"));
     const bool               disableNeighborLists = parser.exists("--disable-neighbor-lists");
+    const IOOptions          ioOptions            = ioOptionsFromArguments(parser);
 
     std::ofstream nullOutput("/dev/null");
     std::ostream& output = (quiet || rank) ? nullOutput : std::cout;
     std::ofstream constantsFile(fs::path(outFile).parent_path() / fs::path("constants.txt"));
 
     //! @brief evaluate user choice for different kind of actions
-    auto fileWriter  = fileWriterFactory(ascii, MPI_COMM_WORLD);
-    auto fileReader  = fileReaderFactory(ascii, MPI_COMM_WORLD);
+    auto fileWriter  = fileWriterFactory(ioOptions, MPI_COMM_WORLD);
+    auto fileReader  = fileReaderFactory(ioOptions, MPI_COMM_WORLD);
     auto simInit     = initializerFactory<Dataset>(initCond, glassBlock, fileReader.get());
     auto propagator  = propagatorFactory<Domain, Dataset>(propChoice, avClean, output, rank, simInit->constants());
     auto observables = observablesFactory<Dataset>(simInit->constants(), constantsFile);
@@ -201,7 +202,7 @@ int main(int argc, char** argv)
         if (isOutputStep(d.iteration, profFreqStr) || isOutputTime(d.ttot - d.minDt, d.ttot, profFreqStr) ||
             isWallClockReached)
         {
-            auto fileWriterSeq = fileWriterFactory(ascii, MPI_COMM_WORLD, true);
+            auto fileWriterSeq = fileWriterFactory(ioOptions, MPI_COMM_WORLD);
             if (profEnabled) { propagator->writeMetrics(fileWriterSeq.get(), profFile); }
         }
     }
@@ -280,6 +281,11 @@ void printHelp(char* name, int rank)
                "\t\t\t resulting in a restartable output file\n\n");
 
         printf("\t--ascii \t Dump file in ASCII format [binary HDF5 by default]\n\n");
+        printf("\t--io-backend NAME \t h5hut, openpmd-hdf5 or openpmd-bp5 [h5hut]\n\n");
+        printf("\t--collective MODE \t all, data, metadata or none [all]\n\n");
+        printf("\t--staging-mib NUM \t Maximum OpenPMD write chunk staging budget in MiB [64]\n\n");
+        printf("\t--openpmd-config JSON \t Base OpenPMD backend configuration\n\n");
+        printf("\t--openpmd-engine-config JSON \t Backend engine parameter overrides\n\n");
 
         printf("\t--outDir PATH \t Path to directory where output will be saved [./].\n\
                 \t Note that directory must exist and be provided with ending slash,\n\

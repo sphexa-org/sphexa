@@ -190,24 +190,52 @@ these fields, it is necessary to add the ```_m1```. We provide an example script
 ./scripts/add_m1.py <hdf5-output-file>
 ```
 
-#### HDF5 collective mode (environment variable)
+#### I/O backends and collective modes
 
-For parallel HDF5 output, the environment variable `SPH_EXA_HDF5_COLLECTIVE_MODE` selects which
-file operations use collective MPI-IO:
+H5hut remains the default checkpoint backend. Build SPH-EXA with OpenPMD support using
+`-DSPH_EXA_WITH_OPENPMD=ON` and select a backend with the same options in `sphexa` and
+`iobench`:
 
-| value       | particle data | metadata |
-|:------------|:--------------|:---------|
-| `all` (default) | collective | collective |
-| `data`      | collective    | independent |
-| `metadata`  | independent   | collective |
-| `none`      | independent   | independent |
+| `--io-backend` | output layout |
+|:---------------|:--------------|
+| `h5hut`        | H5Part/HDF5 file |
+| `openpmd-hdf5` | group-based OpenPMD HDF5 file |
+| `openpmd-bp5`  | OpenPMD BP5 series directory with one file per iteration |
+
+For restarts, use the same `--io-backend` value passed to the run that produced the
+checkpoint. BP5 restarts use the series directory, for example `--init dump.bp5`.
+
+`--collective` selects the common I/O transfer mode:
+
+| value | particle data | HDF5 metadata | BP5 aggregation |
+|:------|:--------------|:--------------|:----------------|
+| `all` (default) | collective | collective | backend default |
+| `data` | collective | independent | backend default |
+| `metadata` | independent | collective | independent per-rank writes |
+| `none` | independent | independent | independent per-rank writes |
+
+The environment variable `SPH_EXA_IO_COLLECTIVE` has the same effect as `--collective`.
+The older H5hut-only `SPH_EXA_HDF5_COLLECTIVE_MODE` and iobench
+`--hdf5-collective` options are retained as aliases. CLI options take precedence over
+environment variables.
+
+For H5hut, `H5HUT_FILE_ALIGN` sets the HDF5 raw-data alignment in bytes. Decimal `k`,
+`m`, and `g` suffixes are accepted (for example `H5HUT_FILE_ALIGN=4m`); unset or zero
+uses the HDF5 default.
 
 The legacy values `collective` (= `data`) and `independent` (= `none`) are still accepted, but
-deprecated and produce a warning. An invalid value aborts the program with an error listing the
-valid choices.
+deprecated. An invalid value aborts the program.
 
-The standalone IO benchmark `iobench` (see `main/src/iobench/`) uses the same setting and
-additionally accepts it as a command line argument, e.g. `--hdf5-collective metadata`.
+OpenPMD stores are written in rank-owned chunks. `--staging-mib` bounds the chunk size
+(64 MiB by default). BP5 aggregation and the number of I/O aggregators are controlled by
+the ADIOS2 engine, not by gathering particle payloads in SPH-EXA. Use
+`--openpmd-engine-config` or `SPH_EXA_OPENPMD_ENGINE_CONFIG` to provide JSON engine
+overrides such as `{"adios2":{"engine":{"parameters":{"aggregationtype":"everyonewrites"}}}}`.
+The backend and file-encoding settings required for restartable SPH-EXA output cannot be
+overridden.
+
+The standalone IO benchmark `iobench` accepts the same backend and collective options,
+allowing direct backend comparisons.
 
 #### Unit, integration and regression tests
 
