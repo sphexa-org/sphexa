@@ -4,18 +4,16 @@
 # see documentation https://www.paraview.org/paraview-docs/nightly/python/paraview.util.vtkAlgorithm.html
 # 
 # Contributed by Jean M. Favre, CSCS
-# Tested with ParaView v6.1
+# Tested with ParaView v6.2
 #
 # This file is loaded from the ParaView GUI with the "Tools->Manage plugins" pull-down menu
 
 from paraview.util.vtkAlgorithm import *
-from vtkmodules import vtkCommonDataModel as dm
 from vtkmodules.vtkCommonCore import vtkDataArraySelection
 from vtkmodules.vtkCommonDataModel import vtkUnstructuredGrid
 from vtkmodules.numpy_interface import dataset_adapter as dsa
-from vtkmodules.numpy_interface import algorithms as algs
 from vtkmodules.util import vtkConstants
-from paraview import print_error, print_warning
+from paraview import print_error
 
 try:
   import numpy as np
@@ -50,7 +48,7 @@ class H5Reader(VTKPythonAlgorithmBase):
         self._fds = None # H5py file descriptor
         self._arrayselection = vtkDataArraySelection()
         self._arrayselection.AddObserver("ModifiedEvent", createModifiedCallback(self))
-        self._vertextype = 2
+        self._vertextype = 0
 
     def __del__(self):
       if self._fds is not None:
@@ -70,7 +68,7 @@ class H5Reader(VTKPythonAlgorithmBase):
             self.timesteps = None
             self.Modified()
 
-    @smproperty.intvector(name="VertexType", number_of_elements="1", default_values="2")
+    @smproperty.intvector(name="VertexType", number_of_elements="1", default_values="0")
     @smdomain.xml(\
         """<EnumerationDomain name="enum">
           <Entry value="0" text="None"/>
@@ -142,9 +140,10 @@ class H5Reader(VTKPythonAlgorithmBase):
     def RequestData(self, request, inInfo, outInfoVec):
         # coordinates are read as float32 to save space
         # all other variables are read at their native resolution in the file
-        # when run in parallel, the domain will be split equaly among MPI tasks
+        # when run in parallel, the domain will be split equally among MPI tasks
         from vtkmodules.vtkCommonDataModel import vtkCellArray
-        from vtkmodules.vtkCommonCore import vtkAffineIntArray
+        from vtkmodules.vtkCommonCore import vtkAffineArray
+        from vtkmodules.util.numpy_support import numpy_to_vtk_soa
         from vtkmodules.vtkCommonExecutionModel import vtkStreamingDemandDrivenPipeline
         if not _has_deps:
           print_error("Required Python module 'h5py' or 'numpy' missing!")
@@ -176,27 +175,26 @@ class H5Reader(VTKPythonAlgorithmBase):
         coords_x = timedata['x'][begin:end].astype('f4')
         coords_y = timedata['y'][begin:end].astype('f4')
         coords_z = timedata['z'][begin:end].astype('f4')
-        output.Points = algs.make_vector(coords_x, coords_y, coords_z)
+        output.Points = numpy_to_vtk_soa([coords_x, coords_y, coords_z], name="Points")
         for name in self._ndata:
           if self._arrayselection.ArrayIsEnabled(name):
             dataset = timedata[name][begin:end]
             output.PointData.append(dataset, name)
+        
+        dtype = np.int32 if MyNumber_of_Cells < 2**31 else np.int64
+        
         if self._vertextype == 1:
-          vertex = vtkAffineIntArray()
-          vertex.ConstructBackend(1,0)
-          vertex.SetNumberOfTuples(MyNumber_of_Cells)
+          vertex = vtkAffineArray[dtype](MyNumber_of_Cells, slope=1, intercept=0)
           verts = vtkCellArray()
           verts.AllocateExact(MyNumber_of_Cells, MyNumber_of_Cells) # numCells, connectivitySize
           # offsets array below is automatically generated given the fixed cells size
           verts.SetData(1, vertex)
           output.VTKObject.SetCells(vtkConstants.VTK_VERTEX, verts)
         elif self._vertextype == 2:
-          polyVertex = vtkAffineIntArray()
-          polyVertex.ConstructBackend(1,0)
-          polyVertex.SetNumberOfTuples(MyNumber_of_Cells)
+          vertex = vtkAffineArray[dtype](MyNumber_of_Cells, slope=1, intercept=0)
           verts = vtkCellArray()
           verts.AllocateExact(1, MyNumber_of_Cells) # numCells, connectivitySize
-          verts.SetData(MyNumber_of_Cells, polyVertex)
+          verts.SetData(MyNumber_of_Cells, vertex)
           output.VTKObject.SetCells(vtkConstants.VTK_POLY_VERTEX, verts)
         return 1
 
